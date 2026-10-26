@@ -1,0 +1,155 @@
+{
+  "version": "0.2.0",
+  "verification_date": "2026-10-26",
+  "environment": {
+    "platform": "Linux X11",
+    "renderer": "Mesa llvmpipe software Vulkan",
+    "window": [
+      1440,
+      900
+    ],
+    "minimum_window": [
+      1100,
+      700
+    ],
+    "gaming_hardware_benchmark": false
+  },
+  "source": {
+    "terrain": "terra-procedural-v2",
+    "native_network_chunk_radius": 1,
+    "native_network_chunk_count": 9,
+    "terrain_resolution": 65,
+    "day_night_for_capture": false,
+    "population": "Authored settlement, two admitted player accounts, 52 bodies"
+  },
+  "native_actions": {
+    "owned_worker_possession": true,
+    "first_and_third_person": true,
+    "first_person_exterior_hidden": true,
+    "manual_movement_changed_host_gps": true,
+    "buy_one_bread": {
+      "starting_money_minor_units": 25000,
+      "price_minor_units": 250,
+      "result_money_minor_units": 24750,
+      "result_owned_bread": 1
+    },
+    "native_reconnect_preserved_principal_active_body_money_inventory": true,
+    "disconnect_released_manual_possession": true,
+    "industry_capture_completed_deliveries": 12,
+    "minimum_window_capture_completed_deliveries": 13,
+    "default_landscape": {
+      "resident_chunks": 49,
+      "rendered_chunks": 49,
+      "pending_chunks": 0,
+      "population": 47,
+      "selected_owned_bodies": 5,
+      "paused_footer_visible": true,
+      "save_command_confirmed": true
+    },
+    "heightmap": {
+      "resident_chunks": 49,
+      "rendered_chunks": 49,
+      "pending_chunks": 0,
+      "synthetic_banner_visible": true,
+      "terrain_draped_roads_visible": true
+    }
+  },
+  "authoritative_state_samples": {
+    "before_reconnect": {
+      "tick": 9098,
+      "account": {
+        "player_id": 2,
+        "money": 24750,
+        "avatar_unit": 1000062,
+        "active_unit": 1000063,
+        "possessed": true
+      },
+      "body": {
+        "id": 1000063,
+        "kind": "human",
+        "position": {
+          "latitude": 48.13703155371205,
+          "longitude": 11.57509404869101,
+          "altitude_m": 167.46233215332032
+        }
+      },
+      "inventory": {
+        "bread": 1,
+        "stone": 20,
+        "wheat_seed": 8,
+        "wood": 30
+      },
+      "population": 52,
+      "metrics": {
+        "production_cycles": 1082,
+        "deliveries_completed": 14,
+        "units_traded": 1,
+        "credits_traded": 250,
+        "npc_purchases": 74
+      }
+    },
+    "after_reconnect": {
+      "tick": 10263,
+      "account": {
+        "player_id": 2,
+        "money": 24750,
+        "avatar_unit": 1000062,
+        "active_unit": 1000063,
+        "possessed": false
+      },
+      "body": {
+        "id": 1000063,
+        "kind": "human",
+        "position": {
+          "latitude": 48.13703155371204,
+          "longitude": 11.57509404869101,
+          "altitude_m": 167.46233215332032
+        }
+      },
+      "inventory": {
+        "bread": 1,
+        "stone": 20,
+        "wheat_seed": 8,
+        "wood": 30
+      },
+      "population": 52,
+      "metrics": {
+        "production_cycles": 1124,
+        "deliveries_completed": 14,
+        "units_traded": 1,
+        "credits_traded": 250,
+        "npc_purchases": 79
+      }
+    }
+  },
+  "screenshots": [
+    "v2-third-person.png",
+    "v2-first-person.png",
+    "v2-market-purchase.png",
+    "v2-industry-logistics.png",
+    "v2-minimum-window.png",
+    "v2-multiplayer-resume.png",
+    "v2-political-atlas.png",
+    "v2-rts-overview.png",
+    "v2-heightmap-settlement.png",
+    "v2-heightmap-overview.png"
+  ],
+  "independent_process_smoke": {
+    "procedural_two_clients": true,
+    "save_restart_two_identities": true,
+    "historical_pack_politics_client": true,
+    "mismatched_epoch_pack_politics_rejected": true,
+    "invalid_history_startup_and_resume_rejected": true,
+    "special_file_inputs_rejected_without_blocking": true
+  },
+  "limits": [
+    "Native multiplayer capture uses a 3 by 3 neighborhood; the default 49-chunk world is separately verified by the procedural integration and native landscape capture.",
+    "State samples were taken at different server ticks; economic metrics continue advancing.",
+    "This record contains only selected public gameplay evidence, not session capabilities or private host saves."
+  ],
+  "independent_visual_review": {
+    "final_possession_market_industry_minimum": true,
+    "final_default_rts_pause_and_heightmap": true,
+    "blocking_findings": 0
+  }
+}

@@ -37,9 +37,10 @@ organization data services or additional datasets.
 | Layer | Source | Implemented behavior | Explicit limits |
 |---|---|---|---|
 | Height field | Mapzen Terrain Tiles on AWS | Terrarium PNG decode, geographic resampling, stable shared tile samples, raw-tile and result caching | Web Mercator only, ±85.0511°; source zoom capped at 15; ≤12 source images per world chunk; no geoid conversion |
-| Semantic features | OpenStreetMap via Overpass | Buildings, roads, trees, closed water/forest/farmland/grass polygons; OSM IDs and tags preserved | No relation assembly, polygon holes, river-centreline buffering, routable graph, tunnel/bridge topology or complete city meshing |
+| Semantic features | OpenStreetMap via Overpass | Buildings and parts, roads, trees, closed water/forest/farmland/grass areas, linear waterways and shop/amenity/craft/tourism POIs; OSM IDs and tags preserved | No relation assembly, polygon holes, complete routable graph, stacked tunnel/bridge topology or complete city reconstruction |
+| Imported height field | Georeferenced grayscale PNG + manifest | Bounded 8/16-bit import, declared elevation mapping and provenance, bilinear tile resampling and explicit coverage errors | No color-image elevation inference, NoData inference, geoid conversion, or semantic extraction |
 | Current weather | Open-Meteo | Temperature, cloud fraction, precipitation rate, wind speed/direction, provider timestamp | Current wall-clock model conditions; no historical replay, full forecast series, atmosphere volume or physical fluid simulation |
-| Offline fallback | Terra generator | Seamless synthetic surface, roads, ponds, farm/forest patches, houses and trees | Illustrative geometry, not real location data |
+| Offline fallback | Terra generator v2 | Seamless synthetic relief, connected streets, tagged shops and services, pond basins, fields, forests, small houses and trees | Authored settlement and materials, not real location data |
 
 In live mode missing OSM content stays missing. No fabricated roads, buildings or
 trees are overlaid and labelled as real data. A terrain failure can use a clearly
@@ -76,6 +77,15 @@ disk I/O on `poll`.
 The default budgets are 49 resident chunks, 2 in flight, 64 pending, a 33×33 height
 grid, 8 MiB per response and a 256 MiB disk cache. Tile count is bounded; the
 renderer must separately budget GPU meshes, colliders and vegetation instances.
+The native Bevy preset raises the grid to 65×65 and uses feature distance tiers;
+these renderer settings do not change this crate's smaller probe defaults.
+
+`HeightmapProvider::open(path, resolution)` loads a versioned PNG manifest and
+implements the same `ChunkProvider` interface. See the authored fixture in
+[`data/heightmap-demo`](data/heightmap-demo) and the
+[graphics and map guide](../../docs/GRAPHICS_AND_MAPS.md). Elevation is retained
+in the declared vertical datum; a tile outside the manifest's full extent fails
+explicitly. The importer never supplies zero elevation for missing coverage.
 
 Overpass is serialized across this process with at least two seconds between
 completed requests, a default 256-request session budget, and a 256 MiB session

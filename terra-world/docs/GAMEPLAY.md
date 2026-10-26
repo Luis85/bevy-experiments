@@ -1,9 +1,9 @@
 # Playing and building on Terra World
 
-The native demo is an explorer and sandbox reference for the reusable engine.
-It combines geographic streaming with a small complete resource/construction/
-farming loop. You can play locally, share land through multiplayer factions,
-or use the same command system in another game.
+The native demo combines geographic streaming, a living settlement, direct actor
+control and RTS orders with construction, farming and shared ownership. The same
+domain commands run locally or on the authoritative reference server. The world
+and its settlement are configurable building blocks for another game.
 
 ## A first session
 
@@ -11,9 +11,13 @@ or use the same command system in another game.
 cargo run -p terra-demo -- --camp-view --save saves/my-world.json
 ```
 
-Wait until nearby terrain appears. The local player is grounded onto the loaded
-surface and starts with **30 wood, 20 stone and 8 wheat seeds**. The offline
-terrain, buildings and vegetation are synthetic demonstration content. The
+Wait for the status to report that the settlement is ready. The initial regional
+view requests 49 chunks with 65 × 65 height samples each. The local player is
+grounded onto loaded, walkable land and starts with **30 wood, 20 stone, 8 wheat
+seeds and 250.00 credits**. Buy bread and water from the market as needed. Your
+account owns five bodies: an avatar, two crew members, a utility rover and a
+survey helicopter. The offline terrain, buildings and vegetation are synthetic
+demonstration content. The
 coordinates still refer to a real location on Earth.
 
 Two authored starter deposits are placed near the original camp: renewable wood
@@ -22,23 +26,104 @@ from claims about a real location's geology. Loaded world tree points also
 become wood resource nodes. Resource counts persist, so returning to a chunk
 does not refill a harvested node.
 
-The camera and the player are separate. **Tab** focuses the player, **O** moves
-to an overview, and the right panel's **Move player to explorer focus** relocates
-the player in a local session. In multiplayer, the server owns movement; use
-the arrow keys to move the player. Flying the explorer camera does not teleport
-the multiplayer character.
+The right inspector groups actions into **Command**, **Build**, **Market**,
+**Industry** and **Factions** tabs. **F10** opens world settings and **F11** hides
+or shows the inspector. The bottom bar reports the last command result, current
+controls, resident/rendered chunk counts and population. Scroll inside a panel
+to reach its remaining controls. Your player ID appears in the top-right session
+status and in **Factions**; use that ID when another player invites you.
+
+### Command a crew or take control
+
+1. Stay in **F1 RTS** mode. Click a body or its **Your crew** button. A click on an
+   unowned resident inspects it; it does not grant control.
+2. Drag a box over owned units to select a group. **Shift** adds to the selection;
+   **Ctrl+A** selects your owned group. Right-click loaded terrain to send a move
+   order. Units use small formation offsets and their available road routes.
+   Aircraft RTS orders stay horizontal at their current/cruise clearance;
+   possession supplies explicit altitude control. This is not a flight planner.
+3. **Tab** focuses the selected body. **X** stops selected units, while **Rest
+   units** cancels movement and restores biological energy.
+4. Select a crew member and press **F2** for third-person possession or **F3** for
+   first person. Move with **WASD**, look with right-drag, and hold **Shift** for
+   the current body's sprint/speed cap. **C** changes first/third-person view.
+5. **F1** or **Esc** releases direct control and returns to RTS. The selected
+   body remains the active interaction context; choose your avatar explicitly
+   if you want to build or trade from its location.
+6. Select the survey helicopter and possess it. **R** ascends and **F** descends;
+   WASD remains view-relative horizontal movement. These are kinematic controls,
+   not a simulated rotor or aircraft cockpit.
+
+A player's identity, inventory, wallet and faction permissions remain the same
+when possessing another owned body. Each body has its own position and needs.
+Selecting an owned unit makes it active for interaction without replacing its
+order. Trade, gather and build reach follows that body, not the camera. The
+reference shares inventory among owned units; separate backpacks are a game
+policy you can add.
+
+The RTS camera uses WASD to pan, the wheel to zoom, and middle-drag or **Alt +
+right-drag** to rotate. **O** opens an overview. **World → Move active actor to
+this region** explicitly relocates the active body in a local sandbox. GPS
+presets otherwise move only the viewer and release possession. The relocation
+shortcut is disabled in multiplayer.
+
+### Buy supplies and maintain needs
+
+1. Select your avatar or a crew member. Open **Market** or press **E**. The panel
+   shows the nearest shop, distance, finite till and each item's price/stock.
+2. Click **Order active actor to market** if needed. Wait for the displayed
+   distance to fall within 20 m, or possess the actor and walk there.
+3. Leave quantity at one and click **Buy** under bread or water. Buying removes
+   that quantity from shop stock and debits your wallet. The quantity button
+   cycles one, five and ten items.
+4. Use **Eat bread** or **Drink water** when the corresponding need has fallen.
+   One item is consumed from shared inventory; a fully satisfied need rejects
+   unnecessary consumption. Vehicles cannot eat or drink.
+5. Sell gathered wood or crafted planks through the same panel. Selling credits
+   your wallet and debits the shop's till. The shop cannot pay more than it owns.
+
+**Food**, **Water** and **Energy** bars belong to the selected biological body.
+Low needs reduce its movement speed. Food and water follow the simulation clock;
+physical exertion and rest affect energy. This sample does not kill characters
+from starvation. Rest is an explicit unit order, and neither a meal nor resting
+creates currency.
+
+### Watch production and delivery
+
+Open **Industry** and cycle **Next facility**. It shows inputs, outputs, stored
+goods, cycle progress, owner and running/paused state. Seven authored sites
+connect these chains:
+
+- Well + seed store → field → grain mill → bakery → market.
+- Managed woodlot → sawmill → market.
+- Grain also replenishes the seed store, closing the planting-input loop.
+
+Six couriers collect real supplier stock and carry it to another facility or
+shop. Cargo is removed at pickup and added at arrival, so a blocked vehicle
+cannot complete a delivery. Residents buy and consume supplies using finite
+pocket money; eight traffic vehicles patrol road routes. The fallback settlement
+also includes 24 residents and four animals. Short imported road networks can
+reduce traffic population.
+
+The first player owns the demonstration producers. **Order actor here** brings
+its active body near the selected site's service point; **Pause / resume owned
+production** requires ownership and 20 m reach. New houses do not automatically
+become businesses. Prices and site recipes are fixed reference rules; there are
+no wages, tax, loans or player-authored factory blueprints yet. See
+[LIVING_WORLD.md](LIVING_WORLD.md) for the exact production quantities and limits.
 
 ### Build your first home
 
-1. Press **Tab** for a close view. Click **Claim a 40 m housing plot**. The plot
-   is centered on your player and cannot overlap any existing claim.
-2. Click **Craft planks** three times. Each action consumes 2 wood and produces
-   4 planks, giving the 12 planks required for a house.
-3. Click **Craft blocks** four times. Each consumes 2 stone and produces one
-   stone block.
-4. Click **Place house**. Move the cursor onto free ground inside your plot and
-   within 20 metres of your player, then click to place. **Esc** cancels.
-5. Click **Set nearest permitted house as home** while nearby. The HUD records
+1. Select your avatar, press **Tab** for a close view and open **Build**. Click
+   **Claim a 40 m housing plot**. The plot is centered on your active body and
+   cannot overlap any existing claim.
+2. Click **Planks · 2 wood → 4 planks** three times. Each action consumes 2 wood
+   and produces 4 planks, giving the 12 planks required for a house.
+3. Click **Blocks · 2 stone → 1 block** four times. Each consumes 2 stone and
+   produces one stone block.
+4. Click **House · 12 planks + 4 blocks**. Move the cursor onto free ground inside
+   your plot and within 20 metres of your active body, then click. **Esc** cancels.
+5. Click **Set nearby house as home** while nearby. The HUD records
    the home ID. A home is an ownership/gameplay record in this version; interior
    rooms and respawning are game-specific additions.
 6. Press **F5** to save. The status message reports success or an actionable
@@ -46,9 +131,11 @@ the multiplayer character.
 
 The placement preview helps you aim. The authoritative command performs the
 final checks: complete footprint inside permitted land, no overlap with another
-player-built structure or crop, sufficient materials, 20 m three-dimensional
-reach, and the host's known-terrain support check. Rejection spends no materials
-and creates no partial object.
+player-built structure or crop, sufficient materials and 20 m three-dimensional
+reach. The local Bevy host also checks loaded support, water, slope, source
+buildings, facility footprints and living bodies. The placement preview uses
+the same environmental admission checks as the local command. Rejection spends
+no materials and creates no partial object.
 
 ### Continue the resource loop
 
@@ -76,6 +163,8 @@ data format a host can replace.
 | `stone_blocks` | 2 stone | 1 stone block | None |
 | `tool` | 2 planks + 2 stone | 1 tool | Permitted workbench within 20 m |
 | `wheat_seed` | 1 wheat | 3 wheat seeds | None |
+| `flour` | 2 wheat | 3 flour | Permitted workbench within 20 m |
+| `bread` | 2 flour + 1 water | 4 bread | Permitted workbench within 20 m |
 
 | Blueprint | Materials | Hit points | Footprint radius | Capability |
 |---|---|---:|---:|---|
@@ -85,8 +174,9 @@ data format a host can replace.
 
 Crafting is immediate. Quantities use checked integer arithmetic. A failed
 debit, overflow, missing workbench or invalid quantity leaves state unchanged.
-Inventories remain personal when land becomes faction-owned; shared property
-does not silently share every member's materials.
+Inventories remain personal to the player principal when land becomes
+faction-owned; shared property does not share every member's materials. The five
+bodies owned by one principal share that principal's inventory and wallet.
 
 ## Farming and time
 
@@ -94,7 +184,9 @@ Click **Plant wheat**, then choose free permitted ground near your player. A
 planting consumes one wheat seed and creates a crop with its own progress and
 moisture. Click **Harvest ripe wheat** when it is ready. Harvest removes that
 crop and grants four wheat exactly once. Crafting one wheat into three seeds
-lets you replant without depending on the starter inventory.
+lets you replant without depending on the starter inventory. A nearby workbench
+also lets you turn harvested wheat into flour and bread. Buy water from the
+market for the bread recipe, then consume or sell the result.
 
 Wheat requires 180 effective growth seconds in the built-in catalog. Temperature
 and moisture change the growth rate, so elapsed seconds are not a promise of a
@@ -103,8 +195,7 @@ temperatures slow or stop growth. This is an illustrative game model, not an
 agronomic prediction. The domain advances crops in bounded work even when a host
 advances a large simulated interval.
 
-The demo starts with an accelerated UTC clock. **Space** pauses/resumes; **Change
-time speed** cycles local speeds. Calendar acceleration affects crop/resource
+The demo starts with an accelerated UTC clock. **Space** pauses/resumes; **World → Time speed** cycles local speeds. Calendar acceleration affects food/water depletion, production and crop/resource
 progress; actor velocity remains in physical metres per second. Advancing the
 season changes the environment clock. It does not reverse inventory changes or
 simulate all intervening ecology as a historical reconstruction.
@@ -159,19 +250,19 @@ cargo run -p terra-demo -- --connect 127.0.0.1:7777 --session saves/alice-sessio
 cargo run -p terra-demo -- --connect 127.0.0.1:7777 --session saves/bob-session.json --camp-view
 ```
 
-1. Alice creates a named faction through the right panel. Creating it makes
+1. Alice opens **Factions** and creates a named faction. Creating it makes
    Alice its Leader. The faction panel shows its ID and Alice's role.
 2. Alice chooses **Invite a player by ID** and enters Bob's assigned player ID,
-   shown in Bob's inventory panel. Bob must already be registered on this server.
-3. Bob clicks **Accept first pending invitation**. He joins as Member; knowing a
+   shown in Bob's top-right session status or **Factions** panel. Bob must already be registered on this server.
+3. Bob clicks **Accept a pending invitation**. He joins as Member; knowing a
    faction ID alone never authorizes joining.
-4. Alice chooses **Grant builder role by player ID** and enters Bob's ID.
+4. Alice chooses **Grant builder role** and enters Bob's ID.
 5. Near her personal claim, Alice chooses **Transfer nearest plot to faction**.
    Alice must personally own that plot and lead the selected faction. The plot,
    all its player-built structures and its planted crops transfer atomically.
 6. Bob can now build or farm on that land using his own inventory. Both players
    can set the shared house as home or use the shared workbench.
-7. Alice can choose **Set member role by player ID** to revoke Bob's alteration
+7. Alice can choose **Set member role** to revoke Bob's alteration
    rights. Bob can still use shared housing and the workbench, but cannot damage
    even a faction structure he originally built.
 
@@ -196,27 +287,35 @@ cargo run -p terra-cli -- sandbox-demo --output saves/rules-demo.json
 
 | Control | Effect |
 |---|---|
-| W / A / S / D | Move explorer camera |
-| Q / E | Move camera vertically |
-| Right mouse drag | Look around in the world; pan the political atlas |
-| Shift | Faster camera movement |
-| Tab | Focus/follow player |
-| O | Landscape overview |
-| M | Toggle world / political atlas |
+| F1 / F2 / F3 | RTS / third-person possession / first-person possession |
+| W / A / S / D | Pan RTS camera; move possessed body relative to view |
+| R / F | Raise/lower RTS camera; ascend/descend possessed air body |
+| Right mouse drag | Look while possessed; pan the political atlas |
+| Middle drag or Alt + right drag | Rotate RTS camera |
+| Mouse wheel in world | RTS zoom; third-person follow distance |
+| Click / drag box / Shift | Select actors / group / add to selection |
+| Ctrl + A in RTS | Select owned group |
+| Right click ground in RTS | Move selected owned group |
+| X / Rest units | Stop / restore biological energy while resting |
+| Shift | Faster camera movement or possessed-body sprint/speed cap |
+| C / Esc | Switch first/third person / release possession |
+| E | Open nearby market interaction |
+| Tab / O / M | Focus selection / landscape overview / political atlas |
+| F10 / F11 | Toggle world drawer / inspector |
 | Mouse wheel over a side panel | Scroll that panel |
 | Mouse wheel in atlas | Zoom map |
-| Arrow keys in multiplayer | Submit movement intent for your player |
-| Space | Pause/resume local clock |
+| Space | Pause/resume local simulation |
 | F5 / F9 | Save/load local world |
 | Esc while placing or drawing | Cancel placement/drawing |
 
-**Enter coordinates** accepts `latitude, longitude` in decimal degrees. The
+**World → Enter GPS coordinates** accepts `latitude, longitude` in decimal degrees. The
 presets jump the explorer to Munich, Zugspitze, Hamburg or Cape Town. The
 streamer changes its nearby working set and frees old chunks; long-distance
 jumps also rebase the local render frame. Global positions remain geographic
 `f64` values rather than accumulating floating-point error in render transforms.
 
-Terrain, water, vegetation, buildings, roads, weather and actors can be shown or
+The **World** drawer has layer switches for terrain, water, vegetation,
+buildings, roads, weather and actors. Layers can be shown or
 hidden through layer controls. A display toggle does not erase a source chunk,
 delete an owned building or revoke a faction permission. Host games can use
 these data types independently of the supplied renderer.
@@ -242,8 +341,7 @@ features are visible. Political queries preserve overlapping countries, regions
 and disputed claims as source assertions. They do not choose a geopolitical
 winner or convert those claims into gameplay ownership.
 
-In the atlas, click a location to inspect its names/status and select it. **Fly
-to selected map location** returns to the local world at that coordinate. In a
+In the atlas, click a location to inspect its names/status and select it. **Explore selected** returns to the local world at that coordinate. In a
 local session with a political dataset loaded, **Draw a scenario territory**
 lets you click boundary vertices; **Backspace** removes the last vertex,
 **Enter** closes the boundary, and **Esc** cancels. An authored territory is
@@ -260,9 +358,9 @@ The reference does not stream live political-geometry edits between clients.
 
 | File | Producer / consumer | Contains |
 |---|---|---|
-| Local world save | Desktop F5/F9 | World/source/epoch identity, clock, local player, sandbox state and political dataset |
+| Local world save | Desktop F5/F9 | World/source/epoch identity, clock, player, living bodies/needs/orders, money/shops/production/cargo, sandbox overlay and politics |
 | Sandbox rules save | `terra-cli sandbox-demo --output`, `SandboxState::save/load` | Pure gameplay overlay, players, inventories, factions and edits |
-| Server save | `terra-server --save/--load` | Authoritative world identity, actors, clock, rules/catalog, commands/resume ownership and sandbox state |
+| Server save | `terra-server --save/--load` | Authoritative world identity, actors/living economy, clock, rules/catalog, commands/resume ownership and full sandbox state |
 | Client session | Desktop or CLI `--session` | Server-pinned player resume capability; not a copy of the world |
 | Political GeoJSON | Atlas export / `--politics` | Dated source geometry plus authored scenario territories and provenance |
 
@@ -288,7 +386,10 @@ to resume that player's property, so use separate files for separate players.
 
 | Message or symptom | What to check |
 |---|---|
-| Target is outside interaction range | Move the player closer; moving only the camera does not change reach. Altitude difference counts. |
+| Target is outside interaction range | Move the active owned body closer; moving only the camera does not change reach. Altitude difference counts. |
+| Buy/sell button is disabled | Check active body reach, item stock, your balance and shop till. Quantity applies to the whole trade. |
+| Possession rejected | Select an owned body. Residents and another player's units cannot be possessed. |
+| Movement slows or stops | Inspect needs, rest/eat/drink, loaded terrain, obstacles and destination coverage. There is no full navmesh. |
 | You do not own the target/land | Check the plot owner, selected faction and current role. Member does not grant building rights. |
 | Overlap | Choose ground clear of other structures/crops and keep the full footprint within one permitted plot. |
 | Not enough material | Review inventory and recipe counts; a house needs crafted planks and blocks, not raw wood and stone. |

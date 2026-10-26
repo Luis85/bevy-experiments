@@ -6,7 +6,10 @@
     "stone_blocks",
     "tool",
     "wheat_seed",
-    "wheat"
+    "wheat",
+    "flour",
+    "bread",
+    "water"
   ],
   "recipes": {
     "planks": {
@@ -45,6 +48,25 @@
         "wheat_seed": 3
       },
       "requires_workbench": false
+    },
+    "flour": {
+      "inputs": {
+        "wheat": 2
+      },
+      "outputs": {
+        "flour": 3
+      },
+      "requires_workbench": true
+    },
+    "bread": {
+      "inputs": {
+        "flour": 2,
+        "water": 1
+      },
+      "outputs": {
+        "bread": 4
+      },
+      "requires_workbench": true
     }
   },
   "blueprints": {

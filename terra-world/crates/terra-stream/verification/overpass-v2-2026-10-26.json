@@ -1,0 +1,20 @@
+{
+  "validation_date": "2026-10-26",
+  "endpoint": "https://overpass.private.coffee/api/interpreter",
+  "query_bbox_south_west_north_east": [
+    48.1366,
+    11.5745,
+    48.1374,
+    11.5755
+  ],
+  "requests": 1,
+  "request_timeout_seconds": 20,
+  "maximum_response_bytes": 1048576,
+  "tls_verification": true,
+  "source": "https://wiki.openstreetmap.org/wiki/Overpass_API",
+  "attribution": "OpenStreetMap contributors",
+  "license": "ODbL 1.0; https://www.openstreetmap.org/copyright",
+  "result": "unavailable",
+  "error": "The read operation timed out",
+  "elapsed_seconds": 20.206
+}

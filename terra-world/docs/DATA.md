@@ -11,7 +11,8 @@ source revision.
 | Layer | Source | Runtime behavior | Known scope |
 |---|---|---|---|
 | Elevation | Mapzen Terrain Tiles / AWS Open Data | Terrarium RGB PNGs reprojected into geographic height grids | Web Mercator coverage ±85.0511°; no polar provider or geoid conversion |
-| Buildings, roads and land use | OpenStreetMap via Overpass | Tagged points and ways, clipped to requested chunks | No relation assembly, holes, complete routing graph or surveyed building interiors |
+| Buildings, roads, POIs and land use | OpenStreetMap via Overpass | Tagged points/ways, waterways, bridges, roofs and functional metadata, clipped to chunks | No relation assembly, holes, complete routing graph or surveyed building interiors |
+| Imported elevation | Local grayscale PNG + manifest | Georeferenced 8/16-bit samples resampled into complete geographic tiles | Explicit bounds/provenance; no NoData inference, datum conversion or semantic extraction |
 | Current weather | Open-Meteo | Temperature, cloud fraction, precipitation rate and wind, with source time | Current model conditions; no historical replay or volumetric atmosphere |
 | Country polygons | Natural Earth 1:110m | Local dated GeoJSON snapshot, original properties retained | Generalized atlas geometry and source-defined boundary policy |
 | Offline world and historical examples | Terra authors | Reproducible generated terrain and authored semantics | Fictional content explicitly marked synthetic |
@@ -45,12 +46,21 @@ the code's MIT/Apache license does not replace elevation-source obligations.
 
 ### OpenStreetMap geometry and public Overpass
 
-OSM imports retain source IDs and tags. The importer supports buildings, roads,
-trees and closed water/forest/farm/grass ways. It leaves relations and complex
-geometry unimported rather than inventing polygon topology. Rivers represented
-only as centre lines need a width-aware importer; roads need a routing/topology
-stage for traffic simulation. The current adapter's absence of a feature does
-not establish that it is absent in the real world.
+OSM imports retain source IDs and tags. Supported semantics include building
+footprints/parts, tagged dimensions and roof forms, roads with physical widths,
+lane/surface/bridge attributes, trees, point amenities/shops, water areas and
+linear waterways, forest/grass/field polygons, orchards and vineyards. Geometry
+is normalized to typed `WorldFeature` values; other properties remain available
+to game-specific systems.
+
+The renderer uses supported roof/material/land-use tags to produce illustrative
+geometry. The living adapter can use roads for its bounded graph and nearby
+shop, water, farm, woodlot, mill or bakery tags to locate authored facilities.
+These tags do not prove that a business is open or that its simulated stock,
+workers, money or output reflects the real place. Relations, complex polygon
+holes, every roof type, interiors and complete transport topology remain outside
+the importer. An absent feature does not establish real-world absence. The exact
+supported map/render matrix is in [GRAPHICS_AND_MAPS.md](GRAPHICS_AND_MAPS.md).
 
 [OpenStreetMap's copyright page](https://www.openstreetmap.org/copyright)
 documents ODbL and attribution. Preserve `© OpenStreetMap contributors` with the
@@ -70,6 +80,34 @@ it allows one Overpass request in flight and waits at least two seconds after
 completion before the next request. Defaults cap a session at 256 requests and
 256 MiB of attempted response data. Failed requests also consume the budgets.
 These caps limit accidental load; they are not a provider service guarantee.
+
+### Local PNG heightmaps
+
+Use `--heightmap path/to/manifest.json` in the demo or install
+`HeightmapProvider` through the reusable provider API. A ready-to-run synthetic
+example is available with:
+
+```sh
+cargo run -p terra-demo -- --config configs/heightmap.json
+```
+
+The manifest supplies south/west/north/east bounds, a linear minimum/maximum
+height range, an immutable revision and a complete source/attribution record.
+North is the PNG's top row. Black and white map to the declared range, and
+bilinear sampling produces the requested tile grid. The image must be 8- or
+16-bit grayscale. Source height datum remains the caller's responsibility.
+
+Manifest size is limited to 64 KiB, encoded PNG size to 32 MiB, dimensions to
+4096 × 4096 and decoder allocations to 128 MiB. The image path must stay within
+the manifest directory. Coverage must contain an entire requested tile. Raster
+extents crossing the date line should be split; color-image interpretation,
+NoData inference and terrain-feature extraction are not implemented.
+
+The included 257 × 257 image, source declaration and generator are authored
+fixtures. They demonstrate relief, streaming and controls without claiming to
+be a real DEM of Munich. A heightmap-only provider emits no sourced buildings or
+vegetation; the sample living facilities and roads are explicitly authored.
+Compose providers if your game also has a licensed vector dataset for that area.
 
 ### Weather semantics and terms
 
@@ -126,16 +164,25 @@ or worker join. Desired keys are deduplicated and prioritized. A changed focus
 drops obsolete queued work, evicts unwanted residents and rejects stale results.
 Existing HTTP requests finish with configured deadlines.
 
-Default budgets are 49 residents, 2 in flight, 64 pending, 33×33 terrain samples,
-8 MiB per HTTP body and 256 MiB on disk. The application should independently cap
-GPU allocations, mesh density, actors and colliders. Custom providers must obey
+The lower-level `StreamConfig` defaults remain 49 resident tiles, 2 in flight,
+64 pending, 33 × 33 terrain samples, 8 MiB per HTTP body and 256 MiB on disk. The
+native `WorldConfig` overrides this to a 49-tile requested neighborhood, 64
+resident capacity and 65 × 65 grids. A plain `--live` launch selects radius one
+and 33 × 33 grids unless a config or explicit radius was supplied. The supplied
+`configs/live.json` also keeps that smaller footprint.
+
+The reference renderer independently bounds mesh jobs and geometry detail; the
+living layer bounds bodies, sites, routes and replicated views. Hosts must still
+choose GPU, actor and collider budgets for their target hardware. Custom providers must obey
 their own resource bounds; `ChunkProvider` is trusted application code.
 
 The disk cache stores a schema marker, retrieval time, payload length and a
 corruption checksum, with atomic writes. It manages only its own
 `terra-v1/*.cache` files and removes oldest entries to satisfy the byte budget.
 The checksum detects accidental corruption and is not authentication. Provider
-URLs, tile keys, source options and schema versions enter cache keys. Stable
+URLs, tile keys, source options and schema versions enter cache keys. Assembled
+semantic chunks use `chunk-v4` keys in this version so earlier parser output is
+not mistaken for the expanded schema. Stable
 terrain/map entries default to a seven-day lifetime; source timestamps also
 limit assembled-chunk reuse. Recombining cached raster tiles preserves their
 oldest retrieval timestamp instead of presenting the assembly as a fresh fetch.
@@ -170,7 +217,10 @@ A manual strict live probe on 2026-10-26 at 48.137, 11.575 loaded sourced terrai
 with a 519.889–530.212 metre sample range and a non-synthetic Open-Meteo current
 sample. The public Overpass POST timed out in this execution environment; a tiny
 GET diagnostic returned HTTP406. Its local HTTP/fixture integration passed, but
-this run does not claim a successful live OSM fetch. Service availability and
+this run does not claim a successful live OSM fetch. One later v0.2 probe to the
+Private.coffee alternate also timed out at 20.206 seconds; no repeated public
+retry loop was used. Its record is
+[`overpass-v2-2026-10-26.json`](../crates/terra-stream/verification/overpass-v2-2026-10-26.json). Service availability and
 current data are not guaranteed by a previously successful probe.
 
 To grow this into a production world dataset, add a reproducible offline importer

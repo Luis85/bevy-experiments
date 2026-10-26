@@ -1,0 +1,8 @@
+{
+  "heightmap_manifest": "crates/terra-stream/data/heightmap-demo/manifest.json",
+  "focus": { "latitude": 48.137, "longitude": 11.575, "altitude_m": 0.0 },
+  "chunk_radius": 3,
+  "terrain_resolution": 65,
+  "live_weather": false,
+  "save_path": "saves/heightmap-world.json"
+}

@@ -1,10 +1,11 @@
-# Terra World
+# Terra World 0.2
 
-**A reusable Rust and Bevy environment SDK with a playable geographic sandbox.**
-Stream terrain and semantic features around real GPS positions, run a UTC world
-clock and environmental model, attach actors, and persist player changes over
-the original world. A native explorer, headless tools and an authoritative
-multiplayer reference demonstrate the same library contracts.
+**A reusable Rust and Bevy world SDK with a playable living settlement.**
+Stream heightfields and semantic features around real GPS positions, command a
+crew in RTS mode, possess a character or vehicle in first or third person, and
+build a persistent settlement over the original source world. Residents, shops,
+finite money, production, couriers and traffic share the gameplay rules used by
+the native demo and authoritative multiplayer reference.
 
 The default playground is deterministic and synthetic, placed at real geographic
 coordinates. Opt-in adapters load public elevation, OpenStreetMap features and
@@ -14,7 +15,7 @@ provenance, attribution and fallback warnings.
 
 This is an implemented foundation for games and simulation tools. It does not
 claim to reconstruct every place and date on Earth, or to provide a full ecology,
-fluid, traffic, geopolitical or rigid-body simulation.
+fluid, traffic-engineering, geopolitical or rigid-body simulation.
 
 ## Start here
 
@@ -29,8 +30,8 @@ If the pinned toolchain is not installed yet, install it through Rustup:
 rustup toolchain install 1.99.1 --profile minimal --component rustfmt
 ```
 
-The native renderer in this workspace enables X11 on Linux. The Ubuntu CI build
-installs these development libraries, in addition to a C/C++ build toolchain and
+The native renderer in this workspace enables X11 on Linux. Linux builds need
+these development libraries, in addition to a C/C++ build toolchain and
 `pkg-config`:
 
 ```sh
@@ -40,10 +41,14 @@ sudo apt-get install build-essential pkg-config libudev-dev libx11-dev libxkbcom
 You also need an active graphical session and a compatible graphics driver to
 run the window. A first desktop build compiles the Bevy graphics stack and can
 take substantially longer than a headless command. Windows and macOS native
-builds have not been exercised in this deliverable; see the validation record
+builds were not exercised in the original deliverable; see the validation record
 before assuming platform coverage.
 
-### 1. Verify the complete gameplay loop without a window
+This workspace is now part of Bevy Experiments; shared CI lives in the repository
+root `.github/workflows/ci.yml` and checks each workspace on Windows. See the root
+`CONTRIBUTING.md` and local `AGENTS.md` for the current development workflow.
+
+### 1. Verify construction, farming and faction rules without a window
 
 ```sh
 cargo run -p terra-cli -- sandbox-demo --output saves/sandbox-demo.json
@@ -54,30 +59,72 @@ house and workbench, farming, harvesting, demolition, and a two-player faction
 transfer with shared building permissions. The output save is validated and
 reloaded, including exact geographic coordinate round trips.
 
-### 2. Open the native world
+The living-world integration checks exercise trading, possession, RTS orders,
+production, physical deliveries and full-state restoration in an actual Bevy app:
 
 ```sh
-cargo run -p terra-demo -- --camp-view
+cargo test -p terra-bevy --no-default-features --test living_world
+cargo test -p terra-bevy --no-default-features --test procedural_settlement
 ```
 
-The offline scene starts near Munich with streamed synthetic terrain, world
-features, starter resources, and reference actors. Ships are spawned only when
-nearby loaded water is available. Scroll the left
-panel for location, layer, time and political controls; scroll the right panel
-for construction, farming, factions and saves. Press **Tab** to return to the
-player, **O** for a landscape view, and **M** for the political atlas.
+### 2. Play the native world
 
-For a first house, claim the nearby plot, craft planks three times and stone
-blocks four times, select **Place house**, and click free ground within 20 metres
-of your player. [The gameplay guide](docs/GAMEPLAY.md) explains placement, shared
-ownership, farming, saves and the full control scheme.
+```sh
+cargo run -p terra-demo -- --save saves/my-world.json
+```
 
-Local progress is saved explicitly with **F5** and restored with **F9**. Choosing
-`--save saves/my-world.json` changes that path; it does not automatically load
-the file on startup or save when the window closes. Restart with the same world
-configuration, wait for the terrain, and press F9 to continue a saved settlement.
+The default view loads **49 geographic chunks with 65 × 65 height samples each**.
+The authored settlement contains residents, traffic, couriers, animals, a market
+and seven production facilities. Your account owns an avatar, two crew members,
+a utility rover and a survey helicopter. The normal fallback settlement has 47
+bodies for its first player; imported road and surface coverage can reduce the
+population. This is authored gameplay at real coordinates, not demographic data.
 
-### 3. Inspect real data explicitly
+Use the right inspector's **Command**, **Build**, **Market**, **Industry** and
+**Factions** tabs. The **World** drawer opens with **F10**; **F11** hides the
+inspector to give the landscape more room.
+
+1. In **F1 RTS** mode, select an owned actor, or drag a group selection. Right-click
+   loaded ground to issue a move order. **Tab** focuses the selection. Aircraft RTS
+   orders are horizontal terrain destinations; use possession for altitude control.
+2. Press **F2** to possess the selected actor in third person, or **F3** for first
+   person. **WASD** moves; right-drag looks; **Shift** sprints. **R / F** changes
+   aircraft altitude. **C** switches first/third person; **F1** releases control.
+3. Open **Market**, order the active actor to the shop, and buy bread or water
+   when within 20 m. Purchases debit your wallet and the shop's stock. Sell gathered
+   wood or crafted goods to earn credits. Eat, drink and rest through **Command**.
+4. Open **Industry** to inspect the water → grain → flour → bread chain and courier
+   deliveries. Facilities consume actual stock; the first player owns the demo
+   production sites and can pause/resume them while nearby.
+5. Open **Build** to claim a plot, gather, craft, build a home, plant and harvest.
+   The [gameplay guide](docs/GAMEPLAY.md) gives the exact first-house sequence.
+
+**O** opens a landscape view and **M** opens the political atlas. Camera travel
+changes the viewed region. Trading and building still use the active body's
+position. Local **World → Move active actor to this region** is an explicit
+sandbox relocation; multiplayer movement remains host-controlled.
+
+Local progress is saved explicitly with **F5** and restored with **F9**. The
+`--save` argument chooses a path; it does not autoload or save on exit. Restart
+with matching source settings, wait for terrain, then press F9. Wallets, needs,
+orders, facilities, delivery cargo and the earlier construction/faction overlay
+are restored together.
+
+### 3. Import a heightmap
+
+```sh
+cargo run -p terra-demo -- \
+  --heightmap crates/terra-stream/data/heightmap-demo/manifest.json
+```
+
+The included 16-bit PNG is an explicitly **synthetic** mountain/valley fixture.
+Replace it with a licensed georeferenced grayscale PNG and its provenance-bearing
+manifest to use your terrain. The demo selects a covered focus and reduces the
+requested radius to complete tiles. A heightmap supplies elevation only; the
+living settlement and its fallback roads remain authored. See
+[graphics and map formats](docs/GRAPHICS_AND_MAPS.md) for limits and the schema.
+
+### 4. Inspect real data explicitly
 
 ```sh
 cargo run -p terra-cli -- probe --live --no-osm --strict --output snapshots/munich.json
@@ -87,8 +134,9 @@ cargo run -p terra-demo -- --live --lat 48.137 --lon 11.575
 The first command probes elevation and current weather while keeping the first
 request small. Omit `--no-osm` to include map features. `--strict` fails on
 provider errors instead of accepting synthetic fallback. The desktop reports
-source/fallback status as it streams. Public endpoints have coverage and usage
-limits; read [data sources and terms](docs/DATA.md) before configuring a game or
+source/fallback status as it streams. A plain `--live` start uses a smaller
+3 × 3 neighborhood and 33 × 33 grids unless a config or radius is supplied.
+Public endpoints have coverage and usage limits; read [data sources and terms](docs/DATA.md) before configuring a game or
 larger download.
 
 ## What is implemented
@@ -97,9 +145,10 @@ larger download.
 |---|---|---|
 | Global coordinates | WGS84 geodetic ↔ ECEF, local east/up/south frames, floating-origin rebasing, date-line/pole-aware geographic tiles | Authoritative coordinates stay `f64`; source vertical datums need explicit conversion for precise use |
 | Streaming | Background loading, request and memory budgets, disk cache, retries/backoff, stale-result rejection, mesh integration budgets | Replace `ChunkProvider` with your prepared world packs or data service |
-| Terrain and features | Heightfields, roads, buildings, water, forest/farm/grass polygons and trees | Reference geometry is simplified; no full OSM relation, road graph or city reconstruction |
+| Terrain and features | Smooth heightfield meshes, PNG heightmaps, tagged buildings/roofs, roads/bridges, water/waterways, fields, orchards and trees | Feature detail tiers bound rendering; no full OSM relations, interiors, satellite textures or globe clipmap |
 | Environment | UTC clock, approximate solar direction, day/night, hemisphere seasons, weather samples, heuristic biomes | Weather is a sampled condition; offline weather and biome inference are illustrative |
-| Actors | Human, animal, creature, vehicle, ship, helicopter, balloon and airplane kinds; GPS motion and environment queries | Add your own AI, physics, navigation, flight and marine systems |
+| Actors and control | Eight actor kinds; owned crew, RTS orders, first/third-person possession, needs, resident patrols and interpolated replicas | Kinematic movement with resident-world checks; no full vehicle/flight physics or general navigation mesh |
+| Economy and logistics | Integer credits, finite shop stocks/tills, buy/sell/consume, seven production sites, courier cargo and traffic | Fixed prices, bounded authored settlement, simple road graph/following; no wages, taxation or traffic engineering |
 | Sandbox | Plots, materials, recipes, structures, housing, damage/destruction, resources, wheat growth/harvest and persistent tree edits | Immutable source geometry plus a mutable gameplay overlay; configurable catalog |
 | Factions | Invitations, leader/builder/member roles, atomic transfer of plots and contained assets, shared housing and workbenches | Gameplay permissions are separate from real political sovereignty |
 | History and politics | Validated dated packs, date-scoped political GeoJSON, overlapping claims, atlas and authored territory drawing/export | Imported coverage is explicit; no invented historical reconstruction or autonomous border simulation |
@@ -113,10 +162,10 @@ larger download.
 | [`terra-core`](crates/terra-core/README.md) | Pure geographic math, tiles, time, solar/seasons, semantic world types, weather and actor contracts |
 | [`terra-stream`](crates/terra-stream/README.md) | Providers, deterministic offline content, cache and bounded asynchronous chunk lifecycle |
 | `terra-history` | Immutable dated world packs and political polygons, provenance, containment and GeoJSON import/export |
-| [`terra-sandbox`](crates/terra-sandbox/README.md) | Transactional gameplay commands, inventories, construction, farming, factions and persistent overlays |
+| [`terra-sandbox`](crates/terra-sandbox/README.md) | Transactional construction/farming/faction rules plus bodies, needs, shops, money, production and cargo |
 | [`terra-net`](crates/terra-net/README.md) | Authoritative multiplayer library, server executable and command-line client |
-| `terra-bevy` | Reusable world/environment/sandbox/network plugins and optional reference renderer |
-| `terra-demo` | Native explorer, construction interface and political atlas |
+| `terra-bevy` | Reusable world, living, environment, sandbox and network plugins; optional renderer |
+| `terra-demo` | Native RTS/possession cameras, contextual gameplay UI and political atlas |
 | `terra-cli` | Headless data probes, deterministic simulation and complete sandbox demonstration |
 
 Core, streaming, history and gameplay are independent of Bevy. The Bevy adapter's
@@ -124,6 +173,25 @@ Core, streaming, history and gameplay are independent of Bevy. The Bevy adapter'
 physics, or run a headless simulation. [Integration contracts](docs/INTEGRATION.md)
 cover schedules, resources, actor attachment and host responsibilities;
 [architecture](docs/ARCHITECTURE.md) describes the data and authority boundaries.
+
+## Native demo gallery
+
+These are actual captures from the verified native build. The default world is
+synthetic gameplay at real GPS coordinates. The bundled heightmap is an authored
+elevation fixture, and the native source banner identifies it explicitly.
+
+![Default 49-chunk world with five owned bodies selected in RTS mode](docs/screenshots/v2-rts-overview.png)
+
+![Imported synthetic heightmap with terrain-draped settlement roads](docs/screenshots/v2-heightmap-settlement.png)
+
+Inspect [third-person possession](docs/screenshots/v2-third-person.png),
+[first-person play](docs/screenshots/v2-first-person.png),
+[a completed multiplayer purchase](docs/screenshots/v2-market-purchase.png),
+[working production and deliveries](docs/screenshots/v2-industry-logistics.png),
+the [minimum window](docs/screenshots/v2-minimum-window.png), and
+[native reconnect](docs/screenshots/v2-multiplayer-resume.png).
+The [validation record](docs/VALIDATION.md) connects the captures to automated
+checks and authoritative saved-state evidence.
 
 ## Historical and political scenarios
 
@@ -163,10 +231,10 @@ cargo run -p terra-demo -- --connect 127.0.0.1:7777 --session saves/alice-sessio
 cargo run -p terra-demo -- --connect 127.0.0.1:7777 --session saves/bob-session.json --camp-view
 ```
 
-Each client receives its own player ID. Arrow keys move the authoritative player;
-WASD moves the spectator camera. Gameplay commands go to the server, which checks
-identity, command sequence, quantity, position and permission before changing
-state. All peers must use matching source revisions and data epochs. Give each
+Each client receives its own player ID, wallet and owned bodies. **F1** commands
+units; **F2/F3** possess one and **WASD** sends movement intent. The host owns
+positions, needs, stock, money, production and delivery outcomes. Gameplay
+commands are checked for identity, sequence, quantity, reach and permission. All peers must use matching source revisions and data epochs. Give each
 player a separate `--session` file and reuse that file to resume their identity.
 
 For a resumable command-line session:
@@ -186,7 +254,9 @@ the reference transport's limits.
 
 `WorldConfig` controls focus coordinates, seed, tile level/radius, resident and
 request budgets, terrain resolution, layers, day/night, seasons, time scale,
-floating-origin distance, public-data adapters, source packs and save paths.
+floating-origin distance, public-data adapters, heightmap manifests, source packs
+and save paths. Add `TerraLivingPlugin` to opt into the reusable living adapter;
+`living::LivingSettings` selects demo seeding, simulation and collision policies.
 Presets in [`configs`](configs) give concrete starting points.
 
 ```sh
@@ -218,11 +288,14 @@ cargo check -p terra-demo
 
 The default workspace test targets are headless. Tests cover geographic edge
 cases, provider decoding and cache behavior, chunk budgets, temporal coverage,
-transactional commands, ownership, persistence and real loopback multiplayer.
+transactional commands, ownership, economy conservation, living orders,
+heightmap/semantic decoding, persistence and real loopback multiplayer.
 Bevy tests exercise the actual plugin with a manual clock and no renderer.
 The [validation record](docs/VALIDATION.md) separates checks actually run from
 hardware/network-dependent verification, and the [product review](docs/PRODUCT_REVIEW.md)
-records the final end-to-end assessment and remaining scope.
+records the final end-to-end assessment and remaining scope. The detailed
+[living-world rules](docs/LIVING_WORLD.md) and [graphics/data guide](docs/GRAPHICS_AND_MAPS.md)
+separate implemented mechanics from extension work.
 
 Code is available under MIT or Apache-2.0. Public datasets retain their own
 licenses and attribution requirements; see [third-party notices](THIRD_PARTY_NOTICES.md)

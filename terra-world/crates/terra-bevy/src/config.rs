@@ -31,6 +31,8 @@ pub struct WorldConfig {
     pub rebase_distance_m: f64,
     pub save_path: PathBuf,
     pub historical_pack: Option<PathBuf>,
+    /// Georeferenced grayscale PNG elevation with a validated source manifest.
+    pub heightmap_manifest: Option<PathBuf>,
     /// Frozen source-data epoch; the simulation may subsequently evolve from it.
     pub data_epoch_unix: Option<i64>,
     pub base_data_revision: String,
@@ -48,8 +50,8 @@ impl Default for WorldConfig {
             },
             seed: 42,
             chunk_level: 15,
-            chunk_radius: 2,
-            terrain_resolution: 33,
+            chunk_radius: 3,
+            terrain_resolution: 65,
             max_resident_chunks: 64,
             max_in_flight: 2,
             max_queued: 64,
@@ -67,8 +69,9 @@ impl Default for WorldConfig {
             rebase_distance_m: 2_000.0,
             save_path: PathBuf::from("world-save.json"),
             historical_pack: None,
+            heightmap_manifest: None,
             data_epoch_unix: None,
-            base_data_revision: "procedural-v1".into(),
+            base_data_revision: "terra-procedural-v2".into(),
             politics_file: None,
             political_dataset_revision: None,
         }
@@ -88,6 +91,11 @@ impl WorldConfig {
         }
         if self.historical_pack.is_some() && self.data_epoch_unix.is_none() {
             return Err("historical_pack requires an explicit data_epoch_unix".into());
+        }
+        if self.heightmap_manifest.is_some()
+            && (self.historical_pack.is_some() || self.live_data || self.data_epoch_unix.is_some())
+        {
+            return Err("heightmap_manifest is an explicit local source; do not combine it with live data or historical packs".into());
         }
         if self.live_data && self.historical_pack.is_some() {
             return Err("historical packs cannot be combined with current live data".into());

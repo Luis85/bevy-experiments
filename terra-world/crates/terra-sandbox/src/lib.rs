@@ -3,11 +3,13 @@
 mod catalog;
 mod commands;
 mod factions;
+mod living;
 mod persistence;
 mod state;
 
 pub use catalog::*;
 pub use commands::*;
+pub use living::*;
 pub use state::*;
 
 use thiserror::Error;

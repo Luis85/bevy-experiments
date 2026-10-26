@@ -4775,7 +4775,7 @@ dependencies = [
 
 [[package]]
 name = "terra-bevy"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy",
  "serde",
@@ -4790,7 +4790,7 @@ dependencies = [
 
 [[package]]
 name = "terra-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde_json",
  "terra-core",
@@ -4800,7 +4800,7 @@ dependencies = [
 
 [[package]]
 name = "terra-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4809,17 +4809,18 @@ dependencies = [
 
 [[package]]
 name = "terra-demo"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bevy",
  "serde_json",
  "terra-bevy",
  "terra-core",
+ "terra-stream",
 ]
 
 [[package]]
 name = "terra-history"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4829,7 +4830,7 @@ dependencies = [
 
 [[package]]
 name = "terra-net"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ctrlc",
  "getrandom 0.4.3",
@@ -4845,7 +4846,7 @@ dependencies = [
 
 [[package]]
 name = "terra-sandbox"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -4855,7 +4856,7 @@ dependencies = [
 
 [[package]]
 name = "terra-stream"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image",
  "reqwest",

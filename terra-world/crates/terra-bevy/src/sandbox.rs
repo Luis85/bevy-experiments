@@ -1,6 +1,4 @@
-use crate::{
-    PoliticalWorld, ResidentChunks, WorldConfig, WorldEnvironment, simulation::WorldRuntime,
-};
+use crate::{PoliticalWorld, ResidentChunks, WorldConfig, simulation::WorldRuntime};
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -182,6 +180,67 @@ pub enum SandboxIntent {
 #[derive(Resource, Default)]
 pub struct SandboxQueue(pub VecDeque<SandboxIntent>);
 
+/// Environment checks shared by the native placement preview and local command
+/// consumer. Permission, inventory and authored-object overlap stay in the rules.
+pub fn placement_error(
+    command: &Command,
+    sandbox: &SandboxRuntime,
+    runtime: &WorldRuntime,
+    resident: &ResidentChunks,
+) -> Option<String> {
+    let (position, radius, footprint) = match command {
+        Command::ClaimPlot { center, .. } => (*center, 0., false),
+        Command::Build {
+            position,
+            blueprint,
+        } => (
+            *position,
+            sandbox
+                .catalog
+                .blueprints
+                .get(blueprint)
+                .map(|b| b.radius_m)
+                .unwrap_or(0.),
+            true,
+        ),
+        Command::Plant { position, .. } => (*position, 1., true),
+        _ => return None,
+    };
+    let Some(surface) =
+        crate::environment::physical_surface(resident, position, &runtime.effective_weather())
+    else {
+        return Some("wait for terrain to load at the placement location".into());
+    };
+    if (position.altitude_m - surface.terrain_height_m).abs() > 3. {
+        return Some("placement requires known support within 3 m of the ground".into());
+    }
+    if surface.water || surface.slope_degrees > 32. {
+        return Some("choose dry ground with a slope below 32 degrees".into());
+    }
+    if footprint && crate::environment::source_building_at(resident, position, radius) {
+        return Some("keep the footprint clear of existing map buildings".into());
+    }
+    if footprint
+        && sandbox
+            .state
+            .living
+            .facility_footprints()
+            .iter()
+            .any(|(p, r)| p.surface_distance_m(position) < radius + r)
+    {
+        return Some("keep the footprint clear of markets and production facilities".into());
+    }
+    if matches!(command, Command::Build { .. })
+        && sandbox.state.living.units.values().any(|u| {
+            u.position.surface_distance_m(position) < radius + 0.4
+                && (u.position.altitude_m - position.altitude_m).abs() < 8.
+        })
+    {
+        return Some("keep the building footprint clear of actors before placing it".into());
+    }
+    None
+}
+
 pub(crate) fn apply_sandbox_commands(
     mut sandbox: ResMut<SandboxRuntime>,
     mut queue: ResMut<SandboxQueue>,
@@ -203,19 +262,8 @@ pub(crate) fn apply_sandbox_commands(
         let mut changed = false;
         let result: Result<String, String> = match intent {
             SandboxIntent::Command(command) => {
-                let target = match &command {
-                    Command::ClaimPlot { center, .. } => Some(*center),
-                    Command::Build { position, .. } | Command::Plant { position, .. } => {
-                        Some(*position)
-                    }
-                    _ => None,
-                };
-                if target.is_some_and(|p| {
-                    resident
-                        .terrain_height(p)
-                        .is_none_or(|h| (p.altitude_m - h).abs() > 3.)
-                }) {
-                    Err("placement requires known terrain within 3 m of the ground".into())
+                if let Some(error) = placement_error(&command, &sandbox, &runtime, &resident) {
+                    Err(error)
                 } else {
                     let SandboxRuntime { state, catalog, .. } = &mut *sandbox;
                     state
@@ -227,14 +275,37 @@ pub(crate) fn apply_sandbox_commands(
                         .map_err(|e| e.to_string())
                 }
             }
-            SandboxIntent::MoveTo(position) => sandbox
-                .state
-                .set_player_position(player, position)
-                .map(|_| {
-                    changed = true;
-                    "Player moved to the explorer focus.".into()
-                })
-                .map_err(|e| e.to_string()),
+            SandboxIntent::MoveTo(position) => {
+                let result = if sandbox.state.living.enabled {
+                    let unit = sandbox.state.living.active_unit(player).map(|u| u.id);
+                    if let Some(unit_id) = unit {
+                        let SandboxRuntime { state, catalog, .. } = &mut *sandbox;
+                        state
+                            .apply(
+                                player,
+                                Command::Living {
+                                    action: terra_sandbox::LivingCommand::StopUnits {
+                                        unit_ids: vec![unit_id],
+                                    },
+                                },
+                                catalog,
+                            )
+                            .and_then(|_| {
+                                state.set_controlled_motion(player, position, [0.; 3], 0.)
+                            })
+                    } else {
+                        Err(terra_sandbox::SandboxError::PlayerMissing)
+                    }
+                } else {
+                    sandbox.state.set_player_position(player, position)
+                };
+                result
+                    .map(|_| {
+                        changed = true;
+                        "Active actor moved to the explorer focus.".into()
+                    })
+                    .map_err(|e| e.to_string())
+            }
             SandboxIntent::Save => {
                 let save = LocalWorldSave {
                     schema_version: 1,

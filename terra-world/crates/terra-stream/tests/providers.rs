@@ -14,15 +14,40 @@ fn documented_terrarium_encoding_decodes_exactly() {
 #[test]
 fn osm_features_keep_source_ids_and_reject_invalid_geometry() {
     let features = parse_overpass(include_bytes!("fixtures/overpass.json")).unwrap();
-    assert_eq!(features.len(), 3);
+    assert_eq!(features.len(), 4);
     assert_eq!(features[0].id, "osm:way:1");
     assert_eq!(features[0].kind, FeatureKind::Building);
     assert_eq!(features[0].height_m, 9.0);
     assert_eq!(features[2].height_m, 12.0);
+    assert_eq!(features[3].kind, FeatureKind::Waterway);
     for feature in features {
         feature.validate().unwrap();
     }
     assert!(parse_overpass(br#"{"remark":"runtime error: timeout", "elements":[]}"#).is_err());
+}
+
+#[test]
+fn osm_semantics_keep_shops_roofs_lanes_bridges_and_physical_units() {
+    let input = br##"{"elements":[
+      {"type":"node","id":20,"lat":48.137,"lon":11.575,"tags":{"shop":"bakery","name":"Authored fixture bakery","opening_hours":"Mo-Fr 08:00-18:00"}},
+      {"type":"way","id":21,"tags":{"highway":"residential","width":"10 ft","lanes":"2","bridge":"yes","layer":"2","maxwidth":"1.5"},"geometry":[{"lat":48.137,"lon":11.575},{"lat":48.138,"lon":11.576}]},
+      {"type":"way","id":22,"tags":{"building":"retail","shop":"general","height":"30 ft","roof:shape":"gabled","roof:height":"2.5","roof:colour":"#885533","building:material":"brick"},"geometry":[{"lat":48.137,"lon":11.575},{"lat":48.137,"lon":11.576},{"lat":48.138,"lon":11.576},{"lat":48.138,"lon":11.575},{"lat":48.137,"lon":11.575}]}
+    ]}"##;
+    let features = parse_overpass(input).unwrap();
+    assert_eq!(features.len(), 3);
+    assert_eq!(features[0].kind, FeatureKind::PointOfInterest);
+    assert_eq!(features[0].properties["shop"], "bakery");
+    assert_eq!(features[0].properties["opening_hours"], "Mo-Fr 08:00-18:00");
+    assert!((features[1].height_m - 3.048).abs() < 0.001);
+    assert_eq!(features[1].properties["bridge"], "yes");
+    assert_eq!(features[1].properties["layer"], "2");
+    assert!((features[2].height_m - 9.144).abs() < 0.001);
+    assert_eq!(features[2].properties["roof:shape"], "gabled");
+    assert_eq!(features[2].properties["roof:colour"], "#885533");
+    for feature in features {
+        feature.validate().unwrap();
+    }
+    assert!(terra_stream::providers::parse_osm_length("NaN").is_none());
 }
 
 #[test]

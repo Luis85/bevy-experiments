@@ -163,20 +163,24 @@ pub enum FeatureKind {
     Farm,
     Grass,
     Tree,
+    /// Semantic facility or landmark node, retaining its original tags.
+    PointOfInterest,
+    /// Linear river, stream, canal or ditch; never treated as a closed lake.
+    Waterway,
 }
 
 impl FeatureKind {
     pub fn layer(self) -> Layer {
         match self {
-            Self::Building => Layer::Buildings,
+            Self::Building | Self::PointOfInterest => Layer::Buildings,
             Self::Road => Layer::Roads,
-            Self::Water => Layer::Water,
+            Self::Water | Self::Waterway => Layer::Water,
             _ => Layer::Vegetation,
         }
     }
 }
 
-/// Normalized semantic geometry. Roads are polylines, trees are points, other
+/// Normalized semantic geometry. Roads/waterways are polylines; trees and POIs are points; other
 /// kinds are polygon exteriors. Polygon holes/multipolygons require splitting
 /// or a richer provider-specific representation; they are not inferred here.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -191,8 +195,8 @@ pub struct WorldFeature {
 impl WorldFeature {
     pub fn validate(&self) -> Result<(), WorldDataError> {
         let minimum = match self.kind {
-            FeatureKind::Tree => 1,
-            FeatureKind::Road => 2,
+            FeatureKind::Tree | FeatureKind::PointOfInterest => 1,
+            FeatureKind::Road | FeatureKind::Waterway => 2,
             _ => 3,
         };
         if self.points.len() < minimum {

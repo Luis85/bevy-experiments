@@ -113,6 +113,8 @@ pub struct FeatureReference {
 /// refreshed independently. Keys in `feature_edits` are persistent tombstones.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SandboxState {
+    #[serde(default)]
+    pub living: crate::LivingWorld,
     pub version: u32,
     pub tick_seconds: f64,
     pub next_id: u64,
@@ -131,6 +133,7 @@ impl Default for SandboxState {
     fn default() -> Self {
         Self {
             version: SAVE_VERSION,
+            living: crate::LivingWorld::default(),
             tick_seconds: 0.0,
             next_id: 1,
             players: BTreeMap::new(),
@@ -147,6 +150,8 @@ impl Default for SandboxState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SandboxView {
+    #[serde(default)]
+    pub living: crate::LivingView,
     pub version: u32,
     pub tick_seconds: f64,
     pub player: PlayerState,
@@ -232,6 +237,11 @@ impl SandboxState {
             .get_mut(&id)
             .ok_or(SandboxError::PlayerMissing)?
             .position = position;
+        if let Some(account) = self.living.accounts.get(&id) {
+            if let Some(unit) = self.living.units.get_mut(&account.active_unit) {
+                unit.position = position;
+            }
+        }
         Ok(())
     }
 
@@ -424,8 +434,9 @@ impl SandboxState {
             truncated = true;
         }
         let factions = relevant_factions.into_iter().take(8).cloned().collect();
-        Ok(SandboxView {
+        let mut view = SandboxView {
             version: self.version,
+            living: self.living.snapshot(player_id, player.position, radius),
             tick_seconds: self.tick_seconds,
             player,
             factions,
@@ -435,12 +446,15 @@ impl SandboxState {
             farms,
             feature_edits,
             truncated,
-        })
+        };
+        view.enforce_wire_budget()?;
+        Ok(view)
     }
 
     pub fn validate_with_catalog(&self, catalog: &Catalog) -> Result<(), SandboxError> {
         self.validate()?;
         catalog.validate()?;
+        self.living.validate(&self.players, Some(catalog))?;
         if self
             .players
             .values()
@@ -493,6 +507,7 @@ impl SandboxState {
     }
 
     pub fn validate(&self) -> Result<(), SandboxError> {
+        self.living.validate(&self.players, None)?;
         if self.version != SAVE_VERSION {
             return Err(SandboxError::SaveVersion(self.version));
         }
@@ -807,4 +822,52 @@ where
         }
     }
     deserializer.deserialize_map(MembersVisitor)
+}
+
+/// Reserve space for the transport envelope beneath the 256 KiB frame limit.
+pub const MAX_SANDBOX_VIEW_BYTES: usize = 240 * 1024;
+impl SandboxView {
+    /// A bounded number of geometric reductions makes pathological long-name
+    /// inventories fit a frame without dropping the active player or body.
+    /// `truncated` explicitly marks omitted regional entities.
+    pub fn enforce_wire_budget(&mut self) -> Result<(), SandboxError> {
+        self.truncated |= self.living.truncated;
+        for _ in 0..8 {
+            if serde_json::to_vec(self)?.len() <= MAX_SANDBOX_VIEW_BYTES {
+                return Ok(());
+            }
+            self.truncated = true;
+            self.living.truncated = true;
+            self.plots.truncate(self.plots.len() / 2);
+            self.structures.truncate(self.structures.len() / 2);
+            self.resource_nodes.truncate(self.resource_nodes.len() / 2);
+            self.farms.truncate(self.farms.len() / 2);
+            self.feature_edits.truncate(self.feature_edits.len() / 2);
+            self.factions.truncate(self.factions.len().div_ceil(2));
+            self.living.shops.truncate(self.living.shops.len() / 2);
+            self.living
+                .producers
+                .truncate(self.living.producers.len() / 2);
+            self.living
+                .deliveries
+                .truncate(self.living.deliveries.len() / 2);
+            self.living.roads.truncate(self.living.roads.len() / 2);
+            let keep = self.living.units.len().div_ceil(2);
+            let protected = self
+                .living
+                .account
+                .as_ref()
+                .map(|a| [a.active_unit, a.avatar_unit]);
+            let mut ordinal = 0;
+            self.living.units.retain(|u| {
+                ordinal += 1;
+                ordinal <= keep || protected.is_some_and(|p| p.contains(&u.id))
+            });
+        }
+        if serde_json::to_vec(self)?.len() <= MAX_SANDBOX_VIEW_BYTES {
+            Ok(())
+        } else {
+            Err(SandboxError::Capacity)
+        }
+    }
 }

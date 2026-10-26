@@ -26,7 +26,7 @@ static OVERPASS_GATE: OnceLock<Mutex<OverpassBudget>> = OnceLock::new();
 
 fn client(config: &StreamConfig, url: &str) -> Result<Client, StreamError> {
     let mut builder = Client::builder()
-        .user_agent("TerraWorld/0.1 (open-data development demo; bounded requests)")
+        .user_agent("TerraWorld/0.2 (open-data development demo; bounded requests)")
         .timeout(Duration::from_secs(config.request_timeout_seconds))
         .connect_timeout(Duration::from_secs(config.request_timeout_seconds.min(8)))
         .redirect(reqwest::redirect::Policy::limited(3));
@@ -116,7 +116,7 @@ fn get(url: &str, config: &StreamConfig) -> Result<Vec<u8>, StreamError> {
 
 fn chunk_cache_key(key: TileKey, config: &StreamConfig) -> String {
     format!(
-        "chunk-v3/{}/{}/{}/{}/{}/{}/{}/{}/{}",
+        "chunk-v4/{}/{}/{}/{}/{}/{}/{}/{}/{}",
         key.level,
         key.x,
         key.y,
@@ -410,7 +410,7 @@ fn load_osm(key: TileKey, config: &StreamConfig) -> Result<Vec<WorldFeature>, St
     let b = key.bounds();
     let bbox = format!("{},{},{},{}", b.south, b.west, b.north, b.east);
     let query = format!(
-        "[out:json][timeout:15][maxsize:8388608];(way[building]({bbox});way[highway]({bbox});way[natural=water]({bbox});way[waterway]({bbox});way[natural=wood]({bbox});way[landuse~\"forest|farmland|farmyard|meadow|grass\"]({bbox});node[natural=tree]({bbox}););out tags geom;"
+        "[out:json][timeout:15][maxsize:8388608];(way[building]({bbox});way[building:part]({bbox});way[highway]({bbox});way[natural=water]({bbox});way[waterway]({bbox});way[natural=wood]({bbox});way[landuse~\"forest|farmland|farmyard|meadow|grass|orchard|vineyard\"]({bbox});node[natural=tree]({bbox});node[shop]({bbox});node[amenity]({bbox});node[craft]({bbox});node[tourism]({bbox}););out tags geom;"
     );
     // One request in flight across all instances and threads in this process.
     let mut budget = OVERPASS_GATE
@@ -454,7 +454,8 @@ fn load_osm(key: TileKey, config: &StreamConfig) -> Result<Vec<WorldFeature>, St
 }
 
 /// Import tagged OSM points and ways. Relations are deliberately not flattened
-/// into false polygons. Closed water/landuse/building ways and open roads are kept.
+/// into false polygons. Closed land-use/building/water areas, open roads and
+/// waterways, trees and semantic shop/amenity nodes are kept with their tags.
 pub fn parse_overpass(bytes: &[u8]) -> Result<Vec<WorldFeature>, StreamError> {
     let root: Value =
         serde_json::from_slice(bytes).map_err(|e| StreamError::Payload(e.to_string()))?;
@@ -484,17 +485,31 @@ pub fn parse_overpass(bytes: &[u8]) -> Result<Vec<WorldFeature>, StreamError> {
             continue;
         };
         let tag = |name: &str| tags.get(name).and_then(Value::as_str).unwrap_or("");
-        let kind = if !tag("building").is_empty() && tag("building") != "no" {
+        let kind = if kind_name == "node"
+            && (!tag("shop").is_empty()
+                || !tag("amenity").is_empty()
+                || !tag("craft").is_empty()
+                || !tag("tourism").is_empty())
+        {
+            FeatureKind::PointOfInterest
+        } else if (!tag("building").is_empty() && tag("building") != "no")
+            || (!tag("building:part").is_empty() && tag("building:part") != "no")
+        {
             FeatureKind::Building
         } else if !tag("highway").is_empty() {
             FeatureKind::Road
-        } else if tag("natural") == "water" || !tag("waterway").is_empty() {
+        } else if tag("natural") == "water" || tag("waterway") == "riverbank" {
             FeatureKind::Water
+        } else if !tag("waterway").is_empty() {
+            FeatureKind::Waterway
         } else if tag("natural") == "tree" {
             FeatureKind::Tree
         } else if tag("natural") == "wood" || tag("landuse") == "forest" {
             FeatureKind::Forest
-        } else if matches!(tag("landuse"), "farmland" | "farmyard") {
+        } else if matches!(
+            tag("landuse"),
+            "farmland" | "farmyard" | "orchard" | "vineyard"
+        ) {
             FeatureKind::Farm
         } else if matches!(tag("landuse"), "meadow" | "grass") {
             FeatureKind::Grass
@@ -538,12 +553,8 @@ pub fn parse_overpass(bytes: &[u8]) -> Result<Vec<WorldFeature>, StreamError> {
                 "OSM geometry vertex budget exceeded".into(),
             ));
         }
-        let parsed_height = tag("height")
-            .trim_end_matches('m')
-            .trim()
-            .parse::<f32>()
-            .ok()
-            .filter(|h| h.is_finite() && *h > 0.0 && *h < 2000.0);
+        let parsed_height =
+            parse_osm_length(tag("height")).filter(|h| h.is_finite() && *h > 0.0 && *h < 2000.0);
         let levels = tag("building:levels")
             .parse::<f32>()
             .ok()
@@ -551,7 +562,19 @@ pub fn parse_overpass(bytes: &[u8]) -> Result<Vec<WorldFeature>, StreamError> {
         let default_height = match kind {
             FeatureKind::Building => levels.unwrap_or(2.0) * 3.0,
             FeatureKind::Tree | FeatureKind::Forest => 8.0,
-            FeatureKind::Road => 4.0,
+            FeatureKind::Road => match tag("highway") {
+                "motorway" | "trunk" => 10.5,
+                "primary" | "secondary" => 7.0,
+                "tertiary" | "residential" => 6.0,
+                "footway" | "path" | "cycleway" | "steps" => 2.0,
+                _ => 4.0,
+            },
+            FeatureKind::Waterway => match tag("waterway") {
+                "river" => 14.0,
+                "canal" => 8.0,
+                "ditch" | "drain" => 1.5,
+                _ => 3.0,
+            },
             _ => 0.0,
         };
         let mut properties: BTreeMap<String, String> = tags
@@ -576,15 +599,57 @@ pub fn parse_overpass(bytes: &[u8]) -> Result<Vec<WorldFeature>, StreamError> {
                 "inferred/default; not measured".into(),
             );
         }
+        let height_m = if matches!(kind, FeatureKind::Road | FeatureKind::Waterway) {
+            // Legacy WorldFeature height_m stores the rendered width for linear features.
+            let lanes = tag("lanes")
+                .parse::<f32>()
+                .ok()
+                .filter(|n| n.is_finite() && (1.0..=12.0).contains(n));
+            let measured = parse_osm_length(tag("width")).filter(|n| (0.3..=100.0).contains(n));
+            if measured.is_none() {
+                properties.insert(
+                    "width_source".into(),
+                    "inferred from lanes/class; not measured".into(),
+                );
+            }
+            measured
+                .or_else(|| {
+                    if kind == FeatureKind::Road {
+                        lanes.map(|n| n * 3.1)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(default_height)
+        } else {
+            parsed_height.unwrap_or(default_height)
+        };
         output.push(WorldFeature {
             id: format!("osm:{kind_name}:{id}"),
             kind,
             points,
-            height_m: parsed_height.unwrap_or(default_height),
+            height_m,
             properties,
         });
     }
     Ok(output)
+}
+
+/// OSM lengths use metres unless a supported unit is explicit. Restrictions such
+/// as `maxwidth` are deliberately not used as physical geometry dimensions.
+pub fn parse_osm_length(input: &str) -> Option<f32> {
+    let value = input.trim();
+    let (digits, factor) = if let Some(s) = value.strip_suffix(" ft") {
+        (s, 0.3048)
+    } else if let Some(s) = value.strip_suffix(" cm") {
+        (s, 0.01)
+    } else if let Some(s) = value.strip_suffix('m') {
+        (s, 1.0)
+    } else {
+        (value, 1.0)
+    };
+    let n = digits.trim().parse::<f32>().ok()? * factor;
+    n.is_finite().then_some(n)
 }
 
 /// Fetch current live conditions, cached per 0.05° cell for ten minutes by default.

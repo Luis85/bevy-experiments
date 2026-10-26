@@ -1,81 +1,145 @@
-# Validation record
+# Terra World 0.2 validation record
 
-Validation date: 2026-10-26. Toolchain: Rust 1.99.1; Bevy 0.20.0. Tests ran on Linux. Windows, macOS, WebAssembly, mobile hardware and public-Internet deployment were not exercised.
+Validation date: 2026-10-26. Rust 1.99.1, Bevy 0.20.0, Linux. The native review uses X11 and Mesa software Vulkan; its timings are not gaming-hardware benchmarks. Windows, macOS, WebAssembly, mobile and public-Internet deployment were not exercised.
 
-## Domain and data suites
+## Automated gates
 
-| Suite | Passing tests | What was exercised |
+| Suite | Distinct passing tests | Coverage |
 |---|---:|---|
-| `terra-core` | 12 | WGS84 round trips, poles, antimeridian, antipodes, tiled geography, environment and actor contracts |
-| `terra-sandbox` gameplay | 13 | Transactional inventory/build/craft/farm/gather/damage; catalog-aware persistence; exact GPS JSON round trip |
-| `terra-sandbox` factions | 7 | Invitations, role changes, shared property, demotion, invalid saves and tagged-message roster deserialization |
-| `terra-cli` | 4 | Command parsing, scripted workflows and complete demo round trip |
-| `terra-history` | 13 | Date intervals, missing coverage, ambiguous packs, provenance, path/file budgets, holes, antimeridian, GeoJSON round trips and both bundled eras |
-| `terra-stream` unit | 11 | Terrain seams, clipping, cache corruption/age/eviction, bounded work, deduplication, stale completion and retry policy |
-| `terra-stream` provider fixtures | 5 | Terrarium decoding, OSM parsing, units, timestamps, offline and polar behavior |
-| `terra-stream` HTTP integration | 1 | Actual local HTTP, PNG/JSON decoding, clipping, cache reuse, serialized Overpass access, response spacing and exhausted budgets |
-| `terra-net` unit | 12 | Incremental frames, rate/buffer budgets, capabilities, geographic rules, configuration and worst-case snapshot size |
-| `terra-net` TCP integration | 13 | Two clients, authoritative movement and commands, interest filtering, replay protection, shared factions, resume, custom catalogs, historical manifests, coverage and isolated malformed peers |
-| `terra-bevy` headless unit | 15 | Config bounds, terrain/water/slope semantics, base-world identity, faction replicas, drawing/export, invalid drafts, regional atlas framing, historical grid identity, local saves, antipodal distance, actual TCP routing of late/backlogged commands and bounded recovery after a stalled frame |
-| `terra-bevy` headless integration | 6 | Actual plugin scheduling/streaming, fixed clock pause, distant rebasing/date-line jumps, queued atomic commands, disabled weather, paused regional weather refresh and custom-catalog source filtering |
-| `terra-bevy` renderer-specific | 3 | Concave polygon triangulation, degenerate geometry rejection and structural mesh fingerprints that ignore inventory-only changes |
-| `terra-demo` interaction | 1 | Resource selection skips nearer forbidden and vertically unreachable nodes, selects a permitted node accepted by the domain, and handles depletion |
+| Core | 12 | Geographic round trips, poles/date line, clocks, solar/seasons, actors and environment contracts |
+| History | 13 | Dated packs, missing coverage, provenance, file bounds, political geometry and bundled scenarios |
+| CLI | 4 | Parsing, deterministic simulation and existing complete sandbox workflow |
+| Stream | 20 | 13 unit, 6 semantic/provider fixtures, 1 real local HTTP/cache integration; PNG heightmaps and OSM tags included |
+| Sandbox | 40 | 7 faction, 13 established gameplay and 20 living-world tests |
+| Network library / host / TCP | 35 | 17 library, 1 CLI spawn-residency and 17 actual loopback tests |
+| Bevy library with rendering | 28 | Includes 20 shared/headless tests and 8 geometry/render-specific checks |
+| Bevy integration | 8 | 6 established engine tests, 1 complete living-world workflow and 1 actual procedural-map settlement |
+| Native demo | 8 | Camera vectors, control transitions, viewport/hit testing, road draping and reachable gathering |
+| **Total** | **168** | Repeated runs and tests shared by headless/render features are counted once |
 
-These counts total **116 distinct tests**. The pure crate tests were independently exercised by their owners and then all 91 passed together in the root Cargo workspace run. The final Bevy headless Cargo target passed all 15 unit and 6 integration tests, including real TCP schedule and stalled-frame regressions discovered during native review. Renderer-specific and demo interaction tests were run with the rendering feature enabled. Do not add repeated runs of the same test to the distinct count.
+The complete domain/network gate passes 75 tests together. The renderer-enabled Bevy/demo gate exercises the same public interfaces used by the desktop application. A test that intentionally creates an unresponsive peer prints a timeout diagnostic while passing; it checks genuine silence separately from queued-frame recovery.
 
-## Actual executable workflows
+### Integrated gameplay proof
 
-The CLI sandbox workflow completed 24 commands with two players, one faction, a transferred plot, three faction-owned structures and a shared home. Save/reload equality was true, including offset GPS values. The offline probe returned a 33×33 heightfield and 22 explicitly synthetic features. The deterministic movement example advanced six seconds and approximately nine metres.
+`crates/terra-bevy/tests/living_world.rs` creates an actual Bevy app, streams terrain, seeds the population, buys bread, possesses another owned body, moves it, releases it, changes the active RTS body, issues a terrain movement order, advances production and courier deliveries, and restores exact state from a saved world. Principal identity, inventory, cash, active-body position and full-state validity are checked.
 
-Both finite Bevy examples run successfully with rendering disabled: the standard headless example loaded a chunk and queried terrain; the custom-provider example loaded a chunk through the public provider hook.
+`crates/terra-bevy/tests/procedural_settlement.rs` adds the actual map and physical constraints that a flat fixture cannot establish:
 
-The independently built server/client process runner passed six groups:
+| Configuration / result | Observed value |
+|---|---:|
+| Region / seed | Munich coordinates / 42 |
+| Resident source chunks | 49 |
+| Heightfield resolution | 65 × 65 per chunk |
+| Population | 47 bodies |
+| Markets / production sites | 1 / 7 |
+| Movement duration / fixed step | 180 seconds / 20 Hz |
+| Calendar scale | 60× |
+| Production cycles | 626 |
+| Completed physical deliveries | 4 |
+| Resident purchases | 42 |
 
-1. Procedural host with two independent clients; neighbouring source chunks are registered beyond the spawn tile.
-2. Clean host save/restart preserving both identities, inventories and command sequences.
-3. Historical era-B host with a matching dated political dataset.
-4. Wrong epoch, pack or political revision rejected before saved-player allocation.
-5. Invalid/missing history configuration, uncovered spawn, conflicting grid and mismatched saved epoch rejected.
-6. FIFO/special-file inputs rejected before they can block startup.
+Loading is paused before advancing the scenario. Source roads, buildings, forests and farms remain present, and the normal physical resolver stays enabled. The test asserts successful productive activity and physical deliveries, not an exact economic balance forever. These counts describe the recorded run, not a throughput benchmark or a promise for arbitrary imported geography.
 
-The reproducible runner is `crates/terra-net/tests/process_smoke.py`; see `MULTIPLAYER.md` for its command line. Client capability files used by the tests are temporary and are not included in this source bundle.
+The first actual-map run failed with zero deliveries. The final fixes rank nearby roads before applying the route budget, use the full bounded road graph, compare desired heading at turns, and distinguish parked vehicles from moving traffic. Focused regressions retain the failure cases.
 
-## Real public data probe
+### Graphics budget
 
-The strict live terrain/weather probe ran with synthetic fallback disabled. It retrieved real terrain samples near Munich, ranging from 519.889 to 530.212 metres, and a current Open-Meteo model sample marked `synthetic: false`. This verifies the implemented HTTPS decoding and unit paths for those providers; it is not a survey comparison or a weather accuracy assessment.
+The default 49-chunk mesh regression measured **1,464,403 source vertices**, with 6 near, 20 middle and 23 far chunks. The assertion keeps this fixture below two million source vertices. This count includes terrain and source features; independently cached actors and player structures are separate. Full heightfields are retained at every detail tier. LOD hysteresis and asynchronous mesh jobs are exercised.
 
-The public Overpass POST timed out at 20 seconds, and a tiny GET diagnostic returned HTTP 406. OSM parsing and the real HTTP/cache/rate-limit path pass against a local fixture. A successful public OSM fetch was **not** observed in this environment. The UI reports this provider condition explicitly and does not silently relabel generated features as OSM.
+## Independent executable checks
 
-Exact measurements and attribution are retained in `crates/terra-stream/verification/live-probe-2026-10-26.json`. The final probe may reuse source bytes downloaded earlier in the same verification session; cached retrieval timestamps retain their original age. TLS verification remains enabled.
+`crates/terra-net/tests/process_smoke.py` ran the freshly built host and client binaries through six passing groups:
 
-## Native explorer and renderer
+1. Procedural host with two independent clients.
+2. Save/restart with both identities and inventories preserved.
+3. Historical world pack with its matching political dataset.
+4. Rejection of mismatched epoch, pack and political revision.
+5. Invalid historical startup/resume configuration and missing coverage.
+6. Rejection of FIFO/special-file inputs before they can block startup.
 
-The native application was built and run on a virtual X11 display using Mesa 25.2.8 / LLVM 20.1.2 software Vulkan. Screenshots were captured from the actual application and inspected independently. The 1440×900 layout and the declared 1100×700 minimum were both exercised. See `PRODUCT_REVIEW.md` for findings and limits.
+A separate 25-tick CLI server smoke opened an actual loopback listener and atomically saved a validated world with 42 NPC bodies, seven production sites, one shop and seven completed production cycles.
 
-- The finite native smoke run completed 160 frames with nine resident chunks and reported success after claiming land, crafting, building a house/workbench/fence, setting a home and planting wheat.
-- An actual UI terrain click placed a fourth structure (another fence), and F5 persisted it. Named faction creation and plot transfer were exercised. F9 restored the earlier personal-plot state, changing the visible shared-plot count from one back to zero.
-- An invalid latitude of 91 degrees was rejected with a useful example; geographic focus stayed unchanged.
-- The current country atlas rendered with provenance and boundary-policy text. The historical atlas originally appeared empty because its regional polygons were too small at global scale. After the fit/zoom correction, both 1950 regions were visible.
-- The native regional editor accepted three clicked vertices and Enter, then exported five total GeoJSON features: four original era features and one new scenario territory. Its closed ring contains exactly four positions, and selection reports overlapping underlying/authored claims. Toolbar clicks do not become accidental map vertices.
-- Native public-elevation streaming near 47.421° N, 10.985° E loaded nine real-data chunks with zero synthetic fallback. OSM and live weather were intentionally disabled for this renderer check; terrain colors are heuristic visualization, not observed surface imagery.
-- Native multiplayer movement reached the authoritative host and moved player 2 approximately ten metres north while another client observed two actors. This review exposed a queue-consumer race that discarded late UI actions; the corrected schedule regression proves a claim and eight craft commands reach both host and replica while preserving the bounded-send backlog. The corrected native UI then successfully claimed a 40-metre plot and crafted planks; the host save confirmed plot 1 owned by player 2 and inventory changing from 30 wood / 0 planks to 28 wood / 4 planks.
-- The native client was deliberately suspended for 12 seconds while its host continued running. After resuming, it consumed queued authoritative updates, remained connected as player 2, and retained its property and crafted inventory. The companion TCP regression also checks that a genuinely silent open peer still times out.
-- The host was saved and restarted before the final native review, preserving player 2 and plot 1. After the native crafting and stall checks, reopening the client with the same capability restored player 2, plot 1 and the crafted inventory. The host retained exactly the original player IDs `[1, 2]`; reconnecting did not allocate another owner. The final native capture shows server tick 34462 and both actor replicas. Sanitized state evidence is in [native-multiplayer-verification.json](native-multiplayer-verification.json); no capability secrets or private save files are bundled.
+## Native review
 
-Accepted images are in `screenshots/`: world overview, restored camp, current atlas, regional historical atlas, authored territory, minimum window, multiplayer, and real terrain. `review-before-regional-atlas.png` is retained as before/after evidence, not presented as the final interface.
+Actual native captures were inspected at 1440 × 900 and at the declared 1100 × 700 minimum. This review covered the expanded RTS scene, first- and third-person cameras, the market, production, a georeferenced heightmap, and the political atlas. It did not substitute screenshots for command/state assertions.
 
-The final multiplayer review used `day_night: false` to keep its visual lighting readable. Its calendar and environmental readouts continued to follow the authoritative server; fixed visual daylight is not a claim that the server's displayed solar angle was used for that capture.
+A native local session verified these actions with the real UI and save output:
 
-## Reproduce the gates
+- F2/F3 changed possession view; first person hid the controlled exterior body.
+- WASD changed the controlled actor's saved GPS position while keeping player ID 1.
+- Ordering the actor to the market released direct possession and created a movement order on the same body.
+- Buying one bread changed the wallet from 25,000 to 24,750 minor credit units and added one bread to inventory. The visible market showed 247.50 credits and the enabled sell action.
+- F5 saved the body, account, inventory, production and logistics state.
 
-```bash
+The final multiplayer check used the freshly built native client and CLI host.
+Two player accounts admitted 52 bodies. Native player 2 selected and possessed
+an owned worker rather than the original avatar, changed its host-validated GPS
+position with WASD, switched between first and third person, and bought one
+bread through the Market UI. The host saved 24,750 minor credit units and one
+bread on that same principal. The Industry capture shows 12 completed physical
+deliveries and a farm waiting for seed inputs; the minimum-window capture shows
+13 deliveries and the farm working again after replenishment.
+
+Closing and reopening the native client with its original session identity
+preserved player 2, worker ID 1000063, position, wallet and inventory. Disconnect
+correctly released manual possession, so the resumed client began in RTS mode.
+The later host sample recorded 14 completed deliveries and 79 resident purchases.
+This visual run used a bounded 9-chunk neighborhood; the 49-chunk default is
+covered separately by the procedural integration and native landscape capture.
+Selected state samples and checked assertions are retained in
+[native-v2-verification.json](native-v2-verification.json); private session
+capabilities and host saves are excluded.
+
+The native renderer in this environment can take several seconds to present a frame while compilation is also running. Early capture filenames were therefore corrected according to the mode actually visible; a command issued immediately before an image is not evidence that the next frame was already presented.
+
+The final UI fixes include explicit control errors, ownership labels, a visible pause state, consistent spatial interaction distance, production waiting states, shorter labels, and opaque panels. See [the product review](PRODUCT_REVIEW.md) and the accepted captures in `screenshots/`.
+
+The final local overview shows all 49 chunks rendered with zero pending chunks,
+47 bodies and all 5 owned bodies selected. Its footer explicitly reports the
+paused state, and the native save command completed. This separately confirms
+the wider default working set, RTS group selection and pause feedback.
+
+### Accepted native captures
+
+These are unedited captures of the native application. The included terrain and
+settlement are authored synthetic content; the political atlas has its own
+source attribution. The UI was also independently reviewed after the final
+polish fixes.
+
+| View | Evidence |
+|---|---|
+| Wider default world and RTS selection | [49-chunk overview](screenshots/v2-rts-overview.png) |
+| Georeferenced PNG terrain | [Heightmap settlement](screenshots/v2-heightmap-settlement.png) · [Wider relief](screenshots/v2-heightmap-overview.png) |
+| Owned-body possession | [Third person](screenshots/v2-third-person.png) · [First person](screenshots/v2-first-person.png) |
+| Authoritative trade | [Bread purchase](screenshots/v2-market-purchase.png) |
+| Production and physical cargo | [Industry and logistics](screenshots/v2-industry-logistics.png) |
+| Small-window layout | [1100 × 700](screenshots/v2-minimum-window.png) |
+| Native resume | [Same player, body and wallet](screenshots/v2-multiplayer-resume.png) |
+| Political geography | [Attributed country atlas](screenshots/v2-political-atlas.png) |
+
+The final heightmap capture shows 49 rendered chunks with zero pending chunks,
+draped roads and the explicit “SYNTHETIC HEIGHTMAP” banner. The final default
+landscape, heightmap, possession, purchase, production and minimum-window images
+were independently accepted with no remaining blocking visual finding.
+
+## Public data and provenance
+
+The retained strict public elevation/weather probe from 2026-10-26 is recorded in `crates/terra-stream/verification/live-probe-2026-10-26.json`: real Munich elevation samples ranged from 519.889 to 530.212 m and the weather sample was not marked synthetic. This establishes HTTPS decoding and units, not scientific accuracy.
+
+A successful public Overpass download was **not** observed. The v0.2 alternate-endpoint attempt timed out after 20.206 seconds and is recorded in `crates/terra-stream/verification/overpass-v2-2026-10-26.json`. OSM semantic fixtures and the actual local HTTP/cache path pass. Public-data rendering must continue to expose source/fallback status rather than calling generated scenery observed data.
+
+The bundled PNG heightmap is explicitly synthetic. It verifies georeferenced 8/16-bit elevation import and terrain draping, and is not the terrain of Munich. The historical examples are fictional era packs. The bundled Natural Earth countries are a current generalized source capture, not an attested historical border reconstruction.
+
+## Reproduce
+
+```sh
 ./scripts/verify.sh
-cargo build -p terra-net --bins
+cargo build -p terra-net --bins --locked
 python3 crates/terra-net/tests/process_smoke.py
-cargo run -p terra-demo -- --smoke --camp-view --noon --time-scale 0 \
-  --radius 1 --frames 160 --screenshot captures/camp.png
+cargo run -p terra-demo --locked -- --camp-view
+cargo run -p terra-demo --locked -- --config configs/heightmap.json
 ```
 
-A native renderer requires a supported graphics device and window system. In this validation environment, a virtual X11 display and Mesa software Vulkan are used for visual inspection; those timings do not represent gaming hardware performance.
+The procedural integration test is part of the normal Bevy integration suite and performs 3,600 fixed updates. Socket tests require a localhost-capable execution environment. Public endpoints are contacted only by explicitly requested live probes or `--live` sessions.
 
-No test contacts a public data endpoint unless it is explicitly a live probe. The included CI definition runs local tests and compiles the native demo; it does not download a planet, stress a public API, or claim Internet-scale load coverage.
+The earlier release's complete evidence is retained in [VALIDATION_v0.1.md](VALIDATION_v0.1.md); its screenshots and counts describe v0.1 and are not substituted for v0.2 checks.

@@ -2,7 +2,7 @@
 //! source attribution and caching without depending on any public API uptime.
 use image::{DynamicImage, ImageFormat, Rgb, RgbImage};
 use std::{
-    io::{Read, Write},
+    io::{BufRead, BufReader, Read, Write},
     net::{TcpListener, TcpStream},
     sync::{
         Arc, Mutex,
@@ -51,12 +51,33 @@ impl FixtureServer {
                 socket
                     .set_read_timeout(Some(Duration::from_secs(2)))
                     .unwrap();
-                let mut request = vec![0u8; 16384];
-                let n = socket.read(&mut request).unwrap_or(0);
-                if n == 0 {
+                // TCP reads may split headers or leave a POST body unread. Closing
+                // with unread input can reset the connection on Windows before
+                // the client receives the response. Consume one complete request.
+                let mut request = String::new();
+                let mut reader = BufReader::new(&mut socket);
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                        break;
+                    }
+                    request.push_str(&line);
+                    assert!(request.len() <= 16384, "fixture request headers too large");
+                    if line == "\r\n" {
+                        break;
+                    }
+                }
+                if request.is_empty() {
                     continue;
                 }
-                let request = String::from_utf8_lossy(&request[..n]);
+                let content_length = request
+                    .lines()
+                    .filter_map(|line| line.split_once(':'))
+                    .find(|(name, _)| name.eq_ignore_ascii_case("content-length"))
+                    .map_or(0, |(_, value)| value.trim().parse::<usize>().unwrap());
+                assert!(content_length <= 16384, "fixture request body too large");
+                reader.read_exact(&mut vec![0; content_length]).unwrap();
+                drop(reader);
                 let path = request.split_whitespace().nth(1).unwrap_or("");
                 let is_overpass = path.starts_with("/overpass");
                 let arrived = Instant::now();

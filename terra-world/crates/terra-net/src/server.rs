@@ -7,7 +7,8 @@ use std::{
 
 use serde::{Deserialize, Serialize};
 use terra_core::{
-    ActorKind, ActorState, GeoPosition, LocalFrame, WorldChunk, WorldClock, synthetic_weather,
+    ActorKind, ActorState, GeoPosition, LocalFrame, TileKey, WorldChunk, WorldClock,
+    synthetic_weather,
 };
 use terra_sandbox::{Catalog, Inventory, SandboxState};
 
@@ -36,6 +37,43 @@ pub trait WorldEnvironment: Send + Sync {
     }
     fn water_height_m(&self, _position: GeoPosition) -> Option<f64> {
         Some(0.0)
+    }
+    /// Called when the host's source streamer integrates or evicts geometry.
+    fn register_chunk(&mut self, _chunk: &WorldChunk) {}
+    fn evict_chunk(&mut self, _key: TileKey) {}
+    /// Override for a game's memory-only collision and navigation queries.
+    /// The default supports terrain/coverage only; the reference CLI uses
+    /// ResidentSurface for water, slopes, bridges and source footprints.
+    fn resolve_movement(
+        &self,
+        kind: ActorKind,
+        _from: GeoPosition,
+        mut candidate: GeoPosition,
+    ) -> Option<GeoPosition> {
+        if !validate_position(candidate) || !self.can_enter(candidate) {
+            return None;
+        }
+        let height = if kind == ActorKind::Ship {
+            self.water_height_m(candidate)
+        } else {
+            self.ground_height_m(candidate)
+        }?;
+        if !height.is_finite() || !(-12_000.0..=99_997.0).contains(&height) {
+            return None;
+        }
+        candidate.altitude_m = if is_airborne(&kind) {
+            candidate.altitude_m.max(height + 3.)
+        } else {
+            height
+        };
+        Some(candidate)
+    }
+    fn allows_placement(&self, position: GeoPosition, _radius_m: f64, _footprint: bool) -> bool {
+        validate_position(position)
+            && self.can_enter(position)
+            && self
+                .ground_height_m(position)
+                .is_some_and(|h| h.is_finite() && (position.altitude_m - h).abs() <= 3.)
     }
 }
 
@@ -251,6 +289,93 @@ impl Server {
         &self.sandbox
     }
 
+    /// Explicit opt-in for an authored economy/population in the hosted world.
+    pub fn enable_living_demo(&mut self, features: &[terra_core::WorldFeature]) -> Result<()> {
+        // A v0.1 built-in catalog is extended only when it exactly matches the
+        // prior built-in rules; custom catalogs are never silently rewritten.
+        if !self.catalog.items.contains("bread") {
+            let mut legacy = Catalog::builtin();
+            for item in ["bread", "water", "flour"] {
+                legacy.items.remove(item);
+            }
+            legacy.recipes.remove("bread");
+            legacy.recipes.remove("flour");
+            if serde_json::to_value(&legacy)? == serde_json::to_value(&self.catalog)? {
+                self.catalog = Catalog::builtin();
+            }
+        }
+        self.sandbox
+            .seed_living_demo(self.config.spawn, features, &self.catalog)?;
+        self.ground_living_positions(None);
+        Ok(())
+    }
+
+    fn ground_living_positions(&mut self, only_player: Option<u64>) {
+        let environment = self.environment.as_ref();
+        let mut moved_facilities = Vec::new();
+        if only_player.is_none() {
+            for shop in self.sandbox.living.shops.values_mut() {
+                if let Some(position) =
+                    find_safe_ground(environment, shop.position, ActorKind::Human)
+                {
+                    moved_facilities.push((shop.position, position));
+                    shop.position = position;
+                }
+            }
+            for site in self.sandbox.living.producers.values_mut() {
+                if let Some(position) =
+                    find_safe_ground(environment, site.position, ActorKind::Human)
+                {
+                    moved_facilities.push((site.position, position));
+                    site.position = position;
+                }
+            }
+        }
+        let remap = |position: GeoPosition| {
+            moved_facilities
+                .iter()
+                .find(|(old, _)| old.surface_distance_m(position) < 0.5)
+                .map(|(_, new)| *new)
+                .unwrap_or_else(|| {
+                    let mut p = position;
+                    if let Some(height) = environment.ground_height_m(p) {
+                        p.altitude_m = height;
+                    }
+                    p
+                })
+        };
+        for unit in self
+            .sandbox
+            .living
+            .units
+            .values_mut()
+            .filter(|u| only_player.is_none_or(|id| u.owner == Some(id)))
+        {
+            if let Some(position) = find_safe_ground(environment, unit.position, unit.kind) {
+                unit.position = position;
+            }
+            unit.home = remap(unit.home);
+            for point in unit.path.iter_mut().chain(&mut unit.patrol) {
+                *point = remap(*point);
+            }
+        }
+        if only_player.is_none() {
+            for road in &mut self.sandbox.living.roads {
+                for point in &mut road.points {
+                    *point = remap(*point);
+                }
+            }
+        }
+        for account in self.sandbox.living.accounts.values() {
+            if let (Some(unit), Some(player)) = (
+                self.sandbox.living.units.get(&account.active_unit),
+                self.sandbox.players.get_mut(&account.player_id),
+            ) {
+                player.position = unit.position;
+            }
+        }
+    }
+
     pub fn set_catalog(&mut self, catalog: Catalog) -> Result<()> {
         self.set_catalog_and_starting_inventory(catalog, self.starting_inventory.clone())
     }
@@ -272,12 +397,19 @@ impl Server {
     /// Feed normalized resident chunks from the hosting world's streaming layer.
     /// This registers resources without changing the immutable source chunk.
     pub fn register_chunk(&mut self, chunk: &WorldChunk) {
+        self.environment.register_chunk(chunk);
         self.sandbox.register_chunk(chunk);
         // The domain's default tree-to-wood mapping is optional for games whose
         // catalog uses different resources. Metadata remains available.
         self.sandbox
             .resource_nodes
             .retain(|_, node| self.catalog.items.contains(&node.item));
+    }
+
+    /// Drop only physical source geometry; persisted gathered-resource state
+    /// remains in the domain and is not regenerated when a tile returns.
+    pub fn evict_chunk(&mut self, key: TileKey) {
+        self.environment.evict_chunk(key);
     }
 
     pub fn seed_resource(
@@ -506,7 +638,7 @@ impl Server {
                 self.peers.insert(id, peer);
             } else {
                 if let Some(actor_id) = peer.actor_id {
-                    self.actors.remove(&actor_id);
+                    self.disconnect_player(actor_id);
                 }
                 report.disconnected += 1;
             }
@@ -637,7 +769,16 @@ impl Server {
                         .position;
                     (actor_id, position, token)
                 } else {
-                    if self.sandbox.players.len() >= terra_sandbox::MAX_PLAYERS {
+                    if self.sandbox.players.len() >= terra_sandbox::MAX_PLAYERS
+                        || (self.sandbox.living.enabled
+                            && self
+                                .sandbox
+                                .living
+                                .units
+                                .len()
+                                .saturating_add(terra_sandbox::STARTER_UNIT_COUNT)
+                                > terra_sandbox::MAX_LIVING_UNITS)
+                    {
                         Self::error(
                             peer,
                             "capacity",
@@ -646,17 +787,15 @@ impl Server {
                         peer.strikes = 3;
                         return Ok(());
                     }
-                    while self.actors.contains_key(&self.next_actor_id)
-                        || self.sandbox.players.contains_key(&self.next_actor_id)
+                    let mut actor_id = self.next_actor_id;
+                    while self.actors.contains_key(&actor_id)
+                        || self.sandbox.players.contains_key(&actor_id)
                     {
-                        self.next_actor_id = self
-                            .next_actor_id
+                        actor_id = actor_id
                             .checked_add(1)
                             .ok_or_else(|| NetError::Protocol("actor IDs exhausted".into()))?;
                     }
-                    let actor_id = self.next_actor_id;
-                    self.next_actor_id = self
-                        .next_actor_id
+                    let following_actor_id = actor_id
                         .checked_add(1)
                         .ok_or_else(|| NetError::Protocol("actor IDs exhausted".into()))?;
                     let offset = (client_id.saturating_sub(1) % 32) as f64 * 3.0;
@@ -678,6 +817,16 @@ impl Server {
                             "authoritative spawn has no available terrain",
                         );
                     }
+                    let Some(safe_spawn) =
+                        find_safe_ground(self.environment.as_ref(), spawn, ActorKind::Human)
+                    else {
+                        return Self::error(
+                            peer,
+                            "spawn",
+                            "no loaded traversable ground is available near the spawn",
+                        );
+                    };
+                    spawn = safe_spawn;
                     let token = fresh_token()?;
                     self.sandbox.add_player_with_inventory(
                         actor_id,
@@ -685,14 +834,35 @@ impl Server {
                         self.starting_inventory.clone(),
                         &self.catalog,
                     )?;
+                    if let Err(error) = self.sandbox.ensure_living_player(actor_id) {
+                        // Crew creation is transactional. A rejected registration
+                        // must not mint inventory or strand a saved player/token.
+                        self.sandbox.players.remove(&actor_id);
+                        return Self::error(peer, "capacity", &error.to_string());
+                    }
+                    self.next_actor_id = following_actor_id;
                     self.sessions.insert(token.clone(), actor_id);
                     (actor_id, spawn, token)
                 };
+                if let Err(error) = self.sandbox.ensure_living_player(actor_id) {
+                    return Self::error(peer, "capacity", &error.to_string());
+                }
+                self.ground_living_positions(Some(actor_id));
+                let spawn = self
+                    .sandbox
+                    .living
+                    .active_unit(actor_id)
+                    .map_or(spawn, |u| u.position);
+                let active_kind = self
+                    .sandbox
+                    .living
+                    .active_unit(actor_id)
+                    .map_or(ActorKind::Human, |u| u.kind);
                 self.actors.insert(
                     actor_id,
                     ActorState {
                         id: actor_id,
-                        kind: ActorKind::Human,
+                        kind: active_kind,
                         position: spawn,
                         velocity_enu_m_s: [0.0; 3],
                         heading_deg: 0.0,
@@ -743,13 +913,32 @@ impl Server {
                     .map(|component| component * component)
                     .sum::<f64>()
                     .sqrt();
-                if !speed.is_finite() || speed > speed_limit(&actor.kind) {
+                let allowed = self.sandbox.living.active_unit(actor_id).map_or_else(
+                    || speed_limit(&actor.kind),
+                    |unit| unit.base_speed_limit_m_s(),
+                );
+                if !speed.is_finite() || speed > allowed {
                     return Self::error(peer, "speed", "movement exceeds actor speed limit");
                 }
                 if !is_airborne(&actor.kind) && velocity_enu_m_s[2].abs() > f64::EPSILON {
                     return Self::error(peer, "vertical_movement", "surface actor cannot fly");
                 }
                 actor.velocity_enu_m_s = velocity_enu_m_s;
+                // Snapshot-delayed clients may request their prior needs cap.
+                // Validate the fixed intent cap, then enforce current needs here.
+                if let Some(unit) = self.sandbox.living.active_unit(actor_id) {
+                    let cap = unit.speed_limit_m_s();
+                    if speed > cap {
+                        for v in &mut actor.velocity_enu_m_s {
+                            *v *= cap / speed;
+                        }
+                    }
+                }
+                if speed > 0.001 {
+                    if let Some(account) = self.sandbox.living.accounts.get_mut(&actor_id) {
+                        account.possessed = true;
+                    }
+                }
                 if speed > 0.01 {
                     actor.heading_deg = velocity_enu_m_s[0]
                         .atan2(velocity_enu_m_s[1])
@@ -806,23 +995,33 @@ impl Server {
                     .position;
                 self.sandbox.set_player_position(actor_id, position)?;
                 let target = match &command {
-                    terra_sandbox::Command::ClaimPlot { center, .. } => Some(*center),
-                    terra_sandbox::Command::Build { position, .. }
-                    | terra_sandbox::Command::Plant { position, .. } => Some(*position),
+                    terra_sandbox::Command::ClaimPlot { center, .. } => Some((*center, 0., false)),
+                    terra_sandbox::Command::Build {
+                        position,
+                        blueprint,
+                    } => Some((
+                        *position,
+                        self.catalog
+                            .blueprints
+                            .get(blueprint)
+                            .map_or(0., |b| b.radius_m),
+                        true,
+                    )),
+                    terra_sandbox::Command::Plant { position, .. } => Some((*position, 1., true)),
                     _ => None,
                 };
-                if let Some(target) = target {
-                    let supported = validate_position(target)
-                        && self
-                            .environment
-                            .ground_height_m(target)
-                            .is_some_and(|height| {
-                                height.is_finite() && (target.altitude_m - height).abs() <= 3.0
-                            });
-                    if !supported {
+                if let Some((target, radius, footprint)) = target {
+                    let clear = !footprint
+                        || self
+                            .sandbox
+                            .living
+                            .facility_footprints()
+                            .iter()
+                            .all(|(p, r)| p.surface_distance_m(target) >= r + radius);
+                    if !clear || !self.environment.allows_placement(target, radius, footprint) {
                         return peer.connection.queue(&ServerMessage::SandboxRejected {
                             sequence,
-                            message: "target must be within 3 m of known terrain surface".into(),
+                            message: "placement requires a known terrain surface, dry gentle ground, and clear source/facility footprints".into(),
                         });
                     }
                 }
@@ -834,6 +1033,15 @@ impl Server {
                         sequence,
                         message: error.to_string(),
                     })?,
+                }
+                if let (Some(unit), Some(actor)) = (
+                    self.sandbox.living.active_unit(actor_id),
+                    self.actors.get_mut(&actor_id),
+                ) {
+                    actor.kind = unit.kind;
+                    actor.position = unit.position;
+                    actor.heading_deg = unit.heading_deg;
+                    actor.velocity_enu_m_s = unit.velocity_enu_m_s;
                 }
                 self.send_sandbox_snapshot(peer, actor_id)
             }
@@ -861,40 +1069,72 @@ impl Server {
                 }
             }
         }
+        let mut facility_footprints = self.sandbox.living.facility_footprints();
+        facility_footprints.extend(
+            self.sandbox
+                .structures
+                .values()
+                .map(|s| (s.position, s.radius_m)),
+        );
         for actor in self.actors.values_mut() {
-            let old_position = actor.position;
-            if actor.advance(step).is_err()
-                || !validate_position(actor.position)
-                || !self.environment.can_enter(actor.position)
+            if self
+                .sandbox
+                .living
+                .accounts
+                .get(&actor.id)
+                .is_some_and(|account| !account.possessed)
             {
-                actor.position = old_position;
-                actor.velocity_enu_m_s = [0.0; 3];
-                errors += 1;
                 continue;
             }
-            let surface = match actor.kind {
-                ActorKind::Ship => self.environment.water_height_m(actor.position),
-                _ => self.environment.ground_height_m(actor.position),
-            };
-            if let Some(height) = surface
-                .filter(|height| height.is_finite() && (-12_000.0..=100_000.0).contains(height))
-            {
-                if is_airborne(&actor.kind) {
-                    actor.position.altitude_m = actor.position.altitude_m.max(height + 1.0);
-                } else {
-                    actor.position.altitude_m = height;
+            if let Some(unit) = self.sandbox.living.active_unit(actor.id) {
+                let cap = unit.speed_limit_m_s();
+                let speed = actor.speed_m_s();
+                if speed > cap {
+                    for v in &mut actor.velocity_enu_m_s {
+                        *v *= cap / speed;
+                    }
                 }
+            }
+            let old_position = actor.position;
+            let resolved = actor.advance(step).ok().and_then(|()| {
+                resolve_authoritative_motion(
+                    self.environment.as_ref(),
+                    actor.kind,
+                    old_position,
+                    actor.position,
+                    &facility_footprints,
+                )
+            });
+            if let Some(position) = resolved {
+                actor.position = position;
+            } else {
+                actor.position = old_position;
+                actor.velocity_enu_m_s = [0.0; 3];
             }
         }
         self.tick += 1;
         for peer in self.peers.values() {
             if let Some(actor_id) = peer.actor_id {
                 if let Some(actor) = self.actors.get(&actor_id) {
-                    if self
+                    let result = if self
                         .sandbox
-                        .set_player_position(actor_id, actor.position)
-                        .is_err()
+                        .living
+                        .accounts
+                        .get(&actor_id)
+                        .is_some_and(|account| account.possessed)
                     {
+                        self.sandbox.set_controlled_motion(
+                            actor_id,
+                            actor.position,
+                            actor.velocity_enu_m_s,
+                            actor.heading_deg,
+                        )
+                    } else if !self.sandbox.living.enabled {
+                        self.sandbox.set_player_position(actor_id, actor.position)
+                    } else {
+                        Ok(())
+                    };
+                    if result.is_err() {
                         errors += 1;
                     }
                 }
@@ -909,6 +1149,36 @@ impl Server {
             .is_err()
         {
             errors += 1;
+        }
+        let environment = &self.environment;
+        let real_dt = if self.clock.paused { 0.0 } else { step };
+        if self
+            .sandbox
+            .advance_living_with_environment(
+                real_dt,
+                self.clock.unix_seconds - previous_time,
+                &self.catalog,
+                |kind, old, candidate| {
+                    resolve_authoritative_motion(
+                        environment.as_ref(),
+                        kind,
+                        old,
+                        candidate,
+                        &facility_footprints,
+                    )
+                },
+            )
+            .is_err()
+        {
+            errors += 1;
+        }
+        for (id, actor) in &mut self.actors {
+            if let Some(unit) = self.sandbox.living.active_unit(*id) {
+                actor.kind = unit.kind;
+                actor.position = unit.position;
+                actor.velocity_enu_m_s = unit.velocity_enu_m_s;
+                actor.heading_deg = unit.heading_deg;
+            }
         }
         errors
     }
@@ -956,7 +1226,12 @@ impl Server {
             } else {
                 report.snapshots_sent += 1;
             }
-            if self.tick.is_multiple_of(u64::from(self.config.tick_hz)) {
+            let sandbox_period = if self.sandbox.living.enabled {
+                self.config.tick_hz.div_ceil(5)
+            } else {
+                self.config.tick_hz
+            };
+            if self.tick.is_multiple_of(u64::from(sandbox_period)) {
                 if let Ok(view) = self.sandbox.snapshot_for(owned_actor, peer.radius_m) {
                     if peer
                         .connection
@@ -975,9 +1250,24 @@ impl Server {
         for id in disconnected {
             if let Some(peer) = self.peers.remove(&id) {
                 if let Some(actor_id) = peer.actor_id {
-                    self.actors.remove(&actor_id);
+                    self.disconnect_player(actor_id);
                 }
                 report.disconnected += 1;
+            }
+        }
+    }
+
+    fn disconnect_player(&mut self, player_id: u64) {
+        self.actors.remove(&player_id);
+        if let Some(account) = self.sandbox.living.accounts.get_mut(&player_id) {
+            // Preserve identity and the selected interaction body for resume.
+            // Offline RTS orders continue; stale manual velocity must not make
+            // a stationary body animate or exhaust itself indefinitely.
+            if account.possessed {
+                account.possessed = false;
+                if let Some(unit) = self.sandbox.living.units.get_mut(&account.active_unit) {
+                    unit.velocity_enu_m_s = [0.; 3];
+                }
             }
         }
     }
@@ -989,6 +1279,80 @@ impl Server {
             view,
         })
     }
+}
+
+fn find_safe_ground(
+    environment: &dyn WorldEnvironment,
+    position: GeoPosition,
+    kind: ActorKind,
+) -> Option<GeoPosition> {
+    let frame = LocalFrame::new(position);
+    for radius in [0., 3., 7., 15., 30., 60., 100.] {
+        for angle in 0..if radius == 0. { 1 } else { 12 } {
+            let theta = angle as f64 * std::f64::consts::TAU / 12.;
+            let candidate = frame
+                .to_geo([radius * theta.cos(), 0., radius * theta.sin()])
+                .ok()?;
+            if let Some(position) = environment
+                .resolve_movement(kind, candidate, candidate)
+                .filter(|p| validate_position(*p))
+            {
+                return Some(position);
+            }
+        }
+    }
+    None
+}
+
+/// Apply the same bounded wall sliding used by the local reference controller.
+/// A failed candidate never commits movement or completes a logistics arrival.
+fn resolve_authoritative_motion(
+    environment: &dyn WorldEnvironment,
+    kind: ActorKind,
+    old: GeoPosition,
+    candidate: GeoPosition,
+    footprints: &[(GeoPosition, f64)],
+) -> Option<GeoPosition> {
+    // Coverage boundaries are not obstacles to slide around. Honor a host's
+    // explicit geographic admission rule before trying local wall steering.
+    if !environment.can_enter(candidate) {
+        return None;
+    }
+    let accept = |candidate| {
+        if !validate_position(candidate)
+            || !terra_sandbox::facility_path_clear(kind, old, candidate, footprints)
+        {
+            return None;
+        }
+        environment
+            .resolve_movement(kind, old, candidate)
+            .filter(|p| validate_position(*p))
+    };
+    if let Some(position) = accept(candidate) {
+        return Some(position);
+    }
+    if !matches!(
+        kind,
+        ActorKind::Human | ActorKind::Animal | ActorKind::Creature | ActorKind::Vehicle
+    ) {
+        return None;
+    }
+    let frame = LocalFrame::new(old);
+    let delta = frame.to_local(candidate);
+    for trial in [
+        [delta[0], 0., 0.],
+        [0., 0., delta[2]],
+        [delta[2] * 0.7, 0., -delta[0] * 0.7],
+        [-delta[2] * 0.7, 0., delta[0] * 0.7],
+    ] {
+        if trial[0].hypot(trial[2]) < 0.0001 {
+            continue;
+        }
+        if let Some(valid) = frame.to_geo(trial).ok().and_then(accept) {
+            return Some(valid);
+        }
+    }
+    None
 }
 
 fn valid_token(token: &str) -> bool {
@@ -1090,5 +1454,101 @@ mod tests {
         assert!(server.insert_actor(second.clone()).is_err());
         second.position.latitude = f64::NAN;
         assert!(server.insert_actor(second).is_err());
+    }
+    #[test]
+    fn living_registration_rejection_leaves_no_player_account_or_session() {
+        for exhausted_ids in [false, true] {
+            let mut server = Server::bind(ServerConfig {
+                bind_addr: "127.0.0.1:0".parse().unwrap(),
+                ..ServerConfig::default()
+            })
+            .unwrap();
+            server.enable_living_demo(&[]).unwrap();
+            if exhausted_ids {
+                server.sandbox.living.next_id = u64::MAX - 2;
+            } else {
+                let template = server
+                    .sandbox
+                    .living
+                    .units
+                    .values()
+                    .find(|u| u.owner.is_none())
+                    .unwrap()
+                    .clone();
+                while server.sandbox.living.units.len()
+                    <= terra_sandbox::MAX_LIVING_UNITS - terra_sandbox::STARTER_UNIT_COUNT
+                {
+                    let mut unit = template.clone();
+                    unit.id = server.sandbox.living.next_id;
+                    server.sandbox.living.next_id += 1;
+                    server.sandbox.living.units.insert(unit.id, unit);
+                }
+            }
+            let before = serde_json::to_value(&server.sandbox).unwrap();
+            let _socket = std::net::TcpStream::connect(server.local_addr().unwrap()).unwrap();
+            server.accept_connections();
+            let mut peer = server.peers.remove(&1).unwrap();
+            server
+                .handle_message(
+                    1,
+                    &mut peer,
+                    ClientMessage::Hello {
+                        protocol: PROTOCOL_VERSION,
+                        interest: server.config.spawn,
+                        resume_token: None,
+                        expected_manifest: None,
+                    },
+                )
+                .unwrap();
+            assert!(peer.actor_id.is_none());
+            assert!(server.sessions.is_empty());
+            assert!(server.actors.is_empty());
+            assert_eq!(server.next_actor_id, 1);
+            assert_eq!(serde_json::to_value(&server.sandbox).unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn constructed_structure_blocks_fast_authoritative_actor_motion() {
+        let mut server = Server::bind(ServerConfig {
+            bind_addr: "127.0.0.1:0".parse().unwrap(),
+            ..ServerConfig::default()
+        })
+        .unwrap();
+        let origin = server.config.spawn;
+        let frame = LocalFrame::new(origin);
+        server.sandbox.structures.insert(
+            1,
+            terra_sandbox::Structure {
+                id: 1,
+                owner: 1,
+                faction_owner: None,
+                blueprint: "cabin".into(),
+                position: frame.to_geo([4., 0., 0.]).unwrap(),
+                hitpoints: 100,
+                max_hitpoints: 100,
+                radius_m: 2.,
+                housing: true,
+                workbench: false,
+            },
+        );
+        server
+            .insert_actor(ActorState {
+                id: 99,
+                kind: ActorKind::Vehicle,
+                position: origin,
+                velocity_enu_m_s: [80., 0., 0.],
+                heading_deg: 90.,
+            })
+            .unwrap();
+        server.fixed_step(0.1);
+        let position = server.actors[&99].position;
+        assert!(frame.to_local(position)[0] < 1.);
+        assert!(terra_sandbox::facility_path_clear(
+            ActorKind::Vehicle,
+            origin,
+            position,
+            &[(frame.to_geo([4., 0., 0.]).unwrap(), 2.)]
+        ));
     }
 }

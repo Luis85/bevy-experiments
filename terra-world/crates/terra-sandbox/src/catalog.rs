@@ -47,11 +47,30 @@ impl Catalog {
             "tool",
             "wheat_seed",
             "wheat",
+            "flour",
+            "bread",
+            "water",
         ]
         .into_iter()
         .map(str::to_owned)
         .collect();
         let recipes = BTreeMap::from([
+            (
+                "flour".into(),
+                Recipe {
+                    inputs: inventory(&[("wheat", 2)]),
+                    outputs: inventory(&[("flour", 3)]),
+                    requires_workbench: true,
+                },
+            ),
+            (
+                "bread".into(),
+                Recipe {
+                    inputs: inventory(&[("flour", 2), ("water", 1)]),
+                    outputs: inventory(&[("bread", 4)]),
+                    requires_workbench: true,
+                },
+            ),
             (
                 "planks".into(),
                 Recipe {

@@ -20,7 +20,16 @@ impl ChunkProvider for EraProvider {
     }
 }
 pub(crate) fn build_streamer(config: &mut WorldConfig) -> Result<ChunkStreamer, StreamError> {
-    if let Some(path) = &config.historical_pack {
+    if let Some(path) = &config.heightmap_manifest {
+        let provider = terra_stream::HeightmapProvider::open(path, config.terrain_resolution)?;
+        let focus = TileKey::at(config.focus, config.chunk_level)
+            .map_err(|e| StreamError::Geography(e.to_string()))?;
+        if !provider.covers(focus) {
+            return Err(StreamError::Configuration("heightmap does not cover the complete focus tile; choose coordinates inside its coverage".into()));
+        }
+        config.base_data_revision = provider.manifest.revision.clone();
+        ChunkStreamer::with_provider(config.stream_config(), Arc::new(provider))
+    } else if let Some(path) = &config.historical_pack {
         let epoch = config
             .data_epoch_unix
             .ok_or_else(|| StreamError::Configuration("historical epoch missing".into()))?;
@@ -88,7 +97,7 @@ mod tests {
         // A finite regional pack need not cover the entire world or neighbor
         // radius to initialize; missing requested tiles still fail explicitly.
         assert!(build_streamer(&mut config).is_ok());
-        assert_ne!(config.base_data_revision, "procedural-v1");
+        assert_ne!(config.base_data_revision, "terra-procedural-v2");
         config.terrain_resolution = 33;
         let error = build_streamer(&mut config)
             .err()

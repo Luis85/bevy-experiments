@@ -1,6 +1,6 @@
 [package]
 name = "terra-core"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 description = "Geospatial domain, world layers and environmental models for Terra World"
 license = "MIT OR Apache-2.0"

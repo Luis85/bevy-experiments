@@ -666,3 +666,359 @@ fn incompatible_data_is_rejected_before_allocating_a_saved_identity() {
     assert!(server.sandbox().players.is_empty());
     assert!(server.actors().is_empty());
 }
+
+#[test]
+fn living_trade_possession_rts_and_resume_are_authoritative() {
+    use terra_core::LocalFrame;
+    use terra_sandbox::{LivingCommand, UnitRole};
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("living-world.json");
+    let mut host = server();
+    host.enable_living_demo(&[]).unwrap();
+    let spawn = host.config().spawn;
+    let mut alice = NetClient::connect(host.local_addr().unwrap(), spawn).unwrap();
+    let mut bob = NetClient::connect(host.local_addr().unwrap(), spawn).unwrap();
+    let messages = pump(&mut host, &mut [&mut alice, &mut bob], 8);
+    let (owner, token) = welcome(&messages[0]);
+    let (other, _) = welcome(&messages[1]);
+    let shop = *host.sandbox().living.shops.keys().next().unwrap();
+    let wallet = host.sandbox().living.accounts[&owner].money;
+    alice
+        .send(ClientMessage::Sandbox {
+            sequence: 1,
+            command: Command::Living {
+                action: LivingCommand::Buy {
+                    shop_id: shop,
+                    item: "bread".into(),
+                    amount: 2,
+                },
+            },
+        })
+        .unwrap();
+    let messages = pump(&mut host, &mut [&mut alice, &mut bob], 5);
+    assert!(
+        messages[0]
+            .iter()
+            .any(|m| matches!(m, ServerMessage::SandboxResult { sequence: 1, .. }))
+    );
+    assert_eq!(host.sandbox().players[&owner].inventory["bread"], 2);
+    assert_eq!(host.sandbox().living.accounts[&owner].money, wallet - 500);
+    let rover = host
+        .sandbox()
+        .living
+        .units
+        .values()
+        .find(|u| u.owner == Some(owner) && u.kind == ActorKind::Vehicle)
+        .unwrap()
+        .id;
+    bob.send(ClientMessage::Sandbox {
+        sequence: 1,
+        command: Command::Living {
+            action: LivingCommand::Possess { unit_id: rover },
+        },
+    })
+    .unwrap();
+    alice
+        .send(ClientMessage::Sandbox {
+            sequence: 2,
+            command: Command::Living {
+                action: LivingCommand::Possess { unit_id: rover },
+            },
+        })
+        .unwrap();
+    let messages = pump(&mut host, &mut [&mut alice, &mut bob], 6);
+    assert!(
+        messages[1]
+            .iter()
+            .any(|m| matches!(m, ServerMessage::SandboxRejected { sequence: 1, .. }))
+    );
+    assert_eq!(host.actors()[&owner].kind, ActorKind::Vehicle);
+    assert_eq!(host.sandbox().living.accounts[&owner].active_unit, rover);
+    assert_ne!(host.sandbox().living.accounts[&other].active_unit, rover);
+    let start = host.sandbox().living.units[&rover].position;
+    alice
+        .send(ClientMessage::Move {
+            sequence: 1,
+            velocity_enu_m_s: [8., 0., 0.],
+        })
+        .unwrap();
+    pump(&mut host, &mut [&mut alice, &mut bob], 12);
+    assert!(start.surface_distance_m(host.sandbox().living.units[&rover].position) > 1.);
+    assert_eq!(
+        host.actors()[&owner].position,
+        host.sandbox().living.units[&rover].position
+    );
+    alice
+        .send(ClientMessage::Move {
+            sequence: 2,
+            velocity_enu_m_s: [0.; 3],
+        })
+        .unwrap();
+    alice
+        .send(ClientMessage::Sandbox {
+            sequence: 3,
+            command: Command::Living {
+                action: LivingCommand::Release,
+            },
+        })
+        .unwrap();
+    let destination = LocalFrame::new(host.sandbox().living.units[&rover].position)
+        .to_geo([14., 0., 0.])
+        .unwrap();
+    alice
+        .send(ClientMessage::Sandbox {
+            sequence: 4,
+            command: Command::Living {
+                action: LivingCommand::MoveUnits {
+                    unit_ids: vec![rover],
+                    destination,
+                },
+            },
+        })
+        .unwrap();
+    let messages = pump(&mut host, &mut [&mut alice, &mut bob], 160);
+    assert!(!host.sandbox().living.accounts[&owner].possessed);
+    assert!(
+        host.sandbox().living.units[&rover]
+            .position
+            .surface_distance_m(destination)
+            < 2.
+    );
+    let view = messages[0]
+        .iter()
+        .filter_map(|m| {
+            if let ServerMessage::SandboxSnapshot { view, .. } = m {
+                Some(view)
+            } else {
+                None
+            }
+        })
+        .next_back()
+        .unwrap();
+    view.living.validate_for(owner).unwrap();
+    assert!(
+        view.living
+            .units
+            .iter()
+            .any(|u| u.role == UnitRole::Citizen)
+    );
+    assert_eq!(view.living.account.as_ref().unwrap().active_unit, rover);
+    let expected_wallet = host.sandbox().living.accounts[&owner].money;
+    let expected_position = host.sandbox().living.units[&rover].position;
+    host.save_world(&path).unwrap();
+    drop(alice);
+    drop(bob);
+    drop(host);
+    let mut restored = server();
+    restored.load_world(&path).unwrap();
+    let mut alice =
+        NetClient::connect_with_token(restored.local_addr().unwrap(), spawn, Some(token)).unwrap();
+    let messages = pump(&mut restored, &mut [&mut alice], 6);
+    assert_eq!(welcome(&messages[0]).0, owner);
+    assert_eq!(
+        restored.sandbox().living.accounts[&owner].active_unit,
+        rover
+    );
+    assert_eq!(
+        restored.sandbox().living.accounts[&owner].money,
+        expected_wallet
+    );
+    assert!(
+        expected_position.surface_distance_m(restored.sandbox().living.units[&rover].position) < 1.
+    );
+    assert_eq!(restored.sandbox().players.len(), 2);
+}
+
+#[test]
+fn delayed_needs_snapshot_clamps_valid_sprint_intent_without_disconnect() {
+    let mut host = server();
+    host.enable_living_demo(&[]).unwrap();
+    let spawn = host.config().spawn;
+    let mut client = NetClient::connect(host.local_addr().unwrap(), spawn).unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 8);
+    let owner = welcome(&messages[0]).0;
+    pump(&mut host, &mut [&mut client], 80);
+    let before = host
+        .sandbox()
+        .living
+        .active_unit(owner)
+        .unwrap()
+        .speed_limit_m_s();
+    assert!(before < 7.);
+    client
+        .send(ClientMessage::Move {
+            sequence: 1,
+            velocity_enu_m_s: [7., 0., 0.],
+        })
+        .unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 12);
+    assert!(
+        !messages[0]
+            .iter()
+            .any(|message| matches!(message, ServerMessage::Error { .. }))
+    );
+    assert!(host.actors()[&owner].speed_m_s() > 0.);
+    assert!(host.actors()[&owner].speed_m_s() <= before);
+    assert!(host.actors()[&owner].position.surface_distance_m(spawn) > 0.5);
+}
+
+#[test]
+fn resident_source_geometry_rejects_building_and_water_placement_atomically() {
+    use std::collections::BTreeMap;
+    use terra_core::{FeatureKind, HeightField, LocalFrame, TileKey, WorldChunk, WorldFeature};
+    let mut host = server();
+    let spawn = host.config().spawn;
+    let frame = LocalFrame::new(spawn);
+    // Explicit clockwise corners; crossed quadrilaterals are not map polygons.
+    let rectangle = |center: [f64; 3]| {
+        [[-1., -1.], [1., -1.], [1., 1.], [-1., 1.]]
+            .map(|p| {
+                frame
+                    .to_geo([center[0] + p[0], 0., center[2] + p[1]])
+                    .unwrap()
+            })
+            .to_vec()
+    };
+    let chunk = WorldChunk {
+        key: TileKey::at(spawn, 15).unwrap(),
+        heights: HeightField::constant(0.),
+        features: vec![
+            WorldFeature {
+                id: "source:house".into(),
+                kind: FeatureKind::Building,
+                points: rectangle([5., 0., 0.]),
+                height_m: 8.,
+                properties: BTreeMap::new(),
+            },
+            WorldFeature {
+                id: "source:pond".into(),
+                kind: FeatureKind::Water,
+                points: rectangle([0., 0., -8.]),
+                height_m: 0.,
+                properties: BTreeMap::new(),
+            },
+        ],
+        sources: vec![],
+        warnings: vec![],
+    };
+    host.set_environment(Box::new(terra_net::ResidentSurface::new(15)));
+    host.register_chunk(&chunk);
+    let mut client = NetClient::connect(host.local_addr().unwrap(), spawn).unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 8);
+    let owner = welcome(&messages[0]).0;
+    client
+        .send(ClientMessage::Sandbox {
+            sequence: 1,
+            command: Command::ClaimPlot {
+                center: spawn,
+                radius_m: 20.,
+            },
+        })
+        .unwrap();
+    client
+        .send(ClientMessage::Sandbox {
+            sequence: 2,
+            command: Command::Craft {
+                recipe: "planks".into(),
+                count: 1,
+            },
+        })
+        .unwrap();
+    pump(&mut host, &mut [&mut client], 8);
+    let before = host.sandbox().players[&owner].inventory.clone();
+    client
+        .send(ClientMessage::Sandbox {
+            sequence: 3,
+            command: Command::Build {
+                blueprint: "fence".into(),
+                position: frame.to_geo([5., 0., 0.]).unwrap(),
+            },
+        })
+        .unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 8);
+    assert!(
+        messages[0]
+            .iter()
+            .any(|m| matches!(m, ServerMessage::SandboxRejected { sequence: 3, .. }))
+    );
+    assert_eq!(host.sandbox().players[&owner].inventory, before);
+    assert!(host.sandbox().structures.is_empty());
+    let plot_id = *host.sandbox().plots.keys().next().unwrap();
+    client
+        .send(ClientMessage::Sandbox {
+            sequence: 4,
+            command: Command::Plant {
+                plot_id,
+                position: frame.to_geo([0., 0., -8.]).unwrap(),
+                crop: "wheat".into(),
+            },
+        })
+        .unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 8);
+    assert!(
+        messages[0]
+            .iter()
+            .any(|m| matches!(m, ServerMessage::SandboxRejected { sequence: 4, .. }))
+    );
+    assert_eq!(host.sandbox().players[&owner].inventory, before);
+    client
+        .send(ClientMessage::Sandbox {
+            sequence: 5,
+            command: Command::Build {
+                blueprint: "fence".into(),
+                position: frame.to_geo([-5., 0., 0.]).unwrap(),
+            },
+        })
+        .unwrap();
+    pump(&mut host, &mut [&mut client], 8);
+    assert_eq!(host.sandbox().structures.len(), 1);
+    assert_eq!(
+        host.sandbox().players[&owner].inventory["planks"],
+        before["planks"] - 2
+    );
+}
+
+#[test]
+fn disconnect_releases_manual_motion_and_resume_keeps_the_same_body_and_wallet() {
+    let mut host = server();
+    host.enable_living_demo(&[]).unwrap();
+    let spawn = host.config().spawn;
+    let mut client = NetClient::connect(host.local_addr().unwrap(), spawn).unwrap();
+    let messages = pump(&mut host, &mut [&mut client], 8);
+    let (owner, token) = welcome(&messages[0]);
+    client
+        .send(ClientMessage::Move {
+            sequence: 1,
+            velocity_enu_m_s: [2., 0., 0.],
+        })
+        .unwrap();
+    pump(&mut host, &mut [&mut client], 12);
+    let account = host.sandbox().living.accounts[&owner].clone();
+    assert!(account.possessed);
+    assert!(host.sandbox().living.units[&account.active_unit].velocity_enu_m_s[0] > 0.);
+    drop(client);
+    pump(&mut host, &mut [], 12);
+    assert!(!host.sandbox().living.accounts[&owner].possessed);
+    assert_eq!(
+        host.sandbox().living.units[&account.active_unit].velocity_enu_m_s,
+        [0.; 3]
+    );
+    let energy = host.sandbox().living.units[&account.active_unit]
+        .needs
+        .energy;
+    pump(&mut host, &mut [], 40);
+    assert!(
+        host.sandbox().living.units[&account.active_unit]
+            .needs
+            .energy
+            >= energy
+    );
+    let mut resumed =
+        NetClient::connect_with_token(host.local_addr().unwrap(), spawn, Some(token)).unwrap();
+    let messages = pump(&mut host, &mut [&mut resumed], 8);
+    assert_eq!(welcome(&messages[0]).0, owner);
+    let after = &host.sandbox().living.accounts[&owner];
+    assert_eq!(after.active_unit, account.active_unit);
+    assert_eq!(after.money, account.money);
+    assert!(!after.possessed);
+}

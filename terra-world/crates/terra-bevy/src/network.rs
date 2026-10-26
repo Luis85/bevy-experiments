@@ -49,6 +49,10 @@ pub struct NetworkStatus {
     pub resume_token: Option<String>,
     pub desired_velocity_enu_m_s: [f64; 3],
     pub follow_player: bool,
+    /// Latest completeness flags are tracked independently because their
+    /// snapshots arrive at different frequencies.
+    pub actor_snapshot_truncated: bool,
+    pub sandbox_snapshot_truncated: bool,
     pub snapshot_truncated: bool,
 }
 impl Plugin for TerraNetworkPlugin {
@@ -406,9 +410,32 @@ fn apply_message(
                 return Err("Server sent an invalid actor snapshot.".into());
             }
             status.tick = tick;
-            status.snapshot_truncated = truncated;
+            status.actor_snapshot_truncated = truncated;
+            status.snapshot_truncated = truncated || status.sandbox_snapshot_truncated;
             runtime.clock.unix_seconds = unix_seconds;
             status.actors = actors.into_iter().map(|actor| (actor.id, actor)).collect();
+            // The host's primary pose arrives at 10 Hz; the richer living view
+            // arrives at 5 Hz. Feed that pose into the SAME controlled body,
+            // without predicting inventory, orders or ownership on the client.
+            if let Some(actor) = status.actor_id.and_then(|id| status.actors.get(&id)) {
+                let active = sandbox
+                    .state
+                    .living
+                    .accounts
+                    .get(&actor.id)
+                    .filter(|account| account.possessed)
+                    .map(|account| account.active_unit);
+                if let Some(unit) = active.and_then(|id| sandbox.state.living.units.get_mut(&id)) {
+                    if unit.kind == actor.kind {
+                        unit.position = actor.position;
+                        unit.velocity_enu_m_s = actor.velocity_enu_m_s;
+                        unit.heading_deg = actor.heading_deg;
+                        if let Some(player) = sandbox.state.players.get_mut(&actor.id) {
+                            player.position = actor.position;
+                        }
+                    }
+                }
+            }
             runtime.weather =
                 synthetic_weather(&runtime.focus, &runtime.clock, runtime.config.seed);
             connection.last_snapshot = Some(Instant::now());
@@ -417,6 +444,9 @@ fn apply_message(
             if !status.connected || !valid_view(&view, status.actor_id) {
                 return Err("Server sent an invalid sandbox snapshot.".into());
             }
+            status.sandbox_snapshot_truncated = view.truncated || view.living.truncated;
+            status.snapshot_truncated =
+                status.actor_snapshot_truncated || status.sandbox_snapshot_truncated;
             sandbox.player_id = view.player.id;
             sandbox.state.version = view.version;
             sandbox.state.tick_seconds = view.tick_seconds;
@@ -435,13 +465,13 @@ fn apply_message(
                 .collect();
             sandbox.state.farms = view.farms.into_iter().map(|farm| (farm.id, farm)).collect();
             sandbox.state.feature_edits = view.feature_edits.into_iter().collect();
+            sandbox.state.living = terra_sandbox::LivingWorld::from_view(view.living);
             sandbox.state.factions = view
                 .factions
                 .into_iter()
                 .map(|faction| (faction.id, faction))
                 .collect();
             // A bounded replica is never treated as a complete writable save.
-            status.snapshot_truncated |= view.truncated;
             sandbox.revision += 1;
         }
         ServerMessage::SandboxResult { outcome, .. } => {
@@ -464,7 +494,10 @@ fn apply_message(
 }
 
 fn compatible_manifest(manifest: &BaseWorldManifest, config: &WorldConfig) -> Result<(), String> {
-    if config.live_data || !manifest.matches_data(&manifest_from_config(config)) {
+    if config.live_data
+        || config.heightmap_manifest.is_some()
+        || !manifest.matches_data(&manifest_from_config(config))
+    {
         return Err("Server base-world provider, version, epoch or political overlay differs from this client configuration.".into());
     }
     Ok(())
@@ -509,6 +542,7 @@ fn bounded_message(message: &str) -> String {
 }
 fn valid_view(view: &SandboxView, actor_id: Option<u64>) -> bool {
     view.version == terra_sandbox::SAVE_VERSION
+        && view.living.validate_for(view.player.id).is_ok()
         && Some(view.player.id) == actor_id
         && valid_position(view.player.position)
         && view.tick_seconds.is_finite()
@@ -561,6 +595,9 @@ fn disconnect(
     status.connected = false;
     status.actor_id = None;
     status.actors.clear();
+    status.actor_snapshot_truncated = false;
+    status.sandbox_snapshot_truncated = false;
+    status.snapshot_truncated = false;
     status.desired_velocity_enu_m_s = [0.0; 3];
     status.message = message.clone();
     sandbox.last_message = message;
@@ -787,6 +824,110 @@ mod tests {
         assert!(!status.connected);
         assert!(status.message.contains("timed out"));
         assert!(app.world().resource::<ClientResource>().terminal);
+    }
+
+    #[test]
+    fn mixed_snapshot_rates_preserve_each_views_completeness() {
+        let config = WorldConfig::default();
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .add_plugins(crate::TerraWorldPlugin::new(config.clone()));
+        let mut runtime = app.world_mut().remove_resource::<WorldRuntime>().unwrap();
+        let mut sandbox = SandboxRuntime::new(config.focus);
+        let (_tx, rx) = mpsc::sync_channel(1);
+        let mut connection = ClientResource {
+            client: None,
+            connecting: Mutex::new(rx),
+            terminal: false,
+            connected_at: None,
+            last_snapshot: None,
+            last_input: Instant::now(),
+            last_ping: Instant::now(),
+            address: "127.0.0.1:7777".parse().unwrap(),
+            session_path: None,
+        };
+        let mut status = NetworkStatus {
+            connected: true,
+            actor_id: Some(1),
+            ..default()
+        };
+        let full = sandbox.state.snapshot_for(1, 5000.).unwrap();
+        let mut partial = full.clone();
+        partial.truncated = true;
+        apply_message(
+            ServerMessage::SandboxSnapshot {
+                tick: 1,
+                view: partial,
+            },
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+        )
+        .unwrap();
+        let actor_view = |tick, truncated| ServerMessage::Snapshot {
+            tick,
+            unix_seconds: 1_782_000_000.,
+            actors: vec![],
+            truncated,
+            total_in_interest: 0,
+        };
+        apply_message(
+            actor_view(2, false),
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+        )
+        .unwrap();
+        assert!(
+            status.snapshot_truncated,
+            "a faster complete pose view must not erase a partial economy view"
+        );
+        apply_message(
+            ServerMessage::SandboxSnapshot {
+                tick: 3,
+                view: full.clone(),
+            },
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+        )
+        .unwrap();
+        assert!(!status.snapshot_truncated);
+        apply_message(
+            actor_view(4, true),
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+        )
+        .unwrap();
+        apply_message(
+            ServerMessage::SandboxSnapshot {
+                tick: 5,
+                view: full,
+            },
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+        )
+        .unwrap();
+        assert!(
+            status.snapshot_truncated,
+            "a complete economy view must not erase a partial pose view"
+        );
+        apply_message(
+            actor_view(6, false),
+            &mut connection,
+            &mut status,
+            &mut runtime,
+            &mut sandbox,
+        )
+        .unwrap();
+        assert!(!status.snapshot_truncated);
     }
 
     #[test]

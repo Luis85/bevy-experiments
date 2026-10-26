@@ -8,12 +8,14 @@ mod client;
 pub mod protocol;
 mod server;
 mod session;
+mod surface;
 mod transport;
 
 pub use client::NetClient;
 pub use protocol::{BaseWorldManifest, ClientMessage, PROTOCOL_VERSION, ServerMessage};
 pub use server::{FlatEnvironment, Server, ServerConfig, ServerReport, WorldEnvironment};
 pub use session::SessionIdentity;
+pub use surface::{ResidentSurface, SurfaceSample};
 pub use transport::{FrameDecoder, MAX_FRAME_BYTES, encode_frame};
 
 #[derive(Debug, thiserror::Error)]

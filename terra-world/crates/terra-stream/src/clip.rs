@@ -11,11 +11,14 @@ pub(crate) fn to_tile(features: Vec<WorldFeature>, key: TileKey) -> Vec<WorldFea
         for point in &mut feature.points {
             point.longitude = center + (point.longitude - center + 180.0).rem_euclid(360.0) - 180.0;
         }
-        if feature.kind == FeatureKind::Tree {
+        if matches!(
+            feature.kind,
+            FeatureKind::Tree | FeatureKind::PointOfInterest
+        ) {
             if feature.points.iter().any(|p| within(*p, bounds)) {
                 result.push(feature);
             }
-        } else if feature.kind == FeatureKind::Road {
+        } else if matches!(feature.kind, FeatureKind::Road | FeatureKind::Waterway) {
             let mut fragments: Vec<Vec<GeoPosition>> = Vec::new();
             for pair in feature.points.windows(2) {
                 if let Some((a, b)) = segment(pair[0], pair[1], bounds) {

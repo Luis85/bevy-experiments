@@ -4,6 +4,7 @@ pub mod environment;
 #[cfg(feature = "render")]
 pub mod geometry;
 pub mod history;
+pub mod living;
 pub mod network;
 pub mod politics;
 #[cfg(feature = "render")]
@@ -13,6 +14,7 @@ pub mod simulation;
 
 pub use config::WorldConfig;
 pub use environment::{EnvironmentSample, WorldEnvironment};
+pub use living::{LivingDiagnostics, LivingMotion, TerraLivingPlugin};
 pub use network::{NetworkSession, NetworkStatus, TerraNetworkPlugin};
 pub use politics::PoliticalWorld;
 #[cfg(feature = "render")]

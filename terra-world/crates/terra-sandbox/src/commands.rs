@@ -9,6 +9,9 @@ use terra_core::GeoPosition;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Command {
+    Living {
+        action: LivingCommand,
+    },
     ClaimPlot {
         center: GeoPosition,
         radius_m: f64,
@@ -126,6 +129,7 @@ impl SandboxState {
             Ok(())
         };
         match command {
+            Command::Living { action } => self.apply_living(player_id, action, catalog),
             Command::ClaimPlot { center, radius_m } => {
                 require_reach(center)?;
                 if !finite_range(radius_m, 5.0, 100.0) {
@@ -179,6 +183,27 @@ impl SandboxState {
                     farm.position.surface_distance_m(position) < 0.5 + definition.radius_m
                 }) {
                     return Err(SandboxError::Overlap);
+                }
+                let height = if definition.housing { 8.0 } else { 2.5 };
+                if self.living.enabled
+                    && self.living.units.values().any(|unit| {
+                        let vertical = unit.position.altitude_m - position.altitude_m;
+                        let body_radius = if matches!(
+                            unit.kind,
+                            terra_core::ActorKind::Vehicle | terra_core::ActorKind::Ship
+                        ) {
+                            1.2
+                        } else {
+                            0.35
+                        };
+                        (-2.0..=height).contains(&vertical)
+                            && unit.position.surface_distance_m(position)
+                                < definition.radius_m + body_radius
+                    })
+                {
+                    return Err(SandboxError::Invalid(
+                        "construction footprint overlaps a living actor".into(),
+                    ));
                 }
                 let next_inventory =
                     exchange(&player.inventory, &definition.costs, &BTreeMap::new(), 1)?;

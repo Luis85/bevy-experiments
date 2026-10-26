@@ -29,10 +29,10 @@ impl Default for BaseWorldManifest {
         Self {
             world_id: "terra-reference-world".into(),
             seed: 42,
-            base_data_revision: "procedural-v1".into(),
+            base_data_revision: "terra-procedural-v2".into(),
             terrain_provider: "procedural".into(),
             chunk_level: 15,
-            terrain_resolution: 33,
+            terrain_resolution: 65,
             data_epoch_unix: None,
             political_dataset_revision: None,
         }
@@ -203,6 +203,7 @@ mod tests {
             .collect();
         let invites: BTreeSet<_> = player_ids.iter().copied().collect();
         let view = SandboxView {
+            living: terra_sandbox::LivingView::default(),
             version: terra_sandbox::SAVE_VERSION,
             tick_seconds: 999999999999.1234,
             player: PlayerState {
@@ -275,7 +276,7 @@ mod tests {
         };
         let frame = crate::encode_frame(&ServerMessage::SandboxSnapshot {
             tick: u64::MAX,
-            view,
+            view: view.clone(),
         })
         .unwrap();
         assert!(
@@ -283,5 +284,65 @@ mod tests {
             "bounded view unexpectedly uses {} bytes",
             frame.len()
         );
+        // The new economy shares the same frame, including pathological long
+        // item IDs. Its bounded reduction retains active/return bodies.
+        let mut state = terra_sandbox::SandboxState::default();
+        state.add_player(u64::MAX, position).unwrap();
+        state
+            .seed_living_demo(position, &[], &terra_sandbox::Catalog::builtin())
+            .unwrap();
+        let mut living = state.snapshot_for(u64::MAX, 5000.).unwrap().living;
+        let base_unit = living.units[0].clone();
+        while living.units.len() < 64 {
+            let mut unit = base_unit.clone();
+            unit.id = 1_300_000 + living.units.len() as u64;
+            unit.name = "é".repeat(32);
+            unit.owner = None;
+            living.units.push(unit);
+        }
+        let mut shop = living.shops[0].clone();
+        shop.stock = (0..64).map(|n| (id(n), 1_000_000)).collect();
+        shop.prices = (0..64)
+            .map(|n| {
+                (
+                    id(n),
+                    terra_sandbox::TradePrice {
+                        buy: 1_000_000_000,
+                        sell: 1_000_000_000,
+                    },
+                )
+            })
+            .collect();
+        living.shops = (0..8)
+            .map(|n| {
+                let mut s = shop.clone();
+                s.id = 1_100_000 + n;
+                s.name = "é".repeat(32);
+                s
+            })
+            .collect();
+        let mut site = living.producers[0].clone();
+        site.stock = shop.stock.clone();
+        site.inputs = shop.stock.clone();
+        site.outputs = shop.stock.clone();
+        living.producers = (0..16)
+            .map(|n| {
+                let mut s = site.clone();
+                s.id = 1_200_000 + n;
+                s.name = "é".repeat(32);
+                s
+            })
+            .collect();
+        let mut combined = view;
+        combined.living = living;
+        combined.enforce_wire_budget().unwrap();
+        combined.living.validate_for(u64::MAX).unwrap();
+        assert!(combined.truncated);
+        let frame = crate::encode_frame(&ServerMessage::SandboxSnapshot {
+            tick: u64::MAX,
+            view: combined,
+        })
+        .unwrap();
+        assert!(frame.len() < crate::MAX_FRAME_BYTES);
     }
 }

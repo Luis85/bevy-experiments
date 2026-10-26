@@ -13,10 +13,10 @@ entire planet's data or actors fit in memory.
 | `terra-core` | WGS84 coordinates, local frames, geographic tiles, normalized chunks/features, environment models, clocks and actor types | Serializable domain types; `GeoPosition`, `TileKey`, `WorldChunk`, `ActorState` |
 | `terra-stream` | Bounded chunk requests, worker execution, provider parsing, cache and provenance | `ChunkProvider`, `ChunkStreamer::with_provider`, `request_tiles` |
 | `terra-history` | Explicit temporal source packs and dated political GeoJSON | `HistoricalPack`, `HistoricalCatalog`, `PoliticsDataset` |
-| `terra-sandbox` | Persistent world edits, inventories, structures, crops, resources and faction authorization | `Catalog`, `Command`, transactional `SandboxState::apply` |
+| `terra-sandbox` | Persistent overlays, factions, living bodies/needs, integer money, shops, production and cargo | `Catalog`, `Command`, transactional `SandboxState::apply`, environment-resolved living advancement |
 | `terra-net` | Authoritative simulation, input validation, bounded replication and server saves | `Server`, `NetClient`, server `WorldEnvironment`, `SessionIdentity` |
-| `terra-bevy` | Bevy resources/schedules, floating origin, streaming integration and optional rendering | `TerraWorldPlugin`, `TerraRenderPlugin`, `TerraNetworkPlugin` |
-| `terra-demo` | Runnable desktop exploration, placement, gameplay and political atlas UI | Example application, not a dependency of the reusable crates |
+| `terra-bevy` | Bevy resources/schedules, floating origin, streaming integration and optional rendering | `TerraWorldPlugin`, `TerraLivingPlugin`, `TerraRenderPlugin`, `TerraNetworkPlugin` |
+| `terra-demo` | RTS selection, first/third-person possession, contextual gameplay panels and political atlas | Example application, not a dependency of the reusable crates |
 | `terra-cli` | Domain-level sandbox script execution and save/reload tooling | JSON command scripts for headless gameplay workflows |
 
 The pure domain crates do not depend on Bevy. A host can use the streaming,
@@ -60,7 +60,9 @@ loaded/failed/evicted events. A completion budget bounds main-thread integration
 Stale results cannot silently replace an unrelated current request.
 
 The built-in offline provider generates explicitly synthetic terrain and semantic
-features. Live providers can sample Terrarium elevation, parse OpenStreetMap
+features under revision `terra-procedural-v2`. A local PNG heightmap provider
+imports georeferenced 8/16-bit grayscale elevation with explicit bounds and
+provenance; incomplete geographic tiles remain unavailable. Live providers can sample Terrarium elevation, parse OpenStreetMap
 features, and retrieve Open-Meteo weather. Network use is opt-in, response sizes
 and request counts are limited, disk cache has a byte budget, and source records
 carry attribution and synthetic status. Geographic data is normalized before it
@@ -75,6 +77,29 @@ bounded scheduler and Bevy integration while changing data access. Stable
 clients cannot accidentally mix incompatible geometry. A production provider can
 serve prepared regional packs instead of asking public demonstration APIs for
 every camera movement.
+
+## Terrain and visual detail
+
+The default native neighborhood contains 7 × 7 geographic tiles, each with a
+65 × 65 source elevation grid. The same heightfield serves actor queries and
+indexed terrain meshes. Smooth normals, authored micro-textures, land-use tint
+and typed source features enrich its presentation without claiming satellite
+surface imagery. `WorldFeature.properties` preserves source tags used by roof,
+road, bridge, waterway, vegetation and gameplay adapters.
+
+Feature geometry has near, middle and far detail tiers with hysteresis. Terrain
+keeps its full grid while distant windows, trees, agricultural rows and road trim
+are simplified. At most two mesh jobs run concurrently; main-thread integration
+remains budgeted. The renderer reports integrated chunks, pending/building work,
+mesh count and source vertices through `RenderTelemetry` (`RenderDiagnostics`
+is an alias). Living actors and player construction use independent bounded
+mesh caches so changing money or stock does not rebuild source geometry.
+
+This is a regional renderer over globally addressable geography. It does not
+render the entire planet at full resolution, assemble every OSM relation or
+supply a building-interior/rigid-body engine. See
+[GRAPHICS_AND_MAPS.md](GRAPHICS_AND_MAPS.md) for the implemented tag matrix and
+geometry limits.
 
 ## History and political layers
 
@@ -113,8 +138,8 @@ flowchart TD
 ```
 
 Source chunks remain immutable. `SandboxState` stores authored structures, land
-claims, farms, resource depletion, inventories, homes, factions, and source-feature
-tombstones. Registering a source chunk repeatedly does not refill a harvested
+claims, farms, resource depletion, inventories, homes, factions, living state and
+source-feature tombstones. Registering a source chunk repeatedly does not refill a harvested
 resource or resurrect a removed tree. Source buildings and roads are not freely
 destroyed through the tree-removal command; authored construction has its own
 validated damage/destruction path.
@@ -133,17 +158,58 @@ cross-references and cached construction/crop rules against that catalog; balanc
 changes that alter those rules require explicit migration.
 
 `SandboxView` is a bounded partial replica containing one player's inventory and
-nearby objects plus relevant faction rosters. It is not a complete save. Code
+wallet, nearby objects/bodies/facilities and relevant faction rosters. It is not a complete save. Code
 must not validate or persist that partial replica as though it owned every
 player, plot, or source reference in the world.
+
+## Living bodies, economics and movement
+
+A player principal and a controlled body have different IDs. `LivingAccount`
+links that principal to an original avatar and the currently active owned unit.
+The active unit's position is also the principal's position for interaction
+checks. Possession changes control mode, not ownership, inventory or permissions.
+RTS selection can change active context without cancelling an autonomous order.
+Releasing possession retains that body so trading does not jump back to an old
+avatar position.
+
+The domain stores one shared inventory/wallet per principal and individual
+needs per biological body. Credits use checked integer minor units. A trade
+validates customer/retailer stock, funds and reach before committing both sides.
+Production consumes real inputs and finite extraction capacity. Courier pickup
+moves stock into actual cargo; dropoff moves it into destination stock. A delivery
+is completed only after the host accepts the movement reaching its endpoint.
+
+The reference settlement creates authored residents, road traffic, courier
+vehicles and animals, plus five owned bodies per player. Map tags can locate its
+facilities and road graph. All economic state remains authored even when a real
+feature supplied the location. Bounded road-vertex routing, simple following
+and local obstacle detours are appropriate to a reference game; they do not
+constitute a complete city traffic model or general pathfinder.
+
+`advance_living_with_environment` separates real-step movement/exertion from
+calendar-driven hunger, thirst and production. The host resolver decides whether
+a proposed geographic step is supported before position or delivery arrival is
+committed. Local Bevy uses resident terrain, water/bridge support, slopes, source
+footprints and authored obstacles. The reference headless server uses a bounded
+`ResidentSurface` fed from the same normalized chunks for water, slope, bridge and source-footprint admission, plus
+server-owned dynamic obstacle checks. Custom hosts must supply equivalent
+policies for their chosen data. Neither domain code nor a client-supplied
+destination bypasses host authority.
+
+The world stores at most 512 living units. The client receives a bounded view,
+never NPC private money, private cargo inventory or full internal path arrays.
+Full persistence validates ownership, active-body positions, goods, reservations
+and cross-references. Loading a save does not regenerate the settlement or grant
+a second starting allowance. See [LIVING_WORLD.md](LIVING_WORLD.md).
 
 ## Bevy scheduling and game integration
 
 `TerraWorldPlugin` inserts `WorldRuntime`, `ResidentChunks`, `SandboxRuntime`,
 `SandboxQueue`, and the streaming service. It runs source integration in the
 `WorldSet::Stream` update set, local clock/actor advancement in a fixed schedule,
-and sandbox commands in `WorldSet::Sandbox`. Rendering consumes the resulting
-resident world and mutable overlay. A game may omit the renderer and supply its
+and sandbox commands in `WorldSet::Sandbox`. `TerraLivingPlugin` seeds after resident-source integration and advances
+authoritative population after the fixed world simulation. Rendering consumes
+the resulting resident world and mutable overlay. A game may omit the renderer and supply its
 own visual representation.
 
 `GeoAnchor` locates an arbitrary entity in absolute geography. `GeoActor` provides
@@ -155,15 +221,16 @@ resident height, slope, water, and weather information for a game's controller.
 Day/night and season models derive from location and calendar time. Deterministic
 weather and crop growth provide a useful offline simulation; they are illustrative
 models, not climate prediction or agronomic/flight simulation. Live weather is a
-timestamped external observation/forecast with provider limits. Physics, ecology,
-population AI, quests, economy, and navigation can be connected through the
-domain/environment seams as independent systems.
+timestamped external observation/forecast with provider limits. The optional living layer supplies lightweight population AI, needs, economy
+and routes. Games can replace or extend those rules and connect specialized
+physics, ecology, quests and navigation through the domain/environment seams.
 
 When `TerraNetworkPlugin` is installed after `TerraWorldPlugin`, it locks authority
 before the first fixed tick. Local sandbox commands are sent to the host, local
 calendar/actor simulation does not compete with authoritative state, and streamed
 source data does not invent mutable resources in the replica. Disconnect clears
-stale network actors and blocks further mutations. A `NetworkSession` resource
+stale network actors and blocks further mutations. Native visuals interpolate
+validated authoritative poses; there is no speculative movement prediction. A `NetworkSession` resource
 enables durable player identity with the same file helper used by terminal
 clients.
 
@@ -173,8 +240,8 @@ The host maintains absolute actor state and fixed simulation ticks, validates
 velocity intent, expires stale input, and uses resident terrain/coverage queries.
 Its source manifest is checked before a compatible client becomes a saved player.
 Clock metadata and actor snapshots are authoritative; each client converts them
-into its own floating origin. Actor interest uses great-circle distance and
-explicit capacity truncation. Mutable sandbox interest follows the player's
+into its own floating origin. Actor poses arrive at 10 Hz; living sandbox views arrive at up to 5 Hz. Actor
+interest uses great-circle distance and explicit capacity truncation. Mutable sandbox interest follows the player's
 position, not the spectator camera.
 
 `terra_net::WorldEnvironment` is the headless host's height/coverage interface;
@@ -186,7 +253,7 @@ a complete rigid-body collision engine.
 Local desktop saves and server saves wrap domain state with a world identity and
 clock, while the pure sandbox persistence API is suitable for domain workflows.
 Server saves additionally retain capabilities, command sequence history, NPCs,
-catalog, and starter equipment. JSON serialization uses precise float round-trip
+all living accounts/cargo/production, catalog and starter equipment. JSON serialization uses precise float round-trip
 support so saved `f64` GPS values survive restore. Unknown schema versions and
 incompatible world identities are rejected before mutation.
 
