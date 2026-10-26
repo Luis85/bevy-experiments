@@ -45,7 +45,9 @@ pwsh -NoProfile -File scripts/dev.ps1 test -Project legion-battle-lab
 ```
 
 `-Project all` is the default. Tasks: `doctor`, `fmt` (check only), `check`,
-`test`, `clippy`, and `verify` (format check, Clippy, workspace tests). Projects run
+`test`, `clippy`, and `verify` (format check, Clippy, workspace tests). Frontline's
+baseline excludes its `gpu_*`, `brp_*` and long `milestone_*` tests, matching its
+ordinary gate; use `-IncludeDeviceTests` on a suitable local machine to include them. Projects run
 sequentially to limit memory and disk use. GitHub Actions runs each workspace in
 its own Windows job. These are baseline checks; Frontline and NPC Framework also
 have architecture, replay and policy gates described in their agent guides.

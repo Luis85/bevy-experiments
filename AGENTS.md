@@ -40,7 +40,9 @@ combined Rust workspace. Read the relevant nested `AGENTS.md` before editing:
 ## Verification
 
 Root helper: `pwsh -NoProfile -File scripts/dev.ps1 verify -Project <directory>`.
-It runs format check, Clippy with warnings denied, and all workspace tests.
+It runs format check, Clippy with warnings denied, and workspace tests. Frontline
+excludes its device/BRP/milestone test families by default, matching its ordinary
+gate; use `-IncludeDeviceTests` for the complete suite on suitable hardware.
 Use focused package tests while iterating and the workspace's additional gate
 before completion. See `CONTRIBUTING.md` and the nested guide.
 

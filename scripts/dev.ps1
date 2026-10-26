@@ -4,7 +4,8 @@ param(
     [ValidateSet('doctor', 'fmt', 'check', 'test', 'clippy', 'verify')]
     [string]$Task = 'doctor',
     [ValidateSet('all', 'bevy-rts', 'legion-battle-lab', 'npc-framework', 'terra-world')]
-    [string]$Project = 'all'
+    [string]$Project = 'all',
+    [switch]$IncludeDeviceTests
 )
 
 $ErrorActionPreference = 'Stop'
@@ -36,6 +37,15 @@ foreach ($name in $projects) {
     Write-Host "`n=== $name : $Task ==="
     Push-Location (Join-Path $repoRoot $name)
     try {
+        $testArgs = @('test', '--locked', '--workspace')
+        if ($name -eq 'bevy-rts' -and -not $IncludeDeviceTests) {
+            # Match Frontline's ordinary gate: device/BRP and long milestone
+            # tests are separate, explicit local verification.
+            $testArgs += @('--', '--skip', 'gpu_', '--skip', 'brp_', '--skip', 'milestone_')
+            if ($Task -in @('test', 'verify')) {
+                Write-Host 'Frontline baseline excludes gpu_*, brp_* and milestone_* tests; use -IncludeDeviceTests for the complete suite.'
+            }
+        }
         switch ($Task) {
             'doctor' {
                 Invoke-Cargo @('version')
@@ -47,12 +57,12 @@ foreach ($name in $projects) {
             }
             'fmt' { Invoke-Cargo @('fmt', '--all', '--', '--check') }
             'check' { Invoke-Cargo @('check', '--locked', '--workspace', '--all-targets') }
-            'test' { Invoke-Cargo @('test', '--locked', '--workspace') }
+            'test' { Invoke-Cargo $testArgs }
             'clippy' { Invoke-Cargo @('clippy', '--locked', '--workspace', '--all-targets', '--', '-D', 'warnings') }
             'verify' {
                 Invoke-Cargo @('fmt', '--all', '--', '--check')
                 Invoke-Cargo @('clippy', '--locked', '--workspace', '--all-targets', '--', '-D', 'warnings')
-                Invoke-Cargo @('test', '--locked', '--workspace')
+                Invoke-Cargo $testArgs
             }
         }
     }

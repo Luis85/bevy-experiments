@@ -66,6 +66,12 @@ commands never rewrite source. Avoid more than two Cargo builders on one machine
 prefer one for a cold graphical build. Large optimized builds need substantial
 free disk space. Do not rebuild all games for a documentation-only edit.
 
+The helper's Frontline baseline excludes `gpu_*`, `brp_*` and `milestone_*` tests,
+as its ordinary project gate does. The direct `cargo test` command above includes
+them. On a suitable local machine, use `-IncludeDeviceTests` with the helper to
+run the complete suite. These exclusions are explicit test selection, not changes
+to the test sources or oracles.
+
 Additional project gates:
 
 | Workspace | Additional verification |
