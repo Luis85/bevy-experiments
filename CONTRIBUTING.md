@@ -111,5 +111,6 @@ are configured inside Frontline and NPC Framework; launch Claude Code from that
 workspace to load them. Other assistants must follow the same invariants explicitly.
 
 For a visible change, include a screenshot or playtest result. For simulation
-changes, verify determinism and replay compatibility. State which checks were
+changes, verify the workspace's numerical invariants, determinism and replay
+compatibility where provided. State which checks were
 run, skipped or blocked and why; do not invent validation or performance claims.

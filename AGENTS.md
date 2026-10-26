@@ -20,9 +20,11 @@ combined Rust workspace. Read the relevant nested `AGENTS.md` before editing:
   Resolve APIs from the installed crate source or project research, not memory.
   Do not upgrade dependencies or change global Rust/Cargo/agent configuration
   unless the task calls for it. Use `--locked` for standard builds and tests.
-- Preserve deterministic simulation boundaries: stable IDs, sorted iteration,
-  integer/fixed-point authoritative state, seeded counter-based randomness,
-  headless simulation and separate rendering. Follow each project's specific rules.
+- Preserve each project's numerical model and simulation/rendering boundary.
+  Frontline and NPC Framework require integer/fixed-point authoritative state,
+  stable IDs, sorted iteration and counter-based randomness. Legion uses its
+  documented floating-point battle core; Terra uses double-precision geographic
+  coordinates. Follow the selected workspace's invariants.
 - Never weaken tests, remove assertions, bypass policy hooks, silently rebaseline
   replays/snapshots or edit generated Clippy configs. Follow the workspace's
   documented approval/blessing procedure for protected files.
