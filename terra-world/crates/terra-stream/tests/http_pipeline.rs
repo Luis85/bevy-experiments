@@ -48,8 +48,14 @@ impl FixtureServer {
                     }
                     Err(_) => break,
                 };
+                // Accepted sockets can inherit the listener's nonblocking mode
+                // on Windows. Request framing below needs bounded blocking I/O.
+                socket.set_nonblocking(false).unwrap();
                 socket
                     .set_read_timeout(Some(Duration::from_secs(2)))
+                    .unwrap();
+                socket
+                    .set_write_timeout(Some(Duration::from_secs(2)))
                     .unwrap();
                 // TCP reads may split headers or leave a POST body unread. Closing
                 // with unread input can reset the connection on Windows before
@@ -58,7 +64,7 @@ impl FixtureServer {
                 let mut reader = BufReader::new(&mut socket);
                 loop {
                     let mut line = String::new();
-                    if reader.read_line(&mut line).unwrap_or(0) == 0 {
+                    if reader.read_line(&mut line).unwrap() == 0 {
                         break;
                     }
                     request.push_str(&line);
@@ -123,6 +129,42 @@ impl Drop for FixtureServer {
             worker.join().unwrap();
         }
     }
+}
+
+#[test]
+fn fixture_waits_for_complete_fragmented_request() {
+    let server = FixtureServer::start();
+    let mut socket = TcpStream::connect(server.address).unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_millis(100)))
+        .unwrap();
+    socket
+        .write_all(b"POST /overpass HTTP/1.1\r\nContent-Length: 4\r\n")
+        .unwrap();
+    let mut byte = [0];
+    let error = socket
+        .read(&mut byte)
+        .expect_err("the fixture must wait for complete headers");
+    assert!(matches!(
+        error.kind(),
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+    ));
+    socket.write_all(b"\r\nab").unwrap();
+    let error = socket
+        .read(&mut byte)
+        .expect_err("the fixture must wait for the entire POST body");
+    assert!(matches!(
+        error.kind(),
+        std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
+    ));
+    socket.write_all(b"cd").unwrap();
+    socket
+        .set_read_timeout(Some(Duration::from_secs(2)))
+        .unwrap();
+    let mut response = String::new();
+    socket.read_to_string(&mut response).unwrap();
+    assert!(response.starts_with("HTTP/1.1 200 OK\r\n"));
+    assert_eq!(server.requests.load(Ordering::Relaxed), 1);
 }
 
 #[test]
