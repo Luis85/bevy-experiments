@@ -1,0 +1,8 @@
+Unit(
+    id: "a.abstract.tank",
+    abstract: true,
+    tags: ["vehicle"],
+    components: {
+        "Hull": (hp: 100),
+    },
+)

@@ -1,0 +1,18 @@
+diff --git a/crates/fl_sim/tests/props.rs b/crates/fl_sim/tests/props.rs
+deleted file mode 100644
+index 1111111..0000000
+--- a/crates/fl_sim/tests/props.rs
++++ /dev/null
+@@ -1,12 +0,0 @@
+-use proptest::prelude::*;
+-
+-proptest! {
+-    #![proptest_config(ProptestConfig::with_cases(512))]
+-    #[test]
+-    fn hp_stays_in_bounds(dmg in 0u32..1000) {
+-        prop_assert!(apply(dmg) <= MAX_HP);
+-    }
+-    fn seeds_agree(seed in any::<u64>()) {
+-        prop_assert_eq!(run(seed), run(seed));
+-    }
+-}

@@ -1,0 +1,149 @@
+{
+  "application_updates": 17,
+  "build_profile": "development",
+  "checks": [
+    "selected scenario completed at least two fixed ticks",
+    "all stored unit arrays, numeric values and population counters are valid",
+    "CPU render tiers and GPU point population match the stable snapshot",
+    "crowd and scene pipelines are ready and two additional render updates settled",
+    "render-check PNG was written successfully"
+  ],
+  "errors": [],
+  "final_status": {
+    "alive_by_team": [
+      500000,
+      500000
+    ],
+    "busy": false,
+    "generation": 1,
+    "gpu": {
+      "generation": 1,
+      "pipelines_ready": true,
+      "source_tick": 9,
+      "uploaded_points": 1000000
+    },
+    "paused": true,
+    "preparing": false,
+    "render": {
+      "generation": 1,
+      "packing": false,
+      "points": 1000000,
+      "represented_units": 1000000,
+      "source_tick": 9
+    },
+    "status": "",
+    "stored_population": 1000000,
+    "tick": 9
+  },
+  "frames": 17,
+  "method": "Native Bevy application, the full selected scenario, immutable worker publications, CPU/GPU population agreement and GPU screenshot readback. Successful PNG writes are counted. No FPS claim.",
+  "mode": "render-check",
+  "passed": true,
+  "render": {
+    "count_semantics": "Submitted point instances before frustum, depth and occlusion tests; nearby detail models supplement those points. This is not a visible-pixel or FPS measurement.",
+    "detail_models": 0,
+    "draw_batches": 2,
+    "generation": 1,
+    "gpu_generation": 1,
+    "gpu_source_tick": 9,
+    "gpu_uploaded_points": 1000000,
+    "packed_numeric_values_valid": true,
+    "packing_ms": 328.20819091796875,
+    "pipelines_ready": true,
+    "point_only_units": 1000000,
+    "render_instance_bytes": 48000000,
+    "represented_units": 1000000,
+    "settled_updates_after_first_match": 2,
+    "source_tick": 9,
+    "submitted_points": 1000000
+  },
+  "requested_scenario": {
+    "blue": {
+      "category": "creature",
+      "count": 500000,
+      "formation": "lines",
+      "kind": "infantry"
+    },
+    "map": "meadow",
+    "name": "Millionenfront",
+    "red": {
+      "category": "creature",
+      "count": 500000,
+      "formation": "lines",
+      "kind": "infantry"
+    },
+    "seed": 2026,
+    "time_limit_secs": 600
+  },
+  "screenshot_files": [
+    "render-check.png"
+  ],
+  "screenshots_completed": 1,
+  "screenshots_pending": 0,
+  "screenshots_requested": 1,
+  "snapshot": {
+    "category_labels": {
+      "blue": "Creature",
+      "red": "Creature"
+    },
+    "elapsed_simulation_seconds": 0.44999998807907104,
+    "last_tick_cpu_ms": 631.8522338867188,
+    "memory_bytes": {
+      "estimated_authoritative_backend": 85818508,
+      "simulation_snapshot_vectors": 40000000
+    },
+    "numeric_and_population_invariants_valid": true,
+    "population": {
+      "alive_by_team": [
+        500000,
+        500000
+      ],
+      "alive_total": 1000000,
+      "casualties_by_team": [
+        0,
+        0
+      ],
+      "requested_total": 1000000,
+      "stored_by_team": [
+        500000,
+        500000
+      ],
+      "stored_total": 1000000
+    },
+    "scenario": {
+      "blue": {
+        "category": "creature",
+        "count": 500000,
+        "formation": "lines",
+        "kind": "infantry"
+      },
+      "map": "meadow",
+      "name": "Millionenfront",
+      "red": {
+        "category": "creature",
+        "count": 500000,
+        "formation": "lines",
+        "kind": "infantry"
+      },
+      "seed": 2026,
+      "time_limit_secs": 600
+    },
+    "simulation_tiers_last_tick": {
+      "full_detail": 0,
+      "strategic": 1000000
+    },
+    "snapshot_age_ms_at_inspection": 12543.616465,
+    "snapshot_copy_ms": 483.8273620605469,
+    "tick": 9
+  },
+  "supported_category_labels": [
+    "Creature",
+    "Vehicle",
+    "Building",
+    "Air Unit",
+    "Sea Unit",
+    "Underground Unit",
+    "Space Unit"
+  ],
+  "wall_seconds": 73.100026188
+}

@@ -1,0 +1,26 @@
+# Rust build products (each experiment has its own workspace).
+**/target/
+*.log
+*.pdb
+
+# Personal editor state and local agent configuration.
+**/.obsidian/
+**/.vscode/
+**/.idea/
+**/.claude/settings.local.json
+**/.claude/worktrees/
+**/.superpowers/
+**/.gate-base
+
+# Credentials and local environment overrides. Keep example files versioned.
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# OS files.
+.DS_Store
+Thumbs.db
+Desktop.ini

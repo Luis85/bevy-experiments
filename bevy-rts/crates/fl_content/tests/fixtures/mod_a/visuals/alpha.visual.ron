@@ -1,0 +1,7 @@
+VisualDef(
+    unit: "a.alpha",
+    placeholder: Tank(hull: (3.0, 2.0, 6.0), turret: (2.0, 1.0, 2.5), barrel_len: 3.0),
+    model: None,
+    scale: 1.0,
+    recolor: true,
+)

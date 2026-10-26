@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "craft",
+  "seed": 1,
+  "world": { "layout": "compound", "furnish": true, "detection": "automatic" },
+  "actors": [
+    { "kind": "unit", "name": "master", "template": "carpenter", "pos": [-8500, 6500], "carry": [{ "kind": "log", "stack": 8 }] },
+    { "kind": "unit", "name": "apprentice", "template": "novice", "pos": [-7500, 7500], "carry": [{ "kind": "log", "stack": 8 }] }
+  ]
+}

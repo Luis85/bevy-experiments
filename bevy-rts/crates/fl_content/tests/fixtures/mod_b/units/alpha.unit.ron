@@ -1,0 +1,10 @@
+// Replaces mod a's unit wholesale.
+Unit(
+    id: "a.alpha",
+    override: true,
+    inherits: Some("a.abstract.tank"),
+    name: "Alpha (b)",
+    components: {
+        "Speed": (kmh: 50.0),
+    },
+)

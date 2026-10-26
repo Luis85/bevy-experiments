@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "doors",
+  "seed": 1,
+  "world": {
+    "layout": "compound", "furnish": false, "detection": "automatic", "stagger": 1,
+    "items": [{ "kind": "book", "pos": [-5500, 6500], "name": "target" }]
+  },
+  "actors": [
+    { "kind": "unit", "name": "eye", "template": "scout", "pos": [-5500, 2500], "facing": [0, 1] }
+  ]
+}

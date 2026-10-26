@@ -1,0 +1,17 @@
+[package]
+name = "npc_nav"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Opt-in pathfinding for the NPC framework: deterministic grid A* with smoothing, a per-tick node budget, replanning and pass-cost hooks (GridPathMover)."
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+npc_kernel.workspace = true
+npc_locomotion.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"

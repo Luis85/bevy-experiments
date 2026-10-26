@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "vehicles",
+  "seed": 1,
+  "world": { "layout": "compound", "furnish": true, "detection": "automatic" },
+  "actors": [
+    { "kind": "unit", "name": "driver", "template": "novice", "pos": [4500, -4500] },
+    { "kind": "unit", "name": "passenger", "template": "novice", "pos": [5500, -5500] }
+  ]
+}

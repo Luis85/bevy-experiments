@@ -1,0 +1,8 @@
+{
+  "name": "Pfeilhagel im Tal",
+  "seed": 214,
+  "map": "valley",
+  "blue": { "count": 400, "kind": "ranger", "formation": "lines" },
+  "red": { "count": 900, "kind": "infantry", "formation": "wedge" },
+  "time_limit_secs": 180
+}

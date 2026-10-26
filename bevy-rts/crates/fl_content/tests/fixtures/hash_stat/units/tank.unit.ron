@@ -1,0 +1,1 @@
+Unit(id: "h.tank", name: "Tank", tags: ["armored", "tracked"], components: { "Hull": (hp: 101), "Speed": (kmh: 36.0) })

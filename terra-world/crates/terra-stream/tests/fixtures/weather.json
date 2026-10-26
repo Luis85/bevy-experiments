@@ -1,0 +1,5 @@
+{
+  "latitude":48.1,"longitude":11.5,
+  "current_units":{"time":"unixtime","interval":"seconds","temperature_2m":"°C","precipitation":"mm","cloud_cover":"%","wind_speed_10m":"m/s","wind_direction_10m":"°"},
+  "current":{"time":1782043200,"interval":900,"temperature_2m":22.5,"precipitation":0.25,"cloud_cover":45,"wind_speed_10m":3.4,"wind_direction_10m":245}
+}

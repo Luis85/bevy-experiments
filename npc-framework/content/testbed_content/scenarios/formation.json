@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "formation",
+  "seed": 1,
+  "world": { "layout": "compound", "furnish": false, "detection": "automatic" },
+  "actors": [
+    { "kind": "unit", "name": "a", "template": "smith", "pos": [-6500, -4500] },
+    { "kind": "unit", "name": "b", "template": "carpenter", "pos": [-4500, -4500] },
+    { "kind": "unit", "name": "c", "template": "woodcutter", "pos": [-2500, -4500] },
+    { "kind": "unit", "name": "d", "template": "scout", "pos": [-500, -4500] },
+    { "kind": "unit", "name": "enemy", "template": "skeleton_warrior", "owner": 2, "pos": [16500, -3500] }
+  ]
+}

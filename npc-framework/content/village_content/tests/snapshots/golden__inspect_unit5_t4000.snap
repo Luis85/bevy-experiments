@@ -1,0 +1,252 @@
+---
+source: content/village_content/tests/golden.rs
+assertion_line: 32
+expression: unit
+---
+{
+  "sim_id": 5,
+  "kind": "villager",
+  "pos": {
+    "x": -5055,
+    "z": -1444
+  },
+  "needs": {
+    "hunger": {
+      "value": 59800,
+      "level": "Ok"
+    },
+    "energy": {
+      "value": 36080,
+      "level": "Low"
+    },
+    "thirst": {
+      "value": 80020,
+      "level": "Ok"
+    }
+  },
+  "activity": "Walk",
+  "stockpile": null,
+  "tree_path": [
+    "Villager",
+    "Wander",
+    "MoveToDest"
+  ],
+  "active_leaf": {
+    "node": "MoveToDest",
+    "action": "MoveToDest",
+    "status": "Running"
+  },
+  "blackboard": {
+    "dest": {
+      "Pos": [
+        -4987,
+        -767
+      ]
+    }
+  },
+  "order": null,
+  "brain_stats": {
+    "leaf_starts": 25,
+    "aborts": 0
+  },
+  "reservations_held": [],
+  "recent_journal": [
+    {
+      "tick": 3675,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3715,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3726,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "LeafDone"
+      }
+    },
+    {
+      "tick": 3726,
+      "seq": 1,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStop",
+        "node": "MoveToDest",
+        "path": "Villager > Wander > MoveToDest",
+        "action": "MoveToDest",
+        "reason": "Finished"
+      }
+    },
+    {
+      "tick": 3726,
+      "seq": 2,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStart",
+        "node": "IdleFor",
+        "path": "Villager > Wander > IdleFor",
+        "action": "IdleFor",
+        "status": "Running"
+      }
+    },
+    {
+      "tick": 3755,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3795,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3835,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3875,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3902,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "NeedLevel",
+        "need": "Energy",
+        "from": "Ok",
+        "to": "Low"
+      }
+    },
+    {
+      "tick": 3902,
+      "seq": 1,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3911,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "LeafDone"
+      }
+    },
+    {
+      "tick": 3911,
+      "seq": 1,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStop",
+        "node": "IdleFor",
+        "path": "Villager > Wander > IdleFor",
+        "action": "IdleFor",
+        "reason": "Finished"
+      }
+    },
+    {
+      "tick": 3911,
+      "seq": 2,
+      "unit": 5,
+      "kind": {
+        "type": "RootDone",
+        "status": "Success"
+      }
+    },
+    {
+      "tick": 3912,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "NoLeaf"
+      }
+    },
+    {
+      "tick": 3912,
+      "seq": 1,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStart",
+        "node": "PickWanderPoint",
+        "path": "Villager > Wander > PickWanderPoint",
+        "action": "PickWanderPoint",
+        "status": "Success"
+      }
+    },
+    {
+      "tick": 3912,
+      "seq": 2,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStart",
+        "node": "MoveToDest",
+        "path": "Villager > Wander > MoveToDest",
+        "action": "MoveToDest",
+        "status": "Running"
+      }
+    },
+    {
+      "tick": 3915,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3955,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 3995,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    }
+  ]
+}

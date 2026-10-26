@@ -1,0 +1,9 @@
+Unit(
+    id: "base.su.kv1",
+    inherits: Some("base.abstract.heavy_tank"),
+    name: "KV-1",
+    components: {
+        "Hull": (hp: 190, footprint: (3.3, 6.8), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 35.0, terrain_factor: 0.5, turn_rate_deg_s: 60.0),
+    },
+)

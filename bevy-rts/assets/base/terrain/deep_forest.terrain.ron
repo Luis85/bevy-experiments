@@ -1,0 +1,8 @@
+// guess: values informed by docs/research/blitzkrieg-mechanics.md §1.8, not measured.
+TerrainDef(
+    id: "base.deep_forest",
+    name: "Deep forest",
+    pass: 0.6,
+    blocks: [Wheeled, HalfTrack, Tracked],
+    color: (0.08, 0.22, 0.08),
+)

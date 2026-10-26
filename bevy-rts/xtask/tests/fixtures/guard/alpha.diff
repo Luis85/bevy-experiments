@@ -1,0 +1,7 @@
+diff --git a/crates/fl_test_utils/src/stats.rs b/crates/fl_test_utils/src/stats.rs
+index 1111111..2222222 100644
+--- a/crates/fl_test_utils/src/stats.rs
++++ b/crates/fl_test_utils/src/stats.rs
+@@ -3 +3 @@
+-const ALPHA: f64 = 1e-4;
++const ALPHA: f64 = 1e-2;

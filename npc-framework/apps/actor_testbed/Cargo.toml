@@ -1,0 +1,38 @@
+[package]
+name = "actor_testbed"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The windowed Actor Testbed: every opt-in capability on, RTS command UI, F5 sheet and F6 perception panels, BRP npc/* + agent/* remote."
+
+[dependencies]
+# Not `bevy.workspace = true`: the workspace entry keeps Bevy's default
+# features, which select the `ruzstd` backend. Same list as the village app
+# (`zstd_c`, never `zstd_rust`; see apps/village/Cargo.toml). Keep in sync
+# with content/testbed_view/Cargo.toml.
+bevy = { version = "0.20.0", default-features = false, features = [
+    "2d", "ui", "audio",
+    "default_app", "default_platform", "scene", "picking",
+    "common_api", "bevy_light", "bevy_mikktspace", "ktx2", "morph_animation", "morph",
+    "smaa_luts", "tonemapping_luts", "zstd_c",
+    "bevy_render", "bevy_core_pipeline", "bevy_gizmos_render", "bevy_anti_alias",
+    "bevy_gltf", "bevy_pbr", "bevy_post_process", "gltf_animation",
+] }
+npc_framework = { workspace = true, features = ["view-helpers", "agent-io", "tools"] }
+testbed_content.workspace = true
+testbed_view.workspace = true
+serde.workspace = true
+serde_json = "1"
+
+[features]
+default = ["debug-tools"]
+# Remote interface (BRP npc/* + agent/* + world/* on 127.0.0.1:15702), the
+# built-in profiler (F4 panel, `npc/perf`) and Bevy's per-system spans.
+debug-tools = [
+    "npc_framework/remote",
+    "npc_framework/perf",
+    "testbed_view/perf",
+    "bevy/trace",
+    "bevy/bevy_remote",
+]

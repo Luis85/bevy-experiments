@@ -1,0 +1,4 @@
+Credits([
+    (asset: "c/ok.glb", title: "Ok", author: "A", license: "CC0-1.0", url: "https://example.invalid/ok"),
+    (asset: "c/nc.glb", title: "Nc", author: "B", license: "CC-BY-NC-4.0", url: "https://example.invalid/nc"),
+])

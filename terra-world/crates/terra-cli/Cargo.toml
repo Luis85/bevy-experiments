@@ -1,0 +1,14 @@
+[package]
+name = "terra-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Headless world-data probe and reproducible simulation"
+
+[dependencies]
+serde_json.workspace = true
+terra-core = { path = "../terra-core" }
+terra-stream = { path = "../terra-stream" }
+terra-sandbox = { path = "../terra-sandbox" }
+

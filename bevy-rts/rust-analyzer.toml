@@ -1,0 +1,6 @@
+# rust-analyzer checks into its own target subdirectory, so it never holds the build lock (ADR-0013).
+[cargo]
+targetDir = true
+
+[check]
+command = "clippy"

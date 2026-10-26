@@ -1,0 +1,296 @@
+# Test-guard findings a reviewer has accepted (ruling M16, R154). `cargo xtask gate` and `cargo xtask test-guard` drop
+# the findings an entry accepts; the rest are reported. An entry's key is file, test (the enclosing function), kind and
+# the whole normalized text of the finding; the line number is ignored. `count` (default 1) is how many identical
+# findings were accepted: if more than `count` match, all of them are reported again. The text and test are copied from
+# `cargo xtask test-guard` output. Every entry names its ruling; `note` names the M1 task review that accepted it,
+# where the M1 ledger says so.
+# Protected (OWNERS.toml): only the lead adds entries, after a reviewer accepts a finding.
+#
+# Seed: R154 batch-accepts every finding of `cargo xtask test-guard --base m0` at tag m1 as reviewed at M1 close.
+
+[[accepted]]
+file = "crates/fl_catalog/tests/base_content.rs"
+test = "base_content_loads"
+kind = "RemovedAssert"
+text = "assert_eq!(db.kind::<ScenarioDef>().len(), 1);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_content/tests/load.rs"
+test = "registry_string_tables_sorted"
+kind = "RemovedAssert"
+text = "assert_eq!( names(tables::CONTENT_KINDS), [\"faction\", \"map\", \"scenario\", \"visual\"] );"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/src/commands.rs"
+test = "slot_pitch"
+kind = "ToleranceChanged"
+text = "let margin = world"
+ruling = "R154"
+note = "M1 Task 10 review (R109) accepted this false positive"
+
+[[accepted]]
+file = "crates/fl_sim/src/movement.rs"
+test = ""
+kind = "ToleranceChanged"
+text = "const MAX_SEPARATION_MARGIN_M: i32 = 50;"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/src/movement.rs"
+test = "move_system"
+kind = "ToleranceChanged"
+text = "let step_delta = step.map_or(FxVec2::ZERO, |(to, _)| to - from);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/astar.rs"
+test = "astar_matches_dijkstra_cost"
+kind = "NewAssume"
+text = "prop_assume!(!cells.is_empty());"
+ruling = "R154"
+note = "M1 Task 6 review accepted the 3 prop_assume"
+
+[[accepted]]
+file = "crates/fl_sim/tests/astar.rs"
+test = "smooth_keeps_path_valid"
+kind = "NewAssume"
+text = "prop_assume!(!cells.is_empty());"
+ruling = "R154"
+note = "M1 Task 6 review accepted the 3 prop_assume"
+
+[[accepted]]
+file = "crates/fl_sim/tests/astar.rs"
+test = "astar_is_deterministic"
+kind = "NewAssume"
+text = "prop_assume!(!cells.is_empty());"
+ruling = "R154"
+note = "M1 Task 6 review accepted the 3 prop_assume"
+
+[[accepted]]
+file = "crates/fl_sim/tests/commands.rs"
+test = "queued_waypoints_are_capped"
+kind = "RemovedAssert"
+text = "assert_eq!(waypoints(&app, 1).len(), MAX_WAYPOINTS, \"unchanged\");"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/debug_query.rs"
+test = "duplicate_debug_query_panics_naming_both"
+kind = "NewShouldPanic"
+text = "#[should_panic(expected = \"registered by 'test' and 'other'\")]"
+ruling = "R154"
+note = "M1 Task 2 review accepted this should_panic"
+
+[[accepted]]
+file = "crates/fl_sim/tests/feature.rs"
+test = "header_lists_features_mods_and_tables"
+kind = "RemovedAssert"
+text = "assert_eq!( header.features, [(\"core\".to_owned(), 1), (\"test\".to_owned(), 3)] );"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/feature.rs"
+test = "header_lists_features_mods_and_tables"
+kind = "RemovedAssert"
+text = "assert_eq!(names(tables::RULES_SECTIONS), [\"Spatial\", \"StateHash\"]);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/hash.rs"
+test = "inspect_world_summarizes_state"
+kind = "RemovedAssert"
+text = "assert_eq!( world[\"header\"], serde_json::json!({ \"features\": [[\"core\", 1], [\"hp\", 1]], \"mods\": [[\"core_test\", \"0.1.0\"]], \"rules_hash\": header.rules_hash, }) );"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/hpa.rs"
+test = "hpa_cost_ratio_tripwire"
+kind = "NewSeedOverride"
+text = "let mut runner = TestRunner::new_with_rng("
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/movement.rs"
+test = "move_target_outside_map_is_clamped"
+kind = "RemovedAssert"
+text = "assert!(order.waypoints.is_empty());"
+count = 2
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/movement.rs"
+test = "move_target_outside_map_is_clamped"
+kind = "RemovedAssert"
+text = "assert_eq!( pos, map.clamp(v(5000, 5000)), \"arrived at the clamped target\" );"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/observe.rs"
+test = "applied_and_rejected_commands_are_journaled"
+kind = "RemovedAssert"
+text = "assert_eq!(order[0].data[\"waypoints\"], 1);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/observe.rs"
+test = "applied_and_rejected_commands_are_journaled"
+kind = "RemovedAssert"
+text = "assert_eq!(order.data[\"waypoints\"], 0);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/observe.rs"
+test = "journal_identical_across_shuffle_seeds"
+kind = "RemovedAssert"
+text = "assert!(orders.iter().all(|order| order.len() == 2), \"{orders:?}\");"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/observe.rs"
+test = "journal_identical_across_shuffle_seeds"
+kind = "RemovedAssert"
+text = "assert!( orders.iter().any(|order| order != &orders[0]), \"seeds 1-3 must order the recording systems differently: {orders:?}\" );"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/observe.rs"
+test = "journal_identical_across_shuffle_seeds"
+kind = "RemovedAssert"
+text = "assert_eq!(reference.len(), 10 * 5 + 2, \"{reference:?}\");"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/observe.rs"
+test = "journal_entries_sorted"
+kind = "RemovedAssert"
+text = "assert_eq!( keys, [ (0, \"core.command_applied\", None, 0), (0, \"core.move_order\", Some(SimId(1)), 0), (1, \"test.ping\", Some(SimId(1)), 0), (1, \"test.ping\", Some(…"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/orders.rs"
+test = "path_request_timing_follows_the_hook"
+kind = "NewSeedOverride"
+text = ".shuffle_seed(shuffle)"
+ruling = "R154"
+note = "M1 Task 9 review accepted this seed override"
+
+[[accepted]]
+file = "crates/fl_sim/tests/pathing.rs"
+test = "hull_rotates_before_moving"
+kind = "ToleranceChanged"
+text = "let threshold = i32::from(Angle::from_degrees(Fx::from_int(30)).raw());"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/save.rs"
+test = "pending_commands_survive_save"
+kind = "RemovedAssert"
+text = "assert_eq!(order.waypoints, [v(150, 600)]);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/save.rs"
+test = "pending_command_ids_remap_on_load"
+kind = "RemovedAssert"
+text = "assert_eq!(order.waypoints, [v(400, 400)]);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/scale_mix.rs"
+test = "scale_mix_twin_run"
+kind = "RemovedAssert"
+text = "assert!(a.iter().all(Option::is_some), \"hashed every tick\");"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_sim/tests/steering.rs"
+test = "never_blocked_case"
+kind = "NewAssume"
+text = "prop_assume!(!placed.is_empty());"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/src/perf.rs"
+test = "record_then_check_round_trips"
+kind = "RemovedAssert"
+text = "assert_eq!(budgets.scenarios[\"s\"][\"b.n\"], 0);"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/src/perf.rs"
+test = "record_then_check_round_trips"
+kind = "RemovedAssert"
+text = "assert_eq!(budgets.scenarios[\"t\"][\"c.n\"], 2, \"ceil(1 × 1.25)\");"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/src/perf.rs"
+test = "record_then_check_round_trips"
+kind = "RemovedAssert"
+text = "assert_eq!( check_budgets(\"t\", &run, &budgets), Err(vec![ \"t: a.n max 8 has no budget\".to_owned(), \"t: b.n max 0 has no budget\".to_owned(), \"t: c.n has budget 2…"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/tests/movement_determinism.rs"
+test = ""
+kind = "NewSeedOverride"
+text = "assert_shuffle_invariant, base_content, shuffle_seeds,"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/tests/movement_determinism.rs"
+test = "m1_shuffle_moves_no_game_system"
+kind = "NewSeedOverride"
+text = "let order = |shuffle_seed: Option<u64>| {"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/tests/movement_determinism.rs"
+test = "m1_shuffle_moves_no_game_system"
+kind = "NewSeedOverride"
+text = "shuffle_seed,"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/tests/movement_determinism.rs"
+test = "m1_shuffle_moves_no_game_system"
+kind = "NewSeedOverride"
+text = "for seed in shuffle_seeds() {"
+ruling = "R154"
+
+[[accepted]]
+file = "crates/fl_test_utils/tests/movement_determinism.rs"
+test = "random_orders_branch"
+kind = "NewSeedOverride"
+text = "let mut runner = TestRunner::new_with_rng("
+ruling = "R154"
+
+[[accepted]]
+file = "xtask/src/gate.rs"
+test = "task_filter_selects_touched_and_smoke"
+kind = "RemovedAssert"
+text = "assert_eq!( task_filter(&touched, &smoke, excl).as_deref(), Some( \"(package(=fl_view) | package(=xtask) | ((package(=fl_sim) | package(=fl_test_utils)) \\ & test…"
+ruling = "R154"
+
+[[accepted]]
+file = "xtask/src/gate.rs"
+test = "task_filter_selects_touched_and_smoke"
+kind = "RemovedAssert"
+text = "assert_eq!( task_filter(&[], &[], excl), None, \"nothing selected means the step is skipped\" );"
+ruling = "R154"
+
+[[accepted]]
+file = "xtask/src/gate.rs"
+test = "content_change_runs_catalog_and_golden_tests_at_task_level"
+kind = "RemovedAssert"
+text = "assert_eq!( task_headless_filter(&headless, &touched, true, excl).as_deref(), Some( \"(((package(=fl_sim) | package(=fl_test_utils)) & test(/smoke_/)) | package(…"
+ruling = "R154"
+
+[[accepted]]
+file = "xtask/src/gate.rs"
+test = "content_change_runs_catalog_and_golden_tests_at_task_level"
+kind = "RemovedAssert"
+text = "assert_eq!( task_headless_filter(&headless, &touched, false, excl).as_deref(), Some( \"(((package(=fl_sim) | package(=fl_test_utils)) & test(/smoke_/))) & not \\ …"
+ruling = "R154"

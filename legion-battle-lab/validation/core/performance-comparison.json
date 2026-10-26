@@ -1,0 +1,121 @@
+{
+  "date_utc": "2026-10-26T17:22:14Z",
+  "profile": "release, thin LTO, codegen-units 16",
+  "platform": [
+    "Linux",
+    "a979f05de699",
+    "6.18.55",
+    "#1 SMP Wed Oct 14 19:45:18 UTC 2026",
+    "x86_64"
+  ],
+  "runs": [
+    {
+      "name": "baseline",
+      "binary": "/tmp/legion-bench-before-thin",
+      "sha256": "0288409c147d3f9961a663168542c7a8e82ef9472f0e718e7482f01fb9377442",
+      "returncode": 0,
+      "elapsed_seconds": 109.51722273100131,
+      "command": [
+        "/tmp/legion-bench-before-thin",
+        "--units",
+        "1000000",
+        "--ticks",
+        "300",
+        "--seed",
+        "2026",
+        "--map",
+        "meadow",
+        "--output",
+        "/tmp/legion-million-baseline-matched.json"
+      ],
+      "report": {
+        "backend": "CPU SoA / logical 20 Hz / camera-independent activity LOD / bounded candidates",
+        "requested_units": 1000000,
+        "requested_ticks": 300,
+        "completed_ticks": 300,
+        "seed": 2026,
+        "map": "meadow",
+        "blue_category": "creature",
+        "red_category": "creature",
+        "wall_seconds": 108.630776193,
+        "simulated_seconds": 15.0,
+        "ticks_per_wall_second": 2.761648314718859,
+        "tick_ms_p50": 252.63333129882812,
+        "tick_ms_p95": 1054.941650390625,
+        "tick_ms_max": 2292.10205078125,
+        "alive": [
+          497089,
+          496422
+        ],
+        "casualties": [
+          2911,
+          3578
+        ],
+        "last_neighbor_checks": 3571237,
+        "peak_cell_occupancy": 56,
+        "last_full_detail_units": 50566,
+        "last_strategic_units": 942992,
+        "peak_full_detail_units": 56192,
+        "estimated_state_bytes": 77818508,
+        "initialization_seconds": 0.795540238,
+        "build_profile": "release",
+        "state_valid": true,
+        "outcome": null
+      }
+    },
+    {
+      "name": "parallel",
+      "binary": "/tmp/legion-bench-parallel-thin",
+      "sha256": "d559c56dd7446f6e3d0b38819d1fa6e6dc1c885efe70cd4f11078da5452e89d9",
+      "returncode": 0,
+      "elapsed_seconds": 77.149831232,
+      "command": [
+        "/tmp/legion-bench-parallel-thin",
+        "--units",
+        "1000000",
+        "--ticks",
+        "300",
+        "--seed",
+        "2026",
+        "--map",
+        "meadow",
+        "--output",
+        "/tmp/legion-million-parallel-matched.json"
+      ],
+      "report": {
+        "backend": "CPU SoA / logical 20 Hz / camera-independent activity LOD / bounded candidates",
+        "requested_units": 1000000,
+        "requested_ticks": 300,
+        "completed_ticks": 300,
+        "seed": 2026,
+        "map": "meadow",
+        "blue_category": "creature",
+        "red_category": "creature",
+        "wall_seconds": 76.6141301,
+        "simulated_seconds": 15.0,
+        "ticks_per_wall_second": 3.9157267674830654,
+        "tick_ms_p50": 205.79986572265625,
+        "tick_ms_p95": 596.6112060546875,
+        "tick_ms_max": 1317.914306640625,
+        "alive": [
+          497089,
+          496422
+        ],
+        "casualties": [
+          2911,
+          3578
+        ],
+        "last_neighbor_checks": 3571237,
+        "peak_cell_occupancy": 56,
+        "last_full_detail_units": 50566,
+        "last_strategic_units": 942992,
+        "peak_full_detail_units": 56192,
+        "estimated_state_bytes": 85818508,
+        "initialization_seconds": 0.480327718,
+        "build_profile": "release",
+        "state_valid": true,
+        "outcome": null
+      }
+    }
+  ]
+}

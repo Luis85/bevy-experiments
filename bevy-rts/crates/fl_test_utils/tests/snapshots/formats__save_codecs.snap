@@ -1,0 +1,93 @@
+---
+source: crates/fl_test_utils/tests/formats.rs
+assertion_line: 43
+expression: text
+---
+core.clock@1:
+  root: TypeName("SimClock")
+  SimClock: Struct([Named { name: "tick", value: TypeName("Tick") }])
+  Tick: NewTypeStruct(U32)
+core.follower@1:
+  root: TypeName("Follower")
+  Follower: Struct([Named { name: "leader", value: TypeName("SimId") }, Named { name: "offset", value: TupleArray { content: I64, size: 2 } }])
+  SimId: NewTypeStruct(U32)
+core.footprint@1:
+  root: TypeName("Footprint")
+  Footprint: Struct([Named { name: "width", value: I64 }, Named { name: "length", value: I64 }, Named { name: "hitbox_shrink", value: I64 }])
+core.health@1:
+  root: TypeName("Health")
+  Health: Struct([Named { name: "hp", value: U32 }, Named { name: "max", value: U32 }])
+core.invulnerable@1:
+  root: TypeName("Invulnerable")
+  Invulnerable: UnitStruct
+core.last_seq@1:
+  root: TypeName("LastSeq")
+  LastSeq: NewTypeStruct(Map { key: TypeName("PlayerId"), value: U32 })
+  PlayerId: NewTypeStruct(U8)
+core.map@1:
+  root: TypeName("MapInfo")
+  MapInfo: Struct([Named { name: "size", value: TupleArray { content: I64, size: 2 } }, Named { name: "cell", value: I64 }, Named { name: "cells_x", value: U32 }, Named { name: "cells_y", value: U32 }])
+core.match_seed@1:
+  root: TypeName("MatchSeed")
+  MatchSeed: NewTypeStruct(U64)
+core.mobility@1:
+  root: TypeName("Mobility")
+  Mobility: Struct([Named { name: "class", value: TypeName("MoveClass") }, Named { name: "speed", value: I64 }, Named { name: "terrain_factor", value: I64 }, Named { name: "turn_rate", value: U16 }])
+  MoveClass: Enum({0: Named { name: "Foot", value: Unit }, 1: Named { name: "Wheeled", value: Unit }, 2: Named { name: "HalfTrack", value: Unit }, 3: Named { name: "Tracked", value: Unit }})
+core.move_order@2 reads 1:
+  root: TypeName("MoveOrder")
+  MoveOrder: Struct([Named { name: "orders", value: Seq(TypeName("Order")) }])
+  Order: Enum({0: Named { name: "Move", value: Struct([Named { name: "target", value: TupleArray { content: I64, size: 2 } }]) }, 1: Named { name: "Rotate", value: Struct([Named { name: "facing", value: U16 }]) }, 2: Named { name: "Follow", value: Struct([Named { name: "leader", value: TypeName("SimId") }, Named { name: "offset", value: TupleArray { content: I64, size: 2 } }]) }})
+  SimId: NewTypeStruct(U32)
+core.owner@1:
+  root: TypeName("Owner")
+  Owner: NewTypeStruct(TypeName("PlayerId"))
+  PlayerId: NewTypeStruct(U8)
+core.path_follow@1:
+  root: TypeName("PathFollow")
+  ClusterId: NewTypeStruct(U32)
+  FlowKey: Struct([Named { name: "cluster", value: TypeName("ClusterId") }, Named { name: "profile", value: TypeName("MoveProfile") }])
+  MoveClass: Enum({0: Named { name: "Foot", value: Unit }, 1: Named { name: "Wheeled", value: Unit }, 2: Named { name: "HalfTrack", value: Unit }, 3: Named { name: "Tracked", value: Unit }})
+  MoveProfile: Struct([Named { name: "class", value: TypeName("MoveClass") }, Named { name: "size", value: U8 }])
+  PathFollow: Struct([Named { name: "state", value: TypeName("PathState") }, Named { name: "goal", value: TupleArray { content: I64, size: 2 } }, Named { name: "corners", value: Seq(TupleArray { content: I64, size: 2 }) }, Named { name: "next", value: U16 }, Named { name: "planned", value: TypeName("Tick") }])
+  PathState: Enum({0: Named { name: "Idle", value: Unit }, 1: Named { name: "Waiting", value: Struct([Named { name: "request", value: U32 }]) }, 2: Named { name: "Following", value: Unit }, 3: Named { name: "Flow", value: Struct([Named { name: "key", value: TypeName("FlowKey") }]) }, 4: Named { name: "Done", value: Unit }, 5: Named { name: "Failed", value: Unit }})
+  Tick: NewTypeStruct(U32)
+core.path_queue@1:
+  root: TypeName("PathQueue")
+  PathQueue: Struct([Named { name: "pending", value: Seq(TypeName("PathRequest")) }, Named { name: "next_id", value: U32 }])
+  PathRequest: Struct([Named { name: "id", value: U32 }, Named { name: "unit", value: TypeName("SimId") }, Named { name: "goal", value: TupleArray { content: I64, size: 2 } }, Named { name: "kind", value: TypeName("RequestKind") }, Named { name: "issued", value: TypeName("Tick") }])
+  RequestKind: Enum({0: Named { name: "Single", value: Unit }, 1: Named { name: "Group", value: Struct([Named { name: "units", value: Seq(Tuple([TypeName("SimId"), TupleArray { content: I64, size: 2 }])) }]) }})
+  SimId: NewTypeStruct(U32)
+  Tick: NewTypeStruct(U32)
+core.players@1 reads older:
+  root: TypeName("Players")
+  Controller: Enum({0: Named { name: "Human", value: Unit }, 1: Named { name: "Ai", value: NewType(Str) }, 2: Named { name: "None", value: Unit }})
+  FactionId: NewTypeStruct(U16)
+  PlayerId: NewTypeStruct(U8)
+  PlayerInfo: Struct([Named { name: "id", value: TypeName("PlayerId") }, Named { name: "faction", value: TypeName("FactionId") }, Named { name: "team", value: TypeName("TeamId") }, Named { name: "controller", value: TypeName("Controller") }])
+  Players: Struct([Named { name: "list", value: Seq(TypeName("PlayerInfo")) }])
+  TeamId: NewTypeStruct(U8)
+core.pose@1:
+  root: TypeName("Pose")
+  Pose: Struct([Named { name: "pos", value: TupleArray { content: I64, size: 2 } }, Named { name: "heading", value: U16 }])
+core.projectile@1:
+  root: TypeName("Projectile")
+  Projectile: Struct([Named { name: "vel", value: TupleArray { content: I64, size: 2 } }, Named { name: "ttl", value: U16 }])
+core.scale_mix@1:
+  root: TypeName("ScaleMix")
+  ScaleMix: Struct([Named { name: "projectiles", value: U32 }, Named { name: "projectile_ttl", value: U16 }, Named { name: "sensor_every", value: U32 }, Named { name: "units", value: Seq(TypeName("SimId")) }])
+  SimId: NewTypeStruct(U32)
+core.selectable@1:
+  root: TypeName("Selectable")
+  Selectable: UnitStruct
+core.sim_id_allocator@1:
+  root: TypeName("SimIdAllocator")
+  SimIdAllocator: Struct([Named { name: "next", value: U32 }])
+core.terrain@1:
+  root: TypeName("TerrainGrid")
+  TerrainGrid: Struct([Named { name: "cells_x", value: U32 }, Named { name: "cells_y", value: U32 }, Named { name: "palette", value: Seq(Str) }, Named { name: "types", value: Seq(U8) }, Named { name: "heights", value: Seq(U16) }, Named { name: "height_m", value: TupleArray { content: I64, size: 2 } }])
+core.unit_type@1 reads older:
+  root: U16
+core.wander@1:
+  root: TypeName("Wander")
+  Wander: Struct([Named { name: "home", value: TupleArray { content: I64, size: 2 } }, Named { name: "radius", value: I64 }])

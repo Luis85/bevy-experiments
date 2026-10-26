@@ -1,0 +1,11 @@
+{
+  "input": "world click, then W held for twelve seconds to span software-rendered frames",
+  "changed_world_pixels_over_8_levels": 126701,
+  "passed": true,
+  "roi": [
+    0,
+    180,
+    1024,
+    650
+  ]
+}

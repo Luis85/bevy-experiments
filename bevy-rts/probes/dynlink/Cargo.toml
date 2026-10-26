@@ -1,0 +1,18 @@
+[package]
+name = "probe_dynlink"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[features]
+dynamic = ["bevy/dynamic_linking"]
+
+[dependencies]
+bevy.workspace = true
+fl_sim.workspace = true
+fl_protocol.workspace = true

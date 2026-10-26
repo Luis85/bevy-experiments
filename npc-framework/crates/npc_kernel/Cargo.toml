@@ -1,0 +1,18 @@
+[package]
+name = "npc_kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Deterministic NPC sim kernel: ids, clock, rng, fixed math, NpcSimTick/NpcSet, command bus, journal, replay, state-hash registry, inspect, host-safe driver."
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_time.workspace = true
+bevy_reflect.workspace = true
+npc_ai.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"
+

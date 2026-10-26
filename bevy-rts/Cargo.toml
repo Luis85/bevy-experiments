@@ -1,0 +1,128 @@
+[workspace]
+resolver = "3"
+members = ["crates/*", "xtask", "probes/*"]
+default-members = ["crates/*", "xtask"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+# Explicit feature list: Bevy 0.20 `default` (2d, 3d, ui, audio) expanded to leaf
+# features, minus audio (bevy_audio, vorbis); M2 adds them back. ktx2 + zstd_rust stay
+# for the embedded tonemapping/SMAA LUTs (ruling R29; see the ruzstd note in deny.toml).
+bevy = { version = "=0.20.0", default-features = false, features = [
+    "std",
+    "async_executor",
+    "bevy_gilrs",
+    "bevy_ui_widgets",
+    "bevy_asset",
+    "bevy_log",
+    "bevy_state",
+    "reflect_auto_register",
+    "gamepad",
+    "bevy_winit",
+    "bevy_clipboard",
+    "default_font",
+    "multi_threaded",
+    "webgl2",
+    "x11",
+    "wayland",
+    "custom_cursor",
+    "sysinfo_plugin",
+    "bevy_animation",
+    "bevy_camera",
+    "bevy_color",
+    "bevy_curve",
+    "bevy_gizmos",
+    "bevy_image",
+    "bevy_mesh",
+    "bevy_shader",
+    "bevy_material",
+    "bevy_text",
+    "bevy_window",
+    "hdr",
+    "png",
+    "bevy_sprite",
+    "bevy_render",
+    "bevy_core_pipeline",
+    "bevy_post_process",
+    "bevy_sprite_render",
+    "bevy_gizmos_render",
+    "bevy_world_serialization",
+    "bevy_scene",
+    "bevy_picking",
+    "mesh_picking",
+    "sprite_picking",
+    "ui_picking",
+    "bevy_light",
+    "bevy_mikktspace",
+    "ktx2",
+    "morph_animation",
+    "morph",
+    "smaa_luts",
+    "tonemapping_luts",
+    "zstd_rust",
+    "bevy_anti_alias",
+    "bevy_gltf",
+    "bevy_pbr",
+    "gltf_animation",
+    "bevy_input_focus",
+    "bevy_ui",
+    "bevy_ui_render",
+] }
+bevy_app = { version = "=0.20.0", default-features = false, features = ["std"] }
+bevy_ecs = { version = "=0.20.0", default-features = false, features = ["std", "trace", "debug"] }
+bevy_egui = "0.43"
+fixed = "1"
+serde = { version = "1", features = ["derive"] }
+ron = "0.12"
+serde_json = "1"
+erased-serde = "0.4"
+postcard = { version = "1", default-features = false, features = ["alloc"] }
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
+thiserror = "2"
+clap = { version = "4", features = ["derive"] }
+criterion = "0.8"
+proptest = "1"
+tracing = "0.1"
+insta = { version = "1", features = ["ron", "json", "filters"] }
+serde-reflection = "0.5"
+crossbeam-channel = "0.5"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt", "registry"] }
+stats_alloc = "0.1"
+bevy_brp_extras = "=0.23.0"
+cargo_metadata = "0.23"
+toml = "1"
+globset = "0.4"
+anyhow = "1"
+tempfile = "3"
+# PNG map layers, decoded by fl_content only (ADR-0014; arch-check enforces it).
+png = "=0.18.1"
+
+fl_math = { path = "crates/fl_math" }
+fl_protocol = { path = "crates/fl_protocol" }
+fl_content = { path = "crates/fl_content" }
+fl_sim = { path = "crates/fl_sim" }
+fl_catalog = { path = "crates/fl_catalog" }
+fl_test_utils = { path = "crates/fl_test_utils" }
+fl_cli = { path = "crates/fl_cli" }
+fl_client = { path = "crates/fl_client" }
+fl_view = { path = "crates/fl_view" }
+fl_observe = { path = "crates/fl_observe" }
+fl_game = { path = "crates/fl_game" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[profile.dev]
+opt-level = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 3
+debug = false
+
+[profile.release]
+debug = "line-tables-only"

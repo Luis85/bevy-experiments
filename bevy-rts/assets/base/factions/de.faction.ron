@@ -1,0 +1,6 @@
+Faction(
+    id: "base.de",
+    name: "Germany",
+    color: (0.42, 0.46, 0.50),
+    roster: ["base.de.pz2", "base.de.pz3", "base.de.tiger", "base.de.opel_blitz", "base.de.rifleman"],
+)

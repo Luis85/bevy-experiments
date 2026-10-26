@@ -1,0 +1,7 @@
+[build]
+build-dir = "C:/t/fl/{workspace-path-hash}"
+rustc-wrapper = "sccache"
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+[alias]
+xtask = "run -q -p xtask --"

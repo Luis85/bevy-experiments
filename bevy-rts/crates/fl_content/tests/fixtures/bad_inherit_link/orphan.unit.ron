@@ -1,0 +1,1 @@
+Unit(id: "k.orphan", inherits: Some("k.ghost"), components: { "Hull": (hp: 10) })

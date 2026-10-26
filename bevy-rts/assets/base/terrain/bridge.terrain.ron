@@ -1,0 +1,8 @@
+// guess: values informed by docs/research/blitzkrieg-mechanics.md §1.8, not measured.
+TerrainDef(
+    id: "base.bridge",
+    name: "Bridge",
+    pass: 1.0,
+    blocks: [],
+    color: (0.50, 0.42, 0.30),
+)

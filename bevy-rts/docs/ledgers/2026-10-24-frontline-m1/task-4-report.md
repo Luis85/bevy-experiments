@@ -1,0 +1,10 @@
+# Task 4 report
+
+Commit c9ee64f (branch m1/t04-content, base d9361c2).
+
+Implemented: 8 base/terrain/*.terrain.ron (each with a `// guess` comment; values verbatim from the brief), fl_cli `map-gen <testbed|scale> --out <dir> [--json]` (crates/fl_cli/src/map_gen.rs: MapPreset, generate, map_gen), generated PNGs for testbed_1km (250x250, height -4..16 m) and scale_2km (500x500, height range 0..16, flat), both map.ron files gain `terrain: Some(..)` with an 8-colour legend (colours = round(table*255)), "terrain" interned in data-check kinds.
+Guesses: all terrain values (pass, blocks, colour) per brief; scale height_m (0,16) is my choice; hill cosine uses fl_math Angle table (integer); `Pcg32::seed(1)` does not exist, used `Pcg32::new(1, 0)`, 2 draws (x,y over 0..=492) per block, both drawn before the river-row skip.
+Tests: crates/fl_cli/tests/map_gen.rs (6 required + scale_layout_matches_plan + missing-dir). RED seen (missing PNGs/subcommand), GREEN: fl_cli + fl_catalog nextest 40/41 pass; the one failure was base_content scenario count (stale 1; base already has testbed + testbed_ai), fixed per coordinator addendum (scenarios 2, terrain 8) in crates/fl_catalog/tests/base_content.rs. data-check assets/base: exit 0, units 10, terrain 8.
+Golden: crates/fl_test_utils/tests/replays/testbed_wander.replay.new written (uncommitted, not blessed). Replay dump diff old vs new: only build_id, rules_hash (4288563367055306475 -> 3467218278007742600) and the string-table header (content.terrain, base.testbed_ai); command/hash stream identical (18 diff lines, all header).
+Gate (content+tools): fmt, clippy, arch-check, data-check, protected PASS; test-guard WARN (RemovedAssert scenario len 1, replaced by 2: the stale assertion, authorised by coordinator); check-scope FAIL only on base_content.rs and the .new file (both outside track by design); test-headless FAIL only golden_replays_verify (RulesHash, awaits bless). Gate 400s > 300s budget (cold build).
+Merge note: phase-a 14734a3 also changes base_content scenario count to 2; resolve by keeping 2 plus my terrain==8 assert and `TerrainDef` import. Replay: regenerate after merge.

@@ -1,0 +1,260 @@
+---
+source: content/village_content/tests/golden.rs
+assertion_line: 32
+expression: unit
+---
+{
+  "sim_id": 5,
+  "kind": "villager",
+  "pos": {
+    "x": 3000,
+    "z": 2200
+  },
+  "needs": {
+    "hunger": {
+      "value": 76000,
+      "level": "Ok"
+    },
+    "energy": {
+      "value": 76000,
+      "level": "Ok"
+    },
+    "thirst": {
+      "value": 73000,
+      "level": "Ok"
+    }
+  },
+  "activity": "Work",
+  "stockpile": null,
+  "tree_path": [
+    "Villager",
+    "DayWork",
+    "WorkSeq",
+    "DoWork"
+  ],
+  "active_leaf": {
+    "node": "DoWork",
+    "action": "DoWork",
+    "status": "Running"
+  },
+  "blackboard": {
+    "dest": {
+      "Pos": [
+        3000,
+        2200
+      ]
+    },
+    "target": {
+      "U32": 4
+    }
+  },
+  "order": null,
+  "brain_stats": {
+    "leaf_starts": 3,
+    "aborts": 0
+  },
+  "reservations_held": [
+    4
+  ],
+  "recent_journal": [
+    {
+      "tick": 235,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 275,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 315,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 355,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 362,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "Effect",
+        "effect": {
+          "type": "AddFood",
+          "stockpile": 3,
+          "amount": 3
+        },
+        "applied": true
+      }
+    },
+    {
+      "tick": 363,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "LeafDone"
+      }
+    },
+    {
+      "tick": 363,
+      "seq": 1,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStop",
+        "node": "DoWork",
+        "path": "Villager > DayWork > WorkSeq > DoWork",
+        "action": "DoWork",
+        "reason": "Finished"
+      }
+    },
+    {
+      "tick": 363,
+      "seq": 2,
+      "unit": 5,
+      "kind": {
+        "type": "Release",
+        "target": 4,
+        "reason": "Finished"
+      }
+    },
+    {
+      "tick": 363,
+      "seq": 3,
+      "unit": 5,
+      "kind": {
+        "type": "RootDone",
+        "status": "Success"
+      }
+    },
+    {
+      "tick": 364,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "NoLeaf"
+      }
+    },
+    {
+      "tick": 364,
+      "seq": 1,
+      "unit": 5,
+      "kind": {
+        "type": "Reserve",
+        "target": 4,
+        "ok": true
+      }
+    },
+    {
+      "tick": 364,
+      "seq": 2,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStart",
+        "node": "ReserveWork",
+        "path": "Villager > DayWork > WorkSeq > ReserveWork",
+        "action": "ReserveWork",
+        "status": "Success"
+      }
+    },
+    {
+      "tick": 364,
+      "seq": 3,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStart",
+        "node": "MoveToDest",
+        "path": "Villager > DayWork > WorkSeq > MoveToDest",
+        "action": "MoveToDest",
+        "status": "Success"
+      }
+    },
+    {
+      "tick": 364,
+      "seq": 4,
+      "unit": 5,
+      "kind": {
+        "type": "LeafStart",
+        "node": "DoWork",
+        "path": "Villager > DayWork > WorkSeq > DoWork",
+        "action": "DoWork",
+        "status": "Running"
+      }
+    },
+    {
+      "tick": 395,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 435,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 475,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 515,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 555,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    },
+    {
+      "tick": 595,
+      "seq": 0,
+      "unit": 5,
+      "kind": {
+        "type": "ThinkStart",
+        "reason": "Request"
+      }
+    }
+  ]
+}

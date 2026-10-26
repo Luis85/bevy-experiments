@@ -1,0 +1,7 @@
+Unit(
+    id: "test.bad.armour",
+    components: {
+        "Hull": (hp: 10),
+        "Armour": (),
+    },
+)

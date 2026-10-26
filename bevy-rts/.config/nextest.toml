@@ -1,0 +1,18 @@
+# cargo-nextest configuration. `cargo xtask gate` runs every test through the `agent` profile (spec §12.1).
+
+[profile.agent]
+failure-output = "final"
+success-output = "never"
+status-level = "fail"
+final-status-level = "fail"
+fail-fast = { max-fail = 5 }
+slow-timeout = { period = "60s", terminate-after = 3 }
+junit.path = "junit.xml"
+
+[test-groups]
+gpu = { max-threads = 1 }
+
+# Default-profile overrides apply to every profile: GPU tests never run in parallel.
+[[profile.default.overrides]]
+filter = 'test(/gpu_/)'
+test-group = 'gpu'

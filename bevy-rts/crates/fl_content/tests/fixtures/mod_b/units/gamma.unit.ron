@@ -1,0 +1,5 @@
+// Deliberately has no visual: loading warns.
+Unit(
+    id: "b.gamma",
+    inherits: Some("a.abstract.tank"),
+)

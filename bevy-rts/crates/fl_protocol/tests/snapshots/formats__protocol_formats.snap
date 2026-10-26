@@ -1,0 +1,25 @@
+---
+source: crates/fl_protocol/tests/formats.rs
+assertion_line: 63
+expression: text
+---
+FORMAT_VERSION = 1
+CommandKind: Struct([Named { name: "type_id", value: TypeName("CommandTypeId") }, Named { name: "payload", value: Seq(U8) }])
+CommandTypeId: NewTypeStruct(U16)
+DebugInvulnerableCmd: Struct([Named { name: "on", value: Bool }])
+DebugSetHpCmd: Struct([Named { name: "hp", value: U32 }])
+DebugSetOwnerCmd: Struct([Named { name: "owner", value: TypeName("PlayerId") }])
+DebugSetTerrainCmd: Struct([Named { name: "min_cell", value: TupleArray { content: U32, size: 2 } }, Named { name: "max_cell", value: TupleArray { content: U32, size: 2 } }, Named { name: "terrain", value: Str }])
+DebugSpawnCmd: Struct([Named { name: "unit", value: Str }, Named { name: "owner", value: TypeName("PlayerId") }, Named { name: "pos", value: TupleArray { content: I64, size: 2 } }, Named { name: "heading", value: U16 }])
+DebugTeleportCmd: Struct([Named { name: "pos", value: TupleArray { content: I64, size: 2 } }])
+DebugWanderCmd: Struct([Named { name: "radius", value: I64 }])
+FollowCmd: Struct([Named { name: "leader", value: TypeName("SimId") }])
+MatchHeader: Struct([Named { name: "format_version", value: U32 }, Named { name: "build_id", value: Str }, Named { name: "sim_version", value: U32 }, Named { name: "features", value: Seq(Tuple([Str, U32])) }, Named { name: "mods", value: Seq(TupleArray { content: Str, size: 2 }) }, Named { name: "rules_hash", value: U64 }, Named { name: "cheats_allowed", value: Bool }, Named { name: "seed", value: U64 }, Named { name: "string_tables", value: TypeName("StringTables") }])
+MoveCmd: Struct([Named { name: "target", value: TupleArray { content: I64, size: 2 } }])
+PlayerCommand: Struct([Named { name: "exec_tick", value: TypeName("Tick") }, Named { name: "player", value: TypeName("PlayerId") }, Named { name: "seq", value: U32 }, Named { name: "units", value: Seq(TypeName("SimId")) }, Named { name: "kind", value: TypeName("CommandKind") }, Named { name: "queue", value: Bool }])
+PlayerId: NewTypeStruct(U8)
+RotateCmd: Struct([Named { name: "toward", value: TupleArray { content: I64, size: 2 } }])
+SimId: NewTypeStruct(U32)
+StopCmd: UnitStruct
+StringTables: Struct([Named { name: "tables", value: Map { key: Str, value: Seq(Str) } }])
+Tick: NewTypeStruct(U32)

@@ -1,0 +1,32 @@
+[package]
+name = "testbed_content"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Actor Testbed content: a walled compound with every opt-in capability on (perception, rules, agent control, interaction, RTS command, vehicles, progression, crafting), its units, items, recipes and scenarios."
+
+[dependencies]
+# Content depends on the framework only through the facade (arch_fitness);
+# the bevy_* sub-crates are the engine crates its derives expand to. Every
+# capability is on: the testbed is the integration scene (spec §4.9).
+npc_framework = { workspace = true, features = [
+    "locomotion",
+    "nav",
+    "perception",
+    "rules",
+    "agent-io",
+    "interaction",
+    "command",
+    "vehicles",
+    "progression",
+    "crafting",
+] }
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+serde.workspace = true
+serde_json = "1"
+
+[dev-dependencies]
+bevy_ecs.workspace = true

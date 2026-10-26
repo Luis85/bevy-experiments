@@ -1,0 +1,27 @@
+[package]
+name = "fl_client"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+debug_remote = ["bevy/bevy_remote", "dep:bevy_brp_extras"]
+
+[dependencies]
+bevy.workspace = true
+bevy_egui.workspace = true
+fl_math.workspace = true
+fl_protocol.workspace = true
+fl_view.workspace = true
+fl_content.workspace = true
+tracing.workspace = true
+crossbeam-channel.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+postcard.workspace = true
+ron.workspace = true
+bevy_brp_extras = { workspace = true, optional = true }

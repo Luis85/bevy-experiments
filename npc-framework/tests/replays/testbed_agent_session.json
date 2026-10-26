@@ -1,0 +1,512 @@
+{
+  "version": 1,
+  "scenario": {
+    "version": 1,
+    "content": "testbed",
+    "name": "smithy",
+    "seed": 1,
+    "world": {
+      "detection": "automatic",
+      "furnish": true,
+      "layout": "compound",
+      "store_locked": true
+    },
+    "actors": [
+      {
+        "carry": [
+          {
+            "kind": "plank",
+            "stack": 1
+          }
+        ],
+        "kind": "unit",
+        "name": "smith",
+        "pos": [
+          6500,
+          -500
+        ],
+        "template": "smith"
+      },
+      {
+        "carry": [
+          {
+            "kind": "log",
+            "stack": 8
+          }
+        ],
+        "kind": "unit",
+        "name": "joiner",
+        "pos": [
+          -8500,
+          6500
+        ],
+        "spend_policy": "player",
+        "template": "carpenter"
+      },
+      {
+        "kind": "unit",
+        "name": "apprentice",
+        "pos": [
+          -6500,
+          4500
+        ],
+        "template": "novice"
+      }
+    ],
+    "controllers": []
+  },
+  "seed": 1,
+  "replay": {
+    "version": 2,
+    "content_hash": 9041667160828634387,
+    "seed": 1,
+    "scenario": "scenario:smithy",
+    "villagers": 3,
+    "ticks": 600,
+    "commands": [
+      [
+        0,
+        0,
+        {
+          "type": "AttachController",
+          "unit": 33,
+          "controller": "fetch",
+          "mode": "Direct",
+          "on_idle": "Idle",
+          "force": false
+        }
+      ],
+      [
+        1,
+        0,
+        {
+          "type": "IssueOrder",
+          "player": 1,
+          "units": [
+            33
+          ],
+          "order": {
+            "pos": [
+              7500,
+              -1500
+            ],
+            "type": "Move"
+          },
+          "queue": false
+        }
+      ],
+      [
+        6,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 1,
+          "replace": true,
+          "verb": "execute_orders",
+          "label": "Carry out your orders",
+          "steps": [
+            {
+              "action": "ExecuteOrder",
+              "param": "None",
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        31,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 2,
+          "replace": true,
+          "verb": "pick_up",
+          "label": "pick up the store_key #26",
+          "steps": [
+            {
+              "key": 7,
+              "type": "SetBlackboard",
+              "value": {
+                "U32": 26
+              }
+            },
+            {
+              "key": 6,
+              "type": "SetBlackboard",
+              "value": "None"
+            },
+            {
+              "action": "Interact",
+              "param": {
+                "Name": "pick_up"
+              },
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        46,
+        0,
+        {
+          "type": "IssueOrder",
+          "player": 1,
+          "units": [
+            33
+          ],
+          "order": {
+            "pos": [
+              6500,
+              2500
+            ],
+            "type": "Move"
+          },
+          "queue": false
+        }
+      ],
+      [
+        51,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 3,
+          "replace": true,
+          "verb": "execute_orders",
+          "label": "Carry out your orders",
+          "steps": [
+            {
+              "action": "ExecuteOrder",
+              "param": "None",
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        116,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 4,
+          "replace": true,
+          "verb": "unlock",
+          "label": "unlock the locked door #12",
+          "steps": [
+            {
+              "key": 7,
+              "type": "SetBlackboard",
+              "value": {
+                "U32": 12
+              }
+            },
+            {
+              "key": 6,
+              "type": "SetBlackboard",
+              "value": "None"
+            },
+            {
+              "action": "Interact",
+              "param": {
+                "Name": "unlock"
+              },
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        141,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 5,
+          "replace": true,
+          "verb": "open",
+          "label": "open the closed door #12",
+          "steps": [
+            {
+              "key": 7,
+              "type": "SetBlackboard",
+              "value": {
+                "U32": 12
+              }
+            },
+            {
+              "key": 6,
+              "type": "SetBlackboard",
+              "value": "None"
+            },
+            {
+              "action": "Interact",
+              "param": {
+                "Name": "open"
+              },
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        156,
+        0,
+        {
+          "type": "IssueOrder",
+          "player": 1,
+          "units": [
+            33
+          ],
+          "order": {
+            "pos": [
+              4500,
+              6500
+            ],
+            "type": "Move"
+          },
+          "queue": false
+        }
+      ],
+      [
+        161,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 6,
+          "replace": true,
+          "verb": "execute_orders",
+          "label": "Carry out your orders",
+          "steps": [
+            {
+              "action": "ExecuteOrder",
+              "param": "None",
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        236,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 7,
+          "replace": true,
+          "verb": "pick_up",
+          "label": "pick up the pickaxe #17",
+          "steps": [
+            {
+              "key": 7,
+              "type": "SetBlackboard",
+              "value": {
+                "U32": 17
+              }
+            },
+            {
+              "key": 6,
+              "type": "SetBlackboard",
+              "value": "None"
+            },
+            {
+              "action": "Interact",
+              "param": {
+                "Name": "pick_up"
+              },
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        251,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 8,
+          "replace": true,
+          "verb": "equip",
+          "label": "equip the pickaxe #17",
+          "steps": [
+            {
+              "key": 7,
+              "type": "SetBlackboard",
+              "value": {
+                "U32": 17
+              }
+            },
+            {
+              "key": 6,
+              "type": "SetBlackboard",
+              "value": "None"
+            },
+            {
+              "action": "Interact",
+              "param": {
+                "Name": "equip"
+              },
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        266,
+        0,
+        {
+          "type": "IssueOrder",
+          "player": 1,
+          "units": [
+            33
+          ],
+          "order": {
+            "pos": [
+              8500,
+              -6500
+            ],
+            "type": "Move"
+          },
+          "queue": false
+        }
+      ],
+      [
+        271,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 9,
+          "replace": true,
+          "verb": "execute_orders",
+          "label": "Carry out your orders",
+          "steps": [
+            {
+              "action": "ExecuteOrder",
+              "param": "None",
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        471,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 10,
+          "replace": true,
+          "verb": "use_tool_on",
+          "label": "use tool on #24 (needs tool:pickaxe)",
+          "steps": [
+            {
+              "key": 7,
+              "type": "SetBlackboard",
+              "value": {
+                "U32": 24
+              }
+            },
+            {
+              "key": 6,
+              "type": "SetBlackboard",
+              "value": "None"
+            },
+            {
+              "action": "Interact",
+              "param": {
+                "Name": "use_tool_on"
+              },
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ],
+      [
+        556,
+        0,
+        {
+          "type": "AgentAct",
+          "unit": 33,
+          "controller": "fetch",
+          "handle": 11,
+          "replace": true,
+          "verb": "pick_up",
+          "label": "pick up the ore #38",
+          "steps": [
+            {
+              "key": 7,
+              "type": "SetBlackboard",
+              "value": {
+                "U32": 38
+              }
+            },
+            {
+              "key": 6,
+              "type": "SetBlackboard",
+              "value": "None"
+            },
+            {
+              "action": "Interact",
+              "param": {
+                "Name": "pick_up"
+              },
+              "type": "Action"
+            }
+          ],
+          "latency_ticks": 0
+        }
+      ]
+    ],
+    "checkpoints": [
+      [
+        100,
+        8740659879548260815
+      ],
+      [
+        200,
+        14424806531379625089
+      ],
+      [
+        300,
+        2711053175617276424
+      ],
+      [
+        400,
+        10939248155451253825
+      ],
+      [
+        500,
+        16254990788490368127
+      ],
+      [
+        600,
+        301925038395307104
+      ]
+    ]
+  }
+}

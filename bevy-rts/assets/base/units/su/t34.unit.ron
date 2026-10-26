@@ -1,0 +1,9 @@
+Unit(
+    id: "base.su.t34",
+    inherits: Some("base.abstract.medium_tank"),
+    name: "T-34",
+    components: {
+        "Hull": (hp: 125, footprint: (3.0, 6.0), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 54.0, terrain_factor: 0.55, turn_rate_deg_s: 85.0),
+    },
+)

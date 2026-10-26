@@ -1,0 +1,25 @@
+---
+source: crates/fl_test_utils/tests/perf_counters.rs
+assertion_line: 86
+expression: totals
+---
+Totals(
+  entities: 216,
+  totals: {
+    "commands.applied": 36,
+    "flowfield.abstract_nodes": 9072,
+    "flowfield.cells": 9216,
+    "move.los_cells": 974010,
+    "path.budget_spent": 9072,
+    "path.queue_len": 4,
+    "path.requests": 36,
+    "publish.rebuilt": 43200,
+    "publish.records": 43200,
+    "sort.items": 36,
+    "spatial.checked": 43200,
+    "spatial.inserts": 0,
+    "spatial.relocations": 180,
+    "steer.pairs": 442628,
+    "steer.units": 43181,
+  },
+)

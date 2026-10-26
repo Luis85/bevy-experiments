@@ -1,0 +1,9 @@
+Unit(
+    id: "base.de.pz2",
+    inherits: Some("base.abstract.light_tank"),
+    name: "Panzer II",
+    components: {
+        "Hull": (hp: 70, footprint: (2.3, 4.8), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 40.0, terrain_factor: 0.6, turn_rate_deg_s: 100.0),
+    },
+)

@@ -1,0 +1,106 @@
+[
+  {
+    "path": "validation/native/million/render-check.png",
+    "roi": [
+      0,
+      180,
+      1440,
+      780
+    ],
+    "blue_family_pixels": 156857,
+    "red_family_pixels": 143446,
+    "meadow_pixels": 563649,
+    "passed": true
+  },
+  {
+    "path": "validation/native/categories/creature/render-check.png",
+    "roi": [
+      0,
+      180,
+      1024,
+      648
+    ],
+    "blue_family_pixels": 5618,
+    "red_family_pixels": 6964,
+    "meadow_pixels": 430242,
+    "passed": true
+  },
+  {
+    "path": "validation/native/categories/vehicle/render-check.png",
+    "roi": [
+      0,
+      180,
+      1024,
+      648
+    ],
+    "blue_family_pixels": 36934,
+    "red_family_pixels": 36557,
+    "meadow_pixels": 357516,
+    "passed": true
+  },
+  {
+    "path": "validation/native/categories/building/render-check.png",
+    "roi": [
+      0,
+      180,
+      1024,
+      648
+    ],
+    "blue_family_pixels": 33112,
+    "red_family_pixels": 45748,
+    "meadow_pixels": 309893,
+    "passed": true
+  },
+  {
+    "path": "validation/native/categories/air_unit/render-check.png",
+    "roi": [
+      0,
+      180,
+      1024,
+      648
+    ],
+    "blue_family_pixels": 13738,
+    "red_family_pixels": 14898,
+    "meadow_pixels": 440947,
+    "passed": true
+  },
+  {
+    "path": "validation/native/categories/sea_unit/render-check.png",
+    "roi": [
+      0,
+      180,
+      1024,
+      648
+    ],
+    "blue_family_pixels": 30418,
+    "red_family_pixels": 27288,
+    "meadow_pixels": 387951,
+    "passed": true
+  },
+  {
+    "path": "validation/native/categories/underground_unit/render-check.png",
+    "roi": [
+      0,
+      180,
+      1024,
+      648
+    ],
+    "blue_family_pixels": 10575,
+    "red_family_pixels": 8586,
+    "meadow_pixels": 422235,
+    "passed": true
+  },
+  {
+    "path": "validation/native/categories/space_unit/render-check.png",
+    "roi": [
+      0,
+      180,
+      1024,
+      648
+    ],
+    "blue_family_pixels": 12042,
+    "red_family_pixels": 17747,
+    "meadow_pixels": 428762,
+    "passed": true
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "focus": {"latitude": 48.137, "longitude": 11.575, "altitude_m": 0.0},
+  "live_data": true,
+  "osm_features": true,
+  "live_weather": true,
+  "chunk_level": 15,
+  "chunk_radius": 1,
+  "terrain_resolution": 33,
+  "time_scale": 1.0,
+  "max_in_flight": 1,
+  "save_path": "world-save-live.json"
+}

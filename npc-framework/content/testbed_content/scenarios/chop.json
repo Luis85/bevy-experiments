@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "chop",
+  "seed": 1,
+  "world": { "layout": "compound", "furnish": true, "detection": "automatic" },
+  "actors": [
+    { "kind": "unit", "name": "lumberjack", "template": "woodcutter", "pos": [-7500, -6500], "equip": ["axe"] },
+    { "kind": "unit", "name": "bare", "template": "novice", "pos": [-9500, -6500] }
+  ]
+}

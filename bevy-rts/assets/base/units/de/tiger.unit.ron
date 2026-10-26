@@ -1,0 +1,9 @@
+Unit(
+    id: "base.de.tiger",
+    inherits: Some("base.abstract.heavy_tank"),
+    name: "Tiger",
+    components: {
+        "Hull": (hp: 210, footprint: (3.6, 6.3), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 38.0, terrain_factor: 0.5, turn_rate_deg_s: 55.0),
+    },
+)

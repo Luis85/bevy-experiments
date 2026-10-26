@@ -1,0 +1,1 @@
+Unit(id: "a.ghost", override: true, components: { "Hull": (hp: 1) })

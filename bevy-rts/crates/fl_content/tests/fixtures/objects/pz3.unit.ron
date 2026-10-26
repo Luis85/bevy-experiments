@@ -1,0 +1,14 @@
+// A concrete unit that uses both test components.
+Unit(
+    id: "test.de.pz3",
+    inherits: Some("test.abstract.tank"),
+    abstract: false,
+    name: "Pz.Kpfw. III",
+    tags: ["armored", "tracked"],
+    override: false,
+    components: {
+        "Hull": (hp: 160),
+        "Speed": (kmh: 40.5),
+    },
+    remove: [],
+)

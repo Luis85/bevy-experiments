@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "locked_store",
+  "seed": 1,
+  "world": { "layout": "compound", "furnish": true, "store_locked": true, "detection": "automatic" },
+  "actors": [
+    { "kind": "unit", "name": "keeper", "template": "novice", "pos": [8500, -500] },
+    { "kind": "unit", "name": "warden", "template": "smith", "pos": [6500, 2500], "carry": [{ "kind": "store_key" }] }
+  ]
+}

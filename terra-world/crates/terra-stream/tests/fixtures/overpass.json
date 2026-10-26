@@ -1,0 +1,13 @@
+{
+  "version": 0.6,
+  "generator": "synthetic parser fixture, not an OSM extract",
+  "elements": [
+    {"type":"way","id":1,"tags":{"building":"yes","building:levels":"3"},"geometry":[{"lat":48.1,"lon":11.5},{"lat":48.1,"lon":11.501},{"lat":48.101,"lon":11.501},{"lat":48.101,"lon":11.5},{"lat":48.1,"lon":11.5}]},
+    {"type":"way","id":2,"tags":{"highway":"residential","name":"Fixture street"},"geometry":[{"lat":48.1,"lon":11.5},{"lat":48.11,"lon":11.51}]},
+    {"type":"node","id":3,"tags":{"natural":"tree","height":"12 m"},"lat":48.1,"lon":11.5},
+    {"type":"relation","id":4,"tags":{"natural":"water","type":"multipolygon"},"members":[]},
+    {"type":"way","id":5,"tags":{"building":"yes"},"geometry":[{"lat":48.1,"lon":11.5},{"lat":48.1,"lon":11.501}]},
+    {"type":"node","id":6,"tags":{"natural":"tree"},"lat":999.0,"lon":11.5},
+    {"type":"way","id":7,"tags":{"waterway":"river"},"geometry":[{"lat":48.1,"lon":11.5},{"lat":48.11,"lon":11.51}]}
+  ]
+}

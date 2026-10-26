@@ -1,0 +1,13 @@
+{
+  "focus": {"latitude": 48.137, "longitude": 11.575, "altitude_m": 0.0},
+  "historical_pack": "crates/terra-history/data/synthetic-era-b/manifest.json",
+  "data_epoch_unix": 315532800,
+  "politics_file": "crates/terra-history/data/synthetic-politics-eras.geojson",
+  "chunk_level": 15,
+  "chunk_radius": 2,
+  "terrain_resolution": 17,
+  "live_data": false,
+  "live_weather": false,
+  "time_scale": 60.0,
+  "save_path": "world-save-era-1980.json"
+}

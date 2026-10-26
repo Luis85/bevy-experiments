@@ -1,0 +1,10 @@
+// A template: never interned, never spawned.
+Unit(
+    id: "core_test.abstract.vehicle",
+    abstract: true,
+    tags: ["vehicle"],
+    components: {
+        "Selectable": (),
+        "Hull": (hp: 50, footprint: (2.0, 4.0), hitbox_shrink: 0.5),
+    },
+)

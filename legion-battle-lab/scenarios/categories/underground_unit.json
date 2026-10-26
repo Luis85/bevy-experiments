@@ -1,0 +1,18 @@
+{
+  "name": "Underground Unit — Kategorienbeispiel",
+  "seed": 2026,
+  "map": "meadow",
+  "blue": {
+    "count": 64,
+    "category": "underground_unit",
+    "kind": "infantry",
+    "formation": "lines"
+  },
+  "red": {
+    "count": 64,
+    "category": "underground_unit",
+    "kind": "infantry",
+    "formation": "lines"
+  },
+  "time_limit_secs": 180
+}

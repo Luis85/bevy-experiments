@@ -1,0 +1,1 @@
+Faction(id: "f.green", name: "Green", color: (0.1, 0.8, 0.1), roster: ["a.alpha", "a.nope"])

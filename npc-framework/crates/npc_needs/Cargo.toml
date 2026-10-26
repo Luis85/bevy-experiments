@@ -1,0 +1,16 @@
+[package]
+name = "npc_needs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Data-driven needs for the NPC kernel: NeedDef registration, hysteresis levels, per-tick decay."
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+npc_ai.workspace = true
+npc_kernel.workspace = true
+serde.workspace = true
+serde_json = "1"

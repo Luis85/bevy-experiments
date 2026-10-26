@@ -1,0 +1,36 @@
+[package]
+name = "village_content"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Example content: the villager unit type (needs, places, actions, conditions, tree), its commands and scenarios."
+
+[dependencies]
+# Content depends on the framework only through the facade; the bevy_*
+# sub-crates are the engine crates its derives expand to.
+# `locomotion`: walks go through MoveIntent (the StraightLineMover is in
+# NpcPlugins); `nav`: the opt-in `village_nav` scenario (NavAgent villagers).
+# `agent-io`: the village's agent-control affordances and scenario loader
+# (`agent` module; only used when a host adds `VillageAgentPlugin`).
+npc_framework = { workspace = true, features = ["locomotion", "nav", "agent-io"] }
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"
+
+[features]
+# Mechanic tags for the npc_perf profiler (village_content::perf_tags).
+perf = ["npc_framework/perf"]
+
+[dev-dependencies]
+# `perception`: the opt-in `village_perception` scenario test (tests/village_perception.rs).
+npc_framework = { workspace = true, features = ["perception"] }
+# `debug` enables `ScheduleBuildSettings::shuffle_seed` (tests/shuffle.rs).
+bevy_ecs = { workspace = true, features = ["debug"] }
+bevy_time.workspace = true
+insta = { version = "1.49", features = ["json"] }
+proptest = "1.12"
+proptest-state-machine = "0.9"

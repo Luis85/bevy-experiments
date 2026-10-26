@@ -1,0 +1,180 @@
+{
+  "type": "FeatureCollection",
+  "terra": {
+    "schema_version": 1,
+    "id": "terra-synthetic-politics-two-eras-v1",
+    "title": "Fictional cooperative territories, two-era demonstration",
+    "valid_from_unix": -631152000,
+    "valid_until_unix": 1577836800,
+    "source_url": "urn:terra:synthetic-history:politics:v1",
+    "license": "MIT OR Apache-2.0",
+    "attribution": "Authored fictional faction territories. Not country borders, historical evidence, or claims about the real location.",
+    "synthetic": true
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "fictional-west-era-a",
+        "name": "Fictional West Cooperative · era A",
+        "kind": "scenario_territory",
+        "country": "",
+        "claimants": [],
+        "status": "Authored gameplay territory; no real sovereignty claim",
+        "faction_id": 1,
+        "valid_from_unix": -631152000,
+        "valid_until_unix": 315532800
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.546630859375,
+              48.1256103515625
+            ],
+            [
+              11.5740966796875,
+              48.1256103515625
+            ],
+            [
+              11.5740966796875,
+              48.153076171875
+            ],
+            [
+              11.546630859375,
+              48.153076171875
+            ],
+            [
+              11.546630859375,
+              48.1256103515625
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "fictional-east-era-a",
+        "name": "Fictional East Cooperative · era A",
+        "kind": "scenario_territory",
+        "country": "",
+        "claimants": [],
+        "status": "Authored gameplay territory; no real sovereignty claim",
+        "faction_id": 2,
+        "valid_from_unix": -631152000,
+        "valid_until_unix": 315532800
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.5740966796875,
+              48.1256103515625
+            ],
+            [
+              11.6015625,
+              48.1256103515625
+            ],
+            [
+              11.6015625,
+              48.153076171875
+            ],
+            [
+              11.5740966796875,
+              48.153076171875
+            ],
+            [
+              11.5740966796875,
+              48.1256103515625
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "fictional-west-era-b",
+        "name": "Fictional West Cooperative · era B",
+        "kind": "scenario_territory",
+        "country": "",
+        "claimants": [],
+        "status": "Authored gameplay territory; no real sovereignty claim",
+        "faction_id": 1,
+        "valid_from_unix": 315532800,
+        "valid_until_unix": 1577836800
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.546630859375,
+              48.1256103515625
+            ],
+            [
+              11.58233642578125,
+              48.1256103515625
+            ],
+            [
+              11.58233642578125,
+              48.153076171875
+            ],
+            [
+              11.546630859375,
+              48.153076171875
+            ],
+            [
+              11.546630859375,
+              48.1256103515625
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "fictional-east-era-b",
+        "name": "Fictional East Cooperative · era B",
+        "kind": "scenario_territory",
+        "country": "",
+        "claimants": [],
+        "status": "Authored gameplay territory; no real sovereignty claim",
+        "faction_id": 2,
+        "valid_from_unix": 315532800,
+        "valid_until_unix": 1577836800
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              11.58233642578125,
+              48.1256103515625
+            ],
+            [
+              11.6015625,
+              48.1256103515625
+            ],
+            [
+              11.6015625,
+              48.153076171875
+            ],
+            [
+              11.58233642578125,
+              48.153076171875
+            ],
+            [
+              11.58233642578125,
+              48.1256103515625
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}

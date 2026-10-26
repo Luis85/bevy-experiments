@@ -1,0 +1,78 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/npc_ai",
+    "crates/npc_kernel",
+    "crates/npc_needs",
+    "crates/npc_jobs",
+    "crates/npc_locomotion",
+    "crates/npc_nav",
+    "crates/npc_perception",
+    "crates/npc_rules",
+    "crates/npc_agent_io",
+    "crates/npc_interaction",
+    "crates/npc_command",
+    "crates/npc_vehicles",
+    "crates/npc_progression",
+    "crates/npc_crafting",
+    "crates/npc_perf",
+    "crates/npc_tools",
+    "crates/npc_framework",
+    "crates/npc_view_helpers",
+    "content/village_content",
+    "content/village_view",
+    "content/testbed_view",
+    "content/testbed_content",
+    "apps/village",
+    "apps/npcctl",
+    "apps/actor_testbed",
+    "apps/rts_units_demo",
+    "apps/game_menu",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+bevy = "0.20.0"
+bevy_ecs = "0.20.0"
+bevy_app = "0.20.0"
+bevy_time = "0.20.0"
+bevy_reflect = "0.20.0"
+serde = { version = "1", features = ["derive"] }
+npc_ai = { path = "crates/npc_ai" }
+npc_kernel = { path = "crates/npc_kernel" }
+npc_needs = { path = "crates/npc_needs" }
+npc_jobs = { path = "crates/npc_jobs" }
+npc_locomotion = { path = "crates/npc_locomotion" }
+npc_nav = { path = "crates/npc_nav" }
+npc_perception = { path = "crates/npc_perception" }
+npc_rules = { path = "crates/npc_rules" }
+npc_agent_io = { path = "crates/npc_agent_io" }
+npc_interaction = { path = "crates/npc_interaction" }
+npc_command = { path = "crates/npc_command" }
+npc_vehicles = { path = "crates/npc_vehicles" }
+npc_progression = { path = "crates/npc_progression" }
+npc_crafting = { path = "crates/npc_crafting" }
+npc_perf = { path = "crates/npc_perf" }
+npc_tools = { path = "crates/npc_tools", default-features = false }
+npc_framework = { path = "crates/npc_framework", default-features = false }
+npc_view_helpers = { path = "crates/npc_view_helpers", default-features = false }
+village_content = { path = "content/village_content" }
+village_view = { path = "content/village_view", default-features = false }
+testbed_content = { path = "content/testbed_content" }
+testbed_view = { path = "content/testbed_view" }
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+# Dependencies keep line tables only: with full debug info the windowed
+# examples (bevy + bevy_remote, all features unified under
+# `cargo test --workspace`) exceed the MSVC PDB limit (LNK1140).
+debug = "line-tables-only"

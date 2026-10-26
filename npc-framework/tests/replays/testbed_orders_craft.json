@@ -1,0 +1,392 @@
+{
+  "version": 2,
+  "content_hash": 9041667160828634387,
+  "seed": 1,
+  "scenario": "testbed:smithy",
+  "villagers": 3,
+  "ticks": 2400,
+  "commands": [
+    [
+      10,
+      0,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 26,
+          "type": "Interact",
+          "verb": "pick_up"
+        },
+        "queue": false
+      }
+    ],
+    [
+      10,
+      1,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 12,
+          "type": "Interact",
+          "verb": "unlock"
+        },
+        "queue": true
+      }
+    ],
+    [
+      10,
+      2,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 12,
+          "type": "Interact",
+          "verb": "open"
+        },
+        "queue": true
+      }
+    ],
+    [
+      10,
+      3,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "pos": [
+            5500,
+            6500
+          ],
+          "type": "Move"
+        },
+        "queue": true
+      }
+    ],
+    [
+      10,
+      4,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 17,
+          "type": "Interact",
+          "verb": "pick_up"
+        },
+        "queue": true
+      }
+    ],
+    [
+      10,
+      5,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 18,
+          "type": "Interact",
+          "verb": "pick_up"
+        },
+        "queue": true
+      }
+    ],
+    [
+      10,
+      6,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "pos": [
+            8500,
+            -6500
+          ],
+          "type": "Move"
+        },
+        "queue": true
+      }
+    ],
+    [
+      420,
+      0,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 17,
+          "type": "Interact",
+          "verb": "equip"
+        },
+        "queue": false
+      }
+    ],
+    [
+      420,
+      1,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 24,
+          "type": "Interact",
+          "verb": "use_tool_on"
+        },
+        "queue": true
+      }
+    ],
+    [
+      420,
+      2,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 24,
+          "type": "Interact",
+          "verb": "use_tool_on"
+        },
+        "queue": true
+      }
+    ],
+    [
+      420,
+      3,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 24,
+          "type": "Interact",
+          "verb": "use_tool_on"
+        },
+        "queue": true
+      }
+    ],
+    [
+      680,
+      0,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 38,
+          "type": "Interact",
+          "verb": "pick_up"
+        },
+        "queue": false
+      }
+    ],
+    [
+      680,
+      1,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "target": 39,
+          "type": "Interact",
+          "verb": "pick_up"
+        },
+        "queue": true
+      }
+    ],
+    [
+      680,
+      2,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "pos": [
+            -2500,
+            7500
+          ],
+          "type": "Move"
+        },
+        "queue": true
+      }
+    ],
+    [
+      1050,
+      0,
+      {
+        "type": "Craft",
+        "unit": 33,
+        "recipe": "ingot",
+        "workstation": 15
+      }
+    ],
+    [
+      1140,
+      0,
+      {
+        "type": "Craft",
+        "unit": 33,
+        "recipe": "forge_axe",
+        "workstation": 14
+      }
+    ],
+    [
+      1270,
+      0,
+      {
+        "type": "Craft",
+        "unit": 33,
+        "recipe": "forge_axe",
+        "workstation": 14
+      }
+    ],
+    [
+      1400,
+      0,
+      {
+        "type": "Craft",
+        "unit": 33,
+        "recipe": "forge_axe",
+        "workstation": 14
+      }
+    ]
+  ],
+  "checkpoints": [
+    [
+      100,
+      6646300144820011399
+    ],
+    [
+      200,
+      15586334770501207579
+    ],
+    [
+      300,
+      17821528254994306659
+    ],
+    [
+      400,
+      3300412519681560717
+    ],
+    [
+      500,
+      14158415413600412473
+    ],
+    [
+      600,
+      9627616766895998422
+    ],
+    [
+      700,
+      183743403067490963
+    ],
+    [
+      800,
+      2872560323004776540
+    ],
+    [
+      900,
+      17225555029981036217
+    ],
+    [
+      1000,
+      9186069191805363900
+    ],
+    [
+      1100,
+      11721290639708095610
+    ],
+    [
+      1200,
+      9915778794430394701
+    ],
+    [
+      1300,
+      5949946781915936982
+    ],
+    [
+      1400,
+      8839621344411260027
+    ],
+    [
+      1500,
+      7549523550320250191
+    ],
+    [
+      1600,
+      11251331839125999287
+    ],
+    [
+      1700,
+      8273233571206767460
+    ],
+    [
+      1800,
+      3396937499273031503
+    ],
+    [
+      1900,
+      1707125835956899266
+    ],
+    [
+      2000,
+      254545957300377396
+    ],
+    [
+      2100,
+      2333053256857727681
+    ],
+    [
+      2200,
+      14793645194146358958
+    ],
+    [
+      2300,
+      3060117569031127580
+    ],
+    [
+      2400,
+      4423304460180320468
+    ]
+  ]
+}

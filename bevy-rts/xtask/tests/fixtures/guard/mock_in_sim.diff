@@ -1,0 +1,12 @@
+diff --git a/crates/fl_sim/tests/x.rs b/crates/fl_sim/tests/x.rs
+index 1111111..2222222 100644
+--- a/crates/fl_sim/tests/x.rs
++++ b/crates/fl_sim/tests/x.rs
+@@ -1,0 +2 @@
++struct MockRunner;
+diff --git a/crates/fl_client/tests/input.rs b/crates/fl_client/tests/input.rs
+index 1111111..2222222 100644
+--- a/crates/fl_client/tests/input.rs
++++ b/crates/fl_client/tests/input.rs
+@@ -1,0 +2 @@
++struct MockWindow;

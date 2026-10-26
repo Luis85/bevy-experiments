@@ -1,0 +1,8 @@
+// guess: values informed by docs/research/blitzkrieg-mechanics.md §1.8, not measured.
+TerrainDef(
+    id: "base.road",
+    name: "Road",
+    pass: 1.0,
+    blocks: [],
+    color: (0.45, 0.40, 0.32),
+)

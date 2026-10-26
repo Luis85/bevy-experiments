@@ -1,0 +1,602 @@
+pub mod fl_content
+pub enum fl_content::ContentTree
+pub fl_content::ContentTree::Bool(bool)
+pub fl_content::ContentTree::Float(f64)
+pub fl_content::ContentTree::Ident(alloc::string::String)
+pub fl_content::ContentTree::Int(i128)
+pub fl_content::ContentTree::Map(alloc::vec::Vec<(fl_content::Node, fl_content::Node)>)
+pub fl_content::ContentTree::Option(core::option::Option<alloc::boxed::Box<fl_content::Node>>)
+pub fl_content::ContentTree::Seq(alloc::vec::Vec<fl_content::Node>)
+pub fl_content::ContentTree::Str(alloc::string::String)
+pub fl_content::ContentTree::Struct
+pub fl_content::ContentTree::Struct::fields: alloc::vec::Vec<(alloc::string::String, fl_content::Node)>
+pub fl_content::ContentTree::Struct::name: core::option::Option<alloc::string::String>
+pub fl_content::ContentTree::Tuple(alloc::vec::Vec<fl_content::Node>)
+pub fl_content::ContentTree::TupleStruct
+pub fl_content::ContentTree::TupleStruct::items: alloc::vec::Vec<fl_content::Node>
+pub fl_content::ContentTree::TupleStruct::name: core::option::Option<alloc::string::String>
+pub fl_content::ContentTree::Unit
+impl core::clone::Clone for fl_content::ContentTree
+pub fn fl_content::ContentTree::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::ContentTree
+pub fn fl_content::ContentTree::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::ContentTree
+pub fn fl_content::ContentTree::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::ContentTree
+pub enum fl_content::MoveClass
+pub fl_content::MoveClass::Foot
+pub fl_content::MoveClass::HalfTrack
+pub fl_content::MoveClass::Tracked
+pub fl_content::MoveClass::Wheeled
+impl fl_content::MoveClass
+pub const fl_content::MoveClass::ALL: [fl_content::MoveClass; 4]
+pub fn fl_content::MoveClass::index(self) -> usize
+impl core::clone::Clone for fl_content::MoveClass
+pub fn fl_content::MoveClass::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::MoveClass
+impl core::cmp::Ord for fl_content::MoveClass
+pub fn fl_content::MoveClass::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_content::MoveClass
+pub fn fl_content::MoveClass::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_content::MoveClass
+pub fn fl_content::MoveClass::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_content::MoveClass
+pub fn fl_content::MoveClass::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_content::MoveClass
+pub fn fl_content::MoveClass::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_content::MoveClass
+impl core::marker::StructuralPartialEq for fl_content::MoveClass
+impl serde_core::ser::Serialize for fl_content::MoveClass
+pub fn fl_content::MoveClass::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::MoveClass
+pub fn fl_content::MoveClass::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_content::PathSeg
+pub fl_content::PathSeg::Field(alloc::string::String)
+pub fl_content::PathSeg::Index(usize)
+impl core::clone::Clone for fl_content::PathSeg
+pub fn fl_content::PathSeg::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::PathSeg
+impl core::cmp::Ord for fl_content::PathSeg
+pub fn fl_content::PathSeg::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_content::PathSeg
+pub fn fl_content::PathSeg::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_content::PathSeg
+pub fn fl_content::PathSeg::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_content::PathSeg
+pub fn fl_content::PathSeg::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_content::PathSeg
+pub fn fl_content::PathSeg::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::PathSeg
+pub enum fl_content::Placeholder
+pub fl_content::Placeholder::Box
+pub fl_content::Placeholder::Box::size: (f32, f32, f32)
+pub fl_content::Placeholder::Infantry
+pub fl_content::Placeholder::Infantry::height: f32
+pub fl_content::Placeholder::Infantry::radius: f32
+pub fl_content::Placeholder::Tank
+pub fl_content::Placeholder::Tank::barrel_len: f32
+pub fl_content::Placeholder::Tank::hull: (f32, f32, f32)
+pub fl_content::Placeholder::Tank::turret: (f32, f32, f32)
+pub fl_content::Placeholder::Truck
+pub fl_content::Placeholder::Truck::bed: (f32, f32, f32)
+pub fl_content::Placeholder::Truck::cab: (f32, f32, f32)
+impl core::clone::Clone for fl_content::Placeholder
+pub fn fl_content::Placeholder::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::Placeholder
+pub fn fl_content::Placeholder::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::Placeholder
+pub fn fl_content::Placeholder::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::Placeholder
+impl serde_core::ser::Serialize for fl_content::Placeholder
+pub fn fl_content::Placeholder::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::Placeholder
+pub fn fl_content::Placeholder::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::ContentDb
+impl fl_content::ContentDb
+pub fn fl_content::ContentDb::credits(&self) -> &[fl_content::CreditEntry]
+pub fn fl_content::ContentDb::id_set_diff(&self, &fl_content::ContentDb) -> alloc::vec::Vec<alloc::string::String>
+pub fn fl_content::ContentDb::kind<K: fl_content::ContentKind>(&self) -> &fl_content::KindTable<K>
+pub fn fl_content::ContentDb::load_scenario_file(&self, &std::path::Path) -> core::result::Result<fl_content::ScenarioDef, fl_content::ContentErrors>
+pub fn fl_content::ContentDb::mods(&self) -> &[fl_content::ModManifest]
+pub fn fl_content::ContentDb::origins(&self) -> &alloc::collections::btree::map::BTreeMap<alloc::string::String, fl_content::Origin>
+pub fn fl_content::ContentDb::registry(&self) -> &fl_content::DefRegistry
+pub fn fl_content::ContentDb::rules<S: fl_content::RulesSection>(&self) -> &S
+pub fn fl_content::ContentDb::rules_hash(&self) -> u64
+pub fn fl_content::ContentDb::same_id_sets(&self, &fl_content::ContentDb) -> bool
+pub fn fl_content::ContentDb::string_tables(&self) -> fl_protocol::tables::StringTables
+pub fn fl_content::ContentDb::unit(&self, fl_protocol::ids::UnitTypeId) -> core::option::Option<&fl_content::ResolvedObject>
+pub fn fl_content::ContentDb::unit_id(&self, &str) -> core::option::Option<fl_protocol::ids::UnitTypeId>
+pub fn fl_content::ContentDb::units(&self) -> &[fl_content::ResolvedObject]
+pub fn fl_content::ContentDb::warnings(&self) -> &[alloc::string::String]
+pub struct fl_content::ContentError
+pub fl_content::ContentError::file: std::path::PathBuf
+pub fl_content::ContentError::line_col: core::option::Option<(usize, usize)>
+pub fl_content::ContentError::message: alloc::string::String
+pub fl_content::ContentError::path: alloc::string::String
+impl core::clone::Clone for fl_content::ContentError
+pub fn fl_content::ContentError::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::ContentError
+impl core::cmp::PartialEq for fl_content::ContentError
+pub fn fl_content::ContentError::eq(&self, &Self) -> bool
+impl core::convert::From<fl_content::ContentError> for fl_content::ContentErrors
+pub fn fl_content::ContentErrors::from(fl_content::ContentError) -> Self
+impl core::error::Error for fl_content::ContentError
+impl core::fmt::Debug for fl_content::ContentError
+pub fn fl_content::ContentError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_content::ContentError
+pub fn fl_content::ContentError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::ContentError
+pub struct fl_content::ContentErrors(pub alloc::vec::Vec<fl_content::ContentError>)
+impl core::clone::Clone for fl_content::ContentErrors
+pub fn fl_content::ContentErrors::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::ContentErrors
+impl core::cmp::PartialEq for fl_content::ContentErrors
+pub fn fl_content::ContentErrors::eq(&self, &Self) -> bool
+impl core::convert::From<fl_content::ContentError> for fl_content::ContentErrors
+pub fn fl_content::ContentErrors::from(fl_content::ContentError) -> Self
+impl core::default::Default for fl_content::ContentErrors
+pub fn fl_content::ContentErrors::default() -> Self
+impl core::error::Error for fl_content::ContentErrors
+impl core::fmt::Debug for fl_content::ContentErrors
+pub fn fl_content::ContentErrors::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_content::ContentErrors
+pub fn fl_content::ContentErrors::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::ContentErrors
+pub struct fl_content::CreditEntry
+pub fl_content::CreditEntry::asset: alloc::string::String
+pub fl_content::CreditEntry::author: alloc::string::String
+pub fl_content::CreditEntry::license: alloc::string::String
+pub fl_content::CreditEntry::title: alloc::string::String
+pub fl_content::CreditEntry::url: alloc::string::String
+impl core::clone::Clone for fl_content::CreditEntry
+pub fn fl_content::CreditEntry::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::CreditEntry
+impl core::cmp::PartialEq for fl_content::CreditEntry
+pub fn fl_content::CreditEntry::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::CreditEntry
+pub fn fl_content::CreditEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::CreditEntry
+impl serde_core::ser::Serialize for fl_content::CreditEntry
+pub fn fl_content::CreditEntry::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::CreditEntry
+pub fn fl_content::CreditEntry::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::DefRegistry
+impl fl_content::DefRegistry
+pub fn fl_content::DefRegistry::component_name<T: fl_content::DefComponent>(&self) -> core::option::Option<&'static str>
+pub fn fl_content::DefRegistry::fingerprint(&self) -> u64
+pub fn fl_content::DefRegistry::freeze(&mut self)
+pub fn fl_content::DefRegistry::is_frozen(&self) -> bool
+pub fn fl_content::DefRegistry::object_kind(&self, &str) -> core::option::Option<&'static str>
+pub fn fl_content::DefRegistry::register_component<T: fl_content::DefComponent + serde_core::de::DeserializeOwned>(&mut self, &'static str)
+pub fn fl_content::DefRegistry::register_kind<K: fl_content::ContentKind>(&mut self)
+pub fn fl_content::DefRegistry::register_object_kind(&mut self, &'static str)
+pub fn fl_content::DefRegistry::register_rules_section<S: fl_content::RulesSection>(&mut self, &'static str)
+pub fn fl_content::DefRegistry::string_tables(&self) -> fl_protocol::tables::StringTables
+pub fn fl_content::DefRegistry::with_builtins() -> Self
+impl bevy_ecs::component::Component for fl_content::DefRegistry where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_content::DefRegistry::Mutability = bevy_ecs::component::Mutable
+pub const fl_content::DefRegistry::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_content::DefRegistry::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_content::DefRegistry::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_content::DefRegistry::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_content::DefRegistry where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::default::Default for fl_content::DefRegistry
+pub fn fl_content::DefRegistry::default() -> Self
+pub struct fl_content::Faction
+pub fl_content::Faction::color: (f32, f32, f32)
+pub fl_content::Faction::id: alloc::string::String
+pub fl_content::Faction::name: alloc::string::String
+pub fl_content::Faction::roster: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for fl_content::Faction
+pub fn fl_content::Faction::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::Faction
+pub fn fl_content::Faction::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::Faction
+pub fn fl_content::Faction::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::Faction
+impl fl_content::ContentKind for fl_content::Faction
+pub const fl_content::Faction::EXT: &'static str
+pub const fl_content::Faction::ID_FIELD: &'static str
+pub const fl_content::Faction::IN_RULES_HASH: bool
+pub const fl_content::Faction::NAMESPACED: bool
+pub fn fl_content::Faction::id(&self) -> &str
+pub fn fl_content::Faction::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::Faction::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl serde_core::ser::Serialize for fl_content::Faction
+pub fn fl_content::Faction::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::Faction
+pub fn fl_content::Faction::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::KindTable<K>
+impl<K: fl_content::ContentKind> fl_content::KindTable<K>
+pub fn fl_content::KindTable<K>::get(&self, &str) -> core::option::Option<&K>
+pub fn fl_content::KindTable<K>::index_of(&self, &str) -> core::option::Option<u32>
+pub fn fl_content::KindTable<K>::is_empty(&self) -> bool
+pub fn fl_content::KindTable<K>::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = &K>
+pub fn fl_content::KindTable<K>::len(&self) -> usize
+impl<K: core::fmt::Debug> core::fmt::Debug for fl_content::KindTable<K>
+pub fn fl_content::KindTable<K>::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_content::LinkCtx<'a>
+impl<'a> fl_content::LinkCtx<'a>
+pub fn fl_content::LinkCtx<'a>::error(&mut self, impl core::convert::Into<alloc::string::String>, impl core::convert::Into<alloc::string::String>)
+pub fn fl_content::LinkCtx<'a>::kind_get<K: fl_content::ContentKind>(&self, &str) -> core::option::Option<&K>
+pub fn fl_content::LinkCtx<'a>::unit_exists(&self, &str) -> bool
+pub fn fl_content::LinkCtx<'a>::unit_is_abstract(&self, &str) -> bool
+pub struct fl_content::MapDef
+pub fl_content::MapDef::cell_m: fl_math::fx::Fx
+pub fl_content::MapDef::ground_color: (f32, f32, f32)
+pub fl_content::MapDef::id: alloc::string::String
+pub fl_content::MapDef::layers: core::option::Option<fl_content::MapLayers>
+pub fl_content::MapDef::name: alloc::string::String
+pub fl_content::MapDef::size_m: fl_math::vec::FxVec2
+pub fl_content::MapDef::terrain: core::option::Option<fl_content::MapTerrain>
+impl core::clone::Clone for fl_content::MapDef
+pub fn fl_content::MapDef::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::MapDef
+pub fn fl_content::MapDef::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::MapDef
+pub fn fl_content::MapDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::MapDef
+impl fl_content::ContentKind for fl_content::MapDef
+pub const fl_content::MapDef::EXT: &'static str
+pub const fl_content::MapDef::ID_FIELD: &'static str
+pub const fl_content::MapDef::IN_RULES_HASH: bool
+pub const fl_content::MapDef::NAMESPACED: bool
+pub fn fl_content::MapDef::id(&self) -> &str
+pub fn fl_content::MapDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::MapDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl serde_core::ser::Serialize for fl_content::MapDef
+pub fn fl_content::MapDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::MapDef
+pub fn fl_content::MapDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::MapLayers
+pub fl_content::MapLayers::cells_x: u32
+pub fl_content::MapLayers::cells_y: u32
+pub fl_content::MapLayers::heights: alloc::vec::Vec<u16>
+pub fl_content::MapLayers::palette: alloc::vec::Vec<alloc::string::String>
+pub fl_content::MapLayers::types: alloc::vec::Vec<u8>
+impl fl_content::MapLayers
+pub fn fl_content::MapLayers::index(&self, u32, u32) -> usize
+impl core::clone::Clone for fl_content::MapLayers
+pub fn fl_content::MapLayers::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::MapLayers
+impl core::cmp::PartialEq for fl_content::MapLayers
+pub fn fl_content::MapLayers::eq(&self, &Self) -> bool
+impl core::default::Default for fl_content::MapLayers
+pub fn fl_content::MapLayers::default() -> Self
+impl core::fmt::Debug for fl_content::MapLayers
+pub fn fl_content::MapLayers::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::MapLayers
+impl serde_core::ser::Serialize for fl_content::MapLayers
+pub fn fl_content::MapLayers::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::MapLayers
+pub fn fl_content::MapLayers::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::MapTerrain
+pub fl_content::MapTerrain::height_m: (fl_math::fx::Fx, fl_math::fx::Fx)
+pub fl_content::MapTerrain::height_png: alloc::string::String
+pub fl_content::MapTerrain::legend: alloc::vec::Vec<((u8, u8, u8), alloc::string::String)>
+pub fl_content::MapTerrain::terrain_png: alloc::string::String
+impl core::clone::Clone for fl_content::MapTerrain
+pub fn fl_content::MapTerrain::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::MapTerrain
+pub fn fl_content::MapTerrain::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::MapTerrain
+pub fn fl_content::MapTerrain::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::MapTerrain
+impl serde_core::ser::Serialize for fl_content::MapTerrain
+pub fn fl_content::MapTerrain::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::MapTerrain
+pub fn fl_content::MapTerrain::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::ModManifest
+pub fl_content::ModManifest::depends: alloc::vec::Vec<alloc::string::String>
+pub fl_content::ModManifest::dir: std::path::PathBuf
+pub fl_content::ModManifest::id: alloc::string::String
+pub fl_content::ModManifest::load_after: alloc::vec::Vec<alloc::string::String>
+pub fl_content::ModManifest::version: alloc::string::String
+impl core::clone::Clone for fl_content::ModManifest
+pub fn fl_content::ModManifest::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::ModManifest
+impl core::cmp::PartialEq for fl_content::ModManifest
+pub fn fl_content::ModManifest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::ModManifest
+pub fn fl_content::ModManifest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::ModManifest
+pub struct fl_content::Node
+pub fl_content::Node::span: fl_content::Span
+pub fl_content::Node::value: fl_content::ContentTree
+impl core::clone::Clone for fl_content::Node
+pub fn fl_content::Node::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::Node
+pub fn fl_content::Node::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::Node
+pub fn fl_content::Node::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::Node
+pub struct fl_content::ObjectDef
+pub fl_content::ObjectDef::components: alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::rcs::arc::Arc<dyn fl_content::DefComponent>>
+pub fl_content::ObjectDef::file: std::path::PathBuf
+pub fl_content::ObjectDef::id: alloc::string::String
+pub fl_content::ObjectDef::inherits: core::option::Option<alloc::string::String>
+pub fl_content::ObjectDef::is_abstract: bool
+pub fl_content::ObjectDef::is_override: bool
+pub fl_content::ObjectDef::kind: &'static str
+pub fl_content::ObjectDef::name: core::option::Option<alloc::string::String>
+pub fl_content::ObjectDef::remove: alloc::vec::Vec<alloc::string::String>
+pub fl_content::ObjectDef::tags: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for fl_content::ObjectDef
+pub fn fl_content::ObjectDef::clone(&self) -> Self
+impl core::fmt::Debug for fl_content::ObjectDef
+pub fn fl_content::ObjectDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_content::Origin
+pub fl_content::Origin::file: std::path::PathBuf
+pub fl_content::Origin::mod_id: alloc::string::String
+impl core::clone::Clone for fl_content::Origin
+pub fn fl_content::Origin::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::Origin
+impl core::cmp::PartialEq for fl_content::Origin
+pub fn fl_content::Origin::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::Origin
+pub fn fl_content::Origin::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::Origin
+pub struct fl_content::Resolved
+pub fl_content::Resolved::abstract_ids: alloc::collections::btree::set::BTreeSet<alloc::string::String>
+pub fl_content::Resolved::concrete: alloc::vec::Vec<fl_content::ResolvedObject>
+impl core::clone::Clone for fl_content::Resolved
+pub fn fl_content::Resolved::clone(&self) -> Self
+impl core::default::Default for fl_content::Resolved
+pub fn fl_content::Resolved::default() -> Self
+impl core::fmt::Debug for fl_content::Resolved
+pub fn fl_content::Resolved::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_content::ResolvedObject
+pub fl_content::ResolvedObject::components: alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::rcs::arc::Arc<dyn fl_content::DefComponent>>
+pub fl_content::ResolvedObject::file: std::path::PathBuf
+pub fl_content::ResolvedObject::id: alloc::string::String
+pub fl_content::ResolvedObject::kind: &'static str
+pub fl_content::ResolvedObject::name: alloc::string::String
+pub fl_content::ResolvedObject::tags: alloc::vec::Vec<alloc::string::String>
+impl fl_content::ResolvedObject
+pub fn fl_content::ResolvedObject::get<T: fl_content::DefComponent>(&self, &fl_content::DefRegistry) -> core::option::Option<&T>
+pub fn fl_content::ResolvedObject::has(&self, &str) -> bool
+impl core::clone::Clone for fl_content::ResolvedObject
+pub fn fl_content::ResolvedObject::clone(&self) -> Self
+impl core::fmt::Debug for fl_content::ResolvedObject
+pub fn fl_content::ResolvedObject::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_content::ScenarioDef
+pub fl_content::ScenarioDef::id: alloc::string::String
+pub fl_content::ScenarioDef::map: alloc::string::String
+pub fl_content::ScenarioDef::players: alloc::vec::Vec<fl_content::ScenarioPlayer>
+pub fl_content::ScenarioDef::seed: u64
+pub fl_content::ScenarioDef::units: alloc::vec::Vec<fl_content::ScenarioUnit>
+impl core::clone::Clone for fl_content::ScenarioDef
+pub fn fl_content::ScenarioDef::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::ScenarioDef
+pub fn fl_content::ScenarioDef::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::ScenarioDef
+pub fn fl_content::ScenarioDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::ScenarioDef
+impl fl_content::ContentKind for fl_content::ScenarioDef
+pub const fl_content::ScenarioDef::EXT: &'static str
+pub const fl_content::ScenarioDef::ID_FIELD: &'static str
+pub const fl_content::ScenarioDef::IN_RULES_HASH: bool
+pub const fl_content::ScenarioDef::NAMESPACED: bool
+pub fn fl_content::ScenarioDef::id(&self) -> &str
+pub fn fl_content::ScenarioDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::ScenarioDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl serde_core::ser::Serialize for fl_content::ScenarioDef
+pub fn fl_content::ScenarioDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::ScenarioDef
+pub fn fl_content::ScenarioDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::ScenarioPlayer
+pub fl_content::ScenarioPlayer::controller: fl_protocol::header::Controller
+pub fl_content::ScenarioPlayer::faction: alloc::string::String
+pub fl_content::ScenarioPlayer::team: u8
+impl core::clone::Clone for fl_content::ScenarioPlayer
+pub fn fl_content::ScenarioPlayer::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::ScenarioPlayer
+pub fn fl_content::ScenarioPlayer::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::ScenarioPlayer
+pub fn fl_content::ScenarioPlayer::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::ScenarioPlayer
+impl serde_core::ser::Serialize for fl_content::ScenarioPlayer
+pub fn fl_content::ScenarioPlayer::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::ScenarioPlayer
+pub fn fl_content::ScenarioPlayer::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::ScenarioUnit
+pub fl_content::ScenarioUnit::heading_deg: fl_math::fx::Fx
+pub fl_content::ScenarioUnit::player: u8
+pub fl_content::ScenarioUnit::pos: fl_math::vec::FxVec2
+pub fl_content::ScenarioUnit::unit: alloc::string::String
+impl core::clone::Clone for fl_content::ScenarioUnit
+pub fn fl_content::ScenarioUnit::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::ScenarioUnit
+pub fn fl_content::ScenarioUnit::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::ScenarioUnit
+pub fn fl_content::ScenarioUnit::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::ScenarioUnit
+impl serde_core::ser::Serialize for fl_content::ScenarioUnit
+pub fn fl_content::ScenarioUnit::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::ScenarioUnit
+pub fn fl_content::ScenarioUnit::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::Span
+pub fl_content::Span::col: u32
+pub fl_content::Span::line: u32
+impl core::clone::Clone for fl_content::Span
+pub fn fl_content::Span::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::Span
+impl core::cmp::PartialEq for fl_content::Span
+pub fn fl_content::Span::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::Span
+pub fn fl_content::Span::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_content::Span
+impl core::marker::StructuralPartialEq for fl_content::Span
+pub struct fl_content::SpawnCtx<'a>
+pub fl_content::SpawnCtx::content: &'a fl_content::ContentDb
+pub fl_content::SpawnCtx::heading: fl_math::angle::Angle
+pub fl_content::SpawnCtx::player: fl_protocol::ids::PlayerId
+pub fl_content::SpawnCtx::pos: fl_math::vec::FxVec2
+pub fl_content::SpawnCtx::unit: fl_protocol::ids::UnitTypeId
+pub struct fl_content::TerrainDef
+pub fl_content::TerrainDef::blocks: alloc::vec::Vec<fl_content::MoveClass>
+pub fl_content::TerrainDef::color: (f32, f32, f32)
+pub fl_content::TerrainDef::id: alloc::string::String
+pub fl_content::TerrainDef::name: alloc::string::String
+pub fl_content::TerrainDef::pass: fl_math::fx::Fx
+impl core::clone::Clone for fl_content::TerrainDef
+pub fn fl_content::TerrainDef::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::TerrainDef
+pub fn fl_content::TerrainDef::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::TerrainDef
+pub fn fl_content::TerrainDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::TerrainDef
+impl fl_content::ContentKind for fl_content::TerrainDef
+pub const fl_content::TerrainDef::EXT: &'static str
+pub const fl_content::TerrainDef::ID_FIELD: &'static str
+pub const fl_content::TerrainDef::IN_RULES_HASH: bool
+pub const fl_content::TerrainDef::NAMESPACED: bool
+pub fn fl_content::TerrainDef::id(&self) -> &str
+pub fn fl_content::TerrainDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::TerrainDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl serde_core::ser::Serialize for fl_content::TerrainDef
+pub fn fl_content::TerrainDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::TerrainDef
+pub fn fl_content::TerrainDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_content::TreeDeserializer<'a>
+impl<'a> fl_content::TreeDeserializer<'a>
+pub fn fl_content::TreeDeserializer<'a>::new(&'a fl_content::Node) -> Self
+impl<'a> serde_core::de::Deserializer<'a> for fl_content::TreeDeserializer<'a>
+pub type fl_content::TreeDeserializer<'a>::Error = fl_content::TreeError
+pub fn fl_content::TreeDeserializer<'a>::deserialize_any<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_bool<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_byte_buf<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_bytes<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_char<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_enum<V: serde_core::de::Visitor<'a>>(self, &'static str, &'static [&'static str], V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_f32<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_f64<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_i128<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_i16<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_i32<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_i64<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_i8<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_identifier<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_ignored_any<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_map<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_newtype_struct<V: serde_core::de::Visitor<'a>>(self, &'static str, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_option<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_seq<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_str<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_string<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_struct<V: serde_core::de::Visitor<'a>>(self, &'static str, &'static [&'static str], V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_tuple<V: serde_core::de::Visitor<'a>>(self, usize, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_tuple_struct<V: serde_core::de::Visitor<'a>>(self, &'static str, usize, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_u128<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_u16<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_u32<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_u64<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_u8<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_unit<V: serde_core::de::Visitor<'a>>(self, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub fn fl_content::TreeDeserializer<'a>::deserialize_unit_struct<V: serde_core::de::Visitor<'a>>(self, &'static str, V) -> core::result::Result<<V as serde_core::de::Visitor>::Value, fl_content::TreeError>
+pub struct fl_content::TreeError(_)
+impl core::clone::Clone for fl_content::TreeError
+pub fn fl_content::TreeError::clone(&self) -> Self
+impl core::cmp::Eq for fl_content::TreeError
+impl core::cmp::PartialEq for fl_content::TreeError
+pub fn fl_content::TreeError::eq(&self, &Self) -> bool
+impl core::error::Error for fl_content::TreeError
+impl core::fmt::Debug for fl_content::TreeError
+pub fn fl_content::TreeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_content::TreeError
+pub fn fl_content::TreeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::TreeError
+impl serde_core::de::Error for fl_content::TreeError
+pub fn fl_content::TreeError::custom<T: core::fmt::Display>(T) -> Self
+pub struct fl_content::VisualDef
+pub fl_content::VisualDef::model: core::option::Option<alloc::string::String>
+pub fl_content::VisualDef::placeholder: fl_content::Placeholder
+pub fl_content::VisualDef::recolor: bool
+pub fl_content::VisualDef::scale: f32
+pub fl_content::VisualDef::unit: alloc::string::String
+impl core::clone::Clone for fl_content::VisualDef
+pub fn fl_content::VisualDef::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_content::VisualDef
+pub fn fl_content::VisualDef::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_content::VisualDef
+pub fn fl_content::VisualDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_content::VisualDef
+impl fl_content::ContentKind for fl_content::VisualDef
+pub const fl_content::VisualDef::EXT: &'static str
+pub const fl_content::VisualDef::ID_FIELD: &'static str
+pub const fl_content::VisualDef::IN_RULES_HASH: bool
+pub const fl_content::VisualDef::NAMESPACED: bool
+pub fn fl_content::VisualDef::id(&self) -> &str
+pub fn fl_content::VisualDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::VisualDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl serde_core::ser::Serialize for fl_content::VisualDef
+pub fn fl_content::VisualDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_content::VisualDef
+pub fn fl_content::VisualDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub const fl_content::ALLOWED_LICENSES: &[&str]
+pub const fl_content::RULES_HASH_FORMAT: u32
+pub trait fl_content::ContentKind: serde_core::de::DeserializeOwned + serde_core::ser::Serialize + core::fmt::Debug + core::marker::Send + core::marker::Sync + 'static
+pub const fl_content::ContentKind::EXT: &'static str
+pub const fl_content::ContentKind::ID_FIELD: &'static str
+pub const fl_content::ContentKind::IN_RULES_HASH: bool
+pub const fl_content::ContentKind::NAMESPACED: bool
+pub fn fl_content::ContentKind::id(&self) -> &str
+pub fn fl_content::ContentKind::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::ContentKind::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl fl_content::ContentKind for fl_content::Faction
+pub const fl_content::Faction::EXT: &'static str
+pub const fl_content::Faction::ID_FIELD: &'static str
+pub const fl_content::Faction::IN_RULES_HASH: bool
+pub const fl_content::Faction::NAMESPACED: bool
+pub fn fl_content::Faction::id(&self) -> &str
+pub fn fl_content::Faction::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::Faction::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl fl_content::ContentKind for fl_content::MapDef
+pub const fl_content::MapDef::EXT: &'static str
+pub const fl_content::MapDef::ID_FIELD: &'static str
+pub const fl_content::MapDef::IN_RULES_HASH: bool
+pub const fl_content::MapDef::NAMESPACED: bool
+pub fn fl_content::MapDef::id(&self) -> &str
+pub fn fl_content::MapDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::MapDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl fl_content::ContentKind for fl_content::ScenarioDef
+pub const fl_content::ScenarioDef::EXT: &'static str
+pub const fl_content::ScenarioDef::ID_FIELD: &'static str
+pub const fl_content::ScenarioDef::IN_RULES_HASH: bool
+pub const fl_content::ScenarioDef::NAMESPACED: bool
+pub fn fl_content::ScenarioDef::id(&self) -> &str
+pub fn fl_content::ScenarioDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::ScenarioDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl fl_content::ContentKind for fl_content::TerrainDef
+pub const fl_content::TerrainDef::EXT: &'static str
+pub const fl_content::TerrainDef::ID_FIELD: &'static str
+pub const fl_content::TerrainDef::IN_RULES_HASH: bool
+pub const fl_content::TerrainDef::NAMESPACED: bool
+pub fn fl_content::TerrainDef::id(&self) -> &str
+pub fn fl_content::TerrainDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::TerrainDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+impl fl_content::ContentKind for fl_content::VisualDef
+pub const fl_content::VisualDef::EXT: &'static str
+pub const fl_content::VisualDef::ID_FIELD: &'static str
+pub const fl_content::VisualDef::IN_RULES_HASH: bool
+pub const fl_content::VisualDef::NAMESPACED: bool
+pub fn fl_content::VisualDef::id(&self) -> &str
+pub fn fl_content::VisualDef::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::VisualDef::load_sidecars(&mut self, &std::path::Path) -> core::result::Result<(), (alloc::string::String, alloc::string::String)>
+pub trait fl_content::DefComponent: erased_serde::ser::Serialize + core::fmt::Debug + core::marker::Send + core::marker::Sync + 'static
+pub fn fl_content::DefComponent::as_any(&self) -> &dyn core::any::Any
+pub fn fl_content::DefComponent::instantiate(&self, &fl_content::SpawnCtx<'_>, &mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>)
+pub fn fl_content::DefComponent::reload(&self, &fl_content::SpawnCtx<'_>, &mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>)
+pub fn fl_content::DefComponent::validate(&self, &mut fl_content::LinkCtx<'_>)
+pub trait fl_content::RulesSection: serde_core::de::DeserializeOwned + serde_core::ser::Serialize + core::fmt::Debug + core::clone::Clone + core::marker::Send + core::marker::Sync + 'static
+pub fn fl_content::RulesSection::link(&self, &mut fl_content::LinkCtx<'_>)
+pub fn fl_content::decode_layers(&fl_content::MapTerrain, &std::path::Path, (u32, u32)) -> core::result::Result<fl_content::MapLayers, alloc::string::String>
+pub fn fl_content::from_tree<T: serde_core::de::DeserializeOwned>(&fl_content::Node, &std::path::Path) -> core::result::Result<T, fl_content::ContentError>
+pub fn fl_content::load_dirs(fl_content::DefRegistry, &[std::path::PathBuf]) -> core::result::Result<fl_content::ContentDb, fl_content::ContentErrors>
+pub fn fl_content::parse_object(&fl_content::DefRegistry, &'static str, &std::path::Path, &str) -> core::result::Result<fl_content::ObjectDef, fl_content::ContentError>
+pub fn fl_content::parse_ron(&std::path::Path, &str) -> core::result::Result<fl_content::Node, fl_content::ContentError>
+pub fn fl_content::path_key(&str, &[fl_content::PathSeg]) -> alloc::string::String
+pub fn fl_content::resolve_objects(alloc::vec::Vec<fl_content::ObjectDef>) -> core::result::Result<fl_content::Resolved, fl_content::ContentErrors>
+pub fn fl_content::split_path_key(&str) -> core::option::Option<(&str, alloc::vec::Vec<alloc::string::String>)>
+pub fn fl_content::to_ron(&fl_content::Node) -> alloc::string::String
+pub fn fl_content::write_layers(&fl_content::MapTerrain, &std::path::Path, &fl_content::MapLayers) -> core::io::error::Result<()>

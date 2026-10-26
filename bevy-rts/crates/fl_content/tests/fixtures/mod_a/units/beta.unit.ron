@@ -1,0 +1,6 @@
+Unit(
+    id: "a.beta",
+    components: {
+        "Hull": (hp: 50),
+    },
+)

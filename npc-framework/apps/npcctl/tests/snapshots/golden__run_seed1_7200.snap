@@ -1,0 +1,83 @@
+---
+source: apps/npcctl/tests/golden.rs
+assertion_line: 24
+expression: summary
+---
+{
+  "aborts": 0,
+  "commands_applied": 0,
+  "commands_not_reached": 0,
+  "day_length": 2400,
+  "days": [
+    {
+      "aborts": 0,
+      "day": 0,
+      "leaf_starts": 14,
+      "max_needs": {
+        "energy": 100000,
+        "hunger": 99960
+      },
+      "meals": 1,
+      "min_needs": {
+        "energy": 27120,
+        "hunger": 36480
+      },
+      "ticks": 2400,
+      "ticks_asleep": 578,
+      "work_shifts": 2
+    },
+    {
+      "aborts": 0,
+      "day": 1,
+      "leaf_starts": 14,
+      "max_needs": {
+        "energy": 100000,
+        "hunger": 100000
+      },
+      "meals": 1,
+      "min_needs": {
+        "energy": 28320,
+        "hunger": 27800
+      },
+      "ticks": 2400,
+      "ticks_asleep": 607,
+      "work_shifts": 2
+    },
+    {
+      "aborts": 0,
+      "day": 2,
+      "leaf_starts": 17,
+      "max_needs": {
+        "energy": 100000,
+        "hunger": 100000
+      },
+      "meals": 3,
+      "min_needs": {
+        "energy": 17080,
+        "hunger": 20240
+      },
+      "ticks": 2400,
+      "ticks_asleep": 326,
+      "work_shifts": 1
+    }
+  ],
+  "final_hash": 15122655079128925728,
+  "final_tick": 7200,
+  "journal": null,
+  "leaf_starts": 45,
+  "needs": {
+    "energy": {
+      "max": 100000,
+      "min": 17080
+    },
+    "hunger": {
+      "max": 100000,
+      "min": 20240
+    }
+  },
+  "record": null,
+  "scenario": "village",
+  "seed": 1,
+  "ticks": 7200,
+  "villagers": 1
+}

@@ -1,0 +1,1 @@
+VisualDef(unit: "a.abstract.tank", placeholder: Truck(cab: (2.0, 2.0, 2.0), bed: (2.0, 1.0, 4.0)), model: Some("models/truck.glb"), scale: 1.5, recolor: false)

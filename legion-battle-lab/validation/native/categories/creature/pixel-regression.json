@@ -1,0 +1,15 @@
+{
+  "roi": [
+    0,
+    180,
+    1024,
+    648
+  ],
+  "blue_family_pixels": 5618,
+  "red_family_pixels": 6964,
+  "minimum_per_team": 1000,
+  "meadow_pixels": 430242,
+  "minimum_meadow_pixels": 50000,
+  "passed": true,
+  "scope": "Scoped regression for visible meadow in all seven category views and both army colors in the million-unit overview. The crop excludes HUD/controls; color pixels are not individual visible-unit counts."
+}

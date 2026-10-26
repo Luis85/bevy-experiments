@@ -1,0 +1,6 @@
+Faction(
+    roster: [ "h.tank" ],
+    color: (0.8, 0.1, 0.1),
+    name: "Red",
+    id: "h.red",
+)

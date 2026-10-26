@@ -1,0 +1,55 @@
+{
+  "chunk": {
+    "feature_count": 0,
+    "height_range_m": [
+      519.8892822265625,
+      530.2119140625
+    ],
+    "key": {
+      "level": 16,
+      "x": 34875,
+      "y": 15241
+    },
+    "ok": true,
+    "sources": [
+      {
+        "attribution": "Mapzen Terrain Tiles and contributing elevation datasets; https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+        "license": "Source-specific open-data terms; see Tilezen attribution manifest",
+        "provider": "Mapzen Terrain Tiles / AWS Open Data",
+        "retrieved_unix_seconds": 1793036484,
+        "synthetic": false,
+        "url": "https://s3.amazonaws.com/elevation-tiles-prod/terrarium"
+      }
+    ],
+    "warnings": [
+      "Elevation source vertical datum is retained without a geoid transform. Rendered height approximates WGS84 ellipsoidal altitude; not survey/navigation precision."
+    ]
+  },
+  "live": true,
+  "position": {
+    "altitude_m": 0.0,
+    "latitude": 48.137,
+    "longitude": 11.575
+  },
+  "weather": {
+    "ok": true,
+    "sample": {
+      "cloud_cover": 0.7900000214576721,
+      "observed_unix_seconds": 1793037600,
+      "precipitation_mm_h": 0.0,
+      "synthetic": false,
+      "temperature_c": 8.300000190734863,
+      "wind_direction_deg": 114.0,
+      "wind_speed_m_s": 0.9800000190734863
+    }
+  },
+  "cache_note": "Provider data were retrieved over HTTPS in this verification session; this final rerun may reuse the validated cache. Terrain source timestamp is the oldest raw-tile retrieval timestamp.",
+  "weather_attribution": "Weather data by Open-Meteo, https://open-meteo.com/ — CC BY 4.0; current model sample, not an asserted on-site observation.",
+  "osm_verification": {
+    "fixture_http_integration": "passed",
+    "public_post": "20-second timeout",
+    "tiny_public_get": "HTTP406",
+    "live_success": false
+  },
+  "verification_utc": "2026-10-26T18:03:07.263465+00:00"
+}

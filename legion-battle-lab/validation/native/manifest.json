@@ -1,0 +1,173 @@
+{
+  "executable_sha256": "37cef30931b33993660a632b56649d456443efe1458b42bcc42b5460bcf514fb",
+  "runs": [
+    {
+      "name": "million",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/millionenfront.json",
+        "--capture-dir",
+        "/tmp/legion-complete-native/million"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 77.52951713599941
+    },
+    {
+      "name": "desktop",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--smoke-test",
+        "--capture-dir",
+        "/tmp/legion-complete-native/desktop"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 163.77364518600007
+    },
+    {
+      "name": "compact",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--smoke-test",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/compact"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 103.28983001400047
+    },
+    {
+      "name": "categories/creature",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/categories/creature.json",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/categories/creature"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 8.66071773799922
+    },
+    {
+      "name": "categories/vehicle",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/categories/vehicle.json",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/categories/vehicle"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 7.262158391999037
+    },
+    {
+      "name": "categories/building",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/categories/building.json",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/categories/building"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 9.077151912999398
+    },
+    {
+      "name": "categories/air_unit",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/categories/air_unit.json",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/categories/air_unit"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 15.727230145999783
+    },
+    {
+      "name": "categories/sea_unit",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/categories/sea_unit.json",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/categories/sea_unit"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 6.064198158999716
+    },
+    {
+      "name": "categories/underground_unit",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/categories/underground_unit.json",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/categories/underground_unit"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 6.521158597999602
+    },
+    {
+      "name": "categories/space_unit",
+      "command": [
+        "/tmp/legion-final-59899ec515b9-target/debug/legion",
+        "--render-check",
+        "--scenario",
+        "scenarios/categories/space_unit.json",
+        "--width",
+        "1024",
+        "--height",
+        "768",
+        "--capture-dir",
+        "/tmp/legion-complete-native/categories/space_unit"
+      ],
+      "exit_code": 0,
+      "passed": true,
+      "wall_seconds": 9.265789246999702
+    }
+  ]
+}

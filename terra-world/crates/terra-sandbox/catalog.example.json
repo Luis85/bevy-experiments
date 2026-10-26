@@ -1,0 +1,89 @@
+{
+  "items": [
+    "wood",
+    "stone",
+    "planks",
+    "stone_blocks",
+    "tool",
+    "wheat_seed",
+    "wheat"
+  ],
+  "recipes": {
+    "planks": {
+      "inputs": {
+        "wood": 2
+      },
+      "outputs": {
+        "planks": 4
+      },
+      "requires_workbench": false
+    },
+    "stone_blocks": {
+      "inputs": {
+        "stone": 2
+      },
+      "outputs": {
+        "stone_blocks": 1
+      },
+      "requires_workbench": false
+    },
+    "tool": {
+      "inputs": {
+        "planks": 2,
+        "stone": 2
+      },
+      "outputs": {
+        "tool": 1
+      },
+      "requires_workbench": true
+    },
+    "wheat_seed": {
+      "inputs": {
+        "wheat": 1
+      },
+      "outputs": {
+        "wheat_seed": 3
+      },
+      "requires_workbench": false
+    }
+  },
+  "blueprints": {
+    "house": {
+      "costs": {
+        "planks": 12,
+        "stone_blocks": 4
+      },
+      "hitpoints": 200,
+      "radius_m": 4.0,
+      "housing": true,
+      "workbench": false
+    },
+    "workbench": {
+      "costs": {
+        "planks": 4,
+        "stone": 2
+      },
+      "hitpoints": 80,
+      "radius_m": 1.0,
+      "housing": false,
+      "workbench": true
+    },
+    "fence": {
+      "costs": {
+        "planks": 2
+      },
+      "hitpoints": 40,
+      "radius_m": 0.7,
+      "housing": false,
+      "workbench": false
+    }
+  },
+  "crops": {
+    "wheat": {
+      "seed_item": "wheat_seed",
+      "harvest_item": "wheat",
+      "harvest_amount": 4,
+      "growth_seconds": 180.0
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "smithy",
+  "seed": 1,
+  "world": { "layout": "compound", "furnish": true, "store_locked": true, "detection": "automatic" },
+  "actors": [
+    { "kind": "unit", "name": "smith", "template": "smith", "pos": [6500, -500], "carry": [{ "kind": "plank", "stack": 1 }] },
+    { "kind": "unit", "name": "joiner", "template": "carpenter", "pos": [-8500, 6500], "spend_policy": "player", "carry": [{ "kind": "log", "stack": 8 }] },
+    { "kind": "unit", "name": "apprentice", "template": "novice", "pos": [-6500, 4500] }
+  ]
+}

@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc d1c4092d044fe0eb19b3181a2e7de260704c737d3728d116412f1152c8506875 # shrinks to (initial_state, transitions, seen_counter) = (Model { seed: 0, plots: 1, journal: false, alive: {1: House, 2: Bed, 3: Stockpile, 4: Field, 5: Villager}, pending_spawns: 0, next_id: 6 }, [Tick(1), Tick(1), Cmd(Despawn { unit: 4 }), Tick(1)], None)

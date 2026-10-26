@@ -1,0 +1,14 @@
+[package]
+name = "terra-demo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Native 3D world explorer and integration example"
+
+[dependencies]
+bevy.workspace = true
+serde_json.workspace = true
+terra-core = { path = "../terra-core" }
+terra-bevy = { path = "../terra-bevy" }
+

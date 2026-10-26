@@ -1,0 +1,59 @@
+[package]
+name = "village"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+# Not `bevy.workspace = true`: the workspace entry keeps Bevy's default
+# features, which select the `ruzstd` backend (see the feature list).
+bevy = { version = "0.20.0", default-features = false, features = [
+    # Bevy's default features (2d, 3d, ui, audio) spelled out, except that
+    # zstd-compressed KTX2 textures (the tonemapping/SMAA LUTs) decode with
+    # the C `zstd` crate (`zstd_c`, needs a C compiler) instead of `ruzstd`
+    # (`zstd_rust`, RUSTSEC-2026-0344, no fixed version for bevy_image 0.20).
+    # Bevy's `3d` / `3d_api` features turn `zstd_rust` on, so they are
+    # expanded here. Keep in sync with content/village_view/Cargo.toml.
+    "2d", "ui", "audio",
+    "default_app", "default_platform", "scene", "picking",
+    "common_api", "bevy_light", "bevy_mikktspace", "ktx2", "morph_animation", "morph",
+    "smaa_luts", "tonemapping_luts", "zstd_c",
+    "bevy_render", "bevy_core_pipeline", "bevy_gizmos_render", "bevy_anti_alias",
+    "bevy_gltf", "bevy_pbr", "bevy_post_process", "gltf_animation",
+] }
+# The framework through its facade, plus the example content and its view.
+npc_framework = { workspace = true, features = ["view-helpers"] }
+village_content.workspace = true
+village_view.workspace = true
+serde.workspace = true
+serde_json = "1"
+
+[features]
+default = ["debug-tools"]
+# Remote interface (BRP npc/* + agent/* on 127.0.0.1:15702), the built-in profiler (F4 panel,
+# `npc/perf`) and Bevy's per-system tracing spans.
+debug-tools = [
+    "npc_framework/remote",
+    # `agent/*` + `world/*` on BRP (AgentRemotePlugin). The village does not
+    # add AgentIoPlugin, so nothing new is registered in the sim: agents can
+    # list, observe and read events; attaching is rejected (unknown command).
+    "npc_framework/agent-io",
+    "npc_framework/perf",
+    "village_view/perf",
+    "village_content/perf",
+    "bevy/trace",
+    "bevy/bevy_remote",
+]
+# Also stream spans to the Tracy profiler.
+tracy = ["debug-tools", "bevy/trace_tracy"]
+# Also write a Chrome trace (trace-<timestamp>.json, open in ui.perfetto.dev).
+chrome-trace = ["debug-tools", "bevy/trace_chrome"]
+
+[dev-dependencies]
+# tests/rpc.rs drives the BRP methods over real HTTP (needs `debug-tools`).
+ureq = { version = "3", default-features = false, features = ["json"] }
+
+[[test]]
+name = "rpc"
+required-features = ["debug-tools"]

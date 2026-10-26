@@ -1,0 +1,15 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Repo automation: `cargo xtask verify` (fmt, clippy, tests, architecture fitness, replays, goldens, cargo-deny)."
+
+# No [dependencies] on purpose: the binary must never need relinking while it
+# runs `cargo test` on the workspace (Windows locks a running .exe), so its
+# build fingerprint may not depend on workspace-wide feature unification.
+
+[dev-dependencies]
+cargo_metadata = "0.23"

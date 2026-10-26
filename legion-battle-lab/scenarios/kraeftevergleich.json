@@ -1,0 +1,8 @@
+{
+  "name": "Kräftevergleich",
+  "seed": 42,
+  "map": "meadow",
+  "blue": { "count": 600, "kind": "infantry", "formation": "lines" },
+  "red": { "count": 600, "kind": "infantry", "formation": "lines" },
+  "time_limit_secs": 180
+}

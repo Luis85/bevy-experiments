@@ -1,0 +1,14 @@
+const SCENARIO: &str = r##"
+(
+    name: "duel",
+    note: "unbalanced ( paren and a \" quote",
+    script: "#[test] fn fake_unit() { assert!(false) }",
+    count: 2,
+)
+"##;
+
+#[test]
+fn smoke_scenario_loads() {
+    let s = load(SCENARIO);
+    assert_eq!(s.units.len(), 2);
+}

@@ -1,0 +1,23 @@
+[package]
+name = "terra-bevy"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Streaming geospatial environment and optional renderer for Bevy"
+
+[features]
+default = ["render"]
+render = ["bevy/default_app", "bevy/bevy_winit", "bevy/x11", "bevy/default_font", "bevy/3d_bevy_render", "bevy/ui_bevy_render", "bevy/bevy_ui_widgets", "bevy/bevy_input_focus", "bevy/bevy_picking", "bevy/ui_picking"]
+
+[dependencies]
+bevy.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+terra-core = { path = "../terra-core" }
+terra-stream = { path = "../terra-stream" }
+terra-net = { path = "../terra-net", default-features = false }
+terra-sandbox = { path = "../terra-sandbox" }
+terra-history = { path = "../terra-history" }
+

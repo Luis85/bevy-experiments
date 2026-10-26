@@ -1,0 +1,212 @@
+# Source of every generated `clippy.toml` (spec §12.2, ADR-0009).
+#
+# Clippy reads only the nearest `clippy.toml` and never merges them, so `cargo xtask gen-clippy` writes one file per
+# crate that has a profile, plus the root file that every other crate reads. `cargo xtask gen-clippy --check` (and every
+# `cargo xtask gate` level) fails when a generated file drifts from this template. Edit this file, never the output.
+#
+# A ban is emitted only when its path resolves in the crate's normal dependency graph (`std`, `core` and primitives
+# always do), so an unused ban never becomes an "unresolvable path" warning under `-D warnings`.
+#
+# `[[pending]]` holds bans that existing code still violates. The generator leaves them out of that crate's file and
+# writes `# pending: <path> until <until>` instead; the named task removes the violation and the entry.
+
+[profile.sim]
+crates = ["fl_protocol", "fl_view", "fl_sim", "fl_feat_*"]
+exclude = ["fl_feat_*_client"]
+
+[profile.edge]
+crates = ["fl_math", "fl_content"]
+
+# The root file, read by every crate without its own file (client, game, tools, xtask, probes). Use std paths only:
+# the root file is shared by crates with different dependency graphs.
+[profile.client]
+root = true
+
+# Numbers: sim state is Fx and integers only.
+[[ban]]
+kind = "type"
+path = "f32"
+reason = "sim state is Fx and integers only (spec §5.4)"
+profiles = ["sim"]
+
+[[ban]]
+kind = "type"
+path = "f64"
+reason = "sim state is Fx and integers only (spec §5.4)"
+profiles = ["sim"]
+
+# Collections: iteration order must not depend on a hasher.
+[[ban]]
+kind = "type"
+path = "std::collections::HashMap"
+reason = "iteration order is unspecified; use BTreeMap or an index keyed by SimId"
+profiles = ["sim", "edge", "client"]
+
+[[ban]]
+kind = "type"
+path = "std::collections::HashSet"
+reason = "iteration order is unspecified; use BTreeSet or an index keyed by SimId"
+profiles = ["sim", "edge", "client"]
+
+[[ban]]
+kind = "type"
+path = "bevy_platform::collections::HashMap"
+reason = "iteration order is unspecified; use BTreeMap or an index keyed by SimId"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "type"
+path = "bevy_platform::collections::HashSet"
+reason = "iteration order is unspecified; use BTreeSet or an index keyed by SimId"
+profiles = ["sim", "edge"]
+
+# Entity-keyed and third-party collections (the aliases are not matched, so these name the defining newtypes).
+[[ban]]
+kind = "type"
+path = "bevy_ecs::entity::hash_map::EntityEquivalentHashMap"
+reason = "keyed or ordered by Entity: Entity bits differ between a live run and a load; key by SimId"
+profiles = ["sim"]
+
+[[ban]]
+kind = "type"
+path = "bevy_ecs::entity::hash_set::EntityEquivalentHashSet"
+reason = "keyed or ordered by Entity: Entity bits differ between a live run and a load; key by SimId"
+profiles = ["sim"]
+
+[[ban]]
+kind = "type"
+path = "bevy_ecs::entity::index_map::EntityEquivalentIndexMap"
+reason = "keyed or ordered by Entity: Entity bits differ between a live run and a load; key by SimId"
+profiles = ["sim"]
+
+[[ban]]
+kind = "type"
+path = "bevy_ecs::entity::index_set::EntityEquivalentIndexSet"
+reason = "keyed or ordered by Entity: Entity bits differ between a live run and a load; key by SimId"
+profiles = ["sim"]
+
+[[ban]]
+kind = "type"
+path = "hashbrown::HashMap"
+reason = "iteration order depends on the hasher; use BTreeMap/BTreeSet or an index keyed by SimId"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "type"
+path = "hashbrown::HashSet"
+reason = "iteration order depends on the hasher; use BTreeMap/BTreeSet or an index keyed by SimId"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "type"
+path = "indexmap::IndexMap"
+reason = "iteration order depends on the hasher; use BTreeMap/BTreeSet or an index keyed by SimId"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "type"
+path = "indexmap::IndexSet"
+reason = "iteration order depends on the hasher; use BTreeMap/BTreeSet or an index keyed by SimId"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "type"
+path = "std::hash::RandomState"
+reason = "a randomly seeded hasher makes iteration order differ between runs"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "type"
+path = "bevy_platform::hash::RandomState"
+reason = "a randomly seeded hasher makes iteration order differ between runs"
+profiles = ["sim", "edge"]
+
+# Time: the sim never reads a clock.
+[[ban]]
+kind = "type"
+path = "std::time::Instant"
+reason = "the sim never reads a clock; wall-clock reads need a scoped #[expect] (spec §15)"
+profiles = ["sim", "edge", "client"]
+
+[[ban]]
+kind = "type"
+path = "std::time::SystemTime"
+reason = "the sim never reads a clock; wall-clock reads need a scoped #[expect] (spec §15)"
+profiles = ["sim", "edge", "client"]
+
+[[ban]]
+kind = "method"
+path = "std::time::SystemTime::now"
+reason = "the sim never reads a clock"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "method"
+path = "std::time::Instant::now"
+reason = "the sim never reads a clock"
+profiles = ["sim", "edge"]
+
+# Sim-only: scheduling, time and randomness.
+[[ban]]
+kind = "type"
+path = "bevy_ecs::system::ParallelCommands"
+reason = "command order would depend on thread scheduling"
+profiles = ["sim"]
+
+[[ban]]
+kind = "type"
+path = "bevy_time::Time"
+reason = "the sim counts ticks (SimClock), never Time"
+profiles = ["sim"]
+
+[[ban]]
+kind = "type"
+path = "fl_math::Pcg32"
+reason = "sim randomness is fl_math::Rolls only; Pcg32 is for tools and the client (ADR-0003)"
+profiles = ["sim"]
+
+# Randomness: draws come from a registered stream (`fl_sim::rolls` over a `Stream` from
+# `SimBuilder::register_stream`). `fl_sim::rng::rolls` and setup code that seeds its own draws use the raw cursor
+# behind a scoped `#[expect]`.
+[[ban]]
+kind = "method"
+path = "fl_math::Rolls::new"
+reason = "draw with fl_sim::rolls over a Stream from SimBuilder::register_stream (ADR-0003)"
+profiles = ["sim"]
+
+[[ban]]
+kind = "method"
+path = "fl_math::roll"
+reason = "draw with fl_sim::rolls over a Stream from SimBuilder::register_stream (ADR-0003)"
+profiles = ["sim"]
+
+[[ban]]
+kind = "method"
+path = "rand::rng"
+reason = "sim randomness is fl_math::Rolls only (ADR-0003)"
+profiles = ["sim"]
+
+[[ban]]
+kind = "method"
+path = "rand::random"
+reason = "sim randomness is fl_math::Rolls only (ADR-0003)"
+profiles = ["sim"]
+
+# Threads and environment.
+[[ban]]
+kind = "method"
+path = "std::thread::spawn"
+reason = "the sim is single-threaded; the runner thread is the one scoped #[expect] (Task 12)"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "method"
+path = "std::thread::Builder::spawn"
+reason = "the sim is single-threaded; the runner thread is the one scoped #[expect] (Task 12)"
+profiles = ["sim", "edge"]
+
+[[ban]]
+kind = "method"
+path = "std::env::var"
+reason = "behaviour must not depend on the environment; pass configuration explicitly"
+profiles = ["sim", "edge"]

@@ -1,0 +1,27 @@
+[package]
+name = "npc_agent_io"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "External agent control for the NPC framework (real time): controllers attached by command (Direct / Advisor / Observer), observations, affordances, an action queue, events long-poll, a headless JSON-RPC session host, a CLI/MCP client and the provider registries capability crates plug into."
+
+[features]
+default = []
+# Also register the `agent/*` and `world/*` methods on Bevy's BRP through
+# npc_tools' remote plugin (windowed hosts). Pulls the `bevy` umbrella via
+# npc_tools; the headless session host (`session`, `http`) never needs it.
+remote = ["npc_tools/remote"]
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+npc_ai.workspace = true
+npc_kernel.workspace = true
+npc_tools.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"
+
+[[example]]
+name = "greedy_controller"

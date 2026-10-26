@@ -1,0 +1,126 @@
+{
+  "schema_version": 1,
+  "validation_date": "2026-10-26",
+  "environment": {
+    "platform": "Linux",
+    "window_system": "X11 virtual display",
+    "graphics": "Mesa llvmpipe software Vulkan",
+    "transport": "local loopback TCP",
+    "performance_benchmark": false
+  },
+  "participants": {
+    "observer_player_id": 1,
+    "native_player_id": 2,
+    "saved_player_ids": [
+      1,
+      2
+    ]
+  },
+  "native_actions": {
+    "movement": {
+      "input": "two-second northward arrow input",
+      "authoritative_surface_distance_m": 10.000000063143487,
+      "position_retained_after_reconnect": true
+    },
+    "claim": {
+      "input": "native Claim plot button",
+      "authoritative_plot_id": 1,
+      "owner": 2,
+      "radius_m": 40.0
+    },
+    "craft": {
+      "input": "native Craft planks button",
+      "recipe": "planks",
+      "wood_before": 30,
+      "wood_after": 28,
+      "planks_before": 0,
+      "planks_after": 4
+    }
+  },
+  "host_save_restore_checks": [
+    {
+      "restored_from_tick": 11410,
+      "saved_player_ids": [
+        1,
+        2
+      ],
+      "same_native_identity": true,
+      "movement_retained": true
+    },
+    {
+      "restored_from_tick": 29682,
+      "saved_player_ids": [
+        1,
+        2
+      ],
+      "same_native_identity": true,
+      "retained_native_plot_id": 1
+    }
+  ],
+  "stalled_native_process": {
+    "pause_seconds": 12,
+    "method": "SIGSTOP / SIGCONT",
+    "observed_connected_after_resume": true,
+    "observed_native_player_id": 2,
+    "observed_authoritative_tick_after_resume": 32514,
+    "observed_wood": 28,
+    "observed_planks": 4,
+    "observed_plot_count": 1,
+    "evidence": "Native window observation reported by the primary reviewer; independently regression-tested over loopback TCP."
+  },
+  "final_reconnect": {
+    "successful_welcome_identity_write_observed": true,
+    "same_native_player_id": 2,
+    "saved_player_ids": [
+      1,
+      2
+    ],
+    "retained_plots": [
+      {
+        "id": 1,
+        "owner": 2,
+        "radius_m": 40.0
+      }
+    ],
+    "retained_inventory": {
+      "wood": 28,
+      "planks": 4
+    },
+    "client_identity_file_permissions": "0600",
+    "server_save_permissions": "0600",
+    "authoritative_saved_tick": 35627,
+    "screenshot": "screenshots/07-multiplayer.png",
+    "screenshot_tick": 34462,
+    "screenshot_connected_player_id": 2,
+    "screenshot_actor_count": 2
+  },
+  "regressions": [
+    {
+      "test": "network::tests::late_network_intents_and_bounded_backlog_reach_the_authoritative_server",
+      "result": "passed",
+      "covers": "Nine intents enqueued after the network send pass survive the local system; the one-intent bounded backlog survives the next pass; host and replica receive the claim and eight crafts."
+    },
+    {
+      "test": "network::tests::queued_snapshots_recover_an_expired_frame_deadline_but_silence_still_times_out",
+      "result": "passed",
+      "covers": "An expired prior receive timestamp plus 100 queued real TCP snapshots recovers and catches up; an open silent socket still times out."
+    }
+  ],
+  "process_cleanup": {
+    "status": "complete",
+    "server_exit_code": 0,
+    "observer_exit": "intentional SIGINT after verification",
+    "observer_exit_code": 130,
+    "final_saved_tick": 35627,
+    "final_saved_player_ids": [
+      1,
+      2
+    ],
+    "remaining_review_server_or_observer_processes": 0
+  },
+  "limits": [
+    "Single host and two clients; no public Internet or load benchmark.",
+    "Reference transport is unencrypted TCP for trusted local sessions.",
+    "Software rendering timings do not represent gaming hardware."
+  ]
+}

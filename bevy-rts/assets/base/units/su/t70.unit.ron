@@ -1,0 +1,9 @@
+Unit(
+    id: "base.su.t70",
+    inherits: Some("base.abstract.light_tank"),
+    name: "T-70",
+    components: {
+        "Hull": (hp: 75, footprint: (2.3, 4.3), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 45.0, terrain_factor: 0.6, turn_rate_deg_s: 105.0),
+    },
+)

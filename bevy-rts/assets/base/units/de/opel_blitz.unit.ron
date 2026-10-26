@@ -1,0 +1,9 @@
+Unit(
+    id: "base.de.opel_blitz",
+    inherits: Some("base.abstract.truck"),
+    name: "Opel Blitz",
+    components: {
+        "Hull": (hp: 40, footprint: (2.4, 6.0), hitbox_shrink: 0.5),
+        "Mobility": (class: Wheeled, road_speed_kmh: 60.0, terrain_factor: 0.35, turn_rate_deg_s: 70.0),
+    },
+)

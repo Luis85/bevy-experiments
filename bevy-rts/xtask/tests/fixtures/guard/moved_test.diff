@@ -1,0 +1,27 @@
+diff --git a/crates/fl_sim/src/step.rs b/crates/fl_sim/src/step.rs
+index 1111111..2222222 100644
+--- a/crates/fl_sim/src/step.rs
++++ b/crates/fl_sim/src/step.rs
+@@ -100,6 +99,0 @@ mod tests {
+-    #[test]
+-    fn smoke_step_advances_clock() {
+-        let mut app = app();
+-        step_tick(&mut app);
+-        assert_eq!(app.tick(), 1);
+-    }
+diff --git a/crates/fl_sim/tests/step.rs b/crates/fl_sim/tests/step.rs
+new file mode 100644
+index 0000000..2222222
+--- /dev/null
++++ b/crates/fl_sim/tests/step.rs
+@@ -0,0 +1,10 @@
++use fl_sim::step_tick;
++
++#[test]
++fn smoke_step_advances_clock() {
++    let mut app = app();
++    step_tick(&mut app);
++    assert_eq!(
++        app.tick(),
++        1
++    );

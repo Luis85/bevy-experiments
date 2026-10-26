@@ -1,0 +1,19 @@
+[package]
+name = "fl_math"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+fixed.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+ron.workspace = true
+postcard.workspace = true
+insta.workspace = true

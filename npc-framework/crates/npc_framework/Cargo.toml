@@ -1,0 +1,90 @@
+[package]
+name = "npc_framework"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Facade of the NPC framework: NpcPlugins, NpcAppExt and a prelude over the kernel, AI, needs, jobs, perf and tools crates."
+
+[features]
+default = ["tools", "perf", "locomotion"]
+# Headless tooling: CLI helpers, bench harness, per-tick profiler glue.
+tools = ["dep:npc_tools", "perf"]
+# BRP `npc/*` methods (pulls the `bevy` umbrella with `bevy_remote`); with
+# `agent-io` also the `agent/*` / `world/*` methods on BRP; with
+# `view-helpers` also the windowed host's remote setup (`view_helpers::remote`).
+remote = ["tools", "npc_tools/remote", "npc_agent_io?/remote", "npc_view_helpers?/remote"]
+# The per-system/per-mechanic profiler.
+perf = ["dep:npc_perf", "npc_view_helpers?/perf"]
+# The locomotion seam (MoveIntent/MoveStatus) and the StraightLineMover,
+# added to NpcPlugins.
+locomotion = ["dep:npc_locomotion"]
+# Opt-in grid pathfinding (`npc_nav`: NavPlugin / GridPathMover, NavAgent);
+# with `view-helpers` also the path gizmo.
+nav = ["locomotion", "dep:npc_nav", "npc_view_helpers?/nav"]
+# Opt-in perception (`npc_perception`: PerceptionPlugin, Sensors, Perceivable,
+# Noise); with `view-helpers` also the vision-cone / line-of-sight gizmos.
+perception = ["dep:npc_perception", "npc_view_helpers?/perception"]
+# Opt-in character rules (`npc_rules`: RulesPlugin, CharacterSheet, 3d6
+# success rolls); with `remote` also BRP `npc/sheet`.
+rules = ["dep:npc_rules", "npc_tools?/rules"]
+# Opt-in external agent control (`npc_agent_io`: AgentIoPlugin, controllers,
+# observations/affordances registries, the headless session host and clients).
+agent-io = ["dep:npc_agent_io", "tools"]
+# Opt-in interaction (`npc_interaction`: InteractionPlugin, items, inventory,
+# equipment, doors, tools, the `Interact` leaf/command); its glue with
+# `rules`, `perception` and `agent-io` is in `glue`.
+interaction = ["dep:npc_interaction"]
+# Opt-in vehicles (`npc_vehicles`: VehiclesPlugin, Vehicle seats, the
+# mount/dismount verbs, Mount/Dismount/Unload, DriveVehicle); needs and turns
+# on `interaction`. With `view-helpers` also the crew gizmo.
+vehicles = ["dep:npc_vehicles", "interaction", "locomotion", "npc_view_helpers?/vehicles"]
+# Opt-in RTS command (`npc_command`: CommandPlugin, Commandable, Owner,
+# IssueOrder, order queues, formations, squads, the ExecuteOrder leaf); with
+# `view-helpers` also selection, control groups, context orders and gizmos.
+command = ["dep:npc_command", "locomotion", "npc_view_helpers?/command"]
+# Opt-in progression (`npc_progression`: ProgressionPlugin, Experience, XP
+# sources, levels, spend policies, practice/study/teaching); needs `rules`.
+progression = ["dep:npc_progression", "rules"]
+# Opt-in crafting (`npc_crafting`: CraftingPlugin, recipes, Workstation,
+# CraftingOrders, the `Craft` leaf/command); needs `interaction` + `rules`.
+crafting = ["dep:npc_crafting", "interaction", "rules"]
+# Generic presentation helpers (VisualOf, interpolation, panels, selection).
+view-helpers = ["dep:npc_view_helpers"]
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+npc_ai.workspace = true
+npc_kernel.workspace = true
+npc_needs.workspace = true
+npc_jobs.workspace = true
+npc_locomotion = { workspace = true, optional = true }
+npc_nav = { workspace = true, optional = true }
+npc_rules = { workspace = true, optional = true }
+npc_perception = { workspace = true, optional = true }
+npc_agent_io = { workspace = true, optional = true }
+npc_interaction = { workspace = true, optional = true }
+npc_progression = { workspace = true, optional = true }
+npc_crafting = { workspace = true, optional = true }
+npc_vehicles = { workspace = true, optional = true }
+npc_command = { workspace = true, optional = true }
+npc_perf = { workspace = true, optional = true }
+npc_tools = { workspace = true, optional = true }
+npc_view_helpers = { workspace = true, optional = true }
+# The capability glue (`glue`): observation sections, the `Stealthy` component.
+serde.workspace = true
+serde_json = "1"
+
+[dev-dependencies]
+bevy_time.workspace = true
+# The glue tests (`tests/glue.rs`) need every capability on (and `nav` for
+# the blocked-move reports of `tests/glue_agent.rs`).
+npc_framework = { path = ".", default-features = false, features = [
+    "tools", "perf", "locomotion", "nav", "perception", "rules", "agent-io", "interaction",
+    "vehicles",
+    "command",
+    "progression",
+    "crafting",
+] }

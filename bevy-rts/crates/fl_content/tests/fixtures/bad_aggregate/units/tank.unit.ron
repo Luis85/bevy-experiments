@@ -1,0 +1,6 @@
+Unit(
+    id: "g.tank",
+    components: {
+        "Armour": (front: 10),
+    },
+)

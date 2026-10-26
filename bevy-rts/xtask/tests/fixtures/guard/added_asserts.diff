@@ -1,0 +1,7 @@
+diff --git a/crates/fl_sim/tests/movement.rs b/crates/fl_sim/tests/movement.rs
+index 1111111..2222222 100644
+--- a/crates/fl_sim/tests/movement.rs
++++ b/crates/fl_sim/tests/movement.rs
+@@ -12,0 +13,2 @@ fn smoke_truck_moves() {
++    assert!(truck.speed > Fx::ZERO);
++    assert!(path.is_empty(), "path consumed");

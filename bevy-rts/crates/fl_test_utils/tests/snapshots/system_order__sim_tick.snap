@@ -1,0 +1,30 @@
+---
+source: crates/fl_test_utils/tests/system_order.rs
+assertion_line: 17
+expression: system_order(&mut app)
+---
+Input/Housekeeping fl_sim::classify::reset_transients
+Input/Housekeeping fl_sim::nav::flow::begin_flow_tick
+Input/Apply fl_sim::commands::apply_commands
+Input/Sync bevy_ecs::apply_deferred
+Think/Orders fl_sim::orders::advance_orders
+Think/Orders fl_sim::movement::wander_system
+Think/Behaviour fl_sim::path::process_path_queue
+Think/Behaviour fl_sim::steer::compute_steering
+Think/Sync bevy_ecs::apply_deferred
+Act/Move fl_sim::movement::prepare_flow_tiles
+Act/Move fl_sim::movement::move_system
+Act/Move fl_sim::scale::follow_system
+Act/Fire fl_sim::scale::scale_fire
+Act/Sync bevy_ecs::apply_deferred
+Resolve/Projectiles fl_sim::scale::projectile_step
+Resolve/Sync bevy_ecs::apply_deferred
+Economy/Sync bevy_ecs::apply_deferred
+Perceive/Spatial fl_sim::spatial::track_spatial
+Perceive/Vision fl_sim::scale::scale_sense
+Perceive/Sync bevy_ecs::apply_deferred
+Lifecycle/Spawn fl_sim::spawn::spawn_funnel
+Lifecycle/Despawn fl_sim::spawn::despawn_funnel
+Lifecycle/Sync bevy_ecs::apply_deferred
+Publish/Snapshot fl_sim::publish::publish_snapshot
+Publish/Sync bevy_ecs::apply_deferred

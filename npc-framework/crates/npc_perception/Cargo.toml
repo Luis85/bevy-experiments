@@ -1,0 +1,17 @@
+[package]
+name = "npc_perception"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Opt-in perception for the NPC framework: integer vision cones with grid line of sight, hearing (Noise stimuli), proximity, bounded perception memory, a detection-check hook and BT conditions."
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+npc_ai.workspace = true
+npc_kernel.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"

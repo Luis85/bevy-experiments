@@ -1,0 +1,10 @@
+Unit(
+    id: "core_test.tank",
+    name: "Test Tank",
+    tags: ["vehicle", "tracked"],
+    components: {
+        "Selectable": (),
+        "Hull": (hp: 100, footprint: (3.0, 6.0), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 1e12, terrain_factor: 0.5, turn_rate_deg_s: 90.0),
+    },
+)

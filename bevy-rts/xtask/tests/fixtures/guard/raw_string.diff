@@ -1,0 +1,17 @@
+diff --git a/crates/fl_sim/tests/scenario.rs b/crates/fl_sim/tests/scenario.rs
+index 1111111..2222222 100644
+--- a/crates/fl_sim/tests/scenario.rs
++++ b/crates/fl_sim/tests/scenario.rs
+@@ -4,11 +4,10 @@
+     note: "unbalanced ( paren and a \" quote",
+     script: "#[test] fn fake_unit() { assert!(false) }",
+-    count: 2,
++    count: 3,
+ )
+ "##;
+
+ #[test]
+ fn smoke_scenario_loads() {
+     let s = load(SCENARIO);
+-    assert_eq!(s.units.len(), 2);
+ }

@@ -1,0 +1,8 @@
+// guess: values informed by docs/research/blitzkrieg-mechanics.md §1.8, not measured.
+TerrainDef(
+    id: "base.grass",
+    name: "Grass",
+    pass: 0.8,
+    blocks: [],
+    color: (0.33, 0.45, 0.20),
+)

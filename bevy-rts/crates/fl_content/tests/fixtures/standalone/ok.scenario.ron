@@ -1,0 +1,7 @@
+ScenarioDef(
+    id: "agent.ok",
+    map: "a.flat",
+    seed: 7,
+    players: [(faction: "a.red", team: 0, controller: Human), (faction: "a.blue", team: 1, controller: Ai("default"))],
+    units: [(unit: "a.beta", player: 1, pos: (500.0, 500.0), heading_deg: 90.0)],
+)

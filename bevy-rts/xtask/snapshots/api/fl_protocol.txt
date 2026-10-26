@@ -1,0 +1,1103 @@
+pub mod fl_protocol
+pub mod fl_protocol::command
+pub struct fl_protocol::command::CommandKind
+pub fl_protocol::command::CommandKind::payload: alloc::vec::Vec<u8>
+pub fl_protocol::command::CommandKind::type_id: fl_protocol::ids::CommandTypeId
+impl core::clone::Clone for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::command::CommandKind
+impl core::cmp::PartialEq for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for fl_protocol::command::CommandKind
+impl serde_core::ser::Serialize for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::command::PlayerCommand
+pub fl_protocol::command::PlayerCommand::exec_tick: fl_protocol::ids::Tick
+pub fl_protocol::command::PlayerCommand::kind: fl_protocol::command::CommandKind
+pub fl_protocol::command::PlayerCommand::player: fl_protocol::ids::PlayerId
+pub fl_protocol::command::PlayerCommand::queue: bool
+pub fl_protocol::command::PlayerCommand::seq: u32
+pub fl_protocol::command::PlayerCommand::units: alloc::vec::Vec<fl_protocol::ids::SimId>
+impl core::clone::Clone for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::command::PlayerCommand
+impl core::cmp::PartialEq for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for fl_protocol::command::PlayerCommand
+impl serde_core::ser::Serialize for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub trait fl_protocol::command::CommandPayload: serde_core::ser::Serialize + serde_core::de::DeserializeOwned + core::fmt::Debug + core::marker::Send + core::marker::Sync + 'static
+pub const fl_protocol::command::CommandPayload::DEBUG_ONLY: bool
+pub const fl_protocol::command::CommandPayload::NAME: &'static str
+pub const fl_protocol::command::CommandPayload::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugInvulnerableCmd
+pub const fl_protocol::payloads::DebugInvulnerableCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetHpCmd
+pub const fl_protocol::payloads::DebugSetHpCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetHpCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetHpCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetOwnerCmd
+pub const fl_protocol::payloads::DebugSetOwnerCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetTerrainCmd
+pub const fl_protocol::payloads::DebugSetTerrainCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSpawnCmd
+pub const fl_protocol::payloads::DebugSpawnCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSpawnCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSpawnCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugTeleportCmd
+pub const fl_protocol::payloads::DebugTeleportCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugTeleportCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugTeleportCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugWanderCmd
+pub const fl_protocol::payloads::DebugWanderCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugWanderCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugWanderCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::FollowCmd
+pub const fl_protocol::payloads::FollowCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::FollowCmd::NAME: &'static str
+pub const fl_protocol::payloads::FollowCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::MoveCmd
+pub const fl_protocol::payloads::MoveCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::MoveCmd::NAME: &'static str
+pub const fl_protocol::payloads::MoveCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::RotateCmd
+pub const fl_protocol::payloads::RotateCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::RotateCmd::NAME: &'static str
+pub const fl_protocol::payloads::RotateCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::StopCmd
+pub const fl_protocol::payloads::StopCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::StopCmd::NAME: &'static str
+pub const fl_protocol::payloads::StopCmd::NEEDS_UNITS: bool
+pub mod fl_protocol::header
+#[non_exhaustive] pub enum fl_protocol::header::Controller
+pub fl_protocol::header::Controller::Ai(alloc::string::String)
+pub fl_protocol::header::Controller::Human
+pub fl_protocol::header::Controller::None
+impl core::clone::Clone for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::header::Controller
+impl core::cmp::PartialEq for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for fl_protocol::header::Controller
+impl serde_core::ser::Serialize for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_protocol::header::HeaderMismatch
+pub fl_protocol::header::HeaderMismatch::BuildId
+pub fl_protocol::header::HeaderMismatch::CheatsAllowed
+pub fl_protocol::header::HeaderMismatch::Features
+pub fl_protocol::header::HeaderMismatch::FormatVersion
+pub fl_protocol::header::HeaderMismatch::Mods
+pub fl_protocol::header::HeaderMismatch::RulesHash
+pub fl_protocol::header::HeaderMismatch::Seed
+pub fl_protocol::header::HeaderMismatch::SimVersion
+pub fl_protocol::header::HeaderMismatch::StringTables
+impl core::clone::Clone for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::header::HeaderMismatch
+impl core::cmp::PartialEq for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::eq(&self, &Self) -> bool
+impl core::error::Error for fl_protocol::header::HeaderMismatch
+impl core::fmt::Debug for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::header::HeaderMismatch
+impl core::marker::StructuralPartialEq for fl_protocol::header::HeaderMismatch
+impl serde_core::ser::Serialize for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::header::MatchHeader
+pub fl_protocol::header::MatchHeader::build_id: alloc::string::String
+pub fl_protocol::header::MatchHeader::cheats_allowed: bool
+pub fl_protocol::header::MatchHeader::features: alloc::vec::Vec<(alloc::string::String, u32)>
+pub fl_protocol::header::MatchHeader::format_version: u32
+pub fl_protocol::header::MatchHeader::mods: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub fl_protocol::header::MatchHeader::rules_hash: u64
+pub fl_protocol::header::MatchHeader::seed: u64
+pub fl_protocol::header::MatchHeader::sim_version: u32
+pub fl_protocol::header::MatchHeader::string_tables: fl_protocol::tables::StringTables
+impl fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::check_handshake(&self, &fl_protocol::header::MatchHeader) -> core::result::Result<(), fl_protocol::header::HeaderMismatch>
+pub fn fl_protocol::header::MatchHeader::check_replay(&self, &fl_protocol::header::MatchHeader) -> core::result::Result<alloc::vec::Vec<alloc::string::String>, fl_protocol::header::HeaderMismatch>
+pub fn fl_protocol::header::MatchHeader::check_save(&self, &fl_protocol::header::MatchHeader) -> core::result::Result<(), fl_protocol::header::HeaderMismatch>
+impl core::clone::Clone for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::header::MatchHeader
+impl core::cmp::PartialEq for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::header::MatchHeader
+impl serde_core::ser::Serialize for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub const fl_protocol::header::FORMAT_VERSION: u32
+pub mod fl_protocol::ids
+pub struct fl_protocol::ids::CommandTypeId(pub u16)
+impl core::clone::Clone for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::CommandTypeId
+impl core::cmp::Ord for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::CommandTypeId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::CommandTypeId
+impl serde_core::ser::Serialize for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::ids::FactionId(pub u16)
+impl core::clone::Clone for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::FactionId
+impl core::cmp::Ord for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::FactionId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::FactionId
+impl serde_core::ser::Serialize for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::ids::PlayerId(pub u8)
+impl core::clone::Clone for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::PlayerId
+impl core::cmp::Ord for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::PlayerId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::PlayerId
+impl serde_core::ser::Serialize for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::ids::SimId(pub u32)
+impl core::clone::Clone for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::SimId
+impl core::cmp::Ord for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::SimId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::SimId
+impl serde_core::ser::Serialize for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::ids::TeamId(pub u8)
+impl core::clone::Clone for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::TeamId
+impl core::cmp::Ord for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::TeamId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::TeamId
+impl serde_core::ser::Serialize for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::ids::Tick(pub u32)
+impl fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::next(self) -> fl_protocol::ids::Tick
+impl core::clone::Clone for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::Tick
+impl core::cmp::Ord for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::Tick
+impl core::marker::StructuralPartialEq for fl_protocol::ids::Tick
+impl serde_core::ser::Serialize for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::ids::UnitTypeId(pub u16)
+impl core::clone::Clone for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::UnitTypeId
+impl core::cmp::Ord for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::UnitTypeId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::UnitTypeId
+impl serde_core::ser::Serialize for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub const fl_protocol::ids::SIM_TICK_HZ: u32
+pub mod fl_protocol::payloads
+pub struct fl_protocol::payloads::DebugInvulnerableCmd
+pub fl_protocol::payloads::DebugInvulnerableCmd::on: bool
+impl core::clone::Clone for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugInvulnerableCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugInvulnerableCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugInvulnerableCmd
+pub const fl_protocol::payloads::DebugInvulnerableCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::DebugSetHpCmd
+pub fl_protocol::payloads::DebugSetHpCmd::hp: u32
+impl core::clone::Clone for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSetHpCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSetHpCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetHpCmd
+pub const fl_protocol::payloads::DebugSetHpCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetHpCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetHpCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::DebugSetOwnerCmd
+pub fl_protocol::payloads::DebugSetOwnerCmd::owner: fl_protocol::ids::PlayerId
+impl core::clone::Clone for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSetOwnerCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSetOwnerCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetOwnerCmd
+pub const fl_protocol::payloads::DebugSetOwnerCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::DebugSetTerrainCmd
+pub fl_protocol::payloads::DebugSetTerrainCmd::max_cell: (u32, u32)
+pub fl_protocol::payloads::DebugSetTerrainCmd::min_cell: (u32, u32)
+pub fl_protocol::payloads::DebugSetTerrainCmd::terrain: alloc::string::String
+impl core::clone::Clone for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSetTerrainCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSetTerrainCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetTerrainCmd
+pub const fl_protocol::payloads::DebugSetTerrainCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::DebugSpawnCmd
+pub fl_protocol::payloads::DebugSpawnCmd::heading: fl_math::angle::Angle
+pub fl_protocol::payloads::DebugSpawnCmd::owner: fl_protocol::ids::PlayerId
+pub fl_protocol::payloads::DebugSpawnCmd::pos: fl_math::vec::FxVec2
+pub fl_protocol::payloads::DebugSpawnCmd::unit: alloc::string::String
+impl core::clone::Clone for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSpawnCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSpawnCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSpawnCmd
+pub const fl_protocol::payloads::DebugSpawnCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSpawnCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSpawnCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::DebugTeleportCmd
+pub fl_protocol::payloads::DebugTeleportCmd::pos: fl_math::vec::FxVec2
+impl core::clone::Clone for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugTeleportCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugTeleportCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugTeleportCmd
+pub const fl_protocol::payloads::DebugTeleportCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugTeleportCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugTeleportCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::DebugWanderCmd
+pub fl_protocol::payloads::DebugWanderCmd::radius: fl_math::fx::Fx
+impl core::clone::Clone for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugWanderCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugWanderCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugWanderCmd
+pub const fl_protocol::payloads::DebugWanderCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugWanderCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugWanderCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::FollowCmd
+pub fl_protocol::payloads::FollowCmd::leader: fl_protocol::ids::SimId
+impl core::clone::Clone for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::FollowCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::FollowCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::FollowCmd
+pub const fl_protocol::payloads::FollowCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::FollowCmd::NAME: &'static str
+pub const fl_protocol::payloads::FollowCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::MoveCmd
+pub fl_protocol::payloads::MoveCmd::target: fl_math::vec::FxVec2
+impl core::clone::Clone for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::MoveCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::MoveCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::MoveCmd
+pub const fl_protocol::payloads::MoveCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::MoveCmd::NAME: &'static str
+pub const fl_protocol::payloads::MoveCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::RotateCmd
+pub fl_protocol::payloads::RotateCmd::toward: fl_math::vec::FxVec2
+impl core::clone::Clone for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::RotateCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::RotateCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::RotateCmd
+pub const fl_protocol::payloads::RotateCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::RotateCmd::NAME: &'static str
+pub const fl_protocol::payloads::RotateCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::payloads::StopCmd
+impl core::clone::Clone for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::StopCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::StopCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::StopCmd
+pub const fl_protocol::payloads::StopCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::StopCmd::NAME: &'static str
+pub const fl_protocol::payloads::StopCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub mod fl_protocol::tables
+pub struct fl_protocol::tables::StringTables
+pub fl_protocol::tables::StringTables::tables: alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::vec::Vec<alloc::string::String>>
+impl fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::get(&self, &str) -> core::option::Option<&[alloc::string::String]>
+pub fn fl_protocol::tables::StringTables::id_of(&self, &str, &str) -> core::option::Option<u32>
+pub fn fl_protocol::tables::StringTables::insert(&mut self, &str, alloc::vec::Vec<alloc::string::String>)
+pub fn fl_protocol::tables::StringTables::remap(&self, &str, &fl_protocol::tables::StringTables) -> alloc::vec::Vec<core::option::Option<u32>>
+impl core::clone::Clone for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::tables::StringTables
+impl core::cmp::PartialEq for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::eq(&self, &Self) -> bool
+impl core::default::Default for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::default() -> Self
+impl core::fmt::Debug for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::tables::StringTables
+impl serde_core::ser::Serialize for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub const fl_protocol::tables::COMMANDS: &str
+pub const fl_protocol::tables::CONTENT_KINDS: &str
+pub const fl_protocol::tables::DEF_COMPONENTS: &str
+pub const fl_protocol::tables::JOURNAL_RECORDS: &str
+pub const fl_protocol::tables::OBJECT_KINDS: &str
+pub const fl_protocol::tables::RNG_STREAMS: &str
+pub const fl_protocol::tables::RULES_SECTIONS: &str
+pub const fl_protocol::tables::SIM_COMPONENTS: &str
+pub const fl_protocol::tables::SIM_RESOURCES: &str
+pub const fl_protocol::tables::UNITS: &str
+pub const fl_protocol::tables::VIEW_CHANNELS: &str
+#[non_exhaustive] pub enum fl_protocol::Controller
+pub fl_protocol::Controller::Ai(alloc::string::String)
+pub fl_protocol::Controller::Human
+pub fl_protocol::Controller::None
+impl core::clone::Clone for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::header::Controller
+impl core::cmp::PartialEq for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for fl_protocol::header::Controller
+impl serde_core::ser::Serialize for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::header::Controller
+pub fn fl_protocol::header::Controller::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_protocol::HeaderMismatch
+pub fl_protocol::HeaderMismatch::BuildId
+pub fl_protocol::HeaderMismatch::CheatsAllowed
+pub fl_protocol::HeaderMismatch::Features
+pub fl_protocol::HeaderMismatch::FormatVersion
+pub fl_protocol::HeaderMismatch::Mods
+pub fl_protocol::HeaderMismatch::RulesHash
+pub fl_protocol::HeaderMismatch::Seed
+pub fl_protocol::HeaderMismatch::SimVersion
+pub fl_protocol::HeaderMismatch::StringTables
+impl core::clone::Clone for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::header::HeaderMismatch
+impl core::cmp::PartialEq for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::eq(&self, &Self) -> bool
+impl core::error::Error for fl_protocol::header::HeaderMismatch
+impl core::fmt::Debug for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::header::HeaderMismatch
+impl core::marker::StructuralPartialEq for fl_protocol::header::HeaderMismatch
+impl serde_core::ser::Serialize for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::header::HeaderMismatch
+pub fn fl_protocol::header::HeaderMismatch::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::CommandKind
+pub fl_protocol::CommandKind::payload: alloc::vec::Vec<u8>
+pub fl_protocol::CommandKind::type_id: fl_protocol::ids::CommandTypeId
+impl core::clone::Clone for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::command::CommandKind
+impl core::cmp::PartialEq for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for fl_protocol::command::CommandKind
+impl serde_core::ser::Serialize for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::command::CommandKind
+pub fn fl_protocol::command::CommandKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::CommandTypeId(pub u16)
+impl core::clone::Clone for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::CommandTypeId
+impl core::cmp::Ord for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::CommandTypeId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::CommandTypeId
+impl serde_core::ser::Serialize for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::CommandTypeId
+pub fn fl_protocol::ids::CommandTypeId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::DebugInvulnerableCmd
+pub fl_protocol::DebugInvulnerableCmd::on: bool
+impl core::clone::Clone for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugInvulnerableCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugInvulnerableCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugInvulnerableCmd
+pub const fl_protocol::payloads::DebugInvulnerableCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugInvulnerableCmd
+pub fn fl_protocol::payloads::DebugInvulnerableCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::DebugSetHpCmd
+pub fl_protocol::DebugSetHpCmd::hp: u32
+impl core::clone::Clone for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSetHpCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSetHpCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetHpCmd
+pub const fl_protocol::payloads::DebugSetHpCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetHpCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetHpCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSetHpCmd
+pub fn fl_protocol::payloads::DebugSetHpCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::DebugSetOwnerCmd
+pub fl_protocol::DebugSetOwnerCmd::owner: fl_protocol::ids::PlayerId
+impl core::clone::Clone for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSetOwnerCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSetOwnerCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetOwnerCmd
+pub const fl_protocol::payloads::DebugSetOwnerCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSetOwnerCmd
+pub fn fl_protocol::payloads::DebugSetOwnerCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::DebugSetTerrainCmd
+pub fl_protocol::DebugSetTerrainCmd::max_cell: (u32, u32)
+pub fl_protocol::DebugSetTerrainCmd::min_cell: (u32, u32)
+pub fl_protocol::DebugSetTerrainCmd::terrain: alloc::string::String
+impl core::clone::Clone for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSetTerrainCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSetTerrainCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetTerrainCmd
+pub const fl_protocol::payloads::DebugSetTerrainCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSetTerrainCmd
+pub fn fl_protocol::payloads::DebugSetTerrainCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::DebugSpawnCmd
+pub fl_protocol::DebugSpawnCmd::heading: fl_math::angle::Angle
+pub fl_protocol::DebugSpawnCmd::owner: fl_protocol::ids::PlayerId
+pub fl_protocol::DebugSpawnCmd::pos: fl_math::vec::FxVec2
+pub fl_protocol::DebugSpawnCmd::unit: alloc::string::String
+impl core::clone::Clone for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugSpawnCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugSpawnCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSpawnCmd
+pub const fl_protocol::payloads::DebugSpawnCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSpawnCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSpawnCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugSpawnCmd
+pub fn fl_protocol::payloads::DebugSpawnCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::DebugTeleportCmd
+pub fl_protocol::DebugTeleportCmd::pos: fl_math::vec::FxVec2
+impl core::clone::Clone for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugTeleportCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugTeleportCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugTeleportCmd
+pub const fl_protocol::payloads::DebugTeleportCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugTeleportCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugTeleportCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugTeleportCmd
+pub fn fl_protocol::payloads::DebugTeleportCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::DebugWanderCmd
+pub fl_protocol::DebugWanderCmd::radius: fl_math::fx::Fx
+impl core::clone::Clone for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::DebugWanderCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::DebugWanderCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugWanderCmd
+pub const fl_protocol::payloads::DebugWanderCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugWanderCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugWanderCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::DebugWanderCmd
+pub fn fl_protocol::payloads::DebugWanderCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::FactionId(pub u16)
+impl core::clone::Clone for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::FactionId
+impl core::cmp::Ord for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::FactionId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::FactionId
+impl serde_core::ser::Serialize for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::FactionId
+pub fn fl_protocol::ids::FactionId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::FollowCmd
+pub fl_protocol::FollowCmd::leader: fl_protocol::ids::SimId
+impl core::clone::Clone for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::FollowCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::FollowCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::FollowCmd
+pub const fl_protocol::payloads::FollowCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::FollowCmd::NAME: &'static str
+pub const fl_protocol::payloads::FollowCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::FollowCmd
+pub fn fl_protocol::payloads::FollowCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::MatchHeader
+pub fl_protocol::MatchHeader::build_id: alloc::string::String
+pub fl_protocol::MatchHeader::cheats_allowed: bool
+pub fl_protocol::MatchHeader::features: alloc::vec::Vec<(alloc::string::String, u32)>
+pub fl_protocol::MatchHeader::format_version: u32
+pub fl_protocol::MatchHeader::mods: alloc::vec::Vec<(alloc::string::String, alloc::string::String)>
+pub fl_protocol::MatchHeader::rules_hash: u64
+pub fl_protocol::MatchHeader::seed: u64
+pub fl_protocol::MatchHeader::sim_version: u32
+pub fl_protocol::MatchHeader::string_tables: fl_protocol::tables::StringTables
+impl fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::check_handshake(&self, &fl_protocol::header::MatchHeader) -> core::result::Result<(), fl_protocol::header::HeaderMismatch>
+pub fn fl_protocol::header::MatchHeader::check_replay(&self, &fl_protocol::header::MatchHeader) -> core::result::Result<alloc::vec::Vec<alloc::string::String>, fl_protocol::header::HeaderMismatch>
+pub fn fl_protocol::header::MatchHeader::check_save(&self, &fl_protocol::header::MatchHeader) -> core::result::Result<(), fl_protocol::header::HeaderMismatch>
+impl core::clone::Clone for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::header::MatchHeader
+impl core::cmp::PartialEq for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::header::MatchHeader
+impl serde_core::ser::Serialize for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::header::MatchHeader
+pub fn fl_protocol::header::MatchHeader::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::MoveCmd
+pub fl_protocol::MoveCmd::target: fl_math::vec::FxVec2
+impl core::clone::Clone for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::MoveCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::MoveCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::MoveCmd
+pub const fl_protocol::payloads::MoveCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::MoveCmd::NAME: &'static str
+pub const fl_protocol::payloads::MoveCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::MoveCmd
+pub fn fl_protocol::payloads::MoveCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::PlayerCommand
+pub fl_protocol::PlayerCommand::exec_tick: fl_protocol::ids::Tick
+pub fl_protocol::PlayerCommand::kind: fl_protocol::command::CommandKind
+pub fl_protocol::PlayerCommand::player: fl_protocol::ids::PlayerId
+pub fl_protocol::PlayerCommand::queue: bool
+pub fl_protocol::PlayerCommand::seq: u32
+pub fl_protocol::PlayerCommand::units: alloc::vec::Vec<fl_protocol::ids::SimId>
+impl core::clone::Clone for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::command::PlayerCommand
+impl core::cmp::PartialEq for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for fl_protocol::command::PlayerCommand
+impl serde_core::ser::Serialize for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::command::PlayerCommand
+pub fn fl_protocol::command::PlayerCommand::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::PlayerId(pub u8)
+impl core::clone::Clone for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::PlayerId
+impl core::cmp::Ord for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::PlayerId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::PlayerId
+impl serde_core::ser::Serialize for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::RotateCmd
+pub fl_protocol::RotateCmd::toward: fl_math::vec::FxVec2
+impl core::clone::Clone for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::RotateCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::RotateCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::RotateCmd
+pub const fl_protocol::payloads::RotateCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::RotateCmd::NAME: &'static str
+pub const fl_protocol::payloads::RotateCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::RotateCmd
+pub fn fl_protocol::payloads::RotateCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::SimId(pub u32)
+impl core::clone::Clone for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::SimId
+impl core::cmp::Ord for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::SimId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::SimId
+impl serde_core::ser::Serialize for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::StopCmd
+impl core::clone::Clone for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::payloads::StopCmd
+impl core::cmp::PartialEq for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::payloads::StopCmd
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::StopCmd
+pub const fl_protocol::payloads::StopCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::StopCmd::NAME: &'static str
+pub const fl_protocol::payloads::StopCmd::NEEDS_UNITS: bool
+impl serde_core::ser::Serialize for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::payloads::StopCmd
+pub fn fl_protocol::payloads::StopCmd::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::StringTables
+pub fl_protocol::StringTables::tables: alloc::collections::btree::map::BTreeMap<alloc::string::String, alloc::vec::Vec<alloc::string::String>>
+impl fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::get(&self, &str) -> core::option::Option<&[alloc::string::String]>
+pub fn fl_protocol::tables::StringTables::id_of(&self, &str, &str) -> core::option::Option<u32>
+pub fn fl_protocol::tables::StringTables::insert(&mut self, &str, alloc::vec::Vec<alloc::string::String>)
+pub fn fl_protocol::tables::StringTables::remap(&self, &str, &fl_protocol::tables::StringTables) -> alloc::vec::Vec<core::option::Option<u32>>
+impl core::clone::Clone for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::tables::StringTables
+impl core::cmp::PartialEq for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::eq(&self, &Self) -> bool
+impl core::default::Default for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::default() -> Self
+impl core::fmt::Debug for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_protocol::tables::StringTables
+impl serde_core::ser::Serialize for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::tables::StringTables
+pub fn fl_protocol::tables::StringTables::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::TeamId(pub u8)
+impl core::clone::Clone for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::TeamId
+impl core::cmp::Ord for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::TeamId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::TeamId
+impl serde_core::ser::Serialize for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::TeamId
+pub fn fl_protocol::ids::TeamId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::Tick(pub u32)
+impl fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::next(self) -> fl_protocol::ids::Tick
+impl core::clone::Clone for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::Tick
+impl core::cmp::Ord for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::Tick
+impl core::marker::StructuralPartialEq for fl_protocol::ids::Tick
+impl serde_core::ser::Serialize for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_protocol::UnitTypeId(pub u16)
+impl core::clone::Clone for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::clone(&self) -> Self
+impl core::cmp::Eq for fl_protocol::ids::UnitTypeId
+impl core::cmp::Ord for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::default() -> Self
+impl core::fmt::Debug for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_protocol::ids::UnitTypeId
+impl core::marker::StructuralPartialEq for fl_protocol::ids::UnitTypeId
+impl serde_core::ser::Serialize for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub const fl_protocol::FORMAT_VERSION: u32
+pub const fl_protocol::SIM_TICK_HZ: u32
+pub trait fl_protocol::CommandPayload: serde_core::ser::Serialize + serde_core::de::DeserializeOwned + core::fmt::Debug + core::marker::Send + core::marker::Sync + 'static
+pub const fl_protocol::CommandPayload::DEBUG_ONLY: bool
+pub const fl_protocol::CommandPayload::NAME: &'static str
+pub const fl_protocol::CommandPayload::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugInvulnerableCmd
+pub const fl_protocol::payloads::DebugInvulnerableCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugInvulnerableCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetHpCmd
+pub const fl_protocol::payloads::DebugSetHpCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetHpCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetHpCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetOwnerCmd
+pub const fl_protocol::payloads::DebugSetOwnerCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetOwnerCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSetTerrainCmd
+pub const fl_protocol::payloads::DebugSetTerrainCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSetTerrainCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugSpawnCmd
+pub const fl_protocol::payloads::DebugSpawnCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugSpawnCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugSpawnCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugTeleportCmd
+pub const fl_protocol::payloads::DebugTeleportCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugTeleportCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugTeleportCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::DebugWanderCmd
+pub const fl_protocol::payloads::DebugWanderCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::DebugWanderCmd::NAME: &'static str
+pub const fl_protocol::payloads::DebugWanderCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::FollowCmd
+pub const fl_protocol::payloads::FollowCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::FollowCmd::NAME: &'static str
+pub const fl_protocol::payloads::FollowCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::MoveCmd
+pub const fl_protocol::payloads::MoveCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::MoveCmd::NAME: &'static str
+pub const fl_protocol::payloads::MoveCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::RotateCmd
+pub const fl_protocol::payloads::RotateCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::RotateCmd::NAME: &'static str
+pub const fl_protocol::payloads::RotateCmd::NEEDS_UNITS: bool
+impl fl_protocol::command::CommandPayload for fl_protocol::payloads::StopCmd
+pub const fl_protocol::payloads::StopCmd::DEBUG_ONLY: bool
+pub const fl_protocol::payloads::StopCmd::NAME: &'static str
+pub const fl_protocol::payloads::StopCmd::NEEDS_UNITS: bool

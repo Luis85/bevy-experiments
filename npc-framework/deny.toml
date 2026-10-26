@@ -1,0 +1,100 @@
+# cargo-deny 0.20 configuration (plan Task P1; hardening spec §2.6).
+# Run: `cargo deny check` (part of `cargo xtask verify`, skipped by --quick).
+# Never edit this file to make a check pass; ask for approval first.
+
+[graph]
+# Worst case: every optional dependency (tracy, chrome-trace, debug-tools...).
+all-features = true
+
+[advisories]
+# RustSec advisory database (fetched into $CARGO_HOME/advisory-dbs).
+# Vulnerabilities and unsound advisories are errors; unmaintained crates are
+# reported for direct dependencies of workspace crates only.
+unmaintained = "workspace"
+# No advisory is ignored. RUSTSEC-2026-0344 (ruzstd 0.8.3, pinned by
+# bevy_image 0.20's `zstd_rust`) is avoided rather than ignored: the windowed
+# apps use Bevy's `zstd_c` backend instead (plan Task C2, user decision), so
+# ruzstd is not in the graph (`cargo tree -i ruzstd --workspace` finds none).
+ignore = [
+    # zstd 0.13.3 (via bevy_image 0.20's `zstd_c`): an abandoned stream's data
+    # can leak into the next stream on a *reused* context (`with_context`
+    # constructors). Bevy only calls `zstd::decode_all`, which builds a fresh
+    # `Decoder::new` per call, so the flaw is not reachable here. The fix
+    # (zstd >= 0.14.3) is not semver-compatible with Bevy 0.20, and the other
+    # backend (ruzstd) has RUSTSEC-2026-0344. Ignored by the dev's decision
+    # (2026-10-26); drop this entry when Bevy moves to zstd 0.14.
+    { id = "RUSTSEC-2026-0391", reason = "unreachable in Bevy 0.20 (decode_all, no reused context); fix needs zstd 0.14" },
+    # zstd-safe 7.3.0 (zstd 0.13's backend; the fix, zstd-safe >= 8.2, needs
+    # zstd 0.14). `Seekable::decompress` is behind zstd-safe's `seekable`
+    # feature, which nothing here enables.
+    { id = "RUSTSEC-2026-0398", reason = "seekable feature not enabled; fix needs zstd-safe 8.2 / zstd 0.14" },
+    # A failed streaming decompression of a *legacy*-format frame can expose
+    # uninitialised memory. zstd's default `legacy` feature is on through
+    # bevy_image, but Bevy only decodes the bundled tonemapping/SMAA LUTs
+    # (current-format frames from trusted, embedded files).
+    { id = "RUSTSEC-2026-0403", reason = "only trusted embedded current-format frames are decoded; fix needs zstd-safe 8.2 / zstd 0.14" },
+]
+
+[licenses]
+# Permissive licenses only (hardening spec §2.6). An `OR` expression passes
+# when any branch is allowed.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Zlib",
+    "ISC",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "MPL-2.0",
+]
+confidence-threshold = 0.8
+# Single crates under other permissive licenses, allowed one by one so a new
+# crate under them still needs a decision.
+exceptions = [
+    # MIT No Attribution (MIT without the notice requirement); wgpu's encase.
+    { crate = "encase", allow = ["MIT-0"] },
+    { crate = "encase_derive", allow = ["MIT-0"] },
+    { crate = "encase_derive_impl", allow = ["MIT-0"] },
+]
+
+[licenses.private]
+# Workspace crates are not published (and carry MIT OR Apache-2.0 anyway).
+ignore = true
+
+[bans]
+# Bevy pulls many duplicate versions; report, do not fail.
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+# Crate-boundary rules mirrored from xtask/tests/arch_fitness.rs. A `deny`
+# entry with `wrappers` lets only the listed crates depend on it *directly*;
+# arch_fitness checks the transitive closure. Keep both in sync.
+deny = [
+    # The umbrella crate (pulls the renderer): only presentation crates, the
+    # BRP feature of npc_tools, and apps. (P3 split: npc_view became
+    # npc_view_helpers + village_view, npc_remote became npc_tools' `remote`.)
+    { crate = "bevy", wrappers = ["npc_view_helpers", "village_view", "npc_tools", "village", "testbed_view", "actor_testbed", "rts_units_demo", "game_menu"], reason = "core crates name the bevy_* sub-crates they need; no renderer in npc_ai/npc_kernel/npc_needs/npc_jobs/npc_perf/village_content/npcctl (npc_tools only behind `remote`, checked by arch_fitness)" },
+    { crate = "bevy_internal", wrappers = ["bevy"], reason = "only via the bevy umbrella" },
+    # Presentation: never from core sim crates or npcctl.
+    { crate = "npc_view_helpers", wrappers = ["npc_framework", "village_view", "village"], reason = "presentation only, behind the facade's `view-helpers` feature; core crates and npcctl must not depend on it" },
+    { crate = "village_view", wrappers = ["village"], reason = "the village's presentation is app-level" },
+    { crate = "testbed_view", wrappers = ["actor_testbed"], reason = "the Actor Testbed's presentation is app-level" },
+    # Rendering: only Bevy's own crates may depend on these directly, so a
+    # workspace crate cannot add them. The wrapper lists are the Bevy 0.20
+    # crates that use them; extend them on a Bevy upgrade.
+    { crate = "bevy_render", wrappers = [
+        "bevy_anti_alias", "bevy_core_pipeline", "bevy_dev_tools",
+        "bevy_gizmos_render", "bevy_internal", "bevy_pbr", "bevy_post_process",
+        "bevy_remote", "bevy_sprite_render", "bevy_ui_render",
+    ], reason = "rendering never in core crates (hardening spec §2.6)" },
+    { crate = "bevy_pbr", wrappers = ["bevy_dev_tools", "bevy_gizmos_render", "bevy_internal"], reason = "rendering never in core crates (hardening spec §2.6)" },
+    { crate = "wgpu", wrappers = ["bevy_render"], reason = "rendering never in core crates (hardening spec §2.6)" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

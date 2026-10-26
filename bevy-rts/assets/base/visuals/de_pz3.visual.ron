@@ -1,0 +1,1 @@
+VisualDef(unit: "base.de.pz3", placeholder: Tank(hull: (2.9, 1.0, 5.6), turret: (1.7, 0.7, 1.9), barrel_len: 2.2), scale: 1.0, recolor: true)

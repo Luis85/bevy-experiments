@@ -1,0 +1,4 @@
+[alias]
+# `cargo xtask verify [--quick] [--pretty]`: the single verify entry point
+# (see xtask/src/main.rs). Prints one JSON verdict on stdout.
+xtask = "run -p xtask --"

@@ -1,0 +1,14 @@
+ScenarioDef(
+    id: "a.duel",
+    map: "a.flat",
+    seed: 42,
+    players: [
+        (faction: "a.red", team: 0, controller: Human),
+        (faction: "a.blue", team: 1, controller: Ai("default")),
+        (faction: "a.blue", team: 1, controller: None),
+    ],
+    units: [
+        (unit: "a.alpha", player: 0, pos: (100.0, 100.0), heading_deg: 45.0),
+        (unit: "a.beta", player: 1, pos: (900.0, 900.0), heading_deg: 225.0),
+    ],
+)

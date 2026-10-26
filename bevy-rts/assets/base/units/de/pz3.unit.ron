@@ -1,0 +1,9 @@
+Unit(
+    id: "base.de.pz3",
+    inherits: Some("base.abstract.medium_tank"),
+    name: "Panzer III",
+    components: {
+        "Hull": (hp: 110, footprint: (2.9, 5.6), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 40.0, terrain_factor: 0.55, turn_rate_deg_s: 80.0),
+    },
+)

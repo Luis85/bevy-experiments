@@ -1,0 +1,18 @@
+name: Rust workspace
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev libx11-dev libxkbcommon-dev libvulkan-dev
+      - name: Verify
+        run: ./scripts/verify.sh

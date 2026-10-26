@@ -1,0 +1,128 @@
+# cargo-deny policy (spec §12.2, ADR-0009). `cargo xtask gate pr` runs `cargo deny check`.
+
+[graph]
+all-features = false
+
+[advisories]
+# The default RustSec advisory database. Every ignore names its upstream path and when to revisit it.
+ignore = [
+    { id = "RUSTSEC-2026-0344", reason = "ruzstd 0.8 (decompression bomb) decodes KTX2 in bevy_image: only Bevy's embedded, trusted LUT KTX2 files are decoded; no untrusted KTX2 is loaded (M0 uses primitives). No fixed version is semver-compatible with bevy 0.20 / bevy_egui 0.43. Revisit on the next bevy upgrade (ruling R29)." },
+    { id = "RUSTSEC-2026-0192", reason = "ttf-parser (unmaintained) comes only through winit's sctk-adwaita window decorations on Linux; no replacement upstream yet. Revisit on the next bevy upgrade." },
+]
+
+[licenses]
+# Permissive licences only: never NC, ND, SA or the GPL family.
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Zlib",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "MPL-2.0",
+    "MIT-0",
+    "BSL-1.0",
+]
+confidence-threshold = 0.8
+# MPL-2.0 is pre-approved but not in the tree yet.
+unused-allowed-license = "allow"
+# Font licences for the egui default fonts only (OFL is a font licence, not a code copyleft).
+exceptions = [
+    { crate = "epaint_default_fonts", allow = ["OFL-1.1", "Ubuntu-font-1.0"] },
+]
+
+[licenses.private]
+# Workspace crates are not published.
+ignore = true
+
+[bans]
+multiple-versions = "allow"
+wildcards = "allow"
+deny = [
+    { crate = "bincode", reason = "postcard is the only binary format (spec §5.5)" },
+    { crate = "bevy_dynamic_plugin", reason = "no dynamic plugins (spec §3)" },
+    # Multiple versions of any Bevy crate fail: one entry per bevy* crate in Cargo.lock.
+    { crate = "bevy", deny-multiple-versions = true },
+    { crate = "bevy_a11y", deny-multiple-versions = true },
+    { crate = "bevy_android", deny-multiple-versions = true },
+    { crate = "bevy_animation", deny-multiple-versions = true },
+    { crate = "bevy_animation_macros", deny-multiple-versions = true },
+    { crate = "bevy_anti_alias", deny-multiple-versions = true },
+    { crate = "bevy_app", deny-multiple-versions = true },
+    { crate = "bevy_asset", deny-multiple-versions = true },
+    { crate = "bevy_asset_macros", deny-multiple-versions = true },
+    { crate = "bevy_audio", deny-multiple-versions = true },
+    { crate = "bevy_brp_extras", deny-multiple-versions = true },
+    { crate = "bevy_camera", deny-multiple-versions = true },
+    { crate = "bevy_clipboard", deny-multiple-versions = true },
+    { crate = "bevy_color", deny-multiple-versions = true },
+    { crate = "bevy_core_pipeline", deny-multiple-versions = true },
+    { crate = "bevy_curve", deny-multiple-versions = true },
+    { crate = "bevy_derive", deny-multiple-versions = true },
+    { crate = "bevy_dev_tools", deny-multiple-versions = true },
+    { crate = "bevy_diagnostic", deny-multiple-versions = true },
+    { crate = "bevy_dylib", deny-multiple-versions = true },
+    { crate = "bevy_ecs", deny-multiple-versions = true },
+    { crate = "bevy_ecs_macro_logic", deny-multiple-versions = true },
+    { crate = "bevy_ecs_macros", deny-multiple-versions = true },
+    { crate = "bevy_egui", deny-multiple-versions = true },
+    { crate = "bevy_encase_derive", deny-multiple-versions = true },
+    { crate = "bevy_extract", deny-multiple-versions = true },
+    { crate = "bevy_extract_macros", deny-multiple-versions = true },
+    { crate = "bevy_feathers", deny-multiple-versions = true },
+    { crate = "bevy_gilrs", deny-multiple-versions = true },
+    { crate = "bevy_gizmos", deny-multiple-versions = true },
+    { crate = "bevy_gizmos_macros", deny-multiple-versions = true },
+    { crate = "bevy_gizmos_render", deny-multiple-versions = true },
+    { crate = "bevy_gltf", deny-multiple-versions = true },
+    { crate = "bevy_image", deny-multiple-versions = true },
+    { crate = "bevy_input", deny-multiple-versions = true },
+    { crate = "bevy_input_focus", deny-multiple-versions = true },
+    { crate = "bevy_internal", deny-multiple-versions = true },
+    { crate = "bevy_light", deny-multiple-versions = true },
+    { crate = "bevy_log", deny-multiple-versions = true },
+    { crate = "bevy_macro_utils", deny-multiple-versions = true },
+    { crate = "bevy_material", deny-multiple-versions = true },
+    { crate = "bevy_material_macros", deny-multiple-versions = true },
+    { crate = "bevy_math", deny-multiple-versions = true },
+    { crate = "bevy_mesh", deny-multiple-versions = true },
+    { crate = "bevy_mikktspace", deny-multiple-versions = true },
+    { crate = "bevy_pbr", deny-multiple-versions = true },
+    { crate = "bevy_picking", deny-multiple-versions = true },
+    { crate = "bevy_platform", deny-multiple-versions = true },
+    { crate = "bevy_post_process", deny-multiple-versions = true },
+    { crate = "bevy_ptr", deny-multiple-versions = true },
+    { crate = "bevy_reflect", deny-multiple-versions = true },
+    { crate = "bevy_reflect_derive", deny-multiple-versions = true },
+    { crate = "bevy_remote", deny-multiple-versions = true },
+    { crate = "bevy_render", deny-multiple-versions = true },
+    { crate = "bevy_render_macros", deny-multiple-versions = true },
+    { crate = "bevy_scene", deny-multiple-versions = true },
+    { crate = "bevy_scene_macros", deny-multiple-versions = true },
+    { crate = "bevy_shader", deny-multiple-versions = true },
+    { crate = "bevy_shape", deny-multiple-versions = true },
+    { crate = "bevy_sprite", deny-multiple-versions = true },
+    { crate = "bevy_sprite_render", deny-multiple-versions = true },
+    { crate = "bevy_state", deny-multiple-versions = true },
+    { crate = "bevy_state_macros", deny-multiple-versions = true },
+    { crate = "bevy_tasks", deny-multiple-versions = true },
+    { crate = "bevy_text", deny-multiple-versions = true },
+    { crate = "bevy_time", deny-multiple-versions = true },
+    { crate = "bevy_transform", deny-multiple-versions = true },
+    { crate = "bevy_ui", deny-multiple-versions = true },
+    { crate = "bevy_ui_render", deny-multiple-versions = true },
+    { crate = "bevy_ui_widgets", deny-multiple-versions = true },
+    { crate = "bevy_utils", deny-multiple-versions = true },
+    { crate = "bevy_window", deny-multiple-versions = true },
+    { crate = "bevy_winit", deny-multiple-versions = true },
+    { crate = "bevy_world_serialization", deny-multiple-versions = true },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

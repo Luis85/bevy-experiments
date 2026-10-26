@@ -1,0 +1,17 @@
+---
+source: crates/fl_view/tests/formats.rs
+assertion_line: 54
+expression: text
+---
+VIEW_FORMAT_VERSION = 1
+CommandKind: Struct([Named { name: "type_id", value: TypeName("CommandTypeId") }, Named { name: "payload", value: Seq(U8) }])
+CommandTypeId: NewTypeStruct(U16)
+EntityRecord: Struct([Named { name: "sim_id", value: TypeName("SimId") }, Named { name: "unit", value: TypeName("UnitTypeId") }, Named { name: "owner", value: TypeName("PlayerId") }, Named { name: "pos", value: TupleArray { content: I64, size: 2 } }, Named { name: "heading", value: U16 }, Named { name: "turrets", value: Seq(U16) }, Named { name: "hp_frac", value: U16 }, Named { name: "flags", value: U32 }, Named { name: "visible_to", value: U8 }])
+PlayerCommand: Struct([Named { name: "exec_tick", value: TypeName("Tick") }, Named { name: "player", value: TypeName("PlayerId") }, Named { name: "seq", value: U32 }, Named { name: "units", value: Seq(TypeName("SimId")) }, Named { name: "kind", value: TypeName("CommandKind") }, Named { name: "queue", value: Bool }])
+PlayerId: NewTypeStruct(U8)
+SimEvent: Enum({0: Named { name: "Spawned", value: Struct([Named { name: "sim_id", value: TypeName("SimId") }, Named { name: "unit", value: Option(TypeName("UnitTypeId")) }, Named { name: "owner", value: TypeName("PlayerId") }]) }, 1: Named { name: "Despawned", value: Struct([Named { name: "sim_id", value: TypeName("SimId") }]) }, 2: Named { name: "CommandRejected", value: Struct([Named { name: "player", value: TypeName("PlayerId") }, Named { name: "seq", value: U32 }, Named { name: "reason", value: Str }]) }, 3: Named { name: "Custom", value: Struct([Named { name: "channel", value: Str }, Named { name: "data", value: Seq(U8) }]) }})
+SimId: NewTypeStruct(U32)
+SimSnapshot: Struct([Named { name: "tick", value: TypeName("Tick") }, Named { name: "entities", value: Seq(TypeName("EntityRecord")) }, Named { name: "channels", value: Seq(Tuple([Str, Seq(U8)])) }])
+Tick: NewTypeStruct(U32)
+TickInput: Struct([Named { name: "tick", value: TypeName("Tick") }, Named { name: "commands", value: Seq(TypeName("PlayerCommand")) }])
+UnitTypeId: NewTypeStruct(U16)

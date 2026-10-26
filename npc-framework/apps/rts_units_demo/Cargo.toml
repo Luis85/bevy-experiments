@@ -1,0 +1,41 @@
+[package]
+name = "rts_units_demo"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Portability proof: a self-contained RTS host app that uses only the npc_framework facade (+ bevy) — its own units, map, FixedUpdate host system, 10 Hz sim, selection, control groups, formations."
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "rts_units_demo"
+path = "src/main.rs"
+
+[dependencies]
+# The host's own engine. Not `bevy.workspace = true`: the workspace entry keeps
+# Bevy's default features, which select the `ruzstd` backend
+# (RUSTSEC-2026-0344); the 3D features are spelled out with `zstd_c` instead,
+# as in apps/village (no glTF, audio or animation: the visuals are primitives).
+bevy = { version = "0.20.0", default-features = false, features = [
+    "ui", "default_app", "default_platform", "common_api", "bevy_light",
+    "bevy_mikktspace", "ktx2", "smaa_luts", "tonemapping_luts", "zstd_c",
+    "bevy_render", "bevy_core_pipeline", "bevy_gizmos_render", "bevy_anti_alias",
+    "bevy_pbr", "bevy_post_process",
+] }
+# The framework, through its facade only (the portability proof:
+# arch_fitness `rts_demo_uses_only_facade`). No content/* crate.
+npc_framework = { workspace = true, features = [
+    "locomotion",
+    "nav",
+    "command",
+    "view-helpers",
+] }
+serde.workspace = true
+serde_json = "1"
+
+[features]
+default = ["perf"]
+# The built-in profiler and the F4 perf panel (Bevy's per-system spans).
+perf = ["npc_framework/perf", "bevy/trace"]

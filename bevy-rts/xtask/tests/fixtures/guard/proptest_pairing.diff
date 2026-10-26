@@ -1,0 +1,25 @@
+diff --git a/crates/fl_sim/tests/props.rs b/crates/fl_sim/tests/props.rs
+index 1111111..2222222 100644
+--- a/crates/fl_sim/tests/props.rs
++++ b/crates/fl_sim/tests/props.rs
+@@ -1,10 +1,10 @@
+-proptest! {
+-    #![proptest_config(ProptestConfig::with_cases(1024))]
+-    #[test]
+-    fn a(x in 0u8..) {}
+-}
+-proptest! {
+-    #![proptest_config(ProptestConfig::with_cases(64))]
+-    #[test]
+-    fn b(x in 0u8..) {}
+-}
++proptest! {
++    #![proptest_config(ProptestConfig::with_cases(64))]
++    #[test]
++    fn b(x in 0u8..) {}
++}
++proptest! {
++    #![proptest_config(ProptestConfig::with_cases(1024))]
++    #[test]
++    fn a(x in 0u8..) {}
++}

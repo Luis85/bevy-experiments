@@ -1,0 +1,8 @@
+Unit(
+    id: "a.alpha",
+    inherits: Some("a.abstract.tank"),
+    name: "Alpha",
+    components: {
+        "Speed": (kmh: 30.0),
+    },
+)

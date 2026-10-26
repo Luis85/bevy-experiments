@@ -1,0 +1,6 @@
+Faction(
+    id: "base.su",
+    name: "USSR",
+    color: (0.38, 0.45, 0.22),
+    roster: ["base.su.t70", "base.su.t34", "base.su.kv1", "base.su.zis5", "base.su.rifleman"],
+)

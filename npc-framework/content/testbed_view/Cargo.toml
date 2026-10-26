@@ -1,0 +1,45 @@
+[package]
+name = "testbed_view"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Presentation of the Actor Testbed: Dungeon walls and doors, props, vehicles, animated actors, RTS camera and command UI, F1 overlay, F5 character sheet, F6 perception."
+
+[dependencies]
+# Not `bevy.workspace = true`: the workspace entry keeps Bevy's default
+# features, which select the `ruzstd` backend. The list is the village
+# view's (`zstd_c`, never `zstd_rust`; see content/village_view/Cargo.toml).
+# Keep in sync with apps/actor_testbed/Cargo.toml.
+bevy = { version = "0.20.0", default-features = false, features = [
+    "2d", "ui", "audio",
+    "default_app", "default_platform", "scene", "picking",
+    "common_api", "bevy_light", "bevy_mikktspace", "ktx2", "morph_animation", "morph",
+    "smaa_luts", "tonemapping_luts", "zstd_c",
+    "bevy_render", "bevy_core_pipeline", "bevy_gizmos_render", "bevy_anti_alias",
+    "bevy_gltf", "bevy_pbr", "bevy_post_process", "gltf_animation",
+    # Not a Bevy default; the grass texture is a .jpg.
+    "jpeg",
+] }
+# The framework through its facade with every capability the testbed shows
+# (the view reads their components; it never writes them).
+npc_framework = { workspace = true, features = [
+    "view-helpers",
+    "agent-io",
+    "locomotion",
+    "nav",
+    "perception",
+    "rules",
+    "interaction",
+    "command",
+    "vehicles",
+    "progression",
+    "crafting",
+] }
+testbed_content.workspace = true
+serde_json = "1"
+
+[features]
+default = []
+# F4 perf panel (reads the `npc_perf` profiler's `PerfHandle`).
+perf = ["npc_framework/perf"]

@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "explorer",
+  "seed": 1,
+  "world": {
+    "layout": "frontier", "furnish": true, "store_locked": true, "detection": "per_roll"
+  },
+  "actors": [
+    { "kind": "unit", "name": "explorer", "template": "scout", "pos": [0, -6500], "facing": [0, 1] }
+  ],
+  "controllers": [
+    { "actor": 0, "controller": "explorer", "mode": "Direct", "on_idle": "Idle" }
+  ]
+}

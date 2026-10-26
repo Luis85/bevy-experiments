@@ -1,0 +1,21 @@
+ScenarioDef(
+    id: "base.testbed_ai",
+    map: "base.testbed_1km",
+    seed: 1,
+    players: [
+        (faction: "base.de", team: 0, controller: Human),
+        (faction: "base.su", team: 1, controller: Ai("null")),
+    ],
+    units: [
+        (unit: "base.de.pz2", player: 0, pos: (350.0, 350.0), heading_deg: 90.0),
+        (unit: "base.de.pz3", player: 0, pos: (380.0, 350.0), heading_deg: 90.0),
+        (unit: "base.de.tiger", player: 0, pos: (410.0, 350.0), heading_deg: 90.0),
+        (unit: "base.de.opel_blitz", player: 0, pos: (440.0, 350.0), heading_deg: 90.0),
+        (unit: "base.de.rifleman", player: 0, pos: (470.0, 350.0), heading_deg: 90.0),
+        (unit: "base.su.t70", player: 1, pos: (350.0, 650.0), heading_deg: 270.0),
+        (unit: "base.su.t34", player: 1, pos: (380.0, 650.0), heading_deg: 270.0),
+        (unit: "base.su.kv1", player: 1, pos: (410.0, 650.0), heading_deg: 270.0),
+        (unit: "base.su.zis5", player: 1, pos: (440.0, 650.0), heading_deg: 270.0),
+        (unit: "base.su.rifleman", player: 1, pos: (470.0, 650.0), heading_deg: 270.0),
+    ],
+)

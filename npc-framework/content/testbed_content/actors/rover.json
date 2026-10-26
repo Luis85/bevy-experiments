@@ -1,0 +1,37 @@
+{
+  "name": "Rover",
+  "description": "A wheeled robot with a 360-degree LIDAR and a forward camera: opens doors and gates, uses tools and workstations and rides vehicles, but does not craft.",
+  "body": "robot",
+  "model": "rover",
+  "sheet": {
+    "attributes": { "st": 12, "dx": 10, "iq": 10, "ht": 12 },
+    "skills": { "Mining": 2 },
+    "unspent": 10
+  },
+  "speed_mm_per_tick": 60,
+  "carry_capacity": 40000,
+  "actions": [
+    "close",
+    "dismount",
+    "drive_to",
+    "drop",
+    "equip",
+    "give",
+    "lock",
+    "mount",
+    "open",
+    "pick_up",
+    "study",
+    "teach",
+    "unequip",
+    "unload",
+    "unlock",
+    "use_tool_on"
+  ],
+  "sensors": [
+    { "type": "lidar", "range_mm": 20000, "fov_deg": 360, "beams": 360, "noise_ppm": 10000 },
+    { "type": "camera", "range_mm": 15000, "half_fov_deg": 35 },
+    { "type": "reach", "radius_mm": 1500 }
+  ],
+  "perception": { "detection": null }
+}

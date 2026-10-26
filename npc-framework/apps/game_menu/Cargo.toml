@@ -1,0 +1,27 @@
+[package]
+name = "game_menu"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "The game menu: a window listing everything playable (AI explorer, Actor Testbed scenarios, Village, RTS units demo) that launches the chosen game as a child process, plus the agents-folder setting."
+
+[dependencies]
+# Not `bevy.workspace = true`: the workspace entry keeps Bevy's default
+# features, which select the `ruzstd` backend. The actor testbed's list
+# (`zstd_c`, never `zstd_rust`; see apps/village/Cargo.toml) trimmed to a 2D
+# UI: no 3D, glTF, PBR, audio or animation. `ui` brings `ui_widgets`
+# (buttons, `TextInput`) and `png` (screenshots).
+bevy = { version = "0.20.0", default-features = false, features = [
+    "2d", "ui",
+    "default_app", "default_platform", "common_api",
+    "tonemapping_luts", "zstd_c",
+    "bevy_render", "bevy_core_pipeline",
+] }
+# Scenario names and descriptions, the agents-folder settings and their
+# validation. Not the facade: the menu runs no sim.
+testbed_content.workspace = true
+# The `--check-save` line and the save header's `saved` date (both already in
+# the graph through testbed_content).
+serde.workspace = true
+serde_json = "1"

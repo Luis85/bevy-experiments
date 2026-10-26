@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "testbed",
+  "seed": 1,
+  "world": { "layout": "compound", "furnish": true, "store_locked": true, "detection": "per_roll" },
+  "actors": [
+    { "kind": "unit", "name": "carpenter", "template": "carpenter", "owner": 1, "pos": [-5500, 500], "behaviour": "wander", "carry": [{ "kind": "log", "stack": 2 }] },
+    { "kind": "unit", "name": "smith", "template": "smith", "owner": 1, "pos": [-1500, 500], "behaviour": "wander" },
+    { "kind": "unit", "name": "woodcutter", "template": "woodcutter", "owner": 1, "pos": [-6500, -3500], "behaviour": "worker", "equip": ["axe"] },
+    { "kind": "unit", "name": "scout", "template": "scout", "owner": 1, "pos": [3500, -500], "behaviour": "wander", "spend_policy": "player" },
+    { "kind": "unit", "name": "skel_warrior_a", "template": "skeleton_warrior", "owner": 2, "pos": [16500, -3500], "behaviour": "wander", "facing": [-1, 0] },
+    { "kind": "unit", "name": "skel_warrior_b", "template": "skeleton_warrior", "owner": 2, "pos": [16500, 500], "behaviour": "wander", "facing": [-1, 0] },
+    { "kind": "unit", "name": "skel_minion_a", "template": "skeleton_minion", "owner": 2, "pos": [18500, -1500], "behaviour": "wander", "stealthy": 2 },
+    { "kind": "unit", "name": "skel_minion_b", "template": "skeleton_minion", "owner": 2, "pos": [18500, 2500], "behaviour": "idle", "facing": [-1, 0] }
+  ]
+}

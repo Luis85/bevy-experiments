@@ -1,0 +1,11 @@
+// A template: never interned, never spawned.
+Unit(
+    id: "base.abstract.infantry",
+    abstract: true,
+    tags: ["infantry", "foot"],
+    components: {
+        "Selectable": (),
+        "Hull": (hp: 10, footprint: (0.8, 0.8), hitbox_shrink: 0.5),
+        "Mobility": (class: Foot, road_speed_kmh: 5.0, terrain_factor: 0.8, turn_rate_deg_s: 180.0),
+    },
+)

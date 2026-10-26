@@ -1,0 +1,36 @@
+{
+  "name": "Sentinel",
+  "description": "A tracked robot with a radar and a forward camera, good at spotting things that move: opens doors and gates, uses tools and workstations and rides vehicles, but does not craft.",
+  "body": "robot",
+  "model": "sentinel",
+  "sheet": {
+    "attributes": { "st": 11, "dx": 10, "iq": 11, "ht": 12 },
+    "unspent": 10
+  },
+  "speed_mm_per_tick": 50,
+  "carry_capacity": 30000,
+  "actions": [
+    "close",
+    "dismount",
+    "drive_to",
+    "drop",
+    "equip",
+    "give",
+    "lock",
+    "mount",
+    "open",
+    "pick_up",
+    "study",
+    "teach",
+    "unequip",
+    "unload",
+    "unlock",
+    "use_tool_on"
+  ],
+  "sensors": [
+    { "type": "radar", "range_mm": 30000, "half_fov_deg": 60, "range_res_mm": 500, "bearing_res_mdeg": 2000 },
+    { "type": "camera", "range_mm": 15000, "half_fov_deg": 35 },
+    { "type": "reach", "radius_mm": 1500 }
+  ],
+  "perception": { "detection": null }
+}

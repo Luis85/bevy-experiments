@@ -1,0 +1,17 @@
+/target/
+/.terra-cache/
+/captures/
+*.tmp
+*.log
+
+
+/world-save*.json
+/terra-session*.json
+/world-save*.geojson
+
+# Session capabilities and host saves contain private identity material.
+/*-session*.json
+/server-*.json
+/sessions/
+/saves/
+/snapshots/

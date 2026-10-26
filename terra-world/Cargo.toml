@@ -1,0 +1,33 @@
+[workspace]
+members = ["crates/terra-core", "crates/terra-stream", "crates/terra-history", "crates/terra-sandbox", "crates/terra-net", "crates/terra-bevy", "crates/terra-demo", "crates/terra-cli"]
+default-members = ["crates/terra-core", "crates/terra-stream", "crates/terra-history", "crates/terra-sandbox", "crates/terra-net", "crates/terra-cli"]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "MIT OR Apache-2.0"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+bevy = { version = "=0.20.0", default-features = false, features = ["std", "multi_threaded", "bevy_state"] }
+
+[profile.dev]
+opt-level = 1
+debug = 0
+codegen-units = 1
+
+[profile.dev.package."*"]
+opt-level = 1
+
+[profile.dev.build-override]
+opt-level = 0
+codegen-units = 1
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+

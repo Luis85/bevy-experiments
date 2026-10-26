@@ -1,0 +1,12 @@
+// Same unit as hash_base, reformatted.
+Unit(
+    components: {
+        "Speed": (kmh: 36),
+        "Hull": (
+            hp: 100,
+        ),
+    },
+    tags: ["tracked", "armored"],
+    name: "Tank",
+    id: "h.tank",
+)

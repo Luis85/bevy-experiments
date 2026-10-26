@@ -1,0 +1,7 @@
+diff --git a/crates/fl_sim/tests/props.rs b/crates/fl_sim/tests/props.rs
+index 1111111..2222222 100644
+--- a/crates/fl_sim/tests/props.rs
++++ b/crates/fl_sim/tests/props.rs
+@@ -8 +8 @@ proptest! {
+-    cases: 256,
++    cases: 64,

@@ -1,0 +1,33 @@
+[package]
+name = "npc_tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Tooling for the NPC framework: CLI helpers (JSON output, command files, bench harness), per-tick profiler glue, and (feature `remote`) the BRP `npc/*` methods."
+
+[features]
+default = []
+# Bevy Remote Protocol methods (`npc/*`) over HTTP, the live replay recorder.
+# Pulls the `bevy` umbrella (bevy_remote depends on the renderer crates).
+remote = ["dep:bevy"]
+# With `remote`: the `npc/sheet {unit}` method (an `npc_rules` character
+# sheet with every derived value).
+rules = ["dep:npc_rules"]
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+npc_kernel.workspace = true
+npc_perf.workspace = true
+npc_rules = { workspace = true, optional = true }
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"
+clap = { version = "4", features = ["derive"] }
+# Only what the remote interface uses (no default features: the app picks
+# the renderer's features, including the zstd backend; see apps/village).
+# `bevy_render` for the render sub-app's BRP server port (`RenderPort`).
+bevy = { version = "0.20.0", optional = true, default-features = false, features = [
+    "std", "bevy_remote", "bevy_render", "bevy_window", "bevy_log",
+] }

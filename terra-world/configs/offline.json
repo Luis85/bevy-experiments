@@ -1,0 +1,17 @@
+{
+  "focus": {"latitude": 48.137, "longitude": 11.575, "altitude_m": 0.0},
+  "seed": 42,
+  "chunk_level": 15,
+  "chunk_radius": 2,
+  "terrain_resolution": 33,
+  "max_resident_chunks": 64,
+  "max_in_flight": 2,
+  "max_queued": 64,
+  "integrate_per_frame": 2,
+  "max_features_per_chunk": 384,
+  "live_data": false,
+  "time_scale": 60.0,
+  "fixed_hz": 20.0,
+  "politics_file": "crates/terra-history/data/natural-earth-countries-2026-10-26.geojson",
+  "save_path": "world-save.json"
+}

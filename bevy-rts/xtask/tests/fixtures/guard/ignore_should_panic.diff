@@ -1,0 +1,9 @@
+diff --git a/crates/fl_sim/tests/combat.rs b/crates/fl_sim/tests/combat.rs
+index 1111111..2222222 100644
+--- a/crates/fl_sim/tests/combat.rs
++++ b/crates/fl_sim/tests/combat.rs
+@@ -20,0 +21 @@ mod tests {
++    #[ignore = "flaky"]
+@@ -40,0 +42,2 @@ mod tests {
++    #[should_panic]
++    // #[ignore] is only mentioned in this comment

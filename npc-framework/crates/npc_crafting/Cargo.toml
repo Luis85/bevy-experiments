@@ -1,0 +1,20 @@
+[package]
+name = "npc_crafting"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Opt-in crafting for the NPC framework: recipes by stable name (item inputs, tools, workstations, a skill roll), quality from the margin of success, tool wear, a Craft action/command and workstation order queues, on top of npc_interaction and npc_rules."
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+npc_ai.workspace = true
+npc_kernel.workspace = true
+npc_jobs.workspace = true
+npc_interaction.workspace = true
+npc_rules.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"

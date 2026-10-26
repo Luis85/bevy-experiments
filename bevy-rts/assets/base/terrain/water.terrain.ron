@@ -1,0 +1,8 @@
+// guess: values informed by docs/research/blitzkrieg-mechanics.md §1.8, not measured.
+TerrainDef(
+    id: "base.water",
+    name: "Water",
+    pass: 0.0,
+    blocks: [Foot, Wheeled, HalfTrack, Tracked],
+    color: (0.15, 0.30, 0.55),
+)

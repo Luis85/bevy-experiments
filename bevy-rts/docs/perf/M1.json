@@ -1,0 +1,1810 @@
+{
+  "features": {
+    "core.classify": {
+      "max_ms": 0.0522,
+      "mean_ms": 0.012545833333333336,
+      "p50_ms": 0.0111,
+      "p95_ms": 0.0206,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.commands": {
+      "max_ms": 0.0245,
+      "mean_ms": 0.0005004166666666671,
+      "p50_ms": 0.00039999999999999996,
+      "p95_ms": 0.0007,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.movement": {
+      "max_ms": 3.4984,
+      "mean_ms": 1.9510891666666672,
+      "p50_ms": 1.7920999999999998,
+      "p95_ms": 2.7859999999999996,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.nav": {
+      "max_ms": 0.0025,
+      "mean_ms": 0.0004137500000000002,
+      "p50_ms": 0.00039999999999999996,
+      "p95_ms": 0.0006,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.observe": {
+      "max_ms": 0.0436,
+      "mean_ms": 0.015135416666666662,
+      "p50_ms": 0.013900000000000001,
+      "p95_ms": 0.0217,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.orders": {
+      "max_ms": 0.3014,
+      "mean_ms": 0.04550500000000002,
+      "p50_ms": 0.0419,
+      "p95_ms": 0.0693,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.path": {
+      "max_ms": 0.5714,
+      "mean_ms": 0.15057083333333326,
+      "p50_ms": 0.13990000000000002,
+      "p95_ms": 0.3352,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.publish": {
+      "max_ms": 0.2921,
+      "mean_ms": 0.1639475000000001,
+      "p50_ms": 0.15410000000000001,
+      "p95_ms": 0.2354,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.scale": {
+      "max_ms": 5.7676,
+      "mean_ms": 4.200691666666663,
+      "p50_ms": 4.074,
+      "p95_ms": 5.1039,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.spatial": {
+      "max_ms": 0.6155,
+      "mean_ms": 0.3576037500000003,
+      "p50_ms": 0.332,
+      "p95_ms": 0.49700000000000005,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.spawn": {
+      "max_ms": 0.2686,
+      "mean_ms": 0.16332250000000012,
+      "p50_ms": 0.1522,
+      "p95_ms": 0.2392,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "core.steer": {
+      "max_ms": 4.3336,
+      "mean_ms": 2.746686666666668,
+      "p50_ms": 2.6205,
+      "p95_ms": 3.5292000000000003,
+      "samples": 400,
+      "window_samples": 240
+    }
+  },
+  "meta": {
+    "build": "release",
+    "map": "base.scale_2km",
+    "note": "wall times include profiler and phase-marker overhead; profiler statistics cover the last profiler_window_ticks ticks",
+    "profiler_window_ticks": 240,
+    "repeat": 5,
+    "seed": 1,
+    "ticks": 400,
+    "units": [
+      500,
+      3000,
+      5000
+    ],
+    "warmup": 40,
+    "commit": "3d78b45 (sim code; m1/phase-a, every M1 task merged)",
+    "head": "3d78b45",
+    "date": "2026-10-25",
+    "rustc": "1.99.1 (58cf8f9c3 2026-10-13)",
+    "machine": {
+      "cpu": "Intel Core Ultra 9 185H (16 cores, 22 threads)",
+      "ram_gb": 63.5,
+      "gpu": "NVIDIA RTX 1000 Ada Generation Laptop GPU (Vulkan, driver 596.71)",
+      "os": "Windows 11 Pro 10.0.26300",
+      "power_plan": "Balanced (381b4222-f694-41f0-9685-ff5bb260df2e); not changed: a system setting the agent may not modify",
+      "load": "idle: no cargo/rustc process; CPU load 0-39 % (median 9 %) sampled every 3 s during the bench"
+    },
+    "m0_comparison": {
+      "method": "m0 tag (0ae615d) fl_cli built in its own worktree; 5 interleaved rounds of `bench` (M0) and `bench --flat` (M1), --repeat 1 each, 400 ticks + 40 warmup, median of the 5 rounds",
+      "rows": [
+        {
+          "units": 500,
+          "m0_mean_ms": 0.305,
+          "m0_p95_ms": 0.449,
+          "m1_flat_mean_ms": 0.474,
+          "m1_flat_p95_ms": 0.819
+        },
+        {
+          "units": 3000,
+          "m0_mean_ms": 2.828,
+          "m0_p95_ms": 3.612,
+          "m1_flat_mean_ms": 4.463,
+          "m1_flat_p95_ms": 6.008
+        },
+        {
+          "units": 5000,
+          "m0_mean_ms": 5.883,
+          "m0_p95_ms": 8.04,
+          "m1_flat_mean_ms": 9.613,
+          "m1_flat_p95_ms": 13.473
+        }
+      ],
+      "note": "M1 is 55-63 % slower on the open map; the delta is new M1 work: compute_steering +2.56 ms and move_system +1.04 ms at 5000 units (docs/perf/M1.md)"
+    },
+    "render_stress": {
+      "command": "cargo run -p fl_game --release -- --stress 3000 --exit-after 25 --agent",
+      "target_avg_fps": 60,
+      "median_avg_fps": 72.6,
+      "best_avg_fps": 88.0,
+      "runs": [
+        {
+          "avg_fps": 88.0,
+          "p1_low_fps": 2.6,
+          "frames": 1955
+        },
+        {
+          "avg_fps": 70.6,
+          "p1_low_fps": 2.1,
+          "frames": 1554
+        },
+        {
+          "avg_fps": 71.1,
+          "p1_low_fps": 2.1,
+          "frames": 1595
+        },
+        {
+          "avg_fps": 74.1,
+          "p1_low_fps": 2.1,
+          "frames": 1660,
+          "rust_log": "warn"
+        }
+      ],
+      "note": "terrain map with its mesh; 1 % lows of about 2 fps also in the m0-tag game on this machine (docs/perf/M1.md)"
+    }
+  },
+  "phases": {
+    "Act": {
+      "max_ms": 4.2833000000000006,
+      "mean_ms": 2.4383725000000003,
+      "p50_ms": 2.2438,
+      "p95_ms": 3.4446,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "Economy": {
+      "max_ms": 0.0015999999999999999,
+      "mean_ms": 0.0008524999999999997,
+      "p50_ms": 0.0007999999999999999,
+      "p95_ms": 0.0012,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "Input": {
+      "max_ms": 0.088,
+      "mean_ms": 0.018060416666666676,
+      "p50_ms": 0.0161,
+      "p95_ms": 0.0275,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "Lifecycle": {
+      "max_ms": 0.2789,
+      "mean_ms": 0.1673491666666667,
+      "p50_ms": 0.1558,
+      "p95_ms": 0.24469999999999997,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "Perceive": {
+      "max_ms": 5.595,
+      "mean_ms": 4.053395416666665,
+      "p50_ms": 3.9262,
+      "p95_ms": 5.0032000000000005,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "Publish": {
+      "max_ms": 0.2998,
+      "mean_ms": 0.16684125000000008,
+      "p50_ms": 0.1565,
+      "p95_ms": 0.2392,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "Resolve": {
+      "max_ms": 0.076,
+      "mean_ms": 0.016268333333333287,
+      "p50_ms": 0.015000000000000001,
+      "p95_ms": 0.0244,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "Think": {
+      "max_ms": 4.6122000000000005,
+      "mean_ms": 2.9722541666666653,
+      "p50_ms": 2.8512,
+      "p95_ms": 3.7944,
+      "samples": 400,
+      "window_samples": 240
+    }
+  },
+  "rows": [
+    {
+      "counters_per_tick": [
+        [
+          "despawn.entities",
+          9.0
+        ],
+        [
+          "move.los_cells",
+          996.77
+        ],
+        [
+          "path.budget_spent",
+          144.07
+        ],
+        [
+          "path.los_cells",
+          101.3925
+        ],
+        [
+          "path.nodes_expanded",
+          42.6775
+        ],
+        [
+          "path.requests",
+          1.465
+        ],
+        [
+          "publish.rebuilt",
+          500.0
+        ],
+        [
+          "publish.records",
+          500.0
+        ],
+        [
+          "scale.follows",
+          1000.0
+        ],
+        [
+          "scale.projectile_steps",
+          180.0
+        ],
+        [
+          "sort.items",
+          9.0
+        ],
+        [
+          "spatial.checked",
+          1680.0
+        ],
+        [
+          "spatial.inserts",
+          9.0
+        ],
+        [
+          "spatial.queries",
+          50.0
+        ],
+        [
+          "spatial.query_candidates",
+          2340.3175
+        ],
+        [
+          "spatial.relocations",
+          89.43
+        ],
+        [
+          "spawn.entities",
+          9.0
+        ],
+        [
+          "steer.pairs",
+          1420.79
+        ],
+        [
+          "steer.units",
+          500.0
+        ]
+      ],
+      "entities": 1680,
+      "map": "base.scale_2km",
+      "max_ms": 1.9922999999999997,
+      "mean_ms": 0.5214437500000001,
+      "p95_ms": 1.1966999999999999,
+      "per_phase_mean_ms": [
+        [
+          "Input",
+          0.007846666666666667
+        ],
+        [
+          "Think",
+          0.10215083333333327
+        ],
+        [
+          "Act",
+          0.20895375
+        ],
+        [
+          "Resolve",
+          0.0033004166666666624
+        ],
+        [
+          "Economy",
+          0.0008162500000000031
+        ],
+        [
+          "Perceive",
+          0.1135475000000001
+        ],
+        [
+          "Lifecycle",
+          0.018933333333333316
+        ],
+        [
+          "Publish",
+          0.01842458333333333
+        ]
+      ],
+      "units": 500
+    },
+    {
+      "counters_per_tick": [
+        [
+          "despawn.entities",
+          50.0
+        ],
+        [
+          "move.blocked",
+          0.085
+        ],
+        [
+          "move.los_cells",
+          6002.34
+        ],
+        [
+          "path.budget_spent",
+          924.665
+        ],
+        [
+          "path.los_cells",
+          604.26
+        ],
+        [
+          "path.nodes_expanded",
+          320.405
+        ],
+        [
+          "path.requests",
+          8.1475
+        ],
+        [
+          "publish.rebuilt",
+          3000.0
+        ],
+        [
+          "publish.records",
+          3000.0
+        ],
+        [
+          "scale.follows",
+          6000.0
+        ],
+        [
+          "scale.projectile_steps",
+          1000.0
+        ],
+        [
+          "sort.items",
+          50.0
+        ],
+        [
+          "spatial.checked",
+          10000.0
+        ],
+        [
+          "spatial.inserts",
+          50.0
+        ],
+        [
+          "spatial.queries",
+          300.0
+        ],
+        [
+          "spatial.query_candidates",
+          76596.235
+        ],
+        [
+          "spatial.relocations",
+          504.435
+        ],
+        [
+          "spawn.entities",
+          50.0
+        ],
+        [
+          "steer.pairs",
+          21497.7575
+        ],
+        [
+          "steer.units",
+          3000.0
+        ]
+      ],
+      "entities": 10000,
+      "map": "base.scale_2km",
+      "max_ms": 8.8936,
+      "mean_ms": 4.612951249999997,
+      "p95_ms": 6.2861,
+      "per_phase_mean_ms": [
+        [
+          "Input",
+          0.013864999999999997
+        ],
+        [
+          "Think",
+          1.2401741666666668
+        ],
+        [
+          "Act",
+          1.2979674999999995
+        ],
+        [
+          "Resolve",
+          0.009773750000000005
+        ],
+        [
+          "Economy",
+          0.0008037499999999987
+        ],
+        [
+          "Perceive",
+          1.6642316666666659
+        ],
+        [
+          "Lifecycle",
+          0.0898358333333333
+        ],
+        [
+          "Publish",
+          0.09243666666666664
+        ]
+      ],
+      "units": 3000
+    },
+    {
+      "counters_per_tick": [
+        [
+          "despawn.entities",
+          84.0
+        ],
+        [
+          "move.blocked",
+          0.4925
+        ],
+        [
+          "move.los_cells",
+          9944.2475
+        ],
+        [
+          "path.budget_spent",
+          1573.43
+        ],
+        [
+          "path.los_cells",
+          1053.045
+        ],
+        [
+          "path.nodes_expanded",
+          520.385
+        ],
+        [
+          "path.queue_len",
+          16.7625
+        ],
+        [
+          "path.requests",
+          15.955
+        ],
+        [
+          "publish.rebuilt",
+          4983.51
+        ],
+        [
+          "publish.records",
+          5000.0
+        ],
+        [
+          "scale.follows",
+          10000.0
+        ],
+        [
+          "scale.projectile_steps",
+          1680.0
+        ],
+        [
+          "sort.items",
+          84.0
+        ],
+        [
+          "spatial.checked",
+          16680.0
+        ],
+        [
+          "spatial.inserts",
+          84.0
+        ],
+        [
+          "spatial.queries",
+          500.0
+        ],
+        [
+          "spatial.query_candidates",
+          211501.4975
+        ],
+        [
+          "spatial.relocations",
+          838.6925
+        ],
+        [
+          "spawn.entities",
+          84.0
+        ],
+        [
+          "steer.pairs",
+          52891.095
+        ],
+        [
+          "steer.units",
+          4986.5825
+        ]
+      ],
+      "entities": 16680,
+      "map": "base.scale_2km",
+      "max_ms": 19.157,
+      "mean_ms": 9.896729,
+      "p95_ms": 14.8147,
+      "per_phase_mean_ms": [
+        [
+          "Input",
+          0.018060416666666676
+        ],
+        [
+          "Think",
+          2.9722541666666653
+        ],
+        [
+          "Act",
+          2.4383725000000003
+        ],
+        [
+          "Resolve",
+          0.016268333333333287
+        ],
+        [
+          "Economy",
+          0.0008524999999999997
+        ],
+        [
+          "Perceive",
+          4.053395416666665
+        ],
+        [
+          "Lifecycle",
+          0.1673491666666667
+        ],
+        [
+          "Publish",
+          0.16684125000000008
+        ]
+      ],
+      "units": 5000
+    }
+  ],
+  "sizes": [
+    {
+      "features": {
+        "core.classify": {
+          "max_ms": 0.0357,
+          "mean_ms": 0.004502916666666668,
+          "p50_ms": 0.0031999999999999997,
+          "p95_ms": 0.0106,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.commands": {
+          "max_ms": 0.0007999999999999999,
+          "mean_ms": 0.00023499999999999983,
+          "p50_ms": 0.00019999999999999998,
+          "p95_ms": 0.00039999999999999996,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.movement": {
+          "max_ms": 0.38789999999999997,
+          "mean_ms": 0.16648083333333336,
+          "p50_ms": 0.1543,
+          "p95_ms": 0.23700000000000002,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.nav": {
+          "max_ms": 0.0023,
+          "mean_ms": 0.00023958333333333313,
+          "p50_ms": 0.00019999999999999998,
+          "p95_ms": 0.00039999999999999996,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.observe": {
+          "max_ms": 0.049499999999999995,
+          "mean_ms": 0.009006666666666671,
+          "p50_ms": 0.0078,
+          "p95_ms": 0.0135,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.orders": {
+          "max_ms": 0.018199999999999997,
+          "mean_ms": 0.0027620833333333356,
+          "p50_ms": 0.0024,
+          "p95_ms": 0.0047,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.path": {
+          "max_ms": 0.2434,
+          "mean_ms": 0.015483750000000001,
+          "p50_ms": 0.0035,
+          "p95_ms": 0.1109,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.publish": {
+          "max_ms": 0.2648,
+          "mean_ms": 0.016839166666666676,
+          "p50_ms": 0.0143,
+          "p95_ms": 0.022500000000000003,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.scale": {
+          "max_ms": 0.7605,
+          "mean_ms": 0.11877833333333336,
+          "p50_ms": 0.1081,
+          "p95_ms": 0.1511,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.spatial": {
+          "max_ms": 0.127,
+          "mean_ms": 0.03383916666666665,
+          "p50_ms": 0.0315,
+          "p95_ms": 0.0458,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.spawn": {
+          "max_ms": 0.0344,
+          "mean_ms": 0.016696249999999992,
+          "p50_ms": 0.0149,
+          "p95_ms": 0.0264,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.steer": {
+          "max_ms": 0.2434,
+          "mean_ms": 0.07801041666666667,
+          "p50_ms": 0.0725,
+          "p95_ms": 0.1043,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "phases": {
+        "Act": {
+          "max_ms": 0.7522,
+          "mean_ms": 0.20895375,
+          "p50_ms": 0.1915,
+          "p95_ms": 0.30469999999999997,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Economy": {
+          "max_ms": 0.030199999999999998,
+          "mean_ms": 0.0008162500000000031,
+          "p50_ms": 0.0007,
+          "p95_ms": 0.0009,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Input": {
+          "max_ms": 0.0527,
+          "mean_ms": 0.007846666666666667,
+          "p50_ms": 0.0062,
+          "p95_ms": 0.016,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Lifecycle": {
+          "max_ms": 0.038099999999999995,
+          "mean_ms": 0.018933333333333316,
+          "p50_ms": 0.016900000000000002,
+          "p95_ms": 0.0294,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Perceive": {
+          "max_ms": 0.4466,
+          "mean_ms": 0.1135475000000001,
+          "p50_ms": 0.1047,
+          "p95_ms": 0.1472,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Publish": {
+          "max_ms": 0.2719,
+          "mean_ms": 0.01842458333333333,
+          "p50_ms": 0.0157,
+          "p95_ms": 0.0248,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Resolve": {
+          "max_ms": 0.0068000000000000005,
+          "mean_ms": 0.0033004166666666624,
+          "p50_ms": 0.0031,
+          "p95_ms": 0.0049,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Think": {
+          "max_ms": 0.368,
+          "mean_ms": 0.10215083333333327,
+          "p50_ms": 0.0839,
+          "p95_ms": 0.206,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "systems": {
+        "fl_sim::classify::reset_transients": {
+          "feature": "core.classify",
+          "max_ms": 0.0357,
+          "mean_ms": 0.004502916666666668,
+          "p50_ms": 0.0031999999999999997,
+          "p95_ms": 0.0106,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::commands::apply_commands": {
+          "feature": "core.commands",
+          "max_ms": 0.0007999999999999999,
+          "mean_ms": 0.00023499999999999983,
+          "p50_ms": 0.00019999999999999998,
+          "p95_ms": 0.00039999999999999996,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::move_system": {
+          "feature": "core.movement",
+          "max_ms": 0.38249999999999995,
+          "mean_ms": 0.16331666666666667,
+          "p50_ms": 0.1512,
+          "p95_ms": 0.2331,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::prepare_flow_tiles": {
+          "feature": "core.movement",
+          "max_ms": 0.0039,
+          "mean_ms": 0.0009787499999999996,
+          "p50_ms": 0.0007999999999999999,
+          "p95_ms": 0.0017000000000000001,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::wander_system": {
+          "feature": "core.movement",
+          "max_ms": 0.0124,
+          "mean_ms": 0.002185416666666668,
+          "p50_ms": 0.002,
+          "p95_ms": 0.004,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::nav::flow::begin_flow_tick": {
+          "feature": "core.nav",
+          "max_ms": 0.0023,
+          "mean_ms": 0.00023958333333333313,
+          "p50_ms": 0.00019999999999999998,
+          "p95_ms": 0.00039999999999999996,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::observe::marker::{{closure}}": {
+          "feature": "core.observe",
+          "max_ms": 0.049499999999999995,
+          "mean_ms": 0.009006666666666671,
+          "p50_ms": 0.0078,
+          "p95_ms": 0.0135,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::orders::advance_orders": {
+          "feature": "core.orders",
+          "max_ms": 0.018199999999999997,
+          "mean_ms": 0.0027620833333333356,
+          "p50_ms": 0.0024,
+          "p95_ms": 0.0047,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::path::process_path_queue": {
+          "feature": "core.path",
+          "max_ms": 0.2434,
+          "mean_ms": 0.015483750000000001,
+          "p50_ms": 0.0035,
+          "p95_ms": 0.1109,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::publish::publish_snapshot": {
+          "feature": "core.publish",
+          "max_ms": 0.2648,
+          "mean_ms": 0.016839166666666676,
+          "p50_ms": 0.0143,
+          "p95_ms": 0.022500000000000003,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::follow_system": {
+          "feature": "core.scale",
+          "max_ms": 0.17880000000000001,
+          "mean_ms": 0.03733416666666664,
+          "p50_ms": 0.034,
+          "p95_ms": 0.0507,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::projectile_step": {
+          "feature": "core.scale",
+          "max_ms": 0.0039,
+          "mean_ms": 0.0019120833333333375,
+          "p50_ms": 0.0018,
+          "p95_ms": 0.0028,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::scale_fire": {
+          "feature": "core.scale",
+          "max_ms": 0.31589999999999996,
+          "mean_ms": 0.0023724999999999996,
+          "p50_ms": 0.001,
+          "p95_ms": 0.0017000000000000001,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::scale_sense": {
+          "feature": "core.scale",
+          "max_ms": 0.40509999999999996,
+          "mean_ms": 0.07715958333333339,
+          "p50_ms": 0.07100000000000001,
+          "p95_ms": 0.1051,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spatial::track_spatial": {
+          "feature": "core.spatial",
+          "max_ms": 0.127,
+          "mean_ms": 0.03383916666666665,
+          "p50_ms": 0.0315,
+          "p95_ms": 0.0458,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spawn::despawn_funnel": {
+          "feature": "core.spawn",
+          "max_ms": 0.0109,
+          "mean_ms": 0.00597041666666666,
+          "p50_ms": 0.0055,
+          "p95_ms": 0.009000000000000001,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spawn::spawn_funnel": {
+          "feature": "core.spawn",
+          "max_ms": 0.0262,
+          "mean_ms": 0.010725833333333346,
+          "p50_ms": 0.0094,
+          "p95_ms": 0.0176,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::steer::compute_steering": {
+          "feature": "core.steer",
+          "max_ms": 0.2434,
+          "mean_ms": 0.07801041666666667,
+          "p50_ms": 0.0725,
+          "p95_ms": 0.1043,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "tick": {
+        "max_ms": 1.9607999999999999,
+        "mean_ms": 0.5268375000000001,
+        "p50_ms": 0.4455,
+        "p95_ms": 1.1804999999999999,
+        "samples": 400,
+        "window_samples": 240
+      },
+      "ticks": 400,
+      "units": 500
+    },
+    {
+      "features": {
+        "core.classify": {
+          "max_ms": 0.022699999999999998,
+          "mean_ms": 0.00932041666666667,
+          "p50_ms": 0.0085,
+          "p95_ms": 0.0155,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.commands": {
+          "max_ms": 0.0009,
+          "mean_ms": 0.0002962500000000003,
+          "p50_ms": 0.0003,
+          "p95_ms": 0.0005,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.movement": {
+          "max_ms": 1.7234,
+          "mean_ms": 1.0396708333333335,
+          "p50_ms": 1.0029,
+          "p95_ms": 1.2878,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.nav": {
+          "max_ms": 0.0006,
+          "mean_ms": 0.00031625000000000056,
+          "p50_ms": 0.0003,
+          "p95_ms": 0.00039999999999999996,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.observe": {
+          "max_ms": 0.039400000000000004,
+          "mean_ms": 0.011903750000000008,
+          "p50_ms": 0.0111,
+          "p95_ms": 0.0159,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.orders": {
+          "max_ms": 0.0496,
+          "mean_ms": 0.02035083333333332,
+          "p50_ms": 0.018000000000000002,
+          "p95_ms": 0.0331,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.path": {
+          "max_ms": 0.4485,
+          "mean_ms": 0.10481708333333331,
+          "p50_ms": 0.1126,
+          "p95_ms": 0.2695,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.publish": {
+          "max_ms": 0.14650000000000002,
+          "mean_ms": 0.09032708333333339,
+          "p50_ms": 0.0876,
+          "p95_ms": 0.1086,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.scale": {
+          "max_ms": 2.5145999999999997,
+          "mean_ms": 1.7321704166666672,
+          "p50_ms": 1.7063,
+          "p95_ms": 1.9054,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.spatial": {
+          "max_ms": 0.3143,
+          "mean_ms": 0.19838875000000006,
+          "p50_ms": 0.1933,
+          "p95_ms": 0.2274,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.spawn": {
+          "max_ms": 0.1522,
+          "mean_ms": 0.08682791666666671,
+          "p50_ms": 0.08349999999999999,
+          "p95_ms": 0.1031,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.steer": {
+          "max_ms": 1.4726,
+          "mean_ms": 1.0974408333333334,
+          "p50_ms": 1.075,
+          "p95_ms": 1.2593999999999999,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "phases": {
+        "Act": {
+          "max_ms": 2.0831999999999997,
+          "mean_ms": 1.2979674999999995,
+          "p50_ms": 1.2551999999999999,
+          "p95_ms": 1.5688,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Economy": {
+          "max_ms": 0.0017000000000000001,
+          "mean_ms": 0.0008037499999999987,
+          "p50_ms": 0.0007999999999999999,
+          "p95_ms": 0.0011,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Input": {
+          "max_ms": 0.0309,
+          "mean_ms": 0.013864999999999997,
+          "p50_ms": 0.012700000000000001,
+          "p95_ms": 0.0207,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Lifecycle": {
+          "max_ms": 0.1595,
+          "mean_ms": 0.0898358333333333,
+          "p50_ms": 0.0863,
+          "p95_ms": 0.1065,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Perceive": {
+          "max_ms": 2.457,
+          "mean_ms": 1.6642316666666659,
+          "p50_ms": 1.6433000000000002,
+          "p95_ms": 1.8414,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Publish": {
+          "max_ms": 0.1507,
+          "mean_ms": 0.09243666666666664,
+          "p50_ms": 0.0895,
+          "p95_ms": 0.11230000000000001,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Resolve": {
+          "max_ms": 0.016,
+          "mean_ms": 0.009773750000000005,
+          "p50_ms": 0.0096,
+          "p95_ms": 0.0107,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Think": {
+          "max_ms": 1.7432,
+          "mean_ms": 1.2401741666666668,
+          "p50_ms": 1.2193,
+          "p95_ms": 1.5082,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "systems": {
+        "fl_sim::classify::reset_transients": {
+          "feature": "core.classify",
+          "max_ms": 0.022699999999999998,
+          "mean_ms": 0.00932041666666667,
+          "p50_ms": 0.0085,
+          "p95_ms": 0.0155,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::commands::apply_commands": {
+          "feature": "core.commands",
+          "max_ms": 0.0009,
+          "mean_ms": 0.0002962500000000003,
+          "p50_ms": 0.0003,
+          "p95_ms": 0.0005,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::move_system": {
+          "feature": "core.movement",
+          "max_ms": 1.6969999999999998,
+          "mean_ms": 1.0238,
+          "p50_ms": 0.9859999999999999,
+          "p95_ms": 1.2672,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::prepare_flow_tiles": {
+          "feature": "core.movement",
+          "max_ms": 0.0212,
+          "mean_ms": 0.0043054166666666675,
+          "p50_ms": 0.0037,
+          "p95_ms": 0.007500000000000001,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::wander_system": {
+          "feature": "core.movement",
+          "max_ms": 0.0813,
+          "mean_ms": 0.011565416666666663,
+          "p50_ms": 0.0107,
+          "p95_ms": 0.016,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::nav::flow::begin_flow_tick": {
+          "feature": "core.nav",
+          "max_ms": 0.0006,
+          "mean_ms": 0.00031625000000000056,
+          "p50_ms": 0.0003,
+          "p95_ms": 0.00039999999999999996,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::observe::marker::{{closure}}": {
+          "feature": "core.observe",
+          "max_ms": 0.039400000000000004,
+          "mean_ms": 0.011903750000000008,
+          "p50_ms": 0.0111,
+          "p95_ms": 0.0159,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::orders::advance_orders": {
+          "feature": "core.orders",
+          "max_ms": 0.0496,
+          "mean_ms": 0.02035083333333332,
+          "p50_ms": 0.018000000000000002,
+          "p95_ms": 0.0331,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::path::process_path_queue": {
+          "feature": "core.path",
+          "max_ms": 0.4485,
+          "mean_ms": 0.10481708333333331,
+          "p50_ms": 0.1126,
+          "p95_ms": 0.2695,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::publish::publish_snapshot": {
+          "feature": "core.publish",
+          "max_ms": 0.14650000000000002,
+          "mean_ms": 0.09032708333333339,
+          "p50_ms": 0.0876,
+          "p95_ms": 0.1086,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::follow_system": {
+          "feature": "core.scale",
+          "max_ms": 0.4153,
+          "mean_ms": 0.2570225,
+          "p50_ms": 0.24760000000000001,
+          "p95_ms": 0.30200000000000005,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::projectile_step": {
+          "feature": "core.scale",
+          "max_ms": 0.0125,
+          "mean_ms": 0.008062083333333329,
+          "p50_ms": 0.0079,
+          "p95_ms": 0.0085,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::scale_fire": {
+          "feature": "core.scale",
+          "max_ms": 0.011399999999999999,
+          "mean_ms": 0.005603333333333321,
+          "p50_ms": 0.0053,
+          "p95_ms": 0.0074,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::scale_sense": {
+          "feature": "core.scale",
+          "max_ms": 2.2523999999999997,
+          "mean_ms": 1.4614825,
+          "p50_ms": 1.4422,
+          "p95_ms": 1.6203999999999998,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spatial::track_spatial": {
+          "feature": "core.spatial",
+          "max_ms": 0.3143,
+          "mean_ms": 0.19838875000000006,
+          "p50_ms": 0.1933,
+          "p95_ms": 0.2274,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spawn::despawn_funnel": {
+          "feature": "core.spawn",
+          "max_ms": 0.0795,
+          "mean_ms": 0.03684583333333333,
+          "p50_ms": 0.0354,
+          "p95_ms": 0.0445,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spawn::spawn_funnel": {
+          "feature": "core.spawn",
+          "max_ms": 0.1105,
+          "mean_ms": 0.04998208333333332,
+          "p50_ms": 0.0479,
+          "p95_ms": 0.0621,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::steer::compute_steering": {
+          "feature": "core.steer",
+          "max_ms": 1.4726,
+          "mean_ms": 1.0974408333333334,
+          "p50_ms": 1.075,
+          "p95_ms": 1.2593999999999999,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "tick": {
+        "max_ms": 8.735,
+        "mean_ms": 4.628797916666666,
+        "p50_ms": 4.3668,
+        "p95_ms": 6.2469,
+        "samples": 400,
+        "window_samples": 240
+      },
+      "ticks": 400,
+      "units": 3000
+    },
+    {
+      "features": {
+        "core.classify": {
+          "max_ms": 0.0522,
+          "mean_ms": 0.012545833333333336,
+          "p50_ms": 0.0111,
+          "p95_ms": 0.0206,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.commands": {
+          "max_ms": 0.0245,
+          "mean_ms": 0.0005004166666666671,
+          "p50_ms": 0.00039999999999999996,
+          "p95_ms": 0.0007,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.movement": {
+          "max_ms": 3.4984,
+          "mean_ms": 1.9510891666666672,
+          "p50_ms": 1.7920999999999998,
+          "p95_ms": 2.7859999999999996,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.nav": {
+          "max_ms": 0.0025,
+          "mean_ms": 0.0004137500000000002,
+          "p50_ms": 0.00039999999999999996,
+          "p95_ms": 0.0006,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.observe": {
+          "max_ms": 0.0436,
+          "mean_ms": 0.015135416666666662,
+          "p50_ms": 0.013900000000000001,
+          "p95_ms": 0.0217,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.orders": {
+          "max_ms": 0.3014,
+          "mean_ms": 0.04550500000000002,
+          "p50_ms": 0.0419,
+          "p95_ms": 0.0693,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.path": {
+          "max_ms": 0.5714,
+          "mean_ms": 0.15057083333333326,
+          "p50_ms": 0.13990000000000002,
+          "p95_ms": 0.3352,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.publish": {
+          "max_ms": 0.2921,
+          "mean_ms": 0.1639475000000001,
+          "p50_ms": 0.15410000000000001,
+          "p95_ms": 0.2354,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.scale": {
+          "max_ms": 5.7676,
+          "mean_ms": 4.200691666666663,
+          "p50_ms": 4.074,
+          "p95_ms": 5.1039,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.spatial": {
+          "max_ms": 0.6155,
+          "mean_ms": 0.3576037500000003,
+          "p50_ms": 0.332,
+          "p95_ms": 0.49700000000000005,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.spawn": {
+          "max_ms": 0.2686,
+          "mean_ms": 0.16332250000000012,
+          "p50_ms": 0.1522,
+          "p95_ms": 0.2392,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "core.steer": {
+          "max_ms": 4.3336,
+          "mean_ms": 2.746686666666668,
+          "p50_ms": 2.6205,
+          "p95_ms": 3.5292000000000003,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "phases": {
+        "Act": {
+          "max_ms": 4.2833000000000006,
+          "mean_ms": 2.4383725000000003,
+          "p50_ms": 2.2438,
+          "p95_ms": 3.4446,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Economy": {
+          "max_ms": 0.0015999999999999999,
+          "mean_ms": 0.0008524999999999997,
+          "p50_ms": 0.0007999999999999999,
+          "p95_ms": 0.0012,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Input": {
+          "max_ms": 0.088,
+          "mean_ms": 0.018060416666666676,
+          "p50_ms": 0.0161,
+          "p95_ms": 0.0275,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Lifecycle": {
+          "max_ms": 0.2789,
+          "mean_ms": 0.1673491666666667,
+          "p50_ms": 0.1558,
+          "p95_ms": 0.24469999999999997,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Perceive": {
+          "max_ms": 5.595,
+          "mean_ms": 4.053395416666665,
+          "p50_ms": 3.9262,
+          "p95_ms": 5.0032000000000005,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Publish": {
+          "max_ms": 0.2998,
+          "mean_ms": 0.16684125000000008,
+          "p50_ms": 0.1565,
+          "p95_ms": 0.2392,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Resolve": {
+          "max_ms": 0.076,
+          "mean_ms": 0.016268333333333287,
+          "p50_ms": 0.015000000000000001,
+          "p95_ms": 0.0244,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "Think": {
+          "max_ms": 4.6122000000000005,
+          "mean_ms": 2.9722541666666653,
+          "p50_ms": 2.8512,
+          "p95_ms": 3.7944,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "systems": {
+        "fl_sim::classify::reset_transients": {
+          "feature": "core.classify",
+          "max_ms": 0.0522,
+          "mean_ms": 0.012545833333333336,
+          "p50_ms": 0.0111,
+          "p95_ms": 0.0206,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::commands::apply_commands": {
+          "feature": "core.commands",
+          "max_ms": 0.0245,
+          "mean_ms": 0.0005004166666666671,
+          "p50_ms": 0.00039999999999999996,
+          "p95_ms": 0.0007,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::move_system": {
+          "feature": "core.movement",
+          "max_ms": 3.4491,
+          "mean_ms": 1.9205508333333325,
+          "p50_ms": 1.7668,
+          "p95_ms": 2.7502999999999997,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::prepare_flow_tiles": {
+          "feature": "core.movement",
+          "max_ms": 0.0419,
+          "mean_ms": 0.0098625,
+          "p50_ms": 0.008,
+          "p95_ms": 0.0173,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::movement::wander_system": {
+          "feature": "core.movement",
+          "max_ms": 0.0532,
+          "mean_ms": 0.02067583333333334,
+          "p50_ms": 0.0196,
+          "p95_ms": 0.0293,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::nav::flow::begin_flow_tick": {
+          "feature": "core.nav",
+          "max_ms": 0.0025,
+          "mean_ms": 0.0004137500000000002,
+          "p50_ms": 0.00039999999999999996,
+          "p95_ms": 0.0006,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::observe::marker::{{closure}}": {
+          "feature": "core.observe",
+          "max_ms": 0.0436,
+          "mean_ms": 0.015135416666666662,
+          "p50_ms": 0.013900000000000001,
+          "p95_ms": 0.0217,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::orders::advance_orders": {
+          "feature": "core.orders",
+          "max_ms": 0.3014,
+          "mean_ms": 0.04550500000000002,
+          "p50_ms": 0.0419,
+          "p95_ms": 0.0693,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::path::process_path_queue": {
+          "feature": "core.path",
+          "max_ms": 0.5714,
+          "mean_ms": 0.15057083333333326,
+          "p50_ms": 0.13990000000000002,
+          "p95_ms": 0.3352,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::publish::publish_snapshot": {
+          "feature": "core.publish",
+          "max_ms": 0.2921,
+          "mean_ms": 0.1639475000000001,
+          "p50_ms": 0.15410000000000001,
+          "p95_ms": 0.2354,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::follow_system": {
+          "feature": "core.scale",
+          "max_ms": 0.7898999999999999,
+          "mean_ms": 0.48597958333333346,
+          "p50_ms": 0.45389999999999997,
+          "p95_ms": 0.6362,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::projectile_step": {
+          "feature": "core.scale",
+          "max_ms": 0.07289999999999999,
+          "mean_ms": 0.014222499999999996,
+          "p50_ms": 0.0131,
+          "p95_ms": 0.0212,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::scale_fire": {
+          "feature": "core.scale",
+          "max_ms": 0.054400000000000004,
+          "mean_ms": 0.011369583333333329,
+          "p50_ms": 0.0099,
+          "p95_ms": 0.018000000000000002,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::scale::scale_sense": {
+          "feature": "core.scale",
+          "max_ms": 5.1113,
+          "mean_ms": 3.68912,
+          "p50_ms": 3.5813,
+          "p95_ms": 4.5112,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spatial::track_spatial": {
+          "feature": "core.spatial",
+          "max_ms": 0.6155,
+          "mean_ms": 0.3576037500000003,
+          "p50_ms": 0.332,
+          "p95_ms": 0.49700000000000005,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spawn::despawn_funnel": {
+          "feature": "core.spawn",
+          "max_ms": 0.1495,
+          "mean_ms": 0.07842833333333335,
+          "p50_ms": 0.0727,
+          "p95_ms": 0.1173,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::spawn::spawn_funnel": {
+          "feature": "core.spawn",
+          "max_ms": 0.1873,
+          "mean_ms": 0.08489416666666666,
+          "p50_ms": 0.0799,
+          "p95_ms": 0.1224,
+          "samples": 400,
+          "window_samples": 240
+        },
+        "fl_sim::steer::compute_steering": {
+          "feature": "core.steer",
+          "max_ms": 4.3336,
+          "mean_ms": 2.746686666666668,
+          "p50_ms": 2.6205,
+          "p95_ms": 3.5292000000000003,
+          "samples": 400,
+          "window_samples": 240
+        }
+      },
+      "tick": {
+        "max_ms": 19.1067,
+        "mean_ms": 10.202002499999997,
+        "p50_ms": 9.5305,
+        "p95_ms": 14.7754,
+        "samples": 400,
+        "window_samples": 240
+      },
+      "ticks": 400,
+      "units": 5000
+    }
+  ],
+  "systems": {
+    "fl_sim::classify::reset_transients": {
+      "feature": "core.classify",
+      "max_ms": 0.0522,
+      "mean_ms": 0.012545833333333336,
+      "p50_ms": 0.0111,
+      "p95_ms": 0.0206,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::commands::apply_commands": {
+      "feature": "core.commands",
+      "max_ms": 0.0245,
+      "mean_ms": 0.0005004166666666671,
+      "p50_ms": 0.00039999999999999996,
+      "p95_ms": 0.0007,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::movement::move_system": {
+      "feature": "core.movement",
+      "max_ms": 3.4491,
+      "mean_ms": 1.9205508333333325,
+      "p50_ms": 1.7668,
+      "p95_ms": 2.7502999999999997,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::movement::prepare_flow_tiles": {
+      "feature": "core.movement",
+      "max_ms": 0.0419,
+      "mean_ms": 0.0098625,
+      "p50_ms": 0.008,
+      "p95_ms": 0.0173,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::movement::wander_system": {
+      "feature": "core.movement",
+      "max_ms": 0.0532,
+      "mean_ms": 0.02067583333333334,
+      "p50_ms": 0.0196,
+      "p95_ms": 0.0293,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::nav::flow::begin_flow_tick": {
+      "feature": "core.nav",
+      "max_ms": 0.0025,
+      "mean_ms": 0.0004137500000000002,
+      "p50_ms": 0.00039999999999999996,
+      "p95_ms": 0.0006,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::observe::marker::{{closure}}": {
+      "feature": "core.observe",
+      "max_ms": 0.0436,
+      "mean_ms": 0.015135416666666662,
+      "p50_ms": 0.013900000000000001,
+      "p95_ms": 0.0217,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::orders::advance_orders": {
+      "feature": "core.orders",
+      "max_ms": 0.3014,
+      "mean_ms": 0.04550500000000002,
+      "p50_ms": 0.0419,
+      "p95_ms": 0.0693,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::path::process_path_queue": {
+      "feature": "core.path",
+      "max_ms": 0.5714,
+      "mean_ms": 0.15057083333333326,
+      "p50_ms": 0.13990000000000002,
+      "p95_ms": 0.3352,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::publish::publish_snapshot": {
+      "feature": "core.publish",
+      "max_ms": 0.2921,
+      "mean_ms": 0.1639475000000001,
+      "p50_ms": 0.15410000000000001,
+      "p95_ms": 0.2354,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::scale::follow_system": {
+      "feature": "core.scale",
+      "max_ms": 0.7898999999999999,
+      "mean_ms": 0.48597958333333346,
+      "p50_ms": 0.45389999999999997,
+      "p95_ms": 0.6362,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::scale::projectile_step": {
+      "feature": "core.scale",
+      "max_ms": 0.07289999999999999,
+      "mean_ms": 0.014222499999999996,
+      "p50_ms": 0.0131,
+      "p95_ms": 0.0212,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::scale::scale_fire": {
+      "feature": "core.scale",
+      "max_ms": 0.054400000000000004,
+      "mean_ms": 0.011369583333333329,
+      "p50_ms": 0.0099,
+      "p95_ms": 0.018000000000000002,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::scale::scale_sense": {
+      "feature": "core.scale",
+      "max_ms": 5.1113,
+      "mean_ms": 3.68912,
+      "p50_ms": 3.5813,
+      "p95_ms": 4.5112,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::spatial::track_spatial": {
+      "feature": "core.spatial",
+      "max_ms": 0.6155,
+      "mean_ms": 0.3576037500000003,
+      "p50_ms": 0.332,
+      "p95_ms": 0.49700000000000005,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::spawn::despawn_funnel": {
+      "feature": "core.spawn",
+      "max_ms": 0.1495,
+      "mean_ms": 0.07842833333333335,
+      "p50_ms": 0.0727,
+      "p95_ms": 0.1173,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::spawn::spawn_funnel": {
+      "feature": "core.spawn",
+      "max_ms": 0.1873,
+      "mean_ms": 0.08489416666666666,
+      "p50_ms": 0.0799,
+      "p95_ms": 0.1224,
+      "samples": 400,
+      "window_samples": 240
+    },
+    "fl_sim::steer::compute_steering": {
+      "feature": "core.steer",
+      "max_ms": 4.3336,
+      "mean_ms": 2.746686666666668,
+      "p50_ms": 2.6205,
+      "p95_ms": 3.5292000000000003,
+      "samples": 400,
+      "window_samples": 240
+    }
+  }
+}

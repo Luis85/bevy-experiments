@@ -1,0 +1,2015 @@
+---
+source: content/village_content/tests/golden.rs
+assertion_line: 64
+expression: first
+---
+[
+  {
+    "tick": 0,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 0,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 4,
+      "ok": true
+    }
+  },
+  {
+    "tick": 0,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveWork",
+      "path": "Villager > DayWork > WorkSeq > ReserveWork",
+      "action": "ReserveWork",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 0,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 35,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 63,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 63,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 63,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "DoWork",
+      "path": "Villager > DayWork > WorkSeq > DoWork",
+      "action": "DoWork",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 75,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 115,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 155,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 195,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 235,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 275,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 315,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 355,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 362,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "Effect",
+      "effect": {
+        "type": "AddFood",
+        "stockpile": 3,
+        "amount": 3
+      },
+      "applied": true
+    }
+  },
+  {
+    "tick": 363,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 363,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "DoWork",
+      "path": "Villager > DayWork > WorkSeq > DoWork",
+      "action": "DoWork",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 363,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 4,
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 363,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 364,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 364,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 4,
+      "ok": true
+    }
+  },
+  {
+    "tick": 364,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveWork",
+      "path": "Villager > DayWork > WorkSeq > ReserveWork",
+      "action": "ReserveWork",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 364,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 364,
+    "seq": 4,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "DoWork",
+      "path": "Villager > DayWork > WorkSeq > DoWork",
+      "action": "DoWork",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 395,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 435,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 475,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 515,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 555,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 595,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 635,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 663,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "Effect",
+      "effect": {
+        "type": "AddFood",
+        "stockpile": 3,
+        "amount": 3
+      },
+      "applied": true
+    }
+  },
+  {
+    "tick": 664,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 664,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "DoWork",
+      "path": "Villager > DayWork > WorkSeq > DoWork",
+      "action": "DoWork",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 664,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 4,
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 664,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 665,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 665,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "PickWanderPoint",
+      "path": "Villager > Wander > PickWanderPoint",
+      "action": "PickWanderPoint",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 665,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > Wander > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 675,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 715,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 755,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 790,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 790,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > Wander > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 790,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "IdleFor",
+      "path": "Villager > Wander > IdleFor",
+      "action": "IdleFor",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 795,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 835,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 854,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 854,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "IdleFor",
+      "path": "Villager > Wander > IdleFor",
+      "action": "IdleFor",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 854,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 855,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 855,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "PickWanderPoint",
+      "path": "Villager > Wander > PickWanderPoint",
+      "action": "PickWanderPoint",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 855,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > Wander > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 875,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 915,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 949,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 949,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > Wander > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 949,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "IdleFor",
+      "path": "Villager > Wander > IdleFor",
+      "action": "IdleFor",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 955,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 995,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1035,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1075,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1111,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Thirst",
+      "from": "Ok",
+      "to": "Low"
+    }
+  },
+  {
+    "tick": 1111,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1115,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1146,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 1146,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "IdleFor",
+      "path": "Villager > Wander > IdleFor",
+      "action": "IdleFor",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1146,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 1147,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 1147,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 6,
+      "ok": true
+    }
+  },
+  {
+    "tick": 1147,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveWell",
+      "path": "Villager > CasualDrink > DrinkSeq > ReserveWell",
+      "action": "ReserveWell",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 1147,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > CasualDrink > DrinkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 1155,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1195,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1235,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1250,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Hunger",
+      "from": "Ok",
+      "to": "Low"
+    }
+  },
+  {
+    "tick": 1250,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1275,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1298,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 1298,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > CasualDrink > DrinkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1298,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "DrinkWater",
+      "path": "Villager > CasualDrink > DrinkSeq > DrinkWater",
+      "action": "DrinkWater",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 1315,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1337,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 6,
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1338,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Thirst",
+      "from": "Low",
+      "to": "Ok"
+    }
+  },
+  {
+    "tick": 1338,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1338,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "DrinkWater",
+      "path": "Villager > CasualDrink > DrinkSeq > DrinkWater",
+      "action": "DrinkWater",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1338,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 1339,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 1339,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 3,
+      "ok": true
+    }
+  },
+  {
+    "tick": 1339,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveFood",
+      "path": "Villager > CasualEat > EatSeq > ReserveFood",
+      "action": "ReserveFood",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 1339,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > CasualEat > EatSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 1355,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1395,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1435,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1475,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1500,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Energy",
+      "from": "Ok",
+      "to": "Low"
+    }
+  },
+  {
+    "tick": 1500,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1515,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1529,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 1529,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > CasualEat > EatSeq > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1529,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "EatFood",
+      "path": "Villager > CasualEat > EatSeq > EatFood",
+      "action": "EatFood",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 1555,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1588,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 3,
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1588,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Effect",
+      "effect": {
+        "type": "TakeFood",
+        "stockpile": 3,
+        "amount": 1
+      },
+      "applied": true
+    }
+  },
+  {
+    "tick": 1589,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Hunger",
+      "from": "Low",
+      "to": "Ok"
+    }
+  },
+  {
+    "tick": 1589,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1589,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "EatFood",
+      "path": "Villager > CasualEat > EatSeq > EatFood",
+      "action": "EatFood",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1589,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 1590,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 1590,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 4,
+      "ok": true
+    }
+  },
+  {
+    "tick": 1590,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveWork",
+      "path": "Villager > DayWork > WorkSeq > ReserveWork",
+      "action": "ReserveWork",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 1590,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 1595,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1635,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1675,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1680,
+    "seq": 0,
+    "unit": null,
+    "kind": {
+      "type": "PhaseChange",
+      "night": true
+    }
+  },
+  {
+    "tick": 1680,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1681,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 1681,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1681,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 4,
+      "reason": "Failed"
+    }
+  },
+  {
+    "tick": 1681,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "DoWork",
+      "path": "Villager > DayWork > WorkSeq > DoWork",
+      "action": "DoWork",
+      "status": "Failure"
+    }
+  },
+  {
+    "tick": 1681,
+    "seq": 4,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 2,
+      "ok": true
+    }
+  },
+  {
+    "tick": 1681,
+    "seq": 5,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveBed",
+      "path": "Villager > NightSleep > SleepSeq > ReserveBed",
+      "action": "ReserveBed",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 1681,
+    "seq": 6,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > NightSleep > SleepSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 1715,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1755,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1795,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1822,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 1822,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > NightSleep > SleepSeq > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 1822,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "SleepInBed",
+      "path": "Villager > NightSleep > SleepSeq > SleepInBed",
+      "action": "SleepInBed",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 1835,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1875,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1915,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1955,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 1995,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2035,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2075,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2115,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2137,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Energy",
+      "from": "Low",
+      "to": "Ok"
+    }
+  },
+  {
+    "tick": 2137,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2155,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2195,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2235,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2275,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2315,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2355,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2395,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2400,
+    "seq": 0,
+    "unit": null,
+    "kind": {
+      "type": "PhaseChange",
+      "night": false
+    }
+  },
+  {
+    "tick": 2400,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2401,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 2401,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "SleepInBed",
+      "path": "Villager > NightSleep > SleepSeq > SleepInBed",
+      "action": "SleepInBed",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2401,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 2,
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2401,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 2402,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 2402,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 4,
+      "ok": true
+    }
+  },
+  {
+    "tick": 2402,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveWork",
+      "path": "Villager > DayWork > WorkSeq > ReserveWork",
+      "action": "ReserveWork",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 2402,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 2435,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2475,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2515,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2543,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 2543,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2543,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "DoWork",
+      "path": "Villager > DayWork > WorkSeq > DoWork",
+      "action": "DoWork",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 2555,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2595,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2635,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2675,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2715,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2750,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Hunger",
+      "from": "Ok",
+      "to": "Low"
+    }
+  },
+  {
+    "tick": 2750,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2755,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2795,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2835,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2842,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "Effect",
+      "effect": {
+        "type": "AddFood",
+        "stockpile": 3,
+        "amount": 3
+      },
+      "applied": true
+    }
+  },
+  {
+    "tick": 2843,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 2843,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "DoWork",
+      "path": "Villager > DayWork > WorkSeq > DoWork",
+      "action": "DoWork",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2843,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 4,
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2843,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 2844,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 2844,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 3,
+      "ok": true
+    }
+  },
+  {
+    "tick": 2844,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveFood",
+      "path": "Villager > CasualEat > EatSeq > ReserveFood",
+      "action": "ReserveFood",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 2844,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > CasualEat > EatSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 2875,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2915,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2935,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "LeafDone"
+    }
+  },
+  {
+    "tick": 2935,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "MoveToDest",
+      "path": "Villager > CasualEat > EatSeq > MoveToDest",
+      "action": "MoveToDest",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2935,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "EatFood",
+      "path": "Villager > CasualEat > EatSeq > EatFood",
+      "action": "EatFood",
+      "status": "Running"
+    }
+  },
+  {
+    "tick": 2955,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2994,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "Release",
+      "target": 3,
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2994,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Effect",
+      "effect": {
+        "type": "TakeFood",
+        "stockpile": 3,
+        "amount": 1
+      },
+      "applied": true
+    }
+  },
+  {
+    "tick": 2995,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "NeedLevel",
+      "need": "Hunger",
+      "from": "Low",
+      "to": "Ok"
+    }
+  },
+  {
+    "tick": 2995,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "Request"
+    }
+  },
+  {
+    "tick": 2995,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStop",
+      "node": "EatFood",
+      "path": "Villager > CasualEat > EatSeq > EatFood",
+      "action": "EatFood",
+      "reason": "Finished"
+    }
+  },
+  {
+    "tick": 2995,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "RootDone",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 2996,
+    "seq": 0,
+    "unit": 5,
+    "kind": {
+      "type": "ThinkStart",
+      "reason": "NoLeaf"
+    }
+  },
+  {
+    "tick": 2996,
+    "seq": 1,
+    "unit": 5,
+    "kind": {
+      "type": "Reserve",
+      "target": 4,
+      "ok": true
+    }
+  },
+  {
+    "tick": 2996,
+    "seq": 2,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "ReserveWork",
+      "path": "Villager > DayWork > WorkSeq > ReserveWork",
+      "action": "ReserveWork",
+      "status": "Success"
+    }
+  },
+  {
+    "tick": 2996,
+    "seq": 3,
+    "unit": 5,
+    "kind": {
+      "type": "LeafStart",
+      "node": "MoveToDest",
+      "path": "Villager > DayWork > WorkSeq > MoveToDest",
+      "action": "MoveToDest",
+      "status": "Running"
+    }
+  }
+]

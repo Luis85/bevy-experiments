@@ -1,0 +1,7 @@
+ScenarioDef(
+    id: "s.outside",
+    map: "a.flat",
+    seed: 1,
+    players: [(faction: "a.red", team: 0, controller: Human)],
+    units: [(unit: "a.alpha", player: 0, pos: (1000.0, 10.0), heading_deg: 0.0)],
+)

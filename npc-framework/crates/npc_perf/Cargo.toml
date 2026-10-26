@@ -1,0 +1,20 @@
+[package]
+name = "npc_perf"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Tracing layer that times every Bevy system and mechanic span, with rolling stats and budgets."
+
+[dependencies]
+bevy_ecs.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std"] }
+
+[dev-dependencies]
+# `trace` emits the per-system spans; `debug` keeps real system names
+# (without it every system is named "<Enable the debug feature ...>");
+# `multi_threaded` runs the executor on worker threads in tests/global.rs.
+bevy_ecs = { workspace = true, features = ["trace", "debug", "multi_threaded"] }

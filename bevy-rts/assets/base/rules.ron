@@ -1,0 +1,25 @@
+// guess: the "Movement", "Path" and "Steering" values are placeholders until tuned (spec §7, ADR-0014).
+Rules({
+    "StateHash": (interval_ticks: 20),
+    "Spatial": (cell_m: 32.0),
+    "Movement": (
+        min_speed_frac: 0.05,
+        turn_in_place_deg: 30.0,
+        arrive_m: 0.5,
+        formation_max_spread_m: 40.0,
+        follow_distance_m: 8.0,
+        follow_repath_ticks: 20,
+        max_slope_m: {Foot: 100.0, Wheeled: 1.5, HalfTrack: 2.0, Tracked: 2.5},
+        path_terrain_factor: {Foot: 1.0, Wheeled: 0.2, HalfTrack: 0.45, Tracked: 0.5},
+    ),
+    "Path": (
+        cluster_cells: 16,
+        budget_per_tick: 8000,
+        max_clearance: 3,
+        snap_radius_cells: 8,
+        flow_min_group: 6,
+        flow_cache_max: 32,
+        flow_cache_hard_max: 128,
+    ),
+    "Steering": (separation_gain: 0.5, separation_margin_m: 0.5, idle_every: 5, max_push_frac: 0.5),
+})

@@ -1,0 +1,1 @@
+Mod(id: "b", version: "0.1.0", depends: ["a"], load_after: ["not_installed"])

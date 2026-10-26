@@ -1,0 +1,41 @@
+[package]
+name = "fl_game"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+debug_remote = ["fl_client/debug_remote"]
+dynamic = ["bevy/dynamic_linking"]
+trace = ["bevy/trace"]
+trace_tracy = ["bevy/trace_tracy"]
+trace_chrome = ["bevy/trace_chrome"]
+
+[dependencies]
+fl_client.workspace = true
+fl_sim.workspace = true
+fl_view.workspace = true
+fl_catalog.workspace = true
+fl_content.workspace = true
+fl_protocol.workspace = true
+fl_math.workspace = true
+fl_observe.workspace = true
+bevy.workspace = true
+clap.workspace = true
+tracing.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+ron.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "fl_game"
+path = "src/main.rs"

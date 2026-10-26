@@ -1,0 +1,28 @@
+---
+source: crates/fl_test_utils/tests/perf_counters.rs
+assertion_line: 86
+expression: totals
+---
+Totals(
+  entities: 10000,
+  totals: {
+    "despawn.entities": 10000,
+    "move.los_cells": 1211962,
+    "path.budget_spent": 81899,
+    "path.los_cells": 81899,
+    "path.requests": 1805,
+    "publish.rebuilt": 600000,
+    "publish.records": 600000,
+    "scale.follows": 1200000,
+    "scale.projectile_steps": 200000,
+    "sort.items": 10000,
+    "spatial.checked": 2000000,
+    "spatial.inserts": 10000,
+    "spatial.queries": 60000,
+    "spatial.query_candidates": 15281852,
+    "spatial.relocations": 104831,
+    "spawn.entities": 10000,
+    "steer.pairs": 4075560,
+    "steer.units": 600000,
+  },
+)

@@ -1,0 +1,45 @@
+[package]
+name = "npc_view_helpers"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Generic presentation helpers for the NPC framework: VisualOf links, interpolation, tick timing, journal and perf panels, selection, screenshots."
+
+[dependencies]
+# Only what the helpers use (no default features: the app picks the
+# renderer's features, including the zstd backend; see apps/village).
+bevy = { version = "0.20.0", default-features = false, features = [
+    "std", "bevy_render", "bevy_window", "bevy_camera", "bevy_ui", "bevy_text",
+    "bevy_gizmos", "bevy_color", "bevy_log",
+] }
+npc_kernel.workspace = true
+npc_perf = { workspace = true, optional = true }
+npc_nav = { workspace = true, optional = true }
+npc_perception = { workspace = true, optional = true }
+npc_vehicles = { workspace = true, optional = true }
+npc_command = { workspace = true, optional = true }
+npc_tools = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
+serde_json = "1"
+
+[features]
+default = []
+# F4 perf panel (reads the npc_perf profiler's `PerfHandle`).
+perf = ["dep:npc_perf"]
+# Path gizmos for `npc_nav` agents (`nav_gizmos`).
+nav = ["dep:npc_nav"]
+# Vision cones and line-of-sight rays for `npc_perception` agents
+# (`perception_gizmos`).
+perception = ["dep:npc_perception"]
+# Crew gizmos for `npc_vehicles` vehicles (`vehicle_gizmos`).
+vehicles = ["dep:npc_vehicles"]
+# RTS command UI for `npc_command` (`command_ui`: multi-selection, box
+# select, shift-add, Ctrl+1-9 control groups, right-click context orders,
+# order/waypoint gizmos), all emitting `SimCommand`s.
+command = ["dep:npc_command"]
+# The remote interface of a windowed host (`remote`: the --remote/--no-remote/
+# --remote-port/--out-dir flags, BRP `npc/*` via npc_tools, `npc/screenshot
+# {path}` confined under the output root, `--record`). Off by default in
+# release builds (the app passes `cfg!(debug_assertions)`).
+remote = ["dep:npc_tools", "npc_tools/remote", "dep:serde"]

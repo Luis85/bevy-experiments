@@ -1,0 +1,41 @@
+# Path ownership by track (spec §13.2, ADR-0011). Tracks are evaluated in file order, and the first match wins.
+# `cargo xtask check-scope --track <name>` fails a branch that touches paths outside its track(s); `[protected]`
+# paths are denied to implementer roles and change only through `cargo xtask bless` (spec §12.5, ADR-0009).
+# Globs use `/` separators; `*` stays within one path segment and `**` spans segments.
+
+[[track]]
+name = "contract"
+paths = ["crates/fl_math/**", "crates/fl_protocol/**", "crates/fl_view/**",
+  "crates/fl_sim/src/{builder,registry,classify,schedule,feature,step,hash,replay,spawn,commands}.rs", "crates/fl_sim/src/runner/**", "crates/fl_sim/src/save/**",
+  "crates/fl_content/src/{registry,mods,hash,kinds,def}.rs",
+  "xtask/**", ".claude/**", "CLAUDE.md", ".mcp.json", "rust-analyzer.toml", "deny.toml", "OWNERS.toml", ".config/**", ".cargo/**",
+  "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "clippy.toml", "crates/*/clippy.toml", "docs/superpowers/specs/**", "docs/adr/**",
+  ".gitignore", ".gitattributes"]
+[[track]]
+name = "perf"
+paths = ["docs/perf/**"]
+[[track]]
+name = "sim-core"
+paths = ["crates/fl_sim/**", "crates/fl_catalog/**", "crates/fl_test_utils/**"]
+[[track]]
+name = "content"
+paths = ["assets/**", "mods/**", "crates/fl_content/**"]
+[[track]]
+name = "client"
+paths = ["crates/fl_client/**", "crates/fl_game/**"]
+[[track]]
+name = "tools"
+paths = ["crates/fl_cli/**", "crates/fl_observe/**", "debug.ron"]
+[[track]]
+name = "probes"
+paths = ["probes/**", "docs/research/**"]
+[[track]]
+name = "docs"
+paths = ["docs/**", "README.md"]
+# Each feature adds a `feature:<name>` track with `features/<name>/**` (M4 onward).
+
+[protected]
+paths = ["**/tests/acceptance/**", "**/tests/holdout/**", "**/tests/replays/**", "**/snapshots/**", "scenarios/**",
+  "docs/design/mechanics/**", "docs/perf/baselines/**", "docs/perf/budgets.ron", "docs/perf/M*.json",
+  "**/*.proptest-regressions", "xtask/heavy-tests.txt", "xtask/test-guard-accepted.toml",
+  "crates/fl_sim/tests/fixtures/replays/**"]

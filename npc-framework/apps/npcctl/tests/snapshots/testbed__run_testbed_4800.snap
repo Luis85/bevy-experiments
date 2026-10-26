@@ -1,0 +1,262 @@
+---
+source: apps/npcctl/tests/testbed.rs
+assertion_line: 69
+expression: summary
+---
+{
+  "aborts": 0,
+  "commands_applied": 0,
+  "commands_not_reached": 0,
+  "content_summary": {
+    "doors": {
+      "gate": "open",
+      "store_door": "locked",
+      "workshop_door": "closed"
+    },
+    "ground_items": {
+      "axe": 1,
+      "book": 1,
+      "bread": 3,
+      "hammer": 1,
+      "log": 32,
+      "pickaxe": 1,
+      "scroll": 1,
+      "store_key": 1
+    },
+    "units": [
+      {
+        "carries": {
+          "log": 2
+        },
+        "level": 0,
+        "name": "carpenter",
+        "orders": 0,
+        "owner": 1,
+        "pos": [
+          -5084,
+          1194
+        ],
+        "riding": null,
+        "sim_id": 33,
+        "skills": {
+          "Carpentry": 8,
+          "Woodcutting": 1
+        },
+        "template": "carpenter",
+        "unspent": 5,
+        "xp": 0
+      },
+      {
+        "carries": {},
+        "level": 0,
+        "name": "smith",
+        "orders": 0,
+        "owner": 1,
+        "pos": [
+          -4270,
+          1551
+        ],
+        "riding": null,
+        "sim_id": 35,
+        "skills": {
+          "Mining": 2,
+          "Smithing": 8
+        },
+        "template": "smith",
+        "unspent": 0,
+        "xp": 0
+      },
+      {
+        "carries": {
+          "axe": 1
+        },
+        "level": 0,
+        "name": "woodcutter",
+        "orders": 0,
+        "owner": 1,
+        "pos": [
+          -4135,
+          -5310
+        ],
+        "riding": null,
+        "sim_id": 36,
+        "skills": {
+          "Carpentry": 1,
+          "Woodcutting": 5
+        },
+        "template": "woodcutter",
+        "unspent": 0,
+        "xp": 75
+      },
+      {
+        "carries": {},
+        "level": 0,
+        "name": "scout",
+        "orders": 0,
+        "owner": 1,
+        "pos": [
+          5236,
+          -1390
+        ],
+        "riding": null,
+        "sim_id": 38,
+        "skills": {
+          "Stealth": 4
+        },
+        "template": "scout",
+        "unspent": 10,
+        "xp": 0
+      },
+      {
+        "carries": {},
+        "level": 0,
+        "name": "skel_warrior_a",
+        "orders": 0,
+        "owner": 2,
+        "pos": [
+          15696,
+          -717
+        ],
+        "riding": null,
+        "sim_id": 39,
+        "skills": {
+          "Mining": 1,
+          "Stealth": 1
+        },
+        "template": "skeleton_warrior",
+        "unspent": 0,
+        "xp": 0
+      },
+      {
+        "carries": {},
+        "level": 0,
+        "name": "skel_warrior_b",
+        "orders": 0,
+        "owner": 2,
+        "pos": [
+          17252,
+          536
+        ],
+        "riding": null,
+        "sim_id": 40,
+        "skills": {
+          "Mining": 1,
+          "Stealth": 1
+        },
+        "template": "skeleton_warrior",
+        "unspent": 0,
+        "xp": 0
+      },
+      {
+        "carries": {},
+        "level": 0,
+        "name": "skel_minion_a",
+        "orders": 0,
+        "owner": 2,
+        "pos": [
+          18739,
+          -1327
+        ],
+        "riding": null,
+        "sim_id": 41,
+        "skills": {
+          "Stealth": 2
+        },
+        "template": "skeleton_minion",
+        "unspent": 0,
+        "xp": 0
+      },
+      {
+        "carries": {},
+        "level": 0,
+        "name": "skel_minion_b",
+        "orders": 0,
+        "owner": 2,
+        "pos": [
+          18500,
+          2500
+        ],
+        "riding": null,
+        "sim_id": 42,
+        "skills": {
+          "Stealth": 2
+        },
+        "template": "skeleton_minion",
+        "unspent": 0,
+        "xp": 0
+      }
+    ],
+    "vehicles": {
+      "cart": {
+        "pos": [
+          4500,
+          -5500
+        ],
+        "sim_id": 29
+      },
+      "wagon": {
+        "pos": [
+          500,
+          -14500
+        ],
+        "sim_id": 30
+      }
+    }
+  },
+  "day_length": 2400,
+  "days": [
+    {
+      "aborts": 0,
+      "day": 0,
+      "leaf_starts": 398,
+      "max_needs": {
+        "energy": -2147483648,
+        "hunger": -2147483648
+      },
+      "meals": 0,
+      "min_needs": {
+        "energy": 2147483647,
+        "hunger": 2147483647
+      },
+      "ticks": 2400,
+      "ticks_asleep": 0,
+      "work_shifts": 0
+    },
+    {
+      "aborts": 0,
+      "day": 1,
+      "leaf_starts": 395,
+      "max_needs": {
+        "energy": -2147483648,
+        "hunger": -2147483648
+      },
+      "meals": 0,
+      "min_needs": {
+        "energy": 2147483647,
+        "hunger": 2147483647
+      },
+      "ticks": 2400,
+      "ticks_asleep": 0,
+      "work_shifts": 0
+    }
+  ],
+  "final_hash": 10481591832455268674,
+  "final_tick": 4800,
+  "journal": null,
+  "leaf_starts": 793,
+  "needs": {
+    "energy": {
+      "max": 0,
+      "min": 0
+    },
+    "hunger": {
+      "max": 0,
+      "min": 0
+    }
+  },
+  "record": null,
+  "scenario": "testbed",
+  "seed": 1,
+  "ticks": 4800,
+  "villagers": 8
+}

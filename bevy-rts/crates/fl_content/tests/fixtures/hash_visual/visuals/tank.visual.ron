@@ -1,0 +1,1 @@
+VisualDef(unit: "h.tank", placeholder: Box(size: (4.0, 2.5, 7.0)), model: Some("tank.glb"), scale: 2.0, recolor: false)

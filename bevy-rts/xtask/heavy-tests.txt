@@ -1,0 +1,30 @@
+# Tests the task-level gate leaves to pr and above (ruling M17): `<package> <binary> <test>`, one per line,
+# `# <seconds> s` as measured on the M2-prelude Task 1 run. Task level runs the touched packages' tests and the
+# `smoke_` tests minus these; pr, nightly and milestone run them. The nightly `task-time` row keeps the budgets honest.
+# Selection rule: every test of fl_sim, fl_test_utils, fl_catalog, fl_content and fl_cli over 10 s that is not a
+# `smoke_` test, every `scale_*` and `counters_*` test, and the three M17 names (group_move_uses_one_flow_request,
+# queue_burst_drains_at_5000, path_budget_holds_at_scale). The `smoke_` tests total 29 s, under the 120 s smoke budget.
+fl_cli map_gen scale_layers_are_generated # 1 s
+fl_cli map_gen scale_layout_matches_plan # 1 s
+fl_content terrain layers_round_trip # 11 s
+fl_sim flow group_move_uses_one_flow_request # 2 s
+fl_sim hpa invalidate_equals_full_rebuild # 12 s
+fl_sim movement scale_populate_is_deterministic # 3 s
+fl_sim movement scale_seed_must_be_the_match_seed # 1 s
+fl_sim replay scale_and_save_starts_verify # 2 s
+fl_sim scale_mix scale_map_size_must_match # 1 s
+fl_sim scale_mix scale_mix_entity_count # 3 s
+fl_sim scale_mix scale_mix_twin_run # 7 s
+fl_sim scale_mix scale_pathing_reaches_targets # 5 s
+fl_sim scale_mix scale_units_start_on_passable_cells # 4 s
+fl_sim schedule counters_reset_each_tick # 2 s
+fl_sim terrain incremental_nav_equals_full_rebuild # 13 s
+fl_test_utils determinism scale_mix_branch # 6 s
+fl_test_utils determinism scale_twin_run_500_units # 7 s
+fl_test_utils perf_counters counters_choke_crowd # 3 s
+fl_test_utils perf_counters counters_flat_3000 # 7 s
+fl_test_utils perf_counters counters_flow_thrash # 3 s
+fl_test_utils perf_counters counters_group_move # 4 s
+fl_test_utils perf_counters counters_scale_3000 # 6 s
+fl_test_utils perf_counters path_budget_holds_at_scale # 4 s
+fl_test_utils perf_counters queue_burst_drains_at_5000 # 6 s

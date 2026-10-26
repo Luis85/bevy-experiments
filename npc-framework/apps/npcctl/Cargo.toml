@@ -1,0 +1,32 @@
+[package]
+name = "npcctl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Headless JSON CLI for the NPC framework: run, inspect, journal, replay, diverge, bench, and agent control (serve, agent, world, session, mcp)."
+
+[dependencies]
+# The framework through its facade (headless features only) plus the content.
+npc_framework = { workspace = true, features = ["tools", "perf", "agent-io"] }
+village_content = { workspace = true, features = ["perf"] }
+# The Actor Testbed scenario loader (`serve --scenario testbed` or a file).
+testbed_content.workspace = true
+# `trace` emits one span per system run (timed by npc_perf); `debug` keeps
+# real system names (without it every system is "<Enable the debug feature>").
+bevy_ecs = { workspace = true, features = ["trace", "debug"] }
+bevy_app = { workspace = true, features = ["trace"] }
+serde.workspace = true
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+# Ctrl+C stops a detached explorer world gracefully (save, remove run.json);
+# `termination` adds SIGTERM / SIGHUP (so closing a terminal) on Unix. On
+# Windows closing the console window is not graceful: ctrlc's handler
+# returns at once and Windows ends the process, losing up to the last 60 s
+# autosave interval (use `npcctl session stop` or Ctrl+C there).
+ctrlc = { version = "3.5", features = ["termination"] }
+tracing-subscriber = { version = "0.3", default-features = false, features = ["registry", "std", "fmt"] }
+
+[dev-dependencies]
+insta = { version = "1.49", features = ["json"] }

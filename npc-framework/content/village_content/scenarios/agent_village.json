@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "content": "village",
+  "name": "agent_village",
+  "seed": 1,
+  "world": { "layout": "village", "stockpile_food": 6 },
+  "actors": [
+    { "kind": "villager", "pos": [2000, 1000], "needs": { "Hunger": 35000 } }
+  ],
+  "controllers": [
+    { "actor": 0, "controller": "agent", "mode": "Direct", "on_idle": "Idle" }
+  ]
+}

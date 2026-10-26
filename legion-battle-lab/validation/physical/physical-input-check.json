@@ -1,0 +1,36 @@
+{
+  "resolution": [
+    1024,
+    768
+  ],
+  "scenario": "500000 Underground vs500000 Space; u64::MAX seed; 3600-second limit",
+  "observed_passes": [
+    "Real mouse opened configuration and started battle",
+    "One-million total, maximum seed and both long category names fit",
+    "F1 opened help over the battle",
+    "Focused help action activated with Enter and left battle paused",
+    "World click followed by W moved camera while paused",
+    "Real mouse returned from battle to the main menu"
+  ],
+  "camera_check": {
+    "input": "world click, then W held for twelve seconds to span software-rendered frames",
+    "changed_world_pixels_over_8_levels": 126701,
+    "passed": true,
+    "roi": [
+      0,
+      180,
+      1024,
+      650
+    ]
+  },
+  "limits": [
+    "Software Vulkan has long frames; sustained-key tests were held across multiple updates",
+    "The final quit click was not scored; the harness cleaned up the remaining test process."
+  ],
+  "verified_screenshots": [
+    "02-extreme-configuration.png",
+    "03-help-while-running.png",
+    "04-help-closed-paused.png",
+    "05-camera-after-world-click.png"
+  ]
+}

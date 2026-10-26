@@ -1,0 +1,256 @@
+pub mod fl_math
+pub struct fl_math::Angle(_)
+impl fl_math::Angle
+pub const fl_math::Angle::HALF: fl_math::Angle
+pub const fl_math::Angle::QUARTER: fl_math::Angle
+pub const fl_math::Angle::ZERO: fl_math::Angle
+pub fn fl_math::Angle::atan2(fl_math::Fx, fl_math::Fx) -> fl_math::Angle
+pub fn fl_math::Angle::cos(self) -> fl_math::Fx
+pub const fn fl_math::Angle::from_degrees(fl_math::Fx) -> fl_math::Angle
+pub const fn fl_math::Angle::from_raw(u16) -> fl_math::Angle
+pub const fn fl_math::Angle::raw(self) -> u16
+pub const fn fl_math::Angle::rotate_towards(self, fl_math::Angle, fl_math::Angle) -> fl_math::Angle
+pub const fn fl_math::Angle::signed_diff(self, fl_math::Angle) -> i32
+pub fn fl_math::Angle::sin(self) -> fl_math::Fx
+pub const fn fl_math::Angle::to_degrees(self) -> fl_math::Fx
+pub fn fl_math::Angle::to_radians_f32(self) -> f32
+impl core::clone::Clone for fl_math::Angle
+pub fn fl_math::Angle::clone(&self) -> Self
+impl core::cmp::Eq for fl_math::Angle
+impl core::cmp::Ord for fl_math::Angle
+pub fn fl_math::Angle::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_math::Angle
+pub fn fl_math::Angle::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_math::Angle
+pub fn fl_math::Angle::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_math::Angle
+pub fn fl_math::Angle::default() -> Self
+impl core::fmt::Debug for fl_math::Angle
+pub fn fl_math::Angle::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_math::Angle
+pub fn fl_math::Angle::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_math::Angle
+impl core::marker::StructuralPartialEq for fl_math::Angle
+impl core::ops::arith::Add for fl_math::Angle
+pub type fl_math::Angle::Output = fl_math::Angle
+pub fn fl_math::Angle::add(self, fl_math::Angle) -> fl_math::Angle
+impl core::ops::arith::Neg for fl_math::Angle
+pub type fl_math::Angle::Output = fl_math::Angle
+pub fn fl_math::Angle::neg(self) -> fl_math::Angle
+impl core::ops::arith::Sub for fl_math::Angle
+pub type fl_math::Angle::Output = fl_math::Angle
+pub fn fl_math::Angle::sub(self, fl_math::Angle) -> fl_math::Angle
+impl serde_core::ser::Serialize for fl_math::Angle
+pub fn fl_math::Angle::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+impl<'de> serde_core::de::Deserialize<'de> for fl_math::Angle
+pub fn fl_math::Angle::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<fl_math::Angle, <D as serde_core::de::Deserializer>::Error>
+#[repr(transparent)] pub struct fl_math::Fx(_)
+impl fl_math::Fx
+pub const fl_math::Fx::EPSILON: fl_math::Fx
+pub const fl_math::Fx::HALF: fl_math::Fx
+pub const fl_math::Fx::MAX: fl_math::Fx
+pub const fl_math::Fx::MIN: fl_math::Fx
+pub const fl_math::Fx::ONE: fl_math::Fx
+pub const fl_math::Fx::ZERO: fl_math::Fx
+pub const fn fl_math::Fx::abs(self) -> fl_math::Fx
+pub const fn fl_math::Fx::clamp(self, fl_math::Fx, fl_math::Fx) -> fl_math::Fx
+pub const fn fl_math::Fx::floor_to_i64(self) -> i64
+pub fn fl_math::Fx::from_f64(f64) -> core::result::Result<fl_math::Fx, fl_math::FxRangeError>
+pub const fn fl_math::Fx::from_int(i32) -> fl_math::Fx
+pub const fn fl_math::Fx::from_ratio(i64, i64) -> fl_math::Fx
+pub const fn fl_math::Fx::from_raw(i64) -> fl_math::Fx
+pub const fn fl_math::Fx::max(self, fl_math::Fx) -> fl_math::Fx
+pub const fn fl_math::Fx::min(self, fl_math::Fx) -> fl_math::Fx
+pub const fn fl_math::Fx::mul_int(self, i32) -> fl_math::Fx
+pub const fn fl_math::Fx::raw(self) -> i64
+pub const fn fl_math::Fx::sqrt(self) -> fl_math::Fx
+pub fn fl_math::Fx::to_f32(self) -> f32
+pub fn fl_math::Fx::to_f64(self) -> f64
+impl core::clone::Clone for fl_math::Fx
+pub fn fl_math::Fx::clone(&self) -> Self
+impl core::cmp::Eq for fl_math::Fx
+impl core::cmp::Ord for fl_math::Fx
+pub fn fl_math::Fx::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_math::Fx
+pub fn fl_math::Fx::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_math::Fx
+pub fn fl_math::Fx::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::default::Default for fl_math::Fx
+pub fn fl_math::Fx::default() -> Self
+impl core::fmt::Debug for fl_math::Fx
+pub fn fl_math::Fx::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_math::Fx
+pub fn fl_math::Fx::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_math::Fx
+pub fn fl_math::Fx::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_math::Fx
+impl core::marker::StructuralPartialEq for fl_math::Fx
+impl core::ops::arith::Add for fl_math::Fx
+pub type fl_math::Fx::Output = fl_math::Fx
+pub fn fl_math::Fx::add(self, fl_math::Fx) -> fl_math::Fx
+impl core::ops::arith::AddAssign for fl_math::Fx
+pub fn fl_math::Fx::add_assign(&mut self, fl_math::Fx)
+impl core::ops::arith::Div for fl_math::Fx
+pub type fl_math::Fx::Output = fl_math::Fx
+pub fn fl_math::Fx::div(self, fl_math::Fx) -> fl_math::Fx
+impl core::ops::arith::Div<fl_math::Fx> for fl_math::FxVec2
+pub type fl_math::FxVec2::Output = fl_math::FxVec2
+pub fn fl_math::FxVec2::div(self, fl_math::Fx) -> fl_math::FxVec2
+impl core::ops::arith::DivAssign for fl_math::Fx
+pub fn fl_math::Fx::div_assign(&mut self, fl_math::Fx)
+impl core::ops::arith::Mul for fl_math::Fx
+pub type fl_math::Fx::Output = fl_math::Fx
+pub fn fl_math::Fx::mul(self, fl_math::Fx) -> fl_math::Fx
+impl core::ops::arith::Mul<fl_math::Fx> for fl_math::FxVec2
+pub type fl_math::FxVec2::Output = fl_math::FxVec2
+pub fn fl_math::FxVec2::mul(self, fl_math::Fx) -> fl_math::FxVec2
+impl core::ops::arith::Mul<fl_math::Fx> for fl_math::FxVec3
+pub type fl_math::FxVec3::Output = fl_math::FxVec3
+pub fn fl_math::FxVec3::mul(self, fl_math::Fx) -> fl_math::FxVec3
+impl core::ops::arith::MulAssign for fl_math::Fx
+pub fn fl_math::Fx::mul_assign(&mut self, fl_math::Fx)
+impl core::ops::arith::Neg for fl_math::Fx
+pub type fl_math::Fx::Output = fl_math::Fx
+pub fn fl_math::Fx::neg(self) -> fl_math::Fx
+impl core::ops::arith::Sub for fl_math::Fx
+pub type fl_math::Fx::Output = fl_math::Fx
+pub fn fl_math::Fx::sub(self, fl_math::Fx) -> fl_math::Fx
+impl core::ops::arith::SubAssign for fl_math::Fx
+pub fn fl_math::Fx::sub_assign(&mut self, fl_math::Fx)
+impl serde_core::ser::Serialize for fl_math::Fx
+pub fn fl_math::Fx::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+impl<'de> serde_core::de::Deserialize<'de> for fl_math::Fx
+pub fn fl_math::Fx::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<fl_math::Fx, <D as serde_core::de::Deserializer>::Error>
+pub struct fl_math::FxRangeError
+pub fl_math::FxRangeError::value: f64
+impl core::clone::Clone for fl_math::FxRangeError
+pub fn fl_math::FxRangeError::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_math::FxRangeError
+pub fn fl_math::FxRangeError::eq(&self, &Self) -> bool
+impl core::error::Error for fl_math::FxRangeError
+impl core::fmt::Debug for fl_math::FxRangeError
+pub fn fl_math::FxRangeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_math::FxRangeError
+pub fn fl_math::FxRangeError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_math::FxRangeError
+impl core::marker::StructuralPartialEq for fl_math::FxRangeError
+pub struct fl_math::FxVec2
+pub fl_math::FxVec2::x: fl_math::Fx
+pub fl_math::FxVec2::y: fl_math::Fx
+impl fl_math::FxVec2
+pub const fl_math::FxVec2::ZERO: fl_math::FxVec2
+pub fn fl_math::FxVec2::angle(self) -> fl_math::Angle
+pub fn fl_math::FxVec2::clamp_to_rect(self, fl_math::FxVec2, fl_math::FxVec2) -> fl_math::FxVec2
+pub fn fl_math::FxVec2::distance_sq(self, fl_math::FxVec2) -> fl_math::Fx
+pub fn fl_math::FxVec2::dot(self, fl_math::FxVec2) -> fl_math::Fx
+pub fn fl_math::FxVec2::from_angle(fl_math::Angle) -> fl_math::FxVec2
+pub fn fl_math::FxVec2::length(self) -> fl_math::Fx
+pub fn fl_math::FxVec2::length_sq(self) -> fl_math::Fx
+pub const fn fl_math::FxVec2::new(fl_math::Fx, fl_math::Fx) -> fl_math::FxVec2
+pub fn fl_math::FxVec2::normalize_or_zero(self) -> fl_math::FxVec2
+pub fn fl_math::FxVec2::perp_dot(self, fl_math::FxVec2) -> fl_math::Fx
+pub fn fl_math::FxVec2::rotate(self, fl_math::Angle) -> fl_math::FxVec2
+impl core::clone::Clone for fl_math::FxVec2
+pub fn fl_math::FxVec2::clone(&self) -> Self
+impl core::cmp::Eq for fl_math::FxVec2
+impl core::cmp::PartialEq for fl_math::FxVec2
+pub fn fl_math::FxVec2::eq(&self, &Self) -> bool
+impl core::default::Default for fl_math::FxVec2
+pub fn fl_math::FxVec2::default() -> Self
+impl core::fmt::Debug for fl_math::FxVec2
+pub fn fl_math::FxVec2::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_math::FxVec2
+pub fn fl_math::FxVec2::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_math::FxVec2
+impl core::marker::StructuralPartialEq for fl_math::FxVec2
+impl core::ops::arith::Add for fl_math::FxVec2
+pub type fl_math::FxVec2::Output = fl_math::FxVec2
+pub fn fl_math::FxVec2::add(self, fl_math::FxVec2) -> fl_math::FxVec2
+impl core::ops::arith::Div<fl_math::Fx> for fl_math::FxVec2
+pub type fl_math::FxVec2::Output = fl_math::FxVec2
+pub fn fl_math::FxVec2::div(self, fl_math::Fx) -> fl_math::FxVec2
+impl core::ops::arith::Mul<fl_math::Fx> for fl_math::FxVec2
+pub type fl_math::FxVec2::Output = fl_math::FxVec2
+pub fn fl_math::FxVec2::mul(self, fl_math::Fx) -> fl_math::FxVec2
+impl core::ops::arith::Neg for fl_math::FxVec2
+pub type fl_math::FxVec2::Output = fl_math::FxVec2
+pub fn fl_math::FxVec2::neg(self) -> fl_math::FxVec2
+impl core::ops::arith::Sub for fl_math::FxVec2
+pub type fl_math::FxVec2::Output = fl_math::FxVec2
+pub fn fl_math::FxVec2::sub(self, fl_math::FxVec2) -> fl_math::FxVec2
+impl serde_core::ser::Serialize for fl_math::FxVec2
+pub fn fl_math::FxVec2::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+impl<'de> serde_core::de::Deserialize<'de> for fl_math::FxVec2
+pub fn fl_math::FxVec2::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<fl_math::FxVec2, <D as serde_core::de::Deserializer>::Error>
+pub struct fl_math::FxVec3
+pub fl_math::FxVec3::x: fl_math::Fx
+pub fl_math::FxVec3::y: fl_math::Fx
+pub fl_math::FxVec3::z: fl_math::Fx
+impl fl_math::FxVec3
+pub const fl_math::FxVec3::ZERO: fl_math::FxVec3
+pub const fn fl_math::FxVec3::new(fl_math::Fx, fl_math::Fx, fl_math::Fx) -> fl_math::FxVec3
+pub const fn fl_math::FxVec3::xy(self) -> fl_math::FxVec2
+impl core::clone::Clone for fl_math::FxVec3
+pub fn fl_math::FxVec3::clone(&self) -> Self
+impl core::cmp::Eq for fl_math::FxVec3
+impl core::cmp::PartialEq for fl_math::FxVec3
+pub fn fl_math::FxVec3::eq(&self, &Self) -> bool
+impl core::default::Default for fl_math::FxVec3
+pub fn fl_math::FxVec3::default() -> Self
+impl core::fmt::Debug for fl_math::FxVec3
+pub fn fl_math::FxVec3::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_math::FxVec3
+pub fn fl_math::FxVec3::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_math::FxVec3
+impl core::marker::StructuralPartialEq for fl_math::FxVec3
+impl core::ops::arith::Add for fl_math::FxVec3
+pub type fl_math::FxVec3::Output = fl_math::FxVec3
+pub fn fl_math::FxVec3::add(self, fl_math::FxVec3) -> fl_math::FxVec3
+impl core::ops::arith::Mul<fl_math::Fx> for fl_math::FxVec3
+pub type fl_math::FxVec3::Output = fl_math::FxVec3
+pub fn fl_math::FxVec3::mul(self, fl_math::Fx) -> fl_math::FxVec3
+impl core::ops::arith::Sub for fl_math::FxVec3
+pub type fl_math::FxVec3::Output = fl_math::FxVec3
+pub fn fl_math::FxVec3::sub(self, fl_math::FxVec3) -> fl_math::FxVec3
+impl serde_core::ser::Serialize for fl_math::FxVec3
+pub fn fl_math::FxVec3::serialize<S: serde_core::ser::Serializer>(&self, S) -> core::result::Result<<S as serde_core::ser::Serializer>::Ok, <S as serde_core::ser::Serializer>::Error>
+impl<'de> serde_core::de::Deserialize<'de> for fl_math::FxVec3
+pub fn fl_math::FxVec3::deserialize<D: serde_core::de::Deserializer<'de>>(D) -> core::result::Result<fl_math::FxVec3, <D as serde_core::de::Deserializer>::Error>
+pub struct fl_math::Pcg32
+impl fl_math::Pcg32
+pub fn fl_math::Pcg32::chance(&mut self, u32, u32) -> bool
+pub fn fl_math::Pcg32::new(u64, u64) -> fl_math::Pcg32
+pub fn fl_math::Pcg32::next_u32(&mut self) -> u32
+pub fn fl_math::Pcg32::next_u64(&mut self) -> u64
+pub fn fl_math::Pcg32::range_fx(&mut self, fl_math::Fx, fl_math::Fx) -> fl_math::Fx
+pub fn fl_math::Pcg32::range_u32(&mut self, u32, u32) -> u32
+pub fn fl_math::Pcg32::state(&self) -> (u64, u64)
+pub fn fl_math::Pcg32::unit_fx(&mut self) -> fl_math::Fx
+impl core::clone::Clone for fl_math::Pcg32
+pub fn fl_math::Pcg32::clone(&self) -> Self
+impl core::cmp::Eq for fl_math::Pcg32
+impl core::cmp::PartialEq for fl_math::Pcg32
+pub fn fl_math::Pcg32::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_math::Pcg32
+pub fn fl_math::Pcg32::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_math::Pcg32
+impl serde_core::ser::Serialize for fl_math::Pcg32
+pub fn fl_math::Pcg32::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_math::Pcg32
+pub fn fl_math::Pcg32::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_math::Rolls
+impl fl_math::Rolls
+pub fn fl_math::Rolls::chance(&mut self, u32, u32) -> bool
+pub fn fl_math::Rolls::draws(&self) -> u32
+pub const fn fl_math::Rolls::new(u64, u32, u32, u64) -> fl_math::Rolls
+pub fn fl_math::Rolls::next_u32(&mut self) -> u32
+pub fn fl_math::Rolls::next_u64(&mut self) -> u64
+pub fn fl_math::Rolls::range_fx(&mut self, fl_math::Fx, fl_math::Fx) -> fl_math::Fx
+pub fn fl_math::Rolls::range_u32(&mut self, u32, u32) -> u32
+pub fn fl_math::Rolls::unit_fx(&mut self) -> fl_math::Fx
+impl core::clone::Clone for fl_math::Rolls
+pub fn fl_math::Rolls::clone(&self) -> Self
+impl core::fmt::Debug for fl_math::Rolls
+pub fn fl_math::Rolls::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub fn fl_math::roll(u64, u32, u32, u64, u32) -> u64
+pub const fn fl_math::stream_key(&str) -> u64

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "content": "testbed",
+  "name": "perception",
+  "seed": 1,
+  "world": {
+    "layout": "open", "furnish": false, "detection": "per_roll", "stagger": 1,
+    "items": [
+      { "kind": "book", "pos": [-10000, 9000], "name": "target_sharp" },
+      { "kind": "book", "pos": [10000, 9000], "name": "target_dull" }
+    ]
+  },
+  "actors": [
+    { "kind": "unit", "name": "sharp", "template": "scout", "pos": [-10000, 0], "facing": [0, 1], "fixed_facing": true },
+    { "kind": "unit", "name": "dull", "template": "skeleton_minion", "owner": 2, "pos": [10000, 0], "facing": [0, 1], "fixed_facing": true }
+  ]
+}

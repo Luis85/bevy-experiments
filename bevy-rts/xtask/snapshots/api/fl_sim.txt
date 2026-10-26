@@ -1,0 +1,2581 @@
+pub mod fl_sim
+pub use fl_sim::MoveClass
+pub mod fl_sim::nav
+pub mod fl_sim::nav::astar
+pub struct fl_sim::nav::astar::DistanceField
+impl fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::cost(&self, fl_sim::nav::astar::CellXY) -> core::option::Option<u32>
+pub fn fl_sim::nav::astar::DistanceField::next_toward_source(&self, fl_sim::nav::astar::CellXY) -> core::option::Option<fl_sim::nav::astar::CellXY>
+pub fn fl_sim::nav::astar::DistanceField::path_to(&self, fl_sim::nav::astar::CellXY) -> core::option::Option<alloc::vec::Vec<fl_sim::nav::astar::CellXY>>
+impl core::clone::Clone for fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::astar::DistanceField
+impl core::cmp::PartialEq for fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::astar::DistanceField
+pub struct fl_sim::nav::astar::SearchStats
+pub fl_sim::nav::astar::SearchStats::expanded: u32
+impl core::clone::Clone for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::astar::SearchStats
+impl core::cmp::PartialEq for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::astar::SearchStats
+impl core::marker::StructuralPartialEq for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::astar(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_sim::nav::astar::CellXY, fl_sim::nav::astar::CellXY, fl_sim::CellRect, &mut fl_sim::nav::astar::SearchStats) -> core::option::Option<(alloc::vec::Vec<fl_sim::nav::astar::CellXY>, u32)>
+pub fn fl_sim::nav::astar::cell_centre(&fl_sim::nav::NavGrid, fl_sim::nav::astar::CellXY) -> fl_math::vec::FxVec2
+pub fn fl_sim::nav::astar::dijkstra_from(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_sim::nav::astar::CellXY, fl_sim::CellRect, &mut fl_sim::nav::astar::SearchStats) -> fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::dijkstra_seeded(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, &[(fl_sim::nav::astar::CellXY, u32)], fl_sim::CellRect, &mut fl_sim::nav::astar::SearchStats) -> fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::edge_cost(&fl_sim::nav::NavGrid, fl_content::terrain::MoveClass, fl_sim::nav::astar::CellXY, fl_sim::nav::astar::CellXY) -> u32
+pub fn fl_sim::nav::astar::nearest_passable(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_sim::nav::astar::CellXY, u32, &mut u32) -> core::option::Option<fl_sim::nav::astar::CellXY>
+pub fn fl_sim::nav::astar::octile(fl_sim::nav::astar::CellXY, fl_sim::nav::astar::CellXY) -> u32
+pub type fl_sim::nav::astar::CellXY = (u32, u32)
+pub mod fl_sim::nav::flow
+pub enum fl_sim::nav::flow::FlowDir
+pub fl_sim::nav::flow::FlowDir::Arrived
+pub fl_sim::nav::flow::FlowDir::Toward(fl_sim::nav::astar::CellXY)
+impl core::clone::Clone for fl_sim::nav::flow::FlowDir
+pub fn fl_sim::nav::flow::FlowDir::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::flow::FlowDir
+impl core::cmp::PartialEq for fl_sim::nav::flow::FlowDir
+pub fn fl_sim::nav::flow::FlowDir::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::flow::FlowDir
+pub fn fl_sim::nav::flow::FlowDir::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::flow::FlowDir
+impl core::marker::StructuralPartialEq for fl_sim::nav::flow::FlowDir
+pub struct fl_sim::nav::flow::FlowCache
+impl fl_sim::nav::flow::FlowCache
+pub fn fl_sim::nav::flow::FlowCache::clear_profile(&mut self, fl_sim::nav::MoveProfile)
+pub fn fl_sim::nav::flow::FlowCache::cold_cost(&mut self, fl_sim::FlowKey, &fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, &mut fl_sim::nav::flow::FlowWork) -> u32
+pub fn fl_sim::nav::flow::FlowCache::direction(&mut self, fl_sim::FlowKey, fl_sim::nav::astar::CellXY, &fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, &mut fl_sim::nav::flow::FlowWork) -> core::option::Option<fl_sim::nav::flow::FlowDir>
+pub fn fl_sim::nav::flow::FlowCache::ensure_tile(&mut self, fl_sim::FlowKey, fl_sim::nav::hpa::ClusterId, &fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, &mut fl_sim::nav::flow::FlowWork)
+pub fn fl_sim::nav::flow::FlowCache::is_cold(&self) -> bool
+pub fn fl_sim::nav::flow::FlowCache::is_empty(&self) -> bool
+pub fn fl_sim::nav::flow::FlowCache::len(&self) -> usize
+pub fn fl_sim::nav::flow::FlowCache::new(u32, u32, bool) -> Self
+impl bevy_ecs::component::Component for fl_sim::nav::flow::FlowCache where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::nav::flow::FlowCache::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::nav::flow::FlowCache::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::nav::flow::FlowCache::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::nav::flow::FlowCache::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::nav::flow::FlowCache::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::nav::flow::FlowCache where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::default::Default for fl_sim::nav::flow::FlowCache
+pub fn fl_sim::nav::flow::FlowCache::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::flow::FlowCache
+pub fn fl_sim::nav::flow::FlowCache::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::nav::flow::FlowWork
+pub fl_sim::nav::flow::FlowWork::abstract_nodes: u32
+pub fl_sim::nav::flow::FlowWork::cells: u32
+impl core::clone::Clone for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::flow::FlowWork
+impl core::cmp::PartialEq for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::flow::FlowWork
+impl core::marker::StructuralPartialEq for fl_sim::nav::flow::FlowWork
+pub mod fl_sim::nav::hpa
+pub enum fl_sim::nav::hpa::PlanStatus
+pub fl_sim::nav::hpa::PlanStatus::Found
+pub fl_sim::nav::hpa::PlanStatus::Partial
+pub fl_sim::nav::hpa::PlanStatus::Unreachable
+impl core::clone::Clone for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::PlanStatus
+impl core::cmp::PartialEq for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::hpa::PlanStatus
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::PlanStatus
+impl serde_core::ser::Serialize for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::nav::hpa::ClusterId(pub u32)
+impl core::clone::Clone for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::ClusterId
+impl core::cmp::Ord for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::nav::hpa::ClusterId
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::ClusterId
+impl serde_core::ser::Serialize for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::nav::hpa::HpaGraph
+impl fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::cluster_of(&self, fl_sim::nav::astar::CellXY) -> fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::HpaGraph::cluster_rect(&self, fl_sim::nav::hpa::ClusterId) -> fl_sim::CellRect
+pub fn fl_sim::nav::hpa::HpaGraph::clusters(&self) -> (u32, u32)
+pub fn fl_sim::nav::hpa::HpaGraph::entrances(&self, fl_sim::nav::hpa::ClusterId) -> &[fl_sim::nav::astar::CellXY]
+pub fn fl_sim::nav::hpa::HpaGraph::node_count(&self) -> usize
+pub fn fl_sim::nav::hpa::HpaGraph::profile(&self) -> fl_sim::nav::MoveProfile
+impl core::clone::Clone for fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::HpaGraph
+impl core::cmp::PartialEq for fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::HpaGraph
+pub struct fl_sim::nav::hpa::HpaGraphs
+impl fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::build(&fl_sim::nav::NavGrid, u32) -> Self
+pub fn fl_sim::nav::hpa::HpaGraphs::cluster_cells(&self) -> u32
+pub fn fl_sim::nav::hpa::HpaGraphs::cluster_rect(&self, fl_sim::nav::hpa::ClusterId) -> core::option::Option<fl_sim::CellRect>
+pub fn fl_sim::nav::hpa::HpaGraphs::graph(&self, fl_sim::nav::MoveProfile) -> core::option::Option<&fl_sim::nav::hpa::HpaGraph>
+pub fn fl_sim::nav::hpa::HpaGraphs::invalidate(&mut self, &fl_sim::nav::NavGrid, fl_sim::CellRect) -> alloc::vec::Vec<fl_sim::nav::hpa::ClusterId>
+impl bevy_ecs::component::Component for fl_sim::nav::hpa::HpaGraphs where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::nav::hpa::HpaGraphs::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::nav::hpa::HpaGraphs::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::nav::hpa::HpaGraphs::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::nav::hpa::HpaGraphs::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::nav::hpa::HpaGraphs::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::nav::hpa::HpaGraphs where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::HpaGraphs
+impl core::cmp::PartialEq for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::HpaGraphs
+pub struct fl_sim::nav::hpa::PathPlan
+pub fl_sim::nav::hpa::PathPlan::corners: alloc::vec::Vec<fl_math::vec::FxVec2>
+pub fl_sim::nav::hpa::PathPlan::cost: u32
+pub fl_sim::nav::hpa::PathPlan::status: fl_sim::nav::hpa::PlanStatus
+impl core::clone::Clone for fl_sim::nav::hpa::PathPlan
+pub fn fl_sim::nav::hpa::PathPlan::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::PathPlan
+impl core::cmp::PartialEq for fl_sim::nav::hpa::PathPlan
+pub fn fl_sim::nav::hpa::PathPlan::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::hpa::PathPlan
+pub fn fl_sim::nav::hpa::PathPlan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::PathPlan
+pub struct fl_sim::nav::hpa::PathWork
+pub fl_sim::nav::hpa::PathWork::los_cells: u32
+pub fl_sim::nav::hpa::PathWork::nodes_expanded: u32
+impl fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::charge(&self) -> u32
+impl core::clone::Clone for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::PathWork
+impl core::cmp::PartialEq for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::hpa::PathWork
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::plan_path(&fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, fl_sim::nav::MoveProfile, fl_math::vec::FxVec2, fl_math::vec::FxVec2, &fl_sim::nav::PathRules, &mut fl_sim::nav::hpa::PathWork) -> fl_sim::nav::hpa::PathPlan
+pub mod fl_sim::nav::los
+pub fn fl_sim::nav::los::line_clear(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_math::vec::FxVec2, fl_math::vec::FxVec2, &mut u32) -> bool
+pub fn fl_sim::nav::los::smooth(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_math::vec::FxVec2, &[fl_sim::nav::astar::CellXY], fl_math::vec::FxVec2, &mut u32) -> alloc::vec::Vec<fl_math::vec::FxVec2>
+pub enum fl_sim::nav::FlowDir
+pub fl_sim::nav::FlowDir::Arrived
+pub fl_sim::nav::FlowDir::Toward(fl_sim::nav::astar::CellXY)
+impl core::clone::Clone for fl_sim::nav::flow::FlowDir
+pub fn fl_sim::nav::flow::FlowDir::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::flow::FlowDir
+impl core::cmp::PartialEq for fl_sim::nav::flow::FlowDir
+pub fn fl_sim::nav::flow::FlowDir::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::flow::FlowDir
+pub fn fl_sim::nav::flow::FlowDir::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::flow::FlowDir
+impl core::marker::StructuralPartialEq for fl_sim::nav::flow::FlowDir
+pub enum fl_sim::nav::PlanStatus
+pub fl_sim::nav::PlanStatus::Found
+pub fl_sim::nav::PlanStatus::Partial
+pub fl_sim::nav::PlanStatus::Unreachable
+impl core::clone::Clone for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::PlanStatus
+impl core::cmp::PartialEq for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::hpa::PlanStatus
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::PlanStatus
+impl serde_core::ser::Serialize for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::nav::hpa::PlanStatus
+pub fn fl_sim::nav::hpa::PlanStatus::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::nav::ClusterId(pub u32)
+impl core::clone::Clone for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::ClusterId
+impl core::cmp::Ord for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::nav::hpa::ClusterId
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::ClusterId
+impl serde_core::ser::Serialize for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::ClusterId::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::nav::DistanceField
+impl fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::cost(&self, fl_sim::nav::astar::CellXY) -> core::option::Option<u32>
+pub fn fl_sim::nav::astar::DistanceField::next_toward_source(&self, fl_sim::nav::astar::CellXY) -> core::option::Option<fl_sim::nav::astar::CellXY>
+pub fn fl_sim::nav::astar::DistanceField::path_to(&self, fl_sim::nav::astar::CellXY) -> core::option::Option<alloc::vec::Vec<fl_sim::nav::astar::CellXY>>
+impl core::clone::Clone for fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::astar::DistanceField
+impl core::cmp::PartialEq for fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::astar::DistanceField::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::astar::DistanceField
+pub struct fl_sim::nav::FlowCache
+impl fl_sim::nav::flow::FlowCache
+pub fn fl_sim::nav::flow::FlowCache::clear_profile(&mut self, fl_sim::nav::MoveProfile)
+pub fn fl_sim::nav::flow::FlowCache::cold_cost(&mut self, fl_sim::FlowKey, &fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, &mut fl_sim::nav::flow::FlowWork) -> u32
+pub fn fl_sim::nav::flow::FlowCache::direction(&mut self, fl_sim::FlowKey, fl_sim::nav::astar::CellXY, &fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, &mut fl_sim::nav::flow::FlowWork) -> core::option::Option<fl_sim::nav::flow::FlowDir>
+pub fn fl_sim::nav::flow::FlowCache::ensure_tile(&mut self, fl_sim::FlowKey, fl_sim::nav::hpa::ClusterId, &fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, &mut fl_sim::nav::flow::FlowWork)
+pub fn fl_sim::nav::flow::FlowCache::is_cold(&self) -> bool
+pub fn fl_sim::nav::flow::FlowCache::is_empty(&self) -> bool
+pub fn fl_sim::nav::flow::FlowCache::len(&self) -> usize
+pub fn fl_sim::nav::flow::FlowCache::new(u32, u32, bool) -> Self
+impl bevy_ecs::component::Component for fl_sim::nav::flow::FlowCache where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::nav::flow::FlowCache::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::nav::flow::FlowCache::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::nav::flow::FlowCache::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::nav::flow::FlowCache::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::nav::flow::FlowCache::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::nav::flow::FlowCache where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::default::Default for fl_sim::nav::flow::FlowCache
+pub fn fl_sim::nav::flow::FlowCache::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::flow::FlowCache
+pub fn fl_sim::nav::flow::FlowCache::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::nav::FlowWork
+pub fl_sim::nav::FlowWork::abstract_nodes: u32
+pub fl_sim::nav::FlowWork::cells: u32
+impl core::clone::Clone for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::flow::FlowWork
+impl core::cmp::PartialEq for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::flow::FlowWork
+pub fn fl_sim::nav::flow::FlowWork::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::flow::FlowWork
+impl core::marker::StructuralPartialEq for fl_sim::nav::flow::FlowWork
+pub struct fl_sim::nav::HpaGraph
+impl fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::cluster_of(&self, fl_sim::nav::astar::CellXY) -> fl_sim::nav::hpa::ClusterId
+pub fn fl_sim::nav::hpa::HpaGraph::cluster_rect(&self, fl_sim::nav::hpa::ClusterId) -> fl_sim::CellRect
+pub fn fl_sim::nav::hpa::HpaGraph::clusters(&self) -> (u32, u32)
+pub fn fl_sim::nav::hpa::HpaGraph::entrances(&self, fl_sim::nav::hpa::ClusterId) -> &[fl_sim::nav::astar::CellXY]
+pub fn fl_sim::nav::hpa::HpaGraph::node_count(&self) -> usize
+pub fn fl_sim::nav::hpa::HpaGraph::profile(&self) -> fl_sim::nav::MoveProfile
+impl core::clone::Clone for fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::HpaGraph
+impl core::cmp::PartialEq for fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::hpa::HpaGraph
+pub fn fl_sim::nav::hpa::HpaGraph::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::HpaGraph
+pub struct fl_sim::nav::HpaGraphs
+impl fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::build(&fl_sim::nav::NavGrid, u32) -> Self
+pub fn fl_sim::nav::hpa::HpaGraphs::cluster_cells(&self) -> u32
+pub fn fl_sim::nav::hpa::HpaGraphs::cluster_rect(&self, fl_sim::nav::hpa::ClusterId) -> core::option::Option<fl_sim::CellRect>
+pub fn fl_sim::nav::hpa::HpaGraphs::graph(&self, fl_sim::nav::MoveProfile) -> core::option::Option<&fl_sim::nav::hpa::HpaGraph>
+pub fn fl_sim::nav::hpa::HpaGraphs::invalidate(&mut self, &fl_sim::nav::NavGrid, fl_sim::CellRect) -> alloc::vec::Vec<fl_sim::nav::hpa::ClusterId>
+impl bevy_ecs::component::Component for fl_sim::nav::hpa::HpaGraphs where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::nav::hpa::HpaGraphs::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::nav::hpa::HpaGraphs::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::nav::hpa::HpaGraphs::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::nav::hpa::HpaGraphs::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::nav::hpa::HpaGraphs::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::nav::hpa::HpaGraphs where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::HpaGraphs
+impl core::cmp::PartialEq for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::hpa::HpaGraphs
+pub fn fl_sim::nav::hpa::HpaGraphs::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::HpaGraphs
+pub struct fl_sim::nav::MoveProfile
+pub fl_sim::nav::MoveProfile::class: fl_content::terrain::MoveClass
+pub fl_sim::nav::MoveProfile::size: u8
+impl core::clone::Clone for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::MoveProfile
+impl core::cmp::Ord for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::nav::MoveProfile
+impl core::marker::StructuralPartialEq for fl_sim::nav::MoveProfile
+impl serde_core::ser::Serialize for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::MoveProfile::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::nav::NavGrid
+impl fl_sim::nav::NavGrid
+pub fn fl_sim::nav::NavGrid::blocked(&self, fl_content::terrain::MoveClass, u32, u32) -> bool
+pub fn fl_sim::nav::NavGrid::build(&fl_sim::TerrainGrid, &fl_content::db::ContentDb, &fl_sim::MovementRules, &[fl_sim::nav::MoveProfile], u8, fl_math::fx::Fx) -> Self
+pub fn fl_sim::nav::NavGrid::cell_m(&self) -> fl_math::fx::Fx
+pub fn fl_sim::nav::NavGrid::cell_of(&self, fl_math::vec::FxVec2) -> (u32, u32)
+pub fn fl_sim::nav::NavGrid::cells(&self) -> (u32, u32)
+pub fn fl_sim::nav::NavGrid::clearance(&self, fl_content::terrain::MoveClass, u32, u32) -> u8
+pub fn fl_sim::nav::NavGrid::cost(&self, fl_content::terrain::MoveClass, u32, u32) -> u16
+pub fn fl_sim::nav::NavGrid::max_clearance(&self) -> u8
+pub fn fl_sim::nav::NavGrid::passable(&self, fl_sim::nav::MoveProfile, i64, i64) -> bool
+pub fn fl_sim::nav::NavGrid::profiles(&self) -> &[fl_sim::nav::MoveProfile]
+pub fn fl_sim::nav::NavGrid::speed_factor(&self, fl_math::fx::Fx, u32, u32) -> fl_math::fx::Fx
+pub fn fl_sim::nav::NavGrid::update_rect(&mut self, &fl_sim::TerrainGrid, &fl_content::db::ContentDb, &fl_sim::MovementRules, fl_sim::CellRect) -> fl_sim::CellRect
+pub fn fl_sim::nav::NavGrid::version(&self) -> u64
+impl bevy_ecs::component::Component for fl_sim::nav::NavGrid where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::nav::NavGrid::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::nav::NavGrid::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::nav::NavGrid::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::nav::NavGrid::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::nav::NavGrid::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::nav::NavGrid where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::nav::NavGrid
+pub fn fl_sim::nav::NavGrid::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::NavGrid
+impl core::cmp::PartialEq for fl_sim::nav::NavGrid
+pub fn fl_sim::nav::NavGrid::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::NavGrid
+pub fn fl_sim::nav::NavGrid::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::nav::PathPlan
+pub fl_sim::nav::PathPlan::corners: alloc::vec::Vec<fl_math::vec::FxVec2>
+pub fl_sim::nav::PathPlan::cost: u32
+pub fl_sim::nav::PathPlan::status: fl_sim::nav::hpa::PlanStatus
+impl core::clone::Clone for fl_sim::nav::hpa::PathPlan
+pub fn fl_sim::nav::hpa::PathPlan::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::PathPlan
+impl core::cmp::PartialEq for fl_sim::nav::hpa::PathPlan
+pub fn fl_sim::nav::hpa::PathPlan::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::hpa::PathPlan
+pub fn fl_sim::nav::hpa::PathPlan::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::PathPlan
+pub struct fl_sim::nav::PathRules
+pub fl_sim::nav::PathRules::budget_per_tick: u32
+pub fl_sim::nav::PathRules::cluster_cells: u32
+pub fl_sim::nav::PathRules::flow_cache_hard_max: u32
+pub fl_sim::nav::PathRules::flow_cache_max: u32
+pub fl_sim::nav::PathRules::flow_min_group: u32
+pub fl_sim::nav::PathRules::max_clearance: u8
+pub fl_sim::nav::PathRules::snap_radius_cells: u32
+impl core::clone::Clone for fl_sim::nav::PathRules
+pub fn fl_sim::nav::PathRules::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::nav::PathRules
+pub fn fl_sim::nav::PathRules::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::nav::PathRules
+pub fn fl_sim::nav::PathRules::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::PathRules
+impl core::marker::StructuralPartialEq for fl_sim::nav::PathRules
+impl fl_content::kinds::RulesSection for fl_sim::nav::PathRules
+pub fn fl_sim::nav::PathRules::link(&self, &mut fl_content::link::LinkCtx<'_>)
+impl serde_core::ser::Serialize for fl_sim::nav::PathRules
+pub fn fl_sim::nav::PathRules::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::nav::PathRules
+pub fn fl_sim::nav::PathRules::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::nav::PathWork
+pub fl_sim::nav::PathWork::los_cells: u32
+pub fl_sim::nav::PathWork::nodes_expanded: u32
+impl fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::charge(&self) -> u32
+impl core::clone::Clone for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::hpa::PathWork
+impl core::cmp::PartialEq for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::hpa::PathWork
+pub fn fl_sim::nav::hpa::PathWork::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::hpa::PathWork
+impl core::marker::StructuralPartialEq for fl_sim::nav::hpa::PathWork
+pub struct fl_sim::nav::SearchStats
+pub fl_sim::nav::SearchStats::expanded: u32
+impl core::clone::Clone for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::nav::astar::SearchStats
+impl core::cmp::PartialEq for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::default() -> Self
+impl core::fmt::Debug for fl_sim::nav::astar::SearchStats
+pub fn fl_sim::nav::astar::SearchStats::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::nav::astar::SearchStats
+impl core::marker::StructuralPartialEq for fl_sim::nav::astar::SearchStats
+pub const fl_sim::nav::COST_ROAD: u16
+pub fn fl_sim::nav::astar(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_sim::nav::astar::CellXY, fl_sim::nav::astar::CellXY, fl_sim::CellRect, &mut fl_sim::nav::astar::SearchStats) -> core::option::Option<(alloc::vec::Vec<fl_sim::nav::astar::CellXY>, u32)>
+pub fn fl_sim::nav::cell_centre(&fl_sim::nav::NavGrid, fl_sim::nav::astar::CellXY) -> fl_math::vec::FxVec2
+pub fn fl_sim::nav::content_profiles(&fl_content::db::ContentDb, fl_math::fx::Fx, u8) -> alloc::vec::Vec<fl_sim::nav::MoveProfile>
+pub fn fl_sim::nav::dijkstra_from(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_sim::nav::astar::CellXY, fl_sim::CellRect, &mut fl_sim::nav::astar::SearchStats) -> fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::dijkstra_seeded(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, &[(fl_sim::nav::astar::CellXY, u32)], fl_sim::CellRect, &mut fl_sim::nav::astar::SearchStats) -> fl_sim::nav::astar::DistanceField
+pub fn fl_sim::nav::edge_cost(&fl_sim::nav::NavGrid, fl_content::terrain::MoveClass, fl_sim::nav::astar::CellXY, fl_sim::nav::astar::CellXY) -> u32
+pub fn fl_sim::nav::line_clear(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_math::vec::FxVec2, fl_math::vec::FxVec2, &mut u32) -> bool
+pub fn fl_sim::nav::nearest_passable(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_sim::nav::astar::CellXY, u32, &mut u32) -> core::option::Option<fl_sim::nav::astar::CellXY>
+pub fn fl_sim::nav::octile(fl_sim::nav::astar::CellXY, fl_sim::nav::astar::CellXY) -> u32
+pub fn fl_sim::nav::plan_path(&fl_sim::nav::NavGrid, &fl_sim::nav::hpa::HpaGraphs, fl_sim::nav::MoveProfile, fl_math::vec::FxVec2, fl_math::vec::FxVec2, &fl_sim::nav::PathRules, &mut fl_sim::nav::hpa::PathWork) -> fl_sim::nav::hpa::PathPlan
+pub fn fl_sim::nav::profile_of(&fl_sim::Mobility, core::option::Option<&fl_sim::Footprint>, fl_math::fx::Fx, u8) -> fl_sim::nav::MoveProfile
+pub fn fl_sim::nav::rebuild_nav(&mut bevy_ecs::world::World)
+pub fn fl_sim::nav::smooth(&fl_sim::nav::NavGrid, fl_sim::nav::MoveProfile, fl_math::vec::FxVec2, &[fl_sim::nav::astar::CellXY], fl_math::vec::FxVec2, &mut u32) -> alloc::vec::Vec<fl_math::vec::FxVec2>
+pub type fl_sim::nav::CellXY = (u32, u32)
+pub enum fl_sim::ActSet
+pub fl_sim::ActSet::Fire
+pub fl_sim::ActSet::Move
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::ActSet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::ActSet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::ActSet
+pub fn fl_sim::ActSet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::ActSet
+impl core::cmp::Ord for fl_sim::ActSet
+pub fn fl_sim::ActSet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::ActSet
+pub fn fl_sim::ActSet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::ActSet
+pub fn fl_sim::ActSet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::ActSet
+pub fn fl_sim::ActSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::ActSet
+pub fn fl_sim::ActSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::ActSet
+impl core::marker::StructuralPartialEq for fl_sim::ActSet
+impl fl_sim::SimHook for fl_sim::ActSet
+pub fn fl_sim::ActSet::phase(self) -> fl_sim::Phase
+pub enum fl_sim::BuildError
+pub fl_sim::BuildError::Content(fl_content::error::ContentErrors)
+pub fl_sim::BuildError::Feature(fl_sim::FeatureError)
+pub fl_sim::BuildError::RegistryMismatch
+pub fl_sim::BuildError::Unclassified(alloc::vec::Vec<alloc::string::String>)
+impl core::convert::From<fl_content::error::ContentErrors> for fl_sim::BuildError
+pub fn fl_sim::BuildError::from(fl_content::error::ContentErrors) -> Self
+impl core::convert::From<fl_sim::BuildError> for fl_sim::LoadError
+pub fn fl_sim::LoadError::from(fl_sim::BuildError) -> Self
+impl core::convert::From<fl_sim::FeatureError> for fl_sim::BuildError
+pub fn fl_sim::BuildError::from(fl_sim::FeatureError) -> Self
+impl core::error::Error for fl_sim::BuildError
+pub fn fl_sim::BuildError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for fl_sim::BuildError
+pub fn fl_sim::BuildError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::BuildError
+pub fn fl_sim::BuildError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum fl_sim::Class<T>
+pub fl_sim::Class::Derived
+pub fl_sim::Class::External
+pub fl_sim::Class::Hashed(fl_sim::Codec<T>)
+pub fl_sim::Class::Transient
+pub fl_sim::Class::TransientKept(&'static str)
+pub fl_sim::Class::TransientReset(fn(&mut T))
+impl<T: core::default::Default> fl_sim::Class<T>
+pub fn fl_sim::Class<T>::transient() -> fl_sim::Class<T>
+impl<T: fl_sim::SimHash + serde_core::ser::Serialize + serde_core::de::DeserializeOwned + core::marker::Send + core::marker::Sync + 'static> fl_sim::Class<T>
+pub fn fl_sim::Class<T>::hashed(u32) -> fl_sim::Class<T>
+pub enum fl_sim::EconomySet
+pub fl_sim::EconomySet::Main
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::EconomySet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::EconomySet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::EconomySet
+impl core::cmp::Ord for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::EconomySet
+impl core::marker::StructuralPartialEq for fl_sim::EconomySet
+impl fl_sim::SimHook for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::phase(self) -> fl_sim::Phase
+pub enum fl_sim::FeatureError
+pub fl_sim::FeatureError::Cycle(alloc::vec::Vec<alloc::string::String>)
+pub fl_sim::FeatureError::Duplicate(alloc::string::String)
+pub fl_sim::FeatureError::MissingDep
+pub fl_sim::FeatureError::MissingDep::dep: alloc::string::String
+pub fl_sim::FeatureError::MissingDep::feature: alloc::string::String
+pub fl_sim::FeatureError::Reserved(alloc::string::String)
+impl core::clone::Clone for fl_sim::FeatureError
+pub fn fl_sim::FeatureError::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::FeatureError
+impl core::cmp::PartialEq for fl_sim::FeatureError
+pub fn fl_sim::FeatureError::eq(&self, &Self) -> bool
+impl core::convert::From<fl_sim::FeatureError> for fl_sim::BuildError
+pub fn fl_sim::BuildError::from(fl_sim::FeatureError) -> Self
+impl core::error::Error for fl_sim::FeatureError
+impl core::fmt::Debug for fl_sim::FeatureError
+pub fn fl_sim::FeatureError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::FeatureError
+pub fn fl_sim::FeatureError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::FeatureError
+pub enum fl_sim::InputSet
+pub fl_sim::InputSet::Apply
+pub fl_sim::InputSet::Housekeeping
+pub fl_sim::InputSet::Validate
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::InputSet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::InputSet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::InputSet
+pub fn fl_sim::InputSet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::InputSet
+impl core::cmp::Ord for fl_sim::InputSet
+pub fn fl_sim::InputSet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::InputSet
+pub fn fl_sim::InputSet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::InputSet
+pub fn fl_sim::InputSet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::InputSet
+pub fn fl_sim::InputSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::InputSet
+pub fn fl_sim::InputSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::InputSet
+impl core::marker::StructuralPartialEq for fl_sim::InputSet
+impl fl_sim::SimHook for fl_sim::InputSet
+pub fn fl_sim::InputSet::phase(self) -> fl_sim::Phase
+pub enum fl_sim::LifecycleSet
+pub fl_sim::LifecycleSet::Death
+pub fl_sim::LifecycleSet::Despawn
+pub fl_sim::LifecycleSet::Spawn
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::LifecycleSet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::LifecycleSet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::LifecycleSet
+impl core::cmp::Ord for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::LifecycleSet
+impl core::marker::StructuralPartialEq for fl_sim::LifecycleSet
+impl fl_sim::SimHook for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::phase(self) -> fl_sim::Phase
+pub enum fl_sim::LoadError
+pub fl_sim::LoadError::Build(fl_sim::BuildError)
+pub fl_sim::LoadError::Codec
+pub fl_sim::LoadError::Codec::message: alloc::string::String
+pub fl_sim::LoadError::Codec::name: alloc::string::String
+pub fl_sim::LoadError::Command(alloc::string::String)
+pub fl_sim::LoadError::Decode(alloc::string::String)
+pub fl_sim::LoadError::DropNeedsCheats
+pub fl_sim::LoadError::FormatVersion
+pub fl_sim::LoadError::FormatVersion::found: u32
+pub fl_sim::LoadError::FormatVersion::supported: u32
+pub fl_sim::LoadError::Header(fl_protocol::header::HeaderMismatch)
+pub fl_sim::LoadError::NoMigration
+pub fl_sim::LoadError::NoMigration::from: u32
+pub fl_sim::LoadError::NoMigration::name: alloc::string::String
+pub fl_sim::LoadError::NoMigration::to: u32
+pub fl_sim::LoadError::UnknownComponent(alloc::string::String)
+pub fl_sim::LoadError::UnknownResource(alloc::string::String)
+impl core::convert::From<fl_sim::BuildError> for fl_sim::LoadError
+pub fn fl_sim::LoadError::from(fl_sim::BuildError) -> Self
+impl core::error::Error for fl_sim::LoadError
+pub fn fl_sim::LoadError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for fl_sim::LoadError
+pub fn fl_sim::LoadError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::LoadError
+pub fn fl_sim::LoadError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum fl_sim::Order
+pub fl_sim::Order::Follow
+pub fl_sim::Order::Follow::leader: fl_protocol::ids::SimId
+pub fl_sim::Order::Follow::offset: fl_math::vec::FxVec2
+pub fl_sim::Order::Move
+pub fl_sim::Order::Move::target: fl_math::vec::FxVec2
+pub fl_sim::Order::Rotate
+pub fl_sim::Order::Rotate::facing: fl_math::angle::Angle
+impl core::clone::Clone for fl_sim::Order
+pub fn fl_sim::Order::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Order
+impl core::cmp::PartialEq for fl_sim::Order
+pub fn fl_sim::Order::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Order
+pub fn fl_sim::Order::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::Order
+impl fl_sim::SimHash for fl_sim::Order
+pub fn fl_sim::Order::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Order
+pub fn fl_sim::Order::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Order
+pub fn fl_sim::Order::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_sim::PathState
+pub fl_sim::PathState::Done
+pub fl_sim::PathState::Failed
+pub fl_sim::PathState::Flow
+pub fl_sim::PathState::Flow::key: fl_sim::FlowKey
+pub fl_sim::PathState::Following
+pub fl_sim::PathState::Idle
+pub fl_sim::PathState::Waiting
+pub fl_sim::PathState::Waiting::request: u32
+impl core::clone::Clone for fl_sim::PathState
+pub fn fl_sim::PathState::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::PathState
+impl core::cmp::PartialEq for fl_sim::PathState
+pub fn fl_sim::PathState::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::PathState
+pub fn fl_sim::PathState::default() -> Self
+impl core::fmt::Debug for fl_sim::PathState
+pub fn fl_sim::PathState::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::PathState
+impl core::marker::StructuralPartialEq for fl_sim::PathState
+impl fl_sim::SimHash for fl_sim::PathState
+pub fn fl_sim::PathState::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::PathState
+pub fn fl_sim::PathState::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::PathState
+pub fn fl_sim::PathState::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_sim::PerceiveSet
+pub fl_sim::PerceiveSet::Spatial
+pub fl_sim::PerceiveSet::Vision
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::PerceiveSet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::PerceiveSet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::PerceiveSet
+impl core::cmp::Ord for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::PerceiveSet
+impl core::marker::StructuralPartialEq for fl_sim::PerceiveSet
+impl fl_sim::SimHook for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::phase(self) -> fl_sim::Phase
+pub enum fl_sim::Phase
+pub fl_sim::Phase::Act
+pub fl_sim::Phase::Economy
+pub fl_sim::Phase::Input
+pub fl_sim::Phase::Lifecycle
+pub fl_sim::Phase::Perceive
+pub fl_sim::Phase::Publish
+pub fl_sim::Phase::Resolve
+pub fl_sim::Phase::Think
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::Phase where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::Phase::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::Phase
+pub fn fl_sim::Phase::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Phase
+impl core::cmp::Ord for fl_sim::Phase
+pub fn fl_sim::Phase::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::Phase
+pub fn fl_sim::Phase::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::Phase
+pub fn fl_sim::Phase::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::Phase
+pub fn fl_sim::Phase::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::Phase
+pub fn fl_sim::Phase::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::Phase
+impl core::marker::StructuralPartialEq for fl_sim::Phase
+pub enum fl_sim::PublishSet
+pub fl_sim::PublishSet::Events
+pub fl_sim::PublishSet::Snapshot
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::PublishSet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::PublishSet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::PublishSet
+impl core::cmp::Ord for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::PublishSet
+impl core::marker::StructuralPartialEq for fl_sim::PublishSet
+impl fl_sim::SimHook for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::phase(self) -> fl_sim::Phase
+#[non_exhaustive] pub enum fl_sim::RejectReason
+pub fl_sim::RejectReason::BadPayload
+pub fl_sim::RejectReason::DebugDisabled
+pub fl_sim::RejectReason::DuplicateSeq
+pub fl_sim::RejectReason::Early
+pub fl_sim::RejectReason::Feature(&'static str)
+pub fl_sim::RejectReason::Late
+pub fl_sim::RejectReason::NoValidUnits
+pub fl_sim::RejectReason::QueueFull
+pub fl_sim::RejectReason::TooManyUnits
+pub fl_sim::RejectReason::UnknownContent
+pub fl_sim::RejectReason::UnknownPlayer
+pub fl_sim::RejectReason::UnknownType
+impl fl_sim::RejectReason
+pub fn fl_sim::RejectReason::code(&self) -> &'static str
+impl core::clone::Clone for fl_sim::RejectReason
+pub fn fl_sim::RejectReason::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::RejectReason
+impl core::cmp::PartialEq for fl_sim::RejectReason
+pub fn fl_sim::RejectReason::eq(&self, &Self) -> bool
+impl core::error::Error for fl_sim::RejectReason
+impl core::fmt::Debug for fl_sim::RejectReason
+pub fn fl_sim::RejectReason::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::RejectReason
+pub fn fl_sim::RejectReason::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::RejectReason
+pub fn fl_sim::RejectReason::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::RejectReason
+impl core::marker::StructuralPartialEq for fl_sim::RejectReason
+impl serde_core::ser::Serialize for fl_sim::RejectReason
+pub fn fl_sim::RejectReason::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+#[non_exhaustive] pub enum fl_sim::ReloadError
+pub fl_sim::ReloadError::CheatsOff
+pub fl_sim::ReloadError::IdSetsDiffer(alloc::vec::Vec<alloc::string::String>)
+pub fl_sim::ReloadError::RegistryMismatch
+impl core::clone::Clone for fl_sim::ReloadError
+pub fn fl_sim::ReloadError::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::ReloadError
+impl core::cmp::PartialEq for fl_sim::ReloadError
+pub fn fl_sim::ReloadError::eq(&self, &Self) -> bool
+impl core::error::Error for fl_sim::ReloadError
+impl core::fmt::Debug for fl_sim::ReloadError
+pub fn fl_sim::ReloadError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::ReloadError
+pub fn fl_sim::ReloadError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::ReloadError
+pub enum fl_sim::ReplayError
+pub fl_sim::ReplayError::Command(alloc::string::String)
+pub fl_sim::ReplayError::Decode(alloc::string::String)
+pub fl_sim::ReplayError::Header(fl_protocol::header::HeaderMismatch)
+pub fl_sim::ReplayError::Setup(alloc::string::String)
+pub fl_sim::ReplayError::Version
+pub fl_sim::ReplayError::Version::found: u32
+impl core::error::Error for fl_sim::ReplayError
+pub fn fl_sim::ReplayError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for fl_sim::ReplayError
+pub fn fl_sim::ReplayError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::ReplayError
+pub fn fl_sim::ReplayError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub enum fl_sim::ReplayEvent
+pub fl_sim::ReplayEvent::ContentReload
+pub fl_sim::ReplayEvent::ContentReload::rules_hash: u64
+pub fl_sim::ReplayEvent::ContentReload::tick: fl_protocol::ids::Tick
+impl core::clone::Clone for fl_sim::ReplayEvent
+pub fn fl_sim::ReplayEvent::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::ReplayEvent
+pub fn fl_sim::ReplayEvent::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::ReplayEvent
+pub fn fl_sim::ReplayEvent::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::ReplayEvent
+impl serde_core::ser::Serialize for fl_sim::ReplayEvent
+pub fn fl_sim::ReplayEvent::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::ReplayEvent
+pub fn fl_sim::ReplayEvent::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_sim::ReplayStart
+pub fl_sim::ReplayStart::Save(alloc::vec::Vec<u8>)
+pub fl_sim::ReplayStart::Scale
+pub fl_sim::ReplayStart::Scale::params: alloc::vec::Vec<u8>
+pub fl_sim::ReplayStart::Scale::version: u32
+pub fl_sim::ReplayStart::Scenario(alloc::string::String)
+impl fl_sim::ReplayStart
+pub fn fl_sim::ReplayStart::scale(&fl_sim::ScaleScenario) -> fl_sim::ReplayStart
+impl core::clone::Clone for fl_sim::ReplayStart
+pub fn fl_sim::ReplayStart::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::ReplayStart
+pub fn fl_sim::ReplayStart::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::ReplayStart
+pub fn fl_sim::ReplayStart::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::ReplayStart
+impl serde_core::ser::Serialize for fl_sim::ReplayStart
+pub fn fl_sim::ReplayStart::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::ReplayStart
+pub fn fl_sim::ReplayStart::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_sim::RequestKind
+pub fl_sim::RequestKind::Group
+pub fl_sim::RequestKind::Group::units: alloc::vec::Vec<(fl_protocol::ids::SimId, fl_math::vec::FxVec2)>
+pub fl_sim::RequestKind::Single
+impl core::clone::Clone for fl_sim::RequestKind
+pub fn fl_sim::RequestKind::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::RequestKind
+impl core::cmp::PartialEq for fl_sim::RequestKind
+pub fn fl_sim::RequestKind::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::RequestKind
+pub fn fl_sim::RequestKind::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::RequestKind
+impl fl_sim::SimHash for fl_sim::RequestKind
+pub fn fl_sim::RequestKind::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::RequestKind
+pub fn fl_sim::RequestKind::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::RequestKind
+pub fn fl_sim::RequestKind::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_sim::ResolveSet
+pub fl_sim::ResolveSet::Effects
+pub fl_sim::ResolveSet::Projectiles
+pub fl_sim::ResolveSet::Stats
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::ResolveSet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::ResolveSet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::ResolveSet
+impl core::cmp::Ord for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::ResolveSet
+impl core::marker::StructuralPartialEq for fl_sim::ResolveSet
+impl fl_sim::SimHook for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::phase(self) -> fl_sim::Phase
+#[non_exhaustive] pub enum fl_sim::SaveError
+pub fl_sim::SaveError::PendingRequests
+pub fl_sim::SaveError::PendingRequests::despawns: usize
+pub fl_sim::SaveError::PendingRequests::spawns: usize
+impl core::clone::Clone for fl_sim::SaveError
+pub fn fl_sim::SaveError::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SaveError
+impl core::cmp::PartialEq for fl_sim::SaveError
+pub fn fl_sim::SaveError::eq(&self, &Self) -> bool
+impl core::error::Error for fl_sim::SaveError
+impl core::fmt::Debug for fl_sim::SaveError
+pub fn fl_sim::SaveError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::SaveError
+pub fn fl_sim::SaveError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SaveError
+#[non_exhaustive] pub enum fl_sim::SemanticCheck
+pub fl_sim::SemanticCheck::EntityCount
+pub fl_sim::SemanticCheck::EntityCount::id: alloc::string::String
+pub fl_sim::SemanticCheck::EntityCount::max: u32
+pub fl_sim::SemanticCheck::EntityCount::min: u32
+pub fl_sim::SemanticCheck::EntityCount::tick: fl_protocol::ids::Tick
+pub fl_sim::SemanticCheck::NeverOnTerrain
+pub fl_sim::SemanticCheck::NeverOnTerrain::id: alloc::string::String
+pub fl_sim::SemanticCheck::NeverOnTerrain::terrain: alloc::string::String
+pub fl_sim::SemanticCheck::NeverOnTerrain::units: alloc::vec::Vec<fl_protocol::ids::SimId>
+pub fl_sim::SemanticCheck::UnitExists
+pub fl_sim::SemanticCheck::UnitExists::exists: bool
+pub fl_sim::SemanticCheck::UnitExists::id: alloc::string::String
+pub fl_sim::SemanticCheck::UnitExists::tick: fl_protocol::ids::Tick
+pub fl_sim::SemanticCheck::UnitExists::unit: fl_protocol::ids::SimId
+pub fl_sim::SemanticCheck::UnitWithin
+pub fl_sim::SemanticCheck::UnitWithin::id: alloc::string::String
+pub fl_sim::SemanticCheck::UnitWithin::max: fl_math::vec::FxVec2
+pub fl_sim::SemanticCheck::UnitWithin::min: fl_math::vec::FxVec2
+pub fl_sim::SemanticCheck::UnitWithin::tick: fl_protocol::ids::Tick
+pub fl_sim::SemanticCheck::UnitWithin::unit: fl_protocol::ids::SimId
+impl fl_sim::SemanticCheck
+pub fn fl_sim::SemanticCheck::id(&self) -> &str
+impl core::clone::Clone for fl_sim::SemanticCheck
+pub fn fl_sim::SemanticCheck::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::SemanticCheck
+pub fn fl_sim::SemanticCheck::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SemanticCheck
+pub fn fl_sim::SemanticCheck::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SemanticCheck
+impl serde_core::ser::Serialize for fl_sim::SemanticCheck
+pub fn fl_sim::SemanticCheck::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SemanticCheck
+pub fn fl_sim::SemanticCheck::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub enum fl_sim::SetupError
+pub fl_sim::SetupError::MapSizeMismatch
+pub fl_sim::SetupError::MapSizeMismatch::map: alloc::string::String
+pub fl_sim::SetupError::MapSizeMismatch::map_m: i32
+pub fl_sim::SetupError::SeedMismatch
+pub fl_sim::SetupError::SeedMismatch::matched: u64
+pub fl_sim::SetupError::SeedMismatch::scale: u64
+pub fl_sim::SetupError::Spawn(fl_sim::SpawnError)
+pub fl_sim::SetupError::TooManyPlayers(usize)
+pub fl_sim::SetupError::Unit
+pub fl_sim::SetupError::Unit::error: fl_sim::SpawnError
+pub fl_sim::SetupError::Unit::index: usize
+pub fl_sim::SetupError::Unit::unit: alloc::string::String
+pub fl_sim::SetupError::UnknownFaction(alloc::string::String)
+pub fl_sim::SetupError::UnknownMap(alloc::string::String)
+pub fl_sim::SetupError::UnknownScenario(alloc::string::String)
+impl core::clone::Clone for fl_sim::SetupError
+pub fn fl_sim::SetupError::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SetupError
+impl core::cmp::PartialEq for fl_sim::SetupError
+pub fn fl_sim::SetupError::eq(&self, &Self) -> bool
+impl core::convert::From<fl_sim::SpawnError> for fl_sim::SetupError
+pub fn fl_sim::SetupError::from(fl_sim::SpawnError) -> Self
+impl core::error::Error for fl_sim::SetupError
+pub fn fl_sim::SetupError::source(&self) -> core::option::Option<&(dyn core::error::Error + 'static)>
+impl core::fmt::Debug for fl_sim::SetupError
+pub fn fl_sim::SetupError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::SetupError
+pub fn fl_sim::SetupError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SetupError
+pub enum fl_sim::SpawnError
+pub fl_sim::SpawnError::BlockedCell
+pub fl_sim::SpawnError::NoMap
+pub fl_sim::SpawnError::OutsideMap
+pub fl_sim::SpawnError::UnknownPlayer
+pub fl_sim::SpawnError::UnknownUnit
+impl core::clone::Clone for fl_sim::SpawnError
+pub fn fl_sim::SpawnError::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SpawnError
+impl core::cmp::PartialEq for fl_sim::SpawnError
+pub fn fl_sim::SpawnError::eq(&self, &Self) -> bool
+impl core::convert::From<fl_sim::SpawnError> for fl_sim::SetupError
+pub fn fl_sim::SetupError::from(fl_sim::SpawnError) -> Self
+impl core::error::Error for fl_sim::SpawnError
+impl core::fmt::Debug for fl_sim::SpawnError
+pub fn fl_sim::SpawnError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::fmt::Display for fl_sim::SpawnError
+pub fn fl_sim::SpawnError::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::SpawnError
+impl core::marker::StructuralPartialEq for fl_sim::SpawnError
+pub enum fl_sim::ThinkSet
+pub fl_sim::ThinkSet::Behaviour
+pub fl_sim::ThinkSet::Orders
+impl bevy_ecs::schedule::set::SystemSet for fl_sim::ThinkSet where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::ThinkSet::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::SystemSet>
+impl core::clone::Clone for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::ThinkSet
+impl core::cmp::Ord for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::ThinkSet
+impl core::marker::StructuralPartialEq for fl_sim::ThinkSet
+impl fl_sim::SimHook for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::phase(self) -> fl_sim::Phase
+#[non_exhaustive] pub enum fl_sim::VerifyOutcome
+pub fl_sim::VerifyOutcome::Diverged(fl_sim::Divergence)
+pub fl_sim::VerifyOutcome::NonReproducible
+pub fl_sim::VerifyOutcome::SemanticFailed(alloc::vec::Vec<fl_sim::SemanticFailure>)
+pub fl_sim::VerifyOutcome::Verified
+pub fl_sim::VerifyOutcome::Verified::ticks: u32
+pub fl_sim::VerifyOutcome::Verified::warnings: alloc::vec::Vec<alloc::string::String>
+impl core::clone::Clone for fl_sim::VerifyOutcome
+pub fn fl_sim::VerifyOutcome::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::VerifyOutcome
+pub fn fl_sim::VerifyOutcome::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::VerifyOutcome
+pub fn fl_sim::VerifyOutcome::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::VerifyOutcome
+pub struct fl_sim::CellRect
+pub fl_sim::CellRect::max: (u32, u32)
+pub fl_sim::CellRect::min: (u32, u32)
+impl fl_sim::CellRect
+pub fn fl_sim::CellRect::area(&self) -> u64
+impl core::clone::Clone for fl_sim::CellRect
+pub fn fl_sim::CellRect::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::CellRect
+impl core::cmp::PartialEq for fl_sim::CellRect
+pub fn fl_sim::CellRect::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::CellRect
+pub fn fl_sim::CellRect::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::CellRect
+impl core::marker::StructuralPartialEq for fl_sim::CellRect
+impl serde_core::ser::Serialize for fl_sim::CellRect
+pub fn fl_sim::CellRect::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::CellRect
+pub fn fl_sim::CellRect::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Codec<T>
+pub fl_sim::Codec::decode: fn(u32, &[u8], &fl_sim::LoadCtx<'_>) -> core::result::Result<T, alloc::string::String>
+pub fl_sim::Codec::dump: fn(&T) -> serde_json::value::Value
+pub fl_sim::Codec::encode: fn(&T, &fl_sim::SaveCtx<'_>) -> alloc::vec::Vec<u8>
+pub fl_sim::Codec::hash: fn(&T, &mut fl_sim::StateHasher)
+pub fl_sim::Codec::trace: fl_sim::TraceFn
+pub fl_sim::Codec::version: u32
+impl<T: fl_sim::SimHash + serde_core::ser::Serialize + serde_core::de::DeserializeOwned + core::marker::Send + core::marker::Sync + 'static> fl_sim::Codec<T>
+pub fn fl_sim::Codec<T>::custom(u32, fn(&T, &fl_sim::SaveCtx<'_>) -> alloc::vec::Vec<u8>, fn(u32, &[u8], &fl_sim::LoadCtx<'_>) -> core::result::Result<T, alloc::string::String>, fl_sim::TraceFn) -> Self
+pub fn fl_sim::Codec<T>::new(u32) -> Self
+impl<T> fl_sim::Codec<T>
+pub fn fl_sim::Codec<T>::fill_missing(self, fl_sim::FillFn) -> Self
+pub fn fl_sim::Codec<T>::migrate_from<Old: serde_core::de::DeserializeOwned + core::convert::Into<T>>(self, u32) -> Self
+pub fn fl_sim::Codec<T>::trace_enum<E: serde_core::de::DeserializeOwned>(self) -> Self
+impl<T> core::clone::Clone for fl_sim::Codec<T>
+pub fn fl_sim::Codec<T>::clone(&self) -> Self
+pub struct fl_sim::CommandCtx<'a>
+pub fl_sim::CommandCtx::player: fl_protocol::ids::PlayerId
+pub fl_sim::CommandCtx::queue: bool
+pub fl_sim::CommandCtx::seq: u32
+pub fl_sim::CommandCtx::tick: fl_protocol::ids::Tick
+pub fl_sim::CommandCtx::units: &'a [(fl_protocol::ids::SimId, bevy_ecs::entity::Entity)]
+pub struct fl_sim::CommandInbox(pub alloc::vec::Vec<fl_protocol::command::PlayerCommand>)
+impl bevy_ecs::component::Component for fl_sim::CommandInbox where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::CommandInbox::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::CommandInbox::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::CommandInbox::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::CommandInbox::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::CommandInbox::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::CommandInbox where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::default::Default for fl_sim::CommandInbox
+pub fn fl_sim::CommandInbox::default() -> Self
+impl core::fmt::Debug for fl_sim::CommandInbox
+pub fn fl_sim::CommandInbox::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::CommandLog
+pub fl_sim::CommandLog::applied: alloc::vec::Vec<fl_protocol::command::PlayerCommand>
+pub fl_sim::CommandLog::rejected: alloc::vec::Vec<(fl_protocol::command::PlayerCommand, fl_sim::RejectReason)>
+impl bevy_ecs::component::Component for fl_sim::CommandLog where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::CommandLog::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::CommandLog::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::CommandLog::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::CommandLog::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::CommandLog::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::CommandLog where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::default::Default for fl_sim::CommandLog
+pub fn fl_sim::CommandLog::default() -> Self
+impl core::fmt::Debug for fl_sim::CommandLog
+pub fn fl_sim::CommandLog::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::CommandRegistry
+impl fl_sim::CommandRegistry
+pub fn fl_sim::CommandRegistry::encode<P: fl_protocol::command::CommandPayload>(&self, &P) -> fl_protocol::command::CommandKind
+pub fn fl_sim::CommandRegistry::name(&self, fl_protocol::ids::CommandTypeId) -> core::option::Option<&'static str>
+pub fn fl_sim::CommandRegistry::type_id<P: fl_protocol::command::CommandPayload>(&self) -> fl_protocol::ids::CommandTypeId
+impl bevy_ecs::component::Component for fl_sim::CommandRegistry where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::CommandRegistry::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::CommandRegistry::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::CommandRegistry::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::CommandRegistry::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::CommandRegistry::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::CommandRegistry where Self: core::marker::Send + core::marker::Sync + 'static
+pub struct fl_sim::Content(pub alloc::rcs::arc::Arc<fl_content::db::ContentDb>)
+impl bevy_ecs::component::Component for fl_sim::Content where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Content::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Content::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Content::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Content::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Content::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::Content where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::Content
+pub fn fl_sim::Content::clone(&self) -> Self
+pub struct fl_sim::CoreFeature
+impl fl_sim::CoreFeature
+pub const fl_sim::CoreFeature::ID: &'static str
+impl fl_sim::SimFeature for fl_sim::CoreFeature
+pub fn fl_sim::CoreFeature::build(&self, &mut fl_sim::SimBuilder)
+pub fn fl_sim::CoreFeature::deps(&self) -> &'static [&'static str]
+pub fn fl_sim::CoreFeature::id(&self) -> &'static str
+pub fn fl_sim::CoreFeature::version(&self) -> u32
+pub struct fl_sim::DebugQueries
+impl fl_sim::DebugQueries
+pub fn fl_sim::DebugQueries::names(&self) -> impl core::iter::traits::iterator::Iterator<Item = &'static str> + '_
+impl bevy_ecs::component::Component for fl_sim::DebugQueries where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::DebugQueries::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::DebugQueries::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::DebugQueries::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::DebugQueries::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::DebugQueries::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::DebugQueries where Self: core::marker::Send + core::marker::Sync + 'static
+pub struct fl_sim::DespawnRequest(pub fl_protocol::ids::SimId)
+impl bevy_ecs::message::Message for fl_sim::DespawnRequest where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::DespawnRequest
+pub fn fl_sim::DespawnRequest::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::DespawnRequest
+impl core::cmp::PartialEq for fl_sim::DespawnRequest
+pub fn fl_sim::DespawnRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::DespawnRequest
+pub fn fl_sim::DespawnRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::DespawnRequest
+impl core::marker::StructuralPartialEq for fl_sim::DespawnRequest
+pub struct fl_sim::Divergence
+pub fl_sim::Divergence::actual: u64
+pub fl_sim::Divergence::expected: u64
+pub fl_sim::Divergence::tick: fl_protocol::ids::Tick
+impl core::clone::Clone for fl_sim::Divergence
+pub fn fl_sim::Divergence::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::Divergence
+pub fn fl_sim::Divergence::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Divergence
+pub fn fl_sim::Divergence::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::Divergence
+pub struct fl_sim::FlowKey
+pub fl_sim::FlowKey::cluster: fl_sim::nav::hpa::ClusterId
+pub fl_sim::FlowKey::profile: fl_sim::nav::MoveProfile
+impl core::clone::Clone for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::FlowKey
+impl core::cmp::Ord for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::FlowKey
+impl core::marker::StructuralPartialEq for fl_sim::FlowKey
+impl fl_sim::SimHash for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Follower
+pub fl_sim::Follower::leader: fl_protocol::ids::SimId
+pub fl_sim::Follower::offset: fl_math::vec::FxVec2
+impl bevy_ecs::component::Component for fl_sim::Follower where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Follower::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Follower::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Follower::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Follower::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Follower::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Follower
+pub fn fl_sim::Follower::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Follower
+impl core::cmp::PartialEq for fl_sim::Follower
+pub fn fl_sim::Follower::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Follower
+pub fn fl_sim::Follower::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Follower
+impl core::marker::StructuralPartialEq for fl_sim::Follower
+impl fl_sim::SimHash for fl_sim::Follower
+pub fn fl_sim::Follower::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Follower
+pub fn fl_sim::Follower::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Follower
+pub fn fl_sim::Follower::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Footprint
+pub fl_sim::Footprint::hitbox_shrink: fl_math::fx::Fx
+pub fl_sim::Footprint::length: fl_math::fx::Fx
+pub fl_sim::Footprint::width: fl_math::fx::Fx
+impl bevy_ecs::component::Component for fl_sim::Footprint where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Footprint::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Footprint::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Footprint::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Footprint::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Footprint::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Footprint
+pub fn fl_sim::Footprint::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Footprint
+impl core::cmp::PartialEq for fl_sim::Footprint
+pub fn fl_sim::Footprint::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Footprint
+pub fn fl_sim::Footprint::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Footprint
+impl core::marker::StructuralPartialEq for fl_sim::Footprint
+impl fl_sim::SimHash for fl_sim::Footprint
+pub fn fl_sim::Footprint::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Footprint
+pub fn fl_sim::Footprint::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Footprint
+pub fn fl_sim::Footprint::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::HashInterval(pub u32)
+impl bevy_ecs::component::Component for fl_sim::HashInterval where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::HashInterval::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::HashInterval::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::HashInterval::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::HashInterval::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::HashInterval::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::HashInterval where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::HashInterval
+pub fn fl_sim::HashInterval::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::HashInterval
+impl core::cmp::PartialEq for fl_sim::HashInterval
+pub fn fl_sim::HashInterval::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::HashInterval
+pub fn fl_sim::HashInterval::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::HashInterval
+impl core::marker::StructuralPartialEq for fl_sim::HashInterval
+pub struct fl_sim::Health
+pub fl_sim::Health::hp: u32
+pub fl_sim::Health::max: u32
+impl bevy_ecs::component::Component for fl_sim::Health where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Health::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Health::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Health::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Health::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Health::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Health
+pub fn fl_sim::Health::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Health
+impl core::cmp::PartialEq for fl_sim::Health
+pub fn fl_sim::Health::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Health
+pub fn fl_sim::Health::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Health
+impl core::marker::StructuralPartialEq for fl_sim::Health
+impl fl_sim::SimHash for fl_sim::Health
+pub fn fl_sim::Health::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Health
+pub fn fl_sim::Health::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Health
+pub fn fl_sim::Health::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::HullDef
+pub fl_sim::HullDef::footprint: fl_math::vec::FxVec2
+pub fl_sim::HullDef::hitbox_shrink: fl_math::fx::Fx
+pub fl_sim::HullDef::hp: u32
+impl core::clone::Clone for fl_sim::HullDef
+pub fn fl_sim::HullDef::clone(&self) -> Self
+impl core::fmt::Debug for fl_sim::HullDef
+pub fn fl_sim::HullDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl fl_content::def::DefComponent for fl_sim::HullDef
+pub fn fl_sim::HullDef::as_any(&self) -> &dyn core::any::Any
+pub fn fl_sim::HullDef::instantiate(&self, &fl_content::def::SpawnCtx<'_>, &mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>)
+pub fn fl_sim::HullDef::reload(&self, &fl_content::def::SpawnCtx<'_>, &mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>)
+pub fn fl_sim::HullDef::validate(&self, &mut fl_content::link::LinkCtx<'_>)
+impl serde_core::ser::Serialize for fl_sim::HullDef
+pub fn fl_sim::HullDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::HullDef
+pub fn fl_sim::HullDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Invulnerable
+impl bevy_ecs::component::Component for fl_sim::Invulnerable where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Invulnerable::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Invulnerable::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Invulnerable::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Invulnerable::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Invulnerable::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Invulnerable
+pub fn fl_sim::Invulnerable::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Invulnerable
+impl core::cmp::PartialEq for fl_sim::Invulnerable
+pub fn fl_sim::Invulnerable::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Invulnerable
+pub fn fl_sim::Invulnerable::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Invulnerable
+impl core::marker::StructuralPartialEq for fl_sim::Invulnerable
+impl fl_sim::SimHash for fl_sim::Invulnerable
+pub fn fl_sim::Invulnerable::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Invulnerable
+pub fn fl_sim::Invulnerable::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Invulnerable
+pub fn fl_sim::Invulnerable::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Journal
+impl fl_sim::Journal
+pub fn fl_sim::Journal::enabled(&self) -> bool
+pub fn fl_sim::Journal::is_empty(&self) -> bool
+pub fn fl_sim::Journal::len(&self) -> usize
+pub fn fl_sim::Journal::record<R: fl_sim::JournalRecord>(&mut self, fl_protocol::ids::Tick, fl_sim::Phase, core::option::Option<fl_protocol::ids::SimId>, core::option::Option<fl_protocol::ids::PlayerId>, &R)
+impl bevy_ecs::component::Component for fl_sim::Journal where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Journal::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Journal::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Journal::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Journal::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Journal::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::Journal where Self: core::marker::Send + core::marker::Sync + 'static
+pub struct fl_sim::LastSeq(pub alloc::collections::btree::map::BTreeMap<fl_protocol::ids::PlayerId, u32>)
+impl bevy_ecs::component::Component for fl_sim::LastSeq where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::LastSeq::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::LastSeq::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::LastSeq::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::LastSeq::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::LastSeq::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::LastSeq where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::LastSeq
+impl core::cmp::PartialEq for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::default() -> Self
+impl core::fmt::Debug for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::LastSeq
+impl fl_sim::SimHash for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::LoadCtx<'a>
+impl<'a> fl_sim::LoadCtx<'a>
+pub fn fl_sim::LoadCtx<'a>::current_tables(&self) -> &fl_protocol::tables::StringTables
+pub fn fl_sim::LoadCtx<'a>::remap(&self, &str, u32) -> core::result::Result<u32, alloc::string::String>
+pub fn fl_sim::LoadCtx<'a>::saved_tables(&self) -> &fl_protocol::tables::StringTables
+pub struct fl_sim::LoadOptions
+pub fl_sim::LoadOptions::drop_unknown_units: bool
+impl core::clone::Clone for fl_sim::LoadOptions
+pub fn fl_sim::LoadOptions::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::LoadOptions
+impl core::cmp::PartialEq for fl_sim::LoadOptions
+pub fn fl_sim::LoadOptions::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::LoadOptions
+pub fn fl_sim::LoadOptions::default() -> Self
+impl core::fmt::Debug for fl_sim::LoadOptions
+pub fn fl_sim::LoadOptions::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::LoadOptions
+impl core::marker::StructuralPartialEq for fl_sim::LoadOptions
+pub struct fl_sim::Loaded
+pub fl_sim::Loaded::app: bevy_app::app::App
+pub fl_sim::Loaded::dropped: alloc::vec::Vec<(fl_protocol::ids::SimId, alloc::string::String)>
+pub fl_sim::Loaded::last_seq: alloc::collections::btree::map::BTreeMap<fl_protocol::ids::PlayerId, u32>
+pub fl_sim::Loaded::pending: alloc::vec::Vec<fl_protocol::command::PlayerCommand>
+pub struct fl_sim::LockstepDriver<S: fl_sim::NetSession>
+impl<S: fl_sim::NetSession> fl_sim::LockstepDriver<S>
+pub fn fl_sim::LockstepDriver<S>::new(fl_protocol::ids::PlayerId, alloc::vec::Vec<fl_protocol::ids::PlayerId>, S, u32) -> Self
+impl<S: fl_sim::NetSession> fl_view::driver::TickDriver for fl_sim::LockstepDriver<S>
+pub fn fl_sim::LockstepDriver<S>::input_delay(&self) -> u32
+pub fn fl_sim::LockstepDriver<S>::issue(&mut self, fl_view::driver::CommandDraft) -> fl_protocol::command::PlayerCommand
+pub fn fl_sim::LockstepDriver<S>::next_tick(&self) -> fl_protocol::ids::Tick
+pub fn fl_sim::LockstepDriver<S>::pending(&self) -> alloc::vec::Vec<fl_protocol::command::PlayerCommand>
+pub fn fl_sim::LockstepDriver<S>::poll(&mut self) -> core::option::Option<fl_view::runner::TickInput>
+pub struct fl_sim::LoopbackSession
+impl core::fmt::Debug for fl_sim::LoopbackSession
+pub fn fl_sim::LoopbackSession::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl fl_sim::NetSession for fl_sim::LoopbackSession
+pub fn fl_sim::LoopbackSession::recv(&mut self) -> alloc::vec::Vec<(fl_protocol::ids::Tick, fl_protocol::ids::PlayerId, alloc::vec::Vec<fl_protocol::command::PlayerCommand>)>
+pub fn fl_sim::LoopbackSession::send(&mut self, fl_protocol::ids::Tick, fl_protocol::ids::PlayerId, alloc::vec::Vec<fl_protocol::command::PlayerCommand>)
+pub struct fl_sim::MapInfo
+pub fl_sim::MapInfo::cell: fl_math::fx::Fx
+pub fl_sim::MapInfo::cells_x: u32
+pub fl_sim::MapInfo::cells_y: u32
+pub fl_sim::MapInfo::size: fl_math::vec::FxVec2
+impl fl_sim::MapInfo
+pub fn fl_sim::MapInfo::clamp(&self, fl_math::vec::FxVec2) -> fl_math::vec::FxVec2
+pub fn fl_sim::MapInfo::contains(&self, fl_math::vec::FxVec2) -> bool
+pub fn fl_sim::MapInfo::flat(fl_math::vec::FxVec2, fl_math::fx::Fx) -> Self
+impl bevy_ecs::component::Component for fl_sim::MapInfo where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::MapInfo::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::MapInfo::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::MapInfo::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::MapInfo::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::MapInfo::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::MapInfo where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::MapInfo
+pub fn fl_sim::MapInfo::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::MapInfo
+pub fn fl_sim::MapInfo::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::MapInfo
+pub fn fl_sim::MapInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::MapInfo
+impl fl_sim::SimHash for fl_sim::MapInfo
+pub fn fl_sim::MapInfo::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::MapInfo
+pub fn fl_sim::MapInfo::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::MapInfo
+pub fn fl_sim::MapInfo::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::MatchHeaderRes(pub fl_protocol::header::MatchHeader)
+impl bevy_ecs::component::Component for fl_sim::MatchHeaderRes where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::MatchHeaderRes::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::MatchHeaderRes::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::MatchHeaderRes::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::MatchHeaderRes::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::MatchHeaderRes::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::MatchHeaderRes where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::MatchHeaderRes
+pub fn fl_sim::MatchHeaderRes::clone(&self) -> Self
+impl core::fmt::Debug for fl_sim::MatchHeaderRes
+pub fn fl_sim::MatchHeaderRes::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::MatchSeed(pub u64)
+impl bevy_ecs::component::Component for fl_sim::MatchSeed where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::MatchSeed::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::MatchSeed::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::MatchSeed::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::MatchSeed::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::MatchSeed::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::MatchSeed where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::MatchSeed
+impl core::cmp::PartialEq for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::default() -> Self
+impl core::fmt::Debug for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::MatchSeed
+impl core::marker::StructuralPartialEq for fl_sim::MatchSeed
+impl fl_sim::SimHash for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::MatchSetup
+pub fl_sim::MatchSetup::cheats_allowed: bool
+pub fl_sim::MatchSetup::seed: u64
+impl fl_sim::MatchSetup
+pub fn fl_sim::MatchSetup::for_scenario(&fl_content::db::ContentDb, &str) -> core::result::Result<fl_sim::MatchSetup, fl_sim::SetupError>
+impl core::clone::Clone for fl_sim::MatchSetup
+pub fn fl_sim::MatchSetup::clone(&self) -> Self
+impl core::default::Default for fl_sim::MatchSetup
+pub fn fl_sim::MatchSetup::default() -> Self
+impl core::fmt::Debug for fl_sim::MatchSetup
+pub fn fl_sim::MatchSetup::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::Mobility
+pub fl_sim::Mobility::class: fl_content::terrain::MoveClass
+pub fl_sim::Mobility::speed: fl_math::fx::Fx
+pub fl_sim::Mobility::terrain_factor: fl_math::fx::Fx
+pub fl_sim::Mobility::turn_rate: fl_math::angle::Angle
+impl bevy_ecs::component::Component for fl_sim::Mobility where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Mobility::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Mobility::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Mobility::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Mobility::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Mobility::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Mobility
+pub fn fl_sim::Mobility::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Mobility
+impl core::cmp::PartialEq for fl_sim::Mobility
+pub fn fl_sim::Mobility::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Mobility
+pub fn fl_sim::Mobility::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Mobility
+impl core::marker::StructuralPartialEq for fl_sim::Mobility
+impl fl_sim::SimHash for fl_sim::Mobility
+pub fn fl_sim::Mobility::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Mobility
+pub fn fl_sim::Mobility::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Mobility
+pub fn fl_sim::Mobility::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::MobilityDef
+pub fl_sim::MobilityDef::class: fl_content::terrain::MoveClass
+pub fl_sim::MobilityDef::road_speed_kmh: fl_math::fx::Fx
+pub fl_sim::MobilityDef::terrain_factor: fl_math::fx::Fx
+pub fl_sim::MobilityDef::turn_rate_deg_s: fl_math::fx::Fx
+impl core::clone::Clone for fl_sim::MobilityDef
+pub fn fl_sim::MobilityDef::clone(&self) -> Self
+impl core::fmt::Debug for fl_sim::MobilityDef
+pub fn fl_sim::MobilityDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl fl_content::def::DefComponent for fl_sim::MobilityDef
+pub fn fl_sim::MobilityDef::as_any(&self) -> &dyn core::any::Any
+pub fn fl_sim::MobilityDef::instantiate(&self, &fl_content::def::SpawnCtx<'_>, &mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>)
+pub fn fl_sim::MobilityDef::reload(&self, &fl_content::def::SpawnCtx<'_>, &mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>)
+pub fn fl_sim::MobilityDef::validate(&self, &mut fl_content::link::LinkCtx<'_>)
+impl serde_core::ser::Serialize for fl_sim::MobilityDef
+pub fn fl_sim::MobilityDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::MobilityDef
+pub fn fl_sim::MobilityDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::MoveOrder
+pub fl_sim::MoveOrder::orders: alloc::vec::Vec<fl_sim::Order>
+impl bevy_ecs::component::Component for fl_sim::MoveOrder where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::MoveOrder::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::MoveOrder::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::MoveOrder::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::MoveOrder::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::MoveOrder::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::MoveOrder
+impl core::cmp::PartialEq for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::default() -> Self
+impl core::fmt::Debug for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::MoveOrder
+impl fl_sim::SimHash for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::MovementRules
+pub fl_sim::MovementRules::arrive_m: fl_math::fx::Fx
+pub fl_sim::MovementRules::follow_distance_m: fl_math::fx::Fx
+pub fl_sim::MovementRules::follow_repath_ticks: u32
+pub fl_sim::MovementRules::formation_max_spread_m: fl_math::fx::Fx
+pub fl_sim::MovementRules::max_slope_m: alloc::collections::btree::map::BTreeMap<fl_content::terrain::MoveClass, fl_math::fx::Fx>
+pub fl_sim::MovementRules::min_speed_frac: fl_math::fx::Fx
+pub fl_sim::MovementRules::path_terrain_factor: alloc::collections::btree::map::BTreeMap<fl_content::terrain::MoveClass, fl_math::fx::Fx>
+pub fl_sim::MovementRules::turn_in_place_deg: fl_math::fx::Fx
+impl core::clone::Clone for fl_sim::MovementRules
+pub fn fl_sim::MovementRules::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::MovementRules
+pub fn fl_sim::MovementRules::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::MovementRules
+pub fn fl_sim::MovementRules::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::MovementRules
+impl fl_content::kinds::RulesSection for fl_sim::MovementRules
+pub fn fl_sim::MovementRules::link(&self, &mut fl_content::link::LinkCtx<'_>)
+impl serde_core::ser::Serialize for fl_sim::MovementRules
+pub fn fl_sim::MovementRules::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::MovementRules
+pub fn fl_sim::MovementRules::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Owner(pub fl_protocol::ids::PlayerId)
+impl bevy_ecs::component::Component for fl_sim::Owner where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Owner::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Owner::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Owner::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Owner::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Owner::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Owner
+pub fn fl_sim::Owner::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Owner
+impl core::cmp::PartialEq for fl_sim::Owner
+pub fn fl_sim::Owner::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Owner
+pub fn fl_sim::Owner::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Owner
+impl core::marker::StructuralPartialEq for fl_sim::Owner
+impl fl_sim::SimHash for fl_sim::Owner
+pub fn fl_sim::Owner::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Owner
+pub fn fl_sim::Owner::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Owner
+pub fn fl_sim::Owner::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::PathFollow
+pub fl_sim::PathFollow::corners: alloc::vec::Vec<fl_math::vec::FxVec2>
+pub fl_sim::PathFollow::goal: fl_math::vec::FxVec2
+pub fl_sim::PathFollow::next: u16
+pub fl_sim::PathFollow::planned: fl_protocol::ids::Tick
+pub fl_sim::PathFollow::state: fl_sim::PathState
+impl bevy_ecs::component::Component for fl_sim::PathFollow where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::PathFollow::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::PathFollow::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::PathFollow::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::PathFollow::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::PathFollow::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::PathFollow
+impl core::cmp::PartialEq for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::default() -> Self
+impl core::fmt::Debug for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::PathFollow
+impl fl_sim::SimHash for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::PathQueue
+pub fl_sim::PathQueue::next_id: u32
+pub fl_sim::PathQueue::pending: alloc::collections::vec_deque::VecDeque<fl_sim::PathRequest>
+impl bevy_ecs::component::Component for fl_sim::PathQueue where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::PathQueue::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::PathQueue::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::PathQueue::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::PathQueue::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::PathQueue::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::PathQueue where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::PathQueue
+impl core::cmp::PartialEq for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::default() -> Self
+impl core::fmt::Debug for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::PathQueue
+impl fl_sim::SimHash for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::PathRequest
+pub fl_sim::PathRequest::goal: fl_math::vec::FxVec2
+pub fl_sim::PathRequest::id: u32
+pub fl_sim::PathRequest::issued: fl_protocol::ids::Tick
+pub fl_sim::PathRequest::kind: fl_sim::RequestKind
+pub fl_sim::PathRequest::unit: fl_protocol::ids::SimId
+impl core::clone::Clone for fl_sim::PathRequest
+pub fn fl_sim::PathRequest::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::PathRequest
+impl core::cmp::PartialEq for fl_sim::PathRequest
+pub fn fl_sim::PathRequest::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::PathRequest
+pub fn fl_sim::PathRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::PathRequest
+impl fl_sim::SimHash for fl_sim::PathRequest
+pub fn fl_sim::PathRequest::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::PathRequest
+pub fn fl_sim::PathRequest::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::PathRequest
+pub fn fl_sim::PathRequest::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::PlayerInfo
+pub fl_sim::PlayerInfo::controller: fl_protocol::header::Controller
+pub fl_sim::PlayerInfo::faction: fl_protocol::ids::FactionId
+pub fl_sim::PlayerInfo::id: fl_protocol::ids::PlayerId
+pub fl_sim::PlayerInfo::team: fl_protocol::ids::TeamId
+impl core::clone::Clone for fl_sim::PlayerInfo
+pub fn fl_sim::PlayerInfo::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::PlayerInfo
+pub fn fl_sim::PlayerInfo::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::PlayerInfo
+pub fn fl_sim::PlayerInfo::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::PlayerInfo
+impl fl_sim::SimHash for fl_sim::PlayerInfo
+pub fn fl_sim::PlayerInfo::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::PlayerInfo
+pub fn fl_sim::PlayerInfo::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::PlayerInfo
+pub fn fl_sim::PlayerInfo::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Players
+pub fl_sim::Players::list: alloc::vec::Vec<fl_sim::PlayerInfo>
+impl fl_sim::Players
+pub fn fl_sim::Players::get(&self, fl_protocol::ids::PlayerId) -> core::option::Option<&fl_sim::PlayerInfo>
+impl bevy_ecs::component::Component for fl_sim::Players where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Players::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Players::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Players::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Players::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Players::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::Players where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::Players
+pub fn fl_sim::Players::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::Players
+pub fn fl_sim::Players::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::Players
+pub fn fl_sim::Players::default() -> Self
+impl core::fmt::Debug for fl_sim::Players
+pub fn fl_sim::Players::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::Players
+impl fl_sim::SimHash for fl_sim::Players
+pub fn fl_sim::Players::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Players
+pub fn fl_sim::Players::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Players
+pub fn fl_sim::Players::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Pose
+pub fl_sim::Pose::heading: fl_math::angle::Angle
+pub fl_sim::Pose::pos: fl_math::vec::FxVec2
+impl bevy_ecs::component::Component for fl_sim::Pose where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Pose::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Pose::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Pose::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Pose::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Pose::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Pose
+pub fn fl_sim::Pose::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Pose
+impl core::cmp::PartialEq for fl_sim::Pose
+pub fn fl_sim::Pose::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Pose
+pub fn fl_sim::Pose::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Pose
+impl core::marker::StructuralPartialEq for fl_sim::Pose
+impl fl_sim::SimHash for fl_sim::Pose
+pub fn fl_sim::Pose::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Pose
+pub fn fl_sim::Pose::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Pose
+pub fn fl_sim::Pose::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Projectile
+pub fl_sim::Projectile::ttl: u16
+pub fl_sim::Projectile::vel: fl_math::vec::FxVec2
+impl bevy_ecs::component::Component for fl_sim::Projectile where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Projectile::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Projectile::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Projectile::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Projectile::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Projectile::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Projectile
+pub fn fl_sim::Projectile::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Projectile
+impl core::cmp::PartialEq for fl_sim::Projectile
+pub fn fl_sim::Projectile::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Projectile
+pub fn fl_sim::Projectile::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Projectile
+impl core::marker::StructuralPartialEq for fl_sim::Projectile
+impl fl_sim::SimHash for fl_sim::Projectile
+pub fn fl_sim::Projectile::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Projectile
+pub fn fl_sim::Projectile::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Projectile
+pub fn fl_sim::Projectile::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::ReblessEntry
+pub fl_sim::ReblessEntry::entities: (u32, u32)
+pub fl_sim::ReblessEntry::first_divergence: core::option::Option<fl_sim::Divergence>
+pub fl_sim::ReblessEntry::journal_diff: alloc::vec::Vec<(alloc::string::String, u32, u32)>
+pub fl_sim::ReblessEntry::semantic: alloc::vec::Vec<fl_sim::SemanticFailure>
+impl core::clone::Clone for fl_sim::ReblessEntry
+pub fn fl_sim::ReblessEntry::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::ReblessEntry
+pub fn fl_sim::ReblessEntry::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::ReblessEntry
+pub fn fl_sim::ReblessEntry::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::ReblessEntry
+pub struct fl_sim::ReloadReport
+pub fl_sim::ReloadReport::old_rules_hash: u64
+pub fl_sim::ReloadReport::rules_hash: u64
+pub fl_sim::ReloadReport::tick: fl_protocol::ids::Tick
+pub fl_sim::ReloadReport::units_reloaded: u32
+impl core::clone::Clone for fl_sim::ReloadReport
+pub fn fl_sim::ReloadReport::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::ReloadReport
+impl core::cmp::PartialEq for fl_sim::ReloadReport
+pub fn fl_sim::ReloadReport::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::ReloadReport
+pub fn fl_sim::ReloadReport::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::ReloadReport
+pub struct fl_sim::Replay
+pub fl_sim::Replay::events: alloc::vec::Vec<fl_sim::ReplayEvent>
+pub fl_sim::Replay::hash_interval: u32
+pub fl_sim::Replay::hashes: alloc::vec::Vec<(fl_protocol::ids::Tick, u64)>
+pub fl_sim::Replay::header: fl_protocol::header::MatchHeader
+pub fl_sim::Replay::inputs: alloc::vec::Vec<fl_view::runner::TickInput>
+pub fl_sim::Replay::journal_summary: alloc::collections::btree::map::BTreeMap<alloc::string::String, u32>
+pub fl_sim::Replay::semantic: alloc::vec::Vec<fl_sim::SemanticCheck>
+pub fl_sim::Replay::start: fl_sim::ReplayStart
+pub fl_sim::Replay::ticks: u32
+pub fl_sim::Replay::version: u32
+impl fl_sim::Replay
+pub fn fl_sim::Replay::from_bytes(&[u8]) -> core::result::Result<fl_sim::Replay, fl_sim::ReplayError>
+pub fn fl_sim::Replay::reproducible(&self) -> bool
+pub fn fl_sim::Replay::to_bytes(&self) -> alloc::vec::Vec<u8>
+pub fn fl_sim::Replay::to_json(&self) -> serde_json::value::Value
+pub fn fl_sim::Replay::with_semantics(self, alloc::vec::Vec<fl_sim::SemanticCheck>) -> fl_sim::Replay
+impl core::clone::Clone for fl_sim::Replay
+pub fn fl_sim::Replay::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::Replay
+pub fn fl_sim::Replay::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Replay
+pub fn fl_sim::Replay::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::Replay
+impl serde_core::ser::Serialize for fl_sim::Replay
+pub fn fl_sim::Replay::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Replay
+pub fn fl_sim::Replay::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::ReplayDriver
+impl fl_sim::ReplayDriver
+pub fn fl_sim::ReplayDriver::new(alloc::vec::Vec<fl_view::runner::TickInput>, fl_protocol::ids::Tick, core::option::Option<fl_protocol::ids::Tick>) -> Self
+impl core::clone::Clone for fl_sim::ReplayDriver
+pub fn fl_sim::ReplayDriver::clone(&self) -> Self
+impl core::fmt::Debug for fl_sim::ReplayDriver
+pub fn fl_sim::ReplayDriver::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl fl_view::driver::TickDriver for fl_sim::ReplayDriver
+pub fn fl_sim::ReplayDriver::input_delay(&self) -> u32
+pub fn fl_sim::ReplayDriver::issue(&mut self, fl_view::driver::CommandDraft) -> fl_protocol::command::PlayerCommand
+pub fn fl_sim::ReplayDriver::next_tick(&self) -> fl_protocol::ids::Tick
+pub fn fl_sim::ReplayDriver::pending(&self) -> alloc::vec::Vec<fl_protocol::command::PlayerCommand>
+pub fn fl_sim::ReplayDriver::poll(&mut self) -> core::option::Option<fl_view::runner::TickInput>
+pub struct fl_sim::ReplayRecorder
+impl fl_sim::ReplayRecorder
+pub fn fl_sim::ReplayRecorder::finish(self) -> fl_sim::Replay
+pub fn fl_sim::ReplayRecorder::new(fl_protocol::header::MatchHeader, fl_sim::ReplayStart, u32) -> Self
+pub fn fl_sim::ReplayRecorder::record(&mut self, &fl_view::runner::TickInput, &fl_view::runner::TickOutput)
+impl core::clone::Clone for fl_sim::ReplayRecorder
+pub fn fl_sim::ReplayRecorder::clone(&self) -> Self
+impl core::fmt::Debug for fl_sim::ReplayRecorder
+pub fn fl_sim::ReplayRecorder::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::RunConfig
+pub fl_sim::RunConfig::flow_cache_cold: bool
+pub fl_sim::RunConfig::hash_interval: core::option::Option<u32>
+pub fl_sim::RunConfig::journal: core::option::Option<bool>
+pub fl_sim::RunConfig::phase_markers: bool
+pub fl_sim::RunConfig::shuffle_seed: core::option::Option<u64>
+impl core::clone::Clone for fl_sim::RunConfig
+pub fn fl_sim::RunConfig::clone(&self) -> Self
+impl core::default::Default for fl_sim::RunConfig
+pub fn fl_sim::RunConfig::default() -> Self
+impl core::fmt::Debug for fl_sim::RunConfig
+pub fn fl_sim::RunConfig::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::SaveCtx<'a>
+impl<'a> fl_sim::SaveCtx<'a>
+pub fn fl_sim::SaveCtx<'a>::tables(&self) -> &fl_protocol::tables::StringTables
+pub struct fl_sim::SaveFile
+pub fl_sim::SaveFile::format_version: u32
+pub fl_sim::SaveFile::header: fl_protocol::header::MatchHeader
+pub fl_sim::SaveFile::sim: fl_sim::SimSave
+impl core::clone::Clone for fl_sim::SaveFile
+pub fn fl_sim::SaveFile::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SaveFile
+impl core::cmp::PartialEq for fl_sim::SaveFile
+pub fn fl_sim::SaveFile::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SaveFile
+pub fn fl_sim::SaveFile::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SaveFile
+impl serde_core::ser::Serialize for fl_sim::SaveFile
+pub fn fl_sim::SaveFile::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SaveFile
+pub fn fl_sim::SaveFile::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::ScaleMix
+impl bevy_ecs::component::Component for fl_sim::ScaleMix where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::ScaleMix::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::ScaleMix::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::ScaleMix::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::ScaleMix::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::ScaleMix::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::ScaleMix where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::ScaleMix
+pub fn fl_sim::ScaleMix::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::ScaleMix
+impl core::cmp::PartialEq for fl_sim::ScaleMix
+pub fn fl_sim::ScaleMix::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::ScaleMix
+pub fn fl_sim::ScaleMix::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::ScaleMix
+impl fl_sim::SimHash for fl_sim::ScaleMix
+pub fn fl_sim::ScaleMix::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::ScaleMix
+pub fn fl_sim::ScaleMix::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::ScaleMix
+pub fn fl_sim::ScaleMix::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::ScaleScenario
+pub fl_sim::ScaleScenario::followers_per_unit: u32
+pub fl_sim::ScaleScenario::map: core::option::Option<alloc::string::String>
+pub fl_sim::ScaleScenario::map_m: i32
+pub fl_sim::ScaleScenario::players: u8
+pub fl_sim::ScaleScenario::projectile_ttl: u32
+pub fl_sim::ScaleScenario::projectiles: u32
+pub fl_sim::ScaleScenario::seed: u64
+pub fl_sim::ScaleScenario::sensor_every: u32
+pub fl_sim::ScaleScenario::units: u32
+pub fl_sim::ScaleScenario::wander_m: i32
+impl fl_sim::ScaleScenario
+pub const fl_sim::ScaleScenario::VERSION: u32
+pub fn fl_sim::ScaleScenario::decode(u32, &[u8]) -> core::result::Result<fl_sim::ScaleScenario, alloc::string::String>
+pub fn fl_sim::ScaleScenario::encode(&self) -> (u32, alloc::vec::Vec<u8>)
+pub fn fl_sim::ScaleScenario::on_terrain(u32) -> Self
+pub fn fl_sim::ScaleScenario::populate(&self, &mut bevy_ecs::world::World) -> core::result::Result<alloc::vec::Vec<fl_protocol::ids::SimId>, fl_sim::SetupError>
+pub fn fl_sim::ScaleScenario::with_units(u32) -> Self
+impl core::clone::Clone for fl_sim::ScaleScenario
+pub fn fl_sim::ScaleScenario::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::ScaleScenario
+impl core::cmp::PartialEq for fl_sim::ScaleScenario
+pub fn fl_sim::ScaleScenario::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::ScaleScenario
+pub fn fl_sim::ScaleScenario::default() -> Self
+impl core::fmt::Debug for fl_sim::ScaleScenario
+pub fn fl_sim::ScaleScenario::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::ScaleScenario
+impl serde_core::ser::Serialize for fl_sim::ScaleScenario
+pub fn fl_sim::ScaleScenario::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::ScaleScenario
+pub fn fl_sim::ScaleScenario::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Selectable
+impl bevy_ecs::component::Component for fl_sim::Selectable where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Selectable::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Selectable::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Selectable::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Selectable::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Selectable::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Selectable
+pub fn fl_sim::Selectable::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Selectable
+impl core::cmp::PartialEq for fl_sim::Selectable
+pub fn fl_sim::Selectable::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Selectable
+pub fn fl_sim::Selectable::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Selectable
+impl core::marker::StructuralPartialEq for fl_sim::Selectable
+impl fl_sim::SimHash for fl_sim::Selectable
+pub fn fl_sim::Selectable::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Selectable
+pub fn fl_sim::Selectable::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Selectable
+pub fn fl_sim::Selectable::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::SelectableDef
+impl core::clone::Clone for fl_sim::SelectableDef
+pub fn fl_sim::SelectableDef::clone(&self) -> Self
+impl core::fmt::Debug for fl_sim::SelectableDef
+pub fn fl_sim::SelectableDef::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl fl_content::def::DefComponent for fl_sim::SelectableDef
+pub fn fl_sim::SelectableDef::as_any(&self) -> &dyn core::any::Any
+pub fn fl_sim::SelectableDef::instantiate(&self, &fl_content::def::SpawnCtx<'_>, &mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>)
+impl serde_core::ser::Serialize for fl_sim::SelectableDef
+pub fn fl_sim::SelectableDef::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SelectableDef
+pub fn fl_sim::SelectableDef::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::SemanticFailure
+pub fl_sim::SemanticFailure::detail: alloc::string::String
+pub fl_sim::SemanticFailure::id: alloc::string::String
+pub fl_sim::SemanticFailure::tick: fl_protocol::ids::Tick
+impl core::clone::Clone for fl_sim::SemanticFailure
+pub fn fl_sim::SemanticFailure::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::SemanticFailure
+pub fn fl_sim::SemanticFailure::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SemanticFailure
+pub fn fl_sim::SemanticFailure::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SemanticFailure
+pub struct fl_sim::SimBuilder
+impl fl_sim::SimBuilder
+pub fn fl_sim::SimBuilder::add_message<M: bevy_ecs::message::Message>(&mut self, &'static str) -> &mut Self
+pub fn fl_sim::SimBuilder::add_systems<M>(&mut self, impl fl_sim::SimHook, impl bevy_ecs::schedule::config::IntoScheduleConfigs<bevy_ecs::system::schedule_system::ScheduleSystem, M>) -> &mut Self
+pub fn fl_sim::SimBuilder::app_mut(&mut self) -> &mut bevy_app::app::App
+pub fn fl_sim::SimBuilder::feature_id(&self) -> &'static str
+pub fn fl_sim::SimBuilder::register_command<P: fl_protocol::command::CommandPayload>(&mut self, impl fl_sim::CommandHandler<P>) -> &mut Self
+pub fn fl_sim::SimBuilder::register_component<C: bevy_ecs::component::Component>(&mut self, &'static str, fl_sim::Class<C>) -> &mut Self
+pub fn fl_sim::SimBuilder::register_content_kind<K: fl_content::kinds::ContentKind>(&mut self) -> &mut Self
+pub fn fl_sim::SimBuilder::register_debug_query(&mut self, &'static str, fl_sim::DebugQueryFn) -> &mut Self
+pub fn fl_sim::SimBuilder::register_def_component<T: fl_content::def::DefComponent + serde_core::de::DeserializeOwned>(&mut self, &'static str) -> &mut Self
+pub fn fl_sim::SimBuilder::register_journal_record<R: fl_sim::JournalRecord>(&mut self) -> &mut Self
+pub fn fl_sim::SimBuilder::register_rebuild(&mut self, fn(&mut bevy_ecs::world::World)) -> &mut Self
+pub fn fl_sim::SimBuilder::register_resource<R: bevy_ecs::resource::Resource>(&mut self, &'static str, fl_sim::Class<R>) -> &mut Self
+pub fn fl_sim::SimBuilder::register_rules_section<S: fl_content::kinds::RulesSection>(&mut self, &'static str) -> &mut Self
+pub fn fl_sim::SimBuilder::register_stream(&mut self, &'static str) -> fl_sim::Stream
+pub struct fl_sim::SimClock
+pub fl_sim::SimClock::tick: fl_protocol::ids::Tick
+impl bevy_ecs::component::Component for fl_sim::SimClock where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SimClock::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SimClock::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SimClock::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SimClock::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SimClock::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::SimClock where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::SimClock
+pub fn fl_sim::SimClock::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SimClock
+impl core::cmp::PartialEq for fl_sim::SimClock
+pub fn fl_sim::SimClock::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::SimClock
+pub fn fl_sim::SimClock::default() -> Self
+impl core::fmt::Debug for fl_sim::SimClock
+pub fn fl_sim::SimClock::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::SimClock
+impl core::marker::StructuralPartialEq for fl_sim::SimClock
+impl fl_sim::SimHash for fl_sim::SimClock
+pub fn fl_sim::SimClock::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::SimClock
+pub fn fl_sim::SimClock::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SimClock
+pub fn fl_sim::SimClock::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::SimCounters
+impl fl_sim::SimCounters
+pub fn fl_sim::SimCounters::add(&mut self, &'static str, u64)
+pub fn fl_sim::SimCounters::clear(&mut self)
+pub fn fl_sim::SimCounters::get(&self, &str) -> u64
+pub fn fl_sim::SimCounters::snapshot(&self) -> alloc::vec::Vec<(&'static str, u64)>
+impl bevy_ecs::component::Component for fl_sim::SimCounters where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SimCounters::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SimCounters::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SimCounters::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SimCounters::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SimCounters::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::SimCounters where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::default::Default for fl_sim::SimCounters
+pub fn fl_sim::SimCounters::default() -> Self
+impl core::fmt::Debug for fl_sim::SimCounters
+pub fn fl_sim::SimCounters::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::SimEntity(_)
+impl fl_sim::SimEntity
+pub fn fl_sim::SimEntity::id(&self) -> fl_protocol::ids::SimId
+impl bevy_ecs::component::Component for fl_sim::SimEntity where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SimEntity::Mutability = bevy_ecs::component::Immutable
+pub const fl_sim::SimEntity::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SimEntity::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SimEntity::on_discard() -> core::option::Option<bevy_ecs::lifecycle::ComponentHook>
+pub fn fl_sim::SimEntity::on_insert() -> core::option::Option<bevy_ecs::lifecycle::ComponentHook>
+pub fn fl_sim::SimEntity::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SimEntity::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::SimEntity
+pub fn fl_sim::SimEntity::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SimEntity
+impl core::cmp::Ord for fl_sim::SimEntity
+pub fn fl_sim::SimEntity::cmp(&self, &Self) -> core::cmp::Ordering
+impl core::cmp::PartialEq for fl_sim::SimEntity
+pub fn fl_sim::SimEntity::eq(&self, &Self) -> bool
+impl core::cmp::PartialOrd for fl_sim::SimEntity
+pub fn fl_sim::SimEntity::partial_cmp(&self, &Self) -> core::option::Option<core::cmp::Ordering>
+impl core::fmt::Debug for fl_sim::SimEntity
+pub fn fl_sim::SimEntity::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::SimEntity
+pub fn fl_sim::SimEntity::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::Copy for fl_sim::SimEntity
+impl core::marker::StructuralPartialEq for fl_sim::SimEntity
+pub struct fl_sim::SimEvents<E: core::marker::Send + core::marker::Sync + 'static>
+impl<E: core::marker::Send + core::marker::Sync + 'static> fl_sim::SimEvents<E>
+pub fn fl_sim::SimEvents<E>::clear(&mut self)
+pub fn fl_sim::SimEvents<E>::drain(&mut self) -> alloc::vec::drain::Drain<'_, E>
+pub fn fl_sim::SimEvents<E>::is_empty(&self) -> bool
+pub fn fl_sim::SimEvents<E>::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = &E> + '_
+pub fn fl_sim::SimEvents<E>::len(&self) -> usize
+pub fn fl_sim::SimEvents<E>::push(&mut self, E)
+impl<E: core::marker::Send + core::marker::Sync + 'static> bevy_ecs::component::Component for fl_sim::SimEvents<E> where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SimEvents<E>::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SimEvents<E>::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SimEvents<E>::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SimEvents<E>::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SimEvents<E>::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl<E: core::marker::Send + core::marker::Sync + 'static> bevy_ecs::resource::Resource for fl_sim::SimEvents<E> where Self: core::marker::Send + core::marker::Sync + 'static
+impl<E: core::marker::Send + core::marker::Sync + 'static> core::default::Default for fl_sim::SimEvents<E>
+pub fn fl_sim::SimEvents<E>::default() -> Self
+pub struct fl_sim::SimIdAllocator
+impl fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::issued(&self) -> u32
+impl bevy_ecs::component::Component for fl_sim::SimIdAllocator where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SimIdAllocator::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SimIdAllocator::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SimIdAllocator::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SimIdAllocator::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SimIdAllocator::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::SimIdAllocator where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SimIdAllocator
+impl core::cmp::PartialEq for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::default() -> Self
+impl core::fmt::Debug for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SimIdAllocator
+impl fl_sim::SimHash for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::SimIndex
+impl fl_sim::SimIndex
+pub fn fl_sim::SimIndex::get(&self, fl_protocol::ids::SimId) -> core::option::Option<bevy_ecs::entity::Entity>
+pub fn fl_sim::SimIndex::ids(&self) -> impl core::iter::traits::iterator::Iterator<Item = fl_protocol::ids::SimId> + '_
+pub fn fl_sim::SimIndex::is_empty(&self) -> bool
+pub fn fl_sim::SimIndex::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = (fl_protocol::ids::SimId, bevy_ecs::entity::Entity)> + '_
+pub fn fl_sim::SimIndex::len(&self) -> usize
+impl bevy_ecs::component::Component for fl_sim::SimIndex where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SimIndex::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SimIndex::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SimIndex::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SimIndex::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SimIndex::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::SimIndex where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::SimIndex
+pub fn fl_sim::SimIndex::clone(&self) -> Self
+impl core::default::Default for fl_sim::SimIndex
+pub fn fl_sim::SimIndex::default() -> Self
+impl core::fmt::Debug for fl_sim::SimIndex
+pub fn fl_sim::SimIndex::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::SimRunner
+impl fl_sim::SimRunner
+pub fn fl_sim::SimRunner::control(&mut self, fl_view::runner::RunnerControl) -> fl_view::runner::SimReply
+pub fn fl_sim::SimRunner::new(bevy_app::app::App) -> fl_sim::SimRunner
+pub fn fl_sim::SimRunner::next_tick(&self) -> fl_protocol::ids::Tick
+pub fn fl_sim::SimRunner::query(&mut self, fl_view::runner::SimQuery) -> fl_view::runner::SimReply
+pub fn fl_sim::SimRunner::run(&mut self, &mut dyn fl_view::driver::TickDriver, u32) -> alloc::vec::Vec<fl_view::runner::TickOutput>
+pub fn fl_sim::SimRunner::step(&mut self, fl_view::runner::TickInput) -> fl_view::runner::TickOutput
+pub fn fl_sim::SimRunner::world(&self) -> &bevy_ecs::world::World
+pub fn fl_sim::SimRunner::world_mut(&mut self) -> &mut bevy_ecs::world::World
+impl fl_sim::SimRunner
+pub fn fl_sim::SimRunner::spawn_threaded(self) -> (fl_view::runner::RunnerPort, std::thread::join_handle::JoinHandle<()>)
+pub struct fl_sim::SimSave
+pub fl_sim::SimSave::entities: alloc::vec::Vec<(fl_protocol::ids::SimId, alloc::vec::Vec<fl_sim::SavedValue>)>
+pub fl_sim::SimSave::pending_commands: alloc::vec::Vec<fl_protocol::command::PlayerCommand>
+pub fl_sim::SimSave::resources: alloc::vec::Vec<fl_sim::SavedValue>
+pub fl_sim::SimSave::sim_id_next: u32
+pub fl_sim::SimSave::tick: fl_protocol::ids::Tick
+impl core::clone::Clone for fl_sim::SimSave
+pub fn fl_sim::SimSave::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SimSave
+impl core::cmp::PartialEq for fl_sim::SimSave
+pub fn fl_sim::SimSave::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SimSave
+pub fn fl_sim::SimSave::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SimSave
+impl serde_core::ser::Serialize for fl_sim::SimSave
+pub fn fl_sim::SimSave::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SimSave
+pub fn fl_sim::SimSave::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::SimTick
+impl bevy_ecs::schedule::set::ScheduleLabel for fl_sim::SimTick where Self: 'static + core::marker::Send + core::marker::Sync + core::clone::Clone + core::cmp::Eq + core::fmt::Debug + core::hash::Hash
+pub fn fl_sim::SimTick::dyn_clone(&self) -> alloc::boxed::Box<dyn bevy_ecs::schedule::set::ScheduleLabel>
+impl core::clone::Clone for fl_sim::SimTick
+pub fn fl_sim::SimTick::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SimTick
+impl core::cmp::PartialEq for fl_sim::SimTick
+pub fn fl_sim::SimTick::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SimTick
+pub fn fl_sim::SimTick::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::hash::Hash for fl_sim::SimTick
+pub fn fl_sim::SimTick::hash<__H: core::hash::Hasher>(&self, &mut __H)
+impl core::marker::StructuralPartialEq for fl_sim::SimTick
+pub struct fl_sim::SnapshotOut
+impl fl_sim::SnapshotOut
+pub fn fl_sim::SnapshotOut::current(&self) -> &alloc::rcs::arc::Arc<fl_view::snapshot::SimSnapshot>
+impl bevy_ecs::component::Component for fl_sim::SnapshotOut where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SnapshotOut::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SnapshotOut::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SnapshotOut::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SnapshotOut::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SnapshotOut::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::SnapshotOut where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::default::Default for fl_sim::SnapshotOut
+pub fn fl_sim::SnapshotOut::default() -> Self
+pub struct fl_sim::SpatialCell(pub u32)
+impl bevy_ecs::component::Component for fl_sim::SpatialCell where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SpatialCell::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SpatialCell::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SpatialCell::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SpatialCell::on_remove() -> core::option::Option<bevy_ecs::lifecycle::ComponentHook>
+pub fn fl_sim::SpatialCell::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SpatialCell::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::SpatialCell
+pub fn fl_sim::SpatialCell::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SpatialCell
+impl core::cmp::PartialEq for fl_sim::SpatialCell
+pub fn fl_sim::SpatialCell::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SpatialCell
+pub fn fl_sim::SpatialCell::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::SpatialCell
+impl core::marker::StructuralPartialEq for fl_sim::SpatialCell
+pub struct fl_sim::SpatialGrid
+impl fl_sim::SpatialGrid
+pub fn fl_sim::SpatialGrid::cell_of(&self, fl_math::vec::FxVec2) -> u32
+pub fn fl_sim::SpatialGrid::cols(&self) -> u32
+pub fn fl_sim::SpatialGrid::insert(&mut self, fl_protocol::ids::SimId, u32)
+pub fn fl_sim::SpatialGrid::is_empty(&self) -> bool
+pub fn fl_sim::SpatialGrid::len(&self) -> usize
+pub fn fl_sim::SpatialGrid::members(&self, u32) -> &[fl_protocol::ids::SimId]
+pub fn fl_sim::SpatialGrid::new(&fl_sim::MapInfo, fl_math::fx::Fx) -> Self
+pub fn fl_sim::SpatialGrid::query_radius(&self, fl_math::vec::FxVec2, fl_math::fx::Fx, &mut alloc::vec::Vec<fl_protocol::ids::SimId>) -> u32
+pub fn fl_sim::SpatialGrid::relocate(&mut self, fl_protocol::ids::SimId, u32, u32)
+pub fn fl_sim::SpatialGrid::remove(&mut self, fl_protocol::ids::SimId, u32) -> bool
+pub fn fl_sim::SpatialGrid::rows(&self) -> u32
+impl bevy_ecs::component::Component for fl_sim::SpatialGrid where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SpatialGrid::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SpatialGrid::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SpatialGrid::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SpatialGrid::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SpatialGrid::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::SpatialGrid where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::SpatialGrid
+pub fn fl_sim::SpatialGrid::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SpatialGrid
+impl core::cmp::PartialEq for fl_sim::SpatialGrid
+pub fn fl_sim::SpatialGrid::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SpatialGrid
+pub fn fl_sim::SpatialGrid::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SpatialGrid
+pub struct fl_sim::SpatialRules
+pub fl_sim::SpatialRules::cell_m: fl_math::fx::Fx
+impl core::clone::Clone for fl_sim::SpatialRules
+pub fn fl_sim::SpatialRules::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::SpatialRules
+pub fn fl_sim::SpatialRules::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SpatialRules
+pub fn fl_sim::SpatialRules::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::SpatialRules
+impl core::marker::StructuralPartialEq for fl_sim::SpatialRules
+impl fl_content::kinds::RulesSection for fl_sim::SpatialRules
+impl serde_core::ser::Serialize for fl_sim::SpatialRules
+pub fn fl_sim::SpatialRules::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SpatialRules
+pub fn fl_sim::SpatialRules::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::SpawnRequest
+pub fl_sim::SpawnRequest::heading: fl_math::angle::Angle
+pub fl_sim::SpawnRequest::init: core::option::Option<fl_sim::SpawnInit>
+pub fl_sim::SpawnRequest::owner: fl_protocol::ids::PlayerId
+pub fl_sim::SpawnRequest::pos: fl_math::vec::FxVec2
+pub fl_sim::SpawnRequest::unit: core::option::Option<fl_protocol::ids::UnitTypeId>
+impl bevy_ecs::message::Message for fl_sim::SpawnRequest where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::SpawnRequest
+pub fn fl_sim::SpawnRequest::clone(&self) -> Self
+impl core::fmt::Debug for fl_sim::SpawnRequest
+pub fn fl_sim::SpawnRequest::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+pub struct fl_sim::StableRegistry<V>
+impl<V> fl_sim::StableRegistry<V>
+pub fn fl_sim::StableRegistry<V>::export(&self, &mut fl_protocol::tables::StringTables)
+pub fn fl_sim::StableRegistry<V>::freeze(&mut self)
+pub fn fl_sim::StableRegistry<V>::get(&self, &str) -> core::option::Option<&V>
+pub fn fl_sim::StableRegistry<V>::get_by_id(&self, u32) -> core::option::Option<&V>
+pub fn fl_sim::StableRegistry<V>::id(&self, &str) -> core::option::Option<u32>
+pub fn fl_sim::StableRegistry<V>::is_empty(&self) -> bool
+pub fn fl_sim::StableRegistry<V>::is_frozen(&self) -> bool
+pub fn fl_sim::StableRegistry<V>::iter(&self) -> impl core::iter::traits::iterator::Iterator<Item = (u32, &'static str, &V)> + '_
+pub fn fl_sim::StableRegistry<V>::len(&self) -> usize
+pub fn fl_sim::StableRegistry<V>::name(&self, u32) -> core::option::Option<&'static str>
+pub fn fl_sim::StableRegistry<V>::name_key(&self, u32) -> core::option::Option<u64>
+pub fn fl_sim::StableRegistry<V>::new(&'static str) -> Self
+pub fn fl_sim::StableRegistry<V>::register(&mut self, &'static str, &'static str, V)
+pub fn fl_sim::StableRegistry<V>::table(&self) -> &'static str
+pub struct fl_sim::StateHashRules
+pub fl_sim::StateHashRules::interval_ticks: u32
+impl core::clone::Clone for fl_sim::StateHashRules
+pub fn fl_sim::StateHashRules::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::StateHashRules
+pub fn fl_sim::StateHashRules::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::StateHashRules
+pub fn fl_sim::StateHashRules::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::StateHashRules
+impl core::marker::StructuralPartialEq for fl_sim::StateHashRules
+impl fl_content::kinds::RulesSection for fl_sim::StateHashRules
+impl serde_core::ser::Serialize for fl_sim::StateHashRules
+pub fn fl_sim::StateHashRules::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::StateHashRules
+pub fn fl_sim::StateHashRules::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::StateHasher
+impl fl_sim::StateHasher
+pub fn fl_sim::StateHasher::finish(&self) -> u64
+pub fn fl_sim::StateHasher::new() -> Self
+pub fn fl_sim::StateHasher::write_bool(&mut self, bool)
+pub fn fl_sim::StateHasher::write_bytes(&mut self, &[u8])
+pub fn fl_sim::StateHasher::write_fx(&mut self, fl_math::fx::Fx)
+pub fn fl_sim::StateHasher::write_i64(&mut self, i64)
+pub fn fl_sim::StateHasher::write_registry_id(&mut self, &'static str, u32)
+pub fn fl_sim::StateHasher::write_u16(&mut self, u16)
+pub fn fl_sim::StateHasher::write_u32(&mut self, u32)
+pub fn fl_sim::StateHasher::write_u64(&mut self, u64)
+pub fn fl_sim::StateHasher::write_u8(&mut self, u8)
+impl core::default::Default for fl_sim::StateHasher
+pub fn fl_sim::StateHasher::default() -> Self
+pub struct fl_sim::SteerPushes
+impl fl_sim::SteerPushes
+pub fn fl_sim::SteerPushes::clear(&mut self)
+pub fn fl_sim::SteerPushes::entries(&self) -> &[(fl_protocol::ids::SimId, fl_math::vec::FxVec2)]
+pub fn fl_sim::SteerPushes::get(&self, fl_protocol::ids::SimId) -> fl_math::vec::FxVec2
+pub fn fl_sim::SteerPushes::is_empty(&self) -> bool
+pub fn fl_sim::SteerPushes::len(&self) -> usize
+impl bevy_ecs::component::Component for fl_sim::SteerPushes where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::SteerPushes::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::SteerPushes::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::SteerPushes::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::SteerPushes::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::SteerPushes::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::SteerPushes where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::SteerPushes
+pub fn fl_sim::SteerPushes::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::SteerPushes
+impl core::cmp::PartialEq for fl_sim::SteerPushes
+pub fn fl_sim::SteerPushes::eq(&self, &Self) -> bool
+impl core::default::Default for fl_sim::SteerPushes
+pub fn fl_sim::SteerPushes::default() -> Self
+impl core::fmt::Debug for fl_sim::SteerPushes
+pub fn fl_sim::SteerPushes::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::SteerPushes
+pub struct fl_sim::SteeringRules
+pub fl_sim::SteeringRules::idle_every: u32
+pub fl_sim::SteeringRules::max_push_frac: fl_math::fx::Fx
+pub fl_sim::SteeringRules::separation_gain: fl_math::fx::Fx
+pub fl_sim::SteeringRules::separation_margin_m: fl_math::fx::Fx
+impl core::clone::Clone for fl_sim::SteeringRules
+pub fn fl_sim::SteeringRules::clone(&self) -> Self
+impl core::cmp::PartialEq for fl_sim::SteeringRules
+pub fn fl_sim::SteeringRules::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::SteeringRules
+pub fn fl_sim::SteeringRules::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::SteeringRules
+impl core::marker::StructuralPartialEq for fl_sim::SteeringRules
+impl fl_content::kinds::RulesSection for fl_sim::SteeringRules
+pub fn fl_sim::SteeringRules::link(&self, &mut fl_content::link::LinkCtx<'_>)
+impl serde_core::ser::Serialize for fl_sim::SteeringRules
+pub fn fl_sim::SteeringRules::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::SteeringRules
+pub fn fl_sim::SteeringRules::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Stream
+impl core::clone::Clone for fl_sim::Stream
+pub fn fl_sim::Stream::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Stream
+impl core::cmp::PartialEq for fl_sim::Stream
+pub fn fl_sim::Stream::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Stream
+pub fn fl_sim::Stream::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Stream
+impl core::marker::StructuralPartialEq for fl_sim::Stream
+pub struct fl_sim::TerrainGrid
+pub fl_sim::TerrainGrid::cells_x: u32
+pub fl_sim::TerrainGrid::cells_y: u32
+pub fl_sim::TerrainGrid::height_m: (fl_math::fx::Fx, fl_math::fx::Fx)
+pub fl_sim::TerrainGrid::heights: alloc::vec::Vec<u16>
+pub fl_sim::TerrainGrid::palette: alloc::vec::Vec<alloc::string::String>
+pub fl_sim::TerrainGrid::types: alloc::vec::Vec<u8>
+impl fl_sim::TerrainGrid
+pub const fl_sim::TerrainGrid::OPEN: u8
+pub fn fl_sim::TerrainGrid::from_layers(&fl_content::layers::MapLayers, (fl_math::fx::Fx, fl_math::fx::Fx)) -> Self
+pub fn fl_sim::TerrainGrid::height_at(&self, u32, u32) -> fl_math::fx::Fx
+pub fn fl_sim::TerrainGrid::open(u32, u32) -> Self
+pub fn fl_sim::TerrainGrid::set_rect(&mut self, fl_sim::CellRect, &str)
+pub fn fl_sim::TerrainGrid::terrain_at(&self, u32, u32) -> core::option::Option<&str>
+pub fn fl_sim::TerrainGrid::type_at(&self, u32, u32) -> u8
+impl bevy_ecs::component::Component for fl_sim::TerrainGrid where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::TerrainGrid::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::TerrainGrid::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::TerrainGrid::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::TerrainGrid::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::TerrainGrid::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl bevy_ecs::resource::Resource for fl_sim::TerrainGrid where Self: core::marker::Send + core::marker::Sync + 'static
+impl core::clone::Clone for fl_sim::TerrainGrid
+pub fn fl_sim::TerrainGrid::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::TerrainGrid
+impl core::cmp::PartialEq for fl_sim::TerrainGrid
+pub fn fl_sim::TerrainGrid::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::TerrainGrid
+pub fn fl_sim::TerrainGrid::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::StructuralPartialEq for fl_sim::TerrainGrid
+impl fl_sim::SimHash for fl_sim::TerrainGrid
+pub fn fl_sim::TerrainGrid::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::TerrainGrid
+pub fn fl_sim::TerrainGrid::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::TerrainGrid
+pub fn fl_sim::TerrainGrid::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::TestDriver
+impl fl_sim::TestDriver
+pub fn fl_sim::TestDriver::new() -> Self
+pub fn fl_sim::TestDriver::restore(&mut self, alloc::vec::Vec<fl_protocol::command::PlayerCommand>, &alloc::collections::btree::map::BTreeMap<fl_protocol::ids::PlayerId, u32>)
+pub fn fl_sim::TestDriver::starting_at(self, fl_protocol::ids::Tick) -> Self
+pub fn fl_sim::TestDriver::with_delay(u32) -> Self
+impl core::clone::Clone for fl_sim::TestDriver
+pub fn fl_sim::TestDriver::clone(&self) -> Self
+impl core::default::Default for fl_sim::TestDriver
+pub fn fl_sim::TestDriver::default() -> Self
+impl core::fmt::Debug for fl_sim::TestDriver
+pub fn fl_sim::TestDriver::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl fl_view::driver::TickDriver for fl_sim::TestDriver
+pub fn fl_sim::TestDriver::input_delay(&self) -> u32
+pub fn fl_sim::TestDriver::issue(&mut self, fl_view::driver::CommandDraft) -> fl_protocol::command::PlayerCommand
+pub fn fl_sim::TestDriver::next_tick(&self) -> fl_protocol::ids::Tick
+pub fn fl_sim::TestDriver::pending(&self) -> alloc::vec::Vec<fl_protocol::command::PlayerCommand>
+pub fn fl_sim::TestDriver::poll(&mut self) -> core::option::Option<fl_view::runner::TickInput>
+pub struct fl_sim::UnitType(pub fl_protocol::ids::UnitTypeId)
+impl bevy_ecs::component::Component for fl_sim::UnitType where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::UnitType::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::UnitType::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::UnitType::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::UnitType::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::UnitType::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::UnitType
+pub fn fl_sim::UnitType::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::UnitType
+impl core::cmp::PartialEq for fl_sim::UnitType
+pub fn fl_sim::UnitType::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::UnitType
+pub fn fl_sim::UnitType::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::UnitType
+impl core::marker::StructuralPartialEq for fl_sim::UnitType
+impl fl_sim::SimHash for fl_sim::UnitType
+pub fn fl_sim::UnitType::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::UnitType
+pub fn fl_sim::UnitType::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::UnitType
+pub fn fl_sim::UnitType::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub struct fl_sim::Wander
+pub fl_sim::Wander::home: fl_math::vec::FxVec2
+pub fl_sim::Wander::radius: fl_math::fx::Fx
+impl bevy_ecs::component::Component for fl_sim::Wander where Self: core::marker::Send + core::marker::Sync + 'static
+pub type fl_sim::Wander::Mutability = bevy_ecs::component::Mutable
+pub const fl_sim::Wander::STORAGE_TYPE: bevy_ecs::component::StorageType
+pub fn fl_sim::Wander::clone_behavior() -> bevy_ecs::component::clone::ComponentCloneBehavior
+pub fn fl_sim::Wander::register_required_components(bevy_ecs::component::info::ComponentId, &mut bevy_ecs::component::required::RequiredComponentsRegistrator<'_, '_>)
+pub fn fl_sim::Wander::relationship_accessor() -> core::option::Option<bevy_ecs::relationship::ComponentRelationshipAccessor<Self>>
+impl core::clone::Clone for fl_sim::Wander
+pub fn fl_sim::Wander::clone(&self) -> Self
+impl core::cmp::Eq for fl_sim::Wander
+impl core::cmp::PartialEq for fl_sim::Wander
+pub fn fl_sim::Wander::eq(&self, &Self) -> bool
+impl core::fmt::Debug for fl_sim::Wander
+pub fn fl_sim::Wander::fmt(&self, &mut core::fmt::Formatter<'_>) -> core::fmt::Result
+impl core::marker::Copy for fl_sim::Wander
+impl core::marker::StructuralPartialEq for fl_sim::Wander
+impl fl_sim::SimHash for fl_sim::Wander
+pub fn fl_sim::Wander::sim_hash(&self, &mut fl_sim::StateHasher)
+impl serde_core::ser::Serialize for fl_sim::Wander
+pub fn fl_sim::Wander::serialize<__S>(&self, __S) -> core::result::Result<<__S as serde_core::ser::Serializer>::Ok, <__S as serde_core::ser::Serializer>::Error> where __S: serde_core::ser::Serializer
+impl<'de> serde_core::de::Deserialize<'de> for fl_sim::Wander
+pub fn fl_sim::Wander::deserialize<__D>(__D) -> core::result::Result<Self, <__D as serde_core::de::Deserializer>::Error> where __D: serde_core::de::Deserializer<'de>
+pub const fl_sim::JOURNAL_RING: usize
+pub const fl_sim::MAX_COMMAND_UNITS: usize
+pub const fl_sim::MAX_WAYPOINTS: usize
+pub const fl_sim::PHASE_TARGET: &str
+pub const fl_sim::REPLAY_FORMAT_VERSION: u32
+pub const fl_sim::SAVE_FORMAT_VERSION: u32
+pub const fl_sim::SCALE_MAP: &str
+pub const fl_sim::SIM_VERSION: u32
+pub trait fl_sim::CommandHandler<P: fl_protocol::command::CommandPayload>: core::marker::Send + core::marker::Sync + 'static
+pub fn fl_sim::CommandHandler::apply(&self, &P, &mut bevy_ecs::world::World, &fl_sim::CommandCtx<'_>) -> core::result::Result<(), fl_sim::RejectReason>
+pub fn fl_sim::CommandHandler::unit_can(&self, &P, bevy_ecs::world::entity_access::entity_ref::EntityRef<'_>) -> bool
+pub trait fl_sim::JournalRecord: serde_core::ser::Serialize + core::fmt::Debug + core::marker::Send + core::marker::Sync + 'static
+pub const fl_sim::JournalRecord::KIND: &'static str
+pub trait fl_sim::NetSession: core::marker::Send
+pub fn fl_sim::NetSession::recv(&mut self) -> alloc::vec::Vec<(fl_protocol::ids::Tick, fl_protocol::ids::PlayerId, alloc::vec::Vec<fl_protocol::command::PlayerCommand>)>
+pub fn fl_sim::NetSession::send(&mut self, fl_protocol::ids::Tick, fl_protocol::ids::PlayerId, alloc::vec::Vec<fl_protocol::command::PlayerCommand>)
+impl fl_sim::NetSession for fl_sim::LoopbackSession
+pub fn fl_sim::LoopbackSession::recv(&mut self) -> alloc::vec::Vec<(fl_protocol::ids::Tick, fl_protocol::ids::PlayerId, alloc::vec::Vec<fl_protocol::command::PlayerCommand>)>
+pub fn fl_sim::LoopbackSession::send(&mut self, fl_protocol::ids::Tick, fl_protocol::ids::PlayerId, alloc::vec::Vec<fl_protocol::command::PlayerCommand>)
+pub trait fl_sim::SimFeature: core::marker::Send + core::marker::Sync + 'static
+pub fn fl_sim::SimFeature::build(&self, &mut fl_sim::SimBuilder)
+pub fn fl_sim::SimFeature::deps(&self) -> &'static [&'static str]
+pub fn fl_sim::SimFeature::id(&self) -> &'static str
+pub fn fl_sim::SimFeature::version(&self) -> u32
+impl fl_sim::SimFeature for fl_sim::CoreFeature
+pub fn fl_sim::CoreFeature::build(&self, &mut fl_sim::SimBuilder)
+pub fn fl_sim::CoreFeature::deps(&self) -> &'static [&'static str]
+pub fn fl_sim::CoreFeature::id(&self) -> &'static str
+pub fn fl_sim::CoreFeature::version(&self) -> u32
+pub trait fl_sim::SimHash
+pub fn fl_sim::SimHash::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for bool
+pub fn bool::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_content::terrain::MoveClass
+pub fn fl_content::terrain::MoveClass::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_math::angle::Angle
+pub fn fl_math::angle::Angle::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_math::fx::Fx
+pub fn fl_math::fx::Fx::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_math::vec::FxVec2
+pub fn fl_math::vec::FxVec2::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_protocol::ids::PlayerId
+pub fn fl_protocol::ids::PlayerId::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_protocol::ids::SimId
+pub fn fl_protocol::ids::SimId::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_protocol::ids::Tick
+pub fn fl_protocol::ids::Tick::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_protocol::ids::UnitTypeId
+pub fn fl_protocol::ids::UnitTypeId::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::FlowKey
+pub fn fl_sim::FlowKey::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Follower
+pub fn fl_sim::Follower::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Footprint
+pub fn fl_sim::Footprint::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Health
+pub fn fl_sim::Health::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Invulnerable
+pub fn fl_sim::Invulnerable::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::LastSeq
+pub fn fl_sim::LastSeq::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::MapInfo
+pub fn fl_sim::MapInfo::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::MatchSeed
+pub fn fl_sim::MatchSeed::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Mobility
+pub fn fl_sim::Mobility::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::MoveOrder
+pub fn fl_sim::MoveOrder::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Order
+pub fn fl_sim::Order::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Owner
+pub fn fl_sim::Owner::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::PathFollow
+pub fn fl_sim::PathFollow::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::PathQueue
+pub fn fl_sim::PathQueue::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::PathRequest
+pub fn fl_sim::PathRequest::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::PathState
+pub fn fl_sim::PathState::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::PlayerInfo
+pub fn fl_sim::PlayerInfo::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Players
+pub fn fl_sim::Players::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Pose
+pub fn fl_sim::Pose::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Projectile
+pub fn fl_sim::Projectile::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::RequestKind
+pub fn fl_sim::RequestKind::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::ScaleMix
+pub fn fl_sim::ScaleMix::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Selectable
+pub fn fl_sim::Selectable::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::SimClock
+pub fn fl_sim::SimClock::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::SimIdAllocator
+pub fn fl_sim::SimIdAllocator::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::TerrainGrid
+pub fn fl_sim::TerrainGrid::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::UnitType
+pub fn fl_sim::UnitType::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for fl_sim::Wander
+pub fn fl_sim::Wander::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for i32
+pub fn i32::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for i64
+pub fn i64::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for u16
+pub fn u16::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for u32
+pub fn u32::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for u64
+pub fn u64::sim_hash(&self, &mut fl_sim::StateHasher)
+impl fl_sim::SimHash for u8
+pub fn u8::sim_hash(&self, &mut fl_sim::StateHasher)
+impl<T: fl_sim::SimHash> fl_sim::SimHash for alloc::vec::Vec<T>
+pub fn alloc::vec::Vec<T>::sim_hash(&self, &mut fl_sim::StateHasher)
+impl<T: fl_sim::SimHash> fl_sim::SimHash for core::option::Option<T>
+pub fn core::option::Option<T>::sim_hash(&self, &mut fl_sim::StateHasher)
+pub trait fl_sim::SimHook: bevy_ecs::schedule::set::SystemSet + core::marker::Copy + fl_sim::schedule::sealed::Sealed
+pub fn fl_sim::SimHook::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::ActSet
+pub fn fl_sim::ActSet::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::EconomySet
+pub fn fl_sim::EconomySet::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::InputSet
+pub fn fl_sim::InputSet::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::LifecycleSet
+pub fn fl_sim::LifecycleSet::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::PerceiveSet
+pub fn fl_sim::PerceiveSet::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::PublishSet
+pub fn fl_sim::PublishSet::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::ResolveSet
+pub fn fl_sim::ResolveSet::phase(self) -> fl_sim::Phase
+impl fl_sim::SimHook for fl_sim::ThinkSet
+pub fn fl_sim::ThinkSet::phase(self) -> fl_sim::Phase
+pub fn fl_sim::apply_content_values(&mut bevy_ecs::world::World, alloc::rcs::arc::Arc<fl_content::db::ContentDb>) -> core::result::Result<fl_sim::ReloadReport, fl_sim::ReloadError>
+pub fn fl_sim::build_id() -> alloc::string::String
+pub fn fl_sim::build_sim_app(&[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>], alloc::rcs::arc::Arc<fl_content::db::ContentDb>, fl_sim::MatchSetup, fl_sim::RunConfig) -> core::result::Result<bevy_app::app::App, fl_sim::BuildError>
+pub fn fl_sim::check_classification(&bevy_ecs::world::World) -> core::result::Result<(), alloc::vec::Vec<alloc::string::String>>
+pub fn fl_sim::codec_formats(&bevy_app::app::App) -> alloc::string::String
+pub fn fl_sim::compute_state_hash(&bevy_ecs::world::World) -> u64
+pub fn fl_sim::configure_sim_schedule(&mut bevy_app::app::App, core::option::Option<u64>)
+pub fn fl_sim::debug_query(&bevy_ecs::world::World, &str, &serde_json::value::Value) -> core::result::Result<serde_json::value::Value, alloc::string::String>
+pub fn fl_sim::enqueue_path(&mut bevy_ecs::world::World, fl_protocol::ids::SimId, fl_math::vec::FxVec2) -> u32
+pub fn fl_sim::first_divergence(&[(fl_protocol::ids::Tick, u64)], &[(fl_protocol::ids::Tick, u64)]) -> core::option::Option<fl_sim::Divergence>
+pub fn fl_sim::formation_targets(&[fl_math::vec::FxVec2], fl_math::vec::FxVec2, fl_math::fx::Fx, &fl_sim::MapInfo) -> alloc::vec::Vec<fl_math::vec::FxVec2>
+pub fn fl_sim::inspect_entity(&bevy_ecs::world::World, fl_protocol::ids::SimId) -> core::option::Option<serde_json::value::Value>
+pub fn fl_sim::inspect_world(&bevy_ecs::world::World) -> serde_json::value::Value
+pub fn fl_sim::last_seqs(&bevy_ecs::world::World) -> alloc::collections::btree::map::BTreeMap<fl_protocol::ids::PlayerId, u32>
+pub fn fl_sim::load_content(&[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>], &[std::path::PathBuf]) -> core::result::Result<alloc::rcs::arc::Arc<fl_content::db::ContentDb>, fl_sim::BuildError>
+pub fn fl_sim::load_world(&[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>], alloc::rcs::arc::Arc<fl_content::db::ContentDb>, &[u8], fl_sim::RunConfig) -> core::result::Result<fl_sim::Loaded, fl_sim::LoadError>
+pub fn fl_sim::load_world_with(&[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>], alloc::rcs::arc::Arc<fl_content::db::ContentDb>, &[u8], fl_sim::RunConfig, fl_sim::LoadOptions) -> core::result::Result<fl_sim::Loaded, fl_sim::LoadError>
+pub fn fl_sim::loopback(&[fl_protocol::ids::PlayerId]) -> alloc::vec::Vec<fl_sim::LoopbackSession>
+pub fn fl_sim::rebless_replay(&fl_sim::Replay, &[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>], alloc::rcs::arc::Arc<fl_content::db::ContentDb>) -> core::result::Result<(fl_sim::Replay, fl_sim::ReblessEntry), fl_sim::ReplayError>
+pub fn fl_sim::rebuild_spatial(&mut bevy_ecs::world::World)
+pub fn fl_sim::replay_app(&fl_sim::Replay, &[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>], alloc::rcs::arc::Arc<fl_content::db::ContentDb>, fl_sim::RunConfig) -> core::result::Result<(bevy_app::app::App, alloc::vec::Vec<alloc::string::String>), fl_sim::ReplayError>
+pub fn fl_sim::replay_inputs(&fl_sim::Replay, &bevy_app::app::App) -> core::result::Result<alloc::vec::Vec<fl_view::runner::TickInput>, fl_sim::ReplayError>
+pub fn fl_sim::rolls(&fl_sim::MatchSeed, fl_protocol::ids::Tick, fl_protocol::ids::SimId, fl_sim::Stream) -> fl_math::rng::Rolls
+pub fn fl_sim::save_world(&bevy_ecs::world::World, &[fl_protocol::command::PlayerCommand]) -> core::result::Result<alloc::vec::Vec<u8>, fl_sim::SaveError>
+pub fn fl_sim::setup_despawn(&mut bevy_ecs::world::World, fl_protocol::ids::SimId) -> bool
+pub fn fl_sim::setup_map(&mut bevy_ecs::world::World, &str) -> core::result::Result<(), fl_sim::SetupError>
+pub fn fl_sim::setup_scenario(&mut bevy_ecs::world::World, &str) -> core::result::Result<alloc::vec::Vec<fl_protocol::ids::SimId>, fl_sim::SetupError>
+pub fn fl_sim::setup_scenario_def(&mut bevy_ecs::world::World, &fl_content::builtin::ScenarioDef) -> core::result::Result<alloc::vec::Vec<fl_protocol::ids::SimId>, fl_sim::SetupError>
+pub fn fl_sim::setup_spawn(&mut bevy_ecs::world::World, &fl_sim::SpawnRequest) -> core::result::Result<fl_protocol::ids::SimId, fl_sim::SpawnError>
+pub fn fl_sim::sim_registry(&[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>]) -> core::result::Result<fl_content::registry::DefRegistry, fl_sim::BuildError>
+pub fn fl_sim::sort_features(&[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>]) -> core::result::Result<alloc::vec::Vec<alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>>, fl_sim::FeatureError>
+pub fn fl_sim::space_slots(&[fl_math::vec::FxVec2], fl_math::fx::Fx, &fl_sim::MapInfo) -> alloc::vec::Vec<fl_math::vec::FxVec2>
+pub fn fl_sim::step_tick(&mut bevy_ecs::world::World, fl_view::runner::TickInput) -> fl_view::runner::TickOutput
+pub fn fl_sim::system_order(&mut bevy_app::app::App) -> alloc::string::String
+pub fn fl_sim::trace_type<T: serde_core::de::DeserializeOwned>(&mut serde_reflection::trace::Tracer) -> serde_reflection::error::Result<serde_reflection::format::Format>
+pub fn fl_sim::verify_replay(&fl_sim::Replay, &[alloc::rcs::arc::Arc<dyn fl_sim::SimFeature>], alloc::rcs::arc::Arc<fl_content::db::ContentDb>) -> core::result::Result<fl_sim::VerifyOutcome, fl_sim::ReplayError>
+pub type fl_sim::DebugQueryFn = fn(&bevy_ecs::world::World, &serde_json::value::Value) -> core::result::Result<serde_json::value::Value, alloc::string::String>
+pub type fl_sim::FillFn = fn(&mut bevy_ecs::world::World) -> core::result::Result<(), alloc::string::String>
+pub type fl_sim::SavedValue = (alloc::string::String, u32, alloc::vec::Vec<u8>)
+pub type fl_sim::SpawnInit = fn(&mut bevy_ecs::world::entity_access::world_mut::EntityWorldMut<'_>, &fl_sim::SpawnRequest)
+pub type fl_sim::TraceFn = fn(&mut serde_reflection::trace::Tracer) -> serde_reflection::error::Result<serde_reflection::format::Format>

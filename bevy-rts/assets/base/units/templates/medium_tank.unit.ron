@@ -1,0 +1,11 @@
+// A template: never interned, never spawned.
+Unit(
+    id: "base.abstract.medium_tank",
+    abstract: true,
+    tags: ["vehicle", "tank", "tracked"],
+    components: {
+        "Selectable": (),
+        "Hull": (hp: 120, footprint: (2.8, 5.8), hitbox_shrink: 0.5),
+        "Mobility": (class: Tracked, road_speed_kmh: 40.0, terrain_factor: 0.55, turn_rate_deg_s: 80.0),
+    },
+)

@@ -1,0 +1,27 @@
+// Debug config for every process (spec §15 D), read by `fl_observe::load_debug_config`.
+// RUST_LOG, when set, replaces `log_filter`. `fl_sim::spawn=info` keeps the per-spawn DEBUG records (about 30 ms per
+// tick at 3,000 units in a debug build) out of the default; set `fl_sim::spawn=debug` to see them.
+// Budget overruns only warn (target fl_observe::budget). `hot_reload` watches the mod files of a testbed match (dev
+// builds) every `hot_reload_poll_ms` and hot-reloads the content when one changes; the console command `reload` forces one.
+(
+    log_filter: "info,fl_sim=debug,fl_sim::spawn=info",
+    json_log: true,
+    journal_file: true,
+    profiler: true,
+    budgets: (
+        tick_ms: 15.0,
+        per_phase_ms: {
+            "Input": 3.0,
+            "Think": 3.0,
+            "Act": 3.0,
+            "Resolve": 3.0,
+            "Economy": 3.0,
+            "Perceive": 3.0,
+            "Lifecycle": 3.0,
+            "Publish": 3.0,
+        },
+        per_feature_ms: {},
+    ),
+    hot_reload: true,
+    hot_reload_poll_ms: 500,
+)

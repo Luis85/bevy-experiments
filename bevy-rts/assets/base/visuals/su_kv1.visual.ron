@@ -1,0 +1,1 @@
+VisualDef(unit: "base.su.kv1", placeholder: Tank(hull: (3.3, 1.2, 6.8), turret: (2.0, 0.8, 2.3), barrel_len: 2.6), scale: 1.0, recolor: true)

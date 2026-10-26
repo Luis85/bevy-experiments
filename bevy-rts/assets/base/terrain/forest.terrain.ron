@@ -1,0 +1,8 @@
+// guess: values informed by docs/research/blitzkrieg-mechanics.md §1.8, not measured.
+TerrainDef(
+    id: "base.forest",
+    name: "Forest",
+    pass: 0.7,
+    blocks: [],
+    color: (0.15, 0.32, 0.12),
+)

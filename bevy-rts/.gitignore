@@ -1,0 +1,7 @@
+/target
+*.log
+/.superpowers/
+/logs/
+.claude/settings.local.json
+.claude/worktrees/
+/.gate-base

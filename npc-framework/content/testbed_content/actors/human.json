@@ -1,0 +1,39 @@
+{
+  "name": "Human scout",
+  "description": "A person on foot: opens doors and gates, uses tools and rides vehicles.",
+  "body": "human",
+  "model": "rogue",
+  "sheet": {
+    "attributes": { "st": 10, "dx": 12, "iq": 10, "ht": 10 },
+    "traits": { "Keen Eyes": 2 },
+    "skills": { "Stealth": 4 },
+    "unspent": 10
+  },
+  "speed_mm_per_tick": 70,
+  "carry_capacity": 30000,
+  "actions": [
+    "close",
+    "craft",
+    "dismount",
+    "drive_to",
+    "drop",
+    "equip",
+    "give",
+    "lock",
+    "mount",
+    "open",
+    "pick_up",
+    "study",
+    "teach",
+    "unequip",
+    "unload",
+    "unlock",
+    "use_tool_on"
+  ],
+  "sensors": [
+    { "type": "vision", "range_mm": 15000, "half_fov_deg": 60 },
+    { "type": "hearing", "radius_mm": 10000 },
+    { "type": "reach", "radius_mm": 1500 }
+  ],
+  "perception": { "detection": null }
+}

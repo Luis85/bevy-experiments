@@ -1,0 +1,38 @@
+[package]
+name = "village_view"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Presentation of the example village: models, animation, RTS camera, day/night, overlay."
+
+[dependencies]
+# Not `bevy.workspace = true`: the workspace entry keeps Bevy's default
+# features, which select the `ruzstd` backend (see the feature list).
+bevy = { version = "0.20.0", default-features = false, features = [
+    # Bevy's default features (2d, 3d, ui, audio) spelled out, except that
+    # zstd-compressed KTX2 textures (the tonemapping/SMAA LUTs) decode with
+    # the C `zstd` crate (`zstd_c`, needs a C compiler) instead of `ruzstd`
+    # (`zstd_rust`, RUSTSEC-2026-0344, no fixed version for bevy_image 0.20).
+    # Bevy's `3d` / `3d_api` features turn `zstd_rust` on, so they are
+    # expanded here. Keep in sync with apps/village/Cargo.toml.
+    "2d", "ui", "audio",
+    "default_app", "default_platform", "scene", "picking",
+    "common_api", "bevy_light", "bevy_mikktspace", "ktx2", "morph_animation", "morph",
+    "smaa_luts", "tonemapping_luts", "zstd_c",
+    "bevy_render", "bevy_core_pipeline", "bevy_gizmos_render", "bevy_anti_alias",
+    "bevy_gltf", "bevy_pbr", "bevy_post_process", "gltf_animation",
+    # Not a Bevy default; the ground texture is a .jpg.
+    "jpeg",
+] }
+npc_framework = { workspace = true, features = ["view-helpers"] }
+village_content.workspace = true
+
+[features]
+default = []
+# F4 perf panel (reads the `npc_perf` profiler's `PerfHandle`).
+perf = ["npc_framework/perf"]
+
+
+[[example]]
+name = "view_smoke"

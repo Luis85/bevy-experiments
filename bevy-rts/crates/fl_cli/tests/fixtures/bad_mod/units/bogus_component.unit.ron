@@ -1,0 +1,7 @@
+Unit(
+    id: "bad_mod.bogus",
+    name: "Bogus",
+    components: {
+        "NoSuchComponent": (hp: 1),
+    },
+)

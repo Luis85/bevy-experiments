@@ -1,0 +1,20 @@
+[package]
+name = "npc_interaction"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Opt-in interaction for the NPC framework: items, inventory and equipment, doors (grid blocking, nav door markers), tools, and verbs registered by name behind one Interact action/command."
+
+[dependencies]
+bevy_ecs.workspace = true
+bevy_app.workspace = true
+bevy_reflect.workspace = true
+npc_ai.workspace = true
+npc_kernel.workspace = true
+npc_jobs.workspace = true
+npc_locomotion.workspace = true
+npc_nav.workspace = true
+serde.workspace = true
+serde_json = "1"
+tracing = "0.1"

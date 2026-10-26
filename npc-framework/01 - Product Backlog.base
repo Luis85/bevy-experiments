@@ -1,0 +1,51 @@
+filters:
+  and:
+    - file.inFolder("docs")
+views:
+  - type: product-backlog
+    name: Backlog
+    typeFolder.absence: docs/absences
+    openIn: split
+    stateProperty: note.status
+    startedDateProperty: note.started
+    finishedDateProperty: note.finished
+    horizonProperty: note.horizon
+    startProperty: note.start
+    targetProperty: note.due
+    riskProperty: note.risk
+    priorityProperty: note.priority
+    assigneeProperty: note.assignee
+    dependsOnProperty: note.dependsOn
+    iterationProperty: note.iteration
+    iterationGoalProperty: note.goal
+    releaseProperty: note.release
+  - type: table
+    name: Entities
+    filters:
+      and:
+        - file.inFolder("docs/entities")
+    groupBy:
+      property: type
+      direction: ASC
+    order:
+      - type
+      - file.name
+      - parent
+      - extends
+      - description
+      - color
+      - category
+      - aliases
+      - tags
+    sort:
+      - property: file.folder
+        direction: ASC
+    columnSize:
+      note.type: 102
+      file.name: 317
+      note.parent: 128
+      note.extends: 132
+      note.description: 135
+      note.color: 107
+      note.category: 129
+      note.aliases: 143

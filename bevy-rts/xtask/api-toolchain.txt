@@ -1,0 +1,6 @@
+# The nightly toolchain cargo-public-api builds rustdoc JSON with (spec §12.7, ADR-0011); nothing
+# builds, tests or lints with it. Undated (ruling R66): the listings omit auto-trait impls (-ss).
+# The first line that is not a comment names it.
+# Listings made with rustc 1.101.0-nightly (7189d39d9 2026-10-22) and:
+# cargo-public-api 0.52.0
+nightly

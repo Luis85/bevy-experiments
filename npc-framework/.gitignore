@@ -1,0 +1,8 @@
+/target
+build.log
+*.log
+/screenshots
+
+# Claude Code: user-only re-baseline approval marker and local settings
+.claude/rebaseline-approved
+.claude/settings.local.json

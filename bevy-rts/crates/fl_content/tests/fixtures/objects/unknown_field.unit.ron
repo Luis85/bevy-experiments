@@ -1,0 +1,6 @@
+Unit(
+    id: "test.bad.colour",
+    components: {
+        "Hull": (hp: 1, colour: 2),
+    },
+)

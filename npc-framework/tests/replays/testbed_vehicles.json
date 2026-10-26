@@ -1,0 +1,192 @@
+{
+  "version": 2,
+  "content_hash": 9041667160828634387,
+  "seed": 1,
+  "scenario": "testbed:vehicles",
+  "villagers": 2,
+  "ticks": 1200,
+  "commands": [
+    [
+      10,
+      0,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "type": "Mount",
+          "vehicle": 29
+        },
+        "queue": false
+      }
+    ],
+    [
+      10,
+      1,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          34
+        ],
+        "order": {
+          "type": "Mount",
+          "vehicle": 29
+        },
+        "queue": false
+      }
+    ],
+    [
+      80,
+      0,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          29
+        ],
+        "order": {
+          "pos": [
+            4500,
+            -1500
+          ],
+          "type": "Move"
+        },
+        "queue": false
+      }
+    ],
+    [
+      80,
+      1,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          29
+        ],
+        "order": {
+          "type": "Unload"
+        },
+        "queue": true
+      }
+    ],
+    [
+      300,
+      0,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          33
+        ],
+        "order": {
+          "type": "Mount",
+          "vehicle": 30
+        },
+        "queue": false
+      }
+    ],
+    [
+      300,
+      1,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          34
+        ],
+        "order": {
+          "type": "Mount",
+          "vehicle": 30
+        },
+        "queue": false
+      }
+    ],
+    [
+      500,
+      0,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          30
+        ],
+        "order": {
+          "pos": [
+            10500,
+            -14500
+          ],
+          "type": "Move"
+        },
+        "queue": false
+      }
+    ],
+    [
+      500,
+      1,
+      {
+        "type": "IssueOrder",
+        "player": 1,
+        "units": [
+          30
+        ],
+        "order": {
+          "type": "Unload"
+        },
+        "queue": true
+      }
+    ]
+  ],
+  "checkpoints": [
+    [
+      100,
+      3221180666079708844
+    ],
+    [
+      200,
+      1452401979496862659
+    ],
+    [
+      300,
+      8522904598567311527
+    ],
+    [
+      400,
+      12039164371265873987
+    ],
+    [
+      500,
+      2171591990225667120
+    ],
+    [
+      600,
+      8877674429366474284
+    ],
+    [
+      700,
+      17127274101809157706
+    ],
+    [
+      800,
+      4294893144215199340
+    ],
+    [
+      900,
+      7383753577253060786
+    ],
+    [
+      1000,
+      10943330858476055703
+    ],
+    [
+      1100,
+      18274860519165252000
+    ],
+    [
+      1200,
+      9886145044289641947
+    ]
+  ]
+}

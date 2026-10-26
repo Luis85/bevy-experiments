@@ -1,0 +1,32 @@
+---
+source: crates/fl_sim/tests/formats.rs
+assertion_line: 109
+expression: text
+---
+SAVE_FORMAT_VERSION = 1
+CommandKind: Struct([Named { name: "type_id", value: TypeName("CommandTypeId") }, Named { name: "payload", value: Seq(U8) }])
+CommandTypeId: NewTypeStruct(U16)
+MatchHeader: Struct([Named { name: "format_version", value: U32 }, Named { name: "build_id", value: Str }, Named { name: "sim_version", value: U32 }, Named { name: "features", value: Seq(Tuple([Str, U32])) }, Named { name: "mods", value: Seq(TupleArray { content: Str, size: 2 }) }, Named { name: "rules_hash", value: U64 }, Named { name: "cheats_allowed", value: Bool }, Named { name: "seed", value: U64 }, Named { name: "string_tables", value: TypeName("StringTables") }])
+PlayerCommand: Struct([Named { name: "exec_tick", value: TypeName("Tick") }, Named { name: "player", value: TypeName("PlayerId") }, Named { name: "seq", value: U32 }, Named { name: "units", value: Seq(TypeName("SimId")) }, Named { name: "kind", value: TypeName("CommandKind") }, Named { name: "queue", value: Bool }])
+PlayerId: NewTypeStruct(U8)
+SaveFile: Struct([Named { name: "format_version", value: U32 }, Named { name: "header", value: TypeName("MatchHeader") }, Named { name: "sim", value: TypeName("SimSave") }])
+SimId: NewTypeStruct(U32)
+SimSave: Struct([Named { name: "tick", value: TypeName("Tick") }, Named { name: "sim_id_next", value: U32 }, Named { name: "pending_commands", value: Seq(TypeName("PlayerCommand")) }, Named { name: "resources", value: Seq(Tuple([Str, U32, Seq(U8)])) }, Named { name: "entities", value: Seq(Tuple([TypeName("SimId"), Seq(Tuple([Str, U32, Seq(U8)]))])) }])
+StringTables: Struct([Named { name: "tables", value: Map { key: Str, value: Seq(Str) } }])
+Tick: NewTypeStruct(U32)
+REPLAY_FORMAT_VERSION = 4
+CommandKind: Struct([Named { name: "type_id", value: TypeName("CommandTypeId") }, Named { name: "payload", value: Seq(U8) }])
+CommandTypeId: NewTypeStruct(U16)
+MatchHeader: Struct([Named { name: "format_version", value: U32 }, Named { name: "build_id", value: Str }, Named { name: "sim_version", value: U32 }, Named { name: "features", value: Seq(Tuple([Str, U32])) }, Named { name: "mods", value: Seq(TupleArray { content: Str, size: 2 }) }, Named { name: "rules_hash", value: U64 }, Named { name: "cheats_allowed", value: Bool }, Named { name: "seed", value: U64 }, Named { name: "string_tables", value: TypeName("StringTables") }])
+PlayerCommand: Struct([Named { name: "exec_tick", value: TypeName("Tick") }, Named { name: "player", value: TypeName("PlayerId") }, Named { name: "seq", value: U32 }, Named { name: "units", value: Seq(TypeName("SimId")) }, Named { name: "kind", value: TypeName("CommandKind") }, Named { name: "queue", value: Bool }])
+PlayerId: NewTypeStruct(U8)
+Replay: Struct([Named { name: "version", value: U32 }, Named { name: "header", value: TypeName("MatchHeader") }, Named { name: "start", value: TypeName("ReplayStart") }, Named { name: "hash_interval", value: U32 }, Named { name: "ticks", value: U32 }, Named { name: "inputs", value: Seq(TypeName("TickInput")) }, Named { name: "hashes", value: Seq(Tuple([TypeName("Tick"), U64])) }, Named { name: "events", value: Seq(TypeName("ReplayEvent")) }, Named { name: "semantic", value: Seq(TypeName("SemanticCheck")) }, Named { name: "journal_summary", value: Map { key: Str, value: U32 } }])
+ReplayEvent: Enum({0: Named { name: "ContentReload", value: Struct([Named { name: "tick", value: TypeName("Tick") }, Named { name: "rules_hash", value: U64 }]) }})
+ReplayStart: Enum({0: Named { name: "Scenario", value: NewType(Str) }, 1: Named { name: "Scale", value: Struct([Named { name: "version", value: U32 }, Named { name: "params", value: Seq(U8) }]) }, 2: Named { name: "Save", value: NewType(Seq(U8)) }})
+SemanticCheck: Enum({0: Named { name: "UnitWithin", value: Struct([Named { name: "id", value: Str }, Named { name: "tick", value: TypeName("Tick") }, Named { name: "unit", value: TypeName("SimId") }, Named { name: "min", value: TupleArray { content: I64, size: 2 } }, Named { name: "max", value: TupleArray { content: I64, size: 2 } }]) }, 1: Named { name: "UnitExists", value: Struct([Named { name: "id", value: Str }, Named { name: "tick", value: TypeName("Tick") }, Named { name: "unit", value: TypeName("SimId") }, Named { name: "exists", value: Bool }]) }, 2: Named { name: "EntityCount", value: Struct([Named { name: "id", value: Str }, Named { name: "tick", value: TypeName("Tick") }, Named { name: "min", value: U32 }, Named { name: "max", value: U32 }]) }, 3: Named { name: "NeverOnTerrain", value: Struct([Named { name: "id", value: Str }, Named { name: "units", value: Seq(TypeName("SimId")) }, Named { name: "terrain", value: Str }]) }})
+SimId: NewTypeStruct(U32)
+StringTables: Struct([Named { name: "tables", value: Map { key: Str, value: Seq(Str) } }])
+Tick: NewTypeStruct(U32)
+TickInput: Struct([Named { name: "tick", value: TypeName("Tick") }, Named { name: "commands", value: Seq(TypeName("PlayerCommand")) }])
+SCALE_SCENARIO_VERSION = 1
+ScaleScenario: Struct([Named { name: "units", value: U32 }, Named { name: "players", value: U8 }, Named { name: "map_m", value: I32 }, Named { name: "wander_m", value: I32 }, Named { name: "seed", value: U64 }, Named { name: "followers_per_unit", value: U32 }, Named { name: "projectiles", value: U32 }, Named { name: "projectile_ttl", value: U32 }, Named { name: "sensor_every", value: U32 }, Named { name: "map", value: Option(Str) }])
