@@ -78,7 +78,16 @@ impl Base {
 pub fn changed_files(root: &Path, base_rev: &str) -> Result<Vec<PathBuf>> {
     let diff = git(
         root,
-        &["diff", "--name-only", "--no-renames", "-z", base_rev],
+        &[
+            "diff",
+            "--relative",
+            "--name-only",
+            "--no-renames",
+            "-z",
+            base_rev,
+            "--",
+            ".",
+        ],
     )?;
     let untracked = git(root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
     let files: BTreeSet<PathBuf> = diff
@@ -149,6 +158,80 @@ mod tests {
             PathBuf::from("docs/a.md"),
         ];
         assert_eq!(touched_packages(&meta, &files), ["fl_sim"]);
+    }
+
+    #[test]
+    fn monorepo_changes_are_scoped_and_history_is_workspace_relative() {
+        let temp = tempfile::tempdir().unwrap();
+        let repo = temp.path();
+        git(repo, &["init", "-q"]).unwrap();
+        git(repo, &["config", "user.name", "Tooling test"]).unwrap();
+        git(repo, &["config", "user.email", "test@example.invalid"]).unwrap();
+        let root = repo.join("bevy-rts");
+        let source = root.join("crates/fl_sim/src/lib.rs");
+        std::fs::create_dir_all(source.parent().unwrap()).unwrap();
+        std::fs::write(&source, "#[test]\nfn invariant() { assert_eq!(1, 1); }\n").unwrap();
+        std::fs::write(repo.join("README.md"), "original\n").unwrap();
+        git(repo, &["add", "."]).unwrap();
+        git(
+            repo,
+            &[
+                "-c",
+                "core.hooksPath=",
+                "commit",
+                "--no-gpg-sign",
+                "-qm",
+                "initial",
+            ],
+        )
+        .unwrap();
+        let base = git(repo, &["rev-parse", "HEAD"]).unwrap().trim().to_owned();
+
+        std::fs::write(&source, "#[test]\nfn invariant() {}\n").unwrap();
+        std::fs::write(root.join("new.txt"), "new\n").unwrap();
+        std::fs::write(repo.join("README.md"), "sibling change\n").unwrap();
+        std::fs::write(repo.join("sibling.txt"), "untracked sibling\n").unwrap();
+        assert_eq!(
+            changed_files(&root, &base).unwrap(),
+            [
+                PathBuf::from("crates/fl_sim/src/lib.rs"),
+                PathBuf::from("new.txt")
+            ]
+        );
+        let findings = crate::test_guard::run(&root, &base).unwrap();
+        assert!(findings.iter().any(|finding| {
+            finding.kind == crate::test_guard::FindingKind::RemovedAssert
+                && finding.file == Path::new("crates/fl_sim/src/lib.rs")
+        }));
+
+        git(repo, &["add", "."]).unwrap();
+        git(
+            repo,
+            &[
+                "-c",
+                "core.hooksPath=",
+                "commit",
+                "--no-gpg-sign",
+                "-qm",
+                "change\n\nChange-Class: X",
+            ],
+        )
+        .unwrap();
+        let commits = crate::change_class::commits(&root, &base).unwrap();
+        assert_eq!(commits.len(), 1);
+        assert_eq!(
+            commits[0].files,
+            [
+                PathBuf::from("crates/fl_sim/src/lib.rs"),
+                PathBuf::from("new.txt")
+            ]
+        );
+        // Reads of SIM_VERSION/replay constants must resolve inside the workspace.
+        assert!(
+            crate::change_class::check_branch(&root, &base)
+                .unwrap()
+                .is_empty()
+        );
     }
 
     #[test]

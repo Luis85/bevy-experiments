@@ -31,6 +31,7 @@ which alternatives were rejected.
 | [0020](0020-content-load-phases-patches-provenance.md) | Content load phases over a lossless RON tree; patches, per-path origins and the provenance ledger | accepted | 2026-10-25 | §6.1, §6.4, §9.2 C2, C6 |
 | [0021](0021-golden-replay-versioning.md) | Golden replay versioning, change classes, MCRs and the re-bless protocol | accepted | 2026-10-25 | §5.5, §9.2 C8, §12.5 |
 | [0022](0022-verification-from-m2.md) | Verification from M2: mechanic specs and tracing, test author and holdout, statistics, mutants, review tiers | accepted | 2026-10-25 | §9.2 C1, C3, C4, C9, C10, §12 |
+| [0023](0023-monorepo-development.md) | Portable development and policy checks inside the Bevy Experiments monorepo | accepted | 2026-10-26 | §13 |
 
 The M2 entry requirements (spec §9.2, Group C) are recorded in ADR-0017 to ADR-0022 and in the M2 prelude
 refinements of ADR-0002, ADR-0006, ADR-0007 and ADR-0015 (spec revision 2.5); the controller accepts them at the M2

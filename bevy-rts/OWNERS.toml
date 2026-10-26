@@ -8,7 +8,7 @@ name = "contract"
 paths = ["crates/fl_math/**", "crates/fl_protocol/**", "crates/fl_view/**",
   "crates/fl_sim/src/{builder,registry,classify,schedule,feature,step,hash,replay,spawn,commands}.rs", "crates/fl_sim/src/runner/**", "crates/fl_sim/src/save/**",
   "crates/fl_content/src/{registry,mods,hash,kinds,def}.rs",
-  "xtask/**", ".claude/**", "CLAUDE.md", ".mcp.json", "rust-analyzer.toml", "deny.toml", "OWNERS.toml", ".config/**", ".cargo/**",
+  "xtask/**", ".claude/**", "CLAUDE.md", "AGENTS.md", ".mcp.json", "rust-analyzer.toml", "deny.toml", "OWNERS.toml", ".config/**", ".cargo/**",
   "Cargo.toml", "Cargo.lock", "rust-toolchain.toml", "clippy.toml", "crates/*/clippy.toml", "docs/superpowers/specs/**", "docs/adr/**",
   ".gitignore", ".gitattributes"]
 [[track]]

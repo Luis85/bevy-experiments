@@ -274,7 +274,7 @@ fn hashes_of(json: &serde_json::Value) -> Option<&serde_json::Value> {
 /// The bytes of `path` at `rev`; `None` if it does not exist there.
 fn bytes_at(root: &Path, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
     let out = Command::new("git")
-        .args(["show", &format!("{rev}:{path}")])
+        .args(["show", &format!("{rev}:./{path}")])
         .current_dir(root)
         .stdin(Stdio::null())
         .output()
@@ -313,6 +313,7 @@ pub fn commits(root: &Path, base_rev: &str) -> Result<Vec<CommitFacts>> {
             root,
             &[
                 "diff-tree",
+                "--relative",
                 "--no-commit-id",
                 "--name-only",
                 "-r",
@@ -405,7 +406,16 @@ fn hash_stream_kept(root: &Path, sha: &str, path: &Path) -> Result<bool> {
 pub fn check_branch(root: &Path, base_rev: &str) -> Result<Vec<String>> {
     let files = git_paths(
         root,
-        &["diff", "--name-only", "--no-renames", base_rev, "HEAD"],
+        &[
+            "diff",
+            "--relative",
+            "--name-only",
+            "--no-renames",
+            base_rev,
+            "HEAD",
+            "--",
+            ".",
+        ],
     )?;
     let commits = commits(root, base_rev)?;
     let mut refactor_goldens = Vec::new();

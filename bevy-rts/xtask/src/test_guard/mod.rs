@@ -165,6 +165,7 @@ pub fn run(root: &Path, base_rev: &str) -> Result<Vec<Finding>> {
             "-c",
             "core.quotepath=off",
             "diff",
+            "--relative",
             "--no-color",
             "--no-ext-diff",
             "--no-renames",
@@ -195,7 +196,7 @@ pub fn run(root: &Path, base_rev: &str) -> Result<Vec<Finding>> {
     // real: fail closed rather than scan a partial view.
     let source = |path: &Path, old: bool| -> Result<String> {
         if old {
-            let spec = format!("{base_rev}:{}", owners::normalize(path));
+            let spec = format!("{base_rev}:./{}", owners::normalize(path));
             git(root, &["show", &spec])
         } else {
             let bytes = std::fs::read(root.join(path))

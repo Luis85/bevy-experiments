@@ -710,10 +710,11 @@ fn lexical_normalize(path: &Path) -> PathBuf {
     out
 }
 
-/// The git worktree containing `dir` (or `dir` itself): the nearest ancestor with a `.git`.
+/// The policy workspace containing `dir`: prefer the nearest OWNERS.toml to the
+/// enclosing Git root, so hooks also work inside a monorepo.
 fn repo_root(dir: &Path) -> Option<PathBuf> {
     dir.ancestors()
-        .find(|d| d.join(".git").exists())
+        .find(|d| d.join("OWNERS.toml").is_file() || d.join(".git").exists())
         .map(Path::to_path_buf)
 }
 
@@ -930,6 +931,26 @@ mod tests {
             Some((
                 dir.path().to_path_buf(),
                 PathBuf::from("crates/a/tests/snapshots/x.snap")
+            ))
+        );
+    }
+
+    #[test]
+    fn nested_workspace_keeps_its_own_protected_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join(".git"), "gitdir: x").unwrap();
+        let workspace = dir.path().join("bevy-rts");
+        std::fs::create_dir_all(workspace.join("crates")).unwrap();
+        std::fs::write(workspace.join("OWNERS.toml"), "[protected]\npaths = []\n").unwrap();
+        assert_eq!(
+            repo_root(&workspace.join("crates")),
+            Some(workspace.clone())
+        );
+        assert_eq!(
+            repo_relative(&workspace.join("crates/sim/tests/snapshots/x.snap")),
+            Some((
+                workspace,
+                PathBuf::from("crates/sim/tests/snapshots/x.snap")
             ))
         );
     }

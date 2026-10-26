@@ -1,0 +1,23 @@
+{
+  "folders": [{ "path": "." }],
+  "settings": {
+    "rust-analyzer.linkedProjects": [
+      "bevy-rts/Cargo.toml",
+      "legion-battle-lab/Cargo.toml",
+      "npc-framework/Cargo.toml",
+      "terra-world/Cargo.toml"
+    ],
+    "files.watcherExclude": {
+      "**/target/**": true,
+      "**/.git/objects/**": true
+    },
+    "search.exclude": { "**/target": true }
+  },
+  "extensions": {
+    "recommendations": [
+      "rust-lang.rust-analyzer",
+      "tamasfe.even-better-toml",
+      "ms-vscode.powershell"
+    ]
+  }
+}

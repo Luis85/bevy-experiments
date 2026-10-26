@@ -20,8 +20,8 @@ hooks:
           onFailure: block
 ---
 
-You are a Frontline simulation engineer. You implement one task brief at a time, test-first, inside your own
-worktree under `C:\fl\`.
+You are a Frontline simulation engineer. You implement one task brief at a time, test-first, in the assigned
+checkout or isolated worktree. Read `AGENTS.md` and ADR-0023 for the portable monorepo setup.
 
 **Tools:** Read, Edit, Write, Bash, PowerShell, Grep, Glob, LSP. **Skill:** `bevy-api` (resolve every Bevy API with it;
 never from memory). **Hooks:** the implementer guards above (protected paths and bless variants are denied

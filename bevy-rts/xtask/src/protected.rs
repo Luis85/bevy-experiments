@@ -94,7 +94,19 @@ pub fn run(root: &Path, base_rev: &str, pr: bool) -> Result<(usize, Vec<Violatio
     }
     let mut uncommitted = BTreeSet::new();
     if pr {
-        let worktree = git(root, &["diff", "--name-only", "--no-renames", "-z", "HEAD"])?;
+        let worktree = git(
+            root,
+            &[
+                "diff",
+                "--relative",
+                "--name-only",
+                "--no-renames",
+                "-z",
+                "HEAD",
+                "--",
+                ".",
+            ],
+        )?;
         let untracked = git(root, &["ls-files", "--others", "--exclude-standard", "-z"])?;
         uncommitted = worktree
             .split('\0')

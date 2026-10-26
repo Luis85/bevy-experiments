@@ -1,7 +1,4 @@
-[build]
-build-dir = "C:/t/fl/{workspace-path-hash}"
-rustc-wrapper = "sccache"
-[target.x86_64-pc-windows-msvc]
-linker = "rust-lld.exe"
+# Keep machine-specific build paths, compiler caches and linkers in the user's
+# Cargo configuration or environment. A fresh clone uses the platform defaults.
 [alias]
 xtask = "run -q -p xtask --"

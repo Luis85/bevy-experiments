@@ -35,18 +35,17 @@ cargo run -p fl_game --features dynamic            # faster dev relinks (bevy/dy
 - Rust `1.99.1` pinned in `rust-toolchain.toml` (MSRV 1.97.1), edition 2024. Never run `rustup default`.
 - One dated nightly exists only for `cargo-public-api` rustdoc JSON; its name is in `xtask/api-toolchain.txt`
   (added with `xtask api`). Nothing builds, tests or lints with it.
-- `.cargo/config.toml` sets `rustc-wrapper = "sccache"`: builds fail unless `sccache` is installed (it is a
-  user-approved global install; agents never change user-level config in `~/.cargo` or `~/.claude`).
+- Cargo uses the platform compiler/linker and local `target/` by default (ADR-0023). Caches and custom paths
+  are optional personal configuration; agents never change user-level config in `~/.cargo` or `~/.claude`.
 - Bevy crates are pinned `=0.20.0` with `default-features = false` and explicit features.
 
 ## Worktrees and builds
 
-- Edit only inside your worktree under `C:\fl\` (lane worktrees `C:\fl\a`, `C:\fl\tNN`). `main` lives in
-  `C:\Projects\bevy-experiments`; never write there.
+- Use the user's current checkout or an isolated branch/worktree as appropriate (ADR-0023). This workspace
+  is the `bevy-rts/` subdirectory of the Bevy Experiments Git repository; run Cargo from this directory.
 - At most **two** cargo builders run at once across all agents; a gate run counts as one.
-- Build output goes to a per-worktree build dir, `build.build-dir = "C:/t/fl/{workspace-path-hash}"` in the
-  repo `.cargo/config.toml`; there is no shared `target-dir`. Before removing a worktree, delete it with
-  `cargo xtask hook worktree-remove --worktree <dir>` (only paths under `C:/t/fl/` are ever deleted).
+- Each workspace/worktree uses its own local `target/`. The legacy `cargo xtask hook worktree-remove`
+  only cleans optional build paths under `C:/t/fl/`; it leaves platform-default output directories alone.
 - A cold Bevy build takes 15+ minutes per build dir: run long cargo commands in the background or with a
   long timeout, and never start a second build while one runs.
 - After Task 1, no task edits `Cargo.toml` or `Cargo.lock` unless its **Files** list says so. If a dependency
@@ -124,6 +123,6 @@ methods, not mouse clicks; built-in `world.*` methods see only the client World,
 ## Commits
 
 - Commit only the files your task owns, with a conventional message (`feat(fl_x): …`, `!` for contract breaks).
-- Trailers, in order: `Refs: ADR-NNNN` (contract changes), `Blessed: <reason>` (blessed artifacts), then the
-  last line `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.
+- Trailers include `Refs: ADR-NNNN` (contract changes) and `Blessed: <reason>` (blessed artifacts).
+  Include co-authorship only when it accurately identifies a contributor.
 - Keep LF line endings (`.gitattributes`); never rewrite a whole file you only edit partially.

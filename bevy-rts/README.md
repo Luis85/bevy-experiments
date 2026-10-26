@@ -7,6 +7,11 @@ roads, forest, a hill and a ridge), selection, move/stop/rotate/follow orders wi
 formation over flow fields, HPA* pathfinding under a per-tick budget, separation steering, pathing overlays and hot
 reload. M0 (the foundation) is in `docs/m0-demo-checklist.md`, M1 in `docs/m1-demo-checklist.md`.
 
+This is the `bevy-rts/` Cargo workspace inside Bevy Experiments. Run commands
+from this directory. Rust 1.99.1 is pinned; standard platform build tools are
+sufficient, and sccache/custom linkers are optional. See the repository's
+`CONTRIBUTING.md`, this workspace's `AGENTS.md` and ADR-0023 for the current setup.
+
 ## Gate
 
 One command defines "verified" for agents, hooks and people (spec §12, ADR-0009):
