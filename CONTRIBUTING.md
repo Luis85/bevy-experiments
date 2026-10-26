@@ -53,13 +53,18 @@ pwsh -NoProfile -File scripts/dev.ps1 check -Project npc-framework
 pwsh -NoProfile -File scripts/dev.ps1 verify -Project npc-framework
 ```
 
-Equivalent baseline commands inside any workspace:
+Standard commands inside a workspace:
 
 ```sh
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 ```
+
+For Frontline, append `--exclude probe_dynlink --exclude probe_remote` before
+the `--` separator when using `--workspace`: these throwaway historical API
+probes are outside its default members and its maintained game/tooling gate.
+The helper applies this package selection automatically.
 
 To apply formatting, use `cargo fmt --all` in the selected workspace. Check-only
 commands never rewrite source. Avoid more than two Cargo builders on one machine;

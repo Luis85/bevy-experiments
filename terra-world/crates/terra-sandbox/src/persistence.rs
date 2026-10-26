@@ -37,10 +37,10 @@ impl SandboxState {
             fs::rename(&temporary, path)?;
             // Best-effort directory sync on platforms that support directory
             // handles. The file data itself was synchronously flushed above.
-            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
-                if let Ok(directory) = File::open(parent) {
-                    let _ = directory.sync_all();
-                }
+            if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty())
+                && let Ok(directory) = File::open(parent)
+            {
+                let _ = directory.sync_all();
             }
             Ok(())
         })();

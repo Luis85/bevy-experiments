@@ -149,25 +149,21 @@ pub(crate) fn load_chunk_cached(
         ));
     }
     let cache_key = chunk_cache_key(key, config);
-    if let Some(data) = cache::read(config, &cache_key, config.chunk_cache_ttl_seconds) {
-        if let Ok(chunk) = serde_json::from_slice::<WorldChunk>(&data) {
-            if chunk.key == key
-                && chunk.validate().is_ok()
-                && chunk.heights.width == config.terrain_resolution
-                && chunk.heights.height == config.terrain_resolution
-                && !chunk.sources.is_empty()
-                && chunk.sources.iter().all(|source| {
-                    !source.synthetic
-                        && cache::now()
-                            .checked_sub(source.retrieved_unix_seconds)
-                            .is_some_and(|age| {
-                                age >= 0 && age as u64 <= config.chunk_cache_ttl_seconds
-                            })
-                })
-            {
-                return Ok((chunk, true));
-            }
-        }
+    if let Some(data) = cache::read(config, &cache_key, config.chunk_cache_ttl_seconds)
+        && let Ok(chunk) = serde_json::from_slice::<WorldChunk>(&data)
+        && chunk.key == key
+        && chunk.validate().is_ok()
+        && chunk.heights.width == config.terrain_resolution
+        && chunk.heights.height == config.terrain_resolution
+        && !chunk.sources.is_empty()
+        && chunk.sources.iter().all(|source| {
+            !source.synthetic
+                && cache::now()
+                    .checked_sub(source.retrieved_unix_seconds)
+                    .is_some_and(|age| age >= 0 && age as u64 <= config.chunk_cache_ttl_seconds)
+        })
+    {
+        return Ok((chunk, true));
     }
     // Missing semantic data stays missing in live mode. Never plant fictional
     // buildings over real terrain and pass them off as surveyed objects.
@@ -687,10 +683,10 @@ pub fn fetch_weather(
         .append_pair("timezone", "UTC");
     let url = url.to_string();
     let key = format!("weather-v2:{url}");
-    if let Some(bytes) = cache::read(config, &key, config.weather_cache_ttl_seconds) {
-        if let Ok(sample) = parse_open_meteo(&bytes) {
-            return Ok(sample);
-        }
+    if let Some(bytes) = cache::read(config, &key, config.weather_cache_ttl_seconds)
+        && let Ok(sample) = parse_open_meteo(&bytes)
+    {
+        return Ok(sample);
     }
     let bytes = get(&url, config)?;
     let sample = parse_open_meteo(&bytes)?;

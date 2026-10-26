@@ -172,7 +172,7 @@ impl MeshBuilder {
                 [0.31, 0.23, 0.15, 1.],
                 5,
             );
-            if seed % 3 == 0 {
+            if seed.is_multiple_of(3) {
                 self.ellipsoid(
                     base + Vec3::Y * h * 0.69,
                     Vec3::new(h * 0.35, h * 0.32, h * 0.33),
@@ -197,14 +197,14 @@ impl MeshBuilder {
         let h = height.clamp(1., 35.);
         let bark = [0.31, 0.23, 0.15, 1.];
         self.cylinder(base, base + Vec3::Y * h * 0.68, h * 0.035, bark, 7);
-        if seed % 3 == 0 {
+        if seed.is_multiple_of(3) {
             // Broadleaf canopy: several intersecting smooth crowns and branches.
             let shades = [
                 [0.24, 0.40, 0.18, 1.],
                 [0.31, 0.46, 0.21, 1.],
                 [0.27, 0.43, 0.23, 1.],
             ];
-            for i in 0..3 {
+            for (i, shade) in shades.into_iter().enumerate() {
                 let angle = (seed % 31) as f32 + i as f32 * 2.1;
                 let crown = base
                     + Vec3::new(
@@ -213,7 +213,7 @@ impl MeshBuilder {
                         angle.sin() * h * 0.16,
                     );
                 self.cylinder(base + Vec3::Y * h * 0.4, crown, h * 0.018, bark, 5);
-                self.ellipsoid(crown, Vec3::new(h * 0.29, h * 0.27, h * 0.27), shades[i], 8);
+                self.ellipsoid(crown, Vec3::new(h * 0.29, h * 0.27, h * 0.27), shade, 8);
             }
         } else {
             for tier in 0..4 {
@@ -467,17 +467,16 @@ fn tag<'a>(feature: &'a WorldFeature, key: &str) -> &'a str {
 }
 fn tag_color(value: &str, fallback: [f32; 4]) -> [f32; 4] {
     let v = value.trim().to_lowercase();
-    if let Some(hex) = v.strip_prefix('#') {
-        if hex.len() == 6 {
-            if let Ok(rgb) = u32::from_str_radix(hex, 16) {
-                return [
-                    ((rgb >> 16) & 255) as f32 / 255.,
-                    ((rgb >> 8) & 255) as f32 / 255.,
-                    (rgb & 255) as f32 / 255.,
-                    1.,
-                ];
-            }
-        }
+    if let Some(hex) = v.strip_prefix('#')
+        && hex.len() == 6
+        && let Ok(rgb) = u32::from_str_radix(hex, 16)
+    {
+        return [
+            ((rgb >> 16) & 255) as f32 / 255.,
+            ((rgb >> 8) & 255) as f32 / 255.,
+            (rgb & 255) as f32 / 255.,
+            1.,
+        ];
     }
     match v.as_str() {
         "red" => [0.57, 0.22, 0.16, 1.],
@@ -748,7 +747,7 @@ fn building(
             );
         }
     }
-    if pitched && seed % 3 == 0 && lod == 0 {
+    if pitched && seed.is_multiple_of(3) && lod == 0 {
         let center = points[0].lerp(points[2], 0.4) + Vec3::Y * (roof_height + 0.4);
         builder.cuboid(center, Vec3::new(0.65, 1.6, 0.7), [0.49, 0.34, 0.28, 1.]);
     }
@@ -950,21 +949,21 @@ pub fn feature_meshes_lod(
         }
         let seed = hash(&feature.id);
         if feature.kind == FeatureKind::Tree {
-            if trees_left > 0 {
-                if let Some(&p) = feature.points.first() {
-                    trees_left -= 1;
-                    explicit_trees_left = explicit_trees_left.saturating_sub(1);
-                    builder.tree_lod(
-                        surface(chunk, &frame, p, 0.),
-                        feature.height_m.clamp(3., 28.),
-                        match tag(feature, "leaf_type") {
-                            "broadleaved" => seed / 3 * 3,
-                            "needleleaved" => seed / 3 * 3 + 1,
-                            _ => seed,
-                        },
-                        lod,
-                    );
-                }
+            if trees_left > 0
+                && let Some(&p) = feature.points.first()
+            {
+                trees_left -= 1;
+                explicit_trees_left = explicit_trees_left.saturating_sub(1);
+                builder.tree_lod(
+                    surface(chunk, &frame, p, 0.),
+                    feature.height_m.clamp(3., 28.),
+                    match tag(feature, "leaf_type") {
+                        "broadleaved" => seed / 3 * 3,
+                        "needleleaved" => seed / 3 * 3 + 1,
+                        _ => seed,
+                    },
+                    lod,
+                );
             }
             continue;
         }
@@ -1138,7 +1137,7 @@ pub fn feature_meshes_lod(
                             if matches!(tag(feature, "crop"), "wheat" | "barley" | "oat" | "maize")
                             {
                                 [0.64, 0.59, 0.30, 1.]
-                            } else if (row + seed as usize) % 3 == 0 {
+                            } else if (row + seed as usize).is_multiple_of(3) {
                                 [0.60, 0.56, 0.27, 1.]
                             } else {
                                 [0.45, 0.52, 0.24, 1.]

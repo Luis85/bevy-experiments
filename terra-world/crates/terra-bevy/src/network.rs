@@ -425,14 +425,14 @@ fn apply_message(
                     .get(&actor.id)
                     .filter(|account| account.possessed)
                     .map(|account| account.active_unit);
-                if let Some(unit) = active.and_then(|id| sandbox.state.living.units.get_mut(&id)) {
-                    if unit.kind == actor.kind {
-                        unit.position = actor.position;
-                        unit.velocity_enu_m_s = actor.velocity_enu_m_s;
-                        unit.heading_deg = actor.heading_deg;
-                        if let Some(player) = sandbox.state.players.get_mut(&actor.id) {
-                            player.position = actor.position;
-                        }
+                if let Some(unit) = active.and_then(|id| sandbox.state.living.units.get_mut(&id))
+                    && unit.kind == actor.kind
+                {
+                    unit.position = actor.position;
+                    unit.velocity_enu_m_s = actor.velocity_enu_m_s;
+                    unit.heading_deg = actor.heading_deg;
+                    if let Some(player) = sandbox.state.players.get_mut(&actor.id) {
+                        player.position = actor.position;
                     }
                 }
             }

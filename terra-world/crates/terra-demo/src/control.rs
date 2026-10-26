@@ -165,11 +165,11 @@ fn synchronize_control(
 ) {
     let life = &sandbox.state.living;
     control.selected.retain(|id| life.units.contains_key(id));
-    if control.initialized_player != Some(sandbox.player_id) {
-        if let Some(account) = life.accounts.get(&sandbox.player_id) {
-            control.selected = BTreeSet::from([account.active_unit]);
-            control.initialized_player = Some(sandbox.player_id);
-        }
+    if control.initialized_player != Some(sandbox.player_id)
+        && let Some(account) = life.accounts.get(&sandbox.player_id)
+    {
+        control.selected = BTreeSet::from([account.active_unit]);
+        control.initialized_player = Some(sandbox.player_id);
     }
     if let Some(id) = control.pending_possession {
         control.pending_seconds += time.delta_secs().min(0.25);
@@ -450,6 +450,10 @@ fn nearest_projected_unit(
         .map(|(id, _)| id)
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn selection_input(
     buttons: Res<ButtonInput<MouseButton>>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -485,68 +489,68 @@ fn selection_input(
             viewport.rect(&window, false).max,
         ));
     }
-    if buttons.just_released(MouseButton::Left) {
-        if let Some(start) = control.drag_start.take() {
-            let previous_primary = control.primary();
-            let end = control.drag_end.take().unwrap_or(cursor);
-            let additive = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-            let mut projected = Vec::new();
-            for unit in sandbox.state.living.units.values() {
-                let mut local =
-                    Vec3::from_array(runtime.frame.to_local(unit.position).map(|v| v as f32));
-                local.y += if matches!(unit.kind, ActorKind::Human | ActorKind::Creature) {
-                    1.
-                } else {
-                    0.8
-                };
-                if let Ok(screen) = camera.0.world_to_viewport(camera.1, local) {
-                    if viewport.contains(&window, screen, false) {
-                        projected.push((unit.id, screen, unit.owner));
-                    }
-                }
-            }
-            if !additive {
-                control.selected.clear();
-            }
-            if start.distance(end) > 7. {
-                let rect = Rect::from_corners(start, end);
-                for (id, point, owner) in projected {
-                    if owner == Some(sandbox.player_id)
-                        && rect.contains(point)
-                        && control.selected.len() < 32
-                    {
-                        control.selected.insert(id);
-                    }
-                }
-            } else if let Some(id) =
-                nearest_projected_unit(end, projected.into_iter().map(|(id, p, _)| (id, p, 22.)))
+    if buttons.just_released(MouseButton::Left)
+        && let Some(start) = control.drag_start.take()
+    {
+        let previous_primary = control.primary();
+        let end = control.drag_end.take().unwrap_or(cursor);
+        let additive = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+        let mut projected = Vec::new();
+        for unit in sandbox.state.living.units.values() {
+            let mut local =
+                Vec3::from_array(runtime.frame.to_local(unit.position).map(|v| v as f32));
+            local.y += if matches!(unit.kind, ActorKind::Human | ActorKind::Creature) {
+                1.
+            } else {
+                0.8
+            };
+            if let Ok(screen) = camera.0.world_to_viewport(camera.1, local)
+                && viewport.contains(&window, screen, false)
             {
-                if additive && control.selected.contains(&id) {
-                    control.selected.remove(&id);
-                } else {
+                projected.push((unit.id, screen, unit.owner));
+            }
+        }
+        if !additive {
+            control.selected.clear();
+        }
+        if start.distance(end) > 7. {
+            let rect = Rect::from_corners(start, end);
+            for (id, point, owner) in projected {
+                if owner == Some(sandbox.player_id)
+                    && rect.contains(point)
+                    && control.selected.len() < 32
+                {
                     control.selected.insert(id);
                 }
             }
-            control.status = if control.selected.is_empty() {
-                "Click an actor to inspect it; drag a box to select your units.".into()
+        } else if let Some(id) =
+            nearest_projected_unit(end, projected.into_iter().map(|(id, p, _)| (id, p, 22.)))
+        {
+            if additive && control.selected.contains(&id) {
+                control.selected.remove(&id);
             } else {
-                format!(
-                    "{} selected · F2 possess · right-click terrain to move owned units",
-                    control.selected.len()
-                )
-            };
-            if control.primary() != previous_primary {
-                if let Some(unit_id) = control.primary().filter(|id| {
-                    sandbox
-                        .state
-                        .living
-                        .units
-                        .get(id)
-                        .is_some_and(|u| u.owner == Some(sandbox.player_id))
-                }) {
-                    enqueue_living(&mut queue, LivingCommand::SelectActive { unit_id });
-                }
+                control.selected.insert(id);
             }
+        }
+        control.status = if control.selected.is_empty() {
+            "Click an actor to inspect it; drag a box to select your units.".into()
+        } else {
+            format!(
+                "{} selected · F2 possess · right-click terrain to move owned units",
+                control.selected.len()
+            )
+        };
+        if control.primary() != previous_primary
+            && let Some(unit_id) = control.primary().filter(|id| {
+                sandbox
+                    .state
+                    .living
+                    .units
+                    .get(id)
+                    .is_some_and(|u| u.owner == Some(sandbox.player_id))
+            })
+        {
+            enqueue_living(&mut queue, LivingCommand::SelectActive { unit_id });
         }
     }
     if buttons.just_pressed(MouseButton::Right)

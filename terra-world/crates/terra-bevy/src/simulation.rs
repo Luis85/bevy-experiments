@@ -75,9 +75,11 @@ pub struct GeoAnchor(pub GeoPosition);
 #[derive(Component, Clone, Debug)]
 pub struct GeoActor(pub ActorState);
 
+type WeatherResponse = (GeoPosition, Result<WeatherSample, String>);
+
 #[derive(Resource, Default)]
 struct WeatherTask {
-    receiver: Option<Mutex<mpsc::Receiver<(GeoPosition, Result<WeatherSample, String>)>>>,
+    receiver: Option<Mutex<mpsc::Receiver<WeatherResponse>>>,
     last_requested: Option<GeoPosition>,
     last_fetch: Option<Instant>,
     last_sim_bucket: i64,
@@ -115,8 +117,10 @@ impl Plugin for TerraWorldPlugin {
             .validate()
             .expect("invalid Terra World configuration");
         let mut config = self.config.clone();
-        let mut clock = WorldClock::default();
-        clock.time_scale = config.time_scale;
+        let mut clock = WorldClock {
+            time_scale: config.time_scale,
+            ..WorldClock::default()
+        };
         if config.live_data {
             clock.unix_seconds = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -257,10 +261,10 @@ fn advance_world(
         let before = runtime.clock.unix_seconds;
         runtime.clock.advance(dt);
         let elapsed = runtime.clock.unix_seconds - before;
-        if elapsed > 0.0 {
-            if let Err(e) = sandbox.state.advance(elapsed, &weather) {
-                runtime.last_error = Some(e.to_string());
-            }
+        if elapsed > 0.0
+            && let Err(e) = sandbox.state.advance(elapsed, &weather)
+        {
+            runtime.last_error = Some(e.to_string());
         }
         if runtime.config.layers.contains(Layer::Actors) && !runtime.clock.paused {
             for mut actor in &mut actors {

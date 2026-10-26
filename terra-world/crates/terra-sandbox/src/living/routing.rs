@@ -20,10 +20,10 @@ impl LivingWorld {
                         points.push(p);
                         points.len() - 1
                     });
-                if let Some(a) = prev {
-                    if a != index {
-                        links.push((a, index));
-                    }
+                if let Some(a) = prev
+                    && a != index
+                {
+                    links.push((a, index));
                 }
                 prev = Some(index);
             }

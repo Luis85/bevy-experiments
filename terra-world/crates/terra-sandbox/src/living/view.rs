@@ -85,19 +85,18 @@ impl LivingWorld {
     /// Replace a client's read-only replica. Views are incomplete and must never
     /// be saved as an authoritative world or advanced by the client.
     pub fn from_view(view: LivingView) -> Self {
-        let mut world = Self::default();
-        world.enabled = view.enabled;
-        world.origin = view.origin;
-        world.units = view.units.into_iter().map(|u| (u.id, u)).collect();
-        if let Some(account) = view.account {
-            world.accounts.insert(account.player_id, account);
+        Self {
+            enabled: view.enabled,
+            origin: view.origin,
+            units: view.units.into_iter().map(|u| (u.id, u)).collect(),
+            accounts: view.account.into_iter().map(|a| (a.player_id, a)).collect(),
+            shops: view.shops.into_iter().map(|s| (s.id, s)).collect(),
+            producers: view.producers.into_iter().map(|s| (s.id, s)).collect(),
+            deliveries: view.deliveries,
+            roads: view.roads,
+            elapsed_seconds: view.elapsed_seconds,
+            metrics: view.metrics,
+            ..Self::default()
         }
-        world.shops = view.shops.into_iter().map(|s| (s.id, s)).collect();
-        world.producers = view.producers.into_iter().map(|s| (s.id, s)).collect();
-        world.deliveries = view.deliveries;
-        world.roads = view.roads;
-        world.elapsed_seconds = view.elapsed_seconds;
-        world.metrics = view.metrics;
-        world
     }
 }

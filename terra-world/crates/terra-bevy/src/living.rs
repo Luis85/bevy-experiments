@@ -211,10 +211,10 @@ fn ground_initial_population(
         }
     }
     for account in sandbox.state.living.accounts.values() {
-        if let Some(unit) = sandbox.state.living.units.get(&account.active_unit) {
-            if let Some(player) = sandbox.state.players.get_mut(&account.player_id) {
-                player.position = unit.position;
-            }
+        if let Some(unit) = sandbox.state.living.units.get(&account.active_unit)
+            && let Some(player) = sandbox.state.players.get_mut(&account.player_id)
+        {
+            player.position = unit.position;
         }
     }
 }
@@ -368,41 +368,38 @@ fn advance_population(
             .accounts
             .get(&player)
             .is_some_and(|a| a.possessed)
+        && let Some(unit) = sandbox.state.living.active_unit(player).cloned()
     {
-        if let Some(unit) = sandbox.state.living.active_unit(player).cloned() {
-            let speed = motion
-                .velocity_enu_m_s
-                .iter()
-                .map(|v| v * v)
-                .sum::<f64>()
-                .sqrt();
-            let cap = unit.speed_limit_m_s();
-            let velocity = if speed > cap {
-                motion.velocity_enu_m_s.map(|v| v * cap / speed)
-            } else {
-                motion.velocity_enu_m_s
+        let speed = motion
+            .velocity_enu_m_s
+            .iter()
+            .map(|v| v * v)
+            .sum::<f64>()
+            .sqrt();
+        let cap = unit.speed_limit_m_s();
+        let velocity = if speed > cap {
+            motion.velocity_enu_m_s.map(|v| v * cap / speed)
+        } else {
+            motion.velocity_enu_m_s
+        };
+        let mut actor = ActorState {
+            id: unit.id,
+            kind: unit.kind,
+            position: unit.position,
+            velocity_enu_m_s: velocity,
+            heading_deg: motion.heading_deg,
+        };
+        if actor.advance(dt).is_ok() {
+            let (position, velocity) = match resolver(unit.kind, unit.position, actor.position) {
+                Some(position) => (position, velocity),
+                None => (unit.position, [0.; 3]),
             };
-            let mut actor = ActorState {
-                id: unit.id,
-                kind: unit.kind,
-                position: unit.position,
-                velocity_enu_m_s: velocity,
-                heading_deg: motion.heading_deg,
-            };
-            if actor.advance(dt).is_ok() {
-                let (position, velocity) = match resolver(unit.kind, unit.position, actor.position)
-                {
-                    Some(position) => (position, velocity),
-                    None => (unit.position, [0.; 3]),
-                };
-                if let Err(error) = sandbox.state.set_controlled_motion(
-                    player,
-                    position,
-                    velocity,
-                    motion.heading_deg,
-                ) {
-                    diagnostics.last_error = Some(error.to_string());
-                }
+            if let Err(error) =
+                sandbox
+                    .state
+                    .set_controlled_motion(player, position, velocity, motion.heading_deg)
+            {
+                diagnostics.last_error = Some(error.to_string());
             }
         }
     }

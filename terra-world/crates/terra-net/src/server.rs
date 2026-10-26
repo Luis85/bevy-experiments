@@ -449,7 +449,7 @@ impl Server {
                 .filter(|(id, _)| !self.sandbox.players.contains_key(id))
                 .map(|(id, actor)| (*id, actor.clone()))
                 .collect(),
-            clock: self.clock.clone(),
+            clock: self.clock,
             tick: self.tick,
         };
         let bytes = serde_json::to_vec_pretty(&saved)?;
@@ -934,10 +934,10 @@ impl Server {
                         }
                     }
                 }
-                if speed > 0.001 {
-                    if let Some(account) = self.sandbox.living.accounts.get_mut(&actor_id) {
-                        account.possessed = true;
-                    }
+                if speed > 0.001
+                    && let Some(account) = self.sandbox.living.accounts.get_mut(&actor_id)
+                {
+                    account.possessed = true;
                 }
                 if speed > 0.01 {
                     actor.heading_deg = velocity_enu_m_s[0]
@@ -1063,10 +1063,10 @@ impl Server {
     fn fixed_step(&mut self, step: f64) -> usize {
         let mut errors = 0;
         for peer in self.peers.values() {
-            if self.real_seconds - peer.last_movement > INPUT_TIMEOUT_SECONDS {
-                if let Some(actor) = peer.actor_id.and_then(|id| self.actors.get_mut(&id)) {
-                    actor.velocity_enu_m_s = [0.0; 3];
-                }
+            if self.real_seconds - peer.last_movement > INPUT_TIMEOUT_SECONDS
+                && let Some(actor) = peer.actor_id.and_then(|id| self.actors.get_mut(&id))
+            {
+                actor.velocity_enu_m_s = [0.0; 3];
             }
         }
         let mut facility_footprints = self.sandbox.living.facility_footprints();
@@ -1114,29 +1114,29 @@ impl Server {
         }
         self.tick += 1;
         for peer in self.peers.values() {
-            if let Some(actor_id) = peer.actor_id {
-                if let Some(actor) = self.actors.get(&actor_id) {
-                    let result = if self
-                        .sandbox
-                        .living
-                        .accounts
-                        .get(&actor_id)
-                        .is_some_and(|account| account.possessed)
-                    {
-                        self.sandbox.set_controlled_motion(
-                            actor_id,
-                            actor.position,
-                            actor.velocity_enu_m_s,
-                            actor.heading_deg,
-                        )
-                    } else if !self.sandbox.living.enabled {
-                        self.sandbox.set_player_position(actor_id, actor.position)
-                    } else {
-                        Ok(())
-                    };
-                    if result.is_err() {
-                        errors += 1;
-                    }
+            if let Some(actor_id) = peer.actor_id
+                && let Some(actor) = self.actors.get(&actor_id)
+            {
+                let result = if self
+                    .sandbox
+                    .living
+                    .accounts
+                    .get(&actor_id)
+                    .is_some_and(|account| account.possessed)
+                {
+                    self.sandbox.set_controlled_motion(
+                        actor_id,
+                        actor.position,
+                        actor.velocity_enu_m_s,
+                        actor.heading_deg,
+                    )
+                } else if !self.sandbox.living.enabled {
+                    self.sandbox.set_player_position(actor_id, actor.position)
+                } else {
+                    Ok(())
+                };
+                if result.is_err() {
+                    errors += 1;
                 }
             }
         }
@@ -1231,20 +1231,18 @@ impl Server {
             } else {
                 self.config.tick_hz
             };
-            if self.tick.is_multiple_of(u64::from(sandbox_period)) {
-                if let Ok(view) = self.sandbox.snapshot_for(owned_actor, peer.radius_m) {
-                    if peer
-                        .connection
-                        .queue(&ServerMessage::SandboxSnapshot {
-                            tick: self.tick,
-                            view,
-                        })
-                        .and_then(|()| peer.connection.flush())
-                        .is_err()
-                    {
-                        disconnected.push(*client_id);
-                    }
-                }
+            if self.tick.is_multiple_of(u64::from(sandbox_period))
+                && let Ok(view) = self.sandbox.snapshot_for(owned_actor, peer.radius_m)
+                && peer
+                    .connection
+                    .queue(&ServerMessage::SandboxSnapshot {
+                        tick: self.tick,
+                        view,
+                    })
+                    .and_then(|()| peer.connection.flush())
+                    .is_err()
+            {
+                disconnected.push(*client_id);
             }
         }
         for id in disconnected {
@@ -1410,8 +1408,10 @@ mod tests {
 
     #[test]
     fn invalid_configuration_is_reported_before_binding() {
-        let mut config = ServerConfig::default();
-        config.tick_hz = 0;
+        let config = ServerConfig {
+            tick_hz: 0,
+            ..ServerConfig::default()
+        };
         assert!(matches!(
             Server::bind(config),
             Err(NetError::Configuration(_))

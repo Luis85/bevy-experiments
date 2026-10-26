@@ -237,10 +237,10 @@ impl SandboxState {
             .get_mut(&id)
             .ok_or(SandboxError::PlayerMissing)?
             .position = position;
-        if let Some(account) = self.living.accounts.get(&id) {
-            if let Some(unit) = self.living.units.get_mut(&account.active_unit) {
-                unit.position = position;
-            }
+        if let Some(account) = self.living.accounts.get(&id)
+            && let Some(unit) = self.living.units.get_mut(&account.active_unit)
+        {
+            unit.position = position;
         }
         Ok(())
     }

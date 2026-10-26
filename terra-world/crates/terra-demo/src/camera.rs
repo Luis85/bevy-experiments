@@ -218,106 +218,104 @@ fn control_camera(
         }
         return;
     }
-    if control.mode.is_possessed() {
-        if let Some(unit) = control
+    if control.mode.is_possessed()
+        && let Some(unit) = control
             .possessed
             .and_then(|id| sandbox.state.living.units.get(&id))
-        {
-            let entering = rig.last_mode == ControlMode::Rts;
-            rig.last_mode = control.mode;
-            rig.needs_grounding = false;
-            if !ui.editing_gps {
-                if buttons.pressed(MouseButton::Right) && in_view {
-                    rig.yaw -= mouse.delta.x * 0.003;
-                    rig.pitch = (rig.pitch - mouse.delta.y * 0.003).clamp(-1.35, 1.25);
-                }
-                if in_view && control.mode == ControlMode::ThirdPerson {
-                    rig.follow_distance =
-                        (rig.follow_distance - scroll.delta.y * 0.75).clamp(2.5, 14.);
-                }
-                let direction = Vec2::new(
-                    (keys.pressed(KeyCode::KeyD) as u8 as f32)
-                        - (keys.pressed(KeyCode::KeyA) as u8 as f32),
-                    (keys.pressed(KeyCode::KeyS) as u8 as f32)
-                        - (keys.pressed(KeyCode::KeyW) as u8 as f32),
-                );
-                let air = unit.kind.travel_mode() == TravelMode::Air;
-                let vertical = if air {
-                    (keys.pressed(KeyCode::KeyR) as u8 as f32)
-                        - (keys.pressed(KeyCode::KeyF) as u8 as f32)
-                } else {
-                    0.
-                };
-                let sprint = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-                let capability = unit.speed_limit_m_s();
-                let speed = if sprint {
-                    capability
-                } else {
-                    capability
-                        * if unit.kind == ActorKind::Human {
-                            0.60
-                        } else {
-                            0.72
-                        }
-                };
-                let velocity = movement_velocity(direction, rig.yaw, vertical, speed);
-                let accepted = sandbox
-                    .state
-                    .living
-                    .accounts
-                    .get(&sandbox.player_id)
-                    .is_some_and(|a| a.possessed && a.active_unit == unit.id);
-                if accepted {
-                    locomotion.active = true;
-                    locomotion.velocity_enu_m_s = velocity;
-                    locomotion.heading_deg = if velocity[0].hypot(velocity[1]) > 0.001 {
-                        velocity[0].atan2(velocity[1]).to_degrees() as f32
+    {
+        let entering = rig.last_mode == ControlMode::Rts;
+        rig.last_mode = control.mode;
+        rig.needs_grounding = false;
+        if !ui.editing_gps {
+            if buttons.pressed(MouseButton::Right) && in_view {
+                rig.yaw -= mouse.delta.x * 0.003;
+                rig.pitch = (rig.pitch - mouse.delta.y * 0.003).clamp(-1.35, 1.25);
+            }
+            if in_view && control.mode == ControlMode::ThirdPerson {
+                rig.follow_distance = (rig.follow_distance - scroll.delta.y * 0.75).clamp(2.5, 14.);
+            }
+            let direction = Vec2::new(
+                (keys.pressed(KeyCode::KeyD) as u8 as f32)
+                    - (keys.pressed(KeyCode::KeyA) as u8 as f32),
+                (keys.pressed(KeyCode::KeyS) as u8 as f32)
+                    - (keys.pressed(KeyCode::KeyW) as u8 as f32),
+            );
+            let air = unit.kind.travel_mode() == TravelMode::Air;
+            let vertical = if air {
+                (keys.pressed(KeyCode::KeyR) as u8 as f32)
+                    - (keys.pressed(KeyCode::KeyF) as u8 as f32)
+            } else {
+                0.
+            };
+            let sprint = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+            let capability = unit.speed_limit_m_s();
+            let speed = if sprint {
+                capability
+            } else {
+                capability
+                    * if unit.kind == ActorKind::Human {
+                        0.60
                     } else {
-                        -rig.yaw.to_degrees()
-                    };
-                    if let Some(net) = net.as_mut() {
-                        net.desired_velocity_enu_m_s = velocity;
-                        net.follow_player = false;
+                        0.72
                     }
+            };
+            let velocity = movement_velocity(direction, rig.yaw, vertical, speed);
+            let accepted = sandbox
+                .state
+                .living
+                .accounts
+                .get(&sandbox.player_id)
+                .is_some_and(|a| a.possessed && a.active_unit == unit.id);
+            if accepted {
+                locomotion.active = true;
+                locomotion.velocity_enu_m_s = velocity;
+                locomotion.heading_deg = if velocity[0].hypot(velocity[1]) > 0.001 {
+                    velocity[0].atan2(velocity[1]).to_degrees() as f32
+                } else {
+                    -rig.yaw.to_degrees()
+                };
+                if let Some(net) = net.as_mut() {
+                    net.desired_velocity_enu_m_s = velocity;
+                    net.follow_player = false;
                 }
             }
-            let (eye_height, distance) = chase_offsets(unit.kind, rig.follow_distance);
-            let mut eye = unit.position;
-            eye.altitude_m += eye_height as f64;
-            let desired = if control.mode == ControlMode::FirstPerson {
-                eye
-            } else {
-                let rotation = Quat::from_euler(EulerRot::YXZ, rig.yaw, rig.pitch, 0.);
-                let offset = rotation * Vec3::Z * distance + Vec3::Y * 0.55;
-                let position = LocalFrame::new(eye)
-                    .to_geo(offset.to_array().map(|x| x as f64))
-                    .unwrap_or(eye);
-                clear_chase_position(eye, position, &resident, &sandbox)
-            };
-            if entering || rig.position.surface_distance_m(desired) > 150. {
-                rig.position = desired;
-            } else {
-                let frame = LocalFrame::new(rig.position);
-                let delta = frame.to_local(desired);
-                let rate = if control.mode == ControlMode::FirstPerson {
-                    30.
-                } else {
-                    12.
-                };
-                let blend = 1. - (-rate * time.delta_secs_f64().min(0.25)).exp();
-                let blended = frame.to_geo(delta.map(|x| x * blend)).unwrap_or(desired);
-                rig.position = if control.mode == ControlMode::FirstPerson {
-                    blended
-                } else {
-                    clear_chase_position(eye, blended, &resident, &sandbox)
-                };
-            }
-            runtime.focus = GeoPosition {
-                altitude_m: 0.,
-                ..unit.position
-            };
-            return;
         }
+        let (eye_height, distance) = chase_offsets(unit.kind, rig.follow_distance);
+        let mut eye = unit.position;
+        eye.altitude_m += eye_height as f64;
+        let desired = if control.mode == ControlMode::FirstPerson {
+            eye
+        } else {
+            let rotation = Quat::from_euler(EulerRot::YXZ, rig.yaw, rig.pitch, 0.);
+            let offset = rotation * Vec3::Z * distance + Vec3::Y * 0.55;
+            let position = LocalFrame::new(eye)
+                .to_geo(offset.to_array().map(|x| x as f64))
+                .unwrap_or(eye);
+            clear_chase_position(eye, position, &resident, &sandbox)
+        };
+        if entering || rig.position.surface_distance_m(desired) > 150. {
+            rig.position = desired;
+        } else {
+            let frame = LocalFrame::new(rig.position);
+            let delta = frame.to_local(desired);
+            let rate = if control.mode == ControlMode::FirstPerson {
+                30.
+            } else {
+                12.
+            };
+            let blend = 1. - (-rate * time.delta_secs_f64().min(0.25)).exp();
+            let blended = frame.to_geo(delta.map(|x| x * blend)).unwrap_or(desired);
+            rig.position = if control.mode == ControlMode::FirstPerson {
+                blended
+            } else {
+                clear_chase_position(eye, blended, &resident, &sandbox)
+            };
+        }
+        runtime.focus = GeoPosition {
+            altitude_m: 0.,
+            ..unit.position
+        };
+        return;
     }
     rig.last_mode = ControlMode::Rts;
     if let Some(position) = rig.teleport.take() {
@@ -328,11 +326,11 @@ fn control_camera(
             ..position
         };
     }
-    if rig.needs_grounding {
-        if let Some(ground) = resident.terrain_height(rig.position) {
-            rig.position.altitude_m = ground + rig.altitude_offset;
-            rig.needs_grounding = false;
-        }
+    if rig.needs_grounding
+        && let Some(ground) = resident.terrain_height(rig.position)
+    {
+        rig.position.altitude_m = ground + rig.altitude_offset;
+        rig.needs_grounding = false;
     }
     if !ui.editing_gps {
         let rotating = buttons.pressed(MouseButton::Middle)
@@ -387,26 +385,25 @@ fn control_camera(
         }
         // The legacy reference player stays operable when joining a host that
         // explicitly disabled its living layer.
-        if let Some(net) = net.as_mut() {
-            if !sandbox.state.living.enabled {
-                net.desired_velocity_enu_m_s = [
-                    (keys.pressed(KeyCode::ArrowRight) as u8 as f64
-                        - keys.pressed(KeyCode::ArrowLeft) as u8 as f64)
-                        * 5.,
-                    (keys.pressed(KeyCode::ArrowUp) as u8 as f64
-                        - keys.pressed(KeyCode::ArrowDown) as u8 as f64)
-                        * 5.,
-                    0.,
-                ];
-                if net.follow_player {
-                    if let Some(actor) = net.actor_id.and_then(|id| net.actors.get(&id)) {
-                        if let Ok(pos) = LocalFrame::new(actor.position).to_geo([15., 22., 32.]) {
-                            rig.position = pos;
-                            rig.yaw = 0.42;
-                            rig.pitch = -0.52;
-                        }
-                    }
-                }
+        if let Some(net) = net.as_mut()
+            && !sandbox.state.living.enabled
+        {
+            net.desired_velocity_enu_m_s = [
+                (keys.pressed(KeyCode::ArrowRight) as u8 as f64
+                    - keys.pressed(KeyCode::ArrowLeft) as u8 as f64)
+                    * 5.,
+                (keys.pressed(KeyCode::ArrowUp) as u8 as f64
+                    - keys.pressed(KeyCode::ArrowDown) as u8 as f64)
+                    * 5.,
+                0.,
+            ];
+            if net.follow_player
+                && let Some(actor) = net.actor_id.and_then(|id| net.actors.get(&id))
+                && let Ok(pos) = LocalFrame::new(actor.position).to_geo([15., 22., 32.])
+            {
+                rig.position = pos;
+                rig.yaw = 0.42;
+                rig.pitch = -0.52;
             }
         }
     }

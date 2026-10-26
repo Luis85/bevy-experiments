@@ -213,9 +213,9 @@ pub fn procedural_chunk(key: TileKey, resolution: usize, seed: u64) -> WorldChun
                 let depth = 9. + (index % 3) as f64 * 2.;
                 let vc = v + side * (14. + depth * 0.5) / span_z;
                 let levels = 1 + index % 3;
-                let shape = if index % 6 == 0 {
+                let shape = if index.is_multiple_of(6) {
                     "hipped"
-                } else if index % 5 == 0 {
+                } else if index.is_multiple_of(5) {
                     "flat"
                 } else {
                     "gabled"
@@ -233,7 +233,11 @@ pub fn procedural_chunk(key: TileKey, resolution: usize, seed: u64) -> WorldChun
                         ("roof:material", "roof_tiles"),
                         (
                             "building:material",
-                            if index % 4 == 0 { "brick" } else { "plaster" },
+                            if index.is_multiple_of(4) {
+                                "brick"
+                            } else {
+                                "plaster"
+                            },
                         ),
                     ],
                 );

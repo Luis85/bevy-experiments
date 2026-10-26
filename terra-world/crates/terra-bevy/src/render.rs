@@ -225,14 +225,20 @@ fn clear_chunk(
     }
 }
 
+type MeshJob = (u64, u8, Mutex<mpsc::Receiver<BTreeMap<Layer, Mesh>>>);
+
 #[derive(Resource, Default)]
 struct MeshTasks {
     pending: BTreeSet<TileKey>,
-    jobs: BTreeMap<TileKey, (u64, u8, Mutex<mpsc::Receiver<BTreeMap<Layer, Mesh>>>)>,
+    jobs: BTreeMap<TileKey, MeshJob>,
     revision: u64,
     detail_targets: BTreeMap<TileKey, u8>,
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn render_chunks(
     mut commands: Commands,
     mut state: ResMut<RenderState>,
@@ -460,7 +466,7 @@ fn sync_anchors(
     for (actor, mut transform) in &mut actors {
         let scale = transform.scale;
         *transform = geo_transform(actor.0.position, &runtime.frame);
-        transform.rotate_local_y(-(actor.0.heading_deg as f32).to_radians());
+        transform.rotate_local_y(-actor.0.heading_deg.to_radians());
         transform.scale = scale;
     }
     for (layer, mut visibility) in &mut layers {
@@ -836,19 +842,19 @@ fn animate_environment(
             end: local_span * 1.08 / (1. + weather.precipitation_mm_h * 0.15),
         };
     }
-    if let Some(handle) = state.materials.get(&Layer::Vegetation) {
-        if let Some(mut m) = materials.get_mut(handle) {
-            m.base_color = if runtime.config.seasons {
-                match season(&runtime.focus, &runtime.clock) {
-                    Season::Spring => Color::srgb(0.85, 1., 0.82),
-                    Season::Summer => Color::WHITE,
-                    Season::Autumn => Color::srgb(1., 0.73, 0.36),
-                    Season::Winter => Color::srgb(0.86, 0.89, 0.88),
-                }
-            } else {
-                Color::WHITE
-            };
-        }
+    if let Some(handle) = state.materials.get(&Layer::Vegetation)
+        && let Some(mut m) = materials.get_mut(handle)
+    {
+        m.base_color = if runtime.config.seasons {
+            match season(&runtime.focus, &runtime.clock) {
+                Season::Spring => Color::srgb(0.85, 1., 0.82),
+                Season::Summer => Color::WHITE,
+                Season::Autumn => Color::srgb(1., 0.73, 0.36),
+                Season::Winter => Color::srgb(0.86, 0.89, 0.88),
+            }
+        } else {
+            Color::WHITE
+        };
     }
 }
 
@@ -866,7 +872,7 @@ pub fn actor_mesh_variant(kind: ActorKind, variant: u64) -> Mesh {
     ];
     let cloth = jackets[(variant % 4) as usize];
     let dark = [0.19, 0.23, 0.26, 1.];
-    let skin = if variant % 3 == 0 {
+    let skin = if variant.is_multiple_of(3) {
         [0.55, 0.37, 0.25, 1.]
     } else {
         [0.78, 0.60, 0.43, 1.]
@@ -958,7 +964,7 @@ pub fn actor_mesh_variant(kind: ActorKind, variant: u64) -> Mesh {
             }
         }
         ActorKind::Animal => {
-            let fur = if variant % 2 == 0 {
+            let fur = if variant.is_multiple_of(2) {
                 [0.53, 0.36, 0.21, 1.]
             } else {
                 [0.72, 0.68, 0.55, 1.]
@@ -1313,7 +1319,7 @@ pub fn market_mesh(seed: u64) -> Mesh {
                     (n / 3) as f32 * 0.25 - 0.12,
                 ),
                 Vec3::new(0.12, 0.10, 0.12),
-                if (i + seed as usize) % 2 == 0 {
+                if (i + seed as usize).is_multiple_of(2) {
                     [0.77, 0.38, 0.19, 1.]
                 } else {
                     [0.59, 0.65, 0.26, 1.]

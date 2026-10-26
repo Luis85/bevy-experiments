@@ -140,6 +140,10 @@ fn shortcuts(keys: Res<ButtonInput<KeyCode>>, ui: Res<UiState>, mut queue: ResMu
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn actions(
     mut queue: ResMut<UiQueue>,
     mut ui: ResMut<UiState>,
@@ -180,8 +184,8 @@ fn actions(
             .map(|p| p.position)
             .unwrap_or(runtime.focus);
         let command=match action{
-            Action::ToggleWorld=>{ui.world_panel=!ui.world_panel;None},
-            Action::ToggleInspector=>{ui.context_panel=!ui.context_panel;None},
+            Action::ToggleWorld=>{ui.world_panel= !ui.world_panel;None},
+            Action::ToggleInspector=>{ui.context_panel= !ui.context_panel;None},
             Action::Panel(panel)=>{ui.panel=panel;ui.context_panel=true;None},
             Action::Mode(mode)=>{politics.atlas=false;placement.0=None;control_queue.0.push_back(ControlIntent::SetMode(mode));None},
             Action::Possess=>{politics.atlas=false;placement.0=None;control_queue.0.push_back(ControlIntent::PossessSelected);None},
@@ -229,7 +233,7 @@ fn actions(
                 }
             },
             Action::Toggle(layer)=>{let enabled=runtime.config.layers.contains(layer);runtime.config.layers.set(layer,!enabled);None},
-            Action::Pause=>{if !runtime.network_authority{runtime.clock.paused=!runtime.clock.paused;}None},
+            Action::Pause=>{if !runtime.network_authority{runtime.clock.paused= !runtime.clock.paused;}None},
             Action::Speed=>{if !runtime.network_authority{runtime.clock.time_scale=if runtime.clock.time_scale<10.{60.}else if runtime.clock.time_scale<100.{600.}else{1.};}None},
             Action::Noon=>{if !runtime.network_authority{runtime.clock.unix_seconds=(runtime.clock.unix_seconds/86400.).floor()*86400.+((12.-runtime.focus.longitude/15.).rem_euclid(24.))*3600.;}else{sandbox.last_message="The server controls the calendar in multiplayer.".into();}None},
             Action::Season=>{if !runtime.network_authority{runtime.clock.unix_seconds+=91.*86400.;}None},
@@ -254,15 +258,15 @@ fn actions(
                 let plot=sandbox.state.plots.values().filter(|p|p.owner==player_id&&p.faction_owner.is_none()).min_by(|a,b|a.center.surface_distance_m(position).total_cmp(&b.center.surface_distance_m(position)));
                 if let(Some(plot),Some(faction_id))=(plot,selected_faction){Some(Command::TransferPlotToFaction{plot_id:plot.id,faction_id})}else{sandbox.last_message="Select your faction and claim a personal plot first.".into();None}
             },
-            Action::Atlas=>{politics.atlas=!politics.atlas;placement.0=None;None},
+            Action::Atlas=>{politics.atlas= !politics.atlas;placement.0=None;None},
             Action::FitAtlas=>{sandbox.last_message=if politics.fit_at_epoch(runtime.clock.unix_seconds as i64){"Atlas framed to geometry valid at the simulation date.".into()}else{"No political geometry is valid at this date.".into()};None},
-            Action::Borders=>{politics.borders=!politics.borders;None},
+            Action::Borders=>{politics.borders= !politics.borders;None},
             Action::FlyToSelection=>{if let Some(p)=politics.selected{control_queue.0.push_back(ControlIntent::Release);rig.teleport=Some(p);rig.altitude_offset=650.;politics.atlas=false;ui.location="Selected atlas location".into();if let Some(net)=net.as_mut(){net.follow_player=false;}}else{sandbox.last_message="Click a location in the political atlas first.".into();}None},
             Action::DrawTerritory=>{if runtime.network_authority{sandbox.last_message="Draw scenario territories in a local session, export, then configure every peer with that dataset.".into();}else if politics.dataset.is_none(){sandbox.last_message="Load a political GeoJSON dataset before drawing territories.".into();}else{politics.atlas=true;politics.drawing=true;politics.draft.clear();placement.0=None;sandbox.last_message="Click territory vertices. Enter closes the boundary; Esc cancels. This is an authored scenario layer.".into();}None},
             Action::ExportPolitics=>{let path=runtime.config.save_path.with_extension("politics.geojson");sandbox.last_message=politics.export(&path).map(|_|format!("Exported {}",path.display())).unwrap_or_else(|e|format!("Export failed: {e}"));None},
             Action::Save=>{commands.0.push_back(SandboxIntent::Save);None},Action::Load=>{commands.0.push_back(SandboxIntent::Load);None},
             Action::Follow=>{politics.atlas=false;placement.0=None;control_queue.0.push_back(ControlIntent::FocusSelection);None},
-            Action::Overview=>{politics.atlas=false;control_queue.0.push_back(ControlIntent::Release);rig.position=LocalFrame::new(position).to_geo([200.,650.,650.]).unwrap_or(position);rig.yaw=-0.28;rig.pitch=-0.65;rig.needs_grounding=false;if let Some(net)=net.as_mut(){net.follow_player=false;}None},
+            Action::Overview=>{politics.atlas=false;control_queue.0.push_back(ControlIntent::Release);rig.position=LocalFrame::new(position).to_geo([200.,650.,650.]).unwrap_or(position);rig.yaw= -0.28;rig.pitch= -0.65;rig.needs_grounding=false;if let Some(net)=net.as_mut(){net.follow_player=false;}None},
         };
         if let Some(command) = command {
             commands.0.push_back(SandboxIntent::Command(command));
@@ -286,26 +290,30 @@ pub(crate) fn pick_ground(
     let mut previous = 0.;
     for i in 1..=500 {
         let distance = i as f32 * 20.;
-        if let Some((_, height)) = at(distance) {
-            if height <= 0. {
-                let mut low = previous;
-                let mut high = distance;
-                for _ in 0..14 {
-                    let mid = (low + high) * 0.5;
-                    if at(mid).is_some_and(|(_, h)| h > 0.) {
-                        low = mid;
-                    } else {
-                        high = mid;
-                    }
+        if let Some((_, height)) = at(distance)
+            && height <= 0.
+        {
+            let mut low = previous;
+            let mut high = distance;
+            for _ in 0..14 {
+                let mid = (low + high) * 0.5;
+                if at(mid).is_some_and(|(_, h)| h > 0.) {
+                    low = mid;
+                } else {
+                    high = mid;
                 }
-                return at((low + high) * 0.5).and_then(|(p, _)| ground_at(resident, p));
             }
+            return at((low + high) * 0.5).and_then(|(p, _)| ground_at(resident, p));
         }
         previous = distance;
     }
     None
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn place_on_ground(
     mut placement: ResMut<Placement>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -399,6 +407,10 @@ fn place_on_ground(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn verification(
     mut frames: Local<u64>,
     mut exercised: Local<bool>,
@@ -509,13 +521,12 @@ fn verification(
         && render.chunks >= expected
         && render.pending_meshes == 0
         && render.building_meshes == 0
+        && let Some(path) = &options.screenshot
     {
-        if let Some(path) = &options.screenshot {
-            commands
-                .spawn(Screenshot::primary_window())
-                .observe(save_to_disk(path.clone()));
-            *captured = true;
-        }
+        commands
+            .spawn(Screenshot::primary_window())
+            .observe(save_to_disk(path.clone()));
+        *captured = true;
     }
     if options.exit_frames.is_some_and(|f| *frames >= f) {
         println!(
@@ -535,6 +546,10 @@ fn verification(
     }
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn atlas_interaction(
     window: Single<&Window>,
     camera: Single<(&Camera, &GlobalTransform), With<ExplorerCamera>>,
@@ -591,7 +606,7 @@ fn atlas_interaction(
         return;
     };
     politics.hover = format!(
-        "{:.3}°, {:.3}° · {}",
+        "{:.3}Â°, {:.3}Â° Â· {}",
         position.latitude,
         position.longitude,
         politics.describe(position, &runtime.clock)
@@ -606,7 +621,7 @@ fn atlas_interaction(
             }
         } else {
             sandbox.last_message = format!(
-                "Selected {:.3}°, {:.3}°. Use ‘Fly to selected map location’ to explore here.",
+                "Selected {:.3}Â°, {:.3}Â°. Use â€˜Fly to selected map locationâ€™ to explore here.",
                 position.latitude, position.longitude
             );
         }

@@ -693,6 +693,10 @@ fn setup_ui(mut commands: Commands) {
     }
 }
 
+#[expect(
+    clippy::type_complexity,
+    reason = "the Bevy query groups the UI layout components"
+)]
 fn sync_layout(
     ui: Res<UiState>,
     politics: Res<PoliticalWorld>,
@@ -830,6 +834,10 @@ fn local_only(action: Action) -> bool {
             | Action::DrawTerritory
     )
 }
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn button_availability(
     mut commands: Commands,
     runtime: Res<WorldRuntime>,
@@ -934,6 +942,10 @@ fn button_availability(
         }
     }
 }
+#[expect(
+    clippy::type_complexity,
+    reason = "the Bevy query groups the button styling components"
+)]
 fn button_style(
     ui: Res<UiState>,
     control: Res<PlayerControl>,
@@ -1161,6 +1173,10 @@ fn inventory_line(items: &terra_bevy::rules::Inventory) -> String {
         .collect::<Vec<_>>()
         .join(" · ")
 }
+#[expect(
+    clippy::too_many_arguments,
+    reason = "Bevy injects each ECS system parameter"
+)]
 fn update_labels(
     runtime: Res<WorldRuntime>,
     resident: Res<ResidentChunks>,

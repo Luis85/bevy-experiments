@@ -37,7 +37,13 @@ foreach ($name in $projects) {
     Write-Host "`n=== $name : $Task ==="
     Push-Location (Join-Path $repoRoot $name)
     try {
-        $testArgs = @('test', '--locked', '--workspace')
+        $workspaceArgs = @('--workspace')
+        if ($name -eq 'bevy-rts') {
+            # Historical API probes are outside Frontline's default members and
+            # ordinary gate. Verify the maintained game/tooling packages here.
+            $workspaceArgs += @('--exclude', 'probe_dynlink', '--exclude', 'probe_remote')
+        }
+        $testArgs = @('test', '--locked') + $workspaceArgs
         if ($name -eq 'bevy-rts' -and -not $IncludeDeviceTests) {
             # Match Frontline's ordinary gate: device/BRP and long milestone
             # tests are separate, explicit local verification.
@@ -56,12 +62,12 @@ foreach ($name in $projects) {
                 Write-Host "$($workspace.workspace_members.Count) workspace members; target: $($workspace.target_directory)"
             }
             'fmt' { Invoke-Cargo @('fmt', '--all', '--', '--check') }
-            'check' { Invoke-Cargo @('check', '--locked', '--workspace', '--all-targets') }
+            'check' { Invoke-Cargo (@('check', '--locked') + $workspaceArgs + @('--all-targets')) }
             'test' { Invoke-Cargo $testArgs }
-            'clippy' { Invoke-Cargo @('clippy', '--locked', '--workspace', '--all-targets', '--', '-D', 'warnings') }
+            'clippy' { Invoke-Cargo (@('clippy', '--locked') + $workspaceArgs + @('--all-targets', '--', '-D', 'warnings')) }
             'verify' {
                 Invoke-Cargo @('fmt', '--all', '--', '--check')
-                Invoke-Cargo @('clippy', '--locked', '--workspace', '--all-targets', '--', '-D', 'warnings')
+                Invoke-Cargo (@('clippy', '--locked') + $workspaceArgs + @('--all-targets', '--', '-D', 'warnings'))
                 Invoke-Cargo $testArgs
             }
         }

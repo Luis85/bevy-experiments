@@ -140,21 +140,26 @@ fn authored_road_mesh(road: &RoadRoute, resident: &ResidentChunks) -> Option<Mes
                 continue;
             };
             mesh.quad(l0, l1, r1, r0, [0.29, 0.30, 0.29, 1.]);
-            if i % 2 == 0 {
-                if let (Some(c0), Some(c1), Some(c2), Some(c3)) = (
+            if i % 2 == 0
+                && let (Some(c0), Some(c1), Some(c2), Some(c3)) = (
                     sample(start + normal * 0.07, 0.13),
                     sample(start.lerp(end, 0.62) + normal * 0.07, 0.13),
                     sample(start.lerp(end, 0.62) - normal * 0.07, 0.13),
                     sample(start - normal * 0.07, 0.13),
-                ) {
-                    mesh.quad(c0, c1, c2, c3, [0.86, 0.81, 0.59, 1.]);
-                }
+                )
+            {
+                mesh.quad(c0, c1, c2, c3, [0.86, 0.81, 0.59, 1.]);
             }
         }
     }
     mesh.finish()
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    clippy::type_complexity,
+    reason = "Bevy injects system parameters and the query groups each visual's mutable components"
+)]
 fn sync_living_visuals(
     mut commands: Commands,
     time: Res<Time>,
@@ -314,11 +319,11 @@ fn sync_living_visuals(
             continue;
         };
         alive.insert(*key);
-        if *mesh_key != target.mesh {
-            if let Some(handle) = assets.meshes.get(&target.mesh) {
-                mesh.0 = handle.clone();
-                *mesh_key = target.mesh.clone();
-            }
+        if *mesh_key != target.mesh
+            && let Some(handle) = assets.meshes.get(&target.mesh)
+        {
+            mesh.0 = handle.clone();
+            *mesh_key = target.mesh.clone();
         }
         let is_actor = matches!(target.mesh, MeshKey::Actor(..));
         if is_actor && pose.position.surface_distance_m(target.position) < 80. {
@@ -335,9 +340,7 @@ fn sync_living_visuals(
         }
         *transform = geo_transform(pose.position, &runtime.frame);
         transform.rotate_local_y(-pose.heading.to_radians());
-        if target.moving
-            && !runtime.clock.paused
-            && matches!(target.mesh, MeshKey::Actor(0 | 1 | 2, _))
+        if target.moving && !runtime.clock.paused && matches!(target.mesh, MeshKey::Actor(0..=2, _))
         {
             let id = match key {
                 VisualKey::Unit(id) | VisualKey::Legacy(id) => *id,

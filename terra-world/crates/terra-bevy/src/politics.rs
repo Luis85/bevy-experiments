@@ -341,6 +341,10 @@ mod drawing {
         };
         Some((at(low), at(high)))
     }
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Bevy injects each ECS system parameter"
+    )]
     pub fn render_atlas(
         mut commands: Commands,
         politics: Res<PoliticalWorld>,
@@ -382,61 +386,57 @@ mod drawing {
                     Color::srgb(1., 0.73, 0.35),
                 );
             }
-        } else if politics.borders {
-            if let Some(data) = &politics.dataset {
-                if let Ok(features) = data.visible(
-                    terra_core::GeoBounds {
-                        south: (runtime.focus.latitude - 0.1).max(-90.),
-                        north: (runtime.focus.latitude + 0.1).min(90.),
-                        west: terra_core::normalize_longitude(runtime.focus.longitude - 0.2),
-                        east: terra_core::normalize_longitude(runtime.focus.longitude + 0.2),
-                    },
-                    epoch,
-                ) {
-                    for feature in features {
-                        for polygon in &feature.polygons {
-                            for ring in &polygon.rings {
-                                for pair in ring.windows(2) {
-                                    let Some((from, to)) =
-                                        clip_local_border(pair[0], pair[1], runtime.focus)
-                                    else {
-                                        continue;
-                                    };
-                                    let steps =
-                                        (from.surface_distance_m(to) / 100.).ceil().clamp(1., 64.)
-                                            as usize;
-                                    let lon_delta = terra_core::normalize_longitude(
-                                        to.longitude - from.longitude,
+        } else if politics.borders
+            && let Some(data) = &politics.dataset
+            && let Ok(features) = data.visible(
+                terra_core::GeoBounds {
+                    south: (runtime.focus.latitude - 0.1).max(-90.),
+                    north: (runtime.focus.latitude + 0.1).min(90.),
+                    west: terra_core::normalize_longitude(runtime.focus.longitude - 0.2),
+                    east: terra_core::normalize_longitude(runtime.focus.longitude + 0.2),
+                },
+                epoch,
+            )
+        {
+            for feature in features {
+                for polygon in &feature.polygons {
+                    for ring in &polygon.rings {
+                        for pair in ring.windows(2) {
+                            let Some((from, to)) =
+                                clip_local_border(pair[0], pair[1], runtime.focus)
+                            else {
+                                continue;
+                            };
+                            let steps =
+                                (from.surface_distance_m(to) / 100.).ceil().clamp(1., 64.) as usize;
+                            let lon_delta =
+                                terra_core::normalize_longitude(to.longitude - from.longitude);
+                            let mut previous: Option<Vec3> = None;
+                            for index in 0..=steps {
+                                let t = index as f64 / steps as f64;
+                                let p = GeoPosition {
+                                    latitude: from.latitude + (to.latitude - from.latitude) * t,
+                                    longitude: terra_core::normalize_longitude(
+                                        from.longitude + lon_delta * t,
+                                    ),
+                                    altitude_m: 0.,
+                                };
+                                if let Some(height) = resident.terrain_height(p) {
+                                    let q = Vec3::from_array(
+                                        runtime
+                                            .frame
+                                            .to_local(GeoPosition {
+                                                altitude_m: height + 2.,
+                                                ..p
+                                            })
+                                            .map(|v| v as f32),
                                     );
-                                    let mut previous: Option<Vec3> = None;
-                                    for index in 0..=steps {
-                                        let t = index as f64 / steps as f64;
-                                        let p = GeoPosition {
-                                            latitude: from.latitude
-                                                + (to.latitude - from.latitude) * t,
-                                            longitude: terra_core::normalize_longitude(
-                                                from.longitude + lon_delta * t,
-                                            ),
-                                            altitude_m: 0.,
-                                        };
-                                        if let Some(height) = resident.terrain_height(p) {
-                                            let q = Vec3::from_array(
-                                                runtime
-                                                    .frame
-                                                    .to_local(GeoPosition {
-                                                        altitude_m: height + 2.,
-                                                        ..p
-                                                    })
-                                                    .map(|v| v as f32),
-                                            );
-                                            if let Some(old) = previous {
-                                                gizmos.line(old, q, Color::srgb(0.95, 0.76, 0.32));
-                                            }
-                                            previous = Some(q);
-                                        } else {
-                                            previous = None;
-                                        }
+                                    if let Some(old) = previous {
+                                        gizmos.line(old, q, Color::srgb(0.95, 0.76, 0.32));
                                     }
+                                    previous = Some(q);
+                                } else {
+                                    previous = None;
                                 }
                             }
                         }
@@ -487,37 +487,31 @@ mod drawing {
                 [0.13, 0.23, 0.25, 1.],
             );
         }
-        if let Some(data) = &politics.dataset {
-            if data.contains_time(epoch) {
-                for feature in &data.features {
-                    if !terra_history::valid_at(
-                        epoch,
-                        feature.valid_from_unix,
-                        feature.valid_until_unix,
-                    ) {
-                        continue;
-                    }
-                    let color = if feature.faction_id.is_some() {
-                        [0.58, 0.88, 0.43, 1.]
-                    } else if feature.kind == PoliticalKind::DisputedArea
-                        || feature.status.to_lowercase().contains("disput")
-                    {
-                        [0.95, 0.64, 0.31, 1.]
-                    } else {
-                        [0.51, 0.77, 0.74, 1.]
-                    };
-                    for polygon in &feature.polygons {
-                        for ring in &polygon.rings {
-                            for pair in ring.windows(2) {
-                                if (pair[0].longitude - pair[1].longitude).abs() < 180. {
-                                    line(
-                                        &mut builder,
-                                        map(pair[0]),
-                                        map(pair[1]),
-                                        0.65 / zoom,
-                                        color,
-                                    );
-                                }
+        if let Some(data) = &politics.dataset
+            && data.contains_time(epoch)
+        {
+            for feature in &data.features {
+                if !terra_history::valid_at(
+                    epoch,
+                    feature.valid_from_unix,
+                    feature.valid_until_unix,
+                ) {
+                    continue;
+                }
+                let color = if feature.faction_id.is_some() {
+                    [0.58, 0.88, 0.43, 1.]
+                } else if feature.kind == PoliticalKind::DisputedArea
+                    || feature.status.to_lowercase().contains("disput")
+                {
+                    [0.95, 0.64, 0.31, 1.]
+                } else {
+                    [0.51, 0.77, 0.74, 1.]
+                };
+                for polygon in &feature.polygons {
+                    for ring in &polygon.rings {
+                        for pair in ring.windows(2) {
+                            if (pair[0].longitude - pair[1].longitude).abs() < 180. {
+                                line(&mut builder, map(pair[0]), map(pair[1]), 0.65 / zoom, color);
                             }
                         }
                     }

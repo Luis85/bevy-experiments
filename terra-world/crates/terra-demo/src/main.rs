@@ -202,13 +202,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     if options.exit_frames.is_some_and(|n| n < 100) {
         return Err("--frames must be at least 100 to allow initial rendering".into());
     }
-    if let Some(path) = &options.screenshot {
-        if let Some(parent) = std::path::Path::new(path)
+    if let Some(path) = &options.screenshot
+        && let Some(parent) = std::path::Path::new(path)
             .parent()
             .filter(|p| !p.as_os_str().is_empty())
-        {
-            std::fs::create_dir_all(parent)?;
-        }
+    {
+        std::fs::create_dir_all(parent)?;
     }
     if options.connect.is_some()
         && (config.live_data || config.heightmap_manifest.is_some() || options.smoke)

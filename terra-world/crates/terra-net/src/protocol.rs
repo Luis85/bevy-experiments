@@ -90,6 +90,10 @@ pub enum ClientMessage {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case", deny_unknown_fields)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "the bounded snapshot stays inline to preserve the public message construction API"
+)]
 pub enum ServerMessage {
     Welcome {
         protocol: u16,

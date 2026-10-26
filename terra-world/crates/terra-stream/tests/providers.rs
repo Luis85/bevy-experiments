@@ -5,6 +5,10 @@ use terra_stream::{
 };
 
 #[test]
+#[expect(
+    clippy::excessive_precision,
+    reason = "retain the exact decoded Terrarium reference value in the assertion"
+)]
 fn documented_terrarium_encoding_decodes_exactly() {
     assert_eq!(decode_terrarium_pixel([128, 0, 0]), 0.0);
     assert_eq!(decode_terrarium_pixel([137, 219, 68]), 2523.265625);
