@@ -122,6 +122,11 @@ impl ExplorerContext {
             return Err("explorer context memory requires a positive stagger and capacity".into());
         }
         app.insert_resource(self.memory.to_config());
+        if let Some(world) = &self.world {
+            app.insert_resource(npc_framework::agent_io::map::MapEnabled(
+                world.preset.systems.map,
+            ));
+        }
         apply_senses(
             app,
             &self.actor,

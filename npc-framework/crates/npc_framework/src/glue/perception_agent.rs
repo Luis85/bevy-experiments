@@ -210,6 +210,14 @@ pub fn perceived_or_remembered(world: &World, ctx: &AgentCtx) -> Option<Vec<SimI
     Some(out)
 }
 
+pub fn remembered_position(world: &World, ctx: &AgentCtx, thing: SimId) -> Option<SimPos> {
+    world
+        .get::<PerceptionMemory>(ctx.entity)?
+        .percepts
+        .get(&thing)
+        .map(|percept| percept.pos)
+}
+
 /// The `perception` section of `ctx.unit` (see the module docs).
 pub fn perception_section(world: &World, ctx: &AgentCtx) -> Option<Section> {
     let clock = inspect::clock(world);
@@ -619,7 +627,8 @@ impl Plugin for PerceptionAgentPlugin {
             .register_perception(LIDAR_SECTION, lidar_section)
             .register_perception(CAMERA_SECTION, camera_section)
             .register_perception(RADAR_SECTION, radar_section)
-            .register_known(PERCEPTION_SECTION, perceived_or_remembered);
+            .register_known(PERCEPTION_SECTION, perceived_or_remembered)
+            .register_thing_position(PERCEPTION_SECTION, remembered_position);
     }
 }
 

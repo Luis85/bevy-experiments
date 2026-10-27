@@ -734,6 +734,7 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                 ("vehicles", "Vehicles"),
                 ("locked_doors", "Locked doors"),
                 ("progression", "Progression"),
+                ("map", "Map landmarks"),
             ]
             .iter()
             .enumerate()
@@ -745,7 +746,7 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                 d,
                 "inhabitants.workers",
                 "Worker inhabitants (0..8)",
-                204,
+                205,
                 false,
             );
             field(
@@ -753,7 +754,7 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                 d,
                 "inhabitants.skeletons",
                 "Skeleton inhabitants (0..8)",
-                205,
+                206,
                 false,
             );
         }

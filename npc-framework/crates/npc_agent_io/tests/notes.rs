@@ -52,6 +52,214 @@ fn title_change(title: &str) -> NoteChange {
     }
 }
 
+#[test]
+fn id_exhaustion_is_checked_for_add_adoption_and_legacy_migrations() {
+    let d = folder("id-exhaustion");
+    let mut store = NotesStore::open(&d).unwrap();
+    store
+        .add(Book::Memory, Writer::Agent, new("Max", "body"), at(1))
+        .unwrap();
+    let path = d.join("memory/Max.md");
+    let text = read(&path).replace("id: 1", "id: 4294967295");
+    std::fs::write(&path, &text).unwrap();
+    let mut store = NotesStore::open(&d).unwrap();
+    assert!(matches!(
+        store.add(Book::Memory, Writer::Agent, new("Next", "body"), at(2)),
+        Err(NotesError::Exhausted(_))
+    ));
+    assert_eq!(read(&path), text);
+    std::fs::write(
+        d.join("memory/Adopt.md"),
+        "---\ntype: memory\ntitle: Adopt\n---\nbody\n",
+    )
+    .unwrap();
+    assert!(matches!(
+        NotesStore::open(&d),
+        Err(NotesError::Exhausted(_))
+    ));
+    assert!(!read(&d.join("memory/Adopt.md")).contains("id:"));
+    for (tag, text) in [
+        (
+            "legacy-reassign",
+            "## Max\n<!-- note id=4294967295 created=1@d updated=1@d -->\nbody\n## No id\nbody\n",
+        ),
+        (
+            "legacy-stray",
+            "preface\n## Max\n<!-- note id=4294967295 created=1@d updated=1@d -->\nbody\n",
+        ),
+    ] {
+        let d = folder(tag);
+        std::fs::write(d.join("diary.md"), text).unwrap();
+        assert!(matches!(
+            NotesStore::open(&d),
+            Err(NotesError::Exhausted(_))
+        ));
+        assert_eq!(read(&d.join("diary.md")), text);
+        assert!(!d.join("diary.md.bak").exists());
+    }
+    let d = folder("old-proposal-exhaustion");
+    std::fs::create_dir_all(d.join("proposals")).unwrap();
+    std::fs::write(
+        d.join("proposals/a.md"),
+        "id: 4294967295\ntitle: Max\n\nbody\n",
+    )
+    .unwrap();
+    std::fs::write(d.join("proposals/b.md"), "title: No id\n\nbody\n").unwrap();
+    assert!(matches!(
+        NotesStore::open(&d),
+        Err(NotesError::Exhausted(_))
+    ));
+    assert!(read(&d.join("proposals/a.md")).starts_with("id:"));
+}
+
+#[test]
+fn revision_exhaustion_rejects_repeated_writes_without_losing_the_hand_edit() {
+    let d = folder("revision-exhaustion");
+    let mut store = NotesStore::open(&d).unwrap();
+    store
+        .add(Book::Memory, Writer::Agent, new("Max", "old"), at(1))
+        .unwrap();
+    let path = d.join("memory/Max.md");
+    let text = read(&path).replace("revision: 1", "revision: 4294967295");
+    std::fs::write(&path, &text).unwrap();
+    let mut store = NotesStore::open(&d).unwrap();
+    let mark = store.list(Book::Memory).unwrap().remove(0);
+    for _ in 0..2 {
+        assert!(matches!(
+            store.update(
+                Book::Memory,
+                Writer::Agent,
+                mark.id,
+                &mark.updated,
+                body_change("new"),
+                at(1)
+            ),
+            Err(NotesError::Exhausted(_))
+        ));
+        assert_eq!(read(&path), text);
+    }
+    let edited = text.replace("old", "NEW");
+    std::fs::write(&path, &edited).unwrap();
+    for _ in 0..2 {
+        assert!(matches!(
+            store.list(Book::Memory),
+            Err(NotesError::Exhausted(_))
+        ));
+        assert_eq!(read(&path), edited);
+    }
+}
+
+#[test]
+fn byte_digest_detects_hand_edits_with_unchanged_size_and_mtime() {
+    let d = folder("same-metadata-edit");
+    let mut store = NotesStore::open(&d).unwrap();
+    let note = store
+        .add(Book::Memory, Writer::Agent, new("Place", "old"), at(1))
+        .unwrap();
+    let path = d.join("memory/Place.md");
+    let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+    let text = read(&path).replace("old", "NEW");
+    std::fs::write(&path, text).unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(modified))
+        .unwrap();
+    let notes = store.list(Book::Memory).unwrap();
+    assert_eq!(notes[0].body, "NEW");
+    assert_ne!(notes[0].updated, note.updated);
+}
+
+#[cfg(windows)]
+#[test]
+fn rename_retry_keeps_a_concurrently_edited_old_source() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let d = folder("rename-source-edit");
+    let mut store = NotesStore::open(&d).unwrap();
+    let note = store
+        .add(Book::Memory, Writer::Agent, new("Old", "old"), at(1))
+        .unwrap();
+    let path = d.join("memory/Old.md");
+    let held = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(3)
+        .open(&path)
+        .unwrap();
+    store
+        .update(
+            Book::Memory,
+            Writer::Agent,
+            note.id,
+            &note.updated,
+            title_change("New"),
+            at(2),
+        )
+        .unwrap();
+    assert!(path.exists());
+    let time = std::fs::metadata(&path).unwrap().modified().unwrap();
+    let edited = read(&path).replace("old", "NEW");
+    std::fs::write(&path, &edited).unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(time))
+        .unwrap();
+    drop(held);
+    store.list(Book::Memory).unwrap();
+    assert_eq!(read(&path), edited);
+    assert!(d.join("memory/New.md").exists());
+    assert!(
+        store
+            .unreadable(Book::Memory)
+            .iter()
+            .any(|f| f.file == "memory/Old.md")
+    );
+}
+
+#[cfg(windows)]
+#[test]
+fn proposal_migration_cleanup_does_not_delete_a_later_source_edit() {
+    use std::os::windows::fs::OpenOptionsExt;
+    for already_migrated in [false, true] {
+        let d = folder(if already_migrated {
+            "migration-retry-done"
+        } else {
+            "migration-retry-new"
+        });
+        if already_migrated {
+            NotesStore::open(&d)
+                .unwrap()
+                .add(Book::Proposals, Writer::Agent, new("Old", "old"), at(1))
+                .unwrap();
+        }
+        std::fs::create_dir_all(d.join("proposals")).unwrap();
+        let path = d.join("proposals/001-Old.md");
+        let original = format!("title: Old\nwritten: tick 1, {}\n\nold\n", at(1).date);
+        std::fs::write(&path, &original).unwrap();
+        let held = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(3)
+            .open(&path)
+            .unwrap();
+        let mut store = NotesStore::open(&d).unwrap();
+        assert!(path.exists());
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+        std::fs::write(&path, original.replace("old", "NEW")).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(modified))
+            .unwrap();
+        drop(held);
+        let notes = store.list(Book::Proposals).unwrap();
+        assert!(notes.iter().any(|n| n.body == "old"));
+        assert!(notes.iter().any(|n| n.body == "NEW"), "{notes:?}");
+    }
+}
+
 fn read(p: &Path) -> String {
     String::from_utf8(std::fs::read(p).unwrap()).unwrap()
 }

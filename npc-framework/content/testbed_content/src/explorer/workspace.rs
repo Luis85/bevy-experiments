@@ -249,6 +249,7 @@ pub fn render_agents_md(v: &WorkspaceVars) -> String {
         ("AGENT_ID", v.identity.agent_id.clone()),
         ("TOKEN", v.identity.token.clone()),
         ("WORLD_RULES", render_world_rules(&v.world)),
+        ("MAP_GUIDE",if v.world.systems.map {"## Your map\n\nKeep places worth returning to with `map_add`: use `place: \"here\"`, a sensed or remembered `thing`, or an explicit `pos`. The landmark stays at that position. Read your landmarks with `map_list`; rename, move or annotate one with `map_update`, passing the exact updated stamp you read. Walk back using an `order` with `{\"type\":\"Move\",\"landmark\":N}` through the MCP action tools. Your observations show the five nearest landmarks. Keep descriptions useful to a later you.\n".into()}else{String::new()}),
         (
             "MEMORY_NOTE",
             if v.world.perception.forget_after_ticks == 1200 {
@@ -481,6 +482,7 @@ mod tests {
                 npcctl: PathBuf::from(npcctl),
                 dir: dir.to_path_buf(),
                 npcctl_missing: false,
+                map_enabled: true,
             },
             actor: ActorSummary::human_scout(),
             world: crate::worlds::plain_preset(),
@@ -875,6 +877,35 @@ mod tests {
             "memory span"
         );
         assert!(md.contains("Keep lasting knowledge in your notebooks"));
+    }
+
+    #[test]
+    fn agents_md_teaches_only_available_map_tools_and_respects_world_switch() {
+        let mut v = vars();
+        let on = render_agents_md(&v);
+        for text in [
+            "## Your map",
+            "`map_list`",
+            "`map_add`",
+            "`map_update`",
+            "sensed or remembered",
+            "\"landmark\":N",
+        ] {
+            assert!(on.contains(text), "missing {text}");
+        }
+        assert!(!on.contains("npcctl") && !on.contains("http://") && !on.contains("controller"));
+        v.world.systems.map = false;
+        v.prompt.map_enabled = false;
+        let off = render_agents_md(&v);
+        for text in [
+            "## Your map",
+            "map_list",
+            "map_add",
+            "map_update",
+            "landmark",
+        ] {
+            assert!(!off.contains(text), "disabled map: {text}");
+        }
     }
 
     #[test]

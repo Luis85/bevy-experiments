@@ -8,6 +8,15 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Added (landmarks, plan Tasks 21–23)
+
+- Actors keep an owned map of fixed landmarks: agent/player list/add/update methods, session-bound MCP tools
+  and developer CLI commands. Positions can come from here, perception memory or explicit coordinates.
+- Observe includes the five nearest landmarks. Move orders can target a landmark; recorded inputs resolve to
+  positions and replay without map files. The world map switch defaults on and can disable the feature.
+- F7 has a Map tab with stale-save protection; noninteractive landmark labels remain visible through fog.
+  The shared notes/map store detects byte changes, guards source deletion and reports exhausted IDs/revisions.
+
 ### Added (world presets, plan Tasks 15–17)
 
 - World presets configure needs, battery, day/night sensing, detection, perception memory, systems and

@@ -40,6 +40,7 @@ mod explorer_modal;
 mod explorer_panel;
 mod field_clipboard;
 mod fog;
+mod landmarks;
 mod model_preview;
 mod overlay;
 mod panels;
@@ -116,6 +117,7 @@ impl Plugin for TestbedViewPlugin {
             overlay::plugin,
             panels::plugin,
             explorer_panel::plugin,
+            landmarks::plugin,
             command::plugin,
             fog::plugin,
         ))

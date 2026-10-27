@@ -19,7 +19,7 @@ use npc_kernel::commands::{
     CommandError, CommandLog, CommandQueue, SimCommand, canonical, submit, validate,
 };
 use npc_kernel::journal::{self, Journal, JournalFilter, JournalKind};
-use npc_kernel::{SimClock, SimControl, SimId, SimIndex, inspect};
+use npc_kernel::{SimClock, SimControl, SimId, SimIndex, SimPos, inspect};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -30,6 +30,7 @@ use crate::control::{
 };
 use crate::control::{DetachController, ExternalController, ExternalQueue, IdlePolicy};
 use crate::events::{self, AgentEvent, AgentEvents, EventQuery};
+use crate::map::{self, Landmark, LandmarkChange, MapError, NewLandmark, Place};
 use crate::notes::{
     Book, NewNote, NoteChange, NotesClock, NotesDirs, NotesError, NotesStores, ProposalStatus,
     Stamp, Writer,
@@ -177,7 +178,7 @@ pub fn epoch(world: &World) -> u64 {
 /// The `agent/*`, `notes/*` and `world/*` method names this module serves
 /// (the session host adds `world/load_scenario`, `world/reset`,
 /// `session/stop` and a subset of `npc/*`).
-pub const METHODS: [&str; 21] = [
+pub const METHODS: [&str; 27] = [
     "agent/register",
     "agent/enter_world",
     "agent/take_control",
@@ -198,6 +199,12 @@ pub const METHODS: [&str; 21] = [
     "notes/list",
     "notes/add",
     "notes/update",
+    "agent/map/list",
+    "agent/map/add",
+    "agent/map/update",
+    "map/list",
+    "map/add",
+    "map/update",
     "world/state",
 ];
 
@@ -278,6 +285,80 @@ pub fn call(world: &mut World, method: &str, mut p: Option<Value>) -> RpcResult 
             params(p, "{kind?}")?,
             authorization.as_ref().map(|a| a.assigned),
         ),
+        "agent/map/list" | "map/list" => {
+            let agent = method.starts_with("agent/");
+            let p: MapListParams = params(p, "{unit, controller?}")?;
+            map_call(
+                world,
+                p.unit,
+                if agent {
+                    Some(
+                        p.controller
+                            .as_deref()
+                            .ok_or_else(|| RpcError::invalid("map methods need a controller"))?,
+                    )
+                } else {
+                    None
+                },
+                MapOp::List,
+                authorization.as_ref(),
+            )
+        }
+        "agent/map/add" | "map/add" => {
+            let agent = method.starts_with("agent/");
+            let p: MapAddParams = params(p, "{unit, controller?, name, place, kind?, note?}")?;
+            map_call(
+                world,
+                p.unit,
+                if agent {
+                    Some(
+                        p.controller
+                            .as_deref()
+                            .ok_or_else(|| RpcError::invalid("map methods need a controller"))?,
+                    )
+                } else {
+                    None
+                },
+                MapOp::Add(NewLandmark {
+                    name: p.name,
+                    place: p.place,
+                    kind: p.kind,
+                    note: p.note,
+                }),
+                authorization.as_ref(),
+            )
+        }
+        "agent/map/update" | "map/update" => {
+            let agent = method.starts_with("agent/");
+            let p: MapUpdateParams = params(
+                p,
+                "{unit, controller?, id, expected:{tick,date}, name?, kind?, pos?, note?}",
+            )?;
+            map_call(
+                world,
+                p.unit,
+                if agent {
+                    Some(
+                        p.controller
+                            .as_deref()
+                            .ok_or_else(|| RpcError::invalid("map methods need a controller"))?,
+                    )
+                } else {
+                    None
+                },
+                MapOp::Update(
+                    p.id,
+                    p.expected,
+                    LandmarkChange {
+                        name: p.name,
+                        kind: p.kind,
+                        pos: p.pos,
+                        note: p.note,
+                    },
+                ),
+                authorization.as_ref(),
+            )
+        }
         "agent/notes/list" => {
             let p: AgentNotesList = params(p, AGENT_NOTES_LIST)?;
             notes_call(
@@ -516,6 +597,15 @@ fn observe_method(world: &mut World, p: ObserveParams) -> RpcResult {
     }
     let (mut obs, lines) = observe::observe_with(world, SimId(p.unit), opts)
         .ok_or_else(|| RpcError::command(&CommandError::UnknownUnit { unit: p.unit }))?;
+    if map::enabled(world)
+        && let Some(here) = world.get::<SimPos>(entity).copied()
+    {
+        let landmarks = map_landmarks(world, SimId(p.unit)).unwrap_or_default();
+        let nearest = observe::nearest_landmarks(here, &landmarks);
+        if !nearest.is_empty() {
+            obs["map"] = json!(nearest);
+        }
+    }
     let changes = p
         .since_seq
         .map(|s| observe::changes(world, SimId(p.unit), s));
@@ -1023,10 +1113,13 @@ pub fn act(world: &mut World, p: ActParams) -> RpcResult {
             .clone()
             .or_else(|| step.affordance.clone())
             .unwrap_or_default();
-        let request = match resolve(world, &ctx, step) {
+        let mut request = match resolve(world, &ctx, step) {
             Ok(r) => r,
             Err(r) => return reject_with(world, unit, &controller, &hint, r, step_extra),
         };
+        if let Err(reason) = resolve_landmark_move(world, &ctx, &mut request) {
+            return reject_with(world, unit, &controller, &hint, reason, step_extra);
+        }
         if let Some(reason) = crate::verb_gate(world, entity, &request.verb) {
             let verb = request.verb.clone();
             return reject_with(
@@ -1347,6 +1440,7 @@ fn notes_error(world: &World, e: &NotesError) -> RpcResult {
         NotesError::TooLong { .. } => (codes::INVALID_PARAMS, "too_long"),
         NotesError::NotFound(_) => (codes::INVALID_PARAMS, "not_found"),
         NotesError::Forbidden(_) => (codes::INVALID_PARAMS, "forbidden"),
+        NotesError::Exhausted(_) => (codes::INVALID_PARAMS, "invalid"),
         NotesError::Io(_) => (codes::INTERNAL, "io"),
     };
     let mut err = RpcError::new(code, e.to_string());
@@ -1882,6 +1976,274 @@ pub fn act_wait_result(world: &mut World, w: &ActWait, timed_out: bool) -> RpcRe
         }
     }
     stamp(world, out)
+}
+
+// ---------------------------------------------------------------- landmarks
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MapListParams {
+    unit: u32,
+    #[serde(default)]
+    controller: Option<String>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MapAddParams {
+    unit: u32,
+    #[serde(default)]
+    controller: Option<String>,
+    name: String,
+    place: Place,
+    #[serde(default)]
+    kind: Option<String>,
+    #[serde(default)]
+    note: String,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MapUpdateParams {
+    unit: u32,
+    #[serde(default)]
+    controller: Option<String>,
+    id: u32,
+    expected: Stamp,
+    #[serde(default)]
+    name: Option<String>,
+    #[serde(default, deserialize_with = "map_kind_change")]
+    kind: Option<Option<String>>,
+    #[serde(default)]
+    pos: Option<[i32; 2]>,
+    #[serde(default)]
+    note: Option<String>,
+}
+fn map_kind_change<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Option<Option<String>>, D::Error> {
+    Option::<String>::deserialize(deserializer).map(Some)
+}
+enum MapOp {
+    List,
+    Add(NewLandmark),
+    Update(u32, Stamp, LandmarkChange),
+}
+
+fn map_invalid(reason: &str, message: impl Into<String>) -> RpcError {
+    let mut error = RpcError::invalid(message);
+    error.data = Some(json!({"reason":reason}));
+    error
+}
+fn map_error(world: &World, error: MapError) -> RpcResult {
+    match &error {
+        MapError::Stale { current, .. } => stamp(
+            world,
+            json!({"accepted":false,"reason":"stale","message":error.to_string(),"current":current}),
+        ),
+        MapError::NotFound(_) => Err(map_invalid("unknown_landmark", error.to_string())),
+        MapError::Io(_) => {
+            let mut e = RpcError::new(codes::INTERNAL, error.to_string());
+            e.data = Some(json!({"reason":"io"}));
+            Err(e)
+        }
+        _ => Err(map_invalid("invalid", error.to_string())),
+    }
+}
+fn map_dir(world: &World, unit: SimId) -> Result<std::path::PathBuf, RpcError> {
+    if !map::enabled(world) {
+        return Err(map_invalid("no_map", "this world has no map"));
+    }
+    world
+        .get_resource::<NotesDirs>()
+        .and_then(|dirs| dirs.0.get(&unit))
+        .cloned()
+        .ok_or_else(|| map_invalid("no_map", "this actor has no map"))
+}
+fn map_landmarks(world: &mut World, unit: SimId) -> Result<Vec<Landmark>, RpcError> {
+    let dir = map_dir(world, unit)?;
+    world
+        .get_resource_or_init::<NotesStores>()
+        .map_for(&dir)
+        .and_then(|store| store.list())
+        .map_err(|e| map_invalid("invalid", e.to_string()))
+}
+fn map_pos(pos: [i32; 2]) -> Result<[i32; 2], RpcError> {
+    map::validate_pos(pos).map_err(|error| map_invalid("invalid", error.to_string()))?;
+    npc_kernel::commands::check_pos("map position", (pos[0], pos[1]))
+        .map_err(|error| map_invalid("invalid", error.to_string()))?;
+    Ok(pos)
+}
+fn place_position(
+    world: &World,
+    unit: SimId,
+    place: &Place,
+) -> Result<([i32; 2], Option<SimId>), RpcError> {
+    let entity = unit_entity(world, unit.0)?;
+    let pos = match place {
+        Place::Here => world
+            .get::<SimPos>(entity)
+            .copied()
+            .ok_or_else(|| map_invalid("invalid", "this actor has no position"))?,
+        Place::Pos(pos) => return Ok((map_pos(*pos)?, None)),
+        Place::Thing(thing) => {
+            let ctx = AgentCtx {
+                unit,
+                entity,
+                controller: world.get::<ExternalController>(entity),
+                planned: &[],
+            };
+            world
+                .get_resource::<AgentRegistry>()
+                .and_then(|registry| {
+                    registry
+                        .thing_positions
+                        .values()
+                        .find_map(|provider| provider(world, &ctx, *thing))
+                })
+                .ok_or_else(|| {
+                    map_invalid(
+                        "unknown_thing",
+                        "this actor does not sense or remember that thing",
+                    )
+                })?
+        }
+    };
+    Ok((
+        map_pos([pos.x, pos.z])?,
+        if let Place::Thing(id) = place {
+            Some(*id)
+        } else {
+            None
+        },
+    ))
+}
+fn map_call(
+    world: &mut World,
+    unit: u32,
+    controller: Option<&str>,
+    op: MapOp,
+    authorization: Option<&Authorization>,
+) -> RpcResult {
+    let writer = if let Some(controller) = controller {
+        if let Some(permit) = authorization {
+            registration::validate_permit(world, permit, false)?;
+        } else {
+            let entity = unit_entity(world, unit)?;
+            let checked = if matches!(&op, MapOp::List) {
+                controller_of(world, entity, unit, controller).map(drop)
+            } else {
+                check_controller(world, unit, controller)
+            };
+            if let Err(reason) = checked {
+                return stamp(
+                    world,
+                    json!({"accepted":false,"reason":reason.reason,"message":reason.message}),
+                );
+            }
+        }
+        Writer::Agent
+    } else {
+        Writer::Player
+    };
+    let dir = map_dir(world, SimId(unit))?;
+    let placement = if let MapOp::Add(new) = &op {
+        Some(place_position(world, SimId(unit), &new.place)?)
+    } else {
+        None
+    };
+    if let MapOp::Update(_, _, change) = &op
+        && let Some(pos) = change.pos
+    {
+        map_pos(pos)?;
+    }
+    let at = Stamp {
+        tick: now(world)?,
+        date: world
+            .get_resource::<NotesClock>()
+            .map_or_else(String::new, |clock| (clock.0)()),
+    };
+    let result = {
+        let mut stores = world.get_resource_or_init::<NotesStores>();
+        stores.map_for(&dir).and_then(|store| match op {
+            MapOp::List => {
+                let landmarks = store.list()?;
+                let unreadable = store.unreadable()?;
+                Ok(json!({"unit":unit,"landmarks":landmarks,"unreadable":unreadable}))
+            }
+            MapOp::Add(new) => {
+                let (pos, thing) = placement.ok_or_else(|| {
+                    MapError::Invalid("landmark placement was not resolved".into())
+                })?;
+                store
+                    .add(new, pos, thing, at, writer)
+                    .map(|landmark| json!({"accepted":true,"unit":unit,"landmark":landmark}))
+            }
+            MapOp::Update(id, expected, change) => store
+                .update(id, &expected, change, at, writer)
+                .map(|landmark| json!({"accepted":true,"unit":unit,"landmark":landmark})),
+        })
+    };
+    match result {
+        Ok(mut value) => {
+            if authorization.is_some()
+                && let Some(object) = value.as_object_mut()
+            {
+                object.remove("unit");
+            }
+            stamp(world, value)
+        }
+        Err(error) => map_error(world, error),
+    }
+}
+
+fn resolve_landmark_move(
+    world: &mut World,
+    ctx: &AgentCtx,
+    request: &mut ActionRequest,
+) -> Result<(), Rejection> {
+    if request.verb != "order" {
+        return Ok(());
+    }
+    let Some(order) = request.args.get_mut("order").and_then(Value::as_object_mut) else {
+        return Ok(());
+    };
+    if order.get("type").and_then(Value::as_str) != Some("Move") || !order.contains_key("landmark")
+    {
+        return Ok(());
+    }
+    if order.contains_key("pos") {
+        return Err(Rejection::new(
+            "invalid",
+            "Move takes either pos or landmark, not both",
+        ));
+    }
+    let id = order
+        .get("landmark")
+        .and_then(Value::as_u64)
+        .and_then(|id| u32::try_from(id).ok())
+        .ok_or_else(|| Rejection::new("invalid", "landmark must be a positive integer id"))?;
+    let landmarks = map_landmarks(world, ctx.unit).map_err(|error| {
+        Rejection::new(
+            error
+                .data
+                .as_ref()
+                .and_then(|d| d["reason"].as_str())
+                .unwrap_or("invalid"),
+            error.message,
+        )
+    })?;
+    let landmark = landmarks
+        .into_iter()
+        .find(|landmark| landmark.id == id)
+        .ok_or_else(|| {
+            Rejection::new(
+                "unknown_landmark",
+                format!("no landmark #{id} is on your map"),
+            )
+        })?;
+    map_pos(landmark.pos).map_err(|error| Rejection::new("invalid", error.message))?;
+    order.remove("landmark");
+    order.insert("pos".into(), json!(landmark.pos));
+    Ok(())
 }
 
 // ---------------------------------------------------------------- stats, units

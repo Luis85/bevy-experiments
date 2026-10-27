@@ -13,7 +13,8 @@
 //! per-request `_meta` versions) is not implemented yet.
 //!
 //! Tools: `observe`, `act`, `act_and_wait`, `cancel`, `events`, `attach`,
-//! `list_units`, `notes_list`, `notes_add` and `notes_update`, each one RPC
+//! `list_units`, `notes_list`, `notes_add`, `notes_update`, and the three
+//! `map_list` / `map_add` / `map_update` tools, each one RPC
 //! to the server
 //! at `--url` (`agent/*`; the notes tools are the agent notes methods,
 //! `agent/notes/*`, with `controller` defaulting to the server's
@@ -41,6 +42,7 @@ use serde_json::{Value, json};
 use crate::api::RpcError;
 use crate::http::{ClientError, RpcClient};
 
+mod map_tools;
 mod registered;
 pub use registered::{RegisteredClient, handle_registered, registered_tools, serve_registered};
 
@@ -120,7 +122,7 @@ pub fn tools() -> Value {
         }, "description": "the observation returned at the end (format default text)"}),
         );
     }
-    json!([
+    let mut all = json!([
         {
             "name": "observe",
             "title": "Observe a unit",
@@ -220,7 +222,11 @@ pub fn tools() -> Value {
                 "body": {"type": "string"}
             }), &["unit", "book", "id", "expected"]),
         },
-    ])
+    ]);
+    all.as_array_mut()
+        .expect("tool array")
+        .extend(map_tools::tools(&unit, &notes_controller));
+    all
 }
 
 fn tool_result(value: &Value, text: String, is_error: bool) -> Value {
@@ -314,7 +320,7 @@ fn prepare_call(
         }
         "attach" => "agent/attach",
         "list_units" => "agent/list_units",
-        "notes_list" | "notes_add" | "notes_update" => {
+        "notes_list" | "notes_add" | "notes_update" | "map_list" | "map_add" | "map_update" => {
             if let Some(controller) = controller
                 && args.get("controller").is_none_or(Value::is_null)
             {
@@ -323,7 +329,11 @@ fn prepare_call(
             match name {
                 "notes_list" => "agent/notes/list",
                 "notes_add" => "agent/notes/add",
-                _ => "agent/notes/update",
+                "notes_update" => "agent/notes/update",
+                "map_list" => "agent/map/list",
+                "map_add" => "agent/map/add",
+                "map_update" => "agent/map/update",
+                _ => unreachable!("matched notebook/map tool"),
             }
         }
         other => return Err((-32602, format!("Unknown tool: {other}"))),
@@ -512,7 +522,10 @@ mod tests {
                 "list_units",
                 "notes_list",
                 "notes_add",
-                "notes_update"
+                "notes_update",
+                "map_list",
+                "map_add",
+                "map_update"
             ]
         );
         assert_eq!(lines[2]["result"], json!({}));

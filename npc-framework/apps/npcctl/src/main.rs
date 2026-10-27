@@ -186,6 +186,15 @@ enum Cmd {
         #[command(subcommand)]
         cmd: agent::NotesCmd,
     },
+    /// The player's map of an actor: list, add or update landmarks.
+    Map {
+        #[command(flatten)]
+        client: agent::ClientArgs,
+        #[arg(long = "as", value_enum, default_value_t = agent::MapWriter::Player, global = true)]
+        writer: agent::MapWriter,
+        #[command(subcommand)]
+        cmd: agent::MapCmd,
+    },
     /// Read or reset the world of a running session.
     World {
         #[command(flatten)]
@@ -510,6 +519,11 @@ fn main() -> ExitCode {
         Cmd::World { client, cmd } => agent::cmd_world(cmd, client, &mut out),
         Cmd::Session { client, cmd } => agent::cmd_session(cmd, client, &mut out),
         Cmd::Notes { client, cmd } => agent::cmd_notes(cmd, client, &mut out),
+        Cmd::Map {
+            client,
+            writer: agent::MapWriter::Player,
+            cmd,
+        } => agent::cmd_map(cmd, client, &mut out),
         Cmd::Snapshot(SnapshotCmd::Save { world, ticks }) => {
             cmd_snapshot_save(world, *ticks, cli.out.as_deref(), &mut out)
         }

@@ -391,7 +391,9 @@ failed order does not stop the ones behind it. The `/play-actor` skill
 
 The longer-running version of this experiment (game menu spec, `docs/superpowers/specs/2026-10-24-game-menu-and-ai-explorer-design.md`):
 an AI agent of the dev's choice wakes in a world of its own with an Epoch 1 mission (survive, learn, explore, map),
-keeps notebooks as its only memory, and writes improvement proposals for the game. The world is saved and resumed exactly.
+keeps notebooks and fixed landmarks as lasting knowledge, and writes improvement proposals for the game.
+The world save restores its clock, position, inventory and construction data; the assigned character waits
+for registered control after reopening.
 
 **The flow.**
 
@@ -457,14 +459,20 @@ when the source is edited or deleted.
    not replay a mutating call. The developer CLI is documented separately in the debugging guide.
    The world serves the agent on the port the game picked
    (the first free one in 15702..=15721, or from `--remote-port N` on, whose next port is free too for the render
-   server; named in the prompt and the modal's notes). **F7** is the notes editor: tabs Diary,
-   Memory and Proposals (Tab cycles them), newest first with ids and stamps, re-read within ~1 s of an agent's
+   server; stored in `.mcp.json` and `run.json`). **F7** is the notes editor: tabs Diary,
+   Memory, Proposals and Map (when enabled; Tab cycles them), newest notes first with ids and stamps, re-read within ~1 s of an agent's
    write; **Add** / **Edit** (click an entry's title) open a title and a body field, **Save** writes as the player
    and never silently replaces an entry the agent changed meanwhile: the save is refused, the form keeps your
    text and shows the entry's current title and body above it ("Now in the file:"), and only a second Save
    replaces it (if it changed again, you are shown the newer version first). A proposal's status buttons set its
    status (a stale one says "changed meanwhile - reloaded"). While a field has focus the game's keys do nothing (Escape leaves the field);
-   `--panels explorer` opens it at start.
+   `--panels explorer` opens it at start. **Map** lists landmarks and edits name, kind, fixed position and note.
+   On Add, leave X/Z blank to mark the played actor's position when saved; enter both for an explicit place.
+   The same optimistic-save guard protects concurrent map edits. Map labels remain visible through every fog
+   state and do not intercept world clicks; `--panels map` opens this tab for a capture.
+   The agent uses `map_add` (`here`, a remembered thing or explicit coordinates), `map_list` and `map_update`.
+   A Move order can name `landmark: ID`; it resolves to a position before recording. Observe lists the nearest
+   five. Worlds → Systems can turn the map off; owned landmark files remain untouched.
 5. Closing the game window asks **"Keep it running detached?"**: **Yes** keeps the world running without a window
    on the same port (the agent keeps playing; the menu shows its Detached screen), **No** saves and stops it, Escape
    goes back to the game. **F9** moves it to detached without asking. The world is autosaved every 60 s of wall
@@ -486,8 +494,10 @@ when the source is edited or deleted.
    (the row opens its Detached screen); one running in a window cannot be started twice. Resume first
    runs `actor_testbed ... --check-save` ("Checking ..."); a save that fits starts the game with
    `--resume`, which rebuilds the world from the save header's scenario and seed and loads the snapshot (ADR
-   0013) before the first frame: the actor stands where it was, mid-order, with its inventory, doors, items,
-   the clock and the controller attachment. A check that crashes (an exit code other than 0 or 1) is reported on
+   0013) before the first frame: position, inventory, doors, items and clock are restored. The registered
+   explorer lifecycle clears the played actor's old external work and waits for a new take_control;
+   its MCP client reconnects and restores previously requested control. Notes and map files stay outside the
+   save. A check that crashes (an exit code other than 0 or 1) is reported on
    the Resume screen with its last stderr line; one still running after 30 s, or when you go Back, is killed.
 
 **The folder layout** (`testbed_content::explorer::home` and `::workspace`; folder and file names are slugs, the real names stay in

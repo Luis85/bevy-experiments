@@ -42,7 +42,7 @@
 //! old file).
 
 use super::frontmatter::{self, Frontmatter, FrontmatterError};
-use super::{Book, Note, NotesOwner, ProposalStatus, Stamp, Writer};
+use super::{Book, Note, NotesError, NotesOwner, ProposalStatus, Stamp, Writer};
 
 /// Drops a leading byte order mark.
 pub(super) fn strip_bom(text: &str) -> &str {
@@ -73,13 +73,13 @@ fn trim_eol(line: &str) -> &str {
 }
 
 /// One line: newlines and carriage returns become spaces, ends trimmed.
-pub(super) fn one_line(text: &str) -> String {
+pub(crate) fn one_line(text: &str) -> String {
     text.replace(['\r', '\n'], " ").trim().to_string()
 }
 
 /// A body as the store keeps it: `\n` line ends, no leading blank lines, no
 /// trailing whitespace.
-pub(super) fn clean_body(text: &str) -> String {
+pub(crate) fn clean_body(text: &str) -> String {
     let text = text.replace("\r\n", "\n");
     let mut rest = text.as_str();
     while let Some(nl) = rest.find('\n') {
@@ -94,7 +94,7 @@ pub(super) fn clean_body(text: &str) -> String {
 
 /// A date as the store keeps it: whitespace and `>` become `_` (so a
 /// stamp read back from any file compares equal to the one a writer holds).
-pub(super) fn clean_date(date: &str) -> String {
+pub(crate) fn clean_date(date: &str) -> String {
     date.chars()
         .map(|c| {
             if c.is_whitespace() || c == '>' {
@@ -108,7 +108,7 @@ pub(super) fn clean_date(date: &str) -> String {
 
 /// A date's base and revision: `D#rN` is (`D`, N); a date without a
 /// revision suffix is revision 1.
-pub(super) fn split_rev(date: &str) -> (&str, u32) {
+pub(crate) fn split_rev(date: &str) -> (&str, u32) {
     if let Some((base, n)) = date.rsplit_once("#r")
         && let Ok(n) = n.parse::<u32>()
         && n >= 2
@@ -135,15 +135,20 @@ fn stamp_of(tick: u64, date: &str, revision: u32) -> Stamp {
 /// aside) as `prev` (a paused game, a hand edit): then `prev`'s date with
 /// the next revision suffix `#rN`. So every write gives a stamp that differs
 /// from the one before it.
-pub(super) fn next_stamp(prev: &Stamp, at: Stamp) -> Stamp {
+pub(crate) fn next_stamp(prev: &Stamp, at: Stamp) -> Result<Stamp, NotesError> {
     let (prev_base, prev_rev) = split_rev(&prev.date);
     if at.tick == prev.tick && split_rev(&at.date).0 == prev_base {
-        Stamp {
+        Ok(Stamp {
             tick: at.tick,
-            date: format!("{prev_base}#r{}", prev_rev.saturating_add(1)),
-        }
+            date: format!(
+                "{prev_base}#r{}",
+                prev_rev
+                    .checked_add(1)
+                    .ok_or(NotesError::Exhausted("entry revisions"))?
+            ),
+        })
     } else {
-        at
+        Ok(at)
     }
 }
 
@@ -421,7 +426,7 @@ impl EntryFile {
 /// The largest id an `id:` line of `text` names, read leniently (quotes,
 /// spaces), for a file the store cannot read: its id is never handed out
 /// again.
-pub(super) fn lenient_id(text: &str) -> Option<u32> {
+pub(crate) fn lenient_id(text: &str) -> Option<u32> {
     text.lines()
         .filter_map(|l| l.trim().strip_prefix("id:"))
         .filter_map(|v| {
@@ -557,7 +562,7 @@ impl Doc {
     /// Parses an old diary or memory file and gives every entry without a
     /// usable id (none, or one an earlier entry already has) the next free
     /// id, in file order.
-    pub(super) fn parse(text: &str) -> Self {
+    pub(super) fn parse(text: &str) -> Result<Self, NotesError> {
         let text = strip_bom(text);
         let eol = detect_eol(text);
         let mut preamble = String::new();
@@ -583,15 +588,15 @@ impl Doc {
         }
         let mut next = used.last().copied().unwrap_or(0);
         for e in entries.iter_mut().filter(|e| !e.has_id) {
-            next += 1;
+            next = super::storage::next_id(next)?;
             e.note.id = next;
             e.has_id = true;
         }
-        Self {
+        Ok(Self {
             preamble,
             entries,
             eol,
-        }
+        })
     }
 
     /// The preamble, when it holds more than the file's own `# Title` line
@@ -846,14 +851,24 @@ mod tests {
             tick,
             date: date.to_string(),
         };
-        assert_eq!(next_stamp(&s(5, "d"), s(6, "d")), s(6, "d"));
-        assert_eq!(next_stamp(&s(5, "d"), s(5, "e")), s(5, "e"));
-        assert_eq!(next_stamp(&s(5, "d"), s(5, "d")), s(5, "d#r2"));
-        assert_eq!(next_stamp(&s(5, "d#r2"), s(5, "d")), s(5, "d#r3"));
-        assert_eq!(next_stamp(&s(5, "d#r9"), s(5, "d#r9")), s(5, "d#r10"));
-        assert_eq!(next_stamp(&s(5, ""), s(5, "")), s(5, "#r2"));
+        assert_eq!(next_stamp(&s(5, "d"), s(6, "d")).unwrap(), s(6, "d"));
+        assert_eq!(next_stamp(&s(5, "d"), s(5, "e")).unwrap(), s(5, "e"));
+        assert_eq!(next_stamp(&s(5, "d"), s(5, "d")).unwrap(), s(5, "d#r2"));
+        assert_eq!(next_stamp(&s(5, "d#r2"), s(5, "d")).unwrap(), s(5, "d#r3"));
+        assert_eq!(
+            next_stamp(&s(5, "d#r9"), s(5, "d#r9")).unwrap(),
+            s(5, "d#r10")
+        );
+        assert_eq!(next_stamp(&s(5, ""), s(5, "")).unwrap(), s(5, "#r2"));
         // `#r1`, `#r0` and `#rx` are not revisions, just date text.
-        assert_eq!(next_stamp(&s(5, "d#r1"), s(5, "d#r1")), s(5, "d#r1#r2"));
+        assert_eq!(
+            next_stamp(&s(5, "d#r1"), s(5, "d#r1")).unwrap(),
+            s(5, "d#r1#r2")
+        );
+        assert!(matches!(
+            next_stamp(&s(5, "d#r4294967295"), s(5, "d")),
+            Err(NotesError::Exhausted(_))
+        ));
         assert_eq!(split_rev("d#rx"), ("d#rx", 1));
         // A stamp splits into date and revision and is rebuilt from them.
         for st in [s(5, "#r3"), s(5, "d"), s(5, "d#r1"), s(5, "d#r12")] {
@@ -876,7 +891,7 @@ mod tests {
 
     #[test]
     fn a_malformed_comment_is_body_text() {
-        let d = Doc::parse("## A\n<!-- note id=x -->\nbody\n");
+        let d = Doc::parse("## A\n<!-- note id=x -->\nbody\n").unwrap();
         assert_eq!(d.entries[0].note.id, 1);
         assert_eq!(d.entries[0].note.body, "<!-- note id=x -->\nbody");
     }
@@ -884,7 +899,7 @@ mod tests {
     #[test]
     fn duplicate_ids_are_reassigned() {
         let c = "<!-- note id=4 created=1@d updated=1@d -->";
-        let d = Doc::parse(&format!("## A\n{c}\na\n\n## B\n{c}\nb\n"));
+        let d = Doc::parse(&format!("## A\n{c}\na\n\n## B\n{c}\nb\n")).unwrap();
         let ids: Vec<u32> = d.entries.iter().map(|e| e.note.id).collect();
         assert_eq!(ids, [4, 5]);
         assert_eq!(d.entries[1].note.body, "b");
@@ -893,18 +908,21 @@ mod tests {
     #[test]
     fn stray_text_is_more_than_a_title() {
         assert_eq!(
-            Doc::parse("# Diary of Wren\n\n## A\nx\n").stray_text(),
+            Doc::parse("# Diary of Wren\n\n## A\nx\n")
+                .unwrap()
+                .stray_text(),
             None
         );
-        assert_eq!(Doc::parse("\n\n## A\nx\n").stray_text(), None);
+        assert_eq!(Doc::parse("\n\n## A\nx\n").unwrap().stray_text(), None);
         assert_eq!(
             Doc::parse("# Diary\nmore\n## A\nx\n")
+                .unwrap()
                 .stray_text()
                 .as_deref(),
             Some("# Diary\nmore")
         );
         assert_eq!(
-            Doc::parse("loose line\n").stray_text().as_deref(),
+            Doc::parse("loose line\n").unwrap().stray_text().as_deref(),
             Some("loose line")
         );
     }

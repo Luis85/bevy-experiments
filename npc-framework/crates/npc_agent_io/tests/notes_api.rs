@@ -420,7 +420,10 @@ fn mcp_lists_every_field() {
             "list_units",
             "notes_list",
             "notes_add",
-            "notes_update"
+            "notes_update",
+            "map_list",
+            "map_add",
+            "map_update"
         ]
     );
     for (name, fields, required) in [
@@ -446,6 +449,26 @@ fn mcp_lists_every_field() {
                 "body",
             ][..],
             &["unit", "book", "id", "expected"][..],
+        ),
+        ("map_list", &["unit", "controller"][..], &["unit"][..]),
+        (
+            "map_add",
+            &["unit", "controller", "name", "place", "kind", "note"][..],
+            &["unit", "name", "place"][..],
+        ),
+        (
+            "map_update",
+            &[
+                "unit",
+                "controller",
+                "id",
+                "expected",
+                "name",
+                "kind",
+                "pos",
+                "note",
+            ][..],
+            &["unit", "id", "expected"][..],
         ),
     ] {
         let mut got = props(name);

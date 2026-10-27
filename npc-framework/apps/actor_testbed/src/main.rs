@@ -5,7 +5,7 @@
 //! ```text
 //! cargo run -p actor_testbed -- [--scenario NAME|FILE] [--seed N] [--speed N] [--player N]
 //!     [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE]
-//!     [--screenshot PATH --after-secs S] [--panels journal,perf,sheet,perception,explorer]
+//!     [--screenshot PATH --after-secs S] [--panels journal,perf,sheet,perception,explorer,map]
 //!     [--journal FILE] [--record FILE] [--paused] [--perf-warn] [--fog on|off]
 //!     [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote]
 //!     [--out-dir DIR]
@@ -113,7 +113,7 @@ pub const SPEED_PRESETS: [u32; 3] = [1, 3, 10];
 
 const USAGE: &str = "usage: actor_testbed [--scenario NAME|FILE] [--seed N] [--speed N] [--player N] \
 [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE] [--screenshot PATH] \
-[--after-secs S] [--panels journal,perf,sheet,perception,explorer] [--journal FILE] [--record FILE] [--paused] [--perf-warn] \
+[--after-secs S] [--panels journal,perf,sheet,perception,explorer,map] [--journal FILE] [--record FILE] [--paused] [--perf-warn] \
 [--fog on|off] [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote] [--out-dir DIR]
        actor_testbed --explorer-home DIR --agent NAME [--world NAME [--preset ID] [--world-preset ID] | --resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog] [--actors-dir DIR] [--worlds-dir DIR] [other flags except --scenario and --seed]
        (explorer mode: BRP is always on, on the first free port from --remote-port N on, N..=N+19, default 15702;
@@ -162,8 +162,12 @@ fn parse_panels(list: &str) -> (DebugPanels, TestbedPanels) {
             "sheet" => testbed.sheet = true,
             "perception" => testbed.perception = true,
             "explorer" => testbed.explorer = true,
+            "map" => {
+                testbed.explorer = true;
+                testbed.map = true;
+            }
             other => usage(&format!(
-                "unknown panel `{other}` (expected journal, perf, sheet, perception, explorer)"
+                "unknown panel `{other}` (expected journal, perf, sheet, perception, explorer, map)"
             )),
         }
     }
@@ -708,5 +712,15 @@ mod debug_tools {
         if let Some(path) = &args.record {
             record_from_startup(app, "actor_testbed", path.clone());
         }
+    }
+}
+
+#[cfg(test)]
+mod map_panel_tests {
+    #[test]
+    fn panels_map_opens_explorer_on_the_map_tab() {
+        let (debug, panels) = super::parse_panels("map");
+        assert!(panels.explorer && panels.map);
+        assert!(!panels.sheet && !panels.perception && !debug.journal && !debug.perf);
     }
 }

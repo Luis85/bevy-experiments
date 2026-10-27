@@ -281,7 +281,7 @@ Reference numbers (`bench/baseline.json`, release, idle, 2000 ticks):
 | 100 | 10 631 | 0.094 | think 91, think.cond 16, actions.move 9 |
 | 500 | 3 628 | 0.276 | think 464, think.cond 207, actions.move 50, actions.work 45 |
 
-### 2.9 Agent subcommands: `serve`, `agent`, `notes`, `world`, `session`, `mcp`
+### 2.9 Agent subcommands: `serve`, `agent`, `notes`, `map`, `world`, `session`, `mcp`
 
 ```sh
 npcctl serve --scenario FILE|NAME [--tick-hz 20] [--record session.json] [--port 15702] [--seed N] [--token T]
@@ -366,7 +366,7 @@ npcctl notes list|add|update --unit 33 --book proposals .. [--status new|liked|p
 npcctl world state | world reset [--seed N] | world load-scenario FILE [--seed N]     # reset/load: session only
 npcctl session info | session stop                                                 # session only
 npcctl mcp --url http://127.0.0.1:15702 [--token T] [--controller explorer]
-    # stdio MCP server: tools observe, act, act_and_wait, cancel, events, attach, list_units, notes_list, notes_add, notes_update
+    # stdio MCP: observe/act/act_and_wait/cancel/events, attach/list_units, notes_list/add/update, map_list/add/update
 ```
 
 `agent notes` and `notes` wrap the notes methods (§4): `update` passes `--expected-tick`/`--expected-date`, the
@@ -496,7 +496,7 @@ need control. Supplied identities may only match the assigned actor. Missing/inv
 `not_registered` / `unknown_session`; wrong credentials return `bad_credentials` with a nonblocking retry delay.
 
 Generated explorer `.mcp.json` runs `npcctl mcp --registered`: register, enter_world, take_control, release and
-session-bound observe/act/act_and_wait/events/cancel/notes tools omit unit/controller arguments. Session keys and
+session-bound observe/act/act_and_wait/events/cancel/notes/map tools omit unit/controller arguments. Session keys and
 credentials stay inside the MCP process. A restarted/moved host can reconnect once and restore control; explicit
 replacement/rotation returns `revoked:true` and requires the agent to register with its current handbook again.
 Legacy `npcctl mcp` remains available for unlocked scenarios and their existing schemas.
@@ -572,6 +572,35 @@ is written. Other errors are invalid params with `data.reason`: `too_long` (titl
 characters, body over 8192 bytes; the message names the limit), `not_found`, `forbidden` (`prompted_by` outside
 proposals, a status outside proposals); a file error is `-32603` with `data.reason: "io"`. Book and status
 names are case-insensitive.
+
+**Map** (`npc_agent_io::map`, ADR 0018): one fixed landmark per owned `map/<name>.md`, using the same folder,
+writer and optimistic-stamp conventions as notes. `agent/map/list|add|update` are session-bound for registered
+worlds (including before taking control); `map/list|add|update` are player methods. Legacy callers supply
+`unit` and their `controller`; player calls supply only `unit`. List returns `landmarks` by id and `unreadable`.
+Add takes `{name, place: "here" | {thing: ID} | {pos: [x,z]}, kind?, note?}`. Here resolves the current actor
+position, Thing uses only its last perception-memory position, and the stored position never follows it.
+Update takes `{id, expected:{tick,date}, name?, kind?, pos?, note?}`: an explicit `kind:null` clears the category,
+while omission preserves it. IDs/thing references stay fixed. Name: one line/200 characters; note: 8192 UTF-8
+bytes. Stale updates return `accepted:false` and `current`; invalid coordinates/limits, `unknown_thing`,
+`unknown_landmark` and `no_map` have explicit reasons. A disabled map rejects before filesystem access.
+
+```sh
+npcctl agent map add --agent-id ID --token TOKEN --name "Arrival" --here --note "First camp."
+npcctl agent map list --agent-id ID --token TOKEN
+npcctl map add --as player --unit N --name "North gate" --pos=-8000,3500 --kind gate
+npcctl map update --as player --unit N --id 1 --expected-tick T --expected-date "DATE#r1" --clear-kind --note "Return here."
+```
+
+MCP tools `map_list`, `map_add`, `map_update` expose the same fields, without unit/controller in registered
+mode. Observe includes up to five nearest landmarks as a top-level `map` array and a `Your map:` text line;
+empty/disabled maps add neither. A Move order can use `{type:"Move", landmark:ID}` instead of `pos`, including
+inside atomic `steps`/act-and-wait. Resolution happens before submission, so replays contain positions and
+need no map folder. F7 → **Map** edits the shared store; blank X/Z on Add means Here at save time. Labels
+remain visible through fog and do not intercept world clicks. `actor_testbed --panels map` opens the Map tab
+for capture. World presets' `systems.map` defaults true, including older saved copies.
+
+Notes and map stores check ID/revision exhaustion instead of wrapping. Byte identities detect equal-size
+edits with restored mtimes and guard old-source deletion during rename/migration cleanup.
 
 With a perception provider (`omniscient: false`), affordances only target entities the unit perceives, remembers
 (last-known position), holds or rides, plus imperceptible things (no `Perceivable`) within 1.5 m (touch); there
