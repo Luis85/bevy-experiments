@@ -25,7 +25,7 @@ use npc_interaction::items::{
 };
 use npc_interaction::{Interacting, run::metres};
 use npc_jobs::{Reservations, free_for};
-use npc_kernel::journal::{self, JournalKind, ReleaseReason};
+use npc_kernel::journal::{self, DroppedItem, JournalKind, ReleaseReason};
 use npc_kernel::{SimClock, SimId, SimPos, spawn_sim};
 use npc_rules::{CharacterSheet, Critical, effective_skill, roll_skill};
 use serde::{Deserialize, Serialize};
@@ -705,9 +705,16 @@ fn wear_tool(world: &mut World, id: SimId, wear: u32, critical: bool) -> bool {
     broke
 }
 
-fn spawn_outputs(world: &mut World, actor: Entity, recipe: &RecipeDef, quality: i32) -> Vec<SimId> {
+fn spawn_outputs(
+    world: &mut World,
+    actor: Entity,
+    recipe: &RecipeDef,
+    quality: i32,
+) -> (Vec<SimId>, Vec<DroppedItem>) {
     let pos = world.get::<SimPos>(actor).copied().unwrap_or_default();
+    let holder = world.get::<SimId>(actor).copied();
     let mut out = Vec::new();
+    let mut dropped = Vec::new();
     for o in &recipe.outputs {
         let (id, e) = spawn_sim(
             world,
@@ -720,14 +727,34 @@ fn spawn_outputs(world: &mut World, actor: Entity, recipe: &RecipeDef, quality: 
                 pos,
             ),
         );
-        if can_store(world, actor, e).is_ok() {
+        // Crafting deliberately creates separate outputs instead of merging
+        // stacks. can_store also accepts merge capacity, so require a real
+        // carried slot before appending this new item.
+        let free_slot = world
+            .get::<Inventory>(actor)
+            .is_some_and(|inventory| inventory.free_slots() > 0);
+        if free_slot && can_store(world, actor, e).is_ok() {
             put_in_inventory(world, actor, e);
+            journal::record(world, holder, || JournalKind::ItemMoved {
+                item: id,
+                kind: o.kind.clone(),
+                stack: o.count,
+                from: None,
+                to: holder,
+                slot: None,
+            });
         } else {
             place_in_world(world, e, pos);
+            dropped.push(DroppedItem {
+                item: id,
+                kind: o.kind.clone(),
+                stack: o.count,
+                pos: [pos.x, pos.z],
+            });
         }
         out.push(id);
     }
-    out
+    (out, dropped)
 }
 
 /// Finishes one craft now (its duration is over): see the module docs.
@@ -805,13 +832,14 @@ pub fn complete_craft(world: &mut World, actor: Entity) -> Option<CraftCompleted
             broken.push(t);
         }
     }
-    let (quality, outputs) = if result.succeeded() {
+    let (quality, outputs, dropped) = if result.succeeded() {
         let q = cfg
             .quality
             .quality(margin, result == CraftResult::CriticalSuccess);
-        (Some(q), spawn_outputs(world, actor, &def, q))
+        let (outputs, dropped) = spawn_outputs(world, actor, &def, q);
+        (Some(q), outputs, dropped)
     } else {
-        (None, Vec::new())
+        (None, Vec::new(), Vec::new())
     };
     release_claims(world, me, &all_claims(&c), ReleaseReason::Finished);
     let broke = broken
@@ -826,6 +854,7 @@ pub fn complete_craft(world: &mut World, actor: Entity) -> Option<CraftCompleted
                 margin,
                 quality: q,
                 outputs: outputs.clone(),
+                dropped,
             });
             if let (Some(ws), Some(order)) = (c.workstation, c.order) {
                 count_down(world, ws, order);

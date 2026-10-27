@@ -131,7 +131,7 @@ impl LogLevel {
     }
 }
 
-#[derive(Subcommand, Debug)]
+#[derive(Subcommand)]
 enum Cmd {
     /// Run a scenario; print a per-day timeline, need ranges, aborts and the final hash.
     #[command(
@@ -230,6 +230,64 @@ enum Cmd {
         #[arg(long)]
         registered: bool,
     },
+}
+
+impl std::fmt::Debug for Cmd {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Run(args) => f.debug_tuple("Run").field(args).finish(),
+            Self::Inspect(args) => f.debug_tuple("Inspect").field(args).finish(),
+            Self::Journal(args) => f.debug_tuple("Journal").field(args).finish(),
+            Self::Replay(args) => f.debug_tuple("Replay").field(args).finish(),
+            Self::Diverge(args) => f.debug_tuple("Diverge").field(args).finish(),
+            Self::Bench(args) => f.debug_tuple("Bench").field(args).finish(),
+            Self::Serve(args) => f.debug_tuple("Serve").field(args).finish(),
+            Self::Agent { client, cmd } => f
+                .debug_struct("Agent")
+                .field("client", client)
+                .field("cmd", cmd)
+                .finish(),
+            Self::AgentToken(args) => f.debug_tuple("AgentToken").field(args).finish(),
+            Self::Notes { client, cmd } => f
+                .debug_struct("Notes")
+                .field("client", client)
+                .field("cmd", cmd)
+                .finish(),
+            Self::Map {
+                client,
+                writer,
+                cmd,
+            } => f
+                .debug_struct("Map")
+                .field("client", client)
+                .field("writer", writer)
+                .field("cmd", cmd)
+                .finish(),
+            Self::World { client, cmd } => f
+                .debug_struct("World")
+                .field("client", client)
+                .field("cmd", cmd)
+                .finish(),
+            Self::Snapshot(args) => f.debug_tuple("Snapshot").field(args).finish(),
+            Self::Session { client, cmd } => f
+                .debug_struct("Session")
+                .field("client", client)
+                .field("cmd", cmd)
+                .finish(),
+            Self::Mcp {
+                url,
+                token,
+                controller,
+                registered,
+            } => f
+                .debug_struct("Mcp")
+                .field("url", url)
+                .field("token", &token.as_ref().map(|_| "<redacted>"))
+                .field("controller", controller)
+                .field("registered", registered)
+                .finish(),
+        }
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -936,4 +994,97 @@ fn cmd_bench(a: &BenchArgs, collector: &PerfCollector, out: &mut Out) -> CmdResu
     }
     out.json(&report)?;
     Ok(code)
+}
+
+#[cfg(test)]
+mod debug_redaction {
+    use super::*;
+    const REGISTRATION_SECRET: &str = "test-registration-secret-must-not-be-debugged";
+    const HTTP_SECRET: &str = "test-http-secret-must-not-be-debugged";
+    const URL: &str = "http://127.0.0.1:15977";
+
+    fn parsed(args: &[&str]) -> Cli {
+        Cli::try_parse_from(args).unwrap_or_else(|_| panic!("the redaction fixture must parse"))
+    }
+    fn assert_redacted(value: &impl std::fmt::Debug, public_fields: &[&str]) {
+        let debug = format!("{value:?}");
+        for secret in [REGISTRATION_SECRET, HTTP_SECRET] {
+            assert!(!debug.contains(secret), "Debug exposed a secret");
+        }
+        for field in public_fields {
+            assert!(debug.contains(field), "Debug lost useful public context");
+        }
+    }
+
+    #[test]
+    fn agent_and_enclosing_cli_debug_hide_registration_and_bearer_tokens() {
+        let cli = parsed(&[
+            "npcctl",
+            "agent",
+            "--url",
+            URL,
+            "--agent-id",
+            "redaction-agent",
+            "--token",
+            REGISTRATION_SECRET,
+            "--bearer-token",
+            HTTP_SECRET,
+            "observe",
+            "--unit",
+            "7",
+        ]);
+        let Cmd::Agent { client, .. } = &cli.cmd else {
+            panic!("expected an agent fixture");
+        };
+        assert_redacted(
+            client,
+            &[
+                "ClientArgs",
+                URL,
+                "redaction-agent",
+                "token",
+                "bearer_token",
+            ],
+        );
+        assert_redacted(&cli, &["Cli", "Agent", "Observe", URL, "redaction-agent"]);
+    }
+
+    #[test]
+    fn serve_and_enclosing_cli_debug_hide_http_token() {
+        let cli = parsed(&[
+            "npcctl",
+            "serve",
+            "--scenario",
+            "testbed",
+            "--port",
+            "15977",
+            "--token",
+            HTTP_SECRET,
+        ]);
+        let Cmd::Serve(args) = &cli.cmd else {
+            panic!("expected a serve fixture");
+        };
+        assert_redacted(args, &["ServeArgs", "testbed", "15977", "token"]);
+        assert_redacted(&cli, &["Cli", "Serve", "testbed", "15977"]);
+    }
+
+    #[test]
+    fn mcp_and_enclosing_cli_debug_hide_http_token() {
+        let cli = parsed(&[
+            "npcctl",
+            "mcp",
+            "--url",
+            URL,
+            "--token",
+            HTTP_SECRET,
+            "--controller",
+            "redaction-controller",
+            "--registered",
+        ]);
+        assert_redacted(
+            &cli.cmd,
+            &["Mcp", URL, "redaction-controller", "registered"],
+        );
+        assert_redacted(&cli, &["Cli", "Mcp", URL, "redaction-controller"]);
+    }
 }

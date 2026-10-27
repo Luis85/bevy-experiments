@@ -652,6 +652,19 @@ pub fn event_line(e: &Value) -> String {
             interacted_tail(ev)
         ),
         "OrderDone" => format!("{} done", s(ev, "order")),
+        "CraftDone" => {
+            let mut detail = format!(
+                "craft {} done: q{} (by {}), {} item(s)",
+                s(ev, "recipe"),
+                ev["quality"],
+                ev["margin"],
+                ev["outputs"].as_array().map_or(0, Vec::len)
+            );
+            if let Some(dropped) = dropped_text(ev) {
+                detail.push_str(&format!(", {dropped}"));
+            }
+            detail
+        }
         "OrderFailed" => format!("{} failed: {}", s(ev, "order"), order_failed_text(ev)),
         _ => {
             let mut obj = ev.clone();
@@ -863,6 +876,15 @@ pub fn self_section(world: &World, ctx: &AgentCtx) -> Option<crate::registry::Se
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn crafted_event_names_outputs_dropped_on_the_ground() {
+        let event = json!({"tick":9,"event":{"type":"CraftDone","recipe":"planks","quality":0,"margin":0,"outputs":[70],"dropped":[{"item":70,"kind":"plank","stack":2,"pos":[24080,1100]}]}});
+        assert_eq!(
+            event_line(&event),
+            "- t9 CraftDone craft planks done: q0 (by 0), 1 item(s), 2 × plank dropped at (24.08 m, 1.10 m)"
+        );
+    }
 
     #[test]
     fn interacted_names_its_drops() {

@@ -42,7 +42,7 @@ fn scenario_text(path: &std::path::Path) -> std::io::Result<String> {
     }
 }
 
-#[derive(Args, Debug)]
+#[derive(Args)]
 #[command(group(
     clap::ArgGroup::new("source")
         .required(true)
@@ -77,6 +77,20 @@ pub struct ServeArgs {
     pub explorer: crate::explorer::ExplorerServeArgs,
 }
 
+impl std::fmt::Debug for ServeArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ServeArgs")
+            .field("scenario", &self.scenario)
+            .field("tick_hz", &self.tick_hz)
+            .field("record", &self.record)
+            .field("port", &self.port)
+            .field("seed", &self.seed)
+            .field("token", &self.token.as_ref().map(|_| "<redacted>"))
+            .field("explorer", &self.explorer)
+            .finish()
+    }
+}
+
 /// Output of the client commands.
 #[derive(Copy, Clone, Debug, Default, ValueEnum, PartialEq, Eq)]
 pub enum Format {
@@ -87,7 +101,7 @@ pub enum Format {
     Text,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args)]
 pub struct ClientArgs {
     /// The session (`npcctl serve`) or game BRP server.
     #[arg(long, global = true, default_value = DEFAULT_URL)]
@@ -103,6 +117,21 @@ pub struct ClientArgs {
     pub bearer_token: Option<String>,
     #[arg(long, global = true, value_enum, default_value_t = Format::Json)]
     pub format: Format,
+}
+
+impl std::fmt::Debug for ClientArgs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ClientArgs")
+            .field("url", &self.url)
+            .field("token", &self.token.as_ref().map(|_| "<redacted>"))
+            .field("agent_id", &self.agent_id)
+            .field(
+                "bearer_token",
+                &self.bearer_token.as_ref().map(|_| "<redacted>"),
+            )
+            .field("format", &self.format)
+            .finish()
+    }
 }
 
 impl ClientArgs {

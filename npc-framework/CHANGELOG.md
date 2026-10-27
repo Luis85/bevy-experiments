@@ -8,6 +8,22 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Fixed (final review)
+
+- Crafting no longer overfills a full pack merely because a matching stack exists. Separate output IDs and
+  equipment's slot exemption remain; carried outputs appear in inventory deltas and dropped outputs report
+  their fixed completion positions.
+- Notes/map update revisions stay unique across tick/date rollback and reopen, preventing stale-token reuse.
+- CLI and HTTP server Debug representations redact all token fields without changing parsing or dispatch.
+- Picked-up/equipped/restored items follow real ownership even without SimPos; hidden inventory stays hidden,
+  hand/grip attachments work, and unseen pickups retain their last-seen ground appearance until observed empty.
+- Position validation safely rejects signed integer extremes while retaining the closed supported bounds.
+- LIDAR reuses solid-cell scratch bitmaps across subcell movement and combines `SOLID`/`VISITED` flags, clearing
+  fog coverage on every scan. All beams, endpoints, corner traversal and noise remain unchanged; the original
+  9,000-case oracle and additional cache/snapshot/shared-scratch regressions retain full-scan coverage.
+- Plain explorer skips empty survival/night runtime systems and unused actor base state. Snapshot registration
+  and clock setup remain unchanged; worlds with active needs or night sensing penalties retain their updates.
+
 ### Documentation and end-to-end verification (plan Task 18)
 
 - Updated contributor/user guidance for the actor and world editors, registered MCP lifecycle, persistent

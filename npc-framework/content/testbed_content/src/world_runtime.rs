@@ -76,17 +76,22 @@ pub fn prepare(app: &mut App, p: &WorldPreset) {
                 .reach(1500),
         );
     }
-    app.add_systems(
-        NpcSimTick,
-        (
-            update_state
-                .in_set(NpcSet::Sense)
-                .before(npc_framework::perception::NpcPerceptionSet),
-            scale_movement
-                .in_set(NpcSet::Locomotion)
-                .before(NpcMoverSet),
-        ),
-    );
+    if need_specs(p).iter().any(|(_, spec)| spec.on) || night_penalty(p) {
+        app.add_systems(
+            NpcSimTick,
+            (
+                update_state
+                    .in_set(NpcSet::Sense)
+                    .before(npc_framework::perception::NpcPerceptionSet),
+                scale_movement
+                    .in_set(NpcSet::Locomotion)
+                    .before(NpcMoverSet),
+            ),
+        );
+    }
+}
+fn night_penalty(p: &WorldPreset) -> bool {
+    p.day_night.on && p.day_night.night_vision_pct != 100
 }
 fn keys() -> [&'static str; 4] {
     ["hunger", "thirst", "energy", "battery"]
@@ -121,7 +126,7 @@ pub fn apply(world: &mut World, played: SimId, p: &WorldPreset) {
         .iter()
         .enumerate()
         .any(|(i, (_, s))| s.on && relevant(body, i));
-    if has_needs || p.day_night.night_vision_pct != 100 {
+    if has_needs || night_penalty(p) {
         let base_speed = world
             .get::<Commandable>(entity)
             .map_or(70, |c| c.speed_mm_per_tick);
@@ -209,7 +214,7 @@ pub fn apply(world: &mut World, played: SimId, p: &WorldPreset) {
             let id =
                 crate::layout::spawn_unit(world, crate::layout::cell(-5 + i32::from(i), -4), &spec)
                     .expect("validated built-in inhabitant");
-            if p.day_night.night_vision_pct != 100 {
+            if night_penalty(p) {
                 let entity = world
                     .resource::<SimIndex>()
                     .get(id)

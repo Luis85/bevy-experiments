@@ -333,6 +333,9 @@ pub enum JournalKind {
         margin: i32,
         quality: i32,
         outputs: Vec<SimId>,
+        /// Outputs left on the ground because the pack had no capacity.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        dropped: Vec<DroppedItem>,
     },
     /// A craft did not succeed (`npc_crafting`): `outcome` is `"rejected"`
     /// (it could not start), `"failed"` (the roll failed: time spent),
@@ -990,6 +993,14 @@ pub fn query(journal: &Journal, filter: &JournalFilter) -> Vec<JournalEntry> {
 mod names_tests {
     use super::*;
 
+    #[test]
+    fn craft_done_accepts_legacy_payload_and_omits_empty_drops() {
+        let old = serde_json::json!({"type":"CraftDone","recipe":"planks","workstation":null,"margin":0,"quality":0,"outputs":[70]});
+        let kind: JournalKind = serde_json::from_value(old.clone()).unwrap();
+        assert!(matches!(&kind,JournalKind::CraftDone{dropped,..} if dropped.is_empty()));
+        assert_eq!(serde_json::to_value(kind).unwrap(), old);
+    }
+
     /// One value of every variant. The match in `variant_count` has no
     /// wildcard, so a new variant fails to compile until it is listed here
     /// and in `JournalKind::NAMES`.
@@ -1152,6 +1163,7 @@ mod names_tests {
                 margin: 0,
                 quality: 0,
                 outputs: Vec::new(),
+                dropped: Vec::new(),
             },
             JournalKind::CraftFailed {
                 recipe: String::new(),

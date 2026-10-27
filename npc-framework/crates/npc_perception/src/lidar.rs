@@ -15,13 +15,14 @@
 //! callback per cell; a 360-beam, 20 m scan on 1 m cells visits about 7 000
 //! cells and allocates nothing once warm. An idle robot (same position,
 //! facing, LIDAR, grid revision and obstacle cells) reuses its noise-free
-//! ranges and only draws the noise again.
+//! ranges and only draws the noise again. Subcell movement still traces
+//! every beam, while reusing the identical solid-cell bitmap.
 
 use std::collections::BTreeMap;
 
 use bevy_ecs::prelude::*;
 use npc_kernel::rng::{sim_rand, splitmix64};
-use npc_kernel::spatial::{CellCoord, SpatialGrid};
+use npc_kernel::spatial::{CellCoord, GridBounds, SpatialGrid};
 use npc_kernel::{SimId, SimPos};
 use serde::{Deserialize, Serialize};
 
@@ -39,6 +40,8 @@ pub const LIDAR_RANGE_MIN_MM: i32 = 50;
 /// Above this many cells the scan square is not marked in a bitmap; beams
 /// then read the grid cell by cell (huge ranges on fine grids).
 const WINDOW_MAX_CELLS: i64 = 1 << 20;
+const SOLID: u8 = 1;
+const VISITED: u8 = 2;
 
 /// A planar laser scan shaped like ROS `sensor_msgs/LaserScan`, in mm and
 /// millidegrees: beam `i` points `angle_min_mdeg + i · angle_increment_mdeg`
@@ -118,10 +121,8 @@ struct LidarCache {
 /// Reused buffers of the LIDAR pass (not state).
 #[derive(Default)]
 pub struct LidarScratch {
-    /// The scan square's cells: 1 = a beam stops there.
-    solid: Vec<u8>,
-    /// Geometry visited by the fog pass (one byte per window cell).
-    visited: Vec<u8>,
+    /// The scan square: cached SOLID and transient VISITED flags.
+    solid: SolidBitmap,
     /// This scan's obstacle cells, sorted.
     thing_cells: Vec<CellCoord>,
     /// The beams' unit directions relative to the facing (ppm), for
@@ -141,10 +142,52 @@ impl LidarScratch {
 }
 
 /// The square of cells `(x0, z0, width)` the beams can reach.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Window {
     x0: i32,
     z0: i32,
     w: i32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SolidKey {
+    window: Window,
+    cell_mm: i32,
+    bounds: GridBounds,
+    revision: u64,
+}
+
+/// Unlike beam endpoints, solid cells do not change when an origin moves
+/// within a cell. Sensor noise is never cached here; the VISITED flag is
+/// reset before every fog scan and ignored by the range scanner.
+#[derive(Default)]
+struct SolidBitmap {
+    key: Option<SolidKey>,
+    things: Vec<CellCoord>,
+    cells: Vec<u8>,
+    #[cfg(test)]
+    fills: u64,
+}
+impl SolidBitmap {
+    fn prepare(&mut self, window: &Window, grid: &SpatialGrid, things: &[CellCoord]) {
+        let key = SolidKey {
+            window: *window,
+            cell_mm: grid.cell_mm(),
+            bounds: grid.bounds(),
+            revision: grid.revision(),
+        };
+        if self.key == Some(key) && self.things == things {
+            return;
+        }
+        window.fill(grid, things, &mut self.cells);
+        self.key = Some(key);
+        self.things.clear();
+        self.things.extend_from_slice(things);
+        #[cfg(test)]
+        {
+            self.fills += 1;
+        }
+    }
 }
 
 impl Window {
@@ -163,13 +206,13 @@ impl Window {
             CellCoord::new(self.x0 + self.w - 1, self.z0 + self.w - 1),
             |c| {
                 if let Some(i) = self.index(c) {
-                    solid[i] = 1;
+                    solid[i] = SOLID;
                 }
             },
         );
         for &c in things {
             if let Some(i) = self.index(c) {
-                solid[i] = 1;
+                solid[i] = SOLID;
             }
         }
     }
@@ -226,26 +269,26 @@ pub(crate) fn reveal_lidar(
     let start = grid.cell_of(pos);
     prepare_beams(scratch, &lidar);
     let direction = dir_ppm(i64::from(facing_angle_mdeg(facing)));
+    if let Some(win) = window.as_ref() {
+        scratch.solid.prepare(win, grid, things);
+    }
+    // Every full scan starts with empty coverage, even when solids reuse.
+    for flags in &mut scratch.solid.cells {
+        *flags &= SOLID;
+    }
     if let Some(win) = window {
-        win.fill(grid, things, &mut scratch.solid);
-        scratch.visited.clear();
-        scratch.visited.resize(scratch.solid.len(), 0);
-        scratch.visited[win.index(start).expect("scan origin inside window")] = 1;
+        scratch.solid.cells[win.index(start).expect("scan origin inside window")] |= VISITED;
         for &beam in &scratch.beams {
             let end = beam_end(pos, direction, beam, i64::from(range));
-            let _ = march_with(
-                &win,
-                &scratch.solid,
-                i64::from(grid.cell_mm()),
-                pos,
-                end,
-                start,
-                |i| scratch.visited[i] = 1,
-            );
+            let _ = march_using(&win, i64::from(grid.cell_mm()), pos, end, start, |i| {
+                let flags = &mut scratch.solid.cells[i as usize];
+                *flags |= VISITED;
+                *flags & SOLID != 0
+            });
         }
-        for (z, row) in scratch.visited.chunks_exact(win.w as usize).enumerate() {
+        for (z, row) in scratch.solid.cells.chunks_exact(win.w as usize).enumerate() {
             for (x, &v) in row.iter().enumerate() {
-                if v != 0 {
+                if v & VISITED != 0 {
                     visit(CellCoord::new(win.x0 + x as i32, win.z0 + z as i32));
                 }
             }
@@ -377,14 +420,14 @@ fn trace(
     grid: &SpatialGrid,
     window: Option<&Window>,
     things: &[CellCoord],
-    solid: &mut Vec<u8>,
+    solid: &mut SolidBitmap,
     beams: &[(i64, i64)],
     (pos, facing, range): (SimPos, Facing, i32),
     clean: &mut Vec<i32>,
 ) {
     clean.clear();
     if let Some(win) = window {
-        win.fill(grid, things, solid);
+        solid.prepare(win, grid, things);
     }
     let cs = i64::from(grid.cell_mm());
     let start = grid.cell_of(pos);
@@ -398,7 +441,7 @@ fn trace(
     for &beam in beams {
         let end = beam_end(pos, (ux, uz), beam, r);
         let hit = match window {
-            Some(win) => march(win, solid, cs, pos, end, start)
+            Some(win) => march(win, &solid.cells, cs, pos, end, start)
                 .map(|(num, den)| fraction_distance(num, den, r)),
             None => {
                 let mut hit = None;
@@ -432,9 +475,10 @@ fn march(
     b: SimPos,
     start: CellCoord,
 ) -> Option<(i64, i64)> {
-    march_with(win, solid, cs, a, b, start, |_| {})
+    march_using(win, cs, a, b, start, |i| solid[i as usize] & SOLID != 0)
 }
 
+#[cfg(test)]
 fn march_with(
     win: &Window,
     solid: &[u8],
@@ -444,15 +488,23 @@ fn march_with(
     start: CellCoord,
     mut visit: impl FnMut(usize),
 ) -> Option<(i64, i64)> {
-    let w = i64::from(win.w);
-    let at = |x: i32, z: i32| -> i64 { i64::from(z - win.z0) * w + i64::from(x - win.x0) };
-    // The window spans the beam's entire reach, including corner side
-    // cells. Ordinary checked indexing needs only one bounds check here.
-    let mut is_solid = |i: i64| {
+    march_using(win, cs, a, b, start, |i| {
         let i = i as usize;
         visit(i);
-        solid[i] != 0
-    };
+        solid[i] & SOLID != 0
+    })
+}
+
+fn march_using(
+    win: &Window,
+    cs: i64,
+    a: SimPos,
+    b: SimPos,
+    start: CellCoord,
+    mut is_solid: impl FnMut(i64) -> bool,
+) -> Option<(i64, i64)> {
+    let w = i64::from(win.w);
+    let at = |x: i32, z: i32| -> i64 { i64::from(z - win.z0) * w + i64::from(x - win.x0) };
     let dx = i64::from(b.x) - i64::from(a.x);
     let dz = i64::from(b.z) - i64::from(a.z);
     let (sx, sz) = (dx.signum() as i32, dz.signum() as i32);
@@ -566,6 +618,348 @@ mod tests {
     use npc_kernel::{NpcKernelPlugin, run_ticks, spawn_sim};
 
     use super::*;
+
+    fn reference_scan(
+        grid: &SpatialGrid,
+        things: &[CellCoord],
+        pos: SimPos,
+        facing: Facing,
+        lidar: Lidar,
+    ) -> (Vec<i32>, std::collections::BTreeSet<CellCoord>) {
+        let (angle, inc) = beam_angles(&lidar);
+        let range = i64::from(lidar.range_mm);
+        let direction = dir_ppm(i64::from(facing_angle_mdeg(facing)));
+        let start = grid.cell_of(pos);
+        let mut ranges = Vec::new();
+        let mut cells = std::collections::BTreeSet::new();
+        for beam in 0..lidar.beams {
+            let end = beam_end(
+                pos,
+                direction,
+                dir_ppm(i64::from(angle) + i64::from(beam) * i64::from(inc)),
+                range,
+            );
+            let mut hit = None;
+            grid.trace_segment(pos, end, |cell| {
+                cells.insert(cell);
+                let flags = grid.cell(cell).flags;
+                if cell != start
+                    && (flags.blocking || flags.occluding || things.binary_search(&cell).is_ok())
+                {
+                    hit = Some(cell);
+                    false
+                } else {
+                    true
+                }
+            });
+            ranges.push(hit.map_or(lidar.range_mm + 1, |cell| {
+                entry_distance(pos, end, range, cell, i64::from(grid.cell_mm()))
+                    .clamp(i64::from(LIDAR_RANGE_MIN_MM.min(lidar.range_mm)), range)
+                    as i32
+            }));
+        }
+        (ranges, cells)
+    }
+    fn check_cached_scan(
+        grid: &SpatialGrid,
+        things: &[CellCoord],
+        pos: SimPos,
+        facing: Facing,
+        lidar: Lidar,
+        entity: Entity,
+        scratches: (&mut LidarScratch, &mut LidarScratch),
+    ) {
+        let (scan, fog) = scratches;
+        let expected = reference_scan(grid, things, pos, facing, lidar);
+        let mut got = LaserScan::default();
+        scan_lidar(
+            LidarInput {
+                grid,
+                things: things.iter().map(|&cell| grid.center(cell)),
+                entity,
+                id: SimId(1),
+                pos,
+                facing,
+                lidar,
+                seed: 1,
+                tick: 0,
+            },
+            &mut got,
+            scan,
+        );
+        assert_eq!(got.ranges_mm, expected.0, "full ranges at {pos:?}");
+        assert_eq!(got.ranges_mm.len(), usize::from(lidar.beams));
+        let mut cells = std::collections::BTreeSet::new();
+        reveal_lidar(grid, pos, facing, lidar, things, fog, |cell| {
+            cells.insert(cell);
+        });
+        assert_eq!(cells, expected.1, "exact fog coverage at {pos:?}");
+    }
+    #[test]
+    fn solid_bitmap_reuses_within_cell_and_invalidates_exact_inputs() {
+        let mut grid = SpatialGrid::new(1000, GridBounds::centered(80, 80));
+        grid.set_static(
+            CellCoord::new(3, 0),
+            CellInfo {
+                flags: CellFlags {
+                    blocking: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        );
+        let entity = World::new().spawn_empty().id();
+        let mut scan = LidarScratch::default();
+        let mut fog = LidarScratch::default();
+        let lidar = Lidar {
+            range_mm: 8000,
+            fov_deg: 360,
+            beams: 360,
+            noise_ppm: 0,
+        };
+        let facing = Facing::new(0, 1);
+        let mut things = vec![CellCoord::new(-3, 2)];
+        for pos in [
+            SimPos::new(101, 151),
+            SimPos::new(271, 221),
+            SimPos::new(631, 811),
+            SimPos::new(901, 901),
+        ] {
+            check_cached_scan(
+                &grid,
+                &things,
+                pos,
+                facing,
+                lidar,
+                entity,
+                (&mut scan, &mut fog),
+            );
+            assert_eq!(scan.solid.fills, 1);
+            assert_eq!(fog.solid.fills, 1);
+        }
+        // Facing/FOV change alters every endpoint, not the cached solids.
+        check_cached_scan(
+            &grid,
+            &things,
+            SimPos::new(901, 901),
+            Facing::new(1, 1),
+            Lidar {
+                fov_deg: 90,
+                ..lidar
+            },
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(scan.solid.fills, 1);
+        assert_eq!(fog.solid.fills, 1);
+        grid.set_static(
+            CellCoord::new(0, 2),
+            CellInfo {
+                flags: CellFlags {
+                    occluding: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        );
+        check_cached_scan(
+            &grid,
+            &things,
+            SimPos::new(901, 901),
+            facing,
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(scan.solid.fills, 2);
+        assert_eq!(fog.solid.fills, 2);
+        things[0] = CellCoord::new(2, -3);
+        check_cached_scan(
+            &grid,
+            &things,
+            SimPos::new(901, 901),
+            facing,
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(scan.solid.fills, 3);
+        assert_eq!(fog.solid.fills, 3);
+        check_cached_scan(
+            &grid,
+            &things,
+            SimPos::new(1101, 901),
+            facing,
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(scan.solid.fills, 4);
+        assert_eq!(fog.solid.fills, 4);
+        let different_size = SpatialGrid::new(500, GridBounds::centered(80, 80));
+        check_cached_scan(
+            &different_size,
+            &things,
+            SimPos::new(1101, 901),
+            facing,
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(scan.solid.fills, 5);
+        assert_eq!(fog.solid.fills, 5);
+        let different_bounds = SpatialGrid::new(500, GridBounds::centered(40, 40));
+        // Turn to force fresh ranges; only bounds changed for the solid key.
+        check_cached_scan(
+            &different_bounds,
+            &things,
+            SimPos::new(1101, 901),
+            Facing::new(-1, 1),
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(scan.solid.fills, 6);
+        assert_eq!(fog.solid.fills, 6);
+    }
+
+    #[test]
+    fn solid_bitmap_snapshot_replacement_and_visited_reset_match_reference() {
+        use npc_kernel::snapshot::{self, LoadMode};
+        let mut app = App::new();
+        app.insert_resource(SpatialGrid::new(1000, GridBounds::centered(40, 40)));
+        app.add_plugins((NpcKernelPlugin::default(), SpatialPlugin));
+        app.finish();
+        app.cleanup();
+        let saved = snapshot::save(app.world_mut()).unwrap();
+        let entity = app.world_mut().spawn_empty().id();
+        let lidar = Lidar {
+            range_mm: 8000,
+            fov_deg: 90,
+            beams: 91,
+            noise_ppm: 0,
+        };
+        let mut scan = LidarScratch::default();
+        let mut fog = LidarScratch::default();
+        check_cached_scan(
+            app.world().resource::<SpatialGrid>(),
+            &[],
+            SimPos::new(101, 151),
+            Facing::new(0, 1),
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        check_cached_scan(
+            app.world().resource::<SpatialGrid>(),
+            &[],
+            SimPos::new(631, 811),
+            Facing::new(0, -1),
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(
+            fog.solid.fills, 1,
+            "coverage reset even while solid window reused"
+        );
+        app.world_mut().resource_mut::<SpatialGrid>().set_static(
+            CellCoord::new(0, -2),
+            CellInfo {
+                flags: CellFlags {
+                    blocking: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+        );
+        check_cached_scan(
+            app.world().resource::<SpatialGrid>(),
+            &[],
+            SimPos::new(631, 811),
+            Facing::new(0, -1),
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        let fills = fog.solid.fills;
+        snapshot::load(app.world_mut(), &saved, LoadMode::Strict).unwrap();
+        check_cached_scan(
+            app.world().resource::<SpatialGrid>(),
+            &[],
+            SimPos::new(631, 811),
+            Facing::new(0, -1),
+            lidar,
+            entity,
+            (&mut scan, &mut fog),
+        );
+        assert_eq!(fog.solid.fills, fills + 1);
+        assert_eq!(scan.solid.fills, fills + 1);
+    }
+
+    #[test]
+    fn shared_scratch_reveal_range_and_opposite_reveal_keep_flags_independent() {
+        let grid = SpatialGrid::new(1000, GridBounds::centered(40, 40));
+        let entity = World::new().spawn_empty().id();
+        let mut scratch = LidarScratch::default();
+        let lidar = Lidar {
+            range_mm: 8000,
+            fov_deg: 90,
+            beams: 91,
+            noise_ppm: 0,
+        };
+        let north = Facing::new(0, 1);
+        let south = Facing::new(0, -1);
+        let first = SimPos::new(101, 151);
+        let second = SimPos::new(631, 811);
+        let mut initial = std::collections::BTreeSet::new();
+        reveal_lidar(&grid, first, north, lidar, &[], &mut scratch, |cell| {
+            initial.insert(cell);
+        });
+        assert_eq!(initial, reference_scan(&grid, &[], first, north, lidar).1);
+        let mut ranges = LaserScan::default();
+        scan_lidar(
+            LidarInput {
+                grid: &grid,
+                things: std::iter::empty(),
+                entity,
+                id: SimId(1),
+                pos: second,
+                facing: south,
+                lidar,
+                seed: 1,
+                tick: 0,
+            },
+            &mut ranges,
+            &mut scratch,
+        );
+        assert_eq!(
+            ranges.ranges_mm,
+            reference_scan(&grid, &[], second, south, lidar).0,
+            "visited-only north cells must not become solid range hits"
+        );
+        let mut opposite = std::collections::BTreeSet::new();
+        reveal_lidar(&grid, second, south, lidar, &[], &mut scratch, |cell| {
+            opposite.insert(cell);
+        });
+        assert_eq!(opposite, reference_scan(&grid, &[], second, south, lidar).1);
+        assert!(initial.difference(&opposite).next().is_some());
+        assert_eq!(
+            scratch.solid.fills, 1,
+            "neither flags nor endpoint changes rebuild identical solids"
+        );
+        // A later solid fill must clear every transient flag as well.
+        let things = [CellCoord::new(0, -2)];
+        let mut changed = std::collections::BTreeSet::new();
+        reveal_lidar(&grid, second, north, lidar, &things, &mut scratch, |cell| {
+            changed.insert(cell);
+        });
+        assert_eq!(
+            changed,
+            reference_scan(&grid, &things, second, north, lidar).1
+        );
+        assert_eq!(scratch.solid.fills, 2);
+    }
 
     #[test]
     fn scaled_hit_distance_handles_wide_cross_products() {
