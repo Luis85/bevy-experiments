@@ -49,4 +49,7 @@ replays verified; six snapshots with none pending; format, Clippy and cargo-deny
 were skipped. Process-local `CARGO_BUILD_JOBS=8` and `NEXTEST_TEST_THREADS=1` bounded the builders/tests;
 no retries, filters, oracle changes or assertion removals were used to pass the gate.
 
-The five-app release build follows the verified local merge; its result is recorded in the progress ledger.
+The verified checkpoint `28cb8d4` was merged --no-ff to main as `f78702b`. The five-app release build on main
+passed in 3m24s (`target/release-phase-i.log`). Binaries are
+`C:\Projects\bevy-experiments\npc-framework\target\release\{game_menu,actor_testbed,npcctl,village,rts_units_demo}.exe`.
+The user's running old `npcctl.exe` was renamed aside to permit replacement; its process was not stopped.

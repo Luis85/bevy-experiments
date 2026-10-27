@@ -2,6 +2,13 @@
 
 ## Current continuation (2026-10-27)
 
+**Latest: Tasks 30–31 are complete and Gate I verification passed** (`target/verify-phase-i-final.json`,
+`ok:true`, 1,144 tests passed/12 skipped/four reported leaky; doc 1/10 ignored, architecture 7/7, replays 8/8,
+six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped). Feature `28cb8d4` was merged
+--no-ff to local main `f78702b`. The five-app release build passed on main in 3m24s (`target/release-phase-i.log`);
+Gate I is complete. Live generated-MCP rover handoff and token rotation passed; evidence is
+`docs/_notes/phase-i-registration-evidence.md`. Next: G / 15–17, H / 21–23, F / 18, final review/fix wave.
+
 The user asked to **drive the whole plan to the end**. Phases A–E are complete in the current monorepo,
 `C:\Projects\bevy-experiments\npc-framework`. Tasks 13/14 were committed as `e3b8475` and merged --no-ff to
 `main` as `65ea248`. Full Gate E (`target/verify-phase-e-serial.json`) reports **`"ok": true`**: 1,105 tests
@@ -14,7 +21,7 @@ The five-app release build passed on main, 2026-10-27. Artifacts are under `targ
 Evidence: `docs/_notes/task13-robot-explorer-evidence.md` and `task14-actor-editor-evidence.md`.
 The LIDAR decision is resolved: optimized complete scans; rover median p95 37.2 µs perception /49.4 µs fog.
 
-**Next: Phase I / Tasks 30–31 (registration/tokens), then G / 15–17 (worlds), H / 21–23 (map), F / 18 (docs,
+**Order after Gate E: Phase I / Tasks 30–31 (now complete), G / 15–17 (worlds), H / 21–23 (map), F / 18 (docs,
 MCP end-to-end, final verify), final whole-change review and one fix wave.** Preserve the phase gates: full
 verification, local main checkpoint and five release apps before starting the next phase. Use the current
 checkout layout and `codex/` branches, preserving unrelated changes; no push/PR was requested.

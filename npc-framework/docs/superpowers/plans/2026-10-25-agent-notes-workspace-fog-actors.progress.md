@@ -2,6 +2,23 @@
 
 ## Continuation in the monorepo (2026-10-27)
 
+- **Tasks 30–31 complete; Gate I verification passed.** Registration checkpoint `28cb8d4`, merged --no-ff
+  to local main as `f78702b`. Full `cargo xtask verify` (`target/verify-phase-i-final.json`): `ok:true`;
+  1,144 passed, 12 skipped, four reported leaky; doc 1 passed/10 ignored; architecture 7/7, replays 8/8,
+  six snapshots none pending; fmt/Clippy/deny passed, no optional tools skipped. Serial test execution used
+  process-local settings; no retries, oracle edits or removed assertions. Five-app release build passed on main
+  in 3m24s (`target/release-phase-i.log`); binaries at `target/release/{game_menu,actor_testbed,npcctl,village,rts_units_demo}.exe`.
+  The user's running old `npcctl.exe` was renamed `npcctl.locked-57336.exe`; its process was not stopped.
+- Registered MCP live run: generated config and handbook, assigned rover, 300 mm movement, three notebooks,
+  developer memory, detached→native same-port/same-position reconnect, stale read cursor, explicit token
+  revocation and new login all passed. Valid delayed native and Resume/New-token menu captures inspected.
+  Evidence: `docs/_notes/phase-i-registration-evidence.md`; ADR 0016. Unlocked scenario API retained.
+- Ruling R20: a pure optional explorer construction context carries immutable preset/perception data for
+  ordinary replay/snapshot reconstruction; host credentials/session state never enter it. Explicit revocation
+  prevents transparent reconnect; a restarted/moved host may reconnect once and restore requested control.
+- **Gate I complete. Next: G / Tasks 15–17**, then H / 21–23 and F / 18, final review + fix wave.
+  World loader/host/menu interfaces are agreed; preparation so far is read-only.
+
 - User: **"drive the whole plan to the end"**. Continue through I, G, H and F, including phase verification,
   local main checkpoints, five-app release artifacts, end-to-end checks and final review. No push/PR requested.
 - **Task 14 complete; Gate E complete.** Combined Tasks 13/14 checkpoint `e3b8475`, merged --no-ff to current
