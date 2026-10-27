@@ -2,12 +2,17 @@
 
 ## Current continuation (2026-10-27)
 
-**Latest: Tasks 30–31 are complete and Gate I verification passed** (`target/verify-phase-i-final.json`,
-`ok:true`, 1,144 tests passed/12 skipped/four reported leaky; doc 1/10 ignored, architecture 7/7, replays 8/8,
-six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped). Feature `28cb8d4` was merged
---no-ff to local main `f78702b`. The five-app release build passed on main in 3m24s (`target/release-phase-i.log`);
-Gate I is complete. Live generated-MCP rover handoff and token rotation passed; evidence is
-`docs/_notes/phase-i-registration-evidence.md`. Next: G / 15–17, H / 21–23, F / 18, final review/fix wave.
+**Latest: Tasks 15–17 are complete and Gate G verification passed** (`target/verify-phase-g.json`,
+`ok:true`, 1,174 tests passed/12 skipped/two reported leaky; doc 1/10 ignored, architecture 7/7, replays 8/8,
+six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped). Feature `51d804c` was merged
+--no-ff to main `7bc8a2c`; five-app release build passed on main in 3m02s (`target/release-phase-g.log`). Gate G
+is complete. Evidence:
+`docs/_notes/phase-g-world-presets-evidence.md` (live Survival/source-edit resume and inspected UI/night captures).
+Next: H / 21–23, F / 18, final review/fix wave. H interfaces are agreed read-only. The final audit found a
+crafting full-pack matching-stack overflow and missing crafted-output delta/drop feedback for the final wave.
+
+Gate I is complete: feature `28cb8d4`, main merge `f78702b`, five-app release passed in 3m24s. Its evidence is
+`docs/_notes/phase-i-registration-evidence.md` (1,144 tests; live generated-MCP rover handoff/token rotation).
 
 The user asked to **drive the whole plan to the end**. Phases A–E are complete in the current monorepo,
 `C:\Projects\bevy-experiments\npc-framework`. Tasks 13/14 were committed as `e3b8475` and merged --no-ff to

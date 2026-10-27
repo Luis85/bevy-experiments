@@ -2,6 +2,25 @@
 
 ## Continuation in the monorepo (2026-10-27)
 
+- **Tasks 15–17 complete; Gate G verification passed.** World-preset checkpoint `51d804c`, merged --no-ff
+  to main as `7bc8a2c`. Full `cargo xtask verify` (`target/verify-phase-g.json`): `ok:true`; 1,174 passed,
+  12 skipped, two reported leaky; doc 1 passed/10 ignored, architecture 7/7, replays 8/8, six snapshots none
+  pending; fmt/Clippy/deny passed, no optional tools skipped. Five-app release build passed on main in 3m02s
+  (`target/release-phase-g.log`), with all five `.exe` files under this workspace's `target/release/`.
+- Live Survival probe verified rising needs, night, 50% movement speed and immutable saved world rules/need
+  levels after source replacement and native handoff. Worlds, New (with persistent selection markers), Resume
+  (both preset IDs) and night-world captures inspected. Evidence: `docs/_notes/phase-g-world-presets-evidence.md`.
+- Ruling R21: Plain retains its incumbent 2,400-tick/30%-night clock with 100% night vision and existing
+  progression; optional needs register only when selected, preserving every old hash fixture.
+- Ruling R22: active-world recovery verbs are intrinsic for the matching body/source, so old installed/saved
+  actors need no whitelist migration. Hunger/thirst exhaustion needs external rescue; rest/charge are the only
+  permitted collapsed actions. Ruling R23: inhabitant patrols are validated constructor state, not extra
+  external inputs; a fresh world with inhabitants records/replays successfully.
+- **Gate G complete. Next: H / Tasks 21–23**, F / 18, final whole-change review and one fix wave. H contracts
+  are agreed read-only (store/helpers, API/host, F7/markers, controller-free MCP/CLI). Final audit found two
+  crafting issues for that fix wave: full-pack matching-stack overfill and missing crafted-output delta/drop
+  feedback. Existing replay/snapshot coverage does not exercise the overflow; verify unchanged oracles.
+
 - **Tasks 30–31 complete; Gate I verification passed.** Registration checkpoint `28cb8d4`, merged --no-ff
   to local main as `f78702b`. Full `cargo xtask verify` (`target/verify-phase-i-final.json`): `ok:true`;
   1,144 passed, 12 skipped, four reported leaky; doc 1 passed/10 ignored; architecture 7/7, replays 8/8,

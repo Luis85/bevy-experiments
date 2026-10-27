@@ -46,4 +46,6 @@ Full `cargo xtask verify` reports **`"ok":true`** (`target/verify-phase-g.json`)
 12 skipped, two reported leaky; documentation 1 passed/10 ignored; architecture 7/7; all eight replay files
 verified; six snapshots none pending; format, Clippy and cargo-deny passed. No optional tools skipped.
 Process-local `CARGO_BUILD_JOBS=8`, `NEXTEST_TEST_THREADS=1`; no retries, oracle edits or assertion removals.
-The verified local merge and five-app release result follow in the progress ledger.
+Checkpoint `51d804c` was merged --no-ff to main as `7bc8a2c`; the five-app release build on main passed in
+3m02s (`target/release-phase-g.log`). Artifacts:
+`C:\Projects\bevy-experiments\npc-framework\target\release\{game_menu,actor_testbed,npcctl,village,rts_units_demo}.exe`.
