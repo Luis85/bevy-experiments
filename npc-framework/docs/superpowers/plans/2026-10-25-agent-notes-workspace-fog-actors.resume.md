@@ -2,7 +2,21 @@
 
 ## Current continuation (2026-10-27)
 
-**Latest: Tasks 15–17 are complete and Gate G verification passed** (`target/verify-phase-g.json`,
+**Latest: Tasks 21–23 implemented; Gate H passed.** Feature `76b153a`, main merge `dd645c3`.
+`target/verify-phase-h-final.json`: `ok:true`, 1,217 passed/12 skipped/one slow/two reported leaky, doc 1/10
+ignored, architecture 7/7, replays 8/8, six unchanged snapshots, fmt/Clippy/deny passed, no optional tools
+skipped. A first-run stale MCP tool-list assertion was corrected with expanded field checks; full gate rerun.
+Five-app release build passed on main in 3m20s (`target/release-phase-h.log`); Gate H is complete.
+Map live/generated-MCP/native evidence:
+`docs/_notes/phase-h-landmarks-evidence.md`.
+
+Next F18, final review refresh and one fix wave: crafting capacity/output feedback, secret-bearing Debug,
+carried/equipped item visuals and clock-reset optimistic stamp collisions. Existing BRP world.query,
+world.write_message(WindowCloseRequested) and world.trigger_event(Activate) can drive actual F7 tabs and
+close-dialog Yes without OS input; primary/type paths and JSON were source-verified, live F validation pending.
+R22 hunger/thirst exhaustion needing external rescue is deliberate, not a new defect.
+
+**Previous checkpoint: Tasks 15–17 and Gate G passed** (`target/verify-phase-g.json`,
 `ok:true`, 1,174 tests passed/12 skipped/two reported leaky; doc 1/10 ignored, architecture 7/7, replays 8/8,
 six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped). Feature `51d804c` was merged
 --no-ff to main `7bc8a2c`; five-app release build passed on main in 3m02s (`target/release-phase-g.log`). Gate G

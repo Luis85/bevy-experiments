@@ -2,6 +2,25 @@
 
 ## Continuation in the monorepo (2026-10-27)
 
+- **Tasks 21–23 implemented; Gate H verification passed.** Map checkpoint `76b153a`, merged --no-ff to
+  main as `dd645c3`. Complete `cargo xtask verify` rerun (`target/verify-phase-h-final.json`) reports `ok:true`:
+  1,217 passed, 12 skipped, one slow/two reported leaky; doc 1 passed/10 ignored, architecture 7/7, replays 8/8,
+  six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped. The first run's only failure
+  was an outdated exact MCP tool-list test; its old assertions were retained and expanded, then the full gate
+  reran with two test workers. Five-app release build passed on main in 3m20s (`target/release-phase-h.log`);
+  all five binaries are under `C:\Projects\bevy-experiments\npc-framework\target\release\`.
+- Live generated-MCP map probe passed twice: Here/explicit placement, null-kind update, stale rejection,
+  landmark movement/nearest output, notebooks, developer memory, same-port native handoff/map persistence,
+  stale-cursor reconnect and token rotation. F7 Map and labels under black fog inspected; one bounded label
+  collision correction was confirmed. Evidence: `docs/_notes/phase-h-landmarks-evidence.md`.
+- Ruling R24: map markers are noninteractive projected UI labels, so owned knowledge remains visible through
+  all fog; ID-sorted label packing displaces labels while keeping exact ground anchors fixed.
+- **Gate H complete. Next: F / Task 18** (complete docs, real reflected F7/close-Yes-to-detached workflow,
+  full verify/release), final review refresh and **one fix wave**. Concrete queued items: crafted matching-stack
+  capacity overflow and missing output/drop feedback; four secret-bearing Debug holders; real carried/equipped
+  item visual lifecycle; notes/map optimistic-stamp repetition across clock resets. The R22 hunger/thirst
+  rescue rule is deliberate and is not a new bug. No final completion claim until queued defects are fixed.
+
 - **Tasks 15–17 complete; Gate G verification passed.** World-preset checkpoint `51d804c`, merged --no-ff
   to main as `7bc8a2c`. Full `cargo xtask verify` (`target/verify-phase-g.json`): `ok:true`; 1,174 passed,
   12 skipped, two reported leaky; doc 1 passed/10 ignored, architecture 7/7, replays 8/8, six snapshots none

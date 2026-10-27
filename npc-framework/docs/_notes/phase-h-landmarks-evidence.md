@@ -54,5 +54,8 @@ The complete rerun reports **`"ok":true`** (`target/verify-phase-h-final.json`):
 one slow and two reported leaky; documentation 1 passed/10 ignored; architecture 7/7; eight replays verified;
 six snapshots none pending; format, Clippy and deny passed. No optional tools skipped. Process-local
 `CARGO_BUILD_JOBS=8`, `NEXTEST_TEST_THREADS=2`; no retry/filter/ignore changes in this full gate.
-The local merge and five-app release result follow in the progress ledger. The final review's separate fix
+Checkpoint `76b153a` was merged --no-ff to main as `dd645c3`; the five-app release build on main passed in
+3m20s (`target/release-phase-h.log`). Artifacts:
+`C:\Projects\bevy-experiments\npc-framework\target\release\{game_menu,actor_testbed,npcctl,village,rts_units_demo}.exe`.
+The final review's separate fix
 pass will also address the inherited clock-reset stamp collision discovered after these focused tests.
