@@ -72,6 +72,62 @@ fn app() -> App {
     app
 }
 
+#[test]
+fn rover_uses_the_rover_model() {
+    for model in ["rover", "sentinel"] {
+        let mut app = app();
+        let sim = app
+            .world_mut()
+            .spawn((
+                unit(1, 500),
+                testbed_content::actors::ActorModel(model.into()),
+                npc_framework::perception::Sensors::new()
+                    .lidar(20_000, 360, 360, 0)
+                    .camera(15_000, 35),
+            ))
+            .id();
+        app.update();
+        app.update();
+        let root = app.world().resource::<VisualIndex>().map[&sim];
+        let mut parts = app
+            .world_mut()
+            .query::<(&ChildOf, &Name, Option<&Mesh3d>)>();
+        let parts: Vec<_> = parts
+            .iter(app.world())
+            .filter(|(parent, _, _)| parent.parent() == root)
+            .collect();
+        assert!(
+            parts
+                .iter()
+                .any(|(_, name, mesh)| name.as_str() == "robot chassis" && mesh.is_some())
+        );
+        assert_eq!(
+            parts
+                .iter()
+                .filter(|(_, name, _)| name.as_str() == "robot wheel")
+                .count(),
+            4
+        );
+        assert_eq!(
+            parts
+                .iter()
+                .filter(|(_, name, _)| name.as_str() == "sensor dome")
+                .count(),
+            2
+        );
+        assert!(
+            parts
+                .iter()
+                .any(|(_, name, _)| name.as_str() == "sensor mast")
+                == (model == "sentinel")
+        );
+        assert!(
+            app.world().get::<Transform>(sim).is_none(),
+            "view parts stay off the simulation entity"
+        );
+    }
+}
+
 /// Builds, runs, and checks that the fog hides an unsensed unit from the
 /// generic helpers (`ViewHidden`) while the actor and a sensed unit show.
 #[test]
@@ -102,6 +158,7 @@ fn view_plugin_runs_headless_and_fogs_units() {
             ExploredCells::sized(bounds),
             VisibleCells {
                 bits: vec![0; words],
+                ..default()
             },
             memory,
         ))

@@ -26,10 +26,12 @@ pub enum Entry {
     Village,
     Testbed(&'static str),
     RtsDemo,
+    ActorEditor,
     ExplorerNew {
         agent: String,
         world: String,
         mode: RunMode,
+        preset: String,
     },
     ExplorerResume {
         agent: String,
@@ -57,6 +59,7 @@ impl Entry {
             Self::Village => "Village".into(),
             Self::Testbed(name) => format!("Actor Testbed: {name}"),
             Self::RtsDemo => "RTS units demo".into(),
+            Self::ActorEditor => "Actor editor".into(),
             Self::ExplorerNew { agent, .. }
             | Self::ExplorerResume { agent, .. }
             | Self::ExplorerMove { agent, .. }
@@ -113,11 +116,24 @@ pub fn command_for(entry: &Entry, settings: &Settings) -> (&'static str, Vec<Str
     match entry {
         Entry::Village => ("village", Vec::new()),
         Entry::RtsDemo => ("rts_units_demo", Vec::new()),
+        Entry::ActorEditor => (
+            "actor_testbed",
+            vec![
+                "--actor-editor".into(),
+                "--actors-dir".into(),
+                settings.actors_dir().display().to_string(),
+            ],
+        ),
         Entry::Testbed(name) => (
             "actor_testbed",
             vec!["--scenario".to_owned(), (*name).to_owned()],
         ),
-        Entry::ExplorerNew { agent, world, mode } => {
+        Entry::ExplorerNew {
+            agent,
+            world,
+            mode,
+            preset,
+        } => {
             let mut args = home();
             args.extend([
                 "--agent".into(),
@@ -125,6 +141,9 @@ pub fn command_for(entry: &Entry, settings: &Settings) -> (&'static str, Vec<Str
                 "--world".into(),
                 world.clone(),
             ]);
+            if preset != "human" {
+                args.extend(["--preset".into(), preset.clone()]);
+            }
             with_mode(*mode, args, settings)
         }
         Entry::ExplorerResume {
@@ -245,17 +264,31 @@ pub fn home_dir(env: &dyn Fn(&str) -> Option<String>) -> PathBuf {
 ///
 /// # Errors
 /// The validation, folder or file error, one line.
+#[cfg(test)]
 pub fn save_settings(
     agents_dir: &str,
     fog_of_war: bool,
     file: Option<&Path>,
 ) -> Result<Settings, String> {
+    let actors_dir = file.and_then(|f| Settings::load(f, Path::new("")).actors_dir);
+    save_settings_with_actors(agents_dir, fog_of_war, actors_dir, file)
+}
+
+/// Saves both folder preferences after validating every field. No folder
+/// or settings file is created when either path is invalid.
+pub fn save_settings_with_actors(
+    agents_dir: &str,
+    fog_of_war: bool,
+    actors_dir: Option<PathBuf>,
+    file: Option<&Path>,
+) -> Result<Settings, String> {
     let dir = PathBuf::from(agents_dir.trim());
     validate_agents_dir(&dir)?;
+    if let Some(actors) = &actors_dir {
+        validate_agents_dir(actors).map_err(|e| format!("actors folder: {e}"))?;
+    }
     let file = file.ok_or("no settings folder: APPDATA, XDG_CONFIG_HOME and HOME are unset")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
-    // The actors folder is not on this screen: keep what the file has.
-    let actors_dir = Settings::load(file, Path::new("")).actors_dir;
     let settings = Settings {
         agents_dir: dir,
         fog_of_war,
@@ -558,12 +591,61 @@ mod tests {
     }
 
     #[test]
+    fn actors_entry_launches_the_editor() {
+        let mut settings = settings(Path::new("/agents"));
+        settings.actors_dir = Some(PathBuf::from("/custom actors"));
+        assert_eq!(
+            command_for(&Entry::ActorEditor, &settings),
+            (
+                "actor_testbed",
+                strings(&["--actor-editor", "--actors-dir", "/custom actors"])
+            )
+        );
+        assert!(!Entry::ActorEditor.is_detached());
+        assert_eq!(Entry::ActorEditor.agent(), None);
+        assert_eq!(Entry::ActorEditor.title(), "Actor editor");
+    }
+
+    #[test]
+    fn actors_folder_setting_is_validated_and_persisted() {
+        let root = tmp("actors-setting");
+        let file = root.join("settings.json");
+        let agents = root.join("agents");
+        assert!(
+            save_settings_with_actors(
+                &agents.display().to_string(),
+                true,
+                Some("relative".into()),
+                Some(&file)
+            )
+            .is_err()
+        );
+        assert!(!file.exists() && !agents.exists());
+        let actors = root.join("actors");
+        let settings = save_settings_with_actors(
+            &agents.display().to_string(),
+            true,
+            Some(actors.clone()),
+            Some(&file),
+        )
+        .unwrap();
+        assert_eq!(settings.actors_dir, Some(actors.clone()));
+        assert_eq!(Settings::load(&file, &root).actors_dir, Some(actors));
+        let reset =
+            save_settings_with_actors(&agents.display().to_string(), true, None, Some(&file))
+                .unwrap();
+        assert_eq!(reset.actors_dir, None);
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn command_for_explorer_new() {
         let home = std::env::temp_dir().join("my agents");
         let entry = Entry::ExplorerNew {
             agent: "Wren Ashdown".into(),
             world: "Gloomhollow".into(),
             mode: RunMode::Window,
+            preset: "human".into(),
         };
         let (stem, args) = command_for(&entry, &settings(&home));
         assert_eq!(stem, "actor_testbed");
@@ -598,6 +680,7 @@ mod tests {
             agent: "Wren".into(),
             world: "Moor".into(),
             mode: RunMode::Window,
+            preset: "human".into(),
         };
         assert!(!command_for(&new, &s).1.contains(&"--actors-dir".to_owned()));
         let acts = Path::new("/my/actors");
@@ -609,6 +692,7 @@ mod tests {
                 agent: "Wren".into(),
                 world: "Moor".into(),
                 mode: RunMode::Detached,
+                preset: "human".into(),
             },
             Entry::ExplorerResume {
                 agent: "Wren".into(),
@@ -673,6 +757,7 @@ mod tests {
             agent: "Wren Ashdown".into(),
             world: "Gloomhollow".into(),
             mode: RunMode::Detached,
+            preset: "human".into(),
         };
         assert_eq!(
             command_for(&new, &s),

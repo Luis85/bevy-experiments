@@ -71,6 +71,67 @@ struct StartButton;
 #[derive(Resource, Default)]
 struct CheckedNames(Option<(String, String)>);
 
+#[derive(Clone, Debug)]
+struct PresetChoice {
+    id: String,
+    name: String,
+    description: String,
+}
+
+#[derive(Resource, Default)]
+struct PresetPicker {
+    choices: Vec<PresetChoice>,
+    selected: Option<String>,
+}
+
+#[derive(Component)]
+struct PresetDescription;
+
+type PresetDescriptionFilter = (
+    With<PresetDescription>,
+    Without<NewFolderText>,
+    Without<NewProblemText>,
+);
+
+/// Parse and fully validate against the world's registered capabilities;
+/// invalid presets never appear as choices.
+fn valid_presets(dir: &std::path::Path) -> Vec<PresetChoice> {
+    let app = testbed_content::scenario::new_sim_app(1, "explorer");
+    testbed_content::actors::load_presets(dir)
+        .into_iter()
+        .filter_map(|(path, result)| {
+            let preset = result.ok()?;
+            testbed_content::actors::validate(&preset, app.world()).ok()?;
+            Some(PresetChoice {
+                id: path.file_stem()?.to_str()?.to_owned(),
+                name: preset.name,
+                description: preset.description,
+            })
+        })
+        .collect()
+}
+
+fn preset_description(picker: &PresetPicker) -> String {
+    picker
+        .choices
+        .iter()
+        .find(|p| Some(&p.id) == picker.selected.as_ref())
+        .map(|p| format!("{}: {}", p.name, p.description))
+        .unwrap_or_else(|| {
+            "No valid actor presets. Check the actors folder before starting.".into()
+        })
+}
+
+pub fn pick_actor(world: &mut World, id: &str) {
+    let Some(mut picker) = world.get_resource_mut::<PresetPicker>() else {
+        return;
+    };
+    if picker.choices.iter().any(|p| p.id == id) {
+        picker.selected = Some(id.into());
+        world.resource_mut::<CheckedNames>().0 = None;
+    }
+}
+
 /// The Resume screen's error line (the save check could not run), shown
 /// once: the screen takes it when it opens.
 #[derive(Resource, Clone, Debug, Default, PartialEq, Eq)]
@@ -210,6 +271,19 @@ fn spawn_new(
     let agent = random_name(NameKind::Agent, seed);
     let world = random_name(NameKind::World, seed.rotate_left(17) ^ 0x5DEE_CE66);
     let problem = launch::new_world_problem(&settings.0.agents_dir, &agent, &world);
+    let choices = valid_presets(&settings.0.actors_dir());
+    let selected = choices
+        .iter()
+        .find(|p| p.id == "human")
+        .or_else(|| choices.first())
+        .map(|p| p.id.clone());
+    let picker = PresetPicker { choices, selected };
+    let problem = problem.or_else(|| {
+        picker
+            .selected
+            .is_none()
+            .then(|| "No valid actor presets".into())
+    });
     let folder = launch::agent_folder_line(&settings.0.agents_dir, &agent);
     let panel = ui::spawn_screen(
         &mut commands,
@@ -226,6 +300,29 @@ fn spawn_new(
         name_row(p, NameKind::Agent, &agent, 0);
         p.spawn(ui::label("World", 18.0, TEXT));
         name_row(p, NameKind::World, &world, 2);
+        p.spawn(ui::label("Actor", 18.0, TEXT));
+        p.spawn(Node {
+            flex_wrap: FlexWrap::Wrap,
+            column_gap: px(10),
+            row_gap: px(6),
+            ..default()
+        })
+        .with_children(|r| {
+            for (i, preset) in picker.choices.iter().enumerate() {
+                button(
+                    r,
+                    &preset.name,
+                    None,
+                    true,
+                    4 + i as i32,
+                    Action::PickActor(preset.id.clone()),
+                );
+            }
+        });
+        p.spawn((
+            PresetDescription,
+            ui::label(preset_description(&picker), 14.0, ui::DIM),
+        ));
         p.spawn((
             NewProblemText,
             ui::label(problem.clone().unwrap_or_default(), 14.0, ERROR),
@@ -241,12 +338,12 @@ fn spawn_new(
                     text,
                     None,
                     problem.is_none(),
-                    tab,
+                    tab + picker.choices.len() as i32,
                     Action::StartNew(mode),
                 );
                 r.commands().entity(start).insert(StartButton);
             }
-            back_button(r, Screen::ExplorerNew, 6);
+            back_button(r, Screen::ExplorerNew, 6 + picker.choices.len() as i32);
         });
         p.spawn(ui::label(
             "Detached: no window; the menu shows the prompt, the port and the tick, and can \
@@ -255,6 +352,7 @@ fn spawn_new(
             ui::DIM,
         ));
     });
+    commands.insert_resource(picker);
 }
 
 /// A name field with its dice button (`tab`, `tab + 1`).
@@ -299,13 +397,22 @@ fn refresh_new(
         Query<&mut TextColor>,
     ),
     mut lines: Query<(&mut Text, Has<NewFolderText>), NewLine>,
+    (picker, mut description): (Res<PresetPicker>, Query<&mut Text, PresetDescriptionFilter>),
 ) {
     let now = names(fields.iter().map(|(f, t)| (f.0, t.value().to_string())));
     if checked.0.as_ref() == Some(&now) {
         return;
     }
     let root = &settings.0.agents_dir;
-    let problem = launch::new_world_problem(root, &now.0, &now.1);
+    let problem = launch::new_world_problem(root, &now.0, &now.1).or_else(|| {
+        picker
+            .selected
+            .is_none()
+            .then(|| "No valid actor presets".into())
+    });
+    for mut text in &mut description {
+        text.0 = preset_description(&picker);
+    }
     let folder = launch::agent_folder_line(root, &now.0);
     checked.0 = Some(now);
     for (mut t, is_folder) in &mut lines {
@@ -361,12 +468,19 @@ pub fn start_new(world: &mut World, mode: RunMode) {
     if launch::new_world_problem(&root, &agent, &world_name).is_some() {
         return;
     }
+    let Some(preset) = world
+        .get_resource::<PresetPicker>()
+        .and_then(|p| p.selected.clone())
+    else {
+        return;
+    };
     run::launch(
         world,
         Entry::ExplorerNew {
             agent: agent.trim().to_owned(),
             world: world_name.trim().to_owned(),
             mode,
+            preset,
         },
     );
 }
@@ -648,6 +762,7 @@ fn resume_row(
             false,
         ),
     };
+    let detail = format!("{detail}  -  actor: {}", a.meta.preset);
     let id = ui::list_button(row, (&a.meta.agent, name_px), &detail, enabled, tab, action);
     row.commands().entity(id).observe(on_activate);
     ui::grow(&mut row.commands(), id);
@@ -876,6 +991,69 @@ mod tests {
     use super::*;
     use crate::screens::tests::{app, button_for, press, screen, test_child, tmp};
 
+    #[test]
+    fn new_screen_lists_valid_presets_only() {
+        let d = tmp("actor-picker");
+        let mut app = app(&d, &d.join("agents"));
+        let actors = app.world().resource::<AppSettings>().0.actors_dir();
+        testbed_content::actors::install_builtins(&actors).unwrap();
+        let mut invalid = testbed_content::actors::human_preset();
+        invalid.model = "missing-model".into();
+        std::fs::write(
+            actors.join("invalid.json"),
+            serde_json::to_string(&invalid).unwrap(),
+        )
+        .unwrap();
+        open(&mut app, Screen::ExplorerNew);
+        let picker = app.world().resource::<PresetPicker>();
+        assert_eq!(
+            picker
+                .choices
+                .iter()
+                .map(|p| p.id.as_str())
+                .collect::<Vec<_>>(),
+            ["human", "rover", "sentinel"]
+        );
+        let rover = button_for(
+            &mut app,
+            |a| matches!(a, Action::PickActor(p) if p == "rover"),
+        );
+        press(&mut app, rover);
+        app.update();
+        type_name(&mut app, NameKind::Agent, "Rover Pilot");
+        type_name(&mut app, NameKind::World, "Robot Yard");
+        let start = button_for(&mut app, |a| matches!(a, Action::StartNew(RunMode::Window)));
+        press(&mut app, start);
+        app.update();
+        let entry = &app.world().resource::<Missing>().entry;
+        assert!(matches!(entry, Entry::ExplorerNew { preset, .. } if preset == "rover"));
+        for mode in [RunMode::Window, RunMode::Detached] {
+            let mut entry = entry.clone();
+            if let Entry::ExplorerNew { mode: m, .. } = &mut entry {
+                *m = mode;
+            }
+            let args = launch::command_for(&entry, &app.world().resource::<AppSettings>().0).1;
+            assert!(args.windows(2).any(|w| w == ["--preset", "rover"]));
+        }
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn new_screen_without_valid_presets_cannot_start() {
+        let d = tmp("no-valid-actors");
+        let mut app = app(&d, &d.join("agents"));
+        let actors = app.world().resource::<AppSettings>().0.actors_dir();
+        std::fs::create_dir_all(&actors).unwrap();
+        std::fs::write(actors.join("invalid.json"), "not JSON").unwrap();
+        open(&mut app, Screen::ExplorerNew);
+        assert!(app.world().resource::<PresetPicker>().choices.is_empty());
+        assert!(start_disabled(&mut app));
+        assert_eq!(problem(&mut app), "No valid actor presets");
+        start_new(app.world_mut(), RunMode::Window);
+        assert_eq!(screen(&app), Screen::ExplorerNew);
+        let _ = std::fs::remove_dir_all(d);
+    }
+
     fn open(app: &mut App, s: Screen) {
         run::set_screen(app.world_mut(), s);
         app.update();
@@ -1029,6 +1207,7 @@ mod tests {
                 agent: "Brin Marlow".into(),
                 world: "Gloomhollow".into(),
                 mode: RunMode::Window,
+                preset: "human".into(),
             }
         );
         let _ = std::fs::remove_dir_all(&d);
@@ -1076,10 +1255,12 @@ mod tests {
         );
         let texts = texts(&mut app);
         assert!(
-            texts.contains(&"Hollowmere  -  last saved 2026-10-25 01:46 UTC".to_owned()),
+            texts.contains(
+                &"Hollowmere  -  last saved 2026-10-25 01:46 UTC  -  actor: human".to_owned()
+            ),
             "{texts:?}"
         );
-        assert!(texts.contains(&"Gloomhollow  -  no save yet".to_owned()));
+        assert!(texts.contains(&"Gloomhollow  -  no save yet  -  actor: human".to_owned()));
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -1091,6 +1272,21 @@ mod tests {
         assert!(resume_buttons(&mut app).is_empty());
         assert!(texts(&mut app).iter().any(|t| t.contains("No agents")));
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn resume_row_shows_preset() {
+        let d = tmp("resume-preset");
+        let agents = d.join("agents");
+        let dir = create_agent(&agents, "Rover Pilot", "Robot Yard", "2026-10-27").unwrap();
+        let mut meta: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(dir.meta()).unwrap()).unwrap();
+        meta["preset"] = serde_json::json!("rover");
+        std::fs::write(dir.meta(), serde_json::to_string(&meta).unwrap()).unwrap();
+        let mut app = app(&d, &agents);
+        open(&mut app, Screen::ExplorerResume);
+        assert!(texts(&mut app).iter().any(|t| t.contains("actor: rover")));
+        let _ = std::fs::remove_dir_all(d);
     }
 
     #[test]

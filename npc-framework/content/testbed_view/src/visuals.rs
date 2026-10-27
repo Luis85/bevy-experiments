@@ -24,7 +24,7 @@ use std::f32::consts::PI;
 
 use bevy::{prelude::*, world_serialization::WorldInstanceReady};
 use npc_framework::interaction::items::{MAIN_HAND, OFF_HAND};
-use npc_framework::perception::SeenState;
+use npc_framework::perception::{SeenState, Sensors};
 use npc_framework::prelude::{
     CarriedBy, Door, GridBlocker, Item, MountedIn, Owner, PrevSimPos, SimClock, SimControl, SimId,
     SimIndex, SimPos, SimRate, SimTime, ToolTarget, Vehicle,
@@ -282,11 +282,22 @@ fn spawn_visuals(
     mut commands: Commands,
     assets: Option<Res<ViewAssets>>,
     rings: Option<Res<Rings>>,
+    robots: Option<Res<crate::robots::RobotAssets>>,
     mut index: ResMut<VisualIndex>,
     alive: Query<(), With<VisualOf>>,
     props: Query<(Entity, Option<&SimId>, &Prop, &SimPos, Option<&GridBlocker>)>,
     items: Query<(Entity, &Item, &SimPos), (Without<Prop>, Without<TestbedUnit>)>,
-    actors: Query<(Entity, &TestbedUnit, &SimPos, Option<&Owner>), Without<Prop>>,
+    actors: Query<
+        (
+            Entity,
+            &TestbedUnit,
+            &SimPos,
+            Option<&Owner>,
+            Option<&testbed_content::actors::ActorModel>,
+            Option<&Sensors>,
+        ),
+        Without<Prop>,
+    >,
 ) {
     let (Some(assets), Some(rings)) = (assets, rings) else {
         return;
@@ -478,11 +489,16 @@ fn spawn_visuals(
         index.map.insert(sim, root);
     }
 
-    for (sim, unit, pos, owner) in &actors {
+    for (sim, unit, pos, owner, preset_model, sensors) in &actors {
         if !fresh(&mut index, sim) {
             continue;
         }
-        let kind = ModelKind::for_actor(&unit.template, owner.map(|o| o.0.0));
+        let kind = preset_model
+            .and_then(|m| ModelKind::from_name(&m.0))
+            .unwrap_or_else(|| ModelKind::for_actor(&unit.template, owner.map(|o| o.0.0)));
+        if kind.is_robot() && robots.is_none() {
+            continue;
+        }
         let at = sim_to_world(*pos);
         let root = commands
             .spawn((
@@ -501,16 +517,32 @@ fn spawn_visuals(
                 FogDim::default(),
             ))
             .id();
-        commands
-            .spawn((
-                ChildOf(root),
-                ActorModel { root },
-                model(
-                    &assets.actor[kind.index()],
-                    Transform::from_scale(Vec3::splat(V)),
-                ),
-            ))
-            .observe(crate::anim::on_actor_ready);
+        if kind.is_robot() {
+            let (right, left) = crate::robots::spawn(
+                &mut commands,
+                root,
+                kind,
+                sensors,
+                robots.as_deref().expect("robot assets ready"),
+            );
+            commands.entity(root).insert(ActorVisual {
+                kind,
+                motion: Motion::at(at),
+                hand_r: Some(right),
+                hand_l: Some(left),
+            });
+        } else {
+            commands
+                .spawn((
+                    ChildOf(root),
+                    ActorModel { root },
+                    model(
+                        &assets.actor[kind.index()],
+                        Transform::from_scale(Vec3::splat(V)),
+                    ),
+                ))
+                .observe(crate::anim::on_actor_ready);
+        }
         commands.spawn((
             ChildOf(root),
             Name::new("faction ring"),

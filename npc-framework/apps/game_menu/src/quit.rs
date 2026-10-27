@@ -792,6 +792,7 @@ mod tests {
                 agent: agent.into(),
                 world: name.into(),
                 mode: RunMode::Detached,
+                preset: "human".into(),
             },
         );
         assert!(
@@ -1029,6 +1030,7 @@ mod tests {
                     agent: "Wren Ashdown".into(),
                     world: "Moor".into(),
                     mode: RunMode::Window,
+                    preset: "human".into(),
                 },
             );
             let pid = app.world().resource::<Running>().child.id();
@@ -1278,6 +1280,7 @@ mod tests {
                 agent: "Wren Ashdown".into(),
                 world: "Moor".into(),
                 mode: RunMode::Detached,
+                preset: "human".into(),
             },
         );
         let pid = app
@@ -1638,6 +1641,7 @@ mod tests {
                 agent: "Wren Ashdown".into(),
                 world: "Moor".into(),
                 mode: Mode::Detached,
+                preset: "human".into(),
             },
         );
         assert!(
@@ -1657,6 +1661,7 @@ mod tests {
                 agent: "Brin Marlow".into(),
                 world: "Fen".into(),
                 mode: Mode::Window,
+                preset: "human".into(),
             },
         );
         let (wren, brin) = (folder(&d, "Wren Ashdown"), folder(&d, "Brin Marlow"));

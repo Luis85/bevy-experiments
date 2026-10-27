@@ -1,6 +1,24 @@
-# Resume: agent notes, workspace, fog, actors (paused 2026-10-26)
+# Resume: agent notes, workspace, fog, actors (updated 2026-10-27)
 
-## Paste this into a new Claude Code session started in `npc-framework/`
+## Current continuation (2026-10-27)
+
+Task 13 is complete in the current monorepo checkout, `C:\Projects\bevy-experiments\npc-framework`, on
+`main` with local changes. The user resolved the LIDAR decision: **optimize traversal, preserve full scans**.
+The release profiler measures moving-rover perception p95 37.2 µs and fog p95 49.4 µs (55 µs budgets).
+Robot models, fog, workspace descriptions, New's preset picker and Resume's preset labels have regression
+tests and inspected local screenshots. Evidence: `docs/_notes/task13-robot-explorer-evidence.md`.
+
+Final full `cargo xtask verify`: **`"ok": true`**, in `target/verify-task13-final.json`, with process-local
+`CARGO_BUILD_JOBS=8`, `NEXTEST_TEST_THREADS=4`. All 1,080 tests passed (12 skipped, two reported leaky),
+seven architecture tests and all eight replays passed, snapshots had none pending, and cargo-deny passed;
+Clippy has no warnings. No optional tools were skipped. The two leaky-test reports remain a harness limitation.
+The next implementation task is **Task 14 (actor editor)**; Gate E is not complete yet. Changes are uncommitted;
+no phase merge or five-app release build was performed at this Task 13 checkpoint.
+
+The older handoff below records the previous checkout and workflow. Use the current repository working
+agreement and preserve these local changes when continuing.
+
+## Historical resume prompt (2026-10-26)
 
 > Resume the plan `docs/superpowers/plans/2026-10-25-agent-notes-workspace-fog-actors.md` with
 > superpowers:subagent-driven-development. Read
@@ -32,7 +50,10 @@
   5. **Phase F**: Task 18 (docs, end to end, full verify) → Gate F, then the final whole-branch
      review, one fix wave, and the "Rulings I made" report to the dev.
 
-## Open decision for the dev (ask before Task 13)
+## Historical decision (resolved 2026-10-27)
+
+The user selected optimizing traversal while preserving complete scans. The following was the decision at
+the previous pause; do not ask it again.
 
 A walking **rover** costs 54.6–57 µs perception p95 against the 55 µs budget (idle 15 µs after the
 LIDAR cache). Options: (a) a rotating LIDAR that scans 1/stagger of its beams per tick, as a real

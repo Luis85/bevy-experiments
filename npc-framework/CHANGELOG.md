@@ -8,6 +8,32 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Added (actor editor, plan Task 14)
+
+- **Actors** in the game menu opens the Actor Testbed's standalone `--actor-editor` mode: a preset list,
+  New/Duplicate/Revert/Save, a rotating 3D model preview and model picker, and explicit forms for identity,
+  attributes, skills, traits, actions and every sensor parameter (including reach). Live validation disables
+  invalid saves; the character-point total stays visible. Body and Sensor ranges views share real metre units.
+- Preset writes are atomic. Another file at the chosen slug, or a source changed on disk, requires explicit
+  replacement confirmation. Ordinary edits retain the selected file's stable preset ID; renamed/new copies
+  use the name's slug and preserve the original. Unsaved navigation and window close require discard approval.
+- Settings now exposes the optional actors folder. CLI capture helpers: `--editor-preset ID`, `--screenshot`
+  and `--after-secs`; the editor runs without a simulation driver. Shared preset validation safely rejects
+  extreme numeric values before core point-buy arithmetic; `sheet_point_total` exposes a checked `i64` total.
+
+### Added (robots in the explorer, plan Task 13)
+
+- The New-agent screen lists valid actor presets with their descriptions and passes the chosen preset to both
+  windowed and detached worlds. Resume rows show each agent's preset. The Rover and Sentinel have procedural
+  bodies, wheels, sensor domes and tool grips; the view honors every preset's model selection.
+- Robot fog follows its sensors: camera cones with line of sight, LIDAR geometry through the first beam hit,
+  and radar target cells. LIDAR alone reveals no named items or live object state. `VisibleCells.identified`
+  keeps that coverage separate from geometry (snapshot-only, default absent for older saves). Robot fog caches
+  invalidate on position, facing, sensor settings, obstacle cells, radar detections and grid revision.
+- LIDAR traversal keeps scaled crossing times, converting the distance only at a hit, and uses checked bitmap
+  indexing within the scan window. Range scans and fog share the bitmap beam walker; moving robots retain their
+  cache entries and buffers. Full scans and the existing conservative corner behavior are preserved.
+
 ### Security
 
 - `cargo deny` ignores RUSTSEC-2026-0391 (zstd 0.13.3), RUSTSEC-2026-0398 and RUSTSEC-2026-0403 (zstd-safe 7.3.0), published 2026-10-26: all come in through Bevy 0.20's `bevy_image` (`zstd_c`); the fixes need zstd 0.14 / zstd-safe 8.2, which Bevy 0.20 cannot take, and the other backend (ruzstd) has RUSTSEC-2026-0344. The flawed paths are not reached (no reused context, no `seekable` feature, only trusted embedded current-format LUT frames). The dev's decision; drop the entries when Bevy moves to zstd 0.14.

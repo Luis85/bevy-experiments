@@ -392,6 +392,36 @@ mod tests {
         )
     }
 
+    #[test]
+    fn agents_md_describes_the_robot() {
+        for (_, json) in crate::actors::BUILTIN_PRESETS
+            .iter()
+            .filter(|(id, _)| *id != "human")
+        {
+            let preset: ActorPreset = serde_json::from_str(json).unwrap();
+            let mut v = vars();
+            v.actor = ActorSummary::from_preset(&preset);
+            let md = render_agents_md(&v);
+            assert!(
+                md.contains(&preset.name) && md.contains("robot") && md.contains("Rolls"),
+                "{md}"
+            );
+            assert!(md.contains("camera: 15 m"), "{md}");
+            assert!(
+                !md.contains("- sight:") && !md.contains("- hearing:"),
+                "{md}"
+            );
+            assert!(
+                md.contains(if preset.model == "rover" {
+                    "no names"
+                } else {
+                    "radar: 30 m"
+                }),
+                "{md}"
+            );
+        }
+    }
+
     fn agent(tag: &str) -> (PathBuf, AgentDir) {
         let home = tmp(tag);
         let a = create_agent(&home, "Wren Ashdown", "Hollowmere", "2026-10-25").unwrap();

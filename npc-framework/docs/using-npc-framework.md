@@ -569,6 +569,14 @@ app.register_detection_check("camouflage", camouflage).use_detection_check("camo
 
 With `rules` too, `with_per_roll_detection()` activates `per_roll` (§7).
 
+Actors that opt into fog with `RevealsFog` receive snapshot-only `ExploredCells`, `VisibleCells` and
+`SeenStatics`. Camera cones reveal cells with line of sight, LIDAR reveals geometry along beams through the
+first hit (including blocking/occluding cells and the content's `LidarObstacles` kinds), and radar reveals
+detected target cells. Hearing and proximity do not reveal fog; `ReachSense` does, with line of sight.
+Render terrain using `VisibleCells::is_visible`, named static objects using `VisibleCells::identifies`, and
+units using the currently sensed entries in `PerceptionMemory`. A robot's `VisibleCells.identified` excludes
+LIDAR-only geometry; it is optional for compatibility with ordinary vision actors and older snapshots.
+
 ### 6.3 Character rules (`rules`)
 
 ```rust

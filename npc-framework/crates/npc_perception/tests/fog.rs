@@ -126,6 +126,110 @@ fn vision() -> Sensor {
 }
 
 #[test]
+fn lidar_reveals_geometry_only() {
+    let mut app = app_with(4);
+    let (_, robot) = spawn_sim(
+        app.world_mut(),
+        (
+            cell(0, 0),
+            NORTH,
+            FixedFacing,
+            Sensors::new().lidar(10_000, 360, 360, 0),
+            RevealsFog,
+        ),
+    );
+    wall_cell(&mut app, cell(0, 3));
+    let (item, _) = spawn_sim(app.world_mut(), (cell(0, 2), Perceivable::new(ITEM)));
+    app.set_lidar_obstacles(npc_perception::LidarObstacles { kinds: UNIT });
+    run_ticks(app.world_mut(), 4);
+    assert!(visible(&app, robot, (0, 2)));
+    assert!(visible(&app, robot, (0, 3)), "the wall face");
+    assert!(!visible(&app, robot, (0, 4)), "behind the wall");
+    assert!(
+        !statics(&app, robot).0.contains_key(&item),
+        "LIDAR returns no item identities"
+    );
+    assert!(
+        app.world()
+            .get::<npc_perception::PerceptionMemory>(robot)
+            .unwrap()
+            .percepts
+            .is_empty()
+    );
+}
+
+#[test]
+fn camera_reveals_its_cone_and_radar_only_its_targets() {
+    let mut app = app();
+    let (_, camera) = spawn_sim(
+        app.world_mut(),
+        (
+            cell(0, 0),
+            NORTH,
+            FixedFacing,
+            Sensors::new().camera(10_000, 35),
+            RevealsFog,
+        ),
+    );
+    let (_, radar) = spawn_sim(
+        app.world_mut(),
+        (
+            cell(0, 0),
+            NORTH,
+            FixedFacing,
+            Sensors::new().radar(10_000, 60, 500, 2000),
+            RevealsFog,
+        ),
+    );
+    spawn_sim(app.world_mut(), (cell(0, 5), Perceivable::new(ITEM)));
+    wall_cell(&mut app, cell(2, 3));
+    run_ticks(app.world_mut(), 1);
+    assert!(visible(&app, camera, (0, 3)));
+    assert!(!visible(&app, camera, (0, -3)));
+    assert!(!visible(&app, camera, (4, 6)), "occluded");
+    assert!(visible(&app, radar, (0, 5)));
+    assert!(
+        !visible(&app, radar, (0, 3)),
+        "radar does not reveal empty ground"
+    );
+}
+
+#[test]
+fn cached_robot_fog_tracks_moving_obstacles_and_sensor_changes() {
+    let mut app = app_with(4);
+    app.set_lidar_obstacles(npc_perception::LidarObstacles { kinds: UNIT });
+    let (_, robot) = spawn_sim(
+        app.world_mut(),
+        (
+            cell(0, 0),
+            NORTH,
+            FixedFacing,
+            Sensors::new().lidar(10_000, 1, 1, 0),
+            RevealsFog,
+        ),
+    );
+    let (_, obstacle) = spawn_sim(app.world_mut(), (cell(0, 3), Perceivable::new(UNIT)));
+    run_ticks(app.world_mut(), 8);
+    assert!(visible(&app, robot, (0, 3)) && !visible(&app, robot, (0, 5)));
+    *app.world_mut().get_mut::<SimPos>(obstacle).unwrap() = cell(5, 3);
+    run_ticks(app.world_mut(), 4);
+    assert!(
+        visible(&app, robot, (0, 5)),
+        "moving obstacle invalidates the cache"
+    );
+    *app.world_mut().get_mut::<Sensors>(robot).unwrap() = Sensors::new().lidar(2_000, 1, 1, 0);
+    run_ticks(app.world_mut(), 4);
+    assert!(
+        !visible(&app, robot, (0, 5)),
+        "shorter sensor range invalidates the cache"
+    );
+    assert!(explored(&app, robot, (0, 5)), "exploration never shrinks");
+    *app.world_mut().get_mut::<Facing>(robot).unwrap() = SOUTH;
+    run_ticks(app.world_mut(), 4);
+    assert!(visible(&app, robot, (0, -1)) && !visible(&app, robot, (0, 1)));
+}
+
+#[test]
 fn fog_respects_line_of_sight() {
     let mut app = app();
     let (_, e) = eye(&mut app, cell(0, 0), NORTH, true);

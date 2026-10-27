@@ -95,6 +95,7 @@ pub enum Action {
     /// The New screen's Start in window / Start detached (checked again
     /// when pressed).
     StartNew(RunMode),
+    PickActor(String),
     /// Shows the agent's detached world.
     Watch(String),
     /// The agent's detached world into the window, on its port.
@@ -154,6 +155,9 @@ struct SettingsStatus(Option<Result<String, String>>);
 
 #[derive(Component)]
 struct AgentsDirField;
+#[derive(Component)]
+struct ActorsDirField;
+type SettingsFieldFilter = Or<(With<AgentsDirField>, With<ActorsDirField>)>;
 #[derive(Component)]
 struct SettingsStatusText;
 /// The fog of war checkbox (a button whose label shows the box).
@@ -227,6 +231,7 @@ pub fn apply_action(world: &mut World, action: Action) {
         Action::ToggleFog => toggle_fog(world),
         Action::RandomName(kind) => explorer::reroll_name(world, kind),
         Action::StartNew(mode) => explorer::start_new(world, mode),
+        Action::PickActor(id) => explorer::pick_actor(world, &id),
         Action::Watch(agent) => detached::watch(world, &agent),
         Action::OpenInWindow(agent) => {
             world.insert_resource(MainNotice::default());
@@ -275,7 +280,14 @@ fn save_settings(world: &mut World) {
     };
     let file = world.resource::<Paths>().settings_file.clone();
     let fog = world.resource::<AppSettings>().0.fog_of_war;
-    let status = match launch::save_settings(&text, fog, file.as_deref()) {
+    let mut actor_fields = world.query_filtered::<&EditableText, With<ActorsDirField>>();
+    let actors = actor_fields
+        .single(world)
+        .ok()
+        .map(|v| v.value().to_string().trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from);
+    let status = match launch::save_settings_with_actors(&text, fog, actors, file.as_deref()) {
         Ok(settings) => {
             let msg = format!("saved: {}", settings.agents_dir.display());
             world.resource_mut::<AppSettings>().0 = settings;
@@ -340,7 +352,7 @@ fn escape_goes_back(
 fn enter_saves(
     keys: Res<ButtonInput<KeyCode>>,
     focus: Res<InputFocus>,
-    fields: Query<(), With<AgentsDirField>>,
+    fields: Query<(), SettingsFieldFilter>,
     mut commands: Commands,
 ) {
     if keys.just_pressed(KeyCode::Enter) && focus.get().is_some_and(|e| fields.contains(e)) {
@@ -409,13 +421,21 @@ fn spawn_main(mut commands: Commands, settings: Res<AppSettings>, notice: Res<Ma
             3,
             Action::Launch(Entry::RtsDemo),
         );
-        button(p, "Settings", None, true, 4, Action::Go(Screen::Settings));
+        button(
+            p,
+            "Actors",
+            Some("create and edit actor presets with a 3D preview"),
+            true,
+            4,
+            Action::Launch(Entry::ActorEditor),
+        );
+        button(p, "Settings", None, true, 5, Action::Go(Screen::Settings));
         button(
             p,
             "Quit",
             Some("stops every world and window it started (they save first)"),
             true,
-            5,
+            6,
             Action::Quit,
         );
         if let Some(e) = &notice.0 {
@@ -480,6 +500,9 @@ fn spawn_settings(mut commands: Commands, settings: Res<AppSettings>, paths: Res
             ui::DIM,
         ));
         p.spawn((AgentsDirField, ui::text_field(current, 0), AutoFocus));
+        p.spawn(ui::label("Actors folder (optional)", 18.0, TEXT));
+        p.spawn((ActorsDirField, ui::text_field(&settings.0.actors_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 1)));
+        p.spawn(ui::label("Blank uses npc-actors beside the agents folder. Used by Actors and New agents.", 12.0, ui::DIM));
         p.spawn(ui::label("Explorer window", 18.0, TEXT));
         let fog = button(
             p,
@@ -488,15 +511,15 @@ fn spawn_settings(mut commands: Commands, settings: Res<AppSettings>, paths: Res
                 "Show the world as the agent's actor knows it: black where it has never been, greyed as last seen where it is not looking, no units it cannot sense. F8 toggles it in the game.",
             ),
             true,
-            1,
+            2,
             Action::ToggleFog,
         );
         p.commands().entity(fog).insert(FogCheckbox);
         p.spawn((SettingsStatusText, ui::label("", 14.0, NOTE)));
         p.spawn(ui::label(format!("Saved to {file}"), 12.0, ui::DIM));
         ui::row(p, |r| {
-            button(r, "Save", None, true, 2, Action::SaveSettings);
-            back_button(r, Screen::Settings, 3);
+            button(r, "Save", None, true, 3, Action::SaveSettings);
+            back_button(r, Screen::Settings, 4);
         });
     });
 }
@@ -1111,6 +1134,41 @@ pub(crate) mod tests {
         assert_eq!(app.world().resource::<AppSettings>().0.agents_dir, agents);
         assert_eq!(Settings::load(&file, &d).agents_dir, agents);
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn actors_folder_field_is_saved_and_used_by_the_launcher() {
+        let d = tmp("actor-settings-ui");
+        let mut app = app_with_valid(&d);
+        let file = d.join("settings.json");
+        app.world_mut().resource_mut::<Paths>().settings_file = Some(file.clone());
+        run::set_screen(app.world_mut(), Screen::Settings);
+        app.update();
+        let actors = d.join("custom actors");
+        let mut q = app
+            .world_mut()
+            .query_filtered::<&mut EditableText, With<ActorsDirField>>();
+        *q.single_mut(app.world_mut()).unwrap() = EditableText::new(actors.display().to_string());
+        let save = button_for(&mut app, |a| matches!(a, Action::SaveSettings));
+        press(&mut app, save);
+        assert!(status(&app).unwrap().is_ok());
+        assert_eq!(Settings::load(&file, &d).actors_dir, Some(actors.clone()));
+        run::set_screen(app.world_mut(), Screen::Main);
+        app.update();
+        let actors_button = button_for(&mut app, |a| {
+            matches!(a, Action::Launch(Entry::ActorEditor))
+        });
+        press(&mut app, actors_button);
+        app.update();
+        assert_eq!(screen(&app), Screen::Missing);
+        let entry = &app.world().resource::<Missing>().entry;
+        assert_eq!(entry, &Entry::ActorEditor);
+        let args = launch::command_for(entry, &app.world().resource::<AppSettings>().0).1;
+        assert!(
+            args.windows(2)
+                .any(|p| p == ["--actors-dir", &actors.display().to_string()])
+        );
+        let _ = std::fs::remove_dir_all(d);
     }
     #[test]
     fn a_build_that_leaves_the_game_missing_says_so() {

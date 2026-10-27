@@ -29,18 +29,19 @@ pub fn asset_plugin() -> AssetPlugin {
     }
 }
 
-/// The four actor models (one animation graph each; they share the KayKit
-/// rig and clip names).
+/// Four animated KayKit actors and two procedural robot bodies.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum ModelKind {
     Knight,
     Rogue,
     SkeletonMinion,
     SkeletonWarrior,
+    Rover,
+    Sentinel,
 }
 
 impl ModelKind {
-    pub const ALL: [ModelKind; 4] = [
+    pub const ANIMATED: [ModelKind; 4] = [
         ModelKind::Knight,
         ModelKind::Rogue,
         ModelKind::SkeletonMinion,
@@ -51,13 +52,30 @@ impl ModelKind {
         self as usize
     }
 
-    pub fn path(self) -> &'static str {
-        match self {
+    pub fn path(self) -> Option<&'static str> {
+        Some(match self {
             ModelKind::Knight => "testbed/characters/Knight.glb",
             ModelKind::Rogue => "characters/Rogue_Hooded.glb",
             ModelKind::SkeletonMinion => "testbed/characters/Skeleton_Minion.glb",
             ModelKind::SkeletonWarrior => "testbed/characters/Skeleton_Warrior.glb",
-        }
+            ModelKind::Rover | ModelKind::Sentinel => return None,
+        })
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        Some(match name {
+            "knight" => Self::Knight,
+            "rogue" => Self::Rogue,
+            "skeleton_minion" => Self::SkeletonMinion,
+            "skeleton_warrior" => Self::SkeletonWarrior,
+            "rover" => Self::Rover,
+            "sentinel" => Self::Sentinel,
+            _ => return None,
+        })
+    }
+
+    pub fn is_robot(self) -> bool {
+        matches!(self, Self::Rover | Self::Sentinel)
     }
 
     /// Faction 1 = adventurers (Knight for the smith and the woodcutter,
@@ -162,8 +180,9 @@ fn load_assets(mut commands: Commands, server: Option<Res<AssetServer>>) {
         })
         .load(GRASS);
     commands.insert_resource(ViewAssets {
-        actor_gltf: ModelKind::ALL.map(|k| server.load(k.path())),
-        actor: ModelKind::ALL.map(|k| scene(&server, k.path())),
+        actor_gltf: ModelKind::ANIMATED
+            .map(|k| server.load(k.path().expect("animated model path"))),
+        actor: ModelKind::ANIMATED.map(|k| scene(&server, k.path().expect("animated model path"))),
         models: Models::load(&server),
         grass,
     });

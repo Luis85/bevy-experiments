@@ -120,6 +120,8 @@ struct LidarCache {
 pub struct LidarScratch {
     /// The scan square's cells: 1 = a beam stops there.
     solid: Vec<u8>,
+    /// Geometry visited by the fog pass (one byte per window cell).
+    visited: Vec<u8>,
     /// This scan's obstacle cells, sorted.
     thing_cells: Vec<CellCoord>,
     /// The beams' unit directions relative to the facing (ppm), for
@@ -173,6 +175,97 @@ impl Window {
     }
 }
 
+fn scan_window(grid: &SpatialGrid, pos: SimPos, range: i32) -> Option<Window> {
+    let cs = grid.cell_mm();
+    let start = grid.cell_of(pos);
+    let reach = range / cs + 2;
+    let w = 2 * i64::from(reach) + 1;
+    (range < 1 << 29 && cs < 1 << 29 && w * w <= WINDOW_MAX_CELLS).then(|| Window {
+        x0: start.x - reach,
+        z0: start.z - reach,
+        w: w as i32,
+    })
+}
+
+fn beam_end(pos: SimPos, (ux, uz): (i64, i64), (c, s): (i64, i64), range: i64) -> SimPos {
+    let (dx, dz) = ((ux * c - uz * s) / PPM, (ux * s + uz * c) / PPM);
+    SimPos::new(
+        (i64::from(pos.x) + dx * range / PPM).clamp(i64::from(i32::MIN), i64::from(i32::MAX))
+            as i32,
+        (i64::from(pos.z) + dz * range / PPM).clamp(i64::from(i32::MIN), i64::from(i32::MAX))
+            as i32,
+    )
+}
+
+fn prepare_beams(scratch: &mut LidarScratch, lidar: &Lidar) {
+    let (angle, inc) = beam_angles(lidar);
+    let key = (angle, inc, usize::from(lidar.beams.max(1)));
+    if scratch.beams_key != Some(key) {
+        scratch.beams.clear();
+        scratch
+            .beams
+            .extend((0..key.2).map(|i| dir_ppm(i64::from(angle) + i as i64 * i64::from(inc))));
+        scratch.beams_key = Some(key);
+    }
+}
+
+/// Visit the geometry reached by a complete, noise-free LIDAR scan. Fog
+/// uses the range scanner's bitmap and exact supercover, marking each
+/// reached cell once instead of asking the grid again on every beam.
+pub(crate) fn reveal_lidar(
+    grid: &SpatialGrid,
+    pos: SimPos,
+    facing: Facing,
+    lidar: Lidar,
+    things: &[CellCoord],
+    scratch: &mut LidarScratch,
+    mut visit: impl FnMut(CellCoord),
+) {
+    let range = lidar.range_mm.max(0);
+    let window = scan_window(grid, pos, range);
+    let start = grid.cell_of(pos);
+    prepare_beams(scratch, &lidar);
+    let direction = dir_ppm(i64::from(facing_angle_mdeg(facing)));
+    if let Some(win) = window {
+        win.fill(grid, things, &mut scratch.solid);
+        scratch.visited.clear();
+        scratch.visited.resize(scratch.solid.len(), 0);
+        scratch.visited[win.index(start).expect("scan origin inside window")] = 1;
+        for &beam in &scratch.beams {
+            let end = beam_end(pos, direction, beam, i64::from(range));
+            let _ = march_with(
+                &win,
+                &scratch.solid,
+                i64::from(grid.cell_mm()),
+                pos,
+                end,
+                start,
+                |i| scratch.visited[i] = 1,
+            );
+        }
+        for (z, row) in scratch.visited.chunks_exact(win.w as usize).enumerate() {
+            for (x, &v) in row.iter().enumerate() {
+                if v != 0 {
+                    visit(CellCoord::new(win.x0 + x as i32, win.z0 + z as i32));
+                }
+            }
+        }
+    } else {
+        for &beam in &scratch.beams {
+            grid.trace_segment(
+                pos,
+                beam_end(pos, direction, beam, i64::from(range)),
+                |cell| {
+                    visit(cell);
+                    let f = grid.cell(cell).flags;
+                    cell == start
+                        || !(f.blocking || f.occluding || things.binary_search(&cell).is_ok())
+                },
+            );
+        }
+    }
+}
+
 /// One scan's inputs.
 pub(crate) struct LidarInput<'a, I: Iterator<Item = SimPos>> {
     pub grid: &'a SpatialGrid,
@@ -213,16 +306,7 @@ pub(crate) fn scan_lidar<I: Iterator<Item = SimPos>>(
     out.range_max_mm = range;
     out.ranges_mm.clear();
     let cs = grid.cell_mm();
-    let start = grid.cell_of(pos);
-    let reach = range / cs + 2;
-    let w = 2 * i64::from(reach) + 1;
-    // The bitmap walk ([`march`]) also needs i64-sized cross products.
-    let narrow = range < 1 << 29 && cs < 1 << 29;
-    let window = (w * w <= WINDOW_MAX_CELLS && narrow).then(|| Window {
-        x0: start.x - reach,
-        z0: start.z - reach,
-        w: w as i32,
-    });
+    let window = scan_window(grid, pos, range);
     scratch.thing_cells.clear();
     scratch.thing_cells.extend(
         things
@@ -232,14 +316,7 @@ pub(crate) fn scan_lidar<I: Iterator<Item = SimPos>>(
     scratch.thing_cells.sort_unstable();
     scratch.thing_cells.dedup();
     let beams = usize::from(lidar.beams.max(1));
-    let key = (angle_min, inc, beams);
-    if scratch.beams_key != Some(key) {
-        scratch.beams.clear();
-        scratch
-            .beams
-            .extend((0..beams).map(|i| dir_ppm(out.angle_of(i))));
-        scratch.beams_key = Some(key);
-    }
+    prepare_beams(scratch, &lidar);
     let revision = grid.revision();
     let cached = scratch.cache.get(&entity).is_some_and(|c| {
         c.pos == pos
@@ -253,7 +330,9 @@ pub(crate) fn scan_lidar<I: Iterator<Item = SimPos>>(
     if cached {
         scratch.hits += 1;
     } else {
-        let mut cache = scratch.cache.remove(&entity).unwrap_or_default();
+        // Keep the entry allocated while a robot moves: removing and
+        // reinserting the only robot also churns the BTreeMap's root node.
+        let cache = scratch.cache.entry(entity).or_default();
         trace(
             grid,
             window.as_ref(),
@@ -270,7 +349,6 @@ pub(crate) fn scan_lidar<I: Iterator<Item = SimPos>>(
         cache.revision = revision;
         cache.things.clear();
         cache.things.extend_from_slice(&scratch.thing_cells);
-        scratch.cache.insert(entity, cache);
     }
     let clean = &scratch.cache[&entity].clean;
     let noise = i64::from(lidar.noise_ppm.min(1_000_000));
@@ -317,17 +395,11 @@ fn trace(
     // Turned by the facing once per beam.
     let (ux, uz) = dir_ppm(i64::from(facing_angle_mdeg(facing)));
     let r = i64::from(range);
-    for &(c, s) in beams {
-        let (dx, dz) = ((ux * c - uz * s) / PPM, (ux * s + uz * c) / PPM);
-        let end = SimPos::new(
-            (i64::from(pos.x) + dx * r / PPM).clamp(i64::from(i32::MIN), i64::from(i32::MAX))
-                as i32,
-            (i64::from(pos.z) + dz * r / PPM).clamp(i64::from(i32::MIN), i64::from(i32::MAX))
-                as i32,
-        );
+    for &beam in beams {
+        let end = beam_end(pos, (ux, uz), beam, r);
         let hit = match window {
             Some(win) => march(win, solid, cs, pos, end, start)
-                .map(|(num, den)| if den > 0 { num * r / den } else { 0 }),
+                .map(|(num, den)| fraction_distance(num, den, r)),
             None => {
                 let mut hit = None;
                 grid.trace_segment(pos, end, |c| {
@@ -360,13 +432,26 @@ fn march(
     b: SimPos,
     start: CellCoord,
 ) -> Option<(i64, i64)> {
+    march_with(win, solid, cs, a, b, start, |_| {})
+}
+
+fn march_with(
+    win: &Window,
+    solid: &[u8],
+    cs: i64,
+    a: SimPos,
+    b: SimPos,
+    start: CellCoord,
+    mut visit: impl FnMut(usize),
+) -> Option<(i64, i64)> {
     let w = i64::from(win.w);
     let at = |x: i32, z: i32| -> i64 { i64::from(z - win.z0) * w + i64::from(x - win.x0) };
-    let is_solid = |i: i64| {
-        usize::try_from(i)
-            .ok()
-            .and_then(|i| solid.get(i))
-            .is_some_and(|&s| s != 0)
+    // The window spans the beam's entire reach, including corner side
+    // cells. Ordinary checked indexing needs only one bounds check here.
+    let mut is_solid = |i: i64| {
+        let i = i as usize;
+        visit(i);
+        solid[i] != 0
     };
     let dx = i64::from(b.x) - i64::from(a.x);
     let dz = i64::from(b.z) - i64::from(a.z);
@@ -379,8 +464,8 @@ fn march(
             _ => 0,
         }
     };
-    let mut nx = first(start.x, a.x, sx);
-    let mut nz = first(start.z, a.z, sz);
+    let nx = first(start.x, a.x, sx);
+    let nz = first(start.z, a.z, sz);
     let mut idx = at(start.x, start.z);
     let (ix, iz) = (i64::from(sx), i64::from(sz) * w);
     // A crossing `n` along an axis is on the segment while `n < lim`: a
@@ -393,6 +478,8 @@ fn march(
     // no crossing left (so the other always goes first, as in
     // `trace_segment`). A beam spans at most a window: no overflow.
     let (kx, kz) = (adz.max(1), adx.max(1));
+    let denominator = kx * kz;
+    let (limit_x, limit_z) = (lim_x * kx, lim_z * kz);
     let (dtx, dtz) = (cs * kx, cs * kz);
     let mut tx = if nx < lim_x { nx * kx } else { i64::MAX };
     let mut tz = if nz < lim_z { nz * kz } else { i64::MAX };
@@ -401,27 +488,35 @@ fn march(
             // Exactly through a corner (at nx / adx): both side cells,
             // then the diagonal.
             if is_solid(idx + ix) || is_solid(idx + iz) || is_solid(idx + ix + iz) {
-                return Some((nx, adx));
+                return Some((tx, denominator));
             }
             idx += ix + iz;
-            nx += cs;
-            nz += cs;
-            tx = if nx < lim_x { tx + dtx } else { i64::MAX };
-            tz = if nz < lim_z { tz + dtz } else { i64::MAX };
+            tx += dtx;
+            tz += dtz;
+            if tx >= limit_x {
+                tx = i64::MAX;
+            }
+            if tz >= limit_z {
+                tz = i64::MAX;
+            }
             continue;
         }
         // The crossing into the next cell, as a fraction of the segment.
         let entry = if tx < tz {
             idx += ix;
-            let e = (nx, adx);
-            nx += cs;
-            tx = if nx < lim_x { tx + dtx } else { i64::MAX };
+            let e = (tx, denominator);
+            tx += dtx;
+            if tx >= limit_x {
+                tx = i64::MAX;
+            }
             e
         } else {
             idx += iz;
-            let e = (nz, adz);
-            nz += cs;
-            tz = if nz < lim_z { tz + dtz } else { i64::MAX };
+            let e = (tz, denominator);
+            tz += dtz;
+            if tz >= limit_z {
+                tz = i64::MAX;
+            }
             e
         };
         if is_solid(idx) {
@@ -429,6 +524,15 @@ fn march(
         }
     }
     None
+}
+
+/// Convert the scaled crossing time once, at the hit, instead of keeping
+/// both axis distances and scaled times in the beam's inner loop.
+fn fraction_distance(num: i64, den: i64, range: i64) -> i64 {
+    match num.checked_mul(range) {
+        Some(n) => n / den,
+        None => (i128::from(num) * i128::from(range) / i128::from(den)) as i64,
+    }
 }
 
 /// How far along the segment `a → b` (of nominal length `len`) it enters
@@ -462,6 +566,15 @@ mod tests {
     use npc_kernel::{NpcKernelPlugin, run_ticks, spawn_sim};
 
     use super::*;
+
+    #[test]
+    fn scaled_hit_distance_handles_wide_cross_products() {
+        assert_eq!(
+            fraction_distance(1 << 50, 1 << 55, 1_000_000_000),
+            31_250_000
+        );
+        assert_eq!(fraction_distance(0, 1, 0), 0);
+    }
 
     struct Rng(u64);
 
@@ -593,10 +706,18 @@ mod tests {
                 win.fill(&grid, &things, &mut solid);
                 let len = i64::try_from(u64::try_from(a.dist2(b)).unwrap_or(0).isqrt())
                     .unwrap_or(i64::MAX);
-                let fast = march(&win, &solid, cell, a, b, start)
-                    .map(|(n, den)| if den > 0 { n * len / den } else { 0 });
+                let mut fast_cells = vec![start];
+                let fast = march_with(&win, &solid, cell, a, b, start, |i| {
+                    fast_cells.push(CellCoord::new(
+                        win.x0 + i as i32 % win.w,
+                        win.z0 + i as i32 / win.w,
+                    ))
+                })
+                .map(|(n, den)| fraction_distance(n, den, len));
                 let mut hit = None;
+                let mut slow_cells = Vec::new();
                 grid.trace_segment(a, b, |c| {
+                    slow_cells.push(c);
                     if c != start && solid_at(c) {
                         hit = Some(c);
                         return false;
@@ -605,6 +726,10 @@ mod tests {
                 });
                 let slow = hit.map(|c| entry_distance(a, b, len, c, cell));
                 assert_eq!(fast, slow, "cs {cs}, {a:?} -> {b:?}");
+                assert_eq!(
+                    fast_cells, slow_cells,
+                    "visited cells: cs {cs}, {a:?} -> {b:?}"
+                );
             }
         }
         assert!(

@@ -395,6 +395,20 @@ keeps notebooks as its only memory, and writes improvement proposals for the gam
 
 **The flow.**
 
+**Editing actors.** Main → **Actors** opens the standalone editor (or
+`cargo run --locked -p actor_testbed -- --actor-editor [--actors-dir DIR]`). Settings' optional **Actors folder**
+chooses its preset folder; blank keeps `npc-actors` beside the agents folder. Select a preset, or use **New**
+(Human) / **Duplicate**. Identity, Sheet, Actions and Sensors expose every field with live validation and the
+100-point budget. The centre's model picker changes the preview; **Body**, **Sensor ranges**, **Rotate** and
+the mouse wheel control its presentation. Sensor ranges are drawn at their actual metre sizes.
+
+**Save preset** / Ctrl+S writes atomically; an invalid draft cannot be saved. Ordinary edits keep the selected
+file's ID (for example, editing Human scout keeps `human.json`). A new/duplicated/renamed preset uses the
+display name's slug; the old file stays available. The actual destination updates while naming it, and an
+existing or externally changed destination requires **Confirm Replace**. Revert reloads a saved file or
+restores a new/duplicate draft's starting values. Changing presets or closing with unsaved edits asks before
+discarding them. Resumed worlds retain their saved preset copy; file edits apply to new/fresh worlds.
+
 1. `cargo run -p game_menu` → **Settings**: the agents folder (default `<home>/npc-agents`, kept in
    `%APPDATA%\npc-framework\settings.json`, `$XDG_CONFIG_HOME` or `~/.config`; `--settings FILE` for another
    file). **Explore with an AI agent** stays disabled until the folder is valid.
@@ -411,6 +425,15 @@ keeps notebooks as its only memory, and writes improvement proposals for the gam
    no shell, edits or web), `.claude/settings.local.json` (enables the `npc` server) and `.mcp.json`
    (`npcctl mcp --url ...`). A folder that cannot be written is logged and named in the modal's notes; the world
    still starts. **Start detached** runs the same world without a window (`npcctl serve`, see **Detached** below).
+   Choose an **Actor** preset below the names: Human, Rover (LIDAR and camera), Sentinel (radar and camera), or
+   another valid JSON preset from the configured actors folder. The selected actor's description is shown;
+   invalid presets are excluded and Start is disabled if none are valid. The default is Human. Both launch
+   modes use the choice; Resume rows show the saved agent's preset and keep it when reopening the world.
+   The robot models are built from primitives with a dome per physical sensor. LIDAR reveals geometry through
+   the first hit without identifying objects, cameras reveal their cone with line of sight, and radar reveals
+   only detected target cells. Named objects outside the camera/reach/radar coverage stay hidden or last seen.
+   For a new world from the terminal, add `--preset rover` or `--preset sentinel` (and optionally `--actors-dir DIR`)
+   to `actor_testbed --explorer-home DIR --agent NAME --world NAME` or `npcctl serve` with the same explorer flags.
 3. The game window opens **paused** behind a modal with the prompt: **Copy** puts it on the OS clipboard (a
    note names `prompts/<kind>.md` when the copy tool fails), **OK** closes the modal and starts the sim. Open the
    agent tool (Claude Code, Codex, a chat with MCP or a shell) **in the agent's folder**, paste the prompt into a
