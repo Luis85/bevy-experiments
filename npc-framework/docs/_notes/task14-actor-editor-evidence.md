@@ -34,7 +34,11 @@ Date: 2026-10-27. Continuation of the whole-plan implementation in the current m
   one doc test passed (ten ignored), architecture 7/7, eight replays, six snapshots with none pending, Clippy
   no warnings and cargo-deny passed. No optional tools were skipped. The earlier concurrent run failed two
   detached-host tests; both passed unchanged in isolation and in the complete serial run. No assertions,
-  baselines, protected tooling or lint policy were changed to get the verdict. Five-app release build pending.
+  baselines, protected tooling or lint policy were changed to get the verdict.
+- Phase E checkpoint: feature commit `e3b8475`, merged locally to `main` with `--no-ff` as `65ea248`.
+  `cargo build --release --locked -p game_menu -p actor_testbed -p npcctl -p village -p rts_units_demo`:
+  passed on main (2026-10-27). Artifacts under `C:\Projects\bevy-experiments\npc-framework\target\release\`:
+  `game_menu.exe`, `actor_testbed.exe`, `npcctl.exe`, `village.exe`, `rts_units_demo.exe`.
 
 ## Bounded visual check
 

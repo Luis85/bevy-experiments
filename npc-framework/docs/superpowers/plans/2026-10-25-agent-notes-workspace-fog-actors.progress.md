@@ -2,6 +2,19 @@
 
 ## Continuation in the monorepo (2026-10-27)
 
+- User: **"drive the whole plan to the end"**. Continue through I, G, H and F, including phase verification,
+  local main checkpoints, five-app release artifacts, end-to-end checks and final review. No push/PR requested.
+- **Task 14 complete; Gate E complete.** Combined Tasks 13/14 checkpoint `e3b8475`, merged --no-ff to current
+  monorepo main as `65ea248`. Full gate `target/verify-phase-e-serial.json`: `ok:true`; 1,105 tests passed
+  (12 skipped, one slow, three reported leaky), doc 1 passed/10 ignored, architecture 7/7, replays 8/8,
+  six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped. Two detached-host tests failed
+  in a concurrent attempt but passed unchanged alone and in the complete serial run; no assertions changed.
+- Gate E release build of all five apps passed on main, 2026-10-27; artifacts in
+  `C:\Projects\bevy-experiments\npc-framework\target\release\{game_menu,actor_testbed,npcctl,village,rts_units_demo}.exe`.
+  Actor editor evidence: `docs/_notes/task14-actor-editor-evidence.md`; ADR 0015 records stable file IDs and
+  safe validation. Ruling R19: ordinary edits retain selected filename ID; new/duplicate/renamed copies use slug.
+- Next: **Phase I / Tasks 30–31**, then G / 15–17, H / 21–23, F / 18, final review + fix wave.
+
 - Resumed in `C:\Projects\bevy-experiments\npc-framework`, current `main` checkout. The user chose to
   optimize LIDAR traversal while preserving full scans; the old open decision is resolved.
 - **Task 13 complete**, as local uncommitted changes: procedural Rover/Sentinel models, preset model selection,

@@ -2,21 +2,24 @@
 
 ## Current continuation (2026-10-27)
 
-Task 13 is complete in the current monorepo checkout, `C:\Projects\bevy-experiments\npc-framework`, on
-`main` with local changes. The user resolved the LIDAR decision: **optimize traversal, preserve full scans**.
-The release profiler measures moving-rover perception p95 37.2 µs and fog p95 49.4 µs (55 µs budgets).
-Robot models, fog, workspace descriptions, New's preset picker and Resume's preset labels have regression
-tests and inspected local screenshots. Evidence: `docs/_notes/task13-robot-explorer-evidence.md`.
+The user asked to **drive the whole plan to the end**. Phases A–E are complete in the current monorepo,
+`C:\Projects\bevy-experiments\npc-framework`. Tasks 13/14 were committed as `e3b8475` and merged --no-ff to
+`main` as `65ea248`. Full Gate E (`target/verify-phase-e-serial.json`) reports **`"ok": true`**: 1,105 tests
+passed, 12 skipped, one slow and three reported leaky; doc 1 passed/10 ignored; architecture 7/7, replays 8/8,
+six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped. The complete serial suite passed
+two detached-host tests that failed under concurrent load; no assertions or baselines were changed.
 
-Final full `cargo xtask verify`: **`"ok": true`**, in `target/verify-task13-final.json`, with process-local
-`CARGO_BUILD_JOBS=8`, `NEXTEST_TEST_THREADS=4`. All 1,080 tests passed (12 skipped, two reported leaky),
-seven architecture tests and all eight replays passed, snapshots had none pending, and cargo-deny passed;
-Clippy has no warnings. No optional tools were skipped. The two leaky-test reports remain a harness limitation.
-The next implementation task is **Task 14 (actor editor)**; Gate E is not complete yet. Changes are uncommitted;
-no phase merge or five-app release build was performed at this Task 13 checkpoint.
+The five-app release build passed on main, 2026-10-27. Artifacts are under `target/release/`:
+`game_menu.exe`, `actor_testbed.exe`, `npcctl.exe`, `village.exe`, `rts_units_demo.exe`.
+Evidence: `docs/_notes/task13-robot-explorer-evidence.md` and `task14-actor-editor-evidence.md`.
+The LIDAR decision is resolved: optimized complete scans; rover median p95 37.2 µs perception /49.4 µs fog.
 
-The older handoff below records the previous checkout and workflow. Use the current repository working
-agreement and preserve these local changes when continuing.
+**Next: Phase I / Tasks 30–31 (registration/tokens), then G / 15–17 (worlds), H / 21–23 (map), F / 18 (docs,
+MCP end-to-end, final verify), final whole-change review and one fix wave.** Preserve the phase gates: full
+verification, local main checkpoint and five release apps before starting the next phase. Use the current
+checkout layout and `codex/` branches, preserving unrelated changes; no push/PR was requested.
+
+The older handoff below records the previous checkout and workflow. Its Task 13 starting point is historical.
 
 ## Historical resume prompt (2026-10-26)
 
