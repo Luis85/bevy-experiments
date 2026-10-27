@@ -92,8 +92,53 @@ pub struct ClientArgs {
     /// Bearer token of a session started with `serve --token`.
     #[arg(long, global = true, value_name = "TOKEN")]
     pub token: Option<String>,
+    /// Register this agent; --token then means its registration credential.
+    #[arg(long, global = true, requires = "token")]
+    pub agent_id: Option<String>,
+    /// Optional HTTP bearer when --token is the agent registration secret.
+    #[arg(long, global = true, value_name = "TOKEN")]
+    pub bearer_token: Option<String>,
     #[arg(long, global = true, value_enum, default_value_t = Format::Json)]
     pub format: Format,
+}
+
+impl ClientArgs {
+    fn transport_token(&self) -> Result<Option<&str>, Failure> {
+        if self.agent_id.is_some() {
+            return Ok(self.bearer_token.as_deref());
+        }
+        if self.token.is_some() && self.bearer_token.is_some() {
+            return Err(Failure::usage(
+                "Use --token or --bearer-token for HTTP authentication, not both",
+            ));
+        }
+        Ok(self.bearer_token.as_deref().or(self.token.as_deref()))
+    }
+}
+
+#[derive(Subcommand, Debug)]
+pub enum AgentTokenCmd {
+    /// Rotate an agent's token and refresh its generated workspace (never prints secrets).
+    Rotate {
+        #[arg(long)]
+        explorer_home: PathBuf,
+        #[arg(long)]
+        agent: String,
+    },
+}
+
+pub fn cmd_agent_token(cmd: &AgentTokenCmd, out: &mut Out) -> Result<u8, Failure> {
+    let AgentTokenCmd::Rotate {
+        explorer_home,
+        agent,
+    } = cmd;
+    let dir = testbed_content::explorer::home::AgentDir {
+        dir: explorer_home.join(testbed_content::explorer::home::slug(agent)),
+    };
+    let meta = testbed_content::explorer::home::ensure_credentials(&dir).map_err(Failure::usage)?;
+    testbed_content::explorer::host::rotate_agent_token(&dir).map_err(Failure::usage)?;
+    out.json(&json!({"rotated":true,"agent_id":meta.agent_id}))?;
+    Ok(EXIT_OK)
 }
 
 #[derive(Copy, Clone, Debug, ValueEnum)]
@@ -111,11 +156,19 @@ pub enum OnIdle {
 
 #[derive(Subcommand, Debug)]
 pub enum AgentCmd {
+    /// Register credentials and print the public acknowledgement (no session key).
+    Register,
+    /// Register, then meet the assigned character without revealing its unit number.
+    EnterWorld,
+    /// Register and take Direct control of the assigned actor.
+    TakeControl,
+    /// Register and release the assigned actor.
+    Release,
     /// Attach a controller to a unit: {controller, unit, mode, on_idle, applies_at}.
     #[command(after_help = "Example: npcctl agent attach --unit 5 --controller me --mode direct")]
     Attach {
-        #[arg(long)]
-        unit: u32,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
         #[arg(long)]
         controller: Option<String>,
         #[arg(long, value_enum, default_value_t = Mode::Direct)]
@@ -128,18 +181,18 @@ pub enum AgentCmd {
     },
     /// Detach; the unit's own behaviour resumes.
     Detach {
-        #[arg(long)]
-        unit: u32,
-        #[arg(long)]
-        controller: String,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
+        #[arg(long, required_unless_present = "agent_id")]
+        controller: Option<String>,
     },
     /// The unit's egocentric observation (affordances included).
     #[command(
         after_help = "Examples:\n  npcctl agent observe --unit 5 --format text --brief\n  npcctl agent observe --unit 5 --format text --since-seq 40   # first line: what changed since seq 40"
     )]
     Observe {
-        #[arg(long)]
-        unit: u32,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
         #[arg(long)]
         controller: Option<String>,
         /// Recent events to include.
@@ -162,19 +215,19 @@ pub enum AgentCmd {
     Act(ActArgs),
     /// Cancel an action (--handle) or the running one.
     Cancel {
-        #[arg(long)]
-        unit: u32,
-        #[arg(long)]
-        controller: String,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
+        #[arg(long, required_unless_present = "agent_id")]
+        controller: Option<String>,
         #[arg(long)]
         handle: Option<u32>,
     },
     /// Cancel the running action and empty the queue.
     Clear {
-        #[arg(long)]
-        unit: u32,
-        #[arg(long)]
-        controller: String,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
+        #[arg(long, required_unless_present = "agent_id")]
+        controller: Option<String>,
     },
     /// Events after --since-seq; with --timeout-ms waits until one happens (long-poll).
     #[command(
@@ -299,19 +352,19 @@ pub struct NoteChangeArgs {
 pub enum AgentNotesCmd {
     /// The entries of a book, oldest first: {unit, book, notes:[{id, title, body, created, updated, status?, prompted_by?}], unreadable:[{file, reason}]}.
     List {
-        #[arg(long)]
-        unit: u32,
-        #[arg(long)]
-        controller: String,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
+        #[arg(long, required_unless_present = "agent_id")]
+        controller: Option<String>,
         #[arg(long, value_enum)]
         book: BookArg,
     },
     /// Add an entry: {accepted, note}.
     Add {
-        #[arg(long)]
-        unit: u32,
-        #[arg(long)]
-        controller: String,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
+        #[arg(long, required_unless_present = "agent_id")]
+        controller: Option<String>,
         #[arg(long, value_enum)]
         book: BookArg,
         #[command(flatten)]
@@ -320,10 +373,10 @@ pub enum AgentNotesCmd {
     /// Change an entry's title or body if it is unchanged since --expected-*: {accepted, note}
     /// (stale: exit 1 with `current`).
     Update {
-        #[arg(long)]
-        unit: u32,
-        #[arg(long)]
-        controller: String,
+        #[arg(long, required_unless_present = "agent_id")]
+        unit: Option<u32>,
+        #[arg(long, required_unless_present = "agent_id")]
+        controller: Option<String>,
         #[arg(long, value_enum)]
         book: BookArg,
         #[command(flatten)]
@@ -417,7 +470,7 @@ fn agent_notes(cmd: &AgentNotesCmd) -> (&'static str, Value) {
 
 /// `npcctl notes ...`: the player's notes methods (no controller).
 pub fn cmd_notes(cmd: &NotesCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Failure> {
-    let client = client(&c.url, c.token.as_deref())?;
+    let client = client(&c.url, c.transport_token()?)?;
     let (method, params) = match cmd {
         NotesCmd::List { unit, book } => ("notes/list", json!({"unit": unit, "book": book.name()})),
         NotesCmd::Add { unit, book, note } => {
@@ -458,10 +511,10 @@ fn exit_code(v: &Value) -> u8 {
 
 #[derive(Args, Debug)]
 pub struct ActArgs {
-    #[arg(long)]
-    unit: u32,
-    #[arg(long)]
-    controller: String,
+    #[arg(long, required_unless_present = "agent_id")]
+    unit: Option<u32>,
+    #[arg(long, required_unless_present = "agent_id")]
+    controller: Option<String>,
     #[arg(long)]
     affordance: Option<String>,
     #[arg(long)]
@@ -560,7 +613,12 @@ fn client(url: &str, token: Option<&str>) -> Result<RpcClient, Failure> {
 
 /// One call; RPC errors exit 2 with `{"error", "code", "data"}`.
 fn rpc(c: &RpcClient, method: &str, params: Value) -> Result<Value, Failure> {
-    c.call(method, params).map_err(|e| match e {
+    c.call(method, params)
+        .map_err(|e| rpc_failure(e, c, method))
+}
+
+fn rpc_failure(e: ClientError, c: &RpcClient, method: &str) -> Failure {
+    match e {
         ClientError::Rpc(err) => Failure::usage(err.message.clone())
             .with("code", err.code)
             .with("data", err.data)
@@ -569,7 +627,7 @@ fn rpc(c: &RpcClient, method: &str, params: Value) -> Result<Value, Failure> {
             Failure::usage(format!("{t} (is `npcctl serve` running at {}?)", c.url()))
                 .with("method", method)
         }
-    })
+    }
 }
 
 fn print(out: &mut Out, format: Format, v: &Value) -> Result<(), Failure> {
@@ -599,21 +657,53 @@ fn nonce() -> Value {
 }
 
 pub fn cmd_agent(cmd: &AgentCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Failure> {
-    let client = client(&c.url, c.token.as_deref())?;
+    let client = client(&c.url, c.transport_token()?)?;
+    if c.agent_id.is_none()
+        && matches!(
+            cmd,
+            AgentCmd::Register | AgentCmd::EnterWorld | AgentCmd::TakeControl | AgentCmd::Release
+        )
+    {
+        return Err(Failure::usage(
+            "This command requires --agent-id and --token",
+        ));
+    }
     let (method, params) = match cmd {
+        AgentCmd::Register => ("agent/register", json!({})),
+        AgentCmd::EnterWorld => ("agent/enter_world", json!({})),
+        AgentCmd::TakeControl => ("agent/take_control", json!({})),
+        AgentCmd::Release => ("agent/release", json!({})),
         AgentCmd::Attach {
             unit,
             controller,
             mode,
             on_idle,
             force,
-        } => (
-            "agent/attach",
-            json!({"unit": unit, "controller": controller, "mode": mode_name(*mode),
+        } => {
+            if c.agent_id.is_some() {
+                if !matches!(mode, Mode::Direct) || !matches!(on_idle, OnIdle::Idle) || *force {
+                    return Err(Failure::usage(
+                        "Registered actors take Direct control with Idle policy; --force is not supported",
+                    ));
+                }
+                (
+                    "agent/take_control",
+                    json!({"unit":unit,"controller":controller}),
+                )
+            } else {
+                (
+                    "agent/attach",
+                    json!({"unit": unit, "controller": controller, "mode": mode_name(*mode),
                    "on_idle": idle_name(*on_idle), "force": force}),
-        ),
+                )
+            }
+        }
         AgentCmd::Detach { unit, controller } => (
-            "agent/detach",
+            if c.agent_id.is_some() {
+                "agent/release"
+            } else {
+                "agent/detach"
+            },
             json!({"unit": unit, "controller": controller}),
         ),
         AgentCmd::Observe {
@@ -735,13 +825,60 @@ pub fn cmd_agent(cmd: &AgentCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Fa
         AgentCmd::ListUnits { kind } => ("agent/list_units", json!({"kind": kind})),
         AgentCmd::Notes(n) => agent_notes(n),
     };
-    let v = rpc(&client, method, params)?;
+    let v = if let Some(agent_id) = &c.agent_id {
+        let token = c
+            .token
+            .as_deref()
+            .ok_or_else(|| Failure::usage("--agent-id requires --token"))?;
+        let mut registered = npc_framework::agent_io::mcp::RegisteredClient::new(&client);
+        let ack = registered
+            .register(agent_id, token)
+            .map_err(|e| rpc_failure(e, &client, "agent/register"))?;
+        if method == "agent/register" {
+            ack
+        } else {
+            let mut params = params;
+            if let Some(object) = params.as_object_mut() {
+                object.retain(|key, value| {
+                    !matches!(key.as_str(), "unit" | "controller") || !value.is_null()
+                });
+            }
+            if !method.starts_with("agent/notes/")
+                && !matches!(
+                    method,
+                    "agent/enter_world" | "agent/list_units" | "agent/take_control"
+                )
+            {
+                let mut target = json!({});
+                for key in ["unit", "controller"] {
+                    if let Some(value) = params.get(key) {
+                        target[key] = value.clone();
+                    }
+                }
+                let ready = registered
+                    .call("agent/take_control", target)
+                    .map_err(|e| rpc_failure(e, &client, "agent/take_control"))?;
+                if ready.get("in_control").and_then(Value::as_bool) != Some(true) {
+                    return Err(Failure::usage(
+                        "Control is queued; resume the world before acting",
+                    )
+                    .with("reason", "not_in_control")
+                    .with("pending", true));
+                }
+            }
+            registered
+                .call(method, params)
+                .map_err(|e| rpc_failure(e, &client, method))?
+        }
+    } else {
+        rpc(&client, method, params)?
+    };
     print(out, c.format, &v)?;
     Ok(exit_code(&v))
 }
 
 pub fn cmd_world(cmd: &WorldCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Failure> {
-    let client = client(&c.url, c.token.as_deref())?;
+    let client = client(&c.url, c.transport_token()?)?;
     let (method, params) = match cmd {
         WorldCmd::LoadScenario { file, seed } => {
             let doc: Value = read_json(file, "scenario")?;
@@ -759,7 +896,7 @@ pub fn cmd_world(cmd: &WorldCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Fa
 }
 
 pub fn cmd_session(cmd: &SessionCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Failure> {
-    let client = client(&c.url, c.token.as_deref())?;
+    let client = client(&c.url, c.transport_token()?)?;
     let method = match cmd {
         SessionCmd::Info => "session/info",
         SessionCmd::Stop => "session/stop",
@@ -805,12 +942,21 @@ pub fn cmd_serve(a: &ServeArgs, out: &mut Out) -> Result<u8, Failure> {
     Ok(EXIT_OK)
 }
 
-pub fn cmd_mcp(url: &str, token: Option<&str>, controller: &str) -> Result<u8, Failure> {
+pub fn cmd_mcp(
+    url: &str,
+    token: Option<&str>,
+    controller: &str,
+    registered: bool,
+) -> Result<u8, Failure> {
     let client = client(url, token)?;
     let stdin = std::io::stdin();
     let stdout = std::io::stdout();
-    npc_framework::agent_io::mcp::serve(&client, controller, stdin.lock(), stdout.lock())
-        .map_err(|e| Failure::usage(format!("mcp: {e}")))?;
+    let result = if registered {
+        npc_framework::agent_io::mcp::serve_registered(&client, stdin.lock(), stdout.lock())
+    } else {
+        npc_framework::agent_io::mcp::serve(&client, controller, stdin.lock(), stdout.lock())
+    };
+    result.map_err(|e| Failure::usage(format!("mcp: {e}")))?;
     Ok(EXIT_OK)
 }
 

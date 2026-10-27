@@ -32,7 +32,7 @@ a headless CLI, a JSON-RPC interface on the running game, a journal of every dec
 - **Entity reference**: one page per ECS [component](docs/entities/components/index.md) (fields and units, who
   adds, reads and writes it, hashed and/or saved in world snapshots) and per [system](docs/entities/systems/index.md)
   (schedule and set, reads/writes, determinism, perf mechanic).
-- Decisions: [`docs/adr/`](docs/adr/) (0001–0015). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
+- Decisions: [`docs/adr/`](docs/adr/) (0001–0016). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
   `docs/superpowers/`. Benchmarks: [`bench/README.md`](bench/README.md). Agent workflow: [`CLAUDE.md`](CLAUDE.md).
 
 ## Features

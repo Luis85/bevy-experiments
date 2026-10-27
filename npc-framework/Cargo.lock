@@ -4212,6 +4212,8 @@ version = "0.1.0"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
+ "blake3",
+ "getrandom 0.4.3",
  "npc_ai",
  "npc_kernel",
  "npc_tools",

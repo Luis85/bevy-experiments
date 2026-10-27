@@ -35,6 +35,7 @@ use crate::notes::{
     Stamp, Writer,
 };
 use crate::observe;
+use crate::registration::{self, Authorization};
 use crate::registry::{ActionPlan, ActionRequest, AgentCtx, AgentRegistry, Rejection};
 use crate::stats::AgentStats;
 
@@ -176,7 +177,11 @@ pub fn epoch(world: &World) -> u64 {
 /// The `agent/*`, `notes/*` and `world/*` method names this module serves
 /// (the session host adds `world/load_scenario`, `world/reset`,
 /// `session/stop` and a subset of `npc/*`).
-pub const METHODS: [&str; 17] = [
+pub const METHODS: [&str; 21] = [
+    "agent/register",
+    "agent/enter_world",
+    "agent/take_control",
+    "agent/release",
     "agent/attach",
     "agent/detach",
     "agent/observe",
@@ -212,7 +217,7 @@ fn now(world: &World) -> Result<u64, RpcError> {
         .ok_or_else(|| RpcError::new(codes::NOT_READY, "sim not ready: missing SimClock"))
 }
 
-fn stamp(world: &World, mut v: Value) -> RpcResult {
+pub(crate) fn stamp(world: &World, mut v: Value) -> RpcResult {
     let tick = now(world)?;
     if let Value::Object(m) = &mut v {
         m.insert("tick".into(), json!(tick));
@@ -238,28 +243,51 @@ fn submit_cmd(world: &mut World, cmd: SimCommand) -> Result<(u64, u32), RpcError
 /// waited for); transports that support waiting use [`events_ready`] and
 /// [`events_result`], [`act_and_wait_start`], [`act_wait_ready`] and
 /// [`act_wait_result`].
-pub fn call(world: &mut World, method: &str, p: Option<Value>) -> RpcResult {
+pub fn call(world: &mut World, method: &str, mut p: Option<Value>) -> RpcResult {
+    if registration::bootstrap(method) {
+        return registration::call(world, method, p);
+    }
+    if registration::required(world) {
+        match method {
+            "agent/attach" => return registration::call(world, "agent/take_control", p),
+            "agent/detach" => return registration::call(world, "agent/release", p),
+            _ => {}
+        }
+    }
+    // The waiting entry points are also called directly by transports.
+    if method == "agent/act_and_wait" {
+        let wait = act_and_wait_start(world, p)?;
+        return act_wait_result(world, &wait, false);
+    }
+    if method == "agent/events" {
+        let params = parse_events_for(world, p)?;
+        return events_result(world, &params, false);
+    }
+    let authorization = registration::authorize(world, method, &mut p)?;
     events::harvest(world);
     match method {
         "agent/attach" => attach(world, params(p, ATTACH)?),
         "agent/detach" => detach(world, params(p, OWNER)?),
         "agent/observe" => observe_method(world, params(p, OBSERVE)?),
         "agent/act" => act(world, act_params(p, ACT)?),
-        "agent/act_and_wait" => {
-            let w = act_and_wait_start(world, p)?;
-            act_wait_result(world, &w, false)
-        }
         "agent/cancel" => cancel(world, params(p, CANCEL)?),
         "agent/clear" => clear(world, params(p, OWNER)?),
-        "agent/events" => {
-            let p = parse_events(p)?;
-            events_result(world, &p, false)
-        }
         "agent/stats" => stats(world, params(p, "{controller?}")?),
-        "agent/list_units" => list_units(world, params(p, "{kind?}")?),
+        "agent/list_units" => list_units(
+            world,
+            params(p, "{kind?}")?,
+            authorization.as_ref().map(|a| a.assigned),
+        ),
         "agent/notes/list" => {
             let p: AgentNotesList = params(p, AGENT_NOTES_LIST)?;
-            notes_call(world, p.unit, Some(&p.controller), &p.book, NotesOp::List)
+            notes_call(
+                world,
+                p.unit,
+                Some(&p.controller),
+                &p.book,
+                NotesOp::List,
+                authorization.as_ref(),
+            )
         }
         "agent/notes/add" => {
             let p: AgentNotesAdd = params(p, AGENT_NOTES_ADD)?;
@@ -268,7 +296,14 @@ pub fn call(world: &mut World, method: &str, p: Option<Value>) -> RpcResult {
                 body: p.body,
                 prompted_by: p.prompted_by,
             });
-            notes_call(world, p.unit, Some(&p.controller), &p.book, op)
+            notes_call(
+                world,
+                p.unit,
+                Some(&p.controller),
+                &p.book,
+                op,
+                authorization.as_ref(),
+            )
         }
         "agent/notes/update" => {
             let p: AgentNotesUpdate = params(p, AGENT_NOTES_UPDATE)?;
@@ -278,11 +313,18 @@ pub fn call(world: &mut World, method: &str, p: Option<Value>) -> RpcResult {
                 status: None,
             };
             let op = NotesOp::Update(p.id, p.expected, change);
-            notes_call(world, p.unit, Some(&p.controller), &p.book, op)
+            notes_call(
+                world,
+                p.unit,
+                Some(&p.controller),
+                &p.book,
+                op,
+                authorization.as_ref(),
+            )
         }
         "notes/list" => {
             let p: PlayerNotesList = params(p, PLAYER_NOTES_LIST)?;
-            notes_call(world, p.unit, None, &p.book, NotesOp::List)
+            notes_call(world, p.unit, None, &p.book, NotesOp::List, None)
         }
         "notes/add" => {
             let p: PlayerNotesAdd = params(p, PLAYER_NOTES_ADD)?;
@@ -291,7 +333,7 @@ pub fn call(world: &mut World, method: &str, p: Option<Value>) -> RpcResult {
                 body: p.body,
                 prompted_by: p.prompted_by,
             });
-            notes_call(world, p.unit, None, &p.book, op)
+            notes_call(world, p.unit, None, &p.book, op, None)
         }
         "notes/update" => {
             let p: PlayerNotesUpdate = params(p, PLAYER_NOTES_UPDATE)?;
@@ -302,7 +344,7 @@ pub fn call(world: &mut World, method: &str, p: Option<Value>) -> RpcResult {
                 status,
             };
             let op = NotesOp::Update(p.id, p.expected, change);
-            notes_call(world, p.unit, None, &p.book, op)
+            notes_call(world, p.unit, None, &p.book, op, None)
         }
         "world/state" => {
             now(world)?;
@@ -1323,25 +1365,31 @@ fn notes_call(
     controller: Option<&str>,
     book: &str,
     op: NotesOp,
+    authorization: Option<&Authorization>,
 ) -> RpcResult {
     let book = parse_book(book)?;
     let tick = now(world)?;
     let writer = match controller {
         Some(c) => {
-            let entity = unit_entity(world, unit)?;
-            // Reading is not acting: an Observer lists its notes; writes
-            // need the full `agent/act` check.
-            let checked = match op {
-                NotesOp::List => controller_of(world, entity, unit, c).map(drop),
-                NotesOp::Add(_) | NotesOp::Update(..) => check_controller(world, unit, c),
-            };
-            if let Err(r) = checked {
-                return stamp(
-                    world,
-                    json!({"accepted": false, "reason": r.reason, "message": r.message}),
-                );
+            if let Some(permit) = authorization {
+                registration::validate_permit(world, permit, false)?;
+                Writer::Agent
+            } else {
+                let entity = unit_entity(world, unit)?;
+                // Reading is not acting: an Observer lists its notes; writes
+                // need the full `agent/act` check.
+                let checked = match op {
+                    NotesOp::List => controller_of(world, entity, unit, c).map(drop),
+                    NotesOp::Add(_) | NotesOp::Update(..) => check_controller(world, unit, c),
+                };
+                if let Err(r) = checked {
+                    return stamp(
+                        world,
+                        json!({"accepted": false, "reason": r.reason, "message": r.message}),
+                    );
+                }
+                Writer::Agent
             }
-            Writer::Agent
         }
         None => Writer::Player,
     };
@@ -1350,7 +1398,11 @@ fn notes_call(
         .and_then(|d| d.0.get(&SimId(unit)))
         .cloned()
     else {
-        return Err(RpcError::invalid(format!("unit {unit} keeps no notes")));
+        return Err(RpcError::invalid(if authorization.is_some() {
+            "this agent has no assigned notebooks".to_owned()
+        } else {
+            format!("unit {unit} keeps no notes")
+        }));
     };
     let at = Stamp {
         tick,
@@ -1378,7 +1430,16 @@ fn notes_call(
         })
     };
     match result {
-        Ok(v) => stamp(world, v),
+        Ok(mut v) => {
+            // Notes are available before take_control, which is the first
+            // method allowed to reveal the assigned actor's numeric id.
+            if authorization.is_some()
+                && let Some(map) = v.as_object_mut()
+            {
+                map.remove("unit");
+            }
+            stamp(world, v)
+        }
         Err(e) => notes_error(world, &e),
     }
 }
@@ -1389,6 +1450,9 @@ fn notes_call(
 #[derive(Deserialize, Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
 pub struct EventsParams {
+    /// Host-only permit retained while waiting; never accepted from JSON.
+    #[serde(skip)]
+    pub authorization: Option<Authorization>,
     #[serde(default)]
     pub unit: Option<u32>,
     #[serde(default)]
@@ -1476,6 +1540,14 @@ pub fn parse_events(p: Option<Value>) -> Result<EventsParams, RpcError> {
     Ok(p)
 }
 
+/// Transport entry point: authenticate before the legacy event parser.
+pub fn parse_events_for(world: &mut World, mut p: Option<Value>) -> Result<EventsParams, RpcError> {
+    let authorization = registration::authorize(world, "agent/events", &mut p)?;
+    let mut params = parse_events(p)?;
+    params.authorization = authorization;
+    Ok(params)
+}
+
 fn query(p: &EventsParams) -> EventQuery {
     EventQuery {
         unit: p.unit.map(SimId),
@@ -1513,11 +1585,26 @@ pub fn busy_reason(world: &World, unit: SimId) -> Option<String> {
         .find_map(|f| f(world, e))
 }
 
+fn check_event_authorization(world: &mut World, p: &EventsParams) -> Result<(), RpcError> {
+    match &p.authorization {
+        Some(permit) => registration::validate_permit(world, permit, true),
+        None if registration::required(world) => {
+            // A host can enable its lock while a legacy poll is parked.
+            let mut raw = None;
+            registration::authorize(world, "agent/events", &mut raw).map(|_| ())
+        }
+        None => Ok(()),
+    }
+}
+
 /// Whether `agent/events` with `p` has something to return now: enough
 /// matching events (`min_events`, default 1), or with `until_idle` the unit
-/// is idle; also at once when `since_seq` is ahead of the latest seq (the
-/// result is then an error: the world was rebuilt).
+/// is idle; also at once for a revoked caller or when `since_seq` is ahead
+/// of the latest seq (the result is then an error).
 pub fn events_ready(world: &mut World, p: &EventsParams) -> bool {
+    if check_event_authorization(world, p).is_err() {
+        return true;
+    }
     events::harvest(world);
     let Some(ev) = world.get_resource::<AgentEvents>() else {
         return false;
@@ -1564,6 +1651,7 @@ fn dedupe(found: &[AgentEvent]) -> Vec<Value> {
 /// before this call (the poller missed them). `since_seq` beyond the latest
 /// seq is an error (the world was rebuilt: see `epoch`).
 pub fn events_result(world: &mut World, p: &EventsParams, timed_out: bool) -> RpcResult {
+    check_event_authorization(world, p)?;
     events::harvest(world);
     if let Some(unit) = p.unit {
         unit_entity(world, unit).or_else(|e| {
@@ -1682,7 +1770,8 @@ impl ActWait {
 /// on bad params), then acts exactly like `agent/act`. Errors are those of
 /// `agent/act` plus invalid wait params; a rejection is a result
 /// ([`ActWait::answers_at_once`]).
-pub fn act_and_wait_start(world: &mut World, p: Option<Value>) -> Result<ActWait, RpcError> {
+pub fn act_and_wait_start(world: &mut World, mut p: Option<Value>) -> Result<ActWait, RpcError> {
+    let authorization = registration::authorize(world, "agent/act_and_wait", &mut p)?;
     events::harvest(world);
     let mut map = match p {
         Some(Value::Object(m)) => m,
@@ -1727,6 +1816,7 @@ pub fn act_and_wait_start(world: &mut World, p: Option<Value>) -> Result<ActWait
         "kinds": wait.get("kinds").cloned().unwrap_or(Value::Null),
         "until_idle": until_idle,
     })))?;
+    events.authorization = authorization;
     let unit = act_params.unit;
     let act = act(world, act_params)?;
     events.since_seq = act["seq"]
@@ -1817,7 +1907,7 @@ struct UnitsParams {
     kind: Option<String>,
 }
 
-fn list_units(world: &mut World, p: UnitsParams) -> RpcResult {
+fn list_units(world: &mut World, p: UnitsParams, assigned: Option<SimId>) -> RpcResult {
     let info: Vec<crate::registry::UnitInfoFn> = world
         .get_resource::<AgentRegistry>()
         .map(|r| r.unit_info.values().copied().collect())
@@ -1825,6 +1915,9 @@ fn list_units(world: &mut World, p: UnitsParams) -> RpcResult {
     let units: Vec<Value> = inspect::sim_entities(world)
         .into_iter()
         .filter_map(|(id, e)| {
+            if assigned.is_some_and(|own| own != id) {
+                return None;
+            }
             let kind = inspect::kind_name(world, e);
             if p.kind.as_deref().is_some_and(|k| k != kind) {
                 return None;

@@ -1,3 +1,3 @@
-{AGENT}, you return to {WORLD}. Epoch 1 goes on: survive, learn, explore, map.
+{AGENT}, you return to the threshold of {WORLD}. Epoch 1 continues: survive, learn, explore, map, and add the next chapter of your story.
 
-Read `{AGENTS_MD}` first. Then remember: list your memory (`notes_list` with `book: "memory"`), the last entries of your diary (`book: "diary"`) and your proposals (`book: "proposals"`; the `status` on each is the dev's answer). The world was saved about once a minute, so it may lag a little behind your diary: where they disagree, trust your senses and note the difference. Then observe and go on from where you left off.
+Read `{AGENTS_MD}` first and register again. Remember before you enter: list your memory (`notes_list` with `book: "memory"`), the last entries of your diary (`book: "diary"`) and your proposals (`book: "proposals"`; their `status` is the dev's answer). The save may lag behind your diary. Enter the world, meet your character, and take control; then observe and continue, testing your memories against what your senses tell you.

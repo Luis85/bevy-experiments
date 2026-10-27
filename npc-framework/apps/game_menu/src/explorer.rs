@@ -87,6 +87,51 @@ struct PresetPicker {
 #[derive(Component)]
 struct PresetDescription;
 
+#[derive(Resource, Default)]
+pub struct TokenNotice {
+    text: String,
+    error: bool,
+}
+
+#[derive(Component)]
+struct TokenNoticeText;
+
+pub(crate) fn token_notice(parent: &mut ChildSpawnerCommands) {
+    parent.spawn((TokenNoticeText, ui::label("", 13.0, OK)));
+}
+
+fn show_token_notice(
+    notice: Res<TokenNotice>,
+    mut labels: Query<(&mut Text, &mut TextColor), With<TokenNoticeText>>,
+) {
+    if !notice.is_changed() {
+        return;
+    }
+    for (mut text, mut color) in &mut labels {
+        text.0.clone_from(&notice.text);
+        color.0 = if notice.error { ERROR } else { OK };
+    }
+}
+
+pub(crate) fn rotate_token(world: &mut World, agent: &str, dir: std::path::PathBuf) {
+    if crate::quit::active(world) {
+        return;
+    }
+    let result = testbed_content::explorer::host::rotate_agent_token(
+        &testbed_content::explorer::home::AgentDir { dir },
+    );
+    let (text, error) = match result {
+        Ok(()) => (
+            format!(
+                "{agent}: new token saved. Re-read AGENTS.md and register again; the old session is revoked."
+            ),
+            false,
+        ),
+        Err(e) => (format!("{agent}: {e}"), true),
+    };
+    world.insert_resource(TokenNotice { text, error });
+}
+
 type PresetDescriptionFilter = (
     With<PresetDescription>,
     Without<NewFolderText>,
@@ -231,6 +276,7 @@ pub struct ExplorerPlugin;
 impl Plugin for ExplorerPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ResumeNotice>()
+            .init_resource::<TokenNotice>()
             .init_resource::<ResumeInfo>()
             .init_resource::<RunScan>()
             .init_resource::<CheckedNames>()
@@ -248,6 +294,7 @@ impl Plugin for ExplorerPlugin {
                     (refresh_new, enter_starts).run_if(in_state(Screen::ExplorerNew)),
                     poll_save_check.run_if(in_state(Screen::ExplorerCheck)),
                     finish_run_scan.run_if(in_state(Screen::ExplorerResume)),
+                    show_token_notice,
                 ),
             );
     }
@@ -641,7 +688,7 @@ fn spawn_resume(
             ))
             .with_children(|list| {
                 for (i, (a, state)) in agents.iter().zip(&states).enumerate() {
-                    let tab = i32::try_from(i * 3).unwrap_or(i32::MAX);
+                    let tab = i32::try_from(i * 4).unwrap_or(i32::MAX);
                     list.spawn((
                         ResumeRow(i),
                         Node {
@@ -663,6 +710,7 @@ fn spawn_resume(
         if let Some(e) = &notice {
             p.spawn(ui::label(e.clone(), 14.0, ERROR));
         }
+        token_notice(p);
         ui::row(p, |r| {
             if let Some(back) = Screen::ExplorerResume.back() {
                 let b = button(r, "Back", None, true, 10_000, Action::Go(back));
@@ -696,7 +744,7 @@ fn finish_run_scan(
             continue;
         };
         let state = checked_state(&mut worlds, &a, run);
-        let tab = i32::try_from(i * 3).unwrap_or(i32::MAX);
+        let tab = i32::try_from(i * 4).unwrap_or(i32::MAX);
         let name_px = scan.name_px;
         for (row, _) in rows.iter().filter(|(_, r)| r.0 == i) {
             commands
@@ -783,6 +831,15 @@ fn resume_row(
             small("Stop", on, tab + 2, Action::StopDetached(agent.clone()));
         }
     }
+    small(
+        "New token",
+        a.has_save,
+        tab + 3,
+        Action::RotateToken {
+            agent: agent.clone(),
+            dir: a.dir.dir.clone(),
+        },
+    );
     if enabled && !*focused {
         row.commands().entity(id).insert(AutoFocus);
         *focused = true;
@@ -1286,6 +1343,65 @@ mod tests {
         let mut app = app(&d, &agents);
         open(&mut app, Screen::ExplorerResume);
         assert!(texts(&mut app).iter().any(|t| t.contains("actor: rover")));
+        let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn new_token_button_rotates_credentials_and_refreshes_the_handbook() {
+        use testbed_content::explorer::home::AgentMeta;
+        use testbed_content::explorer::host::{HostArgs, build_world, write_session_files};
+        let d = tmp("rotate-button");
+        let agents = d.join("agents");
+        let args = HostArgs {
+            home: agents.clone(),
+            agent: "Rover Pilot".into(),
+            world: Some("W".into()),
+            resume: false,
+            on_mismatch: None,
+            preset: None,
+            actors_dir: Some(d.join("actors")),
+        };
+        let (simulation, start, dir) =
+            build_world(&args, 1, "2026-10-27T00:00:00Z", |_| {}).unwrap();
+        write_session_files(
+            simulation.world(),
+            &start,
+            &dir,
+            "http://127.0.0.1:15990",
+            std::path::PathBuf::from("C:/helper/npcctl.exe"),
+            true,
+        )
+        .unwrap();
+        let read_meta = || {
+            serde_json::from_str::<AgentMeta>(&std::fs::read_to_string(dir.meta()).unwrap())
+                .unwrap()
+        };
+        let before = read_meta();
+        let saved = std::fs::read(dir.save("W")).unwrap();
+        let mut app = app(&d, &agents);
+        open(&mut app, Screen::ExplorerResume);
+        let token_button = button_for(
+            &mut app,
+            |a| matches!(a, Action::RotateToken { agent, .. } if agent == "Rover Pilot"),
+        );
+        press(&mut app, token_button);
+        app.update();
+        let after = read_meta();
+        assert_eq!(before.agent_id, after.agent_id);
+        assert!(
+            !after.token.is_empty() && before.token != after.token,
+            "token must rotate without being printed"
+        );
+        assert!(!app.world().resource::<TokenNotice>().error);
+        let handbook = std::fs::read_to_string(dir.dir.join("AGENTS.md")).unwrap();
+        assert!(
+            handbook.contains(&after.token) && !handbook.contains(&before.token),
+            "handbook must contain only the current credential"
+        );
+        assert!(
+            std::fs::read(dir.save("W")).unwrap() == saved,
+            "rotation must not rewrite the world save"
+        );
         let _ = std::fs::remove_dir_all(d);
     }
 

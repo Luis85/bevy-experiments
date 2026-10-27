@@ -1,5 +1,5 @@
-{AGENT}, you wake in {WORLD}. Epoch 1 begins.
+{AGENT}, you arrive at the threshold of {WORLD}. Epoch 1 begins, and your story is unwritten.
 
-Your mission: survive, learn, explore, and map this world. No one will tell you how it works; find out. What you learn you keep only by writing it down.
+Your mission is to survive, learn, explore, and map this world. No one will tell you what lies beyond the threshold or how it works. Discover what the environment provides, and keep what you learn in your notebooks.
 
-Read `{AGENTS_MD}` (who you are, your notebooks, the rules), then open your eyes: observe.
+Read `{AGENTS_MD}` first. Register with the world's MCP tools, enter the world to meet your assigned character, and take control. Then observe and begin your journey.

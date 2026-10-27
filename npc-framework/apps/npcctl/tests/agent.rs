@@ -95,15 +95,316 @@ fn run(args: &[&str], want: i32) -> String {
     assert_eq!(
         out.status.code(),
         Some(want),
-        "{args:?}\nstdout: {stdout}\nstderr: {}",
-        String::from_utf8_lossy(&out.stderr)
+        "{:?}\nstdout: {}\nstderr: {}",
+        safe_args(args),
+        safe_text(&stdout, args),
+        safe_text(&String::from_utf8_lossy(&out.stderr), args)
     );
     stdout
 }
 
 fn json_out(args: &[&str], want: i32) -> Value {
     let s = run(args, want);
-    serde_json::from_str(&s).unwrap_or_else(|e| panic!("{args:?}: not JSON ({e}): {s}"))
+    serde_json::from_str(&s).unwrap_or_else(|e| {
+        panic!(
+            "{:?}: not JSON ({e}): {}",
+            safe_args(args),
+            safe_text(&s, args)
+        )
+    })
+}
+
+fn safe_args<'a>(args: &'a [&'a str]) -> Vec<&'a str> {
+    let mut secret = false;
+    args.iter()
+        .map(|arg| {
+            if secret {
+                secret = false;
+                return "[redacted]";
+            }
+            secret = matches!(*arg, "--token" | "--bearer-token");
+            *arg
+        })
+        .collect()
+}
+
+fn safe_text(text: &str, args: &[&str]) -> String {
+    args.windows(2)
+        .filter(|pair| matches!(pair[0], "--token" | "--bearer-token") && !pair[1].is_empty())
+        .fold(text.to_owned(), |text, pair| {
+            text.replace(pair[1], "[redacted]")
+        })
+}
+
+fn tool_call(
+    input: &mut impl Write,
+    output: &mut impl BufRead,
+    id: u64,
+    name: &str,
+    args: Value,
+) -> Value {
+    let request = json!({"jsonrpc":"2.0","id":id,"method":"tools/call","params":{"name":name,"arguments":args}});
+    writeln!(input, "{request}").unwrap();
+    input.flush().unwrap();
+    let mut line = String::new();
+    output.read_line(&mut line).unwrap();
+    serde_json::from_str(&line).expect("MCP JSON response")
+}
+
+#[test]
+fn registered_cli_and_mcp_lifecycle_and_token_rotation() {
+    use npc_framework::agent_io::http::RpcClient;
+    let base = temp_dir("registered");
+    let agents = base.join("agents");
+    let actors = base.join("actors");
+    let mut host = KillOnDrop(
+        Command::new(env!("CARGO_BIN_EXE_npcctl"))
+            .args([
+                "serve",
+                "--explorer-home",
+                agents.to_str().unwrap(),
+                "--actors-dir",
+                actors.to_str().unwrap(),
+                "--agent",
+                "Wren",
+                "--world",
+                "Field",
+                "--port",
+                "0",
+            ])
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    let stdout = host.0.stdout.take().unwrap();
+    let (tx, rx) = mpsc::channel();
+    let reader = std::thread::spawn(move || {
+        for line in BufReader::new(stdout).lines() {
+            if let Ok(line) = line {
+                let _ = tx.send(line);
+            } else {
+                break;
+            }
+        }
+    });
+    let ready: Value = serde_json::from_str(
+        &rx.recv_timeout(Duration::from_secs(180))
+            .expect("host ready"),
+    )
+    .unwrap();
+    let url = ready["listening"].as_str().unwrap();
+    let raw = RpcClient::new(url).unwrap();
+    let meta: Value =
+        serde_json::from_str(&std::fs::read_to_string(agents.join("wren/agent.json")).unwrap())
+            .unwrap();
+    let agent_id = meta["agent_id"].as_str().unwrap();
+    let token = meta["token"].as_str().unwrap();
+    let failure = raw
+        .call("agent/observe", json!({}))
+        .expect_err("anonymous actor calls are locked");
+    let npc_framework::agent_io::http::ClientError::Rpc(failure) = failure else {
+        panic!("wrong error type")
+    };
+    assert_eq!(failure.data.unwrap()["reason"], "not_registered");
+    let observed = json_out(
+        &[
+            "agent",
+            "observe",
+            "--agent-id",
+            agent_id,
+            "--token",
+            token,
+            "--url",
+            url,
+        ],
+        0,
+    );
+    assert!(
+        observed["unit"].is_u64(),
+        "the developer CLI resolves its own actor"
+    );
+    let mut mcp = KillOnDrop(
+        Command::new(env!("CARGO_BIN_EXE_npcctl"))
+            .args(["mcp", "--registered", "--url", url])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .unwrap(),
+    );
+    let mut input = mcp.0.stdin.take().unwrap();
+    let mut output = BufReader::new(mcp.0.stdout.take().unwrap());
+    let registered = tool_call(
+        &mut input,
+        &mut output,
+        1,
+        "register",
+        json!({"agent_id":agent_id,"token":token}),
+    );
+    assert_eq!(registered["result"]["isError"], false);
+    assert!(
+        registered["result"]["structuredContent"]
+            .get("session")
+            .is_none()
+    );
+    assert!(!registered.to_string().contains(token));
+    let entered = tool_call(&mut input, &mut output, 2, "enter_world", json!({}));
+    assert_eq!(entered["result"]["isError"], false);
+    assert!(entered["result"]["structuredContent"]["character"].is_object());
+    assert!(entered["result"]["structuredContent"].get("unit").is_none());
+    let forbidden = tool_call(&mut input, &mut output, 3, "observe", json!({}));
+    assert_eq!(
+        forbidden["result"]["structuredContent"]["error"]["reason"],
+        "not_in_control"
+    );
+    let taken = tool_call(&mut input, &mut output, 4, "take_control", json!({}));
+    assert_eq!(
+        taken["result"]["structuredContent"]["in_control"], true,
+        "{taken}"
+    );
+    let acted = tool_call(
+        &mut input,
+        &mut output,
+        5,
+        "act_and_wait",
+        json!({"verb":"wait","args":{"ticks":2},"timeout_ms":10000}),
+    );
+    assert_eq!(acted["result"]["isError"], false, "{acted}");
+    assert_eq!(
+        acted["result"]["structuredContent"]["act"]["accepted"],
+        true
+    );
+    let note = tool_call(
+        &mut input,
+        &mut output,
+        6,
+        "notes_add",
+        json!({"book":"memory","title":"Registration","body":"Use the world's tools."}),
+    );
+    assert_eq!(note["result"]["structuredContent"]["accepted"], true);
+    let rotated = json_out(
+        &[
+            "agent-token",
+            "rotate",
+            "--explorer-home",
+            agents.to_str().unwrap(),
+            "--agent",
+            "Wren",
+        ],
+        0,
+    );
+    assert_eq!(rotated, json!({"rotated":true,"agent_id":agent_id}));
+    let new_meta: Value =
+        serde_json::from_str(&std::fs::read_to_string(agents.join("wren/agent.json")).unwrap())
+            .unwrap();
+    let new_token = new_meta["token"].as_str().unwrap();
+    assert!(token != new_token, "rotation changes the secret");
+    let denied = tool_call(&mut input, &mut output, 7, "observe", json!({}));
+    assert_eq!(
+        denied["result"]["structuredContent"]["error"]["data"]["revoked"],
+        true
+    );
+    assert!(!denied.to_string().contains(token) && !denied.to_string().contains(new_token));
+    let still_denied = tool_call(&mut input, &mut output, 8, "observe", json!({}));
+    assert_eq!(
+        still_denied["result"]["structuredContent"]["error"]["reason"],
+        "not_registered"
+    );
+    let refreshed = tool_call(
+        &mut input,
+        &mut output,
+        9,
+        "register",
+        json!({"agent_id":agent_id,"token":new_token}),
+    );
+    assert_eq!(refreshed["result"]["isError"], false);
+    let notes = tool_call(
+        &mut input,
+        &mut output,
+        10,
+        "notes_list",
+        json!({"book":"memory"}),
+    );
+    assert_eq!(
+        notes["result"]["structuredContent"]["notes"][0]["title"],
+        "Registration"
+    );
+    drop(input);
+    assert!(mcp.0.wait().unwrap().success());
+    raw.call("session/stop", json!({})).unwrap();
+    assert!(host.0.wait().unwrap().success());
+    reader.join().unwrap();
+    let saved = std::fs::read_to_string(agents.join("wren/field.world.json")).unwrap();
+    assert!(
+        !saved.contains(token) && !saved.contains(new_token),
+        "credentials are never in a world snapshot"
+    );
+}
+
+#[test]
+fn registration_credentials_and_http_bearer_are_separate() {
+    use npc_framework::agent_io::http::{HttpServer, ServerOptions};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let bearer = "transport-bearer-only";
+    let credential = "registration-credential-only";
+    let server = HttpServer::bind_with(
+        0,
+        ServerOptions {
+            token: Some(bearer.into()),
+        },
+    )
+    .unwrap();
+    let url = server.url();
+    let stop = Arc::new(AtomicBool::new(false));
+    let done = Arc::clone(&stop);
+    let host = std::thread::spawn(move || {
+        while !done.load(Ordering::Relaxed) {
+            while let Some(call) = server.try_recv() {
+                let answer = match call.method.as_str() {
+                    "agent/register" => {
+                        assert!(
+                            call.params.as_ref().unwrap()["token"] == credential,
+                            "wrong registration credential"
+                        );
+                        json!({"session":"private-session-key-for-this-test","agent_id":"wren","world":"Field"})
+                    }
+                    "agent/take_control" => {
+                        json!({"accepted":true,"in_control":true,"unit":42,"controller":"wren"})
+                    }
+                    "agent/observe" => json!({"unit":42,"text":"You are here."}),
+                    "session/info" => json!({"token_required":true}),
+                    _ => panic!("unexpected test method"),
+                };
+                call.reply(Ok(answer));
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    });
+    let observed = json_out(
+        &[
+            "agent",
+            "observe",
+            "--url",
+            &url,
+            "--agent-id",
+            "wren",
+            "--token",
+            credential,
+            "--bearer-token",
+            bearer,
+        ],
+        0,
+    );
+    assert_eq!(observed["unit"], 42);
+    let info = json_out(&["session", "info", "--url", &url, "--token", bearer], 0);
+    assert_eq!(
+        info["token_required"], true,
+        "legacy token still authenticates HTTP"
+    );
+    stop.store(true, Ordering::Relaxed);
+    host.join().unwrap();
 }
 
 #[test]

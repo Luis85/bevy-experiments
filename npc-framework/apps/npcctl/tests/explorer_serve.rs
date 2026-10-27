@@ -3,6 +3,7 @@
 //! runtime (`--port 0`), in its own agents folder, and stops it by
 //! `session/stop` (a failing test kills only the child it started).
 
+use std::cell::RefCell;
 use std::io::{BufRead, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdout, Command, Stdio};
@@ -30,6 +31,8 @@ struct Served {
     lines: mpsc::Receiver<String>,
     line: Value,
     client: RpcClient,
+    credentials: Value,
+    session: RefCell<Option<String>>,
 }
 
 impl Drop for Served {
@@ -99,14 +102,38 @@ fn serve(home: &Path, args: &[&str]) -> Served {
         lines,
         line,
         client: RpcClient::new(&url).unwrap(),
+        credentials: read_json(&home.join("wren").join("agent.json")),
+        session: RefCell::new(None),
     }
 }
 
 impl Served {
-    fn call(&self, method: &str, params: Value) -> Value {
-        self.client
+    fn call(&self, method: &str, mut params: Value) -> Value {
+        if method.starts_with("agent/") {
+            if self.session.borrow().is_none() {
+                let registered=self.client.call("agent/register",json!({"agent_id":self.credentials["agent_id"],"token":self.credentials["token"]})).expect("fixture registers its own credentials");
+                *self.session.borrow_mut() = Some(
+                    registered["session"]
+                        .as_str()
+                        .expect("session key")
+                        .to_owned(),
+                );
+            }
+            params["session"] = json!(self.session.borrow().as_deref());
+            // Explicitly upgrade the historical fixture controller to the
+            // assigned public identity; foreign identities are never rewritten.
+            if params.get("controller").and_then(Value::as_str) == Some("explorer") {
+                params["controller"] = self.credentials["agent_id"].clone();
+            }
+        }
+        let result = self
+            .client
             .call(method, params)
-            .unwrap_or_else(|e| panic!("{method}: {e}"))
+            .unwrap_or_else(|e| panic!("{method}: {e}"));
+        if method == "world/reset" {
+            *self.session.borrow_mut() = None;
+        }
+        result
     }
 
     /// `session/stop`, then the exit code and the last stdout line.
@@ -130,15 +157,15 @@ impl Served {
 
     /// The agent's unit: the one the explorer controller drives.
     fn unit(&self) -> u64 {
-        let units = self.call("agent/list_units", json!({}));
-        units["units"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|u| u["controller"]["id"] == "explorer")
-            .unwrap_or_else(|| panic!("no explorer unit: {units}"))["id"]
-            .as_u64()
-            .unwrap()
+        let mut taken = self.call("agent/take_control", json!({}));
+        if taken["in_control"] != true {
+            // This fixture deliberately supports paused hosts. A developer
+            // step applies its recorded AttachController; clients never do it.
+            self.call("npc/step", json!({"ticks":1}));
+            taken = self.call("agent/take_control", json!({}));
+        }
+        assert_eq!(taken["in_control"], true, "{taken}");
+        taken["unit"].as_u64().unwrap()
     }
 }
 
@@ -173,11 +200,23 @@ fn serve_starts_a_new_explorer_world() {
     let prompt = PathBuf::from(line["prompt"].as_str().unwrap());
     assert_eq!(prompt, dir.join("prompts").join("start.md"));
     assert!(prompt.is_file(), "{}", prompt.display());
-    // The workspace names this session's URL.
+    // The workspace is MCP-only; transport details stay in .mcp.json.
     let agents = std::fs::read_to_string(dir.join("AGENTS.md")).unwrap();
     assert!(
-        agents.contains(&format!("http://127.0.0.1:{port}")),
-        "{agents}"
+        !agents.contains("http://") && !agents.contains("npcctl"),
+        "generated AGENTS.md must be MCP-only"
+    );
+    let mcp = read_json(&dir.join(".mcp.json"));
+    assert!(
+        mcp["mcpServers"]["npc"]["args"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == "--registered")
+    );
+    assert!(
+        mcp.to_string()
+            .contains(&format!("http://127.0.0.1:{port}"))
     );
     // run.json: this process, detached, on this port.
     let run = read_json(&dir.join("run.json"));
@@ -240,8 +279,30 @@ fn serve_resumes_the_same_tick() {
     );
     assert_eq!(act["accepted"], true, "{act}");
     let before = s.call("npc/step", json!({"ticks": 37}));
+    let before_unit = s.call("npc/unit", json!({"id":unit}));
     let (code, _) = s.stop();
     assert_eq!(code, Some(0));
+
+    // The persistence oracle remains exact for the still-active saved
+    // world. Load through the untouched kernel path, before the explorer
+    // host intentionally makes a resumed character dormant for login.
+    let saved = snapshot::read(&home.join("wren/moor.world.json")).unwrap();
+    let doc = npc_framework::agent_io::scenario::ScenarioDoc::parse(
+        &saved.header["scenario"].to_string(),
+    )
+    .unwrap();
+    let mut loaders = npc_framework::agent_io::scenario::ScenarioLoaders::default();
+    testbed_content::register_scenario_loader(&mut loaders);
+    let mut raw =
+        npc_framework::agent_io::scenario::load(&loaders, &doc, saved.header["seed"].as_u64())
+            .unwrap()
+            .app;
+    snapshot::load(raw.world_mut(), &saved, snapshot::LoadMode::Strict).unwrap();
+    assert_eq!(
+        serde_json::json!(npc_framework::prelude::state_hash(raw.world_mut())),
+        before["hash"],
+        "the same complete saved world"
+    );
 
     let s = serve(&home, &["--resume", "--paused"]);
     assert_eq!(s.line["world"], "Moor");
@@ -256,7 +317,27 @@ fn serve_resumes_the_same_tick() {
     );
     let after = s.call("npc/step", json!({"ticks": 0}));
     assert_eq!(after["tick"], before["tick"], "{after} vs {before}");
-    assert_eq!(after["hash"], before["hash"], "the same world");
+    let resumed = s.call("npc/unit", json!({"id":unit}));
+    assert_eq!(
+        resumed["components"]["pos"], before_unit["components"]["pos"],
+        "the same actor position"
+    );
+    assert!(
+        resumed["components"].get("external_controller").is_none(),
+        "resume waits for new control"
+    );
+    assert!(
+        resumed["components"]
+            .get("external_queue")
+            .is_none_or(|queue| queue.is_null()
+                || (queue["current"].is_null()
+                    && queue["pending"].as_array().is_some_and(Vec::is_empty))),
+        "saved external work is dormant"
+    );
+    assert!(
+        resumed["components"]["order_queue"]["current"].is_null(),
+        "saved orders are dormant"
+    );
     assert_eq!(s.unit(), unit);
     let (code, _) = s.stop();
     assert_eq!(code, Some(0));

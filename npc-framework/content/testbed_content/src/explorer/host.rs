@@ -16,22 +16,26 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
+use npc_framework::agent_io::control::{ExternalController, cancel_all};
 use npc_framework::agent_io::notes::{NotesClock, NotesDirs, NotesOwner, NotesStores};
+use npc_framework::agent_io::registration::{self, Credential, RegistrationRequired};
 use npc_framework::agent_io::scenario::{ScenarioDoc, attach_controllers};
 use npc_framework::kernel::replay::ScenarioInfo;
-use npc_framework::perception::{FogResets, Perceivable, PerceptionConfig, ReachSense, RevealsFog};
-use npc_framework::prelude::{SimControl, SimId};
+use npc_framework::perception::{FogResets, PerceptionConfig};
+use npc_framework::prelude::{SimControl, SimId, SimIndex, ThinkRequest};
 use npc_framework::snapshot::{self, LoadError, LoadMode, LoadReport, WorldSnapshot};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-use super::home::{AgentDir, AgentMeta, create_agent_as, read_lossy, slug};
+use super::context::ExplorerContext;
+use super::home::{self, AgentDir, AgentMeta, CredentialStamp, create_agent_as, read_lossy, slug};
 use super::prompt::{PromptKind, PromptVars, render_prompt};
 use super::settings::default_actors_dir;
-use super::workspace::{ActorSummary, WorkspaceVars, write_atomic, write_workspace};
+use super::workspace::{
+    ActorSummary, AgentIdentity, WorkspaceVars, render_character, write_atomic, write_workspace,
+};
 use crate::TestbedIds;
 use crate::actors::{ActorPreset, ActorPresets, builtin_preset, find_preset, validate};
-use crate::world::{Prop, PropKind, kinds};
 
 /// The embedded scenario every explorer world is built from.
 pub const SCENARIO: &str = "explorer";
@@ -47,7 +51,7 @@ pub const EXPLORER_FORGET_AFTER: u64 = 1200;
 /// How many things an explorer actor's perception memory holds (and one scan
 /// senses, nearest first).
 pub const EXPLORER_MEMORY_CAPACITY: u32 = 128;
-/// The explorer actor's all-round reach ([`ReachSense`], spec F3) before
+/// The explorer actor's all-round reach ([`npc_framework::perception::ReachSense`], spec F3) before
 /// actor presets: 1.5 m, the interaction reach, the built-in presets' `reach`
 /// (a preset's own `reach` sensor sets it now). Other scenarios' actors have
 /// none.
@@ -297,7 +301,8 @@ pub fn build_world_with(
     if !args.resume {
         return new_agent(args, seed, now, plugins, &ready, write_save);
     }
-    let (dir, mut meta) = read_agent(&args.home, &args.agent)?;
+    let (dir, _) = read_agent(&args.home, &args.agent)?;
+    let mut meta = home::ensure_credentials(&dir)?;
     if args.on_mismatch == Some(Mismatch::FreshWorld) {
         let (id, preset, notes) = fresh_world_preset(args, &dir, &meta)?;
         check_asked(args, &meta.agent, &id)?;
@@ -342,7 +347,7 @@ pub fn build_world_with(
         preset: opened.preset,
         notes,
     };
-    Ok((begin(opened.app, session), start, dir))
+    Ok((begin(opened.app, session)?, start, dir))
 }
 
 /// A resume keeps the world's actor preset: `--preset` naming another one is
@@ -358,9 +363,8 @@ fn check_asked(args: &HostArgs, agent: &str, id: &str) -> Result<(), String> {
 
 /// Writes `agent.json` again (atomically); a failure is printed, not fatal.
 fn write_meta(dir: &AgentDir, meta: &AgentMeta) {
-    let written = serde_json::to_string_pretty(meta)
-        .map_err(|e| e.to_string())
-        .and_then(|t| write_atomic(&dir.meta(), &t).map_err(|e| e.to_string()));
+    let fields = Map::from_iter([("preset".into(), Value::String(meta.preset.clone()))]);
+    let written = home::update_public_metadata(dir, &fields);
     if let Err(e) = written {
         eprintln!("explorer: cannot update {}: {e}", dir.meta().display());
     }
@@ -441,14 +445,17 @@ pub fn reset_world(
     plugins: impl FnOnce(&mut App),
 ) -> Result<App, String> {
     let doc = ScenarioDoc::from_value(session.scenario.clone())?;
-    let mut app = build(&doc, seed, session.presets(), plugins)?;
+    let mut app = build(&doc, seed, session.presets(), &session.meta.agent, plugins)?;
     apply_memory(&mut app);
     apply_senses(&mut app, &session.meta.agent, &session.preset)?;
+    let scenario = serde_json::to_value(normalized_doc(&doc, app.world(), &session.meta.agent)?)
+        .map_err(|_| "cannot encode explorer scenario")?;
     let session = ExplorerSession {
         seed,
+        scenario,
         ..session.clone()
     };
-    Ok(begin(app, session))
+    begin(app, session)
 }
 
 /// How many ports past the first an explorer world tries
@@ -738,12 +745,7 @@ fn new_agent(
     let (mut app, scenario) = fresh_world(&args.agent, seed, (id, &preset), plugins, ready)?;
     let dir = create_agent_as(&args.home, &args.agent, world, now, id)?;
     let session = ExplorerSession {
-        meta: AgentMeta {
-            agent: args.agent.clone(),
-            world: world.to_owned(),
-            created: now.to_owned(),
-            preset: id.to_owned(),
-        },
+        meta: home::read_meta(&dir)?,
         dir: dir.clone(),
         scenario,
         seed,
@@ -760,7 +762,7 @@ fn new_agent(
             ),
         });
     }
-    Ok((begin(app, session), Start::New, dir))
+    Ok((begin(app, session)?, Start::New, dir))
 }
 
 /// Fresh world, keep the diary: the old save (if any) is renamed to
@@ -793,7 +795,7 @@ fn rebuild(
         notes,
     };
     write_save(app.world_mut(), &session.save_path(), session.header(now))?;
-    Ok((begin(app, session), Start::Rebuilt, dir))
+    Ok((begin(app, session)?, Start::Rebuilt, dir))
 }
 
 /// Explorer worlds remember longer than the shared scenario default: sets
@@ -811,11 +813,11 @@ fn apply_memory(app: &mut App) {
 }
 
 /// Explorer worlds sense what is in reach (spec F3, proposals 007 and 011):
-/// the actor named `agent` gets [`ReachSense`] (its actor preset's `reach`;
-/// none at 0) and [`RevealsFog`] (fog of war, spec G8: its explored cells
+/// the actor named `agent` gets `ReachSense` (its actor preset's `reach`;
+/// none at 0) and `RevealsFog` (fog of war, spec G8: its explored cells
 /// and last-seen statics, snapshot-only; every preset keeps it), and
-/// every chest without [`Perceivable`] becomes perceivable
-/// ([`kinds::CONTAINER`]), so it can be sensed and remembered. Only here:
+/// every chest without `Perceivable` becomes perceivable
+/// (`kinds::CONTAINER`), so it can be sensed and remembered. Only here:
 /// the shared scenarios keep their hashes. Idempotent (a resumed save that
 /// already has both is unchanged).
 ///
@@ -829,43 +831,12 @@ fn apply_memory(app: &mut App) {
 /// When the world has no actor named `agent` (it would silently get no
 /// reach sense otherwise).
 fn apply_senses(app: &mut App, agent: &str, preset: &ActorPreset) -> Result<(), String> {
-    let world = app.world_mut();
-    let e = world
-        .get_resource::<TestbedIds>()
-        .and_then(|ids| ids.get(agent))
-        .and_then(|id| world.resource::<npc_framework::prelude::SimIndex>().get(id))
-        .ok_or_else(|| format!("the explorer world has no actor named `{agent}`"))?;
-    // Fog of war (plan Task 9, spec G8): the played actor reveals fog and
-    // keeps its explored ground in the save, whatever its actor preset.
-    // Inserting it again keeps the explored cells a resumed save brought.
-    let mut actor = world.entity_mut(e);
-    actor.insert(RevealsFog);
-    match preset.reach_mm() {
-        Some(radius_mm) => {
-            actor.insert(ReachSense { radius_mm });
-        }
-        None => {
-            actor.remove::<ReachSense>();
-        }
-    }
-    let mut chests = world.query_filtered::<(Entity, &Prop), Without<Perceivable>>();
-    let chests: Vec<Entity> = chests
-        .iter(world)
-        .filter(|(_, p)| p.kind == PropKind::Chest)
-        .map(|(e, _)| e)
-        .collect();
-    // Order does not matter: every one gets the same component.
-    for e in chests {
-        world
-            .entity_mut(e)
-            .insert(Perceivable::new(kinds::CONTAINER));
-    }
-    Ok(())
+    super::context::apply_senses(app, agent, preset, true, true)
 }
 
 /// Pauses the sim (the host unpauses it) and stores the session (its
 /// notes printed to stderr).
-fn begin(mut app: App, session: ExplorerSession) -> App {
+fn begin(mut app: App, mut session: ExplorerSession) -> Result<App, String> {
     for note in &session.notes {
         eprintln!("explorer: {note}");
     }
@@ -877,8 +848,171 @@ fn begin(mut app: App, session: ExplorerSession) -> App {
             ..Default::default()
         }),
     }
+    let assigned = world
+        .resource::<TestbedIds>()
+        .get(&session.meta.agent)
+        .ok_or("the explorer actor is missing")?;
+    let entity = world
+        .resource::<SimIndex>()
+        .get(assigned)
+        .ok_or("the explorer actor is missing")?;
+    // Host activation is a control boundary, not a generic snapshot rebuild.
+    // Cancel work before removing its owner; no tick is run or advanced.
+    let had_controller = world.get::<ExternalController>(entity).is_some();
+    cancel_pending_for_actor(world, assigned);
+    cancel_all(world, entity);
+    npc_framework::command::cancel_orders(world, entity, "controller released on host activation");
+    world.entity_mut(entity).remove::<ExternalController>();
+    if had_controller {
+        world.entity_mut(entity).insert(ThinkRequest);
+    }
+    let (meta, stamp) = home::credential_snapshot(&session.dir)?;
+    if meta.agent != session.meta.agent || meta.world != session.meta.world {
+        return Err("agent metadata names another world or character".into());
+    }
+    session.meta.agent_id = meta.agent_id;
+    session.meta.token = meta.token;
+    let source = CredentialFile {
+        dir: session.dir.clone(),
+        agent_id: session.meta.agent_id.clone(),
+        agent: session.meta.agent.clone(),
+        world: session.meta.world.clone(),
+        stamp: Some(stamp),
+    };
+    world.insert_resource(RegistrationRequired);
+    registration::set_credential(
+        world,
+        session.meta.agent_id.clone(),
+        Credential {
+            token_digest: registration::token_digest(&session.meta.token),
+            assigned,
+            controller: session.meta.agent_id.clone(),
+        },
+    );
+    registration::set_world_name(world, session.meta.world.clone());
+    registration::set_reload(world, reload_credentials);
+    registration::set_enter_world(world, enter_world);
+    world.insert_resource(source);
     world.insert_resource(session);
-    app
+    Ok(app)
+}
+
+/// A host activation forgets the previous process's queued control/work for
+/// this actor. Keep independent actors' work, including the other recipients
+/// of a squad/group order. The generic snapshot loader restores every command.
+fn cancel_pending_for_actor(world: &mut World, assigned: SimId) {
+    use npc_framework::command::{IssueOrder, Squad, expand_units};
+    use npc_framework::kernel::commands::{CommandQueue, SimCommand};
+    let Some(mut queue) = world.remove_resource::<CommandQueue>() else {
+        return;
+    };
+    queue.pending.retain(|_, command| {
+        match command {
+            SimCommand::Order { unit, .. } if *unit == assigned.0 => return false,
+            SimCommand::Content { kind, payload }
+                if matches!(
+                    kind.as_str(),
+                    "AttachController"
+                        | "DetachController"
+                        | "AgentAct"
+                        | "AgentCancel"
+                        | "AgentClear"
+                ) && payload.get("unit").and_then(Value::as_u64)
+                    == Some(u64::from(assigned.0)) =>
+            {
+                return false;
+            }
+            SimCommand::Content { kind, payload } if kind == "IssueOrder" => {
+                if let Ok(mut order) = payload.to_typed::<IssueOrder>() {
+                    let expanded = expand_units(world, &order.units);
+                    if expanded.contains(&assigned) {
+                        if order.formation.is_none()
+                            && let [one] = order.units.as_slice()
+                        {
+                            order.formation = world
+                                .resource::<SimIndex>()
+                                .get(*one)
+                                .and_then(|e| world.get::<Squad>(e))
+                                .map(|s| s.formation);
+                        }
+                        order.units = expanded.into_iter().filter(|&id| id != assigned).collect();
+                        if order.units.is_empty() {
+                            return false;
+                        }
+                        *command = SimCommand::content(&order);
+                    }
+                }
+            }
+            _ => {}
+        }
+        true
+    });
+    world.insert_resource(queue);
+}
+
+#[derive(Resource)]
+struct CredentialFile {
+    dir: AgentDir,
+    agent_id: String,
+    agent: String,
+    world: String,
+    stamp: Option<CredentialStamp>,
+}
+
+fn reload_credentials(world: &mut World) {
+    let Some(mut source) = world.remove_resource::<CredentialFile>() else {
+        return;
+    };
+    if home::credential_stamp(&source.dir).ok().as_ref() == source.stamp.as_ref()
+        && source.stamp.is_some()
+    {
+        world.insert_resource(source);
+        return;
+    }
+    let current = home::credential_snapshot(&source.dir);
+    match current {
+        Ok((meta, stamp))
+            if meta.agent_id == source.agent_id
+                && meta.agent == source.agent
+                && meta.world == source.world =>
+        {
+            if let Some(assigned) = world.resource::<TestbedIds>().get(&source.agent) {
+                registration::set_credential(
+                    world,
+                    source.agent_id.clone(),
+                    Credential {
+                        token_digest: registration::token_digest(&meta.token),
+                        assigned,
+                        controller: source.agent_id.clone(),
+                    },
+                );
+                if let Some(mut session) = world.get_resource_mut::<ExplorerSession>() {
+                    session.meta.token = meta.token;
+                }
+                source.stamp = Some(stamp);
+            } else {
+                registration::remove_credential(world, &source.agent_id);
+                source.stamp = None;
+            }
+        }
+        _ => {
+            registration::remove_credential(world, &source.agent_id);
+            source.stamp = None;
+        }
+    }
+    world.insert_resource(source);
+}
+
+fn enter_world(world: &World, agent_id: &str, assigned: SimId) -> Value {
+    let Some(session) = world.get_resource::<ExplorerSession>().filter(|s| {
+        s.meta.agent_id == agent_id
+            && world.resource::<TestbedIds>().get(&s.meta.agent) == Some(assigned)
+    }) else {
+        return serde_json::json!({"character":null,"scene":"No character is assigned here."});
+    };
+    let summary = ActorSummary::from_preset(&session.preset);
+    let text = render_character(&summary);
+    serde_json::json!({"character":{"name":summary.name,"body":summary.body,"description":summary.description,"senses":summary.sensors,"actions":summary.actions},"scene":format!("You arrive in {}.",session.meta.world),"text":text})
 }
 
 /// `<home>/<slug(agent)>`.
@@ -898,9 +1032,8 @@ fn read_agent(home: &Path, agent: &str) -> Result<(AgentDir, AgentMeta), String>
         ));
     }
     let path = dir.meta();
-    let bad = |e: &dyn std::fmt::Display| format!("unreadable {}: {e}", path.display());
-    let text = std::fs::read_to_string(&path).map_err(|e| bad(&e))?;
-    let meta = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| bad(&e))?;
+    let meta = home::read_meta(&dir)
+        .map_err(|_| format!("unreadable agent metadata {}", path.display()))?;
     Ok((dir, meta))
 }
 
@@ -948,11 +1081,12 @@ fn fresh_world(
         .extra
         .insert("preset".into(), Value::String(id.to_owned()));
     let presets = ActorPresets::one(id, preset.clone());
-    let mut app = build(&doc, seed, presets, plugins)?;
+    let mut app = build(&doc, seed, presets, agent, plugins)?;
     ready(&app)?;
     apply_memory(&mut app);
     apply_senses(&mut app, agent, preset)?;
-    let json = serde_json::to_value(&doc).map_err(|e| format!("scenario to JSON: {e}"))?;
+    let json = serde_json::to_value(normalized_doc(&doc, app.world(), agent)?)
+        .map_err(|e| format!("scenario to JSON: {e}"))?;
     Ok((app, json))
 }
 
@@ -962,18 +1096,67 @@ fn build(
     doc: &ScenarioDoc,
     seed: u64,
     presets: ActorPresets,
+    agent: &str,
     plugins: impl FnOnce(&mut App),
 ) -> Result<App, String> {
-    let mut loaded = crate::scenario::load_with(doc, seed, |app| {
+    let mut descriptor = doc.clone();
+    let spec = crate::scenario::WorldSpec::parse(&descriptor.world)?;
+    let mut memory = spec
+        .explorer_context
+        .as_ref()
+        .map(|context| context.memory.to_config())
+        .unwrap_or(PerceptionConfig {
+            stagger: spec.stagger.max(1),
+            ..Default::default()
+        });
+    memory.forget_after_ticks = EXPLORER_FORGET_AFTER;
+    memory.memory_capacity = EXPLORER_MEMORY_CAPACITY;
+    let (id, preset) = presets
+        .0
+        .iter()
+        .next()
+        .ok_or("explorer construction has no actor preset")?;
+    ExplorerContext::new(agent, id, preset, memory).write_to(&mut descriptor)?;
+    let mut loaded = crate::scenario::load_with(&descriptor, seed, |app| {
         plugins(app);
         app.insert_resource(presets);
     })?;
-    attach_controllers(doc, &mut loaded)?;
+    attach_controllers(
+        &normalized_doc(&descriptor, loaded.app.world(), agent)?,
+        &mut loaded,
+    )?;
     loaded.app.insert_resource(ScenarioInfo {
         name: doc.name.clone().unwrap_or_else(|| SCENARIO.into()),
         villagers: u32::try_from(loaded.actors.len()).unwrap_or(u32::MAX),
     });
     Ok(loaded.app)
+}
+
+fn normalized_doc(doc: &ScenarioDoc, world: &World, agent: &str) -> Result<ScenarioDoc, String> {
+    let mut normalized = doc.clone();
+    let index = doc
+        .actors
+        .iter()
+        .position(|a| a.extra.get("name").and_then(Value::as_str) == Some(agent));
+    let assigned = world
+        .get_resource::<TestbedIds>()
+        .and_then(|ids| ids.get(agent));
+    normalized.controllers.retain(|c| {
+        !(index.is_some() && c.actor == index)
+            && !(assigned.is_some() && c.unit == assigned.map(|id| id.0))
+    });
+    let (id, preset) = world
+        .get_resource::<ActorPresets>()
+        .and_then(|presets| presets.0.iter().next())
+        .ok_or("explorer scenario has no actor preset")?;
+    let mut memory = world
+        .get_resource::<PerceptionConfig>()
+        .copied()
+        .unwrap_or_default();
+    memory.forget_after_ticks = EXPLORER_FORGET_AFTER;
+    memory.memory_capacity = EXPLORER_MEMORY_CAPACITY;
+    ExplorerContext::new(agent, id, preset, memory).write_to(&mut normalized)?;
+    Ok(normalized)
 }
 
 /// A save read and its world rebuilt from the header, not loaded yet.
@@ -1015,7 +1198,10 @@ fn open_save(
         saved_preset(&snap.header, &meta.agent).map_err(|e| unreadable(&path, &e))?;
     let doc = ScenarioDoc::from_value(scenario.clone()).map_err(|e| unreadable(&path, &e))?;
     let presets = ActorPresets::one(&preset_id, preset.clone());
-    let app = build(&doc, seed, presets, plugins).map_err(|e| unreadable(&path, &e))?;
+    let app =
+        build(&doc, seed, presets, &meta.agent, plugins).map_err(|e| unreadable(&path, &e))?;
+    let scenario = serde_json::to_value(normalized_doc(&doc, app.world(), &meta.agent)?)
+        .map_err(|_| "cannot encode explorer scenario")?;
     ready(&app)?;
     Ok(Opened {
         app,
@@ -1124,28 +1310,90 @@ pub fn write_session_files(
         .get(&session.meta.agent)
         .ok_or_else(|| format!("no unit named {}", session.meta.agent))?;
     let kind = prompt_kind(start);
-    let vars = WorkspaceVars {
-        prompt: PromptVars {
-            agent: session.meta.agent.clone(),
-            world: session.meta.world.clone(),
-            url: url.to_owned(),
-            unit: unit.0,
-            npcctl,
-            dir: dir.dir.clone(),
-            npcctl_missing,
-        },
-        actor: ActorSummary::from_preset(&session.preset),
-    };
-    let text = render_prompt(kind, &vars.prompt);
-    let write_error = write_workspace(dir, kind, &vars)
-        .map_err(|e| format!("cannot write the agent folder {}: {e}", dir.dir.display()))
-        .err();
-    Ok(SessionFiles {
-        kind,
-        unit,
-        path: dir.prompt(kind),
-        text,
-        write_error,
+    home::with_credentials(dir, |meta| {
+        if meta.agent_id != session.meta.agent_id
+            || meta.agent != session.meta.agent
+            || meta.world != session.meta.world
+        {
+            return Err("agent metadata changed identity while preparing the workspace".into());
+        }
+        let vars = WorkspaceVars {
+            prompt: PromptVars {
+                agent: session.meta.agent.clone(),
+                world: session.meta.world.clone(),
+                url: url.to_owned(),
+                unit: unit.0,
+                npcctl,
+                dir: dir.dir.clone(),
+                npcctl_missing,
+            },
+            actor: ActorSummary::from_preset(&session.preset),
+            identity: AgentIdentity::from(meta),
+        };
+        let text = render_prompt(kind, &vars.prompt);
+        let write_error = write_workspace(dir, kind, &vars)
+            .map_err(|e| format!("cannot write the agent folder {}: {e}", dir.dir.display()))
+            .err();
+        Ok(SessionFiles {
+            kind,
+            unit,
+            path: dir.prompt(kind),
+            text,
+            write_error,
+        })
+    })
+}
+
+/// Refresh only generated files after a rotation, without loading or
+/// advancing a world. The existing MCP configuration supplies its executable
+/// and URL; owned notebooks, metadata and world saves are left untouched.
+pub fn refresh_generated_workspace(dir: &AgentDir) -> Result<(), String> {
+    home::with_credentials(dir, |meta| {
+        let mcp_path = dir.dir.join(".mcp.json");
+        let bytes=std::fs::read(&mcp_path).map_err(|_|format!("no readable generated MCP configuration at {}; resume the world to regenerate its workspace",mcp_path.display()))?;
+        let config: Value = serde_json::from_slice(&bytes).map_err(
+            |_| "generated MCP configuration is invalid; resume the world to regenerate it",
+        )?;
+        let server = &config["mcpServers"]["npc"];
+        let command = server["command"]
+            .as_str()
+            .ok_or("generated MCP configuration has no executable")?;
+        let args = server["args"]
+            .as_array()
+            .ok_or("generated MCP configuration has no arguments")?;
+        let url = args
+            .windows(2)
+            .find(|pair| pair[0].as_str() == Some("--url"))
+            .and_then(|pair| pair[1].as_str())
+            .ok_or("generated MCP configuration has no world URL")?;
+        // Bootstrap text deliberately withholds character details. Rotation
+        // therefore does not need to load an unrelated (possibly old) save.
+        let actor = ActorSummary::human_scout();
+        let vars = WorkspaceVars {
+            prompt: PromptVars {
+                agent: meta.agent.clone(),
+                world: meta.world.clone(),
+                url: url.to_owned(),
+                unit: 0,
+                npcctl: PathBuf::from(command),
+                dir: dir.dir.clone(),
+                npcctl_missing: !Path::new(command).is_file(),
+            },
+            actor,
+            identity: AgentIdentity::from(meta),
+        };
+        write_workspace(dir, PromptKind::Resume, &vars)
+            .map_err(|e| format!("cannot refresh generated workspace: {e}"))
+    })
+}
+
+/// Rotate the metadata secret, then update every generated prompt and
+/// bootstrap file. A rewrite failure never rolls the secret back: old
+/// sessions must stay revoked, and the error explicitly reports the change.
+pub fn rotate_agent_token(dir: &AgentDir) -> Result<(), String> {
+    home::rotate_token(dir)?;
+    refresh_generated_workspace(dir).map_err(|e| {
+        format!("The token was rotated, but the generated workspace could not be refreshed: {e}")
     })
 }
 
@@ -1436,7 +1684,11 @@ mod tests {
             .resource::<npc_framework::prelude::SimIndex>()
             .get(id)
             .unwrap();
-        assert!(app.world().get::<ReachSense>(e).is_some());
+        assert!(
+            app.world()
+                .get::<npc_framework::perception::ReachSense>(e)
+                .is_some()
+        );
     }
 
     /// `world/reset` of a detached explorer world: the New world of that

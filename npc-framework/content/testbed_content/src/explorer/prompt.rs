@@ -60,7 +60,10 @@ pub fn render_prompt(kind: PromptKind, v: &PromptVars) -> String {
         PromptKind::ResumeChanged => RESUME_CHANGED,
         PromptKind::ResumeRebuilt => RESUME_REBUILT,
     };
-    fill(&format!("{head}{COMMON}"), &prompt_values(v))
+    fill(
+        &format!("{}\n\n{}", head.trim_end(), COMMON.trim_start()),
+        &prompt_values(v),
+    )
 }
 
 /// A path with forward slashes: command lines and paths in the text work in
@@ -175,7 +178,7 @@ mod tests {
         let mut v = vars(false);
         v.agent = "{URL}".into();
         let p = render_prompt(PromptKind::Start, &v);
-        assert!(p.contains("{URL}, you wake"), "{p}");
+        assert!(p.contains("{URL}, you arrive"), "{p}");
     }
 
     #[test]
@@ -187,13 +190,22 @@ mod tests {
                 "Hollowmere",
                 "`C:/agents/wren-ashdown/AGENTS.md`",
                 "Epoch 1",
-                "survive, learn, explore",
                 "map",
-                "actor #33",
                 "the `notes_*` tools",
                 "trust this folder",
             ] {
                 assert!(p.contains(s), "{k:?} misses {s:?}");
+            }
+            let folded = p.to_ascii_lowercase();
+            for requirement in [
+                "survive",
+                "learn",
+                "explore",
+                "register",
+                "enter the world",
+                "take control",
+            ] {
+                assert!(folded.contains(requirement), "{k:?} misses {requirement}");
             }
             // AGENTS.md is read before anything is done.
             let read = p.find("AGENTS.md").unwrap();
@@ -222,7 +234,10 @@ mod tests {
                 .expect("memory");
             let diary = p.find(r#"`book: "diary"`"#).expect("diary");
             let proposals = p.find(r#"`book: "proposals"`"#).expect("proposals");
-            let observe = p.find("Then observe").expect("then observe");
+            let observe = p
+                .find("Then observe")
+                .or_else(|| p.find("then observe"))
+                .expect("then observe");
             assert!(agents < memory && memory < diary, "{k:?}");
             assert!(diary < proposals && proposals < observe, "{k:?}");
         }
@@ -252,6 +267,31 @@ mod tests {
                 }
                 assert!(p.contains("never in files"), "{k:?}");
             }
+        }
+    }
+
+    #[test]
+    fn prompts_are_a_briefing_without_connection_details_or_credentials() {
+        let v = vars(false);
+        for kind in ALL {
+            let p = render_prompt(kind, &v);
+            for forbidden in [
+                v.url.as_str(),
+                "npcctl",
+                "controller",
+                "actor #33",
+                "--unit",
+            ] {
+                assert!(
+                    !p.contains(forbidden),
+                    "{kind:?}: contains a private bootstrap detail"
+                );
+            }
+            assert!(
+                p.contains("Epoch 1")
+                    && (p.contains("story") || p.contains("chapter"))
+                    && p.contains("MCP")
+            );
         }
     }
 }

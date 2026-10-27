@@ -712,7 +712,7 @@ impl Session {
                 // Short, or invalid params (call_npc reports them).
                 _ => api::call_npc(self.app.world_mut(), "npc/step", params),
             },
-            "agent/events" => match api::parse_events(params) {
+            "agent/events" => match api::parse_events_for(self.app.world_mut(), params) {
                 Err(e) => Err(e),
                 Ok(p) => {
                     let world = self.app.world_mut();

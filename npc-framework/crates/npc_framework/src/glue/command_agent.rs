@@ -166,7 +166,12 @@ pub fn command_section(world: &World, ctx: &AgentCtx) -> Option<Section> {
     let current = queue.and_then(|q| q.current.as_ref());
     let queued: Vec<&UnitOrder> =
         queue.map_or_else(Vec::new, |q| q.queued.iter().map(|o| &o.order).collect());
-    let mut owned = owned_units(world, owner);
+    let registered = npc_agent_io::registration::required(world);
+    let mut owned = if registered {
+        vec![ctx.unit]
+    } else {
+        owned_units(world, owner)
+    };
     let total = owned.len();
     owned.truncate(MAX_LISTED_UNITS);
     let value = json!({
@@ -206,14 +211,23 @@ pub fn command_affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
         return Vec::new();
     };
     let mode = ctx.mode();
+    let registered = npc_agent_io::registration::required(world);
     let order = Affordance::new(
         ORDER,
-        format!("Give an RTS order to your units (player {})", owner.0),
+        if registered {
+            "Give an RTS order to your assigned actor".to_owned()
+        } else {
+            format!("Give an RTS order to your units (player {})", owner.0)
+        },
     )
     .arg("order", ORDER_SCHEMA)
     .arg(
         "units",
-        "[SimId] of units or squads you own (default: this unit)",
+        if registered {
+            "only your assigned actor's SimId (default: this actor)"
+        } else {
+            "[SimId] of units or squads you own (default: this unit)"
+        },
     )
     .arg(
         "queue",
@@ -289,6 +303,20 @@ pub fn order_command(
         Some(v) => serde_json::from_value::<Vec<SimId>>(v.clone())
             .map_err(|e| bad(format!("units must be a list of SimIds ({e})")))?,
     };
+    if npc_agent_io::registration::required(world)
+        && (units.iter().any(|&unit| unit != ctx.unit)
+            || npc_command::expand_units(world, &units)
+                .iter()
+                .any(|&unit| unit != ctx.unit))
+    {
+        // Order recipients confer control; targets of Follow/Interact/Mount
+        // are world objects and remain legal. Vehicle redirects still act
+        // through the assigned actor's own orders/driver seat.
+        return Err(Rejection::new(
+            "not_yours",
+            "orders may control only your assigned actor",
+        ));
+    }
     let queue = match req.args.get("queue") {
         None | Some(Value::Null) => false,
         Some(v) => v

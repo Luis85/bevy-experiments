@@ -644,12 +644,480 @@ fn stand(app: &mut App, agent: SimId, at: SimPos, facing: (i32, i32)) {
 }
 
 fn observe_json(app: &mut App, unit: SimId) -> Value {
+    let session = controlled_session(app);
     npc_framework::agent_io::api::call(
         app.world_mut(),
         "agent/observe",
-        Some(serde_json::json!({"unit": unit.0})),
+        Some(serde_json::json!({"unit": unit.0,"session":session})),
     )
     .unwrap()
+}
+
+#[derive(bevy_ecs::prelude::Resource)]
+struct TestSession(String);
+
+fn controlled_session(app: &mut App) -> String {
+    if let Some(session) = app.world().get_resource::<TestSession>() {
+        return session.0.clone();
+    }
+    let session = register_session(app);
+    let taken = npc_framework::agent_io::api::call(
+        app.world_mut(),
+        "agent/take_control",
+        Some(serde_json::json!({"session":session})),
+    )
+    .unwrap();
+    if taken["in_control"] != serde_json::json!(true) {
+        run_ticks(app.world_mut(), 1);
+    }
+    app.insert_resource(TestSession(session.clone()));
+    session
+}
+
+fn register_session(app: &mut App) -> String {
+    let meta = app.world().resource::<ExplorerSession>().meta.clone();
+    let registered = npc_framework::agent_io::api::call(
+        app.world_mut(),
+        "agent/register",
+        Some(serde_json::json!({"agent_id":meta.agent_id,"token":meta.token})),
+    )
+    .unwrap();
+    registered["session"].as_str().unwrap().to_owned()
+}
+
+#[test]
+fn registered_host_briefs_before_recorded_control_without_disclosing_credentials() {
+    use npc_framework::agent_io::{api, control::ExternalController};
+    let home = tmp("registered-brief");
+    let (mut app, start, dir) =
+        build_explorer_app(&new_args(&home, "Wren", "Hollowmere"), |_| {}).unwrap();
+    let id = actor(&app, "Wren");
+    let e = entity(&app, id);
+    assert!(app.world().get::<ExternalController>(e).is_none());
+    assert!(
+        api::call(
+            app.world_mut(),
+            "agent/observe",
+            Some(serde_json::json!({"unit":id.0}))
+        )
+        .is_err()
+    );
+    let before = state_hash(app.world_mut());
+    let session = register_session(&mut app);
+    let brief = api::call(
+        app.world_mut(),
+        "agent/enter_world",
+        Some(serde_json::json!({"session":session})),
+    )
+    .unwrap();
+    assert_eq!(
+        brief["character"]["name"],
+        app.world().resource::<ExplorerSession>().preset.name
+    );
+    assert!(brief["character"]["senses"].as_array().unwrap().len() > 1);
+    assert!(brief["character"]["actions"].as_array().unwrap().len() > 1);
+    assert_eq!(brief["scene"], "You arrive in Hollowmere.");
+    assert!(brief.get("unit").is_none());
+    assert!(brief.get("controller").is_none());
+    assert_eq!(
+        state_hash(app.world_mut()),
+        before,
+        "registration/briefing are hash neutral"
+    );
+    assert_eq!(app.world().resource::<SimClock>().tick, 0);
+    assert!(app.world().get::<ExternalController>(e).is_none());
+    let meta = app.world().resource::<ExplorerSession>().meta.clone();
+    write_session_files(
+        app.world(),
+        &start,
+        &dir,
+        "http://127.0.0.1:15703",
+        home.join("npcctl"),
+        true,
+    )
+    .unwrap();
+    let agents = read(dir.dir.join("AGENTS.md"));
+    assert!(agents.contains(&meta.agent_id) && agents.contains(&meta.token));
+    assert!(
+        !agents.contains("npcctl") && !agents.contains("http://") && !agents.contains("Character")
+    );
+    for kind in [
+        PromptKind::Start,
+        PromptKind::Resume,
+        PromptKind::ResumeChanged,
+        PromptKind::ResumeRebuilt,
+    ] {
+        let text = read(dir.prompt(kind));
+        assert!(!text.contains(&meta.token) && !text.contains(&meta.agent_id));
+    }
+    let config: Value = serde_json::from_str(&read(dir.dir.join(".mcp.json"))).unwrap();
+    assert!(
+        config["mcpServers"]["npc"]["args"]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::json!("--registered"))
+    );
+    assert!(!brief.to_string().contains(&meta.token));
+    let _ = std::fs::remove_dir_all(home);
+}
+
+#[test]
+fn live_rotation_revokes_session_and_refreshes_only_generated_files() {
+    use npc_framework::agent_io::api;
+    use testbed_content::explorer::{home::read_meta, host::rotate_agent_token};
+    let home = tmp("registered-rotation");
+    let (mut app, start, dir) = build_explorer_app(&new_args(&home, "Wren", "W"), |_| {}).unwrap();
+    write_session_files(
+        app.world(),
+        &start,
+        &dir,
+        "http://127.0.0.1:15719",
+        home.join("npcctl"),
+        true,
+    )
+    .unwrap();
+    std::fs::write(dir.dir.join("memory.md"), "owned memories").unwrap();
+    let old = read_meta(&dir).unwrap();
+    let session = register_session(&mut app);
+    let save = std::fs::read(dir.save("W")).unwrap();
+    let before = state_hash(app.world_mut());
+    rotate_agent_token(&dir).unwrap();
+    let new = read_meta(&dir).unwrap();
+    assert_eq!(new.agent_id, old.agent_id);
+    assert_ne!(new.token, old.token);
+    assert_eq!(std::fs::read(dir.save("W")).unwrap(), save);
+    assert_eq!(read(dir.dir.join("memory.md")), "owned memories");
+    let agents = read(dir.dir.join("AGENTS.md"));
+    assert!(agents.contains(&new.token) && !agents.contains(&old.token));
+    assert!(read(dir.dir.join(".mcp.json")).contains("15719"));
+    let refused = api::call(
+        app.world_mut(),
+        "agent/enter_world",
+        Some(serde_json::json!({"session":session})),
+    )
+    .unwrap_err();
+    assert_eq!(refused.data.unwrap()["reason"], "unknown_session");
+    let registered = api::call(
+        app.world_mut(),
+        "agent/register",
+        Some(serde_json::json!({"agent_id":new.agent_id,"token":new.token})),
+    )
+    .unwrap();
+    assert!(registered["session"].is_string());
+    assert_eq!(state_hash(app.world_mut()), before);
+    let _ = std::fs::remove_dir_all(home);
+}
+
+#[test]
+fn legacy_save_checks_and_listing_are_readonly_then_resume_migrates_once() {
+    use testbed_content::explorer::home::{list_agents, read_meta};
+    let home = tmp("registered-readonly-check");
+    let (app, _, dir) = build_explorer_app(&new_args(&home, "Wren", "W"), |_| {}).unwrap();
+    drop(app);
+    let mut legacy: Value = serde_json::from_slice(&std::fs::read(dir.meta()).unwrap()).unwrap();
+    let object = legacy.as_object_mut().unwrap();
+    object.remove("agent_id");
+    object.remove("token");
+    object.insert("private_extension".into(), serde_json::json!({"keep":true}));
+    let original = serde_json::to_vec_pretty(&legacy).unwrap();
+    std::fs::write(dir.meta(), &original).unwrap();
+    assert_eq!(check_save(&home, "Wren"), Ok(()));
+    assert_eq!(list_agents(&home).len(), 1);
+    assert_eq!(std::fs::read(dir.meta()).unwrap(), original);
+    let (app, _, _) = build_explorer_app(&resume_args(&home, "Wren", None), |_| {}).unwrap();
+    let migrated = read_meta(&dir).unwrap();
+    assert!(!migrated.agent_id.is_empty() && !migrated.token.is_empty());
+    assert_eq!(
+        serde_json::from_slice::<Value>(&std::fs::read(dir.meta()).unwrap()).unwrap()["private_extension"],
+        serde_json::json!({"keep":true})
+    );
+    drop(app);
+    let (app, _, _) = build_explorer_app(&resume_args(&home, "Wren", None), |_| {}).unwrap();
+    assert_eq!(read_meta(&dir).unwrap(), migrated);
+    drop(app);
+    let _ = std::fs::remove_dir_all(home);
+}
+
+#[test]
+fn missing_or_malformed_metadata_revokes_and_restoration_needs_fresh_registration() {
+    use npc_framework::agent_io::api;
+    let home = tmp("registered-fail-closed");
+    let (mut app, _, dir) = build_explorer_app(&new_args(&home, "Wren", "W"), |_| {}).unwrap();
+    let original = std::fs::read(dir.meta()).unwrap();
+    let mut session = register_session(&mut app);
+    for broken in [None, Some(b"{\"token\":false}".as_slice())] {
+        if let Some(bytes) = broken {
+            std::fs::write(dir.meta(), bytes).unwrap();
+        } else {
+            std::fs::remove_file(dir.meta()).unwrap();
+        }
+        let err = api::call(
+            app.world_mut(),
+            "agent/enter_world",
+            Some(serde_json::json!({"session":session})),
+        )
+        .unwrap_err();
+        assert_eq!(err.data.unwrap()["reason"], "unknown_session");
+        std::fs::write(dir.meta(), &original).unwrap();
+        assert!(
+            api::call(
+                app.world_mut(),
+                "agent/enter_world",
+                Some(serde_json::json!({"session":session}))
+            )
+            .is_err(),
+            "restoring credentials cannot revive old sessions"
+        );
+        session = register_session(&mut app);
+        assert!(
+            api::call(
+                app.world_mut(),
+                "agent/enter_world",
+                Some(serde_json::json!({"session":session}))
+            )
+            .is_ok()
+        );
+    }
+    let _ = std::fs::remove_dir_all(home);
+}
+
+#[test]
+fn fresh_registered_explorer_record_replays_with_its_normalized_descriptor() {
+    use npc_framework::agent_io::scenario::{
+        ScenarioDoc, ScenarioLoaders, SessionRecord, verify_session,
+    };
+    use npc_framework::kernel::replay::Recorder;
+    for preset in ["human", "bespoke"] {
+        let home = tmp(&format!("registered-replay-{preset}"));
+        let actors = home.join("actors");
+        std::fs::create_dir_all(&actors).unwrap();
+        // Built-ins are installed only for an empty actors folder.
+        let _ = testbed_content::actors::load_presets(&actors);
+        let mut custom = testbed_content::actors::builtin_preset("human").unwrap();
+        custom.name = "A remembered custom character".into();
+        custom.speed_mm_per_tick = 73;
+        std::fs::write(
+            actors.join("bespoke.json"),
+            serde_json::to_vec(&custom).unwrap(),
+        )
+        .unwrap();
+        let args = HostArgs {
+            preset: Some(preset.into()),
+            ..new_args(&home, "Wren", "W")
+        };
+        let (mut app, _, _) = build_explorer_app(&args, |_| {}).unwrap();
+        let doc: ScenarioDoc =
+            serde_json::from_value(app.world().resource::<ExplorerSession>().scenario.clone())
+                .unwrap();
+        assert!(
+            doc.controllers.is_empty(),
+            "the host's played actor must not be pre-attached in the record header"
+        );
+        assert_eq!(doc.world["explorer_context"]["preset_id"], preset);
+        assert_eq!(
+            doc.world["explorer_context"]["memory"]["memory_capacity"],
+            EXPLORER_MEMORY_CAPACITY
+        );
+        if preset == "bespoke" {
+            assert_eq!(
+                doc.world["explorer_context"]["preset"],
+                serde_json::to_value(&custom).unwrap()
+            );
+        }
+        // Replaying must use the descriptor's immutable copy, without file I/O.
+        std::fs::remove_dir_all(&actors).unwrap();
+        let mut recorder = Recorder::live(app.world_mut(), 10);
+        let _session = controlled_session(&mut app);
+        for _ in 0..30 {
+            run_ticks(app.world_mut(), 1);
+            recorder.after_tick(app.world_mut());
+        }
+        let replay = recorder.finish(app.world_mut()).unwrap();
+        assert!(replay.commands.iter().any(|(_, _, c)| {
+            serde_json::to_value(c)
+                .unwrap()
+                .to_string()
+                .contains("AttachController")
+        }));
+        let meta = &app.world().resource::<ExplorerSession>().meta;
+        assert!(
+            !serde_json::to_string(&replay)
+                .unwrap()
+                .contains(&meta.token)
+        );
+        let mut loaders = ScenarioLoaders::default();
+        testbed_content::scenario::register_scenario_loader(&mut loaders);
+        let result = verify_session(
+            &loaders,
+            &SessionRecord {
+                version: 1,
+                scenario: doc,
+                seed: SEED,
+                replay,
+            },
+        );
+        assert!(result.ok, "{result:?}");
+        let _ = std::fs::remove_dir_all(home);
+    }
+}
+
+#[test]
+fn host_resume_cancels_saved_control_and_work_without_changing_generic_snapshot_restore() {
+    use npc_framework::agent_io::{
+        api,
+        control::{AttachController, ExternalController, ExternalQueue},
+    };
+    use npc_framework::command::{IssueOrder, OrderQueue, Owner, UnitOrder};
+    use npc_framework::kernel::commands::{CommandQueue, SimCommand, submit_deferred};
+    use testbed_content::explorer::host::reset_world;
+    let home = tmp("registered-host-boundary");
+    let (app, _, dir) = build_explorer_app(&new_args(&home, "Wren", "W"), |_| {}).unwrap();
+    // A second actor makes preservation of independent/group work observable.
+    let mut descriptor = app.world().resource::<ExplorerSession>().clone();
+    let mut guest = descriptor.scenario["actors"][0].clone();
+    guest["name"] = serde_json::json!("Guest");
+    descriptor.scenario["actors"]
+        .as_array_mut()
+        .unwrap()
+        .push(guest);
+    let mut app = reset_world(&descriptor, SEED, |_| {}).unwrap();
+    let wren = actor(&app, "Wren");
+    let guest = actor(&app, "Guest");
+    let session = controlled_session(&mut app);
+    let action = api::call(
+        app.world_mut(),
+        "agent/act",
+        Some(serde_json::json!({"session":session,"verb":"wait","args":{"ticks":1000}})),
+    )
+    .unwrap();
+    assert_eq!(action["accepted"], true);
+    run_ticks(app.world_mut(), 1);
+    assert!(
+        app.world()
+            .get::<ExternalQueue>(entity(&app, wren))
+            .unwrap()
+            .current
+            .is_some()
+    );
+    let player = app.world().get::<Owner>(entity(&app, wren)).unwrap().0;
+    let controller = app
+        .world()
+        .resource::<ExplorerSession>()
+        .meta
+        .agent_id
+        .clone();
+    let stale_attach = AttachController {
+        unit: wren.0,
+        controller,
+        mode: Default::default(),
+        on_idle: Default::default(),
+        force: false,
+    };
+    let guest_attach = AttachController {
+        unit: guest.0,
+        controller: "guest-controller".into(),
+        mode: Default::default(),
+        on_idle: Default::default(),
+        force: false,
+    };
+    for command in [
+        SimCommand::content(&stale_attach),
+        SimCommand::content(&IssueOrder::new(player, [wren, guest], UnitOrder::Hold)),
+        SimCommand::content(&guest_attach),
+        SimCommand::content(&IssueOrder::new(
+            player,
+            [guest],
+            UnitOrder::Follow { target: wren },
+        )),
+    ] {
+        submit_deferred(app.world_mut(), Some(10), command).unwrap();
+    }
+    let at = pos(&app, wren);
+    let tick = app.world().resource::<SimClock>().tick;
+    let hash = state_hash(app.world_mut());
+    save_now(app.world_mut(), &dir, NOW).unwrap();
+    let saved = snapshot::read(&dir.save("W")).unwrap();
+    let current = app.world().resource::<ExplorerSession>().clone();
+    let mut raw = reset_world(&current, SEED, |_| {}).unwrap();
+    snapshot::load(
+        raw.world_mut(),
+        &saved,
+        npc_framework::snapshot::LoadMode::Strict,
+    )
+    .unwrap();
+    assert_eq!(
+        state_hash(raw.world_mut()),
+        hash,
+        "the generic kernel snapshot preserves the original state exactly"
+    );
+    assert!(
+        raw.world()
+            .get::<ExternalController>(entity(&raw, wren))
+            .is_some()
+    );
+    assert!(
+        raw.world()
+            .get::<ExternalQueue>(entity(&raw, wren))
+            .unwrap()
+            .current
+            .is_some()
+    );
+    assert_eq!(raw.world().resource::<CommandQueue>().pending.len(), 4);
+
+    let (mut back, _, _) = build_explorer_app(&resume_args(&home, "Wren", None), |_| {}).unwrap();
+    assert_eq!(back.world().resource::<SimClock>().tick, tick);
+    assert_eq!(pos(&back, wren), at);
+    let e = entity(&back, wren);
+    assert!(back.world().get::<ExternalController>(e).is_none());
+    let queue = back.world().get::<ExternalQueue>(e).unwrap();
+    assert!(queue.current.is_none() && queue.pending.is_empty());
+    let commands = &back.world().resource::<CommandQueue>().pending;
+    assert_eq!(
+        commands.len(),
+        3,
+        "only the assigned actor's stale attach was discarded; group work was split"
+    );
+    let orders: Vec<IssueOrder> = commands
+        .values()
+        .filter_map(|c| match c {
+            SimCommand::Content { kind, payload } if kind == "IssueOrder" => {
+                Some(payload.to_typed().unwrap())
+            }
+            _ => None,
+        })
+        .collect();
+    assert_eq!(orders.len(), 2);
+    assert!(orders.iter().all(|o| o.units == vec![guest]));
+    assert!(
+        orders
+            .iter()
+            .any(|o| o.order == UnitOrder::Follow { target: wren }),
+        "foreign orders may still refer to the actor as target"
+    );
+    run_ticks(back.world_mut(), 12);
+    assert!(
+        back.world()
+            .get::<ExternalController>(entity(&back, wren))
+            .is_none()
+    );
+    assert!(
+        !back
+            .world()
+            .get::<OrderQueue>(entity(&back, wren))
+            .unwrap()
+            .has_order()
+    );
+    assert_eq!(pos(&back, wren), at);
+    let reset = reset_world(&current, SEED, |_| {}).unwrap();
+    assert_eq!(reset.world().resource::<SimClock>().tick, 0);
+    assert!(
+        reset
+            .world()
+            .get::<ExternalController>(entity(&reset, wren))
+            .is_none()
+    );
+    assert!(reset.world().resource::<CommandQueue>().pending.is_empty());
+    let _ = std::fs::remove_dir_all(home);
 }
 
 #[test]
@@ -1005,10 +1473,11 @@ fn explorer_observation_shows_searched_ground() {
     );
     let map_pct = s["map_pct"].as_u64().unwrap();
     assert!((1..100).contains(&map_pct), "{map_pct}");
+    let session = controlled_session(&mut app);
     let text = npc_framework::agent_io::api::call(
         app.world_mut(),
         "agent/observe",
-        Some(serde_json::json!({"unit": wren.0, "format": "text"})),
+        Some(serde_json::json!({"unit": wren.0, "format": "text","session":session})),
     )
     .unwrap()["text"]
         .as_str()

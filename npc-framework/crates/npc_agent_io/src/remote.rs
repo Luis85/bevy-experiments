@@ -79,7 +79,10 @@ struct Watches {
 /// One `agent/act_and_wait` request's state.
 enum ActSlot {
     /// Acted; waiting since `first`.
-    Waiting { first: Instant, wait: api::ActWait },
+    Waiting {
+        first: Instant,
+        wait: Box<api::ActWait>,
+    },
     /// Answered: the tombstone that answers every re-run the same way.
     Done(Result<Value, RpcError>),
 }
@@ -123,7 +126,7 @@ fn key(world: &mut World, method: &str, p: &Option<Value>) -> String {
 }
 
 fn long_poll(In(p): In<Option<Value>>, world: &mut World) -> BrpResult<Option<Value>> {
-    let params = api::parse_events(p.clone()).map_err(to_brp)?;
+    let params = api::parse_events_for(world, p.clone()).map_err(to_brp)?;
     let now = wall_now();
     let k = key(world, "agent/events", &p);
     let timeout = Duration::from_millis(api::events_timeout_ms(world, &params));
@@ -146,7 +149,7 @@ fn long_poll(In(p): In<Option<Value>>, world: &mut World) -> BrpResult<Option<Va
 }
 
 fn stream(In(p): In<Option<Value>>, world: &mut World) -> BrpResult<Option<Value>> {
-    let mut params = api::parse_events(p.clone()).map_err(to_brp)?;
+    let mut params = api::parse_events_for(world, p.clone()).map_err(to_brp)?;
     let now = wall_now();
     let k = key(world, "agent/events+watch", &p);
     let sent = {
@@ -175,7 +178,7 @@ fn stream(In(p): In<Option<Value>>, world: &mut World) -> BrpResult<Option<Value
 /// What a run of [`act_and_wait`] found in its slot.
 enum Found {
     Nothing,
-    Waiting(Instant, api::ActWait),
+    Waiting(Instant, Box<api::ActWait>),
     Done(Result<Value, RpcError>),
 }
 
@@ -198,6 +201,10 @@ fn finish(
 /// (a rejected act or `timeout_ms: 0` on the first run). Every later run of
 /// the same key gets the stored answer (module docs).
 fn act_and_wait(In(p): In<Option<Value>>, world: &mut World) -> BrpResult<Option<Value>> {
+    // Even an answered tombstone must not expose a revoked session's data.
+    let mut checked = p.clone();
+    let _ = crate::registration::authorize(world, "agent/act_and_wait", &mut checked)
+        .map_err(to_brp)?;
     let has_nonce = p
         .as_ref()
         .and_then(|v| v.get("nonce"))
@@ -212,9 +219,7 @@ fn act_and_wait(In(p): In<Option<Value>>, world: &mut World) -> BrpResult<Option
     let k = base("agent/act_and_wait", &p);
     let found = {
         let mut w = world.get_resource_or_init::<ActWaits>();
-        w.slots
-            .retain(|_, (last, _)| now.duration_since(*last) < ACT_KEEP);
-        match w.slots.get_mut(&k) {
+        let found = match w.slots.get_mut(&k) {
             None => Found::Nothing,
             Some((last, slot)) => {
                 *last = now;
@@ -223,14 +228,19 @@ fn act_and_wait(In(p): In<Option<Value>>, world: &mut World) -> BrpResult<Option
                     ActSlot::Done(r) => Found::Done(r.clone()),
                 }
             }
-        }
+        };
+        // Refresh the currently executing watcher before expiring other
+        // requests: a long frame gap must never submit its act twice.
+        w.slots
+            .retain(|_, (last, _)| now.duration_since(*last) < ACT_KEEP);
+        found
     };
     let (first, wait) = match found {
         Found::Done(r) => return r.map(Some).map_err(to_brp),
         Found::Waiting(first, wait) => (first, wait),
         Found::Nothing => {
             // Bad params act on nothing: no tombstone needed.
-            let wait = api::act_and_wait_start(world, p).map_err(to_brp)?;
+            let wait = Box::new(api::act_and_wait_start(world, p).map_err(to_brp)?);
             if wait.answers_at_once() {
                 let r = api::act_wait_result(world, &wait, false);
                 return finish(world, k, now, r);
@@ -471,5 +481,65 @@ mod tests {
         }
         npc_kernel::run_ticks(world, 1);
         assert_eq!(api::command_log(world).len(), before, "nothing acted");
+    }
+
+    #[test]
+    fn answered_act_wait_survives_a_long_frame_without_acting_twice() {
+        let mut app = toy();
+        let world = app.world_mut();
+        let p = serde_json::json!({"unit":1,"controller":"c","verb":"wait","args":{"ticks":5},"timeout_ms":0,"nonce":"hitch"});
+        let first = act_and_wait(In(Some(p.clone())), world).unwrap().unwrap();
+        let submitted = api::command_log(world).len();
+        for (last, _) in world.resource_mut::<ActWaits>().slots.values_mut() {
+            *last = wall_now() - ACT_KEEP - Duration::from_secs(1);
+        }
+        let again = act_and_wait(In(Some(p)), world).unwrap().unwrap();
+        assert_eq!(again, first);
+        assert_eq!(
+            api::command_log(world).len(),
+            submitted,
+            "the old watcher must not submit another act"
+        );
+    }
+
+    #[test]
+    fn a_revoked_session_cannot_read_an_answered_act_wait_tombstone() {
+        use crate::registration::{self, Credential, RegistrationRequired};
+        let mut app = toy();
+        let world = app.world_mut();
+        world.insert_resource(RegistrationRequired);
+        registration::set_credential(
+            world,
+            "c",
+            Credential {
+                token_digest: registration::token_digest("secret"),
+                assigned: npc_kernel::SimId(1),
+                controller: "c".into(),
+            },
+        );
+        let session = api::call(
+            world,
+            "agent/register",
+            Some(serde_json::json!({"agent_id":"c","token":"secret"})),
+        )
+        .unwrap()["session"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        api::call(
+            world,
+            "agent/take_control",
+            Some(serde_json::json!({"session":session})),
+        )
+        .unwrap();
+        let p = serde_json::json!({"session":session,"verb":"wait","args":{"ticks":5},"timeout_ms":0,"nonce":"revoked"});
+        let first = act_and_wait(In(Some(p.clone())), world).unwrap().unwrap();
+        assert_eq!(first["act"]["accepted"], true);
+        let submitted = api::command_log(world).len();
+        registration::revoke_agent(world, "c");
+        let error = act_and_wait(In(Some(p)), world).unwrap_err();
+        assert_eq!(error.data.as_ref().unwrap()["reason"], "unknown_session");
+        assert_eq!(error.data.unwrap()["revoked"], true);
+        assert_eq!(api::command_log(world).len(), submitted);
     }
 }

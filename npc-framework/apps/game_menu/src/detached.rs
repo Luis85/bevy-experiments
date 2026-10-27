@@ -1434,6 +1434,7 @@ fn spawn_detached(mut commands: Commands, worlds: Res<DetachedWorlds>, settings:
             r.commands().entity(copy).insert(CopyButton);
         });
         p.spawn((Line::Notice, ui::label("", 14.0, ERROR)));
+        crate::explorer::token_notice(p);
         ui::row(p, |r| {
             let open = button(
                 r,
@@ -1453,7 +1454,19 @@ fn spawn_detached(mut commands: Commands, worlds: Res<DetachedWorlds>, settings:
                 Action::StopDetached(agent.clone()),
             );
             r.commands().entity(stop).insert(OpButton);
-            button(r, "Back", None, true, 3, Action::Go(Screen::ExplorerResume));
+            let token = button(
+                r,
+                "New token",
+                None,
+                false,
+                3,
+                Action::RotateToken {
+                    agent: agent.clone(),
+                    dir: dir.clone(),
+                },
+            );
+            r.commands().entity(token).insert(OpButton);
+            button(r, "Back", None, true, 4, Action::Go(Screen::ExplorerResume));
         });
     });
 }

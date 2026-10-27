@@ -172,6 +172,9 @@ enum Cmd {
         #[command(subcommand)]
         cmd: agent::AgentCmd,
     },
+    /// Rotate an explorer agent's credential without printing it.
+    #[command(subcommand)]
+    AgentToken(agent::AgentTokenCmd),
     /// The player's notes of a unit (diary, memory, proposals; no controller): list, add, update
     /// (only the player sets a proposal's --status).
     #[command(
@@ -214,6 +217,9 @@ enum Cmd {
         /// The controller the notes tools use when a call names none.
         #[arg(long, default_value = npc_framework::agent_io::mcp::DEFAULT_CONTROLLER)]
         controller: String,
+        /// Use session-bound explorer tools; credentials arrive through register.
+        #[arg(long)]
+        registered: bool,
     },
 }
 
@@ -500,6 +506,7 @@ fn main() -> ExitCode {
         Cmd::Replay(ReplayCmd::VerifySession { file }) => agent::cmd_verify_session(file, &mut out),
         Cmd::Serve(a) => agent::cmd_serve(a, &mut out),
         Cmd::Agent { client, cmd } => agent::cmd_agent(cmd, client, &mut out),
+        Cmd::AgentToken(cmd) => agent::cmd_agent_token(cmd, &mut out),
         Cmd::World { client, cmd } => agent::cmd_world(cmd, client, &mut out),
         Cmd::Session { client, cmd } => agent::cmd_session(cmd, client, &mut out),
         Cmd::Notes { client, cmd } => agent::cmd_notes(cmd, client, &mut out),
@@ -513,7 +520,8 @@ fn main() -> ExitCode {
             url,
             token,
             controller,
-        } => agent::cmd_mcp(url, token.as_deref(), controller),
+            registered,
+        } => agent::cmd_mcp(url, token.as_deref(), controller, *registered),
     }
     .and_then(|code| out.finish().map(|()| code));
     match result {
