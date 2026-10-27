@@ -31,6 +31,7 @@ pub enum Screen {
     Testbed,
     /// The agents folder and the fog of war checkbox.
     Settings,
+    Worlds,
     /// The AI explorer's New / Resume choice.
     Explorer,
     /// Name a new agent and world.
@@ -54,7 +55,7 @@ pub enum Screen {
 impl Screen {
     /// The `--screen` names.
     pub const NAMES: &'static str =
-        "main, testbed, settings, explorer, explorer_new, explorer_resume";
+        "main, testbed, settings, worlds, explorer, explorer_new, explorer_resume";
 
     /// The screen `--screen name` opens.
     pub fn from_name(name: &str) -> Option<Self> {
@@ -62,6 +63,7 @@ impl Screen {
             "main" => Self::Main,
             "testbed" => Self::Testbed,
             "settings" => Self::Settings,
+            "worlds" => Self::Worlds,
             "explorer" => Self::Explorer,
             "explorer_new" => Self::ExplorerNew,
             "explorer_resume" => Self::ExplorerResume,
@@ -73,7 +75,9 @@ impl Screen {
     pub fn back(self) -> Option<Self> {
         match self {
             Self::Main | Self::Running | Self::Quitting => None,
-            Self::Testbed | Self::Settings | Self::Explorer | Self::Missing => Some(Self::Main),
+            Self::Testbed | Self::Settings | Self::Worlds | Self::Explorer | Self::Missing => {
+                Some(Self::Main)
+            }
             Self::ExplorerNew | Self::ExplorerResume => Some(Self::Explorer),
             Self::ExplorerCheck | Self::ExplorerMismatch | Self::ExplorerDetached => {
                 Some(Self::ExplorerResume)
@@ -96,6 +100,7 @@ pub enum Action {
     /// when pressed).
     StartNew(RunMode),
     PickActor(String),
+    PickWorld(String),
     /// Shows the agent's detached world.
     Watch(String),
     /// The agent's detached world into the window, on its port.
@@ -162,7 +167,13 @@ struct SettingsStatus(Option<Result<String, String>>);
 struct AgentsDirField;
 #[derive(Component)]
 struct ActorsDirField;
-type SettingsFieldFilter = Or<(With<AgentsDirField>, With<ActorsDirField>)>;
+#[derive(Component)]
+struct WorldsDirField;
+type SettingsFieldFilter = Or<(
+    With<AgentsDirField>,
+    With<ActorsDirField>,
+    With<WorldsDirField>,
+)>;
 #[derive(Component)]
 struct SettingsStatusText;
 /// The fog of war checkbox (a button whose label shows the box).
@@ -196,7 +207,12 @@ impl Plugin for ScreensPlugin {
                 s.0 = None;
             })
             .add_systems(OnEnter(Screen::Explorer), spawn_explorer)
-            .add_plugins((ExplorerPlugin, DetachedPlugin, crate::quit::QuitPlugin))
+            .add_plugins((
+                ExplorerPlugin,
+                DetachedPlugin,
+                crate::quit::QuitPlugin,
+                crate::worlds::WorldsPlugin,
+            ))
             .add_systems(OnEnter(Screen::Running), spawn_running)
             .add_systems(OnEnter(Screen::Missing), spawn_missing)
             .add_systems(
@@ -237,6 +253,7 @@ pub fn apply_action(world: &mut World, action: Action) {
         Action::RandomName(kind) => explorer::reroll_name(world, kind),
         Action::StartNew(mode) => explorer::start_new(world, mode),
         Action::PickActor(id) => explorer::pick_actor(world, &id),
+        Action::PickWorld(id) => explorer::pick_world(world, &id),
         Action::Watch(agent) => detached::watch(world, &agent),
         Action::OpenInWindow(agent) => {
             world.insert_resource(MainNotice::default());
@@ -293,14 +310,22 @@ fn save_settings(world: &mut World) {
         .map(|v| v.value().to_string().trim().to_owned())
         .filter(|s| !s.is_empty())
         .map(PathBuf::from);
-    let status = match launch::save_settings_with_actors(&text, fog, actors, file.as_deref()) {
-        Ok(settings) => {
-            let msg = format!("saved: {}", settings.agents_dir.display());
-            world.resource_mut::<AppSettings>().0 = settings;
-            Ok(msg)
-        }
-        Err(e) => Err(e),
-    };
+    let mut world_fields = world.query_filtered::<&EditableText, With<WorldsDirField>>();
+    let worlds = world_fields
+        .single(world)
+        .ok()
+        .map(|v| v.value().to_string().trim().to_owned())
+        .filter(|s| !s.is_empty())
+        .map(PathBuf::from);
+    let status =
+        match launch::save_settings_with_folders(&text, fog, actors, worlds, file.as_deref()) {
+            Ok(settings) => {
+                let msg = format!("saved: {}", settings.agents_dir.display());
+                world.resource_mut::<AppSettings>().0 = settings;
+                Ok(msg)
+            }
+            Err(e) => Err(e),
+        };
     world.resource_mut::<SettingsStatus>().0 = Some(status);
 }
 
@@ -435,13 +460,21 @@ fn spawn_main(mut commands: Commands, settings: Res<AppSettings>, notice: Res<Ma
             4,
             Action::Launch(Entry::ActorEditor),
         );
-        button(p, "Settings", None, true, 5, Action::Go(Screen::Settings));
+        button(
+            p,
+            "Worlds",
+            Some("create and edit world rules for new agents"),
+            true,
+            5,
+            Action::Go(Screen::Worlds),
+        );
+        button(p, "Settings", None, true, 6, Action::Go(Screen::Settings));
         button(
             p,
             "Quit",
             Some("stops every world and window it started (they save first)"),
             true,
-            6,
+            7,
             Action::Quit,
         );
         if let Some(e) = &notice.0 {
@@ -493,6 +526,7 @@ fn spawn_testbed(mut commands: Commands) {
 
 fn spawn_settings(mut commands: Commands, settings: Res<AppSettings>, paths: Res<Paths>) {
     let panel = ui::spawn_screen(&mut commands, DespawnOnExit(Screen::Settings), "Settings");
+    ui::scroll_panel(&mut commands, panel);
     let current = settings.0.agents_dir.display().to_string();
     let file = paths.settings_file.as_ref().map_or_else(
         || "(no settings folder)".to_owned(),
@@ -509,6 +543,9 @@ fn spawn_settings(mut commands: Commands, settings: Res<AppSettings>, paths: Res
         p.spawn(ui::label("Actors folder (optional)", 18.0, TEXT));
         p.spawn((ActorsDirField, ui::text_field(&settings.0.actors_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 1)));
         p.spawn(ui::label("Blank uses npc-actors beside the agents folder. Used by Actors and New agents.", 12.0, ui::DIM));
+        p.spawn(ui::label("Worlds folder (optional)", 18.0, TEXT));
+        p.spawn((WorldsDirField, ui::text_field(settings.0.worlds_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 2)));
+        p.spawn(ui::label("Blank uses npc-worlds beside the agents folder. Used by Worlds and New agents.", 12.0, ui::DIM));
         p.spawn(ui::label("Explorer window", 18.0, TEXT));
         let fog = button(
             p,
@@ -517,15 +554,15 @@ fn spawn_settings(mut commands: Commands, settings: Res<AppSettings>, paths: Res
                 "Show the world as the agent's actor knows it: black where it has never been, greyed as last seen where it is not looking, no units it cannot sense. F8 toggles it in the game.",
             ),
             true,
-            2,
+            3,
             Action::ToggleFog,
         );
         p.commands().entity(fog).insert(FogCheckbox);
         p.spawn((SettingsStatusText, ui::label("", 14.0, NOTE)));
         p.spawn(ui::label(format!("Saved to {file}"), 12.0, ui::DIM));
         ui::row(p, |r| {
-            button(r, "Save", None, true, 3, Action::SaveSettings);
-            back_button(r, Screen::Settings, 4);
+            button(r, "Save", None, true, 4, Action::SaveSettings);
+            back_button(r, Screen::Settings, 5);
         });
     });
 }
@@ -675,6 +712,7 @@ pub(crate) mod tests {
                 agents_dir: agents_dir.to_path_buf(),
                 fog_of_war: true,
                 actors_dir: None,
+                worlds_dir: None,
             }))
             .insert_resource(BuildTools {
                 cargo: None,
@@ -719,6 +757,7 @@ pub(crate) mod tests {
             "main",
             "testbed",
             "settings",
+            "worlds",
             "explorer",
             "explorer_new",
             "explorer_resume",

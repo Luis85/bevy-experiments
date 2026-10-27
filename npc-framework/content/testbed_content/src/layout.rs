@@ -132,7 +132,9 @@ pub fn spawn_walls(world: &mut World, ids: &mut TestbedIds, store_locked: bool) 
     ids.name("gate", gate);
     let workshop = spawn_door(world, WORKSHOP_DOOR_CELL, Door::closed());
     ids.name("workshop_door", workshop);
-    let store_door = if store_locked {
+    let store_door = if !crate::world_runtime::enabled(world, |s| s.locked_doors) {
+        Door::closed()
+    } else if store_locked {
         Door::locked(KEY_STORE)
     } else {
         Door::lockable(KEY_STORE)
@@ -240,12 +242,14 @@ fn vehicle(world: &mut World, kind: PropKind, v: Vehicle, speed: i32, pos: SimPo
 /// Workstations, items, trees, the ore rock and the vehicles.
 pub fn spawn_furnishing(world: &mut World, ids: &mut TestbedIds) {
     // Workshop.
-    let id = station(world, PropKind::Workbench, WORKBENCH, cell(-9, 7));
-    ids.name("workbench", id);
-    let id = station(world, PropKind::Anvil, ANVIL, cell(-4, 7));
-    ids.name("anvil", id);
-    let id = station(world, PropKind::Forge, FORGE, cell(-2, 8));
-    ids.name("forge", id);
+    if crate::world_runtime::enabled(world, |s| s.crafting) {
+        let id = station(world, PropKind::Workbench, WORKBENCH, cell(-9, 7));
+        ids.name("workbench", id);
+        let id = station(world, PropKind::Anvil, ANVIL, cell(-4, 7));
+        ids.name("anvil", id);
+        let id = station(world, PropKind::Forge, FORGE, cell(-2, 8));
+        ids.name("forge", id);
+    }
     let id = spawn_item(world, BOOK, 1, 0, cell(-7, 5));
     ids.name("book", id);
     // Store.
@@ -266,29 +270,33 @@ pub fn spawn_furnishing(world: &mut World, ids: &mut TestbedIds) {
     ids.name("ore_rock", id);
     let id = spawn_item(world, AXE, 1, 0, cell(-4, -5));
     ids.name("axe", id);
-    let id = spawn_item(world, STORE_KEY, 1, 0, cell(8, -2));
-    ids.name("store_key", id);
+    if crate::world_runtime::enabled(world, |s| s.locked_doors) {
+        let id = spawn_item(world, STORE_KEY, 1, 0, cell(8, -2));
+        ids.name("store_key", id);
+    }
     let id = spawn_item(world, BREAD, 3, 0, cell(1, -4));
     ids.name("bread", id);
     let id = spawn_item(world, LOG, 2, 0, cell(-3, -8));
     ids.name("logs", id);
-    let id = vehicle(
-        world,
-        PropKind::Cart,
-        cart_vehicle(),
-        CART_SPEED,
-        cell(4, -6),
-    );
-    ids.name("cart", id);
-    // Outside the gate.
-    let id = vehicle(
-        world,
-        PropKind::Wagon,
-        wagon_vehicle(),
-        WAGON_SPEED,
-        cell(0, -15),
-    );
-    ids.name("wagon", id);
+    if crate::world_runtime::enabled(world, |s| s.vehicles) {
+        let id = vehicle(
+            world,
+            PropKind::Cart,
+            cart_vehicle(),
+            CART_SPEED,
+            cell(4, -6),
+        );
+        ids.name("cart", id);
+        // Outside the gate.
+        let id = vehicle(
+            world,
+            PropKind::Wagon,
+            wagon_vehicle(),
+            WAGON_SPEED,
+            cell(0, -15),
+        );
+        ids.name("wagon", id);
+    }
     for (i, (x, z)) in [(-5, -15), (6, -16)].into_iter().enumerate() {
         let id = tree(world, cell(x, z));
         ids.name(format!("tree_{}", i + 3), id);
@@ -488,6 +496,12 @@ pub fn spawn_unit(world: &mut World, pos: SimPos, spec: &UnitSpec) -> Result<Sim
             (Commandable::new(speed), Owner(PlayerId(owner)), NavAgent),
         ),
     );
+    if !crate::world_runtime::enabled(world, |s| s.progression) {
+        world
+            .entity_mut(e)
+            .remove::<Experience>()
+            .remove::<SpendPolicy>();
+    }
     if spec.fixed_facing {
         world.entity_mut(e).insert(FixedFacing);
     }

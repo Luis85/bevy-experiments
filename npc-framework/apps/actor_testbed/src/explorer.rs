@@ -57,6 +57,8 @@ pub struct ExplorerArgs {
     /// `--actors-dir DIR`: the actor presets folder (default `npc-actors`
     /// beside the agents folder).
     pub actors_dir: Option<PathBuf>,
+    pub world_preset: Option<String>,
+    pub worlds_dir: Option<PathBuf>,
 }
 
 impl ExplorerArgs {
@@ -70,6 +72,8 @@ impl ExplorerArgs {
             on_mismatch: self.on_mismatch,
             preset: self.preset.clone(),
             actors_dir: self.actors_dir.clone(),
+            world_preset: self.world_preset.clone(),
+            worlds_dir: self.worlds_dir.clone(),
         }
     }
 }
@@ -88,6 +92,8 @@ pub struct ExplorerFlags {
     exact_port: Option<String>,
     preset: Option<String>,
     actors_dir: Option<PathBuf>,
+    world_preset: Option<String>,
+    worlds_dir: Option<PathBuf>,
 }
 
 impl ExplorerFlags {
@@ -114,6 +120,8 @@ impl ExplorerFlags {
             "--exact-port" => self.exact_port = Some(value.to_owned()),
             "--preset" => self.preset = Some(value.to_owned()),
             "--actors-dir" => self.actors_dir = Some(PathBuf::from(value)),
+            "--world-preset" => self.world_preset = Some(value.into()),
+            "--worlds-dir" => self.worlds_dir = Some(PathBuf::from(value)),
             _ => return false,
         }
         true
@@ -139,10 +147,11 @@ impl ExplorerFlags {
                 || self.exact_port.is_some()
                 || self.preset.is_some()
                 || self.actors_dir.is_some();
+            let any = any || self.world_preset.is_some() || self.worlds_dir.is_some();
             return if any {
                 Err("--agent, --world, --resume, --load-anyway, --fresh-world, \
                      --check-save, --preset, --actors-dir and --exact-port need \
-                     --explorer-home DIR"
+                     --explorer-home DIR; --world-preset and --worlds-dir also need --explorer-home DIR"
                     .into())
             } else {
                 Ok(None)
@@ -168,6 +177,13 @@ impl ExplorerFlags {
         }
         if self.preset.as_ref().is_some_and(|p| p.trim().is_empty()) {
             return Err("--preset: the name is blank".into());
+        }
+        if self
+            .world_preset
+            .as_ref()
+            .is_some_and(|p| p.trim().is_empty())
+        {
+            return Err("--world-preset: the name is blank".into());
         }
         if self.resume && self.world.is_some() {
             return Err(
@@ -220,6 +236,8 @@ impl ExplorerFlags {
             show_close_dialog: self.close_dialog,
             preset: self.preset,
             actors_dir: self.actors_dir,
+            world_preset: self.world_preset,
+            worlds_dir: self.worlds_dir,
         }))
     }
 }
@@ -1163,6 +1181,8 @@ mod tests {
             show_close_dialog: false,
             preset: None,
             actors_dir: Some(home.join("actors")),
+            world_preset: None,
+            worlds_dir: Some(home.join("worlds")),
         }
     }
 
@@ -1243,6 +1263,10 @@ mod tests {
                 "rover",
                 "--actors-dir",
                 "acts",
+                "--world-preset",
+                "survival",
+                "--worlds-dir",
+                "worlds",
             ],
             false,
         )
@@ -1251,8 +1275,29 @@ mod tests {
         let host = p.host_args();
         assert_eq!(host.preset.as_deref(), Some("rover"));
         assert_eq!(host.actors_dir, Some(PathBuf::from("acts")));
+        assert_eq!(host.world_preset.as_deref(), Some("survival"));
+        assert_eq!(host.worlds_dir, Some(PathBuf::from("worlds")));
         assert_eq!(a.host_args().preset, None, "the default: human");
         for (flags, scenario, needle) in [
+            (
+                &["--world-preset", "survival"][..],
+                false,
+                "--explorer-home",
+            ),
+            (
+                &[
+                    "--explorer-home",
+                    "h",
+                    "--agent",
+                    "A",
+                    "--world",
+                    "W",
+                    "--world-preset",
+                    " ",
+                ][..],
+                false,
+                "--world-preset: the name is blank",
+            ),
             (
                 &["--preset", "rover"][..],
                 false,

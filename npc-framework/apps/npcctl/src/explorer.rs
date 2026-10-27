@@ -92,6 +92,12 @@ pub struct ExplorerServeArgs {
     /// folder; the built-ins are copied into an empty one).
     #[arg(long, value_name = "DIR", requires = "explorer_home")]
     pub actors_dir: Option<PathBuf>,
+    /// New world's preset (default plain_explorer); resume keeps its saved copy.
+    #[arg(long, value_name = "ID", requires = "explorer_home")]
+    pub world_preset: Option<String>,
+    /// World presets folder (default npc-worlds beside the agents folder).
+    #[arg(long, value_name = "DIR", requires = "explorer_home")]
+    pub worlds_dir: Option<PathBuf>,
     /// Start (and reset) the world paused (`npc/resume` runs it).
     #[arg(long, requires = "explorer_home")]
     pub paused: bool,
@@ -132,6 +138,9 @@ fn host_args(e: &ExplorerServeArgs) -> Result<HostArgs, Failure> {
     if e.world.as_ref().is_some_and(|w| w.trim().is_empty()) {
         return Err(Failure::usage("--world: the name is blank"));
     }
+    if e.world_preset.as_ref().is_some_and(|p| p.trim().is_empty()) {
+        return Err(Failure::usage("--world-preset: the name is blank"));
+    }
     if !e.resume && e.world.is_none() {
         return Err(Failure::usage(
             "a new agent needs --world NAME (or --resume an existing one)",
@@ -152,6 +161,8 @@ fn host_args(e: &ExplorerServeArgs) -> Result<HostArgs, Failure> {
         on_mismatch,
         preset: e.preset.clone(),
         actors_dir: e.actors_dir.clone(),
+        world_preset: e.world_preset.clone(),
+        worlds_dir: e.worlds_dir.clone(),
     })
 }
 

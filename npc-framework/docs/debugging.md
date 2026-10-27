@@ -297,7 +297,8 @@ The server refuses browser and DNS-rebinding requests and, with `--token T`, eve
 `Authorization: Bearer T` (§4, *Transport security*).
 
 ```sh
-npcctl serve --explorer-home DIR --agent NAME --world W [--preset ID] [--actors-dir DIR] [--port N] [--paused] [--tick-hz 20]
+npcctl serve --explorer-home DIR --agent NAME --world W [--preset ID] [--actors-dir DIR]
+              [--world-preset ID] [--worlds-dir DIR] [--port N] [--paused] [--tick-hz 20]
 npcctl serve --explorer-home DIR --agent NAME --resume [--load-anyway | --fresh-world] [--port N] [--paused]
 ```
 
@@ -324,7 +325,18 @@ the reset world is saved at once; `world load-scenario` is refused. A second `se
 `--explorer-home` (the agent folder's settings carry no token). `--preset ID` (New only, default `human`) picks
 the actor preset: a valid `<ID>.json` in `--actors-dir` (default `npc-actors` beside the agents folder, the built-in
 `human`, `rover` and `sentinel` copied into it when it has no preset; `testbed_content::actors`); an unknown or
-invalid one exits 2 with its reasons (the robots until the robot sensors exist); a resume keeps the agent's preset. A save from another build exits **3** (as `actor_testbed`) with `"needs_choice": true`.
+invalid one exits 2 with its reasons; a resume keeps the agent's preset. `--world-preset ID` selects a strict
+world preset from `--worlds-dir` (default `npc-worlds` beside the agents folder): `plain_explorer`, `survival`
+or `night_shift`, plus valid custom files. The actor is validated against that world's detection rules.
+Both preset IDs and complete copies are saved; source edits/deletion do not alter Resume or reset.
+The native explorer accepts the same preset/folder flags. A save from another build exits **3** (as
+`actor_testbed`) with `"needs_choice": true`.
+
+World presets control hunger/thirst/energy (humans), battery (robots), day/night and vision/camera scaling,
+perception memory, crafting, vehicles, locks, progression and inhabitants. Needs report their levels and
+effects through observe. Low levels slow ongoing movement; exhaustion stops actions until appropriate
+rest/charge recovery at a source. Hunger/thirst exhaustion requires external rescue. LIDAR/radar do not lose
+range at night. Plain explorer retains the existing clock and full night sensing range.
 
 Clients make one RPC call per invocation (`--url http://127.0.0.1:15702` default, `--format json|text`,
 `--token T` for a session served with one); they

@@ -140,13 +140,24 @@ type PresetDescriptionFilter = (
 
 /// Parse and fully validate against the world's registered capabilities;
 /// invalid presets never appear as choices.
-fn valid_presets(dir: &std::path::Path) -> Vec<PresetChoice> {
-    let app = testbed_content::scenario::new_sim_app(1, "explorer");
+fn valid_presets(
+    dir: &std::path::Path,
+    selected_world: &testbed_content::worlds::WorldPreset,
+) -> Vec<PresetChoice> {
+    let Ok(doc) = testbed_content::worlds::world_doc(
+        selected_world,
+        &testbed_content::actors::human_preset(),
+    ) else {
+        return Vec::new();
+    };
+    let Ok(loaded) = testbed_content::scenario::load_scenario(&doc, 1) else {
+        return Vec::new();
+    };
     testbed_content::actors::load_presets(dir)
         .into_iter()
         .filter_map(|(path, result)| {
             let preset = result.ok()?;
-            testbed_content::actors::validate(&preset, app.world()).ok()?;
+            testbed_content::actors::validate(&preset, loaded.app.world()).ok()?;
             Some(PresetChoice {
                 id: path.file_stem()?.to_str()?.to_owned(),
                 name: preset.name,
@@ -154,6 +165,135 @@ fn valid_presets(dir: &std::path::Path) -> Vec<PresetChoice> {
             })
         })
         .collect()
+}
+
+#[derive(Clone)]
+struct WorldChoice {
+    id: String,
+    preset: testbed_content::worlds::WorldPreset,
+}
+#[derive(Resource, Default)]
+struct WorldPicker {
+    choices: Vec<WorldChoice>,
+    selected: Option<String>,
+}
+#[derive(Component)]
+struct ActorChoices;
+#[derive(Component)]
+struct WorldDescription;
+
+fn world_choices(dir: &std::path::Path) -> WorldPicker {
+    let choices: Vec<_> = testbed_content::worlds::load_worlds(dir)
+        .into_iter()
+        .filter_map(|(path, result)| {
+            let preset = result.ok()?;
+            testbed_content::worlds::validate(&preset).ok()?;
+            Some(WorldChoice {
+                id: testbed_content::worlds::preset_id(&path)?,
+                preset,
+            })
+        })
+        .collect();
+    let selected = choices
+        .iter()
+        .find(|p| p.id == "plain_explorer")
+        .or_else(|| choices.first())
+        .map(|p| p.id.clone());
+    WorldPicker { choices, selected }
+}
+
+pub fn pick_world(world: &mut World, id: &str) {
+    let selected = world
+        .get_resource::<WorldPicker>()
+        .and_then(|p| p.choices.iter().find(|p| p.id == id))
+        .cloned();
+    let Some(selected) = selected else {
+        return;
+    };
+    let dir = world.resource::<AppSettings>().0.actors_dir();
+    let choices = valid_presets(&dir, &selected.preset);
+    let old = world.resource::<PresetPicker>().selected.clone();
+    let selected_actor = choices
+        .iter()
+        .find(|p| Some(&p.id) == old.as_ref())
+        .or_else(|| choices.iter().find(|p| p.id == "human"))
+        .or_else(|| choices.first())
+        .map(|p| p.id.clone());
+    world.insert_resource(PresetPicker {
+        choices,
+        selected: selected_actor,
+    });
+    world.resource_mut::<WorldPicker>().selected = Some(id.into());
+    world.resource_mut::<CheckedNames>().0 = None;
+}
+
+fn choice_label(name: &str, selected: bool) -> String {
+    format!("{}{name}", if selected { "> " } else { "" })
+}
+
+fn refresh_picker_buttons(
+    mut commands: Commands,
+    picker: Res<PresetPicker>,
+    containers: Query<Entity, With<ActorChoices>>,
+    worlds: Res<WorldPicker>,
+    mut labels: Query<&mut Text, With<WorldDescription>>,
+    buttons: Query<(&Action, &Children)>,
+    mut button_labels: Query<&mut Text, Without<WorldDescription>>,
+) {
+    if picker.is_changed() {
+        for entity in &containers {
+            commands
+                .entity(entity)
+                .despawn_children()
+                .with_children(|r| {
+                    for (i, p) in picker.choices.iter().enumerate() {
+                        button(
+                            r,
+                            &choice_label(&p.name, picker.selected.as_ref() == Some(&p.id)),
+                            None,
+                            true,
+                            40 + i as i32,
+                            Action::PickActor(p.id.clone()),
+                        );
+                    }
+                });
+        }
+    }
+    if worlds.is_changed() {
+        let description = worlds
+            .choices
+            .iter()
+            .find(|p| Some(&p.id) == worlds.selected.as_ref())
+            .map(|p| format!("{}: {}", p.preset.name, p.preset.description))
+            .unwrap_or_else(|| "No valid world presets. Open Worlds to fix the files.".into());
+        for mut label in &mut labels {
+            label.0.clone_from(&description);
+        }
+    }
+    // Update labels in place: selecting a preset preserves the name fields
+    // and their caret/selection, as well as the world picker buttons.
+    for (action, children) in &buttons {
+        let label = match action {
+            Action::PickWorld(id) => worlds
+                .choices
+                .iter()
+                .find(|p| &p.id == id)
+                .map(|p| choice_label(&p.preset.name, worlds.selected.as_ref() == Some(id))),
+            Action::PickActor(id) => picker
+                .choices
+                .iter()
+                .find(|p| &p.id == id)
+                .map(|p| choice_label(&p.name, picker.selected.as_ref() == Some(id))),
+            _ => None,
+        };
+        if let Some(label) = label
+            && let Some(child) = children.first()
+            && let Ok(mut text) = button_labels.get_mut(*child)
+            && text.0 != label
+        {
+            text.0 = label;
+        }
+    }
 }
 
 fn preset_description(picker: &PresetPicker) -> String {
@@ -291,7 +431,8 @@ impl Plugin for ExplorerPlugin {
             .add_systems(
                 Update,
                 (
-                    (refresh_new, enter_starts).run_if(in_state(Screen::ExplorerNew)),
+                    (refresh_new, refresh_picker_buttons, enter_starts)
+                        .run_if(in_state(Screen::ExplorerNew)),
                     poll_save_check.run_if(in_state(Screen::ExplorerCheck)),
                     finish_run_scan.run_if(in_state(Screen::ExplorerResume)),
                     show_token_notice,
@@ -318,7 +459,13 @@ fn spawn_new(
     let agent = random_name(NameKind::Agent, seed);
     let world = random_name(NameKind::World, seed.rotate_left(17) ^ 0x5DEE_CE66);
     let problem = launch::new_world_problem(&settings.0.agents_dir, &agent, &world);
-    let choices = valid_presets(&settings.0.actors_dir());
+    let worlds = world_choices(&settings.0.worlds_dir());
+    let choices = worlds
+        .choices
+        .iter()
+        .find(|p| Some(&p.id) == worlds.selected.as_ref())
+        .map(|w| valid_presets(&settings.0.actors_dir(), &w.preset))
+        .unwrap_or_default();
     let selected = choices
         .iter()
         .find(|p| p.id == "human")
@@ -337,6 +484,7 @@ fn spawn_new(
         DespawnOnExit(Screen::ExplorerNew),
         "New agent",
     );
+    ui::scroll_panel(&mut commands, panel);
     commands.entity(panel).with_children(|p| {
         p.spawn(ui::label(
             "Name the agent and its world (or keep the random names).",
@@ -347,21 +495,44 @@ fn spawn_new(
         name_row(p, NameKind::Agent, &agent, 0);
         p.spawn(ui::label("World", 18.0, TEXT));
         name_row(p, NameKind::World, &world, 2);
-        p.spawn(ui::label("Actor", 18.0, TEXT));
+        p.spawn(ui::label("World preset", 18.0, TEXT));
         p.spawn(Node {
             flex_wrap: FlexWrap::Wrap,
-            column_gap: px(10),
+            column_gap: px(8),
             row_gap: px(6),
             ..default()
         })
         .with_children(|r| {
-            for (i, preset) in picker.choices.iter().enumerate() {
+            for (i, p) in worlds.choices.iter().enumerate() {
                 button(
                     r,
-                    &preset.name,
+                    &choice_label(&p.preset.name, worlds.selected.as_ref() == Some(&p.id)),
                     None,
                     true,
                     4 + i as i32,
+                    Action::PickWorld(p.id.clone()),
+                );
+            }
+        });
+        p.spawn((WorldDescription, ui::label("", 14.0, ui::DIM)));
+        p.spawn(ui::label("Actor", 18.0, TEXT));
+        p.spawn((
+            ActorChoices,
+            Node {
+                flex_wrap: FlexWrap::Wrap,
+                column_gap: px(10),
+                row_gap: px(6),
+                ..default()
+            },
+        ))
+        .with_children(|r| {
+            for (i, preset) in picker.choices.iter().enumerate() {
+                button(
+                    r,
+                    &choice_label(&preset.name, picker.selected.as_ref() == Some(&preset.id)),
+                    None,
+                    true,
+                    40 + i as i32,
                     Action::PickActor(preset.id.clone()),
                 );
             }
@@ -385,12 +556,12 @@ fn spawn_new(
                     text,
                     None,
                     problem.is_none(),
-                    tab + picker.choices.len() as i32,
+                    100 + tab,
                     Action::StartNew(mode),
                 );
                 r.commands().entity(start).insert(StartButton);
             }
-            back_button(r, Screen::ExplorerNew, 6 + picker.choices.len() as i32);
+            back_button(r, Screen::ExplorerNew, 110);
         });
         p.spawn(ui::label(
             "Detached: no window; the menu shows the prompt, the port and the tick, and can \
@@ -400,6 +571,7 @@ fn spawn_new(
         ));
     });
     commands.insert_resource(picker);
+    commands.insert_resource(worlds);
 }
 
 /// A name field with its dice button (`tab`, `tab + 1`).
@@ -521,6 +693,12 @@ pub fn start_new(world: &mut World, mode: RunMode) {
     else {
         return;
     };
+    let Some(world_preset) = world
+        .get_resource::<WorldPicker>()
+        .and_then(|p| p.selected.clone())
+    else {
+        return;
+    };
     run::launch(
         world,
         Entry::ExplorerNew {
@@ -528,6 +706,7 @@ pub fn start_new(world: &mut World, mode: RunMode) {
             world: world_name.trim().to_owned(),
             mode,
             preset,
+            world_preset,
         },
     );
 }
@@ -810,7 +989,10 @@ fn resume_row(
             false,
         ),
     };
-    let detail = format!("{detail}  -  actor: {}", a.meta.preset);
+    let detail = format!(
+        "{detail}\nactor: {}  -  world preset: {}",
+        a.meta.preset, a.meta.world_preset
+    );
     let id = ui::list_button(row, (&a.meta.agent, name_px), &detail, enabled, tab, action);
     row.commands().entity(id).observe(on_activate);
     ui::grow(&mut row.commands(), id);
@@ -1049,6 +1231,109 @@ mod tests {
     use crate::screens::tests::{app, button_for, press, screen, test_child, tmp};
 
     #[test]
+    fn selecting_world_revalidates_actor_detection_and_launches_both_choices() {
+        let dir = tmp("world-picker");
+        let mut app = app(&dir, &dir.join("agents"));
+        let settings = &app.world().resource::<AppSettings>().0;
+        let world_dir = settings.worlds_dir();
+        let actor_dir = settings.actors_dir();
+        testbed_content::worlds::install_builtins(&world_dir).unwrap();
+        let mut automatic = testbed_content::worlds::plain_preset();
+        automatic.name = "Automatic world".into();
+        automatic.detection = testbed_content::scenario::Detection::Automatic;
+        std::fs::write(
+            world_dir.join("automatic.json"),
+            serde_json::to_string(&automatic).unwrap(),
+        )
+        .unwrap();
+        std::fs::write(world_dir.join("invalid.json"), "not JSON").unwrap();
+        testbed_content::actors::install_builtins(&actor_dir).unwrap();
+        let mut actor = testbed_content::actors::human_preset();
+        actor.name = "Automatic actor".into();
+        actor.perception.detection = Some("automatic".into());
+        std::fs::write(
+            actor_dir.join("automatic-actor.json"),
+            serde_json::to_string(&actor).unwrap(),
+        )
+        .unwrap();
+        open(&mut app, Screen::ExplorerNew);
+        assert!(texts(&mut app).contains(&"> Plain explorer".into()));
+        assert!(texts(&mut app).contains(&"> Human scout".into()));
+        let name_entities: Vec<_> = app
+            .world_mut()
+            .query_filtered::<Entity, With<NameField>>()
+            .iter(app.world())
+            .collect();
+        assert!(
+            !app.world()
+                .resource::<WorldPicker>()
+                .choices
+                .iter()
+                .any(|p| p.id == "invalid")
+        );
+        assert!(
+            !app.world()
+                .resource::<PresetPicker>()
+                .choices
+                .iter()
+                .any(|p| p.id == "automatic-actor")
+        );
+        let pick = button_for(
+            &mut app,
+            |a| matches!(a,Action::PickWorld(p) if p=="automatic"),
+        );
+        press(&mut app, pick);
+        assert!(texts(&mut app).contains(&"> Automatic world".into()));
+        assert!(!texts(&mut app).contains(&"> Plain explorer".into()));
+        assert!(
+            name_entities
+                .iter()
+                .all(|entity| app.world().get_entity(*entity).is_ok())
+        );
+        assert!(
+            app.world()
+                .resource::<PresetPicker>()
+                .choices
+                .iter()
+                .any(|p| p.id == "automatic-actor")
+        );
+        let pick = button_for(
+            &mut app,
+            |a| matches!(a,Action::PickActor(p) if p=="automatic-actor"),
+        );
+        press(&mut app, pick);
+        assert!(texts(&mut app).contains(&"> Automatic actor".into()));
+        assert!(!texts(&mut app).contains(&"> Human scout".into()));
+        assert!(
+            name_entities
+                .iter()
+                .all(|entity| app.world().get_entity(*entity).is_ok())
+        );
+        type_name(&mut app, NameKind::Agent, "Automatic pilot");
+        type_name(&mut app, NameKind::World, "Test world");
+        start_new(app.world_mut(), RunMode::Detached);
+        app.update();
+        assert!(
+            matches!(&app.world().resource::<Missing>().entry,Entry::ExplorerNew{preset,world_preset,..} if preset=="automatic-actor" && world_preset=="automatic")
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn no_valid_world_disables_start() {
+        let dir = tmp("no-world");
+        let mut app = app(&dir, &dir.join("agents"));
+        let presets = app.world().resource::<AppSettings>().0.worlds_dir();
+        std::fs::create_dir_all(&presets).unwrap();
+        std::fs::write(presets.join("invalid.json"), "bad JSON").unwrap();
+        open(&mut app, Screen::ExplorerNew);
+        assert!(start_disabled(&mut app));
+        start_new(app.world_mut(), RunMode::Window);
+        assert_eq!(screen(&app), Screen::ExplorerNew);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn new_screen_lists_valid_presets_only() {
         let d = tmp("actor-picker");
         let mut app = app(&d, &d.join("agents"));
@@ -1265,6 +1550,7 @@ mod tests {
                 world: "Gloomhollow".into(),
                 mode: RunMode::Window,
                 preset: "human".into(),
+                world_preset: "plain_explorer".into(),
             }
         );
         let _ = std::fs::remove_dir_all(&d);
@@ -1313,12 +1599,40 @@ mod tests {
         let texts = texts(&mut app);
         assert!(
             texts.contains(
-                &"Hollowmere  -  last saved 2026-10-25 01:46 UTC  -  actor: human".to_owned()
+                &"Hollowmere  -  last saved 2026-10-25 01:46 UTC\nactor: human  -  world preset: plain_explorer".to_owned()
             ),
             "{texts:?}"
         );
-        assert!(texts.contains(&"Gloomhollow  -  no save yet  -  actor: human".to_owned()));
+        assert!(
+            texts.contains(
+                &"Gloomhollow  -  no save yet\nactor: human  -  world preset: plain_explorer"
+                    .to_owned()
+            )
+        );
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn resume_row_shows_both_saved_preset_ids() {
+        let dir = tmp("resume-world-id");
+        let agents = dir.join("agents");
+        let entry = create_agent(&agents, "World reader", "Moor", "today").unwrap();
+        testbed_content::explorer::home::update_public_metadata(
+            &entry,
+            &serde_json::Map::from_iter([
+                ("world_preset".into(), "night_shift".into()),
+                ("preset".into(), "rover".into()),
+            ]),
+        )
+        .unwrap();
+        let mut app = app(&dir, &agents);
+        open(&mut app, Screen::ExplorerResume);
+        assert!(
+            texts(&mut app)
+                .iter()
+                .any(|s| s.contains("actor: rover") && s.contains("world preset: night_shift"))
+        );
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -1360,6 +1674,8 @@ mod tests {
             on_mismatch: None,
             preset: None,
             actors_dir: Some(d.join("actors")),
+            world_preset: None,
+            worlds_dir: Some(d.join("worlds")),
         };
         let (simulation, start, dir) =
             build_world(&args, 1, "2026-10-27T00:00:00Z", |_| {}).unwrap();

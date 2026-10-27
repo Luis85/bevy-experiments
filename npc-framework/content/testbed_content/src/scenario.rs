@@ -36,7 +36,7 @@ use npc_framework::kernel::commands::check_pos;
 use npc_framework::kernel::replay::ScenarioInfo;
 use npc_framework::kernel::spatial::GridBounds;
 use npc_framework::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::layout::{
     FRONTIER_GRID_CELLS, GRID_CELLS, ItemSpec, UnitSpec, spawn_frontier, spawn_furnishing,
@@ -88,7 +88,7 @@ impl Layout {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Detection {
     #[default]
@@ -229,9 +229,23 @@ pub fn load_with(
     plugins: impl FnOnce(&mut App),
 ) -> Result<LoadedScenario, String> {
     let spec = WorldSpec::parse(&doc.world)?;
+    if let Some(selection) = spec
+        .explorer_context
+        .as_ref()
+        .and_then(|context| context.world.as_ref())
+    {
+        crate::worlds::validate(&selection.preset).map_err(|reasons| reasons.join("; "))?;
+    }
     let mut app = build_app(seed, &spec, |app| {
         plugins(app);
         if let Some(context) = &spec.explorer_context {
+            if let Some(world) = &context.world {
+                app.world_mut()
+                    .get_resource_or_init::<crate::worlds::WorldPresets>()
+                    .0
+                    .insert(world.id.clone(), world.preset.clone());
+                crate::worlds::prepare(app, &world.preset);
+            }
             app.world_mut()
                 .get_resource_or_init::<crate::actors::ActorPresets>()
                 .0
@@ -270,6 +284,14 @@ pub fn load_with(
     });
     if let Some(context) = &spec.explorer_context {
         context.apply(&mut app)?;
+        if let Some(selection) = &context.world {
+            let played = app
+                .world()
+                .resource::<TestbedIds>()
+                .get(&context.actor)
+                .ok_or("the selected world's played actor is missing")?;
+            crate::worlds::apply(app.world_mut(), played, &selection.preset);
+        }
     }
     Ok(LoadedScenario { app, actors })
 }

@@ -48,6 +48,8 @@ fn explorer(fog: bool, preset: Option<&str>, tag: &str) -> (App, PathBuf) {
         on_mismatch: None,
         preset: preset.map(str::to_owned),
         actors_dir: Some(home.join("actors")),
+        world_preset: None,
+        worlds_dir: Some(home.join("worlds")),
     };
     let (mut app, _, _) = build_world(&args, 0x5eed, "2026-10-25T12:00:00Z", |_| {}).unwrap();
     if !fog {

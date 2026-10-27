@@ -85,7 +85,8 @@ const ORDER_SCHEMA: &str = "{\"type\":\"Move\",\"pos\":[x,z]} | {\"type\":\"Atta
 /// The verb `order` makes `unit` do, for the verb gates (see the module
 /// docs): `Interact` its verb; with vehicles, `Mount` `mount`, `Unload`
 /// `unload`, and a movement order `drive_to` for a vehicle or a unit in a
-/// driver seat. `None`: no gated verb (walking, stopping, holding).
+/// driver seat. Other movement maps to `walk_to`, stopping/holding to
+/// `wait`; custom orders use their registered name.
 pub fn order_verb<'a>(world: &World, order: &'a UnitOrder, unit: Entity) -> Option<&'a str> {
     match order {
         UnitOrder::Interact { verb, .. } => Some(verb.as_str()),
@@ -102,7 +103,14 @@ pub fn order_verb<'a>(world: &World, order: &'a UnitOrder, unit: Entity) -> Opti
         {
             Some(super::vehicles_agent::DRIVE_TO)
         }
-        _ => {
+        UnitOrder::Move { .. }
+        | UnitOrder::AttackMove { .. }
+        | UnitOrder::Patrol { .. }
+        | UnitOrder::Follow { .. } => Some("walk_to"),
+        UnitOrder::Stop | UnitOrder::Hold => Some("wait"),
+        UnitOrder::Custom { name, .. } => Some(name),
+        #[cfg(not(feature = "vehicles"))]
+        UnitOrder::Mount { .. } | UnitOrder::Unload => {
             let _ = (world, unit);
             None
         }
@@ -404,6 +412,37 @@ pub fn execute_orders_handler(
     ctx: &AgentCtx,
     _: &ActionRequest,
 ) -> Result<ActionPlan, Rejection> {
+    // Check the effective queue, including replacements planned earlier in
+    // this atomic act. A wrapper must honor the same gates as a direct verb.
+    let mut orders: Vec<UnitOrder> = world
+        .get::<OrderQueue>(ctx.entity)
+        .map(|q| {
+            q.current
+                .iter()
+                .map(|a| a.order.order.clone())
+                .chain(q.queued.iter().map(|a| a.order.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    for command in ctx.planned {
+        if let SimCommand::Content { kind, payload } = command
+            && kind == IssueOrder::NAME
+            && let Ok(issue) = payload.to_typed::<IssueOrder>()
+            && npc_command::expand_units(world, &issue.units).contains(&ctx.unit)
+        {
+            if !issue.queue {
+                orders.clear();
+            }
+            orders.push(issue.order);
+        }
+    }
+    for order in &orders {
+        if let Some(verb) = order_verb(world, order, ctx.entity)
+            && let Some(reason) = verb_gate(world, ctx.entity, verb)
+        {
+            return Err(Rejection::new("not_allowed", reason));
+        }
+    }
     if !world
         .get::<OrderQueue>(ctx.entity)
         .is_some_and(OrderQueue::has_order)

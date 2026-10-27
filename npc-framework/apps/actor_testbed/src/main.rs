@@ -115,7 +115,7 @@ const USAGE: &str = "usage: actor_testbed [--scenario NAME|FILE] [--seed N] [--s
 [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE] [--screenshot PATH] \
 [--after-secs S] [--panels journal,perf,sheet,perception,explorer] [--journal FILE] [--record FILE] [--paused] [--perf-warn] \
 [--fog on|off] [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote] [--out-dir DIR]
-       actor_testbed --explorer-home DIR --agent NAME [--world NAME [--preset ID] | --resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog] [--actors-dir DIR] [other flags except --scenario and --seed]
+       actor_testbed --explorer-home DIR --agent NAME [--world NAME [--preset ID] [--world-preset ID] | --resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog] [--actors-dir DIR] [--worlds-dir DIR] [other flags except --scenario and --seed]
        (explorer mode: BRP is always on, on the first free port from --remote-port N on, N..=N+19, default 15702;
         --exact-port N: exactly N, waited for up to 10 s, else exit 4)
        actor_testbed --actor-editor [--actors-dir DIR] [--editor-preset ID] [--screenshot PATH --after-secs S]";

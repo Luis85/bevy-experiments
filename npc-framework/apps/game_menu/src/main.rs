@@ -54,6 +54,7 @@ mod quit;
 mod run;
 mod screens;
 mod ui;
+mod worlds;
 
 use std::path::PathBuf;
 

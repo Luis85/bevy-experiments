@@ -54,6 +54,8 @@ fn new_args(home: &Path, preset: Option<&str>) -> HostArgs {
         on_mismatch: None,
         preset: preset.map(str::to_owned),
         actors_dir: Some(home.join("actors")),
+        world_preset: None,
+        worlds_dir: Some(home.join("worlds")),
     }
 }
 

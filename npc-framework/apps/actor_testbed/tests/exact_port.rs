@@ -23,6 +23,8 @@ fn exact_port_retries_then_exits_4() {
         on_mismatch: None,
         preset: None,
         actors_dir: Some(home.join("actors")),
+        world_preset: None,
+        worlds_dir: Some(home.join("worlds")),
     };
     let _ = build_world(&args, 7, "2026-10-25T12:00:00Z", |_| {}).expect("a new agent");
     // A free port picked now, held for the child's whole life (more than
@@ -133,6 +135,8 @@ fn resume_refuses_an_agent_that_is_running() {
         on_mismatch: None,
         preset: None,
         actors_dir: Some(home.join("actors")),
+        world_preset: None,
+        worlds_dir: Some(home.join("worlds")),
     };
     let (_, _, dir) = build_world(&args, 7, "2026-10-25T12:00:00Z", |_| {}).expect("a new agent");
     // A child this test owns stands in for the detached host.

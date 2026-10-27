@@ -28,14 +28,16 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use super::context::ExplorerContext;
-use super::home::{self, AgentDir, AgentMeta, CredentialStamp, create_agent_as, read_lossy, slug};
+use super::home::{self, AgentDir, AgentMeta, CredentialStamp, read_lossy, slug};
 use super::prompt::{PromptKind, PromptVars, render_prompt};
-use super::settings::default_actors_dir;
+use super::settings::{default_actors_dir, default_worlds_dir};
 use super::workspace::{
-    ActorSummary, AgentIdentity, WorkspaceVars, render_character, write_atomic, write_workspace,
+    ActorSummary, AgentIdentity, WorkspaceVars, render_character, render_world_rules, write_atomic,
+    write_workspace,
 };
 use crate::TestbedIds;
 use crate::actors::{ActorPreset, ActorPresets, builtin_preset, find_preset, validate};
+use crate::worlds::{PLAIN_EXPLORER, WorldPreset};
 
 /// The embedded scenario every explorer world is built from.
 pub const SCENARIO: &str = "explorer";
@@ -61,6 +63,8 @@ pub const HEADER_PRESET: &str = "preset";
 /// The save header's actor preset as the world was built with it (a resume
 /// rebuilds from it, not from the actors folder).
 pub const HEADER_ACTOR_PRESET: &str = "actor_preset";
+pub const HEADER_WORLD_PRESET: &str = "world_preset";
+pub const HEADER_WORLD_PRESET_DATA: &str = "world_preset_data";
 /// The running world's file in the agent folder (owned, never generated).
 pub const RUN_FILE: &str = "run.json";
 
@@ -86,6 +90,8 @@ pub struct HostArgs {
     /// [`default_actors_dir`](super::settings::default_actors_dir) of
     /// [`HostArgs::home`].
     pub actors_dir: Option<PathBuf>,
+    pub world_preset: Option<String>,
+    pub worlds_dir: Option<PathBuf>,
 }
 
 impl HostArgs {
@@ -94,6 +100,11 @@ impl HostArgs {
         self.actors_dir
             .clone()
             .unwrap_or_else(|| default_actors_dir(&self.home))
+    }
+    pub fn worlds_dir(&self) -> PathBuf {
+        self.worlds_dir
+            .clone()
+            .unwrap_or_else(|| default_worlds_dir(&self.home))
     }
 }
 
@@ -133,6 +144,7 @@ pub struct ExplorerSession {
     /// The actor preset the agent's actor was built with (`meta.preset`;
     /// the built-in human for a save from before presets).
     pub preset: ActorPreset,
+    pub world_preset: WorldPreset,
     /// What the host decided on its own while starting (an `agent.json`
     /// that disagreed with the save, a preset file that was gone), one
     /// line each; also printed to stderr.
@@ -154,6 +166,14 @@ impl ExplorerSession {
         // A preset always serializes.
         let preset = serde_json::to_value(&self.preset).unwrap_or(Value::Null);
         header.insert(HEADER_ACTOR_PRESET.into(), preset);
+        header.insert(
+            HEADER_WORLD_PRESET.into(),
+            self.meta.world_preset.clone().into(),
+        );
+        header.insert(
+            HEADER_WORLD_PRESET_DATA.into(),
+            serde_json::to_value(&self.world_preset).unwrap_or(Value::Null),
+        );
         header
     }
 
@@ -305,12 +325,28 @@ pub fn build_world_with(
     let mut meta = home::ensure_credentials(&dir)?;
     if args.on_mismatch == Some(Mismatch::FreshWorld) {
         let (id, preset, notes) = fresh_world_preset(args, &dir, &meta)?;
+        let (world_id, world_preset, world_notes) = fresh_world_world_preset(args, &dir, &meta)?;
         check_asked(args, &meta.agent, &id)?;
+        check_world_asked(args, &meta.agent, &world_id)?;
         meta.preset = id;
-        return rebuild(dir, meta, preset, notes, seed, now, plugins, &ready);
+        meta.world_preset = world_id;
+        let mut notes = notes;
+        notes.extend(world_notes);
+        return rebuild(
+            dir,
+            meta,
+            preset,
+            world_preset,
+            notes,
+            seed,
+            now,
+            plugins,
+            &ready,
+        );
     }
     let mut opened = open_save(&dir, &meta, plugins, &ready)?;
     check_asked(args, &meta.agent, &opened.preset_id)?;
+    check_world_asked(args, &meta.agent, &opened.world_preset_id)?;
     let mut notes = Vec::new();
     if opened.preset_id != meta.preset {
         // The save wins: it holds the actor the world was built with.
@@ -320,6 +356,11 @@ pub fn build_world_with(
             meta.preset, opened.preset_id
         ));
         meta.preset = opened.preset_id.clone();
+        write_meta(&dir, &meta);
+    }
+    if opened.world_preset_id != meta.world_preset {
+        notes.push(format!("agent.json names world preset `{}`, the save `{}`: the save's is kept (agent.json updated)",meta.world_preset,opened.world_preset_id));
+        meta.world_preset = opened.world_preset_id.clone();
         write_meta(&dir, &meta);
     }
     let start = match snapshot::check(opened.app.world_mut(), &opened.snap) {
@@ -337,7 +378,7 @@ pub fn build_world_with(
     };
     // After the load: a snapshot restores the resource it was saved with,
     // and a save from before the reach sense has none.
-    apply_memory(&mut opened.app);
+    apply_memory(&mut opened.app, &opened.world_preset);
     apply_senses(&mut opened.app, &meta.agent, &opened.preset)?;
     let session = ExplorerSession {
         meta,
@@ -345,6 +386,7 @@ pub fn build_world_with(
         scenario: opened.scenario,
         seed: opened.seed,
         preset: opened.preset,
+        world_preset: opened.world_preset,
         notes,
     };
     Ok((begin(opened.app, session)?, start, dir))
@@ -361,9 +403,26 @@ fn check_asked(args: &HostArgs, agent: &str, id: &str) -> Result<(), String> {
     }
 }
 
+fn check_world_asked(args: &HostArgs, agent: &str, id: &str) -> Result<(), String> {
+    if let Some(asked) = &args.world_preset
+        && asked != id
+    {
+        return Err(format!(
+            "`{agent}` uses the world preset `{id}`; a resumed world keeps it (asked for `{asked}`)"
+        ));
+    }
+    Ok(())
+}
+
 /// Writes `agent.json` again (atomically); a failure is printed, not fatal.
 fn write_meta(dir: &AgentDir, meta: &AgentMeta) {
-    let fields = Map::from_iter([("preset".into(), Value::String(meta.preset.clone()))]);
+    let fields = Map::from_iter([
+        ("preset".into(), Value::String(meta.preset.clone())),
+        (
+            "world_preset".into(),
+            Value::String(meta.world_preset.clone()),
+        ),
+    ]);
     let written = home::update_public_metadata(dir, &fields);
     if let Err(e) = written {
         eprintln!("explorer: cannot update {}: {e}", dir.meta().display());
@@ -429,6 +488,63 @@ fn fresh_world_preset(
     Ok((id, preset, Vec::new()))
 }
 
+fn saved_world_preset(header: &Map<String, Value>) -> Result<(String, WorldPreset), String> {
+    let context = header
+        .get("scenario")
+        .and_then(|doc| doc.get("world"))
+        .and_then(|w| w.get("explorer_context"))
+        .and_then(|c| c.get("world"));
+    let id = header
+        .get(HEADER_WORLD_PRESET)
+        .and_then(Value::as_str)
+        .or_else(|| context.and_then(|c| c.get("id")).and_then(Value::as_str))
+        .unwrap_or(PLAIN_EXPLORER)
+        .to_owned();
+    let preset = match header
+        .get(HEADER_WORLD_PRESET_DATA)
+        .or_else(|| context.and_then(|c| c.get("preset")))
+    {
+        Some(value) => {
+            serde_json::from_value(value.clone()).map_err(|e| format!("its world preset: {e}"))?
+        }
+        None => crate::worlds::builtin_preset(&id)
+            .ok_or_else(|| format!("it names world preset `{id}` but holds no copy of it"))?,
+    };
+    crate::worlds::validate(&preset)
+        .map_err(|reasons| format!("its world preset `{id}`: {}", reasons.join("; ")))?;
+    Ok((id, preset))
+}
+
+fn fresh_world_world_preset(
+    args: &HostArgs,
+    dir: &AgentDir,
+    meta: &AgentMeta,
+) -> Result<(String, WorldPreset, Vec<String>), String> {
+    let saved = snapshot::read(&dir.save(&meta.world))
+        .ok()
+        .and_then(|snap| saved_world_preset(&snap.header).ok());
+    let id = saved
+        .as_ref()
+        .map_or_else(|| meta.world_preset.clone(), |(id, _)| id.clone());
+    let file = args.worlds_dir().join(format!("{id}.json"));
+    if !file.is_file()
+        && let Some((_, copy)) = saved
+    {
+        return Ok((
+            id.clone(),
+            copy,
+            vec![format!(
+                "the world preset file {} is gone: the fresh world uses the old save's copy of `{id}`",
+                file.display()
+            )],
+        ));
+    }
+    let preset = crate::worlds::find_preset(&args.worlds_dir(), &id)?;
+    crate::worlds::validate(&preset)
+        .map_err(|reasons| format!("world preset `{id}` is invalid: {}", reasons.join("; ")))?;
+    Ok((id, preset, Vec::new()))
+}
+
 /// `world/reset` of a running explorer world (the detached host): the
 /// world `session` was built from (its scenario, the agent's actor), new
 /// for `seed`, with the explorer's memory settings and the session (its
@@ -445,11 +561,23 @@ pub fn reset_world(
     plugins: impl FnOnce(&mut App),
 ) -> Result<App, String> {
     let doc = ScenarioDoc::from_value(session.scenario.clone())?;
-    let mut app = build(&doc, seed, session.presets(), &session.meta.agent, plugins)?;
-    apply_memory(&mut app);
+    let mut app = build(
+        &doc,
+        seed,
+        session.presets(),
+        &session.meta.agent,
+        (&session.meta.world_preset, &session.world_preset),
+        plugins,
+    )?;
+    apply_memory(&mut app, &session.world_preset);
     apply_senses(&mut app, &session.meta.agent, &session.preset)?;
-    let scenario = serde_json::to_value(normalized_doc(&doc, app.world(), &session.meta.agent)?)
-        .map_err(|_| "cannot encode explorer scenario")?;
+    let scenario = serde_json::to_value(normalized_doc(
+        &doc,
+        app.world(),
+        &session.meta.agent,
+        (&session.meta.world_preset, &session.world_preset),
+    )?)
+    .map_err(|_| "cannot encode explorer scenario")?;
     let session = ExplorerSession {
         seed,
         scenario,
@@ -742,14 +870,30 @@ fn new_agent(
     }
     let id = args.preset.as_deref().unwrap_or(HUMAN_PRESET);
     let preset = find_preset(&args.actors_dir(), id)?;
-    let (mut app, scenario) = fresh_world(&args.agent, seed, (id, &preset), plugins, ready)?;
-    let dir = create_agent_as(&args.home, &args.agent, world, now, id)?;
+    let world_id = args.world_preset.as_deref().unwrap_or(PLAIN_EXPLORER);
+    let world_preset = crate::worlds::find_preset(&args.worlds_dir(), world_id)?;
+    crate::worlds::validate(&world_preset).map_err(|reasons| {
+        format!(
+            "world preset `{world_id}` is invalid: {}",
+            reasons.join("; ")
+        )
+    })?;
+    let (mut app, scenario) = fresh_world(
+        &args.agent,
+        seed,
+        (id, &preset),
+        (world_id, &world_preset),
+        plugins,
+        ready,
+    )?;
+    let dir = home::create_agent_in_world(&args.home, &args.agent, world, now, id, world_id)?;
     let session = ExplorerSession {
         meta: home::read_meta(&dir)?,
         dir: dir.clone(),
         scenario,
         seed,
         preset,
+        world_preset,
         notes: Vec::new(),
     };
     if let Err(e) = save(app.world_mut(), &session.save_path(), session.header(now)) {
@@ -772,6 +916,7 @@ fn rebuild(
     dir: AgentDir,
     meta: AgentMeta,
     preset: ActorPreset,
+    world_preset: WorldPreset,
     notes: Vec<String>,
     seed: u64,
     now: &str,
@@ -779,7 +924,14 @@ fn rebuild(
     ready: Ready,
 ) -> Result<(App, Start, AgentDir), String> {
     let chosen = (meta.preset.as_str(), &preset);
-    let (mut app, scenario) = fresh_world(&meta.agent, seed, chosen, plugins, ready)?;
+    let (mut app, scenario) = fresh_world(
+        &meta.agent,
+        seed,
+        chosen,
+        (&meta.world_preset, &world_preset),
+        plugins,
+        ready,
+    )?;
     let save = dir.save(&meta.world);
     if save.exists() {
         dir.backup_save(&meta.world, now)
@@ -792,6 +944,7 @@ fn rebuild(
         scenario,
         seed,
         preset,
+        world_preset,
         notes,
     };
     write_save(app.world_mut(), &session.save_path(), session.header(now))?;
@@ -801,14 +954,14 @@ fn rebuild(
 /// Explorer worlds remember longer than the shared scenario default: sets
 /// [`EXPLORER_FORGET_AFTER`] and [`EXPLORER_MEMORY_CAPACITY`], keeping the
 /// rest of the world's [`PerceptionConfig`].
-fn apply_memory(app: &mut App) {
+fn apply_memory(app: &mut App, preset: &WorldPreset) {
     let mut config = app
         .world()
         .get_resource::<PerceptionConfig>()
         .copied()
         .unwrap_or_default();
-    config.forget_after_ticks = EXPLORER_FORGET_AFTER;
-    config.memory_capacity = EXPLORER_MEMORY_CAPACITY;
+    config.forget_after_ticks = preset.perception.forget_after_ticks;
+    config.memory_capacity = preset.perception.memory_capacity;
     app.insert_resource(config);
 }
 
@@ -1012,7 +1165,7 @@ fn enter_world(world: &World, agent_id: &str, assigned: SimId) -> Value {
     };
     let summary = ActorSummary::from_preset(&session.preset);
     let text = render_character(&summary);
-    serde_json::json!({"character":{"name":summary.name,"body":summary.body,"description":summary.description,"senses":summary.sensors,"actions":summary.actions},"scene":format!("You arrive in {}.",session.meta.world),"text":text})
+    serde_json::json!({"character":{"name":summary.name,"body":summary.body,"description":summary.description,"senses":summary.sensors,"actions":summary.actions},"scene":format!("You arrive in {}.",session.meta.world),"text":text,"rules":render_world_rules(&session.world_preset)})
 }
 
 /// `<home>/<slug(agent)>`.
@@ -1044,24 +1197,21 @@ fn fresh_world(
     agent: &str,
     seed: u64,
     chosen: (&str, &ActorPreset),
+    chosen_world: (&str, &WorldPreset),
     plugins: impl FnOnce(&mut App),
     ready: Ready,
 ) -> Result<(App, Value), String> {
     let (id, preset) = chosen;
-    let mut doc = crate::scenario::scenario_doc(SCENARIO)?;
+    let mut doc = crate::worlds::world_doc(chosen_world.1, &crate::actors::human_preset())?;
     // The world's own names (`gate`, `tree_0`, ..) share the namespace.
-    let bare = ScenarioDoc {
-        actors: Vec::new(),
-        controllers: Vec::new(),
-        ..doc.clone()
-    };
-    let probe = crate::scenario::load_with(&bare, 1, |_| {})?;
+    let probe = crate::scenario::load_with(&doc, 1, |_| {})?;
     if probe
         .app
         .world()
         .resource::<TestbedIds>()
         .get(agent)
         .is_some()
+        && agent != ACTOR
     {
         return Err(format!(
             "`{agent}` names a thing in the explorer world: pick another agent name"
@@ -1069,6 +1219,7 @@ fn fresh_world(
     }
     validate(preset, probe.app.world())
         .map_err(|reasons| format!("actor preset `{id}` is invalid: {}", reasons.join("; ")))?;
+    doc = crate::worlds::world_doc(chosen_world.1, preset)?;
     let actor = doc
         .actors
         .iter_mut()
@@ -1081,11 +1232,11 @@ fn fresh_world(
         .extra
         .insert("preset".into(), Value::String(id.to_owned()));
     let presets = ActorPresets::one(id, preset.clone());
-    let mut app = build(&doc, seed, presets, agent, plugins)?;
+    let mut app = build(&doc, seed, presets, agent, chosen_world, plugins)?;
     ready(&app)?;
-    apply_memory(&mut app);
+    apply_memory(&mut app, chosen_world.1);
     apply_senses(&mut app, agent, preset)?;
-    let json = serde_json::to_value(normalized_doc(&doc, app.world(), agent)?)
+    let json = serde_json::to_value(normalized_doc(&doc, app.world(), agent, chosen_world)?)
         .map_err(|e| format!("scenario to JSON: {e}"))?;
     Ok((app, json))
 }
@@ -1097,6 +1248,7 @@ fn build(
     seed: u64,
     presets: ActorPresets,
     agent: &str,
+    chosen_world: (&str, &WorldPreset),
     plugins: impl FnOnce(&mut App),
 ) -> Result<App, String> {
     let mut descriptor = doc.clone();
@@ -1109,20 +1261,22 @@ fn build(
             stagger: spec.stagger.max(1),
             ..Default::default()
         });
-    memory.forget_after_ticks = EXPLORER_FORGET_AFTER;
-    memory.memory_capacity = EXPLORER_MEMORY_CAPACITY;
+    memory.forget_after_ticks = chosen_world.1.perception.forget_after_ticks;
+    memory.memory_capacity = chosen_world.1.perception.memory_capacity;
     let (id, preset) = presets
         .0
         .iter()
         .next()
         .ok_or("explorer construction has no actor preset")?;
-    ExplorerContext::new(agent, id, preset, memory).write_to(&mut descriptor)?;
+    ExplorerContext::new(agent, id, preset, memory)
+        .with_world(chosen_world.0, chosen_world.1)
+        .write_to(&mut descriptor)?;
     let mut loaded = crate::scenario::load_with(&descriptor, seed, |app| {
         plugins(app);
         app.insert_resource(presets);
     })?;
     attach_controllers(
-        &normalized_doc(&descriptor, loaded.app.world(), agent)?,
+        &normalized_doc(&descriptor, loaded.app.world(), agent, chosen_world)?,
         &mut loaded,
     )?;
     loaded.app.insert_resource(ScenarioInfo {
@@ -1132,7 +1286,12 @@ fn build(
     Ok(loaded.app)
 }
 
-fn normalized_doc(doc: &ScenarioDoc, world: &World, agent: &str) -> Result<ScenarioDoc, String> {
+fn normalized_doc(
+    doc: &ScenarioDoc,
+    world: &World,
+    agent: &str,
+    chosen_world: (&str, &WorldPreset),
+) -> Result<ScenarioDoc, String> {
     let mut normalized = doc.clone();
     let index = doc
         .actors
@@ -1149,13 +1308,13 @@ fn normalized_doc(doc: &ScenarioDoc, world: &World, agent: &str) -> Result<Scena
         .get_resource::<ActorPresets>()
         .and_then(|presets| presets.0.iter().next())
         .ok_or("explorer scenario has no actor preset")?;
-    let mut memory = world
+    let memory = world
         .get_resource::<PerceptionConfig>()
         .copied()
         .unwrap_or_default();
-    memory.forget_after_ticks = EXPLORER_FORGET_AFTER;
-    memory.memory_capacity = EXPLORER_MEMORY_CAPACITY;
-    ExplorerContext::new(agent, id, preset, memory).write_to(&mut normalized)?;
+    let context =
+        ExplorerContext::new(agent, id, preset, memory).with_world(chosen_world.0, chosen_world.1);
+    context.write_to(&mut normalized)?;
     Ok(normalized)
 }
 
@@ -1168,6 +1327,8 @@ struct Opened {
     /// The save's actor preset id and copy ([`saved_preset`]).
     preset_id: String,
     preset: ActorPreset,
+    world_preset_id: String,
+    world_preset: WorldPreset,
 }
 
 fn unreadable(path: &Path, e: &dyn std::fmt::Display) -> String {
@@ -1196,12 +1357,26 @@ fn open_save(
         .ok_or_else(|| unreadable(&path, &"the header has no seed"))?;
     let (preset_id, preset) =
         saved_preset(&snap.header, &meta.agent).map_err(|e| unreadable(&path, &e))?;
+    let (world_preset_id, world_preset) =
+        saved_world_preset(&snap.header).map_err(|e| unreadable(&path, &e))?;
     let doc = ScenarioDoc::from_value(scenario.clone()).map_err(|e| unreadable(&path, &e))?;
     let presets = ActorPresets::one(&preset_id, preset.clone());
-    let app =
-        build(&doc, seed, presets, &meta.agent, plugins).map_err(|e| unreadable(&path, &e))?;
-    let scenario = serde_json::to_value(normalized_doc(&doc, app.world(), &meta.agent)?)
-        .map_err(|_| "cannot encode explorer scenario")?;
+    let app = build(
+        &doc,
+        seed,
+        presets,
+        &meta.agent,
+        (&world_preset_id, &world_preset),
+        plugins,
+    )
+    .map_err(|e| unreadable(&path, &e))?;
+    let scenario = serde_json::to_value(normalized_doc(
+        &doc,
+        app.world(),
+        &meta.agent,
+        (&world_preset_id, &world_preset),
+    )?)
+    .map_err(|_| "cannot encode explorer scenario")?;
     ready(&app)?;
     Ok(Opened {
         app,
@@ -1210,6 +1385,8 @@ fn open_save(
         seed,
         preset_id,
         preset,
+        world_preset_id,
+        world_preset,
     })
 }
 
@@ -1329,6 +1506,7 @@ pub fn write_session_files(
             },
             actor: ActorSummary::from_preset(&session.preset),
             identity: AgentIdentity::from(meta),
+            world: session.world_preset.clone(),
         };
         let text = render_prompt(kind, &vars.prompt);
         let write_error = write_workspace(dir, kind, &vars)
@@ -1369,6 +1547,9 @@ pub fn refresh_generated_workspace(dir: &AgentDir) -> Result<(), String> {
         // Bootstrap text deliberately withholds character details. Rotation
         // therefore does not need to load an unrelated (possibly old) save.
         let actor = ActorSummary::human_scout();
+        let snap = snapshot::read(&dir.save(&meta.world))
+            .map_err(|e| format!("cannot read saved world rules: {e}"))?;
+        let (_, world) = saved_world_preset(&snap.header)?;
         let vars = WorkspaceVars {
             prompt: PromptVars {
                 agent: meta.agent.clone(),
@@ -1381,6 +1562,7 @@ pub fn refresh_generated_workspace(dir: &AgentDir) -> Result<(), String> {
             },
             actor,
             identity: AgentIdentity::from(meta),
+            world,
         };
         write_workspace(dir, PromptKind::Resume, &vars)
             .map_err(|e| format!("cannot refresh generated workspace: {e}"))
@@ -1656,6 +1838,8 @@ mod tests {
             on_mismatch: None,
             preset: None,
             actors_dir: Some(home.join("actors")),
+            world_preset: None,
+            worlds_dir: Some(home.join("worlds")),
         };
         let Err(e) = new_agent(&args, seed, now, |_| {}, &|_| Ok(()), failing_save) else {
             panic!("a New without its tick-0 save started");
@@ -1708,6 +1892,8 @@ mod tests {
             on_mismatch: None,
             preset: None,
             actors_dir: Some(home.join("actors")),
+            world_preset: None,
+            worlds_dir: Some(home.join("worlds")),
         };
         let (mut app, _, _) = build_world(&args, 7, "2026-10-25T12:00:00Z", |_| {}).unwrap();
         let session = app.world().resource::<ExplorerSession>().clone();

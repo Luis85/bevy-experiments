@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::TestbedIds;
 use crate::actors::ActorPreset;
 use crate::world::{Prop, PropKind, kinds};
+use crate::worlds::WorldPreset;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -21,6 +22,15 @@ pub struct ExplorerContext {
     pub memory: MemoryConfig,
     pub reveals_fog: bool,
     pub perceivable_chests: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub world: Option<WorldSelection>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WorldSelection {
+    pub id: String,
+    pub preset: WorldPreset,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -62,7 +72,34 @@ impl ExplorerContext {
             },
             reveals_fog: true,
             perceivable_chests: true,
+            world: None,
         }
+    }
+
+    pub fn with_world(mut self, id: &str, preset: &WorldPreset) -> Self {
+        self.memory.forget_after_ticks = preset.perception.forget_after_ticks;
+        self.memory.memory_capacity = preset.perception.memory_capacity;
+        self.world = Some(WorldSelection {
+            id: id.into(),
+            preset: preset.clone(),
+        });
+        self
+    }
+
+    pub fn for_world(
+        actor_name: &str,
+        actor_preset_id: &str,
+        actor: &ActorPreset,
+        world_id: &str,
+        world: &WorldPreset,
+    ) -> Self {
+        Self::new(
+            actor_name,
+            actor_preset_id,
+            actor,
+            PerceptionConfig::default(),
+        )
+        .with_world(world_id, world)
     }
 
     pub fn write_to(&self, doc: &mut ScenarioDoc) -> Result<(), String> {

@@ -32,6 +32,7 @@ pub enum Entry {
         world: String,
         mode: RunMode,
         preset: String,
+        world_preset: String,
     },
     ExplorerResume {
         agent: String,
@@ -111,6 +112,7 @@ pub fn command_for(entry: &Entry, settings: &Settings) -> (&'static str, Vec<Str
             settings.agents_dir.display().to_string(),
         ];
         args.extend(actors_args(settings));
+        args.extend(worlds_args(settings));
         args
     };
     match entry {
@@ -133,6 +135,7 @@ pub fn command_for(entry: &Entry, settings: &Settings) -> (&'static str, Vec<Str
             world,
             mode,
             preset,
+            world_preset,
         } => {
             let mut args = home();
             args.extend([
@@ -143,6 +146,9 @@ pub fn command_for(entry: &Entry, settings: &Settings) -> (&'static str, Vec<Str
             ]);
             if preset != "human" {
                 args.extend(["--preset".into(), preset.clone()]);
+            }
+            if world_preset != "plain_explorer" {
+                args.extend(["--world-preset".into(), world_preset.clone()]);
             }
             with_mode(*mode, args, settings)
         }
@@ -175,6 +181,7 @@ pub fn command_for(entry: &Entry, settings: &Settings) -> (&'static str, Vec<Str
         Entry::ExplorerRestart { agent, port } => {
             let mut args = detached_resume_args(&settings.agents_dir, agent, *port);
             args.extend(actors_args(settings));
+            args.extend(worlds_args(settings));
             ("npcctl", args)
         }
     }
@@ -186,6 +193,15 @@ pub fn actors_args(settings: &Settings) -> Vec<String> {
         .actors_dir
         .as_ref()
         .map(|d| vec!["--actors-dir".to_owned(), d.display().to_string()])
+        .unwrap_or_default()
+}
+
+/// An explicit world presets folder reaches every explorer host.
+pub fn worlds_args(settings: &Settings) -> Vec<String> {
+    settings
+        .worlds_dir
+        .as_ref()
+        .map(|d| vec!["--worlds-dir".into(), d.display().to_string()])
         .unwrap_or_default()
 }
 
@@ -276,10 +292,22 @@ pub fn save_settings(
 
 /// Saves both folder preferences after validating every field. No folder
 /// or settings file is created when either path is invalid.
+#[cfg(test)]
 pub fn save_settings_with_actors(
     agents_dir: &str,
     fog_of_war: bool,
     actors_dir: Option<PathBuf>,
+    file: Option<&Path>,
+) -> Result<Settings, String> {
+    let worlds = file.and_then(|f| Settings::load(f, Path::new("")).worlds_dir);
+    save_settings_with_folders(agents_dir, fog_of_war, actors_dir, worlds, file)
+}
+
+pub fn save_settings_with_folders(
+    agents_dir: &str,
+    fog_of_war: bool,
+    actors_dir: Option<PathBuf>,
+    worlds_dir: Option<PathBuf>,
     file: Option<&Path>,
 ) -> Result<Settings, String> {
     let dir = PathBuf::from(agents_dir.trim());
@@ -287,12 +315,16 @@ pub fn save_settings_with_actors(
     if let Some(actors) = &actors_dir {
         validate_agents_dir(actors).map_err(|e| format!("actors folder: {e}"))?;
     }
+    if let Some(worlds) = &worlds_dir {
+        validate_agents_dir(worlds).map_err(|e| format!("worlds folder: {e}"))?;
+    }
     let file = file.ok_or("no settings folder: APPDATA, XDG_CONFIG_HOME and HOME are unset")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
     let settings = Settings {
         agents_dir: dir,
         fog_of_war,
         actors_dir,
+        worlds_dir,
     };
     settings
         .save(file)
@@ -572,11 +604,95 @@ mod tests {
             agents_dir: dir.to_path_buf(),
             fog_of_war: true,
             actors_dir: None,
+            worlds_dir: None,
         }
     }
 
     fn strings(v: &[&str]) -> Vec<String> {
         v.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    #[test]
+    fn new_passes_both_presets_and_worlds_folder_reaches_every_host() {
+        let mut settings = settings(Path::new("/agents"));
+        settings.actors_dir = Some("/actors".into());
+        settings.worlds_dir = Some("/worlds".into());
+        for mode in [RunMode::Window, RunMode::Detached] {
+            let entry = Entry::ExplorerNew {
+                agent: "Pilot".into(),
+                world: "Moor".into(),
+                mode,
+                preset: "rover".into(),
+                world_preset: "survival".into(),
+            };
+            let args = command_for(&entry, &settings).1;
+            for want in [
+                ["--preset", "rover"],
+                ["--world-preset", "survival"],
+                ["--actors-dir", "/actors"],
+                ["--worlds-dir", "/worlds"],
+            ] {
+                assert!(args.windows(2).any(|w| w == want));
+            }
+        }
+        for entry in [
+            Entry::ExplorerResume {
+                agent: "Pilot".into(),
+                choice: None,
+                mode: RunMode::Window,
+            },
+            Entry::ExplorerResume {
+                agent: "Pilot".into(),
+                choice: None,
+                mode: RunMode::Detached,
+            },
+            Entry::ExplorerMove {
+                agent: "Pilot".into(),
+                port: 15702,
+            },
+            Entry::ExplorerRestart {
+                agent: "Pilot".into(),
+                port: 15702,
+            },
+        ] {
+            assert!(
+                command_for(&entry, &settings)
+                    .1
+                    .windows(2)
+                    .any(|w| w == ["--worlds-dir", "/worlds"])
+            );
+        }
+    }
+
+    #[test]
+    fn worlds_folder_settings_validate_and_survive_other_saves() {
+        let root = tmp("worlds-setting");
+        let file = root.join("settings.json");
+        let agents = root.join("agents");
+        let worlds = root.join("worlds");
+        assert!(
+            save_settings_with_folders(
+                &agents.display().to_string(),
+                true,
+                None,
+                Some("relative".into()),
+                Some(&file)
+            )
+            .is_err()
+        );
+        assert!(!file.exists() && !agents.exists());
+        let saved = save_settings_with_folders(
+            &agents.display().to_string(),
+            true,
+            None,
+            Some(worlds.clone()),
+            Some(&file),
+        )
+        .unwrap();
+        assert_eq!(saved.worlds_dir, Some(worlds.clone()));
+        let saved = save_settings(&agents.display().to_string(), false, Some(&file)).unwrap();
+        assert_eq!(saved.worlds_dir, Some(worlds));
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
@@ -646,6 +762,7 @@ mod tests {
             world: "Gloomhollow".into(),
             mode: RunMode::Window,
             preset: "human".into(),
+            world_preset: "plain_explorer".into(),
         };
         let (stem, args) = command_for(&entry, &settings(&home));
         assert_eq!(stem, "actor_testbed");
@@ -681,6 +798,7 @@ mod tests {
             world: "Moor".into(),
             mode: RunMode::Window,
             preset: "human".into(),
+            world_preset: "plain_explorer".into(),
         };
         assert!(!command_for(&new, &s).1.contains(&"--actors-dir".to_owned()));
         let acts = Path::new("/my/actors");
@@ -693,6 +811,7 @@ mod tests {
                 world: "Moor".into(),
                 mode: RunMode::Detached,
                 preset: "human".into(),
+                world_preset: "plain_explorer".into(),
             },
             Entry::ExplorerResume {
                 agent: "Wren".into(),
@@ -758,6 +877,7 @@ mod tests {
             world: "Gloomhollow".into(),
             mode: RunMode::Detached,
             preset: "human".into(),
+            world_preset: "plain_explorer".into(),
         };
         assert_eq!(
             command_for(&new, &s),

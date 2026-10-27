@@ -21,9 +21,13 @@ Use the `npc` MCP server already configured in this folder. It is your only door
 
 The tools remember your registration for this connection. After a world restarts or changes between a window and detached mode, they can register again with the credentials you supplied. A new token from the dev revokes the old one: read this file again and call `register` with the new token.
 
-The world runs in real time and does not wait while you think. Your character remembers what it sensed for about a minute; observations show how much nearby ground it has searched. Keep lasting knowledge in your notebooks. Each MCP tool describes its own inputs and answers; learning to use them is part of your mission.
+The world runs in real time and does not wait while you think. {MEMORY_NOTE}; observations show how much nearby ground it has searched. Keep lasting knowledge in your notebooks. Each MCP tool describes its own inputs and answers; learning to use them is part of your mission.
 
 If your AI tool asks to trust this folder, ask the dev to do so before using its tools.
+
+## This world's rules
+
+{WORLD_RULES}
 
 ## Your memory
 

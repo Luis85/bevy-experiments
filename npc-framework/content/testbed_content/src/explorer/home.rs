@@ -140,6 +140,8 @@ pub struct AgentMeta {
     /// Absent in folders from before presets: the human.
     #[serde(default = "default_preset")]
     pub preset: String,
+    #[serde(default = "default_world_preset")]
+    pub world_preset: String,
     /// Stable host identity; old metadata acquires it on production open.
     #[serde(default)]
     pub agent_id: String,
@@ -155,6 +157,7 @@ impl std::fmt::Debug for AgentMeta {
             .field("world", &self.world)
             .field("created", &self.created)
             .field("preset", &self.preset)
+            .field("world_preset", &self.world_preset)
             .field("agent_id", &self.agent_id)
             .field("token", &"<redacted>")
             .finish()
@@ -322,6 +325,9 @@ fn migrate_fields(
     object: &mut serde_json::Map<String, serde_json::Value>,
     rotate: bool,
 ) -> Result<(), String> {
+    object
+        .entry("world_preset")
+        .or_insert_with(|| default_world_preset().into());
     if !object.contains_key("agent_id") {
         let agent = object
             .get("agent")
@@ -374,6 +380,10 @@ fn default_preset() -> String {
     crate::actors::HUMAN.to_owned()
 }
 
+fn default_world_preset() -> String {
+    crate::worlds::PLAIN_EXPLORER.into()
+}
+
 /// Creates the folder, the empty notes folders `diary/`, `memory/` and
 /// `proposals/`, and `agent.json`. Refuses a folder that already exists; a
 /// failure part-way removes the new folder.
@@ -395,11 +405,29 @@ pub fn create_agent_as(
     created: &str,
     preset: &str,
 ) -> Result<AgentDir, String> {
+    create_agent_in_world(
+        root,
+        agent,
+        world,
+        created,
+        preset,
+        crate::worlds::PLAIN_EXPLORER,
+    )
+}
+
+pub fn create_agent_in_world(
+    root: &Path,
+    agent: &str,
+    world: &str,
+    created: &str,
+    preset: &str,
+    world_preset: &str,
+) -> Result<AgentDir, String> {
     if let Some(problem) = name_problem(agent) {
         return Err(problem);
     }
     let fill = |ad: &AgentDir, agent: &str, world: &str, created: &str| {
-        fill_agent(ad, agent, world, created, preset)
+        fill_agent(ad, agent, world, created, preset, world_preset)
     };
     create_agent_with(root, agent, world, created, &fill)
 }
@@ -410,12 +438,14 @@ fn fill_agent(
     world: &str,
     created: &str,
     preset: &str,
+    world_preset: &str,
 ) -> Result<(), String> {
     let err = |e: std::io::Error| format!("cannot write {}: {e}", ad.dir.display());
     for notes in [ad.diary(), ad.memory(), ad.proposals()] {
         std::fs::create_dir(notes).map_err(err)?;
     }
     let meta = AgentMeta {
+        world_preset: world_preset.into(),
         agent: agent.into(),
         world: world.into(),
         created: created.into(),

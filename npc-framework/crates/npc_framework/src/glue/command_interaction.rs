@@ -139,6 +139,10 @@ pub fn interact_precheck(
     verb: &str,
     target: SimId,
 ) -> Result<(), String> {
+    #[cfg(feature = "agent-io")]
+    if let Some(reason) = npc_agent_io::verb_gate(world, unit, verb) {
+        return Err(reason);
+    }
     let mut def = *world
         .get_resource::<InteractionRegistry>()
         .and_then(|r| r.verb(verb))
