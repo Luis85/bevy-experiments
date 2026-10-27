@@ -48,6 +48,8 @@ systems. Their removal must retain complete sensor scans and the existing world 
 
 Version tokens cannot repeat after a reset, capacity accounting matches actual placement, feedback describes
 where outputs went, and visuals match legitimate item states. No dependency, oracle, budget or numerical-model
-relaxation is introduced. Full verification and a new release checkpoint follow the bounded fix wave.
-The scratch and scheduling changes retain semantic behavior; they do not establish a performance-budget pass.
-Fresh timing evidence and its host conditions remain separate from correctness and oracle verification.
+relaxation is introduced. Full verification and the rebuilt main artifacts passed; the exact gate, native
+captures and two successful quiet-host timing runs are recorded in the
+[final review evidence](../_notes/notes-workspace-final-review.md).
+Scratch and scheduling changes alone do not prove budget compliance: measured timing evidence and its host
+conditions remain separate from correctness and oracle verification.

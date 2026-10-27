@@ -1,6 +1,26 @@
-# Resume: agent notes, workspace, fog, actors (updated 2026-10-27)
+# Resume: agent notes, workspace, fog, actors (updated 2026-10-28)
 
-## Current continuation (2026-10-27)
+## Final status (2026-10-28)
+
+**The whole plan is complete.** All features and the bounded final review fixes are on local main:
+feature `ac20a6d`, --no-ff merge `6824a42`. The complete final `cargo xtask verify` passed (`ok:true`):
+1,242 tests passed/12 skipped/two reported leaky; doc 1 passed/10 ignored; architecture 7/7; eight CLI
+replays; six unchanged snapshots; fmt/Clippy/deny passed, no optional tools skipped.
+
+Two consecutive quiet-host release runs measured moving Rover median p95 perception/fog at
+**34.3/41.9 µs** and **34.0/40.7 µs**, both below unchanged 55 µs budgets, with full scans/cadence preserved.
+Earlier noisy results remain recorded, with host-load conditions. Main's five-app locked release passed
+in 3m41s. Launch `C:\Projects\bevy-experiments\npc-framework\target\release\game_menu.exe`;
+the same directory contains `actor_testbed.exe`, `npcctl.exe`, `village.exe`, `rts_units_demo.exe`.
+
+Final fresh release F18 and Human/Rover carried-item workflows passed, with inspected native screenshots
+and all owned processes exited. Evidence: `docs/_notes/notes-workspace-final-review.md` and
+`docs/_notes/notes-workspace-e2e.md`. No source changed after the successful gate; no oracle/dependency
+was changed by the final wave. User MCP PID 57336 was preserved. Physical-input/OS integration and Claude
+Code's trust UI remain the documented human-only checks, not pending implementation. No further plan work
+is queued. The checkpoints below are historical and must not be resumed as active tasks.
+
+## Historical continuation (2026-10-27)
 
 **Latest: Task 18/Gate F complete.** Docs `0c869b1`, main merge `a90562c`; full
 `target/verify-phase-f.json` reports `ok:true` (1,217 passed/12 skipped/three reported leaky, doc 1/10 ignored,

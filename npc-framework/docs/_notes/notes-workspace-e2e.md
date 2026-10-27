@@ -81,3 +81,25 @@ in the progress ledger; this document does not declare those defects fixed or th
 
 Checkpoint `0c869b1` was merged --no-ff as `a90562c`. The five-app release build on main passed in 45.60s
 (`target/release-phase-f.log`); binaries remain under this workspace's `target/release/`.
+
+## Final release refresh (2026-10-28)
+
+After the bounded source-fix wave, feature `ac20a6d` was merged --no-ff to main as `6824a42`.
+The complete final gate passed (`target/verify-final.json`): 1,242 tests passed/12 skipped/two reported
+leaky; doc 1 passed/10 ignored; architecture 7/7; eight replays; six unchanged snapshots; fmt/Clippy/deny
+passed with no optional tools skipped. All five release apps were then rebuilt on main in 3m41s
+(`target/release-final.log`).
+
+The same developer driver was rerun against those fresh release artifacts. Public summary:
+`target/phase-f-e2e-96eba0176a1f/summary.json`, `ok:true`. Generated registered MCP settings, Rover assignment,
+all three notebooks and player memory, landmark add/update/stale/Move, both exact-port handovers,
+all four real reflected F7 tab handlers, token rotation and explicit new registration, real close-dialog
+Yes, same-MCP reconnect and final Stop/save all passed. Explored cells stayed at 336 through handover;
+initial/final saves were tick 30/190. Every owned process exited, and no credential was echoed.
+
+Five fresh screenshots are under that fixture's `npc-out/shots/`; the worker inspected all five and found
+the tab selection, notebook content, stamps, labels and dialog readable without clipping. The controller
+independently inspected Map and the close dialog: all three map cards and separated labels are readable, including the landmark
+over black fog; the actual close question and Yes/No/Cancel buttons fit. The automated-agent and physical
+input coverage boundaries above still apply. Quiet-host final performance is recorded separately in
+`notes-workspace-final-review.md`; this functional run is not a performance benchmark.

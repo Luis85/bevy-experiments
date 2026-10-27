@@ -1,5 +1,9 @@
 # Final review and bounded fix pass
 
+Completed 2026-10-28. All planned implementation, final review fixes, full verification, local main
+checkpoint, release artifacts and automated native/MCP confirmation are complete. Manual coverage
+boundaries remain explicitly recorded in `notes-workspace-e2e.md`.
+
 The source review covered the resumed plan from robot presentation/editor through registration, worlds and
 landmarks, and swept the historical deferred findings. F changed documentation only; its post-gate refresh
 retained the same source findings. This is one bounded fix pass, with diagnostic/test corrections as needed.
@@ -50,7 +54,7 @@ PNGs under that fixture were inspected by the worker and controller; all owned c
 Final full `cargo xtask verify` passed: `target/verify-final.json` reports `ok:true`, 1,242 tests passed,
 12 skipped and two reported leaky; doc tests 1 passed/10 ignored; architecture 7/7; CLI replays 8/8;
 six snapshots with none pending; fmt/Clippy/deny passed, no optional tools skipped. All new schedule and
-integrity regressions passed in that complete run. Final release artifacts follow before overall completion.
+integrity regressions passed in that complete run. Final release confirmation is recorded below.
 ADR 0019 records the choices; no oracle is rebaselined. Performance results below are separate from
 correctness verification.
 
@@ -87,3 +91,21 @@ rounds) measured moving Rover median p95 perception/fog at **34.3/41.9 µs** and
 reported case was within its unchanged 55 µs budgets. Raw logs: `target/final-rover-perf-post-gate.log` and
 `target/final-rover-perf-post-gate-repeat.log`. Full scans and cadence remain unchanged. These are measured
 quiet-host results, not latency guarantees under arbitrary external load; all earlier slower logs remain.
+
+## Final main/release checkpoint
+
+Feature `ac20a6d` was merged --no-ff to main as `6824a42` after the complete successful gate. On main,
+`cargo build --release --locked -p game_menu -p actor_testbed -p npcctl -p village -p rts_units_demo`
+passed in 3m41s (`target/release-final.log`). All five `.exe` artifacts are in this workspace's
+`target/release/`. No source changed after the gate; subsequent changes record evidence only.
+
+- Fresh release F18 driver: `target/phase-f-e2e-96eba0176a1f/summary.json`, `ok:true`. Generated registered
+  MCP, all notebooks/map, both same-port handovers, all four actual reflected F7 handlers, rotation,
+  real close-dialog Yes, reconnect, final Stop/save and owned-process exit passed. Saves tick 30→190;
+  336 explored cells preserved. Worker inspected all five PNGs; controller independently inspected Map/Close.
+- Fresh release item driver: `target/final-items-visual-0a4ff2025f9e/summary.json`, `ok:true` for both Human
+  and Rover. Real pickup/equip, snapshot without ground positions, same-port native grip attachment,
+  unequip-hidden inventory and drop-visible ground passed. Worker inspected all six PNGs; controller
+  independently inspected Human-equipped and Rover-dropped. Every owned process exited.
+- User-owned MCP PID 57336 was preserved; no real keyboard/mouse/clipboard input was sent. No dependency,
+  protected tooling, benchmark baseline, replay or snapshot oracle was modified by the final wave.

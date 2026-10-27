@@ -1,6 +1,35 @@
 # SDD ledger — plan: npc-framework/docs/superpowers/plans/2026-10-25-agent-notes-workspace-fog-actors.md
 
-## Continuation in the monorepo (2026-10-27)
+## Completion in the monorepo (2026-10-28)
+
+- **The whole plan is complete**, including all phase implementations, final source review, one bounded fix
+  wave, full gate, local main merge, five-app release and final automated native/MCP confirmation.
+- Final fixes `ac20a6d`, main --no-ff merge `6824a42`: crafting capacity/output feedback, four secret Debug
+  holders, monotone notes/map revisions, real carried/equipped item presentation, safe coordinate extremes,
+  exact full-scan LIDAR scratch reuse and omission of empty Plain-world runtime systems. ADR 0019 and
+  `docs/_notes/notes-workspace-final-review.md` contain the regression and review evidence.
+- `cargo xtask verify`, `target/verify-final.json`: **`ok:true`**, 1,242 passed/12 skipped/two reported leaky;
+  doc 1 passed/10 ignored; architecture 7/7; eight CLI replays; six unchanged snapshots; fmt/Clippy/deny passed,
+  no optional tools skipped. No protected oracle or dependency changed.
+- Performance acceptance passed in two consecutive quiet-host release runs: moving Rover median p95
+  perception/fog **34.3/41.9 µs** and **34.0/40.7 µs**, below the unchanged 55 µs budgets. Independent CPU
+  samples before those runs were 14.6%/12.7%. Full scans/cadence preserved; earlier loaded-host failures retained.
+  Logs: `target/final-rover-perf-post-gate{,-repeat}.log`.
+- Main five-app locked release passed in 3m41s (`target/release-final.log`). Artifacts under
+  `C:\Projects\bevy-experiments\npc-framework\target\release\`: `game_menu.exe`, `actor_testbed.exe`,
+  `npcctl.exe`, `village.exe`, `rts_units_demo.exe`.
+- Fresh release F18 workflow passed (`target/phase-f-e2e-96eba0176a1f/summary.json`): real reflected F7 tabs,
+  both same-port handovers, rotation, actual close→Yes→detached, MCP reconnect, notes/map/fog, final Stop/save;
+  tick 30→190 and 336 explored cells. All five PNGs reviewed. Fresh Human/Rover release item lifecycle passed
+  (`target/final-items-visual-0a4ff2025f9e/summary.json`); all six PNGs reviewed. All owned processes exited.
+- Ruling R25: final integrity fixes preserve separate craft-output IDs/equipment slot exemption and use
+  monotone opaque file revisions across clock resets; see ADR 0019. Hunger/thirst collapse R22 remains deliberate.
+- Ruling R26: a benchmark's exit code is not a budget pass. Retain all noisy measurements and host conditions;
+  the two final measured quiet-host runs establish this checkpoint's acceptance, not arbitrary-load guarantees.
+- Remaining human-only coverage: Claude Code trust/permission UI and physical keyboard/mouse/clipboard/OS
+  integration, as allowed by the automated-agent fallback. No implementation or phase-gate work remains.
+
+## Historical continuation in the monorepo (2026-10-27)
 
 - **Task 18 and Gate F complete.** Docs/evidence `0c869b1`, main merge `a90562c`; full gate
   `target/verify-phase-f.json`: `ok:true`, 1,217 passed/12 skipped/three reported leaky; doc 1 passed/10 ignored,
