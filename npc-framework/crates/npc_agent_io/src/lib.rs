@@ -59,6 +59,7 @@ pub mod control;
 pub mod events;
 pub mod greedy;
 pub mod http;
+pub mod map;
 pub mod mcp;
 pub mod notes;
 pub mod observe;
@@ -88,7 +89,7 @@ pub use notes::{
 };
 pub use registry::{
     ActionPlan, ActionRequest, Affordance, AgentCtx, AgentIoAppExt, AgentRegistry, Rejection,
-    Section, VerbGateFn, verb_gate,
+    Section, ThingPositionFn, VerbGateFn, verb_gate,
 };
 pub use scenario::{ScenarioDoc, ScenarioLoaders};
 

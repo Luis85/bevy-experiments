@@ -668,6 +668,48 @@ pub fn event_line(e: &Value) -> String {
     format!("- t{tick} {kind} {detail}").trim_end().to_owned()
 }
 
+/// Nearest five entries, sorted by exact squared distance then stable id.
+pub fn nearest_landmarks(
+    here: npc_kernel::SimPos,
+    landmarks: &[crate::map::Landmark],
+) -> Vec<Value> {
+    let mut sorted: Vec<_> = landmarks
+        .iter()
+        .map(|landmark| {
+            let dx = i128::from(landmark.pos[0]) - i128::from(here.x);
+            let dz = i128::from(landmark.pos[1]) - i128::from(here.z);
+            (dx * dx + dz * dz, landmark.id, landmark, dx, dz)
+        })
+        .collect();
+    sorted.sort_by_key(|(distance, id, _, _, _)| (*distance, *id));
+    sorted
+        .into_iter()
+        .take(5)
+        .map(|(distance, _, landmark, dx, dz)| {
+            json!({
+                "id":landmark.id,"name":landmark.name,"pos":landmark.pos,
+                "distance_mm":(distance as u128).isqrt() as u64,"direction":map_direction(dx,dz)
+            })
+        })
+        .collect()
+}
+
+fn map_direction(dx: i128, dz: i128) -> &'static str {
+    let (x, z) = (dx.abs(), dz.abs());
+    if x * 29 <= z * 12 {
+        if dz >= 0 { "N" } else { "S" }
+    } else if z * 29 <= x * 12 {
+        if dx > 0 { "E" } else { "W" }
+    } else {
+        match (dx > 0, dz > 0) {
+            (true, true) => "NE",
+            (true, false) => "SE",
+            (false, false) => "SW",
+            (false, true) => "NW",
+        }
+    }
+}
+
 /// The text form of an observation (see the module docs).
 pub fn render_text(obs: &Value, lines: &[String]) -> String {
     let mut out = Vec::new();
@@ -700,6 +742,31 @@ pub fn render_text(obs: &Value, lines: &[String]) -> String {
         out.push("(No perception model: you are shown the whole world.)".to_owned());
     }
     out.extend(lines.iter().cloned());
+    if let Some(map) = obs
+        .get("map")
+        .and_then(Value::as_array)
+        .filter(|entries| !entries.is_empty())
+    {
+        let entries = map
+            .iter()
+            .map(|landmark| {
+                let mm = landmark["distance_mm"].as_u64().unwrap_or(0);
+                let distance = if mm.is_multiple_of(1000) {
+                    format!("{}", mm / 1000)
+                } else {
+                    format!("{}.{:01}", mm / 1000, (mm % 1000) / 100)
+                };
+                format!(
+                    "#{} {} {distance} m {}",
+                    landmark["id"],
+                    landmark["name"].as_str().unwrap_or(""),
+                    landmark["direction"].as_str().unwrap_or("")
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push(format!("Your map: {entries}."));
+    }
     if let Some(q) = obs["queue"].as_object() {
         match q.get("current").and_then(Value::as_object) {
             Some(c) => out.push(format!(

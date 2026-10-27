@@ -29,6 +29,7 @@ If your AI tool asks to trust this folder, ask the dev to do so before using its
 
 {WORLD_RULES}
 
+{MAP_GUIDE}
 ## Your memory
 
 You remember nothing between sessions. The game holds three notebooks for you. Read and write them only with `notes_list`, `notes_add` and `notes_update`, never in files.

@@ -36,6 +36,7 @@
     }
   },
   "systems": {
+    "map": true,
     "vehicles": true,
     "locked_doors": true,
     "progression": true,

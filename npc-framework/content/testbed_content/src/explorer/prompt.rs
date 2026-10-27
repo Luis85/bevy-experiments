@@ -48,6 +48,7 @@ pub struct PromptVars {
     pub dir: PathBuf,
     /// `npcctl` is not built yet.
     pub npcctl_missing: bool,
+    pub map_enabled: bool,
 }
 
 /// Render the prompt for `kind` with every placeholder filled: the kind's
@@ -89,6 +90,14 @@ pub(crate) fn prompt_values(v: &PromptVars) -> Vec<(&'static str, String)> {
         ("URL", v.url.clone()),
         ("UNIT", v.unit.to_string()),
         ("CONTROLLER", CONTROLLER.to_string()),
+        (
+            "RESUME_MAP",
+            if v.map_enabled {
+                ", then your landmarks (`map_list`)".into()
+            } else {
+                String::new()
+            },
+        ),
     ]
 }
 
@@ -144,6 +153,7 @@ mod tests {
             npcctl: PathBuf::from(r"C:\games\npcctl.exe"),
             dir: PathBuf::from(r"C:\agents\wren-ashdown"),
             npcctl_missing: missing,
+            map_enabled: true,
         }
     }
 
@@ -247,6 +257,22 @@ mod tests {
         assert!(r.contains("rebuilt from scratch"));
         let s = render_prompt(PromptKind::Start, &vars(false));
         assert!(!s.contains("notes_list"), "{s}");
+    }
+
+    #[test]
+    fn resume_lists_map_after_memory_only_when_enabled() {
+        for kind in [
+            PromptKind::Resume,
+            PromptKind::ResumeChanged,
+            PromptKind::ResumeRebuilt,
+        ] {
+            let on = render_prompt(kind, &vars(false));
+            assert!(on.find("book: \"memory\"").unwrap() < on.find("map_list").unwrap());
+            assert!(on.find("map_list").unwrap() < on.find("book: \"diary\"").unwrap());
+            let mut off = vars(false);
+            off.map_enabled = false;
+            assert!(!render_prompt(kind, &off).contains("map_list"));
+        }
     }
 
     #[test]

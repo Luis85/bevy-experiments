@@ -64,12 +64,12 @@
 //! apart from the original and gets no revision.)
 
 pub mod filename;
-mod format;
+pub(crate) mod format;
 pub mod frontmatter;
+pub(crate) mod storage;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
 use bevy_ecs::prelude::Resource;
 use npc_kernel::SimId;
@@ -77,6 +77,7 @@ use serde::{Deserialize, Serialize};
 
 pub use filename::safe_name;
 use format::{Doc, EntryFile, OldProposal, ReadError};
+use storage::{Fingerprint, io_err, next_id, remove_unchanged, write_atomic};
 
 /// Longest title (and `prompted_by` line), in characters.
 pub const TITLE_MAX: usize = 200;
@@ -237,6 +238,8 @@ pub enum NotesError {
     Forbidden(&'static str),
     /// A file could not be read or written.
     Io(String),
+    /// The finite id/revision space is exhausted; existing files stay intact.
+    Exhausted(&'static str),
 }
 
 impl std::fmt::Display for NotesError {
@@ -263,6 +266,7 @@ impl std::fmt::Display for NotesError {
             ),
             NotesError::Forbidden(why) => f.write_str(why),
             NotesError::Io(e) => write!(f, "notes file error: {e}"),
+            NotesError::Exhausted(what) => write!(f, "{what} exhausted"),
         }
     }
 }
@@ -290,20 +294,6 @@ pub struct Unreadable {
     /// Why it is not an entry (`no frontmatter ...`, `line 3: ...`,
     /// `duplicate id 7`, ..).
     pub reason: String,
-}
-
-/// What a file looked like when it was last read or written.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-struct Fingerprint {
-    modified: Option<SystemTime>,
-    len: u64,
-}
-
-fn fingerprint(meta: &std::fs::Metadata) -> Fingerprint {
-    Fingerprint {
-        modified: meta.modified().ok(),
-        len: meta.len(),
-    }
 }
 
 /// What a file of a book's folder holds.
@@ -336,7 +326,7 @@ struct FileCache {
 }
 
 /// One book's folder as last read.
-#[derive(Default)]
+#[derive(Default, Clone)]
 struct BookCache {
     /// By file name.
     files: BTreeMap<String, FileCache>,
@@ -480,44 +470,10 @@ pub struct NotesStore {
 
 const BOOKS: [Book; 3] = [Book::Diary, Book::Memory, Book::Proposals];
 
-fn io_err(path: &Path, e: &std::io::Error) -> NotesError {
-    NotesError::Io(format!("{}: {e}", path.display()))
-}
-
 /// Reads `path`: its text, `None` when it is not valid UTF-8.
 fn read_text(path: &Path) -> Result<Option<String>, NotesError> {
     let bytes = std::fs::read(path).map_err(|e| io_err(path, &e))?;
     Ok(String::from_utf8(bytes).ok())
-}
-
-/// Writes `text` to `path` through a synced temp file next to it (a hidden
-/// `.name.<pid>.tmp`, never read as an entry) and a rename, and returns the
-/// new file's fingerprint.
-fn write_atomic(path: &Path, text: &str) -> Result<Fingerprint, NotesError> {
-    use std::io::Write as _;
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let tmp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
-    let result = (|| {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
-        }
-        let mut file = std::fs::File::create(&tmp)?;
-        file.write_all(text.as_bytes())?;
-        file.sync_all()?;
-        drop(file);
-        std::fs::rename(&tmp, path)?;
-        std::fs::metadata(path)
-    })();
-    match result {
-        Ok(meta) => Ok(fingerprint(&meta)),
-        Err(e) => {
-            let _ = std::fs::remove_file(&tmp);
-            Err(io_err(path, &e))
-        }
-    }
 }
 
 /// The metadata of `path`, `None` when it does not exist.
@@ -670,7 +626,7 @@ impl NotesStore {
         self.refresh(book)?;
         let at = clean_stamp(at);
         let note = Note {
-            id: self.cache(book).high_water() + 1,
+            id: next_id(self.cache(book).high_water())?,
             title,
             body,
             created: at.clone(),
@@ -745,7 +701,7 @@ impl NotesStore {
         if let Some(s) = change.status {
             note.status = Some(s);
         }
-        note.updated = format::next_stamp(&old.updated, clean_stamp(at));
+        note.updated = format::next_stamp(&old.updated, clean_stamp(at))?;
         file.write_note(note.clone(), Some(by));
         let target = if note.title == old.title {
             name.clone()
@@ -766,15 +722,17 @@ impl NotesStore {
         let seen = write_atomic(&dir.join(&target), &file.render())?;
         let cache = self.cache_mut(book);
         if target != name {
-            match std::fs::remove_file(dir.join(&name)) {
-                Err(e) if e.kind() != std::io::ErrorKind::NotFound => {
+            let expected = cache.files.get(&name).map(|f| f.seen);
+            match expected.map(|seen| remove_unchanged(&dir.join(&name), seen)) {
+                Some(Err(_)) => {
                     if let Some(f) = cache.files.get(&name) {
                         cache.superseded.insert(name.clone(), f.seen);
                     }
                 }
-                _ => {
+                Some(Ok(true)) => {
                     cache.files.remove(&name);
                 }
+                _ => {}
             }
         }
         cache.files.insert(
@@ -861,16 +819,23 @@ impl NotesStore {
     /// Re-reads `book`'s folder (only changed files), migrates an old
     /// layout, rebuilds the index and gives hand-edited entries a revision.
     fn refresh(&mut self, book: Book) -> Result<(), NotesError> {
+        let before = self.cache(book).clone();
         let previous = self.cache(book).notes();
-        let reread = self.scan(book)?;
-        if book == Book::Proposals {
-            self.migrate_old_proposals()?;
-        } else {
-            self.migrate_old_book(book)?;
+        let result = (|| {
+            let reread = self.scan(book)?;
+            if book == Book::Proposals {
+                self.migrate_old_proposals()?;
+            } else {
+                self.migrate_old_book(book)?;
+            }
+            self.adopt(book)?;
+            self.cache_mut(book).reindex(book);
+            self.bump_hand_edits(book, &previous, &reread)
+        })();
+        if result.is_err() {
+            *self.cache_mut(book) = before;
         }
-        self.adopt(book)?;
-        self.cache_mut(book).reindex(book);
-        self.bump_hand_edits(book, &previous, &reread)
+        result
     }
 
     /// Gives every hand-made file with frontmatter but no `id` the next id
@@ -886,7 +851,7 @@ impl NotesStore {
             .map(|(name, _)| name.clone())
             .collect();
         for name in new {
-            let id = self.cache(book).high_water() + 1;
+            let id = next_id(self.cache(book).high_water())?;
             let cache = self.cache_mut(book);
             let Some(f) = cache.files.get_mut(&name) else {
                 continue;
@@ -911,12 +876,9 @@ impl NotesStore {
         // file changed since (by hand) stays, a duplicate.
         cache.superseded.retain(|name, was| {
             let path = dir.join(name);
-            match std::fs::metadata(&path) {
-                Ok(meta) if fingerprint(&meta) == *was => std::fs::remove_file(&path).is_err(),
-                _ => false,
-            }
+            remove_unchanged(&path, *was).is_err()
         });
-        let mut found: BTreeMap<String, Fingerprint> = BTreeMap::new();
+        let mut found: BTreeMap<String, (Vec<u8>, Fingerprint)> = BTreeMap::new();
         match std::fs::read_dir(&dir) {
             Ok(rd) => {
                 for entry in rd {
@@ -930,7 +892,8 @@ impl NotesStore {
                     if let Some(meta) = metadata(&dir.join(&name))?
                         && meta.is_file()
                     {
-                        found.insert(name, fingerprint(&meta));
+                        let read = storage::read(&dir.join(&name))?;
+                        found.insert(name, read);
                     }
                 }
             }
@@ -941,7 +904,7 @@ impl NotesStore {
         cache.files.retain(|name, _| found.contains_key(name));
         cache.superseded.retain(|name, _| found.contains_key(name));
         let mut reread = BTreeSet::new();
-        for (name, fp) in found {
+        for (name, (bytes, fp)) in found {
             if self
                 .cache(book)
                 .files
@@ -950,16 +913,12 @@ impl NotesStore {
             {
                 continue;
             }
-            let path = dir.join(&name);
-            let parsed = match read_text(&path)? {
-                None => {
-                    let bytes = std::fs::read(&path).unwrap_or_default();
-                    Parsed::broken(
-                        "not valid UTF-8; fix it by hand (the game never writes it)",
-                        &String::from_utf8_lossy(&bytes),
-                    )
-                }
-                Some(text) => match EntryFile::parse(book, format::stem(&name), &text) {
+            let parsed = match String::from_utf8(bytes) {
+                Err(error) => Parsed::broken(
+                    "not valid UTF-8; fix it by hand (the game never writes it)",
+                    &String::from_utf8_lossy(error.as_bytes()),
+                ),
+                Ok(text) => match EntryFile::parse(book, format::stem(&name), &text) {
                     Ok(e) => Parsed::Entry(Box::new(e)),
                     Err(ReadError::NoFrontmatter)
                         if book == Book::Proposals
@@ -1012,7 +971,7 @@ impl NotesStore {
                 continue;
             }
             let mut note = file.note.clone();
-            note.updated = format::next_stamp(&note.updated, note.updated.clone());
+            note.updated = format::next_stamp(&note.updated, note.updated.clone())?;
             file.write_note(note, None);
             f.seen = write_atomic(&dir.join(&name), &file.render())?;
         }
@@ -1037,7 +996,7 @@ impl NotesStore {
             });
             return Ok(());
         };
-        let doc = Doc::parse(&text);
+        let doc = Doc::parse(&text)?;
         let mut notes: Vec<(Note, &'static str)> = doc
             .entries
             .iter()
@@ -1054,13 +1013,14 @@ impl NotesStore {
                 .any(|e| e.note.title == format!("Kept from {old_name}") && e.note.body == *body)
         });
         if let Some(stray) = stray {
-            let id = notes
-                .iter()
-                .map(|(n, _)| n.id)
-                .max()
-                .unwrap_or(0)
-                .max(cache.high_water())
-                + 1;
+            let id = next_id(
+                notes
+                    .iter()
+                    .map(|(n, _)| n.id)
+                    .max()
+                    .unwrap_or(0)
+                    .max(cache.high_water()),
+            )?;
             let zero = Stamp {
                 tick: 0,
                 date: String::new(),
@@ -1095,39 +1055,37 @@ impl NotesStore {
     /// removal) is only removed.
     fn migrate_old_proposals(&mut self) -> Result<(), NotesError> {
         let book = Book::Proposals;
-        let old: Vec<(String, OldProposal)> = self
+        let old: Vec<(String, OldProposal, Fingerprint)> = self
             .cache(book)
             .files
             .iter()
             .filter_map(|(name, f)| match &f.parsed {
-                Parsed::Old(text) => Some((name.clone(), OldProposal::parse(name, text))),
+                Parsed::Old(text) => Some((name.clone(), OldProposal::parse(name, text), f.seen)),
                 _ => None,
             })
             .collect();
         if old.is_empty() {
             return Ok(());
         }
-        let dir = self.dir.join(book.as_str());
         let existing: Vec<Note> = self.cache(book).entries().map(|e| e.note.clone()).collect();
         let cache = self.cache(book);
         let mut used: BTreeSet<u32> = cache.seen_ids();
         let high_water = cache.high_water();
         let mut todo = Vec::new();
-        for (name, p) in old {
+        for (name, p, seen) in old {
             let done = existing.iter().any(|n| {
                 n.title == p.note.title && n.body == p.note.body && n.created == p.note.created
             });
             if done {
-                let _ = std::fs::remove_file(dir.join(&name));
-                self.cache_mut(book).files.remove(&name);
+                self.remove_migrated_source(book, &name, seen);
             } else {
-                todo.push((name, p));
+                todo.push((name, p, seen));
             }
         }
         // `id:` lines first, then file numbers, then the next free ids.
         let mut ids: Vec<u32> = vec![0; todo.len()];
         for from_id_line in [true, false] {
-            for (i, (_, p)) in todo.iter().enumerate() {
+            for (i, (_, p, _)) in todo.iter().enumerate() {
                 if ids[i] == 0
                     && p.has_id == from_id_line
                     && p.note.id > 0
@@ -1138,19 +1096,29 @@ impl NotesStore {
             }
         }
         for id in ids.iter_mut().filter(|id| **id == 0) {
-            *id = used.last().copied().unwrap_or(0).max(high_water) + 1;
+            *id = next_id(used.last().copied().unwrap_or(0).max(high_water))?;
             used.insert(*id);
         }
-        for ((name, mut p), id) in todo.into_iter().zip(ids) {
+        for ((name, mut p, seen), id) in todo.into_iter().zip(ids) {
             p.note.id = id;
             let written =
                 self.write_new(book, &p.note, Writer::Agent, p.eol, &p.extra, Some(&name))?;
             if written != name {
-                let _ = std::fs::remove_file(dir.join(&name));
-                self.cache_mut(book).files.remove(&name);
+                self.remove_migrated_source(book, &name, seen);
             }
         }
         Ok(())
+    }
+    fn remove_migrated_source(&mut self, book: Book, name: &str, seen: Fingerprint) {
+        match remove_unchanged(&self.dir.join(book.as_str()).join(name), seen) {
+            Ok(true) => {
+                self.cache_mut(book).files.remove(name);
+            }
+            Ok(false) => {}
+            Err(_) => {
+                self.cache_mut(book).superseded.insert(name.into(), seen);
+            }
+        }
     }
 }
 
@@ -1174,10 +1142,24 @@ pub struct NotesClock(pub fn() -> String);
 #[derive(Resource, Default)]
 pub struct NotesStores {
     stores: BTreeMap<PathBuf, NotesStore>,
+    maps: BTreeMap<PathBuf, crate::map::MapStore>,
     owners: BTreeMap<PathBuf, NotesOwner>,
 }
 
 impl NotesStores {
+    /// The same per-folder ownership/cache boundary for the actor's map.
+    pub fn map_for(
+        &mut self,
+        dir: &Path,
+    ) -> Result<&mut crate::map::MapStore, crate::map::MapError> {
+        match self.maps.entry(dir.to_path_buf()) {
+            std::collections::btree_map::Entry::Occupied(e) => Ok(e.into_mut()),
+            std::collections::btree_map::Entry::Vacant(e) => {
+                let owner = self.owners.get(dir).cloned().unwrap_or_default();
+                Ok(e.insert(crate::map::MapStore::open_as(dir, owner)?))
+            }
+        }
+    }
     /// The store of the agent folder `dir`, opened (and kept) on first use,
     /// with the owner set for it ([`NotesStores::set_owner`]).
     ///
@@ -1199,6 +1181,9 @@ impl NotesStores {
     /// opens (the host does, next to [`NotesDirs`]) so a migration writes
     /// them too.
     pub fn set_owner(&mut self, dir: &Path, owner: NotesOwner) {
+        if let Some(store) = self.maps.get_mut(dir) {
+            store.set_owner(owner.clone());
+        }
         if let Some(store) = self.stores.get_mut(dir) {
             store.set_owner(owner.clone());
         }

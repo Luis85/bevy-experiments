@@ -15,6 +15,9 @@ use npc_framework::agent_io::session::{Session, SessionOptions};
 use npc_framework::tools::output::{EXIT_CHECK_FAILED, EXIT_OK, Failure, Out, read_json};
 use serde_json::{Value, json};
 
+mod map_cli;
+pub use map_cli::{AgentMapCmd, MapCmd, MapWriter, cmd_map};
+
 /// Default session / BRP address.
 pub const DEFAULT_URL: &str = "http://127.0.0.1:15702";
 
@@ -273,6 +276,9 @@ pub enum AgentCmd {
         after_help = "Examples:\n  npcctl agent notes list --unit 33 --controller explorer --book memory\n  npcctl agent notes add --unit 33 --controller explorer --book diary --title \"Found the key\" --body \"Under the mat.\"\n  npcctl agent notes update --unit 33 --controller explorer --book diary --id 1 --expected-tick 120 --expected-date 2026-10-25T10:00:00Z --body \"..\""
     )]
     Notes(AgentNotesCmd),
+    /// Your map of fixed landmarks: list, add or update.
+    #[command(subcommand)]
+    Map(AgentMapCmd),
 }
 
 /// A notebook.
@@ -824,6 +830,7 @@ pub fn cmd_agent(cmd: &AgentCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Fa
         AgentCmd::Stats { controller } => ("agent/stats", json!({"controller": controller})),
         AgentCmd::ListUnits { kind } => ("agent/list_units", json!({"kind": kind})),
         AgentCmd::Notes(n) => agent_notes(n),
+        AgentCmd::Map(m) => map_cli::agent_map(m),
     };
     let v = if let Some(agent_id) = &c.agent_id {
         let token = c
@@ -844,6 +851,7 @@ pub fn cmd_agent(cmd: &AgentCmd, c: &ClientArgs, out: &mut Out) -> Result<u8, Fa
                 });
             }
             if !method.starts_with("agent/notes/")
+                && !method.starts_with("agent/map/")
                 && !matches!(
                     method,
                     "agent/enter_world" | "agent/list_units" | "agent/take_control"

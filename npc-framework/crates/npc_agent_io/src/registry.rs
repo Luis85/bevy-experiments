@@ -36,7 +36,7 @@ use std::collections::BTreeMap;
 
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use npc_kernel::{SimCommand, SimId};
+use npc_kernel::{SimCommand, SimId, SimPos};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -95,6 +95,8 @@ pub type ActionHandlerFn = fn(&World, &AgentCtx, &ActionRequest) -> Result<Actio
 /// Entities `ctx.unit` perceives or remembers; `None` when the unit has no
 /// perception model (e.g. no senses): it is then not perception-gated.
 pub type KnownFn = fn(&World, &AgentCtx) -> Option<Vec<SimId>>;
+/// A remembered position supplied by a capability. No world-truth fallback.
+pub type ThingPositionFn = fn(&World, &AgentCtx, SimId) -> Option<SimPos>;
 /// What `ctx.unit` holds or rides.
 pub type PossessionsFn = fn(&World, &AgentCtx) -> Vec<SimId>;
 /// A short description of `id` (`"store_key #26"`); `None`: not this
@@ -354,6 +356,7 @@ pub struct AgentRegistry {
     pub handlers: BTreeMap<&'static str, ActionHandlerFn>,
     /// What a unit perceives or remembers (the affordance gate).
     pub known: BTreeMap<&'static str, KnownFn>,
+    pub thing_positions: BTreeMap<&'static str, ThingPositionFn>,
     /// What a unit holds or rides (always known; not "remembered").
     pub possessions: BTreeMap<&'static str, PossessionsFn>,
     pub describers: BTreeMap<&'static str, DescribeFn>,
@@ -407,6 +410,7 @@ pub trait AgentIoAppExt {
     /// remembers. With a perception provider, affordances only target
     /// known entities (see the module docs).
     fn register_known(&mut self, name: &'static str, f: KnownFn) -> &mut Self;
+    fn register_thing_position(&mut self, name: &'static str, f: ThingPositionFn) -> &mut Self;
     /// Adds possessions provider `name`: what the unit holds or rides.
     fn register_possessions(&mut self, name: &'static str, f: PossessionsFn) -> &mut Self;
     /// Adds describer `name` (short entity names for texts).
@@ -448,6 +452,17 @@ impl AgentIoAppExt for App {
     fn register_known(&mut self, name: &'static str, f: KnownFn) -> &mut Self {
         let mut r = self.world_mut().get_resource_or_init::<AgentRegistry>();
         insert(&mut r.known, "known provider", name, f);
+        self
+    }
+
+    fn register_thing_position(&mut self, name: &'static str, f: ThingPositionFn) -> &mut Self {
+        let mut registry = self.world_mut().get_resource_or_init::<AgentRegistry>();
+        insert(
+            &mut registry.thing_positions,
+            "thing position provider",
+            name,
+            f,
+        );
         self
     }
 

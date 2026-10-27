@@ -253,6 +253,35 @@ fn registered_cli_and_mcp_lifecycle_and_token_rotation() {
     assert_eq!(entered["result"]["isError"], false);
     assert!(entered["result"]["structuredContent"]["character"].is_object());
     assert!(entered["result"]["structuredContent"].get("unit").is_none());
+    let marked = tool_call(
+        &mut input,
+        &mut output,
+        40,
+        "map_add",
+        json!({"name":"Arrival","place":"here","kind":"camp","note":"My first landmark."}),
+    );
+    assert_eq!(marked["result"]["isError"], false, "{marked}");
+    assert_eq!(marked["result"]["structuredContent"]["accepted"], true);
+    assert!(marked["result"]["structuredContent"].get("unit").is_none());
+    let landmark = &marked["result"]["structuredContent"]["landmark"];
+    let changed = tool_call(
+        &mut input,
+        &mut output,
+        41,
+        "map_update",
+        json!({"id":landmark["id"],"expected":landmark["updated"],"kind":null,"note":"Kept before taking control."}),
+    );
+    assert_eq!(changed["result"]["isError"], false, "{changed}");
+    assert!(changed["result"]["structuredContent"]["landmark"]["kind"].is_null());
+    let mapped = tool_call(&mut input, &mut output, 42, "map_list", json!({}));
+    assert_eq!(mapped["result"]["isError"], false, "{mapped}");
+    assert_eq!(
+        mapped["result"]["structuredContent"]["landmarks"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
     let forbidden = tool_call(&mut input, &mut output, 3, "observe", json!({}));
     assert_eq!(
         forbidden["result"]["structuredContent"]["error"]["reason"],
@@ -684,7 +713,10 @@ fn mcp_stdio_round_trip() {
             "list_units",
             "notes_list",
             "notes_add",
-            "notes_update"
+            "notes_update",
+            "map_list",
+            "map_add",
+            "map_update"
         ]
     );
     send(json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
@@ -782,6 +814,123 @@ fn explorer_session(dir: PathBuf) -> (String, std::thread::JoinHandle<()>, u32) 
     });
     let (url, actor) = rx.recv_timeout(Duration::from_secs(120)).unwrap();
     (url, h, actor)
+}
+
+#[test]
+fn map_add_list_update_over_cli_preserves_identity_and_rejects_stale() {
+    use npc_framework::agent_io::http::RpcClient;
+    use npc_framework::agent_io::map::Landmark;
+    struct SessionGuard {
+        url: String,
+        thread: Option<std::thread::JoinHandle<()>>,
+    }
+    impl Drop for SessionGuard {
+        fn drop(&mut self) {
+            let _ = RpcClient::new(&self.url)
+                .unwrap()
+                .call("session/stop", json!({}));
+            if let Some(thread) = self.thread.take() {
+                let _ = thread.join();
+            }
+        }
+    }
+    let dir = temp_dir("map_cli");
+    let (url, thread, actor) = explorer_session(dir.clone());
+    let guard = SessionGuard {
+        url,
+        thread: Some(thread),
+    };
+    let unit = actor.to_string();
+    let agent = |args: &[&str], expected| {
+        json_out(
+            &[&["agent", "map"][..], args, &["--url", &guard.url]].concat(),
+            expected,
+        )
+    };
+    let player = |args: &[&str], expected| {
+        json_out(
+            &[&["map"][..], args, &["--as", "player", "--url", &guard.url]].concat(),
+            expected,
+        )
+    };
+    let identity = ["--unit", unit.as_str(), "--controller", "explorer"];
+    let added = agent(
+        &[
+            &["add"][..],
+            &identity,
+            &[
+                "--name",
+                "Arrival",
+                "--here",
+                "--kind",
+                "camp",
+                "--note",
+                "At the compound.",
+            ],
+        ]
+        .concat(),
+        0,
+    );
+    assert_eq!(added["accepted"], true, "{added}");
+    let first: Landmark = serde_json::from_value(added["landmark"].clone()).unwrap();
+    assert_eq!(first.id, 1);
+    assert_eq!(first.kind.as_deref(), Some("camp"));
+    let listed = player(&["list", "--unit", &unit], 0);
+    assert_eq!(listed["landmarks"][0]["id"], first.id);
+    let tick = first.updated.tick.to_string();
+    let id = first.id.to_string();
+    let changed = player(
+        &[
+            "update",
+            "--unit",
+            &unit,
+            "--id",
+            &id,
+            "--expected-tick",
+            &tick,
+            "--expected-date",
+            &first.updated.date,
+            "--name",
+            "Home marker",
+            "--pos",
+            "-100,200",
+            "--clear-kind",
+            "--note",
+            "Return here.",
+        ],
+        0,
+    );
+    assert_eq!(changed["accepted"], true, "{changed}");
+    let current: Landmark = serde_json::from_value(changed["landmark"].clone()).unwrap();
+    assert_eq!(current.id, first.id);
+    assert_eq!(current.pos, [-100, 200]);
+    assert_eq!(current.thing, first.thing);
+    assert_eq!(current.kind, None);
+    assert_eq!(current.note, "Return here.");
+    let stale = agent(
+        &[
+            &["update"][..],
+            &identity,
+            &[
+                "--id",
+                &id,
+                "--expected-tick",
+                &tick,
+                "--expected-date",
+                &first.updated.date,
+                "--note",
+                "Lost edit",
+            ],
+        ]
+        .concat(),
+        1,
+    );
+    assert_eq!(stale["reason"], "stale", "{stale}");
+    let final_map = agent(&[&["list"][..], &identity].concat(), 0);
+    assert_eq!(final_map["landmarks"][0]["note"], "Return here.");
+    assert!(dir.join("map").join("Home marker.md").is_file());
+    drop(guard);
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]

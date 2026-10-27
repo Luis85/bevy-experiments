@@ -41,21 +41,27 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use bevy::ecs::system::SystemParam;
 use bevy::input::mouse::AccumulatedMouseScroll;
 use bevy::input_focus::{AutoFocus, FocusCause, InputFocus};
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
-use bevy::text::{EditableText, TextCursorStyle};
+use bevy::text::{EditableText, TextCursorStyle, TextEdit};
 use bevy::ui::Pressed;
 use bevy::ui_widgets::{
     Activate, Button as WidgetButton, ButtonPlugin, ScrollArea, ScrollAreaPlugin, TextInput,
 };
+use npc_framework::agent_io::map::{
+    Landmark, LandmarkChange, MapEnabled, MapError, NewLandmark, Place,
+};
+use npc_framework::agent_io::notes::NotesDirs;
 use npc_framework::agent_io::notes::{
     Book, NewNote, Note, NoteChange, NotesClock, NotesError, NotesStores, ProposalStatus, Stamp,
     TITLE_MAX, Unreadable, Writer,
 };
-use npc_framework::prelude::SimClock;
+use npc_framework::prelude::{SimClock, SimId, SimIndex, SimPos};
 use npc_framework::view_helpers::ViewSystems;
+use npc_framework::view_helpers::command_ui::DragBox;
 
 use crate::panels::TestbedPanels;
 
@@ -99,6 +105,8 @@ const SELECTED: Color = Color::srgb(0.18, 0.26, 0.36);
 pub(crate) enum PanelAction {
     /// Show this book.
     Book(Book),
+    /// Show the actor's map (when enabled by its world).
+    Map,
     /// Select the entry with this id.
     Select(u32),
     /// Open the form for a new entry.
@@ -135,6 +143,10 @@ pub fn stale_save_note(id: u32) -> String {
 /// The editor's state.
 #[derive(Resource, Debug)]
 pub(crate) struct NotesEditor {
+    pub map: bool,
+    pub landmarks: Vec<Landmark>,
+    pub selected_landmark: Option<u32>,
+    pub map_form: Option<MapForm>,
     /// The book shown.
     pub book: Book,
     /// Its entries, newest (highest id) first.
@@ -156,6 +168,10 @@ pub(crate) struct NotesEditor {
 impl Default for NotesEditor {
     fn default() -> Self {
         Self {
+            map: false,
+            landmarks: Vec::new(),
+            selected_landmark: None,
+            map_form: None,
             book: Book::Diary,
             notes: Vec::new(),
             unreadable: Vec::new(),
@@ -165,6 +181,55 @@ impl Default for NotesEditor {
             requests: Vec::new(),
             rows_dirty: true,
         }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct MapForm {
+    editing: Option<(u32, Stamp)>,
+    current: Option<Landmark>,
+}
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
+enum MapField {
+    Name,
+    Kind,
+    X,
+    Z,
+    Note,
+}
+#[derive(Component)]
+struct FieldOrder(u8);
+
+/// The actor owning this host-side folder, with the world's map switch applied.
+pub(crate) fn map_actor(
+    files: &ExplorerFiles,
+    dirs: Option<&NotesDirs>,
+    enabled: Option<&MapEnabled>,
+) -> Option<SimId> {
+    if enabled.is_some_and(|flag| !flag.0) {
+        return None;
+    }
+    dirs?
+        .0
+        .iter()
+        .find(|(_, dir)| *dir == &files.dir)
+        .map(|(id, _)| *id)
+}
+#[derive(SystemParam)]
+struct MapContext<'w, 's> {
+    enabled: Option<Res<'w, MapEnabled>>,
+    dirs: Option<Res<'w, NotesDirs>>,
+    index: Option<Res<'w, SimIndex>>,
+    positions: Query<'w, 's, &'static SimPos>,
+}
+impl MapContext<'_, '_> {
+    fn actor(&self, files: &ExplorerFiles) -> Option<SimId> {
+        map_actor(files, self.dirs.as_deref(), self.enabled.as_deref())
+    }
+    fn here(&self, files: &ExplorerFiles) -> Option<[i32; 2]> {
+        let entity = self.index.as_deref()?.get(self.actor(files)?)?;
+        let pos = self.positions.get(entity).ok()?;
+        Some([pos.x, pos.z])
     }
 }
 
@@ -301,11 +366,19 @@ fn button(parent: &mut ChildSpawnerCommands, label: &str, action: PanelAction) {
         .with_child((Text::new(label), font(12.0), TextColor(TEXT)));
 }
 
-fn spawn(mut commands: Commands) {
+fn spawn(
+    mut commands: Commands,
+    panels: Res<TestbedPanels>,
+    mut editor: ResMut<NotesEditor>,
+    files: Res<ExplorerFiles>,
+    context: MapContext,
+) {
+    editor.map = panels.map && context.actor(&files).is_some();
     commands
         .spawn((
             Name::new("explorer notes panel"),
             ExplorerPanel,
+            GlobalZIndex(20),
             Hovered::default(),
             BackgroundColor(PANEL),
             Node {
@@ -333,6 +406,7 @@ fn spawn(mut commands: Commands) {
                     for book in BOOKS {
                         button(row, book_label(book), PanelAction::Book(book));
                     }
+                    button(row, "Map", PanelAction::Map);
                     row.spawn((Text::new("Tab: next"), font(11.0), TextColor(DIM)));
                 });
             panel
@@ -348,10 +422,14 @@ fn spawn(mut commands: Commands) {
                 });
             panel.spawn((
                 FormBox,
+                ScrollArea,
                 Node {
                     flex_direction: FlexDirection::Column,
                     row_gap: px(4),
-                    flex_shrink: 0.0,
+                    flex_shrink: 1.0,
+                    min_height: px(0),
+                    max_height: px(380),
+                    overflow: Overflow::scroll_y(),
                     display: Display::None,
                     ..default()
                 },
@@ -385,6 +463,8 @@ fn keys(
     keys: Option<Res<ButtonInput<KeyCode>>>,
     mut panels: ResMut<TestbedPanels>,
     mut editor: ResMut<NotesEditor>,
+    files: Res<ExplorerFiles>,
+    context: MapContext,
 ) {
     let Some(keys) = keys else { return };
     if keys.just_pressed(KeyCode::F7) {
@@ -392,8 +472,14 @@ fn keys(
     }
     if panels.explorer && keys.just_pressed(KeyCode::Tab) {
         let i = BOOKS.iter().position(|b| *b == editor.book).unwrap_or(0);
-        let next = BOOKS[(i + 1) % BOOKS.len()];
-        editor.requests.push(PanelAction::Book(next));
+        let next = if editor.map {
+            PanelAction::Book(Book::Diary)
+        } else if i + 1 == BOOKS.len() && context.actor(&files).is_some() {
+            PanelAction::Map
+        } else {
+            PanelAction::Book(BOOKS[(i + 1) % BOOKS.len()])
+        };
+        editor.requests.push(next);
     }
 }
 
@@ -401,21 +487,33 @@ fn keys(
 fn field_tab(
     keys: Option<Res<ButtonInput<KeyCode>>>,
     mut focus: ResMut<InputFocus>,
-    title: Query<Entity, With<TitleField>>,
-    body: Query<Entity, With<BodyField>>,
+    fields: Query<(Entity, &FieldOrder), With<NoteField>>,
 ) {
-    if !keys.is_some_and(|k| k.just_pressed(KeyCode::Tab)) {
+    let Some(keys) = keys else {
+        return;
+    };
+    if !keys.just_pressed(KeyCode::Tab) {
         return;
     }
-    let (Ok(title), Ok(body)) = (title.single(), body.single()) else {
+    let mut fields: Vec<_> = fields
+        .iter()
+        .map(|(entity, order)| (order.0, entity))
+        .collect();
+    fields.sort_by_key(|(order, _)| *order);
+    if fields.is_empty() {
         return;
-    };
-    let next = if focus.get() == Some(title) {
-        body
+    }
+    let current = fields
+        .iter()
+        .position(|(_, entity)| Some(*entity) == focus.get())
+        .unwrap_or(0);
+    let reverse = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    let next = if reverse {
+        (current + fields.len() - 1) % fields.len()
     } else {
-        title
+        (current + 1) % fields.len()
     };
-    focus.set(next, FocusCause::Navigated);
+    focus.set(fields[next].1, FocusCause::Navigated);
 }
 
 /// While the pointer is over the open panel, its clicks and wheel do not
@@ -425,12 +523,18 @@ fn shield_world(
     roots: Query<&Hovered, With<ExplorerPanel>>,
     mouse: Option<ResMut<ButtonInput<MouseButton>>>,
     scroll: Option<ResMut<AccumulatedMouseScroll>>,
+    drag: Option<ResMut<DragBox>>,
 ) {
     if !panels.explorer || !roots.iter().any(Hovered::get) {
         return;
     }
     if let Some(mut mouse) = mouse {
-        mouse.clear();
+        // Clear held buttons too; a swallowed release must not leave an RTS
+        // drag or camera pan running behind the panel.
+        mouse.reset_all();
+    }
+    if let Some(mut drag) = drag {
+        drag.start = None;
     }
     if let Some(mut scroll) = scroll
         && scroll.delta != Vec2::ZERO
@@ -441,6 +545,10 @@ fn shield_world(
 
 /// Reads the book shown; marks the list for a rebuild when it changed.
 fn reload(editor: &mut NotesEditor, stores: &mut NotesStores, files: &ExplorerFiles) {
+    if editor.map {
+        reload_map(editor, stores, files);
+        return;
+    }
     let book = editor.book;
     let listed = stores
         .store_for(&files.dir)
@@ -483,6 +591,7 @@ fn open_form(commands: &mut Commands, form_box: Entity, title: &str, body: &str)
             form.spawn((Text::new("Title"), font(11.0), TextColor(DIM)));
             form.spawn((
                 TitleField,
+                FieldOrder(0),
                 AutoFocus,
                 field(
                     EditableText {
@@ -495,6 +604,7 @@ fn open_form(commands: &mut Commands, form_box: Entity, title: &str, body: &str)
             form.spawn((Text::new("Body"), font(11.0), TextColor(DIM)));
             form.spawn((
                 BodyField,
+                FieldOrder(1),
                 field(
                     EditableText {
                         allow_newlines: true,
@@ -515,7 +625,11 @@ fn open_form(commands: &mut Commands, form_box: Entity, title: &str, body: &str)
         });
 }
 
-fn field(text: EditableText, layout: TextLayout) -> impl Bundle {
+fn field(mut text: EditableText, layout: TextLayout) -> impl Bundle {
+    let multiline = text.allow_newlines;
+    if !multiline {
+        text.visible_lines = Some(1.0);
+    }
     (
         NoteField,
         TextInput,
@@ -527,6 +641,7 @@ fn field(text: EditableText, layout: TextLayout) -> impl Bundle {
         Node {
             width: percent(100),
             min_width: px(0),
+            min_height: px(if multiline { 68 } else { 36 }),
             padding: UiRect::all(px(5)),
             border: UiRect::all(px(1)),
             border_radius: BorderRadius::all(px(3)),
@@ -546,6 +661,345 @@ fn field_value<F: Component>(fields: &Query<(&EditableText, Has<F>)>) -> String 
         .unwrap_or_default()
 }
 
+fn reload_map(editor: &mut NotesEditor, stores: &mut NotesStores, files: &ExplorerFiles) {
+    let listed = stores
+        .map_for(&files.dir)
+        .and_then(|store| Ok((store.list()?, store.unreadable()?)));
+    match listed {
+        Ok((mut landmarks, unreadable)) => {
+            landmarks.reverse();
+            if editor.landmarks != landmarks {
+                editor.landmarks = landmarks;
+                editor.rows_dirty = true;
+            }
+            if editor.unreadable != unreadable {
+                editor.unreadable = unreadable;
+                editor.rows_dirty = true;
+            }
+        }
+        Err(error) => editor.message = Some(format!("map: {error}")),
+    }
+}
+fn open_map_form(commands: &mut Commands, form_box: Entity, landmark: Option<&Landmark>) {
+    commands
+        .entity(form_box)
+        .despawn_children()
+        .with_children(|form| {
+            form.spawn((
+                CurrentBox,
+                Node {
+                    padding: UiRect::all(px(5)),
+                    border: UiRect::all(px(1)),
+                    display: Display::None,
+                    ..default()
+                },
+                BackgroundColor(ROW),
+                BorderColor::all(NOTE),
+            ))
+            .with_child((CurrentText, Text::new(""), font(12.0), TextColor(TEXT)));
+            form.spawn((
+                Text::new("Position: leave both coordinates blank to mark Here when saved."),
+                font(11.0),
+                TextColor(DIM),
+            ));
+            let values = [
+                (
+                    MapField::Name,
+                    "Name",
+                    landmark.map(|m| m.name.clone()).unwrap_or_default(),
+                ),
+                (
+                    MapField::Kind,
+                    "Kind (optional)",
+                    landmark.and_then(|m| m.kind.clone()).unwrap_or_default(),
+                ),
+                (
+                    MapField::X,
+                    "X (mm, blank with Z = Here)",
+                    landmark.map(|m| m.pos[0].to_string()).unwrap_or_default(),
+                ),
+                (
+                    MapField::Z,
+                    "Z (mm, blank with X = Here)",
+                    landmark.map(|m| m.pos[1].to_string()).unwrap_or_default(),
+                ),
+                (
+                    MapField::Note,
+                    "Note",
+                    landmark.map(|m| m.note.clone()).unwrap_or_default(),
+                ),
+            ];
+            for (i, (key, label, value)) in values.into_iter().enumerate() {
+                form.spawn((Text::new(label), font(11.0), TextColor(DIM)));
+                let multiline = key == MapField::Note;
+                let mut text = EditableText {
+                    allow_newlines: multiline,
+                    visible_lines: Some(if multiline { 3.0 } else { 1.0 }),
+                    ..EditableText::new(value)
+                };
+                text.pending_edits.clear();
+                text.queue_edit(TextEdit::TextStart(false));
+                let mut entity = form.spawn((
+                    key,
+                    FieldOrder(i as u8),
+                    field(
+                        text,
+                        if multiline {
+                            TextLayout::default()
+                        } else {
+                            TextLayout::no_wrap()
+                        },
+                    ),
+                ));
+                if key == MapField::Name {
+                    entity.insert(AutoFocus);
+                }
+            }
+            form.spawn(Node {
+                column_gap: px(6),
+                ..default()
+            })
+            .with_children(|row| {
+                button(row, "Save", PanelAction::Save);
+                button(row, "Cancel", PanelAction::Cancel);
+            });
+        });
+}
+fn map_value(fields: &Query<(&EditableText, &MapField)>, key: MapField) -> String {
+    fields
+        .iter()
+        .find(|(_, field)| **field == key)
+        .map(|(text, _)| text.value().to_string())
+        .unwrap_or_default()
+}
+fn map_position(x: &str, z: &str) -> Result<Option<[i32; 2]>, String> {
+    match (x.trim().is_empty(), z.trim().is_empty()) {
+        (true, true) => Ok(None),
+        (true, false) | (false, true) => {
+            Err("Enter both X and Z, or leave both blank for Here".into())
+        }
+        (false, false) => Ok(Some([
+            x.trim()
+                .parse()
+                .map_err(|_| "X must be a whole number in mm")?,
+            z.trim()
+                .parse()
+                .map_err(|_| "Z must be a whole number in mm")?,
+        ])),
+    }
+}
+#[allow(clippy::too_many_arguments)]
+fn apply_map_request(
+    request: PanelAction,
+    editor: &mut NotesEditor,
+    stores: &mut NotesStores,
+    files: &ExplorerFiles,
+    at: &Stamp,
+    form_box: Option<Entity>,
+    fields: &Query<(&EditableText, &MapField)>,
+    context: &MapContext,
+    commands: &mut Commands,
+) -> bool {
+    match request {
+        PanelAction::Select(id) => editor.selected_landmark = Some(id),
+        PanelAction::Add | PanelAction::Edit if editor.map_form.is_some() => {
+            editor.message = Some("save or cancel the landmark first".into())
+        }
+        PanelAction::Add => {
+            if let Some(form_box) = form_box {
+                open_map_form(commands, form_box, None);
+                editor.map_form = Some(MapForm {
+                    editing: None,
+                    current: None,
+                });
+                editor.message = None;
+            }
+        }
+        PanelAction::Edit => {
+            let landmark = editor
+                .selected_landmark
+                .and_then(|id| editor.landmarks.iter().find(|m| m.id == id))
+                .cloned();
+            if let (Some(landmark), Some(form_box)) = (landmark, form_box) {
+                open_map_form(commands, form_box, Some(&landmark));
+                editor.map_form = Some(MapForm {
+                    editing: Some((landmark.id, landmark.updated)),
+                    current: None,
+                });
+                editor.message = None;
+            } else {
+                editor.message = Some("select a landmark first (click its name)".into());
+            }
+        }
+        PanelAction::Cancel => {
+            editor.map_form = None;
+            return true;
+        }
+        PanelAction::Save => {
+            let Some(form) = editor.map_form.clone() else {
+                return false;
+            };
+            let name = map_value(fields, MapField::Name);
+            let kind = map_value(fields, MapField::Kind);
+            let note = map_value(fields, MapField::Note);
+            let pos = match map_position(
+                &map_value(fields, MapField::X),
+                &map_value(fields, MapField::Z),
+            ) {
+                Ok(pos) => pos,
+                Err(error) => {
+                    editor.message = Some(error);
+                    return false;
+                }
+            };
+            let resolved = match pos.or_else(|| context.here(files)) {
+                Some(pos) => pos,
+                None => {
+                    editor.message = Some("The played actor has no position for Here".into());
+                    return false;
+                }
+            };
+            let kind = (!kind.trim().is_empty()).then(|| kind.trim().to_owned());
+            let written = stores
+                .map_for(&files.dir)
+                .and_then(|store| match &form.editing {
+                    None => store.add(
+                        NewLandmark {
+                            name,
+                            place: if pos.is_none() {
+                                Place::Here
+                            } else {
+                                Place::Pos(resolved)
+                            },
+                            kind,
+                            note,
+                        },
+                        resolved,
+                        None,
+                        at.clone(),
+                        Writer::Player,
+                    ),
+                    Some((id, expected)) => store.update(
+                        *id,
+                        expected,
+                        LandmarkChange {
+                            name: Some(name),
+                            kind: Some(kind),
+                            pos: Some(resolved),
+                            note: Some(note),
+                        },
+                        at.clone(),
+                        Writer::Player,
+                    ),
+                });
+            match written {
+                Ok(landmark) => {
+                    editor.selected_landmark = Some(landmark.id);
+                    editor.map_form = None;
+                    editor.message = Some(format!(
+                        "{} landmark #{}",
+                        if form.editing.is_none() {
+                            "added"
+                        } else {
+                            "saved"
+                        },
+                        landmark.id
+                    ));
+                    reload_map(editor, stores, files);
+                    return true;
+                }
+                Err(MapError::Stale { id, current }) => {
+                    reload_map(editor, stores, files);
+                    let now = editor.landmarks.iter().find(|m| m.id == id).cloned();
+                    editor.map_form = Some(MapForm {
+                        editing: Some((id, current)),
+                        current: now,
+                    });
+                    editor.message = Some(stale_save_note(id));
+                }
+                Err(error) => editor.message = Some(error.to_string()),
+            }
+            reload_map(editor, stores, files);
+        }
+        _ => {}
+    }
+    false
+}
+fn spawn_map_rows(list: &mut ChildSpawnerCommands, editor: &NotesEditor) {
+    if editor.landmarks.is_empty() {
+        list.spawn((
+            RowText,
+            Text::new("No landmarks yet. Add marks the actor's current position by default."),
+            font(12.0),
+            TextColor(DIM),
+        ));
+    }
+    for landmark in &editor.landmarks {
+        list.spawn((
+            Node {
+                flex_direction: FlexDirection::Column,
+                flex_shrink: 0.0,
+                row_gap: px(2),
+                padding: UiRect::all(px(5)),
+                ..default()
+            },
+            BackgroundColor(ROW),
+        ))
+        .with_children(|row| {
+            let mut detail = format!(
+                "#{}  position {}, {} mm",
+                landmark.id, landmark.pos[0], landmark.pos[1]
+            );
+            if let Some(kind) = &landmark.kind {
+                detail.push_str(&format!("  kind: {kind}"));
+            }
+            if let Some(thing) = landmark.thing {
+                detail.push_str(&format!("  thing: #{}", thing.0));
+            }
+            row.spawn((
+                PanelAction::Select(landmark.id),
+                button_node(),
+                WidgetButton,
+                Hovered::default(),
+                BackgroundColor(Color::NONE),
+            ))
+            .with_child((
+                RowText,
+                Text::new(&landmark.name),
+                font(13.0),
+                TextColor(TEXT),
+            ));
+            row.spawn((RowText, Text::new(detail), font(11.0), TextColor(DIM)));
+            row.spawn((
+                RowText,
+                Text::new(format!(
+                    "created {}  updated {}",
+                    stamp_text(&landmark.created),
+                    stamp_text(&landmark.updated)
+                )),
+                font(11.0),
+                TextColor(DIM),
+            ));
+            if !landmark.note.is_empty() {
+                row.spawn((
+                    RowText,
+                    Text::new(&landmark.note),
+                    font(12.0),
+                    TextColor(TEXT),
+                ));
+            }
+        });
+    }
+    for entry in &editor.unreadable {
+        list.spawn((
+            RowText,
+            Text::new(unreadable_text(entry)),
+            font(11.0),
+            TextColor(NOTE),
+        ));
+    }
+}
+
 /// Handles the button presses and keys of this frame: switches books,
 /// selects, opens and closes the form, writes through the store.
 #[allow(clippy::too_many_arguments)]
@@ -560,6 +1014,8 @@ fn apply_requests(
     titles: Query<(&EditableText, Has<TitleField>)>,
     bodies: Query<(&EditableText, Has<BodyField>)>,
     focus: Option<ResMut<InputFocus>>,
+    map_fields: Query<(&EditableText, &MapField)>,
+    context: MapContext,
 ) {
     if editor.requests.is_empty() {
         return;
@@ -572,11 +1028,47 @@ fn apply_requests(
     let mut close = false;
     for request in std::mem::take(&mut editor.requests) {
         let book = editor.book;
+        if editor.map && !matches!(request, PanelAction::Book(_) | PanelAction::Map) {
+            if context.actor(&files).is_none() {
+                editor.message = Some("Map is disabled in this world".into());
+                continue;
+            }
+            close = apply_map_request(
+                request,
+                &mut editor,
+                &mut stores,
+                &files,
+                &at,
+                form_box,
+                &map_fields,
+                &context,
+                &mut commands,
+            );
+            continue;
+        }
         match request {
+            PanelAction::Map if context.actor(&files).is_none() => {}
+            PanelAction::Map if editor.form.is_some() => {
+                editor.message = Some("save or cancel the entry first".into());
+            }
+            PanelAction::Map => {
+                editor.map = true;
+                editor.rows_dirty = true;
+                editor.message = None;
+                reload(&mut editor, &mut stores, &files);
+            }
+            PanelAction::Book(_) if editor.map_form.is_some() => {
+                editor.message = Some("save or cancel the landmark first".into());
+            }
             PanelAction::Book(b) if editor.form.is_some() && b != book => {
                 editor.message = Some("save or cancel the entry first".into());
             }
             PanelAction::Book(b) => {
+                if editor.map {
+                    editor.map = false;
+                    editor.rows_dirty = true;
+                    editor.message = None;
+                }
                 if b != book {
                     editor.book = b;
                     editor.selected = None;
@@ -759,18 +1251,66 @@ fn refresh(
     >,
     list: Query<Entity, With<ListBox>>,
     mut texts: Query<(&mut Text, Has<CurrentText>), Or<(With<MessageText>, With<CurrentText>)>>,
+    context: MapContext,
+    mut focus: Option<ResMut<InputFocus>>,
+    form_boxes: Query<Entity, With<FormBox>>,
+    mut tabs: Query<
+        (&PanelAction, &mut Node),
+        (
+            Without<ExplorerPanel>,
+            Without<FormBox>,
+            Without<CurrentBox>,
+        ),
+    >,
 ) {
     // Visibility follows the flag here (not in `keys`), because input is
     // gated while the prompt modal is open and `--panels explorer` must
     // still show the panel then.
-    let current = editor.form.as_ref().and_then(|f| f.current.clone());
+    let map_on = context.actor(&files).is_some();
+    for (action, mut node) in &mut tabs {
+        if *action == PanelAction::Map {
+            node.display = if map_on { Display::Flex } else { Display::None };
+        }
+    }
+    if editor.map && !map_on {
+        editor.map = false;
+        if editor.map_form.take().is_some() {
+            for entity in &form_boxes {
+                commands.entity(entity).despawn_children();
+            }
+            if let Some(focus) = focus.as_deref_mut() {
+                focus.clear();
+            }
+        }
+        editor.rows_dirty = true;
+    }
+    let current = if editor.map {
+        editor
+            .map_form
+            .as_ref()
+            .and_then(|f| f.current.as_ref())
+            .map(|m| {
+                (
+                    format!(
+                        "{}  kind: {}  pos: {}, {}",
+                        m.name,
+                        m.kind.as_deref().unwrap_or("none"),
+                        m.pos[0],
+                        m.pos[1]
+                    ),
+                    m.note.clone(),
+                )
+            })
+    } else {
+        editor.form.as_ref().and_then(|f| f.current.clone())
+    };
     for (mut node, is_root, is_current) in &mut boxes {
         let shown = if is_root {
             panels.explorer
         } else if is_current {
             current.is_some()
         } else {
-            editor.form.is_some()
+            editor.form.is_some() || editor.map_form.is_some()
         };
         let want = if shown { Display::Flex } else { Display::None };
         if node.display != want {
@@ -806,6 +1346,10 @@ fn refresh(
         .entity(list)
         .despawn_children()
         .with_children(|list| {
+            if editor.map {
+                spawn_map_rows(list, &editor);
+                return;
+            }
             if editor.notes.is_empty() {
                 list.spawn((
                     RowText,
@@ -912,8 +1456,16 @@ fn paint(
 ) {
     for (action, mut bg, hovered, pressed) in &mut buttons {
         let (active, plain) = match *action {
-            PanelAction::Book(b) => (b == editor.book, BUTTON),
-            PanelAction::Select(id) => (editor.selected == Some(id), Color::NONE),
+            PanelAction::Book(b) => (!editor.map && b == editor.book, BUTTON),
+            PanelAction::Map => (editor.map, BUTTON),
+            PanelAction::Select(id) => (
+                if editor.map {
+                    editor.selected_landmark == Some(id)
+                } else {
+                    editor.selected == Some(id)
+                },
+                Color::NONE,
+            ),
             PanelAction::Status(id, s) => (
                 editor
                     .notes
@@ -1051,6 +1603,253 @@ mod tests {
             .unwrap()
             .add(book, Writer::Agent, new, at)
             .unwrap()
+    }
+
+    fn map_app(dir: &Path) -> App {
+        let mut app = app(dir);
+        let (id, _) = npc_framework::prelude::spawn_sim(app.world_mut(), SimPos::new(4200, -7300));
+        app.insert_resource(NotesDirs(std::collections::BTreeMap::from([(
+            id,
+            dir.into(),
+        )])))
+        .insert_resource(MapEnabled(true));
+        app.update();
+        app
+    }
+    fn map_field(app: &mut App, key: MapField) -> Entity {
+        app.world_mut()
+            .query::<(Entity, &MapField)>()
+            .iter(app.world())
+            .find(|(_, field)| **field == key)
+            .unwrap()
+            .0
+    }
+    fn set_map_field(app: &mut App, key: MapField, value: &str) {
+        let entity = map_field(app, key);
+        let mut text = app.world_mut().get_mut::<EditableText>(entity).unwrap();
+        text.editor_mut().set_text(value);
+        text.pending_edits.clear();
+        app.update();
+    }
+    fn map_list(app: &mut App, dir: &Path) -> Vec<Landmark> {
+        app.world_mut()
+            .resource_mut::<NotesStores>()
+            .map_for(dir)
+            .unwrap()
+            .list()
+            .unwrap()
+    }
+    #[test]
+    fn f7_map_tab_lists_and_adds_at_here_then_edits_all_fields() {
+        let dir = tmp("map-here");
+        let mut app = map_app(&dir);
+        act(&mut app, PanelAction::Map);
+        assert!(editor(&app).map);
+        act(&mut app, PanelAction::Add);
+        let name = map_field(&mut app, MapField::Name);
+        set_map_field(&mut app, MapField::Name, "North gate");
+        set_map_field(&mut app, MapField::Kind, "gate");
+        set_map_field(&mut app, MapField::Note, "Return with the key");
+        assert!(app.world().get::<EditableText>(name).is_some());
+        act(&mut app, PanelAction::Save);
+        let landmarks = map_list(&mut app, &dir);
+        assert_eq!(landmarks.len(), 1);
+        assert_eq!(landmarks[0].pos, [4200, -7300]);
+        assert_eq!(landmarks[0].name, "North gate");
+        assert_eq!(landmarks[0].kind.as_deref(), Some("gate"));
+        assert_eq!(landmarks[0].created.date, fixed_date());
+        assert!(rows_text(&mut app).contains("North gate"));
+        act(&mut app, PanelAction::Edit);
+        set_map_field(&mut app, MapField::Name, "Old gate");
+        set_map_field(&mut app, MapField::Kind, "");
+        set_map_field(&mut app, MapField::X, "12000");
+        set_map_field(&mut app, MapField::Z, "-9500");
+        set_map_field(&mut app, MapField::Note, "No longer locked");
+        act(&mut app, PanelAction::Save);
+        let landmarks = map_list(&mut app, &dir);
+        assert_eq!(landmarks[0].id, 1);
+        assert_eq!(landmarks[0].name, "Old gate");
+        assert_eq!(landmarks[0].kind, None);
+        assert_eq!(landmarks[0].pos, [12000, -9500]);
+        assert_eq!(landmarks[0].note, "No longer locked");
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn f7_map_stale_save_is_reported_and_draft_caret_is_retained() {
+        let dir = tmp("map-stale");
+        let mut app = map_app(&dir);
+        act(&mut app, PanelAction::Map);
+        act(&mut app, PanelAction::Add);
+        set_map_field(&mut app, MapField::Name, "Well");
+        act(&mut app, PanelAction::Save);
+        let old = map_list(&mut app, &dir).remove(0);
+        act(&mut app, PanelAction::Edit);
+        set_map_field(&mut app, MapField::Note, "My pending note");
+        let field = map_field(&mut app, MapField::Note);
+        app.world_mut()
+            .resource_mut::<NotesStores>()
+            .map_for(&dir)
+            .unwrap()
+            .update(
+                old.id,
+                &old.updated,
+                LandmarkChange {
+                    note: Some("Agent's latest note".into()),
+                    pos: Some([9000, 1000]),
+                    ..default()
+                },
+                Stamp {
+                    tick: 9,
+                    date: "newdate".into(),
+                },
+                Writer::Agent,
+            )
+            .unwrap();
+        act(&mut app, PanelAction::Save);
+        assert!(
+            editor(&app)
+                .message
+                .as_ref()
+                .unwrap()
+                .contains("changed meanwhile")
+        );
+        assert_eq!(map_list(&mut app, &dir)[0].note, "Agent's latest note");
+        assert_eq!(map_field(&mut app, MapField::Note), field);
+        assert_eq!(
+            app.world()
+                .get::<EditableText>(field)
+                .unwrap()
+                .value()
+                .to_string(),
+            "My pending note"
+        );
+        assert!(
+            editor(&app)
+                .map_form
+                .as_ref()
+                .unwrap()
+                .current
+                .as_ref()
+                .is_some_and(|m| m.pos == [9000, 1000])
+        );
+        act(&mut app, PanelAction::Save);
+        assert_eq!(map_list(&mut app, &dir)[0].note, "My pending note");
+        assert!(editor(&app).map_form.is_none());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn map_fields_block_world_keys_and_cycle_all_five_fields() {
+        let dir = tmp("map-typing");
+        let mut app = map_app(&dir);
+        app.init_resource::<InputRuns>()
+            .add_systems(Update, count_input.in_set(ViewSystems::Input));
+        act(&mut app, PanelAction::Map);
+        act(&mut app, PanelAction::Add);
+        let name = map_field(&mut app, MapField::Name);
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(name, FocusCause::Navigated);
+        let before = app.world().resource::<InputRuns>().0;
+        for expected in [
+            MapField::Kind,
+            MapField::X,
+            MapField::Z,
+            MapField::Note,
+            MapField::Name,
+        ] {
+            let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+            keys.reset_all();
+            keys.press(KeyCode::Tab);
+            app.update();
+            let expected_field = map_field(&mut app, expected);
+            assert_eq!(
+                app.world().resource::<InputFocus>().get(),
+                Some(expected_field)
+            );
+            assert!(editor(&app).map);
+        }
+        assert_eq!(app.world().resource::<InputRuns>().0, before);
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn map_tab_cycles_only_when_enabled_and_capture_flag_selects_it() {
+        let dir = tmp("map-cycle");
+        let mut app = map_app(&dir);
+        act(&mut app, PanelAction::Book(Book::Proposals));
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Tab);
+        app.update();
+        assert!(editor(&app).map);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Tab);
+        app.update();
+        assert!(!editor(&app).map);
+        assert_eq!(editor(&app).book, Book::Diary);
+        app.insert_resource(MapEnabled(false));
+        app.update();
+        let entity = app
+            .world_mut()
+            .query::<(Entity, &PanelAction)>()
+            .iter(app.world())
+            .find(|(_, action)| **action == PanelAction::Map)
+            .unwrap()
+            .0;
+        assert_eq!(
+            app.world().get::<Node>(entity).unwrap().display,
+            Display::None
+        );
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    #[test]
+    fn capture_flag_initially_opens_the_map_tab() {
+        let dir = tmp("map-capture");
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, AssetPlugin::default(), TextPlugin))
+            .init_resource::<InputFocus>()
+            .init_resource::<ButtonInput<KeyCode>>()
+            .insert_resource(TestbedPanels {
+                explorer: true,
+                map: true,
+                ..default()
+            })
+            .insert_resource(ExplorerFiles { dir: dir.clone() })
+            .insert_resource(NotesDirs(std::collections::BTreeMap::from([(
+                SimId(1),
+                dir.clone(),
+            )])))
+            .add_plugins(plugin);
+        app.update();
+        assert!(editor(&app).map);
+        assert!(rows_text(&mut app).contains("No landmarks yet"));
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn panel_release_cancels_marquee_and_clears_held_mouse_buttons() {
+        let dir = tmp("drag-release");
+        let mut app = app(&dir);
+        app.init_resource::<ButtonInput<MouseButton>>()
+            .insert_resource(DragBox {
+                start: Some(Vec2::new(10.0, 10.0)),
+                current: Vec2::new(50.0, 60.0),
+            });
+        let root = field::<ExplorerPanel>(&mut app);
+        app.world_mut().entity_mut(root).insert(Hovered(true));
+        let mut mouse = app.world_mut().resource_mut::<ButtonInput<MouseButton>>();
+        mouse.press(MouseButton::Middle);
+        mouse.press(MouseButton::Left);
+        mouse.release(MouseButton::Left);
+        app.update();
+        let mouse = app.world().resource::<ButtonInput<MouseButton>>();
+        assert!(!mouse.pressed(MouseButton::Middle));
+        assert!(!mouse.just_released(MouseButton::Left));
+        assert_eq!(app.world().resource::<DragBox>().start, None);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

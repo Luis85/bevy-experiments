@@ -28,6 +28,8 @@ pub struct TestbedPanels {
     pub perception: bool,
     /// F7 diary and proposals (explorer mode only).
     pub explorer: bool,
+    /// Start F7 on the Map tab (explorer mode; map-enabled worlds only).
+    pub map: bool,
 }
 
 #[derive(Component)]

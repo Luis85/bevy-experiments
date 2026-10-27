@@ -74,10 +74,15 @@ impl Default for PerceptionRulesSpec {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SystemsSpec {
+    #[serde(default = "map_default")]
+    pub map: bool,
     pub crafting: bool,
     pub vehicles: bool,
     pub locked_doors: bool,
     pub progression: bool,
+}
+fn map_default() -> bool {
+    true
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
