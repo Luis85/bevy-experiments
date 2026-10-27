@@ -1454,7 +1454,10 @@ mod tests {
         assert!(file.starts_with("---\ntype: prompt\n"), "{file}");
         assert!(file.ends_with(&p.text) && !p.text.starts_with("---"));
         assert_eq!(p.modal().file, Some(dir.prompt(PromptKind::Start)));
-        assert!(read(dir.dir.join("AGENTS.md")).contains("http://127.0.0.1:15703"));
+        let agents = read(dir.dir.join("AGENTS.md"));
+        let meta = &app.world().resource::<ExplorerSession>().meta;
+        assert!(agents.contains(&meta.agent_id) && agents.contains(&meta.token));
+        assert!(!agents.contains("http://127.0.0.1:15703"));
         assert!(read(dir.dir.join(".mcp.json")).contains("http://127.0.0.1:15703"));
         assert_eq!(read(dir.dir.join("CLAUDE.md")), "@AGENTS.md\n");
         assert!(!dir.dir.join("start_prompt.md").exists());
@@ -1489,7 +1492,13 @@ mod tests {
         prepare_session(&mut app, &start, &dir, 15710).unwrap();
         assert_eq!(owned(&dir), before, "owned files untouched");
         let agents = read(dir.dir.join("AGENTS.md"));
-        assert!(!agents.contains("hand edit") && agents.contains("http://127.0.0.1:15710"));
+        let meta = &app.world().resource::<ExplorerSession>().meta;
+        assert!(
+            !agents.contains("hand edit")
+                && agents.contains(&meta.agent_id)
+                && agents.contains(&meta.token)
+        );
+        assert!(!agents.contains("http://127.0.0.1:"));
         let mcp = read(dir.dir.join(".mcp.json"));
         assert!(
             mcp.contains("http://127.0.0.1:15710") && !mcp.contains("15703"),
@@ -1604,7 +1613,22 @@ mod tests {
         assert_eq!(p.kind, PromptKind::Start);
         assert_eq!(p.port, 15703);
         assert_eq!(p.url, "http://127.0.0.1:15703");
-        assert!(p.text.contains(&format!("actor #{unit}")), "{}", p.text);
+        for step in ["Register", "enter the world", "take control"] {
+            assert!(p.text.contains(step), "{}", p.text);
+        }
+        let meta = &app.world().resource::<ExplorerSession>().meta;
+        for hidden in [
+            format!("actor #{unit}"),
+            meta.token.clone(),
+            meta.agent_id.clone(),
+            p.url.clone(),
+            "controller".into(),
+        ] {
+            assert!(
+                !p.text.contains(&hidden),
+                "mission prompt contains bootstrap details"
+            );
+        }
         assert_eq!(p.path, dir.prompt(PromptKind::Start));
         let file = std::fs::read_to_string(&p.path).unwrap();
         assert!(file.starts_with("---\ntype: prompt\n") && file.ends_with(&p.text));

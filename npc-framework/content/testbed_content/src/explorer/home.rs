@@ -7,6 +7,7 @@
 //! `agent.json` and `run.json`. The folder can be opened as an Obsidian
 //! vault.
 
+use std::io::{Read as _, Seek as _};
 use std::path::{Path, PathBuf};
 
 use super::prompt::PromptKind;
@@ -127,7 +128,7 @@ impl AgentDir {
 }
 
 /// The contents of `agent.json`.
-#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 pub struct AgentMeta {
     /// The agent's name.
     pub agent: String,
@@ -139,6 +140,234 @@ pub struct AgentMeta {
     /// Absent in folders from before presets: the human.
     #[serde(default = "default_preset")]
     pub preset: String,
+    /// Stable host identity; old metadata acquires it on production open.
+    #[serde(default)]
+    pub agent_id: String,
+    /// Host secret, persisted only in agent.json and generated AGENTS.md.
+    #[serde(default)]
+    pub token: String,
+}
+
+impl std::fmt::Debug for AgentMeta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentMeta")
+            .field("agent", &self.agent)
+            .field("world", &self.world)
+            .field("created", &self.created)
+            .field("preset", &self.preset)
+            .field("agent_id", &self.agent_id)
+            .field("token", &"<redacted>")
+            .finish()
+    }
+}
+
+/// A stamp and metadata read from one opened file, so replacement between
+/// reading bytes and checking the path's mtime cannot cache stale secrets.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CredentialStamp {
+    pub modified: Option<std::time::SystemTime>,
+    pub created: Option<std::time::SystemTime>,
+    pub len: u64,
+}
+
+impl CredentialStamp {
+    fn from_meta(meta: &std::fs::Metadata) -> Self {
+        Self {
+            modified: meta.modified().ok(),
+            created: meta.created().ok(),
+            len: meta.len(),
+        }
+    }
+}
+
+pub fn credential_stamp(dir: &AgentDir) -> Result<CredentialStamp, String> {
+    std::fs::metadata(dir.meta())
+        .map(|m| CredentialStamp::from_meta(&m))
+        .map_err(|_| "cannot inspect agent credentials".into())
+}
+
+fn metadata_json(bytes: &[u8]) -> Result<serde_json::Map<String, serde_json::Value>, String> {
+    let json = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+    let value: serde_json::Value =
+        serde_json::from_slice(json).map_err(|_| "agent metadata is not valid JSON".to_owned())?;
+    let object = value
+        .as_object()
+        .cloned()
+        .ok_or("agent metadata must be an object")?;
+    for key in ["agent_id", "token"] {
+        if object.get(key).is_some_and(|v| !v.is_string()) {
+            return Err("agent credentials must be strings".into());
+        }
+    }
+    Ok(object)
+}
+
+fn decoded_meta(object: &serde_json::Map<String, serde_json::Value>) -> Result<AgentMeta, String> {
+    // Do not echo a serde error's offending value: credential data may be
+    // malformed, but it is still secret.
+    serde_json::from_value(serde_json::Value::Object(object.clone()))
+        .map_err(|_| "agent metadata has invalid fields".into())
+}
+
+fn validate_credentials(meta: &AgentMeta) -> Result<(), String> {
+    if meta.agent_id.is_empty()
+        || meta.agent_id.len() > 64
+        || !meta
+            .agent_id
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+    {
+        return Err("agent identity is invalid; restore agent.json or create a new agent".into());
+    }
+    if meta.token.len() < 32
+        || !meta.token.len().is_multiple_of(2)
+        || !meta.token.bytes().all(|c| c.is_ascii_hexdigit())
+    {
+        return Err("agent token is invalid; rotate the token to repair credentials".into());
+    }
+    Ok(())
+}
+
+/// Read metadata without changing it (passive menus and save checks).
+pub fn read_meta(dir: &AgentDir) -> Result<AgentMeta, String> {
+    let bytes = std::fs::read(dir.meta())
+        .map_err(|e| format!("cannot read {}: {e}", dir.meta().display()))?;
+    decoded_meta(&metadata_json(&bytes)?)
+}
+
+/// Strict live credential read. Missing, malformed or unreadable fields
+/// fail closed; this path never generates replacement credentials.
+pub fn credential_snapshot(dir: &AgentDir) -> Result<(AgentMeta, CredentialStamp), String> {
+    let mut file = std::fs::File::open(dir.meta())
+        .map_err(|e| format!("cannot read {}: {e}", dir.meta().display()))?;
+    let mut bytes = Vec::new();
+    file.read_to_end(&mut bytes)
+        .map_err(|_| "cannot read agent credentials")?;
+    let stamp = CredentialStamp::from_meta(
+        &file
+            .metadata()
+            .map_err(|_| "cannot inspect agent credentials")?,
+    );
+    let meta = decoded_meta(&metadata_json(&bytes)?)?;
+    validate_credentials(&meta)?;
+    Ok((meta, stamp))
+}
+
+/// Serialize cooperative metadata writers across processes. A waiter may
+/// have opened the old inode before another writer's atomic replacement;
+/// compare its locked bytes with the path again and retry that case.
+fn locked_metadata(
+    dir: &AgentDir,
+    writable: bool,
+) -> Result<(std::fs::File, serde_json::Map<String, serde_json::Value>), String> {
+    for _ in 0..8 {
+        let mut file = std::fs::OpenOptions::new()
+            .read(true)
+            .write(writable)
+            .open(dir.meta())
+            .map_err(|e| format!("cannot open {}: {e}", dir.meta().display()))?;
+        file.lock().map_err(|_| "cannot lock agent metadata")?;
+        file.rewind()
+            .map_err(|_| "cannot read locked agent metadata")?;
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)
+            .map_err(|_| "cannot read locked agent metadata")?;
+        let locked_stamp = CredentialStamp::from_meta(
+            &file
+                .metadata()
+                .map_err(|_| "cannot inspect locked metadata")?,
+        );
+        let path_stamp = CredentialStamp::from_meta(
+            &std::fs::metadata(dir.meta()).map_err(|_| "cannot verify agent metadata")?,
+        );
+        if locked_stamp != path_stamp {
+            continue;
+        }
+        return Ok((file, metadata_json(&bytes)?));
+    }
+    Err("agent metadata kept changing; retry the operation".into())
+}
+
+fn change_metadata(
+    dir: &AgentDir,
+    change: impl FnOnce(&mut serde_json::Map<String, serde_json::Value>) -> Result<(), String>,
+) -> Result<AgentMeta, String> {
+    let (_guard, mut object) = locked_metadata(dir, true)?;
+    let before = object.clone();
+    change(&mut object)?;
+    let meta = decoded_meta(&object)?;
+    validate_credentials(&meta)?;
+    if object != before {
+        let text =
+            serde_json::to_string_pretty(&object).map_err(|_| "cannot encode agent metadata")?;
+        super::workspace::write_atomic(&dir.meta(), &text)
+            .map_err(|e| format!("cannot update {}: {e}", dir.meta().display()))?;
+    }
+    Ok(meta)
+}
+
+/// Keep generation and rotation ordered, so a stale AGENTS.md writer
+/// cannot publish an old token after a concurrent rotation finished.
+pub(crate) fn with_credentials<R>(
+    dir: &AgentDir,
+    use_meta: impl FnOnce(&AgentMeta) -> Result<R, String>,
+) -> Result<R, String> {
+    let (_guard, object) = locked_metadata(dir, false)?;
+    let meta = decoded_meta(&object)?;
+    validate_credentials(&meta)?;
+    use_meta(&meta)
+}
+
+fn migrate_fields(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    rotate: bool,
+) -> Result<(), String> {
+    if !object.contains_key("agent_id") {
+        let agent = object
+            .get("agent")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("agent metadata has no name")?;
+        let random = npc_framework::agent_io::registration::new_secret()?;
+        object.insert(
+            "agent_id".into(),
+            format!("{}-{}", slug(agent), &random[..8]).into(),
+        );
+    }
+    if rotate || !object.contains_key("token") {
+        object.insert(
+            "token".into(),
+            npc_framework::agent_io::registration::new_secret()?.into(),
+        );
+    }
+    Ok(())
+}
+
+/// Add missing legacy identity fields once, preserving all other JSON
+/// properties. Explicitly malformed credentials are never silently replaced.
+pub fn ensure_credentials(dir: &AgentDir) -> Result<AgentMeta, String> {
+    change_metadata(dir, |object| migrate_fields(object, false))
+}
+
+/// Replace the token while preserving the stable ID and unrelated fields.
+/// A malformed string token can be repaired explicitly through this API.
+pub fn rotate_token(dir: &AgentDir) -> Result<AgentMeta, String> {
+    change_metadata(dir, |object| migrate_fields(object, true))
+}
+
+/// Merge public host metadata fields without reviving cached credentials.
+pub fn update_public_metadata(
+    dir: &AgentDir,
+    fields: &serde_json::Map<String, serde_json::Value>,
+) -> Result<AgentMeta, String> {
+    if fields.contains_key("agent_id") || fields.contains_key("token") {
+        return Err("credential fields need the credential APIs".into());
+    }
+    change_metadata(dir, |object| {
+        for (key, value) in fields {
+            object.insert(key.clone(), value.clone());
+        }
+        Ok(())
+    })
 }
 
 fn default_preset() -> String {
@@ -191,6 +420,12 @@ fn fill_agent(
         world: world.into(),
         created: created.into(),
         preset: preset.into(),
+        agent_id: format!(
+            "{}-{}",
+            slug(agent),
+            &npc_framework::agent_io::registration::new_secret()?[..8]
+        ),
+        token: npc_framework::agent_io::registration::new_secret()?,
     };
     let json = serde_json::to_string_pretty(&meta).map_err(|e| e.to_string())?;
     std::fs::write(ad.meta(), json).map_err(err)
@@ -454,5 +689,104 @@ mod tests {
         assert_eq!(names, ["Amy", "Zed"]);
         assert!(l[0].has_save && !l[1].has_save);
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn new_agent_gets_id_and_secret_without_debug_disclosure() {
+        let root = tmp("credentials-new");
+        let dir = create_agent(&root, "Wren", "W", "t").unwrap();
+        let meta = read_meta(&dir).unwrap();
+        assert!(meta.agent_id.starts_with("wren-") && meta.agent_id.len() <= 64);
+        assert_eq!(meta.token.len(), 64);
+        assert!(meta.token.bytes().all(|b| b.is_ascii_hexdigit()));
+        assert!(!format!("{meta:?}").contains(&meta.token));
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    fn legacy_meta(dir: &AgentDir) {
+        std::fs::write(
+            dir.meta(),
+            r#"{"agent":"Wren","world":"W","created":"t","extra":"keep"}"#,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn old_agent_json_gets_credentials_once_and_reads_stay_readonly() {
+        let root = tmp("credentials-old");
+        let dir = create_agent(&root, "Wren", "W", "t").unwrap();
+        legacy_meta(&dir);
+        let before = std::fs::read(dir.meta()).unwrap();
+        assert!(read_meta(&dir).unwrap().agent_id.is_empty());
+        assert_eq!(list_agents(&root).len(), 1);
+        assert_eq!(std::fs::read(dir.meta()).unwrap(), before);
+        let first = ensure_credentials(&dir).unwrap();
+        let migrated = std::fs::read(dir.meta()).unwrap();
+        let second = ensure_credentials(&dir).unwrap();
+        assert!(first.agent_id == second.agent_id && first.token == second.token);
+        assert_eq!(std::fs::read(dir.meta()).unwrap(), migrated);
+        let value: serde_json::Value = serde_json::from_slice(&migrated).unwrap();
+        assert_eq!(value["extra"], "keep");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn concurrent_legacy_opens_share_exactly_one_identity() {
+        let root = tmp("credentials-concurrent");
+        let dir = create_agent(&root, "Wren", "W", "t").unwrap();
+        legacy_meta(&dir);
+        let threads: Vec<_> = (0..6)
+            .map(|_| {
+                let dir = dir.clone();
+                std::thread::spawn(move || ensure_credentials(&dir).unwrap())
+            })
+            .collect();
+        let metas: Vec<_> = threads.into_iter().map(|t| t.join().unwrap()).collect();
+        assert!(
+            metas
+                .iter()
+                .all(|m| m.agent_id == metas[0].agent_id && m.token == metas[0].token)
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn token_rotation_and_public_updates_preserve_identity_and_extra_fields() {
+        let root = tmp("credentials-rotate");
+        let dir = create_agent(&root, "Wren", "W", "t").unwrap();
+        let first = read_meta(&dir).unwrap();
+        let rotated = rotate_token(&dir).unwrap();
+        assert!(first.agent_id == rotated.agent_id && first.token != rotated.token);
+        let fields = serde_json::Map::from_iter([
+            ("preset".into(), "rover".into()),
+            ("extra".into(), "keep".into()),
+        ]);
+        let updated = update_public_metadata(&dir, &fields).unwrap();
+        assert!(updated.agent_id == rotated.agent_id && updated.token == rotated.token);
+        assert_eq!(updated.preset, "rover");
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(&std::fs::read(dir.meta()).unwrap())
+                .unwrap()["extra"],
+            "keep"
+        );
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn malformed_credentials_fail_closed_without_regeneration_or_echo() {
+        let root = tmp("credentials-invalid");
+        let dir = create_agent(&root, "Wren", "W", "t").unwrap();
+        let mut value: serde_json::Value =
+            serde_json::from_slice(&std::fs::read(dir.meta()).unwrap()).unwrap();
+        let secret = "do-not-echo-this-malformed-secret";
+        value["token"] = secret.into();
+        std::fs::write(dir.meta(), serde_json::to_vec(&value).unwrap()).unwrap();
+        let before = std::fs::read(dir.meta()).unwrap();
+        let error = credential_snapshot(&dir).unwrap_err();
+        assert!(!error.contains(secret));
+        let error = ensure_credentials(&dir).unwrap_err();
+        assert!(!error.contains(secret));
+        assert_eq!(std::fs::read(dir.meta()).unwrap(), before);
+        let _ = std::fs::remove_dir_all(root);
     }
 }

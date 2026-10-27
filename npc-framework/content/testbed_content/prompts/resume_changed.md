@@ -1,3 +1,3 @@
-{AGENT}, you return to {WORLD}. Epoch 1 goes on: survive, learn, explore, map. But the world was saved by another version of the game and may have changed: test what you remember against what you perceive, and note in your diary what differs.
+{AGENT}, you return to {WORLD}, but it was saved by another version of the game and may have changed. Epoch 1 continues: survive, learn, explore, map.
 
-Read `{AGENTS_MD}` first. Then remember: list your memory (`notes_list` with `book: "memory"`), the last entries of your diary (`book: "diary"`) and your proposals (`book: "proposals"`; the `status` on each is the dev's answer). Then observe and go on.
+Read `{AGENTS_MD}` first and register again. List your memory (`notes_list` with `book: "memory"`), the last entries of your diary (`book: "diary"`) and your proposals (`book: "proposals"`). Enter the world, discover your assigned character, and take control. Then observe, test what you remember, and record what differs as your story continues.

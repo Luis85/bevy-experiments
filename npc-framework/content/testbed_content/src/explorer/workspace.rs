@@ -23,8 +23,8 @@ use std::path::Path;
 use npc_framework::agent_io::notes::frontmatter::Frontmatter;
 use serde_json::json;
 
-use super::home::AgentDir;
-use super::prompt::{CONTROLLER, PromptKind, PromptVars, fill, prompt_values, render_prompt};
+use super::home::{AgentDir, AgentMeta};
+use super::prompt::{PromptKind, PromptVars, fill, prompt_values, render_prompt};
 use crate::actors::{ActorPreset, Body, SensorSpec};
 
 const AGENTS: &str = include_str!("../../prompts/agents.md");
@@ -211,21 +211,58 @@ pub struct WorkspaceVars {
     pub prompt: PromptVars,
     /// The agent's actor.
     pub actor: ActorSummary,
+    /// Credentials are rendered only into AGENTS.md, never the prompts.
+    pub identity: AgentIdentity,
 }
 
-/// `AGENTS.md`: the mission, the agent's character (body, senses, actions),
-/// how it reaches the world, its notebooks, the rules and where the `npcctl`
-/// help is. It teaches no tool usage: the tools describe themselves.
+#[derive(Clone)]
+pub struct AgentIdentity {
+    pub agent_id: String,
+    pub token: String,
+}
+
+impl From<&AgentMeta> for AgentIdentity {
+    fn from(meta: &AgentMeta) -> Self {
+        Self {
+            agent_id: meta.agent_id.clone(),
+            token: meta.token.clone(),
+        }
+    }
+}
+
+impl std::fmt::Debug for AgentIdentity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentIdentity")
+            .field("agent_id", &self.agent_id)
+            .field("token", &"<redacted>")
+            .finish()
+    }
+}
+
+/// `AGENTS.md`: the mission, MCP registration credentials and bootstrap,
+/// notebooks and rules. Character details arrive through `enter_world`.
 pub fn render_agents_md(v: &WorkspaceVars) -> String {
-    let a = &v.actor;
-    let sensors: String = if a.sensors.is_empty() {
-        "- none\n".to_string()
+    let mut values = prompt_values(&v.prompt);
+    values.extend([
+        ("AGENT_ID", v.identity.agent_id.clone()),
+        ("TOKEN", v.identity.token.clone()),
+    ]);
+    fill(AGENTS, &values)
+}
+
+/// Character briefing returned by enter_world, never embedded in the
+/// outsider's AGENTS.md or mission prompt.
+pub fn render_character(a: &ActorSummary) -> String {
+    let sensors = if a.sensors.is_empty() {
+        "- none\n".into()
     } else {
-        a.sensors.iter().map(|s| format!("- {s}\n")).collect()
+        a.sensors
+            .iter()
+            .map(|s| format!("- {s}\n"))
+            .collect::<String>()
     };
-    // The verb in backticks, a hint after it as plain text.
     let actions = if a.actions.is_empty() {
-        "none".to_string()
+        "none".into()
     } else {
         a.actions
             .iter()
@@ -236,15 +273,10 @@ pub fn render_agents_md(v: &WorkspaceVars) -> String {
             .collect::<Vec<_>>()
             .join(", ")
     };
-    let mut values = prompt_values(&v.prompt);
-    values.extend([
-        ("ACTOR_NAME", a.name.clone()),
-        ("ACTOR_BODY", a.body.clone()),
-        ("ACTOR_DESCRIPTION", a.description.clone()),
-        ("ACTOR_SENSORS", sensors),
-        ("ACTOR_ACTIONS", actions),
-    ]);
-    fill(AGENTS, &values)
+    format!(
+        "## Your character: {}\n\nBody: {}. {}\n\nSenses:\n\n{}\nActions: {}.\n",
+        a.name, a.body, a.description, sensors, actions
+    )
 }
 
 /// The frontmatter a generated markdown file starts with: `type` (`kind`:
@@ -289,7 +321,7 @@ pub fn render_mcp_json(v: &PromptVars) -> String {
             "npc": {
                 "type": "stdio",
                 "command": v.npcctl.display().to_string(),
-                "args": ["mcp", "--url", v.url, "--controller", CONTROLLER],
+                "args": ["mcp", "--url", v.url, "--registered"],
             }
         }
     });
@@ -326,7 +358,7 @@ pub(crate) fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
 /// The first file that cannot be written.
 pub fn write_workspace(
     dir: &AgentDir,
-    kind: PromptKind,
+    _kind: PromptKind,
     vars: &WorkspaceVars,
 ) -> std::io::Result<()> {
     let root = &dir.dir;
@@ -334,7 +366,14 @@ pub fn write_workspace(
     std::fs::create_dir_all(root.join(".claude"))?;
     write_atomic(&root.join("AGENTS.md"), &agents_md_file(vars))?;
     write_atomic(&root.join("CLAUDE.md"), CLAUDE_MD)?;
-    write_atomic(&dir.prompt(kind), &prompt_file(kind, &vars.prompt))?;
+    for kind in [
+        PromptKind::Start,
+        PromptKind::Resume,
+        PromptKind::ResumeChanged,
+        PromptKind::ResumeRebuilt,
+    ] {
+        write_atomic(&dir.prompt(kind), &prompt_file(kind, &vars.prompt))?;
+    }
     let claude = root.join(".claude");
     write_atomic(&claude.join("settings.json"), SETTINGS_JSON)?;
     write_atomic(&claude.join("settings.local.json"), SETTINGS_LOCAL_JSON)?;
@@ -381,6 +420,10 @@ mod tests {
                 npcctl_missing: false,
             },
             actor: ActorSummary::human_scout(),
+            identity: AgentIdentity {
+                agent_id: "wren-ashdown-0123abcd".into(),
+                token: "1".repeat(64),
+            },
         }
     }
 
@@ -401,7 +444,7 @@ mod tests {
             let preset: ActorPreset = serde_json::from_str(json).unwrap();
             let mut v = vars();
             v.actor = ActorSummary::from_preset(&preset);
-            let md = render_agents_md(&v);
+            let md = render_character(&v.actor);
             assert!(
                 md.contains(&preset.name) && md.contains("robot") && md.contains("Rolls"),
                 "{md}"
@@ -521,13 +564,7 @@ mod tests {
         assert_eq!(npc["command"], exe);
         assert_eq!(
             npc["args"],
-            json!([
-                "mcp",
-                "--url",
-                "http://127.0.0.1:15710",
-                "--controller",
-                "explorer"
-            ])
+            json!(["mcp", "--url", "http://127.0.0.1:15710", "--registered"])
         );
         assert_eq!(m["mcpServers"].as_object().unwrap().len(), 1);
         let _ = std::fs::remove_dir_all(&home);
@@ -714,7 +751,7 @@ mod tests {
         .unwrap();
         let agents = std::fs::read_to_string(a.dir.join("AGENTS.md")).unwrap();
         assert!(
-            agents.contains("15711") && !agents.contains("15702"),
+            !agents.contains("15711") && !agents.contains("15702"),
             "{agents}"
         );
         let mcp = std::fs::read_to_string(a.dir.join(".mcp.json")).unwrap();
@@ -730,12 +767,13 @@ mod tests {
             "Hollowmere",
             "Epoch 1",
             "Survive. Learn. Explore. Map the world.",
-            "Nobody will explain this world to you",
-            "actor #33",
-            "controller `explorer`",
-            "the MCP server `npc`",
-            "Each tool says what it does",
-            "Claude Code only applies this folder's permissions after you trust the folder when it asks — until then your tools are blocked.",
+            "Nobody will explain the world",
+            "`register`",
+            "`enter_world`",
+            "`take_control`",
+            "the `npc` MCP server",
+            "Each MCP tool describes its own inputs",
+            "trust this folder",
         ] {
             assert!(md.contains(s), "missing {s:?}");
         }
@@ -769,17 +807,17 @@ mod tests {
     fn agents_md_mentions_memory_span() {
         let md = render_agents_md(&vars());
         assert!(
-            md.contains("remember what you sensed for about a minute after you lose it"),
+            md.contains("remembers what it sensed for about a minute"),
             "memory span"
         );
-        assert!(md.contains("keep what matters longer in your notes"));
+        assert!(md.contains("Keep lasting knowledge in your notebooks"));
     }
 
     #[test]
     fn agents_md_says_observations_show_searched_ground() {
         let md = render_agents_md(&vars());
         assert!(
-            md.contains("Observations say how much nearby ground you have searched."),
+            md.contains("observations show how much nearby ground it has searched"),
             "searched ground"
         );
     }
@@ -837,7 +875,7 @@ mod tests {
             sensors: vec!["lidar: 30 m, 360 degrees".into(), "camera: 20 m".into()],
             actions: vec!["pick_up".into(), "drop".into()],
         };
-        let md = render_agents_md(&v);
+        let md = render_character(&v.actor);
         for s in [
             "Rover R1",
             "six-wheeled robot",
@@ -847,7 +885,7 @@ mod tests {
         ] {
             assert!(md.contains(s), "missing {s:?}");
         }
-        let h = render_agents_md(&vars());
+        let h = render_character(&vars().actor);
         for s in [
             "Human scout",
             "human",
@@ -864,7 +902,7 @@ mod tests {
 
     #[test]
     fn agents_md_lists_reach() {
-        let md = render_agents_md(&vars());
+        let md = render_character(&vars().actor);
         assert!(
             md.contains(
                 "- reach: 1.5 m all around, through nothing solid
@@ -881,7 +919,7 @@ mod tests {
         let mut v = vars();
         v.actor.sensors.clear();
         v.actor.actions.clear();
-        let md = render_agents_md(&v);
+        let md = render_character(&v.actor);
         assert!(md.contains("Senses:\n\n- none\n"), "{md}");
         assert!(
             md.contains(
@@ -917,18 +955,37 @@ mod tests {
     }
 
     #[test]
-    fn agents_md_cli_points_at_help_with_slashed_paths() {
-        let md = render_agents_md(&vars());
-        let cli = &md[md.find("## Without MCP").expect("cli section")..];
-        assert!(!cli.contains('\\'), "backslash in {cli}");
-        for s in [
-            "`C:/games/npcctl.exe agent --help`",
-            "`C:/games/npcctl.exe agent <command> --help`",
-            "`--url http://127.0.0.1:15702 --unit 33`",
-            "`--controller explorer`",
-            "--format text",
+    fn agents_md_has_credentials_and_no_cli_unit_controller_or_url() {
+        let v = vars();
+        let md = render_agents_md(&v);
+        assert!(md.contains(&v.identity.agent_id) && md.contains(&v.identity.token));
+        for forbidden in [
+            "npcctl",
+            "controller",
+            "actor #33",
+            "--unit",
+            "http://127.0.0.1",
+            "Without MCP",
+            "Human scout",
+            "sight: 15 m",
         ] {
-            assert!(cli.contains(s), "missing {s:?}");
+            assert!(
+                !md.contains(forbidden),
+                "forbidden bootstrap detail {forbidden}"
+            );
+        }
+        let register = md.find("`register`").unwrap();
+        let enter = md.find("`enter_world`").unwrap();
+        let take = md.find("`take_control`").unwrap();
+        assert!(register < enter && enter < take);
+        assert!(!format!("{v:?}").contains(&v.identity.token));
+        for kind in [
+            PromptKind::Start,
+            PromptKind::Resume,
+            PromptKind::ResumeChanged,
+            PromptKind::ResumeRebuilt,
+        ] {
+            assert!(!render_prompt(kind, &v.prompt).contains(&v.identity.token));
         }
     }
 
@@ -936,8 +993,17 @@ mod tests {
     fn agents_md_keeps_the_rules_and_spoils_nothing() {
         let md = render_agents_md(&vars());
         let rules = &md[md.find("## Rules").unwrap()..];
-        for s in ["world.mutate_*", "npc/command", "npc/pause", "npc/step"] {
+        for s in [
+            "Sense and act only through the game's MCP tools",
+            "Never change the game speed",
+            "alter the simulation directly",
+            "edit game files",
+            "Do not record your token",
+        ] {
             assert!(rules.contains(s), "{s}");
+        }
+        for hidden in ["world.mutate_", "npc/command", "npc/pause", "npc/step"] {
+            assert!(!md.contains(hidden), "hidden developer API {hidden}");
         }
         // No real store ids and no fixed date to copy.
         assert!(!md.contains("@26") && !md.contains("2026-"), "{md}");
@@ -945,7 +1011,7 @@ mod tests {
         let mut v = vars();
         v.prompt.npcctl_missing = true;
         let m = render_agents_md(&v);
-        assert!(m.contains("npcctl is not built yet; the user must run `cargo build -p npcctl`"));
+        assert!(!m.contains("npcctl"));
     }
 
     #[test]

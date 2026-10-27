@@ -8,6 +8,14 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Added (registered explorer agents, plan Tasks 30–31)
+
+- Explorer agents receive a persistent public ID and secret token, register with the server, enter their world
+  and explicitly take control of their assigned actor. Sessions and credentials are host-only; plain scenarios
+  retain their unlocked interface. Token rotation revokes the old session and refreshes the generated handbook.
+- Generated explorer MCP configuration uses session-bound registered mode; legacy MCP clients remain available
+  for ordinary scenarios. Generated handbooks and dungeon-master briefings teach only the MCP workflow.
+
 ### Added (actor editor, plan Task 14)
 
 - **Actors** in the game menu opens the Actor Testbed's standalone `--actor-editor` mode: a preset list,

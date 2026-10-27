@@ -5,6 +5,7 @@
 //! are `npc_framework::agent_io::notes`).
 
 pub mod clipboard;
+pub mod context;
 pub mod home;
 pub mod host;
 pub mod names;

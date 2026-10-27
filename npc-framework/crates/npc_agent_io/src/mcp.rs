@@ -33,6 +33,7 @@
 //! unknown tools and bad requests are JSON-RPC errors.
 
 use std::io::{self, BufRead, Write};
+use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use serde_json::{Value, json};
@@ -40,14 +41,22 @@ use serde_json::{Value, json};
 use crate::api::RpcError;
 use crate::http::{ClientError, RpcClient};
 
-/// A per-call nonce: `mcp-<pid>-<n>`.
-fn nonce() -> String {
+mod registered;
+pub use registered::{RegisteredClient, handle_registered, registered_tools, serve_registered};
+
+/// A per-call nonce with an OS-random process prefix. PID reuse and a
+/// restarted counter cannot reproduce a previous process's request key.
+pub fn request_nonce() -> Result<String, RpcError> {
     static NEXT: AtomicU64 = AtomicU64::new(1);
-    format!(
-        "mcp-{}-{}",
-        std::process::id(),
+    static PREFIX: OnceLock<Result<String, String>> = OnceLock::new();
+    let prefix = PREFIX
+        .get_or_init(crate::registration::new_secret)
+        .as_ref()
+        .map_err(|_| RpcError::new(-32603, "Cannot create a unique request identifier"))?;
+    Ok(format!(
+        "mcp-{prefix}-{}",
         NEXT.fetch_add(1, Ordering::Relaxed)
-    )
+    ))
 }
 
 /// The controller the notes tools use when a call names none (`npcctl mcp
@@ -262,6 +271,15 @@ pub fn call_tool(
     name: &str,
     args: Value,
 ) -> Result<Value, (i64, String)> {
+    let (method, args) = prepare_call(Some(controller), name, args)?;
+    Ok(present_call(name, client.call(method, args)))
+}
+
+fn prepare_call(
+    controller: Option<&str>,
+    name: &str,
+    args: Value,
+) -> Result<(&'static str, Value), (i64, String)> {
     let mut args = match args {
         Value::Null => json!({}),
         Value::Object(m) => Value::Object(m),
@@ -277,7 +295,7 @@ pub fn call_tool(
         "act" => "agent/act",
         "act_and_wait" => {
             if args.get("nonce").is_none() {
-                args["nonce"] = json!(nonce());
+                args["nonce"] = json!(request_nonce().map_err(|e| (e.code, e.message))?);
             }
             if args.get("observe").is_none_or(Value::is_null) {
                 args["observe"] = json!({});
@@ -290,14 +308,16 @@ pub fn call_tool(
         "cancel" => "agent/cancel",
         "events" => {
             if args.get("nonce").is_none() {
-                args["nonce"] = json!(nonce());
+                args["nonce"] = json!(request_nonce().map_err(|e| (e.code, e.message))?);
             }
             "agent/events"
         }
         "attach" => "agent/attach",
         "list_units" => "agent/list_units",
         "notes_list" | "notes_add" | "notes_update" => {
-            if args.get("controller").is_none_or(Value::is_null) {
+            if let Some(controller) = controller
+                && args.get("controller").is_none_or(Value::is_null)
+            {
                 args["controller"] = json!(controller);
             }
             match name {
@@ -308,7 +328,11 @@ pub fn call_tool(
         }
         other => return Err((-32602, format!("Unknown tool: {other}"))),
     };
-    Ok(match client.call(method, args) {
+    Ok((method, args))
+}
+
+fn present_call(name: &str, response: Result<Value, ClientError>) -> Value {
+    match response {
         Ok(v) => {
             let text = if name == "observe" {
                 v.get("text")
@@ -325,7 +349,7 @@ pub fn call_tool(
         }
         Err(ClientError::Rpc(e)) => rpc_tool_error(&e),
         Err(e) => tool_error(e.to_string()),
-    })
+    }
 }
 
 /// Answers one message; `None` for notifications (and responses).
@@ -437,8 +461,8 @@ mod tests {
 
     #[test]
     fn events_calls_carry_distinct_nonces() {
-        let a = nonce();
-        let b = nonce();
+        let a = request_nonce().unwrap();
+        let b = request_nonce().unwrap();
         assert_ne!(a, b);
         assert!(a.starts_with("mcp-"), "{a}");
     }

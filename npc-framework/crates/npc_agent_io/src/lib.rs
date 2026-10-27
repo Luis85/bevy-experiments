@@ -62,6 +62,7 @@ pub mod http;
 pub mod mcp;
 pub mod notes;
 pub mod observe;
+pub mod registration;
 pub mod registry;
 #[cfg(feature = "remote")]
 pub mod remote;

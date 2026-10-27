@@ -15,7 +15,7 @@ use npc_framework::prelude::{SimId, SimIndex, SimPos, run_ticks, state_hash};
 use npc_framework::tools::snapshot_check::assert_resume_equivalent;
 use serde_json::{Value, json};
 use testbed_content::TestbedIds;
-use testbed_content::explorer::host::{HostArgs, build_world};
+use testbed_content::explorer::host::{ExplorerSession, HostArgs, build_world};
 
 const SEED: u64 = 0x5eed;
 const NOW: &str = "2026-10-25T12:00:00Z";
@@ -53,7 +53,7 @@ fn observe(app: &mut App, unit: SimId, format: Option<&str>) -> Value {
     if let Some(f) = format {
         params["format"] = json!(f);
     }
-    npc_framework::agent_io::api::call(app.world_mut(), "agent/observe", Some(params)).unwrap()
+    call(app, "agent/observe", params)
 }
 
 fn text(app: &mut App, unit: SimId) -> String {
@@ -156,6 +156,21 @@ fn existing_hashes_unchanged() {
         assert_eq!(state_hash(app.world_mut()), state, "{scenario}");
     }
     let (mut app, _, home) = explorer("human", "human-hash");
+    // Keep the historical preset oracle while isolating the new dormant
+    // host lifecycle: explicitly attach the legacy controller at tick 0.
+    let legacy = npc_framework::agent_io::control::AttachController {
+        unit: app.world().resource::<TestbedIds>().id("Wren").0,
+        controller: "explorer".into(),
+        mode: Default::default(),
+        on_idle: Default::default(),
+        force: false,
+    };
+    npc_framework::prelude::submit(
+        app.world_mut(),
+        None,
+        npc_framework::prelude::SimCommand::content(&legacy),
+    )
+    .unwrap();
     assert_eq!(content_hash(app.world_mut()), 0xd8a1_bc52_b124_7a36);
     run_ticks(app.world_mut(), 600);
     assert_eq!(state_hash(app.world_mut()), 0xe011_a567_313f_1fe8);
@@ -255,9 +270,45 @@ fn lidar_sees_through_an_open_door_only() {
 }
 
 fn call(app: &mut App, method: &str, params: Value) -> Value {
+    let mut params = params;
+    if app
+        .world()
+        .contains_resource::<npc_framework::agent_io::registration::RegistrationRequired>()
+    {
+        let session = if let Some(session) = app.world().get_resource::<TestSession>() {
+            session.0.clone()
+        } else {
+            let meta = app.world().resource::<ExplorerSession>().meta.clone();
+            let registered = npc_framework::agent_io::api::call(
+                app.world_mut(),
+                "agent/register",
+                Some(json!({"agent_id":meta.agent_id,"token":meta.token})),
+            )
+            .unwrap();
+            let session = registered["session"].as_str().unwrap().to_owned();
+            let taken = npc_framework::agent_io::api::call(
+                app.world_mut(),
+                "agent/take_control",
+                Some(json!({"session":session})),
+            )
+            .unwrap();
+            if taken["in_control"] != json!(true) {
+                run_ticks(app.world_mut(), 1);
+            }
+            app.insert_resource(TestSession(session.clone()));
+            session
+        };
+        params["session"] = json!(session);
+        if params.get("controller").is_some() {
+            params["controller"] = json!(app.world().resource::<ExplorerSession>().meta.agent_id);
+        }
+    }
     npc_framework::agent_io::api::call(app.world_mut(), method, Some(params))
         .unwrap_or_else(|e| panic!("{method}: {e:?}"))
 }
+
+#[derive(bevy_ecs::prelude::Resource)]
+struct TestSession(String);
 
 /// Runs until `done` holds (at most `max` ticks).
 fn run_until(app: &mut App, max: u64, done: impl Fn(&App) -> bool) -> bool {

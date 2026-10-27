@@ -104,6 +104,11 @@ pub enum Action {
     StopDetached(String),
     /// The Detached screen's Copy: the prompt to the OS clipboard.
     CopyPrompt,
+    /// Revoke the current credential and refresh the agent's MCP handbook.
+    RotateToken {
+        agent: String,
+        dir: PathBuf,
+    },
     Build,
     /// The Building screen's Cancel: kills the build, back to Missing.
     CancelBuild,
@@ -239,6 +244,7 @@ pub fn apply_action(world: &mut World, action: Action) {
         }
         Action::StopDetached(agent) => detached::begin_op(world, &agent, OpKind::Stop),
         Action::CopyPrompt => detached::copy_prompt(world),
+        Action::RotateToken { agent, dir } => explorer::rotate_token(world, &agent, dir),
         Action::Build => {
             let tools = world.resource::<BuildTools>().clone();
             let Some(missing) = world.get_resource::<Missing>().cloned() else {

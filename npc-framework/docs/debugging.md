@@ -475,6 +475,26 @@ method, `-32603` internal error.
 
 ## 4. Agent, world and session methods
 
+**Registered explorer worlds (Tasks 30–31).** Explorer hosts require registration; ordinary scenarios keep the
+legacy methods below. `agent/register {agent_id, token}` returns a host-memory session; `agent/enter_world
+{session}` returns the assigned character and scene without its unit ID; `agent/take_control {session}` submits
+the existing recorded attachment and reports `pending` / `in_control`; `agent/release {session}` relinquishes it.
+Every other `agent/*` call needs that session. Notes work after registration; observing/acting/waiting/canceling
+need control. Supplied identities may only match the assigned actor. Missing/invalid sessions return
+`not_registered` / `unknown_session`; wrong credentials return `bad_credentials` with a nonblocking retry delay.
+
+Generated explorer `.mcp.json` runs `npcctl mcp --registered`: register, enter_world, take_control, release and
+session-bound observe/act/act_and_wait/events/cancel/notes tools omit unit/controller arguments. Session keys and
+credentials stay inside the MCP process. A restarted/moved host can reconnect once and restore control; explicit
+replacement/rotation returns `revoked:true` and requires the agent to register with its current handbook again.
+Legacy `npcctl mcp` remains available for unlocked scenarios and their existing schemas.
+
+For developer testing, credentialed `npcctl agent … --agent-id ID --token TOKEN` registers before the call;
+without `--agent-id`, `--token` retains its HTTP-bearer meaning. Use `--bearer-token` when both locks apply.
+`npcctl agent-token rotate --explorer-home DIR --agent NAME` or the menu's **New token** revokes the old
+credential and regenerates the handbook. Tokens are not printed, logged, saved in the world or included in
+observations. `npc/*`, `world/*`, player notes and app/quit keep their developer behavior. See ADR 0016.
+
 Served by `npcctl serve` (a std JSON-RPC host) and, in games, by `AgentRemotePlugin` on BRP (ADR 0010). Every
 result carries `tick` (the next tick to run), `seq` (the latest agent event) and `epoch` (the world instance: a new,
 larger number after `world/reset` or `world/load_scenario`, when seqs and handles restart; poll again from

@@ -100,6 +100,8 @@ pub enum Detection {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct WorldSpec {
+    /// Present only in host-generated explorer descriptors; pure replay data.
+    pub explorer_context: Option<crate::explorer::context::ExplorerContext>,
     pub layout: Layout,
     pub furnish: bool,
     pub store_locked: bool,
@@ -112,6 +114,7 @@ pub struct WorldSpec {
 impl Default for WorldSpec {
     fn default() -> Self {
         Self {
+            explorer_context: None,
             layout: Layout::Compound,
             furnish: true,
             store_locked: true,
@@ -226,7 +229,15 @@ pub fn load_with(
     plugins: impl FnOnce(&mut App),
 ) -> Result<LoadedScenario, String> {
     let spec = WorldSpec::parse(&doc.world)?;
-    let mut app = build_app(seed, &spec, plugins);
+    let mut app = build_app(seed, &spec, |app| {
+        plugins(app);
+        if let Some(context) = &spec.explorer_context {
+            app.world_mut()
+                .get_resource_or_init::<crate::actors::ActorPresets>()
+                .0
+                .insert(context.preset_id.clone(), context.preset.clone());
+        }
+    });
     let world = app.world_mut();
     let mut ids = TestbedIds::default();
     spawn_world(world, &spec, &mut ids)?;
@@ -257,6 +268,9 @@ pub fn load_with(
         name: doc.info_name(),
         villagers: u32::try_from(actors.len()).unwrap_or(u32::MAX),
     });
+    if let Some(context) = &spec.explorer_context {
+        context.apply(&mut app)?;
+    }
     Ok(LoadedScenario { app, actors })
 }
 

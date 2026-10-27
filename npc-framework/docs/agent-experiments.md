@@ -417,13 +417,13 @@ discarding them. Resumed worlds retain their saved preset copy; file edits apply
    letters or digits a folder can use, or names an agent that exists. Under the names the screen says "After
    Start, open your AI tool in <agents folder>/<slug(agent)> and paste the prompt": the folder the game prepares.
    **Start in window** runs `actor_testbed --explorer-home DIR --agent NAME --world NAME`: the `explorer` scenario
-   (`content/testbed_content/README.md`, the `frontier` layout) with one actor named after the agent under the
-   `Direct` controller `explorer`, a wall-clock seed, saved at tick 0. On every start and resume the game writes
+   (`content/testbed_content/README.md`, the `frontier` layout) with one assigned actor named after the agent,
+   initially unattached, a wall-clock seed, saved at tick 0. On every start and resume the game writes
    the agent's **prepared folder** (`testbed_content::explorer::workspace::write_workspace`, each file atomically):
-   `AGENTS.md` (the actor, the world, the tools with this run's URL, the notes, the rules), `CLAUDE.md`
+   `AGENTS.md` (credentials, MCP registration workflow, notebooks and rules), `CLAUDE.md`
    (`@AGENTS.md`), `prompts/<kind>.md`, `.claude/settings.json` (only the game's MCP tools and reading the folder;
    no shell, edits or web), `.claude/settings.local.json` (enables the `npc` server) and `.mcp.json`
-   (`npcctl mcp --url ...`). A folder that cannot be written is logged and named in the modal's notes; the world
+   (`npcctl mcp --registered --url ...`). A folder that cannot be written is logged and named in the modal's notes; the world
    still starts. **Start detached** runs the same world without a window (`npcctl serve`, see **Detached** below).
    Choose an **Actor** preset below the names: Human, Rover (LIDAR and camera), Sentinel (radar and camera), or
    another valid JSON preset from the configured actors folder. The selected actor's description is shown;
@@ -439,7 +439,13 @@ discarding them. Resumed worlds retain their saved preset copy; file edits apply
    agent tool (Claude Code, Codex, a chat with MCP or a shell) **in the agent's folder**, paste the prompt into a
    fresh session and press OK. Claude Code asks once to trust the folder; until then its settings (and so the
    game's tools) are not applied.
-4. The agent plays through `npcctl agent observe | act | events` (or `npcctl mcp`) on the port the game picked
+4. The agent uses the configured **npc MCP tools**: read its ID/token from `AGENTS.md`, **register**, **enter_world**
+   to learn its assigned character, then **take_control**. Later tools act on its actor without unit/controller
+   arguments. The generated `.mcp.json` selects registered mode; the token is never in the prompts or world save.
+   **New token** on Resume/Detached revokes the old session and refreshes the handbook; the agent registers again
+   with that credential. Restart/mode-switch recovery re-registers transparently, while explicit revocation does
+   not replay a mutating call. The developer CLI is documented separately in the debugging guide.
+   The world serves the agent on the port the game picked
    (the first free one in 15702..=15721, or from `--remote-port N` on, whose next port is free too for the render
    server; named in the prompt and the modal's notes). **F7** is the notes editor: tabs Diary,
    Memory and Proposals (Tab cycles them), newest first with ids and stamps, re-read within ~1 s of an agent's

@@ -422,7 +422,7 @@ fn explorer_spawns_the_chosen_preset() {
         serde_json::from_str(&std::fs::read_to_string(dir.dir.join("agent.json")).unwrap())
             .unwrap();
     assert_eq!(meta.preset, "porter");
-    // AGENTS.md describes the porter.
+    // AGENTS.md withholds the character until enter_world.
     let files = write_session_files(
         app.world(),
         &start,
@@ -434,11 +434,29 @@ fn explorer_spawns_the_chosen_preset() {
     .unwrap();
     assert_eq!(files.write_error, None);
     let md = std::fs::read_to_string(dir.dir.join("AGENTS.md")).unwrap();
-    assert!(md.contains("Porter"), "{md}");
-    assert!(md.contains("sight: 12 m, 45 degrees"), "{md}");
-    assert!(md.contains("reach: 2.0 m"), "{md}");
-    assert!(!md.contains("`craft`") && !md.contains("`pick_up`"), "{md}");
-    assert!(md.contains("1.0 m/s"), "{md}");
+    assert!(!md.contains("Porter") && !md.contains("sight: 12 m"));
+    let meta = app.world().resource::<ExplorerSession>().meta.clone();
+    let registration = npc_framework::agent_io::api::call(
+        app.world_mut(),
+        "agent/register",
+        Some(json!({"agent_id":meta.agent_id,"token":meta.token})),
+    )
+    .unwrap();
+    let character = npc_framework::agent_io::api::call(
+        app.world_mut(),
+        "agent/enter_world",
+        Some(json!({"session":registration["session"]})),
+    )
+    .unwrap();
+    let text = character["text"].as_str().unwrap();
+    assert!(text.contains("Porter"), "{text}");
+    assert!(text.contains("sight: 12 m, 45 degrees"), "{text}");
+    assert!(text.contains("reach: 2.0 m"), "{text}");
+    assert!(
+        !text.contains("`craft`") && !text.contains("`pick_up`"),
+        "{text}"
+    );
+    assert!(text.contains("1.0 m/s"), "{text}");
     // A save and a resume keep the preset, even when its file changes.
     run_ticks(app.world_mut(), 20);
     let session = app.world().resource::<ExplorerSession>().clone();
@@ -462,7 +480,51 @@ fn explorer_spawns_the_chosen_preset() {
     let _ = std::fs::remove_dir_all(&home);
 }
 
+#[derive(bevy_ecs::prelude::Resource)]
+struct TestSession(String);
+
+fn registered_params(app: &mut App, mut params: Value) -> Value {
+    if !app
+        .world()
+        .contains_resource::<npc_framework::agent_io::registration::RegistrationRequired>()
+    {
+        if let Some(object) = params.as_object_mut() {
+            object.remove("session");
+        }
+        return params;
+    }
+    let session = if let Some(session) = app.world().get_resource::<TestSession>() {
+        session.0.clone()
+    } else {
+        let meta = app.world().resource::<ExplorerSession>().meta.clone();
+        let registered = npc_framework::agent_io::api::call(
+            app.world_mut(),
+            "agent/register",
+            Some(json!({"agent_id":meta.agent_id,"token":meta.token})),
+        )
+        .unwrap();
+        let session = registered["session"].as_str().unwrap().to_owned();
+        let taken = npc_framework::agent_io::api::call(
+            app.world_mut(),
+            "agent/take_control",
+            Some(json!({"session":session})),
+        )
+        .unwrap();
+        if taken["in_control"] != json!(true) {
+            run_ticks(app.world_mut(), 1);
+        }
+        app.insert_resource(TestSession(session.clone()));
+        session
+    };
+    params["session"] = json!(session);
+    if params.get("controller").is_some() {
+        params["controller"] = json!(app.world().resource::<ExplorerSession>().meta.agent_id);
+    }
+    params
+}
+
 fn call(app: &mut App, method: &str, params: Value) -> Value {
+    let params = registered_params(app, params);
     npc_framework::agent_io::api::call(app.world_mut(), method, Some(params))
         .unwrap_or_else(|e| panic!("{method}: {e:?}"))
 }
@@ -552,6 +614,21 @@ fn human_preset_matches_todays_scout() {
     for (tag, preset) in [("human-default", None), ("human-named", Some("human"))] {
         let home = tmp(tag);
         let (mut app, _, _) = build_world(&new_args(&home, preset), SEED, NOW, |_| {}).unwrap();
+        // Isolate preset compatibility from host registration: explicitly
+        // reproduce the legacy controller using its recorded command.
+        let legacy = npc_framework::agent_io::control::AttachController {
+            unit: entity(&app, "Wren").0.0,
+            controller: "explorer".into(),
+            mode: Default::default(),
+            on_idle: Default::default(),
+            force: false,
+        };
+        npc_framework::prelude::submit(
+            app.world_mut(),
+            None,
+            npc_framework::prelude::SimCommand::content(&legacy),
+        )
+        .unwrap();
         assert_eq!(content_hash(app.world_mut()), TODAY_CONTENT, "{tag}");
         let (_, e) = entity(&app, "Wren");
         assert_eq!(
@@ -629,7 +706,25 @@ fn withheld_vehicle_verbs_cannot_be_ordered() {
         write_preset(&home, "walker", &walker(&home));
         let (mut app, _, _) =
             build_world(&new_args(&home, Some(preset)), SEED, NOW, |_| {}).unwrap();
+        // This compatibility test isolates the verb gate from the new host
+        // assignment boundary: an unlocked legacy controller may order vehicles.
+        app.world_mut()
+            .remove_resource::<npc_framework::agent_io::registration::RegistrationRequired>();
         let (wren, _) = entity(&app, "Wren");
+        let attach = npc_framework::agent_io::control::AttachController {
+            unit: wren.0,
+            controller: "explorer".into(),
+            mode: Default::default(),
+            on_idle: Default::default(),
+            force: false,
+        };
+        npc_framework::prelude::submit(
+            app.world_mut(),
+            None,
+            npc_framework::prelude::SimCommand::content(&attach),
+        )
+        .unwrap();
+        run_ticks(app.world_mut(), 1);
         let (cart, _) = entity(&app, "cart");
         let (wagon, _) = entity(&app, "wagon");
         let check = |r: &Value, verb: &str| {
