@@ -491,7 +491,7 @@ method, `-32603` internal error.
 legacy methods below. `agent/register {agent_id, token}` returns a host-memory session; `agent/enter_world
 {session}` returns the assigned character and scene without its unit ID; `agent/take_control {session}` submits
 the existing recorded attachment and reports `pending` / `in_control`; `agent/release {session}` relinquishes it.
-Every other `agent/*` call needs that session. Notes work after registration; observing/acting/waiting/canceling
+Every other `agent/*` call needs that session. Notes/map work after registration; observing/acting/waiting/canceling
 need control. Supplied identities may only match the assigned actor. Missing/invalid sessions return
 `not_registered` / `unknown_session`; wrong credentials return `bad_credentials` with a nonblocking retry delay.
 
@@ -505,7 +505,7 @@ For developer testing, credentialed `npcctl agent … --agent-id ID --token TOKE
 without `--agent-id`, `--token` retains its HTTP-bearer meaning. Use `--bearer-token` when both locks apply.
 `npcctl agent-token rotate --explorer-home DIR --agent NAME` or the menu's **New token** revokes the old
 credential and regenerates the handbook. Tokens are not printed, logged, saved in the world or included in
-observations. `npc/*`, `world/*`, player notes and app/quit keep their developer behavior. See ADR 0016.
+observations. `npc/*`, `world/*`, player notes/map and app/quit keep their developer behavior. See ADR 0016.
 
 Served by `npcctl serve` (a std JSON-RPC host) and, in games, by `AgentRemotePlugin` on BRP (ADR 0010). Every
 result carries `tick` (the next tick to run), `seq` (the latest agent event) and `epoch` (the world instance: a new,

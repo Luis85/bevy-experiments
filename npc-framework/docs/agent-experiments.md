@@ -415,11 +415,20 @@ discarding them. Resumed worlds retain their saved preset copy; file edits apply
 their rates/thresholds/movement effects, day/night, detection, perception memory, system switches and
 inhabitants. Validation is live; invalid presets cannot be saved or launched. New/Duplicate/Revert and guarded
 atomic saves follow the actor editor's conventions. Settings' optional **Worlds folder** defaults to
-`npc-worlds` beside the agents folder. Plain explorer preserves today's mechanics; Survival enables needs
-and darker nights, and Night shift uses a shorter cycle. A saved world keeps its complete preset copy even
+`npc-worlds` beside the agents folder. Plain explorer preserves the existing clock and full night sensing;
+Survival enables needs and reduced night sensing, and Night shift uses a shorter cycle. A saved world keeps its complete preset copy even
 when the source is edited or deleted.
 
-1. `cargo run -p game_menu` → **Settings**: the agents folder (default `<home>/npc-agents`, kept in
+At the default 20 Hz, explorer memory lasts 1,200 ticks (one minute) and holds 128 things; world presets tune
+both values. Needs are rising deprivation values from 0 to 100,000: humans use hunger/thirst/energy and robots
+use battery. Reaching `low_milli` applies the preset's movement percentage to an ongoing walk;
+reaching `out_milli` collapses the
+actor. Rest/charge at a matching source restores energy/battery. Hunger/thirst exhaustion requires developer
+rescue under the strict collapsed-action rule (ADR 0017). Vision/camera use the preset's night percentage
+without compounding; LIDAR/radar ranges stay unchanged. Plain retains its incumbent 2,400-tick clock and
+100% night sensing. Optional workers work/wander and skeletons patrol.
+
+1. From `npc-framework/`, `cargo run --locked -p game_menu` → **Settings**: the agents folder (default `<home>/npc-agents`, kept in
    `%APPDATA%\npc-framework\settings.json`, `$XDG_CONFIG_HOME` or `~/.config`; `--settings FILE` for another
    file). **Explore with an AI agent** stays disabled until the folder is valid.
 2. **New**: the agent and world names come prefilled with random names (**Random** rolls again; Ctrl+C, Ctrl+X and
@@ -448,9 +457,10 @@ when the source is edited or deleted.
    to `actor_testbed --explorer-home DIR --agent NAME --world NAME` or `npcctl serve` with the same explorer flags.
 3. The game window opens **paused** behind a modal with the prompt: **Copy** puts it on the OS clipboard (a
    note names `prompts/<kind>.md` when the copy tool fails), **OK** closes the modal and starts the sim. Open the
-   agent tool (Claude Code, Codex, a chat with MCP or a shell) **in the agent's folder**, paste the prompt into a
+   MCP-capable agent tool (Claude Code, Codex or another MCP harness) **in the agent's folder**, paste the prompt into a
    fresh session and press OK. Claude Code asks once to trust the folder; until then its settings (and so the
-   game's tools) are not applied.
+   game's tools) are not applied. Other harnesses need the same MCP-only policy; the generated Claude settings
+   do not configure another product's permissions.
 4. The agent uses the configured **npc MCP tools**: read its ID/token from `AGENTS.md`, **register**, **enter_world**
    to learn its assigned character, then **take_control**. Later tools act on its actor without unit/controller
    arguments. The generated `.mcp.json` selects registered mode; the token is never in the prompts or world save.
@@ -500,54 +510,55 @@ when the source is edited or deleted.
    save. A check that crashes (an exit code other than 0 or 1) is reported on
    the Resume screen with its last stderr line; one still running after 30 s, or when you go Back, is killed.
 
-**The folder layout** (`testbed_content::explorer::home` and `::workspace`; folder and file names are slugs, the real names stay in
-the files). The generated files are rewritten on every start and resume (hand edits there are lost; an older
+**The folder layout** (`testbed_content::explorer::home` and `::workspace`; agent/save names are slugs, notes and
+landmarks use readable safe titles, and real display names stay in the files). Generated files are rewritten
+on every start and resume (hand edits there are lost; an older
 folder gets them on its next resume, and its old `start_prompt.md` / `resume_prompt.md` are deleted); the notes,
 `agent.json` and the saves are never touched by it:
 
 ```
 <agents folder>/
   <slug(agent)>/
-    agent.json                 {agent, world, created}
-    AGENTS.md                  generated: the actor, the world, the tools (this run's URL), the notes, the rules
+    agent.json                 owned: names, preset IDs, created, public agent_id, private token
+    AGENTS.md                  generated: credentials, MCP workflow, notebooks, world rules and optional map
     CLAUDE.md                  generated: `@AGENTS.md`
     prompts/start.md           generated: the prompt the modal showed on New
     prompts/resume.md          generated: the prompt of the last Resume (also resume_changed.md, resume_rebuilt.md)
     .claude/settings.json      generated: MCP-only permissions for Claude Code
     .claude/settings.local.json  generated: enables the `npc` server of .mcp.json
-    .mcp.json                  generated: the game's MCP server (`npcctl mcp --url URL --controller explorer`)
+    .mcp.json                  generated: the game's MCP server (`npcctl mcp --registered --url URL`)
     diary/YYYY-MM-DD <title>.md   one file per diary entry (frontmatter id, type, title, aliases, tags, agent, world,
                                author, created, created_tick, updated, updated_tick, revision; then the body)
     memory/<title>.md          one file per memory, same frontmatter
     proposals/<title>.md       one file per proposal, plus status and prompted_by
+    map/<name>.md              one file per fixed landmark (id, type: landmark, name, pos, kind, thing, stamps)
     diary.md.bak, memory.md.bak   an old one-file diary / memory after it moved into its folder (kept, never read)
-    <slug(world)>.world.json   the save: {version, content_hash, tick, header {agent, world, scenario, seed, saved}, entities, resources}
+    <slug(world)>.world.json   save: version/content hash/tick, entities/resources, header with scenario/seed/names
+                               and immutable actor/world preset copies; no credentials, notes or map files
     <slug(world)>.world.<date>.json   a backup made by "Fresh world, keep the diary"
+    run.json                  runtime only: pid, port, mode, started, agent and world; removed on clean stop
 ```
 
-The notes are written only through the game (the notes tools, `npcctl agent notes`, `npcctl notes`, F7); the
+The agent writes notes/map only through game tools. The developer can also use player CLI methods or F7; the
 agent never writes files. Every entry is a markdown file with YAML frontmatter named after its title, so the
 agent folder (or the agents folder) opens as an Obsidian vault: the game finds entries by their `id` property, so
 renaming a file or editing it there is fine; a file it cannot read is listed as `unreadable` (with the reason, in
 `notes_list` and F7) and never overwritten. Only the dev changes a proposal's `status` (`new` → `liked`,
 `pursuing` or `rejected`); the agent reads every proposal before writing one and never re-proposes an idea.
 
-**The prompt variants** (`content/testbed_content/prompts/`, editable without code; `cargo test -p
+**The prompt variants** (`content/testbed_content/prompts/`, editable without code; `cargo test --locked -p
 testbed_content explorer` checks every placeholder is filled): the prompts are short mission briefs, as a game
 master would hand them out. Epoch 1's mission is **survive, learn, explore and map the world**; nobody explains the
-world, the tools or the mechanics: the agent finds out by trying and keeps what it learns only in its notebooks.
-`start.md` (you wake in the world, the mission, read `AGENTS.md`, then observe) and three resume openings, each
-followed by `common.md` (your unit and controller, act only through the game's MCP tools, notebooks only through the
-`notes_*` tools, never in files). `agents.md`, the template of the folder's `AGENTS.md`, is a character sheet, not a
-manual: the mission, the actor's body, senses and actions, how it reaches the world (unit, controller, the `npc` MCP
-server, whose tools describe themselves), its three notebooks (memory doubles as its map and its manual of how
-things work), the rules (only `agent/*`, never `world.mutate_*`, `npc/command`, `npc/pause|step` or the speed; no
-end) and, for tools without MCP, the `npcctl` path with a pointer to `npcctl agent --help`. It no longer teaches the
-one-call loop, the tool fields or the world's geometry:
+world geometry in advance. `start.md` and the three resume openings lead to `common.md`: read `AGENTS.md`,
+register, enter the world, take control, explore and write the story through MCP. The handbook names public ID
+and private token, the registration/one-call act-and-wait loop, notebooks, active world rules and optional map.
+It contains no URL, CLI command, unit/controller selector or assigned character sheet; `enter_world` delivers
+the body, senses and actions. Notebook/map files are owned knowledge, never generated. Resume lists memory
+then map (when enabled), diary and proposals before continuing.
 
 | Variant | When | The opening says |
 |---|---|---|
-| `resume.md` | the save fits this build | list memory, diary and proposals (with the dev's statuses) with `notes_list` first, then observe and continue; the save may be up to a minute older than the diary's last lines |
+| `resume.md` | the save fits this build | register/enter/control, review memory then map, diary and proposals, observe and continue; the save may be up to a minute older than the diary's last lines |
 | `resume_changed.md` | **Load anyway** | the world was saved by another version and may have changed: check memory against the senses, write down what differs |
 | `resume_rebuilt.md` | **Fresh world, keep the diary** | the world was rebuilt from scratch: trust the senses over the diary |
 
@@ -563,14 +574,14 @@ the same folder, so the diary and proposals stay. An unreadable save offers only
 BRP, [debugging.md §3.3](debugging.md#33-npc-methods)):
 
 ```sh
-cargo build -p actor_testbed -p npcctl
+cargo build --locked -p actor_testbed -p npcctl
 target/debug/actor_testbed --explorer-home ~/npc-agents --agent "Wren" --world "Hollowmere" [--panels explorer]
 target/debug/actor_testbed --explorer-home ~/npc-agents --agent "Wren" --check-save   # {"ok":true} or {"ok":false,"kind":..}
 target/debug/actor_testbed --explorer-home ~/npc-agents --agent "Wren" --resume [--load-anyway | --fresh-world]
-target/debug/npcctl snapshot check --scenario testbed:explorer ~/npc-agents/wren/hollowmere.world.json
 ```
 
-(`npcctl snapshot check` without `--scenario` checks against the village and reports a content-hash mismatch.)
+Use the explorer-aware `--check-save` path for saved actor/world copies. Generic `npcctl snapshot check`
+constructs its supplied scenario, which may differ from a customised explorer's saved constructor.
 `--record` and `--commands` are refused with `--resume`.
 
 **Detached** (spec G7): the same world without a window, hosted by `npcctl serve` (it never renders):
@@ -598,7 +609,7 @@ prompt modal (the agent is already playing): the sim runs and a notice "moved he
 for 5 s. The agent sees connection errors for the seconds the switch takes, and a new event epoch after it.
 
 **Detached from the menu** (plan Task 8): **Start detached** (New or a Resume row) runs `npcctl serve
---explorer-home DIR --agent NAME [--world W | --resume ..]` in its own console and process group (closing the
+--explorer-home DIR --agent NAME [--world W | --resume ..]` in a separate process group (hidden on Windows; closing the
 menu's terminal or Ctrl+C there does not reach it; the menu's **Quit** stops it, see **Quitting the game** below) and
 opens the **Detached** screen: "<agent> in <world> running detached on port N,
 tick T" (`session/info` every 2 s, off the frame), the URL, the prompt with **Copy**, **Open in window**, **Stop**
@@ -616,9 +627,9 @@ question) saves, starts `npcctl serve --explorer-home DIR --agent NAME --resume 
 another port (exit 4). The window prints `{"detached":{"pid","port","agent","world"}}` on stdout, so a menu that
 started it shows the Detached screen next. While the dialog is open the game's keys do nothing. If that `npcctl serve`
 cannot take the port within its 10 s (exit 4), nothing reports it: the window has already exited and saved, so the
-world simply is not running; resume it from the menu. A detached world the menu started writes its log to the
-menu's terminal (there is no log file yet), so the lines of a world left running (Back on a refused stop, below) are
-lost once the menu quits. An end-to-end run with its findings: `docs/_notes/explorer-e2e.md`.
+world simply is not running; resume it from the menu. The menu retains a bounded stderr tail for start/exit
+diagnostics rather than a durable log file. Current end-to-end evidence is in
+[`notes-workspace-e2e.md`](_notes/notes-workspace-e2e.md); older findings remain in `_notes/explorer-e2e.md`.
 
 **Quitting the game** (plan Task 29, the dev's "quitting the game stops all processes"; it replaces G7's "a detached
 world outlives the menu" for the menu's Quit). **Quit** on Main, the menu window's close button, or Ctrl+C on the
