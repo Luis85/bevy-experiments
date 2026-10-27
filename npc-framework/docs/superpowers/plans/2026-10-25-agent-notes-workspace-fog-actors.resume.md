@@ -2,6 +2,16 @@
 
 ## Current continuation (2026-10-27)
 
+**Latest: Task 18/Gate F complete.** Docs `0c869b1`, main merge `a90562c`; full
+`target/verify-phase-f.json` reports `ok:true` (1,217 passed/12 skipped/three reported leaky, doc 1/10 ignored,
+architecture 7/7, replays 8/8, six unchanged snapshots, fmt/Clippy/deny passed). Five-app release passed on main
+in 45.60s. Real release end-to-end verified reflected F7 tabs, both same-port handovers, actual close→Yes,
+notes/map/fog and final Stop. Evidence `docs/_notes/notes-workspace-e2e.md` (save ticks 40→204, 336 explored cells).
+
+**Remaining: one bounded final source-fix wave + full final gate/release/performance check.** Fix crafted pack
+overflow/feedback, four secret Debug holders, carried/equipped visual lifecycle and optimistic stamp ABA across
+clock reset. The user still wants the entire plan driven to completion; do not stop after this checkpoint.
+
 **Latest: Tasks 21–23 implemented; Gate H passed.** Feature `76b153a`, main merge `dd645c3`.
 `target/verify-phase-h-final.json`: `ok:true`, 1,217 passed/12 skipped/one slow/two reported leaky, doc 1/10
 ignored, architecture 7/7, replays 8/8, six unchanged snapshots, fmt/Clippy/deny passed, no optional tools

@@ -78,3 +78,6 @@ eight replays; six unchanged snapshots; fmt/Clippy/deny passed, no optional tool
 were eight build jobs/two test workers, with no filtered or retried full-gate tests. The local merge and
 five-app build precede the final review refresh and single bounded source-fix wave. Queued findings remain
 in the progress ledger; this document does not declare those defects fixed or the whole plan finished yet.
+
+Checkpoint `0c869b1` was merged --no-ff as `a90562c`. The five-app release build on main passed in 45.60s
+(`target/release-phase-f.log`); binaries remain under this workspace's `target/release/`.

@@ -2,6 +2,20 @@
 
 ## Continuation in the monorepo (2026-10-27)
 
+- **Task 18 and Gate F complete.** Docs/evidence `0c869b1`, main merge `a90562c`; full gate
+  `target/verify-phase-f.json`: `ok:true`, 1,217 passed/12 skipped/three reported leaky; doc 1 passed/10 ignored,
+  architecture 7/7, replays 8/8, six snapshots none pending, fmt/Clippy/deny passed, no optional tools skipped.
+  Five-app release build passed on main in 45.60s (`target/release-phase-f.log`).
+- Actual release-binary end-to-end passed: generated MCP/settings, rover story, three notebooks/map plus
+  player memory, same-port detached→native, 336 explored cells preserved, real reflected F7 four-tab handlers,
+  rotation, real WindowCloseRequested→Yes→same-port detached, same MCP reconnect and final Stop/save/handle exit.
+  Initial/final saves tick 40/204. Five native captures inspected. `docs/_notes/notes-workspace-e2e.md` records
+  exact evidence, manual boundaries and transient startup profiler warnings (steady performance still rechecked).
+- Final review refresh: F changed documentation only; the source findings remain the bounded final wave:
+  crafting capacity and output/drop feedback, all four secret Debug holders, real carried/equipped visuals,
+  and monotonic notes/map stamps across clock resets. All phase implementations are checkpointed, but the
+  overall request remains active until those fixes and final verification/artifacts are complete.
+
 - **Tasks 21–23 implemented; Gate H verification passed.** Map checkpoint `76b153a`, merged --no-ff to
   main as `dd645c3`. Complete `cargo xtask verify` rerun (`target/verify-phase-h-final.json`) reports `ok:true`:
   1,217 passed, 12 skipped, one slow/two reported leaky; doc 1 passed/10 ignored, architecture 7/7, replays 8/8,
