@@ -97,10 +97,18 @@ pub fn call_wait(method: &str, params: Option<&Value>) -> Duration {
 }
 
 /// Server settings.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct ServerOptions {
     /// Require `Authorization: Bearer <token>` on every request.
     pub token: Option<String>,
+}
+
+impl std::fmt::Debug for ServerOptions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ServerOptions")
+            .field("token", &self.token.as_ref().map(|_| "<redacted>"))
+            .finish()
+    }
 }
 
 /// One call waiting for the host.
@@ -737,6 +745,20 @@ fn read_chunked(reader: &mut impl BufRead) -> io::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn server_options_debug_hides_http_token() {
+        let secret = "test-server-options-secret-must-not-be-debugged";
+        let options = ServerOptions {
+            token: Some(secret.into()),
+        };
+        let debug = format!("{options:?}");
+        assert!(!debug.contains(secret), "Debug exposed a secret");
+        assert!(
+            debug.contains("ServerOptions") && debug.contains("token"),
+            "Debug lost useful public context"
+        );
+    }
 
     #[test]
     fn round_trip_through_a_host_loop() {

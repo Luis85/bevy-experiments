@@ -26,6 +26,102 @@ fn shipped_worlds_validate() {
     }
 }
 
+fn schedule_system_types(app: &bevy_app::App) -> std::collections::BTreeSet<std::any::TypeId> {
+    app.world()
+        .resource::<bevy_ecs::schedule::Schedules>()
+        .get(NpcSimTick)
+        .unwrap()
+        .systems()
+        .unwrap()
+        // DebugName is a feature-disabled placeholder in ordinary builds.
+        // The concrete system type remains available independently of names.
+        .map(|(_, system)| system.as_ref().system_type())
+        .collect()
+}
+
+fn incumbent_schedule_types() -> std::collections::BTreeSet<std::any::TypeId> {
+    let mut doc = worlds::world_doc(&worlds::plain_preset(), &actors::human_preset()).unwrap();
+    // The incumbent explorer has the same plugins, but no preset runtime.
+    doc.world["explorer_context"]
+        .as_object_mut()
+        .unwrap()
+        .remove("world");
+    let mut app = testbed_content::scenario::load_with(&doc, 1, |_| {})
+        .unwrap()
+        .app;
+    app.finish();
+    app.cleanup();
+    run_ticks(app.world_mut(), 1);
+    schedule_system_types(&app)
+}
+
+#[test]
+fn plain_schedules_no_empty_world_runtime_systems_or_actor_bases() {
+    let mut plain = build("plain_explorer");
+    run_ticks(plain.world_mut(), 1);
+    let incumbent = incumbent_schedule_types();
+    assert_eq!(schedule_system_types(&plain), incumbent);
+    assert_eq!(
+        plain
+            .world_mut()
+            .query::<&testbed_content::world_runtime::WorldActor>()
+            .iter(plain.world())
+            .count(),
+        0
+    );
+    assert_eq!(plain.world().resource::<SimConfig>().day_length, 2400);
+    assert_eq!(plain.world().resource::<SimConfig>().night_permille, 300);
+    let mut runtime_types = None;
+    for id in ["survival", "night_shift"] {
+        let mut active = build(id);
+        run_ticks(active.world_mut(), 1);
+        let active_types = schedule_system_types(&active);
+        assert!(
+            active_types.is_superset(&incumbent),
+            "{id} must preserve all incumbent systems"
+        );
+        let systems: std::collections::BTreeSet<_> =
+            active_types.difference(&incumbent).copied().collect();
+        assert_eq!(systems.len(), 2, "{id}: {systems:?}");
+        if let Some(expected) = &runtime_types {
+            assert_eq!(
+                &systems, expected,
+                "Survival and NightShift must use the same two runtime systems"
+            );
+        } else {
+            runtime_types = Some(systems);
+        }
+    }
+}
+
+#[test]
+fn disabled_night_with_a_stored_penalty_schedules_no_runtime_or_unused_bases() {
+    let mut preset = worlds::plain_preset();
+    preset.day_night.on = false;
+    preset.day_night.night_vision_pct = 40;
+    preset.inhabitants.workers = 1;
+    let doc = worlds::world_doc(&preset, &actors::human_preset()).unwrap();
+    let mut app = testbed_content::scenario::load_with(&doc, 1, |_| {})
+        .unwrap()
+        .app;
+    app.finish();
+    app.cleanup();
+    let (_, entity) = actor(&app);
+    let before = app.world().get::<Sensors>(entity).unwrap().clone();
+    app.world_mut().resource_mut::<SimClock>().tick = 1800;
+    run_ticks(app.world_mut(), 1);
+    assert_eq!(schedule_system_types(&app), incumbent_schedule_types());
+    assert_eq!(
+        app.world_mut()
+            .query::<&testbed_content::world_runtime::WorldActor>()
+            .iter(app.world())
+            .count(),
+        0
+    );
+    assert_eq!(app.world().get::<Sensors>(entity).unwrap(), &before);
+    assert_eq!(app.world().resource::<SimConfig>().night_permille, 0);
+}
+
 #[test]
 fn invalid_worlds_are_reported() {
     let mut preset = worlds::plain_preset();

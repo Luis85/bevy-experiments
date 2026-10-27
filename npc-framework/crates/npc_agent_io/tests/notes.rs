@@ -27,6 +27,11 @@ fn at(tick: u64) -> Stamp {
         date: format!("2026-10-25T10:00:{:02}Z", tick % 60),
     }
 }
+fn at_revision(tick: u64, revision: u32) -> Stamp {
+    let mut stamp = at(tick);
+    stamp.date = format!("{}#r{revision}", stamp.date);
+    stamp
+}
 
 fn new(title: &str, body: &str) -> NewNote {
     NewNote {
@@ -49,6 +54,71 @@ fn title_change(title: &str) -> NoteChange {
         title: Some(title.to_string()),
         body: None,
         status: None,
+    }
+}
+
+#[test]
+fn stale_stamp_never_repeats_across_reopens_tick_and_date_rollbacks() {
+    for (tag, middle_date) in [("aba-tick", "D"), ("aba-date", "C")] {
+        let dir = folder(tag);
+        let initial = Stamp {
+            tick: 1,
+            date: "D".into(),
+        };
+        let mut store = NotesStore::open(&dir).unwrap();
+        let a = store
+            .add(
+                Book::Memory,
+                Writer::Agent,
+                new("Place", "A"),
+                initial.clone(),
+            )
+            .unwrap();
+        let b = store
+            .update(
+                Book::Memory,
+                Writer::Agent,
+                a.id,
+                &a.updated,
+                body_change("B"),
+                Stamp {
+                    tick: 0,
+                    date: middle_date.into(),
+                },
+            )
+            .unwrap();
+        drop(store);
+        let mut store = NotesStore::open(&dir).unwrap();
+        let c = store
+            .update(
+                Book::Memory,
+                Writer::Player,
+                a.id,
+                &b.updated,
+                body_change("C"),
+                initial.clone(),
+            )
+            .unwrap();
+        drop(store);
+        let mut store = NotesStore::open(&dir).unwrap();
+        assert!(matches!(
+            store.update(
+                Book::Memory,
+                Writer::Agent,
+                a.id,
+                &a.updated,
+                body_change("stale overwrite"),
+                Stamp {
+                    tick: 2,
+                    date: "E".into()
+                }
+            ),
+            Err(NotesError::Stale { .. })
+        ));
+        assert_ne!(c.updated, a.updated);
+        assert_eq!(c.created, a.created);
+        assert_eq!(store.list(Book::Memory).unwrap()[0].body, "C");
+        assert!(read(&dir.join("memory/Place.md")).contains("revision: 3"));
     }
 }
 
@@ -862,7 +932,9 @@ fn unknown_properties_survive_update() {
             "updated: 2026-10-25T10:00:10Z",
         )
         .replace("updated_tick: 60", "updated_tick: 70")
+        .replace("revision: 1", "revision: 2")
         .replace("author: agent", "author: player");
+    assert_eq!(u.updated, at_revision(70, 2));
     assert_eq!(text, format!("{want}---\nVery dark at night.\n"));
     let mut again = NotesStore::open(&d).unwrap();
     assert_eq!(again.list(Book::Proposals).unwrap(), vec![u]);
@@ -1071,7 +1143,7 @@ fn renamed_entry_left_behind_loses_to_the_new_file() {
         .unwrap();
     let old = read(&d.join("memory/Grove.md"));
     assert!(old.contains("\nrevision: 3\n"), "{old}");
-    // Renamed at a later tick (revision 1) ...
+    // Renamed at a later tick (the monotonic revision is now 4) ...
     let r = store
         .update(
             Book::Memory,
@@ -1512,7 +1584,7 @@ fn old_proposal_migrates() {
         "{text}"
     );
     assert!(text.ends_with("\n---\nShorter.\n"), "{text}");
-    assert_eq!(n.updated, at(1900));
+    assert_eq!(n.updated, at_revision(1900, 2));
     assert_eq!(
         store
             .add(
@@ -1667,8 +1739,8 @@ fn api_stamp_shape_unchanged() {
             at(11),
         )
         .unwrap();
-    assert_eq!(u3.updated, at(11));
-    assert!(read(&d.join("diary/2026-10-25 t.md")).contains("\nrevision: 1\n"));
+    assert_eq!(u3.updated, at_revision(11, 4));
+    assert!(read(&d.join("diary/2026-10-25 t.md")).contains("\nrevision: 4\n"));
     let _ = std::fs::remove_dir_all(&d);
 }
 
@@ -1811,7 +1883,7 @@ fn stale_update_is_rejected() {
             at(20),
         )
         .unwrap();
-    assert_eq!(dev.updated, at(20));
+    assert_eq!(dev.updated, at_revision(20, 2));
     assert_eq!(dev.created, at(10));
     let file = d.join("diary/2026-10-25 Grove.md");
     let before = read(&file);
@@ -1830,7 +1902,7 @@ fn stale_update_is_rejected() {
         err,
         NotesError::Stale {
             id: n.id,
-            current: at(20)
+            current: dev.updated.clone()
         }
     );
     assert!(
@@ -2200,7 +2272,7 @@ fn same_tick_writes_get_distinct_stamps() {
             )
             .unwrap();
         assert_eq!(u2.updated.date, format!("{}#r3", when.date));
-        // A later tick drops the revision.
+        // A later tick keeps the monotonic revision.
         let mut later = when.clone();
         later.tick += 1;
         let u3 = store
@@ -2213,6 +2285,7 @@ fn same_tick_writes_get_distinct_stamps() {
                 later.clone(),
             )
             .unwrap();
+        later.date = format!("{}#r4", later.date);
         assert_eq!(u3.updated, later);
         // The revisions round-trip through the files.
         let mut again = NotesStore::open(&d).unwrap();

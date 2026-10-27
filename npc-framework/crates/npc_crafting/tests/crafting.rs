@@ -417,6 +417,119 @@ fn a_craft_reserves_consumes_its_inputs_and_makes_the_output() {
 }
 
 #[test]
+fn crafted_matching_stack_cannot_overfill_a_full_inventory() {
+    let mut app = app(1);
+    let (unit, actor) = crafter(&mut app, HERE, 0);
+    app.world_mut().get_mut::<Inventory>(actor).unwrap().slots = 2;
+    give(&mut app, actor, Item::new("wood").stack(2));
+    let (existing, _) = give(&mut app, actor, Item::new("plank").stack(1));
+    begin_craft(
+        app.world_mut(),
+        actor,
+        "splinter",
+        None,
+        CraftSource::Command,
+        None,
+    )
+    .unwrap();
+    run_ticks(app.world_mut(), 1);
+    let done = seen(&app);
+    assert_eq!(done.len(), 1);
+    assert!(done[0].result.succeeded());
+    assert_eq!(done[0].outputs.len(), 1);
+    let output = done[0].outputs[0];
+    assert_ne!(output, existing);
+    assert_eq!(app.world().get::<Inventory>(actor).unwrap().items.len(), 2);
+    assert_eq!(
+        get::<Item>(&app, existing).unwrap().stack,
+        1,
+        "craft output remains a separate item"
+    );
+    assert!(get::<npc_interaction::CarriedBy>(&app, output).is_none());
+    assert_eq!(get::<SimPos>(&app, output), Some(HERE));
+    let event = app
+        .world()
+        .resource::<Journal>()
+        .entries
+        .iter()
+        .find(|entry| {
+            entry.unit == Some(unit) && matches!(entry.kind, JournalKind::CraftDone { .. })
+        })
+        .unwrap();
+    let value = serde_json::to_value(&event.kind).unwrap();
+    assert_eq!(
+        value["dropped"],
+        serde_json::json!([{"item":output,"kind":"plank","stack":1,"pos":[HERE.x,HERE.z]}])
+    );
+}
+
+#[test]
+fn crafted_output_uses_a_free_pack_slot_beside_equipped_items() {
+    let mut app = app(1);
+    let (_, actor) = crafter(&mut app, HERE, 0);
+    app.world_mut().get_mut::<Inventory>(actor).unwrap().slots = 2;
+    give(&mut app, actor, Item::new("wood").stack(2));
+    let (hammer, _) = equip(&mut app, actor, Item::new("hammer"));
+    assert_eq!(app.world().get::<Inventory>(actor).unwrap().free_slots(), 1);
+    begin_craft(
+        app.world_mut(),
+        actor,
+        "splinter",
+        None,
+        CraftSource::Command,
+        None,
+    )
+    .unwrap();
+    run_ticks(app.world_mut(), 1);
+    let output = seen(&app)[0].outputs[0];
+    assert!(get::<npc_interaction::CarriedBy>(&app, output).is_some());
+    assert_eq!(app.world().get::<Inventory>(actor).unwrap().items.len(), 2);
+    assert!(
+        app.world()
+            .get::<Equipment>(actor)
+            .unwrap()
+            .items()
+            .contains(&hammer)
+    );
+}
+
+#[test]
+fn crafted_overweight_output_records_its_drop_position() {
+    let mut app = app(1);
+    let (unit, actor, station, _, _) = chair_setup(&mut app, 40);
+    app.world_mut()
+        .get_mut::<Inventory>(actor)
+        .unwrap()
+        .max_weight_g = 3500;
+    begin_craft(
+        app.world_mut(),
+        actor,
+        "chair",
+        Some(station),
+        CraftSource::Command,
+        None,
+    )
+    .unwrap();
+    run_ticks(app.world_mut(), 11);
+    let output = seen(&app)[0].outputs[0];
+    assert!(get::<npc_interaction::CarriedBy>(&app, output).is_none());
+    let event = app
+        .world()
+        .resource::<Journal>()
+        .entries
+        .iter()
+        .find(|entry| {
+            entry.unit == Some(unit) && matches!(entry.kind, JournalKind::CraftDone { .. })
+        })
+        .unwrap();
+    let value = serde_json::to_value(&event.kind).unwrap();
+    assert_eq!(
+        value["dropped"],
+        serde_json::json!([{"item":output,"kind":"chair","stack":1,"pos":[HERE.x,HERE.z]}])
+    );
+}
+
+#[test]
 fn two_crafters_contend_for_one_workstation() {
     let mut app = app(5);
     let (a, ae, ws, _, _) = chair_setup(&mut app, 40);

@@ -286,7 +286,7 @@ fn spawn_visuals(
     mut index: ResMut<VisualIndex>,
     alive: Query<(), With<VisualOf>>,
     props: Query<(Entity, Option<&SimId>, &Prop, &SimPos, Option<&GridBlocker>)>,
-    items: Query<(Entity, &Item, &SimPos), (Without<Prop>, Without<TestbedUnit>)>,
+    items: Query<(Entity, &Item, Option<&SimPos>), (Without<Prop>, Without<TestbedUnit>)>,
     actors: Query<
         (
             Entity,
@@ -472,8 +472,14 @@ fn spawn_visuals(
                 Name::new(format!("visual item {}", item.kind)),
                 VisualOf(sim),
                 Selectable,
-                Transform::from_translation(sim_to_world(*pos)),
-                Visibility::default(),
+                Transform::from_translation(pos.copied().map(sim_to_world).unwrap_or_default()),
+                // Carried/remembered items have no ground position. The
+                // animation pass decides their display before rendering.
+                if pos.is_some() {
+                    Visibility::Inherited
+                } else {
+                    Visibility::Hidden
+                },
                 Fogged::default(),
                 FogDim::default(),
             ))
@@ -1044,7 +1050,7 @@ impl ItemLook {
 #[allow(clippy::type_complexity)]
 fn item_transforms(
     mut commands: Commands,
-    sims: Query<(&SimPos, Option<&CarriedBy>)>,
+    sims: Query<(Option<&SimPos>, Option<&CarriedBy>), With<Item>>,
     index: Option<Res<SimIndex>>,
     vis_index: Res<VisualIndex>,
     actors: Query<&ActorVisual>,
@@ -1066,68 +1072,53 @@ fn item_transforms(
             continue;
         };
         let look = fogged.map_or(Look::Live, |f| f.0);
-        let hand = carried.and_then(|c| {
-            let slot = c.slot.as_deref()?;
-            let holder = index.as_deref()?.get(c.holder)?;
-            let actor = actors.get(*vis_index.map.get(&holder)?).ok()?;
-            match slot {
-                MAIN_HAND => actor.hand_r,
-                OFF_HAND => actor.hand_l,
-                _ => None,
-            }
-        });
+        // The fog's last-seen object is independent of its real ownership:
+        // an unseen pickup must not reveal that the ground is now empty.
+        let ground = match look {
+            Look::LastSeen(state) => Some(state.pos),
+            Look::Live | Look::Dim if carried.is_none() => pos.copied(),
+            _ => None,
+        };
+        let hand = carried
+            .filter(|_| matches!(look, Look::Live | Look::Dim))
+            .and_then(|c| {
+                let slot = c.slot.as_deref()?;
+                let holder = index.as_deref()?.get(c.holder)?;
+                let actor = actors.get(*vis_index.map.get(&holder)?).ok()?;
+                match slot {
+                    MAIN_HAND => actor.hand_r,
+                    OFF_HAND => actor.hand_l,
+                    _ => None,
+                }
+            });
         let held = hand.zip(item.look.held());
-        match (carried, held) {
-            (_, Some((hand, held))) => {
-                if item.attached != Some(hand) {
-                    item.attached = Some(hand);
-                    commands.entity(root).insert(ChildOf(hand));
-                    *transform = Transform::IDENTITY;
-                    commands.entity(item.model).insert(held);
-                    commands.entity(root).remove::<Selectable>();
-                }
-                if *visibility != Visibility::Inherited {
-                    *visibility = Visibility::Inherited;
-                }
+        if let Some((hand, held)) = held {
+            if item.attached != Some(hand) {
+                item.attached = Some(hand);
+                commands.entity(root).insert(ChildOf(hand));
+                *transform = Transform::IDENTITY;
+                commands.entity(item.model).insert(held);
             }
-            (Some(_), None) => {
-                if item.attached.is_some() {
-                    item.attached = None;
-                    commands.entity(root).remove::<ChildOf>();
-                    commands.entity(item.model).insert(item.look.lying());
-                }
-                if selectable {
-                    commands.entity(root).remove::<Selectable>();
-                }
-                if *visibility != Visibility::Hidden {
-                    *visibility = Visibility::Hidden;
-                }
+            if selectable {
+                commands.entity(root).remove::<Selectable>();
             }
-            (None, _) => {
-                if item.attached.is_some() {
-                    item.attached = None;
-                    commands.entity(root).remove::<ChildOf>();
-                    commands.entity(item.model).insert(item.look.lying());
-                }
+            visibility.set_if_neq(Visibility::Inherited);
+        } else {
+            if item.attached.take().is_some() {
+                commands.entity(root).remove::<ChildOf>();
+                commands.entity(item.model).insert(item.look.lying());
+            }
+            if let Some(at) = ground {
                 if !selectable {
                     commands.entity(root).insert(Selectable);
                 }
-                let want_vis = if look.shown() {
-                    Visibility::Inherited
-                } else {
-                    Visibility::Hidden
-                };
-                if *visibility != want_vis {
-                    *visibility = want_vis;
+                transform.set_if_neq(Transform::from_translation(sim_to_world(at)));
+                visibility.set_if_neq(Visibility::Inherited);
+            } else {
+                if selectable {
+                    commands.entity(root).remove::<Selectable>();
                 }
-                let at = match look {
-                    Look::LastSeen(s) => s.pos,
-                    _ => *pos,
-                };
-                let want = Transform::from_translation(sim_to_world(at));
-                if *transform != want {
-                    *transform = want;
-                }
+                visibility.set_if_neq(Visibility::Hidden);
             }
         }
     }
@@ -1139,6 +1130,401 @@ mod tests {
     use testbed_content::layout::{cart_vehicle, wagon_vehicle};
 
     use super::*;
+
+    use npc_framework::interaction::items::{place_in_world, put_in_inventory, put_in_slot};
+    use npc_framework::perception::{ExploredCells, RevealsFog, SeenStatics, VisibleCells};
+    use npc_framework::prelude::{Equipment, GridBounds, Inventory, SpatialGrid, spawn_sim};
+
+    // Render-system fixtures have handles, not loaded models or a GPU. The
+    // holder's hand/grip is a view entity; item ownership uses the real API.
+    fn install_item_view(app: &mut App) {
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<bevy::world_serialization::WorldAsset>()
+            .init_asset::<Mesh>()
+            .init_asset::<StandardMaterial>()
+            .init_asset::<Image>()
+            .init_resource::<VisualIndex>()
+            .init_resource::<SimClock>();
+        macro_rules! models {($($name:ident),* $(,)?)=>{Models{$($name:default(),)*}};}
+        app.insert_resource(ViewAssets {
+            actor_gltf: default(),
+            actor: default(),
+            grass: default(),
+            models: models!(
+                wall,
+                doorway,
+                floor,
+                chest,
+                key,
+                food,
+                ingot,
+                barrel,
+                crate_large,
+                tree_a,
+                tree_b,
+                stump_a,
+                stump_b,
+                stone,
+                lumber,
+                rock,
+                book,
+                axe,
+                workbench,
+                anvil,
+                forge,
+                pickaxe,
+                hammer,
+                log,
+                planks,
+                scroll,
+                ram,
+                cart
+            ),
+        });
+        app.insert_resource(Rings {
+            mesh: default(),
+            owner: default(),
+        });
+        app.add_systems(
+            Update,
+            (spawn_visuals.before(FogSet), item_transforms.after(FogSet)).chain(),
+        );
+    }
+    fn item_view_app() -> App {
+        let mut app = App::new();
+        install_item_view(&mut app);
+        app
+    }
+    fn visual_holder(app: &mut App, holder: Entity, kind: ModelKind) -> Entity {
+        let root = app
+            .world_mut()
+            .spawn((
+                VisualOf(holder),
+                Transform::default(),
+                Visibility::Inherited,
+                Fogged::default(),
+                FogDim::default(),
+            ))
+            .id();
+        let grip = app
+            .world_mut()
+            .spawn((
+                Name::new(if kind.is_robot() {
+                    "robot right grip"
+                } else {
+                    "human hand bone"
+                }),
+                ChildOf(root),
+                Transform::default(),
+            ))
+            .id();
+        app.world_mut().entity_mut(root).insert(ActorVisual {
+            kind,
+            motion: Motion::default(),
+            hand_r: Some(grip),
+            hand_l: None,
+        });
+        app.world_mut()
+            .resource_mut::<VisualIndex>()
+            .map
+            .insert(holder, root);
+        grip
+    }
+    fn carried_fixture(kind: ModelKind) -> (App, Entity, Entity, Entity) {
+        let mut app = item_view_app();
+        let (_, holder) = spawn_sim(
+            app.world_mut(),
+            (
+                SimPos::new(0, 0),
+                Inventory::new(20, 100000),
+                Equipment::hands(),
+            ),
+        );
+        let grip = visual_holder(&mut app, holder, kind);
+        let (_, item) = spawn_sim(app.world_mut(), (SimPos::new(1000, 0), Item::new(AXE)));
+        (app, holder, item, grip)
+    }
+    fn item_root(app: &App, item: Entity) -> Entity {
+        app.world()
+            .resource::<VisualIndex>()
+            .map
+            .get(&item)
+            .copied()
+            .expect("every existing ground or carried item needs a visual root")
+    }
+    fn assert_carried_has_no_ground_position(app: &App, item: Entity) {
+        assert!(app.world().get::<SimPos>(item).is_none());
+        assert!(app.world().get::<CarriedBy>(item).is_some());
+    }
+
+    #[test]
+    fn real_pickup_hides_inventory_item_and_drop_restores_ground_visual() {
+        let (mut app, holder, item, _) = carried_fixture(ModelKind::Rogue);
+        app.update();
+        let root = item_root(&app, item);
+        assert_eq!(
+            app.world().get::<Visibility>(root),
+            Some(&Visibility::Inherited)
+        );
+        put_in_inventory(app.world_mut(), holder, item);
+        assert_carried_has_no_ground_position(&app, item);
+        app.update();
+        assert_eq!(
+            app.world().get::<Visibility>(root),
+            Some(&Visibility::Hidden),
+            "a real pickup removes SimPos; it must still hide the old ground visual"
+        );
+        assert!(app.world().get::<Selectable>(root).is_none());
+        place_in_world(app.world_mut(), item, SimPos::new(4000, 2000));
+        app.update();
+        assert_eq!(
+            app.world().get::<Visibility>(root),
+            Some(&Visibility::Inherited)
+        );
+        assert_eq!(
+            app.world().get::<Transform>(root).unwrap().translation,
+            Vec3::new(4.0, 0.0, 2.0)
+        );
+        assert!(app.world().get::<Selectable>(root).is_some());
+    }
+    #[test]
+    fn real_equipment_attaches_to_human_and_robot_grips() {
+        for kind in [ModelKind::Rogue, ModelKind::Rover] {
+            let (mut app, holder, item, grip) = carried_fixture(kind);
+            app.update();
+            let root = item_root(&app, item);
+            put_in_inventory(app.world_mut(), holder, item);
+            put_in_slot(app.world_mut(), holder, item, MAIN_HAND);
+            assert_carried_has_no_ground_position(&app, item);
+            app.update();
+            assert_eq!(
+                app.world().get::<ChildOf>(root).map(ChildOf::parent),
+                Some(grip),
+                "{kind:?}: equipped tool must be parented to its actual view hand/grip"
+            );
+            assert_eq!(
+                app.world().get::<Visibility>(root),
+                Some(&Visibility::Inherited)
+            );
+            assert_eq!(
+                app.world().get::<Transform>(root),
+                Some(&Transform::IDENTITY)
+            );
+            assert!(app.world().get::<Selectable>(root).is_none());
+            put_in_inventory(app.world_mut(), holder, item);
+            app.update();
+            assert_eq!(
+                app.world().get::<Visibility>(root),
+                Some(&Visibility::Hidden)
+            );
+            assert!(app.world().get::<ChildOf>(root).is_none());
+        }
+    }
+    #[test]
+    fn already_carried_and_equipped_items_spawn_after_snapshot_and_can_drop() {
+        use npc_framework::kernel::snapshot::{LoadMode, load, save};
+        for equipped in [false, true] {
+            let mut saved = testbed_content::new_sim_app(11, "explorer");
+            let (holder_id, holder) = spawn_sim(
+                saved.world_mut(),
+                (
+                    SimPos::new(0, 0),
+                    Inventory::new(20, 100000),
+                    Equipment::hands(),
+                ),
+            );
+            let (item_id, item) =
+                spawn_sim(saved.world_mut(), (SimPos::new(1000, 0), Item::new(AXE)));
+            put_in_inventory(saved.world_mut(), holder, item);
+            if equipped {
+                put_in_slot(saved.world_mut(), holder, item, MAIN_HAND);
+            }
+            let snapshot = save(saved.world_mut()).unwrap();
+            let mut app = testbed_content::new_sim_app(11, "explorer");
+            load(app.world_mut(), &snapshot, LoadMode::Strict).unwrap();
+            let holder = app.world().resource::<SimIndex>().get(holder_id).unwrap();
+            let item = app.world().resource::<SimIndex>().get(item_id).unwrap();
+            assert_carried_has_no_ground_position(&app, item);
+            install_item_view(&mut app);
+            let grip = visual_holder(&mut app, holder, ModelKind::Rover);
+            app.update();
+            let root = item_root(&app, item);
+            if equipped {
+                assert_eq!(
+                    app.world().get::<ChildOf>(root).map(ChildOf::parent),
+                    Some(grip)
+                );
+                assert_eq!(
+                    app.world().get::<Visibility>(root),
+                    Some(&Visibility::Inherited)
+                );
+            } else {
+                assert_eq!(
+                    app.world().get::<Visibility>(root),
+                    Some(&Visibility::Hidden)
+                );
+            }
+            place_in_world(app.world_mut(), item, SimPos::new(-3000, 5000));
+            app.update();
+            assert!(app.world().get::<ChildOf>(root).is_none());
+            assert_eq!(
+                app.world().get::<Visibility>(root),
+                Some(&Visibility::Inherited)
+            );
+            assert_eq!(
+                app.world().get::<Transform>(root).unwrap().translation,
+                Vec3::new(-3.0, 0.0, 5.0)
+            );
+        }
+    }
+    #[test]
+    fn unseen_real_pickup_keeps_last_seen_ghost_until_the_cell_is_seen_empty() {
+        let (mut app, holder, item, _) = carried_fixture(ModelKind::Rogue);
+        let bounds = GridBounds::centered(8, 8);
+        app.insert_resource(SpatialGrid::new(1000, bounds));
+        app.insert_resource(crate::fog::FogOfWar { enabled: true });
+        app.add_plugins(crate::fog::plugin);
+        let (_, observer) = spawn_sim(app.world_mut(), (SimPos::new(0, 0), RevealsFog));
+        let id = *app.world().get::<SimId>(item).unwrap();
+        let last = SeenState {
+            kind: 1,
+            pos: SimPos::new(1000, 0),
+            open: None,
+            felled: None,
+            footprint: None,
+        };
+        let explored = ExploredCells::sized(bounds);
+        let mut visible = VisibleCells {
+            bits: vec![0; explored.bits.len()],
+            ..default()
+        };
+        let index = bounds
+            .index(npc_framework::kernel::spatial::CellCoord::new(1, 0))
+            .unwrap() as usize;
+        visible.bits[index / 64] |= 1 << (index % 64);
+        app.world_mut().entity_mut(observer).insert((
+            explored,
+            visible,
+            SeenStatics(std::collections::BTreeMap::from([(id, last)])),
+        ));
+        app.update();
+        let root = item_root(&app, item);
+        app.world_mut()
+            .get_mut::<VisibleCells>(observer)
+            .unwrap()
+            .bits
+            .fill(0);
+        put_in_inventory(app.world_mut(), holder, item);
+        assert_carried_has_no_ground_position(&app, item);
+        app.world_mut().resource_mut::<SimClock>().tick += 1;
+        app.update();
+        assert_eq!(
+            app.world().get::<Fogged>(root).unwrap().0,
+            Look::LastSeen(last)
+        );
+        assert_eq!(
+            app.world().get::<Visibility>(root),
+            Some(&Visibility::Inherited)
+        );
+        assert_eq!(
+            app.world().get::<Transform>(root).unwrap().translation,
+            sim_to_world(last.pos)
+        );
+        assert!(app.world().get::<FogDim>(root).unwrap().0);
+        put_in_slot(app.world_mut(), holder, item, MAIN_HAND);
+        app.world_mut().resource_mut::<SimClock>().tick += 1;
+        app.update();
+        assert_eq!(
+            app.world().get::<Fogged>(root).unwrap().0,
+            Look::LastSeen(last)
+        );
+        assert!(
+            app.world().get::<ChildOf>(root).is_none(),
+            "an unseen equip must not steal the remembered ground ghost"
+        );
+        // The sim's fog pass removes this record only when it observes the
+        // old cell empty (covered separately by npc_perception's regression).
+        app.world_mut()
+            .get_mut::<SeenStatics>(observer)
+            .unwrap()
+            .0
+            .remove(&id);
+        app.world_mut()
+            .get_mut::<VisibleCells>(observer)
+            .unwrap()
+            .bits[index / 64] |= 1 << (index % 64);
+        app.world_mut().resource_mut::<SimClock>().tick += 1;
+        app.update();
+        assert_eq!(
+            app.world().get::<Visibility>(root),
+            Some(&Visibility::Hidden)
+        );
+        assert_eq!(app.world().get::<Fogged>(root).unwrap().0, Look::Hidden);
+    }
+
+    #[test]
+    fn fog_cannot_reveal_own_inventory_or_hide_its_equipped_grip() {
+        let (mut app, holder, item, grip) = carried_fixture(ModelKind::Rover);
+        let bounds = GridBounds::centered(8, 8);
+        app.insert_resource(SpatialGrid::new(1000, bounds));
+        app.insert_resource(crate::fog::FogOfWar { enabled: true });
+        app.add_plugins(crate::fog::plugin);
+        app.world_mut().entity_mut(holder).insert((
+            TestbedUnit {
+                template: "scout".into(),
+                behaviour: testbed_content::world::Behaviour::Idle,
+                speed_mm_per_tick: 70,
+                home: SimPos::new(0, 0),
+                wander_radius_mm: 0,
+            },
+            RevealsFog,
+            ExploredCells::sized(bounds),
+            VisibleCells {
+                bits: vec![0; ExploredCells::sized(bounds).bits.len()],
+                ..default()
+            },
+        ));
+        app.update();
+        let root = item_root(&app, item);
+        put_in_inventory(app.world_mut(), holder, item);
+        for _ in 0..2 {
+            app.world_mut().resource_mut::<SimClock>().tick += 1;
+            app.update();
+            assert_eq!(app.world().get::<Fogged>(root).unwrap().0, Look::Live);
+            assert_eq!(
+                app.world().get::<Visibility>(root),
+                Some(&Visibility::Hidden)
+            );
+        }
+        put_in_slot(app.world_mut(), holder, item, MAIN_HAND);
+        app.world_mut().resource_mut::<SimClock>().tick += 1;
+        app.update();
+        assert_eq!(
+            app.world().get::<ChildOf>(root).map(ChildOf::parent),
+            Some(grip)
+        );
+        assert_eq!(
+            app.world().get::<Visibility>(root),
+            Some(&Visibility::Inherited)
+        );
+        let holder_root = app.world().resource::<VisualIndex>().map[&holder];
+        assert_eq!(
+            app.world().get::<Visibility>(holder_root),
+            Some(&Visibility::Inherited)
+        );
+        put_in_inventory(app.world_mut(), holder, item);
+        app.world_mut().resource_mut::<SimClock>().tick += 1;
+        app.update();
+        app.world_mut()
+            .resource_mut::<crate::fog::FogOfWar>()
+            .enabled = false;
+        app.update();
+        assert_eq!(
+            app.world().get::<Visibility>(root),
+            Some(&Visibility::Hidden)
+        );
+        assert!(app.world().get::<ChildOf>(root).is_none());
+    }
 
     #[test]
     fn models_follow_faction_and_template() {

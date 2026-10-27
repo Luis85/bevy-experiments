@@ -219,6 +219,42 @@ pub fn static_look(lens: Option<&FogLens>, id: SimId, pos: SimPos) -> Look {
     }
 }
 
+/// Item ownership is visible only through a sensed holder. Otherwise a
+/// remembered ground item remains at its last-seen position until its old
+/// cell is observed empty, even though real pickup removed its SimPos.
+fn item_look(
+    lens: Option<&FogLens>,
+    id: SimId,
+    pos: Option<SimPos>,
+    carried: Option<&CarriedBy>,
+) -> Look {
+    let Some(lens) = lens else {
+        return Look::Live;
+    };
+    if carried.is_some_and(|carried| {
+        carried.holder == lens.actor
+            || Some(carried.holder) == lens.riding
+            || carried.slot.is_some() && lens.senses(carried.holder)
+    }) {
+        return Look::Live;
+    }
+    // Seeing another actor does not reveal the contents of its inventory.
+
+    if let Some(pos) = pos {
+        return static_look(Some(lens), id, pos);
+    }
+    match lens.seen.0.get(&id) {
+        Some(state)
+            if !lens
+                .visible
+                .identifies(lens.grid, lens.grid.cell_of(state.pos)) =>
+        {
+            Look::LastSeen(*state)
+        }
+        _ => Look::Hidden,
+    }
+}
+
 /// Something that never changes over `lo..=hi` (a wall piece, view-only
 /// dressing): live where any cell is visible, dimmed where explored,
 /// hidden where never explored.
@@ -439,11 +475,11 @@ fn decide_looks(
     actors: Query<FogActor, With<RevealsFog>>,
     sims: Query<(
         &SimId,
-        &SimPos,
+        Option<&SimPos>,
         Has<TestbedUnit>,
         Option<&Prop>,
         Has<Item>,
-        Has<CarriedBy>,
+        Option<&CarriedBy>,
     )>,
     fresh: Query<(), Or<(Added<VisualOf>, Added<FogArea>)>>,
     mut roots: Query<(&VisualOf, &mut Fogged, &mut FogDim, &mut Visibility), Without<FogArea>>,
@@ -464,16 +500,22 @@ fn decide_looks(
     let lens = lens.as_ref();
     let mut hidden = ViewHidden::default();
     for (of, mut fogged, mut dim, mut vis) in &mut roots {
-        let Ok((&id, &pos, unit, prop, item, carried)) = sims.get(of.0) else {
+        let Ok((&id, pos, unit, prop, item, carried)) = sims.get(of.0) else {
             continue;
         };
-        let look = match prop.map(|p| p.kind) {
-            _ if unit => unit_look(lens, id),
-            Some(PropKind::Cart | PropKind::Wagon) => unit_look(lens, id),
-            // Its pieces are fogged one by one.
-            Some(PropKind::Wall) => Look::Live,
-            _ if item && carried => Look::Live,
-            _ => static_look(lens, id, pos),
+        let look = if item {
+            item_look(lens, id, pos.copied(), carried)
+        } else {
+            let Some(&pos) = pos else {
+                continue;
+            };
+            match prop.map(|p| p.kind) {
+                _ if unit => unit_look(lens, id),
+                Some(PropKind::Cart | PropKind::Wagon) => unit_look(lens, id),
+                // Its pieces are fogged one by one.
+                Some(PropKind::Wall) => Look::Live,
+                _ => static_look(lens, id, pos),
+            }
         };
         fogged.set_if_neq(Fogged(look));
         dim.set_if_neq(FogDim(look.dimmed()));

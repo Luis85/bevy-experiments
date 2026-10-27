@@ -599,7 +599,9 @@ need no map folder. F7 → **Map** edits the shared store; blank X/Z on Add mean
 remain visible through fog and do not intercept world clicks. `actor_testbed --panels map` opens the Map tab
 for capture. World presets' `systems.map` defaults true, including older saved copies.
 
-Notes and map stores check ID/revision exhaustion instead of wrapping. Byte identities detect equal-size
+Notes and map stores use a checked monotone revision on every update, so a repeated tick/date after resetting
+the world cannot revive an old expected stamp. Return the exact opaque `updated` value, including `#rN`.
+They check ID/revision exhaustion instead of wrapping. Byte identities detect equal-size
 edits with restored mtimes and guard old-source deletion during rename/migration cleanup.
 
 With a perception provider (`omniscient: false`), affordances only target entities the unit perceives, remembers
@@ -793,7 +795,7 @@ case-insensitively):
 | Kind | Fields | Meaning |
 |---|---|---|
 | `CraftStarted` | `recipe, workstation, ends` | a craft started; it completes at tick `ends` |
-| `CraftDone` | `recipe, workstation, margin, quality, outputs` | it succeeded; quality from the roll's margin |
+| `CraftDone` | `recipe, workstation, margin, quality, outputs, dropped?` | succeeded; quality from the roll; dropped entries keep item/kind/stack/completion pos. Empty dropped omitted; carried outputs also emit ItemMoved for inventory deltas |
 | `CraftFailed` | `recipe, workstation, outcome: rejected \| failed \| critical \| invalid \| cancelled, reason, consumed` | it did not succeed (`critical`: inputs consumed, tool damaged) |
 
 **RTS command (`npc_command`)**

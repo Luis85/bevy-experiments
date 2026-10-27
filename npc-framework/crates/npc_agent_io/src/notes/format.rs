@@ -24,9 +24,9 @@
 //!
 //! Proposals add `status` and `prompted_by`. The API's `updated` stamp is
 //! `{tick: updated_tick, date: updated}` with `#r<revision>` appended from
-//! revision 2 on: `revision` counts the writes at the same tick and date
-//! ([`next_stamp`]), so a write at a later tick is revision 1 again and its
-//! stamp is exactly what the writer passed. An update rewrites only the
+//! revision 2 on: `revision` increases on every mutation ([`next_stamp`]),
+//! including after the clock or date moves backward, so an old optimistic
+//! token cannot become current again. An update rewrites only the
 //! properties that changed and the body only when it changed; everything
 //! else (unknown properties, Obsidian's list style) is kept byte for byte.
 //!
@@ -130,26 +130,19 @@ fn stamp_of(tick: u64, date: &str, revision: u32) -> Stamp {
     }
 }
 
-/// The `updated` stamp of a write at `at` over an entry last updated at
-/// `prev`: `at` itself, unless it has the same tick and date (revision
-/// aside) as `prev` (a paused game, a hand edit): then `prev`'s date with
-/// the next revision suffix `#rN`. So every write gives a stamp that differs
-/// from the one before it.
+/// A persistent monotonic revision, starting at 1 on creation. Every
+/// mutation uses the caller's tick/date base and the next checked revision,
+/// so clock/date rollback cannot revive an old optimistic token.
 pub(crate) fn next_stamp(prev: &Stamp, at: Stamp) -> Result<Stamp, NotesError> {
-    let (prev_base, prev_rev) = split_rev(&prev.date);
-    if at.tick == prev.tick && split_rev(&at.date).0 == prev_base {
-        Ok(Stamp {
-            tick: at.tick,
-            date: format!(
-                "{prev_base}#r{}",
-                prev_rev
-                    .checked_add(1)
-                    .ok_or(NotesError::Exhausted("entry revisions"))?
-            ),
-        })
-    } else {
-        Ok(at)
-    }
+    let (_, prev_rev) = split_rev(&prev.date);
+    let revision = prev_rev
+        .checked_add(1)
+        .ok_or(NotesError::Exhausted("entry revisions"))?;
+    let (base, _) = split_rev(&at.date);
+    Ok(Stamp {
+        tick: at.tick,
+        date: format!("{base}#r{revision}"),
+    })
 }
 
 /// Whether two versions of a note differ in what a writer sees.
@@ -851,8 +844,8 @@ mod tests {
             tick,
             date: date.to_string(),
         };
-        assert_eq!(next_stamp(&s(5, "d"), s(6, "d")).unwrap(), s(6, "d"));
-        assert_eq!(next_stamp(&s(5, "d"), s(5, "e")).unwrap(), s(5, "e"));
+        assert_eq!(next_stamp(&s(5, "d"), s(6, "d")).unwrap(), s(6, "d#r2"));
+        assert_eq!(next_stamp(&s(5, "d"), s(5, "e")).unwrap(), s(5, "e#r2"));
         assert_eq!(next_stamp(&s(5, "d"), s(5, "d")).unwrap(), s(5, "d#r2"));
         assert_eq!(next_stamp(&s(5, "d#r2"), s(5, "d")).unwrap(), s(5, "d#r3"));
         assert_eq!(
@@ -867,6 +860,10 @@ mod tests {
         );
         assert!(matches!(
             next_stamp(&s(5, "d#r4294967295"), s(5, "d")),
+            Err(NotesError::Exhausted(_))
+        ));
+        assert!(matches!(
+            next_stamp(&s(5, "d#r4294967295"), s(6, "later")),
             Err(NotesError::Exhausted(_))
         ));
         assert_eq!(split_rev("d#rx"), ("d#rx", 1));

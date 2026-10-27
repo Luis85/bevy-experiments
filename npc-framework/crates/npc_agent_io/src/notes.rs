@@ -53,9 +53,9 @@
 //! owners. None of the three is hashed or snapshotted.
 //!
 //! `updated` is a version: every change gives a stamp that differs from the
-//! previous one. A write at the same tick and date as the entry's `updated`
-//! (a paused game) gets the date with a revision suffix, `DATE#r2`, `#r3`,
-//! ... (in the file: `updated: DATE`, `revision: N`); a hand edit of an
+//! previous one. Every update gets the date with a monotonic revision
+//! suffix, `DATE#r2`, `#r3`, ... (in the file: `updated: DATE`, `revision: N`),
+//! including clock/date rollback; a hand edit of an
 //! entry's title, body, status or `prompted_by` that leaves its stamp alone
 //! (seen when the store re-reads a changed file) gets the next revision
 //! too, written back to the file, so writers holding the old stamp get

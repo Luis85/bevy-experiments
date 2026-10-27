@@ -23,6 +23,76 @@ fn new(name: &str) -> NewLandmark {
         note: "Remember this place.".into(),
     }
 }
+
+#[test]
+fn stale_landmark_stamp_never_repeats_after_reopen_and_clock_rollback() {
+    for (tag, date) in [("aba-tick", "D"), ("aba-date", "C")] {
+        let dir = folder(tag);
+        let initial = Stamp {
+            tick: 1,
+            date: "D".into(),
+        };
+        let mut store = MapStore::open(&dir).unwrap();
+        let a = store
+            .add(new("Place"), [0, 0], None, initial.clone(), Writer::Agent)
+            .unwrap();
+        let b = store
+            .update(
+                a.id,
+                &a.updated,
+                LandmarkChange {
+                    note: Some("B".into()),
+                    ..Default::default()
+                },
+                Stamp {
+                    tick: 0,
+                    date: date.into(),
+                },
+                Writer::Player,
+            )
+            .unwrap();
+        drop(store);
+        let mut store = MapStore::open(&dir).unwrap();
+        let c = store
+            .update(
+                a.id,
+                &b.updated,
+                LandmarkChange {
+                    note: Some("C".into()),
+                    ..Default::default()
+                },
+                initial.clone(),
+                Writer::Agent,
+            )
+            .unwrap();
+        drop(store);
+        let mut store = MapStore::open(&dir).unwrap();
+        assert!(matches!(
+            store.update(
+                a.id,
+                &a.updated,
+                LandmarkChange {
+                    note: Some("stale overwrite".into()),
+                    ..Default::default()
+                },
+                Stamp {
+                    tick: 2,
+                    date: "E".into()
+                },
+                Writer::Player
+            ),
+            Err(MapError::Stale { .. })
+        ));
+        assert_ne!(c.updated, a.updated);
+        assert_eq!(c.created, a.created);
+        assert_eq!(store.list().unwrap()[0].note, "C");
+        assert!(
+            std::fs::read_to_string(store.path_for(a.id).unwrap())
+                .unwrap()
+                .contains("revision: 3")
+        );
+    }
+}
 #[test]
 fn add_list_and_file_round_trip() {
     let dir = folder("roundtrip");

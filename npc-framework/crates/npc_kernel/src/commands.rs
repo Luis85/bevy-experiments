@@ -491,7 +491,7 @@ pub fn entity_with<T: Component>(
 
 /// A position within ±[`POS_LIMIT`] mm, or `InvalidValue` for `field`.
 pub fn check_pos(field: &str, (x, z): (i32, i32)) -> Result<SimPos, CommandError> {
-    if x.abs() > POS_LIMIT || z.abs() > POS_LIMIT {
+    if !(-POS_LIMIT..=POS_LIMIT).contains(&x) || !(-POS_LIMIT..=POS_LIMIT).contains(&z) {
         return Err(invalid(
             field,
             format!("({x}, {z}) is outside ±{POS_LIMIT} mm"),
@@ -638,6 +638,25 @@ fn apply(world: &mut World, cmd: &SimCommand) {
 mod deferred_tests {
     use super::*;
     use bevy_app::App;
+
+    #[test]
+    fn check_pos_rejects_extreme_integers_and_accepts_closed_boundaries() {
+        for value in [i32::MIN, i32::MAX, -POS_LIMIT - 1, POS_LIMIT + 1] {
+            assert!(matches!(
+                check_pos("pos", (value, 0)),
+                Err(CommandError::InvalidValue { .. })
+            ));
+            assert!(matches!(
+                check_pos("pos", (0, value)),
+                Err(CommandError::InvalidValue { .. })
+            ));
+        }
+        for x in [-POS_LIMIT, 0, POS_LIMIT] {
+            for z in [-POS_LIMIT, 0, POS_LIMIT] {
+                assert_eq!(check_pos("pos", (x, z)), Ok(SimPos::new(x, z)));
+            }
+        }
+    }
 
     fn world() -> App {
         let mut app = App::new();
