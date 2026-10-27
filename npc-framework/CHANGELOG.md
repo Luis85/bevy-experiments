@@ -8,6 +8,12 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Documentation and end-to-end verification (plan Task 18)
+
+- Updated contributor/user guidance for the actor and world editors, registered MCP lifecycle, persistent
+  notes/map, configurable perception memory, fog and exact-port detached/window handovers. See the
+  end-to-end evidence in `docs/_notes/notes-workspace-e2e.md`.
+
 ### Added (landmarks, plan Tasks 21–23)
 
 - Actors keep an owned map of fixed landmarks: agent/player list/add/update methods, session-bound MCP tools

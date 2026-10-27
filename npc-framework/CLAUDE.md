@@ -5,8 +5,10 @@
 > Started from the repository root (a shared vault; it deliberately has no hooks), none of the guardrails below
 > run: if `/play-actor` or `/verify-visual` are not offered, you are in the wrong directory.
 
-A deterministic 3D NPC/actor framework in Rust on **Bevy 0.20** (rustc ≥ 1.97.1), for colony sims and RTS
-games. The sim is integer-only, runs headless, and is replayable bit for bit. Opt-in capabilities (perception,
+A deterministic 3D NPC/actor framework in Rust on **Bevy 0.20**, for colony sims and RTS games. The repository
+pins Rust **1.99.1** in `rust-toolchain.toml`; the workspace manifest minimum is 1.97.1. Run Cargo inside this
+independent workspace (`npc-framework/`), using `--locked` for standard builds/tests. The sim is integer-only, runs headless, and is replayable bit for bit.
+Opt-in capabilities (perception,
 rules, interaction, RTS command, vehicles, progression, crafting, agent control, grid A*) plug into a facade.
 Example content: the village (villagers with needs, a food economy) and the Actor Testbed (every capability).
 
@@ -18,9 +20,9 @@ Example content: the village (villagers with needs, a food economy) and the Acto
 | `crates/npc_kernel` | ids, clock, rng, `SimPos`, `NpcSimTick`/`NpcSet`, commands, orders, journal, replay, hash registry, inspect, freeze, `SpatialGrid`, host-safe driver (`SimControl`, `SimTime`), world snapshots (`snapshot`: save/load, ADR 0013) | `npc_ai`, `bevy_*` sub-crates, no rendering |
 | `crates/npc_needs` / `npc_jobs` | data-driven `NeedDef`s + decay / `Provides`, `Approach`, `Reservations` | kernel |
 | `crates/npc_locomotion` / `npc_nav` | `MoveIntent`/`MoveStatus` seam + `StraightLineMover` / opt-in grid A* (`NavAgent`, budget, replan, pass costs) | kernel |
-| `crates/npc_perception` | sensors (integer FOV, grid LOS, hearing), `PerceptionMemory`, detection checks by name, conditions | kernel, `npc_ai` |
+| `crates/npc_perception` | integer vision/LOS, hearing, reach, LIDAR/camera/radar, `PerceptionMemory`, snapshot-only fog/robot readings, detection checks and conditions | kernel, `npc_ai` |
 | `crates/npc_rules` | `CharacterSheet` (point-buy), skills/traits by name, pluggable `RuleSet`, 3d6 rolls (`Roll`), `SpendPoints` | kernel |
-| `crates/npc_agent_io` | external agent control: controllers, observation/affordance/handler registries, session host, CLI/MCP clients | kernel, `npc_ai`, tools |
+| `crates/npc_agent_io` | controllers, observation/affordance/handler registries, opt-in registration, host-side notes/map stores, session host, CLI/MCP clients | kernel, `npc_ai`, tools |
 | `crates/npc_interaction` | items, inventory/equipment, doors, tools, verbs by name (`Interact` leaf/command), busy/finished hooks | kernel, jobs, locomotion, nav |
 | `crates/npc_command` | `Owner`/`PlayerId`, recorded `IssueOrder`, `OrderQueue`, formations, squads, `ExecuteOrder`, executor/redirect hooks | kernel, ai, locomotion, nav |
 | `crates/npc_vehicles` | `Vehicle` seats, `MountedIn`/`Occupants`, `mount`/`dismount`, `ByCrew` (`DriveVehicle`) / `Direct` | foundations, `npc_interaction` (ADR 0012) |
@@ -31,15 +33,22 @@ Example content: the village (villagers with needs, a food economy) and the Acto
 | `crates/npc_framework` | **the facade**: `NpcPlugins` (+ `with_<capability>()`), `NpcAppExt`, `prelude`; `glue/<a>_<b>.rs` pairwise capability glue, each behind both features (ADR 0011) | the generic crates |
 | `crates/npc_view_helpers` | generic view: `VisualOf`, interpolation, panels, selection, screenshots, gizmos, `command_ui`, perf setup | `bevy`, kernel |
 | `content/village_content` / `village_view` | the villager: needs, places, actions, tree, commands, scenarios / models, animation, camera, F1 overlay | facade (+ `bevy` for the view) |
-| `content/testbed_content` / `testbed_view` | Actor Testbed: compound, scenarios, every capability on, `explorer` (AI explorer prompts, agent folders, clipboard, settings) / models, doors, vehicles, F5 sheet, F6 perception, F7 notes editor, prompt modal, RTS UI | facade (+ `bevy` for the view) |
-| `apps/village` / `apps/actor_testbed` | windowed demos (speed keys, BRP `npc/*` + `agent/*`; the testbed's explorer mode `--explorer-home`) | facade + content + view |
-| `apps/game_menu` | the launcher (`cargo run -p game_menu`): starts the games as child processes, settings, explorer New/Resume, detached worlds (Detached screen, Open in window, Stop) | `bevy` + `testbed_content` (no sim) |
-| `apps/npcctl` | headless JSON CLI (never a renderer; village + testbed factories) | facade + content |
+| `content/testbed_content` / `testbed_view` | Actor Testbed, actor/world preset validation, optional world mechanics, explorer hosts/workspaces/settings / models, fog, standalone model preview, F5/F6, F7 notebooks + Map, landmark markers, prompt modal, RTS UI | facade (+ `bevy` for the view) |
+| `apps/village` / `apps/actor_testbed` | windowed demos (speed keys, BRP `npc/*` + `agent/*`); testbed explorer `--explorer-home` and standalone `--actor-editor` | facade + content + view |
+| `apps/game_menu` | launcher (`cargo run --locked -p game_menu`), structured Worlds editor, Actors launch, settings, actor/world New/Resume selection, tracked detached worlds, save/stop/handover/quit | `bevy` + `testbed_content` (no sim) |
+| `apps/npcctl` | headless JSON CLI, explorer serve, registered/legacy agent + player notes/map clients, stdio MCP (never a renderer) | facade + content |
 | `apps/rts_units_demo` | portability proof: own units/map/physics, 10 Hz in host `FixedUpdate`, `--headless-ticks N` | facade + `bevy` only |
 | `xtask` | `cargo xtask verify`, architecture fitness and hook tests | tooling |
 
 Capability crates depend on each other only per ADR 0012's whitelist; everything else is facade glue. ADRs:
-`docs/adr/` (0008 host-owned schedule, 0009 registration by stable name, 0010 agent transport, 0011 glue, 0012 tiers, 0013 world snapshot).
+`docs/adr/` (0008 host-owned schedule, 0009 registration by stable name, 0010 agent transport, 0011 glue,
+0012 tiers, 0013 world snapshot), plus:
+
+- [0014: fog geometry and identities](docs/adr/0014-fog-geometry-and-identities.md).
+- [0015: preset editor identity and validation](docs/adr/0015-preset-editor-identities-and-validation.md).
+- [0016: registered explorer sessions](docs/adr/0016-registered-explorer-agent-interface.md).
+- [0017: immutable world presets and explorer mechanics](docs/adr/0017-world-presets-and-explorer-runtime.md).
+- [0018: host-side landmarks and file identity](docs/adr/0018-host-side-landmarks-and-file-identity.md).
 
 ## Golden rules
 
@@ -61,17 +70,51 @@ Capability crates depend on each other only per ADR 0012's whitelist; everything
 
 Path-scoped detail loads automatically from `.claude/rules/` (sim, view, content).
 
+## Explorer boundaries
+
+- Actor and world presets are host-read JSON. Validate actors against the **selected world's** frozen
+  registries, including detection, rather than a default world. New saves the selected IDs and complete
+  immutable copies; Resume/reset use those copies even if source files change or disappear. The explicit
+  `world.explorer_context` descriptor lets the ordinary loader prepare before freeze and apply after spawn
+  exactly once. Generic replay/snapshot loaders must not read agent metadata, credentials or preset folders.
+- `RegistrationRequired` is opt-in. Explorer New/Resume/reset/handover leaves the assigned actor idle and
+  unattached; control uses recorded attach commands. Preserve unlocked scenarios and the legacy default MCP
+  schemas. Generated explorer config selects `mcp --registered`; its tools expose no unit/controller/session.
+  Notes/map are available after registration before control. Unknown sessions on restarted/moved hosts may
+  reconnect once; `revoked:true` must never auto-reconnect or replay a mutation. Never step/resume the world
+  from a client merely to finish a pending control claim.
+- Credentials, sessions, wall-clock stamps, notes and landmark stores are host data, excluded from sim hashes,
+  world snapshots and replay records. Keep secret tokens and session keys out of logs, Debug output, observations,
+  prompts and CLI/MCP responses. `--agent-id` plus `--token` identifies registration credentials; without
+  `--agent-id`, `--token` keeps its HTTP-bearer meaning (`--bearer-token` can carry that separate transport lock).
+- F7 and tools share `NotesStores`/folder ownership and optimistic stamps. Only agents and players write;
+  NPCs do not author notebooks or landmarks. Preserve stable IDs across file rename, unknown frontmatter,
+  hand edits and owned files during workspace regeneration. There is no landmark delete operation.
+  `Thing` placement uses perception memory, never current unseen world truth. Resolve landmark Move targets
+  to positions before recording/submitting commands; replay never depends on map files.
+- Fog records (`RevealsFog`, explored/visible cells, last-seen statics), reach and robot readings are registered
+  snapshot-only. LIDAR reveals geometry without object identities; named static objects need identity coverage,
+  and units require currently sensed percepts. Default explorer memory is 1,200 ticks/128 entries; ordinary
+  testbed/village defaults and existing hash fixtures stay unchanged.
+- Views, editor drafts and preview cameras own separate entities. Never write sim components to preview or
+  display a model. The actor editor's validation app is frozen and unticked. The Worlds editor modifies files,
+  not running worlds. `SystemsSpec.map == false` hides map UI/markers and rejects map requests before I/O.
+  Marker labels remain noninteractive and show saved knowledge through every fog state.
+
 ## Commands
 
 ```sh
 cargo xtask verify            # full gate: fmt, clippy -D warnings, nextest/test, arch, replays, goldens, deny
 cargo xtask verify --quick    # what the Stop hook runs (no deny, no long tests)
-cargo test -p <crate> [--test <file>]    # the inner loop while you work; verify once at the end
+cargo test --locked -p <crate> [--test <file>]    # the inner loop while you work; verify once at the end
 ```
+
+Keep at most two Cargo builders active, preferably one for a cold Bevy build; each checkout needs its own
+build output directory.
 
 Timings (busy machine): fresh build ~15 min, `verify --quick` ~5 min, full `verify` 40–50 min (run it once, last).
 
-Headless CLI (`cargo run -p npcctl -- <cmd>`; JSON out, exit 0 ok / 1 check failed / 2 usage error):
+Headless CLI (`cargo run --locked -p npcctl -- <cmd>`; JSON out, exit 0 ok / 1 check failed / 2 usage error):
 
 ```sh
 npcctl run --seed 1 --ticks 7200 [--villagers 25] [--commands cmds.json] [--journal j.jsonl]
@@ -84,9 +127,31 @@ npcctl run --scenario testbed[:<name>] --ticks 4800    # any subcommand above; o
 npcctl serve --scenario smithy --record s.json  /  npcctl agent observe --unit 33 --format text  /  npcctl mcp
 ```
 
+Explorer and editor commands (folder arguments below are placeholders; use absolute paths):
+
+```sh
+cargo run --locked -p game_menu
+cargo run --locked -p actor_testbed -- --actor-editor --actors-dir DIR
+cargo run --locked -p actor_testbed -- --explorer-home DIR --agent NAME --world WORLD --preset rover --world-preset survival
+cargo run --locked -p npcctl -- serve --explorer-home DIR --agent NAME --resume
+npcctl mcp --url URL --registered
+npcctl agent enter-world --url URL --agent-id ID --token TOKEN
+npcctl agent map list --url URL --agent-id ID --token TOKEN
+npcctl map list --as player --unit N --url URL
+npcctl agent-token rotate --explorer-home DIR --agent NAME
+```
+
+Read ID/TOKEN privately from the agent's `AGENTS.md`; never paste real credentials into documentation or logs.
+Explorer hosts also accept `--actors-dir DIR` and `--worlds-dir DIR`. Stop the active host before a manual
+resume. Menu Open/Stop and the window's F9/close dialog manage save and same-port handover automatically;
+a failed save keeps the host alive. Menu Quit stops its started/adopted hosts, not unrelated processes.
+
 Live games serve BRP on `127.0.0.1:15702` (`npc/*`, `agent/*`, `world/state`; dev builds, or `--remote`). Change
-the sim only through `npc/command`. RPC file paths are relative to `target/npc-out/`. `--screenshot shot.png
---after-secs 5` saves a PNG and exits (Read it). Tokens, methods, security: `docs/debugging.md` §3.
+simulation state only through recorded commands (`npc/command` or the command/verb paths behind `agent/act`).
+RPC file paths are relative to `target/npc-out/`. `--screenshot shot.png --after-secs 5` saves a PNG and exits
+(read it). `--panels explorer` opens F7 on Diary, `--panels map` opens its Map tab when enabled; F8 toggles fog.
+Use these capture helpers or existing BRP widget events for visual verification; compilation alone is not GUI
+validation. Tokens, methods, security and flags: `docs/debugging.md` §3–4 and `docs/agent-experiments.md`.
 
 ## Workflow
 
