@@ -8,6 +8,15 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Added (world presets, plan Tasks 15–17)
+
+- World presets configure needs, battery, day/night sensing, detection, perception memory, systems and
+  inhabitants. New explorers select actor and world together; saves retain immutable copies of both presets.
+- Optional survival mechanics provide sources, recovery actions, movement penalties and exhaustion; night
+  vision/camera ranges scale from their base values. Plain explorer preserves its existing world and hashes.
+- The game menu's Worlds editor exposes preset fields with live validation and guarded atomic saves; settings
+  includes a worlds folder and Resume identifies both selected presets.
+
 ### Added (registered explorer agents, plan Tasks 30–31)
 
 - Explorer agents receive a persistent public ID and secret token, register with the server, enter their world

@@ -293,6 +293,8 @@ fn calls_queued_behind_a_stop_are_refused() {
         on_mismatch: None,
         preset: None,
         actors_dir: Some(home.join("actors")),
+        world_preset: None,
+        worlds_dir: Some(home.join("worlds")),
     };
     let (entered_tx, entered_rx) = mpsc::channel::<()>();
     let (gate_tx, gate_rx) = mpsc::channel::<()>();

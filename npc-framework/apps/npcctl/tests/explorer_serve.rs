@@ -59,13 +59,15 @@ fn lines(stdout: ChildStdout) -> mpsc::Receiver<String> {
 /// `serve --explorer-home HOME --actors-dir HOME/actors`: every child gets
 /// its own actor presets folder (never the shared default beside the temp
 /// folder).
-fn serve_home(home: &Path) -> [String; 5] {
+fn serve_home(home: &Path) -> [String; 7] {
     [
         "serve".to_owned(),
         "--explorer-home".to_owned(),
         home.display().to_string(),
         "--actors-dir".to_owned(),
         home.join("actors").display().to_string(),
+        "--worlds-dir".to_owned(),
+        home.join("actors/worlds").display().to_string(),
     ]
 }
 
@@ -262,6 +264,42 @@ fn serve_saves_and_cleans_up_on_stop() {
     let snap = snapshot::read(&dir.join("moor.world.json")).unwrap();
     assert_eq!(snap.tick, 25, "saved on stop");
     let _ = std::fs::remove_dir_all(&home);
+}
+
+#[test]
+fn chosen_world_flags_reach_saved_copy_and_resume_ignores_source_edits() {
+    let home = home("world-preset");
+    let s = serve(
+        &home,
+        &[
+            "--world",
+            "Moor",
+            "--world-preset",
+            "night_shift",
+            "--paused",
+        ],
+    );
+    let save = home.join("wren/moor.world.json");
+    let original = snapshot::read(&save).unwrap();
+    assert_eq!(original.header["world_preset"], "night_shift");
+    assert_eq!(
+        original.header["world_preset_data"]["day_night"]["night_vision_pct"],
+        40
+    );
+    assert_eq!(s.stop().0, Some(0));
+    std::fs::write(
+        home.join("actors/worlds/night_shift.json"),
+        testbed_content::worlds::BUILTIN_PRESETS[0].1,
+    )
+    .unwrap();
+    let s = serve(&home, &["--resume", "--paused"]);
+    assert_eq!(s.stop().0, Some(0));
+    let resumed = snapshot::read(&save).unwrap();
+    assert_eq!(
+        resumed.header["world_preset_data"],
+        original.header["world_preset_data"]
+    );
+    let _ = std::fs::remove_dir_all(home);
 }
 
 #[test]
@@ -489,6 +527,20 @@ fn explorer_flags_are_checked() {
     .unwrap();
     let actors = actors.to_str().unwrap();
     for (args, needle) in [
+        (vec!["--world-preset", "survival"], "--explorer-home"),
+        (
+            vec![
+                "--explorer-home",
+                h,
+                "--agent",
+                "A",
+                "--world",
+                "W",
+                "--world-preset",
+                " ",
+            ],
+            "--world-preset: the name is blank",
+        ),
         (vec!["--explorer-home", h, "--world", "W"], "--agent"),
         (vec!["--explorer-home", h, "--agent", "A"], "--world"),
         (

@@ -736,6 +736,9 @@ pub fn apply_preset(world: &mut World, entity: Entity, p: &ActorPreset) {
 /// are never refused here (`interact` and `order` ask about the verb they
 /// run).
 pub fn verb_gate(world: &World, entity: Entity, verb: &str) -> Option<String> {
+    if crate::world_runtime::intrinsic_recovery(world, entity, verb) {
+        return None;
+    }
     let allowed = world.get::<AllowedActions>(entity)?;
     (!allowed.0.contains(verb) && is_known_action(world, verb))
         .then(|| format!("this actor cannot {verb}"))

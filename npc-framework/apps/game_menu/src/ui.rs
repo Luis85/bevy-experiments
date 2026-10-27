@@ -6,7 +6,7 @@ use bevy::input_focus::InputFocus;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
-use bevy::text::{EditableText, TextCursorStyle};
+use bevy::text::{EditableText, TextCursorStyle, TextEdit};
 use bevy::ui::{InteractionDisabled, Pressed};
 use bevy::ui_widgets::{Button as WidgetButton, TextInput};
 
@@ -82,6 +82,19 @@ pub fn spawn_screen(commands: &mut Commands, scope: impl Bundle, title: &str) ->
     panel
 }
 
+/// Keep long menus and forms reachable in smaller windows.
+pub fn scroll_panel(commands: &mut Commands, panel: Entity) {
+    commands
+        .entity(panel)
+        .insert(bevy::ui_widgets::ScrollArea)
+        .queue(|mut entity: EntityWorldMut| {
+            if let Some(mut node) = entity.get_mut::<Node>() {
+                node.overflow = Overflow::scroll_y();
+                node.min_height = px(0);
+            }
+        });
+}
+
 /// A large button labelled `text` (with an optional dimmer second line),
 /// disabled when `enabled` is false. `tab` orders keyboard focus.
 pub fn button(
@@ -122,12 +135,16 @@ pub fn list_button(
 /// A one-line text field (a Bevy `TextInput`) holding `text`, `tab` in the
 /// keyboard order.
 pub fn text_field(text: impl AsRef<str>, tab: i32) -> impl Bundle {
+    let mut editable = EditableText {
+        allow_newlines: false,
+        visible_lines: Some(1.0),
+        ..EditableText::new(text)
+    };
+    editable.pending_edits.clear();
+    editable.queue_edit(TextEdit::TextStart(false));
     (
         TextInput,
-        EditableText {
-            allow_newlines: false,
-            ..EditableText::new(text)
-        },
+        editable,
         TextLayout::no_wrap(),
         font(16.0),
         TextColor(TEXT),
@@ -136,6 +153,7 @@ pub fn text_field(text: impl AsRef<str>, tab: i32) -> impl Bundle {
         Node {
             width: percent(100),
             min_width: px(0),
+            min_height: px(36),
             padding: UiRect::all(px(8)),
             border: UiRect::all(px(1)),
             border_radius: BorderRadius::all(px(4)),

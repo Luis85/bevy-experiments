@@ -47,6 +47,8 @@ pub mod summary;
 pub mod tree;
 pub mod walls;
 pub mod world;
+pub mod world_runtime;
+pub mod worlds;
 
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
@@ -159,6 +161,11 @@ pub fn perf_tags(tags: &mut npc_framework::perf::MechanicTags) {
             "actions.move",
         ),
         ("testbed_content::actions::idle_system", "actions.idle"),
+        ("testbed_content::world_runtime::update_state", "needs"),
+        (
+            "testbed_content::world_runtime::scale_movement",
+            "actions.move",
+        ),
     ] {
         tags.add(prefix, mechanic);
     }
@@ -188,13 +195,18 @@ mod tests {
                 "actions.move",
             ),
             (type_name_of_val(&actions::idle_system), "actions.idle"),
+            (type_name_of_val(&world_runtime::update_state), "needs"),
+            (
+                type_name_of_val(&world_runtime::scale_movement),
+                "actions.move",
+            ),
         ];
         for (system, mechanic) in cases {
             assert_eq!(tags.mechanic_for(system), mechanic, "{system}");
             assert_ne!(tags.mechanic_for(system), UNTAGGED, "{system}");
         }
         // Each tagged mechanic has a budget: the framework's or ours.
-        for mechanic in ["actions.move", "actions.idle"] {
+        for mechanic in ["actions.move", "actions.idle", "needs"] {
             let framework = npc_framework::perf::NPC_BUDGET_TABLE
                 .iter()
                 .any(|(m, _, _)| *m == mechanic);

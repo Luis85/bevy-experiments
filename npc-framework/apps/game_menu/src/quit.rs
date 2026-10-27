@@ -793,6 +793,7 @@ mod tests {
                 world: name.into(),
                 mode: RunMode::Detached,
                 preset: "human".into(),
+                world_preset: "plain_explorer".into(),
             },
         );
         assert!(
@@ -1031,6 +1032,7 @@ mod tests {
                     world: "Moor".into(),
                     mode: RunMode::Window,
                     preset: "human".into(),
+                    world_preset: "plain_explorer".into(),
                 },
             );
             let pid = app.world().resource::<Running>().child.id();
@@ -1281,6 +1283,7 @@ mod tests {
                 world: "Moor".into(),
                 mode: RunMode::Detached,
                 preset: "human".into(),
+                world_preset: "plain_explorer".into(),
             },
         );
         let pid = app
@@ -1642,6 +1645,7 @@ mod tests {
                 world: "Moor".into(),
                 mode: Mode::Detached,
                 preset: "human".into(),
+                world_preset: "plain_explorer".into(),
             },
         );
         assert!(
@@ -1662,6 +1666,7 @@ mod tests {
                 world: "Fen".into(),
                 mode: Mode::Window,
                 preset: "human".into(),
+                world_preset: "plain_explorer".into(),
             },
         );
         let (wren, brin) = (folder(&d, "Wren Ashdown"), folder(&d, "Brin Marlow"));

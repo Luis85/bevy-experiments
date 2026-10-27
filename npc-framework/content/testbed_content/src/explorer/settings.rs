@@ -20,6 +20,8 @@ pub struct Settings {
     /// in older files): [`default_actors_dir`] of the agents folder.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub actors_dir: Option<PathBuf>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worlds_dir: Option<PathBuf>,
 }
 
 /// The actor presets folder beside the agents folder:
@@ -33,6 +35,13 @@ pub fn default_actors_dir(agents_dir: &Path) -> PathBuf {
         .map_or_else(|| agents_dir.join("npc-actors"), |p| p.join("npc-actors"))
 }
 
+pub fn default_worlds_dir(agents_dir: &Path) -> PathBuf {
+    agents_dir
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .map_or_else(|| agents_dir.join("npc-worlds"), |p| p.join("npc-worlds"))
+}
+
 fn fog_default() -> bool {
     true
 }
@@ -44,6 +53,7 @@ impl Settings {
             agents_dir: home.join("npc-agents"),
             fog_of_war: true,
             actors_dir: None,
+            worlds_dir: None,
         }
     }
 
@@ -52,6 +62,12 @@ impl Settings {
         self.actors_dir
             .clone()
             .unwrap_or_else(|| default_actors_dir(&self.agents_dir))
+    }
+
+    pub fn worlds_dir(&self) -> PathBuf {
+        self.worlds_dir
+            .clone()
+            .unwrap_or_else(|| default_worlds_dir(&self.agents_dir))
     }
 
     /// The settings file: `APPDATA`, else `XDG_CONFIG_HOME`, else `HOME/.config`,
@@ -140,6 +156,7 @@ mod tests {
             agents_dir: d.join("agents"),
             fog_of_war: false,
             actors_dir: Some(d.join("my-actors")),
+            worlds_dir: Some(d.join("my-worlds")),
         };
         s.save(&f).unwrap();
         assert_eq!(Settings::load(&f, &home), s);
@@ -184,6 +201,31 @@ mod tests {
             Path::new("agents").join("npc-actors")
         );
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn worlds_dir_defaults_and_migrates_readonly() {
+        let d = tmp("worlds");
+        let home = d.join("home");
+        let defaults = Settings::default_for(&home);
+        assert_eq!(defaults.worlds_dir(), home.join("npc-worlds"));
+        assert_eq!(
+            default_worlds_dir(Path::new("agents")),
+            Path::new("agents").join("npc-worlds")
+        );
+        let file = d.join("settings.json");
+        let legacy = r#"{"agents_dir":"/x/agents"}"#;
+        std::fs::write(&file, legacy).unwrap();
+        let old = Settings::load(&file, &home);
+        assert_eq!(old.worlds_dir, None);
+        assert_eq!(old.worlds_dir(), Path::new("/x/npc-worlds"));
+        assert_eq!(std::fs::read_to_string(file).unwrap(), legacy);
+        let custom = Settings {
+            worlds_dir: Some(d.join("chosen")),
+            ..old
+        };
+        assert_eq!(custom.worlds_dir(), d.join("chosen"));
+        let _ = std::fs::remove_dir_all(d);
     }
 
     #[test]
@@ -232,6 +274,7 @@ mod tests {
             agents_dir: d.join("agents"),
             fog_of_war: true,
             actors_dir: None,
+            worlds_dir: None,
         };
         let json = serde_json::to_string(&s).unwrap();
         std::fs::write(&f, format!("\u{feff}{json}")).unwrap();

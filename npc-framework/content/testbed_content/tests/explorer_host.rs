@@ -60,6 +60,8 @@ fn new_args(home: &Path, agent: &str, world: &str) -> HostArgs {
         on_mismatch: None,
         preset: None,
         actors_dir: Some(home.join("actors")),
+        world_preset: None,
+        worlds_dir: Some(home.join("worlds")),
     }
 }
 
@@ -835,6 +837,169 @@ fn legacy_save_checks_and_listing_are_readonly_then_resume_migrates_once() {
     let (app, _, _) = build_explorer_app(&resume_args(&home, "Wren", None), |_| {}).unwrap();
     assert_eq!(read_meta(&dir).unwrap(), migrated);
     drop(app);
+    let _ = std::fs::remove_dir_all(home);
+}
+
+#[test]
+fn selected_world_is_validated_then_copied_for_resume_reset_and_token_refresh() {
+    use testbed_content::explorer::host::{
+        HEADER_WORLD_PRESET, HEADER_WORLD_PRESET_DATA, reset_world, rotate_agent_token,
+    };
+    let home = tmp("world-copy");
+    let worlds = home.join("worlds");
+    testbed_content::worlds::install_builtins(&worlds).unwrap();
+    let mut selected = testbed_content::worlds::plain_preset();
+    selected.name = "Remembered climate".into();
+    selected.description = "The selected world's immutable rules.".into();
+    selected.detection = testbed_content::scenario::Detection::Automatic;
+    selected.perception.forget_after_ticks = 700;
+    selected.perception.memory_capacity = 96;
+    let world_file = worlds.join("climate.json");
+    std::fs::write(&world_file, serde_json::to_vec(&selected).unwrap()).unwrap();
+    let actors = home.join("actors");
+    testbed_content::actors::install_builtins(&actors).unwrap();
+    let mut actor_preset = testbed_content::actors::human_preset();
+    actor_preset.perception.detection = Some("automatic".into());
+    std::fs::write(
+        actors.join("automatic.json"),
+        serde_json::to_vec(&actor_preset).unwrap(),
+    )
+    .unwrap();
+    let args = HostArgs {
+        preset: Some("automatic".into()),
+        world_preset: Some("climate".into()),
+        ..new_args(&home, "Wren", "W")
+    };
+    let (mut app, start, dir) = build_explorer_app(&args, |_| {}).unwrap();
+    let session = app.world().resource::<ExplorerSession>().clone();
+    assert_eq!(session.meta.world_preset, "climate");
+    assert_eq!(session.world_preset, selected);
+    assert_eq!(
+        testbed_content::worlds::resolve_preset(app.world(), "climate"),
+        Some(selected.clone())
+    );
+    assert_eq!(
+        session.scenario["world"]["explorer_context"]["world"]["id"],
+        "climate"
+    );
+    assert_eq!(
+        app.world()
+            .resource::<PerceptionConfig>()
+            .forget_after_ticks,
+        700
+    );
+    write_session_files(
+        app.world(),
+        &start,
+        &dir,
+        "http://127.0.0.1:15719",
+        home.join("npcctl"),
+        true,
+    )
+    .unwrap();
+    run_ticks(app.world_mut(), 21);
+    save_now(app.world_mut(), &dir, NOW).unwrap();
+    let snap = snapshot::read(&dir.save("W")).unwrap();
+    assert_eq!(snap.header[HEADER_WORLD_PRESET], "climate");
+    assert_eq!(
+        snap.header[HEADER_WORLD_PRESET_DATA],
+        serde_json::to_value(&selected).unwrap()
+    );
+    let mut edited = selected.clone();
+    edited.name = "Edited source".into();
+    edited.perception.forget_after_ticks = 900;
+    std::fs::write(&world_file, serde_json::to_vec(&edited).unwrap()).unwrap();
+    let (back, _, _) = build_explorer_app(&resume_args(&home, "Wren", None), |_| {}).unwrap();
+    assert_eq!(back.world().resource::<SimClock>().tick, 21);
+    assert_eq!(
+        back.world().resource::<ExplorerSession>().world_preset,
+        selected
+    );
+    assert_eq!(
+        back.world()
+            .resource::<PerceptionConfig>()
+            .forget_after_ticks,
+        700
+    );
+    let reset = reset_world(back.world().resource::<ExplorerSession>(), SEED, |_| {}).unwrap();
+    assert_eq!(
+        reset.world().resource::<ExplorerSession>().world_preset,
+        selected
+    );
+    assert_eq!(
+        reset.world().resource::<PerceptionConfig>().memory_capacity,
+        96
+    );
+    std::fs::remove_file(world_file).unwrap();
+    assert_eq!(check_save(&home, "Wren"), Ok(()));
+    let (back, _, _) = build_explorer_app(&resume_args(&home, "Wren", None), |_| {}).unwrap();
+    assert_eq!(
+        back.world().resource::<ExplorerSession>().world_preset,
+        selected
+    );
+    rotate_agent_token(&dir).unwrap();
+    let agents = read(dir.dir.join("AGENTS.md"));
+    assert!(agents.contains("Remembered climate") && !agents.contains("Edited source"));
+    assert!(agents.contains("about 35 seconds") && agents.contains("Detection is automatic"));
+    assert!(
+        !agents.contains("Human scout")
+            && !agents.contains("http://")
+            && !agents.contains("npcctl")
+    );
+    let request = HostArgs {
+        world_preset: Some("survival".into()),
+        ..resume_args(&home, "Wren", None)
+    };
+    assert!(
+        build_explorer_app(&request, |_| {})
+            .err()
+            .unwrap()
+            .contains("a resumed world keeps it")
+    );
+    let _ = std::fs::remove_dir_all(home);
+}
+
+#[test]
+fn invalid_world_and_incompatible_detection_leave_no_agent_folder() {
+    let home = tmp("world-validation");
+    let worlds = home.join("worlds");
+    testbed_content::worlds::install_builtins(&worlds).unwrap();
+    let mut broken = testbed_content::worlds::plain_preset();
+    broken.perception.memory_capacity = 0;
+    std::fs::write(
+        worlds.join("broken.json"),
+        serde_json::to_vec(&broken).unwrap(),
+    )
+    .unwrap();
+    let args = HostArgs {
+        world_preset: Some("broken".into()),
+        ..new_args(&home, "Invalid", "W")
+    };
+    let error = build_explorer_app(&args, |_| {}).err().unwrap();
+    assert!(
+        error.contains("world preset `broken` is invalid") && error.contains("memory_capacity"),
+        "{error}"
+    );
+    assert!(!home.join("invalid").exists());
+    let actors = home.join("actors");
+    testbed_content::actors::install_builtins(&actors).unwrap();
+    let mut actor = testbed_content::actors::human_preset();
+    actor.perception.detection = Some("automatic".into());
+    std::fs::write(
+        actors.join("auto.json"),
+        serde_json::to_vec(&actor).unwrap(),
+    )
+    .unwrap();
+    let args = HostArgs {
+        preset: Some("auto".into()),
+        ..new_args(&home, "Incompatible", "W")
+    };
+    let error = build_explorer_app(&args, |_| {}).err().unwrap();
+    assert!(
+        error.contains("actor preset `auto` is invalid") && error.contains("per_roll"),
+        "{error}"
+    );
+    assert!(!home.join("incompatible").exists());
     let _ = std::fs::remove_dir_all(home);
 }
 

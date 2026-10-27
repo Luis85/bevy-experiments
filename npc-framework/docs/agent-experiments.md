@@ -409,6 +409,14 @@ existing or externally changed destination requires **Confirm Replace**. Revert 
 restores a new/duplicate draft's starting values. Changing presets or closing with unsaved edits asks before
 discarding them. Resumed worlds retain their saved preset copy; file edits apply to new/fresh worlds.
 
+**Editing worlds.** Main → **Worlds** edits the world presets used by New. The forms expose all four needs,
+their rates/thresholds/movement effects, day/night, detection, perception memory, system switches and
+inhabitants. Validation is live; invalid presets cannot be saved or launched. New/Duplicate/Revert and guarded
+atomic saves follow the actor editor's conventions. Settings' optional **Worlds folder** defaults to
+`npc-worlds` beside the agents folder. Plain explorer preserves today's mechanics; Survival enables needs
+and darker nights, and Night shift uses a shorter cycle. A saved world keeps its complete preset copy even
+when the source is edited or deleted.
+
 1. `cargo run -p game_menu` → **Settings**: the agents folder (default `<home>/npc-agents`, kept in
    `%APPDATA%\npc-framework\settings.json`, `$XDG_CONFIG_HOME` or `~/.config`; `--settings FILE` for another
    file). **Explore with an AI agent** stays disabled until the folder is valid.
@@ -428,11 +436,13 @@ discarding them. Resumed worlds retain their saved preset copy; file edits apply
    Choose an **Actor** preset below the names: Human, Rover (LIDAR and camera), Sentinel (radar and camera), or
    another valid JSON preset from the configured actors folder. The selected actor's description is shown;
    invalid presets are excluded and Start is disabled if none are valid. The default is Human. Both launch
-   modes use the choice; Resume rows show the saved agent's preset and keep it when reopening the world.
+   modes use the choice. Choose a **World** preset as well; changing it revalidates the actor choices under
+   its detection rules. Resume rows show both saved preset IDs and retain their copies when reopening.
    The robot models are built from primitives with a dome per physical sensor. LIDAR reveals geometry through
    the first hit without identifying objects, cameras reveal their cone with line of sight, and radar reveals
    only detected target cells. Named objects outside the camera/reach/radar coverage stay hidden or last seen.
-   For a new world from the terminal, add `--preset rover` or `--preset sentinel` (and optionally `--actors-dir DIR`)
+   For a new world from the terminal, add `--preset rover` or `--preset sentinel`, `--world-preset survival`
+   (and optionally `--actors-dir DIR` / `--worlds-dir DIR`)
    to `actor_testbed --explorer-home DIR --agent NAME --world NAME` or `npcctl serve` with the same explorer flags.
 3. The game window opens **paused** behind a modal with the prompt: **Copy** puts it on the OS clipboard (a
    note names `prompts/<kind>.md` when the copy tool fails), **OK** closes the modal and starts the sim. Open the

@@ -213,6 +213,8 @@ pub struct WorkspaceVars {
     pub actor: ActorSummary,
     /// Credentials are rendered only into AGENTS.md, never the prompts.
     pub identity: AgentIdentity,
+    /// Immutable selected world rules; no live entity/character details.
+    pub world: crate::worlds::WorldPreset,
 }
 
 #[derive(Clone)]
@@ -246,8 +248,69 @@ pub fn render_agents_md(v: &WorkspaceVars) -> String {
     values.extend([
         ("AGENT_ID", v.identity.agent_id.clone()),
         ("TOKEN", v.identity.token.clone()),
+        ("WORLD_RULES", render_world_rules(&v.world)),
+        (
+            "MEMORY_NOTE",
+            if v.world.perception.forget_after_ticks == 1200 {
+                "Your character remembers what it sensed for about a minute".into()
+            } else {
+                format!(
+                    "Your character remembers what it sensed for about {} seconds",
+                    v.world.perception.forget_after_ticks / 20
+                )
+            },
+        ),
     ]);
     fill(AGENTS, &values)
+}
+
+pub fn render_world_rules(world: &crate::worlds::WorldPreset) -> String {
+    let mut lines = vec![format!("{}: {}", world.name, world.description.trim())];
+    let mut active = false;
+    for (name, need, recovery) in [
+        ("Hunger", &world.needs.hunger, "eat"),
+        ("Thirst", &world.needs.thirst, "drink"),
+        ("Energy", &world.needs.energy, "rest"),
+        ("Battery", &world.needs.battery, "charge"),
+    ] {
+        if need.on {
+            active = true;
+            lines.push(format!("{name} worsens over time. At {}%, movement falls to {}% speed; at {}%, your character collapses or shuts down. Use `{recovery}` at a suitable source and recover below {}% before continuing.",need.low_milli/1000,need.low_speed_pct,need.out_milli/1000,need.low_milli/1000));
+        }
+    }
+    if !active {
+        lines.push("No survival needs are enabled.".into());
+    }
+    if world.day_night.on {
+        lines.push(format!("Day and night cycle every {} seconds. At night, sight and camera range are {}% of their daytime range; LIDAR and radar are unchanged.",world.day_night.cycle_ticks/20,world.day_night.night_vision_pct));
+    } else {
+        lines.push("Darkness does not shorten your senses.".into());
+    }
+    let detection = match world.detection {
+        crate::scenario::Detection::PerRoll => {
+            "Some things need a successful perception check to notice."
+        }
+        crate::scenario::Detection::Automatic => {
+            "Detection is automatic when your senses reach a thing."
+        }
+    };
+    lines.push(detection.into());
+    for (name, on) in [
+        ("Crafting", world.systems.crafting),
+        ("Vehicles", world.systems.vehicles),
+        ("Locked doors and keys", world.systems.locked_doors),
+        ("Skill progression", world.systems.progression),
+    ] {
+        lines.push(format!(
+            "{name}: {}.",
+            if on { "enabled" } else { "disabled" }
+        ));
+    }
+    lines
+        .into_iter()
+        .map(|line| format!("- {line}"))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Character briefing returned by enter_world, never embedded in the
@@ -420,6 +483,7 @@ mod tests {
                 npcctl_missing: false,
             },
             actor: ActorSummary::human_scout(),
+            world: crate::worlds::plain_preset(),
             identity: AgentIdentity {
                 agent_id: "wren-ashdown-0123abcd".into(),
                 token: "1".repeat(64),
