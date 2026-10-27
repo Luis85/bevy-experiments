@@ -190,9 +190,28 @@ fn rover_resume_is_equivalent() {
         let snap = serde_json::from_str(&serde_json::to_string(&snap).unwrap()).unwrap();
         load(loaded.world_mut(), &snap, LoadMode::Strict).unwrap();
         assert_eq!(readings(&loaded, wren), readings(&never, wren), "{preset}");
+        let fog = |app: &App| {
+            let e = app.world().resource::<SimIndex>().get(wren).unwrap();
+            (
+                app.world()
+                    .get::<npc_framework::perception::VisibleCells>(e)
+                    .unwrap()
+                    .clone(),
+                app.world()
+                    .get::<npc_framework::perception::ExploredCells>(e)
+                    .unwrap()
+                    .clone(),
+                app.world()
+                    .get::<npc_framework::perception::SeenStatics>(e)
+                    .unwrap()
+                    .clone(),
+            )
+        };
+        assert_eq!(fog(&loaded), fog(&never), "{preset}: restored fog");
         run_ticks(never.world_mut(), 97);
         run_ticks(loaded.world_mut(), 97);
         assert_eq!(readings(&loaded, wren), readings(&never, wren), "{preset}");
+        assert_eq!(fog(&loaded), fog(&never), "{preset}: continued fog");
         for h in homes.into_inner().unwrap().into_iter().chain([h1, h2, h3]) {
             let _ = std::fs::remove_dir_all(&h);
         }

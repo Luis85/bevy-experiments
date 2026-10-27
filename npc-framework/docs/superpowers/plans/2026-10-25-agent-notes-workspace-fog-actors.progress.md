@@ -1,5 +1,23 @@
 # SDD ledger — plan: npc-framework/docs/superpowers/plans/2026-10-25-agent-notes-workspace-fog-actors.md
 
+## Continuation in the monorepo (2026-10-27)
+
+- Resumed in `C:\Projects\bevy-experiments\npc-framework`, current `main` checkout. The user chose to
+  optimize LIDAR traversal while preserving full scans; the old open decision is resolved.
+- **Task 13 complete**, as local uncommitted changes: procedural Rover/Sentinel models, preset model selection,
+  sensor-specific fog with separate geometry/identity coverage, New's valid-preset picker and Resume labels.
+  ADR 0014 records the fog boundary. Inspected screenshots cover both robots, movement and both menu screens.
+- Release moving-rover median p95: perception 37.2 µs, fog 49.4 µs (55 µs budgets unchanged). Exact beam ranges
+  and visited cells are checked against the grid reference; robot fog/readings resume and existing hashes pass.
+- Final `cargo xtask verify`: **`"ok": true`** (`target/verify-task13-final.json`), with process-local
+  `CARGO_BUILD_JOBS=8`, `NEXTEST_TEST_THREADS=4`: 1,080 tests passed (12 skipped, two reported leaky), one doc test
+  passed (ten ignored), architecture 7/7, replays 8/8, six snapshots with none pending, Clippy clean, cargo-deny
+  passed. No optional tools skipped. Two leaky-test reports remain a harness limitation.
+- Evidence: `docs/_notes/task13-robot-explorer-evidence.md`. Next: **Task 14 (actor editor)**, then Gate E.
+  This Task 13 checkpoint did not perform a phase merge or a release build of the five apps.
+
+## Historical ledger (previous checkout and workflow)
+
 Spec: npc-framework/docs/superpowers/specs/2026-10-25-agent-notes-and-workspace-design.md
 Branch: claude/single-npc-testbed-48eb8e. Plan tasks numbered 1–18 (A1..F1 labels kept).
 Phases: A=T1-3, B=T4-5, C=T6-8, D=T9-10, E=T11-14, G=T15-17, F=T18. Phase gate (user rule): full verify ok → merge --no-ff into main at C:\Projects\the-factory (index clean, no dev files under npc-framework/ touched) → cargo build --release of game_menu, actor_testbed, npcctl, village, rts_units_demo there → next phase.

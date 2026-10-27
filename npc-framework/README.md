@@ -32,7 +32,7 @@ a headless CLI, a JSON-RPC interface on the running game, a journal of every dec
 - **Entity reference**: one page per ECS [component](docs/entities/components/index.md) (fields and units, who
   adds, reads and writes it, hashed and/or saved in world snapshots) and per [system](docs/entities/systems/index.md)
   (schedule and set, reads/writes, determinism, perf mechanic).
-- Decisions: [`docs/adr/`](docs/adr/) (0001–0013). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
+- Decisions: [`docs/adr/`](docs/adr/) (0001–0015). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
   `docs/superpowers/`. Benchmarks: [`bench/README.md`](bench/README.md). Agent workflow: [`CLAUDE.md`](CLAUDE.md).
 
 ## Features
@@ -59,10 +59,11 @@ nothing of it runs or is hashed.
 
 ## Quick start
 
-Requires Rust ≥ 1.97.1 (`rustup update stable`). The first build compiles Bevy and takes a while.
+Uses the pinned Rust 1.99.1 toolchain (`rust-toolchain.toml`). The first build compiles Bevy and takes a while.
 
 ```bash
 cargo run -p game_menu                                 # start here: a menu with everything below, no flags
+cargo run --locked -p actor_testbed -- --actor-editor    # Actors: validated preset forms and a 3D preview
 cargo run -p village                                   # the village (F1 overlay, F3 journal, F4 perf, Space, 1-4)
 cargo run -p actor_testbed                             # the Actor Testbed; you command player 1
 cargo run -p actor_testbed -- --scenario vehicles      # embedded scenarios: doors, locked_store, chop, craft,

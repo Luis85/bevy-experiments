@@ -119,7 +119,7 @@ pub(crate) struct ActorAnimTarget {
 }
 
 /// Meshes of the KayKit kits an actor should not carry around.
-const HIDDEN_MESHES: [&str; 12] = [
+pub(crate) const HIDDEN_MESHES: [&str; 12] = [
     "1H_Sword",
     "1H_Sword_Offhand",
     "2H_Sword",
@@ -150,7 +150,7 @@ fn build_graphs(
     mut anims: ResMut<ActorAnimations>,
 ) {
     let Some(assets) = assets else { return };
-    for kind in ModelKind::ALL {
+    for kind in ModelKind::ANIMATED {
         let i = kind.index();
         if anims.graphs[i].is_some() || anims.unavailable[i] {
             continue;

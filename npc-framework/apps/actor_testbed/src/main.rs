@@ -79,6 +79,8 @@
 //! faster through 1x/3x/10x, `.` one tick while paused) act on the kernel's
 //! `SimControl` (digits are the control groups of the command UI).
 
+mod actor_editor;
+mod editor_mode;
 mod explorer;
 
 use std::collections::VecDeque;
@@ -115,7 +117,8 @@ const USAGE: &str = "usage: actor_testbed [--scenario NAME|FILE] [--seed N] [--s
 [--fog on|off] [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote] [--out-dir DIR]
        actor_testbed --explorer-home DIR --agent NAME [--world NAME [--preset ID] | --resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog] [--actors-dir DIR] [other flags except --scenario and --seed]
        (explorer mode: BRP is always on, on the first free port from --remote-port N on, N..=N+19, default 15702;
-        --exact-port N: exactly N, waited for up to 10 s, else exit 4)";
+        --exact-port N: exactly N, waited for up to 10 s, else exit 4)
+       actor_testbed --actor-editor [--actors-dir DIR] [--editor-preset ID] [--screenshot PATH --after-secs S]";
 
 #[cfg_attr(not(feature = "debug-tools"), allow(dead_code))]
 struct Args {
@@ -510,6 +513,16 @@ fn explorer_app(ex: &ExplorerArgs, args: &Args, port: u16) -> App {
 }
 
 fn main() {
+    match editor_mode::parse(&std::env::args().skip(1).collect::<Vec<_>>()) {
+        Ok(Some(args)) => {
+            if let Err(e) = editor_mode::run(args) {
+                usage(&e);
+            }
+            return;
+        }
+        Err(e) => usage(&e),
+        Ok(None) => {}
+    }
     let mut args = parse_args();
     // The profiler's subscriber before the sim app exists: the sim's system
     // spans are created as its plugins add them, before `host` adds the

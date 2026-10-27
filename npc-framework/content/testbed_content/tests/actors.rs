@@ -70,6 +70,83 @@ fn testbed_world() -> App {
     testbed_content::scenario::try_new_sim_app(1, "explorer", 0).unwrap()
 }
 
+#[test]
+fn extreme_sheet_values_are_rejected_without_overflow() {
+    let app = testbed_world();
+    for value in [i32::MIN, i32::MAX] {
+        let mut preset = testbed_content::actors::human_preset();
+        preset.sheet.attributes.st = value;
+        assert!(
+            validate(&preset, app.world())
+                .unwrap_err()
+                .iter()
+                .any(|e| e.contains("attribute ST"))
+        );
+        let mut preset = testbed_content::actors::human_preset();
+        preset.sheet.skills.insert("Mining".into(), value);
+        assert!(validate(&preset, app.world()).is_err());
+        preset.sheet.skills.insert("unknown".into(), value);
+        assert!(validate(&preset, app.world()).is_err());
+    }
+    let mut preset = testbed_content::actors::human_preset();
+    preset.sheet.unspent = i32::MAX;
+    assert!(
+        validate(&preset, app.world())
+            .unwrap_err()
+            .iter()
+            .any(|e| e.contains("budget"))
+    );
+}
+
+#[test]
+fn sheet_point_total_matches_builtin_pricing_and_shows_large_banked_totals() {
+    let app = testbed_world();
+    for (id, json) in BUILTIN_PRESETS {
+        let mut preset: ActorPreset = serde_json::from_str(json).unwrap();
+        let expected = npc_framework::rules::with_rules(app.world(), |r| {
+            r.points(&preset.sheet.to_sheet()).total
+        });
+        assert_eq!(
+            testbed_content::actors::sheet_point_total(&preset.sheet, app.world()),
+            Ok(i64::from(expected)),
+            "{id}"
+        );
+        let spent = i64::from(expected) - i64::from(preset.sheet.unspent);
+        preset.sheet.unspent = i32::MAX;
+        assert_eq!(
+            testbed_content::actors::sheet_point_total(&preset.sheet, app.world()),
+            Ok(spent + i64::from(i32::MAX)),
+            "{id}: an over-budget draft still displays its full point total"
+        );
+        assert!(validate(&preset, app.world()).is_err());
+    }
+}
+
+#[test]
+fn sheet_point_total_rejects_unsafe_custom_rules_accounting() {
+    let mut app = testbed_world();
+    let preset = testbed_content::actors::human_preset();
+    {
+        let mut rules = app
+            .world_mut()
+            .resource_mut::<npc_framework::rules::RuleSet>();
+        rules.costs.st = i32::MAX;
+        rules.costs.dx = i32::MAX;
+    }
+    let mut sheet = preset.sheet;
+    sheet.attributes.st = 11;
+    sheet.attributes.dx = 11;
+    let errors = testbed_content::actors::sheet_point_total(&sheet, app.world()).unwrap_err();
+    assert!(
+        errors.iter().any(|e| e.contains("integer range")),
+        "{errors:?}"
+    );
+    app.world_mut()
+        .resource_mut::<npc_framework::rules::RuleSet>()
+        .attribute_base = i32::MIN;
+    assert!(testbed_content::actors::sheet_point_total(&sheet, app.world()).is_err());
+}
+
 fn entity(app: &App, name: &str) -> (SimId, Entity) {
     let id = app.world().resource::<TestbedIds>().id(name);
     (id, app.world().resource::<SimIndex>().get(id).unwrap())

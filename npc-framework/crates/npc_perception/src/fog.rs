@@ -14,8 +14,10 @@
 //!    two centres) and its [`ReachSense`] ([`reveal_reach_cells`]: all
 //!    round, same line of sight). The actor's own cell is always visible.
 //!    Hearing and proximity reveal nothing (proximity has no line of
-//!    sight); robot sensors come later (Task E3). Only cells inside the grid
-//!    bounds are recorded.
+//!    sight). Cameras reveal a cone with LOS; LIDAR reveals geometry along
+//!    each beam through its first hit; radar reveals detected target cells.
+//!    LIDAR-only cells never reveal named objects (`VisibleCells::identified`).
+//!    Only cells inside the grid bounds are recorded.
 //! 2. **explored** |= visible (it never shrinks).
 //! 3. **statics** ([`SeenStatics`]): what content declares static
 //!    ([`FogStatics`]) and stands in a visible cell is recorded as seen now
@@ -32,6 +34,8 @@
 //! is skipped (the visible cells kept) while the actor's cell, facing,
 //! sensors and the grid's cells ([`SpatialGrid::revision`]) are unchanged
 //! since its last scan: an idle actor, or one walking inside one cell.
+//! Robots also key the exact position, LIDAR settings, obstacle cells and
+//! radar target cells, because a beam can change within one grid cell.
 //! Steps 2 and 3 run on every scan; they touch only the things that can be
 //! static and reuse their buffers, so a scan allocates nothing once warm.
 //!
@@ -58,8 +62,11 @@ use npc_kernel::spatial::{CellCoord, Footprint, GridBounds, GridOccluder, Spatia
 use npc_kernel::{SimClock, SimId, SimPos};
 use serde::{Deserialize, Serialize};
 
+use crate::lidar::LidarScratch;
+use crate::sensors::Lidar;
 use crate::sensors::{Facing, Perceivable, ReachSense, Sensor, Sensors, Vision};
-use crate::system::is_due;
+use crate::system::{is_due, is_lidar_due};
+use crate::{LidarObstacles, SensorReadings};
 
 /// [`Perceivable`] kind bits (content-defined).
 pub type KindBits = u32;
@@ -157,9 +164,22 @@ impl ExploredCells {
 #[reflect(Component)]
 pub struct VisibleCells {
     pub bits: Vec<u64>,
+    /// Robot identity coverage, excluding LIDAR-only geometry. Absent for
+    /// ordinary vision/reach actors and older saves (then `bits` applies).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identified: Option<Vec<u64>>,
 }
 
 impl VisibleCells {
+    /// Whether a cell reveals the current state of named static things.
+    pub fn identifies(&self, grid: &SpatialGrid, cell: CellCoord) -> bool {
+        self.fits(grid.bounds())
+            && cell_bit(
+                self.identified.as_deref().unwrap_or(&self.bits),
+                grid.bounds(),
+                cell,
+            )
+    }
     /// Whether the bits are sized for `bounds` (not after a load into a
     /// grid of another size, until the next scan).
     pub fn fits(&self, bounds: GridBounds) -> bool {
@@ -268,6 +288,7 @@ pub(crate) fn fog_after_load(world: &mut World) {
             && !visible.fits(bounds)
         {
             visible.bits.clear();
+            visible.identified = None;
         }
     }
     world.remove_resource::<FogResets>();
@@ -715,7 +736,9 @@ fn cells_of(bounds: GridBounds, bits: &[u64]) -> Vec<CellCoord> {
 /// test, edges inclusive) with [`line_of_sight`](crate::line_of_sight)
 /// between the two centres (occluding cells themselves are revealed, the
 /// cells behind them are not; the actor's own cell never blocks). Hearing
-/// and proximity reveal nothing (robot sensors: Task E3).
+/// and proximity reveal nothing. Cameras reveal their cone; LIDAR reveals
+/// beam geometry (this helper has no entity obstacles). Radar needs actual
+/// detections, so only the world fog pass reveals its target cells.
 pub fn reveal_cells(
     grid: &SpatialGrid,
     from: SimPos,
@@ -732,14 +755,47 @@ pub fn reveal_cells(
                 reach: None,
             },
         ),
-        // The LIDAR, camera and radar (plan Task 12) reveal fog from Task
-        // 13 (E3) on.
-        Sensor::Hearing(_)
-        | Sensor::Proximity(_)
-        | Sensor::Lidar(_)
-        | Sensor::Camera(_)
-        | Sensor::Radar(_) => Vec::new(),
+        Sensor::Camera(c) => reveal_cells(
+            grid,
+            from,
+            facing,
+            &Sensor::Vision(Vision::new(c.range_mm, c.half_fov_deg)),
+        ),
+        Sensor::Lidar(l) => {
+            let mut bits = vec![0; words(grid.bounds())];
+            reveal_lidar(
+                grid,
+                from,
+                facing,
+                l,
+                &[],
+                &mut LidarScratch::default(),
+                &mut bits,
+            );
+            cells_of(grid.bounds(), &bits)
+        }
+        // Radar reveals its actual detections in fog_pass, never an empty cone.
+        Sensor::Hearing(_) | Sensor::Proximity(_) | Sensor::Radar(_) => Vec::new(),
     }
+}
+
+/// LIDAR reveals geometry along each beam through its first hit, including
+/// the hit cell. It never supplies an identity or a noisy extension behind
+/// a wall. Use the same endpoint rounding and supercover as the range scan.
+fn reveal_lidar(
+    grid: &SpatialGrid,
+    from: SimPos,
+    facing: Facing,
+    lidar: Lidar,
+    things: &[CellCoord],
+    scratch: &mut LidarScratch,
+    bits: &mut [u64],
+) {
+    crate::lidar::reveal_lidar(grid, from, facing, lidar, things, scratch, |cell| {
+        if let Some(i) = grid.bounds().index(cell) {
+            set_bit(bits, i);
+        }
+    });
 }
 
 /// The in-bounds cells a [`ReachSense`] reveals for an actor at `from`: the
@@ -822,6 +878,7 @@ struct FogAgent {
     facing: Facing,
     vis: (usize, usize),
     reach: Option<ReachSense>,
+    robot: bool,
 }
 
 /// What an actor's visible cells were last computed from.
@@ -836,6 +893,15 @@ struct FogKey {
     revision: u64,
     /// The area the scan read.
     area: (CellCoord, CellCoord),
+    robot: Option<RobotFogKey>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+struct RobotFogKey {
+    pos: SimPos,
+    lidar: Option<Lidar>,
+    obstacles: Vec<CellCoord>,
+    radar: Vec<CellCoord>,
 }
 
 /// The fog pass's working memory, kept across ticks (a `Local` of
@@ -852,6 +918,10 @@ pub struct FogScratch {
     visions: Vec<Vision>,
     seen: Vec<(SimId, SeenState)>,
     gone: Vec<SimId>,
+    /// Cells that reveal identities (LIDAR geometry alone does not).
+    identified: Vec<u64>,
+    robot: RobotFogKey,
+    lidar_work: LidarScratch,
 }
 
 /// `NpcSet::Sense` (exclusive), in [`NpcFogSet`](crate::NpcFogSet) after
@@ -904,12 +974,23 @@ fn fog_pass(
     scratch.agents.clear();
     scratch.visions.clear();
     for (entity, &id, &pos, sensors, facing, reach) in agents_q.iter(world) {
-        if !is_due(id, tick, stagger) {
+        let robot = sensors.is_some_and(|s| {
+            s.sensors
+                .iter()
+                .any(|s| matches!(s, Sensor::Lidar(_) | Sensor::Camera(_) | Sensor::Radar(_)))
+        });
+        if !is_due(id, tick, stagger) && !(robot && is_lidar_due(id, tick, stagger)) {
             continue;
         }
         let start = scratch.visions.len();
         if let Some(s) = sensors {
             scratch.visions.extend(s.visions());
+            scratch
+                .visions
+                .extend(s.sensors.iter().filter_map(|s| match s {
+                    Sensor::Camera(c) => Some(Vision::new(c.range_mm, c.half_fov_deg)),
+                    _ => None,
+                }));
         }
         scratch.agents.push(FogAgent {
             id,
@@ -918,6 +999,7 @@ fn fog_pass(
             facing: facing.copied().unwrap_or_default(),
             vis: (start, scratch.visions.len()),
             reach: reach.copied(),
+            robot,
         });
     }
     if scratch.agents.is_empty() {
@@ -934,7 +1016,10 @@ fn fog_pass(
         // Reuse the actor's own buffer.
         let mut bits = world
             .get_mut::<VisibleCells>(agent.entity)
-            .map(|mut v| std::mem::take(&mut v.bits))
+            .map(|mut v| {
+                scratch.identified = v.identified.take().unwrap_or_default();
+                std::mem::take(&mut v.bits)
+            })
             .unwrap_or_default();
         let bounds = {
             let world: &World = world;
@@ -944,6 +1029,43 @@ fn fog_pass(
                 visions: &scratch.visions[agent.vis.0..agent.vis.1],
                 reach: agent.reach,
             };
+            if agent.robot {
+                let robot = &mut scratch.robot;
+                robot.pos = *world
+                    .get::<SimPos>(agent.entity)
+                    .expect("fog actor position");
+                let sensors = world.get::<Sensors>(agent.entity).expect("robot sensors");
+                robot.lidar = sensors.lidar_sensor();
+                robot.obstacles.clear();
+                if robot.lidar.is_some() {
+                    let mask = world
+                        .get_resource::<LidarObstacles>()
+                        .copied()
+                        .unwrap_or_default()
+                        .kinds;
+                    robot.obstacles.extend(
+                        things_q
+                            .iter(world)
+                            .filter(|(_, id, _, p)| **id != agent.id && p.kinds & mask != 0)
+                            .map(|(_, _, p, _)| grid.cell_of(*p)),
+                    );
+                    robot.obstacles.sort_unstable();
+                    robot.obstacles.dedup();
+                }
+                robot.radar.clear();
+                if sensors.radar_sensor().is_some()
+                    && let Some(readings) = world.get::<SensorReadings>(agent.entity)
+                {
+                    robot.radar.extend(
+                        readings
+                            .radar_prev
+                            .values()
+                            .map(|echo| grid.cell_of(echo.pos)),
+                    );
+                    robot.radar.sort_unstable();
+                    robot.radar.dedup();
+                }
+            }
             let unchanged = scratch.keys.get(&agent.entity).is_some_and(|k| {
                 k.cell == agent.cell
                     && k.facing == agent.facing
@@ -952,17 +1074,36 @@ fn fog_pass(
                     && k.bounds == bounds
                     && k.cell_mm == grid.cell_mm()
                     && k.revision == grid.revision()
-            }) && bits.len() == words(bounds);
+                    && k.robot.as_ref() == agent.robot.then_some(&scratch.robot)
+            }) && bits.len() == words(bounds)
+                && (!agent.robot || scratch.identified.len() == words(bounds));
             if !unchanged {
-                let area = reveal_all(
-                    grid,
-                    agent.cell,
-                    agent.facing,
-                    &senses,
-                    &mut scratch.tables,
-                    &mut scratch.occlusion,
-                    &mut bits,
-                );
+                // Camera/radar identity coverage advances on their scan
+                // phase. The staggered LIDAR phase reuses that saved mask,
+                // including after a snapshot load, then adds fresh geometry.
+                let update_camera = !agent.robot || is_due(agent.id, tick, stagger);
+                let area = if update_camera {
+                    reveal_all(
+                        grid,
+                        agent.cell,
+                        agent.facing,
+                        &senses,
+                        &mut scratch.tables,
+                        &mut scratch.occlusion,
+                        &mut bits,
+                    )
+                } else {
+                    bits.clear();
+                    bits.extend_from_slice(&scratch.identified);
+                    bits.resize(words(bounds), 0);
+                    scratch.keys.get(&agent.entity).map_or(
+                        (
+                            CellCoord::new(i32::MIN, i32::MIN),
+                            CellCoord::new(i32::MAX, i32::MAX),
+                        ),
+                        |k| k.area,
+                    )
+                };
                 let key = scratch.keys.entry(agent.entity).or_insert_with(|| FogKey {
                     cell: agent.cell,
                     facing: agent.facing,
@@ -972,23 +1113,76 @@ fn fog_pass(
                     cell_mm: grid.cell_mm(),
                     revision: grid.revision(),
                     area,
+                    robot: None,
                 });
-                key.cell = agent.cell;
-                key.facing = agent.facing;
-                key.visions.clear();
-                key.visions.extend_from_slice(senses.visions);
-                key.reach = senses.reach;
-                key.bounds = bounds;
-                key.cell_mm = grid.cell_mm();
-                key.revision = grid.revision();
+                if update_camera {
+                    key.cell = agent.cell;
+                    key.facing = agent.facing;
+                    key.visions.clear();
+                    key.visions.extend_from_slice(senses.visions);
+                    key.reach = senses.reach;
+                    key.bounds = bounds;
+                    key.cell_mm = grid.cell_mm();
+                    key.revision = grid.revision();
+                }
                 key.area = area;
+                if agent.robot {
+                    let robot = key.robot.get_or_insert_with(RobotFogKey::default);
+                    robot.pos = scratch.robot.pos;
+                    robot.lidar = scratch.robot.lidar;
+                    robot.obstacles.clone_from(&scratch.robot.obstacles);
+                    robot.radar.clone_from(&scratch.robot.radar);
+                } else {
+                    key.robot = None;
+                }
             }
-            let area = scratch.keys[&agent.entity].area;
+            let mut area = scratch.keys[&agent.entity].area;
+            if agent.robot && !unchanged {
+                scratch.identified.clear();
+                scratch.identified.extend_from_slice(&bits);
+                if senses.visions.is_empty() && senses.reach.is_none() {
+                    scratch.identified.fill(0);
+                }
+                // Radar reveals target cells, using current detections rather
+                // than a cone or stale remembered positions.
+                for &c in &scratch.robot.radar {
+                    if let Some(i) = bounds.index(c) {
+                        set_bit(&mut bits, i);
+                        set_bit(&mut scratch.identified, i);
+                    }
+                    area.0.x = area.0.x.min(c.x);
+                    area.0.z = area.0.z.min(c.z);
+                    area.1.x = area.1.x.max(c.x);
+                    area.1.z = area.1.z.max(c.z);
+                }
+                if let Some(lidar) = scratch.robot.lidar {
+                    reveal_lidar(
+                        grid,
+                        scratch.robot.pos,
+                        agent.facing,
+                        lidar,
+                        &scratch.robot.obstacles,
+                        &mut scratch.lidar_work,
+                        &mut bits,
+                    );
+                    let r = radius_cells(cell_mm, lidar.range_mm).saturating_add(1);
+                    area.0.x = area.0.x.min(agent.cell.x.saturating_sub(r));
+                    area.0.z = area.0.z.min(agent.cell.z.saturating_sub(r));
+                    area.1.x = area.1.x.max(agent.cell.x.saturating_add(r));
+                    area.1.z = area.1.z.max(agent.cell.z.saturating_add(r));
+                }
+                scratch.keys.get_mut(&agent.entity).expect("fog key").area = area;
+            }
             observe(
                 world,
                 grid,
                 (&mut *things_q, &mut *occluders_q),
                 &bits,
+                if agent.robot {
+                    &scratch.identified
+                } else {
+                    &bits
+                },
                 area,
                 &statics,
                 agent.id,
@@ -1005,7 +1199,15 @@ fn fog_pass(
                             let (lo, hi) = grid.footprint_cell_rect(st.pos, fp);
                             rect_visible(&bits, bounds, lo, hi)
                         }
-                        None => cell_bit(&bits, bounds, grid.cell_of(st.pos)),
+                        None => cell_bit(
+                            if agent.robot {
+                                &scratch.identified
+                            } else {
+                                &bits
+                            },
+                            bounds,
+                            grid.cell_of(st.pos),
+                        ),
                     };
                     if visible {
                         scratch.gone.push(id);
@@ -1027,6 +1229,7 @@ fn fog_pass(
         }
         if let Some(mut visible) = world.get_mut::<VisibleCells>(agent.entity) {
             visible.bits = bits;
+            visible.identified = agent.robot.then(|| std::mem::take(&mut scratch.identified));
         }
     }
     // Forget the actors that stopped revealing fog.
@@ -1055,6 +1258,7 @@ fn observe(
     grid: &SpatialGrid,
     queries: (&mut FogThingQuery, &mut FogOccluderQuery),
     visible: &[u64],
+    identified: &[u64],
     area: (CellCoord, CellCoord),
     statics: &FogStatics,
     observer: SimId,
@@ -1069,7 +1273,7 @@ fn observe(
                 continue;
             }
             let cell = grid.cell_of(pos);
-            if !overlaps((cell, cell), area) || !cell_bit(visible, bounds, cell) {
+            if !overlaps((cell, cell), area) || !cell_bit(identified, bounds, cell) {
                 continue;
             }
             seen.push((id, statics.state(world.entity(entity), p.kinds, pos, None)));

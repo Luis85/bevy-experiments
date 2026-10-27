@@ -40,8 +40,10 @@ mod explorer_modal;
 mod explorer_panel;
 mod field_clipboard;
 mod fog;
+mod model_preview;
 mod overlay;
 mod panels;
+mod robots;
 mod scene;
 mod visuals;
 
@@ -61,6 +63,10 @@ pub use fog::{
     MaskRegion, area_look, marker_pos, mask_alpha, mask_hash, mask_texel, mask_texels, static_look,
     unit_look,
 };
+pub use model_preview::{
+    ModelPreview, ModelPreviewPlugin, ModelPreviewSettings, ModelPreviewSystems,
+    ModelPreviewViewport, PreviewActor,
+};
 pub use npc_framework::view_helpers::command_ui::{CommandFormation, CommandSelection, CommandUi};
 pub use npc_framework::view_helpers::{
     ScreenshotRequest, Selected, VisualIndex, VisualOf, save_screenshot, sim_to_world,
@@ -68,6 +74,17 @@ pub use npc_framework::view_helpers::{
 pub use overlay::OverlayState;
 pub use panels::TestbedPanels;
 pub use visuals::{DOOR_SX, V};
+
+/// Install the same OS copy/cut/paste bridge used by the game's F7 fields
+/// in a standalone editor. Calling this more than once is harmless.
+pub fn install_text_clipboard(app: &mut App) {
+    if !app
+        .world()
+        .contains_resource::<field_clipboard::ClipboardTools>()
+    {
+        field_clipboard::plugin(app);
+    }
+}
 
 /// F3 toggles the journal panel, F4 the perf panel.
 fn toggle_debug_panels(keys: Option<Res<ButtonInput<KeyCode>>>, mut panels: ResMut<DebugPanels>) {
@@ -91,6 +108,7 @@ impl Plugin for TestbedViewPlugin {
         }
         app.add_plugins((
             assets::plugin,
+            robots::plugin,
             scene::plugin,
             camera::plugin,
             visuals::plugin,

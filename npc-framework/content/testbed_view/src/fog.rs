@@ -15,6 +15,8 @@
 //! actor's cell centre and can differ by half a cell from real sensing).
 //! The played actor and the vehicle it rides are always drawn. A carried
 //! item goes with its holder.
+//! Robot LIDAR coverage reveals terrain and walls; named static things use
+//! `VisibleCells::identifies`, so LIDAR alone cannot expose their live state.
 //!
 //! **Technique.** A mask plane over the ground: one texel per grid cell
 //! ([`mask_texel`]: black at [`MASK_UNEXPLORED`], dark grey at
@@ -208,11 +210,11 @@ pub fn unit_look(lens: Option<&FogLens>, id: SimId) -> Look {
 /// record is in ground not visible now, else hidden (never seen).
 pub fn static_look(lens: Option<&FogLens>, id: SimId, pos: SimPos) -> Look {
     let Some(l) = lens else { return Look::Live };
-    if l.at(pos) == CellFog::Visible {
+    if l.visible.identifies(l.grid, l.grid.cell_of(pos)) {
         return Look::Live;
     }
     match l.seen.0.get(&id) {
-        Some(s) if l.at(s.pos) != CellFog::Visible => Look::LastSeen(*s),
+        Some(s) if !l.visible.identifies(l.grid, l.grid.cell_of(s.pos)) => Look::LastSeen(*s),
         _ => Look::Hidden,
     }
 }
@@ -713,6 +715,7 @@ mod tests {
                 explored: ExploredCells::sized(bounds),
                 visible: VisibleCells {
                     bits: vec![0; ExploredCells::sized(bounds).bits.len()],
+                    ..Default::default()
                 },
                 seen: SeenStatics::default(),
                 memory: PerceptionMemory::default(),
@@ -775,6 +778,24 @@ mod tests {
             felled: None,
             footprint: None,
         }
+    }
+
+    #[test]
+    fn lidar_geometry_does_not_show_named_static_objects() {
+        let mut w = World::new();
+        w.see(1, 0);
+        w.visible.identified = Some(vec![0; w.visible.bits.len()]);
+        assert_eq!(
+            static_look(Some(&w.lens()), SimId(8), at(1, 0)),
+            Look::Hidden
+        );
+        let last = door(at(1, 0), false);
+        w.seen.0.insert(SimId(8), last);
+        assert_eq!(
+            static_look(Some(&w.lens()), SimId(8), at(1, 0)),
+            Look::LastSeen(last)
+        );
+        assert_eq!(area_look(Some(&w.lens()), at(1, 0), at(1, 0)), Look::Live);
     }
 
     #[test]

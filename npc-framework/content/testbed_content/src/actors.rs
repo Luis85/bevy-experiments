@@ -38,7 +38,7 @@ use npc_framework::glue::{CRAFT, DRIVE_TO, UNLOAD};
 use npc_framework::interaction::{InteractionRegistry, Inventory};
 use npc_framework::perception::{ALL_KINDS, DetectionChecks, ReachSense, SensorReadings, Sensors};
 use npc_framework::prelude::{CharacterSheet, Commandable};
-use npc_framework::rules::{Attributes, with_rules};
+use npc_framework::rules::{Attributes, Stat, with_rules};
 use serde::{Deserialize, Serialize};
 
 use crate::world::TestbedUnit;
@@ -438,13 +438,21 @@ fn check_sensor(out: &mut Vec<String>, s: &SensorSpec) {
     }
 }
 
-fn check_sheet(out: &mut Vec<String>, sheet: &SheetSpec, world: &World) {
+/// The sheet's point value, including banked points, for the editor's live
+/// budget display. A valid but over-budget sheet still has a value.
+///
+/// # Errors
+/// Unknown traits/skills, values outside the world's limits, or point costs
+/// that the rules' integer accounting cannot represent. Untrusted draft
+/// values are checked before any point-buy arithmetic is performed.
+pub fn sheet_point_total(sheet: &SheetSpec, world: &World) -> Result<i64, Vec<String>> {
     with_rules(world, |r| {
+        let mut out = Vec::new();
         let limits = r.set.limits;
         let a = sheet.attributes;
         for (name, v) in [("ST", a.st), ("DX", a.dx), ("IQ", a.iq), ("HT", a.ht)] {
             check_range(
-                out,
+                &mut out,
                 &format!("attribute {name}"),
                 v,
                 1,
@@ -458,7 +466,7 @@ fn check_sheet(out: &mut Vec<String>, sheet: &SheetSpec, world: &World) {
                     r.registry.trait_names()
                 )),
                 Some(d) => check_range(
-                    out,
+                    &mut out,
                     &format!("level of `{name}`"),
                     i32::from(level),
                     1,
@@ -474,7 +482,7 @@ fn check_sheet(out: &mut Vec<String>, sheet: &SheetSpec, world: &World) {
                 ));
             } else {
                 check_range(
-                    out,
+                    &mut out,
                     &format!("points in `{name}`"),
                     points,
                     1,
@@ -485,13 +493,52 @@ fn check_sheet(out: &mut Vec<String>, sheet: &SheetSpec, world: &World) {
         if sheet.unspent < 0 {
             out.push(format!("unspent points {} are negative", sheet.unspent));
         }
-        let total = r.points(&sheet.to_sheet()).total;
-        if total > PRESET_POINT_BUDGET {
-            out.push(format!(
-                "the sheet is worth {total} points, over the budget of {PRESET_POINT_BUDGET}"
-            ));
+        // A hand-edited draft may contain any i32. Never run point-buy
+        // arithmetic on values already outside the rules' numeric limits.
+        if !out.is_empty() {
+            return Err(out);
         }
-    });
+        // SheetSpec has no secondary buys. These are the same categories
+        // and ordering as RulesCtx::points, with checked accumulation. This
+        // also rejects unsafe costs in a custom rules registry before a
+        // valid-looking draft can overflow that method's i32 totals.
+        let priced = sheet.to_sheet();
+        let attributes = Stat::ATTRIBUTES.iter().try_fold(0_i32, |sum, &stat| {
+            let bought = priced.bought(stat);
+            bought.checked_sub(r.set.attribute_base)?;
+            sum.checked_add(r.set.stat_cost(stat, bought))
+        });
+        let traits = sheet.traits.iter().try_fold(0_i32, |sum, (name, &level)| {
+            let cost = r
+                .registry
+                .trait_def(name)?
+                .points_per_level
+                .checked_mul(i32::from(level))?;
+            sum.checked_add(cost)
+        });
+        let skills = sheet
+            .skills
+            .values()
+            .try_fold(0_i32, |sum, &points| sum.checked_add(points));
+        let spent = attributes
+            .zip(traits)
+            .and_then(|(a, t)| a.checked_add(t))
+            .zip(skills)
+            .and_then(|(spent, skills)| spent.checked_add(skills));
+        spent
+            .map(|spent| i64::from(spent) + i64::from(sheet.unspent))
+            .ok_or_else(|| vec!["the sheet's point costs exceed the rules' integer range".into()])
+    })
+}
+
+fn check_sheet(out: &mut Vec<String>, sheet: &SheetSpec, world: &World) {
+    match sheet_point_total(sheet, world) {
+        Ok(total) if total > i64::from(PRESET_POINT_BUDGET) => out.push(format!(
+            "the sheet is worth {total} points, over the budget of {PRESET_POINT_BUDGET}"
+        )),
+        Ok(_) => {}
+        Err(reasons) => out.extend(reasons),
+    }
 }
 
 /// Every problem of `p` in `world` (a built, frozen world: its rules, verbs
