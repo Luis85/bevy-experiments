@@ -232,6 +232,11 @@ mod debug_tools {
         // `DEFAULT_MIN_SAMPLES` samples; `PerfHandle`; `end_frame` in `Last`.
         app.add_plugins(
             NpcPerfPlugin::new()
+                .domain(
+                    "village_content",
+                    npc_framework::perf::PerfDomain::Simulation,
+                )
+                .domain("village", npc_framework::perf::PerfDomain::Platform)
                 .tags_with(village_content::perf_tags)
                 .tags_with(village_view::perf_tags),
         );

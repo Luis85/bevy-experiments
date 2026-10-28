@@ -806,6 +806,10 @@ pub fn install_close_to_detached(app: &mut App, home: &Path, agent: &str, port: 
         .configure_sets(Update, ViewSystems::Input.run_if(not(close_dialog_open)))
         .configure_sets(
             Update,
+            ViewSystems::OverlayInput.run_if(not(close_dialog_open)),
+        )
+        .configure_sets(
+            Update,
             testbed_view::NotesInput.run_if(not(close_dialog_open)),
         )
         .configure_sets(Update, CloseDialogSystems.after(ViewSystems::Input))

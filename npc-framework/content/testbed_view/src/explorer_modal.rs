@@ -93,6 +93,7 @@ impl Plugin for ExplorerModalPlugin {
             .init_resource::<ModalUi>()
             .add_message::<PromptModalClosed>()
             .configure_sets(Update, ViewSystems::Input.run_if(not(modal_open)))
+            .configure_sets(Update, ViewSystems::OverlayInput.run_if(not(modal_open)))
             .configure_sets(Update, ExplorerModalSystems.after(ViewSystems::Input))
             .add_systems(
                 Update,

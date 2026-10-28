@@ -333,6 +333,9 @@ fn rpc_journal_filter() {
 
 #[test]
 fn rpc_perf_has_mechanics() {
+    let mut configured = collector().budgets();
+    configured.set("perception", 55);
+    collector().set_budgets(configured);
     let mut rpc = Rpc::build(true, false);
     // Let the headless driver run (one tick and one `end_frame` per update).
     for _ in 0..30 {
@@ -364,6 +367,35 @@ fn rpc_perf_has_mechanics() {
     let top = rpc.call("npc/perf", json!({"top": 2}));
     assert!(top["systems"].as_array().unwrap().len() <= 2);
     assert!(top["mechanics"].as_array().unwrap().len() <= 2);
+    let tree = rpc.call("npc/perf", json!({"tree":true}));
+    assert_eq!(tree["interval"], "sim_tick");
+    assert!(
+        tree["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|n| n["name"] == "npc_kernel::schedule::think_system")
+    );
+    let id = tree["nodes"][0]["id"].clone();
+    let detail = rpc.call("npc/perf", json!({"tree":true,"selected":id}));
+    assert_eq!(detail["detail"]["id"], id);
+    collector().record_history(10.0, None);
+    collector().record_history(10.5, None);
+    let history = rpc.call(
+        "npc/perf",
+        json!({"history":true,"selection":{"kind":"trace","id":id}}),
+    );
+    assert_eq!(history["times_s"].as_array().unwrap().len(), 2);
+    assert_eq!(history["charts"].as_array().unwrap().len(), 4);
+    let capture = rpc.call("npc/perf", json!({"tree":true,"capture":true}));
+    assert_eq!(capture["history"]["samples"].as_array().unwrap().len(), 2);
+    assert!(
+        tree["budgets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|b| b["mechanic"] == "perception")
+    );
 
     // Paused, nothing closes a frame, so a reset leaves exactly 0 frames;
     // a headless `npc/step` then closes one frame per tick.

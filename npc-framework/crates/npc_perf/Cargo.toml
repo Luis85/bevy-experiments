@@ -7,7 +7,7 @@ license.workspace = true
 description = "Tracing layer that times every Bevy system and mechanic span, with rolling stats and budgets."
 
 [dependencies]
-bevy_ecs.workspace = true
+bevy_ecs = { workspace = true, features = ["trace", "debug"] }
 serde.workspace = true
 serde_json = "1"
 tracing = "0.1"

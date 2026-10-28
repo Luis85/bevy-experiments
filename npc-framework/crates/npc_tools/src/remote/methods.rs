@@ -239,6 +239,7 @@ pub fn step_ticks(world: &mut World, ticks: u64) -> BrpResult<StepResult> {
             return Err(BrpError::internal(format!("cannot run NpcSimTick: {e}")));
         }
         if headless && let Some(perf) = &perf {
+            perf.set_interval(npc_perf::PerfInterval::SimTick);
             perf.end_frame();
         }
     }
@@ -401,6 +402,16 @@ pub fn journal(In(p): In<Option<Value>>, world: &mut World) -> BrpResult {
 struct PerfParams {
     #[serde(default)]
     top: Option<usize>,
+    #[serde(default)]
+    tree: bool,
+    #[serde(default)]
+    selected: Option<npc_perf::TraceId>,
+    #[serde(default)]
+    capture: bool,
+    #[serde(default)]
+    history: bool,
+    #[serde(default)]
+    selection: npc_perf::HistorySelection,
 }
 
 fn perf_handle(world: &World) -> BrpResult<PerfHandle> {
@@ -415,10 +426,30 @@ fn perf_handle(world: &World) -> BrpResult<PerfHandle> {
 }
 
 /// `npc/perf {top?}` → `npc_perf::PerfReport` (with `top`, only the top
-/// `top` systems and mechanics).
+/// `top` systems and mechanics). Explicit `tree`/`capture` or `history` queries
+/// return the bounded diagnostic hierarchy or projected time series instead.
 pub fn perf(In(p): In<Option<Value>>, world: &mut World) -> BrpResult {
-    let PerfParams { top } = params_or_default(p)?;
+    let PerfParams {
+        top,
+        tree,
+        selected,
+        capture,
+        history,
+        selection,
+    } = params_or_default(p)?;
     let collector = perf_handle(world)?.0;
+    if history {
+        return to_value(&collector.history_report(&selection, None));
+    }
+    if tree {
+        if capture {
+            let mut report = collector.capture_tree();
+            report.detail =
+                selected.and_then(|id| report.details.iter().find(|d| d.id == id).cloned());
+            return to_value(&report);
+        }
+        return to_value(&collector.tree_report(selected));
+    }
     // `report_top` only summarises the rows it returns.
     let report = top.map_or_else(|| collector.report(), |n| collector.report_top(n));
     to_value(&report)

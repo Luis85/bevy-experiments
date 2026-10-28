@@ -981,6 +981,36 @@ registers its `actions.eat/drink/work/sleep/idle` rows this way (`village_conten
 Headless hosts call `npc_perf::install_global` before building the app and `PerfCollector::end_frame` per tick
 (`apps/npcctl`'s `bench`). Mechanics and budgets: [debugging.md §7](debugging.md#7-performance).
 
+Ownership domains are independent of mechanic/budget names:
+
+```rust
+use npc_framework::perf::{NpcPerfPlugin, PerfDomain, PerfTargets};
+app.add_plugins(NpcPerfPlugin::new()
+    .tag("my_game::sim", "game.sim")
+    .domain("my_game::sim", PerfDomain::Simulation)
+    .domain("my_game::hud", PerfDomain::UserInterface));
+app.insert_resource(PerfTargets { frame_budget_us: 16_667 }); // diagnostic target only
+```
+
+`.domains_with(|domains| ..)` accepts system/ mechanic prefix rules (longest system prefix wins, then longest
+mechanic prefix). Unknown work remains visible. `PerfCollector::set_domains` rebuilds trace history/IDs;
+flat budget history retains its existing contract. A finer nested scope can use
+`tracing::info_span!("perf_scope", name = "upload preparation", domain = "rendering")`; optional `mechanic`
+overrides inherited ownership. Existing `mechanic` spans appear in the hierarchy even when legacy budget
+accounting suppresses their duplicate time.
+
+`tree_report(Some(path_id))` is the throttled live query; `capture_tree()` computes a bounded complete
+snapshot for later drill-down. Frame/tick collection units are explicit through `set_interval(PerfInterval)`.
+F4 is ownership -> mechanic family -> actual execution paths, with inclusive/self details, all configured
+budgets, simulation throughput, sampled History charts and Freeze/Reset. History records 240 samples at
+2 Hz while the panel is hidden, uses real elapsed seconds, and follows the selected cost/budget row.
+It plots rolling statistics; it is not a timestamp trace viewer. `capture_tree()` includes retained history;
+`history_report(&HistorySelection, label)` projects a domain, group, trace or budget without exporting the
+whole capture. Non-windowed hosts can call `record_history(elapsed_seconds, frame_peak_ms)` themselves.
+See the measurement semantics in §7 above. Hosts gate
+`ViewSystems::OverlayInput` alongside `ViewSystems::Input` when modal UI is open. The view never changes
+the host's clocks, simulation speed or authoritative state.
+
 ### 9.3 BRP, journal, replays, CLI
 
 - `remote`: add `npc_framework::tools::remote::NpcRemotePlugin` (and with `agent-io` the

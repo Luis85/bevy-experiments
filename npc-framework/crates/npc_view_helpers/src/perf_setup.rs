@@ -39,7 +39,9 @@ use npc_perf::{
 /// breach ([`BreachLog::WarnOnce`]) stay off the console (`RUST_LOG`
 /// overrides it).
 pub fn perf_log_filter() -> String {
-    format!("{DEFAULT_FILTER}npc=debug,npc_perf=info")
+    format!(
+        "{DEFAULT_FILTER}[system]=info,[system_commands]=info,[check_conditions]=info,[mechanic]=info,[perf_scope]=info,bevy_ecs::schedule::schedule[schedule]=info,npc=debug,npc_perf=info"
+    )
 }
 
 /// Bevy's `LogPlugin` with the profiler layer ([`perf_layer`]) and
@@ -81,6 +83,8 @@ pub fn perf_layer(app: &mut App) -> Option<BoxedLayer> {
 /// spans, but the handle, budgets and panel still work.
 #[derive(Clone, Debug)]
 pub struct NpcPerfPlugin {
+    /// Ownership of measured systems/scopes (independent of mechanic budgets).
+    pub domains: npc_perf::DomainTags,
     /// [`MechanicTags::default_npc`] plus the host's (`tag`, `tags_with`).
     pub tags: MechanicTags,
     /// Default: [`PerfBudgets::default_npc`] scaled for the build profile
@@ -106,6 +110,7 @@ impl Default for NpcPerfPlugin {
 impl NpcPerfPlugin {
     pub fn new() -> Self {
         Self {
+            domains: npc_perf::DomainTags::default(),
             tags: MechanicTags::default_npc(),
             budgets: PerfBudgets::default_npc().scaled_for_profile(),
             end_frame: true,
@@ -122,6 +127,14 @@ impl NpcPerfPlugin {
     /// Lets `f` add tags, e.g. content's `perf_tags(&mut MechanicTags)`.
     pub fn tags_with(mut self, f: impl FnOnce(&mut MechanicTags)) -> Self {
         f(&mut self.tags);
+        self
+    }
+    pub fn domain(mut self, prefix: impl Into<String>, domain: npc_perf::PerfDomain) -> Self {
+        self.domains.system(prefix, domain);
+        self
+    }
+    pub fn domains_with(mut self, f: impl FnOnce(&mut npc_perf::DomainTags)) -> Self {
+        f(&mut self.domains);
         self
     }
 
@@ -177,12 +190,14 @@ impl Plugin for NpcPerfPlugin {
     fn build(&self, app: &mut App) {
         let collector = PerfCollector::global();
         collector.set_tags(self.tags.clone());
+        collector.set_domains(self.domains.clone());
         collector.set_budgets(self.budgets.clone());
         collector.set_breach_log(self.breach_log);
         if !app.world().contains_resource::<PerfHandle>() {
             app.insert_resource(PerfHandle(collector.clone()));
         }
         if self.end_frame {
+            collector.set_interval(npc_perf::PerfInterval::RenderFrame);
             app.add_systems(Last, end_frame_system);
         }
     }

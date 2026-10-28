@@ -20,7 +20,7 @@
 //! | `npc/unit` | `{id}` | the installed inspector's unit JSON (village: `UnitSnapshot`) |
 //! | `npc/command` | `{cmd: SimCommand, at_tick?}` | [`CommandAccepted`] |
 //! | `npc/journal` | `{filter: JournalFilter}` or the filter fields | `[JournalEntry]` |
-//! | `npc/perf` | `{top?}` | `npc_perf::PerfReport` |
+//! | `npc/perf` | `{top?}`, `{tree:true, selected?, capture?}`, `{history:true, selection?}` | flat report, bounded tree or history |
 //! | `npc/perf/reset` | – | `{"reset": true}` |
 //! | `npc/record/start` | `{every = 100}` | [`RecordStatus`] |
 //! | `npc/record/stop` | `{path?, overwrite?}` (relative, under [`OutputRoot`](crate::out_path::OutputRoot)) | `npc_kernel::replay::Replay` |

@@ -698,6 +698,19 @@ mod debug_tools {
         };
         app.add_plugins(
             NpcPerfPlugin::new()
+                .domain(
+                    "testbed_content",
+                    npc_framework::perf::PerfDomain::Simulation,
+                )
+                .domain("actor_testbed", npc_framework::perf::PerfDomain::Platform)
+                .domain(
+                    "actor_testbed::speed_input",
+                    npc_framework::perf::PerfDomain::UserInterface,
+                )
+                .domain(
+                    "actor_testbed::step_input",
+                    npc_framework::perf::PerfDomain::UserInterface,
+                )
                 .tags_with(testbed_content::perf_tags)
                 .tags_with(testbed_view::perf_tags)
                 .breach_log(breach_log),
