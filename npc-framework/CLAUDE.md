@@ -50,6 +50,7 @@ Capability crates depend on each other only per ADR 0012's whitelist; everything
 - [0017: immutable world presets and explorer mechanics](docs/adr/0017-world-presets-and-explorer-runtime.md).
 - [0018: host-side landmarks and file identity](docs/adr/0018-host-side-landmarks-and-file-identity.md).
 - [0019: final integrity and feedback fixes](docs/adr/0019-final-integrity-and-feedback-fixes.md).
+- [0020: native editor safety and keyboard navigation](docs/adr/0020-native-editor-safety-and-keyboard-navigation.md).
 
 ## Golden rules
 

@@ -12,7 +12,7 @@ use serde_json::Value;
 use testbed_content::explorer::home::slug;
 use testbed_content::worlds::{self, WorldPreset};
 
-use crate::screens::{Action as MenuAction, Screen};
+use crate::screens::Screen;
 use crate::{AppSettings, ui};
 
 const PAGES: [&str; 7] = [
@@ -147,11 +147,17 @@ impl WorldEditor {
         editor
     }
     fn select(&mut self, index: usize) {
-        let Some(entry) = self.entries.get(index) else {
+        let Some(entry) = self.entries.get_mut(index) else {
             return;
         };
         self.selected = Some(entry.path.clone());
-        self.original = std::fs::read(&entry.path).ok();
+        // The displayed draft and concurrency baseline must describe one read.
+        let loaded = std::fs::read(&entry.path).map_err(|e| e.to_string());
+        entry.preset = loaded.as_ref().map_err(Clone::clone).and_then(|bytes| {
+            let bytes = bytes.strip_prefix(b"\xef\xbb\xbf").unwrap_or(bytes);
+            serde_json::from_slice(bytes).map_err(|e| e.to_string())
+        });
+        self.original = loaded.ok();
         match &entry.preset {
             Ok(p) => {
                 self.draft = Draft::new(p);
@@ -281,6 +287,8 @@ enum WorldAction {
     Toggle(String),
     Detection,
     Discard,
+    Back,
+    Quit,
 }
 #[derive(Component)]
 struct EditorRoot;
@@ -324,22 +332,67 @@ fn apply(world: &mut World, action: WorldAction) {
         .iter(world)
         .map(|(f, t)| (f.0.clone(), t.value().to_string()))
         .collect();
-    let mut editor = world.resource_mut::<WorldEditor>();
-    for (key, value) in values {
-        editor.draft.values.insert(key, value);
+    let navigation = {
+        let mut editor = world.resource_mut::<WorldEditor>();
+        for (key, value) in values {
+            editor.draft.values.insert(key, value);
+        }
+        let confirmed = matches!(action, WorldAction::Discard);
+        let action = if confirmed {
+            let Some(pending) = editor.discard.take() else {
+                return;
+            };
+            pending
+        } else {
+            action
+        };
+        if !confirmed
+            && matches!(
+                action,
+                WorldAction::Select(_)
+                    | WorldAction::New
+                    | WorldAction::Duplicate
+                    | WorldAction::Back
+                    | WorldAction::Quit
+            )
+            && editor.dirty()
+        {
+            editor.discard = Some(action);
+            editor.message =
+                "Unsaved changes. Discard edits to continue, or Cancel to keep editing.".into();
+            editor.rebuild = true;
+            return;
+        }
+        match action {
+            WorldAction::Back => Some(false),
+            WorldAction::Quit => Some(true),
+            action => {
+                perform(&mut editor, action);
+                None
+            }
+        }
+    };
+    if let Some(quit) = navigation {
+        if quit {
+            crate::screens::quit(world);
+        } else {
+            crate::run::set_screen(world, Screen::Main);
+        }
     }
-    if matches!(
-        action,
-        WorldAction::Select(_) | WorldAction::New | WorldAction::Duplicate
-    ) && editor.dirty()
-    {
-        editor.discard = Some(action);
-        editor.message =
-            "Unsaved changes. Discard edits to continue, or Cancel to keep editing.".into();
-        editor.rebuild = true;
-        return;
-    }
-    perform(&mut editor, action);
+}
+
+pub(crate) fn escape(world: &mut World) {
+    let editor = world.resource::<WorldEditor>();
+    let action = if editor.discard.is_some() || editor.overwrite.is_some() {
+        WorldAction::Cancel
+    } else {
+        WorldAction::Back
+    };
+    apply(world, action);
+}
+
+pub(crate) fn close(world: &mut World) {
+    apply(world, WorldAction::Quit);
 }
 fn perform(editor: &mut WorldEditor, action: WorldAction) {
     match action {
@@ -416,11 +469,7 @@ fn perform(editor: &mut WorldEditor, action: WorldAction) {
             editor.draft.values.insert("detection".into(), next.into());
             editor.message = "Unsaved changes".into();
         }
-        WorldAction::Discard => {
-            if let Some(action) = editor.discard.take() {
-                perform(editor, action);
-            }
-        }
+        WorldAction::Discard | WorldAction::Back | WorldAction::Quit => {}
     }
 }
 fn button(p: &mut ChildSpawnerCommands, text: &str, action: WorldAction, tab: i32) -> Entity {
@@ -457,7 +506,10 @@ fn field(
     text.pending_edits.clear();
     text.queue_edit(TextEdit::TextStart(false));
     let id = p
-        .spawn((Field(key.into()), ui::text_field(draft.text(key), tab)))
+        .spawn((
+            Field(key.into()),
+            ui::text_field(draft.text(key), tab, label),
+        ))
         .id();
     p.commands().entity(id).insert((
         text,
@@ -507,14 +559,12 @@ fn rebuild(
         (EditorRoot, DespawnOnExit(Screen::Worlds)),
         "Worlds",
     );
-    commands.entity(panel).insert(Node {
-        width: percent(96),
-        max_width: px(1200),
-        height: percent(94),
-        padding: UiRect::all(px(22)),
-        row_gap: px(10),
-        flex_direction: FlexDirection::Column,
-        ..default()
+    commands.entity(panel).queue(|mut entity: EntityWorldMut| {
+        let mut node = entity.get_mut::<Node>().expect("screen panel has a Node");
+        node.width = percent(96);
+        node.max_width = px(1200);
+        node.height = percent(94);
+        node.padding = UiRect::all(px(22));
     });
     commands.entity(panel).with_children(|p| {
         p.spawn(ui::label(
@@ -640,7 +690,7 @@ fn rebuild(
             let save = button(r, "Save world", WorldAction::Save, 910);
             r.commands().entity(save).insert(SaveButton);
             button(r, "Revert", WorldAction::Revert, 911);
-            crate::screens::button(r, "Back", None, true, 912, MenuAction::Go(Screen::Main));
+            button(r, "Back", WorldAction::Back, 912);
         });
     });
 }
@@ -858,6 +908,202 @@ mod tests {
             .values
             .insert("needs.battery.low_speed_pct".into(), "-".into());
         assert!(draft.parse().is_err());
+    }
+    #[test]
+    fn selecting_after_an_external_edit_uses_the_same_fresh_bytes_for_draft_and_baseline() {
+        let dir = tmp("world-fresh-select");
+        let mut editor = WorldEditor::new(dir.clone());
+        let path = editor.selected.clone().unwrap();
+        let index = editor
+            .entries
+            .iter()
+            .position(|entry| entry.path == path)
+            .unwrap();
+        let mut fresh = worlds::plain_preset();
+        fresh.name = editor.loaded_name.clone();
+        fresh.description = "Externally changed before selection".into();
+        let bytes = serde_json::to_vec_pretty(&fresh).unwrap();
+        std::fs::write(&path, &bytes).unwrap();
+        editor.select(index);
+        assert_eq!(editor.draft.text("description"), fresh.description);
+        assert_eq!(editor.original.as_deref(), Some(bytes.as_slice()));
+        assert!(!editor.dirty());
+        editor
+            .draft
+            .values
+            .insert("day_night.cycle_ticks".into(), "3000".into());
+        editor.save(false).unwrap();
+        let saved: WorldPreset = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+        assert_eq!(saved.description, fresh.description);
+        assert_eq!(saved.day_night.cycle_ticks, 3000);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn selecting_a_bom_prefixed_world_keeps_the_complete_baseline() {
+        let dir = tmp("world-bom-select");
+        let mut editor = WorldEditor::new(dir.clone());
+        let path = editor.selected.clone().unwrap();
+        let index = editor
+            .entries
+            .iter()
+            .position(|entry| entry.path == path)
+            .unwrap();
+        let mut bytes = b"\xef\xbb\xbf".to_vec();
+        bytes.extend(std::fs::read(&path).unwrap());
+        std::fs::write(&path, &bytes).unwrap();
+        editor.select(index);
+        assert!(editor.errors().is_empty());
+        assert_eq!(editor.original.as_deref(), Some(bytes.as_slice()));
+        editor.save(false).unwrap();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn selecting_a_file_that_became_invalid_refuses_to_overwrite_it() {
+        let dir = tmp("world-invalid-select");
+        let mut editor = WorldEditor::new(dir.clone());
+        let path = editor.selected.clone().unwrap();
+        let index = editor
+            .entries
+            .iter()
+            .position(|entry| entry.path == path)
+            .unwrap();
+        std::fs::write(&path, b"external incomplete JSON").unwrap();
+        editor.select(index);
+        assert!(editor.source_error().is_some());
+        assert!(editor.save(false).is_err());
+        assert_eq!(std::fs::read(&path).unwrap(), b"external incomplete JSON");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    fn dirty_worlds(tag: &str) -> (App, PathBuf) {
+        let dir = tmp(tag);
+        let mut app = app(&dir, &dir.join("agents"));
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(Screen::Worlds);
+        app.update();
+        app.update();
+        let field = app
+            .world_mut()
+            .query::<(Entity, &Field)>()
+            .iter(app.world())
+            .find(|(_, field)| field.0 == "description")
+            .unwrap()
+            .0;
+        app.world_mut()
+            .get_mut::<EditableText>(field)
+            .unwrap()
+            .editor_mut()
+            .set_text("Unsaved draft");
+        app.update();
+        (app, dir)
+    }
+
+    fn click_text(app: &mut App, label: &str) {
+        let button = app
+            .world_mut()
+            .query::<(&Text, &ChildOf)>()
+            .iter(app.world())
+            .find(|(text, _)| text.0 == label)
+            .unwrap()
+            .1
+            .parent();
+        app.world_mut().trigger(Activate { entity: button });
+        app.world_mut().flush();
+        app.update();
+        app.update();
+    }
+
+    #[test]
+    fn back_preserves_a_dirty_world_until_discard_is_confirmed() {
+        let (mut app, dir) = dirty_worlds("world-back-dirty");
+        click_text(&mut app, "Back");
+        assert_eq!(
+            *app.world().resource::<State<Screen>>().get(),
+            Screen::Worlds
+        );
+        assert!(app.world().resource::<WorldEditor>().discard.is_some());
+        click_text(&mut app, "Cancel");
+        assert_eq!(
+            app.world()
+                .resource::<WorldEditor>()
+                .draft
+                .text("description"),
+            "Unsaved draft"
+        );
+        click_text(&mut app, "Back");
+        click_text(&mut app, "Discard edits");
+        assert_eq!(*app.world().resource::<State<Screen>>().get(), Screen::Main);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn window_close_preserves_a_dirty_world_until_quit_is_confirmed() {
+        use bevy::window::WindowCloseRequested;
+        let (mut app, dir) = dirty_worlds("world-close-dirty");
+        app.add_message::<WindowCloseRequested>()
+            .add_systems(Update, crate::screens::close_quits);
+        app.world_mut().write_message(WindowCloseRequested {
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+        app.update();
+        assert!(app.should_exit().is_none());
+        assert_eq!(
+            *app.world().resource::<State<Screen>>().get(),
+            Screen::Worlds
+        );
+        assert!(matches!(
+            app.world().resource::<WorldEditor>().discard,
+            Some(WorldAction::Quit)
+        ));
+        click_text(&mut app, "Cancel");
+        assert_eq!(
+            app.world()
+                .resource::<WorldEditor>()
+                .draft
+                .text("description"),
+            "Unsaved draft"
+        );
+        app.world_mut().write_message(WindowCloseRequested {
+            window: Entity::PLACEHOLDER,
+        });
+        app.update();
+        app.update();
+        click_text(&mut app, "Discard edits");
+        assert!(app.should_exit().is_some());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn escape_preserves_a_dirty_world_and_can_cancel_its_confirmation() {
+        let (mut app, dir) = dirty_worlds("world-escape-dirty");
+        for expected_confirmation in [true, false] {
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::Escape);
+            app.update();
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+            app.update();
+            assert_eq!(
+                *app.world().resource::<State<Screen>>().get(),
+                Screen::Worlds
+            );
+            assert_eq!(
+                app.world().resource::<WorldEditor>().discard.is_some(),
+                expected_confirmation
+            );
+            assert_eq!(
+                app.world()
+                    .resource::<WorldEditor>()
+                    .draft
+                    .text("description"),
+                "Unsaved draft"
+            );
+        }
+        std::fs::remove_dir_all(dir).unwrap();
     }
     #[test]
     fn world_save_retains_identity_and_guards_stale_collision() {

@@ -2,6 +2,7 @@
 build.log
 *.log
 /screenshots
+/.impeccable
 
 # Claude Code: user-only re-baseline approval marker and local settings
 .claude/rebaseline-approved

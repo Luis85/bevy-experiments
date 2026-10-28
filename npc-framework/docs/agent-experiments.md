@@ -470,7 +470,7 @@ without compounding; LIDAR/radar ranges stay unchanged. Plain retains its incumb
    The world serves the agent on the port the game picked
    (the first free one in 15702..=15721, or from `--remote-port N` on, whose next port is free too for the render
    server; stored in `.mcp.json` and `run.json`). **F7** is the notes editor: tabs Diary,
-   Memory, Proposals and Map (when enabled; Tab cycles them), newest notes first with ids and stamps, re-read within ~1 s of an agent's
+   Memory, Proposals and Map (when enabled; Ctrl+Tab cycles them), newest notes first with ids and stamps, re-read within ~1 s of an agent's
    write; **Add** / **Edit** (click an entry's title) open a title and a body field, **Save** writes as the player
    and never silently replaces an entry the agent changed meanwhile: the save is refused, the form keeps your
    text and shows the entry's current title and body above it ("Now in the file:"), and only a second Save

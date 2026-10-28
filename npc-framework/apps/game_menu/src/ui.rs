@@ -7,6 +7,7 @@ use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextCursorStyle, TextEdit};
+use bevy::ui::prelude::AccessibleLabel;
 use bevy::ui::{InteractionDisabled, Pressed};
 use bevy::ui_widgets::{Button as WidgetButton, TextInput};
 
@@ -26,6 +27,7 @@ const BUTTON_HOVER: Color = Color::srgb(0.27, 0.32, 0.40);
 const BUTTON_PRESSED: Color = Color::srgb(0.14, 0.17, 0.22);
 const BUTTON_DISABLED: Color = Color::srgb(0.12, 0.13, 0.15);
 const FOCUS_BORDER: Color = Color::srgb(0.95, 0.80, 0.45);
+const BUTTON_DETAIL: Color = Color::srgb(0.79, 0.82, 0.86);
 
 /// A menu button (for [`refresh_buttons`]).
 #[derive(Component)]
@@ -134,7 +136,7 @@ pub fn list_button(
 
 /// A one-line text field (a Bevy `TextInput`) holding `text`, `tab` in the
 /// keyboard order.
-pub fn text_field(text: impl AsRef<str>, tab: i32) -> impl Bundle {
+pub fn text_field(text: impl AsRef<str>, tab: i32, label: &str) -> impl Bundle {
     let mut editable = EditableText {
         allow_newlines: false,
         visible_lines: Some(1.0),
@@ -144,6 +146,7 @@ pub fn text_field(text: impl AsRef<str>, tab: i32) -> impl Bundle {
     editable.queue_edit(TextEdit::TextStart(false));
     (
         TextInput,
+        AccessibleLabel::new(label),
         editable,
         TextLayout::no_wrap(),
         font(16.0),
@@ -197,6 +200,7 @@ fn spawn_button(
     let mut b = parent.spawn((
         MenuButton,
         WidgetButton,
+        AccessibleLabel::new(text),
         Hovered::default(),
         TabIndex(tab),
         Node {
@@ -250,7 +254,11 @@ fn spawn_button(
         }
         if let Some(d) = detail {
             c.spawn((
-                label(d, if compact { 13.0 } else { 14.0 }, DIM),
+                label(
+                    d,
+                    if compact { 13.0 } else { 14.0 },
+                    if enabled { BUTTON_DETAIL } else { DIM },
+                ),
                 Node {
                     flex_shrink: 1.0,
                     ..default()
@@ -272,6 +280,7 @@ pub fn small_button(
     let mut b = parent.spawn((
         MenuButton,
         WidgetButton,
+        AccessibleLabel::new(text),
         Hovered::default(),
         TabIndex(tab),
         Node {
@@ -311,6 +320,8 @@ pub fn row(parent: &mut ChildSpawnerCommands, children: impl FnOnce(&mut ChildSp
     parent
         .spawn(Node {
             column_gap: px(10),
+            row_gap: px(8),
+            flex_wrap: FlexWrap::Wrap,
             margin: UiRect::top(px(8)),
             ..default()
         })
@@ -346,5 +357,93 @@ pub fn refresh_buttons(focus: Res<InputFocus>, mut buttons: Query<ButtonState, W
         };
         bg.set_if_neq(BackgroundColor(fill));
         border.set_if_neq(BorderColor::all(edge));
+    }
+}
+
+type TextFieldFilter = (With<TextInput>, Without<MenuButton>);
+
+pub fn refresh_fields(
+    focus: Res<InputFocus>,
+    mut fields: Query<(Entity, &mut BorderColor), TextFieldFilter>,
+) {
+    for (entity, mut border) in &mut fields {
+        border.set_if_neq(BorderColor::all(if focus.get() == Some(entity) {
+            FOCUS_BORDER
+        } else {
+            PANEL_BORDER
+        }));
+    }
+}
+
+/// Keep names aligned with dynamic visible labels (choices and toggle states).
+pub fn refresh_accessible_buttons(
+    mut commands: Commands,
+    buttons: Query<(Entity, &Children, &AccessibleLabel), With<MenuButton>>,
+    texts: Query<&Text>,
+) {
+    for (entity, children, current) in &buttons {
+        let label = children
+            .iter()
+            .filter_map(|child| texts.get(child).ok())
+            .map(|text| text.0.as_str())
+            .collect::<Vec<_>>()
+            .join(". ");
+        if current.0 != label {
+            commands.entity(entity).insert(AccessibleLabel::new(label));
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bevy::input_focus::FocusCause;
+
+    #[test]
+    fn secondary_button_text_meets_contrast_in_every_enabled_state() {
+        fn luminance(color: Color) -> f32 {
+            let c = color.to_srgba();
+            let linear = |v: f32| {
+                if v <= 0.04045 {
+                    v / 12.92
+                } else {
+                    ((v + 0.055) / 1.055).powf(2.4)
+                }
+            };
+            0.2126 * linear(c.red) + 0.7152 * linear(c.green) + 0.0722 * linear(c.blue)
+        }
+        for background in [BUTTON, BUTTON_HOVER, BUTTON_PRESSED] {
+            let contrast = (luminance(BUTTON_DETAIL) + 0.05) / (luminance(background) + 0.05);
+            assert!(contrast >= 4.5, "secondary text contrast {contrast}");
+        }
+    }
+
+    #[test]
+    fn text_fields_have_names_and_visible_focus() {
+        let mut app = App::new();
+        app.init_resource::<InputFocus>()
+            .add_systems(Update, refresh_fields);
+        let entity = app
+            .world_mut()
+            .spawn(text_field("Value", 0, "World name"))
+            .id();
+        assert_eq!(
+            app.world().get::<AccessibleLabel>(entity).unwrap().0,
+            "World name"
+        );
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(entity, FocusCause::Navigated);
+        app.update();
+        assert_eq!(
+            *app.world().get::<BorderColor>(entity).unwrap(),
+            BorderColor::all(FOCUS_BORDER)
+        );
+        app.world_mut().resource_mut::<InputFocus>().clear();
+        app.update();
+        assert_eq!(
+            *app.world().get::<BorderColor>(entity).unwrap(),
+            BorderColor::all(PANEL_BORDER)
+        );
     }
 }
