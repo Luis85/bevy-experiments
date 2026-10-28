@@ -71,6 +71,9 @@ the user's pre-existing MCP process was preserved.
 - All five release binaries built with `cargo build --locked --release -p actor_testbed -p village
   -p rts_units_demo -p game_menu -p npcctl --bins`; final native evidence uses these binaries.
   Log: `target/perf-final-release.log`.
+- Feature commit `7407720`, local merge `069b83f` on `main`. The merge tree matches the verified feature
+  exactly. Rebuilt all five locked release binaries on `main` successfully in 3m 57s; log:
+  `target/perf-main-release.log`. The pre-existing MCP process (57336) remained alive.
 
 ## Diagnostic cost (release, same machine)
 
