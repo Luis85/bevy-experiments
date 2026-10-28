@@ -379,6 +379,8 @@ fn autosave(
     let mut last = Instant::now();
     let mut saved_tick = start_tick;
     Box::new(move |world| {
+        testbed_content::village::host::frame(world);
+        npc_framework::agent_io::scheduler::frame(world);
         if last.elapsed() < every {
             return;
         }

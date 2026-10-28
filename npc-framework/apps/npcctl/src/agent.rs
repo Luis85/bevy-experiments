@@ -961,9 +961,24 @@ pub fn cmd_serve(a: &ServeArgs, out: &mut Out) -> Result<u8, Failure> {
         record: a.record.clone(),
         seed: a.seed,
         token: a.token.clone(),
+        on_frame: Some(Box::new(|world| {
+            // A scenario reset replaces the World, including host-only supervisor state.
+            if !world.contains_resource::<npc_framework::agent_io::scheduler::SchedulerRuntime>() {
+                npc_framework::agent_io::scheduler::configure_host(
+                    world,
+                    npc_framework::agent_io::scheduler::default_bindings_path(),
+                );
+            }
+            testbed_content::village::host::frame(world);
+            npc_framework::agent_io::scheduler::frame(world);
+        })),
         ..SessionOptions::default()
     };
-    let session = Session::start(loaders(), doc, options).map_err(Failure::usage)?;
+    let mut session = Session::start(loaders(), doc, options).map_err(Failure::usage)?;
+    npc_framework::agent_io::scheduler::configure_host(
+        session.app_mut().world_mut(),
+        npc_framework::agent_io::scheduler::default_bindings_path(),
+    );
     out.json(&json!({
         "listening": session.url(),
         "port": session.port(),

@@ -46,6 +46,8 @@ mod overlay;
 mod panels;
 mod robots;
 mod scene;
+mod village;
+mod village_world;
 mod visuals;
 
 use bevy::prelude::*;
@@ -111,6 +113,8 @@ impl Plugin for TestbedViewPlugin {
         }
         app.add_plugins((
             assets::plugin,
+            village_world::plugin,
+            village::plugin,
             robots::plugin,
             scene::plugin,
             camera::plugin,
@@ -143,6 +147,8 @@ pub fn perf_tags(tags: &mut npc_framework::perf::MechanicTags) {
         "panels",
         "scene",
         "visuals",
+        "village",
+        "village_world",
     ] {
         tags.add(format!("testbed_view::{module}"), format!("view.{module}"));
     }

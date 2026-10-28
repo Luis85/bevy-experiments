@@ -221,7 +221,12 @@ fn drive_animation(
     time: Res<Time>,
     anims: Res<ActorAnimations>,
     roots: Query<(&VisualOf, &ActorVisual)>,
-    sims: Query<(Option<&MountedIn>, Option<&Interacting>, Option<&Crafting>)>,
+    sims: Query<(
+        Option<&MountedIn>,
+        Option<&Interacting>,
+        Option<&Crafting>,
+        Option<&testbed_content::village::Gathering>,
+    )>,
     mut players: Query<(
         Entity,
         &mut AnimationPlayer,
@@ -238,8 +243,14 @@ fn drive_animation(
             .get(target.root)
             .ok()
             .and_then(|(of, actor)| {
-                let (m, i, c) = sims.get(of.0).ok()?;
-                Some(pose_of(m, i, c, actor.motion.moving))
+                let (m, i, c, gathering) = sims.get(of.0).ok()?;
+                Some(
+                    if gathering.is_some() && m.is_none() && i.is_none() && !actor.motion.moving {
+                        Pose::Work
+                    } else {
+                        pose_of(m, i, c, actor.motion.moving)
+                    },
+                )
             })
             .unwrap_or_default();
         if target.current.is_some() && target.current != Some(pose) {

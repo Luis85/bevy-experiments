@@ -7,3 +7,7 @@ build.log
 # Claude Code: user-only re-baseline approval marker and local settings
 .claude/rebaseline-approved
 .claude/settings.local.json
+
+# Operator-owned AI scheduler links and process leases
+.npc-ai-scheduler/
+.ai-scheduler/

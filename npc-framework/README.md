@@ -7,6 +7,12 @@ perception, a GURPS-like rules layer, interaction with items and doors, RTS orde
 progression, crafting, and control by external AI agents. Everything is reachable as JSON for humans and agents:
 a headless CLI, a JSON-RPC interface on the running game, a journal of every decision, and a profiler.
 
+**Island Village** is a new AI explorer world: nine residents run finite food/material/tool chains, while
+the visiting actor earns coins by gathering or crafting and buys necessities. It has blocked water,
+day/night, seasons, lethal needs and permanent actor lives with recoverable diaries. Scene-level AI
+supervision can resume a linked Codex/Claude CLI session after the external actor goes idle.
+[Play and configure it](docs/ai-village.md).
+
 | The village | The Actor Testbed | A foreign RTS host | The AI explorer |
 |---|---|---|---|
 | ![village](docs/img/day.jpg) | ![testbed](docs/img/testbed_overview.jpg) | ![RTS units demo](docs/img/rts_demo.jpg) | ![AI explorer](docs/img/explorer.jpg) |
@@ -32,7 +38,7 @@ a headless CLI, a JSON-RPC interface on the running game, a journal of every dec
 - **Entity reference**: one page per ECS [component](docs/entities/components/index.md) (fields and units, who
   adds, reads and writes it, hashed and/or saved in world snapshots) and per [system](docs/entities/systems/index.md)
   (schedule and set, reads/writes, determinism, perf mechanic).
-- Decisions: [`docs/adr/`](docs/adr/) (0001–0021). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
+- Decisions: [`docs/adr/`](docs/adr/) (0001–0023). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
   `docs/superpowers/`. Benchmarks: [`bench/README.md`](bench/README.md). Agent workflow: [`CLAUDE.md`](CLAUDE.md).
 
 ## Features

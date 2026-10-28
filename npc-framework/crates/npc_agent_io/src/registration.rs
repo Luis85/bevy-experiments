@@ -173,6 +173,23 @@ pub fn required(world: &World) -> bool {
     world.contains_resource::<RegistrationRequired>()
 }
 
+/// Host supervisors may watch only a currently authorized registered controller.
+/// Credential reload/revocation remains the same fail-closed boundary as ordinary tools.
+pub fn controller_session_active(world: &mut World, controller: &str, assigned: SimId) -> bool {
+    if !required(world) {
+        return true;
+    }
+    reload(world);
+    world
+        .get_resource::<AgentSessions>()
+        .is_some_and(|sessions| {
+            sessions.by_agent.values().any(|key| {
+                session(world, key)
+                    .is_ok_and(|p| p.controller == controller && p.assigned == assigned)
+            })
+        })
+}
+
 fn reload(world: &mut World) {
     if let Some(hook) = world.get_resource::<Hooks>().and_then(|h| h.reload) {
         hook(world);
@@ -348,6 +365,9 @@ pub fn authorize(
     ) && !method.starts_with("agent/notes/")
         && !method.starts_with("agent/map/");
     validate_permit(world, &permit, needs_control)?;
+    world
+        .get_resource_or_init::<crate::stats::AgentStats>()
+        .requested(&permit.controller, permit.assigned.0);
     map.remove("session");
     map.remove("unit");
     map.remove("controller");

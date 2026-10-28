@@ -45,6 +45,7 @@ pub mod replay;
 pub mod scenario;
 pub mod summary;
 pub mod tree;
+pub mod village;
 pub mod walls;
 pub mod world;
 pub mod world_runtime;
@@ -162,6 +163,7 @@ pub fn perf_tags(tags: &mut npc_framework::perf::MechanicTags) {
         ),
         ("testbed_content::actions::idle_system", "actions.idle"),
         ("testbed_content::world_runtime::update_state", "needs"),
+        ("testbed_content::village::tick", "village.economy"),
         (
             "testbed_content::world_runtime::scale_movement",
             "actions.move",

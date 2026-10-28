@@ -68,6 +68,7 @@ pub mod registry;
 #[cfg(feature = "remote")]
 pub mod remote;
 pub mod scenario;
+pub mod scheduler;
 pub mod session;
 pub mod stats;
 

@@ -178,7 +178,8 @@ pub fn epoch(world: &World) -> u64 {
 /// The `agent/*`, `notes/*` and `world/*` method names this module serves
 /// (the session host adds `world/load_scenario`, `world/reset`,
 /// `session/stop` and a subset of `npc/*`).
-pub const METHODS: [&str; 27] = [
+pub const METHODS: [&str; 28] = [
+    "scheduler/status",
     "agent/register",
     "agent/enter_world",
     "agent/take_control",
@@ -273,6 +274,8 @@ pub fn call(world: &mut World, method: &str, mut p: Option<Value>) -> RpcResult 
     let authorization = registration::authorize(world, method, &mut p)?;
     events::harvest(world);
     match method {
+        "scheduler/status" => serde_json::to_value(crate::scheduler::read_status(world))
+            .map_err(|_| RpcError::invalid("cannot serialize scheduler status")),
         "agent/attach" => attach(world, params(p, ATTACH)?),
         "agent/detach" => detach(world, params(p, OWNER)?),
         "agent/observe" => observe_method(world, params(p, OBSERVE)?),

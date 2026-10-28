@@ -8,6 +8,23 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Island Village and AI continuation
+
+- Add the opt-in `ai_village` scenario and `island_village` explorer preset: nine named residents operate
+  physical food, wood, metal and tool chains with finite inventories/wallets and a cash-conserving community
+  fund. Visiting actors gather/craft/sell to buy food, clean water and lodging. Empty supplies allow
+  producers to restart work rather than waiting on their own missing output.
+- Add day/night and seasonal supply, blocked island water, fatigue/health and permanent death. Death drops
+  possessions/currency and a recoverable diary; a new recorded life creates a different actor in the same
+  continuing world, with fresh books/senses and reassigned registration. Original files remain preserved.
+- Publish only deceased actors' Diary pages through a recorded content command. Private Memory/Proposals,
+  map knowledge and credentials stay outside the dropped book; unreadable/oversized exports report errors.
+- Add scene-configurable host AI supervision and `npcctl scheduler bind|unbind|status`: named Codex/Claude
+  CLI resumes, idle/work/control checks, cooldowns, bounded concurrency/rates, owned-process timeouts and
+  cleanup. Operator session links remain outside scene/replay data; status queries never dispatch.
+- Extend the native view with the island/coast, workplaces, calendar/reserves/currency, diary reading,
+  explicit successor controls and supervisor status. World presets gain an AI scheduler settings page.
+
 ### Performance explorer
 
 - F4 groups measured work by ownership domain, then mechanic, system and nested execution path. It exposes

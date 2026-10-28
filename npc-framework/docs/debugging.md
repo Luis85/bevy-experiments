@@ -10,6 +10,9 @@ spec (`…/2026-10-23-agent-control-design.md`), ADRs 0006 and 0010. Agent exper
 [`agent-experiments.md`](agent-experiments.md); integrating the framework into a game is
 [`using-npc-framework.md`](using-npc-framework.md).
 
+The [Island Village guide](ai-village.md) covers its economy, permanent death/diaries and scene AI
+supervision (`npcctl scheduler bind|unbind|status`, real-time idle/cooldown policy and owned fake-runner checks).
+
 - [1. Which tool for which question](#1-which-tool-for-which-question)
 - [2. npcctl, the headless CLI](#2-npcctl-the-headless-cli)
 - [3. The live games and BRP](#3-the-live-games-and-brp)

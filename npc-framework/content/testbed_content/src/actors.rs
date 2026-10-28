@@ -736,6 +736,13 @@ pub fn apply_preset(world: &mut World, entity: Entity, p: &ActorPreset) {
 /// are never refused here (`interact` and `order` ask about the verb they
 /// run).
 pub fn verb_gate(world: &World, entity: Entity, verb: &str) -> Option<String> {
+    if world
+        .get_resource::<crate::village::VillageState>()
+        .is_some()
+        && crate::village::intrinsic_action(verb)
+    {
+        return None;
+    }
     if crate::world_runtime::intrinsic_recovery(world, entity, verb) {
         return None;
     }

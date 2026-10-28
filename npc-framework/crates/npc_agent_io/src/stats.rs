@@ -13,9 +13,9 @@ use serde::Serialize;
 /// Samples kept per controller.
 pub const MAX_SAMPLES: usize = 1024;
 
-/// The wall clock, for latency stats and long-poll deadlines only.
+/// The host wall clock, for latency, deadlines, pacing and idle-supervisor timers only.
 #[allow(clippy::disallowed_methods)]
-// determinism: tooling timing (stats, request deadlines, session pacing);
+// determinism: host tooling timing (stats, deadlines, pacing and idle nudges);
 // never stored in sim state or the journal.
 pub fn wall_now() -> Instant {
     Instant::now()
@@ -24,6 +24,8 @@ pub fn wall_now() -> Instant {
 /// One controller's counters and samples.
 #[derive(Clone, Debug, Default)]
 pub struct ControllerStats {
+    /// Authorized agent-tool requests, including notebook/map/event calls (host-only activity).
+    pub requests: u64,
     pub unit: Option<u32>,
     pub observes: u64,
     pub acts: u64,
@@ -99,6 +101,11 @@ fn push(v: &mut VecDeque<u64>, x: u64) {
 }
 
 impl AgentStats {
+    pub fn requested(&mut self, controller: &str, unit: u32) {
+        let s = self.entry(controller);
+        s.unit = Some(unit);
+        s.requests = s.requests.saturating_add(1);
+    }
     fn entry(&mut self, controller: &str) -> &mut ControllerStats {
         self.controllers.entry(controller.to_owned()).or_default()
     }
