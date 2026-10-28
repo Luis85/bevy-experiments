@@ -23,10 +23,13 @@
 
 mod budget;
 mod collector;
+mod domain;
+mod history;
 mod layer;
 mod report;
 mod stats;
 mod tags;
+mod tree;
 
 use bevy_ecs::prelude::{Res, Resource};
 use tracing_subscriber::layer::SubscriberExt;
@@ -37,10 +40,20 @@ pub use budget::{
 pub use collector::{
     BREACH_INTERVAL, BreachLog, DEFAULT_MIN_SAMPLES, DEFAULT_WINDOW, PerfCollector,
 };
-pub use layer::{MECHANIC_SPAN, PerfLayer, SYSTEM_SPAN};
+pub use domain::{DomainTags, PerfDomain};
+pub use history::{
+    HISTORY_CAPACITY, HISTORY_PERIOD_SECS, HistoryBudget, HistoryCapture, HistoryChart,
+    HistorySample, HistorySelection, HistorySeries, PerfHistoryReport, SeriesRole,
+};
+pub use layer::{MECHANIC_SPAN, PerfLayer, SCOPE_SPAN, SYSTEM_SPAN};
 pub use report::{PerfReport, clip};
 pub use stats::{MechanicStats, SystemStats};
 pub use tags::{MechanicTags, UNTAGGED};
+pub use tree::{
+    BudgetStatus, DEFAULT_TRACE_LIMIT, DomainStats, DurationStats, GroupStats, MAX_TRACE_DEPTH,
+    PerfInterval, PerfTargets, PerfTreeReport, RuntimeStats, TraceDetail, TraceId, TraceKind,
+    TraceNode,
+};
 
 /// The collector as a Bevy resource.
 #[derive(Resource, Clone, Debug)]

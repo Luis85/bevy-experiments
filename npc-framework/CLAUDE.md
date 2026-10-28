@@ -51,6 +51,7 @@ Capability crates depend on each other only per ADR 0012's whitelist; everything
 - [0018: host-side landmarks and file identity](docs/adr/0018-host-side-landmarks-and-file-identity.md).
 - [0019: final integrity and feedback fixes](docs/adr/0019-final-integrity-and-feedback-fixes.md).
 - [0020: native editor safety and keyboard navigation](docs/adr/0020-native-editor-safety-and-keyboard-navigation.md).
+- [0021: performance domains and trace explorer](docs/adr/0021-performance-domains-and-trace-explorer.md).
 
 ## Golden rules
 

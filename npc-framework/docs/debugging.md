@@ -454,7 +454,7 @@ do not browse untrusted sites while a game with BRP is running.
 | `npc/unit` | `{id}` | the unit's snapshot incl. `recent_journal` (as `npcctl inspect --unit`) |
 | `npc/command` | `{cmd: SimCommand, at_tick?}` | `{tick, seq}`: queued, validated, recorded for replay |
 | `npc/journal` | `{filter: JournalFilter}` or the filter fields directly: `{unit?, kinds?:[..], from?, to?, grep?, limit?}` | `[JournalEntry]`; an error while the journal is off |
-| `npc/perf` | `{top?}` | `PerfReport {systems, mechanics, frames}` (with `top`, only those rows: `report_top`) |
+| `npc/perf` | `{top?}`, `{tree:true, selected?, capture?}`, or `{history:true, selection?}` | flat `PerfReport` by default; bounded tree or selected history; complete captures include all path details and history |
 | `npc/perf/reset` | – | `{reset: true}` |
 | `npc/record/start` | `{every=100}` | `{recording, started_at, every}` |
 | `npc/record/stop` | `{path?, overwrite?=false}` | the `Replay` (also written to `path`, relative to the output root, `.json`; a refused path is a `-32602` error before the recording stops; on a write error the replay is in the error's `data`) |
@@ -848,6 +848,63 @@ builds (the workspace builds the sim at `opt-level = 1` in dev).
 Where it shows: the **F4** panel (village, testbed, RTS demo; cached, refreshed at most every 0.5 s), BRP
 `npc/perf {top?}` / `npc/perf/reset`, and `npcctl bench` JSON. Wiring it into your own app: see
 [using-npc-framework.md §9](using-npc-framework.md#9-view-helpers-and-debug-tooling-in-your-app).
+
+F4 now opens a performance explorer. **Costs** starts with a few collapsed ownership domains: Simulation,
+World presentation, User interface, Rendering (CPU), Engine/host, and Unclassified when needed. Expand a
+domain, mechanic family and system to inspect nested calls. Deferred commands and condition checks have
+their own labelled paths. Cross-domain/mechanic calls are references to their owner; they are not charged twice.
+The rows show recent mean **self elapsed time per collector interval**, including inactive intervals, and
+share of measured self time. They are CPU-side span durations including waits, not CPU cycles or GPU timing.
+Parallel spans can overlap; frame-wrapper self time is excluded from ownership totals. Do not subtract
+these totals from frame wall time to infer GPU cost.
+
+The header separates actual frame FPS/interval, a diagnostic frame target (default 60 FPS/16.667 ms),
+achieved simulation ticks per real second, configured simulation Hz/speed, and measured per-tick p95 wall
+time. Simulation FPS is not estimated from inverse tick cost. Paused/unpaced/missing-driver cases remain
+distinct. The frame target never changes VSync, host timing or simulation pacing.
+
+**Budgets** lists every configured effective limit, including unobserved and warming rows, with the original
+inclusive p95 measurement, usage and status. Windowed intervals are render frames; configured headless
+drivers close intervals per tick. Limits are not per individual system call. Parent p95 values are computed
+from raw samples, not summed from child p95 values. Existing limits, scaling and breach behavior are unchanged.
+
+**Freeze / Live** freezes only the displayed snapshot; recording and simulation continue. A complete frozen
+capture retains per-call inclusive/self percentiles for every retained path, so drill-down works offline.
+**History** charts frame mean/peak versus target, achieved versus target simulation throughput, the selected
+Costs or Budgets row, and per-tick p95 wall duration. Select a row, then open History to chart it. Blue is
+measured, red is the largest actual frame interval since the previous sample, and dashed gold is the target.
+Each chart shows current values, units, a zero-based vertical scale and elapsed real seconds horizontally.
+The host samples at most twice per real second, retaining 240 samples (about two minutes), even while F4 is
+hidden. CPU costs are rolling mean self time per interval; budget values are the existing rolling inclusive
+p95, with gaps for warmup/inactive intervals. These are sampled statistics, not individual call timestamps.
+Freeze retains history for every captured path; switching selection does not resume recording on screen.
+Headless hosts without the view sampler have empty history unless they call `record_history` themselves.
+**Reset stats** clears diagnostic history only. **Collapse all** restores the compact view; **More rows**
+extends the bounded visible list. Tab/Shift+Tab and Enter/Space operate controls; Escape/F4 close the focused
+explorer. Its pointer/keyboard input is shielded from the world, and host modals gate `ViewSystems::OverlayInput`.
+
+JSON examples (same `npc/perf` method, no change to old flat replies):
+
+```json
+{"tree":true}
+{"tree":true,"selected":42}
+{"tree":true,"capture":true}
+{"history":true,"selection":{"kind":"domain","domain":"simulation"}}
+{"history":true,"selection":{"kind":"trace","id":42}}
+{"history":true,"selection":{"kind":"budget","mechanic":"perception"}}
+```
+
+`nodes` have generation-scoped IDs, actual per-thread execution parents, kind, domain, mechanic, self/inclusive
+totals and recent interval means. `detail` is calculated only for a selected path during live queries;
+`details` contains every path's summary only in an explicit complete capture. Storage is capped by
+`set_trace_limit` (default 4,096 paths) and depth 64; omitted entries produce a visible warning. Untracked
+descendant work remains in the tracked parent's self time. This is an aggregate call explorer, not a timestamp
+timeline; the Tracy/Chrome options below still provide full chronological traces.
+
+The profiler enables the named measurement span categories even with a broad `RUST_LOG=warn`, while normal
+logging remains filtered. A deliberate equally specific span filter can disable them; missing system coverage
+is reported in the panel. Install the subscriber before building systems, since cached disabled spans cannot
+be recovered later. `npc_perf` enables the pinned ECS trace/debug features for real system names.
 
 ### 7.2 Mechanics and budgets
 

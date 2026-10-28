@@ -533,6 +533,14 @@ fn keys(
     mut commands: Commands,
 ) {
     let Some(keys) = keys else { return };
+    // Another overlay owns the keyboard; do not initialize our form on its Tab.
+    if keyboard
+        .focus
+        .get()
+        .is_some_and(|entity| !keyboard.controls.contains(entity))
+    {
+        return;
+    }
     let typing = keyboard
         .focus
         .get()

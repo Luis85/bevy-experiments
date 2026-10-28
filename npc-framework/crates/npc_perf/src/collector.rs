@@ -1,8 +1,10 @@
 //! The shared, thread-safe collector behind [`PerfCollector`].
 //!
 //! Lock order (always taken in this order, never the reverse):
-//! `Inner::state` → `Inner::slots` → `Slot::data`. The span hot path
-//! (`on_exit`) only takes one `Slot::data` lock.
+//! The short recording/reset barrier is outermost. Legacy order is
+//! `Inner::state` → `Inner::slots` → `Slot::data`; trace order is
+//! frame state → trace store → node data → tick series. Recording releases
+//! each node lock before taking another; it never locks frame state.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError, RwLock};
@@ -61,7 +63,7 @@ pub(crate) enum Kind {
 #[derive(Debug)]
 pub(crate) struct Slot {
     kind: Kind,
-    name: String,
+    pub(crate) name: Arc<str>,
     data: Mutex<SlotData>,
 }
 
@@ -134,6 +136,11 @@ struct State {
 
 #[derive(Debug)]
 pub(crate) struct Inner {
+    history: Mutex<crate::history::HistoryStore>,
+    /// Short recording/reset barrier. Never held for the duration of user work.
+    pub(crate) recording: RwLock<()>,
+    pub(crate) traces: crate::tree::TraceCollector,
+    pub(crate) id: u64,
     window: usize,
     epoch: Instant,
     state: Mutex<State>,
@@ -163,7 +170,7 @@ impl Inner {
         };
         let slot = Arc::new(Slot {
             kind,
-            name: name.to_owned(),
+            name: name.into(),
             data: Mutex::new(SlotData {
                 mechanic,
                 calls: 0,
@@ -200,6 +207,7 @@ impl PerfCollector {
     /// per mechanic, tagged with [`MechanicTags::default_npc`], with no
     /// budgets and [`DEFAULT_MIN_SAMPLES`].
     pub fn new(window: usize) -> Self {
+        static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
         let state = State {
             tags: MechanicTags::default_npc(),
             min_samples: DEFAULT_MIN_SAMPLES,
@@ -207,6 +215,10 @@ impl PerfCollector {
             ..State::default()
         };
         Self(Arc::new(Inner {
+            history: Mutex::new(crate::history::HistoryStore::default()),
+            recording: RwLock::new(()),
+            traces: crate::tree::TraceCollector::new(window.max(1)),
+            id: NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
             window: window.max(1),
             epoch: Instant::now(),
             state: Mutex::new(state),
@@ -247,6 +259,7 @@ impl PerfCollector {
     /// (level per [`PerfCollector::set_breach_log`]), at most once per
     /// mechanic per breach interval (default [`BREACH_INTERVAL`]).
     pub fn end_frame(&self) {
+        let _epoch = read(&self.0.recording);
         let mut warnings = Vec::new();
         {
             let mut guard = lock(&self.0.state);
@@ -314,6 +327,7 @@ impl PerfCollector {
                 }
             }
         }
+        self.0.traces.end_frame();
         for (b, warn) in warnings {
             if warn {
                 tracing::warn!(
@@ -382,7 +396,7 @@ impl PerfCollector {
                 let d = lock(&slot.data);
                 let s = d.window.summary_with(&mut scratch);
                 SystemStats {
-                    name: slot.name.clone(),
+                    name: slot.name.to_string(),
                     mechanic: d.mechanic.to_string(),
                     calls: d.calls,
                     total_us: us(d.total_ns),
@@ -426,6 +440,7 @@ impl PerfCollector {
     /// mechanics were warned about ([`BreachLog::WarnOnce`]). Spans that
     /// already exist keep being timed. Tags and budgets are kept.
     pub fn reset(&self) {
+        let _epoch = write(&self.0.recording);
         let mut state = lock(&self.0.state);
         state.mechanics.clear();
         state.frames = 0;
@@ -440,11 +455,14 @@ impl PerfCollector {
             d.frame_ns = 0;
             d.frame_calls = 0;
         }
+        self.0.traces.reset();
+        lock(&self.0.history).clear();
     }
 
     /// Replaces the tags and re-maps every known system. Mechanic history
     /// already recorded stays under the old mechanic names.
     pub fn set_tags(&self, tags: MechanicTags) {
+        let _epoch = write(&self.0.recording);
         let mut state = lock(&self.0.state);
         state.tags = tags;
         for slot in &read(&self.0.slots).list {
@@ -452,6 +470,8 @@ impl PerfCollector {
                 lock(&slot.data).mechanic = state.tags.mechanic_for(&slot.name).into();
             }
         }
+        self.0.traces.reset();
+        lock(&self.0.history).clear();
     }
 
     /// The current tags.
@@ -506,21 +526,102 @@ impl PerfCollector {
     /// Records one run of system `name` lasting `duration`, as if its span
     /// had been entered and exited.
     pub fn record_system(&self, name: &str, duration: Duration) {
-        self.0
-            .slot(Kind::System, name)
-            .record(duration.as_nanos() as u64);
+        let _epoch = read(&self.0.recording);
+        let slot = self.0.slot(Kind::System, name);
+        let ns = duration.as_nanos() as u64;
+        slot.record(ns);
+        if let Some(node) = self.0.traces.slot(
+            crate::TraceKind::System,
+            slot.name.clone(),
+            slot.mechanic(),
+            None,
+            None,
+        ) {
+            node.record(ns, ns);
+        }
     }
 
     /// Records one `"mechanic"` span named `mechanic` lasting `duration`.
     pub fn record_mechanic(&self, mechanic: &str, duration: Duration) {
-        self.0
-            .slot(Kind::Mechanic, mechanic)
-            .record(duration.as_nanos() as u64);
+        let _epoch = read(&self.0.recording);
+        let slot = self.0.slot(Kind::Mechanic, mechanic);
+        let ns = duration.as_nanos() as u64;
+        slot.record(ns);
+        if let Some(node) = self.0.traces.slot(
+            crate::TraceKind::Mechanic,
+            slot.name.clone(),
+            slot.name.clone(),
+            None,
+            None,
+        ) {
+            node.record(ns, ns);
+        }
     }
 
     /// Test hook: [`PerfCollector::record_system`] with whole microseconds.
     pub fn record_for_test(&self, name: &str, us: u64) {
         self.record_system(name, Duration::from_micros(us));
+    }
+
+    /// Bounded execution-path view. Percentiles for one selected path only;
+    /// flat system/budget reports retain their existing contract.
+    pub fn tree_report(&self, selected: Option<crate::TraceId>) -> crate::PerfTreeReport {
+        self.tree_snapshot(selected, false)
+    }
+    /// Complete bounded snapshot for offline drill-down. More expensive than a live selected-row refresh.
+    pub fn capture_tree(&self) -> crate::PerfTreeReport {
+        self.tree_snapshot(None, true)
+    }
+    fn tree_snapshot(
+        &self,
+        selected: Option<crate::TraceId>,
+        complete: bool,
+    ) -> crate::PerfTreeReport {
+        let _epoch = read(&self.0.recording);
+        let flat = self.report_limited(0, usize::MAX);
+        let mut report = self.0.traces.report(
+            selected,
+            complete,
+            &flat,
+            &self.budgets(),
+            self.min_samples(),
+        );
+        if complete {
+            report.history = Some(lock(&self.0.history).capture());
+        }
+        report
+    }
+    pub fn set_domains(&self, domains: crate::DomainTags) {
+        let _epoch = write(&self.0.recording);
+        self.0.traces.set_domains(domains);
+        lock(&self.0.history).clear();
+    }
+    pub fn set_trace_limit(&self, nodes: usize) {
+        let _epoch = write(&self.0.recording);
+        self.0.traces.set_limit(nodes);
+        lock(&self.0.history).clear();
+    }
+    pub fn set_interval(&self, interval: crate::PerfInterval) {
+        self.0.traces.set_interval(interval);
+    }
+    pub fn record_runtime(&self, stats: crate::RuntimeStats) {
+        self.0.traces.set_runtime(stats);
+    }
+    /// Sample history at most twice a second. The caller supplies real elapsed time and the
+    /// largest frame interval since the last sample; this never changes a host clock.
+    pub fn record_history(&self, time_s: f64, frame_peak_ms: Option<f64>) {
+        let report = self.tree_report(None);
+        let _epoch = read(&self.0.recording);
+        if report.generation == self.0.traces.generation() {
+            lock(&self.0.history).record(time_s, frame_peak_ms, &report);
+        }
+    }
+    pub fn history_report(
+        &self,
+        selection: &crate::HistorySelection,
+        label: Option<&str>,
+    ) -> crate::PerfHistoryReport {
+        lock(&self.0.history).report(selection, label)
     }
 }
 

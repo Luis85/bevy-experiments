@@ -46,6 +46,7 @@ pub(crate) struct Ring {
     buf: Vec<u64>,
     next: usize,
     cap: usize,
+    sum: u128,
 }
 
 impl Ring {
@@ -54,6 +55,7 @@ impl Ring {
             buf: Vec::new(),
             next: 0,
             cap: cap.max(1),
+            sum: 0,
         }
     }
 
@@ -61,14 +63,34 @@ impl Ring {
         if self.buf.len() < self.cap {
             self.buf.push(value);
         } else {
+            self.sum -= u128::from(self.buf[self.next]);
             self.buf[self.next] = value;
         }
+        self.sum += u128::from(value);
         self.next = (self.next + 1) % self.cap;
     }
 
     pub(crate) fn clear(&mut self) {
         self.buf.clear();
         self.next = 0;
+        self.sum = 0;
+    }
+    pub(crate) fn len(&self) -> usize {
+        self.buf.len()
+    }
+    pub(crate) fn mean(&self) -> f64 {
+        if self.buf.is_empty() {
+            0.0
+        } else {
+            self.sum as f64 / self.buf.len() as f64
+        }
+    }
+    pub(crate) fn last(&self) -> u64 {
+        if self.buf.is_empty() {
+            0
+        } else {
+            self.buf[(self.next + self.buf.len() - 1) % self.buf.len()]
+        }
     }
 
     /// `(p50, p95, max)` in ns, nearest-rank.

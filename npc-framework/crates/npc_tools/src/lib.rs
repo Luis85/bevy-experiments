@@ -59,6 +59,7 @@ pub struct PerfTickPlugin;
 
 fn end_perf_frame(world: &mut World) {
     if let Some(perf) = world.get_resource::<PerfHandle>() {
+        perf.0.set_interval(npc_perf::PerfInterval::SimTick);
         perf.0.end_frame();
     }
 }

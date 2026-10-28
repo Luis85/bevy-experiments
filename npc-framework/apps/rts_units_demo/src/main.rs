@@ -167,6 +167,22 @@ fn windowed(args: Args) {
     #[cfg(feature = "perf")]
     app.add_plugins(
         npc_framework::perf::NpcPerfPlugin::new()
+            .domain(
+                "rts_units_demo::sim",
+                npc_framework::perf::PerfDomain::Simulation,
+            )
+            .domain(
+                "rts_units_demo::host",
+                npc_framework::perf::PerfDomain::Platform,
+            )
+            .domain(
+                "rts_units_demo::view",
+                npc_framework::perf::PerfDomain::Presentation,
+            )
+            .domain(
+                "rts_units_demo::view::update_hud",
+                npc_framework::perf::PerfDomain::UserInterface,
+            )
             .tag("rts_units_demo::sim", "rts.sim")
             .tag("rts_units_demo::view", "rts.view")
             .tag("rts_units_demo::host", "rts.host"),

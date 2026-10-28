@@ -8,6 +8,20 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Performance explorer
+
+- F4 groups measured work by ownership domain, then mechanic, system and nested execution path. It exposes
+  self/inclusive timings, deferred/condition costs, full selected names and bounded frozen captures.
+- Separate actual frame rate, achieved simulation ticks/s, configured speed/rate, per-tick wall cost and a
+  diagnostic frame target. Effective budgets show inclusive p95, usage, warmup and unobserved states.
+- History charts retain 240 half-second samples of frame mean/peak/target, actual/target simulation throughput,
+  selected self cost or inclusive budget p95, and per-tick p95. Recording continues with the panel hidden;
+  frozen captures retain history, missing/inactive budget measurements stay gaps, and reset clears diagnostics.
+- Add explicit tree/selected/capture queries to `npc/perf` while preserving flat reports and existing limits.
+  ECS trace/debug support and targeted span filters keep system measurement available with quiet logging.
+- Runtime parent tracking handles cached parentless Bevy spans, concurrency/reentrancy and resets; bounded
+  depth/cardinality warnings expose incomplete capture. Overlay controls shield world input and respect modals.
+
 ### Editor safety and polish
 
 - Worlds now protects unsaved edits on Back, Escape and window close; selected presets and their optimistic

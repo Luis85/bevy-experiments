@@ -37,7 +37,13 @@ pub mod nav_gizmos;
 #[cfg(feature = "perception")]
 pub mod perception_gizmos;
 #[cfg(feature = "perf")]
+mod perf_charts;
+#[cfg(feature = "perf")]
+mod perf_model;
+#[cfg(feature = "perf")]
 mod perf_panel;
+#[cfg(feature = "perf")]
+mod perf_runtime;
 #[cfg(feature = "perf")]
 pub mod perf_setup;
 pub mod remote;
@@ -51,6 +57,8 @@ mod visuals;
 use bevy::prelude::*;
 
 pub use journal_panel::{EffectDescriber, JOURNAL_ROWS, describe, format_entry};
+#[cfg(feature = "perf")]
+pub use perf_panel::{PerfControl, perf_input_active};
 pub use screenshot::save_screenshot;
 pub use select::{PICK_HEIGHT, PICK_RADIUS, Selectable, Selected, pick};
 pub use timing::SimTickTiming;
@@ -61,6 +69,8 @@ pub use visuals::{ViewHidden, VisualIndex, VisualOf, hidden};
 pub enum ViewSystems {
     /// Keyboard/mouse handling (camera, overlay toggle).
     Input,
+    /// Diagnostic overlay input, before game hotkeys (hosts apply modal gates here too).
+    OverlayInput,
     /// Spawn/despawn visual entities for sim entities.
     Sync,
     /// Write visual transforms and animation state from sim components.
@@ -95,6 +105,7 @@ impl Plugin for NpcViewHelpersPlugin {
         app.configure_sets(
             Update,
             (
+                ViewSystems::OverlayInput,
                 ViewSystems::Input,
                 ViewSystems::Sync,
                 ViewSystems::Animate,
@@ -111,7 +122,7 @@ impl Plugin for NpcViewHelpersPlugin {
         ))
         .init_resource::<DebugPanels>();
         #[cfg(feature = "perf")]
-        app.add_plugins(perf_panel::plugin);
+        app.add_plugins((perf_runtime::plugin, perf_panel::plugin));
         #[cfg(feature = "nav")]
         app.add_plugins(nav_gizmos::plugin);
         #[cfg(feature = "perception")]

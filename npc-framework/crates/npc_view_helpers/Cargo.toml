@@ -26,7 +26,7 @@ serde_json = "1"
 [features]
 default = []
 # F4 perf panel (reads the npc_perf profiler's `PerfHandle`).
-perf = ["dep:npc_perf"]
+perf = ["dep:npc_perf", "bevy/bevy_ui_widgets", "bevy/bevy_picking"]
 # Path gizmos for `npc_nav` agents (`nav_gizmos`).
 nav = ["dep:npc_nav"]
 # Vision cones and line-of-sight rays for `npc_perception` agents
