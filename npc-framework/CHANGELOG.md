@@ -8,6 +8,16 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Editor safety and polish
+
+- Worlds now protects unsaved edits on Back, Escape and window close; selected presets and their optimistic
+  save baseline come from one fresh read, including BOM-prefixed files and files changed externally.
+- F7 gains complete Tab/Shift+Tab navigation, Enter/Space actions, visible focus and scroll-into-view.
+  Ctrl+Tab switches books; Escape preserves drafts. Focused controls shield world shortcuts and respect modals.
+- Menu/F7 controls have native accessible names; F7 selection is exposed to accessibility. Menu fields show
+  focus, secondary button text meets enabled-state contrast, action rows wrap, Worlds keeps the shared frame,
+  and empty Resume offers a direct New-agent action.
+
 ### Fixed (final review)
 
 - Crafting no longer overfills a full pack merely because a matching stack exists. Separate output IDs and

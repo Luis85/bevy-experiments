@@ -58,7 +58,9 @@ pub use command::{FORMATION_SPACING_MM, context_tool_order};
 pub use explorer_modal::{
     ExplorerModalPlugin, ExplorerModalSystems, PromptModal, PromptModalClosed, modal_open,
 };
-pub use explorer_panel::{ExplorerFiles, NoteField, STALE_NOTE, editor_typing};
+pub use explorer_panel::{
+    ExplorerFiles, NoteField, NotesControl, NotesInput, STALE_NOTE, editor_typing,
+};
 pub use fog::{
     CellFog, FogLens, FogOfWar, Look, MASK_EXPLORED, MASK_GREY, MASK_UNEXPLORED, MASK_VISIBLE,
     MaskRegion, area_look, marker_pos, mask_alpha, mask_hash, mask_texel, mask_texels, static_look,

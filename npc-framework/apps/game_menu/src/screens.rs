@@ -224,6 +224,8 @@ impl Plugin for ScreensPlugin {
                     show_settings_status.run_if(in_state(Screen::Settings)),
                     show_fog_checkbox.run_if(in_state(Screen::Settings)),
                     ui::refresh_buttons,
+                    ui::refresh_fields,
+                    ui::refresh_accessible_buttons,
                 ),
             )
             .add_systems(
@@ -289,10 +291,15 @@ pub fn quit(world: &mut World) {
 /// request): [`quit`].
 pub fn close_quits(
     mut requests: MessageReader<bevy::window::WindowCloseRequested>,
+    state: Res<State<Screen>>,
     mut commands: Commands,
 ) {
     if requests.read().count() > 0 {
-        commands.queue(quit);
+        if *state.get() == Screen::Worlds {
+            commands.queue(crate::worlds::close);
+        } else {
+            commands.queue(quit);
+        }
     }
 }
 
@@ -370,11 +377,16 @@ fn escape_goes_back(
     keys: Res<ButtonInput<KeyCode>>,
     state: Res<State<Screen>>,
     mut next: ResMut<NextState<Screen>>,
+    mut commands: Commands,
 ) {
     if keys.just_pressed(KeyCode::Escape)
         && let Some(back) = state.get().back()
     {
-        next.set(back);
+        if *state.get() == Screen::Worlds {
+            commands.queue(crate::worlds::escape);
+        } else {
+            next.set(back);
+        }
     }
 }
 
@@ -539,12 +551,12 @@ fn spawn_settings(mut commands: Commands, settings: Res<AppSettings>, paths: Res
             14.0,
             ui::DIM,
         ));
-        p.spawn((AgentsDirField, ui::text_field(current, 0), AutoFocus));
+        p.spawn((AgentsDirField, ui::text_field(current, 0, "Agents folder"), AutoFocus));
         p.spawn(ui::label("Actors folder (optional)", 18.0, TEXT));
-        p.spawn((ActorsDirField, ui::text_field(&settings.0.actors_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 1)));
+        p.spawn((ActorsDirField, ui::text_field(&settings.0.actors_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 1, "Actors folder")));
         p.spawn(ui::label("Blank uses npc-actors beside the agents folder. Used by Actors and New agents.", 12.0, ui::DIM));
         p.spawn(ui::label("Worlds folder (optional)", 18.0, TEXT));
-        p.spawn((WorldsDirField, ui::text_field(settings.0.worlds_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 2)));
+        p.spawn((WorldsDirField, ui::text_field(settings.0.worlds_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 2, "Worlds folder")));
         p.spawn(ui::label("Blank uses npc-worlds beside the agents folder. Used by Worlds and New agents.", 12.0, ui::DIM));
         p.spawn(ui::label("Explorer window", 18.0, TEXT));
         let fog = button(

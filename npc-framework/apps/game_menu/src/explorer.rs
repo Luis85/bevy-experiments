@@ -583,7 +583,18 @@ fn name_row(p: &mut ChildSpawnerCommands, kind: NameKind, name: &str, tab: i32) 
         ..default()
     })
     .with_children(|r| {
-        let mut field = r.spawn((NameField(kind), ui::text_field(name, tab)));
+        let mut field = r.spawn((
+            NameField(kind),
+            ui::text_field(
+                name,
+                tab,
+                if kind == NameKind::Agent {
+                    "Agent name"
+                } else {
+                    "World name"
+                },
+            ),
+        ));
         if kind == NameKind::Agent {
             field.insert(AutoFocus);
         }
@@ -852,6 +863,16 @@ fn spawn_resume(
                 16.0,
                 NOTE,
             ));
+            let new = button(
+                p,
+                "New agent",
+                None,
+                true,
+                0,
+                Action::Go(Screen::ExplorerNew),
+            );
+            p.commands().entity(new).insert(AutoFocus);
+            focused = true;
         } else {
             p.spawn((
                 Node {
@@ -1642,6 +1663,18 @@ mod tests {
         open(&mut app, Screen::ExplorerResume);
         assert!(resume_buttons(&mut app).is_empty());
         assert!(texts(&mut app).iter().any(|t| t.contains("No agents")));
+        let new = crate::screens::tests::button_for(&mut app, |a| {
+            matches!(a, Action::Go(Screen::ExplorerNew))
+        });
+        app.world_mut()
+            .trigger(bevy::ui_widgets::Activate { entity: new });
+        app.world_mut().flush();
+        app.update();
+        app.update();
+        assert_eq!(
+            *app.world().resource::<State<Screen>>().get(),
+            Screen::ExplorerNew
+        );
         let _ = std::fs::remove_dir_all(&d);
     }
 

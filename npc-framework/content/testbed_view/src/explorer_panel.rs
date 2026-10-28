@@ -2,7 +2,7 @@
 //! memory and proposals, read and written as the player. Present only when
 //! the app inserted [`ExplorerFiles`] (explorer mode).
 //!
-//! - **Tabs** Diary, Memory, Proposals (F7 toggles the panel, Tab cycles the
+//! - **Tabs** Diary, Memory, Proposals (F7 toggles the panel, Ctrl+Tab cycles the
 //!   tabs); a scrollable list, newest first: title, id, created and updated
 //!   stamps, the body, and for a proposal its status with a button per
 //!   status. Below the entries, every file of the book's folder the store
@@ -27,11 +27,11 @@
 //!   after every write, and then once a second; the store re-reads only
 //!   files that changed, so agent writes and hand edits appear within about
 //!   a second.
-//! - **Input.** While one of the panel's text fields has focus
+//! - **Input.** While one of the panel's controls has focus
 //!   ([`editor_typing`]), the game's input ([`ViewSystems::Input`]: camera,
 //!   orders, panel toggles, the app's speed keys) does not run, so typing
-//!   never triggers a game key; Tab moves between the two fields and Escape
-//!   leaves them. While the pointer is over the panel, its clicks and wheel
+//!   never triggers a game key; Tab/Shift+Tab reach fields and Save/Cancel, while Ctrl+Tab
+//!   switches books. Escape leaves an open form without discarding its text. While the pointer is over the panel, its clicks and wheel
 //!   do not reach the world behind it. Copy, cut and paste use the OS
 //!   clipboard ([`crate::field_clipboard`]).
 //!
@@ -43,11 +43,16 @@ use std::time::Duration;
 
 use bevy::ecs::system::SystemParam;
 use bevy::input::mouse::AccumulatedMouseScroll;
+use bevy::input_focus::AcquireFocus;
+use bevy::input_focus::tab_navigation::{NavAction, TabGroup, TabIndex, TabNavigation};
 use bevy::input_focus::{AutoFocus, FocusCause, InputFocus};
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextCursorStyle, TextEdit};
 use bevy::ui::Pressed;
+use bevy::ui::prelude::AccessibleLabel;
+use bevy::ui::{Selectable, Selected as UiSelected};
+use bevy::ui_widgets::ScrollIntoView;
 use bevy::ui_widgets::{
     Activate, Button as WidgetButton, ButtonPlugin, ScrollArea, ScrollAreaPlugin, TextInput,
 };
@@ -197,8 +202,13 @@ enum MapField {
     Z,
     Note,
 }
+/// Focusable notes controls, including form actions; game input stays shielded.
 #[derive(Component)]
-struct FieldOrder(u8);
+pub struct NotesControl;
+
+/// Notes keyboard input precedes game input; hosts gate this alongside game input.
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct NotesInput;
 
 /// The actor owning this host-side folder, with the world's map switch applied.
 pub(crate) fn map_actor(
@@ -286,13 +296,20 @@ pub(crate) fn plugin(app: &mut App) {
     .init_resource::<NotesStores>()
     .add_plugins(crate::field_clipboard::plugin)
     .add_observer(on_activate)
+    .add_observer(acquire_notes_focus)
     .configure_sets(Update, ViewSystems::Input.run_if(not(editor_typing)))
+    .configure_sets(
+        Update,
+        NotesInput
+            .before(ViewSystems::Input)
+            .run_if(not(crate::explorer_modal::modal_open)),
+    )
     .add_systems(Startup, spawn.run_if(resource_exists::<ExplorerFiles>))
     .add_systems(
         Update,
         (
-            keys.in_set(ViewSystems::Input).before(apply_requests),
-            (field_tab.run_if(editor_typing), shield_world).before(ViewSystems::Input),
+            keys.in_set(NotesInput).before(apply_requests),
+            shield_world.before(ViewSystems::Input),
         )
             .run_if(resource_exists::<ExplorerFiles>),
     )
@@ -305,8 +322,11 @@ pub(crate) fn plugin(app: &mut App) {
     );
 }
 
-/// Run condition: one of the panel's text fields has the input focus.
-pub fn editor_typing(focus: Option<Res<InputFocus>>, fields: Query<(), With<NoteField>>) -> bool {
+/// Run condition: a notes control owns keyboard focus, including form actions.
+pub fn editor_typing(
+    focus: Option<Res<InputFocus>>,
+    fields: Query<(), With<NotesControl>>,
+) -> bool {
     focus
         .and_then(|f| f.get())
         .is_some_and(|e| fields.contains(e))
@@ -349,21 +369,35 @@ fn button_node() -> Node {
         padding: UiRect::axes(px(10), px(3)),
         justify_content: JustifyContent::Center,
         border_radius: BorderRadius::all(px(3)),
+        border: UiRect::all(px(1)),
         ..default()
     }
 }
 
 /// A labelled panel button doing `action`.
 fn button(parent: &mut ChildSpawnerCommands, label: &str, action: PanelAction) {
-    parent
-        .spawn((
-            action,
-            button_node(),
-            BackgroundColor(BUTTON),
-            WidgetButton,
-            Hovered::default(),
-        ))
-        .with_child((Text::new(label), font(12.0), TextColor(TEXT)));
+    // The widget's role must win over AccessibleLabel's generic required node.
+    let mut entity = parent.spawn((
+        WidgetButton,
+        action,
+        NotesControl,
+        TabIndex(0),
+        AccessibleLabel::new(match action {
+            PanelAction::Status(id, _) => format!("Mark proposal #{id} {label}"),
+            _ => label.to_owned(),
+        }),
+        button_node(),
+        BackgroundColor(BUTTON),
+        BorderColor::all(Color::NONE),
+        Hovered::default(),
+    ));
+    if matches!(
+        action,
+        PanelAction::Book(_) | PanelAction::Map | PanelAction::Select(_) | PanelAction::Status(..)
+    ) {
+        entity.insert(Selectable);
+    }
+    entity.with_child((Text::new(label), font(12.0), TextColor(TEXT)));
 }
 
 fn spawn(
@@ -378,14 +412,16 @@ fn spawn(
         .spawn((
             Name::new("explorer notes panel"),
             ExplorerPanel,
+            TabGroup::modal(),
             GlobalZIndex(20),
             Hovered::default(),
             BackgroundColor(PANEL),
             Node {
                 position_type: PositionType::Absolute,
                 top: px(10),
-                right: px(10),
-                width: px(560),
+                right: percent(2),
+                width: percent(96),
+                max_width: px(560),
                 max_height: percent(85.0),
                 padding: UiRect::all(px(8)),
                 row_gap: px(6),
@@ -398,6 +434,8 @@ fn spawn(
             panel
                 .spawn(Node {
                     column_gap: px(6),
+                    row_gap: px(4),
+                    flex_wrap: FlexWrap::Wrap,
                     align_items: AlignItems::Center,
                     ..default()
                 })
@@ -407,7 +445,11 @@ fn spawn(
                         button(row, book_label(book), PanelAction::Book(book));
                     }
                     button(row, "Map", PanelAction::Map);
-                    row.spawn((Text::new("Tab: next"), font(11.0), TextColor(DIM)));
+                    row.spawn((
+                        Text::new("Tab: controls  Ctrl+Tab: next book"),
+                        font(11.0),
+                        TextColor(DIM),
+                    ));
                 });
             panel
                 .spawn(Node {
@@ -422,6 +464,7 @@ fn spawn(
                 });
             panel.spawn((
                 FormBox,
+                TabGroup::modal(),
                 ScrollArea,
                 Node {
                     flex_direction: FlexDirection::Column,
@@ -457,20 +500,62 @@ fn on_activate(ev: On<Activate>, actions: Query<&PanelAction>, mut editor: ResMu
     }
 }
 
-/// F7 toggles the panel; Tab shows the next book (game input: not while a
-/// field has focus).
+fn acquire_notes_focus(
+    mut event: On<AcquireFocus>,
+    controls: Query<(), With<NotesControl>>,
+    mut focus: ResMut<InputFocus>,
+) {
+    if controls.contains(event.focused_entity) {
+        event.propagate(false);
+        focus.set(event.focused_entity, FocusCause::Navigated);
+    }
+}
+
+#[derive(SystemParam)]
+struct KeyboardContext<'w, 's> {
+    focus: ResMut<'w, InputFocus>,
+    navigation: TabNavigation<'w, 's>,
+    roots: Query<'w, 's, Entity, With<ExplorerPanel>>,
+    forms: Query<'w, 's, Entity, With<FormBox>>,
+    fields: Query<'w, 's, (), With<NoteField>>,
+    controls: Query<'w, 's, (), With<NotesControl>>,
+    actions: Query<'w, 's, &'static PanelAction>,
+}
+
+/// Standard control traversal; Ctrl+Tab keeps fast book switching available.
 fn keys(
     keys: Option<Res<ButtonInput<KeyCode>>>,
     mut panels: ResMut<TestbedPanels>,
     mut editor: ResMut<NotesEditor>,
     files: Res<ExplorerFiles>,
     context: MapContext,
+    mut keyboard: KeyboardContext,
+    mut commands: Commands,
 ) {
     let Some(keys) = keys else { return };
-    if keys.just_pressed(KeyCode::F7) {
+    let typing = keyboard
+        .focus
+        .get()
+        .is_some_and(|entity| keyboard.fields.contains(entity));
+    if keys.just_pressed(KeyCode::F7) && !typing {
         panels.explorer = !panels.explorer;
+        if !panels.explorer {
+            keyboard.focus.clear();
+        }
     }
-    if panels.explorer && keys.just_pressed(KeyCode::Tab) {
+    if !panels.explorer {
+        return;
+    }
+    if keys.just_pressed(KeyCode::Escape) {
+        keyboard.focus.clear();
+        if editor.form.is_none() && editor.map_form.is_none() {
+            panels.explorer = false;
+        }
+        return;
+    }
+    if keys.just_pressed(KeyCode::Tab)
+        && (keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight))
+    {
         let i = BOOKS.iter().position(|b| *b == editor.book).unwrap_or(0);
         let next = if editor.map {
             PanelAction::Book(Book::Diary)
@@ -480,40 +565,41 @@ fn keys(
             PanelAction::Book(BOOKS[(i + 1) % BOOKS.len()])
         };
         editor.requests.push(next);
+    } else if keys.just_pressed(KeyCode::Tab) {
+        let action = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
+            NavAction::Previous
+        } else {
+            NavAction::Next
+        };
+        let form_open = editor.form.is_some() || editor.map_form.is_some();
+        let in_form = keyboard.focus.get().is_some_and(|entity| {
+            keyboard.fields.contains(entity)
+                || keyboard
+                    .actions
+                    .get(entity)
+                    .is_ok_and(|action| matches!(action, PanelAction::Save | PanelAction::Cancel))
+        });
+        let next = if form_open && !in_form {
+            let Ok(form) = keyboard.forms.single() else {
+                return;
+            };
+            keyboard.navigation.initialize(form, action)
+        } else if keyboard
+            .focus
+            .get()
+            .is_some_and(|entity| keyboard.controls.contains(entity))
+        {
+            keyboard.navigation.navigate(&keyboard.focus, action)
+        } else if let Ok(root) = keyboard.roots.single() {
+            keyboard.navigation.initialize(root, action)
+        } else {
+            return;
+        };
+        if let Ok(entity) = next {
+            keyboard.focus.set(entity, FocusCause::Navigated);
+            commands.trigger(ScrollIntoView { entity });
+        }
     }
-}
-
-/// Tab in a field moves to the other field.
-fn field_tab(
-    keys: Option<Res<ButtonInput<KeyCode>>>,
-    mut focus: ResMut<InputFocus>,
-    fields: Query<(Entity, &FieldOrder), With<NoteField>>,
-) {
-    let Some(keys) = keys else {
-        return;
-    };
-    if !keys.just_pressed(KeyCode::Tab) {
-        return;
-    }
-    let mut fields: Vec<_> = fields
-        .iter()
-        .map(|(entity, order)| (order.0, entity))
-        .collect();
-    fields.sort_by_key(|(order, _)| *order);
-    if fields.is_empty() {
-        return;
-    }
-    let current = fields
-        .iter()
-        .position(|(_, entity)| Some(*entity) == focus.get())
-        .unwrap_or(0);
-    let reverse = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
-    let next = if reverse {
-        (current + fields.len() - 1) % fields.len()
-    } else {
-        (current + 1) % fields.len()
-    };
-    focus.set(fields[next].1, FocusCause::Navigated);
 }
 
 /// While the pointer is over the open panel, its clicks and wheel do not
@@ -591,7 +677,6 @@ fn open_form(commands: &mut Commands, form_box: Entity, title: &str, body: &str)
             form.spawn((Text::new("Title"), font(11.0), TextColor(DIM)));
             form.spawn((
                 TitleField,
-                FieldOrder(0),
                 AutoFocus,
                 field(
                     EditableText {
@@ -599,12 +684,12 @@ fn open_form(commands: &mut Commands, form_box: Entity, title: &str, body: &str)
                         ..EditableText::new(title)
                     },
                     TextLayout::no_wrap(),
+                    "Title",
                 ),
             ));
             form.spawn((Text::new("Body"), font(11.0), TextColor(DIM)));
             form.spawn((
                 BodyField,
-                FieldOrder(1),
                 field(
                     EditableText {
                         allow_newlines: true,
@@ -612,6 +697,7 @@ fn open_form(commands: &mut Commands, form_box: Entity, title: &str, body: &str)
                         ..EditableText::new(body)
                     },
                     TextLayout::default(),
+                    "Body",
                 ),
             ));
             form.spawn(Node {
@@ -625,14 +711,18 @@ fn open_form(commands: &mut Commands, form_box: Entity, title: &str, body: &str)
         });
 }
 
-fn field(mut text: EditableText, layout: TextLayout) -> impl Bundle {
+fn field(mut text: EditableText, layout: TextLayout, label: &str) -> impl Bundle {
     let multiline = text.allow_newlines;
     if !multiline {
         text.visible_lines = Some(1.0);
     }
+    // Keep TextInput before AccessibleLabel so its native role is retained.
     (
-        NoteField,
         TextInput,
+        NoteField,
+        NotesControl,
+        TabIndex(0),
+        AccessibleLabel::new(label),
         text,
         layout,
         font(13.0),
@@ -729,7 +819,7 @@ fn open_map_form(commands: &mut Commands, form_box: Entity, landmark: Option<&La
                     landmark.map(|m| m.note.clone()).unwrap_or_default(),
                 ),
             ];
-            for (i, (key, label, value)) in values.into_iter().enumerate() {
+            for (key, label, value) in values {
                 form.spawn((Text::new(label), font(11.0), TextColor(DIM)));
                 let multiline = key == MapField::Note;
                 let mut text = EditableText {
@@ -741,7 +831,6 @@ fn open_map_form(commands: &mut Commands, form_box: Entity, landmark: Option<&La
                 text.queue_edit(TextEdit::TextStart(false));
                 let mut entity = form.spawn((
                     key,
-                    FieldOrder(i as u8),
                     field(
                         text,
                         if multiline {
@@ -749,6 +838,7 @@ fn open_map_form(commands: &mut Commands, form_box: Entity, landmark: Option<&La
                         } else {
                             TextLayout::no_wrap()
                         },
+                        label,
                     ),
                 ));
                 if key == MapField::Name {
@@ -957,11 +1047,19 @@ fn spawn_map_rows(list: &mut ChildSpawnerCommands, editor: &NotesEditor) {
                 detail.push_str(&format!("  thing: #{}", thing.0));
             }
             row.spawn((
-                PanelAction::Select(landmark.id),
-                button_node(),
                 WidgetButton,
+                PanelAction::Select(landmark.id),
+                NotesControl,
+                TabIndex(0),
+                Selectable,
+                AccessibleLabel::new(format!(
+                    "Select landmark #{} {}",
+                    landmark.id, landmark.name
+                )),
+                button_node(),
                 Hovered::default(),
                 BackgroundColor(Color::NONE),
+                BorderColor::all(Color::NONE),
             ))
             .with_child((
                 RowText,
@@ -1254,8 +1352,9 @@ fn refresh(
     context: MapContext,
     mut focus: Option<ResMut<InputFocus>>,
     form_boxes: Query<Entity, With<FormBox>>,
+    controls: Query<(), With<NotesControl>>,
     mut tabs: Query<
-        (&PanelAction, &mut Node),
+        (Entity, &PanelAction, &mut Node, Has<TabIndex>),
         (
             Without<ExplorerPanel>,
             Without<FormBox>,
@@ -1267,9 +1366,15 @@ fn refresh(
     // gated while the prompt modal is open and `--panels explorer` must
     // still show the panel then.
     let map_on = context.actor(&files).is_some();
-    for (action, mut node) in &mut tabs {
+    for (entity, action, mut node, tabbable) in &mut tabs {
         if *action == PanelAction::Map {
             node.display = if map_on { Display::Flex } else { Display::None };
+            if map_on && !tabbable {
+                commands.entity(entity).insert(TabIndex(0));
+            }
+            if !map_on && tabbable {
+                commands.entity(entity).remove::<TabIndex>();
+            }
         }
     }
     if editor.map && !map_on {
@@ -1320,6 +1425,12 @@ fn refresh(
     let opened = panels.explorer && !state.was_open;
     state.was_open = panels.explorer;
     if !panels.explorer {
+        if let Some(focus) = focus.as_deref_mut() {
+            // An invisible panel must not keep shielding the world's keyboard.
+            if focus.get().is_some_and(|entity| controls.contains(entity)) {
+                focus.clear();
+            }
+        }
         return;
     }
     let due = state.timer.tick(time.delta()).just_finished();
@@ -1404,14 +1515,20 @@ fn spawn_row(list: &mut ChildSpawnerCommands, book: Book, note: &Note) {
     ))
     .with_children(|row| {
         row.spawn((
+            WidgetButton,
             PanelAction::Select(note.id),
+            NotesControl,
+            TabIndex(0),
+            Selectable,
+            AccessibleLabel::new(format!("Select entry #{} {}", note.id, note.title)),
             Node {
                 padding: UiRect::axes(px(3), px(1)),
                 border_radius: BorderRadius::all(px(3)),
+                border: UiRect::all(px(1)),
                 ..default()
             },
             BackgroundColor(Color::NONE),
-            WidgetButton,
+            BorderColor::all(Color::NONE),
             Hovered::default(),
         ))
         .with_child((
@@ -1446,15 +1563,21 @@ fn spawn_row(list: &mut ChildSpawnerCommands, book: Book, note: &Note) {
 /// Button colours: pressed, hovered, the active tab / selected entry /
 /// current status, else plain.
 fn paint(
+    mut commands: Commands,
+    focus: Res<InputFocus>,
     editor: Res<NotesEditor>,
     mut buttons: Query<(
+        Entity,
         &PanelAction,
         &mut BackgroundColor,
+        &mut BorderColor,
         Option<&Hovered>,
         Has<Pressed>,
+        Has<UiSelected>,
     )>,
+    mut fields: Query<(Entity, &mut BorderColor), (With<NoteField>, Without<PanelAction>)>,
 ) {
-    for (action, mut bg, hovered, pressed) in &mut buttons {
+    for (entity, action, mut bg, mut border, hovered, pressed, selected) in &mut buttons {
         let (active, plain) = match *action {
             PanelAction::Book(b) => (!editor.map && b == editor.book, BUTTON),
             PanelAction::Map => (editor.map, BUTTON),
@@ -1491,6 +1614,25 @@ fn paint(
         if bg.0 != color {
             bg.0 = color;
         }
+        border.set_if_neq(BorderColor::all(if focus.get() == Some(entity) {
+            NOTE
+        } else {
+            Color::NONE
+        }));
+        if active != selected {
+            if active {
+                commands.entity(entity).insert(UiSelected);
+            } else {
+                commands.entity(entity).remove::<UiSelected>();
+            }
+        }
+    }
+    for (entity, mut border) in &mut fields {
+        border.set_if_neq(BorderColor::all(if focus.get() == Some(entity) {
+            NOTE
+        } else {
+            BORDER
+        }));
     }
 }
 
@@ -1531,7 +1673,21 @@ mod tests {
                 dir: dir.to_path_buf(),
             })
             .insert_resource(NotesClock(fixed_date))
-            .add_plugins(plugin);
+            .add_plugins(plugin)
+            // This headless fixture has no renderer/visibility propagation.
+            // Supply the UI visibility that native tab navigation reads.
+            .add_systems(
+                PostUpdate,
+                |mut nodes: Query<(&Node, &mut InheritedVisibility)>| {
+                    for (node, mut visible) in &mut nodes {
+                        *visible = if node.display == Display::None {
+                            InheritedVisibility::HIDDEN
+                        } else {
+                            InheritedVisibility::VISIBLE
+                        };
+                    }
+                },
+            );
         app.update();
         app
     }
@@ -1750,13 +1906,7 @@ mod tests {
             .resource_mut::<InputFocus>()
             .set(name, FocusCause::Navigated);
         let before = app.world().resource::<InputRuns>().0;
-        for expected in [
-            MapField::Kind,
-            MapField::X,
-            MapField::Z,
-            MapField::Note,
-            MapField::Name,
-        ] {
+        for expected in [MapField::Kind, MapField::X, MapField::Z, MapField::Note] {
             let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
             keys.reset_all();
             keys.press(KeyCode::Tab);
@@ -1768,6 +1918,26 @@ mod tests {
             );
             assert!(editor(&app).map);
         }
+        for action in [PanelAction::Save, PanelAction::Cancel] {
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::Tab);
+            app.update();
+            let focused = app.world().resource::<InputFocus>().get().unwrap();
+            assert_eq!(app.world().get::<PanelAction>(focused), Some(&action));
+            assert!(editor(&app).map);
+        }
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Tab);
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(name));
         assert_eq!(app.world().resource::<InputRuns>().0, before);
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -1778,12 +1948,18 @@ mod tests {
         act(&mut app, PanelAction::Book(Book::Proposals));
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::ControlLeft);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::Tab);
         app.update();
         assert!(editor(&app).map);
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
             .reset_all();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::ControlLeft);
         app.world_mut()
             .resource_mut::<ButtonInput<KeyCode>>()
             .press(KeyCode::Tab);
@@ -2066,6 +2242,281 @@ mod tests {
     }
 
     #[test]
+    fn accessible_names_preserve_native_widget_roles() {
+        use bevy::a11y::AccessibilityNode;
+        let dir = tmp("accessible-roles");
+        let mut app = app(&dir);
+        let bare_button = app.world_mut().spawn(WidgetButton).id();
+        let bare_field = app.world_mut().spawn(TextInput).id();
+        let button_role = app
+            .world()
+            .get::<AccessibilityNode>(bare_button)
+            .unwrap()
+            .role();
+        let field_role = app
+            .world()
+            .get::<AccessibilityNode>(bare_field)
+            .unwrap()
+            .role();
+        act(&mut app, PanelAction::Add);
+        for (entity, action) in app
+            .world_mut()
+            .query::<(Entity, &PanelAction)>()
+            .iter(app.world())
+        {
+            assert_eq!(
+                app.world().get::<AccessibilityNode>(entity).unwrap().role(),
+                button_role,
+                "{action:?}"
+            );
+        }
+        for entity in [field::<TitleField>(&mut app), field::<BodyField>(&mut app)] {
+            assert_eq!(
+                app.world().get::<AccessibilityNode>(entity).unwrap().role(),
+                field_role
+            );
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn keyboard_tab_reaches_panel_actions_and_named_fields() {
+        use bevy::ui::prelude::AccessibleLabel;
+        let dir = tmp("keyboard-actions");
+        let mut app = app(&dir);
+        for expected in [
+            PanelAction::Book(Book::Diary),
+            PanelAction::Book(Book::Memory),
+            PanelAction::Book(Book::Proposals),
+            PanelAction::Add,
+            PanelAction::Edit,
+        ] {
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::Tab);
+            app.update();
+            let entity = app
+                .world()
+                .resource::<InputFocus>()
+                .get()
+                .expect("Tab focuses a control");
+            assert_eq!(app.world().get::<PanelAction>(entity), Some(&expected));
+            assert!(
+                !app.world()
+                    .get::<AccessibleLabel>(entity)
+                    .unwrap()
+                    .0
+                    .is_empty()
+            );
+        }
+        act(&mut app, PanelAction::Add);
+        let title = field::<TitleField>(&mut app);
+        let body = field::<BodyField>(&mut app);
+        assert_eq!(
+            app.world().get::<AccessibleLabel>(title).unwrap().0,
+            "Title"
+        );
+        assert_eq!(app.world().get::<AccessibleLabel>(body).unwrap().0, "Body");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn keyboard_form_traversal_reaches_save_cancel_and_keeps_game_input_blocked() {
+        let dir = tmp("keyboard-form");
+        let mut app = app(&dir);
+        app.init_resource::<InputRuns>()
+            .add_systems(Update, count_input.in_set(ViewSystems::Input));
+        act(&mut app, PanelAction::Add);
+        let title = field::<TitleField>(&mut app);
+        let body = field::<BodyField>(&mut app);
+        let action_entity = |app: &mut App, action| {
+            app.world_mut()
+                .query::<(Entity, &PanelAction)>()
+                .iter(app.world())
+                .find(|(_, candidate)| **candidate == action)
+                .unwrap()
+                .0
+        };
+        let save = action_entity(&mut app, PanelAction::Save);
+        let cancel = action_entity(&mut app, PanelAction::Cancel);
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(title, FocusCause::Navigated);
+        app.update();
+        let before = app.world().resource::<InputRuns>().0;
+        for expected in [body, save, cancel, title] {
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::Tab);
+            app.update();
+            assert_eq!(app.world().resource::<InputFocus>().get(), Some(expected));
+            assert_eq!(app.world().resource::<InputRuns>().0, before);
+            assert_eq!(
+                *app.world().get::<BorderColor>(expected).unwrap(),
+                BorderColor::all(NOTE)
+            );
+        }
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::ShiftLeft);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Tab);
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(cancel));
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn keyboard_enter_saves_and_cancels_through_the_native_button_observer() {
+        use bevy::input::ButtonState;
+        use bevy::input::keyboard::{Key, KeyboardInput};
+        use bevy::input_focus::FocusedInput;
+        let dir = tmp("keyboard-enter");
+        let mut app = app(&dir);
+        for action in [PanelAction::Save, PanelAction::Cancel] {
+            act(&mut app, PanelAction::Add);
+            type_into::<TitleField>(&mut app, "Keyboard note");
+            type_into::<BodyField>(&mut app, "Preserved body");
+            let entity = app
+                .world_mut()
+                .query::<(Entity, &PanelAction)>()
+                .iter(app.world())
+                .find(|(_, candidate)| **candidate == action)
+                .unwrap()
+                .0;
+            app.world_mut()
+                .resource_mut::<InputFocus>()
+                .set(entity, FocusCause::Navigated);
+            app.world_mut().trigger(FocusedInput::new(
+                entity,
+                KeyboardInput {
+                    key_code: KeyCode::Enter,
+                    logical_key: Key::Enter,
+                    state: ButtonState::Pressed,
+                    text: None,
+                    repeat: false,
+                    window: Entity::PLACEHOLDER,
+                },
+                Entity::PLACEHOLDER,
+            ));
+            app.world_mut().flush();
+            app.update();
+            assert!(editor(&app).form.is_none());
+            assert_eq!(
+                list(&mut app, &dir, Book::Diary).len(),
+                1,
+                "Cancel must not add a second entry"
+            );
+        }
+        assert_eq!(list(&mut app, &dir, Book::Diary)[0].body, "Preserved body");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn prompt_modal_and_hidden_panel_do_not_leak_notes_keyboard_focus() {
+        let dir = tmp("keyboard-modal");
+        let mut app = app(&dir);
+        let modal = crate::explorer_modal::PromptModal {
+            open: true,
+            ..default()
+        };
+        app.insert_resource(modal);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F7);
+        app.update();
+        assert!(
+            app.world().resource::<TestbedPanels>().explorer,
+            "modal shields F7"
+        );
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        app.world_mut()
+            .resource_mut::<crate::explorer_modal::PromptModal>()
+            .open = false;
+        act(&mut app, PanelAction::Add);
+        let title = field::<TitleField>(&mut app);
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(title, FocusCause::Navigated);
+        app.world_mut().resource_mut::<TestbedPanels>().explorer = false;
+        app.update();
+        assert!(app.world().resource::<InputFocus>().get().is_none());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn escape_and_header_focus_keep_the_draft_and_tab_returns_to_the_open_form() {
+        use bevy::input::ButtonState;
+        use bevy::input::keyboard::{Key, KeyboardInput};
+        use bevy::input_focus::FocusedInput;
+        let dir = tmp("keyboard-draft");
+        let mut app = app(&dir);
+        act(&mut app, PanelAction::Add);
+        type_into::<TitleField>(&mut app, "Pending title");
+        type_into::<BodyField>(&mut app, "Pending body");
+        let title = field::<TitleField>(&mut app);
+        let header = app
+            .world_mut()
+            .query::<(Entity, &PanelAction)>()
+            .iter(app.world())
+            .find(|(_, action)| **action == PanelAction::Book(Book::Diary))
+            .unwrap()
+            .0;
+        for focused in [title, header] {
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+            app.world_mut()
+                .resource_mut::<InputFocus>()
+                .set(focused, FocusCause::Navigated);
+            if focused == title {
+                app.world_mut().trigger(FocusedInput::new(
+                    title,
+                    KeyboardInput {
+                        key_code: KeyCode::Escape,
+                        logical_key: Key::Escape,
+                        state: ButtonState::Pressed,
+                        text: None,
+                        repeat: false,
+                        window: Entity::PLACEHOLDER,
+                    },
+                    Entity::PLACEHOLDER,
+                ));
+                app.world_mut()
+                    .resource_mut::<ButtonInput<KeyCode>>()
+                    .press(KeyCode::Escape);
+                app.world_mut().flush();
+                app.update();
+                assert!(app.world().resource::<InputFocus>().get().is_none());
+            }
+            assert!(editor(&app).form.is_some());
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::Tab);
+            app.update();
+            assert_eq!(app.world().resource::<InputFocus>().get(), Some(title));
+            assert_eq!(value::<TitleField>(&mut app), "Pending title");
+            assert_eq!(value::<BodyField>(&mut app), "Pending body");
+        }
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn typing_in_the_editor_blocks_game_keys() {
         let dir = tmp("typing");
         let mut app = app(&dir);
@@ -2101,6 +2552,9 @@ mod tests {
         assert_eq!(app.world().resource::<InputFocus>().get(), Some(body));
         assert_eq!(editor(&app).book, Book::Diary);
         // Focus leaves the field: the game's keys work again.
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
         app.world_mut().resource_mut::<InputFocus>().clear();
         app.update();
         assert!(app.world().resource::<InputRuns>().0 > runs);
@@ -2108,13 +2562,16 @@ mod tests {
     }
 
     #[test]
-    fn tab_cycles_the_books_and_f7_toggles() {
+    fn ctrl_tab_cycles_the_books_and_f7_toggles() {
         let dir = tmp("tab");
         let mut app = app(&dir);
         let press = |app: &mut App, key| {
             let mut keys = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
             keys.release_all();
             keys.clear();
+            if key == KeyCode::Tab {
+                keys.press(KeyCode::ControlLeft);
+            }
             keys.press(key);
             app.update();
         };

@@ -604,6 +604,11 @@ the world cannot revive an old expected stamp. Return the exact opaque `updated`
 They check ID/revision exhaustion instead of wrapping. Byte identities detect equal-size
 edits with restored mtimes and guard old-source deletion during rename/migration cleanup.
 
+F7 supports Tab/Shift+Tab traversal through all controls, including Save/Cancel, and Enter/Space activation.
+Ctrl+Tab switches books; Escape leaves an open form without losing its draft. Focus scrolls into view and
+blocks world shortcuts. Hosts with modal input gates must gate `testbed_view::NotesInput` alongside
+`ViewSystems::Input`; the explorer close dialog and prompt modal already do this.
+
 With a perception provider (`omniscient: false`), affordances only target entities the unit perceives, remembers
 (last-known position), holds or rides, plus imperceptible things (no `Perceivable`) within 1.5 m (touch); there
 is no distance cut-off for them (a far one says `why_not: "too far: 12.0 m (reach 1.5 m)"`). Without perception,

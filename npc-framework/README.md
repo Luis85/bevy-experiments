@@ -32,7 +32,7 @@ a headless CLI, a JSON-RPC interface on the running game, a journal of every dec
 - **Entity reference**: one page per ECS [component](docs/entities/components/index.md) (fields and units, who
   adds, reads and writes it, hashed and/or saved in world snapshots) and per [system](docs/entities/systems/index.md)
   (schedule and set, reads/writes, determinism, perf mechanic).
-- Decisions: [`docs/adr/`](docs/adr/) (0001–0019). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
+- Decisions: [`docs/adr/`](docs/adr/) (0001–0020). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
   `docs/superpowers/`. Benchmarks: [`bench/README.md`](bench/README.md). Agent workflow: [`CLAUDE.md`](CLAUDE.md).
 
 ## Features
@@ -298,6 +298,11 @@ opens its Map tab when enabled.
 | F7 / F8 / F9 (explorer) | notebooks and Map / fog toggle / save and move to detached |
 | Space / `.` / `-` `=` | pause / one tick / slower, faster (1×, 3×, 10×) |
 | WASD, Q / E, PgUp / PgDn, wheel, F | pan, orbit, tilt, zoom, focus the selection |
+
+In F7, Tab/Shift+Tab move through controls and form actions; Enter/Space activate a focused button.
+Ctrl+Tab switches books. Escape leaves a field while retaining its draft; Cancel explicitly discards it.
+Focused controls scroll into view and shield world shortcuts. Worlds also guards Back, Escape and window
+close against unsaved edits, and reloads the selected file before establishing its save baseline.
 
 ## Portability: the RTS units demo
 
