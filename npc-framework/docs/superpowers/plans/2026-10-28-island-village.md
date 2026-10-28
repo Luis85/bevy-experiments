@@ -17,3 +17,8 @@
 8. Review invariants and failure paths, exercise an agent earning/spending loop and death/succession, inspect
    native captures, then run the full gate. Record evidence, make the local feature commit/merge and build
    all five release apps on main. Preserve the user's pre-existing MCP host; do not push or open a PR.
+
+Completed: all eight steps, including the reviewed/polished native surface and host-reset supervision.
+The final full gate returned `ok: true` (1,306 tests passed, 12 skipped); all five locked release binaries
+built on local main merge `2fda2f0`. Exact evidence and remaining integration boundaries are recorded in
+`docs/_notes/island-village-evidence.md` and `docs/_notes/island-village-ui-documentation.md`.

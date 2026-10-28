@@ -106,6 +106,22 @@ ran beside it.
 No verification tool was skipped. Reported test skips/ignored cases and nextest's leaky/slow classifications
 are retained above; no assertions, protected files, snapshots, replays or existing budgets were relaxed.
 
+## Local integration and releases
+
+Feature commit **6659837** was merged locally to `main` with **2fda2f0** (`--no-ff`). Only NPC Framework
+paths were staged and committed. Unrelated Terra working changes remain outside these commits; no push
+or pull request was made.
+
+On that merge, the command below completed successfully, exit **0**, in **6m 50s**:
+
+```text
+cargo build --locked --release -p actor_testbed -p village -p rts_units_demo -p game_menu -p npcctl --bins
+```
+
+Log: `target/island-main-release.log`; exit: `target/island-main-release.exit`. All five release binaries
+are present. This build is compilation evidence; native rendering/interaction evidence is the opened
+capture matrix and recorded-command checks above. The remaining documentation commit changes no code.
+
 ## Boundaries
 
 Physical keyboard/mouse input, OS screen-reader announcements and authenticated provider continuation
