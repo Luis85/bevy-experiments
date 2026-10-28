@@ -693,10 +693,17 @@ fn on_vehicle_ready(
 }
 
 /// Despawns visuals whose sim entity is gone.
-fn despawn_visuals(
+type VisualSimKinds = Or<(
+    With<Prop>,
+    With<Item>,
+    With<TestbedUnit>,
+    With<testbed_content::village::VillagePlace>,
+    With<testbed_content::village::ResourcePatch>,
+)>;
+pub(crate) fn despawn_visuals(
     mut commands: Commands,
     mut index: ResMut<VisualIndex>,
-    sims: Query<(), Or<(With<Prop>, With<Item>, With<TestbedUnit>)>>,
+    sims: Query<(), VisualSimKinds>,
     visuals: Query<(), With<VisualOf>>,
 ) {
     index.map.retain(|&sim, &mut visual| {
@@ -1004,9 +1011,17 @@ impl ItemLook {
                 Some((Quat::from_rotation_y(PI), Vec3::new(0.0, -0.18, 0.0))),
             ),
             STORE_KEY => (|m| &m.key, 0.5, flat_x, 0.08, None),
-            BOOK => (|m| &m.book, V, Quat::from_rotation_z(PI / 2.0), 0.13, None),
+            BOOK | testbed_content::village::catalog::DIARY => {
+                (|m| &m.book, V, Quat::from_rotation_z(PI / 2.0), 0.13, None)
+            }
             SCROLL => (|m| &m.scroll, 1.5 * V, upright, 0.0, None),
-            BREAD => (|m| &m.food, 0.5 * V, upright, 0.0, None),
+            BREAD | testbed_content::village::catalog::BOWL => {
+                (|m| &m.food, 0.5 * V, upright, 0.0, None)
+            }
+            testbed_content::village::catalog::WATER => {
+                (|m| &m.barrel, 0.4 * V, upright, 0.0, None)
+            }
+            testbed_content::village::catalog::COINS => (|m| &m.ingot, 0.5 * V, upright, 0.0, None),
             LOG => (|m| &m.log, 2.0 * V, upright, 0.11, None),
             PLANK => (|m| &m.planks, 2.0 * V, upright, 0.0, None),
             ORE => (|m| &m.stone, 1.4 * V, upright, 0.0, None),
@@ -1130,6 +1145,45 @@ mod tests {
     use testbed_content::layout::{cart_vehicle, wagon_vehicle};
 
     use super::*;
+
+    #[test]
+    fn village_buildings_and_patches_survive_visual_cleanup_until_the_sim_entity_is_removed() {
+        use testbed_content::village::{ResourcePatch, VillagePlace};
+        let mut app = testbed_content::new_sim_app(3, "ai_village");
+        app.init_resource::<VisualIndex>()
+            .add_systems(Update, despawn_visuals);
+        let targets: Vec<_> = app
+            .world_mut()
+            .query_filtered::<Entity, Or<(With<VillagePlace>, With<ResourcePatch>)>>()
+            .iter(app.world())
+            .collect();
+        assert_eq!(targets.len(), 13);
+        let mut roots = Vec::new();
+        for sim in targets {
+            let root = app.world_mut().spawn(VisualOf(sim)).id();
+            app.world_mut()
+                .resource_mut::<VisualIndex>()
+                .map
+                .insert(sim, root);
+            roots.push((sim, root));
+        }
+        app.update();
+        assert!(
+            roots
+                .iter()
+                .all(|(_, root)| app.world().get_entity(*root).is_ok())
+        );
+        let (sim, root) = roots[0];
+        app.world_mut().despawn(sim);
+        app.update();
+        assert!(app.world().get_entity(root).is_err());
+        assert!(!app.world().resource::<VisualIndex>().map.contains_key(&sim));
+        assert!(
+            roots[1..]
+                .iter()
+                .all(|(_, root)| app.world().get_entity(*root).is_ok())
+        );
+    }
 
     use npc_framework::interaction::items::{place_in_world, put_in_inventory, put_in_slot};
     use npc_framework::perception::{ExploredCells, RevealsFog, SeenStatics, VisibleCells};

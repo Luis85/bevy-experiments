@@ -81,6 +81,7 @@ impl Default for DomainTags {
             tags.system(prefix, Simulation);
         }
         tags.system("npc_view_helpers", Presentation);
+        tags.system("npc_agent_io::scheduler", Platform);
         tags.system("npc_view_helpers::perf_runtime", Platform)
             .system("npc_view_helpers::timing", Platform);
         for module in ["perf_panel", "journal_panel", "command_ui", "driver_ui"] {

@@ -15,7 +15,7 @@ use testbed_content::worlds::{self, WorldPreset};
 use crate::screens::Screen;
 use crate::{AppSettings, ui};
 
-const PAGES: [&str; 7] = [
+const PAGES: [&str; 8] = [
     "Identity",
     "Hunger",
     "Thirst",
@@ -23,6 +23,7 @@ const PAGES: [&str; 7] = [
     "Battery",
     "Environment",
     "Systems",
+    "AI scheduler",
 ];
 const NEEDS: [&str; 4] = ["hunger", "thirst", "energy", "battery"];
 
@@ -56,11 +57,10 @@ impl Draft {
             }
         }
         let mut values = BTreeMap::new();
-        flatten(
-            "",
-            &serde_json::to_value(preset).expect("WorldPreset serializes"),
-            &mut values,
-        );
+        let mut value = serde_json::to_value(preset).expect("WorldPreset serializes");
+        value["ai_scheduler"] =
+            serde_json::to_value(&preset.ai_scheduler).expect("scheduler policy serializes");
+        flatten("", &value, &mut values);
         Self { values }
     }
     fn text(&self, key: &str) -> &str {
@@ -69,6 +69,9 @@ impl Draft {
     fn parse(&self) -> Result<WorldPreset, Vec<String>> {
         let mut value =
             serde_json::to_value(worlds::plain_preset()).expect("WorldPreset serializes");
+        value["scene"] = "explorer".into();
+        value["ai_scheduler"] = serde_json::to_value(worlds::plain_preset().ai_scheduler)
+            .expect("scheduler policy serializes");
         let mut errors = Vec::new();
         for (key, text) in &self.values {
             let pointer = format!("/{}", key.replace('.', "/"));
@@ -702,6 +705,9 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
     let d = &editor.draft;
     match editor.page {
         0 => {
+            if d.text("scene") == "island_village" {
+                p.spawn(ui::label("Island village: nine residents, production and trade, seasons and permanent actor lives.",12.0,ui::DIM));
+            }
             field(
                 p,
                 d,
@@ -778,7 +784,7 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                 false,
             );
         }
-        _ => {
+        6 => {
             for (i, (key, label)) in [
                 ("crafting", "Crafting"),
                 ("vehicles", "Vehicles"),
@@ -808,6 +814,56 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                 false,
             );
         }
+        7 => {
+            toggle(
+                p,
+                d,
+                "ai_scheduler.enabled",
+                "Resume idle AI CLI sessions",
+                200,
+            );
+            toggle(
+                p,
+                d,
+                "ai_scheduler.skip_paused",
+                "Wait while the game is paused",
+                201,
+            );
+            for (i, (key, label)) in [
+                (
+                    "idle_seconds",
+                    "Idle before a nudge (real seconds, 5..86400)",
+                ),
+                (
+                    "cooldown_seconds",
+                    "Cooldown after a turn (seconds, 5..86400)",
+                ),
+                ("poll_seconds", "Activity check interval (seconds, 1..30)"),
+                ("max_nudges_per_hour", "Nudges per agent per hour (1..60)"),
+                (
+                    "runner_timeout_seconds",
+                    "Stop an owned nudge after (seconds, 10..3600)",
+                ),
+                (
+                    "max_concurrent",
+                    "Concurrent continuation turns in this scene (1..4)",
+                ),
+            ]
+            .iter()
+            .enumerate()
+            {
+                field(
+                    p,
+                    d,
+                    &format!("ai_scheduler.{key}"),
+                    label,
+                    202 + i as i32,
+                    false,
+                );
+            }
+            p.spawn(ui::label("Link an exact Codex/Claude CLI session with npcctl scheduler bind after the agent connects. Session IDs, programs and workspaces stay in operator-owned host settings, separate from the world preset.",12.0,ui::DIM));
+        }
+        _ => {}
     }
 }
 type StatusFilter = Or<(With<Destination>, With<Status>)>;
@@ -1161,7 +1217,23 @@ mod tests {
             .set(Screen::Worlds);
         app.update();
         app.update();
-        assert_eq!(app.world().resource::<WorldEditor>().entries.len(), 4);
+        assert_eq!(
+            app.world().resource::<WorldEditor>().entries.len(),
+            worlds::BUILTIN_PRESETS.len() + 1,
+            "all shipped presets plus the invalid user file remain visible"
+        );
+        assert!(
+            app.world()
+                .resource::<WorldEditor>()
+                .entries
+                .iter()
+                .any(|entry| {
+                    entry
+                        .path
+                        .file_stem()
+                        .is_some_and(|id| id == "island_village")
+                })
+        );
         let entity = app
             .world_mut()
             .query::<(Entity, &Field)>()

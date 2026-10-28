@@ -151,6 +151,15 @@ pub fn apply_senses(
         .and_then(|ids| ids.get(actor))
         .and_then(|id| world.resource::<SimIndex>().get(id))
         .ok_or_else(|| format!("the explorer world has no actor named `{actor}`"))?;
+    if world
+        .get::<crate::village::Vitality>(entity)
+        .is_some_and(|v| v.died_at.is_some())
+    {
+        world
+            .entity_mut(entity)
+            .remove::<(RevealsFog, ReachSense)>();
+        return Ok(());
+    }
     let mut actor = world.entity_mut(entity);
     if reveals_fog {
         actor.insert(RevealsFog);

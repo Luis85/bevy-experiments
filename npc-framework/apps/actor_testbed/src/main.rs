@@ -346,6 +346,9 @@ fn host(app: &mut App, args: &Args) {
     // (`perf::install_log_plugin_now`).
     #[cfg(feature = "debug-tools")]
     let plugins = plugins.disable::<bevy::log::LogPlugin>();
+    if let Some(camera) = args.camera {
+        app.insert_resource(CameraStart(camera));
+    }
     app.add_plugins(plugins)
         .add_plugins(NpcDriverPlugin::new(TICK_HZ, Update))
         .insert_resource(SimControl {
@@ -359,7 +362,6 @@ fn host(app: &mut App, args: &Args) {
             player: PlayerId(args.player),
             ..default()
         })
-        .insert_resource(CameraStart(args.camera.unwrap_or_default()))
         .insert_resource(FogOfWar {
             enabled: fog_enabled(args.fog, args.explorer.is_some()),
         })
@@ -698,6 +700,14 @@ mod debug_tools {
         };
         app.add_plugins(
             NpcPerfPlugin::new()
+                .domain(
+                    "testbed_view::village::",
+                    npc_framework::perf::PerfDomain::UserInterface,
+                )
+                .domain(
+                    "testbed_view::village::background",
+                    npc_framework::perf::PerfDomain::Platform,
+                )
                 .domain(
                     "testbed_content",
                     npc_framework::perf::PerfDomain::Simulation,

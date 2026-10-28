@@ -26,11 +26,15 @@ pub(crate) fn plugin(app: &mut App) {
 }
 
 fn spawn_ground(
+    village: Option<Res<testbed_content::village::VillageState>>,
     mut commands: Commands,
     assets: Option<Res<ViewAssets>>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    if village.is_some() {
+        return;
+    }
     let texture = assets.as_ref().map(|a| a.grass.clone());
     commands.spawn((
         Name::new("ground"),
@@ -67,7 +71,14 @@ fn spawn_ground(
 /// View-only dressing (no sim entity): barrels and crates in the store and
 /// rocks outside the walls. Kept off every cell actors use. Fogged by its
 /// cell like the statics (it never changes).
-fn spawn_dressing(mut commands: Commands, assets: Option<Res<ViewAssets>>) {
+fn spawn_dressing(
+    mut commands: Commands,
+    assets: Option<Res<ViewAssets>>,
+    village: Option<Res<testbed_content::village::VillageState>>,
+) {
+    if village.is_some() {
+        return;
+    }
     let Some(assets) = assets else { return };
     let m = &assets.models;
     let items = [

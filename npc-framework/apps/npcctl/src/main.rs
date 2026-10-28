@@ -8,6 +8,7 @@
 
 mod agent;
 mod explorer;
+mod scheduler;
 mod sim;
 
 use std::collections::VecDeque;
@@ -165,6 +166,9 @@ enum Cmd {
                       Prints {\"listening\": url, ..} once ready; `npcctl session stop` ends it."
     )]
     Serve(agent::ServeArgs),
+    /// Configure resumable AI CLI nudges for an idle actor, or inspect the host scheduler.
+    #[command(subcommand)]
+    Scheduler(scheduler::SchedulerCmd),
     /// Control units of a running session or game (one JSON-RPC call per invocation).
     Agent {
         #[command(flatten)]
@@ -242,6 +246,7 @@ impl std::fmt::Debug for Cmd {
             Self::Diverge(args) => f.debug_tuple("Diverge").field(args).finish(),
             Self::Bench(args) => f.debug_tuple("Bench").field(args).finish(),
             Self::Serve(args) => f.debug_tuple("Serve").field(args).finish(),
+            Self::Scheduler(args) => f.debug_tuple("Scheduler").field(args).finish(),
             Self::Agent { client, cmd } => f
                 .debug_struct("Agent")
                 .field("client", client)
@@ -572,6 +577,7 @@ fn main() -> ExitCode {
         Cmd::Bench(a) => cmd_bench(a, collector.as_ref().expect("bench collector"), &mut out),
         Cmd::Replay(ReplayCmd::VerifySession { file }) => agent::cmd_verify_session(file, &mut out),
         Cmd::Serve(a) => agent::cmd_serve(a, &mut out),
+        Cmd::Scheduler(cmd) => scheduler::run(cmd, &mut out),
         Cmd::Agent { client, cmd } => agent::cmd_agent(cmd, client, &mut out),
         Cmd::AgentToken(cmd) => agent::cmd_agent_token(cmd, &mut out),
         Cmd::World { client, cmd } => agent::cmd_world(cmd, client, &mut out),

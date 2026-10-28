@@ -211,6 +211,7 @@ pub fn save_now(world: &mut World, dir: &AgentDir, now: &str) -> Result<(), Stri
 
 /// Saves the sim state of `world` with `header` to `path` (atomically).
 fn write_save(world: &mut World, path: &Path, header: Map<String, Value>) -> Result<(), String> {
+    crate::village::host::frame(world);
     let mut snap = snapshot::save(world)?;
     snap.header = header;
     snapshot::write_atomic(path, &snap)
@@ -1026,6 +1027,7 @@ fn begin(mut app: App, mut session: ExplorerSession) -> Result<App, String> {
     session.meta.agent_id = meta.agent_id;
     session.meta.token = meta.token;
     let source = CredentialFile {
+        assigned,
         dir: session.dir.clone(),
         agent_id: session.meta.agent_id.clone(),
         agent: session.meta.agent.clone(),
@@ -1047,6 +1049,15 @@ fn begin(mut app: App, mut session: ExplorerSession) -> Result<App, String> {
     registration::set_enter_world(world, enter_world);
     world.insert_resource(source);
     world.insert_resource(session);
+    let path = world
+        .resource::<ExplorerSession>()
+        .dir
+        .dir
+        .parent()
+        .ok_or("agent folder has no parent")?
+        .join(".ai-scheduler")
+        .join(npc_framework::agent_io::scheduler::BINDINGS_FILE);
+    npc_framework::agent_io::scheduler::configure_host(world, path);
     Ok(app)
 }
 
@@ -1070,6 +1081,7 @@ fn cancel_pending_for_actor(world: &mut World, assigned: SimId) {
                         | "AgentAct"
                         | "AgentCancel"
                         | "AgentClear"
+                        | "VillageAct"
                 ) && payload.get("unit").and_then(Value::as_u64)
                     == Some(u64::from(assigned.0)) =>
             {
@@ -1105,6 +1117,7 @@ fn cancel_pending_for_actor(world: &mut World, assigned: SimId) {
 
 #[derive(Resource)]
 struct CredentialFile {
+    assigned: SimId,
     dir: AgentDir,
     agent_id: String,
     agent: String,
@@ -1118,6 +1131,7 @@ fn reload_credentials(world: &mut World) {
     };
     if home::credential_stamp(&source.dir).ok().as_ref() == source.stamp.as_ref()
         && source.stamp.is_some()
+        && world.resource::<TestbedIds>().get(&source.agent) == Some(source.assigned)
     {
         world.insert_resource(source);
         return;
@@ -1130,6 +1144,7 @@ fn reload_credentials(world: &mut World) {
                 && meta.world == source.world =>
         {
             if let Some(assigned) = world.resource::<TestbedIds>().get(&source.agent) {
+                source.assigned = assigned;
                 registration::set_credential(
                     world,
                     source.agent_id.clone(),
@@ -1154,6 +1169,23 @@ fn reload_credentials(world: &mut World) {
         }
     }
     world.insert_resource(source);
+}
+
+/// A permanent village death may be followed by a different actor, never by reviving the corpse.
+/// Re-read current credentials rather than reinstalling a stale token from a session clone.
+pub fn refresh_village_assignment(world: &mut World) {
+    if world
+        .get_resource::<crate::village::VillageState>()
+        .is_none()
+    {
+        return;
+    }
+    if world
+        .get_resource::<CredentialFile>()
+        .is_some_and(|s| world.resource::<TestbedIds>().get(&s.agent) != Some(s.assigned))
+    {
+        reload_credentials(world);
+    }
 }
 
 fn enter_world(world: &World, agent_id: &str, assigned: SimId) -> Value {
@@ -1603,6 +1635,7 @@ pub fn insert_notes(world: &mut World, unit: SimId, dir: &AgentDir, clock: fn() 
         .set_owner(&dir.dir, owner);
     world.insert_resource(NotesDirs(BTreeMap::from([(unit, dir.dir.clone())])));
     world.insert_resource(NotesClock(clock));
+    crate::village::host::setup_notes(world);
 }
 
 /// Where a running world is.

@@ -50,7 +50,7 @@ pub const CONTENT: &str = "testbed";
 
 /// The embedded scenario files: `(name, JSON)`. `testbed` is the default
 /// showcase; the others focus on one feature each (see the README).
-pub const SCENARIO_FILES: [(&str, &str); 11] = [
+pub const SCENARIO_FILES: [(&str, &str); 12] = [
     ("testbed", include_str!("../scenarios/testbed.json")),
     ("doors", include_str!("../scenarios/doors.json")),
     (
@@ -65,6 +65,7 @@ pub const SCENARIO_FILES: [(&str, &str); 11] = [
     ("agent", include_str!("../scenarios/agent.json")),
     ("smithy", include_str!("../scenarios/smithy.json")),
     ("explorer", include_str!("../scenarios/explorer.json")),
+    ("ai_village", include_str!("../scenarios/ai_village.json")),
 ];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -76,6 +77,7 @@ pub enum Layout {
     /// The compound plus the outside features of [`crate::layout::spawn_frontier`]
     /// on a 128-cell grid.
     Frontier,
+    Island,
 }
 
 impl Layout {
@@ -83,7 +85,7 @@ impl Layout {
     pub const fn grid_cells(self) -> u32 {
         match self {
             Self::Frontier => FRONTIER_GRID_CELLS,
-            Self::Compound | Self::Open => GRID_CELLS,
+            Self::Compound | Self::Open | Self::Island => GRID_CELLS,
         }
     }
 }
@@ -100,6 +102,7 @@ pub enum Detection {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct WorldSpec {
+    pub ai_scheduler: Option<npc_framework::agent_io::scheduler::SchedulerPolicy>,
     /// Present only in host-generated explorer descriptors; pure replay data.
     pub explorer_context: Option<crate::explorer::context::ExplorerContext>,
     pub layout: Layout,
@@ -114,6 +117,7 @@ pub struct WorldSpec {
 impl Default for WorldSpec {
     fn default() -> Self {
         Self {
+            ai_scheduler: None,
             explorer_context: None,
             layout: Layout::Compound,
             furnish: true,
@@ -131,7 +135,14 @@ impl WorldSpec {
         if v.is_null() {
             return Ok(Self::default());
         }
-        serde_json::from_value(v.clone()).map_err(|e| format!("world: {e}"))
+        let spec: Self = serde_json::from_value(v.clone()).map_err(|e| format!("world: {e}"))?;
+        if let Some(policy) = &spec.ai_scheduler {
+            policy.validate()?;
+        }
+        if spec.layout == Layout::Island && spec.furnish {
+            return Err("island layout supplies its own village; set furnish:false".into());
+        }
+        Ok(spec)
     }
 }
 
@@ -174,13 +185,32 @@ pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -
         TestbedPlugin,
         TestbedAgentPlugin,
     ));
+    let policy = world
+        .explorer_context
+        .as_ref()
+        .and_then(|c| c.world.as_ref())
+        .map(|s| s.preset.ai_scheduler.clone())
+        .or_else(|| world.ai_scheduler.clone())
+        .unwrap_or_default();
+    app.insert_resource(policy);
+    if world.layout == Layout::Island {
+        let preset = world
+            .explorer_context
+            .as_ref()
+            .and_then(|c| c.world.as_ref())
+            .map(|s| s.preset.clone())
+            .unwrap_or_else(|| {
+                crate::worlds::builtin_preset("island_village").expect("shipped island rules")
+            });
+        crate::village::prepare(&mut app, &preset);
+    }
     plugins(&mut app);
     crate::finish_content(app.world_mut());
     app
 }
 
 fn spawn_world(world: &mut World, spec: &WorldSpec, ids: &mut TestbedIds) -> Result<(), String> {
-    if spec.layout != Layout::Open {
+    if matches!(spec.layout, Layout::Compound | Layout::Frontier) {
         spawn_walls(world, ids, spec.store_locked);
     }
     if spec.furnish {
@@ -188,6 +218,9 @@ fn spawn_world(world: &mut World, spec: &WorldSpec, ids: &mut TestbedIds) -> Res
     }
     if spec.layout == Layout::Frontier {
         spawn_frontier(world, ids);
+    }
+    if spec.layout == Layout::Island {
+        crate::village::spawn_places(world, ids);
     }
     for (i, item) in spec.items.iter().enumerate() {
         let (x, z) = item
@@ -235,6 +268,11 @@ pub fn load_with(
         .and_then(|context| context.world.as_ref())
     {
         crate::worlds::validate(&selection.preset).map_err(|reasons| reasons.join("; "))?;
+        if (selection.preset.scene == crate::worlds::WorldScene::IslandVillage)
+            != (spec.layout == Layout::Island)
+        {
+            return Err("scene layout must match the selected world's scene type".into());
+        }
     }
     let mut app = build_app(seed, &spec, |app| {
         plugins(app);
@@ -292,6 +330,11 @@ pub fn load_with(
                 .ok_or("the selected world's played actor is missing")?;
             crate::worlds::apply(app.world_mut(), played, &selection.preset);
         }
+    }
+    if spec.layout == Layout::Island
+        && let Some(played) = actors.first()
+    {
+        crate::village::apply(app.world_mut(), *played);
     }
     Ok(LoadedScenario { app, actors })
 }
@@ -354,6 +397,10 @@ pub fn embedded_scenarios() -> &'static [(&'static str, &'static str)] {
         (
             "explorer",
             "The frontier map for an AI agent: the compound, groves, ore and a ruin.",
+        ),
+        (
+            "ai_village",
+            "An island village: earn coins, buy food and lodging, survive the seasons, and leave a diary.",
         ),
     ];
     &LIST
