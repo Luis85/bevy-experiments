@@ -127,3 +127,10 @@ All five assessed priorities are addressed. The exact local critique snapshot
 the independent baseline score, not an invented post-change rating; this was the first run for the target.
 The local archive is ignored, the temporary snapshot body was removed, and this repository report remains
 the durable evidence. No browser overlay or live server was applicable to the Bevy UI.
+
+## Final local checkpoint
+
+Feature `bff9b47` was merged --no-ff to main as `66244d2` after the complete passing gate. The locked
+five-app release build then passed on main in 2m50s (`target/polish-release-main.log`). Artifacts:
+`target/release/{game_menu,actor_testbed,npcctl,village,rts_units_demo}.exe`. This is the same production
+source used for the successful native confirmation; subsequent changes only record completion evidence.

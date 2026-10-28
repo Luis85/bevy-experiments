@@ -1,6 +1,20 @@
 # Resume: agent notes, workspace, fog, actors (updated 2026-10-28)
 
-## Final status (2026-10-28)
+## Latest: follow-up review and polish complete (2026-10-28)
+
+The subsequent requested review/improvement pass is complete: feature `bff9b47`, local main --no-ff merge
+`66244d2`. Worlds preserves unsaved edits on navigation/close and reads selected values/save baselines
+from one fresh read. F7 supports complete keyboard traversal with focus/scrolling and retained drafts;
+menu contrast, native labels, shared frame and empty Resume action are polished. See ADR 0020 and
+`docs/_notes/2026-10-28-review-polish.md`.
+
+Full gate `target/verify-polish.json`: `ok:true`, 1,256 passed/12 skipped/two slow/two reported leaky;
+doc 1 passed/10 ignored; architecture 7/7; eight replays and six unchanged snapshots; all tools passed.
+Native input/MCP confirmation and 13 reviewed captures passed, including a 480-logical-pixel window;
+all owned processes exited. Main five-app locked release passed in 2m50s. Launch the same game_menu.exe
+path below. No pending implementation or verification; screen-reader/physical-device coverage remains manual.
+
+## Original plan final status (2026-10-28)
 
 **The whole plan is complete.** All features and the bounded final review fixes are on local main:
 feature `ac20a6d`, --no-ff merge `6824a42`. The complete final `cargo xtask verify` passed (`ok:true`):

@@ -1,6 +1,22 @@
 # SDD ledger — plan: npc-framework/docs/superpowers/plans/2026-10-25-agent-notes-workspace-fog-actors.md
 
-## Completion in the monorepo (2026-10-28)
+## Follow-up review and polish complete (2026-10-28)
+
+- User requested a post-plan review followed by improvement/polish. Independent source/visual assessments
+  found Worlds draft-loss and stale-selection paths plus keyboard/accessibility/contrast gaps. Feature
+  `bff9b47` fixes them; merged --no-ff as `66244d2`. Decisions: ADR 0020. Evidence:
+  `docs/_notes/2026-10-28-review-polish.md`.
+- Full `cargo xtask verify`, `target/verify-polish.json`: **`ok:true`**, 1,256 passed/12 skipped/two slow/two
+  reported leaky; doc 1 passed/10 ignored; architecture 7/7; eight CLI replays; six unchanged snapshots;
+  fmt/Clippy/deny passed, no optional tools skipped. No oracle/dependency changes.
+- Native confirmation passed: all five menu captures and eight F7/form/close captures reviewed. Actual Bevy
+  input messages reached Save/Cancel, scrolled focus into view, retained drafts on Escape and worked at
+  480 logical pixels. Full registered MCP/handover/Stop workflow passed; all owned processes exited.
+- Main locked five-app release passed in 2m50s (`target/polish-release-main.log`), same artifact folder below.
+  All review priorities are addressed; the exact local critique archive is closed. Native screen-reader
+  announcements and physical-device integration remain documented manual coverage. No further work queued.
+
+## Original plan completion in the monorepo (2026-10-28)
 
 - **The whole plan is complete**, including all phase implementations, final source review, one bounded fix
   wave, full gate, local main merge, five-app release and final automated native/MCP confirmation.
