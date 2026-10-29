@@ -25,9 +25,11 @@ struct Label {
     sim: SimId,
     visual: Entity,
     lift: f32,
+    actor: bool,
+    fallback_size: Vec2,
 }
 #[derive(Resource, Default)]
-struct Labels(BTreeMap<SimId, Entity>);
+struct Labels(BTreeMap<SimId, (Entity, bool)>);
 #[derive(Component)]
 struct StaticId(SimId);
 
@@ -73,21 +75,42 @@ fn native_text(value: impl Into<String>, size: f32) -> impl Bundle {
         TextColor(Color::srgb(0.94, 0.96, 0.91)),
     )
 }
-fn label(commands: &mut Commands, sim: SimId, visual: Entity, text: &str, lift: f32) {
+fn label(commands: &mut Commands, sim: SimId, visual: Entity, text: &str, lift: f32, actor: bool) {
+    let width = (text.chars().count() as f32 * 6.7 + 10.0).clamp(40.0, 210.0);
+    let fallback_size = Vec2::new(
+        width,
+        (text.chars().count() as f32 * 6.7 / (width - 10.0))
+            .ceil()
+            .max(1.0)
+            * 14.0
+            + 4.0,
+    );
     commands
         .spawn((
             Name::new("village world label"),
-            Label { sim, visual, lift },
+            Label {
+                sim,
+                visual,
+                lift,
+                actor,
+                fallback_size,
+            },
             Pickable::IGNORE,
             GlobalZIndex(3),
             Node {
                 position_type: PositionType::Absolute,
                 padding: UiRect::axes(px(5), px(2)),
+                width: px(width),
                 ..default()
             },
             BackgroundColor(Color::srgba(0.04, 0.055, 0.07, 0.86)),
         ))
-        .with_child(native_text(text, 11.0));
+        .with_children(|p| {
+            p.spawn((
+                native_text(text, 11.0),
+                TextLayout::default().with_linebreak(bevy::text::LineBreak::WordOrCharacter),
+            ));
+        });
 }
 #[allow(clippy::too_many_arguments)]
 fn spawn(
@@ -246,7 +269,7 @@ fn spawn(
                 }
             }
         });
-        label(&mut commands, *id, root, &place.label, 4.7);
+        label(&mut commands, *id, root, &place.label, 4.7, false);
     }
     for (e, id, pos, patch) in &patches {
         let root = commands
@@ -282,6 +305,7 @@ fn spawn(
                 _ => "Clean water",
             },
             2.8,
+            false,
         );
     }
     commands.insert_resource(IslandMaterials {
@@ -292,23 +316,35 @@ fn spawn(
 }
 fn actor_labels(
     mut commands: Commands,
-    people: Query<(Entity, &SimId, &Villager)>,
+    people: Query<(Entity, &SimId, &Villager, &Vitality)>,
     index: Res<VisualIndex>,
     mut seen: ResMut<Labels>,
+    labels: Query<(Entity, &Label)>,
 ) {
-    for (e, id, person) in &people {
+    for (e, id, person, vitality) in &people {
         if let Some(&visual) = index.map.get(&e) {
-            if seen.0.get(id) == Some(&visual) {
+            let alive = vitality.died_at.is_none();
+            if seen.0.get(id) == Some(&(visual, alive)) {
                 continue;
+            }
+            for (entity, label) in &labels {
+                if label.actor && label.sim == *id {
+                    commands.entity(entity).despawn();
+                }
             }
             label(
                 &mut commands,
                 *id,
                 visual,
-                &format!("{} | {}", person.name, person.role.name()),
+                &if alive {
+                    format!("{} | {}", person.name, person.role.name())
+                } else {
+                    format!("{} (dead)", person.name)
+                },
                 2.1,
+                true,
             );
-            seen.0.insert(*id, visual);
+            seen.0.insert(*id, (visual, alive));
         }
     }
 }
@@ -329,25 +365,91 @@ fn relink_static(
         }
     }
 }
+/// Prefer a nearby, fully visible caption; suppress excess captions rather than piling them up.
+fn caption_rect(anchor: Vec2, size: Vec2, viewport: Rect, occupied: &[Rect]) -> Option<Rect> {
+    let bounds = viewport.inflate(-4.0);
+    if size.x > bounds.width() || size.y > bounds.height() {
+        return None;
+    }
+    let preferred = anchor - Vec2::new(size.x * 0.5, 0.0);
+    for offset in [
+        Vec2::ZERO,
+        Vec2::new(0.0, -size.y - 4.0),
+        Vec2::new(0.0, size.y + 4.0),
+        Vec2::new(-size.x * 0.5 - 4.0, 0.0),
+        Vec2::new(size.x * 0.5 + 4.0, 0.0),
+        Vec2::new(0.0, -2.0 * (size.y + 4.0)),
+        Vec2::new(0.0, 2.0 * (size.y + 4.0)),
+    ] {
+        let position = (preferred + offset).clamp(bounds.min, bounds.max - size);
+        let rect = Rect::from_corners(position, position + size);
+        if position.distance(preferred) <= 90.0
+            && occupied
+                .iter()
+                .all(|other| rect.inflate(2.0).intersect(*other).is_empty())
+        {
+            return Some(rect);
+        }
+    }
+    None
+}
+
+#[allow(clippy::too_many_arguments)]
 fn project(
     mut commands: Commands,
     index: Res<npc_framework::prelude::SimIndex>,
     camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     positions: Query<&SimPos>,
     visible: Query<&Visibility>,
-    mut labels: Query<(Entity, &Label, &mut Node)>,
+    state: Res<VillageState>,
+    selected: Res<npc_framework::view_helpers::Selected>,
+    vitality: Query<&Vitality>,
+    mut labels: Query<(Entity, &Label, &ComputedNode, &mut Node)>,
+    panels: Query<
+        (&Node, &ComputedNode, &UiGlobalTransform),
+        (
+            Or<(With<super::village::Hud>, With<super::village::BookPanel>)>,
+            Without<Label>,
+        ),
+    >,
 ) {
     let Some((camera, transform)) = camera.iter().next() else {
         return;
     };
-    for (entity, label, mut node) in &mut labels {
+    let Some(viewport) = camera.logical_viewport_rect() else {
+        return;
+    };
+    let mut occupied: Vec<_> = panels
+        .iter()
+        .filter(|(node, computed, _)| {
+            node.display != Display::None && computed.size().min_element() > 0.0
+        })
+        .map(|(_, computed, transform)| {
+            Rect::from_center_size(
+                transform.translation * computed.inverse_scale_factor(),
+                computed.size() * computed.inverse_scale_factor(),
+            )
+        })
+        .collect();
+    let mut requests = Vec::new();
+    for (entity, label, computed, mut node) in &mut labels {
         if visible.get(label.visual).is_err() {
             commands.entity(entity).despawn();
             continue;
         }
-        let shown = visible
+        let mut shown = visible
             .get(label.visual)
             .is_ok_and(|v| *v != Visibility::Hidden);
+        if label.actor
+            && label.sim != state.played
+            && selected.0 != Some(label.sim)
+            && index
+                .get(label.sim)
+                .and_then(|e| vitality.get(e).ok())
+                .is_some_and(|v| v.died_at.is_some())
+        {
+            shown = false;
+        }
         let pos = index
             .get(label.sim)
             .and_then(|e| positions.get(e).ok())
@@ -355,15 +457,50 @@ fn project(
         if shown
             && let Some(pos) = pos
             && let Ok(point) = camera.world_to_viewport(transform, pos)
-            && camera
-                .logical_viewport_rect()
-                .is_none_or(|r| r.contains(point))
+            && viewport.contains(point)
         {
-            node.left = px(point.x - 45.);
-            node.top = px(point.y);
-            node.display = Display::Flex;
-        } else {
+            let measured = computed.size() * computed.inverse_scale_factor();
+            let size = if measured.min_element() > 0.0 {
+                measured
+            } else {
+                label.fallback_size
+            };
+            let priority = if label.sim == state.played {
+                0
+            } else if selected.0 == Some(label.sim) {
+                1
+            } else if label.actor {
+                2
+            } else {
+                3
+            };
+            requests.push((priority, label.sim, entity, point, size));
+            continue;
+        }
+        if node.display != Display::None {
             node.display = Display::None;
+        }
+    }
+    requests.sort_by_key(|(priority, id, ..)| (*priority, *id));
+    for (_, _, entity, anchor, size) in requests {
+        let placement = caption_rect(anchor, size, viewport, &occupied);
+        if let Some(rect) = placement {
+            occupied.push(rect);
+        }
+        if let Ok((_, _, _, mut node)) = labels.get_mut(entity) {
+            if let Some(rect) = placement {
+                if node.left != px(rect.min.x) {
+                    node.left = px(rect.min.x);
+                }
+                if node.top != px(rect.min.y) {
+                    node.top = px(rect.min.y);
+                }
+                if node.display != Display::Flex {
+                    node.display = Display::Flex;
+                }
+            } else if node.display != Display::None {
+                node.display = Display::None;
+            }
         }
     }
 }
@@ -445,5 +582,49 @@ fn corpse_pose(
             transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
             transform.translation.y = 0.18;
         }
+    }
+}
+
+#[cfg(test)]
+mod label_tests {
+    use super::*;
+    #[test]
+    fn crowded_captions_stay_in_the_viewport_and_clear_of_each_other_and_the_hud() {
+        let viewport = Rect::new(0.0, 0.0, 480.0, 720.0);
+        let hud = Rect::new(98.0, 12.0, 468.0, 260.0);
+        let mut occupied = vec![hud];
+        let mut shown = 0;
+        for anchor in [
+            Vec2::new(240.0, 400.0),
+            Vec2::new(245.0, 401.0),
+            Vec2::new(249.0, 404.0),
+            Vec2::new(4.0, 705.0),
+            Vec2::new(475.0, 400.0),
+            Vec2::new(240.0, 120.0),
+        ] {
+            if let Some(rect) = caption_rect(anchor, Vec2::new(140.0, 22.0), viewport, &occupied) {
+                assert!(viewport.contains(rect.min) && viewport.contains(rect.max));
+                assert!(
+                    occupied
+                        .iter()
+                        .all(|other| rect.intersect(*other).is_empty())
+                );
+                occupied.push(rect);
+                shown += 1;
+            }
+        }
+        assert!(
+            shown >= 3,
+            "crowding should preserve useful labels instead of hiding everything"
+        );
+        assert!(
+            caption_rect(
+                Vec2::new(100.0, 100.0),
+                Vec2::new(600.0, 22.0),
+                viewport,
+                &[]
+            )
+            .is_none()
+        );
     }
 }

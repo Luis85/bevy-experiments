@@ -799,18 +799,21 @@ pub fn pulses(world: &mut World, policy: &SchedulerPolicy) -> Vec<AgentPulse> {
                 .and_then(|s| s.controllers.get(&c.id))
                 .map_or((0, 0), |s| (s.observes.saturating_add(s.requests), s.acts));
             let authorized = crate::registration::controller_session_active(world, &c.id, id);
-            let blocked = if !crate::registration::required(world) && activity == (0, 0) {
-                Some("waiting for first agent request".into())
+            let excluded = world
+                .get_resource::<SchedulerExclusions>()
+                .and_then(|s| s.0.get(&id).cloned());
+            let blocked = if let Some(reason) = excluded {
+                Some(reason)
             } else if !authorized {
                 Some("registration revoked or disconnected".into())
             } else if paused {
                 Some("game paused".into())
             } else if c.mode == ControlMode::Observer {
                 Some("observer control".into())
+            } else if !crate::registration::required(world) && activity == (0, 0) {
+                Some("waiting for first agent request".into())
             } else {
-                world
-                    .get_resource::<SchedulerExclusions>()
-                    .and_then(|s| s.0.get(&id).cloned())
+                None
             };
             AgentPulse {
                 controller: c.id,
@@ -907,6 +910,37 @@ pub fn read_status(world: &mut World) -> SchedulerStatus {
             .any(|p| p.controller == a.controller && p.unit == a.unit)
     });
     for p in input {
+        let current_reason = if !policy.enabled {
+            Some("disabled".into())
+        } else {
+            p.blocked
+                .clone()
+                .or_else(|| p.busy.as_ref().map(|reason| format!("busy: {reason}")))
+        };
+        if let Some(cached) = status
+            .agents
+            .iter_mut()
+            .find(|a| a.controller == p.controller && a.unit == p.unit)
+        {
+            // Cached timings are useful, but must not disguise current eligibility.
+            // A still-owned running turn remains running until the host reaps it.
+            if cached.state != "running" {
+                if let Some(reason) = current_reason {
+                    cached.state = reason;
+                } else if matches!(
+                    cached.state.as_str(),
+                    "disabled"
+                        | "game paused"
+                        | "observer control"
+                        | "registration revoked or disconnected"
+                        | "waiting for first agent request"
+                ) || cached.state.starts_with("busy:")
+                {
+                    cached.state = "waiting for host poll".into();
+                }
+            }
+            continue;
+        }
         if !status
             .agents
             .iter()
@@ -915,7 +949,7 @@ pub fn read_status(world: &mut World) -> SchedulerStatus {
             status.agents.push(SchedulerAgentStatus {
                 controller: p.controller,
                 unit: p.unit,
-                state: p.blocked.or(p.busy).unwrap_or_else(|| {
+                state: current_reason.unwrap_or_else(|| {
                     if policy.enabled {
                         "waiting for host poll".into()
                     } else {

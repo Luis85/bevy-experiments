@@ -25,7 +25,9 @@ struct Reader {
     open: bool,
     setup: bool,
     book: usize,
+    selected_diary: Option<SimId>,
     page: usize,
+    reset_scroll: bool,
     last_actor: Option<SimId>,
     message: String,
     refresh: f32,
@@ -33,11 +35,13 @@ struct Reader {
 #[derive(Component)]
 struct VillageControl;
 #[derive(Component)]
-struct Hud;
+pub(crate) struct Hud;
 #[derive(Component)]
 struct HudText;
 #[derive(Component)]
-struct BookPanel;
+pub(crate) struct BookPanel;
+#[derive(Component)]
+struct BookScroll;
 #[derive(Component)]
 struct BookText;
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
@@ -87,7 +91,9 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Update, (keys, shield).in_set(ViewSystems::OverlayInput))
         .add_systems(
             Update,
-            (refresh, paint).chain().in_set(ViewSystems::Present),
+            (refresh, scheduler_caption, paint)
+                .chain()
+                .in_set(ViewSystems::Present),
         );
 }
 fn background(world: &mut World) {
@@ -201,6 +207,7 @@ fn spawn(mut commands: Commands) {
             });
             p.spawn((
                 ScrollArea,
+                BookScroll,
                 Node {
                     flex_grow: 1.0,
                     min_height: px(0),
@@ -228,11 +235,13 @@ fn activate(
             reader.open = true;
             reader.setup = false;
             reader.refresh = 1.0;
+            reader.reset_scroll = true;
         }
         Action::Setup => {
             reader.open = true;
             reader.setup = true;
             reader.refresh = 1.0;
+            reader.reset_scroll = true;
         }
         Action::Close => {
             reader.open = false;
@@ -241,15 +250,19 @@ fn activate(
         Action::Previous => {
             reader.page = reader.page.saturating_sub(1);
             reader.refresh = 1.0;
+            reader.reset_scroll = true;
         }
         Action::Next => {
             reader.page = reader.page.saturating_add(1);
             reader.refresh = 1.0;
+            reader.reset_scroll = true;
         }
         Action::NextBook => {
             reader.book = reader.book.saturating_add(1);
             reader.page = 0;
+            reader.selected_diary = None;
             reader.refresh = 1.0;
+            reader.reset_scroll = true;
         }
         Action::PauseNudges => {
             policy.enabled = !policy.enabled;
@@ -361,6 +374,7 @@ fn refresh(
     mut commands: Commands,
     mut input: ResMut<InputFocus>,
     mut selected: ResMut<Selected>,
+    mut scroll: Query<&mut ScrollPosition, With<BookScroll>>,
 ) {
     let LiveData {
         state,
@@ -386,6 +400,7 @@ fn refresh(
             reader.open = false;
             reader.page = 0;
             reader.book = 0;
+            reader.selected_diary = None;
         }
         reader.last_actor = Some(state.played);
     }
@@ -402,11 +417,38 @@ fn refresh(
     let Ok((person, vital, wallet)) = people.get(e) else {
         return;
     };
-    let held: Vec<_> = books
+    let mut held: Vec<_> = books
         .iter()
         .filter(|(_, _, c)| c.holder == state.played)
         .map(|(id, b, _)| (*id, b))
         .collect();
+    held.sort_by_key(|(id, _)| *id);
+    if held.is_empty() {
+        reader.book = 0;
+        reader.page = 0;
+        reader.selected_diary = None;
+    } else {
+        if let Some(index) = held
+            .iter()
+            .position(|(id, _)| Some(*id) == reader.selected_diary)
+        {
+            reader.book = index;
+        } else {
+            reader.book %= held.len();
+            reader.page = 0;
+            reader.reset_scroll = true;
+        }
+        reader.selected_diary = Some(held[reader.book].0);
+        reader.page = reader
+            .page
+            .min(held[reader.book].1.pages.len().saturating_sub(1));
+    }
+    if reader.reset_scroll {
+        for mut position in &mut scroll {
+            position.0 = Vec2::ZERO;
+        }
+        reader.reset_scroll = false;
+    }
     for (entity, action, mut node) in &mut buttons {
         if *action == Action::NewLife {
             node.display = if vital.died_at.is_some() {
@@ -428,6 +470,19 @@ fn refresh(
             } else {
                 Display::Flex
             };
+            let disabled = match action {
+                Action::Previous => held.is_empty() || reader.page == 0,
+                Action::Next => {
+                    held.is_empty() || reader.page + 1 >= held[reader.book].1.pages.len()
+                }
+                Action::NextBook => held.len() <= 1,
+                _ => false,
+            };
+            if disabled {
+                commands.entity(entity).insert(InteractionDisabled);
+            } else {
+                commands.entity(entity).remove::<InteractionDisabled>();
+            }
         }
         if *action == Action::PauseNudges {
             node.display = if reader.setup {
@@ -454,17 +509,23 @@ fn refresh(
             .and_then(|id| needs.get(e).ok().map(|n| n.get(id).value / 1000))
             .unwrap_or(100)
     };
-    let supervisor = status
-        .as_ref()
-        .and_then(|s| s.agents.iter().find(|a| a.unit == state.played.0))
-        .map(|a| format!("{} (idle {}s)", a.state, a.idle_seconds))
-        .unwrap_or_else(|| {
-            if policy.enabled {
-                "waiting for AI connection".into()
-            } else {
-                "disabled".into()
-            }
-        });
+    let supervisor = if vital.died_at.is_some() {
+        "actor is permanently dead".into()
+    } else if !policy.enabled {
+        "nudges paused".into()
+    } else {
+        status
+            .as_ref()
+            .and_then(|s| s.agents.iter().find(|a| a.unit == state.played.0))
+            .map(|a| format!("{} (idle {}s)", a.state, a.idle_seconds))
+            .unwrap_or_else(|| {
+                if policy.enabled {
+                    "waiting for AI connection".into()
+                } else {
+                    "disabled".into()
+                }
+            })
+    };
     let mut header = format!(
         "Day {} | {} | {}\n{} | life {}\n{} coins | Health {}%\nFood {}% | Water {}% | Energy {}%\nBread 6 coins | Water 1 | Bed 3\nAI scheduler: {}",
         day + 1,
@@ -564,6 +625,34 @@ fn refresh(
         }
     }
 }
+fn scheduler_caption(
+    mut commands: Commands,
+    policy: Res<SchedulerPolicy>,
+    controls: Query<(Entity, &Action, &Children)>,
+    mut captions: Query<&mut Text>,
+) {
+    if !policy.is_changed() {
+        return;
+    }
+    let caption = if policy.enabled {
+        "Pause nudges"
+    } else {
+        "Resume nudges"
+    };
+    for (entity, action, children) in &controls {
+        if *action != Action::PauseNudges {
+            continue;
+        }
+        commands
+            .entity(entity)
+            .insert(AccessibleLabel::new(caption));
+        for child in children {
+            if let Ok(mut text) = captions.get_mut(*child) {
+                text.0 = caption.into();
+            }
+        }
+    }
+}
 fn paint(
     input: Res<InputFocus>,
     mut buttons: Query<
@@ -641,6 +730,103 @@ mod tests {
         app.world_mut().trigger(Activate { entity: e });
         app.world_mut().flush();
         app.update();
+    }
+    fn control(app: &mut App, wanted: Action) -> Entity {
+        app.world_mut()
+            .query::<(Entity, &Action)>()
+            .iter(app.world())
+            .find(|(_, action)| **action == wanted)
+            .unwrap()
+            .0
+    }
+    fn recovered_book(app: &mut App, title: &str, pages: usize) -> (SimId, Entity) {
+        let actor = app.world().resource::<VillageState>().played;
+        let holder = app.world().resource::<SimIndex>().get(actor).unwrap();
+        let (id, entity) = spawn_sim(
+            app.world_mut(),
+            (
+                npc_framework::interaction::Item::new(village::catalog::DIARY),
+                DroppedDiary {
+                    author: SimId(9999),
+                    author_name: title.into(),
+                    life: 1,
+                    died_at: 0,
+                    sealed: true,
+                    pages: (0..pages)
+                        .map(|n| village::DiaryPage {
+                            tick: 0,
+                            title: format!("{title} page {}", n + 1),
+                            body: "A recovered memory.".into(),
+                        })
+                        .collect(),
+                },
+            ),
+        );
+        npc_framework::interaction::items::put_in_inventory(app.world_mut(), holder, entity);
+        (id, entity)
+    }
+    #[test]
+    fn diary_navigation_is_stable_bounded_and_resets_scroll() {
+        let mut app = app();
+        let (first, item) = recovered_book(&mut app, "First", 2);
+        let (second, _) = recovered_book(&mut app, "Second", 1);
+        let actor = app.world().resource::<VillageState>().played;
+        let holder = app.world().resource::<SimIndex>().get(actor).unwrap();
+        let other = app
+            .world()
+            .resource::<testbed_content::TestbedIds>()
+            .id("Ada");
+        let other = app.world().resource::<SimIndex>().get(other).unwrap();
+        // Changing archetype iteration order must not change book order or selection.
+        npc_framework::interaction::items::put_in_inventory(app.world_mut(), other, item);
+        npc_framework::interaction::items::put_in_inventory(app.world_mut(), holder, item);
+        press(&mut app, Action::Books);
+        assert_eq!(app.world().resource::<Reader>().selected_diary, Some(first));
+        let previous = control(&mut app, Action::Previous);
+        assert!(app.world().get::<InteractionDisabled>(previous).is_some());
+        let scroll = app
+            .world_mut()
+            .query_filtered::<Entity, With<BookScroll>>()
+            .single(app.world())
+            .unwrap();
+        app.world_mut()
+            .get_mut::<ScrollPosition>(scroll)
+            .unwrap()
+            .0
+            .y = 500.0;
+        press(&mut app, Action::Next);
+        assert_eq!(app.world().resource::<Reader>().page, 1);
+        assert_eq!(
+            app.world().get::<ScrollPosition>(scroll).unwrap().0,
+            Vec2::ZERO
+        );
+        let next = control(&mut app, Action::Next);
+        assert!(app.world().get::<InteractionDisabled>(next).is_some());
+        press(&mut app, Action::NextBook);
+        assert_eq!(
+            app.world().resource::<Reader>().selected_diary,
+            Some(second)
+        );
+        assert_eq!(app.world().resource::<Reader>().page, 0);
+    }
+    #[test]
+    fn a_single_page_book_has_no_unavailable_navigation_and_scheduler_controls_name_the_action() {
+        let mut app = app();
+        recovered_book(&mut app, "Only", 1);
+        press(&mut app, Action::Books);
+        for action in [Action::Previous, Action::Next, Action::NextBook] {
+            let button = control(&mut app, action);
+            assert!(app.world().get::<InteractionDisabled>(button).is_some());
+        }
+        press(&mut app, Action::Setup);
+        let button = control(&mut app, Action::PauseNudges);
+        assert!(
+            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Resume nudges")
+        );
+        press(&mut app, Action::PauseNudges);
+        assert!(
+            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Pause nudges")
+        );
     }
     #[test]
     fn native_hud_and_setup_controls_are_semantic_and_never_change_the_sim() {

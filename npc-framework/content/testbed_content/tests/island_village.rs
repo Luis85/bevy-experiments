@@ -13,6 +13,143 @@ fn scene() -> bevy_app::App {
 }
 
 #[test]
+fn polish_collecting_a_carried_purse_removes_its_inventory_slot() {
+    let mut app = scene();
+    let actor = id(&app, "human");
+    let holder = entity(&app, actor);
+    let (purse, item) = spawn_sim(
+        app.world_mut(),
+        (
+            Item::new(village::catalog::COINS),
+            village::CoinPurse { coins: 7 },
+        ),
+    );
+    npc_framework::interaction::items::put_in_inventory(app.world_mut(), holder, item);
+    let total = money(&mut app);
+    let mut collect = VillageAct::new(actor, "collect_coins");
+    collect.target = Some(purse);
+    collect.perform(app.world_mut()).unwrap();
+    assert_eq!(app.world().get::<Wallet>(holder).unwrap().coins, 7);
+    assert!(
+        !app.world()
+            .get::<Inventory>(holder)
+            .unwrap()
+            .contains(purse),
+        "redeeming carried coins must not leave a ghost inventory slot"
+    );
+    assert_eq!(money(&mut app), total);
+}
+
+fn polish_multi_preset_scene() -> bevy_app::App {
+    let doc = testbed_content::scenario::scenario_doc("ai_village").unwrap();
+    testbed_content::scenario::load_with(&doc, 7, |app| {
+        let human = testbed_content::actors::human_preset();
+        let mut other = human.clone();
+        other.speed_mm_per_tick = 99;
+        app.insert_resource(testbed_content::actors::ActorPresets(
+            std::collections::BTreeMap::from([
+                ("aaa_other".into(), other),
+                ("human".into(), human),
+            ]),
+        ));
+    })
+    .unwrap()
+    .app
+}
+
+#[test]
+fn polish_scheduler_status_reflects_live_eligibility_without_dispatch_or_simulation_changes() {
+    use npc_framework::agent_io::scheduler::{
+        self, SchedulerAgentStatus, SchedulerExclusions, SchedulerPolicy, SchedulerStatus,
+    };
+    let mut app = scene();
+    run_ticks(app.world_mut(), 1);
+    let actor = id(&app, "human");
+    app.insert_resource(SimControl {
+        paused: true,
+        ..Default::default()
+    });
+    app.insert_resource(SchedulerStatus {
+        enabled: true,
+        error: None,
+        agents: vec![SchedulerAgentStatus {
+            controller: "visitor".into(),
+            unit: actor.0,
+            state: "ready".into(),
+            idle_seconds: 123,
+            nudges_last_hour: 0,
+            last_result: None,
+        }],
+    });
+    let before = state_hash(app.world_mut());
+    let status = scheduler::read_status(app.world_mut());
+    assert_eq!(
+        status.agents[0].state, "game paused",
+        "cached ready status must not hide a live pause"
+    );
+    app.world_mut().resource_mut::<SchedulerPolicy>().enabled = false;
+    assert_eq!(
+        scheduler::read_status(app.world_mut()).agents[0].state,
+        "disabled"
+    );
+    app.world_mut().resource_mut::<SchedulerPolicy>().enabled = true;
+    app.world_mut().resource_mut::<SimControl>().paused = false;
+    app.insert_resource(SchedulerExclusions(std::collections::BTreeMap::from([(
+        actor,
+        "actor is permanently dead".into(),
+    )])));
+    assert_eq!(
+        scheduler::read_status(app.world_mut()).agents[0].state,
+        "actor is permanently dead"
+    );
+    assert_eq!(state_hash(app.world_mut()), before);
+}
+
+#[test]
+fn polish_successor_uses_the_scenario_preset_instead_of_the_first_registered_one() {
+    let mut app = polish_multi_preset_scene();
+    let old = id(&app, "human");
+    let body = entity(&app, old);
+    let speed = app.world().get::<Villager>(body).unwrap().base_speed;
+    app.world_mut().get_mut::<Vitality>(body).unwrap().died_at = Some(0);
+    submit(
+        app.world_mut(),
+        None,
+        SimCommand::content(&VillageAct::new(old, "new_life")),
+    )
+    .unwrap();
+    run_ticks(app.world_mut(), 1);
+    let successor = app.world().resource::<VillageState>().played;
+    assert_ne!(successor, old);
+    assert_eq!(
+        app.world()
+            .get::<Villager>(entity(&app, successor))
+            .unwrap()
+            .base_speed,
+        speed,
+        "an unrelated earlier registry entry must not change a successor's body"
+    );
+}
+
+#[test]
+fn polish_future_successor_keeps_its_preset_across_snapshot_resume() {
+    fn factory() -> bevy_app::App {
+        let mut app = polish_multi_preset_scene();
+        let actor = id(&app, "human");
+        let body = entity(&app, actor);
+        app.world_mut().get_mut::<Vitality>(body).unwrap().died_at = Some(0);
+        submit(
+            app.world_mut(),
+            Some(500),
+            SimCommand::content(&VillageAct::new(actor, "new_life")),
+        )
+        .unwrap();
+        app
+    }
+    npc_framework::tools::snapshot_check::assert_resume_equivalent(factory, 400, 800, 40);
+}
+
+#[test]
 fn village_preset_upgrade_preserves_broken_installations_and_user_owned_files() {
     let dir = std::env::temp_dir().join(format!("island-presets-{}", std::process::id()));
     std::fs::create_dir(&dir).unwrap();

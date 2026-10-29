@@ -10,6 +10,11 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ### Island Village and AI continuation
 
+- Polish world captions with measured, bounded placement and actor priority; stabilize the diary reader's
+  selected book, page boundaries and scroll position. Scheduler controls name their next action and status
+  reflects current pause/control/death eligibility. Successors keep the scenario's selected actor preset
+  even when unrelated presets are registered earlier; future births remain consistent across resume.
+
 - Add the opt-in `ai_village` scenario and `island_village` explorer preset: nine named residents operate
   physical food, wood, metal and tool chains with finite inventories/wallets and a cash-conserving community
   fund. Visiting actors gather/craft/sell to buy food, clean water and lodging. Empty supplies allow

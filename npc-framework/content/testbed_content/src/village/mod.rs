@@ -17,6 +17,11 @@ use npc_framework::needs::{NeedDef, NeedRegistry, NeedThresholds};
 use npc_framework::prelude::*;
 pub const REMAINS_TREE: &str = "island_remains";
 
+/// Immutable construction data rebuilt from the saved scenario, like ActorPresets.
+/// Never inferred from registry ordering or read from the host's preset files during play.
+#[derive(Resource)]
+pub(crate) struct BirthPreset(pub String);
+
 pub fn intrinsic_action(verb: &str) -> bool {
     matches!(
         verb,
