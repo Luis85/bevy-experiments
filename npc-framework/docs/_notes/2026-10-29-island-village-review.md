@@ -75,7 +75,21 @@ All five release apps built successfully with `--locked --release --bins`
 No verification tool was skipped. Existing test skips/ignored cases and nextest's leaky classifications
 are retained; no protected file, assertion, snapshot, replay or budget was relaxed.
 
-Local integration and the final main release build are recorded below when complete.
+## Local integration
+
+Feature **3afc32b** was merged locally to `main` as **0fd4744** (`--no-ff`). Only NPC Framework paths
+were staged and committed; unrelated Terra changes and the pre-existing MCP host (PID 57336) were
+preserved. No push or pull request was made.
+
+On the merge, this command completed successfully, exit **0**, in **3m 47s**:
+
+```text
+cargo build --locked --release -p actor_testbed -p village -p rts_units_demo -p game_menu -p npcctl --bins
+```
+
+Evidence: `target/island-polish-main-release.log` and `target/island-polish-main-release.exit`. All five
+release binaries are present. The final documentation commit changes no source code.
+
 Native Rust has no HTML/CSS detector verdict; manual native inspection and semantic/geometry tests are
 the applicable checks. Physical input, OS screen-reader announcements and authenticated provider
 continuation remain outside this automated pass.
