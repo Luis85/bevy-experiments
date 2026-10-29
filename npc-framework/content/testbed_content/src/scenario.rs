@@ -291,6 +291,21 @@ pub fn load_with(
         }
     });
     let world = app.world_mut();
+    if spec.layout == Layout::Island {
+        let preset = spec
+            .explorer_context
+            .as_ref()
+            .map(|c| c.preset_id.clone())
+            .or_else(|| {
+                doc.actors
+                    .first()
+                    .and_then(|a| a.extra.get("preset"))
+                    .and_then(|v| v.as_str())
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| "human".into());
+        world.insert_resource(crate::village::BirthPreset(preset));
+    }
     let mut ids = TestbedIds::default();
     spawn_world(world, &spec, &mut ids)?;
     let mut actors = Vec::new();

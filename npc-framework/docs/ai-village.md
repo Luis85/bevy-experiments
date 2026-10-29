@@ -23,6 +23,8 @@ actor. The village observation section reports the actor's health, reserves, coi
 perceived traders and recovered diaries. Affordances explain stock, price, funds, reach and capacity.
 The island opens with a wider scene camera and its needs/economy HUD. **F1** toggles the diagnostic
 controls overlay; in an explorer world, **F7** opens the actor's shared notebooks.
+World labels avoid one another and the village panels. The current actor and selected unit have priority;
+crowded captions may be suppressed, and old corpse captions appear when selected.
 
 ## Earn, buy, survive
 
@@ -75,6 +77,8 @@ Death is permanent for that SimId. Work stops, possessions/coins drop, and one p
 The village keeps running. Other living actors can pick up and read the diary; residents can recover
 nearby diaries and hand one over through `ask_diary`. The native **Found diaries** reader shows books
 the current actor carries.
+The reader keeps a stable book selection, disables unavailable page/book navigation and returns to the
+top when changing pages or books.
 Agent observations list diary metadata; `read_diary` accepts `args: {page: 1}` to read one page at a
 time, keeping large recovered books out of routine observations.
 
@@ -101,6 +105,8 @@ idle threshold, polling, cooldown, hourly/concurrency caps and runner timeout. T
 enables supervision with a 120-second idle threshold and a 180-second cooldown; it cannot launch anything
 until an operator links a CLI session. The in-game **AI scheduler** panel shows status and can pause/resume
 nudges for the current run. Preset edits apply to new worlds; saved worlds keep their original policy.
+The control names its next action (**Pause nudges** or **Resume nudges**). Read-only status reflects current
+pause/control/death eligibility while retaining cached timing data; querying it never launches a turn.
 
 Start the game, let the AI connect and take control, then link its exact CLI conversation once:
 

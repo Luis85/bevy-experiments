@@ -336,15 +336,10 @@ impl ContentCommand for VillageAct {
 }
 fn new_life(world: &mut World) -> Result<(), String> {
     let old = world.resource::<VillageState>().clone();
-    if let Some(e) = entity_of(world, old.played) {
-        world
-            .entity_mut(e)
-            .remove::<npc_framework::agent_io::control::ExternalController>();
-    }
     let life = old.life + 1;
     let preset = world
-        .get_resource::<crate::actors::ActorPresets>()
-        .and_then(|p| p.0.keys().next().cloned())
+        .get_resource::<super::BirthPreset>()
+        .map(|p| p.0.clone())
         .unwrap_or_else(|| "human".into());
     let spec = crate::layout::UnitSpec {
         template: "scout".into(),
@@ -353,6 +348,11 @@ fn new_life(world: &mut World) -> Result<(), String> {
     };
     let pos = SimPos::new(500, -1500);
     let id = crate::layout::spawn_unit(world, pos, &spec)?;
+    if let Some(e) = entity_of(world, old.played) {
+        world
+            .entity_mut(e)
+            .remove::<npc_framework::agent_io::control::ExternalController>();
+    }
     world.resource_mut::<VillageState>().life = life;
     let e = entity_of(world, id).expect("new life");
     super::initialise_person(
