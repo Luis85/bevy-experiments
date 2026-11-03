@@ -4,7 +4,7 @@ id: character
 title: "Personal stats and equipped appearance"
 parent: preparation
 status: Implemented
-source: "crates/horde_game/src/ui/character.rs::character; crates/horde_game/src/player_model_preview.rs::defender_preview"
+source: "crates/horde_game/src/ui/character.rs::character; crates/horde_game/src/visual_assets/player_preview.rs::defender_preview"
 ---
 
 # Personal stats and equipped appearance

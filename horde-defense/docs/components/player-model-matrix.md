@@ -4,7 +4,7 @@ id: player-model-matrix
 title: "Equipped and action model matrix"
 parent: player-model-review
 status: Implemented
-source: "crates/horde_game/src/ui/review.rs::model_matrix,paint_model_matrix"
+source: "crates/horde_game/src/ui/review/mod.rs::model_matrix,paint_model_matrix"
 ---
 
 # Equipped and action model matrix

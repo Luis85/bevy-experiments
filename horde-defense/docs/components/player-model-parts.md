@@ -4,7 +4,7 @@ id: player-model-parts
 title: "Original semantic part ownership"
 parent: player-model-review
 status: Implemented
-source: "crates/horde_game/src/ui/review.rs::model_parts,paint_model_parts"
+source: "crates/horde_game/src/ui/review/mod.rs::model_parts,paint_model_parts"
 ---
 
 # Original semantic part ownership

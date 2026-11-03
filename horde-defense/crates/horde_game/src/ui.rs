@@ -25,7 +25,6 @@ use horde_core::{
 use std::path::PathBuf;
 
 #[cfg(test)]
-#[path = "ui_tests.rs"]
 mod tests;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

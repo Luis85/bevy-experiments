@@ -8,14 +8,9 @@ use bevy_egui::{
 };
 use horde_core::{ordnance::OrdnanceKind, weapons::WeaponClass};
 use std::sync::OnceLock;
-// Retain the retired rigs solely as historical regression fixtures. Production
-// characters and equipment previews share the source-owned model resolver.
-#[cfg(test)]
-#[path = "character_rig.rs"]
-pub mod character_rig;
-#[path = "player_model_preview.rs"]
-mod player_model_preview;
-pub use player_model_preview::{defender_preview, rig_comparison, rig_review};
+// Characters and equipment previews share the source-owned model resolver.
+mod player_preview;
+pub use player_preview::{defender_preview, hold_sample, paint_model};
 
 /// Source catalogue selection is an application compatibility seam, not a
 /// gender-specific painter. The production manifest can remap these keys.
@@ -88,7 +83,6 @@ pub fn project_player_socket(
 pub fn prepare_player_models(context: &bevy_egui::egui::Context) -> Result<(), String> {
     crate::player_model::backend_egui::textures(context).map(|_| ())
 }
-#[path = "ground_material.rs"]
 mod ground_material;
 
 static FLASH_MASKS: OnceLock<FlashMasks> = OnceLock::new();
@@ -176,6 +170,7 @@ pub struct VisualAssets {
     keyart: Handle<Image>,
     ground: Handle<Image>,
     walkers: Handle<Image>,
+    /// Legacy `defender-rig-v1.png`: now only the firearm/ordnance icon source.
     rig: Handle<Image>,
     menu_idle: Handle<Image>,
     egui_textures: [OnceLock<Result<bevy_egui::egui::TextureHandle, String>>; 7],
@@ -226,36 +221,21 @@ pub struct ArtTextures {
     pub ground: Option<TextureId>,
     pub walkers: [Option<WalkSheet>; 5],
     pub flash_masks: Option<&'static FlashMasks>,
+    /// Weapon and ordnance icon atlas (legacy defender rig sheet; no bodies are drawn from it).
     pub rig: Option<RigSheet>,
     pub menu_idle: Option<TextureId>,
-    #[cfg(test)]
-    pub components: Option<character_rig::ComponentSheet>,
-    #[cfg(test)]
-    pub canonical: Option<character_rig::canonical::CanonicalSheet>,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct RigSheet {
     pub texture: TextureId,
     pub atlas: &'static RigAtlas,
 }
+/// Icon cells cut from the legacy defender rig sheet: 4..=9 firearms, 10..=13 ordnance.
+/// The body cells (0..=3) are retained only because the grid is cut uniformly.
 #[derive(Debug)]
 pub struct RigAtlas {
     size: [f32; 2],
     cells: [[f32; 4]; 16],
-    #[cfg(test)]
-    gun_muzzles: [Pos2; 6],
-    #[cfg(test)]
-    gun_breeches: [Pos2; 6],
-    #[cfg(test)]
-    body_hips: [f32; 2],
-    #[cfg(test)]
-    body_split: f32,
-    #[cfg(test)]
-    shoulders: [Pos2; 2],
-    #[cfg(test)]
-    gun_grips: [Pos2; 6],
-    #[cfg(test)]
-    throw_hands: [Pos2; 2],
 }
 impl RigAtlas {
     fn from_image(image: &Image) -> Self {
@@ -295,65 +275,11 @@ impl RigAtlas {
                 ]
             }
         });
-        // Source pixels inspected at 1254x1254. Calibration names the actual
-        // boot/waist, arm crop, grip, and barrel tip; no source pixels are edited.
-        #[cfg(test)]
-        let point = |x, y| pos2(x * width as f32 / 1254., y * height as f32 / 1254.);
-        #[cfg(test)]
-        let gun_muzzles = [
-            point(234.5, 508.5),
-            point(576.5, 522.5),
-            point(1241.5, 522.5),
-            point(920.5, 524.5),
-            point(620.5, 793.5),
-            point(300.5, 792.5),
-        ];
         Self {
             size: [width as f32, height as f32],
             cells,
-            #[cfg(test)]
-            gun_muzzles,
-            #[cfg(test)]
-            gun_breeches: gun_muzzles.map(|tip| tip - vec2(40. * width as f32 / 1254., 0.)),
-            #[cfg(test)]
-            body_hips: [136.5, 457.5].map(|x| x * width as f32 / 1254.),
-            #[cfg(test)]
-            body_split: 224.5 * height as f32 / 1254.,
-            #[cfg(test)]
-            shoulders: [point(157., 128.), point(477., 131.)],
-            #[cfg(test)]
-            gun_grips: [
-                point(121., 550.),
-                point(420., 568.),
-                point(1042., 550.),
-                point(713., 566.),
-                point(419., 828.),
-                point(94., 831.),
-            ],
-            #[cfg(test)]
-            throw_hands: [point(700., 113.), point(985., 146.)],
         }
     }
-}
-#[cfg(test)]
-#[derive(Clone, Copy, Debug)]
-pub struct DefenderRigMotion {
-    pub target: Pos2,
-    pub weapon: WeaponClass,
-    pub recoil: f32,
-    pub lean: f32,
-    pub reload: Option<f32>,
-    pub throwing: f32,
-    pub throw_kind: Option<OrdnanceKind>,
-    pub melee: f32,
-    pub brace: f32,
-    pub hit: f32,
-}
-#[cfg(test)]
-#[derive(Clone, Copy)]
-pub struct DefenderRigStyle<'a> {
-    pub female: bool,
-    pub equipment: &'a horde_core::survivors::EquipmentVisual,
 }
 #[derive(Clone, Copy, Debug)]
 pub struct WalkSheet {
@@ -460,10 +386,6 @@ pub fn register(
         flash_masks,
         rig,
         menu_idle: texture(6, &visuals.menu_idle),
-        #[cfg(test)]
-        components: None,
-        #[cfg(test)]
-        canonical: None,
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -702,123 +624,6 @@ fn weapon_index(class: WeaponClass) -> usize {
         WeaponClass::MachineGun => 5,
     }
 }
-#[cfg(test)]
-struct RigBody {
-    source: [f32; 4],
-    rect: Rect,
-    hip: Pos2,
-    shoulder: Pos2,
-    split: f32,
-    rotation: bevy_egui::egui::emath::Rot2,
-    mirror: bool,
-}
-#[cfg(test)]
-impl RigBody {
-    fn new(
-        atlas: &RigAtlas,
-        npc: bool,
-        center: Pos2,
-        size: Vec2,
-        motion: DefenderRigMotion,
-    ) -> Self {
-        let source = atlas.cells[usize::from(npc)];
-        let width = source[2] - source[0];
-        let height = source[3] - source[1];
-        let scale = (size.y / height).min(size.x / width);
-        let foot = center + vec2(0., size.y * 0.5);
-        let hip_x = atlas.body_hips[usize::from(npc)];
-        let rect = Rect::from_min_size(
-            foot - vec2((hip_x - source[0]) * scale, height * scale),
-            vec2(width, height) * scale,
-        );
-        let split = atlas.body_split;
-        let hip = pos2(foot.x, rect.top() + (split - source[1]) * scale);
-        let mirror = motion.target.x < hip.x;
-        let heading = (motion.target.y - hip.y).atan2((motion.target.x - hip.x).abs().max(0.001));
-        let rotation =
-            bevy_egui::egui::emath::Rot2::from_angle(heading.clamp(-0.3, 0.3) * 0.45 + motion.lean);
-        let mut shoulder_offset = (atlas.shoulders[usize::from(npc)] - pos2(hip_x, split)) * scale;
-        if mirror {
-            shoulder_offset.x = -shoulder_offset.x;
-        }
-        let shoulder_offset = rotation * shoulder_offset;
-        Self {
-            source,
-            rect,
-            hip,
-            shoulder: hip + shoulder_offset,
-            split,
-            rotation,
-            mirror,
-        }
-    }
-    fn upper_point(&self, point: Pos2) -> Pos2 {
-        let relative = point - self.hip;
-        self.hip
-            + self.rotation
-                * if self.mirror {
-                    vec2(-relative.x, relative.y)
-                } else {
-                    relative
-                }
-    }
-}
-#[cfg(test)]
-struct RigGun {
-    grip: Pos2,
-    muzzle: Pos2,
-    pivot: Pos2,
-    rotation: bevy_egui::egui::emath::Rot2,
-    mirror: bool,
-    scale: f32,
-}
-#[cfg(test)]
-impl RigGun {
-    fn new(atlas: &RigAtlas, body: &RigBody, size: Vec2, motion: DefenderRigMotion) -> Self {
-        let index = weapon_index(motion.weapon);
-        let source = atlas.cells[[4, 5, 7, 6, 9, 8][index]];
-        let width = source[2] - source[0];
-        let scale = size.y * [0.22, 0.58, 0.78, 0.74, 0.9, 0.82][index] / width;
-        let grip = atlas.gun_grips[index];
-        let muzzle = atlas.gun_muzzles[index];
-        let initial = (motion.target - body.shoulder).normalized();
-        let pivot = body.shoulder + initial * size.y * (0.16 - motion.recoil * 0.045);
-        let mut requested = motion.target - pivot;
-        if let Some(reload) = motion.reload {
-            requested = bevy_egui::egui::emath::Rot2::from_angle(
-                (reload * std::f32::consts::PI).sin() * 0.7,
-            ) * requested;
-        }
-        if motion.throwing > 0. {
-            requested = vec2(size.y * 0.4, size.y);
-        }
-        let mirror = requested.x < 0.;
-        let reflect = |v: Vec2| if mirror { vec2(-v.x, v.y) } else { v };
-        let bore = reflect((muzzle - atlas.gun_breeches[index]).normalized());
-        let relative_muzzle = reflect((muzzle - grip) * scale);
-        let offset = bore.x * relative_muzzle.y - bore.y * relative_muzzle.x;
-        let correction = (offset / requested.length().max(0.001))
-            .clamp(-1., 1.)
-            .asin();
-        let heading = requested.y.atan2(requested.x) - correction;
-        let rotation = bevy_egui::egui::emath::Rot2::from_angle(heading - bore.y.atan2(bore.x));
-        Self {
-            grip,
-            muzzle,
-            pivot,
-            rotation,
-            mirror,
-            scale,
-        }
-    }
-    fn point(&self, point: Pos2) -> Pos2 {
-        let mut relative = (point - self.grip) * self.scale;
-        if self.mirror {
-            relative.x = -relative.x;
-        }
-        self.pivot + self.rotation * relative
-    }
-}
 fn rig_region(
     p: &Painter,
     sheet: RigSheet,
@@ -833,62 +638,6 @@ fn rig_region(
         vertex.pos = transform(vertex.pos);
     }
     p.add(bevy_egui::egui::Shape::mesh(mesh));
-}
-/// Same source muzzle and transform used by defender_rig, including recoil.
-#[cfg(test)]
-pub fn defender_muzzle(
-    textures: ArtTextures,
-    npc: bool,
-    center: Pos2,
-    size: Vec2,
-    motion: DefenderRigMotion,
-) -> Option<Pos2> {
-    if let Some(muzzle) = character_rig::muzzle(textures, npc, center, size, motion) {
-        return Some(muzzle);
-    }
-    let sheet = textures.rig?;
-    let body = RigBody::new(sheet.atlas, npc, center, size, motion);
-    let gun = RigGun::new(sheet.atlas, &body, size, motion);
-    Some(gun.point(gun.muzzle))
-}
-#[cfg(test)]
-fn raised_layout(sheet: RigSheet, body: &RigBody, npc: bool) -> ([f32; 4], Rect, Pos2) {
-    let source = sheet.atlas.cells[if npc { 3 } else { 2 }];
-    let torso_height = body.hip.y - body.rect.top();
-    let scale =
-        (torso_height / (source[3] - source[1])).min(body.rect.width() / (source[2] - source[0]));
-    let source_hip = if npc {
-        pos2(1063., 301.)
-    } else {
-        pos2(744., 294.)
-    };
-    let source_hip = pos2(
-        source_hip.x * sheet.atlas.size[0] / 1254.,
-        source_hip.y * sheet.atlas.size[1] / 1254.,
-    );
-    let source_origin = pos2(source[0], source[1]);
-    let rect = Rect::from_min_size(
-        body.hip - (source_hip - source_origin) * scale,
-        vec2(source[2] - source[0], source[3] - source[1]) * scale,
-    );
-    let hand = rect.min + (sheet.atlas.throw_hands[usize::from(npc)] - source_origin) * scale;
-    (source, rect, hand)
-}
-#[cfg(test)]
-pub fn defender_throw_origin(
-    textures: ArtTextures,
-    npc: bool,
-    center: Pos2,
-    size: Vec2,
-    motion: DefenderRigMotion,
-) -> Option<Pos2> {
-    if let Some(hand) = character_rig::throw_origin(textures, npc, center, size, motion) {
-        return Some(hand);
-    }
-    let sheet = textures.rig?;
-    let body = RigBody::new(sheet.atlas, npc, center, size, motion);
-    let (_, _, hand) = raised_layout(sheet, &body, npc);
-    Some(body.upper_point(hand))
 }
 const MENU_IDLE_SIZE: [f32; 2] = [1774.0, 887.0];
 const MENU_IDLE_CROPS: [[f32; 4]; 2] = [[282., 42., 652., 848.], [1128., 60., 1465., 848.]];
@@ -1468,38 +1217,6 @@ pub fn panorama(p: &Painter, r: Rect, textures: ArtTextures, _biome: &str) -> bo
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn rig_fixture() -> RigAtlas {
-        RigAtlas {
-            size: [1024., 1024.],
-            cells: std::array::from_fn(|index| {
-                let x = (index % 4) as f32 * 256.;
-                let y = (index / 4) as f32 * 256.;
-                [x + 30., y + 20., x + 220., y + 235.]
-            }),
-            gun_muzzles: [4, 5, 7, 6, 9, 8].map(|index| {
-                pos2(
-                    (index % 4) as f32 * 256. + 219.,
-                    (index / 4) as f32 * 256. + 75.,
-                )
-            }),
-            gun_breeches: [4, 5, 7, 6, 9, 8].map(|index| {
-                pos2(
-                    (index % 4) as f32 * 256. + 189.,
-                    (index / 4) as f32 * 256. + 75.,
-                )
-            }),
-            body_hips: [125., 381.],
-            body_split: 150.,
-            shoulders: [pos2(135., 95.), pos2(391., 95.)],
-            gun_grips: [4, 5, 7, 6, 9, 8].map(|index| {
-                pos2(
-                    (index % 4) as f32 * 256. + 110.,
-                    (index / 4) as f32 * 256. + 160.,
-                )
-            }),
-            throw_hands: [pos2(700., 110.), pos2(980., 130.)],
-        }
-    }
     #[test]
     fn cohesive_menu_poses_keep_both_boots_and_lower_body_fixed_while_upper_body_breathes() {
         let foot = pos2(320.0, 410.0);
@@ -1653,77 +1370,6 @@ mod tests {
         }
     }
     #[test]
-    fn all_equipped_firearm_bores_track_every_quadrant_from_the_displayed_tip() {
-        let atlas = rig_fixture();
-        for npc in [false, true] {
-            for weapon in WeaponClass::ALL {
-                for degrees in [-179_f32, -135., -90., -45., 0., 45., 90., 135., 179.] {
-                    for recoil in [0., 0.5, 1.] {
-                        let center = pos2(200., 180.);
-                        let size = vec2(60., 65.);
-                        let angle = degrees.to_radians();
-                        let motion = DefenderRigMotion {
-                            target: center + vec2(angle.cos(), angle.sin()) * 250.,
-                            weapon,
-                            recoil,
-                            lean: recoil * 0.06,
-                            reload: None,
-                            throwing: 0.,
-                            throw_kind: None,
-                            melee: 0.,
-                            brace: 0.,
-                            hit: 0.,
-                        };
-                        let body = RigBody::new(&atlas, npc, center, size, motion);
-                        let gun = RigGun::new(&atlas, &body, size, motion);
-                        let muzzle = gun.point(gun.muzzle);
-                        let breech = gun.point(gun.muzzle - vec2(30., 0.));
-                        let bore = (muzzle - breech).normalized();
-                        let desired = (motion.target - muzzle).normalized();
-                        assert!(
-                            bore.dot(desired) > 0.99999,
-                            "{weapon:?}, {degrees}°, recoil={recoil}: {bore:?}/{desired:?}"
-                        );
-                        assert_eq!(gun.point(gun.grip), gun.pivot);
-                    }
-                }
-            }
-        }
-    }
-    #[test]
-    fn aiming_reloading_and_throwing_leave_every_lower_body_vertex_fixed() {
-        let atlas = rig_fixture();
-        let mut bases = Vec::new();
-        for (target, reload, throwing) in [
-            (pos2(400., 20.), None, 0.),
-            (pos2(10., 300.), Some(0.5), 0.),
-            (pos2(400., 300.), None, 0.8),
-        ] {
-            let body = RigBody::new(
-                &atlas,
-                false,
-                pos2(200., 180.),
-                vec2(60., 65.),
-                DefenderRigMotion {
-                    target,
-                    weapon: WeaponClass::Pistol,
-                    recoil: 1.,
-                    lean: 0.1,
-                    reload,
-                    throwing,
-                    throw_kind: Some(OrdnanceKind::Grenade),
-                    melee: 0.,
-                    brace: 0.,
-                    hit: 0.,
-                },
-            );
-            let lower = [body.source[0], body.split, body.source[2], body.source[3]];
-            bases.push(crop_destination(body.rect, body.source, lower));
-        }
-        assert_eq!(bases[0], bases[1]);
-        assert_eq!(bases[1], bases[2]);
-    }
-    #[test]
     fn every_settled_body_is_batched_without_a_count_cap() {
         let ctx = bevy_egui::egui::Context::default();
         let mut output = ctx.run_ui(Default::default(), |ui| {
@@ -1753,7 +1399,7 @@ mod tests {
         output.textures_delta.clear();
     }
     #[test]
-    fn measured_rig_preserves_boots_and_every_muzzle_is_a_solid_source_pixel() {
+    fn weapon_icon_atlas_cells_cover_every_firearm_and_ordnance_icon_with_solid_pixels() {
         let image = Image::from_buffer(
             include_bytes!("../../../assets/art/pixel/defender-rig-v1.png"),
             bevy::image::ImageType::Extension("png"),
@@ -1764,15 +1410,13 @@ mod tests {
         )
         .unwrap();
         let atlas = RigAtlas::from_image(&image);
-        assert!(atlas.cells[0][3] >= 373. && atlas.cells[1][3] >= 368.);
-        assert!(atlas.cells[4][1] > atlas.cells[0][3]);
         let pixels = image.data.as_ref().unwrap();
-        for point in atlas.gun_muzzles.into_iter().chain(atlas.throw_hands) {
-            let offset = (point.y as u32 * image.width() + point.x as u32) as usize * 4;
-            assert!(
-                pixels[offset + 3] >= 128,
-                "A calibrated tip must lie on the actual displayed source: {point:?}"
-            );
+        for cell in [4, 5, 6, 7, 8, 9, 10, 11, 12, 13] {
+            let [left, top, right, bottom] = atlas.cells[cell];
+            let solid = (top as u32..bottom as u32)
+                .flat_map(|y| (left as u32..right as u32).map(move |x| (x, y)))
+                .any(|(x, y)| pixels[((y * image.width() + x) * 4 + 3) as usize] >= 128);
+            assert!(solid, "Icon cell {cell} must contain displayed source art");
         }
     }
     #[test]

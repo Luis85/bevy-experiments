@@ -2,6 +2,8 @@
 //! are never claimed as balance proof or used by the ordinary user profile.
 use super::*;
 
+mod player_model;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum GestureFixture {
     Throws,
@@ -216,9 +218,9 @@ pub(super) fn model_workshop(root: &mut egui::Ui, f: &Frontend) -> bool {
             });
             let rect = ui.available_rect_before_wrap();
             if compare {
-                crate::visual_assets::rig_comparison(ui.painter(), f.textures, rect);
+                player_model::rig_comparison(ui.painter(), f.textures, rect);
             } else {
-                crate::visual_assets::rig_review(ui.painter(), f.textures, rect);
+                player_model::rig_review(ui.painter(), f.textures, rect);
             }
         });
     true

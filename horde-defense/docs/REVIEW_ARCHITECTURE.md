@@ -107,7 +107,7 @@ The facade and draw/publication entry point now remain in `ui.rs`; presentation
 screens live in `ui/menu.rs`, `camp.rs`, `character.rs`, `armory.rs`,
 `progression.rs`, `battle.rs`, `results.rs`, `preferences.rs` and `operations.rs`.
 `inspector.rs` reads actual enemy/structure state and authoritative resolution
-logs. `ui/review.rs` owns explicitly staged startup/practice scenarios; fixture
+logs. `ui/review/mod.rs` owns explicitly staged startup/practice scenarios; fixture
 simulation does not run inside an ordinary widget layout callback.
 
 Held/pressed input publication forces personal combat to 1× even after an NPC

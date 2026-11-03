@@ -1,6 +1,5 @@
 //! One connected personal progression catalogue. All purchases use core preflight.
 use super::*;
-#[path = "upgrade_graph.rs"]
 mod upgrade_graph;
 use upgrade_graph::{Graph, Node, View};
 
