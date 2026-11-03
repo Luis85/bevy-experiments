@@ -2,6 +2,7 @@ use crate::{
     animation::{self, ActorPose, ParticleKind, SceneCache},
     visual_assets::{self, Actor, ArtTextures, HitFlash, Prop, PropMotion},
 };
+use bevy::log::warn;
 use bevy_egui::egui::{
     self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, Vec2, pos2, vec2,
 };
@@ -1260,7 +1261,7 @@ fn player_model_error(p: &Painter, origin: Pos2, error: &str) {
         }
     });
     if changed {
-        eprintln!("Survivor artwork unavailable: {error}");
+        warn!("Survivor artwork unavailable: {error}");
     }
     p.text(
         origin,

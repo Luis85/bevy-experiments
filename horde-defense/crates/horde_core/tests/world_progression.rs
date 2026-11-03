@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 mod support;
 use horde_core::{
     campaign::Campaign,

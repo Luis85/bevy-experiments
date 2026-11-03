@@ -353,7 +353,7 @@ pub fn register(
                 max_texture_side,
             );
             if let Err(error) = &uploaded {
-                eprintln!("{error}");
+                warn!("{error}");
             }
             uploaded
         });

@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 //! CPU-only peak-encounter measurement. Fixture creation and resets are excluded;
 //! cap replenishment and the complete authoritative fixed step are included.
 use horde_core::{

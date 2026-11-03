@@ -11,7 +11,21 @@ license = "MIT"
 
 [profile.dev]
 opt-level = 1
-debug = 0
+debug = "line-tables-only"
 
 [profile.dev.package."*"]
 opt-level = 2
+
+# Optimised build with line tables so crash backtraces stay readable.
+[profile.playtest]
+inherits = "release"
+debug = "line-tables-only"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+print_stdout = "warn"
+print_stderr = "warn"
+todo = "warn"

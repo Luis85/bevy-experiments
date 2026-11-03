@@ -10,6 +10,15 @@ impl Game {
         decode_generation(bytes)
     }
     pub fn save(&self, path: &Path) -> Result<(), String> {
+        tracing::info!(path = %path.display(), "save started");
+        let result = self.save_inner(path);
+        match &result {
+            Ok(()) => tracing::info!(path = %path.display(), "save succeeded"),
+            Err(reason) => tracing::warn!(path = %path.display(), %reason, "save failed"),
+        }
+        result
+    }
+    fn save_inner(&self, path: &Path) -> Result<(), String> {
         validate_game(self, usize::from(self.worker))?;
         let payload = serde_json::to_string(self).map_err(|e| e.to_string())?;
         let envelope = SaveEnvelope {
@@ -21,12 +30,21 @@ impl Game {
         commit_generation(path, &bytes, MAX_GENERATION_BYTES)
     }
     pub fn load(path: &Path) -> Result<Self, String> {
-        match read_save(path) {
+        tracing::info!(path = %path.display(), "load started");
+        let result = match read_save(path) {
             Ok(game) => Ok(game),
-            Err(primary) => read_save(&path.with_extension("bak")).map_err(|backup| {
-                format!("Save recovery failed. Primary: {primary}. Backup: {backup}")
-            }),
+            Err(primary) => {
+                tracing::warn!(path = %path.display(), reason = %primary, "primary save unreadable, trying backup");
+                read_save(&path.with_extension("bak")).map_err(|backup| {
+                    format!("Save recovery failed. Primary: {primary}. Backup: {backup}")
+                })
+            }
+        };
+        match &result {
+            Ok(_) => tracing::info!(path = %path.display(), "load succeeded"),
+            Err(reason) => tracing::warn!(path = %path.display(), %reason, "load failed"),
         }
+        result
     }
 }
 

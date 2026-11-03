@@ -125,6 +125,10 @@ Default keys: primary mouse fires the equipped gun (or a press throws the select
 
 Save and return to the menu, quit, and continue the same deployment. Reload progress, actions, positions, RNG and banked rewards should resume together. A save failure keeps the application open and reports the failure. Never remove a save to test recovery. Use separate practice or `LASTLIGHT_SAVE_DIR` instead.
 
+## Logs and crash reports
+
+Each run writes `%LOCALAPPDATA%\LastlightHordeDefense\logs\lastlight-<unix-timestamp>.log` (or `<LASTLIGHT_SAVE_DIR>\logs\`); the newest 10 are kept. If the game crashes it also writes `crash-<unix-timestamp>.txt` in that folder with the version, OS, panic message and backtrace. Send the newest crash file and log with your feedback. Set `RUST_LOG` to change verbosity; the default is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`.
+
 ## Atmosphere and feedback pass
 
 Keep your ordinary campaign intact and use practice or a separate `LASTLIGHT_SAVE_DIR` for this comparison. Inspect a temperate daytime location, an arid approach, a cold region and a rainy authored stage. Scene tags choose the environmental layers; clear weather must not acquire rain just because its biome is tropical. Bird-like nature calls are absent at night. Changing region or opening an observed expedition should crossfade the environment rather than restart it abruptly.

@@ -40,10 +40,18 @@ fn take_work() -> [f64; 3] {
     std::array::from_fn(|i| WORK_NS[i].swap(0, Ordering::Relaxed) as f64 / 1_000_000.)
 }
 fn bounded_count(value: Option<&str>, default: u32, min: u32, max: u32) -> u32 {
-    value
-        .and_then(|v| v.parse::<u32>().ok())
-        .filter(|v| (min..=max).contains(v))
-        .unwrap_or(default)
+    let Some(raw) = value else {
+        return default;
+    };
+    match raw.parse::<u32>() {
+        Ok(v) if (min..=max).contains(&v) => v,
+        _ => {
+            warn!(
+                "Ignoring out-of-range diagnostic count {raw:?} (allowed {min}..={max}); using {default}"
+            );
+            default
+        }
+    }
 }
 
 #[derive(Default)]
@@ -277,16 +285,14 @@ pub fn capture_performance(
     })();
     match result {
         Ok(()) => {
-            println!("Native frame evidence: {}", path.display());
+            info!("Native frame evidence: {}", path.display());
             // The ordinary persistence service owns the durable close barrier.
             // Do not exit over an older periodic checkpoint still in flight.
             frontend.request_save(crate::runner::SaveIntent::Quit);
         }
         Err(error) => {
-            eprintln!("Frame report failed: {error}");
-            exit.write(AppExit::Error(
-                std::num::NonZeroU8::new(1).expect("nonzero"),
-            ));
+            error!("Frame report failed: {error}");
+            exit.write(AppExit::error());
         }
     }
 }

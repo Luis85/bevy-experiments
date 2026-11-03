@@ -58,7 +58,7 @@ pub fn capture_frames(
         if let Some(directory) = &state.directory
             && let Err(error) = prepare_directory(directory)
         {
-            eprintln!("Animation export requires a fresh directory: {error}");
+            error!("Animation export requires a fresh directory: {error}");
             state.done = true;
             exit.write(AppExit::error());
             return;
@@ -71,7 +71,9 @@ pub fn capture_frames(
     let frame = state.frame;
     frontend.schedule_gesture_review(frame);
     if frame >= FIRST && (frame - FIRST).is_multiple_of(STEP) && (frame - FIRST) / STEP < COUNT {
-        let directory = state.directory.as_ref().unwrap().clone();
+        let Some(directory) = state.directory.clone() else {
+            return;
+        };
         let file = format!("frame-{:04}.png", (frame - FIRST) / STEP);
         commands
             .spawn(Screenshot::primary_window())
@@ -119,14 +121,16 @@ pub fn capture_frames(
     }
     if frame >= FIRST + STEP * (COUNT - 1) + 32 {
         state.done = true;
-        let directory = state.directory.as_ref().unwrap();
+        let Some(directory) = state.directory.as_ref() else {
+            return;
+        };
         let valid = state.records.len() == COUNT as usize
             && state
                 .records
                 .iter()
                 .all(|r| directory.join(&r.file).is_file());
         if !valid {
-            eprintln!("Animation export did not produce every frame");
+            error!("Animation export did not produce every frame");
             exit.write(AppExit::error());
             return;
         }
@@ -138,11 +142,11 @@ pub fn capture_frames(
             });
         match result {
             Ok(()) => {
-                println!("Animation evidence: {}", directory.display());
+                info!("Animation evidence: {}", directory.display());
                 exit.write(AppExit::Success);
             }
             Err(e) => {
-                eprintln!("Animation manifest failed: {e}");
+                error!("Animation manifest failed: {e}");
                 exit.write(AppExit::error());
             }
         }

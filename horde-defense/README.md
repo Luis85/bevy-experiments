@@ -28,7 +28,7 @@ The smoke check validates authored content and an identical save/resume round tr
 pwsh -NoProfile -File scripts/package_playtest.ps1
 ```
 
-The script creates a versioned Windows x64 folder and ZIP under `target/playtest/`, with the executable, pixel art, audio, font/geography notices, editable content JSON, manifest and playtest documentation. `Play Lastlight.cmd` opens the ordinary persistent campaign; `Battle practice.cmd` and `Strategy practice.cmd` open separate resumable practice profiles with clearly staged resources. No Rust installation is needed to run this build. See the [playtest guide](docs/PLAYTEST_GUIDE.md).
+The script builds the `playtest` profile (release optimisation with line tables for readable crash backtraces) by default; pass `-Profile debug` or `-Profile release` to choose another. It creates a versioned Windows x64 folder and ZIP under `target/playtest/`, with the executable, pixel art, audio, font/geography notices, editable content JSON, manifest and playtest documentation. `Play Lastlight.cmd` opens the ordinary persistent campaign; `Battle practice.cmd` and `Strategy practice.cmd` open separate resumable practice profiles with clearly staged resources. No Rust installation is needed to run this build. See the [playtest guide](docs/PLAYTEST_GUIDE.md).
 
 The packaged launchers load `content/world.json`, `content/encounters.json`, `content/skills.json`, `content/enemy_catalog.json` `content/ordnance.json`, `content/progression.json`, `content/quality.json` and `content/balance.json` through the same validated override interfaces as development. Changes load on restart; use separate saves when testing incompatible content changes.
 
@@ -101,6 +101,10 @@ Later milestones add recruiting local survivors, parallel autonomous country bat
 On Windows, saves and settings live under `%LOCALAPPDATA%\LastlightHordeDefense`. Set `LASTLIGHT_SAVE_DIR` to use a separate campaign directory, useful for testing. If `LOCALAPPDATA` is absent, the fallback is `saves/` relative to the working directory. Runtime saves and build products are not source assets.
 
 The game serializes campaign, armory, active encounters, action timers, random state, reward accounting, recruited survivors and strategic pressure together. Saves use a versioned envelope, checksum, synchronized temporary write and a previous-generation backup. Save and quit acknowledges a completed save before closing. No progress is simulated while closed. Unreadable generations are preserved before replacement. Format v1 has a technical 64 MiB encoded-generation ceiling: oversized writes fail before touching existing saves, and no collected loot is discarded. See the acceptance ledger for exact persistence evidence.
+
+## Logging and crash reports
+
+The game logs through Bevy's `LogPlugin` to the console and to a plain-text file, `<save dir>\logs\lastlight-<unix-timestamp>.log` (the save directory is described above; the newest 10 log files are kept). The default filter is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`. Set `RUST_LOG` (for example `RUST_LOG=horde_core=debug,warn`) to replace it entirely. A panic also writes `<save dir>\logs\crash-<unix-timestamp>.txt` with the version, OS, panic message and location, and a backtrace. Attach the newest crash file and log to any bug report. `--smoke` keeps its plain stdout report, which `scripts/verify_playtest.ps1` reads.
 
 ## Develop and verify
 
