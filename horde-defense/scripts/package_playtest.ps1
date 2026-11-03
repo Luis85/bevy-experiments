@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('debug', 'release')][string]$Profile = 'debug',
+    [ValidateSet('debug', 'release', 'playtest')][string]$Profile = 'playtest',
     [string]$OutputDirectory = 'target/playtest'
 )
 $ErrorActionPreference = 'Stop'
@@ -9,6 +9,7 @@ Push-Location $workspace
 try {
     $buildArguments = @('build', '--locked', '-p', 'horde-defense')
     if ($Profile -eq 'release') { $buildArguments += '--release' }
+    elseif ($Profile -ne 'debug') { $buildArguments += @('--profile', $Profile) }
     & cargo @buildArguments
     if ($LASTEXITCODE -ne 0) { throw 'Playtest executable build failed' }
     $outputRoot = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { [System.IO.Path]::GetFullPath((Join-Path $workspace $OutputDirectory)) }

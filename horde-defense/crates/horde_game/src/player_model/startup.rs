@@ -27,13 +27,17 @@ static ACTIVE: OnceLock<Result<StartupPlayerModels, String>> = OnceLock::new();
 pub fn initialize_player_models(asset_root: &Path) -> Result<(), String> {
     match ACTIVE.get_or_init(|| {
         let loaded = load_from_asset_root(asset_root)?;
-        eprintln!(
-            "Player models: {} models, {} sources from {} (asset root {})",
-            loaded.catalogue.models.len(),
-            loaded.catalogue.sources.len(),
-            loaded.provenance,
-            loaded.asset_root.display()
-        );
+        // Runs before LogPlugin installs the subscriber, so stderr is the only channel.
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!(
+                "Player models: {} models, {} sources from {} (asset root {})",
+                loaded.catalogue.models.len(),
+                loaded.catalogue.sources.len(),
+                loaded.provenance,
+                loaded.asset_root.display()
+            );
+        }
         Ok(loaded)
     }) {
         Ok(_) => Ok(()),

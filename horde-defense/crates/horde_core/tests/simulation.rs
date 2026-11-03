@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 mod support;
 use horde_core::content::{EnemyKind, Mode, StructureKind, content};
 use horde_core::sim::{DEFENSE_LINE, Game, Input, Outcome};

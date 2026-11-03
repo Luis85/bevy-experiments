@@ -1,3 +1,4 @@
+#![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 //! Earned-reward progression proof. The controller reads only current enemies;
 //! it receives no free purchases, loadout drops or authoritatively altered hits.
 use horde_core::{

@@ -9,6 +9,7 @@ mod diagnostics;
 mod environment;
 mod gear_appearance;
 mod inspector;
+mod logging;
 mod player_model;
 mod runner;
 mod settings;
@@ -34,11 +35,20 @@ fn validate_startup_catalogs() -> Result<(), String> {
     horde_core::balance::catalog().validate()?;
     player_model::startup::initialize_player_models(&asset_directory())?;
     for (name, source) in environment::catalog_sources() {
-        eprintln!("Lastlight catalogue {name}: {source}");
+        // Runs before LogPlugin installs the subscriber, so stderr is the only channel.
+        #[allow(clippy::print_stderr)]
+        {
+            eprintln!("Lastlight catalogue {name}: {source}");
+        }
     }
     Ok(())
 }
+// Startup validation and `--smoke` run before LogPlugin installs the subscriber, and
+// scripts (verify_playtest.ps1) read the smoke report from stdout, so these keep
+// plain stdout/stderr.
+#[allow(clippy::print_stdout, clippy::print_stderr)]
 fn main() -> AppExit {
+    logging::install_panic_hook();
     if let Err(error) = validate_startup_catalogs() {
         eprintln!("Invalid startup content: {error}");
         return AppExit::error();
@@ -67,6 +77,7 @@ fn main() -> AppExit {
             || environment::flag("LASTLIGHT_PRACTICE")
             || !environment::flag("LASTLIGHT_REVIEW_MOTION")
         {
+            // Before LogPlugin is installed, so stderr is the only channel.
             eprintln!(
                 "Animation export requires an isolated motion review and cannot be combined with performance measurement or a persistent campaign"
             );
@@ -82,6 +93,12 @@ fn main() -> AppExit {
         .insert_resource(Time::<Fixed>::from_hz(60.0))
         .add_plugins(
             DefaultPlugins
+                // `RUST_LOG`, when set, overrides this filter entirely.
+                .set(bevy::log::LogPlugin {
+                    filter: logging::DEFAULT_FILTER.into(),
+                    custom_layer: logging::file_layer,
+                    ..default()
+                })
                 .set(AssetPlugin {
                     file_path: asset_directory().to_string_lossy().into_owned(),
                     ..default()
@@ -221,7 +238,7 @@ fn capture(
         if let Some(folder) = path.parent()
             && let Err(error) = std::fs::create_dir_all(folder)
         {
-            eprintln!("Could not create screenshot folder: {error}");
+            error!("Could not create screenshot folder: {error}");
             return;
         }
         if let Some(report_path) = environment::path("LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT")
@@ -243,7 +260,7 @@ fn capture(
                     std::fs::write(&report_path, bytes).map_err(|error| error.to_string())
                 });
             if let Err(error) = result {
-                eprintln!("Native player-model review manifest failed: {error}");
+                error!("Native player-model review manifest failed: {error}");
                 exit.write(AppExit::error());
                 return;
             }
@@ -267,7 +284,7 @@ fn capture(
         {
             exit.write(AppExit::Success);
         } else if state.frames >= 120 {
-            eprintln!("Native capture timed out before assets or the completed PNG were ready");
+            error!("Native capture timed out before assets or the completed PNG were ready");
             exit.write(AppExit::error());
         }
     }
