@@ -89,7 +89,6 @@ fn main() -> AppExit {
     // Performance sampling keeps ordinary window scheduling. Only deterministic
     // visual export above overrides time and redraw cadence.
     app.insert_resource(ClearColor(Color::srgb(0.067, 0.09, 0.094)))
-        .insert_resource(ui::Frontend::load())
         .insert_resource(Time::<Fixed>::from_hz(60.0))
         .add_plugins(
             DefaultPlugins
@@ -119,6 +118,8 @@ fn main() -> AppExit {
                     ..default()
                 }),
         )
+        // After LogPlugin so Game::load startup events reach the console and log file.
+        .insert_resource(ui::Frontend::load())
         .add_plugins(EguiPlugin::default())
         .add_plugins(atmosphere_audio::AtmosphereAudioPlugin)
         .add_systems(
