@@ -24,3 +24,6 @@
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Agent scratch reports
+/.sdd/
