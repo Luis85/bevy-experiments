@@ -2,6 +2,7 @@ mod journey;
 mod parallel;
 mod persistence;
 pub use journey::JourneyContinuation;
+pub use parallel::SettlementIssue;
 use persistence::validate_game;
 
 use crate::campaign::{Campaign, DefenderProfile};
@@ -406,6 +407,17 @@ pub struct Attempt {
     caller_lanes: Option<[u8; 2]>,
 }
 impl Attempt {
+    /// The surviving structures as a reusable country layout plan.
+    pub fn structure_layout(&self) -> Vec<crate::campaign::Placement> {
+        self.structures
+            .iter()
+            .map(|s| crate::campaign::Placement {
+                kind: s.kind,
+                lane: usize::from(s.lane),
+                column: usize::from(s.column),
+            })
+            .collect()
+    }
     /// Saved authoritative clock; transient presentation events may expire first.
     pub fn brace_remaining_ticks(&self) -> u32 {
         self.brace_left
@@ -631,6 +643,9 @@ pub struct Game {
     pub global_paused: bool,
     #[serde(default)]
     worker: bool,
+    /// Transient settlement failures awaiting a frontend; never persisted.
+    #[serde(skip)]
+    settlement_issues: Vec<SettlementIssue>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ParallelBattle {
@@ -662,10 +677,22 @@ impl Default for Game {
             battles: vec![],
             global_paused: false,
             worker: false,
+            settlement_issues: Vec::new(),
         }
     }
 }
 impl Game {
+    /// An expedition that has not yet settled back into the shared campaign.
+    pub fn active_battle(&self, id: u64) -> Option<&ParallelBattle> {
+        self.battles.iter().find(|b| b.id == id && !b.settled)
+    }
+    pub fn active_battle_mut(&mut self, id: u64) -> Option<&mut ParallelBattle> {
+        self.battles.iter_mut().find(|b| b.id == id && !b.settled)
+    }
+    /// Drains settlement failures recorded since the last call.
+    pub fn take_settlement_issues(&mut self) -> Vec<SettlementIssue> {
+        std::mem::take(&mut self.settlement_issues)
+    }
     pub fn sale_preview(&self, id: u64) -> Result<crate::strategy::StrategySaleQuote, String> {
         self.strategy.sale_preview(&self.campaign, id)
     }
@@ -1034,15 +1061,7 @@ impl Game {
             .country_id
             .as_deref()
             .ok_or("This is not a country deployment")?;
-        let layout = a
-            .structures
-            .iter()
-            .map(|s| crate::campaign::Placement {
-                kind: s.kind,
-                lane: usize::from(s.lane),
-                column: usize::from(s.column),
-            })
-            .collect();
+        let layout = a.structure_layout();
         self.campaign.save_country_layout(country, layout)
     }
     /// Clear the selected country's plan without removing deployed structures.

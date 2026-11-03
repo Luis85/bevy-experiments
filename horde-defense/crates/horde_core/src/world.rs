@@ -513,9 +513,16 @@ impl WorldProgress {
     /// legal, but cannot clear a different stage or reopen neighboring rewards.
     /// Returns true only for the transaction that newly clears this country.
     pub fn record_clear(&mut self, stage: usize) -> Result<bool, String> {
-        let country = self
+        let id = self
             .active_country()
-            .ok_or("Select a starting country first")?;
+            .ok_or("Select a starting country first")?
+            .id
+            .clone();
+        self.record_clear_in(&id, stage)
+    }
+    /// Records a stage clear for an explicit country, independent of `active`.
+    pub fn record_clear_in(&mut self, id: &str, stage: usize) -> Result<bool, String> {
+        let country = world().country(id).ok_or("Unknown country")?;
         let id = country.id.clone();
         let count = country.level_count();
         let completed = self.completed(&id);

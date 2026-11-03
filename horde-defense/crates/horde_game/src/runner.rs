@@ -4,10 +4,9 @@
 use crate::settings::{self, Settings};
 use bevy::{app::AppExit, prelude::*};
 use horde_core::{
-    campaign::NpcTraining,
-    content::{Mode, Policy, StructureKind},
-    sim::{Attempt, Event, EventKind, Game, Input},
-    strategy::RecruitStatus,
+    command::{Command, CommandOutcome},
+    content::{Mode, StructureKind},
+    sim::{Attempt, Event, EventKind, Game, Input, SettlementIssue},
 };
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -22,122 +21,30 @@ pub enum SaveIntent {
     SettingsBack,
     Autosave,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct NpcTactics {
-    pub policy: Policy,
-    pub prefer_aim: bool,
-    pub early_reload: bool,
-    pub allow_risk: bool,
-    pub recall_percent: u32,
-}
+/// Queue entry published by the frontend: gameplay commands applied through
+/// `Game::apply`, plus the durable reset and save intents the runner owns.
 #[derive(Clone, Debug, PartialEq)]
-pub enum GameCommand {
+pub enum AppCommand {
+    /// Serialized storage barrier; never reaches `Game::apply`.
     NewJourney,
-    ContinueJourney,
-    LeaveJourney,
-    SetBalance(horde_core::balance::BalanceSettings),
-    ChooseSurvivor(horde_core::survivors::SurvivorId),
-    ChooseStart(String),
-    EnterCountry(String),
-    Deploy {
-        stage: usize,
-        mode: Mode,
-    },
-    Withdraw,
-    SetPaused(bool),
-    Place {
-        kind: StructureKind,
-        lane: u8,
-        column: u8,
-    },
-    Salvage(u64),
-    SaveStartingLayout,
-    SaveExpeditionLayout(u64),
-    ClearExpeditionLayout(u64),
-    ClearLayout,
-    RespecPlayer,
-    BuySkillNode(String),
-    BuyItem(usize),
-    Equip {
-        mode: Mode,
-        id: u64,
-    },
-    Lock {
-        id: u64,
-        locked: bool,
-    },
-    Favorite {
-        id: u64,
-        favorite: bool,
-    },
-    SellItem(u64),
-    SellUnprotected,
-    SavePreset {
-        name: String,
-        mode: Mode,
-    },
-    ApplyPreset {
-        index: usize,
-        mode: Mode,
-    },
-    BuyNpcPoint,
-    TrainNpc(NpcTraining),
-    RespecNpc,
-    SetNpcPolicy(NpcTactics),
-    Recruit(String),
-    EquipRecruit {
-        id: u64,
-        item: u64,
-    },
-    TrainRecruit {
-        id: u64,
-        training: NpcTraining,
-    },
-    BuyRecruitPoint(u64),
-    SetRecruitPolicy {
-        id: u64,
-        policy: Policy,
-    },
-    AssignGuard {
-        id: u64,
-        country: String,
-    },
-    ReleaseGuard(u64),
-    DeploySurvivor {
-        id: u64,
-        country: String,
-        stage: usize,
-    },
-    CountryOperation {
-        id: u64,
-        country: String,
-    },
-    RecallSurvivor(u64),
-    PlaceExpedition {
-        battle: u64,
-        kind: StructureKind,
-        lane: u8,
-        column: u8,
-    },
-    SalvageExpedition {
-        battle: u64,
-        structure: u64,
-    },
     Save(SaveIntent),
+    Game(Command),
+}
+impl From<Command> for AppCommand {
+    fn from(command: Command) -> Self {
+        Self::Game(command)
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum CommandOutcome {
+pub enum AppOutcome {
+    Command(CommandOutcome),
     JourneyArchived(Option<PathBuf>),
-    CountryLiberated,
-    Applied,
-    Id(u64),
-    Amount(u64),
 }
 #[derive(Clone, Debug)]
 pub enum RuntimeNotice {
     CommandCompleted {
-        command: GameCommand,
-        result: Result<CommandOutcome, String>,
+        command: AppCommand,
+        result: Result<AppOutcome, String>,
         success: String,
     },
     Saved {
@@ -146,6 +53,8 @@ pub enum RuntimeNotice {
     },
     SimulationFinished,
     RecoveryCopies(Vec<PathBuf>),
+    /// Expedition transfers that could not be applied to the shared campaign.
+    SettlementIssues(Vec<SettlementIssue>),
 }
 /// Minimal bridge for the existing native frontend. Game remains an engine-free
 /// aggregate; this facade can later be split into independent Bevy resources.
@@ -184,7 +93,7 @@ impl Default for ControlFrame {
 }
 #[derive(Clone, Debug)]
 struct QueuedCommand {
-    command: GameCommand,
+    command: AppCommand,
     success: String,
 }
 use crate::audio::Cue as SoundCue;
@@ -229,7 +138,7 @@ impl SoundCue {
 #[derive(Debug, Default)]
 pub struct Runtime {
     frame: Option<u32>,
-    seen: Vec<GameCommand>,
+    seen: Vec<AppCommand>,
     queue: VecDeque<QueuedCommand>,
     controls: ControlFrame,
     pending: Input,
@@ -262,8 +171,8 @@ impl Runtime {
             || self.queue.iter().any(|q| {
                 matches!(
                     q.command,
-                    GameCommand::NewJourney
-                        | GameCommand::Save(
+                    AppCommand::NewJourney
+                        | AppCommand::Save(
                             SaveIntent::Menu | SaveIntent::Quit | SaveIntent::SettingsBack
                         )
                 )
@@ -276,8 +185,8 @@ impl Runtime {
                 .iter()
                 .any(|i| *i != SaveIntent::Autosave)
             || self.queue.iter().any(|q| {
-                matches!(q.command, GameCommand::NewJourney)
-                    || matches!(q.command,GameCommand::Save(intent) if intent!=SaveIntent::Autosave)
+                matches!(q.command, AppCommand::NewJourney)
+                    || matches!(q.command,AppCommand::Save(intent) if intent!=SaveIntent::Autosave)
             })
     }
     #[cfg(test)]
@@ -304,12 +213,13 @@ impl Runtime {
             self.seen.clear();
         }
     }
-    pub fn enqueue(&mut self, command: GameCommand, success: impl Into<String>) -> bool {
-        if matches!(command, GameCommand::NewJourney) && self.reset_in_progress() {
+    pub fn enqueue(&mut self, command: impl Into<AppCommand>, success: impl Into<String>) -> bool {
+        let command = command.into();
+        if matches!(command, AppCommand::NewJourney) && self.reset_in_progress() {
             return false;
         }
         if self.durable_transition_pending()
-            && !matches!(command, GameCommand::Save(_) | GameCommand::NewJourney)
+            && !matches!(command, AppCommand::Save(_) | AppCommand::NewJourney)
         {
             return false;
         }
@@ -526,39 +436,44 @@ pub fn flush<H: RuntimeHost>(host: &mut H) -> bool {
     };
     let mut commands = commands.into_iter();
     while let Some(queued) = commands.next() {
-        if matches!(queued.command, GameCommand::NewJourney) {
-            if let Err(error) = begin_new_journey(host, queued.success.clone()) {
-                host.runtime_notice(RuntimeNotice::CommandCompleted {
-                    command: queued.command,
-                    result: Err(error),
-                    success: queued.success,
-                });
+        // Save and reset intents are durable runner concerns; only gameplay
+        // commands reach `Game::apply`.
+        let command = match queued.command {
+            AppCommand::Game(command) => command,
+            AppCommand::Save(intent) => {
+                host.runtime_parts().1.request_save(intent);
+                continue;
             }
-            // Later save/close intents belong to the confirmed new epoch.
-            // They must survive this barrier and be recaptured after reset.
-            for trailing in commands.by_ref() {
-                if let GameCommand::Save(intent) = trailing.command {
-                    host.runtime_parts().1.request_save(intent);
-                } else {
+            AppCommand::NewJourney => {
+                if let Err(error) = begin_new_journey(host, queued.success.clone()) {
                     host.runtime_notice(RuntimeNotice::CommandCompleted {
-                        command: trailing.command,
-                        result: Err("Command superseded by the new journey transition".into()),
-                        success: trailing.success,
+                        command: AppCommand::NewJourney,
+                        result: Err(error),
+                        success: queued.success,
                     });
                 }
+                // Later save/close intents belong to the confirmed new epoch.
+                // They must survive this barrier and be recaptured after reset.
+                for trailing in commands.by_ref() {
+                    if let AppCommand::Save(intent) = trailing.command {
+                        host.runtime_parts().1.request_save(intent);
+                    } else {
+                        host.runtime_notice(RuntimeNotice::CommandCompleted {
+                            command: trailing.command,
+                            result: Err("Command superseded by the new journey transition".into()),
+                            success: trailing.success,
+                        });
+                    }
+                }
+                if !host.runtime_parts().1.reset_in_progress() {
+                    requeue_deferred_saves(host);
+                }
+                break;
             }
-            if !host.runtime_parts().1.reset_in_progress() {
-                requeue_deferred_saves(host);
-            }
-            break;
-        }
-        if let GameCommand::Save(intent) = queued.command {
-            host.runtime_parts().1.request_save(intent);
-            continue;
-        }
+        };
         if host.runtime_parts().1.durable_transition_pending() {
             host.runtime_notice(RuntimeNotice::CommandCompleted {
-                command: queued.command,
+                command: AppCommand::Game(command),
                 result: Err("Wait for the current durable transition to finish".into()),
                 success: queued.success,
             });
@@ -566,25 +481,35 @@ pub fn flush<H: RuntimeHost>(host: &mut H) -> bool {
         }
         let result = {
             let (game, runtime) = host.runtime_parts();
-            let result = apply(game, &queued.command);
+            let result = game.apply(&command);
             if result.is_ok() {
                 runtime.dirty = true;
-                if matches!(queued.command, GameCommand::LeaveJourney) {
+                if matches!(command, Command::LeaveJourney) {
                     runtime.request_save(SaveIntent::Menu);
                 }
-                if matches!(queued.command, GameCommand::Withdraw) {
+                if matches!(command, Command::Withdraw) {
                     runtime.sound(SoundCue::Retreat);
                 }
             }
             result
         };
         host.runtime_notice(RuntimeNotice::CommandCompleted {
-            command: queued.command,
-            result,
+            command: AppCommand::Game(command),
+            result: result
+                .map(AppOutcome::Command)
+                .map_err(|error| error.to_string()),
             success: queued.success,
         });
+        report_settlement_issues(host);
     }
     persist_pending(host)
+}
+/// Settlement runs inside ticks and recalls; its failures become one notice.
+fn report_settlement_issues<H: RuntimeHost>(host: &mut H) {
+    let issues = host.runtime_parts().0.take_settlement_issues();
+    if !issues.is_empty() {
+        host.runtime_notice(RuntimeNotice::SettlementIssues(issues));
+    }
 }
 /// The reset is a serialized storage barrier. Live state swaps only on its ack.
 fn begin_new_journey<H: RuntimeHost>(host: &mut H, success: String) -> Result<(), String> {
@@ -600,7 +525,7 @@ fn begin_new_journey<H: RuntimeHost>(host: &mut H, success: String) -> Result<()
         persistence::dedup(&mut cancelled, std::mem::take(&mut runtime.save_requests));
         runtime.reset_success = Some(success);
         runtime.seen.clear();
-        runtime.seen.push(GameCommand::NewJourney);
+        runtime.seen.push(AppCommand::NewJourney);
         runtime.clear_input();
         cancelled
     };
@@ -622,6 +547,7 @@ pub fn step<H: RuntimeHost>(host: &mut H) {
         runtime.observed_battle = observed;
         runtime.advance(game)
     };
+    report_settlement_issues(host);
     if finished {
         host.runtime_notice(RuntimeNotice::SimulationFinished);
     }
@@ -645,14 +571,17 @@ fn requeue_deferred_saves<H: RuntimeHost>(host: &mut H) {
         let mut deferred = std::mem::take(&mut runtime.save_requests);
         let mut rejected = Vec::new();
         for queued in std::mem::take(&mut runtime.queue) {
-            if let GameCommand::Save(intent) = queued.command {
+            if let AppCommand::Save(intent) = queued.command {
                 persistence::dedup(&mut deferred, [intent]);
             } else {
                 rejected.push(queued);
             }
         }
         runtime.seen.retain(|command| {
-            !matches!(command, GameCommand::Save(_) | GameCommand::SetPaused(true))
+            !matches!(
+                command,
+                AppCommand::Save(_) | AppCommand::Game(Command::SetPaused(true))
+            )
         });
         (deferred, rejected)
     };
@@ -669,14 +598,10 @@ fn requeue_deferred_saves<H: RuntimeHost>(host: &mut H) {
             SaveIntent::Menu | SaveIntent::Quit | SaveIntent::SettingsBack
         )
     }) {
-        host.runtime_parts()
-            .1
-            .enqueue(GameCommand::SetPaused(true), "");
+        host.runtime_parts().1.enqueue(Command::SetPaused(true), "");
     }
     for intent in deferred {
-        host.runtime_parts()
-            .1
-            .enqueue(GameCommand::Save(intent), "");
+        host.runtime_parts().1.enqueue(AppCommand::Save(intent), "");
     }
 }
 
@@ -711,7 +636,7 @@ fn poll_storage<H: RuntimeHost>(host: &mut H) -> bool {
                     runtime.dirty = false;
                     runtime.save_ticks = 0;
                     runtime.retry_save_at = 0;
-                    Ok(CommandOutcome::JourneyArchived(archive))
+                    Ok(AppOutcome::JourneyArchived(archive))
                 }
                 Ok(persistence::Commit::Saved) => {
                     Err("Storage reset acknowledgement did not match its command".into())
@@ -720,7 +645,7 @@ fn poll_storage<H: RuntimeHost>(host: &mut H) -> bool {
             };
             requeue_deferred_saves(host);
             host.runtime_notice(RuntimeNotice::CommandCompleted {
-                command: GameCommand::NewJourney,
+                command: AppCommand::NewJourney,
                 result,
                 success,
             });
@@ -1099,210 +1024,6 @@ pub fn load_profile(directory: PathBuf) -> LoadedProfile {
     }
 }
 
-fn apply(game: &mut Game, command: &GameCommand) -> Result<CommandOutcome, String> {
-    use CommandOutcome::{Amount, Applied, Id};
-    match command {
-        GameCommand::NewJourney => Err("New journey must use the durable reset service".into()),
-        GameCommand::ContinueJourney => game.continue_journey().map(|next| match next {
-            horde_core::sim::JourneyContinuation::Deployed => Applied,
-            horde_core::sim::JourneyContinuation::CountryLiberated => {
-                CommandOutcome::CountryLiberated
-            }
-        }),
-        GameCommand::LeaveJourney => {
-            game.leave_journey();
-            Ok(Applied)
-        }
-        GameCommand::SetBalance(settings) => game
-            .campaign
-            .set_balance_settings(settings.clone())
-            .map(|()| Applied),
-        GameCommand::ChooseSurvivor(id) => game.campaign.choose_survivor(*id).map(|()| Applied),
-        GameCommand::ChooseStart(id) => {
-            if game.campaign.selected_survivor.is_none() {
-                return Err("Choose your survivor before selecting a starting country".into());
-            }
-            let mut selected = game.clone();
-            selected.campaign.choose_start_country(id)?;
-            selected.deploy_country_stage(0, Mode::Personal)?;
-            selected.set_paused(false);
-            *game = selected;
-            Ok(Applied)
-        }
-        GameCommand::EnterCountry(id) => {
-            let mut selected = game.clone();
-            selected.campaign.enter_country(id)?;
-            let country = selected
-                .campaign
-                .world
-                .active_country()
-                .ok_or("No selected country")?;
-            if selected.campaign.world.completed(&country.id) >= country.level_count() {
-                *game = selected;
-                Ok(CommandOutcome::CountryLiberated)
-            } else {
-                let stage = selected.campaign.world.next_stage();
-                selected.deploy_country_stage(stage, Mode::Personal)?;
-                selected.set_paused(false);
-                *game = selected;
-                Ok(Applied)
-            }
-        }
-        GameCommand::Deploy { stage, mode } => {
-            game.deploy_country_stage(*stage, *mode)?;
-            game.set_paused(false);
-            Ok(Applied)
-        }
-        GameCommand::Withdraw => {
-            game.withdraw();
-            game.set_paused(true);
-            Ok(Applied)
-        }
-        GameCommand::SetPaused(paused) => {
-            game.set_paused(*paused);
-            Ok(Applied)
-        }
-        GameCommand::Place { kind, lane, column } => {
-            game.place(*kind, *lane, *column).map(|()| Applied)
-        }
-        GameCommand::Salvage(id) => game.salvage(*id).map(|amount| Amount(u64::from(amount))),
-        GameCommand::SaveStartingLayout => game.save_country_layout().map(|()| Applied),
-        GameCommand::ClearLayout => game.clear_country_layout().map(|()| Applied),
-        GameCommand::SaveExpeditionLayout(id) => {
-            let battle = game
-                .battles
-                .iter()
-                .find(|b| b.id == *id && !b.settled)
-                .ok_or("No active expedition with that ID")?;
-            let a = battle.game.attempt.as_ref().ok_or("Expedition has ended")?;
-            let country = battle.country_id.clone();
-            let layout = a
-                .structures
-                .iter()
-                .map(|s| horde_core::campaign::Placement {
-                    kind: s.kind,
-                    lane: usize::from(s.lane),
-                    column: usize::from(s.column),
-                })
-                .collect();
-            game.campaign
-                .save_country_layout(&country, layout)
-                .map(|()| Applied)
-        }
-        GameCommand::ClearExpeditionLayout(id) => {
-            let country = game
-                .battles
-                .iter()
-                .find(|b| b.id == *id && !b.settled)
-                .ok_or("No active expedition with that ID")?
-                .country_id
-                .clone();
-            game.campaign
-                .clear_country_layout(&country)
-                .map(|()| Applied)
-        }
-        GameCommand::RespecPlayer => game.campaign.respec_player().map(|()| Applied),
-        GameCommand::BuySkillNode(id) => game.campaign.purchase_node(id).map(|()| Applied),
-        GameCommand::BuyItem(index) => game.campaign.buy_item(*index).map(Id),
-        GameCommand::Equip { mode, id } => game.campaign.equip(*mode, *id).map(|()| Applied),
-        GameCommand::Lock { id, locked } => game.campaign.set_lock(*id, *locked).map(|()| Applied),
-        GameCommand::Favorite { id, favorite } => {
-            game.campaign.set_favorite(*id, *favorite).map(|()| Applied)
-        }
-        GameCommand::SellItem(id) => game.sell_item(*id).map(Amount),
-        GameCommand::SellUnprotected => game.sell_unprotected().map(Amount),
-        GameCommand::SavePreset { name, mode } => game
-            .campaign
-            .save_preset(name.clone(), *mode)
-            .map(|()| Applied),
-        GameCommand::ApplyPreset { index, mode } => {
-            game.campaign.apply_preset(*index, *mode).map(|()| Applied)
-        }
-        GameCommand::BuyNpcPoint => game.campaign.buy_training_point().map(|()| Applied),
-        GameCommand::TrainNpc(training) => game.campaign.train_npc(*training).map(|()| Applied),
-        GameCommand::RespecNpc => game.campaign.respec_npc().map(|()| Applied),
-        GameCommand::SetNpcPolicy(tactics) => {
-            if tactics.recall_percent > 75 {
-                return Err("Recall threshold must be between 0 and 75 percent".into());
-            }
-            let npc = &mut game.campaign.npc;
-            npc.policy = tactics.policy;
-            npc.prefer_aim = tactics.prefer_aim;
-            npc.early_reload = tactics.early_reload;
-            npc.allow_risk = tactics.allow_risk;
-            npc.recall_percent = tactics.recall_percent;
-            Ok(Applied)
-        }
-        GameCommand::Recruit(country) => game.strategy.recruit(&mut game.campaign, country).map(Id),
-        GameCommand::EquipRecruit { id, item } => game
-            .strategy
-            .equip_recruit(&game.campaign, *id, *item)
-            .map(|()| Applied),
-        GameCommand::TrainRecruit { id, training } => game
-            .strategy
-            .train_recruit(&mut game.campaign, *id, *training)
-            .map(|()| Applied),
-        GameCommand::BuyRecruitPoint(id) => game
-            .strategy
-            .buy_training_point(&mut game.campaign, *id)
-            .map(|()| Applied),
-        GameCommand::SetRecruitPolicy { id, policy } => {
-            let recruit = game
-                .strategy
-                .roster
-                .iter_mut()
-                .find(|r| r.id == *id)
-                .ok_or("Unknown survivor")?;
-            if recruit.status != RecruitStatus::Ready {
-                return Err("Recall the survivor before changing their preparation policy".into());
-            }
-            recruit.npc.policy = *policy;
-            Ok(Applied)
-        }
-        GameCommand::AssignGuard { id, country } => game
-            .strategy
-            .assign_guard(&mut game.campaign, *id, country)
-            .map(|()| Applied),
-        GameCommand::ReleaseGuard(id) => game
-            .strategy
-            .release_guard(&mut game.campaign, *id)
-            .map(|()| Applied),
-        GameCommand::DeploySurvivor { id, country, stage } => {
-            game.deploy_survivor(*id, country, *stage).map(Id)
-        }
-        GameCommand::CountryOperation { id, country } => {
-            game.deploy_country_operation(*id, country).map(Id)
-        }
-        GameCommand::RecallSurvivor(id) => game.recall_survivor(*id).map(|()| Applied),
-        GameCommand::PlaceExpedition {
-            battle,
-            kind,
-            lane,
-            column,
-        } => {
-            let worker = &mut game
-                .battles
-                .iter_mut()
-                .find(|b| b.id == *battle && !b.settled)
-                .ok_or("No active expedition with that ID")?
-                .game;
-            worker.place(*kind, *lane, *column).map(|()| Applied)
-        }
-        GameCommand::SalvageExpedition { battle, structure } => {
-            let worker = &mut game
-                .battles
-                .iter_mut()
-                .find(|b| b.id == *battle && !b.settled)
-                .ok_or("No active expedition with that ID")?
-                .game;
-            worker
-                .salvage(*structure)
-                .map(|amount| Amount(u64::from(amount)))
-        }
-        GameCommand::Save(_) => Ok(Applied),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1313,10 +1034,11 @@ mod tests {
         use horde_core::survivors::{Appearance, SurvivorId};
         let mut game = Game::default();
         let before = serde_json::to_value(&game).unwrap();
-        assert!(apply(&mut game, &GameCommand::ChooseStart("DEU".into())).is_err());
+        assert!(game.apply(&Command::ChooseStart("DEU".into())).is_err());
         assert_eq!(serde_json::to_value(&game).unwrap(), before);
-        apply(&mut game, &GameCommand::ChooseSurvivor(SurvivorId::June)).unwrap();
-        apply(&mut game, &GameCommand::ChooseStart("DEU".into())).unwrap();
+        game.apply(&Command::ChooseSurvivor(SurvivorId::June))
+            .unwrap();
+        game.apply(&Command::ChooseStart("DEU".into())).unwrap();
         assert_eq!(
             game.attempt.as_ref().unwrap().profile.appearance,
             Appearance::Female
@@ -1355,11 +1077,15 @@ mod tests {
     fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
         let mut game = Game::default();
         game.campaign.coins = 100;
-        apply(&mut game, &GameCommand::BuySkillNode("steady_hands".into())).unwrap();
+        game.apply(&Command::BuySkillNode("steady_hands".into()))
+            .unwrap();
         assert!(game.campaign.has_node("steady_hands"));
         assert_eq!(game.campaign.coins, 80);
         let before = game.clone();
-        assert!(apply(&mut game, &GameCommand::BuySkillNode("steady_hands".into())).is_err());
+        assert!(
+            game.apply(&Command::BuySkillNode("steady_hands".into()))
+                .is_err()
+        );
         assert_eq!(
             serde_json::to_value(game).unwrap(),
             serde_json::to_value(before).unwrap()
@@ -1625,13 +1351,13 @@ mod tests {
         host.runtime.begin_frame(20);
         assert!(
             host.runtime
-                .enqueue(GameCommand::BuySkillNode("quick_reload".into()), "Learned")
+                .enqueue(Command::BuySkillNode("quick_reload".into()), "Learned")
         );
         host.runtime.begin_frame(20);
         assert!(
             !host
                 .runtime
-                .enqueue(GameCommand::BuySkillNode("quick_reload".into()), "Learned")
+                .enqueue(Command::BuySkillNode("quick_reload".into()), "Learned")
         );
         assert!(!flush_for_test(&mut host));
         assert_eq!(host.game.campaign.coins, 75);
@@ -1644,6 +1370,80 @@ mod tests {
             1
         );
         assert!(host.directory.join("campaign.json").exists());
+    }
+    #[test]
+    fn rejected_commands_and_settlement_failures_reach_notices_as_text() {
+        let mut host = Host::new();
+        let tactics = horde_core::command::NpcTactics {
+            policy: host.game.campaign.npc.policy,
+            prefer_aim: false,
+            early_reload: false,
+            allow_risk: false,
+            recall_percent: 76,
+        };
+        host.runtime.enqueue(Command::SetNpcPolicy(tactics), "");
+        let countries: Vec<_> = horde_core::world::world()
+            .countries
+            .iter()
+            .take(4)
+            .map(|c| (c.id.clone(), c.level_count()))
+            .collect();
+        host.game
+            .campaign
+            .choose_start_country(&countries[0].0)
+            .unwrap();
+        for (id, count) in countries {
+            host.game
+                .campaign
+                .world
+                .country_levels
+                .insert(id.clone(), count);
+            host.game.campaign.world.cleared.push(id);
+        }
+        host.game.campaign.coins = 10_000;
+        host.game.campaign.attempts = 1;
+        let country = host.game.campaign.world.cleared[0].clone();
+        let recruit = host
+            .game
+            .strategy
+            .recruit(&mut host.game.campaign, &country)
+            .unwrap();
+        let battle = host.game.deploy_survivor(recruit, &country, 0).unwrap();
+        host.game.campaign.next_item_id = u64::MAX;
+        host.game.battles[0]
+            .game
+            .campaign
+            .add_item_with_quality(4, 9, None)
+            .unwrap();
+        host.runtime.enqueue(Command::RecallSurvivor(battle), "");
+        flush(&mut host);
+        assert!(host.notices.iter().any(|n| matches!(
+            n,
+            RuntimeNotice::CommandCompleted { result: Err(error), .. }
+                if error == "Recall threshold must be between 0 and 75 percent"
+        )));
+        assert!(host.notices.iter().any(|n| matches!(
+            n,
+            RuntimeNotice::CommandCompleted {
+                command: AppCommand::Game(Command::RecallSurvivor(_)),
+                result: Ok(AppOutcome::Command(CommandOutcome::Applied)),
+                ..
+            }
+        )));
+        let issues: Vec<_> = host
+            .notices
+            .iter()
+            .filter_map(|n| match n {
+                RuntimeNotice::SettlementIssues(issues) => Some(issues.clone()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(issues.len(), 1);
+        assert!(matches!(
+            issues[0].as_slice(),
+            [SettlementIssue::LootLost { battle: b, .. }] if *b == battle
+        ));
+        assert!(host.game.take_settlement_issues().is_empty());
     }
     #[test]
     fn pressed_reload_is_consumed_once_across_fixed_ticks_and_speed() {
@@ -1813,13 +1613,11 @@ mod tests {
         host.game = loaded.game;
         host.runtime.begin_frame(1);
         host.runtime.enqueue(
-            GameCommand::ChooseSurvivor(horde_core::survivors::SurvivorId::Rook),
+            Command::ChooseSurvivor(horde_core::survivors::SurvivorId::Rook),
             "Survivor selected",
         );
-        host.runtime.enqueue(
-            GameCommand::ChooseStart("DEU".into()),
-            "New country selected",
-        );
+        host.runtime
+            .enqueue(Command::ChooseStart("DEU".into()), "New country selected");
         assert!(!flush_for_test(&mut host));
         let copies: Vec<_> = host
             .notices
@@ -1906,15 +1704,15 @@ mod tests {
         let settings = std::fs::read(host.directory.join("settings.json")).unwrap();
         let before = state(&host.game);
         let balance = host.game.campaign.balance_settings.clone();
-        host.runtime.enqueue(GameCommand::NewJourney, "");
+        host.runtime.enqueue(AppCommand::NewJourney, "");
         assert!(!flush_for_test(&mut host));
         let archive = host
             .notices
             .iter()
             .find_map(|n| match n {
                 RuntimeNotice::CommandCompleted {
-                    command: GameCommand::NewJourney,
-                    result: Ok(CommandOutcome::JourneyArchived(Some(path))),
+                    command: AppCommand::NewJourney,
+                    result: Ok(AppOutcome::JourneyArchived(Some(path))),
                     ..
                 } => Some(path.clone()),
                 _ => None,
@@ -1953,14 +1751,14 @@ mod tests {
             } else {
                 std::fs::create_dir(path.with_extension("tmp")).unwrap();
             }
-            host.runtime.enqueue(GameCommand::NewJourney, "");
+            host.runtime.enqueue(AppCommand::NewJourney, "");
             assert!(!flush_for_test(&mut host));
             assert_eq!(state(&host.game), before);
             assert_eq!(std::fs::read(&path).unwrap(), saved);
             assert!(host.notices.iter().any(|n| matches!(
                 n,
                 RuntimeNotice::CommandCompleted {
-                    command: GameCommand::NewJourney,
+                    command: AppCommand::NewJourney,
                     result: Err(_),
                     ..
                 }
@@ -1980,7 +1778,7 @@ mod tests {
         host.game.set_paused(true);
         let coins = host.game.campaign.coins;
         let records = host.game.campaign.run_history.len();
-        host.runtime.enqueue(GameCommand::LeaveJourney, "");
+        host.runtime.enqueue(Command::LeaveJourney, "");
         flush_for_test(&mut host);
         let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
         assert!(!saved.campaign.journey_active);
@@ -2005,10 +1803,10 @@ mod tests {
         assert!(!flush(&mut host));
         gate.started();
         let original = state(&host.game);
-        host.runtime.enqueue(GameCommand::NewJourney, "");
+        host.runtime.enqueue(AppCommand::NewJourney, "");
         assert!(!flush(&mut host));
         host.runtime
-            .enqueue(GameCommand::BuySkillNode("steady_hands".into()), "");
+            .enqueue(Command::BuySkillNode("steady_hands".into()), "");
         assert!(!flush(&mut host));
         host.runtime.publish(ControlFrame {
             enabled: true,
@@ -2088,8 +1886,8 @@ mod tests {
             assert!(host.game.campaign.can_purchase_node("steady_hands").is_ok());
             let (service, gate) = persistence::gated();
             host.runtime.storage = service;
-            host.runtime.enqueue(GameCommand::SetPaused(true), "");
-            host.runtime.enqueue(GameCommand::Save(intent), "");
+            host.runtime.enqueue(Command::SetPaused(true), "");
+            host.runtime.enqueue(AppCommand::Save(intent), "");
             assert!(host.runtime.durable_transition_pending());
             assert!(!flush(&mut host));
             gate.started();
@@ -2098,10 +1896,10 @@ mod tests {
             assert!(
                 !host
                     .runtime
-                    .enqueue(GameCommand::BuySkillNode("steady_hands".into()), "")
+                    .enqueue(Command::BuySkillNode("steady_hands".into()), "")
             );
             assert!(!host.runtime.enqueue(
-                GameCommand::Deploy {
+                Command::Deploy {
                     stage: 0,
                     mode: Mode::Personal
                 },
@@ -2132,11 +1930,10 @@ mod tests {
         host.game.campaign.coins = 77;
         let (service, gate) = persistence::gated();
         host.runtime.storage = service;
-        host.runtime.enqueue(GameCommand::NewJourney, "");
+        host.runtime.enqueue(AppCommand::NewJourney, "");
         assert!(!flush(&mut host));
         assert!(gate.started().reset);
-        host.runtime
-            .enqueue(GameCommand::Save(SaveIntent::Quit), "");
+        host.runtime.enqueue(AppCommand::Save(SaveIntent::Quit), "");
         assert!(!flush(&mut host));
         gate.release();
         persistence::wait_for_test(&mut host.runtime.storage);
@@ -2161,14 +1958,11 @@ mod tests {
         host.game.campaign.coins = 77;
         let (service, gate) = persistence::gated();
         host.runtime.storage = service;
-        assert!(host.runtime.enqueue(GameCommand::NewJourney, ""));
+        assert!(host.runtime.enqueue(AppCommand::NewJourney, ""));
         // Native close normally enqueues these together. A queued reset may
         // reject this old-state pause; the deferred fresh pause is mandatory.
-        host.runtime.enqueue(GameCommand::SetPaused(true), "");
-        assert!(
-            host.runtime
-                .enqueue(GameCommand::Save(SaveIntent::Quit), "")
-        );
+        host.runtime.enqueue(Command::SetPaused(true), "");
+        assert!(host.runtime.enqueue(AppCommand::Save(SaveIntent::Quit), ""));
         assert!(!flush(&mut host));
         assert!(gate.started().reset);
         gate.release();

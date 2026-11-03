@@ -36,7 +36,7 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut Frontend, accent: f32) {
                         f.open_history();
                     }
                     if f.screen == Screen::Camp && ui.small_button("Menu").clicked() {
-                        f.dispatch(GameCommand::SetPaused(true), "");
+                        f.dispatch(Command::SetPaused(true), "");
                         f.request_save(SaveIntent::Menu);
                     }
                     ui.colored_label(AMBER, format!("{} coins", f.game.campaign.coins));
@@ -51,7 +51,7 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut Frontend, accent: f32) {
                             ))
                             .clicked()
                     {
-                        f.dispatch(GameCommand::SetPaused(true), "");
+                        f.dispatch(Command::SetPaused(true), "");
                         f.fire_latched = false;
                         f.screen = Screen::Camp;
                         f.tab = Tab::Operations;
@@ -189,7 +189,7 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut Frontend) {
                     ui.label(format!("{fields} live expeditions"));
                     if ui.button("View live fields").clicked() {
                         if f.screen != Screen::Camp {
-                            f.dispatch(GameCommand::SetPaused(true), "");
+                            f.dispatch(Command::SetPaused(true), "");
                         }
                         f.screen = Screen::Camp;
                         f.tab = Tab::Operations;

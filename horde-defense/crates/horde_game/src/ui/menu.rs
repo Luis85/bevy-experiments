@@ -207,7 +207,7 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
             ui.label("Your current journey, equipment and active fields will be archived before a fresh campaign starts. Display, audio, controls and difficulty settings are kept.");
             ui.add_space(10.0);
             ui.add_enabled_ui(!f.save_pending&&!f.runtime.reset_in_progress(),|ui| {ui.horizontal(|ui| {
-                if ui.button("Start new journey").clicked() {f.dispatch(GameCommand::NewJourney,"New journey ready.");}
+                if ui.button("Start new journey").clicked() {f.dispatch(AppCommand::NewJourney,"New journey ready.");}
                 if ui.button("Keep current journey").clicked() {f.new_journey_confirm=false;}
             });});
             if f.save_pending||f.runtime.reset_in_progress(){muted(ui,"Archiving and saving the new journey...");}
@@ -399,7 +399,7 @@ pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut Frontend, time: f3
                         ui.add_space(6.0);
                         if primary(ui, &format!("Continue as {}", f.preview_survivor.name())) {
                             f.dispatch(
-                                GameCommand::ChooseSurvivor(f.preview_survivor),
+                                Command::ChooseSurvivor(f.preview_survivor),
                                 "Survivor chosen. Select your starting country.",
                             );
                         }

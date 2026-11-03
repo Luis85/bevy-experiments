@@ -172,10 +172,7 @@ fn skill_detail(
             )
             .clicked()
         {
-            f.dispatch(
-                GameCommand::BuySkillNode(node.id.clone()),
-                "Upgrade learned.",
-            );
+            f.dispatch(Command::BuySkillNode(node.id.clone()), "Upgrade learned.");
         }
         if let Err(error) = &preflight {
             ui.label(RichText::new(error).color(MUTED).size(12.0));
@@ -183,7 +180,7 @@ fn skill_detail(
     }
     egui::ScrollArea::vertical().id_salt(("skill-requirements",&node.id)).max_height((height-105.0).max(55.0)).show(ui,|ui| {
         ui.label(&node.description);
-        if node.effects.iter().any(|e|matches!(e,horde_core::skill_catalog::SkillEffect::BodyDevelopment{..})) && f.game.campaign.legacy_features && f.game.campaign.player.body.iter().any(|n|*n>0) && ui.button("Refund legacy body allocations").clicked() {f.dispatch(GameCommand::RespecPlayer,"Legacy body points returned to the tree.");}
+        if node.effects.iter().any(|e|matches!(e,horde_core::skill_catalog::SkillEffect::BodyDevelopment{..})) && f.game.campaign.legacy_features && f.game.campaign.player.body.iter().any(|n|*n>0) && ui.button("Refund legacy body allocations").clicked() {f.dispatch(Command::RespecPlayer,"Legacy body points returned to the tree.");}
         ui.add_space(7.0);
         ui.strong("Requirements");
         if node.prerequisites.is_empty() {muted(ui,"Journey foundation");}

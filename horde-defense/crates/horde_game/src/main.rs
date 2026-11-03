@@ -169,10 +169,10 @@ fn close_window(
     if close.read().next().is_some() {
         frontend
             .runtime
-            .enqueue(runner::GameCommand::SetPaused(true), "");
+            .enqueue(horde_core::command::Command::SetPaused(true), "");
         frontend
             .runtime
-            .enqueue(runner::GameCommand::Save(runner::SaveIntent::Quit), "");
+            .enqueue(runner::AppCommand::Save(runner::SaveIntent::Quit), "");
     }
 }
 

@@ -363,7 +363,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
                     .clicked()
                 {
                     f.dispatch(
-                        GameCommand::BuyItem(index),
+                        Command::BuyItem(index),
                         "Equipment added. Select it below to compare before equipping.",
                     );
                 }
@@ -550,9 +550,9 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
         muted(ui, "Save references to your current equipment. Referenced items are retained by bulk sales.");
         ui.horizontal_wrapped(|ui| {
             ui.add(egui::TextEdit::singleline(&mut f.preset_name).hint_text("Preset name").desired_width(180.0));
-            if ui.button("Save loadout preset").clicked() { f.dispatch(GameCommand::SavePreset { name: f.preset_name.clone(), mode: f.mode }, "Loadout saved by reference."); }
+            if ui.button("Save loadout preset").clicked() { f.dispatch(Command::SavePreset { name: f.preset_name.clone(), mode: f.mode }, "Loadout saved by reference."); }
             for (index, preset) in f.game.campaign.presets.clone().iter().enumerate() {
-                if ui.button(format!("Use {}", preset.name)).clicked() { f.dispatch(GameCommand::ApplyPreset { index, mode: f.mode }, "Loadout equipped."); }
+                if ui.button(format!("Use {}", preset.name)).clicked() { f.dispatch(Command::ApplyPreset { index, mode: f.mode }, "Loadout equipped."); }
             }
         });
     });
@@ -583,7 +583,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
                 .clicked()
             {
                 f.dispatch(
-                    GameCommand::BuyItem(index),
+                    Command::BuyItem(index),
                     "Equipment added. Select it above to compare before equipping.",
                 );
             }
@@ -681,7 +681,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
                             .clicked()
                         {
                             f.dispatch(
-                                GameCommand::Equip {
+                                Command::Equip {
                                     mode: f.mode,
                                     id: item.id,
                                 },
@@ -735,7 +735,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
             .clicked()
         {
             f.dispatch(
-                GameCommand::Equip {
+                Command::Equip {
                     mode: f.mode,
                     id: item.id,
                 },
@@ -748,7 +748,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
             .changed()
         {
             f.dispatch(
-                GameCommand::Lock {
+                Command::Lock {
                     id: item.id,
                     locked,
                 },
@@ -758,7 +758,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
         let mut favorite = item.favorite;
         if ui.checkbox(&mut favorite, "Favorite").changed() {
             f.dispatch(
-                GameCommand::Favorite {
+                Command::Favorite {
                     id: item.id,
                     favorite,
                 },
@@ -863,7 +863,7 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut Frontend) {
             );
             if ui.button("Confirm sale").clicked() {
                 f.dispatch(
-                    GameCommand::SellUnprotected,
+                    Command::SellUnprotected,
                     "Extras sold; equipped and preset items retained.",
                 );
                 f.sell_confirm = false;
@@ -905,7 +905,7 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut Frontend) {
                 ui.horizontal(|ui| {
                     if ui.button("Confirm item sale").clicked() {
                         f.dispatch(
-                            GameCommand::SellItem(id),
+                            Command::SellItem(id),
                             "Item sold. Affected loadouts use protected equipment.",
                         );
                     }

@@ -1,6 +1,62 @@
 //! Multi-expedition orchestration and monotonic shared-reward settlement.
 use super::*;
 
+/// A shared-campaign transfer that settlement could not complete. Settlement
+/// still advances its cursors, so each issue is reported exactly once.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SettlementIssue {
+    LootLost {
+        battle: u64,
+        definition: usize,
+        level: u32,
+        error: String,
+    },
+    StageClearRejected {
+        battle: u64,
+        country: String,
+        stage: usize,
+        error: String,
+    },
+    RecruitReleaseFailed {
+        battle: u64,
+        recruit: u64,
+        error: String,
+    },
+}
+impl std::fmt::Display for SettlementIssue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LootLost {
+                battle,
+                definition,
+                level,
+                error,
+            } => write!(
+                f,
+                "Expedition {battle} loot (item {definition}, level {level}) was not stored: {error}"
+            ),
+            Self::StageClearRejected {
+                battle,
+                country,
+                stage,
+                error,
+            } => write!(
+                f,
+                "Expedition {battle} clear of {country} stage {} was not recorded: {error}",
+                stage + 1
+            ),
+            Self::RecruitReleaseFailed {
+                battle,
+                recruit,
+                error,
+            } => write!(
+                f,
+                "Expedition {battle} survivor {recruit} could not return to the roster: {error}"
+            ),
+        }
+    }
+}
+
 impl Game {
     /// Each expedition owns its actual serialized battle; shared earnings are
     /// transferred by monotonic settlement cursors, never by rerunning events.
@@ -123,10 +179,8 @@ impl Game {
     }
     pub fn recall_survivor(&mut self, battle_id: u64) -> Result<(), String> {
         let battle = self
-            .battles
-            .iter_mut()
-            .find(|b| b.id == battle_id && !b.settled)
-            .ok_or("No active expedition with that ID")?;
+            .active_battle_mut(battle_id)
+            .ok_or_else(|| crate::command::CommandError::UnknownExpedition.to_string())?;
         battle.game.withdraw();
         self.settle_parallel();
         Ok(())
@@ -155,9 +209,17 @@ impl Game {
                 .iter()
                 .filter(|item| item.id >= battle.synced_item_id)
             {
-                let _ =
+                if let Err(error) =
                     self.campaign
-                        .add_item_with_quality(item.definition, item.level, item.quality);
+                        .add_item_with_quality(item.definition, item.level, item.quality)
+                {
+                    self.settlement_issues.push(SettlementIssue::LootLost {
+                        battle: battle.id,
+                        definition: item.definition,
+                        level: item.level,
+                        error,
+                    });
+                }
             }
             battle.synced_item_id = battle.game.campaign.next_item_id;
             battle.synced_item_index = battle.game.campaign.items.len();
@@ -167,10 +229,18 @@ impl Game {
                     record.completion_xp = self.campaign.completion_xp_preview();
                     self.campaign.first_clear(record.template, Mode::Personal);
                     if let Some(country) = &record.country_id {
-                        let active = self.campaign.world.active.clone();
-                        self.campaign.world.active = Some(country.clone());
-                        let _ = self.campaign.record_country_stage_clear(record.stage);
-                        self.campaign.world.active = active;
+                        if let Err(error) = self
+                            .campaign
+                            .record_country_stage_clear_in(country, record.stage)
+                        {
+                            self.settlement_issues
+                                .push(SettlementIssue::StageClearRejected {
+                                    battle: battle.id,
+                                    country: country.clone(),
+                                    stage: record.stage,
+                                    error,
+                                });
+                        }
                         self.strategy.resolve_outbreak(country);
                     }
                 }
@@ -192,10 +262,18 @@ impl Game {
                 if !had_pending {
                     report.completion_xp = self.campaign.completion_xp_preview();
                     self.campaign.first_clear(report.level, Mode::Personal);
-                    let active = self.campaign.world.active.clone();
-                    self.campaign.world.active = Some(battle.country_id.clone());
-                    let _ = self.campaign.record_country_stage_clear(battle.stage);
-                    self.campaign.world.active = active;
+                    if let Err(error) = self
+                        .campaign
+                        .record_country_stage_clear_in(&battle.country_id, battle.stage)
+                    {
+                        self.settlement_issues
+                            .push(SettlementIssue::StageClearRejected {
+                                battle: battle.id,
+                                country: battle.country_id.clone(),
+                                stage: battle.stage,
+                                error,
+                            });
+                    }
                     self.strategy.resolve_outbreak(&battle.country_id);
                 }
                 if battle.country_operation && !report.country_freed {
@@ -238,7 +316,14 @@ impl Game {
             }
             let npc = battle.game.campaign.npc.clone();
             self.campaign.release_external(battle.loadout);
-            let _ = self.strategy.release_recruit(battle.recruit_id, npc);
+            if let Err(error) = self.strategy.release_recruit(battle.recruit_id, npc) {
+                self.settlement_issues
+                    .push(SettlementIssue::RecruitReleaseFailed {
+                        battle: battle.id,
+                        recruit: battle.recruit_id,
+                        error,
+                    });
+            }
             battle.settled = true;
             // Completed reports retain the deployed loadout, not a second copy
             // of the entire shared stash or its presets for every past battle.

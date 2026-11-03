@@ -93,13 +93,13 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut Frontend) {
                     .clicked()
                 {
                     if f.game.campaign.journey_active && f.game.last_result.is_some() {
-                        f.dispatch(GameCommand::ContinueJourney, "Journey continued.");
+                        f.dispatch(Command::ContinueJourney, "Journey continued.");
                     } else {
                         f.open_campaign();
                     }
                 }
                 if ui.button("Leave journey").clicked() {
-                    f.dispatch(GameCommand::LeaveJourney, "");
+                    f.dispatch(Command::LeaveJourney, "");
                     f.save_pending = true;
                 }
                 if ui.button("Equipment").clicked() {

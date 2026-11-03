@@ -7,12 +7,13 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | Boundary | Owns | Does not own |
 |---|---|---|
 | `content`, `world` | Validated encounter/equipment/country definitions and scene tags | Runtime input or rendering |
+| `command` | Typed `Command` data and `Game::apply`, the single frontend mutation path, with every player-intent rule and typed `CommandError` | Queueing, saves or presentation |
 | `campaign`, `strategy` | Currency, unique gear, advancement, recruits, duties and outbreaks | Hit detection or cosmetic effects |
 | `rules` | Saved RNG and supported dice, defense, protection and injury procedures | NPC target policy or animation |
 | `sim` | One-field schedules, actors, collision/contact, maneuvers and reward events | UI, audio, filesystem calls |
-| `sim/parallel` | Worker battle ownership, reservations and idempotent settlement | A second combat implementation |
+| `sim/parallel` | Worker battle ownership, reservations, idempotent settlement and reported `SettlementIssue`s | A second combat implementation |
 | `sim/persistence` | Versioned coherent generations, checksums, validation and atomic writes | New combat decisions during load |
-| `runner` | Typed application commands, fixed-step execution, input edges, save coordination and sound consumption | Drawing or alternative combat rules |
+| `runner` | `AppCommand` queue (gameplay `Command`s plus durable reset/save intents), fixed-step execution, input edges, save coordination and sound consumption | Drawing, domain rule checks or alternative combat rules |
 | `ui/*`, `worldmap`, `inspector` | Read state, display decisions, collect intent and manage presentation-only selections | Ticking the game or paying rewards |
 | `art`, `visual_assets`, `animation` | Asset handles, padded atlas poses, read-only tick/event animation and bounded scene histories | Accuracy rolls, health, range or rewards |
 | `atmosphere_audio` | Scene classification, six persistent environment channels, normalized crossfades and audio-bus gain | Combat clocks, weather damage or new hit resolution |
@@ -21,8 +22,8 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 
 ```mermaid
 flowchart LR
-    UI[egui views] -->|GameCommand / ControlFrame| Runtime
-    Runtime -->|PreUpdate: apply once| Game[Engine-free Game aggregate]
+    UI[egui views] -->|AppCommand / ControlFrame| Runtime
+    Runtime -->|PreUpdate: Game::apply once| Game[Engine-free Game aggregate]
     Fixed[FixedUpdate: 60 Hz] --> Runtime
     Runtime -->|whole ticks, 1x / 2x / 4x| Game
     Game -->|authoritative events and reports| Runtime
@@ -34,11 +35,11 @@ flowchart LR
 
 Egui may repeat layout passes. A repeated render pass cannot buy an item twice, advance combat or write a file: `Runtime` deduplicates same-frame semantic commands and holds pressed actions until a real fixed step consumes them. Held input and pressed edges are separate. Observation speed executes complete authoritative ticks, never scaled damage or extra actions per simulated second. Tactical pause covers the main battlefield, parallel workers, recovery, spawns, rewards and plague pressure.
 
-`RuntimeNotice` acknowledges command outcomes, durable saves and completed attempts. Menus and close handling react to those results; they do not assume that an operation succeeded. Failed writes keep the game open. Startup loading and isolated practice construction are application setup, outside widget layout. Unreadable generations are preserved before replacement.
+`RuntimeNotice` acknowledges command outcomes, durable saves, completed attempts and expedition settlement failures. The runner holds no domain rules: it forwards each gameplay `Command` to `Game::apply` and reports the typed `CommandError` text unchanged. Menus and close handling react to those results; they do not assume that an operation succeeded. Failed writes keep the game open. Startup loading and isolated practice construction are application setup, outside widget layout. Unreadable generations are preserved before replacement.
 
 ## Domain interfaces
 
-The `Game` aggregate remains the coherent public domain facade. Each worker uses the same battle procedures with an independent saved random state and actual reserved equipment. Monotonic settlement cursors transfer earned currency and remap new loot identities once. Completed workers compact their copied inventory; the root armory remains unlimited.
+The `Game` aggregate remains the coherent public domain facade. Each worker uses the same battle procedures with an independent saved random state and actual reserved equipment. Monotonic settlement cursors transfer earned currency and remap new loot identities once. A transfer the shared campaign rejects (loot insert, stage clear for the expedition's explicit country, recruit release) is recorded as a transient, unsaved `SettlementIssue` that the runner drains into a notice instead of discarding. Completed workers compact their copied inventory; the root armory remains unlimited.
 
 Personal attacks resolve geometric input directly. NPCs select legal maneuvers from visible information, then resolve the supported rules once. Cosmetic tracers consume that result. Enemy lanes and the defender anchor are authoritative world coordinates; screen size, UI scaling and map zoom cannot change them.
 

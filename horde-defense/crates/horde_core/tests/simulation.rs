@@ -345,6 +345,37 @@ fn parallel_rewards_and_unique_loot_settle_exactly_once() {
     assert!(g.recall_survivor(b1).is_err());
 }
 #[test]
+fn failed_parallel_loot_insert_is_reported_once_instead_of_silently_lost() {
+    use horde_core::sim::SettlementIssue;
+    let mut g = strategic_game();
+    let country = g.campaign.world.cleared[0].clone();
+    let recruit = g.strategy.recruit(&mut g.campaign, &country).unwrap();
+    let battle = g.deploy_survivor(recruit, &country, 0).unwrap();
+    // Exhaust the shared stash's identity space so the transfer must fail.
+    g.campaign.next_item_id = u64::MAX;
+    let items = g.campaign.items.len();
+    g.battles[0]
+        .game
+        .campaign
+        .add_item_with_quality(4, 9, None)
+        .unwrap();
+    g.tick(Input::default());
+    assert_eq!(g.campaign.items.len(), items);
+    let issues = g.take_settlement_issues();
+    assert_eq!(
+        issues,
+        vec![SettlementIssue::LootLost {
+            battle,
+            definition: 4,
+            level: 9,
+            error: "Persistent item identity space exhausted".into(),
+        }]
+    );
+    assert!(issues[0].to_string().contains("was not stored"));
+    ticks(&mut g, 3);
+    assert!(g.take_settlement_issues().is_empty());
+}
+#[test]
 fn country_modifiers_and_replayed_clears_preserve_local_progress() {
     let mut g = legacy_game();
     let id = horde_core::world::world()
