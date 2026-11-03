@@ -1,0 +1,856 @@
+{
+  "version": 1,
+  "source_size": [
+    1774,
+    887
+  ],
+  "frames": [
+    {
+      "id": "Rook",
+      "source_rect": [
+        282,
+        42,
+        652,
+        848
+      ],
+      "ground": [
+        478.1,
+        848
+      ],
+      "hips": [
+        476,
+        510
+      ],
+      "neck": [
+        482,
+        247
+      ],
+      "near_shoulder": [
+        381,
+        270
+      ],
+      "far_shoulder": [
+        549,
+        267
+      ],
+      "upper_arm": 137,
+      "forearm": 113,
+      "parts": [
+        {
+          "id": "head",
+          "source": "MenuStill",
+          "source_rect": [
+            400,
+            42,
+            582,
+            248
+          ],
+          "anchors": {
+            "neck": [
+              482,
+              247
+            ]
+          }
+        },
+        {
+          "id": "pelvis",
+          "source": "MenuStill",
+          "source_rect": [
+            282,
+            500,
+            652,
+            600
+          ],
+          "anchors": {
+            "hips": [
+              476,
+              510
+            ]
+          }
+        },
+        {
+          "id": "far_trousers",
+          "source": "MenuStill",
+          "source_rect": [
+            282,
+            600,
+            474,
+            745
+          ],
+          "anchors": {
+            "upper": [
+              396,
+              600
+            ],
+            "ankle": [
+              384,
+              745
+            ]
+          }
+        },
+        {
+          "id": "near_trousers",
+          "source": "MenuStill",
+          "source_rect": [
+            474,
+            600,
+            652,
+            745
+          ],
+          "anchors": {
+            "upper": [
+              543,
+              600
+            ],
+            "ankle": [
+              550,
+              745
+            ]
+          }
+        },
+        {
+          "id": "far_boot",
+          "source": "MenuStill",
+          "source_rect": [
+            282,
+            745,
+            474,
+            848
+          ],
+          "anchors": {
+            "sole": [
+              384,
+              848
+            ]
+          }
+        },
+        {
+          "id": "near_boot",
+          "source": "MenuStill",
+          "source_rect": [
+            474,
+            745,
+            652,
+            848
+          ],
+          "anchors": {
+            "sole": [
+              558,
+              848
+            ]
+          }
+        }
+      ],
+      "torso_source_top": 206,
+      "torso_reference_width": 220,
+      "hand_width": 70,
+      "field_webbing": "backpack_side",
+      "carriage_anchor": [
+        381,
+        210
+      ],
+      "carriage_height": 220
+    },
+    {
+      "id": "June",
+      "source_rect": [
+        1128,
+        60,
+        1465,
+        848
+      ],
+      "ground": [
+        1306.6100000000001,
+        848
+      ],
+      "hips": [
+        1304,
+        510
+      ],
+      "neck": [
+        1290,
+        259
+      ],
+      "near_shoulder": [
+        1210,
+        280
+      ],
+      "far_shoulder": [
+        1372,
+        280
+      ],
+      "upper_arm": 123,
+      "forearm": 119,
+      "parts": [
+        {
+          "id": "head",
+          "source": "MenuStill",
+          "source_rect": [
+            1128,
+            60,
+            1408,
+            280
+          ],
+          "anchors": {
+            "neck": [
+              1290,
+              259
+            ]
+          },
+          "mask_rects": [
+            [
+              1128,
+              60,
+              1408,
+              220
+            ],
+            [
+              1130,
+              220,
+              1372,
+              252
+            ],
+            [
+              1140,
+              252,
+              1245,
+              280
+            ],
+            [
+              1245,
+              252,
+              1320,
+              268
+            ]
+          ]
+        },
+        {
+          "id": "pelvis",
+          "source": "MenuStill",
+          "source_rect": [
+            1128,
+            500,
+            1465,
+            600
+          ],
+          "anchors": {
+            "hips": [
+              1304,
+              510
+            ]
+          }
+        },
+        {
+          "id": "far_trousers",
+          "source": "MenuStill",
+          "source_rect": [
+            1128,
+            600,
+            1300,
+            745
+          ],
+          "anchors": {
+            "upper": [
+              1230,
+              600
+            ],
+            "ankle": [
+              1204,
+              745
+            ]
+          }
+        },
+        {
+          "id": "near_trousers",
+          "source": "MenuStill",
+          "source_rect": [
+            1300,
+            600,
+            1465,
+            745
+          ],
+          "anchors": {
+            "upper": [
+              1370,
+              600
+            ],
+            "ankle": [
+              1388,
+              745
+            ]
+          }
+        },
+        {
+          "id": "far_boot",
+          "source": "MenuStill",
+          "source_rect": [
+            1128,
+            745,
+            1300,
+            848
+          ],
+          "anchors": {
+            "sole": [
+              1206,
+              848
+            ]
+          }
+        },
+        {
+          "id": "near_boot",
+          "source": "MenuStill",
+          "source_rect": [
+            1300,
+            745,
+            1465,
+            848
+          ],
+          "anchors": {
+            "sole": [
+              1394,
+              848
+            ]
+          }
+        }
+      ],
+      "torso_source_top": 250,
+      "torso_reference_width": 205,
+      "hand_width": 66,
+      "field_webbing": "webbing",
+      "carriage_anchor": [
+        1304,
+        510
+      ],
+      "carriage_height": 251
+    }
+  ],
+  "weapon_widths": {
+    "Pistol": 5.5,
+    "Smg": 19,
+    "Shotgun": 28,
+    "Rifle": 25,
+    "Marksman": 30,
+    "MachineGun": 29
+  },
+  "note": "Original menu-source coordinates. One uniform height/source-frame-height scale; no redrawn faces or articulated trouser distortion. Canonical-kit calibration is separate from unchanged menu regions.",
+  "kit_size": [
+    1448,
+    1086
+  ],
+  "kit_parts": [
+    {
+      "id": "rook_torso",
+      "source": "CanonicalKit",
+      "source_rect": [
+        130,
+        55,
+        311,
+        341
+      ],
+      "anchors": {
+        "neck": [
+          220.5,
+          67
+        ],
+        "waist": [
+          220.5,
+          333
+        ]
+      }
+    },
+    {
+      "id": "june_torso",
+      "source": "CanonicalKit",
+      "source_rect": [
+        487,
+        62,
+        661,
+        341
+      ],
+      "anchors": {
+        "neck": [
+          574.0,
+          74
+        ],
+        "waist": [
+          574.0,
+          333
+        ]
+      }
+    },
+    {
+      "id": "rook_upper",
+      "source": "CanonicalKit",
+      "source_rect": [
+        862,
+        112,
+        969,
+        294
+      ],
+      "anchors": {
+        "start": [
+          915.5,
+          118
+        ],
+        "end": [
+          915.5,
+          288
+        ]
+      }
+    },
+    {
+      "id": "rook_fore",
+      "source": "CanonicalKit",
+      "source_rect": [
+        1218,
+        96,
+        1323,
+        312
+      ],
+      "anchors": {
+        "start": [
+          1270.5,
+          102
+        ],
+        "end": [
+          1270.5,
+          306
+        ]
+      }
+    },
+    {
+      "id": "june_upper",
+      "source": "CanonicalKit",
+      "source_rect": [
+        144,
+        452,
+        252,
+        643
+      ],
+      "anchors": {
+        "start": [
+          198.0,
+          458
+        ],
+        "end": [
+          198.0,
+          637
+        ]
+      }
+    },
+    {
+      "id": "june_fore",
+      "source": "CanonicalKit",
+      "source_rect": [
+        493,
+        447,
+        610,
+        655
+      ],
+      "anchors": {
+        "start": [
+          551.5,
+          453
+        ],
+        "end": [
+          551.5,
+          649
+        ]
+      }
+    },
+    {
+      "id": "dominant_hand",
+      "source": "CanonicalKit",
+      "source_rect": [
+        848,
+        474,
+        990,
+        615
+      ],
+      "anchors": {
+        "wrist": [
+          860,
+          547.24
+        ],
+        "palm": [
+          935.56,
+          544.5
+        ]
+      }
+    },
+    {
+      "id": "support_hand",
+      "source": "CanonicalKit",
+      "source_rect": [
+        1213,
+        494,
+        1329,
+        604
+      ],
+      "anchors": {
+        "wrist": [
+          1224,
+          555.36
+        ],
+        "palm": [
+          1287.8,
+          551.12
+        ]
+      }
+    },
+    {
+      "id": "backpack",
+      "source": "CanonicalKit",
+      "source_rect": [
+        78,
+        769,
+        311,
+        1027
+      ],
+      "anchors": {
+        "pivot": [
+          194.5,
+          1025
+        ]
+      }
+    },
+    {
+      "id": "webbing",
+      "source": "CanonicalKit",
+      "source_rect": [
+        445,
+        764,
+        666,
+        1029
+      ],
+      "anchors": {
+        "pivot": [
+          555.5,
+          1027
+        ]
+      }
+    },
+    {
+      "id": "leather",
+      "source": "CanonicalKit",
+      "source_rect": [
+        811,
+        771,
+        1005,
+        1029
+      ],
+      "anchors": {
+        "pivot": [
+          908.0,
+          1027
+        ]
+      }
+    },
+    {
+      "id": "plate",
+      "source": "CanonicalKit",
+      "source_rect": [
+        1173,
+        771,
+        1369,
+        1027
+      ],
+      "anchors": {
+        "pivot": [
+          1271.0,
+          1025
+        ]
+      }
+    },
+    {
+      "id": "backpack_side",
+      "source": "CanonicalKit",
+      "source_rect": [
+        80,
+        771,
+        198,
+        1025
+      ],
+      "anchors": {
+        "attach": [
+          198,
+          771
+        ]
+      }
+    }
+  ],
+  "near_sleeves": {
+    "rook_near_upper": {
+      "id": "rook_near_upper",
+      "source": "MenuStill",
+      "source_rect": [
+        340,
+        218,
+        450,
+        418
+      ],
+      "anchors": {
+        "start": [
+          381,
+          270
+        ],
+        "end": [
+          404,
+          405
+        ]
+      },
+      "source_polygon": [
+        [
+          375,
+          218
+        ],
+        [
+          414,
+          223
+        ],
+        [
+          433,
+          249
+        ],
+        [
+          434,
+          292
+        ],
+        [
+          444,
+          332
+        ],
+        [
+          449,
+          367
+        ],
+        [
+          434,
+          397
+        ],
+        [
+          410,
+          418
+        ],
+        [
+          382,
+          407
+        ],
+        [
+          360,
+          380
+        ],
+        [
+          346,
+          346
+        ],
+        [
+          340,
+          303
+        ],
+        [
+          348,
+          255
+        ]
+      ],
+      "cloth_only": true
+    },
+    "rook_near_fore": {
+      "id": "rook_near_fore",
+      "source": "MenuStill",
+      "source_rect": [
+        383,
+        373,
+        518,
+        446
+      ],
+      "anchors": {
+        "start": [
+          404,
+          405
+        ],
+        "end": [
+          504,
+          425
+        ]
+      },
+      "source_polygon": [
+        [
+          394,
+          373
+        ],
+        [
+          420,
+          378
+        ],
+        [
+          446,
+          394
+        ],
+        [
+          492,
+          396
+        ],
+        [
+          504,
+          398
+        ],
+        [
+          513,
+          438
+        ],
+        [
+          494,
+          446
+        ],
+        [
+          451,
+          435
+        ],
+        [
+          412,
+          430
+        ],
+        [
+          383,
+          412
+        ]
+      ],
+      "cloth_only": true
+    },
+    "june_near_upper": {
+      "id": "june_near_upper",
+      "source": "MenuStill",
+      "source_rect": [
+        1168,
+        242,
+        1280,
+        418
+      ],
+      "anchors": {
+        "start": [
+          1210,
+          280
+        ],
+        "end": [
+          1225,
+          401
+        ]
+      },
+      "source_polygon": [
+        [
+          1200,
+          242
+        ],
+        [
+          1234,
+          250
+        ],
+        [
+          1260,
+          277
+        ],
+        [
+          1273,
+          309
+        ],
+        [
+          1279,
+          354
+        ],
+        [
+          1260,
+          393
+        ],
+        [
+          1235,
+          418
+        ],
+        [
+          1209,
+          410
+        ],
+        [
+          1188,
+          382
+        ],
+        [
+          1172,
+          340
+        ],
+        [
+          1168,
+          288
+        ],
+        [
+          1177,
+          258
+        ]
+      ],
+      "cloth_only": true
+    },
+    "june_near_fore": {
+      "id": "june_near_fore",
+      "source": "MenuStill",
+      "source_rect": [
+        1200,
+        373,
+        1340,
+        444
+      ],
+      "anchors": {
+        "start": [
+          1225,
+          401
+        ],
+        "end": [
+          1320,
+          425
+        ]
+      },
+      "source_polygon": [
+        [
+          1210,
+          373
+        ],
+        [
+          1236,
+          378
+        ],
+        [
+          1260,
+          392
+        ],
+        [
+          1307,
+          389
+        ],
+        [
+          1320,
+          396
+        ],
+        [
+          1328,
+          436
+        ],
+        [
+          1309,
+          444
+        ],
+        [
+          1263,
+          437
+        ],
+        [
+          1234,
+          430
+        ],
+        [
+          1200,
+          411
+        ]
+      ],
+      "cloth_only": true
+    }
+  }
+}

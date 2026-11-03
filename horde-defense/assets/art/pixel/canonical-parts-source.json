@@ -1,0 +1,406 @@
+{
+  "schema_version": 1,
+  "asset": "canonical-parts-v1.png",
+  "purpose": "Candidate reconstruction of source-obscured upper clothing and rig parts; not approved assembled hero",
+  "generation_mode": "builtin_image_gen",
+  "image_generation_count": 2,
+  "source": {
+    "path": "assets/art/pixel/menu-survivors-v1.png",
+    "role": "sole canonical survivor style/clothing reference",
+    "sha256": "4FEB21B05C1AD5D281D4F0134FDFE546356CA71A204DBA04B7C81C48BD356A3A"
+  },
+  "output": {
+    "width": 1448,
+    "height": 1086,
+    "columns": 4,
+    "rows": 3,
+    "cell_width": 362,
+    "cell_height": 362,
+    "pixel_format": "32bit RGBA",
+    "corner_alpha": 0,
+    "sha256": "CD05A1B695B2780BE28D7910779941EB098862C42D167699D56BE7CB89B3971A",
+    "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a198cc-a0da-7f72-ab6d-2dcd558bece9/exec-029a490a-fffb-4e38-8820-b2e87700a0c1.png",
+    "modified_after_generation": false,
+    "sha256_with_metadata": "bf97c4d1b5d86ce1b461eeaaaa0c58cd8255313d481be72b77dff8e4b05fbd41"
+  },
+  "coordinates": "zero-based atlas pixel xywh; alpha128 bounds are measurement only, no alpha threshold was applied to output",
+  "parts": [
+    {
+      "name": "rook_torso",
+      "row": 0,
+      "column": 0,
+      "cell": [
+        0,
+        0,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        0,
+        29,
+        354,
+        314
+      ],
+      "nonzero_alpha_pixels": 46861,
+      "alpha128_bounds_xywh": [
+        132,
+        57,
+        177,
+        282
+      ],
+      "alpha128_pixels": 42352
+    },
+    {
+      "name": "june_torso",
+      "row": 0,
+      "column": 1,
+      "cell": [
+        362,
+        0,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        379,
+        15,
+        341,
+        331
+      ],
+      "nonzero_alpha_pixels": 44201,
+      "alpha128_bounds_xywh": [
+        489,
+        64,
+        170,
+        275
+      ],
+      "alpha128_pixels": 40242
+    },
+    {
+      "name": "rook_upper_sleeve",
+      "row": 0,
+      "column": 2,
+      "cell": [
+        724,
+        0,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        725,
+        0,
+        361,
+        358
+      ],
+      "nonzero_alpha_pixels": 19123,
+      "alpha128_bounds_xywh": [
+        864,
+        114,
+        103,
+        178
+      ],
+      "alpha128_pixels": 16108,
+      "authored_axis": "vertical, proximal joint at top; rotate baseline 90deg for horizontal rig"
+    },
+    {
+      "name": "rook_fore_sleeve",
+      "row": 0,
+      "column": 3,
+      "cell": [
+        1086,
+        0,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        1086,
+        17,
+        340,
+        298
+      ],
+      "nonzero_alpha_pixels": 20884,
+      "alpha128_bounds_xywh": [
+        1220,
+        98,
+        101,
+        212
+      ],
+      "alpha128_pixels": 17272,
+      "authored_axis": "vertical, proximal joint at top; rotate baseline 90deg for horizontal rig"
+    },
+    {
+      "name": "june_upper_sleeve",
+      "row": 1,
+      "column": 0,
+      "cell": [
+        0,
+        362,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        0,
+        362,
+        362,
+        359
+      ],
+      "nonzero_alpha_pixels": 19843,
+      "alpha128_bounds_xywh": [
+        146,
+        454,
+        104,
+        187
+      ],
+      "alpha128_pixels": 17094,
+      "authored_axis": "vertical, proximal joint at top; rotate baseline 90deg for horizontal rig"
+    },
+    {
+      "name": "june_fore_sleeve",
+      "row": 1,
+      "column": 1,
+      "cell": [
+        362,
+        362,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        369,
+        362,
+        355,
+        359
+      ],
+      "nonzero_alpha_pixels": 20367,
+      "alpha128_bounds_xywh": [
+        495,
+        449,
+        113,
+        204
+      ],
+      "alpha128_pixels": 17469,
+      "authored_axis": "vertical, proximal joint at top; rotate baseline 90deg for horizontal rig"
+    },
+    {
+      "name": "dominant_grasp_hand",
+      "row": 1,
+      "column": 2,
+      "cell": [
+        724,
+        362,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        725,
+        362,
+        361,
+        362
+      ],
+      "nonzero_alpha_pixels": 16418,
+      "alpha128_bounds_xywh": [
+        850,
+        476,
+        138,
+        137
+      ],
+      "alpha128_pixels": 13030
+    },
+    {
+      "name": "support_grasp_hand",
+      "row": 1,
+      "column": 3,
+      "cell": [
+        1086,
+        362,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        1086,
+        364,
+        340,
+        360
+      ],
+      "nonzero_alpha_pixels": 12108,
+      "alpha128_bounds_xywh": [
+        1215,
+        496,
+        112,
+        106
+      ],
+      "alpha128_pixels": 8853
+    },
+    {
+      "name": "rook_backpack",
+      "row": 2,
+      "column": 0,
+      "cell": [
+        0,
+        724,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        49,
+        760,
+        299,
+        276
+      ],
+      "nonzero_alpha_pixels": 50226,
+      "alpha128_bounds_xywh": [
+        80,
+        771,
+        229,
+        254
+      ],
+      "alpha128_pixels": 43802
+    },
+    {
+      "name": "june_webbing",
+      "row": 2,
+      "column": 1,
+      "cell": [
+        362,
+        724,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        369,
+        762,
+        355,
+        300
+      ],
+      "nonzero_alpha_pixels": 43925,
+      "alpha128_bounds_xywh": [
+        447,
+        766,
+        217,
+        261
+      ],
+      "alpha128_pixels": 37874
+    },
+    {
+      "name": "leather_vest",
+      "row": 2,
+      "column": 2,
+      "cell": [
+        724,
+        724,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        749,
+        724,
+        337,
+        315
+      ],
+      "nonzero_alpha_pixels": 45529,
+      "alpha128_bounds_xywh": [
+        813,
+        773,
+        190,
+        254
+      ],
+      "alpha128_pixels": 41177
+    },
+    {
+      "name": "plate_vest",
+      "row": 2,
+      "column": 3,
+      "cell": [
+        1086,
+        724,
+        362,
+        362
+      ],
+      "alpha_bounds_xywh": [
+        1086,
+        724,
+        334,
+        348
+      ],
+      "nonzero_alpha_pixels": 45118,
+      "alpha128_bounds_xywh": [
+        1175,
+        773,
+        192,
+        252
+      ],
+      "alpha128_pixels": 41264
+    }
+  ],
+  "renderer_calibration_from_canonical_source": {
+    "rook_near_shoulder": [
+      381,
+      270
+    ],
+    "rook_elbow": [
+      404,
+      405
+    ],
+    "rook_wrist": [
+      514,
+      430
+    ],
+    "june_near_shoulder": [
+      1210,
+      280
+    ],
+    "june_elbow": [
+      1225,
+      401
+    ],
+    "june_wrist": [
+      1340,
+      430
+    ],
+    "source_upper_span_approx": 137,
+    "source_fore_span_approx": 113,
+    "source_sleeve_width_range": [
+      75,
+      95
+    ],
+    "source_rook_torso_xyxy": [
+      340,
+      200,
+      580,
+      510
+    ],
+    "collar_overlap_source_px": [
+      15,
+      25
+    ],
+    "cuff_overlap_source_px": [
+      10,
+      15
+    ]
+  },
+  "prompts": [
+    {
+      "role": "initial",
+      "prompt": "Use case: identity-preserve\nAsset type: production modular 2D survivor upper-body sprite atlas, one transparent PNG.\nInput image 1 is the SOLE CANONICAL ART reference: menu-survivors-v1.png, Rook on left and June on right. This is a faithful reconstruction/extraction of their existing clothing, NOT new character design. Their original heads, hair, pelvis, trousers and boots will be reused as exact pixels elsewhere; DO NOT render any heads, hair, faces, pelvis, trousers, legs or boots here.\n\nCreate exactly 12 isolated parts arranged in a precise FOUR COLUMNS by THREE ROWS grid on a landscape 4:3 canvas. Prefer 2048x1536, equal 512x512 cells, each part centered within its cell with generous fully transparent gutters. No cell boxes, labels, text, background, floor, cast shadows or decoration. Every part must be separately cut out against TRUE ALPHA TRANSPARENCY.\n\nRead cells strictly left to right:\nROW ONE:\n1. Rook clean ARM-FREE torso from shoulder/neck opening to jacket hem/waist. EXACT original olive hooded field jacket with same zipper/placket, dark inner shirt, collar/hood folds, hem and original pocket placement. Reconstruct only jacket patches obscured by the source arms and pistol. No baked arms, shoulder-arm lobes, hands, gun, backpack or straps.\n2. June clean ARM-FREE torso from shoulder/neck opening to jacket hem/waist. EXACT original slate-blue/charcoal hooded jacket, same zipper, collar, fabric folds, hem and width. Her tan chest webbing is a separate layer in row3, so do not bake it into torso. No arms, shoulder lobes, hands, gun, harness or pack.\n3. Rook upper sleeve, shoulder to elbow, olive original jacket material. Neutral straight span oriented vertically, shoulder at top/elbow at bottom, complete natural cloth silhouette and folds; no hand or forearm.\n4. Rook fore sleeve, elbow to dark cuff, olive original jacket material. Neutral straight vertical span, elbow top/cuff bottom; no hand or upper arm.\n\nROW TWO:\n1. June upper sleeve, shoulder to elbow, slate original jacket material, neutral straight vertical span with complete cloth silhouette/folds, no hand or forearm.\n2. June fore sleeve, elbow to dark cuff, slate original material, neutral straight vertical span, no hand or upper arm.\n3. Dominant bare grasp hand in the exact original warm muted skin palette, side three-quarter view facing right, anatomically complete wrist, thumb and curled grip fingers suitable to close around a pistol/rifle grip. No gun, arm or glove.\n4. Support bare grasp hand in the exact source skin palette, complete wrist, palm, thumb and curled fingers for supporting a weapon fore-end. No gun, arm or glove.\n\nROW THREE:\n1. Rook's EXACT worn brown backpack from the left source survivor, original rounded rectangular proportions, flap and outer pockets, reconstructed as isolated wearable backpack layer, no body.\n2. June's EXACT tan webbing/chest-pouch rig as isolated wearable overlay, shoulder straps, source rectangular tan chest pouches and waist webbing. Preserve the source pockets and dark gaps. Transparent holes/negative space where jacket must show through; no body or arms.\n3. Worn brown leather protective vest as a torso-shaped wearable layer matching the SAME source palette, pixel scale, cloth edge weight and proportions; no body, arms or head.\n4. Dark protective plate vest as a torso-shaped wearable layer matching the SAME source slate/charcoal palette, pixel scale, edge weight and proportions; no body, arms or head.\n\nCRITICAL visual invariants: preserve the source's rugged, rounded but grounded survivor clothing silhouette and exact fabric colors, chunky pixel clusters and thick near-black stepped outlines. Native source survivors are about 800px high; torso parts should preserve about 200–250px width and 280–310px height at comparable cluster scale, upper/fore sleeves about 110–140px long and 60–80px broad, hands roughly 65–90px, backpack and gear proportional. Do not enlarge small hands to fill cells. Keep the three-quarter right-facing source projection for torsos and gear; neutral straight sleeves allow later bone rotation. No newly invented muscular anatomy, generic army avatar, smooth painting, vector-flat icon, antialias glow, pseudo-3D render, tiny noisy dithering, new color scheme or decorative detail. No oval stump caps: clothing patches must terminate naturally at seams with complete usable overlap coverage. Do not include any full character or extra part. Faithful production fidelity to the reference is the priority.",
+      "reference_paths": [
+        "assets/art/pixel/menu-survivors-v1.png"
+      ]
+    },
+    {
+      "role": "single narrow correction",
+      "prompt": "Use case: precise-object-edit.\nImage 1 is the parts atlas to correct. Image 2 is the sole canonical Rook/June clothing/style reference, menu-survivors-v1.png.\nMake ONE narrow structural correction to Image1: make the two torso cells truly ARM-FREE, and make the two upper-sleeve cells truly shoulder-to-elbow spans. Preserve all other atlas cells and grid positions, palette, pixel clusters, outlines, transparency and original-art matching.\n\nExact edit regions in the FOUR-COLUMN by THREE-ROW atlas:\n- Row1 column1 (olive Rook torso) and row1 column2 (slate June torso): REMOVE the conspicuous rounded upper-arm/shoulder lobe baked down the viewer-left outer side. These are body-only coat panels, NOT cut-off sleeved jackets. Remove every pixel that belongs to an arm, upper sleeve, shoulder dome or hanging sleeve. Reconstruct continuous natural coat side seams beneath the armhole. Keep shoulder bridge/collar/hood/zipper/front pockets/hem. Torso needs a narrow clean shoulder-to-waist clothing silhouette; no protruding oval shoulder blob or severed stump. Match source jacket body shape, source colors and pocket folds. No hands, forearms, weapons or pack.\n- Row1 column3 (olive upper sleeve) and row2 column1 (slate upper sleeve): replace their long bent full-arm silhouettes with a single SHORT STRAIGHT NEUTRAL SHOULDER-TO-ELBOW clothing span only. The shoulder is at top; elbow terminates at bottom. No second forearm bend, no cuff, no hand. Natural cloth seam/overlap edges, no black oval stump caps. At reference scale an upper sleeve is about110–140px long and60–80px broad, not as tall as torso. The renderer will rotate it from the shoulder.\n\nPreserve row1column4 and row2column2 fore-sleeves, both hands, all four row3 gear layers exactly as possible. Keep all12 cells, generous transparent gutters, 4x3 equal grid. Truly transparent alpha; no backdrop or checker pattern. NO text/labels/boxes. NO full people or head/legs. All details remain faithful chunky source pixel art, not smooth painting or generic new avatar.",
+      "reference_paths": [
+        "C:/Users/LuisMendez/.codex/generated_images/01a198cc-a0da-7f72-ab6d-2dcd558bece9/exec-a2b6a447-26f1-4109-ba4e-072e49779a28.png",
+        "assets/art/pixel/menu-survivors-v1.png"
+      ]
+    }
+  ],
+  "assessment": {
+    "style": "Closer source olive/slate/brown/tan palette and chunky outlined clothing; source matching is reconstruction, not exact copied pixels.",
+    "structural_correction": "Removed prominent baked shoulder/arm lobes from torso silhouettes and shortened bent upper sleeves into neutral spans.",
+    "limitations": [
+      "Sleeves were authored vertical before late horizontal-axis clarification; renderer must rotate baseline.",
+      "Generated part sizes are not exact original source-pixel dimensions. Calibrate each span and width from canonical source metrics, rather than scaling atlas cells as full bodies.",
+      "Very low nonzero alpha occurs in gutters; alpha>0 bounds are wider than visible silhouette. Raw alpha retained untouched.",
+      "No head, trousers, boots or full character approval: original source UV reuse and native assembled comparison belong to renderer/root."
+    ]
+  }
+}

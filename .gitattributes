@@ -8,3 +8,4 @@
 *.ttf binary
 *.woff2 binary
 *.replay binary
+*.wav binary

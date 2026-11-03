@@ -8,6 +8,7 @@ My Bevy playground: games, deterministic simulations and reusable Rust framework
 | [Legion Battle Lab](legion-battle-lab/README.md) | Native battle sandbox with configurable armies and a GPU crowd renderer | `cargo run --locked --release -p legion` |
 | [NPC Framework](npc-framework/README.md) | NPC behaviour, needs, crafting, vehicles and agent control; village and Actor Testbed demos | `cargo run --locked -p game_menu` |
 | [Terra World](terra-world/README.md) | Geographic environment SDK, world explorer, sandbox and multiplayer reference | `cargo run --locked -p terra-demo` |
+| [Lastlight: Horde Defense](horde-defense/README.md) | Eleven-lane survival, incremental progression, autonomous survivor combat, defenses and a connected country campaign | `cargo run --locked -p horde-defense` |
 
 Each directory is an **independent Cargo workspace**, with its own lockfile,
 assets, tests and architecture. There is deliberately no root `Cargo.toml`:

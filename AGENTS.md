@@ -1,6 +1,6 @@
 # Repository instructions for coding assistants
 
-This is a monorepo containing **four independent Cargo workspaces**, not one
+This is a monorepo containing **five independent Cargo workspaces**, not one
 combined Rust workspace. Read the relevant nested `AGENTS.md` before editing:
 
 | Directory | Entry point | Run |
@@ -9,6 +9,7 @@ combined Rust workspace. Read the relevant nested `AGENTS.md` before editing:
 | `legion-battle-lab/` | `AGENTS.md`, `README.md`, `ARCHITECTURE.md` | `cargo run --locked -p legion` |
 | `npc-framework/` | `AGENTS.md`, `CLAUDE.md`, `docs/adr/` | `cargo run --locked -p game_menu` |
 | `terra-world/` | `AGENTS.md`, `README.md`, `docs/ARCHITECTURE.md` | `cargo run --locked -p terra-demo` |
+| `horde-defense/` | `AGENTS.md`, `README.md`, `docs/GDD.md` | `cargo run --locked -p horde-defense` |
 
 ## Working agreement
 

@@ -1,0 +1,77 @@
+{
+  "max_rank": 50,
+  "batch_rank_step": 3,
+  "max_batch": 4,
+  "item_level_rank_step": 2,
+  "max_item_level": 30,
+  "health_per_rank": 0.015,
+  "damage_per_rank": 0.008,
+  "speed_per_rank": 0.002,
+  "arrival_per_rank": 0.01,
+  "reward_per_rank": 0.03,
+  "fortification_per_rank": 0.025,
+  "supply_per_rank": 1,
+  "max_supply_bonus": 40,
+  "pressure_floors": [
+    {
+      "start_rate": 0.0,
+      "rate_cap": 0.0,
+      "boss_health": 0,
+      "npc_boss_health": 0,
+      "wave_tier": 0,
+      "boss_time": 0
+    },
+    {
+      "start_rate": 0.35,
+      "rate_cap": 1.4,
+      "boss_health": 3000,
+      "npc_boss_health": 43,
+      "wave_tier": 1,
+      "boss_time": 180
+    },
+    {
+      "start_rate": 0.38,
+      "rate_cap": 1.52,
+      "boss_health": 4000,
+      "npc_boss_health": 51,
+      "wave_tier": 2,
+      "boss_time": 210
+    },
+    {
+      "start_rate": 0.41,
+      "rate_cap": 1.64,
+      "boss_health": 5200,
+      "npc_boss_health": 59,
+      "wave_tier": 3,
+      "boss_time": 210
+    },
+    {
+      "start_rate": 0.44,
+      "rate_cap": 1.76,
+      "boss_health": 6800,
+      "npc_boss_health": 67,
+      "wave_tier": 4,
+      "boss_time": 240
+    }
+  ],
+  "gear": {
+    "damage_per_level": 0.09,
+    "protection_per_level": 0.04,
+    "vitality_per_level": 0.05,
+    "npc_damage_add_per_level": 1,
+    "npc_health_per_level": 0.35,
+    "price_per_level": 0.05
+  },
+  "npc_arrival_factor": 0.9,
+  "population_base": 72,
+  "population_per_rank": 2,
+  "population_cap": 145,
+  "player_level_cap": 50,
+  "base_lanes": 11,
+  "lane_level_step": 10,
+  "lanes_per_step": 2,
+  "max_lanes": 17,
+  "population_global_cap": 224,
+  "threat_guard_rank": 10000,
+  "victory_player_xp": 120
+}

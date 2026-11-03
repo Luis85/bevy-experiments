@@ -1,0 +1,4079 @@
+{
+  "nodes": [
+    {
+      "id": "pistol_training",
+      "name": "Survivor foundations",
+      "description": "Innate survival foundations and pistol proficiency. Every development path begins here; training never grants equipment.",
+      "price": 0,
+      "prerequisites": [],
+      "branch": "Foundations",
+      "position": [
+        0,
+        -300
+      ],
+      "icon": "pistol",
+      "effects": [
+        {
+          "kind": "WeaponTraining",
+          "value": "Pistol"
+        }
+      ]
+    },
+    {
+      "id": "quick_reload",
+      "name": "Reload drill",
+      "description": "Personal reload duration is multiplied by 0.80; minimum reload remains 0.65 s.",
+      "price": 25,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1500,
+        0
+      ],
+      "icon": "reload",
+      "effects": [
+        {
+          "kind": "ReloadMultiplier",
+          "value": 0.8
+        }
+      ]
+    },
+    {
+      "id": "steady_hands",
+      "name": "Steady hands",
+      "description": "Add 8 personal firearm damage per projectile. Pistol trigger pulls remain capped below a fresh target's full health.",
+      "price": 20,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1220,
+        0
+      ],
+      "icon": "firearm",
+      "effects": [
+        {
+          "kind": "DamageAdd",
+          "value": 8
+        }
+      ]
+    },
+    {
+      "id": "smg_training",
+      "name": "SMG proficiency",
+      "description": "Equip an owned SMG: rapid individual projectiles, short magazines and frequent reloads. Buy or loot the gun separately.",
+      "price": 30,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -940,
+        0
+      ],
+      "icon": "firearm",
+      "effects": [
+        {
+          "kind": "WeaponTraining",
+          "value": "Smg"
+        }
+      ]
+    },
+    {
+      "id": "shotgun_training",
+      "name": "Shotgun proficiency",
+      "description": "Equip an owned shotgun. Each shell launches an authored fan of pellets. Buy or loot the weapon separately.",
+      "price": 35,
+      "prerequisites": [
+        "steady_hands"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1500,
+        190
+      ],
+      "icon": "firearm",
+      "effects": [
+        {
+          "kind": "WeaponTraining",
+          "value": "Shotgun"
+        }
+      ]
+    },
+    {
+      "id": "rifle_training",
+      "name": "Rifle proficiency",
+      "description": "Equip an owned rifle for balanced damage and sustained fire. Training does not supply the weapon.",
+      "price": 40,
+      "prerequisites": [
+        "quick_reload"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1220,
+        190
+      ],
+      "icon": "firearm",
+      "effects": [
+        {
+          "kind": "WeaponTraining",
+          "value": "Rifle"
+        }
+      ]
+    },
+    {
+      "id": "piercing",
+      "name": "Controlled penetration",
+      "description": "Personal projectiles penetrate one additional enemy.",
+      "price": 55,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -940,
+        190
+      ],
+      "icon": "pierce",
+      "effects": [
+        {
+          "kind": "Piercing"
+        }
+      ]
+    },
+    {
+      "id": "rapid_cycle",
+      "name": "Rapid cycling",
+      "description": "Multiply personal shot interval by 0.85. Faster fire also empties the magazine faster.",
+      "price": 45,
+      "prerequisites": [
+        "quick_reload"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1500,
+        380
+      ],
+      "icon": "reload",
+      "effects": [
+        {
+          "kind": "CadenceMultiplier",
+          "value": 0.85
+        }
+      ]
+    },
+    {
+      "id": "marksman_training",
+      "name": "Marksman proficiency",
+      "description": "Equip an owned marksman rifle for deliberate, heavy single shots. Buy or loot the weapon separately.",
+      "price": 55,
+      "prerequisites": [
+        "rifle_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1220,
+        380
+      ],
+      "icon": "pierce",
+      "effects": [
+        {
+          "kind": "WeaponTraining",
+          "value": "Marksman"
+        }
+      ]
+    },
+    {
+      "id": "machine_gun_training",
+      "name": "Machine gun proficiency",
+      "description": "Equip an owned machine gun: large magazines and sustained fire, offset by long reloads.",
+      "price": 60,
+      "prerequisites": [
+        "rifle_training",
+        "smg_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -940,
+        380
+      ],
+      "icon": "firearm",
+      "effects": [
+        {
+          "kind": "WeaponTraining",
+          "value": "MachineGun"
+        }
+      ]
+    },
+    {
+      "id": "stopping_power",
+      "name": "Stopping power",
+      "description": "Multiply all personal firearm damage by 1.25 after flat damage upgrades.",
+      "price": 55,
+      "prerequisites": [
+        "steady_hands"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1500,
+        570
+      ],
+      "icon": "pierce",
+      "effects": [
+        {
+          "kind": "DamageMultiplier",
+          "value": 1.25
+        }
+      ]
+    },
+    {
+      "id": "combat_reload",
+      "name": "Combat reload",
+      "description": "A further 15% reduction to personal reload duration stacks with Reload drill.",
+      "price": 60,
+      "prerequisites": [
+        "rapid_cycle"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1220,
+        570
+      ],
+      "icon": "reload",
+      "effects": [
+        {
+          "kind": "ReloadMultiplier",
+          "value": 0.85
+        }
+      ]
+    },
+    {
+      "id": "field_fitness",
+      "name": "Field fitness",
+      "description": "Gain 35 maximum personal health on every new attempt.",
+      "price": 20,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Survival",
+      "position": [
+        -300,
+        0
+      ],
+      "icon": "health",
+      "effects": [
+        {
+          "kind": "HealthAdd",
+          "value": 35
+        }
+      ]
+    },
+    {
+      "id": "second_wind",
+      "name": "Emergency aid",
+      "description": "Personal active: restore up to 35 health once per attempt.",
+      "price": 30,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Survival",
+      "position": [
+        -20,
+        0
+      ],
+      "icon": "health",
+      "effects": [
+        {
+          "kind": "Heal"
+        }
+      ]
+    },
+    {
+      "id": "brace",
+      "name": "Brace the line",
+      "description": "Personal active: reduce incoming damage for five seconds, spending 30 stamina.",
+      "price": 35,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Survival",
+      "position": [
+        260,
+        0
+      ],
+      "icon": "brace",
+      "effects": [
+        {
+          "kind": "Brace"
+        }
+      ]
+    },
+    {
+      "id": "endurance_drill",
+      "name": "Endurance drill",
+      "description": "Gain 40 maximum personal stamina for additional melee strikes and bracing.",
+      "price": 25,
+      "prerequisites": [
+        "field_fitness"
+      ],
+      "branch": "Survival",
+      "position": [
+        -300,
+        190
+      ],
+      "icon": "brace",
+      "effects": [
+        {
+          "kind": "StaminaAdd",
+          "value": 40
+        }
+      ]
+    },
+    {
+      "id": "sweep",
+      "name": "Contact sweep",
+      "description": "Personal melee also strikes adjacent eligible contact lanes.",
+      "price": 40,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Survival",
+      "position": [
+        -20,
+        190
+      ],
+      "icon": "sweep",
+      "effects": [
+        {
+          "kind": "Sweep"
+        }
+      ]
+    },
+    {
+      "id": "hardened",
+      "name": "Hardened survivor",
+      "description": "Gain 3 personal armor against contact damage.",
+      "price": 40,
+      "prerequisites": [
+        "field_fitness"
+      ],
+      "branch": "Survival",
+      "position": [
+        260,
+        190
+      ],
+      "icon": "brace",
+      "effects": [
+        {
+          "kind": "ArmorAdd",
+          "value": 3
+        }
+      ]
+    },
+    {
+      "id": "heavy_strike",
+      "name": "Heavy strike",
+      "description": "Add 22 personal melee damage to every successful strike, including sweep targets.",
+      "price": 35,
+      "prerequisites": [
+        "sweep"
+      ],
+      "branch": "Survival",
+      "position": [
+        -300,
+        380
+      ],
+      "icon": "sweep",
+      "effects": [
+        {
+          "kind": "MeleeAdd",
+          "value": 22
+        }
+      ]
+    },
+    {
+      "id": "veteran_vitality",
+      "name": "Veteran vitality",
+      "description": "Gain a further 50 maximum personal health; stacks with Field fitness.",
+      "price": 55,
+      "prerequisites": [
+        "endurance_drill",
+        "hardened"
+      ],
+      "branch": "Survival",
+      "position": [
+        -20,
+        380
+      ],
+      "icon": "health",
+      "effects": [
+        {
+          "kind": "HealthAdd",
+          "value": 50
+        }
+      ]
+    },
+    {
+      "id": "engineering",
+      "name": "Field engineering",
+      "description": "Shared: structures gain 25% durability and damage in personal and NPC deployments.",
+      "price": 60,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2500,
+        0
+      ],
+      "icon": "engineering",
+      "effects": [
+        {
+          "kind": "EngineeringMultiplier",
+          "value": 1.25
+        },
+        {
+          "kind": "FeatureUnlock",
+          "value": "Construction"
+        }
+      ]
+    },
+    {
+      "id": "reinforced_frames",
+      "name": "Reinforced frames",
+      "description": "Shared: multiply structure durability and damage by a further 1.20.",
+      "price": 50,
+      "prerequisites": [
+        "engineering"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2780,
+        0
+      ],
+      "icon": "engineering",
+      "effects": [
+        {
+          "kind": "EngineeringMultiplier",
+          "value": 1.2
+        }
+      ]
+    },
+    {
+      "id": "defensive_fabrication",
+      "name": "Defensive fabrication",
+      "description": "Shared: multiply structure durability and damage by a further 1.20.",
+      "price": 65,
+      "prerequisites": [
+        "reinforced_frames"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3060,
+        0
+      ],
+      "icon": "engineering",
+      "effects": [
+        {
+          "kind": "EngineeringMultiplier",
+          "value": 1.2
+        }
+      ]
+    },
+    {
+      "id": "outpost_mastery",
+      "name": "Outpost mastery",
+      "description": "Shared: multiply structure durability and damage by a further 1.25.",
+      "price": 85,
+      "prerequisites": [
+        "defensive_fabrication"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2500,
+        190
+      ],
+      "icon": "engineering",
+      "effects": [
+        {
+          "kind": "EngineeringMultiplier",
+          "value": 1.25
+        }
+      ]
+    },
+    {
+      "id": "grenade_training",
+      "name": "Grenade handling",
+      "description": "Unlock the grenade action with two renewed charges each attempt. Detonations damage nearby enemies.",
+      "price": 25,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1200,
+        0
+      ],
+      "icon": "grenade",
+      "effects": [
+        {
+          "kind": "GrenadeUnlock"
+        }
+      ]
+    },
+    {
+      "id": "molotov_training",
+      "name": "Incendiary handling",
+      "description": "Unlock the Molotov action with two renewed charges each attempt. Burning ground damages enemies over time.",
+      "price": 30,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1480,
+        0
+      ],
+      "icon": "flame",
+      "effects": [
+        {
+          "kind": "MolotovUnlock"
+        }
+      ]
+    },
+    {
+      "id": "blast_packing",
+      "name": "Blast packing",
+      "description": "Multiply grenade and incendiary damage by 1.30.",
+      "price": 40,
+      "prerequisites": [
+        "grenade_training"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1760,
+        0
+      ],
+      "icon": "grenade",
+      "effects": [
+        {
+          "kind": "OrdnanceDamageMultiplier",
+          "value": 1.3
+        }
+      ]
+    },
+    {
+      "id": "grenade_bandolier",
+      "name": "Grenade bandolier",
+      "description": "Gain two additional renewed grenade charges each attempt.",
+      "price": 40,
+      "prerequisites": [
+        "grenade_training"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1200,
+        190
+      ],
+      "icon": "grenade",
+      "effects": [
+        {
+          "kind": "GrenadeCharges",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "bottle_carrier",
+      "name": "Bottle carrier",
+      "description": "Gain two additional renewed Molotov charges each attempt.",
+      "price": 40,
+      "prerequisites": [
+        "molotov_training"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1480,
+        190
+      ],
+      "icon": "flame",
+      "effects": [
+        {
+          "kind": "MolotovCharges",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "wide_blast",
+      "name": "Wide blast",
+      "description": "Multiply grenade blast and incendiary ground radius by 1.25.",
+      "price": 45,
+      "prerequisites": [
+        "blast_packing"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1760,
+        190
+      ],
+      "icon": "grenade",
+      "effects": [
+        {
+          "kind": "OrdnanceRadiusMultiplier",
+          "value": 1.25
+        }
+      ]
+    },
+    {
+      "id": "slow_burn",
+      "name": "Slow burn",
+      "description": "Incendiary ground remains active 50% longer.",
+      "price": 45,
+      "prerequisites": [
+        "molotov_training"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1200,
+        380
+      ],
+      "icon": "flame",
+      "effects": [
+        {
+          "kind": "BurnDurationMultiplier",
+          "value": 1.5
+        }
+      ]
+    },
+    {
+      "id": "quick_throw",
+      "name": "Quick throw",
+      "description": "Multiply the shared ordnance action cooldown by 0.70.",
+      "price": 55,
+      "prerequisites": [
+        "grenade_bandolier",
+        "bottle_carrier"
+      ],
+      "branch": "Ordnance",
+      "position": [
+        1480,
+        380
+      ],
+      "icon": "grenade",
+      "effects": [
+        {
+          "kind": "OrdnanceCooldownMultiplier",
+          "value": 0.7
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_1",
+      "name": "Vitality 1",
+      "description": "Train vitality to rank 1. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 25,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        1000
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_2",
+      "name": "Vitality 2",
+      "description": "Train vitality to rank 2. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 35,
+      "prerequisites": [
+        "body_vitality_1"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        1170
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_3",
+      "name": "Vitality 3",
+      "description": "Train vitality to rank 3. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 45,
+      "prerequisites": [
+        "body_vitality_2"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        1340
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_4",
+      "name": "Vitality 4",
+      "description": "Train vitality to rank 4. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 55,
+      "prerequisites": [
+        "body_vitality_3"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        1510
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_5",
+      "name": "Vitality 5",
+      "description": "Train vitality to rank 5. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 65,
+      "prerequisites": [
+        "body_vitality_4"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        1680
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_6",
+      "name": "Vitality 6",
+      "description": "Train vitality to rank 6. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 75,
+      "prerequisites": [
+        "body_vitality_5"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        1850
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_7",
+      "name": "Vitality 7",
+      "description": "Train vitality to rank 7. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 85,
+      "prerequisites": [
+        "body_vitality_6"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        2020
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_8",
+      "name": "Vitality 8",
+      "description": "Train vitality to rank 8. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 95,
+      "prerequisites": [
+        "body_vitality_7"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        2190
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_9",
+      "name": "Vitality 9",
+      "description": "Train vitality to rank 9. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 105,
+      "prerequisites": [
+        "body_vitality_8"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        2360
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_10",
+      "name": "Vitality 10",
+      "description": "Train vitality to rank 10. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 115,
+      "prerequisites": [
+        "body_vitality_9"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        2530
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_11",
+      "name": "Vitality 11",
+      "description": "Train vitality to rank 11. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 125,
+      "prerequisites": [
+        "body_vitality_10"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        2700
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 11
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_12",
+      "name": "Vitality 12",
+      "description": "Train vitality to rank 12. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 135,
+      "prerequisites": [
+        "body_vitality_11"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        2870
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_13",
+      "name": "Vitality 13",
+      "description": "Train vitality to rank 13. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 145,
+      "prerequisites": [
+        "body_vitality_12"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        3040
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 13
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_14",
+      "name": "Vitality 14",
+      "description": "Train vitality to rank 14. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 155,
+      "prerequisites": [
+        "body_vitality_13"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        3210
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 14
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_15",
+      "name": "Vitality 15",
+      "description": "Train vitality to rank 15. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 165,
+      "prerequisites": [
+        "body_vitality_14"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        3380
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_16",
+      "name": "Vitality 16",
+      "description": "Train vitality to rank 16. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 175,
+      "prerequisites": [
+        "body_vitality_15"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        3550
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_17",
+      "name": "Vitality 17",
+      "description": "Train vitality to rank 17. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 185,
+      "prerequisites": [
+        "body_vitality_16"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        3720
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 17
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_18",
+      "name": "Vitality 18",
+      "description": "Train vitality to rank 18. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 195,
+      "prerequisites": [
+        "body_vitality_17"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        3890
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 18
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_19",
+      "name": "Vitality 19",
+      "description": "Train vitality to rank 19. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 205,
+      "prerequisites": [
+        "body_vitality_18"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        4060
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 19
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_vitality_20",
+      "name": "Vitality 20",
+      "description": "Train vitality to rank 20. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 215,
+      "prerequisites": [
+        "body_vitality_19"
+      ],
+      "branch": "Body development",
+      "position": [
+        -3200,
+        4230
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Vitality",
+            "rank": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_1",
+      "name": "Strength 1",
+      "description": "Train strength to rank 1. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 25,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        1000
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_2",
+      "name": "Strength 2",
+      "description": "Train strength to rank 2. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 35,
+      "prerequisites": [
+        "body_strength_1"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        1170
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_3",
+      "name": "Strength 3",
+      "description": "Train strength to rank 3. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 45,
+      "prerequisites": [
+        "body_strength_2"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        1340
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_4",
+      "name": "Strength 4",
+      "description": "Train strength to rank 4. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 55,
+      "prerequisites": [
+        "body_strength_3"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        1510
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_5",
+      "name": "Strength 5",
+      "description": "Train strength to rank 5. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 65,
+      "prerequisites": [
+        "body_strength_4"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        1680
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_6",
+      "name": "Strength 6",
+      "description": "Train strength to rank 6. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 75,
+      "prerequisites": [
+        "body_strength_5"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        1850
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_7",
+      "name": "Strength 7",
+      "description": "Train strength to rank 7. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 85,
+      "prerequisites": [
+        "body_strength_6"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        2020
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_8",
+      "name": "Strength 8",
+      "description": "Train strength to rank 8. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 95,
+      "prerequisites": [
+        "body_strength_7"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        2190
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_9",
+      "name": "Strength 9",
+      "description": "Train strength to rank 9. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 105,
+      "prerequisites": [
+        "body_strength_8"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        2360
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_10",
+      "name": "Strength 10",
+      "description": "Train strength to rank 10. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 115,
+      "prerequisites": [
+        "body_strength_9"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        2530
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_11",
+      "name": "Strength 11",
+      "description": "Train strength to rank 11. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 125,
+      "prerequisites": [
+        "body_strength_10"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        2700
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 11
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_12",
+      "name": "Strength 12",
+      "description": "Train strength to rank 12. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 135,
+      "prerequisites": [
+        "body_strength_11"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        2870
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_13",
+      "name": "Strength 13",
+      "description": "Train strength to rank 13. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 145,
+      "prerequisites": [
+        "body_strength_12"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        3040
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 13
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_14",
+      "name": "Strength 14",
+      "description": "Train strength to rank 14. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 155,
+      "prerequisites": [
+        "body_strength_13"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        3210
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 14
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_15",
+      "name": "Strength 15",
+      "description": "Train strength to rank 15. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 165,
+      "prerequisites": [
+        "body_strength_14"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        3380
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_16",
+      "name": "Strength 16",
+      "description": "Train strength to rank 16. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 175,
+      "prerequisites": [
+        "body_strength_15"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        3550
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_17",
+      "name": "Strength 17",
+      "description": "Train strength to rank 17. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 185,
+      "prerequisites": [
+        "body_strength_16"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        3720
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 17
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_18",
+      "name": "Strength 18",
+      "description": "Train strength to rank 18. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 195,
+      "prerequisites": [
+        "body_strength_17"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        3890
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 18
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_19",
+      "name": "Strength 19",
+      "description": "Train strength to rank 19. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 205,
+      "prerequisites": [
+        "body_strength_18"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        4060
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 19
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_strength_20",
+      "name": "Strength 20",
+      "description": "Train strength to rank 20. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 215,
+      "prerequisites": [
+        "body_strength_19"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2910,
+        4230
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Strength",
+            "rank": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_1",
+      "name": "Coordination 1",
+      "description": "Train coordination to rank 1. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 25,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        1000
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_2",
+      "name": "Coordination 2",
+      "description": "Train coordination to rank 2. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 35,
+      "prerequisites": [
+        "body_coordination_1"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        1170
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_3",
+      "name": "Coordination 3",
+      "description": "Train coordination to rank 3. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 45,
+      "prerequisites": [
+        "body_coordination_2"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        1340
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_4",
+      "name": "Coordination 4",
+      "description": "Train coordination to rank 4. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 55,
+      "prerequisites": [
+        "body_coordination_3"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        1510
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_5",
+      "name": "Coordination 5",
+      "description": "Train coordination to rank 5. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 65,
+      "prerequisites": [
+        "body_coordination_4"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        1680
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_6",
+      "name": "Coordination 6",
+      "description": "Train coordination to rank 6. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 75,
+      "prerequisites": [
+        "body_coordination_5"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        1850
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_7",
+      "name": "Coordination 7",
+      "description": "Train coordination to rank 7. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 85,
+      "prerequisites": [
+        "body_coordination_6"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        2020
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_8",
+      "name": "Coordination 8",
+      "description": "Train coordination to rank 8. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 95,
+      "prerequisites": [
+        "body_coordination_7"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        2190
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_9",
+      "name": "Coordination 9",
+      "description": "Train coordination to rank 9. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 105,
+      "prerequisites": [
+        "body_coordination_8"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        2360
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_10",
+      "name": "Coordination 10",
+      "description": "Train coordination to rank 10. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 115,
+      "prerequisites": [
+        "body_coordination_9"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        2530
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_11",
+      "name": "Coordination 11",
+      "description": "Train coordination to rank 11. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 125,
+      "prerequisites": [
+        "body_coordination_10"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        2700
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 11
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_12",
+      "name": "Coordination 12",
+      "description": "Train coordination to rank 12. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 135,
+      "prerequisites": [
+        "body_coordination_11"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        2870
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_13",
+      "name": "Coordination 13",
+      "description": "Train coordination to rank 13. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 145,
+      "prerequisites": [
+        "body_coordination_12"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        3040
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 13
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_14",
+      "name": "Coordination 14",
+      "description": "Train coordination to rank 14. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 155,
+      "prerequisites": [
+        "body_coordination_13"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        3210
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 14
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_15",
+      "name": "Coordination 15",
+      "description": "Train coordination to rank 15. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 165,
+      "prerequisites": [
+        "body_coordination_14"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        3380
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_16",
+      "name": "Coordination 16",
+      "description": "Train coordination to rank 16. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 175,
+      "prerequisites": [
+        "body_coordination_15"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        3550
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_17",
+      "name": "Coordination 17",
+      "description": "Train coordination to rank 17. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 185,
+      "prerequisites": [
+        "body_coordination_16"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        3720
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 17
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_18",
+      "name": "Coordination 18",
+      "description": "Train coordination to rank 18. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 195,
+      "prerequisites": [
+        "body_coordination_17"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        3890
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 18
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_19",
+      "name": "Coordination 19",
+      "description": "Train coordination to rank 19. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 205,
+      "prerequisites": [
+        "body_coordination_18"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        4060
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 19
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_coordination_20",
+      "name": "Coordination 20",
+      "description": "Train coordination to rank 20. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 215,
+      "prerequisites": [
+        "body_coordination_19"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2620,
+        4230
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Coordination",
+            "rank": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_1",
+      "name": "Endurance 1",
+      "description": "Train endurance to rank 1. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 25,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        1000
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_2",
+      "name": "Endurance 2",
+      "description": "Train endurance to rank 2. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 35,
+      "prerequisites": [
+        "body_endurance_1"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        1170
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_3",
+      "name": "Endurance 3",
+      "description": "Train endurance to rank 3. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 45,
+      "prerequisites": [
+        "body_endurance_2"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        1340
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_4",
+      "name": "Endurance 4",
+      "description": "Train endurance to rank 4. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 55,
+      "prerequisites": [
+        "body_endurance_3"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        1510
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_5",
+      "name": "Endurance 5",
+      "description": "Train endurance to rank 5. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 65,
+      "prerequisites": [
+        "body_endurance_4"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        1680
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_6",
+      "name": "Endurance 6",
+      "description": "Train endurance to rank 6. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 75,
+      "prerequisites": [
+        "body_endurance_5"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        1850
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_7",
+      "name": "Endurance 7",
+      "description": "Train endurance to rank 7. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 85,
+      "prerequisites": [
+        "body_endurance_6"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        2020
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_8",
+      "name": "Endurance 8",
+      "description": "Train endurance to rank 8. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 95,
+      "prerequisites": [
+        "body_endurance_7"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        2190
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_9",
+      "name": "Endurance 9",
+      "description": "Train endurance to rank 9. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 105,
+      "prerequisites": [
+        "body_endurance_8"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        2360
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_10",
+      "name": "Endurance 10",
+      "description": "Train endurance to rank 10. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 115,
+      "prerequisites": [
+        "body_endurance_9"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        2530
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_11",
+      "name": "Endurance 11",
+      "description": "Train endurance to rank 11. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 125,
+      "prerequisites": [
+        "body_endurance_10"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        2700
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 11
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_12",
+      "name": "Endurance 12",
+      "description": "Train endurance to rank 12. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 135,
+      "prerequisites": [
+        "body_endurance_11"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        2870
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_13",
+      "name": "Endurance 13",
+      "description": "Train endurance to rank 13. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 145,
+      "prerequisites": [
+        "body_endurance_12"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        3040
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 13
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_14",
+      "name": "Endurance 14",
+      "description": "Train endurance to rank 14. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 155,
+      "prerequisites": [
+        "body_endurance_13"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        3210
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 14
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_15",
+      "name": "Endurance 15",
+      "description": "Train endurance to rank 15. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 165,
+      "prerequisites": [
+        "body_endurance_14"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        3380
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_16",
+      "name": "Endurance 16",
+      "description": "Train endurance to rank 16. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 175,
+      "prerequisites": [
+        "body_endurance_15"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        3550
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_17",
+      "name": "Endurance 17",
+      "description": "Train endurance to rank 17. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 185,
+      "prerequisites": [
+        "body_endurance_16"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        3720
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 17
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_18",
+      "name": "Endurance 18",
+      "description": "Train endurance to rank 18. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 195,
+      "prerequisites": [
+        "body_endurance_17"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        3890
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 18
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_19",
+      "name": "Endurance 19",
+      "description": "Train endurance to rank 19. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 205,
+      "prerequisites": [
+        "body_endurance_18"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        4060
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 19
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_endurance_20",
+      "name": "Endurance 20",
+      "description": "Train endurance to rank 20. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 215,
+      "prerequisites": [
+        "body_endurance_19"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2330,
+        4230
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Endurance",
+            "rank": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_1",
+      "name": "Perception 1",
+      "description": "Train perception to rank 1. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 25,
+      "prerequisites": [
+        "pistol_training"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        1000
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_2",
+      "name": "Perception 2",
+      "description": "Train perception to rank 2. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 35,
+      "prerequisites": [
+        "body_perception_1"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        1170
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_3",
+      "name": "Perception 3",
+      "description": "Train perception to rank 3. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 45,
+      "prerequisites": [
+        "body_perception_2"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        1340
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_4",
+      "name": "Perception 4",
+      "description": "Train perception to rank 4. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 55,
+      "prerequisites": [
+        "body_perception_3"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        1510
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_5",
+      "name": "Perception 5",
+      "description": "Train perception to rank 5. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 65,
+      "prerequisites": [
+        "body_perception_4"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        1680
+      ],
+      "icon": "body",
+      "minimum_victories": 0,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_6",
+      "name": "Perception 6",
+      "description": "Train perception to rank 6. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 75,
+      "prerequisites": [
+        "body_perception_5"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        1850
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_7",
+      "name": "Perception 7",
+      "description": "Train perception to rank 7. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 85,
+      "prerequisites": [
+        "body_perception_6"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        2020
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_8",
+      "name": "Perception 8",
+      "description": "Train perception to rank 8. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 95,
+      "prerequisites": [
+        "body_perception_7"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        2190
+      ],
+      "icon": "body",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_9",
+      "name": "Perception 9",
+      "description": "Train perception to rank 9. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 105,
+      "prerequisites": [
+        "body_perception_8"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        2360
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_10",
+      "name": "Perception 10",
+      "description": "Train perception to rank 10. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 115,
+      "prerequisites": [
+        "body_perception_9"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        2530
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_11",
+      "name": "Perception 11",
+      "description": "Train perception to rank 11. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 125,
+      "prerequisites": [
+        "body_perception_10"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        2700
+      ],
+      "icon": "body",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 11
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_12",
+      "name": "Perception 12",
+      "description": "Train perception to rank 12. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 135,
+      "prerequisites": [
+        "body_perception_11"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        2870
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 12
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_13",
+      "name": "Perception 13",
+      "description": "Train perception to rank 13. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 145,
+      "prerequisites": [
+        "body_perception_12"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        3040
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 13
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_14",
+      "name": "Perception 14",
+      "description": "Train perception to rank 14. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 155,
+      "prerequisites": [
+        "body_perception_13"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        3210
+      ],
+      "icon": "body",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 14
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_15",
+      "name": "Perception 15",
+      "description": "Train perception to rank 15. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 165,
+      "prerequisites": [
+        "body_perception_14"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        3380
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 15
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_16",
+      "name": "Perception 16",
+      "description": "Train perception to rank 16. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 175,
+      "prerequisites": [
+        "body_perception_15"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        3550
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 16
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_17",
+      "name": "Perception 17",
+      "description": "Train perception to rank 17. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 185,
+      "prerequisites": [
+        "body_perception_16"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        3720
+      ],
+      "icon": "body",
+      "minimum_victories": 4,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 17
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_18",
+      "name": "Perception 18",
+      "description": "Train perception to rank 18. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 195,
+      "prerequisites": [
+        "body_perception_17"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        3890
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 18
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_19",
+      "name": "Perception 19",
+      "description": "Train perception to rank 19. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 205,
+      "prerequisites": [
+        "body_perception_18"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        4060
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 19
+          }
+        }
+      ]
+    },
+    {
+      "id": "body_perception_20",
+      "name": "Perception 20",
+      "description": "Train perception to rank 20. Existing allocated ranks are preserved as a floor; this never pays for the same rank twice.",
+      "price": 215,
+      "prerequisites": [
+        "body_perception_19"
+      ],
+      "branch": "Body development",
+      "position": [
+        -2040,
+        4230
+      ],
+      "icon": "body",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "BodyDevelopment",
+          "value": {
+            "attribute": "Perception",
+            "rank": 20
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_blueprint",
+      "name": "Trap blueprint",
+      "description": "Learn the permanent trap blueprint. Placement spends renewable battle supply, not coins.",
+      "price": 25,
+      "prerequisites": [
+        "engineering"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        1100
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "Blueprint",
+          "value": "Trap"
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_1",
+      "name": "Trap mastery 1",
+      "description": "Raise trap effectiveness to rank 1. Previously purchased ranks count as owned.",
+      "price": 25,
+      "prerequisites": [
+        "trap_blueprint"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        1300
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_2",
+      "name": "Trap mastery 2",
+      "description": "Raise trap effectiveness to rank 2. Previously purchased ranks count as owned.",
+      "price": 50,
+      "prerequisites": [
+        "trap_rank_1"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        1480
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_3",
+      "name": "Trap mastery 3",
+      "description": "Raise trap effectiveness to rank 3. Previously purchased ranks count as owned.",
+      "price": 75,
+      "prerequisites": [
+        "trap_rank_2"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        1660
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_4",
+      "name": "Trap mastery 4",
+      "description": "Raise trap effectiveness to rank 4. Previously purchased ranks count as owned.",
+      "price": 100,
+      "prerequisites": [
+        "trap_rank_3"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        1840
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_5",
+      "name": "Trap mastery 5",
+      "description": "Raise trap effectiveness to rank 5. Previously purchased ranks count as owned.",
+      "price": 125,
+      "prerequisites": [
+        "trap_rank_4"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        2020
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_6",
+      "name": "Trap mastery 6",
+      "description": "Raise trap effectiveness to rank 6. Previously purchased ranks count as owned.",
+      "price": 150,
+      "prerequisites": [
+        "trap_rank_5"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        2200
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_7",
+      "name": "Trap mastery 7",
+      "description": "Raise trap effectiveness to rank 7. Previously purchased ranks count as owned.",
+      "price": 175,
+      "prerequisites": [
+        "trap_rank_6"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        2380
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_8",
+      "name": "Trap mastery 8",
+      "description": "Raise trap effectiveness to rank 8. Previously purchased ranks count as owned.",
+      "price": 200,
+      "prerequisites": [
+        "trap_rank_7"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        2560
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_9",
+      "name": "Trap mastery 9",
+      "description": "Raise trap effectiveness to rank 9. Previously purchased ranks count as owned.",
+      "price": 225,
+      "prerequisites": [
+        "trap_rank_8"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        2740
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "trap_rank_10",
+      "name": "Trap mastery 10",
+      "description": "Raise trap effectiveness to rank 10. Previously purchased ranks count as owned.",
+      "price": 250,
+      "prerequisites": [
+        "trap_rank_9"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2600,
+        2920
+      ],
+      "icon": "engineering",
+      "minimum_victories": 1,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Trap",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_blueprint",
+      "name": "Wall blueprint",
+      "description": "Learn the permanent wall blueprint. Placement spends renewable battle supply, not coins.",
+      "price": 35,
+      "prerequisites": [
+        "engineering"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        1100
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "Blueprint",
+          "value": "Wall"
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_1",
+      "name": "Wall mastery 1",
+      "description": "Raise wall effectiveness to rank 1. Previously purchased ranks count as owned.",
+      "price": 25,
+      "prerequisites": [
+        "wall_blueprint"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        1300
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_2",
+      "name": "Wall mastery 2",
+      "description": "Raise wall effectiveness to rank 2. Previously purchased ranks count as owned.",
+      "price": 50,
+      "prerequisites": [
+        "wall_rank_1"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        1480
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_3",
+      "name": "Wall mastery 3",
+      "description": "Raise wall effectiveness to rank 3. Previously purchased ranks count as owned.",
+      "price": 75,
+      "prerequisites": [
+        "wall_rank_2"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        1660
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_4",
+      "name": "Wall mastery 4",
+      "description": "Raise wall effectiveness to rank 4. Previously purchased ranks count as owned.",
+      "price": 100,
+      "prerequisites": [
+        "wall_rank_3"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        1840
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_5",
+      "name": "Wall mastery 5",
+      "description": "Raise wall effectiveness to rank 5. Previously purchased ranks count as owned.",
+      "price": 125,
+      "prerequisites": [
+        "wall_rank_4"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        2020
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_6",
+      "name": "Wall mastery 6",
+      "description": "Raise wall effectiveness to rank 6. Previously purchased ranks count as owned.",
+      "price": 150,
+      "prerequisites": [
+        "wall_rank_5"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        2200
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_7",
+      "name": "Wall mastery 7",
+      "description": "Raise wall effectiveness to rank 7. Previously purchased ranks count as owned.",
+      "price": 175,
+      "prerequisites": [
+        "wall_rank_6"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        2380
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_8",
+      "name": "Wall mastery 8",
+      "description": "Raise wall effectiveness to rank 8. Previously purchased ranks count as owned.",
+      "price": 200,
+      "prerequisites": [
+        "wall_rank_7"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        2560
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_9",
+      "name": "Wall mastery 9",
+      "description": "Raise wall effectiveness to rank 9. Previously purchased ranks count as owned.",
+      "price": 225,
+      "prerequisites": [
+        "wall_rank_8"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        2740
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "wall_rank_10",
+      "name": "Wall mastery 10",
+      "description": "Raise wall effectiveness to rank 10. Previously purchased ranks count as owned.",
+      "price": 250,
+      "prerequisites": [
+        "wall_rank_9"
+      ],
+      "branch": "Fortification",
+      "position": [
+        2900,
+        2920
+      ],
+      "icon": "engineering",
+      "minimum_victories": 2,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Wall",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_blueprint",
+      "name": "Turret blueprint",
+      "description": "Learn the permanent turret blueprint. Placement spends renewable battle supply, not coins.",
+      "price": 50,
+      "prerequisites": [
+        "engineering"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        1100
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "Blueprint",
+          "value": "Turret"
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_1",
+      "name": "Turret mastery 1",
+      "description": "Raise turret effectiveness to rank 1. Previously purchased ranks count as owned.",
+      "price": 25,
+      "prerequisites": [
+        "turret_blueprint"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        1300
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 1
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_2",
+      "name": "Turret mastery 2",
+      "description": "Raise turret effectiveness to rank 2. Previously purchased ranks count as owned.",
+      "price": 50,
+      "prerequisites": [
+        "turret_rank_1"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        1480
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 2
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_3",
+      "name": "Turret mastery 3",
+      "description": "Raise turret effectiveness to rank 3. Previously purchased ranks count as owned.",
+      "price": 75,
+      "prerequisites": [
+        "turret_rank_2"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        1660
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 3
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_4",
+      "name": "Turret mastery 4",
+      "description": "Raise turret effectiveness to rank 4. Previously purchased ranks count as owned.",
+      "price": 100,
+      "prerequisites": [
+        "turret_rank_3"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        1840
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 4
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_5",
+      "name": "Turret mastery 5",
+      "description": "Raise turret effectiveness to rank 5. Previously purchased ranks count as owned.",
+      "price": 125,
+      "prerequisites": [
+        "turret_rank_4"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        2020
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 5
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_6",
+      "name": "Turret mastery 6",
+      "description": "Raise turret effectiveness to rank 6. Previously purchased ranks count as owned.",
+      "price": 150,
+      "prerequisites": [
+        "turret_rank_5"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        2200
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 6
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_7",
+      "name": "Turret mastery 7",
+      "description": "Raise turret effectiveness to rank 7. Previously purchased ranks count as owned.",
+      "price": 175,
+      "prerequisites": [
+        "turret_rank_6"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        2380
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 7
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_8",
+      "name": "Turret mastery 8",
+      "description": "Raise turret effectiveness to rank 8. Previously purchased ranks count as owned.",
+      "price": 200,
+      "prerequisites": [
+        "turret_rank_7"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        2560
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 8
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_9",
+      "name": "Turret mastery 9",
+      "description": "Raise turret effectiveness to rank 9. Previously purchased ranks count as owned.",
+      "price": 225,
+      "prerequisites": [
+        "turret_rank_8"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        2740
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 9
+          }
+        }
+      ]
+    },
+    {
+      "id": "turret_rank_10",
+      "name": "Turret mastery 10",
+      "description": "Raise turret effectiveness to rank 10. Previously purchased ranks count as owned.",
+      "price": 250,
+      "prerequisites": [
+        "turret_rank_9"
+      ],
+      "branch": "Fortification",
+      "position": [
+        3200,
+        2920
+      ],
+      "icon": "engineering",
+      "minimum_victories": 3,
+      "effects": [
+        {
+          "kind": "StructureRank",
+          "value": {
+            "kind": "Turret",
+            "rank": 10
+          }
+        }
+      ]
+    },
+    {
+      "id": "companion_contact",
+      "name": "Meet Mara",
+      "description": "Unlock companion after 1 liberated country milestones. NPC rules, equipment and training remain independent.",
+      "price": 75,
+      "prerequisites": [
+        "field_fitness"
+      ],
+      "branch": "Companions and world",
+      "position": [
+        -300,
+        1000
+      ],
+      "icon": "companion",
+      "minimum_liberated": 1,
+      "effects": [
+        {
+          "kind": "FeatureUnlock",
+          "value": "Companion"
+        }
+      ]
+    },
+    {
+      "id": "recruitment_network",
+      "name": "Survivor network",
+      "description": "Unlock recruitment after 1 liberated country milestones. NPC rules, equipment and training remain independent.",
+      "price": 100,
+      "prerequisites": [
+        "companion_contact"
+      ],
+      "branch": "Companions and world",
+      "position": [
+        80,
+        1000
+      ],
+      "icon": "companion",
+      "minimum_liberated": 1,
+      "effects": [
+        {
+          "kind": "FeatureUnlock",
+          "value": "Recruitment"
+        }
+      ]
+    },
+    {
+      "id": "parallel_command",
+      "name": "Parallel command",
+      "description": "Unlock parallel after 2 liberated country milestones. NPC rules, equipment and training remain independent.",
+      "price": 150,
+      "prerequisites": [
+        "recruitment_network"
+      ],
+      "branch": "Companions and world",
+      "position": [
+        460,
+        1000
+      ],
+      "icon": "companion",
+      "minimum_liberated": 2,
+      "effects": [
+        {
+          "kind": "FeatureUnlock",
+          "value": "Parallel"
+        }
+      ]
+    },
+    {
+      "id": "country_operations",
+      "name": "Country operations",
+      "description": "Unlock operations after 4 liberated country milestones. NPC rules, equipment and training remain independent.",
+      "price": 225,
+      "prerequisites": [
+        "parallel_command"
+      ],
+      "branch": "Companions and world",
+      "position": [
+        840,
+        1000
+      ],
+      "icon": "companion",
+      "minimum_liberated": 4,
+      "effects": [
+        {
+          "kind": "FeatureUnlock",
+          "value": "Operations"
+        }
+      ]
+    }
+  ]
+}

@@ -5,7 +5,8 @@
       "bevy-rts/Cargo.toml",
       "legion-battle-lab/Cargo.toml",
       "npc-framework/Cargo.toml",
-      "terra-world/Cargo.toml"
+      "terra-world/Cargo.toml",
+      "horde-defense/Cargo.toml"
     ],
     "files.watcherExclude": {
       "**/target/**": true,

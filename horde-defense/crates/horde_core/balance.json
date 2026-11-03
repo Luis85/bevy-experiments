@@ -1,0 +1,86 @@
+{
+  "default_preset": "Normal",
+  "presets": [
+    {
+      "id": "Easy",
+      "name": "Easy",
+      "description": "More time and reliable preparation.",
+      "settings": {
+        "enemy_health": 0.8,
+        "enemy_damage": 0.75,
+        "enemy_speed": 1.1,
+        "spawn_rate": 0.7,
+        "player_damage": 1.2,
+        "defender_health": 1.5,
+        "reward": 1.0,
+        "boss_time": 0.85,
+        "threat_growth": 0.8,
+        "npc_spawn_rate": 0.7,
+        "supply": 5,
+        "start_lanes": 3,
+        "max_lanes": 17,
+        "lanes_per_step": 2,
+        "lane_level_step": 3,
+        "start_width": 12,
+        "max_width": 30,
+        "width_per_step": 2,
+        "width_level_step": 3,
+        "preset": "Easy"
+      }
+    },
+    {
+      "id": "Normal",
+      "name": "Normal",
+      "description": "Short opening crossings, faster enemies and earned growth.",
+      "settings": {
+        "enemy_health": 1.0,
+        "enemy_damage": 1.0,
+        "enemy_speed": 1.25,
+        "spawn_rate": 1.0,
+        "player_damage": 1.0,
+        "defender_health": 1.25,
+        "reward": 1.0,
+        "boss_time": 1.0,
+        "threat_growth": 1.0,
+        "npc_spawn_rate": 0.75,
+        "supply": 0,
+        "start_lanes": 3,
+        "max_lanes": 17,
+        "lanes_per_step": 2,
+        "lane_level_step": 3,
+        "start_width": 12,
+        "max_width": 30,
+        "width_per_step": 2,
+        "width_level_step": 3,
+        "preset": "Normal"
+      }
+    },
+    {
+      "id": "Hard",
+      "name": "Hard",
+      "description": "Higher pressure and faster victory escalation.",
+      "settings": {
+        "enemy_health": 1.2,
+        "enemy_damage": 1.2,
+        "enemy_speed": 1.45,
+        "spawn_rate": 1.15,
+        "player_damage": 0.9,
+        "defender_health": 1.0,
+        "reward": 1.15,
+        "boss_time": 1.1,
+        "threat_growth": 1.25,
+        "npc_spawn_rate": 0.9,
+        "supply": -3,
+        "start_lanes": 3,
+        "max_lanes": 17,
+        "lanes_per_step": 2,
+        "lane_level_step": 3,
+        "start_width": 12,
+        "max_width": 30,
+        "width_per_step": 2,
+        "width_level_step": 3,
+        "preset": "Hard"
+      }
+    }
+  ]
+}

@@ -1,0 +1,589 @@
+{
+  "authored": "2026-11-02",
+  "license": "MIT (repository original assets)",
+  "inputs": "Original deterministic Rust synthesis; no recordings, third-party samples or model-generated audio",
+  "generator": "crates/horde_game/src/audio.rs (cfg(test) offline authoring module)",
+  "generator_sha256": "50793b100905f772b62600c26cee3150deafc87fa1e75eb0dc780fd1a33f94aa",
+  "format": "44100 Hz, mono, signed PCM16 little endian WAV",
+  "variants": 3,
+  "peak_limit": 0.18,
+  "voice_limit": 6,
+  "files": [
+    {
+      "file": "survival_armor_0.wav",
+      "frames": 16758,
+      "seconds": 0.38,
+      "peak": 0.17999816888943143,
+      "rms": 0.012084210107601743,
+      "sha256": "3c0a9700c9992850ca41419e2100d0fb15f5ce952fecba84938a0de2c44529a2"
+    },
+    {
+      "file": "survival_armor_1.wav",
+      "frames": 16758,
+      "seconds": 0.38,
+      "peak": 0.17999816888943143,
+      "rms": 0.013283006590489086,
+      "sha256": "2a3c305bdb9e13a90cfb225b3b26bbbd768a290393dff94cb3774d0f916ab3d1"
+    },
+    {
+      "file": "survival_armor_2.wav",
+      "frames": 16758,
+      "seconds": 0.38,
+      "peak": 0.17999816888943143,
+      "rms": 0.011745706955710627,
+      "sha256": "97fac8efd41a17c8f5761df3a597a903bd3d264b7008ecfba8e19bd5d1bd3fd3"
+    },
+    {
+      "file": "survival_boss_0.wav",
+      "frames": 79380,
+      "seconds": 1.8,
+      "peak": 0.17999816888943143,
+      "rms": 0.057571573363456176,
+      "sha256": "49cfb8566f7551c7c251f82f8ece63c7b138bda203f9201fec114413b4eda466"
+    },
+    {
+      "file": "survival_boss_1.wav",
+      "frames": 79380,
+      "seconds": 1.8,
+      "peak": 0.17999816888943143,
+      "rms": 0.05696970316247009,
+      "sha256": "fcd627f610cc735f4ddc67d32822f175df11a7e495d3262c3d2d735f557af4bc"
+    },
+    {
+      "file": "survival_boss_2.wav",
+      "frames": 79380,
+      "seconds": 1.8,
+      "peak": 0.17999816888943143,
+      "rms": 0.055161107656967454,
+      "sha256": "d70f413b2f4a3c550b1ebcfbeba6791c4ad070793d1396384836b93319470a49"
+    },
+    {
+      "file": "survival_damage_0.wav",
+      "frames": 18963,
+      "seconds": 0.43,
+      "peak": 0.17999816888943143,
+      "rms": 0.021604431711956102,
+      "sha256": "f47a50ae8f620acd18fde2825aeb70455a6f8902ee7ce61e8e9ee77f56da399a"
+    },
+    {
+      "file": "survival_damage_1.wav",
+      "frames": 18963,
+      "seconds": 0.43,
+      "peak": 0.17999816888943143,
+      "rms": 0.026350560017546747,
+      "sha256": "aaa6cb81ef21c70287bb5ec314184f5268c847a2a4420afa7b4b564700f8fff3"
+    },
+    {
+      "file": "survival_damage_2.wav",
+      "frames": 18963,
+      "seconds": 0.43,
+      "peak": 0.17999816888943143,
+      "rms": 0.02332071020390452,
+      "sha256": "4b5280733129937c116ce9cc858fa21205d94c6148c02670916d921d1968e4a4"
+    },
+    {
+      "file": "survival_explosion_0.wav",
+      "frames": 66150,
+      "seconds": 1.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.018045293916564713,
+      "sha256": "30d6de46a426eedd5268b2b18919af000c07ac2c90445b565e5308013108fa35"
+    },
+    {
+      "file": "survival_explosion_1.wav",
+      "frames": 66150,
+      "seconds": 1.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.017952617733619364,
+      "sha256": "b21e68624134e31e19bf3c9b818a54fd5948f1b4986e612a7199f738418b6b69"
+    },
+    {
+      "file": "survival_explosion_2.wav",
+      "frames": 66150,
+      "seconds": 1.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.01740676662755345,
+      "sha256": "cda62439fcbe21eb35e060e119b2af043c4401921f92815e11d3de71c8ede74c"
+    },
+    {
+      "file": "survival_fire_0.wav",
+      "frames": 50715,
+      "seconds": 1.15,
+      "peak": 0.17999816888943143,
+      "rms": 0.027797345005993578,
+      "sha256": "38867a97959a2d5f7ac25190091550038d52bc3974a48b79d82afb75cbb043c9"
+    },
+    {
+      "file": "survival_fire_1.wav",
+      "frames": 50715,
+      "seconds": 1.15,
+      "peak": 0.17999816888943143,
+      "rms": 0.028385544524393798,
+      "sha256": "5362e0de57a4cc536f6365681b543d17decfbd213770ac4fc66fddc3739d9f15"
+    },
+    {
+      "file": "survival_fire_2.wav",
+      "frames": 50715,
+      "seconds": 1.15,
+      "peak": 0.17999816888943143,
+      "rms": 0.02500756419059233,
+      "sha256": "004ae1c35baf934c65b8db9acd64eebacfba311aa44217bad6028d941714b50f"
+    },
+    {
+      "file": "survival_impact_0.wav",
+      "frames": 10584,
+      "seconds": 0.24,
+      "peak": 0.17999816888943143,
+      "rms": 0.02336662285566626,
+      "sha256": "eddc65b1885c6e78106898b78d43a0d3666d77e5cfba4951d5904e0ea30133df"
+    },
+    {
+      "file": "survival_impact_1.wav",
+      "frames": 10584,
+      "seconds": 0.24,
+      "peak": 0.17999816888943143,
+      "rms": 0.020904276095909845,
+      "sha256": "9e64143b4ba6ee1136448a7a61aa87554e6123eaf89852ad811e103026ffc12a"
+    },
+    {
+      "file": "survival_impact_2.wav",
+      "frames": 10584,
+      "seconds": 0.24,
+      "peak": 0.17999816888943143,
+      "rms": 0.02189964766741633,
+      "sha256": "49d182e01bbbf15e0b3541de2f123e060169c613866b116deb20f46c84b341e2"
+    },
+    {
+      "file": "survival_incoming_0.wav",
+      "frames": 13230,
+      "seconds": 0.3,
+      "peak": 0.17999816888943143,
+      "rms": 0.017061287587868085,
+      "sha256": "0f1c58695e0e57f2aabac86f439de4e76f908597ce6af9fbc03fb2a7a3277c33"
+    },
+    {
+      "file": "survival_incoming_1.wav",
+      "frames": 13230,
+      "seconds": 0.3,
+      "peak": 0.17999816888943143,
+      "rms": 0.019983623193980008,
+      "sha256": "d6c648af898904ebdc24620f44275caf9b63b9a008d53fb9b470a2a594bb41af"
+    },
+    {
+      "file": "survival_incoming_2.wav",
+      "frames": 13230,
+      "seconds": 0.3,
+      "peak": 0.17999816888943143,
+      "rms": 0.016757427861627587,
+      "sha256": "b4b37ff8eb3a46756741ed4da6fdbd9325a160c127de64b501d24ade091181c0"
+    },
+    {
+      "file": "survival_machinegun_0.wav",
+      "frames": 16317,
+      "seconds": 0.37,
+      "peak": 0.17999816888943143,
+      "rms": 0.013870279108593167,
+      "sha256": "497e506df8ab9ffa29ffa145f7b8604f7316674c4590dee47c7713a78d200333"
+    },
+    {
+      "file": "survival_machinegun_1.wav",
+      "frames": 16317,
+      "seconds": 0.37,
+      "peak": 0.17999816888943143,
+      "rms": 0.014561631995950694,
+      "sha256": "c738d9bf9ab8c1a86ac041e7c8d48d624c9b53ec7868588394f2630306175716"
+    },
+    {
+      "file": "survival_machinegun_2.wav",
+      "frames": 16317,
+      "seconds": 0.37,
+      "peak": 0.17999816888943143,
+      "rms": 0.01722342624144687,
+      "sha256": "fc23dd4b5928ab4a66efa41aa31c47ce57cfd7aeb5b784ffa4248cb9d46e0dce"
+    },
+    {
+      "file": "survival_marksman_0.wav",
+      "frames": 34398,
+      "seconds": 0.78,
+      "peak": 0.17999816888943143,
+      "rms": 0.012585787143589516,
+      "sha256": "f45d052fa2d38ac341bac3e27f8ad128581271cc49ec049fed8c8c165a266197"
+    },
+    {
+      "file": "survival_marksman_1.wav",
+      "frames": 34398,
+      "seconds": 0.78,
+      "peak": 0.17999816888943143,
+      "rms": 0.011107345504173612,
+      "sha256": "0d4876f14071c5ac1392036eedb7989aa05a25fb12d09fbaf0e3208f729c4f57"
+    },
+    {
+      "file": "survival_marksman_2.wav",
+      "frames": 34398,
+      "seconds": 0.78,
+      "peak": 0.17999816888943143,
+      "rms": 0.011691033785793899,
+      "sha256": "a2ce705bb4d4fb721f79db3baa0623ac8b085fb48e834e21f4917043fb88cc31"
+    },
+    {
+      "file": "survival_melee_0.wav",
+      "frames": 22050,
+      "seconds": 0.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.017327370580991684,
+      "sha256": "9c52ceb12092d5f30bf64bc2465a1e98477350034f2398bb3be3411c379f6b00"
+    },
+    {
+      "file": "survival_melee_1.wav",
+      "frames": 22050,
+      "seconds": 0.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.01845700711576444,
+      "sha256": "3f8e76ae2f8a8c547c933c85b5c4362b6df3309243487dae78169d94772c4e55"
+    },
+    {
+      "file": "survival_melee_2.wav",
+      "frames": 22050,
+      "seconds": 0.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.019033637664426856,
+      "sha256": "5a745df3b97e6e4d6a9110ff61b7ef36f89ea43a606bacbf4697fb90760587d9"
+    },
+    {
+      "file": "survival_molotov_0.wav",
+      "frames": 33516,
+      "seconds": 0.76,
+      "peak": 0.17999816888943143,
+      "rms": 0.009744589888115683,
+      "sha256": "3fa00daa4ca9e7aa50bbffd2aa10a7dacf466f77840c35b61566427701a56f5d"
+    },
+    {
+      "file": "survival_molotov_1.wav",
+      "frames": 33516,
+      "seconds": 0.76,
+      "peak": 0.17999816888943143,
+      "rms": 0.008311585086616962,
+      "sha256": "e5c8d56114dbb1e1079c8a63bf35a18e362f03a0f1c517dca49d88492bd775a0"
+    },
+    {
+      "file": "survival_molotov_2.wav",
+      "frames": 33516,
+      "seconds": 0.76,
+      "peak": 0.17999816888943143,
+      "rms": 0.009111816230741972,
+      "sha256": "aed80e9ad883eda78f725e3c7354cdffdb5a19df3799140753f947b30fe19326"
+    },
+    {
+      "file": "survival_npc_shot_0.wav",
+      "frames": 18522,
+      "seconds": 0.42,
+      "peak": 0.17999816888943143,
+      "rms": 0.015374482798219648,
+      "sha256": "4ae7e1846b09d673227c4b825207cc3c70d75a05e56f8af8175c94fdbeeb7275"
+    },
+    {
+      "file": "survival_npc_shot_1.wav",
+      "frames": 18522,
+      "seconds": 0.42,
+      "peak": 0.17999816888943143,
+      "rms": 0.014400070777503125,
+      "sha256": "0cb4c362c6205d07d97de6d7e4370f5459d117b401c7a26afcdeff272e6c56b7"
+    },
+    {
+      "file": "survival_npc_shot_2.wav",
+      "frames": 18522,
+      "seconds": 0.42,
+      "peak": 0.17999816888943143,
+      "rms": 0.014676506575515832,
+      "sha256": "103fac7c7b85b2475b1b85e63cb1f9f7097378c52b292c1874dec7af7d3cdded"
+    },
+    {
+      "file": "survival_pistol_0.wav",
+      "frames": 15876,
+      "seconds": 0.36,
+      "peak": 0.17999816888943143,
+      "rms": 0.01540595392544149,
+      "sha256": "fd65323eae54f08278e87511e3dfa4f8ec73bac36d509c21d06cfc3f1a2693b1"
+    },
+    {
+      "file": "survival_pistol_1.wav",
+      "frames": 15876,
+      "seconds": 0.36,
+      "peak": 0.17999816888943143,
+      "rms": 0.013059134688226946,
+      "sha256": "5d56c08765f0805a3c84fcbc2cb8b8a7d91fa9759540ed9261b81389b06db8e3"
+    },
+    {
+      "file": "survival_pistol_2.wav",
+      "frames": 15876,
+      "seconds": 0.36,
+      "peak": 0.17999816888943143,
+      "rms": 0.013229983176768427,
+      "sha256": "021e03be5e4082a0ab5f7d899b5d3a2fc252a3e41526e440dd2ae688324dd04c"
+    },
+    {
+      "file": "survival_ready_0.wav",
+      "frames": 14994,
+      "seconds": 0.34,
+      "peak": 0.17999816888943143,
+      "rms": 0.0128416561257369,
+      "sha256": "6be9660a1bce63b09aa54c78cc4e86e2f08d56dbe8f48c2a408eea000208302b"
+    },
+    {
+      "file": "survival_ready_1.wav",
+      "frames": 14994,
+      "seconds": 0.34,
+      "peak": 0.17999816888943143,
+      "rms": 0.013052889178987745,
+      "sha256": "651fce587135b8dc4a9328be8b8ec4712419481c042831e3bed1aaacf671df69"
+    },
+    {
+      "file": "survival_ready_2.wav",
+      "frames": 14994,
+      "seconds": 0.34,
+      "peak": 0.17999816888943143,
+      "rms": 0.013462993525371648,
+      "sha256": "5204663675dcfc85ceeb62c390ed3956288dfd4c77daee96af26a9fb2bfebbce"
+    },
+    {
+      "file": "survival_reload_0.wav",
+      "frames": 37926,
+      "seconds": 0.86,
+      "peak": 0.17999816888943143,
+      "rms": 0.011400899983486291,
+      "sha256": "d5fa421c736664543a1f411f7fbe4611c0b77b1ad5a865c50bcae8dadd1ae799"
+    },
+    {
+      "file": "survival_reload_1.wav",
+      "frames": 37926,
+      "seconds": 0.86,
+      "peak": 0.17999816888943143,
+      "rms": 0.012312710550599428,
+      "sha256": "25b72c48436d8fc9d1ccd0236d02e897c223d3bca7dc9bd8690ba2d1b3d8d808"
+    },
+    {
+      "file": "survival_reload_2.wav",
+      "frames": 37926,
+      "seconds": 0.86,
+      "peak": 0.17999816888943143,
+      "rms": 0.012474362266481038,
+      "sha256": "86bc2c3d9e2f8f0d4dd25254dbcf5c81ccbb25b97e275a65a6fd8717169ac52c"
+    },
+    {
+      "file": "survival_retreat_0.wav",
+      "frames": 39690,
+      "seconds": 0.9,
+      "peak": 0.17999816888943143,
+      "rms": 0.010708898866120245,
+      "sha256": "b3ea32ab4b7a929172b8d46b74ad483168376b9d7880d1e77ef4cd81fb6e832f"
+    },
+    {
+      "file": "survival_retreat_1.wav",
+      "frames": 39690,
+      "seconds": 0.9,
+      "peak": 0.17999816888943143,
+      "rms": 0.013025995748170944,
+      "sha256": "d93f37f0cfb74de38ef853afcb6567b7ba9d9a0692995fb92464f0083ebd0417"
+    },
+    {
+      "file": "survival_retreat_2.wav",
+      "frames": 39690,
+      "seconds": 0.9,
+      "peak": 0.17999816888943143,
+      "rms": 0.008646618470588271,
+      "sha256": "678807e384c76694b3f23063bf6abe7c727390e44312144bd07d24548f6c7a0d"
+    },
+    {
+      "file": "survival_rifle_0.wav",
+      "frames": 20286,
+      "seconds": 0.46,
+      "peak": 0.17999816888943143,
+      "rms": 0.014020615626223984,
+      "sha256": "ed78d01486b6a47b26e2b03ef8ae238581637bd0c909e99052dc0f09cdc868ca"
+    },
+    {
+      "file": "survival_rifle_1.wav",
+      "frames": 20286,
+      "seconds": 0.46,
+      "peak": 0.17999816888943143,
+      "rms": 0.012633178460508947,
+      "sha256": "20935284aa4879b712968421f2a2d866cc6cf6c0ff106247a2ecd3623608c64d"
+    },
+    {
+      "file": "survival_rifle_2.wav",
+      "frames": 20286,
+      "seconds": 0.46,
+      "peak": 0.17999816888943143,
+      "rms": 0.01307572299802245,
+      "sha256": "4b45f7eee28bdf7a5aa29cf306144a86f37c120e82c887c1b061219dbe8c64a4"
+    },
+    {
+      "file": "survival_shotgun_0.wav",
+      "frames": 27342,
+      "seconds": 0.62,
+      "peak": 0.17999816888943143,
+      "rms": 0.015634268037956818,
+      "sha256": "bf9a677f3e657f75969f51fa5ee244d1dd3150adec94bb91c2bb8f545ad23681"
+    },
+    {
+      "file": "survival_shotgun_1.wav",
+      "frames": 27342,
+      "seconds": 0.62,
+      "peak": 0.17999816888943143,
+      "rms": 0.014889853089357693,
+      "sha256": "96ec106f929cd664bacb0dd5401a3bc91622b0d29f317d4e6ae61c01d95bb38f"
+    },
+    {
+      "file": "survival_shotgun_2.wav",
+      "frames": 27342,
+      "seconds": 0.62,
+      "peak": 0.17999816888943143,
+      "rms": 0.016731592432353164,
+      "sha256": "7ee55d6cef3f470e184717a502378caac26df94d1ba9073e357e9188b78fb7f5"
+    },
+    {
+      "file": "survival_smg_0.wav",
+      "frames": 9702,
+      "seconds": 0.22,
+      "peak": 0.17999816888943143,
+      "rms": 0.01596766633914742,
+      "sha256": "01be1f24091c833a01d2578e0c03e142b39afd6f6b581b6190a96028ca5d40ef"
+    },
+    {
+      "file": "survival_smg_1.wav",
+      "frames": 9702,
+      "seconds": 0.22,
+      "peak": 0.17999816888943143,
+      "rms": 0.016888203220469206,
+      "sha256": "ea9792cc9ce544ea2dc0e51fb53c876cab767ede16d65a403f8b35c2e19878a6"
+    },
+    {
+      "file": "survival_smg_2.wav",
+      "frames": 9702,
+      "seconds": 0.22,
+      "peak": 0.17999816888943143,
+      "rms": 0.014285142567176482,
+      "sha256": "26d09af3d46b756808063dfa119a2c4b2924b531422df4c6b4da57ba9b7cf363"
+    },
+    {
+      "file": "survival_structure_0.wav",
+      "frames": 52920,
+      "seconds": 1.2,
+      "peak": 0.17999816888943143,
+      "rms": 0.025602878699048568,
+      "sha256": "b315a80c95e3c7dfab4d86939be533d3a746975c52dd43cd5db8fb7a04028eef"
+    },
+    {
+      "file": "survival_structure_1.wav",
+      "frames": 52920,
+      "seconds": 1.2,
+      "peak": 0.17999816888943143,
+      "rms": 0.023843502332287044,
+      "sha256": "7501c465eba6dd67a53496810dc827103facd0a8fee28d7979d467ca85015b51"
+    },
+    {
+      "file": "survival_structure_2.wav",
+      "frames": 52920,
+      "seconds": 1.2,
+      "peak": 0.17999816888943143,
+      "rms": 0.023247098896575304,
+      "sha256": "9b315a5487012b846edd15de89f275eb039f07a1042f845c472863e2e49fb6ea"
+    },
+    {
+      "file": "survival_throw_0.wav",
+      "frames": 24696,
+      "seconds": 0.56,
+      "peak": 0.17999816888943143,
+      "rms": 0.022884424453847793,
+      "sha256": "9bc3c3aa6babda195fa31647946125ba402886771e59403aadf3a88be3637490"
+    },
+    {
+      "file": "survival_throw_1.wav",
+      "frames": 24696,
+      "seconds": 0.56,
+      "peak": 0.17999816888943143,
+      "rms": 0.030273429009362144,
+      "sha256": "5c9339813ea07a5961e10498532bc71a55f32022eff4c30c70d1612b62a5a515"
+    },
+    {
+      "file": "survival_throw_2.wav",
+      "frames": 24696,
+      "seconds": 0.56,
+      "peak": 0.17999816888943143,
+      "rms": 0.022812520779778852,
+      "sha256": "3392246330b7e5d54d63b4a2a3497708ee636a156aaa44326d4df83f8292a92d"
+    },
+    {
+      "file": "survival_trap_0.wav",
+      "frames": 66150,
+      "seconds": 1.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.01589977361565619,
+      "sha256": "ce7b74bd92fb3db3a90e30696af1e857b458eb4a969eaf1571bbd56b1f3e9962"
+    },
+    {
+      "file": "survival_trap_1.wav",
+      "frames": 66150,
+      "seconds": 1.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.013486892662908088,
+      "sha256": "d76e14b0dc71a3cfaa192ab34619695d1f628de4eb12e5f48f771c0f6778420a"
+    },
+    {
+      "file": "survival_trap_2.wav",
+      "frames": 66150,
+      "seconds": 1.5,
+      "peak": 0.17999816888943143,
+      "rms": 0.014883311451645882,
+      "sha256": "4d57948f0c4d96a46c512a9092682f968c6735be162cb799818c40a1aa14bbe0"
+    },
+    {
+      "file": "survival_turret_shot_0.wav",
+      "frames": 17640,
+      "seconds": 0.4,
+      "peak": 0.17999816888943143,
+      "rms": 0.013153690503992033,
+      "sha256": "05452664ee506cf470b7268e71afa1099e0587688e93568934cb52f28621e1f7"
+    },
+    {
+      "file": "survival_turret_shot_1.wav",
+      "frames": 17640,
+      "seconds": 0.4,
+      "peak": 0.17999816888943143,
+      "rms": 0.013978052789381202,
+      "sha256": "59a3c0719f2889f132595f5192fa81ceab97a278dcdd2ada4ab37d2cc71090c1"
+    },
+    {
+      "file": "survival_turret_shot_2.wav",
+      "frames": 17640,
+      "seconds": 0.4,
+      "peak": 0.17999816888943143,
+      "rms": 0.014708724257082676,
+      "sha256": "b101a5e03f83d28ac34595bf800a3217a74512d53f1f66a69bca9d2d41e70978"
+    },
+    {
+      "file": "survival_wave_0.wav",
+      "frames": 31752,
+      "seconds": 0.72,
+      "peak": 0.17999816888943143,
+      "rms": 0.013149314308251928,
+      "sha256": "611c3d78d0f71d57cdada897b9a473b25ec4ac471fb1600959d029b577418c3f"
+    },
+    {
+      "file": "survival_wave_1.wav",
+      "frames": 31752,
+      "seconds": 0.72,
+      "peak": 0.17999816888943143,
+      "rms": 0.01110461701315536,
+      "sha256": "1ea4380b5df2fcc587d4146ef12523ec9097603538f82f2c4f2100e5de350e54"
+    },
+    {
+      "file": "survival_wave_2.wav",
+      "frames": 31752,
+      "seconds": 0.72,
+      "peak": 0.17999816888943143,
+      "rms": 0.009589299880861489,
+      "sha256": "af87148c79751f3098e6b136f3ebdabb7d008207b2ea28a93b7c933515c245d5"
+    }
+  ]
+}

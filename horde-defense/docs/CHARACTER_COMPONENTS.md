@@ -1,0 +1,43 @@
+# Source-owned survivor models and equipped appearance
+
+This guide describes the current presentation interface. Detailed authoring and independent acceptance belong to [PLAYER_MODEL_AUTHORING.md](PLAYER_MODEL_AUTHORING.md), [PLAYER_MODEL_IMPLEMENTATION_PLAN.md](PLAYER_MODEL_IMPLEMENTATION_PLAN.md) and [PLAYER_MODEL_VALIDATION.md](PLAYER_MODEL_VALIDATION.md). Those documents own the model data/research contract. An implemented resolver is not approval of its posed appearance or performance.
+
+## Source authority and accepted scope
+
+The original `menu-survivors-v1.png` RGBA supplies Rook and June. Source masks assign each original visible texel exactly once to actual semantic parts; source geometry retains original UVs and alpha rather than painting a substitute figure underneath. The initial accepted original bind had 22 Rook parts and 23 June parts. Both native black/white comparisons had zero differing pixels and bytes, and independent review accepted visible ownership. The current source has 23 Rook parts and 24 June parts after an approved ownership split separating the authentic near-wrist strip from the distal palm. The source PNG remains unchanged. Current native confirmation again passed both background comparisons with zero differing pixels/bytes/channel deltas, including direct checks of 952 Rook and 567 June opaque source pixels per background. See the dated evidence in the model validation guide.
+
+This exact claim applies to the original reference bind only. Changed poses expose surfaces absent from the still; those surfaces are explicitly authored hidden repairs, not recovered original pixels. Alternate garments and equipment are distinct authored assets. Animation, fit, contacts, action silhouettes and production integration require their own native inspection. Root and independent review accepted the bounded static correction in source-model-confirmation (eight PNGs) and source-model-game-confirmation (six PNGs): the ghost/grid artifacts are removed, raised pistol remains visible, and the closed melee grasp connects through the authentic wrist bridge. All 68 matrix cases are supported. Near-vertical rifles and limited head pitch remain a stylized 2D solution, not fully natural 3D anatomy. Independent review also accepted six current native motion clips, including legal grenade/Molotov release and June contact melee with closed grasp and recovery. Their fixed-step exports show the covered poses, not real-time performance or every possible action combination. Do not describe these poses or new garments as pixel-identical to the original still.
+
+## Core and presentation boundary
+
+Core `EquipmentVisual` freezes actual equipped ranged/outfit/accessory/melee definition, level, resolved quality and stable style ID, plus optional firearm class. `ItemDefinition.visual_style` is authored content. Older missing snapshots have the declared empty fallback; they are not a grant of starter equipment. Proficiency, ownership, reservation, quality, level and NPC-issued restrictions remain independent.
+
+`player_model::resolve_appearance` selects compatible skin/slot material from that immutable snapshot. `resolve_pose` applies a `PlayerPoseSample`; `resolve_equipped_model` is the combined facade. `resolve_model` remains the original source-exact reference. All return actual draw packets and shared sockets. No resolver spends, equips, rolls, advances time or resolves an attack.
+
+`PlayerPoseSample` contains tick, displayed aim, Bind/Hold/Reload/Melee/Throw with action phase, recoil, brace, hit and reduced-effects preference. `ResolvedPlayerPose` contains packets, displayed sockets, source sockets, muzzle and throw origin. Anatomical wrists/palms and painted grip contacts are distinct authored points. Limbs retain their source lengths; no stretching or weapon rescaling may conceal a contact failure.
+
+## Modules and loading
+
+- `player_model/catalogue.rs` validates model/skin schemas; `source_masks.rs` compiles source ownership and cached local meshes.
+- `bind.rs`, `assembly.rs`, `appearance.rs`, `attachments.rs`, `attachment_compile.rs` and `equipped_pose.rs` separate source binding, material selection and pose resolution.
+- `startup.rs::initialize_player_models` eagerly loads `assets/player_models/manifest.json` and compiles the catalogue. The manifest maps appearance keys to models and lists model/skin documents. An absent manifest uses the explicit bundled compatibility catalogue; a present malformed document fails visibly instead of silently choosing another body.
+- `backend_egui.rs` caches managed `ColorImage::from_rgba_unmultiplied` textures with NEAREST after the actual RenderDevice budget is installed. Geometry/source decoding and filesystem work belong to startup, not per-frame painting.
+- `visual_assets::{resolve_player_model,draw_player_model,project_player_socket}` is the app-facing adapter. Production battle and equipped previews use this source-owned facade; the retired `character_rig` is retained only under test configuration as a historical regression fixture.
+
+The ordinary scene/effect loader separately holds seven atlases (walkers, actors, props, terrain, defender-rig, keyart and original menu survivors). Model manifest sources add declared original/repair/garment/equipment textures and may share these files. Count distinct source files separately from handles, source rows and retained provenance; the old eight-atlas/sixteen-part body inventory is historical. Original images and their provenance remain retained. Final inventory is an evidence check, not a reason to infer an active asset from its presence on disk.
+
+## Shared origins and action sampling
+
+`defender_presentation::sample` selects the latest authoritative action/reload state. `target_world` uses the actual throw/melee target when appropriate, rather than an old ranged shot. `release_sample_for_projectile` samples historical release tick and pulses without advancing simulation. Optional saved `ThrownOrdnance.release_cues` retains release tick, shot/hit ticks and brace state even after the brace ends and the bounded event history expires; older None records keep the explicit legacy sampler. This preserves the in-flight origin across save/resume without resampling the current pose. There is no invented prethrow windup: phase zero is the resolved release/recovery start.
+
+Battle draws the resolved pose and uses its muzzle for the same bullet/flash path. `ReleaseOrigins` keeps a bounded historical source-space throwing socket keyed by model, equipment, attempt, projectile and release tick; projection can then follow a resize without making an airborne projectile originate from the current hand. Display transforms never move the fixed defender or change a hit/RNG result. Read-only Character previews use the same equipped model facade; the menu retains its cohesive original low-ready artwork at the existing cabin anchor.
+
+## Developer review tasks
+
+The isolated `ui/review.rs` surfaces cover original parity, semantic parts, equipped/action matrix and explicit repairs. They are developer review tasks under [player-model-review](components/player-model-review.md), not player menu destinations. Parity checks actual source/assembly pixels; parts expose real ownership; matrix exercises selected equipment/actions; repairs disclose newly supplied surfaces. The fixture must report unsupported/error cases plainly. A successful mathematical audit cannot replace visual inspection of the resulting PNGs and motion.
+
+Run the documented model capture/check scripts from the model validation guide. Preserve exact bind checks and slot-removal/backend checks when changing masks or draw order. Unknown hidden regions must stay disclosed; do not fill them with an undisclosed full-body image, repeat a sleeve into a torso or add a second hand without removing the active replaced material. Contact/muzzle/throw checks must examine the selected emitted packets, not metadata aliases or retired renderer helpers.
+
+## Current source verification
+
+The root workspace verification recorded 432 passing tests (201 core, 231 application), zero failures and one intentionally ignored offline sound exporter, with formatting and strict all-target Clippy. The native build passed. Evidence is recorded in [VALIDATION.md](VALIDATION.md); the source gate alone establishes no visual or timing result. Separate static acceptance and focused NPC timing are now recorded there; legal post-warmup grenade/Molotov/melee clips pass their event/charge/recovery assertions. Independent gesture visual confirmation is accepted for the six recorded clips; final archive/copied-package verification remains separate delivery evidence.

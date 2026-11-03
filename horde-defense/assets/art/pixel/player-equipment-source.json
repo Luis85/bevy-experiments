@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "asset": "player-equipment-v1.png",
+  "purpose": "Explicit worn accessories and action-only held melee tools for valid real equipment styles; no default survivor/body/hand replacement",
+  "generation_mode": "builtin_image_gen",
+  "image_generation_count": 1,
+  "source": {
+    "path": "assets/art/pixel/menu-survivors-v1.png",
+    "role": "sole survivor pixel style, projection, palette and scale reference",
+    "sha256": "4feb21b05c1ad5d281d4f0134fdfe546356ca71a204dba04b7c81c48bd356a3a"
+  },
+  "output": {
+    "path": "assets/art/pixel/player-equipment-v1.png",
+    "sha256": "9f70b4d224686e43bfb3f8f22616d535a47e54c2c685f9793f144dd168b08020",
+    "raw_png_sha256": "97ff2c1b3616f1a21bf30d832d3a62b2ace0ba9d83b0be6622861cbeaa702dcc",
+    "rgba_fnv1a64": "81dd2c5efae5ffb7",
+    "width": 1254,
+    "height": 1254,
+    "columns": 3,
+    "rows": 3,
+    "pixel_format": "RGBA",
+    "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a1a16f-6a19-7a00-b04b-474be3d9c90b/exec-77142125-a511-4daf-81cc-e92dbc1bb39f.png",
+    "raster_modified_after_generation": false,
+    "png_prompt_metadata_embedded": true,
+    "metadata_embedding_rgba_unchanged": true
+  },
+  "prompts": [
+    {
+      "role": "initial_selected",
+      "prompt": "Use case: stylized-concept\nAsset type: production modular PIXEL-ART EQUIPMENT atlas for the existing Lastlight survivor rig, with true alpha transparency.\nInput image1 is the sole survivor style/projection/palette/pixel-cluster reference: menu-survivors-v1.png. It is a REFERENCE only, not an edit target. Preserve that source unchanged. Draw isolated equipment only. No people, bodies, heads, hands, arms, clothing torsos, legs, feet, original default pistols or replacement survivor designs.\n\nGenerate exactly NINE independently isolated items in a precise THREE-COLUMN by THREE-ROW square atlas, preferably1536x1536 with equal512px cells. Generous alpha-zero gutters between every item; no grid lines, labels, cell borders, text, numbers, backdrop, checkerboard, ground or cast shadows. Every opening between straps must be genuinely transparent.\nRead each row left to right:\nROW1: (1) First-aid field rig: compact worn olive/brown canvas medical side bag with a modest muted red medical cross patch, flap, two short belt attachment loops and believable small pouches. (2) Compact belt/shoulder-worn RANGEFINDER/RADIO MODULE: dark slate/olive durable rectangular field housing, small dark optical window, one restrained small lens and short folded antenna, leather belt clip or short mounting strap. No hand holding it. (3) SURVIVAL HARNESS SATCHEL: worn brown compact side satchel with flap and practical pockets, attached to a diagonal worn leather shoulder strap. Equipment and straps only, transparent empty space inside the strap, no clothing underneath.\nROW2: (1) VETERAN FIELD RIG: original-looking multipouch chest/waist harness, worn brown/tan canvas pouches, dark webbing straps and belt, useful small attached kit. Equipment overlay ONLY: clear alpha holes where the survivor's clothing will show. No torso, undershirt or armor body behind its straps. (2) CROWBAR: a plain worn dark-steel pry bar, distinct hooked upper end and flattened lower end, no extra attachments. (3) FIRE AXE: worn dull-steel axe head with restrained faded red paint, brown wooden haft and dark worn grip. Practical survival tool.\nROW3: (1) MACHETE: broad worn dull-steel utility blade with a short dark wrapped handle and small modest guard. (2) BREACH HAMMER: solid rectangular worn metal sledge head, long brown handle with dark grip, practical grounded proportions. (3) SABER: gently curved long worn steel blade, small restrained brass/steel guard, dark wrapped handle and plain pommel. No fantasy ornaments.\n\nAll FIVE TOOLS point vertically UP, handles/grasp areas at the bottom, heads/blades at the top. Show complete independent silhouettes with generous space around tips and hooks. Each tool must have a clearly usable lower grasp region for a later hand contact socket. Worn accessories use the same three-quarter right-facing projection as the original survivor clothing; the standalone tools use a matching shallow three-quarter side projection suitable for being rotated by a 2D cutout rig.\nMaintain sensible physical scale across this atlas rather than enlarging every item to fill its cell. Reference survivors are about800sourcepx tall. At that comparable pixel scale, medical bag about110px wide by100px high, radio/rangefinder about65px wide by90px high, satchel body about170px wide by150px high with shoulder strap reaching about280px total height, veteran rig about220px broad by260px high, crowbar about310px long, fire axe about350px long with110px head width, machete about260px long, breach hammer about350px long with120px head width, saber about340px long with55\u201365px guard width. Small items must remain visibly smaller than large items and smaller within their cells.\n\nMatch the original's grounded chunky pixel clusters, near-black stepped outer outlines, muted charcoal steel, weathered brown leather, olive fabric, restrained tan pouches and simple readable material wear. Keep the same apparent pixel-cluster density across all items. These are original unbranded survivor objects, not a generic modern tactical catalogue. No photorealism, smooth vector outlines, glossy pseudo-3D, airbrushed gradients, tiny noisy dithering, neon colors, superhero/fantasy design, inscriptions, brands, readable displays, blood or skull decoration. Do not add any extra item. No baked hands, flesh, fingers, clothing or character parts.",
+      "reference_paths": [
+        "assets/art/pixel/menu-survivors-v1.png"
+      ],
+      "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a1a16f-6a19-7a00-b04b-474be3d9c90b/exec-77142125-a511-4daf-81cc-e92dbc1bb39f.png",
+      "raw_png_sha256": "97ff2c1b3616f1a21bf30d832d3a62b2ace0ba9d83b0be6622861cbeaa702dcc"
+    }
+  ],
+  "part_order": [
+    "accessory.medic",
+    "accessory.radio",
+    "accessory.satchel",
+    "accessory.rig",
+    "melee.crowbar",
+    "melee.axe",
+    "melee.machete",
+    "melee.hammer",
+    "melee.saber"
+  ],
+  "validation": {
+    "raw_png_copied_without_raster_changes": true,
+    "root_visual_atlas_review": "Root viewed and accepted first artifact for staging without edits; nine independent silhouettes, readable grips, coherent materials and transparent accessory openings. Native placements/actions remain pending.",
+    "default_source_masks_unchanged": true,
+    "default_field_webbing_and_pistol_unchanged": true,
+    "default_crowbar_stowed_at_reference_bind": true
+  },
+  "authored_masks": [
+    {
+      "style": "accessory.medic",
+      "source_rect": [
+        121,
+        124,
+        315,
+        330
+      ],
+      "positive_alpha_source_runs": 564,
+      "uniform_scale": 0.58,
+      "source_mount": [
+        214,
+        145
+      ]
+    },
+    {
+      "style": "accessory.radio",
+      "source_rect": [
+        542,
+        100,
+        699,
+        335
+      ],
+      "positive_alpha_source_runs": 599,
+      "uniform_scale": 0.45,
+      "source_mount": [
+        563,
+        217
+      ]
+    },
+    {
+      "style": "accessory.satchel",
+      "source_rect": [
+        934,
+        26,
+        1145,
+        378
+      ],
+      "positive_alpha_source_runs": 1113,
+      "uniform_scale": 0.85,
+      "source_mount": [
+        1100,
+        50
+      ]
+    },
+    {
+      "style": "accessory.rig",
+      "source_rect": [
+        79,
+        474,
+        362,
+        790
+      ],
+      "positive_alpha_source_runs": 1343,
+      "uniform_scale": 0.8,
+      "source_mount": [
+        221,
+        753
+      ]
+    },
+    {
+      "style": "melee.crowbar",
+      "source_rect": [
+        568,
+        442,
+        688,
+        810
+      ],
+      "positive_alpha_source_runs": 736,
+      "uniform_scale": 0.87,
+      "source_grip": [
+        607,
+        750
+      ]
+    },
+    {
+      "style": "melee.axe",
+      "source_rect": [
+        977,
+        444,
+        1131,
+        811
+      ],
+      "positive_alpha_source_runs": 813,
+      "uniform_scale": 0.98,
+      "source_grip": [
+        1007,
+        762
+      ]
+    },
+    {
+      "style": "melee.machete",
+      "source_rect": [
+        186,
+        862,
+        275,
+        1228
+      ],
+      "positive_alpha_source_runs": 630,
+      "uniform_scale": 0.74,
+      "source_grip": [
+        217,
+        1181
+      ]
+    },
+    {
+      "style": "melee.hammer",
+      "source_rect": [
+        555,
+        862,
+        697,
+        1228
+      ],
+      "positive_alpha_source_runs": 806,
+      "uniform_scale": 1.0,
+      "source_grip": [
+        625,
+        1181
+      ]
+    },
+    {
+      "style": "melee.saber",
+      "source_rect": [
+        996,
+        856,
+        1095,
+        1228
+      ],
+      "positive_alpha_source_runs": 645,
+      "uniform_scale": 0.95,
+      "source_grip": [
+        1024,
+        1181
+      ]
+    }
+  ]
+}

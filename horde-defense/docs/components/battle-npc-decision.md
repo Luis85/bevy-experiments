@@ -1,0 +1,21 @@
+---
+type: View
+id: battle-npc-decision
+title: "NPC decision and policy popup"
+parent: battle
+status: Implemented
+source: "crates/horde_game/src/ui/battle.rs::battle; crates/horde_game/src/inspector.rs::npc_decision"
+---
+
+# NPC decision and policy popup
+
+Explain the active NPC's current action and permit policy edits.
+
+- **Entry, exit and actions:** In NPC mode open Survivor; inspect its decision and adjust policy; dismiss outside the popup.
+- **State boundary:** Decision context is read-only; policy changes use the existing validated command at the next legal decision.
+- **Responsiveness and accessibility:** The popup wraps and scrolls within field height; NPC inspection never masquerades as personal firing input.
+
+Parent IDs express view containment, not an exclusive navigation route. Implementation status records the existing surface; it does not claim native GUI validation.
+
+
+NPC zero/negative injury HP can mean conscious Critical / still fighting under the explicitly retained GURPS rules. Signed HP and CRIT · FIGHTING labels distinguish that state from an actual terminal. Actual defeated actors stop and reap/pay in the resolving fixed tick. Inspection and targeting follow Enemy.y(), including saved passing displacement.

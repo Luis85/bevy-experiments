@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "asset": "player-hidden-torsos-v1.png",
+  "purpose": "Coherent original-palette hidden coat torso continuity, replacing rejected repeated sleeve-material tile stencils. Unknown revealed torso surfaces only; never a new visible default body or limb.",
+  "generation_mode": "builtin_image_gen",
+  "image_generation_count": 1,
+  "source": {
+    "path": "assets/art/pixel/menu-survivors-v1.png",
+    "role": "sole original coat palette/proportion/pixel-style reference",
+    "sha256": "4feb21b05c1ad5d281d4f0134fdfe546356ca71a204dba04b7c81c48bd356a3a"
+  },
+  "output": {
+    "path": "assets/art/pixel/player-hidden-torsos-v1.png",
+    "sha256": "c2f337f8ae97eb9ff3dc4aec8abac347064e272f9e298a313622c1a4112cfa3b",
+    "raw_png_sha256": "19cf3f99825e00b238ce55a5051e3ee366fa6ed2707c5f9fcb7c131e1f2239d5",
+    "rgba_fnv1a64": "3a46c868ba6b651c",
+    "width": 1774,
+    "height": 887,
+    "pixel_format": "RGBA",
+    "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a1a16f-6a19-7a00-b04b-474be3d9c90b/exec-3c246e99-b03c-4dbf-92e8-4f28c236f2bd.png",
+    "raster_modified_after_generation": false,
+    "png_prompt_metadata_embedded": true,
+    "metadata_embedding_rgba_unchanged": true
+  },
+  "prompts": [
+    {
+      "role": "single_authorized_hidden_backing",
+      "prompt": "Use case: precise-object-edit / identity-preserve.\nAsset type: ONE transparent production PIXEL ART HIDDEN-CLOTH BACKING SHEET for the existing Lastlight cutout survivor rig. Input image1 (menu-survivors-v1.png) is the SOLE palette, projection, anatomy/proportion and material reference. The original source PNG and every visible default character pixel are preserved elsewhere and must NOT be replaced. This output is used only behind originally occluded cloth when arms/equipment move or are removed, never as a new visible default body.\n\nCreate exactly TWO isolated ARM-FREE TORSO CLOTH BACKINGS on a transparent landscape TWO-TO-ONE canvas, preferably1774x887 matching the reference canvas. Keep the source's original approximate positions/scale: LEFT Rook olive coat body centered near(475,365), about230px broad and300px high; RIGHT June slate/charcoal coat body centered near(1295,380), about215px broad and275px high. Do not zoom torso parts to fill the canvas. Generous true alpha-zero empty space all around and between the two panels. No text, labels, grid, boxes, floor, backdrop or cast shadows.\n\nLEFT: the clean underlying TORSO surface of Rook's original olive hooded work jacket, from the collar/shoulder bridge to its original waist hem, in the exact three-quarter right-facing source projection. Keep the original rugged olive fabric, dark open inner placket/zipper and muted inner shirt relationship. Restore only continuous jacket fabric formerly hidden by the bent arms, hands/pistol, pack straps and carried equipment. Cloth hangs from chest to waist in natural restrained vertical/sagging folds. Match the reference's fitted width and short waist-length hem; no long coat, newly narrow vest, giant pockets or redesigned garment.\nRIGHT: the clean underlying TORSO surface of June's original slate-blue/charcoal hooded work jacket, same three-quarter right-facing source projection and original fitted shoulder/chest/waist proportions. REMOVE ALL tan webbing, pouches, straps and waist carriage from this backing and reconstruct the slate cloth that those objects obscured. Preserve the source's collar/placket, subdued slate fabric palette and waist-length hem. No tan vest or new armor is baked into it.\n\nCRITICAL CONSTRUCTION: both are genuinely ARM-FREE, HAND-FREE, EQUIPMENT-FREE torso surfaces. Only collar/shoulder bridges, chest, side seams and waist hem. No baked upper-arm lobes, shoulder-arm domes, sleeve stumps, cuff shapes, forearm silhouettes, diagonal arm-shaped bands or arm shadows across the chest/waist. No arms hidden in the body art. No hands, fingers, head, face, hair, neck skin, pelvis, trousers, legs, boots, pistol, gun, pack, harness, straps, pouches, armor, objects or complete characters.\nThe cloth must be COHERENT across each entire panel: no repeated rectangular texture blocks, tiled sleeve samples, checker-like patch grid or conspicuous horizontal/diagonal band that reads as a third arm. Outer contour is the natural coat torso only; it does not preserve the silhouette of a former bent arm or backpack. Internal cloth edges should blend naturally under the existing exact original layers, not have outlined rectangular repair borders.\nStyle: the same grounded chunky source pixel clusters and near-black stepped silhouettes, muted olive/brownish jacket cloth for Rook and cool slate/charcoal cloth for June, restrained worn fabric shading and original rugged pixel-survival identity. No smooth vector icon, airbrushed painting, glossy pseudo-3D, tiny noisy dithering, high saturation, generic tactical redesign, muscular superhero torso or decorative additions. This is a targeted hidden-surface continuity asset, not a regenerated default survivor.",
+      "reference_paths": [
+        "assets/art/pixel/menu-survivors-v1.png"
+      ],
+      "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a1a16f-6a19-7a00-b04b-474be3d9c90b/exec-3c246e99-b03c-4dbf-92e8-4f28c236f2bd.png",
+      "raw_png_sha256": "19cf3f99825e00b238ce55a5051e3ee366fa6ed2707c5f9fcb7c131e1f2239d5"
+    }
+  ],
+  "validation": {
+    "causal_evidence": "source-model-repair-cause/model-repairs-rook.png and model-repairs-june.png: stationary third-arm band disappears entirely without HiddenFill; old sleeve-shaped/tiled repairs caused the defect.",
+    "root_artifact_review": "Root accepted inner olive/slate cloth for staging; lateral shoulder/stump contours are excluded from the material domain. Natural torso domain only, no original visible/default replacement.",
+    "raw_png_copied_without_raster_changes": true,
+    "default_bind_contribution": "must remain zero",
+    "native_corrected_pose_review": "pending single coordinated confirmation batch"
+  },
+  "authoring_constraints": [
+    "Natural torso support silhouette, not the old arm/cuff or pack footprint.",
+    "Original known torso/hood/hem and protected body/identity material are preserved.",
+    "Single coherent panel per model, no repeated sleeve-material tile grid.",
+    "Original source image RGBA remains unchanged; all original owners reconstruct once."
+  ],
+  "authored_backing_domains": {
+    "rook": {
+      "natural_target_polygon": [
+        [
+          388,
+          227
+        ],
+        [
+          435,
+          226
+        ],
+        [
+          480,
+          236
+        ],
+        [
+          538,
+          252
+        ],
+        [
+          558,
+          279
+        ],
+        [
+          566,
+          335
+        ],
+        [
+          566,
+          390
+        ],
+        [
+          560,
+          435
+        ],
+        [
+          550,
+          487
+        ],
+        [
+          535,
+          505
+        ],
+        [
+          470,
+          510
+        ],
+        [
+          400,
+          507
+        ],
+        [
+          359,
+          502
+        ],
+        [
+          354,
+          472
+        ],
+        [
+          361,
+          425
+        ],
+        [
+          374,
+          378
+        ],
+        [
+          379,
+          332
+        ],
+        [
+          378,
+          280
+        ]
+      ],
+      "source_origin": [
+        490,
+        590
+      ],
+      "bind_origin": [
+        476,
+        510
+      ],
+      "unknown_target_pixels": 21902,
+      "generated_alpha_zero_at_natural_edge": 133,
+      "groups": {
+        "motion": 17496,
+        "carriage": 4191,
+        "weapon": 215
+      },
+      "steep_pistol_forward_bias": 130.0,
+      "steep_pistol_radius": 50.0,
+      "longgun_original_hand_grasp": [
+        552,
+        435
+      ]
+    },
+    "june": {
+      "natural_target_polygon": [
+        [
+          1210,
+          238
+        ],
+        [
+          1250,
+          232
+        ],
+        [
+          1297,
+          250
+        ],
+        [
+          1358,
+          254
+        ],
+        [
+          1380,
+          283
+        ],
+        [
+          1384,
+          350
+        ],
+        [
+          1382,
+          410
+        ],
+        [
+          1369,
+          462
+        ],
+        [
+          1350,
+          492
+        ],
+        [
+          1320,
+          503
+        ],
+        [
+          1260,
+          500
+        ],
+        [
+          1200,
+          494
+        ],
+        [
+          1198,
+          450
+        ],
+        [
+          1204,
+          410
+        ],
+        [
+          1212,
+          370
+        ],
+        [
+          1217,
+          320
+        ],
+        [
+          1216,
+          280
+        ]
+      ],
+      "source_origin": [
+        1316,
+        590
+      ],
+      "bind_origin": [
+        1304,
+        510
+      ],
+      "unknown_target_pixels": 31617,
+      "generated_alpha_zero_at_natural_edge": 59,
+      "groups": {
+        "motion": 12853,
+        "carriage": 18572,
+        "weapon": 192
+      },
+      "steep_pistol_forward_bias": 105.0,
+      "steep_pistol_radius": 45.0,
+      "longgun_original_hand_grasp": [
+        1377,
+        438
+      ]
+    }
+  }
+}

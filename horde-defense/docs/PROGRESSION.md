@@ -1,0 +1,93 @@
+# Progression and authored content
+
+`crates/horde_core/content.json` is the encounter/equipment tuning source. It contains five encounter templates, five legacy enemy profiles, three boss concepts, three structure definitions and twenty-nine equipment definitions. `content.rs` parses and validates the bundled data once. Changing content does not require changing simulation logic. `LASTLIGHT_CONTENT` selects a validated external JSON override at startup without rebuilding; otherwise the bundled file is used.
+
+Ordinary component-authored archetypes and weighted waves live in the separate [enemy composition catalog](ENEMY_COMPOSITION.md); skill, firearm and throwable authoring is documented in [SKILLS_AND_WEAPONS.md](SKILLS_AND_WEAPONS.md). The legacy enemy array is not a five-archetype limit.
+
+The five encounter templates are The Old Road (180 seconds), Ashwood Crossing (180), Depot Nine (210), The Iron Yard (210) and Lastlight Checkpoint (240). Arrival pressure grows to its authored cap. These templates supply encounter identities and mechanics throughout the country campaign; a saved campaign-threat snapshot scales pressure and new equipment beyond the fifth defense rather than resetting difficulty when the template index wraps. Country borders, population-derived local stage counts and scenario modifiers are authored independently in `world.json`; the world progress record belongs to the same campaign save as the armory and wallet.
+
+## Personal survivor and campaign threat
+
+Fresh profiles choose Rook or June before the first-country command. The choice changes the personal appearance, not initial attributes, pistol or combat rules. The preview is presentation state until explicitly confirmed. Mara remains the independent NPC companion. Existing saves without the identity field receive the legacy Rook selection.
+
+Campaign threat is the committed victory count. Every victory—including a cleared-stage replay, outbreak response and worker/country-operation success—raises future threat exactly once; defeat, withdrawal, XP and world-ledger edits do not. Old unique-clear high-water records are only a one-time migration floor. Each attempt freezes difficulty and lane geometry. Threat 50 is the bounded-growth knee for speed/groups/population/economy, not a difficulty ceiling: health and damage continue to the explicit numerical guard of 10,000. Independent item levels reach 27 at victory 52 and their cap 30 at victory 58.
+
+Equipment instances carry stable IDs, saved levels and optional six-tier quality separately from their definition’s unlock tier. Current-level shop offers use fixed base quality; drops roll quality with a separate counter key and do not consume additional combat RNG. Owned levels/qualities do not silently upgrade. Effective stats and sale values apply the rolled/base quality ratio after level scaling; missing quality or explicit base quality preserves old statistics exactly. See [ITEM_QUALITY.md](ITEM_QUALITY.md) for the complete schema and receipts. Template milestones still govern existing body/NPC allowances and blueprint gates.
+
+See [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md) for presets, frozen geometry, DPS and history. See [PROGRESSION_SCALING.md](PROGRESSION_SCALING.md) for the detailed JSON schema, shipped curve, snapshot rules and save compatibility. Its actual defaults and validation bounds, rather than this overview, define the numerical curve.
+
+## Ownership and transactions
+
+The campaign owns one shared wallet and armory. Items have persistent monotonically assigned IDs; loadouts and presets hold references to those IDs. Personal, Mara, recruit and guard loadouts reference the same armory. Active deployments and guard duties reserve their actual item IDs; equipment cannot serve two active assignments. Fresh personal characters must acquire an eligible weapon separately from Mara’s NPC-issued carbine, even after learning its class. Historical pre-proficiency saves retain their explicit legacy access. Deployment reserves the loadout and incompatible preparation mutations reject while it is reserved. The simulation owns per-attempt reward identities and calls `Campaign::reward` only after accepting a new reward transaction. The results screen never pays rewards.
+
+The four legacy starter items and the fresh campaign’s separate personal pistol cannot be sold or unlocked. They are sufficient to start another attempt after all optional loot is sold. The armory has no gameplay capacity ceiling. Automatic collection never silently discards an item. There is no automatic sale system.
+
+Individual sale previews expose affected saved presets. A deliberate sale falls back to the starter item if that item was equipped; a saved preset referencing the sold item remains visibly invalid and cannot be applied. Batch sale quotes and sales exclude protected, locked, favorited, equipped and preset-referenced items.
+
+## Personal development
+
+Personal kills and structures grant Personal kill XP; NPC kills do not. Every victory grants the actual capped completion XP in either mode. Fresh profiles use XP for level/geometry without minting personal CP; permanent body ranks are coin-funded nodes in the same graph. Existing legacy points/allocations retain their budget through the pure-body node payment adapter and spent-point ledger. Coin-trained body ranks use highest owned target rank and are permanent; the old unique-template body_cap applies to legacy CP eligibility, not the fresh coin tree’s authored twenty-rank paths. Character MAX 50, saved geometry and every-victory threat remain separate.
+
+The authored personal progression DAG contains 169 nodes rooted at stable pistol_training, including body development, firearm/ability paths, fortifications and feature access. The seven branch labels focus one complete graph rather than separate tabs. Purchases require the actual prerequisites and coins; innate pistol training is granted at creation. Class training permits eligible owned equipment and never grants a gun. Personal abilities and ordnance affect personal play; shared engineering effects improve structures in either mode. Mara and recruits retain independent NPC advancement. See [SKILLS_AND_WEAPONS.md](SKILLS_AND_WEAPONS.md) for stable IDs, effects, classes, charges and startup overrides. Personal body investment never converts into NPC skill or damage modifiers.
+
+## Mara's advancement
+
+Mara starts with ST 10, DX 12, IQ 10, HT 12, Guns (Rifle) 16 and Broadsword 13. The creation build costs 76 points: 60 in attributes, 12 in DX/E Guns and 4 in DX/A Broadsword. That creation budget is separate from campaign advancement. Supported melee uses an explicit original unified-melee skill adapter mapped to the purchased Broadsword progression: the same trained melee value controls authored crowbar, axe, machete, hammer and saber profiles. Damage type is individually authored (crowbar/hammer crushing; bladed weapons cutting). Muscle-powered weapon profiles author their original ST-10 baseline. The rules module now applies the pinned Lite swing-table delta for the survivor's actual ST, and low-FP strength adjustments use that same procedure. ST improves both HP and melee force while firearm bullet damage remains unchanged. Supported human ST ends at 20; detailed per-weapon tabletop skill taxonomies remain outside the unified-melee adapter. HP derives from ST, FP from HT, Basic Speed from `(DX + HT) / 4`, Dodge from rounded-down Basic Speed plus 3, and Will/Perception from IQ. Will and Perception remain informational in the supported fixed-position encounter scope.
+
+The advancement allowance is 12 plus 8 for each first-cleared encounter-template milestone. It counts all awarded points, whether spent or unspent. One training-service point costs 25 coins. Twenty successful ranged hits and 120 cumulative simulated combat seconds each award one point once. A first NPC clear of an encounter template awards two points once. Earned awards take priority over paid training; awards blocked by a full allowance remain pending until capacity opens. Respecialization refunds spent points without changing the historical awarded total.
+
+ST or HT improvements cost 10 points, DX costs 20, an additional Guns/Broadsword level costs 4. Independent HP/FP purchases are excluded from the pinned Lite subset; improving ST or HT improves derived HP or FP respectively. DX also improves both DX-based skills. IQ is displayed but purchase is disabled because it currently has no useful combat benefit. No movement upgrade is sold. NPC health/fatigue and injuries are restored between attempts under the GDD's campaign recovery rule.
+
+## Fortifications
+
+Blueprint ownership and ranks now use the shared node preflight; authored victory/liberation requirements and learned construction access apply, while legacy saves retain earned capabilities. Blueprints are permanent; attempts spend renewed build supply, never permanent coins, on placement. Costs are trap 4, wall 3 and turret 10 supply. Base supply ranges from 30 to 45 by encounter template, with authored country and progression adjustments applied at deployment. Construction stays live unless explicitly paused. Save country plan records surviving placements for that country; plans require owned blueprints, unique cells, rows inside the frozen deployed lane count and columns 0–4, but may exceed a particular deployment’s budget. A new attempt applies the ordered affordable prefix, reports omissions and retains the complete plan. Clearing a stored plan does not remove active structures. The simulation revalidates cells, footprints and supply when deploying or constructing. The older single-layout API remains a compatibility path with its own template budget check.
+
+Fortifications now have ten authored rank nodes per type, with their actual node costs, prerequisites and milestones. Old blueprint/rank fields count as ownership and retain their saved floors. The simulation applies their authored durability/damage effects together with shared engineering. Salvage and action clocks are simulation responsibilities.
+
+## Overtaking, critical injury and loot
+
+[OVERTAKING_AND_CRITICAL.md](OVERTAKING_AND_CRITICAL.md) records the user’s explicit passing and retained GURPS injury semantics. Enemy.y() includes saved lateral displacement for hit tests, range, corpses and loot; intact blockers/contact still queue. A conscious NPC enemy at zero/negative HP is Critical, not a paid defeat. Actual terminals stop/reap/pay in the same fixed tick. Loot receipts are bounded informational history for already-owned items, never a second reward path.
+
+## Validation boundary
+
+Automated tests cover XP ownership, advancement conservation across respecialization, pending earned awards, equipment reservation, protected starter recovery, preset identity, unlimited loot retention, invalid layout safety, profile separation and content authoring constraints. Balance numbers are authored prototype hypotheses. They are not evidence of equal clear rates between geometric personal play and rules-based NPC play, and the scope of seeded campaign/country checks and remaining player testing is recorded in [VALIDATION.md](VALIDATION.md).
+
+
+## Playtest preparation assistance and identity safety
+
+`Campaign::recommendation(mode)` is a read-only, deterministic next-action suggestion. After country liberation it points to an accessible new front instead of repeating the completed final stage. During preparation it prioritizes an unspent legal body point, useful equipment already owned, an earned NPC skill increase, newly available blueprints, a cheap reload purchase, then guaranteed shop equipment or the next defense. Its structured action, coin price and affordability are derived from the actual campaign; it performs no purchase or allocation. A recommendation never inspects future random outcomes. Body-cap checks keep its allocation action legal.
+
+`compare_item(mode, id)` compares the complete current and hypothetical loadout without changing ownership. Personal comparisons expose damage, magazine, cadence, reload, armor, health, stamina, weak-point bonus and a body-hit Shambler breakpoint. NPC comparisons expose the actual purchased skills, weapon dice/adds/type, accuracy, protection, HP/FP, Dodge and melee profile. NPC mean basic damage is explicitly **before** attack rolls, defense, armor and wounding; it is not a probability of injury.
+
+Armory identities remain sorted by monotonically increasing creation ID. Binary lookup makes large-stash comparisons efficient without imposing a gameplay item cap. A failed purchase at identity exhaustion and a sale that would overflow the wallet leave both inventory and currency untouched. Save validation checks the actual frontier, body cap, processed XP, unique skill ownership, legal blueprint upgrades, layouts and preset slot references. Intentionally incomplete presets may retain a previously sold ID and continue to warn when applied.
+
+## Individual recruit creation
+
+Legacy NPC records without a `creation` object deserialize to Mara's existing 76-point build. New recruits cycle through four independently validated, equal-budget creation profiles; respecialization restores that survivor's own baseline and never changes historical advancement awards.
+
+| Background | ST / DX / IQ / HT | Guns / Melee | Creation points | Initial policy |
+|---|---|---|---:|---|
+| Marksman | 10 / 12 / 10 / 12 | 16 / 13 | 76 | Marksman |
+| Guardian | 12 / 11 / 10 / 12 | 13 / 14 | 76 | Guardian |
+| Scout | 10 / 13 / 10 / 10 | 16 / 15 | 76 | Balanced |
+| Steadfast | 11 / 11 / 10 / 13 | 14 / 13 | 76 | Boss focus |
+
+The creation cost is checked against the pinned attribute and DX/E Guns, DX/A unified-melee skill costs. Both purchased skill levels are already in the four-point-per-level advancement range. Creation budgets and advancement ledgers are separate. Names are original fictional survivor identities with an explicit country of recruitment; they are not a claim of researched national naming or culture.
+
+
+Offensive structures now declare an explicit NPC skill: trap 14 and turret 15. Walls do not attack. The generic equipment skill-bonus field no longer accidentally raises a turret to skill 29; range, active defense, protection and the authored damage profile still resolve normally.
+
+
+### Supported authoring bounds
+
+The initial schema deliberately keeps five encounter templates, the canonical five-enemy order and three-structure order, the legacy protected starter definitions, a personal pistol and guaranteed shop/loot options for the supported slots. Accepted values are finite: boss timers 10–3,600 seconds, at most 512 ordinary enemies plus a reserved boss, arrival rates up to 30 per second, enemy movement 0.01–10 yards/second, windups 0.5–60 seconds, personal firearm cadence at least 0.08 seconds, and NPC magazine/reload bounds of 1–1,000 rounds and 1–60 turns. These are implementation safety limits, not recommendations for balance. Current authored values are the checked-in JSON; earlier prototype values are not a second source of truth.
+
+NPC damage profiles use the supported 1–20 dice and modifier range, and authored melee profiles must remain valid over the declared ST/fatigue table. Displayed NPC basic-damage means apply minimum damage to each possible roll before averaging, including negative modifiers. The comparison consumes no random state. Reordered profiles, missing guaranteed starter/shop definitions, overflowed spawn weights and nonfinite values fail validation with the named profile.
+
+Bulk sales now preflight the complete wallet transaction before selling any item; exceeding the wallet's integer limit cannot leave a half-sold batch. Their quote uses one inventory pass with a precomputed set of protected loadout/preset/reservation references, avoiding repeated full-armory searches on the native screen.
+
+History retains every newly settled outcome through parent-only worker outboxes; the existing64MiB save ceiling remains explicit. Charts show the last 40 matching records without deleting older ones. DPS is resolved injury over five simulation seconds, zero-padded initially, with whole-run average/peak and defender/structure/ordnance totals; playback speed never multiplies it.
+
+The main incremental route returns every completed main round to Journey upgrades, then explicitly continues/retries or leaves with a durable save. New game protects an existing full generation before replacement. See [JOURNEYS.md](JOURNEYS.md) and [CHARACTER_COMPONENTS.md](CHARACTER_COMPONENTS.md); the individual NPC attribute/skill advancement described above remains separate.
+
+Legacy allocation refunds must reject atomically if removing their ownership floors would orphan an explicitly learned node. No CP/coin/rank/ledger change or free ancestor grant occurs; successful unrelated legacy refunds retain their old semantics. This does not make coin-trained or already graph-spent ranks refundable.

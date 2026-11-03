@@ -22,8 +22,8 @@ rustup toolchain install 1.99.1 --profile minimal --component rustfmt --componen
 pwsh -NoProfile -File scripts/dev.ps1 doctor
 ```
 
-The doctor validates all four manifests and prints their build directories.
-VS Code users can open `bevy-experiments.code-workspace` to register all four
+The doctor validates all five manifests and prints their build directories.
+VS Code users can open `bevy-experiments.code-workspace` to register all five
 Cargo projects with rust-analyzer without sharing personal `.vscode/` state.
 No global cache tool, custom linker, absolute build directory, API key, server or
 Git LFS installation is required for the included offline examples. Optional live
@@ -42,7 +42,7 @@ Each workspace owns its `target/`; never share it between simultaneous worktrees
 
 1. Pull `main` and create a focused `codex/<description>` or feature branch.
 2. Read root and project `AGENTS.md`, the project README and relevant decisions.
-3. Change the smallest relevant crate; keep the four workspaces independent.
+3. Change the smallest relevant crate; keep the five workspaces independent.
 4. Run focused tests, then the checks below. Record commands and failures.
 5. Commit source, assets, lockfiles and docs together as appropriate. Open a pull
    request with the problem, resulting behavior and validation evidence.
@@ -85,6 +85,7 @@ Additional project gates:
 | NPC Framework | `cargo xtask verify` (or `--quick` while iterating). Its JSON verdict must report `"ok":true`. Optional cargo-nextest/cargo-deny are detected by the gate. |
 | Legion | Baseline commands plus local native smoke/render checks in its README. |
 | Terra | `bash scripts/verify.sh` inside `terra-world/` also exercises the headless adapter examples. |
+| Lastlight | Baseline commands plus `cargo run --locked -p horde-defense -- --smoke` for a bounded headless campaign smoke check; see its README for campaign and headless verification. |
 
 The root CI baseline does not replace these project gates or interactive visual
 verification. GPU, BRP and performance checks belong on a suitable local machine.

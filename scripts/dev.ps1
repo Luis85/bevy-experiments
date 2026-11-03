@@ -3,7 +3,7 @@
 param(
     [ValidateSet('doctor', 'fmt', 'check', 'test', 'clippy', 'verify')]
     [string]$Task = 'doctor',
-    [ValidateSet('all', 'bevy-rts', 'legion-battle-lab', 'npc-framework', 'terra-world')]
+    [ValidateSet('all', 'bevy-rts', 'legion-battle-lab', 'npc-framework', 'terra-world', 'horde-defense')]
     [string]$Project = 'all',
     [switch]$IncludeDeviceTests
 )
@@ -11,7 +11,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$projects = @('bevy-rts', 'legion-battle-lab', 'npc-framework', 'terra-world')
+$projects = @('bevy-rts', 'legion-battle-lab', 'npc-framework', 'terra-world', 'horde-defense')
 if ($Project -ne 'all') { $projects = @($Project) }
 
 function Invoke-Cargo {

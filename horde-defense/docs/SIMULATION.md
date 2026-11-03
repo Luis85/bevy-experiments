@@ -1,0 +1,53 @@
+# Simulation and persistence
+
+The authoritative model lives in horde_core::sim without Bevy types/filesystem IO. sim/parallel owns worker coordination and sim/persistence validates/commits generations. Each unpaused Game::tick advances 1/60 simulated second. Attempt.lane_count, width_yards and copied balance freeze at deployment: Normal begins3/12 and grows to 17/30, while legacy missing geometry preserves11/30 and old multipliers. The defender is(0.5,lane_count/2), contact x=1.5; presentation cannot change those coordinates.
+
+Personal shots intersect enemy circles along the actual aim ray, sorted by distance; the first circle receives the hit unless the owned penetration skill enables the second. There is no attack roll in personal mode. Melee selects only the front contact enemy in the cursor's lane. A legal strike cancels reload and commits thirty ticks of exclusive recovery; the seventy-two-tick strike cooldown and stamina are separate restrictions.
+
+NPCs select legal actions on one-second boundaries. Defender acts before hostiles; hostiles retain stable spawn order. A newly arrived hostile must finish its authored windup before its next legal attack opportunity. Aim holds a target unless an actual contact emergency warrants interruption. Active defense or injury interrupts Aim. Readying, magazine reload, stun recovery and posture consume turns. Switching between the slung rifle and melee weapon consumes a Ready turn; the held-weapon state is saved. Hostiles use natural attacks and cannot drop a claw. All NPC-mode attacks, including offensive structures, call the same rules resolver once; visual tracers consume its result. Wounded hostile movement is halved at low HP and separately at low FP.
+
+The **permitted risky actions** preference gates ranged shot selection at the next legal decision. With risk disabled, the NPC declines an effective attack-roll skill below 8 (before defense and protection), takes up to three legal Aim turns when that can reach the threshold, or spends Do Nothing waiting for a closer or safer shot. With risk enabled, otherwise legal skill-3-through-7 attacks are permitted; an effective skill below 3 remains illegal and requires useful Aim or waiting. The threshold is an original tactical policy, not a modifier to the GURPS dice procedure. Cautious aiming can override the optional preference to avoid Aim. Policy changes never inspect future rolls, consume random draws merely to choose an action, or reset a pending Ready/reload timer.
+
+Queues sort by x then stable ID where a front is actually blocked. Faster approaches may pass moving peers through saved within-lane displacement; Enemy.y() drives hits/range/AoE/corpses/loot. Walls/contact still block, traps cover the full lane, and no actor changes assigned lane or bypasses a blocker. Shared construction_bounds/build_cell helpers derive five columns from actual width. See [OVERTAKING_AND_CRITICAL.md](OVERTAKING_AND_CRITICAL.md).
+
+The director integrates the authored increasing arrival envelope, skips ordinary arrivals while at capacity, and accumulates no deferred spawn debt. The boss has its reserved slot and arrives at the authored time regardless of ordinary capacity. `BossTiming` authors warnings, exposure and recovery: defaults expose protection for four seconds each twelve-second cycle, starting seven seconds after that boss arrives. The Caller announces specific reinforcement lanes two seconds before entry. Siege Brute strikes deal extra structural damage in both numerical modes, then recover for four seconds before a fresh attack windup. Defeating a boss stops later actors and piercing followups, then removes remaining ordinary hostiles without rewards.
+
+Kill identities are recorded in the active attempt ledger. A single boss transaction banks boss coins, completion coins, guaranteed equipment and the victory. The results screen only reads its report. Ordinary kill, loot and XP transactions bank immediately; withdrawal cannot lose them or grant a completion payout. Personal XP and NPC objectives have different recipients.
+
+## Geographical campaigns
+
+A deployment records the selected country ID and local stage, then rotates through the five authored encounter templates using `stage % 5`. Its saved effective modifiers combine the country's authored boosts/debuffs with difficulty: enemy health and rewards multiply by difficulty; enemy speed multiplies by its square root. Enemy health includes bosses in both combat modes. Build supply and the declared personal-damage and NPC-skill modifiers also apply. Completing an earlier local stage cannot advance a different frontier stage. A country clears only when every population-derived local stage is complete.
+
+## Concurrent deployments
+
+`Game::deploy_survivor` launches one actual NPC battle. Each battle stores an independent boxed worker game, explicit seed, current action and active reward ledger. Worker games cannot dispatch workers, so the serialized tree is bounded to one level. The configured parallel limit defaults to four; at most thirty-two recent battle records remain visible.
+
+The root owns the shared economy. Every simulation tick it transfers only the increase after each worker's last synchronized wallet cursor. New loot is transferred by monotonic identity and append cursors and receives new globally unique item identities. Workers retain deployed gear instead of cloning the unused stash; settled histories compact to that loadout plus the protected starter set. Actual loadout items are reserved globally until recall or completion. Each recruited NPC's advancement and history return to that same NPC. Workers do not buy, sell or train automatically.
+
+`Game::deploy_country_operation` is a later, separately gated order. It chains actual local-stage battles until the country is freed, the survivor loses, the player recalls them, or deployment validation fails. The normal between-attempt health and equipment recovery applies; no coins are spent. A single-stage parallel battle remains available for individual encounters and outbreak responses.
+
+Call `Game::tick` even in camp to advance workers and the strategic clock. `Game::set_paused` freezes the entire simulation, including parallel battles, recovery and outbreaks. Construction remains live; explicit pause and Settings are separate. Observation speed means more whole fixed ticks; no actor receives an extra action per simulated second.
+
+## Balance, DPS and history
+
+Validated BalanceSettings is copied at deployment; changing the next-run selection cannot alter active main/worker profiles, rows or width. Shared core helpers own spawn/view bounds, building and ordnance.
+
+Attempt.live_dps uses positive post-protection resolved injury in the last 300 fixed ticks divided by 5; the opening is zero-padded. average_dps uses elapsed simulation time; peak_dps retains the rolling maximum. DamageTotals separates defender/structures/ordnance, including logged overkill. Misses, absorption, input and graphics add no damage. Pause/save/1×/2×/4× preserve the same clock.
+
+RunRecord history is untruncated and parent-owned. Main outcomes append once; saved worker outboxes drain once into global records, including victory/defeat/withdrawal. Records describe already-banked transactions and never pay them again. Older finalized results are not fabricated. The64MiB generation ceiling remains explicit. See [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md).
+
+## Saves
+
+`Game::save` serializes the entire campaign, current battle, workers, RNGs, action timers, strategic state and settlement cursors into one versioned generation with a checksum. It flushes a temporary file, retains the previous valid generation as `.bak`, then renames the temporary file into place. `Game::load` checks content compatibility, development ledgers, battlefield bounds, worker depth, roster and equipment reservations; a corrupt main generation falls back to the complete backup. Validation also runs before writing; an inconsistent worker or equipment reservation cannot replace the previous valid generation. It never mixes a newer wallet with an older battle.
+
+Version 1 has a technical **64 MiB limit per complete encoded save generation**, including its envelope. Writer, file reader and single-generation decoder share this exact inclusive limit. The writer checks the encoded size before creating directories or touching temporary, primary or backup files; an oversized checkpoint returns an error and retains both previous readable generations. This is a storage-format limit, separate from the armory's lack of a gameplay item-capacity limit. Loot is never silently dropped or sold to fit a checkpoint. Supporting larger generations requires a future storage-format change; the current game cannot acknowledge an oversized save as successful.
+
+## Checks and limits
+
+`cargo test --locked -p horde_core` covers contact windup, actual frozen geometry and legacy eleven-lane aiming, exclusive melee recovery, reload cancellation, structure placement/blocking/refunds, bounded spawning, exact-once rewards, boss completion, terminal unconsciousness, fixed inputs, country-stage replays, parallel reward and save accounting, global pause, and strategic country operations. `cargo run --locked -p horde_core --example campaign_smoke` runs full encounters using ordinary aim inputs and NPC decisions, purchasing upgrades only from actually earned coins. The campaign regression repeats all five gates in both modes for seeds 1, 2026 and 0x1A571167, without equipping dropped loot. The autonomous proof uses the accessible Boss Focus policy, affordable market upgrades and ordinary point training; the first failed attempt may fund the next one.
+
+The deterministic bot is a combat/economy test, not evidence of human aiming enjoyment, interface comprehension or minimum-spec performance. Authored game adapters, the supported rules subset and excluded supplements are described in `RULES.md`. Infinite reserve ammunition, lane geometry, actor ordering, monster profiles and campaign recovery are explicit scenario rules.
+
+## Native storage adaptation
+
+The core storage adapter still validates/writes one coherent immutable generation; native Runtime now runs that operation through the single-worker service in runner/persistence.rs. Main-frame enqueue/poll does not wait for IO. Critical navigation/reset requests gate later mutations and raw settings input until matching durable acknowledgment, with epochs preventing stale profile completion. This execution-policy change does not move combat, RNG, NPC decisions or reward accounting off the authoritative fixed-step owner. [JOURNEYS.md](JOURNEYS.md) specifies that seam.

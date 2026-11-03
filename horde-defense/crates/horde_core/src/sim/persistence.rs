@@ -1,0 +1,627 @@
+//! Filesystem storage adapter, generation recovery, and save-state validation.
+use super::*;
+use std::path::Path;
+
+const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
+
+impl Game {
+    /// Decode exactly one generation without filesystem access, fallback or writes.
+    pub fn decode_save_generation(bytes: &[u8]) -> Result<Self, String> {
+        decode_generation(bytes)
+    }
+    pub fn save(&self, path: &Path) -> Result<(), String> {
+        validate_game(self, usize::from(self.worker))?;
+        let payload = serde_json::to_string(self).map_err(|e| e.to_string())?;
+        let envelope = SaveEnvelope {
+            version: 1,
+            checksum: checksum(payload.as_bytes()),
+            payload,
+        };
+        let bytes = serde_json::to_vec(&envelope).map_err(|e| e.to_string())?;
+        commit_generation(path, &bytes, MAX_GENERATION_BYTES)
+    }
+    pub fn load(path: &Path) -> Result<Self, String> {
+        match read_save(path) {
+            Ok(game) => Ok(game),
+            Err(primary) => read_save(&path.with_extension("bak")).map_err(|backup| {
+                format!("Save recovery failed. Primary: {primary}. Backup: {backup}")
+            }),
+        }
+    }
+}
+
+fn ensure_generation_size(length: u64, limit: u64) -> Result<(), String> {
+    if length > limit {
+        return Err(format!(
+            "Save generation exceeds the supported storage limit ({length} bytes; maximum {limit} bytes)."
+        ));
+    }
+    Ok(())
+}
+
+fn commit_generation(path: &Path, bytes: &[u8], limit: u64) -> Result<(), String> {
+    // Guard the complete encoded envelope before creating a directory or
+    // touching either committed generation or an existing temporary file.
+    ensure_generation_size(bytes.len() as u64, limit)?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    let temporary = path.with_extension("tmp");
+    let backup = path.with_extension("bak");
+    use std::io::Write;
+    let mut file = std::fs::File::create(&temporary).map_err(|e| e.to_string())?;
+    file.write_all(bytes)
+        .and_then(|()| file.sync_all())
+        .map_err(|e| e.to_string())?;
+    if path.exists() && read_save(path).is_ok() {
+        std::fs::copy(path, &backup).map_err(|e| e.to_string())?;
+    }
+    std::fs::rename(&temporary, path).map_err(|e| format!("Could not commit save: {e}"))?;
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+struct SaveEnvelope {
+    version: u32,
+    checksum: u64,
+    payload: String,
+}
+fn checksum(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf29ce484222325, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
+    })
+}
+fn read_save(path: &Path) -> Result<Game, String> {
+    ensure_generation_size(
+        std::fs::metadata(path).map_err(|e| e.to_string())?.len(),
+        MAX_GENERATION_BYTES,
+    )?;
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    Game::decode_save_generation(&bytes)
+}
+fn decode_generation(bytes: &[u8]) -> Result<Game, String> {
+    ensure_generation_size(bytes.len() as u64, MAX_GENERATION_BYTES)?;
+    let envelope: SaveEnvelope = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
+    if envelope.version != 1 {
+        return Err("Unsupported save version".into());
+    }
+    if checksum(envelope.payload.as_bytes()) != envelope.checksum {
+        return Err("Save checksum mismatch".into());
+    }
+    let mut game: Game = serde_json::from_str(&envelope.payload).map_err(|e| e.to_string())?;
+    reconcile_saved_game(&mut game);
+    validate_game(&game, 0)?;
+    Ok(game)
+}
+fn reconcile_saved_game(game: &mut Game) {
+    if game.campaign.journey_revision == 0 {
+        game.campaign.journey_active =
+            !game.worker && (game.attempt.is_some() || game.last_result.is_some());
+        game.campaign.journey_revision = 1;
+    }
+    game.campaign.migrate_threat_history();
+    game.strategy.reconcile_loadouts(&game.campaign);
+    if let Some(a) = &mut game.attempt {
+        if a.dps.version == 0 {
+            a.dps.version = 1;
+            a.dps.totals.defender = a.active_damage;
+            a.dps.totals.structures = a.structure_damage;
+            a.dps.buckets.clear();
+        }
+        for e in &mut a.enemies {
+            if e.boss && e.boss_kind.is_none() {
+                e.boss_kind = Some(
+                    content()
+                        .levels
+                        .get(a.level)
+                        .map_or(BossKind::Breacher, |l| l.boss),
+                );
+            }
+            if e.contact_since.is_some() && e.attack_phase == EnemyPhase::Advance {
+                e.attack_phase = EnemyPhase::Windup;
+                e.windup_total = e.attack_left;
+            }
+        }
+    }
+    for battle in &mut game.battles {
+        reconcile_saved_game(&mut battle.game);
+    }
+}
+pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
+    game.campaign.validate()?;
+    if let Some(report) = &game.last_result {
+        if !(MIN_LANES..=MAX_LANES).contains(&report.lane_count)
+            || report.lane_count.is_multiple_of(2)
+            || report.telemetry.damage_by_lane.len() != usize::from(report.lane_count)
+            || (report.outcome != Outcome::Victory && report.completion_xp != 0)
+            || report.completion_xp > 1_000_000
+        {
+            return Err("Invalid frozen report arena or completion XP".into());
+        }
+        crate::quality::validate_loot_events(
+            &report.loot_events,
+            game.campaign.next_item_id,
+            None,
+            report.lane_count,
+        )?;
+    }
+    game.strategy.validate(&game.campaign)?;
+    if (!game.worker && !game.pending_runs.is_empty())
+        || (game.worker && !game.campaign.run_history.is_empty())
+    {
+        return Err("Run history must have one parent owner".into());
+    }
+    for record in &game.pending_runs {
+        record.validate()?;
+        if record.id != 0 {
+            return Err("Pending run already has global identity".into());
+        }
+    }
+    if depth > 1
+        || game.worker != (depth == 1)
+        || game.battles.len() > 32
+        || (depth == 1 && !game.battles.is_empty())
+    {
+        return Err("Invalid expedition tree".into());
+    }
+    if game.campaign.unlocked == 0 || game.campaign.unlocked > content().levels.len() {
+        return Err("Invalid campaign stage".into());
+    }
+    if let Some(a) = &game.attempt {
+        crate::quality::validate_loot_events(
+            &a.loot_events,
+            game.campaign.next_item_id,
+            Some(a.tick),
+            a.lane_count,
+        )?;
+        a.profile.equipment_visual.validate()?;
+        if a.profile
+            .equipment_visual
+            .weapon_class
+            .is_some_and(|class| class != a.profile.weapon.class)
+        {
+            return Err("Frozen equipment visual class disagrees with combat weapon".into());
+        }
+        a.balance.validate()?;
+        a.dps.validate(a.tick)?;
+        if !a.width_yards.is_finite() || !(8.0..=30.0).contains(&a.width_yards) {
+            return Err("Invalid frozen clearing width".into());
+        }
+        a.progression.validate()?;
+        let level = content().levels.get(a.level).ok_or("Invalid saved level")?;
+        let boss_base = if a.mode == Mode::Npc {
+            level.boss_npc_hp.max(a.progression.npc_boss_health_floor)
+        } else {
+            level.boss_health.max(a.progression.boss_health_floor)
+        };
+        if boss_base.max(crate::enemy_catalog::enemy_catalog().maximum_health(a.mode)) as f32
+            * a.modifiers.enemy_health
+            > 10_000_000.0
+        {
+            return Err("Saved encounter exceeds supported health numerical bounds".into());
+        }
+        if a.progression.rank > game.campaign.progression_rank() {
+            return Err("Saved encounter rank precedes campaign clears".into());
+        }
+        a.profile.modifiers.validate()?;
+        if !a.profile.weapon.validate() {
+            return Err("Invalid saved firearm projectile profile".into());
+        }
+        a.ordnance.validate(
+            a.mode,
+            &a.profile.modifiers,
+            a.next_id,
+            a.lane_count,
+            a.width_yards,
+        )?;
+        for projectile in &a.ordnance.projectiles {
+            projectile.validate_release_cues(a.tick)?;
+        }
+        if !(MIN_LANES..=MAX_LANES).contains(&a.lane_count)
+            || a.lane_count.is_multiple_of(2)
+            || a.telemetry.damage_by_lane.len() != usize::from(a.lane_count)
+            || a.level >= content().levels.len()
+            || a.enemies.len() > a.enemy_cap() + 1
+            || a.enemies.iter().filter(|enemy| !enemy.boss).count() > a.enemy_cap()
+            || a.structures.len() > usize::from(a.lane_count) * 5
+            || a.enemies
+                .iter()
+                .any(|e| e.lane >= a.lane_count || !e.x.is_finite() || e.x < DEFENSE_LINE)
+            || a.structures
+                .iter()
+                .any(|s| s.lane >= a.lane_count || s.column >= 5)
+        {
+            return Err("Invalid saved battlefield".into());
+        }
+        if a.last_damage_lane.is_some_and(|lane| lane >= a.lane_count)
+            || a.lane_history.iter().any(|lane| *lane >= a.lane_count)
+            || a.caller_lanes
+                .is_some_and(|lanes| lanes.into_iter().any(|lane| lane >= a.lane_count))
+        {
+            return Err("Invalid frozen lane history or warning".into());
+        }
+        if !a.stamina.is_finite()
+            || !a.max_stamina.is_finite()
+            || a.stamina > a.max_stamina
+            || a.stamina < -a.max_stamina
+            || a.tick > u64::MAX - 100_000
+            || a.events.len() > MAX_EVENTS
+            || a.log.len() > MAX_LOG
+            || a.events.iter().any(|e| {
+                e.tick > a.tick
+                    || e.from
+                        .iter()
+                        .chain(e.to.iter())
+                        .any(|value| !value.is_finite())
+                    || e.lane.is_some_and(|lane| lane >= a.lane_count)
+            })
+            || !a.injury.valid()
+            || !a.profile.stats.valid()
+            || !(0..=2).contains(&a.defense_bonus)
+            || [
+                a.modifiers.enemy_health,
+                a.modifiers.enemy_speed,
+                a.modifiers.reward,
+                a.modifiers.personal_damage,
+            ]
+            .into_iter()
+            .any(|value| !value.is_finite() || value <= 0.0)
+            || !a.spawn_credit.is_finite()
+            || !(0.0..1.0).contains(&a.spawn_credit)
+        {
+            return Err("Invalid saved simulation clock, physiology, modifiers or feedback".into());
+        }
+        if game.campaign.reserved != Some(a.mode)
+            || a.max_hp <= 0
+            || a.max_stamina <= 0.0
+            || a.ammo > a.magazine
+        {
+            return Err("Saved defender state is inconsistent".into());
+        }
+        if a.boss_spawned != a.enemies.iter().any(|e| e.boss)
+            || a.enemies.iter().filter(|e| e.boss).count() > 1
+        {
+            return Err("Saved boss lifecycle is inconsistent".into());
+        }
+        let mut cells = BTreeSet::new();
+        let mut deployed_supply = 0u64;
+        for s in &a.structures {
+            if !cells.insert((s.lane, s.column))
+                || s.hp <= 0
+                || s.max_hp <= 0
+                || s.hp > s.max_hp
+                || s.cost == 0
+                || !s.x().is_finite()
+                || !s.footprint_width().is_finite()
+                || s.footprint_width() <= 0.0
+                || s.x() - s.footprint_width() * 0.5 < 1.5
+                || s.x() + s.footprint_width() * 0.5 > a.width_yards * 0.5 + 0.001
+            {
+                return Err("Saved structure footprints or durability are invalid".into());
+            }
+            deployed_supply += u64::from(s.cost);
+        }
+        let starting_supply = (i64::from(content().levels[a.level].supply)
+            + i64::from(a.modifiers.supply)
+            + i64::from(a.progression.supply_bonus)
+            + i64::from(a.balance.supply))
+        .max(0) as u64;
+        if deployed_supply + u64::from(a.supply) > starting_supply {
+            return Err("Saved construction budget exceeds the authored allowance".into());
+        }
+        for e in &a.enemies {
+            if let Some(snapshot) = &e.resolved {
+                snapshot.validate()?;
+                if snapshot.kind != e.kind {
+                    return Err("Saved hostile profile category is inconsistent".into());
+                }
+            }
+            if !e.arena_width.is_finite()
+                || e.arena_width != a.width_yards
+                || e.max_hp <= 0
+                || !e.pass_offset.is_finite()
+                || e.pass_offset.abs() > MAX_PASS_OFFSET
+                || (e.lane == 0 && e.pass_offset < 0.0)
+                || (e.lane + 1 == a.lane_count && e.pass_offset > 0.0)
+                || e.hp > e.max_hp
+                || e.injury.max_hp != e.max_hp
+                || !e.injury.valid()
+                || e.born_tick > a.tick
+                || e.hit_stop_left > ENEMY_HIT_STOP_TICKS
+                || !e.boss_timing.validate()
+                || enemy_defeated(a, e)
+                || (a.mode == Mode::Npc && e.hp != e.injury.hp)
+                || e.target_structure.is_some_and(|id| {
+                    !a.structures
+                        .iter()
+                        .any(|s| s.id == id && s.lane == e.lane && s.kind != StructureKind::Trap)
+                })
+            {
+                return Err("Saved hostile physiology or blocker relationship is invalid".into());
+            }
+        }
+        let mut actors = BTreeSet::new();
+        for id in a
+            .enemies
+            .iter()
+            .map(|e| e.id)
+            .chain(a.structures.iter().map(|s| s.id))
+            .chain(a.ordnance.projectiles.iter().map(|p| p.id))
+            .chain(a.ordnance.fire_zones.iter().map(|z| z.id))
+        {
+            if id == 0 || id >= a.next_id || !actors.insert(id) || a.reward_ledger.contains(&id) {
+                return Err("Invalid live actor identity".into());
+            }
+        }
+        if a.reward_ledger
+            .iter()
+            .any(|id| *id == 0 || *id >= a.next_id)
+        {
+            return Err("Saved reward identity is invalid".into());
+        }
+        let mut corpses = BTreeSet::new();
+        let mut previous_tick = 0;
+        for corpse in &a.corpses {
+            if corpse.id == 0
+                || corpse.id >= a.next_id
+                || !corpses.insert(corpse.id)
+                || actors.contains(&corpse.id)
+                || !a.reward_ledger.contains(&corpse.id)
+                || corpse.tick > a.tick
+                || corpse.tick < previous_tick
+                || corpse.at.iter().any(|value| !value.is_finite())
+                || corpse.at[0] < DEFENSE_LINE
+                || !(0.5..=f32::from(a.lane_count) - 0.5).contains(&corpse.at[1])
+                || corpse.visual.as_ref().is_some_and(|visual| {
+                    !visual.scale.is_finite()
+                        || !(0.25..=3.0).contains(&visual.scale)
+                        || visual
+                            .tint
+                            .iter()
+                            .any(|value| !value.is_finite() || !(0.0..=1.0).contains(value))
+                })
+            {
+                return Err(
+                    "Invalid saved corpse identity, position, appearance or ordering".into(),
+                );
+            }
+            previous_tick = corpse.tick;
+        }
+    } else if game.campaign.reserved.is_some() {
+        return Err("Deployment equipment is reserved without an active attempt".into());
+    }
+    let mut battle_ids = BTreeSet::new();
+    let mut recruits = BTreeSet::new();
+    let actual_reservations: BTreeSet<_> = game.campaign.reserved_items.iter().copied().collect();
+    if actual_reservations.len() != game.campaign.reserved_items.len() {
+        return Err("Duplicate global equipment reservation".into());
+    }
+    let mut expected_reservations = BTreeSet::new();
+    for guard in &game.strategy.guards {
+        let recruit = game
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == guard.recruit_id)
+            .ok_or("Guard missing from roster")?;
+        expected_reservations.extend(recruit.npc.loadout);
+    }
+    for b in &game.battles {
+        if !battle_ids.insert(b.id)
+            || b.synced_coins > b.game.campaign.coins
+            || b.synced_item_id > b.game.campaign.next_item_id
+            || b.synced_item_index > b.game.campaign.items.len()
+        {
+            return Err("Invalid expedition settlement cursor".into());
+        }
+        validate_game(&b.game, depth + 1)?;
+        if !b.settled {
+            expected_reservations.extend(b.loadout);
+            let r = game
+                .strategy
+                .roster
+                .iter()
+                .find(|r| r.id == b.recruit_id)
+                .ok_or("Expedition survivor missing from roster")?;
+            if !recruits.insert(b.recruit_id)
+                || r.status != crate::strategy::RecruitStatus::Deployed
+                || r.npc.loadout != b.loadout
+                || b.loadout
+                    .iter()
+                    .any(|id| !game.campaign.reserved_items.contains(id))
+            {
+                return Err("Expedition reservation is inconsistent".into());
+            }
+        }
+    }
+    if actual_reservations != expected_reservations {
+        return Err("Global equipment reservations do not match active duties".into());
+    }
+    if depth == 0
+        && game.strategy.roster.iter().any(|r| {
+            r.status == crate::strategy::RecruitStatus::Deployed && !recruits.contains(&r.id)
+        })
+    {
+        return Err("Deployed survivor has no active expedition".into());
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU64, Ordering};
+
+    #[test]
+    fn release_cue_clocks_reject_future_and_inconsistent_saved_facts() {
+        fn decode(game: &Game) -> Result<Game, String> {
+            let payload = serde_json::to_string(game).unwrap();
+            let envelope = SaveEnvelope {
+                version: 1,
+                checksum: checksum(payload.as_bytes()),
+                payload,
+            };
+            Game::decode_save_generation(&serde_json::to_vec(&envelope).unwrap())
+        }
+        let mut game = Game::default();
+        game.campaign.coins = 1000;
+        game.campaign.purchase_node("grenade_training").unwrap();
+        game.deploy(0, Mode::Personal).unwrap();
+        game.set_paused(false);
+        game.tick(Input {
+            throw: Some(ordnance::ThrowRequest {
+                kind: ordnance::OrdnanceKind::Grenade,
+                cell: [3, 1],
+            }),
+            ..Default::default()
+        });
+        for _ in 0..10 {
+            game.tick(Input::default());
+        }
+        assert!(decode(&game).is_ok());
+        let cue = game.attempt.as_ref().unwrap().ordnance.projectiles[0]
+            .release_cues
+            .unwrap();
+        let now = game.attempt.as_ref().unwrap().tick;
+        for bad in [
+            ordnance::ReleaseCues {
+                tick: now + 1,
+                ..cue
+            },
+            ordnance::ReleaseCues {
+                tick: cue.tick + 1,
+                ..cue
+            },
+            ordnance::ReleaseCues { tick: 0, ..cue },
+            ordnance::ReleaseCues {
+                last_shot_tick: Some(cue.tick + 1),
+                ..cue
+            },
+            ordnance::ReleaseCues {
+                last_hit_tick: Some(cue.tick + 1),
+                ..cue
+            },
+        ] {
+            let mut invalid = game.clone();
+            invalid.attempt.as_mut().unwrap().ordnance.projectiles[0].release_cues = Some(bad);
+            assert!(
+                validate_game(&invalid, 0)
+                    .unwrap_err()
+                    .contains("release cue clock")
+            );
+            assert!(decode(&invalid).unwrap_err().contains("release cue clock"));
+        }
+
+        // Additive optional data does not rewrite legacy projectile JSON.
+        game.attempt.as_mut().unwrap().ordnance.projectiles[0].release_cues = None;
+        let legacy = serde_json::to_value(&game).unwrap();
+        assert!(
+            legacy["attempt"]["ordnance"]["projectiles"][0]
+                .get("release_cues")
+                .is_none()
+        );
+        let restored = decode(&game).unwrap();
+        assert_eq!(serde_json::to_value(restored).unwrap(), legacy);
+
+        let mut npc = Game::default();
+        npc.campaign.legacy_features = true;
+        npc.campaign.balance_settings = crate::balance::BalanceSettings::legacy();
+        npc.campaign.attempts = 1;
+        npc.deploy(0, Mode::Npc).unwrap();
+        let before = serde_json::to_string(&npc).unwrap();
+        assert!(!before.contains("release_cues"));
+        assert_eq!(
+            serde_json::to_string(&decode(&npc).unwrap()).unwrap(),
+            before
+        );
+    }
+
+    #[test]
+    fn ordinary_population_cannot_borrow_the_reserved_boss_slot_on_restore() {
+        fn restore(game: &Game) -> Result<Game, String> {
+            let payload = serde_json::to_string(game).unwrap();
+            let envelope = SaveEnvelope {
+                version: 1,
+                checksum: checksum(payload.as_bytes()),
+                payload,
+            };
+            Game::decode_save_generation(&serde_json::to_vec(&envelope).unwrap())
+        }
+        let mut game = Game::default();
+        game.deploy(0, Mode::Personal).unwrap();
+        let mut attempt = game.attempt.take().unwrap();
+        let cap = attempt.enemy_cap();
+        for lane in 0..cap {
+            game.spawn_enemy(&mut attempt, EnemyKind::Shambler, (lane % 11) as u8, false);
+        }
+        game.attempt = Some(attempt);
+        assert!(restore(&game).is_ok());
+
+        let mut overfull = game.clone();
+        let attempt = overfull.attempt.as_mut().unwrap();
+        let mut extra = attempt.enemies[0].clone();
+        extra.id = attempt.next_id;
+        attempt.next_id += 1;
+        attempt.enemies.push(extra);
+        assert!(restore(&overfull).is_err());
+
+        let mut attempt = game.attempt.take().unwrap();
+        attempt.boss_spawned = true;
+        attempt.telemetry.boss_arrival_tick = Some(attempt.tick);
+        game.spawn_enemy(&mut attempt, EnemyKind::Brute, 5, true);
+        assert_eq!(attempt.enemies.len(), cap + 1);
+        game.attempt = Some(attempt);
+        assert!(restore(&game).is_ok());
+    }
+
+    #[test]
+    fn writer_and_reader_share_an_inclusive_generation_size_boundary() {
+        assert_eq!(MAX_GENERATION_BYTES, 67_108_864);
+        assert!(ensure_generation_size(MAX_GENERATION_BYTES, MAX_GENERATION_BYTES).is_ok());
+        assert!(ensure_generation_size(MAX_GENERATION_BYTES + 1, MAX_GENERATION_BYTES).is_err());
+    }
+
+    #[test]
+    fn oversized_commit_preserves_both_readable_generations_and_any_temporary_file() {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "lastlight-generation-limit-{}-{}",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let primary = root.join("campaign.json");
+        let backup = primary.with_extension("bak");
+        let temporary = primary.with_extension("tmp");
+        let mut game = Game::default();
+        game.save(&primary).unwrap();
+        game.campaign.reward(7, 0, Mode::Personal);
+        game.save(&primary).unwrap();
+        std::fs::write(&temporary, b"previous uncommitted generation").unwrap();
+        let primary_before = std::fs::read(&primary).unwrap();
+        let backup_before = std::fs::read(&backup).unwrap();
+        let temporary_before = std::fs::read(&temporary).unwrap();
+
+        // Exercise the production commit path at a small injected boundary,
+        // avoiding a 64 MiB object/fixture allocation in the regression suite.
+        let length = primary_before.len() as u64;
+        let error = commit_generation(&primary, &primary_before, length - 1).unwrap_err();
+        assert!(error.contains("storage limit"));
+        assert_eq!(std::fs::read(&primary).unwrap(), primary_before);
+        assert_eq!(std::fs::read(&backup).unwrap(), backup_before);
+        assert_eq!(std::fs::read(&temporary).unwrap(), temporary_before);
+        assert_eq!(read_save(&primary).unwrap().campaign.coins, 7);
+        assert_eq!(read_save(&backup).unwrap().campaign.coins, 0);
+
+        let missing = root.join("never-created").join("campaign.json");
+        assert!(commit_generation(&missing, &primary_before, length - 1).is_err());
+        assert!(!missing.parent().unwrap().exists());
+
+        let exact = root.join("boundary.json");
+        commit_generation(&exact, &primary_before, length).unwrap();
+        assert_eq!(read_save(&exact).unwrap().campaign.coins, 7);
+        for path in [primary, backup, temporary, exact] {
+            std::fs::remove_file(path).unwrap();
+        }
+        std::fs::remove_dir(root).unwrap();
+    }
+}

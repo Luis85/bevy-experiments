@@ -1,0 +1,4 @@
+{
+  "grenade": { "flight_ticks": 36, "cooldown_ticks": 90, "damage": 105, "radius": 2.7, "edge_damage_fraction": 0.35, "burn_damage": 0, "burn_ticks": 0, "burn_interval": 30 },
+  "molotov": { "flight_ticks": 42, "cooldown_ticks": 120, "damage": 18, "radius": 2.2, "edge_damage_fraction": 1.0, "burn_damage": 12, "burn_ticks": 360, "burn_interval": 30 }
+}

@@ -1,0 +1,168 @@
+{
+  "schema_version": 1,
+  "skins": [
+    {
+      "id": "rook.original",
+      "model": "rook",
+      "parts": [
+        "jacket.torso",
+        "pelvis",
+        "leg.far",
+        "leg.near",
+        "boot.far",
+        "boot.near",
+        "head",
+        "neck",
+        "carriage.pack",
+        "carriage.near_strap",
+        "carriage.far_strap",
+        "jacket.hood",
+        "jacket.far.upper",
+        "jacket.far.fore",
+        "jacket.near.upper",
+        "jacket.near.fore",
+        "jacket.near.cuff",
+        "weapon.original.rear",
+        "hand.near.wrist",
+        "hand.near.palm",
+        "hand.far.palm",
+        "jacket.hem",
+        "source.residue"
+      ],
+      "equipment": []
+    },
+    {
+      "id": "rook.work_jacket",
+      "model": "rook",
+      "parts": [
+        "jacket.torso",
+        "jacket.hood",
+        "jacket.far.upper",
+        "jacket.far.fore",
+        "jacket.near.upper",
+        "jacket.near.fore",
+        "jacket.near.cuff",
+        "jacket.hem"
+      ],
+      "equipment": [
+        {
+          "slot": "outfit",
+          "style": "armor.cloth",
+          "weapon_class": null
+        }
+      ]
+    },
+    {
+      "id": "rook.field_webbing",
+      "model": "rook",
+      "parts": [
+        "carriage.pack",
+        "carriage.near_strap",
+        "carriage.far_strap"
+      ],
+      "equipment": [
+        {
+          "slot": "accessory",
+          "style": "accessory.pouch",
+          "weapon_class": null
+        }
+      ]
+    },
+    {
+      "id": "rook.starter_pistol",
+      "model": "rook",
+      "parts": [
+        "weapon.original.rear"
+      ],
+      "equipment": [
+        {
+          "slot": "ranged",
+          "style": null,
+          "weapon_class": "Pistol"
+        }
+      ]
+    },
+    {
+      "id": "june.original",
+      "model": "june",
+      "parts": [
+        "jacket.torso",
+        "pelvis",
+        "leg.far",
+        "leg.near",
+        "boot.far",
+        "boot.near",
+        "hair.back",
+        "head",
+        "neck",
+        "carriage.rear_strap",
+        "carriage.near_strap",
+        "carriage.far_strap",
+        "carriage.webbing",
+        "jacket.hood",
+        "jacket.far.upper",
+        "jacket.far.fore",
+        "jacket.near.upper",
+        "jacket.near.fore",
+        "jacket.near.cuff",
+        "weapon.original.rear",
+        "hand.near.wrist",
+        "hand.near.palm",
+        "hand.far.palm",
+        "source.residue"
+      ],
+      "equipment": []
+    },
+    {
+      "id": "june.work_jacket",
+      "model": "june",
+      "parts": [
+        "jacket.torso",
+        "jacket.hood",
+        "jacket.far.upper",
+        "jacket.far.fore",
+        "jacket.near.upper",
+        "jacket.near.fore",
+        "jacket.near.cuff"
+      ],
+      "equipment": [
+        {
+          "slot": "outfit",
+          "style": "armor.cloth",
+          "weapon_class": null
+        }
+      ]
+    },
+    {
+      "id": "june.field_webbing",
+      "model": "june",
+      "parts": [
+        "carriage.rear_strap",
+        "carriage.near_strap",
+        "carriage.far_strap",
+        "carriage.webbing"
+      ],
+      "equipment": [
+        {
+          "slot": "accessory",
+          "style": "accessory.pouch",
+          "weapon_class": null
+        }
+      ]
+    },
+    {
+      "id": "june.starter_pistol",
+      "model": "june",
+      "parts": [
+        "weapon.original.rear"
+      ],
+      "equipment": [
+        {
+          "slot": "ranged",
+          "style": null,
+          "weapon_class": "Pistol"
+        }
+      ]
+    }
+  ]
+}

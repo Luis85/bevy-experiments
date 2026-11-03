@@ -1,0 +1,10 @@
+{
+  "tiers": [
+    {"quality":"Poor","name":"Poor","color":[0.64,0.65,0.64,1.0],"weight":80,"weight_per_rank":0,"min_rank":0,"stat_multiplier":0.8,"value_multiplier":0.5},
+    {"quality":"Common","name":"Common","color":[0.92,0.93,0.90,1.0],"weight":650,"weight_per_rank":0,"min_rank":0,"stat_multiplier":1.0,"value_multiplier":1.0},
+    {"quality":"Uncommon","name":"Uncommon","color":[0.30,0.84,0.38,1.0],"weight":220,"weight_per_rank":2,"min_rank":0,"stat_multiplier":1.12,"value_multiplier":1.7},
+    {"quality":"Rare","name":"Rare","color":[0.32,0.61,1.0,1.0],"weight":45,"weight_per_rank":1,"min_rank":0,"stat_multiplier":1.30,"value_multiplier":2.8},
+    {"quality":"Epic","name":"Epic","color":[0.76,0.46,1.0,1.0],"weight":5,"weight_per_rank":1,"min_rank":2,"stat_multiplier":1.55,"value_multiplier":5.0},
+    {"quality":"Legendary","name":"Legendary","color":[1.0,0.65,0.24,1.0],"weight":1,"weight_per_rank":1,"min_rank":5,"stat_multiplier":1.90,"value_multiplier":10.0}
+  ]
+}

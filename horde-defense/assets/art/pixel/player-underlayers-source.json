@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "asset": "player-underlayers-v1.png",
+  "purpose": "Explicit unequipped/alternate charcoal undershirt garment bundle; never a replacement for the exact original default survivors",
+  "generation_mode": "builtin_image_gen",
+  "image_generation_count": 2,
+  "source": {
+    "path": "assets/art/pixel/menu-survivors-v1.png",
+    "role": "sole survivor identity, proportions, projection, palette and pixel-style reference",
+    "sha256": "4feb21b05c1ad5d281d4f0134fdfe546356ca71a204dba04b7c81c48bd356a3a"
+  },
+  "output": {
+    "path": "assets/art/pixel/player-underlayers-v1.png",
+    "sha256": "23489f322863880b726f47bdfcb4f8b0bd0d90219740b2258914ee9901108a90",
+    "rgba_fnv1a64": "7610c347148c25de",
+    "width": 1448,
+    "height": 1086,
+    "columns": 4,
+    "rows": 3,
+    "pixel_format": "RGBA",
+    "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a1a16f-6a19-7a00-b04b-474be3d9c90b/exec-78f75b7d-a33a-4687-af6c-f6159eb39d3f.png",
+    "raw_png_sha256": "a3e4779348875b21f13df0d7992338b885ac55c463a7c2362604fcac0d2d1f89",
+    "raster_modified_after_generation": false,
+    "png_prompt_metadata_embedded": true,
+    "metadata_embedding_rgba_unchanged": true
+  },
+  "prompts": [
+    {
+      "role": "initial",
+      "prompt": "Use case: stylized-concept\nAsset type: a production modular PIXEL-ART UNDERLAYER CLOTHING atlas on a truly transparent background, for the Lastlight 2D survivor rig.\nInput image 1: sole style, anatomy, projection, pixel-cluster and proportion reference: the original Rook (left) and June (right) menu-survivors-v1.png. It is a REFERENCE, not an edit target. Their original faces, hair, bodies, default outer jackets, hands, trousers, boots and default equipment are preserved exactly elsewhere. This image must NOT recreate, replace or redraw the default characters. It supplies only an explicit alternative plain charcoal undershirt garment for when outer clothing is unequipped.\n\nGenerate ONE landscape 4:3 transparent atlas with exactly FOUR COLUMNS and THREE ROWS of equal cells, preferably 1536x1152, each part centered with generous alpha-zero gutters. No visible grid, labels, text, numbers, background, floor, checkerboard or cast shadows.\nRead each row left to right:\nRow1: (1) Rook arm-free charcoal long-sleeve undershirt TORSO ONLY, collar to waist, fitted to the original male survivor's shoulders/chest/waist and three-quarter right-facing projection. (2) June arm-free charcoal long-sleeve undershirt TORSO ONLY, collar to waist, fitted to the original female survivor's shoulders/chest/waist and same source projection. (3) Rook NEAR UPPER SLEEVE ONLY, shoulder to elbow. (4) Rook NEAR FORE SLEEVE ONLY, elbow to wrist.\nRow2: (1) June NEAR UPPER SLEEVE ONLY, shoulder to elbow. (2) June NEAR FORE SLEEVE ONLY, elbow to wrist. (3) Rook FAR UPPER SLEEVE ONLY. (4) Rook FAR FORE SLEEVE ONLY.\nRow3: (1) June FAR UPPER SLEEVE ONLY. (2) June FAR FORE SLEEVE ONLY. (3) One isolated Rook dark ribbed WRIST CUFF, no arm or hand. (4) One isolated June dark ribbed WRIST CUFF, no arm or hand.\n\nAll sleeve spans point vertically down in a neutral straight pose, shoulder/elbow at top and elbow/wrist at bottom. They are individual spans, never complete bent arms. The far sleeves share the same material and proportions, with restrained darker far-side shading. Keep each part at a consistent source-pixel scale across the atlas: torso approximately 190\u2013210px broad by 265\u2013280px high; upper sleeves about 80\u201390px broad by 135\u2013155px high including shoulder curvature; fore sleeves about 65\u201375px broad by 145\u2013160px high; cuffs about 60\u201365px broad by 30\u201340px high. Small parts must remain small within their cells; DO NOT enlarge every object to fill its cell. The native reference figures are about800px tall. A torse is not as long as the legs and not a long coat.\n\nPlain worn charcoal washed cotton, same muted slate/charcoal family as the source's inner clothing, subtle compact cloth folds, a modest dark crew neck, same grounded rounded yet chunky source pixel clusters and near-black stepped outer silhouettes. Different male/female torso cuts must respect the original proportions, without stylizing anatomy. These are ordinary underclothes, not armored vests or tactical outerwear.\nCritical construction: torsos are genuinely ARM-FREE: collar, shoulder bridges, chest and waist only; no baked arm lobes, sleeve stumps or shoulder domes. Sleeves have natural open seam coverage at internal joints, no conspicuous black oval end caps. Preserve a usable shoulder-to-elbow/elbow-to-wrist span; no hand, fist, forearm on upper sleeve, upper arm on fore sleeve, or full person. No backpack, pouches, webbing, straps, zipper, hoodie, thick jacket lapel, coat pocket, armor, breastplate, weapon, head, hair, exposed skin, pelvis, trousers, legs or boots. No smooth vector rendering, airbrushed painting, glossy highlights, pseudo-3D, tiny noisy dithering, muscular superhero anatomy or generic military redesign. The result must fit under the ORIGINAL exact characters, not establish a new character identity.",
+      "reference_paths": [
+        "assets/art/pixel/menu-survivors-v1.png"
+      ],
+      "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a1a16f-6a19-7a00-b04b-474be3d9c90b/exec-5002fdfb-1c83-4816-a606-93f0230919f1.png",
+      "raw_png_sha256": "3836b45b21cc188003489f46f01d7132407af2bb694e30adfe7dbe667d790980"
+    },
+    {
+      "role": "arm_free_torso_correction",
+      "prompt": "Use case: precise-object-edit.\nImage1 is the NEW ALTERNATE charcoal underlayer atlas to correct. Image2 is the original Rook/June survivor reference, only for source proportions/projection/pixel style. This is an unequipped/alternate undershirt garment; do NOT redraw or replace the original default survivors.\nMake ONE narrow structural correction to Image1: the TWO TORSOS in ROW1 COLUMN1 and ROW1 COLUMN2 must be truly ARM-FREE. Remove their conspicuous short-sleeve/shoulder-arm lobes projecting down each torso's outer sides, especially the large rounded viewer-left cap. These cells must contain only the fitted shirt collar, shoulder bridges, chest and waist. Reconstruct natural continuous torso side seams under the armpits; no upper-arm volume or sleeve cap is baked into the torso. Keep enough shoulder bridge to attach the independent sleeves already elsewhere in the atlas. Do not narrow the whole chest or lengthen the shirt: preserve the fitted source-proportioned body from collar to waist.\nPRESERVE all other TEN cells, every grid position, the near/far upper/fore sleeves and cuffs, current charcoal fabric palette/folds/pixel clusters/stepped outlines and transparency. Preserve the four-column three-row landscape atlas and generous fully transparent gutters. No labels, grid lines, background, skin, hands, heads, hair, legs, weapons, straps, backpack, hood, coat pockets or armor. Do not change the original reference. Truly transparent alpha.",
+      "reference_paths": [
+        "initial generated underlayer atlas",
+        "assets/art/pixel/menu-survivors-v1.png"
+      ],
+      "raw_output_path": "C:/Users/LuisMendez/.codex/generated_images/01a1a16f-6a19-7a00-b04b-474be3d9c90b/exec-78f75b7d-a33a-4687-af6c-f6159eb39d3f.png",
+      "raw_png_sha256": "a3e4779348875b21f13df0d7992338b885ac55c463a7c2362604fcac0d2d1f89"
+    }
+  ],
+  "part_order": [
+    "rook.torso",
+    "june.torso",
+    "rook.near.upper",
+    "rook.near.fore",
+    "june.near.upper",
+    "june.near.fore",
+    "rook.far.upper",
+    "rook.far.fore",
+    "june.far.upper",
+    "june.far.fore",
+    "rook.cuff",
+    "june.cuff"
+  ],
+  "validation": {
+    "raw_png_copied_without_raster_changes": true,
+    "visual_atlas_review": "Root accepted this separate alternative/unequipped garment atlas for staging after viewing; native assembly/fit/action review remains pending.",
+    "source_default_masks_untouched": true,
+    "production_default_appearance_unchanged": true
+  }
+}

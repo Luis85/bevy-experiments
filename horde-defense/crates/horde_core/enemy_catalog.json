@@ -1,0 +1,750 @@
+{
+  "bodies": [
+    {
+      "id": "shambler",
+      "health": 32,
+      "npc_hp": 9,
+      "npc_ht": 10
+    },
+    {
+      "id": "runner",
+      "health": 23,
+      "npc_hp": 7,
+      "npc_ht": 10
+    },
+    {
+      "id": "brute",
+      "health": 112,
+      "npc_hp": 17,
+      "npc_ht": 12
+    },
+    {
+      "id": "armored",
+      "health": 72,
+      "npc_hp": 12,
+      "npc_ht": 11
+    },
+    {
+      "id": "demolisher",
+      "health": 88,
+      "npc_hp": 14,
+      "npc_ht": 11
+    },
+    {
+      "id": "breacher-pack",
+      "health": 160,
+      "npc_hp": 21,
+      "npc_ht": 12
+    },
+    {
+      "id": "caller-pack",
+      "health": 64,
+      "npc_hp": 11,
+      "npc_ht": 11
+    },
+    {
+      "id": "siege-pack",
+      "health": 184,
+      "npc_hp": 24,
+      "npc_ht": 13
+    }
+  ],
+  "movements": [
+    {
+      "id": "shambler",
+      "speed": 0.47
+    },
+    {
+      "id": "runner",
+      "speed": 1.1
+    },
+    {
+      "id": "brute",
+      "speed": 0.31
+    },
+    {
+      "id": "armored",
+      "speed": 0.43
+    },
+    {
+      "id": "demolisher",
+      "speed": 0.39
+    },
+    {
+      "id": "breacher-pack",
+      "speed": 0.39
+    },
+    {
+      "id": "caller-pack",
+      "speed": 0.7
+    },
+    {
+      "id": "siege-pack",
+      "speed": 0.26
+    },
+    {
+      "id": "restless",
+      "speed": 0.64
+    }
+  ],
+  "attacks": [
+    {
+      "id": "shambler",
+      "damage": 5,
+      "windup": 1.25,
+      "npc_skill": 9,
+      "npc_damage_dice": 1,
+      "npc_damage_add": 0,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "runner",
+      "damage": 4,
+      "windup": 0.9,
+      "npc_skill": 10,
+      "npc_damage_dice": 1,
+      "npc_damage_add": -1,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "brute",
+      "damage": 13,
+      "windup": 1.8,
+      "npc_skill": 11,
+      "npc_damage_dice": 2,
+      "npc_damage_add": 1,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "armored",
+      "damage": 8,
+      "windup": 1.4,
+      "npc_skill": 11,
+      "npc_damage_dice": 1,
+      "npc_damage_add": 3,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "demolisher",
+      "damage": 10,
+      "windup": 1.6,
+      "npc_skill": 11,
+      "npc_damage_dice": 2,
+      "npc_damage_add": 0,
+      "structure_damage_multiplier": 2
+    },
+    {
+      "id": "breacher-pack",
+      "damage": 12,
+      "windup": 1.65,
+      "npc_skill": 11,
+      "npc_damage_dice": 2,
+      "npc_damage_add": 1,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "caller-pack",
+      "damage": 6,
+      "windup": 1.1,
+      "npc_skill": 11,
+      "npc_damage_dice": 1,
+      "npc_damage_add": 2,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "siege-pack",
+      "damage": 16,
+      "windup": 2.0,
+      "npc_skill": 12,
+      "npc_damage_dice": 2,
+      "npc_damage_add": 2,
+      "structure_damage_multiplier": 2
+    }
+  ],
+  "defenses": [
+    {
+      "id": "shambler",
+      "armor": 0,
+      "npc_armor": 0,
+      "npc_dodge": 7,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "runner",
+      "armor": 0,
+      "npc_armor": 0,
+      "npc_dodge": 8,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "brute",
+      "armor": 2,
+      "npc_armor": 2,
+      "npc_dodge": 7,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "armored",
+      "armor": 9,
+      "npc_armor": 5,
+      "npc_dodge": 7,
+      "contact_armor_fraction": 0.5
+    },
+    {
+      "id": "demolisher",
+      "armor": 3,
+      "npc_armor": 3,
+      "npc_dodge": 7,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "breacher-pack",
+      "armor": 5,
+      "npc_armor": 3,
+      "npc_dodge": 7,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "caller-pack",
+      "armor": 1,
+      "npc_armor": 1,
+      "npc_dodge": 8,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "siege-pack",
+      "armor": 7,
+      "npc_armor": 4,
+      "npc_dodge": 6,
+      "contact_armor_fraction": 1.0
+    }
+  ],
+  "rewards": [
+    {
+      "id": "shambler",
+      "coins": 3,
+      "xp": 2
+    },
+    {
+      "id": "runner",
+      "coins": 4,
+      "xp": 3
+    },
+    {
+      "id": "brute",
+      "coins": 9,
+      "xp": 6
+    },
+    {
+      "id": "armored",
+      "coins": 8,
+      "xp": 5
+    },
+    {
+      "id": "demolisher",
+      "coins": 9,
+      "xp": 6
+    },
+    {
+      "id": "breacher-pack",
+      "coins": 12,
+      "xp": 8
+    },
+    {
+      "id": "caller-pack",
+      "coins": 8,
+      "xp": 5
+    },
+    {
+      "id": "siege-pack",
+      "coins": 15,
+      "xp": 10
+    }
+  ],
+  "visuals": [
+    {
+      "id": "shambler",
+      "sprite": "Shambler",
+      "tint": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "scale": 1.0
+    },
+    {
+      "id": "runner",
+      "sprite": "Runner",
+      "tint": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "scale": 1.0
+    },
+    {
+      "id": "brute",
+      "sprite": "Brute",
+      "tint": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "scale": 1.0
+    },
+    {
+      "id": "armored",
+      "sprite": "Armored",
+      "tint": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "scale": 1.0
+    },
+    {
+      "id": "demolisher",
+      "sprite": "Demolisher",
+      "tint": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+      ],
+      "scale": 1.0
+    },
+    {
+      "id": "breacher-pack",
+      "sprite": "Breacher",
+      "tint": [
+        0.95,
+        0.82,
+        0.74,
+        1.0
+      ],
+      "scale": 1.12
+    },
+    {
+      "id": "caller-pack",
+      "sprite": "Caller",
+      "tint": [
+        0.8,
+        0.96,
+        0.82,
+        1.0
+      ],
+      "scale": 0.94
+    },
+    {
+      "id": "siege-pack",
+      "sprite": "SiegeBrute",
+      "tint": [
+        0.88,
+        0.82,
+        0.74,
+        1.0
+      ],
+      "scale": 1.22
+    },
+    {
+      "id": "skitter",
+      "sprite": "Runner",
+      "tint": [
+        0.78,
+        0.9,
+        0.72,
+        1.0
+      ],
+      "scale": 0.82
+    },
+    {
+      "id": "plated-runner",
+      "sprite": "Runner",
+      "tint": [
+        0.68,
+        0.78,
+        0.88,
+        1.0
+      ],
+      "scale": 1.0
+    },
+    {
+      "id": "hungry-shambler",
+      "sprite": "Shambler",
+      "tint": [
+        0.9,
+        0.78,
+        0.66,
+        1.0
+      ],
+      "scale": 0.96
+    }
+  ],
+  "archetypes": [
+    {
+      "id": "shambler",
+      "name": "Shambler",
+      "base_enemy_kind": "Shambler",
+      "body": "shambler",
+      "movement": "shambler",
+      "attack": "shambler",
+      "defense": "shambler",
+      "reward": "shambler",
+      "visual": "shambler",
+      "unlocked_by": null
+    },
+    {
+      "id": "runner",
+      "name": "Runner",
+      "base_enemy_kind": "Runner",
+      "body": "runner",
+      "movement": "runner",
+      "attack": "runner",
+      "defense": "runner",
+      "reward": "runner",
+      "visual": "runner",
+      "unlocked_by": null
+    },
+    {
+      "id": "brute",
+      "name": "Brute",
+      "base_enemy_kind": "Brute",
+      "body": "brute",
+      "movement": "brute",
+      "attack": "brute",
+      "defense": "brute",
+      "reward": "brute",
+      "visual": "brute",
+      "unlocked_by": null
+    },
+    {
+      "id": "armored",
+      "name": "Armored survivor",
+      "base_enemy_kind": "Armored",
+      "body": "armored",
+      "movement": "armored",
+      "attack": "armored",
+      "defense": "armored",
+      "reward": "armored",
+      "visual": "armored",
+      "unlocked_by": null
+    },
+    {
+      "id": "demolisher",
+      "name": "Demolisher",
+      "base_enemy_kind": "Demolisher",
+      "body": "demolisher",
+      "movement": "demolisher",
+      "attack": "demolisher",
+      "defense": "demolisher",
+      "reward": "demolisher",
+      "visual": "demolisher",
+      "unlocked_by": null
+    },
+    {
+      "id": "breacher-pack",
+      "name": "Breacher packling",
+      "base_enemy_kind": "Armored",
+      "body": "breacher-pack",
+      "movement": "breacher-pack",
+      "attack": "breacher-pack",
+      "defense": "breacher-pack",
+      "reward": "breacher-pack",
+      "visual": "breacher-pack",
+      "unlocked_by": "Breacher"
+    },
+    {
+      "id": "caller-pack",
+      "name": "Caller prowler",
+      "base_enemy_kind": "Runner",
+      "body": "caller-pack",
+      "movement": "caller-pack",
+      "attack": "caller-pack",
+      "defense": "caller-pack",
+      "reward": "caller-pack",
+      "visual": "caller-pack",
+      "unlocked_by": "Caller"
+    },
+    {
+      "id": "siege-pack",
+      "name": "Siege husk",
+      "base_enemy_kind": "Demolisher",
+      "body": "siege-pack",
+      "movement": "siege-pack",
+      "attack": "siege-pack",
+      "defense": "siege-pack",
+      "reward": "siege-pack",
+      "visual": "siege-pack",
+      "unlocked_by": "SiegeBrute"
+    },
+    {
+      "id": "skitter",
+      "name": "Skitter",
+      "base_enemy_kind": "Runner",
+      "body": "runner",
+      "movement": "runner",
+      "attack": "runner",
+      "defense": "shambler",
+      "reward": "runner",
+      "visual": "skitter",
+      "unlocked_by": null
+    },
+    {
+      "id": "plated-runner",
+      "name": "Plated runner",
+      "base_enemy_kind": "Runner",
+      "body": "runner",
+      "movement": "runner",
+      "attack": "runner",
+      "defense": "armored",
+      "reward": "armored",
+      "visual": "plated-runner",
+      "unlocked_by": null
+    },
+    {
+      "id": "hungry-shambler",
+      "name": "Hungry shambler",
+      "base_enemy_kind": "Shambler",
+      "body": "shambler",
+      "movement": "restless",
+      "attack": "runner",
+      "defense": "shambler",
+      "reward": "shambler",
+      "visual": "hungry-shambler",
+      "unlocked_by": null
+    }
+  ],
+  "defaults": [
+    {
+      "kind": "Shambler",
+      "archetype_id": "shambler"
+    },
+    {
+      "kind": "Runner",
+      "archetype_id": "runner"
+    },
+    {
+      "kind": "Brute",
+      "archetype_id": "brute"
+    },
+    {
+      "kind": "Armored",
+      "archetype_id": "armored"
+    },
+    {
+      "kind": "Demolisher",
+      "archetype_id": "demolisher"
+    }
+  ],
+  "waves": [
+    {
+      "level": 0,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 76
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 20
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 14
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 5
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 4
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 3
+        }
+      ]
+    },
+    {
+      "level": 1,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 55
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 30
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 15
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 15
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 8
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 5
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 4
+        }
+      ]
+    },
+    {
+      "level": 2,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 38
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 25
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 17
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 10
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 8
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 5
+        }
+      ]
+    },
+    {
+      "level": 3,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 30
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 25
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 15
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 10
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 12
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 12
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 8
+        }
+      ]
+    },
+    {
+      "level": 4,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 20
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 25
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 20
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 15
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 16
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 12
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        }
+      ]
+    }
+  ]
+}
