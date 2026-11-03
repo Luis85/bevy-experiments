@@ -4,7 +4,7 @@ id: player-model-repairs
 title: "Hidden surface repair inspection"
 parent: player-model-review
 status: Implemented
-source: "crates/horde_game/src/ui/review.rs::model_repairs,paint_model_repairs"
+source: "crates/horde_game/src/ui/review/mod.rs::model_repairs,paint_model_repairs"
 ---
 
 # Hidden surface repair inspection

@@ -4,7 +4,7 @@ id: player-model-review
 title: "Player model developer review"
 parent: game
 status: Implemented
-source: "crates/horde_game/src/ui/review.rs::model_workshop"
+source: "crates/horde_game/src/ui/review/mod.rs::model_workshop"
 ---
 
 # Player model developer review
