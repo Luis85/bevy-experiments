@@ -56,7 +56,7 @@ pub(super) fn controls(ctx: &egui::Context, f: &mut Frontend) {
     }
     if f.settings.pressed(ctx, Action::Pause, false) {
         let pause = !f.game.attempt.as_ref().is_some_and(|a| a.paused);
-        f.dispatch(GameCommand::SetPaused(pause), "");
+        f.dispatch(Command::SetPaused(pause), "");
         f.construction = false;
         f.fire_latched = false;
     }
@@ -372,7 +372,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut Frontend) {
                         "Resume defense"
                     };
                     if ui.button(RichText::new(label).strong()).clicked() {
-                        f.dispatch(GameCommand::SetPaused(!paused), "");
+                        f.dispatch(Command::SetPaused(!paused), "");
                         f.construction = false;
                         f.fire_latched = false;
                     }
@@ -434,7 +434,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut Frontend) {
                     {
                         f.fire_latched = false;
                         f.dispatch(
-                            GameCommand::Withdraw,
+                            Command::Withdraw,
                             "Rewards retained. Rest, train, and retry.",
                         );
                     }
@@ -448,7 +448,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut Frontend) {
                             f.request_save(SaveIntent::Manual);
                         }
                         if ui.button("Save and return to menu").clicked() {
-                            f.dispatch(GameCommand::SetPaused(true), "");
+                            f.dispatch(Command::SetPaused(true), "");
                             f.fire_latched = false;
                             f.request_save(SaveIntent::Menu);
                         }
@@ -462,7 +462,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut Frontend) {
                         {
                             f.fire_latched = false;
                             f.dispatch(
-                                GameCommand::Withdraw,
+                                Command::Withdraw,
                                 "Deployment recalled; earned rewards retained.",
                             );
                         }
@@ -890,13 +890,13 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut Frontend) {
     );
     if ui.button("Save country plan").clicked() {
         f.dispatch(
-            GameCommand::SaveStartingLayout,
+            Command::SaveStartingLayout,
             "Country plan saved. Next deployment pays its supply costs.",
         );
     }
     if ui.button("Clear country plan").clicked() {
         f.dispatch(
-            GameCommand::ClearLayout,
+            Command::ClearLayout,
             "Country plan cleared; deployed defenses remain.",
         );
     }
@@ -946,7 +946,7 @@ fn placement_cursor(ui: &mut egui::Ui, r: Rect, f: &mut Frontend) {
     }
     if ui.input(|i| i.pointer.primary_clicked()) {
         f.dispatch(
-            GameCommand::Place {
+            Command::Place {
                 kind: f.build_kind,
                 lane,
                 column,
@@ -965,7 +965,7 @@ fn placement_cursor(ui: &mut egui::Ui, r: Rect, f: &mut Frontend) {
             .find(|s| s.lane == lane && s.column == column)
             .map(|s| s.id);
         if let Some(id) = id {
-            f.dispatch(GameCommand::Salvage(id), "Structure salvaged.");
+            f.dispatch(Command::Salvage(id), "Structure salvaged.");
         }
     }
 }

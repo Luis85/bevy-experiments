@@ -1,7 +1,7 @@
 use crate::{
     art::{self, AMBER, GREEN, INK, MUTED, PANEL, RED, TEXT},
     runner::{
-        self, AttackAims, ControlFrame, GameCommand, NpcTactics, Runtime, RuntimeHost,
+        self, AppCommand, AppOutcome, AttackAims, ControlFrame, Runtime, RuntimeHost,
         RuntimeNotice, SaveIntent,
     },
     settings::{self, Action, Settings},
@@ -16,6 +16,7 @@ use bevy_egui::{
 };
 use horde_core::{
     campaign::{BodyAttribute, NpcTraining, Skill},
+    command::{Command, CommandOutcome, MAX_RECALL_PERCENT, NpcTactics},
     content::{Mode, Policy, Slot, StructureKind, content},
     ordnance::{OrdnanceKind, ThrowRequest},
     sim::{Game, Input, Outcome},
@@ -286,9 +287,9 @@ impl Frontend {
             intent,
             SaveIntent::Menu | SaveIntent::Quit | SaveIntent::SettingsBack
         ) {
-            self.runtime.enqueue(GameCommand::SetPaused(true), "");
+            self.runtime.enqueue(Command::SetPaused(true), "");
         }
-        self.runtime.enqueue(GameCommand::Save(intent), "");
+        self.runtime.enqueue(AppCommand::Save(intent), "");
         self.save_pending = true;
         self.feedback_revision = self.feedback_revision.wrapping_add(1);
         self.message = "Saving campaign and current actions…".into();
@@ -308,32 +309,33 @@ impl Frontend {
         self.history_return = self.screen;
         self.history_world_paused = self.game.global_paused;
         self.fire_latched = false;
-        self.dispatch(GameCommand::SetPaused(true), "");
+        self.dispatch(Command::SetPaused(true), "");
         self.screen = Screen::History;
     }
     fn close_history(&mut self) {
         self.screen = self.history_return;
-        self.dispatch(GameCommand::SetPaused(self.history_world_paused), "");
+        self.dispatch(Command::SetPaused(self.history_world_paused), "");
     }
     fn open_settings(&mut self) {
         self.balance_draft = Some(self.game.campaign.balance_settings.clone());
         self.return_screen = self.screen;
         self.return_world_paused = self.game.global_paused;
         self.screen = Screen::Settings;
-        self.dispatch(GameCommand::SetPaused(true), "");
+        self.dispatch(Command::SetPaused(true), "");
         self.fire_latched = false;
         self.runtime.clear_input();
     }
     fn save_settings_to_menu(&mut self) {
         // Pause through the runtime before the save commits. Returning to the
         // menu must preserve active actions and freeze every live field.
-        self.dispatch(GameCommand::SetPaused(true), "");
+        self.dispatch(Command::SetPaused(true), "");
         self.fire_latched = false;
         self.runtime.clear_input();
         self.request_save(SaveIntent::Menu);
     }
-    fn dispatch(&mut self, command: GameCommand, success: &str) {
-        let reset = matches!(command, GameCommand::NewJourney);
+    fn dispatch(&mut self, command: impl Into<AppCommand>, success: &str) {
+        let command = command.into();
+        let reset = matches!(command, AppCommand::NewJourney);
         if self.runtime.enqueue(command, success) && reset {
             self.save_pending = true;
         }
@@ -349,7 +351,7 @@ impl Frontend {
         {
             self.new_journey_confirm = true;
         } else {
-            self.dispatch(GameCommand::NewJourney, "New journey ready.");
+            self.dispatch(AppCommand::NewJourney, "New journey ready.");
         }
     }
     fn toggle_fire(&mut self, ctx: &egui::Context) {
@@ -361,7 +363,7 @@ impl Frontend {
     }
     fn begin(&mut self) {
         self.dispatch(
-            GameCommand::Deploy {
+            Command::Deploy {
                 stage: self.stage,
                 mode: self.mode,
             },
@@ -408,7 +410,7 @@ impl Frontend {
             self.open_preparation(Tab::Skills);
             return;
         }
-        self.dispatch(GameCommand::SetPaused(true), "");
+        self.dispatch(Command::SetPaused(true), "");
         self.screen = Screen::Results;
         self.fire_latched = false;
         self.runtime.clear_input();
@@ -434,7 +436,7 @@ impl Frontend {
     }
     fn preserve_debrief_pause(&mut self) {
         if self.screen == Screen::Results && !self.game.global_paused {
-            self.dispatch(GameCommand::SetPaused(true), "");
+            self.dispatch(Command::SetPaused(true), "");
         }
     }
     fn open_campaign(&mut self) {
@@ -480,7 +482,7 @@ impl Frontend {
         self.fire_latched = false;
         self.runtime.clear_input();
         if self.game.attempt.is_some() {
-            self.dispatch(GameCommand::SetPaused(true), "");
+            self.dispatch(Command::SetPaused(true), "");
         }
     }
 }
@@ -505,7 +507,7 @@ impl RuntimeHost for Frontend {
         if matches!(
             &notice,
             RuntimeNotice::CommandCompleted {
-                command: GameCommand::NewJourney,
+                command: AppCommand::NewJourney,
                 ..
             }
         ) {
@@ -520,27 +522,33 @@ impl RuntimeHost for Frontend {
                 Ok(outcome) => {
                     if matches!(
                         command,
-                        GameCommand::BuyItem(_)
-                            | GameCommand::Equip { .. }
-                            | GameCommand::BuySkillNode(_)
-                            | GameCommand::TrainNpc(_)
-                            | GameCommand::BuyNpcPoint
+                        AppCommand::Game(
+                            Command::BuyItem(_)
+                                | Command::Equip { .. }
+                                | Command::BuySkillNode(_)
+                                | Command::TrainNpc(_)
+                                | Command::BuyNpcPoint
+                        )
                     ) {
                         self.improvement_focus = None;
                     }
-                    if let (GameCommand::BuyItem(_), runner::CommandOutcome::Id(id)) =
-                        (&command, &outcome)
+                    if let (
+                        AppCommand::Game(Command::BuyItem(_)),
+                        AppOutcome::Command(CommandOutcome::Id(id)),
+                    ) = (&command, &outcome)
                     {
                         self.selected_item = Some(*id);
                     }
                     if !success.is_empty() {
                         self.feedback_revision = self.feedback_revision.wrapping_add(1);
                         self.message = match &outcome {
-                            runner::CommandOutcome::Amount(amount) => format!(
+                            AppOutcome::Command(CommandOutcome::Amount(amount)) => format!(
                                 "{success} +{amount} {}",
                                 if matches!(
                                     command,
-                                    GameCommand::Salvage(_) | GameCommand::SalvageExpedition { .. }
+                                    AppCommand::Game(
+                                        Command::Salvage(_) | Command::SalvageExpedition { .. }
+                                    )
                                 ) {
                                     "supply"
                                 } else {
@@ -552,7 +560,7 @@ impl RuntimeHost for Frontend {
                         self.message_error = false;
                     }
                     match command {
-                        GameCommand::NewJourney => {
+                        AppCommand::NewJourney => {
                             self.new_journey_confirm = false;
                             self.message_error = false;
                             self.selected_country = "DEU".into();
@@ -570,7 +578,7 @@ impl RuntimeHost for Frontend {
                             self.construction = false;
                             self.speed = 1;
                             self.message = match outcome {
-                                runner::CommandOutcome::JourneyArchived(Some(path)) => format!(
+                                AppOutcome::JourneyArchived(Some(path)) => format!(
                                     "New journey ready. Previous journey archived at {}",
                                     path.display()
                                 ),
@@ -578,8 +586,11 @@ impl RuntimeHost for Frontend {
                             };
                             self.open_survivor_selection();
                         }
-                        GameCommand::ContinueJourney => {
-                            if matches!(outcome, runner::CommandOutcome::CountryLiberated) {
+                        AppCommand::Game(Command::ContinueJourney) => {
+                            if matches!(
+                                outcome,
+                                AppOutcome::Command(CommandOutcome::CountryLiberated)
+                            ) {
                                 self.open_campaign();
                             } else {
                                 self.screen = Screen::Battle;
@@ -597,12 +608,12 @@ impl RuntimeHost for Frontend {
                                 self.runtime.clear_input();
                             }
                         }
-                        GameCommand::ChooseSurvivor(id) => {
+                        AppCommand::Game(Command::ChooseSurvivor(id)) => {
                             self.preview_survivor = id;
                             self.profile_exists = true;
                             self.open_campaign();
                         }
-                        GameCommand::Deploy { .. } => {
+                        AppCommand::Game(Command::Deploy { .. }) => {
                             self.screen = Screen::Battle;
                             if let Some(a) = self.game.attempt.as_ref() {
                                 self.aim = [a.width_yards * 0.5, a.defender_position()[1]];
@@ -614,7 +625,7 @@ impl RuntimeHost for Frontend {
                             self.profile_exists = true;
                             self.runtime.clear_input();
                         }
-                        GameCommand::Withdraw => {
+                        AppCommand::Game(Command::Withdraw) => {
                             self.mode =
                                 self.game.last_result.as_ref().map_or(self.mode, |r| r.mode);
                             self.screen = Screen::Results;
@@ -624,7 +635,7 @@ impl RuntimeHost for Frontend {
                             self.fire_latched = false;
                             self.runtime.clear_input();
                         }
-                        GameCommand::ChooseStart(id) => {
+                        AppCommand::Game(Command::ChooseStart(id)) => {
                             self.selected_country = id;
                             self.stage = 0;
                             self.mode = Mode::Personal;
@@ -638,7 +649,7 @@ impl RuntimeHost for Frontend {
                             self.fire_latched = false;
                             self.runtime.clear_input();
                         }
-                        GameCommand::EnterCountry(id) => {
+                        AppCommand::Game(Command::EnterCountry(id)) => {
                             self.selected_country = id;
                             self.stage = self.game.campaign.world.next_stage();
                             self.profile_exists = true;
@@ -652,11 +663,11 @@ impl RuntimeHost for Frontend {
                                 self.open_preparation(Tab::Briefing);
                             }
                         }
-                        GameCommand::SetPaused(_) => {
+                        AppCommand::Game(Command::SetPaused(_)) => {
                             self.fire_latched = false;
                             self.runtime.clear_input();
                         }
-                        GameCommand::SellItem(_) => {
+                        AppCommand::Game(Command::SellItem(_)) => {
                             self.pending_sale = None;
                             self.selected_item = None;
                         }
@@ -697,10 +708,7 @@ impl RuntimeHost for Frontend {
                                 };
                                 self.rebind = None;
                                 if self.return_screen == Screen::Camp {
-                                    self.dispatch(
-                                        GameCommand::SetPaused(self.return_world_paused),
-                                        "",
-                                    );
+                                    self.dispatch(Command::SetPaused(self.return_world_paused), "");
                                 }
                             }
                             _ => {}
@@ -726,6 +734,15 @@ impl RuntimeHost for Frontend {
                     self.recovery_notice
                 );
                 self.message_error = false;
+            }
+            RuntimeNotice::SettlementIssues(issues) => {
+                self.feedback_revision = self.feedback_revision.wrapping_add(1);
+                self.message = issues
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                self.message_error = true;
             }
             RuntimeNotice::SimulationFinished => {
                 self.mode = self.game.last_result.as_ref().map_or(self.mode, |r| r.mode);

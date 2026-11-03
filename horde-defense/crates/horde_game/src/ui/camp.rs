@@ -311,13 +311,13 @@ fn country_action(ui: &mut egui::Ui, f: &mut Frontend) {
             ) {
                 if choosing {
                     f.dispatch(
-                        GameCommand::ChooseStart(country.id.clone()),
+                        Command::ChooseStart(country.id.clone()),
                         "First defense underway. Aim, earn coins, then retreat to train.",
                     );
                     f.stage = 0;
                 } else {
                     f.dispatch(
-                        GameCommand::EnterCountry(country.id.clone()),
+                        Command::EnterCountry(country.id.clone()),
                         "Journey started in the selected country.",
                     );
                 }
@@ -363,7 +363,7 @@ fn toggle_time(f: &mut Frontend) {
         f.screen = Screen::Battle;
         f.construction = false;
     }
-    f.dispatch(GameCommand::SetPaused(!paused), "");
+    f.dispatch(Command::SetPaused(!paused), "");
     f.fire_latched = false;
     f.runtime.clear_input();
 }

@@ -141,11 +141,11 @@ pub(super) fn policy(ui: &mut egui::Ui, f: &mut Frontend) {
     ui.label("Recall below HP (0% disables)");
     ui.scope(|ui| {
         ui.spacing_mut().slider_width = (ui.available_width() - 60.0).clamp(80.0, 160.0);
-        ui.add(egui::Slider::new(&mut proposed.recall_percent, 0..=75).suffix("%"));
+        ui.add(egui::Slider::new(&mut proposed.recall_percent, 0..=MAX_RECALL_PERCENT).suffix("%"));
     });
     if proposed != before {
         f.dispatch(
-            GameCommand::SetNpcPolicy(proposed),
+            Command::SetNpcPolicy(proposed),
             "Policy applies at the next legal decision.",
         );
     }
@@ -179,7 +179,7 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut Frontend) {
     });
     chrome::section(ui, "Training");
     ui.horizontal_wrapped(|ui| {
-        if ui.add_enabled(f.game.campaign.coins >= 25 && n.awarded < f.game.campaign.allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(GameCommand::BuyNpcPoint, "Training point awarded."); }
+        if ui.add_enabled(f.game.campaign.coins >= 25 && n.awarded < f.game.campaign.allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(Command::BuyNpcPoint, "Training point awarded."); }
         if ui.button("Change Mara's equipment").clicked() { f.mode = Mode::Npc; f.open_preparation(Tab::Armory); }
     });
     muted(
@@ -214,14 +214,14 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut Frontend) {
                     })
                     .clicked()
                 {
-                    f.dispatch(GameCommand::TrainNpc(t), "Survivor trained.");
+                    f.dispatch(Command::TrainNpc(t), "Survivor trained.");
                 }
             });
         });
     }
     if ui.button("Redistribute advancement for free").clicked() {
         f.dispatch(
-            GameCommand::RespecNpc,
+            Command::RespecNpc,
             "Points refunded; historical awards preserved.",
         );
     }

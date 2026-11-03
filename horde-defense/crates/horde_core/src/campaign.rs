@@ -2028,6 +2028,14 @@ impl Campaign {
     pub fn record_country_stage_clear(&mut self, stage: usize) -> Result<bool, String> {
         self.world.record_clear(stage)
     }
+    /// Records a stage clear for `country` without changing the active country.
+    pub fn record_country_stage_clear_in(
+        &mut self,
+        country: &str,
+        stage: usize,
+    ) -> Result<bool, String> {
+        self.world.record_clear_in(country, stage)
+    }
     pub fn claim_objectives(&mut self) {
         let allowance = self.allowance();
         self.npc.claim_objectives(allowance);

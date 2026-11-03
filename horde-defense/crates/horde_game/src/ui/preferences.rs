@@ -272,7 +272,7 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut Frontend) {
     };
     if let Some(settings) = apply {
         f.dispatch(
-            GameCommand::SetBalance(settings),
+            Command::SetBalance(settings),
             "Difficulty saved for the next deployment. Active fields are unchanged.",
         );
     }

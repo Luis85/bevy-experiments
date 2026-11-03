@@ -2192,7 +2192,7 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
         enemy_speed: f32::NAN,
         ..BalanceSettings::default()
     };
-    f.dispatch(GameCommand::SetBalance(invalid), "");
+    f.dispatch(Command::SetBalance(invalid), "");
     runner::flush_for_test(f);
     assert!(f.message_error);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
@@ -2448,7 +2448,7 @@ fn older_autosave_ack_keeps_navigation_busy_and_freezes_raw_settings_binding_cap
     let h = Harness::new();
     let f = &mut fixture.frontend;
     let gate = f.runtime.gated_storage_for_test();
-    f.dispatch(GameCommand::Save(SaveIntent::Autosave), "");
+    f.dispatch(AppCommand::Save(SaveIntent::Autosave), "");
     assert!(!runner::flush(f));
     gate.started();
     f.open_settings();
