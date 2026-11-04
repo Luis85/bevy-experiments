@@ -13,7 +13,10 @@ and combat profiles.
 | Grenade/Molotov definitions | `crates/horde_core/ordnance.json` | `LASTLIGHT_ORDNANCE` | `content/ordnance.json` |
 | Encounters and equipment | `crates/horde_core/content.json` | `LASTLIGHT_CONTENT` | `content/encounters.json` |
 
-Without an override the default JSON is compiled into the core. Each catalog
+Every authored entry needs a stable `id` (items, levels, structures, skill
+nodes, enemy archetypes); saves reference them, so never rename or reuse one,
+and add ids to any override file written before ids were required. Without an
+override the default JSON is compiled into the core. Each catalog
 loads and validates once at startup; restart to apply edits. Packaged launchers
 set the variables to their adjacent content files. Invalid or unreadable
 overrides fail visibly rather than silently substituting defaults. Skill and
