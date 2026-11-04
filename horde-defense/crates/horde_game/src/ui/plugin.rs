@@ -20,16 +20,12 @@ use bevy_egui::{EguiPlugin, EguiPostUpdateSet, EguiPrimaryContextPass};
 pub struct UiPlugin;
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(EguiPlugin::default())
+        app.add_plugins((EguiPlugin::default(), NavigationPlugin))
             .add_systems(Startup, (spawn_camera, visual_assets::load_assets))
             .add_systems(
                 EguiPrimaryContextPass,
                 (super::register_textures, super::draw).chain(),
             )
-            // Notices from this frame's Apply pass (and the previous frame's
-            // Advance/Persist passes) become NextState before StateTransition.
-            .add_systems(PreUpdate, notices::handle_notices.after(RuntimeSet::Apply))
-            .add_systems(OnEnter(Screen::Battle), notices::enter_battle)
             .add_systems(
                 PostUpdate,
                 cursor::sync_native_cursor.after(EguiPostUpdateSet::ProcessOutput),
@@ -45,6 +41,19 @@ impl Plugin for UiPlugin {
                         .before(atmosphere_audio::AmbienceUpdate),
                 ),
             );
+    }
+}
+
+/// The window-free part of the UI: runtime notices become state transitions,
+/// and `OnEnter(Screen::Battle)` resets a new deployment. Headless tests run it
+/// without egui.
+pub(crate) struct NavigationPlugin;
+impl Plugin for NavigationPlugin {
+    fn build(&self, app: &mut App) {
+        // Notices from this frame's Apply pass (and the previous frame's
+        // Advance/Persist passes) become NextState before StateTransition.
+        app.add_systems(PreUpdate, notices::handle_notices.after(RuntimeSet::Apply))
+            .add_systems(OnEnter(Screen::Battle), notices::enter_battle);
     }
 }
 

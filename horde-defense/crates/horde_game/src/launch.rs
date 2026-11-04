@@ -128,7 +128,7 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
   Catalogue overrides (read by horde_core; listed at startup)
     LASTLIGHT_CONTENT, LASTLIGHT_WORLD, LASTLIGHT_SKILLS, LASTLIGHT_ENEMIES,
     LASTLIGHT_ORDNANCE, LASTLIGHT_PROGRESSION, LASTLIGHT_QUALITY, LASTLIGHT_BALANCE
-  Review and measurement (builds with the `review` feature only)
+  Review and measurement (builds with the `review` feature; otherwise ignored)
     LASTLIGHT_REVIEW_MOTION       Flag: review fixture starts unpaused
     LASTLIGHT_REVIEW_REDUCED      Flag: force reduced effects in the fixture
     LASTLIGHT_REVIEW_CAPTURE      Automated screenshot path
@@ -266,6 +266,17 @@ impl LaunchConfig {
             .iter()
             .any(|name| env.string(name).is_some())
             || (scenario.is_some() && !practice);
+        let review_requested = review_requested
+            && {
+                if !cfg!(feature = "review") {
+                    warnings.push(
+                    "Ignoring review, capture and performance variables: this build has no `review` feature (practice scenes need LASTLIGHT_PRACTICE=1)".into(),
+                );
+                }
+                cfg!(feature = "review")
+            };
+        // Without review tooling a non-practice scenario would be a review fixture.
+        let scenario = scenario.filter(|_| practice || cfg!(feature = "review"));
         let mut review = review_requested.then(|| ReviewOptions {
             motion: env.flag("LASTLIGHT_REVIEW_MOTION"),
             reduced: env.flag("LASTLIGHT_REVIEW_REDUCED"),
@@ -335,11 +346,6 @@ impl LaunchConfig {
 
     /// Rejects combinations that would silently produce misleading evidence.
     fn validate(&self) -> Result<(), String> {
-        if self.review.is_some() && !cfg!(feature = "review") {
-            return Err(
-                "Review scenes, captures and performance reports need a build with the `review` feature (practice scenes need LASTLIGHT_PRACTICE=1)".into(),
-            );
-        }
         if let Some(review) = &self.review
             && review.sequence.is_some()
             && (review.perf.report.is_some()
@@ -547,18 +553,27 @@ mod tests {
     }
     #[cfg(not(feature = "review"))]
     #[test]
-    fn builds_without_review_reject_review_options() {
-        assert!(parse(&[], &[("LASTLIGHT_REVIEW_SCREEN", "damage")]).is_err());
-        assert!(parse(&[], &[("LASTLIGHT_PERF_REPORT", "perf.json")]).is_err());
-        assert!(
-            parse(
-                &[],
-                &[
-                    ("LASTLIGHT_PRACTICE", "1"),
-                    ("LASTLIGHT_REVIEW_SCREEN", "construction")
-                ]
-            )
-            .is_ok()
-        );
+    fn builds_without_review_warn_and_ignore_review_options() {
+        for vars in [
+            &[("LASTLIGHT_REVIEW_SCREEN", "damage")][..],
+            &[("LASTLIGHT_PERF_REPORT", "perf.json")],
+            &[("LASTLIGHT_REVIEW_SCALE", "1.2")],
+            &[("LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT", "m.json")],
+        ] {
+            let c = parse(&[], vars).unwrap();
+            assert!(c.review.is_none() && c.scenario.is_none(), "{vars:?}");
+            assert_eq!(c.warnings.len(), 1, "{vars:?}");
+        }
+        let c = parse(
+            &[],
+            &[
+                ("LASTLIGHT_PRACTICE", "1"),
+                ("LASTLIGHT_REVIEW_SCREEN", "construction"),
+                ("LASTLIGHT_PERF_FRAMES", "900"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(c.scenario.as_deref(), Some("construction"));
+        assert!(c.practice && c.review.is_none());
     }
 }

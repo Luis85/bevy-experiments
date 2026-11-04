@@ -175,8 +175,12 @@ impl UiCtx<'_> {
 
     /// Requests `screen` at the next state transition. Entering the camp
     /// restores the remembered tab.
+    /// Re-requesting the current screen (with nothing else pending) is a no-op
+    /// rather than an identity transition, so live control keeps running.
     pub(super) fn go(&mut self, screen: Screen) {
-        self.next_screen.set(screen);
+        if screen != self.screen || !matches!(self.next_screen, NextState::Unchanged) {
+            self.next_screen.set(screen);
+        }
         if screen == Screen::Camp {
             self.next_tab.set(self.nav.tab);
         }
@@ -188,13 +192,20 @@ impl UiCtx<'_> {
     }
     /// Whether a screen change is requested but not yet applied.
     pub(super) fn leaving(&self) -> bool {
-        !matches!(self.next_screen, NextState::Unchanged)
+        match &*self.next_screen {
+            NextState::Pending(screen) | NextState::PendingIfDifferent(screen) => {
+                *screen != self.screen
+            }
+            NextState::Unchanged => false,
+        }
     }
     /// A new deployment began: show the battle; `OnEnter(Screen::Battle)` resets
     /// its controls.
     pub(super) fn start_battle(&mut self) {
         self.nav.battle_reset = true;
-        self.go(Screen::Battle);
+        // Always a transition, so `OnEnter(Screen::Battle)` runs the reset even
+        // if a battle screen is already shown.
+        self.next_screen.set(Screen::Battle);
     }
 
     // ----- queries -----

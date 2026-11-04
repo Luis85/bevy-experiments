@@ -111,7 +111,6 @@ fn main() -> AppExit {
                     ..default()
                 }),
         );
-    // After LogPlugin so Game::load startup events reach the console and log file.
     let config = app.world().resource::<launch::LaunchConfig>().clone();
     // After LogPlugin so Game::load startup events reach the console and log file.
     ui::FrontendParts::load(&config).insert_into(&mut app);

@@ -2538,3 +2538,28 @@ fn compact_country_selection_keeps_a_useful_map_visible_before_the_fixed_journey
         );
     }
 }
+#[test]
+fn reselecting_the_current_camp_screen_keeps_strategy_ticks_running() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.set_paused(false);
+    assert!(f.game.attempt.is_none() && !f.game.global_paused);
+    let mut output = h.ctx.run_ui(
+        RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))),
+            ..RawInput::default()
+        },
+        |ui| {
+            let mut c = f.ctx();
+            c.go(Screen::Camp);
+            assert!(!c.leaving(), "same-screen request is not a transition");
+            draw_screen(ui.ctx(), &mut c, 0.0);
+        },
+    );
+    output.textures_delta.clear();
+    let before = f.runtime.simulated_ticks;
+    f.step();
+    assert_eq!(f.runtime.simulated_ticks, before + 1);
+    assert!(f.screen == Screen::Camp);
+}

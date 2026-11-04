@@ -127,7 +127,7 @@ Arguments are `--smoke` and `--help`; everything else is a `LASTLIGHT_*` environ
 
 Cargo features of `horde-defense`:
 
-- `review` (default): model workshop and parity screens, review fixtures, automated captures (`LASTLIGHT_REVIEW_CAPTURE`/`_EXIT`), capture sequences and frame reports. A build without it rejects review options; practice scenes (`LASTLIGHT_PRACTICE=1` with `LASTLIGHT_REVIEW_SCREEN`) and F12 screenshots work in every build.
+- `review` (default): model workshop and parity screens, review fixtures, automated captures (`LASTLIGHT_REVIEW_CAPTURE`/`_EXIT`), capture sequences and frame reports. A build without it ignores review options (and non-practice scenes) with a logged warning; practice scenes (`LASTLIGHT_PRACTICE=1` with `LASTLIGHT_REVIEW_SCREEN`) and F12 screenshots work in every build.
 - `dev`: Bevy `file_watcher` (asset hot reload), `track_location` and `sysinfo_plugin`, e.g. `cargo run -p horde-defense --features dev`. (`bevy_dev_tools` is not included: no `bevy_dev_tools` release matches the locked `bevy_internal` 0.20.1.)
 
 The root helper also recognizes this experiment:

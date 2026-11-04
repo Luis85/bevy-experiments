@@ -21,6 +21,7 @@ default = ["review"]
 # sequence, automated screenshots and performance reports. Playtest packages
 # build without it (`--no-default-features`).
 review = []
-# Developer conveniences: Bevy dev tools, asset hot reload, change-location
-# tracking and system information diagnostics.
+# Developer conveniences: asset hot reload, change-location tracking and system
+# information diagnostics. (`bevy_dev_tools` is left out: no release matches the
+# locked `bevy_internal` 0.20.1.)
 dev = ["bevy/file_watcher", "bevy/track_location", "bevy/sysinfo_plugin"]

@@ -10,6 +10,8 @@ use bevy_egui::{
 };
 use horde_core::{content::Mode, sim::Input};
 
+#[cfg(test)]
+mod app_tests;
 mod context;
 mod notices;
 mod plugin;
