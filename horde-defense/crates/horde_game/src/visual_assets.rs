@@ -105,7 +105,27 @@ struct FlashMask {
     runs: Vec<[f32; 4]>,
 }
 impl FlashMask {
+    /// Bounds are clipped to the real image, so a mismatched replacement sheet
+    /// yields a smaller (or empty) mask rather than an out-of-range read.
     fn from_rgba(width: u32, pixels: &[u8], bounds: [f32; 4]) -> Self {
+        let height = if width == 0 {
+            0
+        } else {
+            (pixels.len() / 4 / width as usize) as u32
+        };
+        let clip = |value: f32, limit: u32| {
+            if value.is_finite() {
+                (value.max(0.0) as u32).min(limit) as f32
+            } else {
+                0.0
+            }
+        };
+        let bounds = [
+            clip(bounds[0], width),
+            clip(bounds[1], height),
+            clip(bounds[2], width),
+            clip(bounds[3], height),
+        ];
         let mut runs = Vec::new();
         // A conservative 2x2 block is lit only when every source pixel is solid.
         // Transparent RGB noise cannot become a rectangular additive glow.
@@ -149,11 +169,15 @@ impl FlashMasks {
             .data
             .as_deref()
             .expect("RGBA actor pixels remain available");
+        let catalog = enemy_visuals::active();
+        let enemy_art_fits = enemy_art_problem(Some(walkers), Some(actors)).is_none();
         Self {
-            enemies: enemy_visuals::active()
+            enemies: catalog
                 .sprites()
                 .iter()
                 .map(|sprite| match &sprite.art {
+                    // Rejected art keeps per-sprite slots but has no masks.
+                    _ if !enemy_art_fits => Vec::new(),
                     SpriteArt::Walk(walk) => walk
                         .frames
                         .iter()
@@ -176,6 +200,53 @@ impl FlashMasks {
                 .collect(),
         }
     }
+}
+
+/// Why the loaded sheets cannot back the enemy mapping, if they cannot: each
+/// sheet a sprite is measured on must have exactly the declared pixel size and
+/// contain every rectangle. Checks only the sheets that have loaded.
+fn enemy_art_problem(walkers: Option<&Image>, actors: Option<&Image>) -> Option<String> {
+    for sprite in enemy_visuals::active().sprites() {
+        let (image, name, rects): (_, _, Vec<[f32; 4]>) = match &sprite.art {
+            SpriteArt::Walk(walk) => (
+                walkers,
+                "walkers-v1.png",
+                walk.frames.iter().map(|frame| frame.bounds).collect(),
+            ),
+            SpriteArt::Standing(art) => (actors, "actors-v1.png", vec![art.bounds]),
+        };
+        let Some(image) = image else {
+            continue;
+        };
+        let size = [image.width() as f32, image.height() as f32];
+        if size != sprite.source_size {
+            return Some(format!(
+                "{name} is {}x{} but enemy visuals declare {:?} for {:?}",
+                image.width(),
+                image.height(),
+                sprite.source_size,
+                sprite.sprite
+            ));
+        }
+        if rects
+            .iter()
+            .any(|r| r[2] > size[0] || r[3] > size[1] || r[0] < 0.0 || r[1] < 0.0)
+        {
+            return Some(format!("{:?} art leaves {name}", sprite.sprite));
+        }
+    }
+    None
+}
+/// Logs a rejected enemy mapping once; the battlefield then uses fallback figures.
+fn enemy_art_rejected(walkers: Option<&Image>, actors: Option<&Image>) -> bool {
+    static REPORTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let Some(problem) = enemy_art_problem(walkers, actors) else {
+        return false;
+    };
+    if !REPORTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        error!("Enemy sprite art disabled: {problem}");
+    }
+    true
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -244,6 +315,8 @@ pub struct ArtTextures {
     pub ground: Option<TextureId>,
     pub walkers: Option<WalkSheet>,
     pub flash_masks: Option<&'static FlashMasks>,
+    /// The loaded sheets do not match `enemy_visuals.json`: draw fallback figures.
+    pub enemy_art_rejected: bool,
     /// Weapon and ordnance icon atlas (legacy defender rig sheet; no bodies are drawn from it).
     pub rig: Option<RigSheet>,
     pub menu_idle: Option<TextureId>,
@@ -407,6 +480,10 @@ pub fn register(
         ground: texture(3, &visuals.ground),
         walkers: sheet,
         flash_masks,
+        enemy_art_rejected: enemy_art_rejected(
+            images.get(&visuals.walkers),
+            images.get(&visuals.actors),
+        ),
         rig,
         menu_idle: texture(6, &visuals.menu_idle),
     }
@@ -455,7 +532,8 @@ pub enum Prop {
 // all more-opaque hands, boots and equipment are enclosed with 3-4px padding.
 // Hips are the median solid pixels in the 51-64% torso band. Each gait keeps
 // its row's deepest boot baseline; passing feet are never pulled to the floor.
-const ACTOR_SIZE: [f32; 2] = [1774., 887.];
+/// Survivor sheet size; startup requires `enemy_visuals.json` to declare the same.
+pub(crate) const ACTOR_SIZE: [f32; 2] = [1774., 887.];
 const PROP_SIZE: [f32; 2] = [1261., 1247.];
 const GROUND_SIZE: [f32; 2] = [2172., 724.];
 const KEYART_RATIO: f32 = 1672. / 941.;
@@ -654,6 +732,7 @@ pub fn actor_animated(
     pose: &ActorPose,
 ) -> bool {
     let (texture, rect, uv, pivot) = match kind {
+        Actor::Enemy(_) if textures.enemy_art_rejected => return false,
         Actor::Enemy(sprite) => match &sprite.art {
             SpriteArt::Walk(walk) => {
                 let Some(sheet) = textures.walkers else {
@@ -734,6 +813,7 @@ pub fn actor_hit_flash(
         return;
     };
     let (mask, source, rect, pivot) = match kind {
+        Actor::Enemy(_) if textures.enemy_art_rejected => return,
         Actor::Enemy(sprite) => {
             let Some(frames) = masks.enemies.get(sprite.index) else {
                 return;
@@ -1781,5 +1861,88 @@ mod tests {
                 assert!(source.bounds[1] < spec.feet_y && spec.feet_y <= source.bounds[3]);
             }
         }
+    }
+    fn blank_sheet(width: u32, height: u32) -> Image {
+        Image::new_fill(
+            bevy::render::render_resource::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            bevy::render::render_resource::TextureDimension::D2,
+            &[255, 255, 255, 255],
+            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+            bevy::asset::RenderAssetUsages::default(),
+        )
+    }
+    #[test]
+    fn mismatched_sheets_disable_enemy_art_without_reading_outside_the_image() {
+        let decode = |bytes| {
+            Image::from_buffer(
+                bytes,
+                bevy::image::ImageType::Extension("png"),
+                bevy::image::CompressedImageFormats::NONE,
+                true,
+                ImageSampler::nearest(),
+                bevy::asset::RenderAssetUsages::default(),
+            )
+            .unwrap()
+        };
+        let walkers = decode(include_bytes!("../../../assets/art/pixel/walkers-v1.png"));
+        let actors = decode(include_bytes!("../../../assets/art/pixel/actors-v1.png"));
+        assert_eq!(enemy_art_problem(Some(&walkers), Some(&actors)), None);
+        assert_eq!(enemy_art_problem(None, None), None);
+        // A replacement smaller than the declared sheet is rejected per sheet.
+        let small = blank_sheet(64, 64);
+        assert!(enemy_art_problem(Some(&small), Some(&actors)).is_some());
+        assert!(enemy_art_problem(Some(&walkers), Some(&small)).is_some());
+        assert!(enemy_art_problem(Some(&small), None).is_some());
+        // Building masks from it neither panics nor lights anything outside it.
+        let masks = FlashMasks::from_images(&small, &small);
+        assert_eq!(masks.enemies.len(), enemy_visuals::active().sprites().len());
+        assert!(masks.enemies.iter().all(Vec::is_empty));
+        for mask in &masks.survivors {
+            for run in &mask.runs {
+                assert!(run[2] <= 64. && run[3] <= 64.);
+            }
+        }
+        let clipped = FlashMask::from_rgba(4, &[255; 4 * 4 * 4], [-8., 2., 900., f32::NAN]);
+        assert!(clipped.runs.is_empty());
+        let inside = FlashMask::from_rgba(4, &[255; 4 * 4 * 4], [0., 0., 900., 900.]);
+        assert_eq!(inside.runs, vec![[0., 0., 4., 2.], [0., 2., 4., 4.]]);
+        // Rejected art draws nothing for enemies, so the caller uses its fallback
+        // figure; survivors are unaffected.
+        let ctx = bevy_egui::egui::Context::default();
+        let shambler = Actor::enemy(VisualSprite::Shambler).unwrap();
+        let boss = Actor::enemy(VisualSprite::Caller).unwrap();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            let textures = ArtTextures {
+                actors: Some(TextureId::User(1)),
+                walkers: Some(WalkSheet {
+                    texture: TextureId::User(2),
+                    size: [1122, 1402],
+                }),
+                ..Default::default()
+            };
+            let rejected = ArtTextures {
+                enemy_art_rejected: true,
+                ..textures
+            };
+            let draw = |textures, actor| {
+                actor_animated(
+                    ui.painter(),
+                    textures,
+                    actor,
+                    pos2(50., 50.),
+                    vec2(40., 40.),
+                    Color32::WHITE,
+                    &ActorPose::default(),
+                )
+            };
+            assert!(draw(textures, shambler) && draw(textures, boss));
+            assert!(!draw(rejected, shambler) && !draw(rejected, boss));
+            assert!(draw(rejected, Actor::Player));
+        });
+        output.textures_delta.clear();
     }
 }

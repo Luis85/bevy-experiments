@@ -116,7 +116,15 @@ pub(super) fn thrown(
         equipment,
         &live,
     );
-    for (projectile, flight) in a.ordnance.projectiles.iter().zip(&view.projectiles) {
+    for flight in &view.projectiles {
+        let Some(projectile) = a
+            .ordnance
+            .projectiles
+            .iter()
+            .find(|projectile| projectile.id == flight.id)
+        else {
+            continue;
+        };
         let end = arena.world(flight.target[0], flight.target[1]);
         let born = crate::defender_presentation::release_tick(a.tick, &a.events, projectile);
         let source = releases.source_point((projectile.id, born), || {

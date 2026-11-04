@@ -116,6 +116,14 @@ impl EnemyVisualCatalog {
         if !in_range(file.boss_height, 0.0, 4.0) || !in_range(file.default_height, 0.0, 3.0) {
             return Err("Enemy visuals boss/default heights are out of range".into());
         }
+        // Survivors share the actor sheet; one size for both, checked here.
+        if file.sheets.actors != super::ACTOR_SIZE {
+            return Err(format!(
+                "Enemy visuals actor sheet {:?} differs from the survivor atlas {:?}",
+                file.sheets.actors,
+                super::ACTOR_SIZE
+            ));
+        }
         for size in [file.sheets.walkers, file.sheets.actors] {
             if size.iter().any(|v| !in_range(*v, 0.0, 16384.0)) {
                 return Err("Enemy visuals sheet sizes must be positive pixels".into());
@@ -275,6 +283,22 @@ static ACTIVE: OnceLock<EnemyVisualCatalog> = OnceLock::new();
 /// Startup only, after the core catalogues: reads and validates the asset
 /// root's mapping. A missing file uses the bundled copy; a bad one is an error.
 pub fn initialize(asset_root: &Path) -> Result<(), String> {
+    let (catalog, provenance) = load(asset_root)?;
+    // Runs before LogPlugin installs the subscriber, so stderr is the only channel.
+    #[allow(clippy::print_stderr)]
+    {
+        eprintln!(
+            "Enemy visuals: {} sprites from {provenance}",
+            catalog.sprites.len()
+        );
+    }
+    ACTIVE
+        .set(catalog)
+        .map_err(|_| "Enemy visuals were already installed or read before startup".into())
+}
+
+/// Reads and validates the asset root's mapping, with its provenance.
+fn load(asset_root: &Path) -> Result<(EnemyVisualCatalog, String), String> {
     let path = asset_root.join(FILE);
     let (text, provenance) = match std::fs::metadata(&path) {
         Ok(meta) if meta.len() > MAX_BYTES => {
@@ -292,17 +316,7 @@ pub fn initialize(asset_root: &Path) -> Result<(), String> {
     };
     let catalog =
         EnemyVisualCatalog::from_json(&text).map_err(|e| format!("{e} ({provenance})"))?;
-    // Runs before LogPlugin installs the subscriber, so stderr is the only channel.
-    #[allow(clippy::print_stderr)]
-    {
-        eprintln!(
-            "Enemy visuals: {} sprites from {provenance}",
-            catalog.sprites.len()
-        );
-    }
-    // A repeated call keeps the first installed mapping, like the core catalogues.
-    let _ = ACTIVE.set(catalog);
-    Ok(())
+    Ok((catalog, provenance))
 }
 
 /// The startup mapping, or the bundled one where startup did not run (tests).
@@ -400,12 +414,29 @@ mod tests {
     }
 
     #[test]
-    fn startup_reads_the_asset_root_and_rejects_a_malformed_file() {
+    fn startup_reads_the_asset_root_falls_back_when_absent_and_rejects_bad_files() {
         let root =
             std::env::temp_dir().join(format!("lastlight-enemy-visuals-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
         std::fs::create_dir_all(root.join("art")).unwrap();
+        // Absent: the bundled mapping.
+        let (bundled, provenance) = load(&root).unwrap();
+        assert!(provenance.contains("bundled"));
+        assert_eq!(bundled.sprites().len(), active().sprites().len());
+        // Present and valid: read from the asset root (a changed boss height proves it).
+        let mut value = serde_json::from_str::<serde_json::Value>(BUNDLED).unwrap();
+        value["boss_height"] = 1.5.into();
+        std::fs::write(root.join(FILE), value.to_string()).unwrap();
+        let (read, provenance) = load(&root).unwrap();
+        assert_eq!(read.boss_height, 1.5);
+        assert!(provenance.contains("enemy_visuals.json"));
+        // Malformed, or naming a different survivor sheet size: clean errors.
         std::fs::write(root.join(FILE), "{ not json").unwrap();
-        assert!(initialize(&root).is_err());
+        assert!(load(&root).is_err());
+        value["boss_height"] = 1.08.into();
+        value["sheets"]["actors"] = serde_json::json!([3548, 1774]);
+        std::fs::write(root.join(FILE), value.to_string()).unwrap();
+        assert!(load(&root).unwrap_err().contains("survivor atlas"));
         std::fs::remove_dir_all(&root).unwrap();
     }
 }

@@ -675,6 +675,35 @@ mod tests {
     }
 
     #[test]
+    fn a_full_four_tick_fixed_step_still_blends_from_its_snapshot() {
+        let mut game = fixture();
+        let mut cache = ActorInterpolation::default();
+        cache.record([(None, game.attempt.as_ref().unwrap())]);
+        let before: BTreeMap<u64, [f32; 2]> = game
+            .attempt
+            .as_ref()
+            .unwrap()
+            .enemies
+            .iter()
+            .map(|e| (e.id, [e.x, e.y()]))
+            .collect();
+        for _ in 0..MAX_TICKS_PER_STEP {
+            game.tick(Input::default());
+        }
+        let a = game.attempt.as_ref().unwrap();
+        let moved = a
+            .enemies
+            .iter()
+            .find(|e| before[&e.id] != [e.x, e.y()])
+            .expect("an enemy advanced");
+        cache.fraction = 0.0;
+        assert_eq!(
+            drawn_at(a, cache.scene(None, a), moved.id),
+            before[&moved.id]
+        );
+    }
+
+    #[test]
     fn capture_modes_draw_the_authoritative_tick_exactly() {
         let play = LaunchConfig::default();
         assert_eq!(blend_fraction(&play, 0.25), 0.25);
