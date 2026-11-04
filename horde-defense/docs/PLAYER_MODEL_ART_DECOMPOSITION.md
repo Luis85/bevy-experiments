@@ -122,8 +122,8 @@ bone lengths; do not scale the source part to those old declarations.
 
 Pistol muzzle, trigger grip, support contact, magazine and barrel axis need
 new source-local sockets on the original pistol. The sockets in
-`character-rig.json` refer to a different gun atlas and cannot establish
-equality with this pistol. Place a muzzle on its actual barrel opening and
+the since-removed `character-rig.json` refer to a different gun atlas and
+cannot establish equality with this pistol. Place a muzzle on its actual barrel opening and
 two points along its visibly downward-right barrel axis; do not use a
 rectangle center or the character's hand center as a substitute.
 

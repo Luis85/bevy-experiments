@@ -104,29 +104,6 @@ retained and shared upload uses correct premultiplied alpha. MIT license.
 
 ## Modular survivors — 3 November 2026
 
-`art/pixel/survivor-components-v2.png` is an original OpenAI image_gen atlas of
-sixteen independent survivor heads, torsos, pelvises, legs, sleeves and hands.
-The original generation `survivor-components-v1.png` remains as the edit source;
-v2 removes a baked vest so equipped protection can be a separate swappable layer.
-Exact generation/edit prompts and source hashes are in
-`art/pixel/survivor-components-source.json` and `art/pixel/PROVENANCE.json`;
-the exact prompt for each operation is also embedded in its PNG metadata.
-Generated pixels and alpha are preserved. MIT license; no reference-game art.
-
-`art/pixel/character-rig.json` authors assembly, attachment sockets and original
-code-native pixel patterns for removable armor, carried equipment and melee gear.
-Weapons use the original separate six-firearm artwork in `defender-rig-v1.png`.
-Equipped instance snapshots select these layers; procedural aiming and hand
-placement do not create equipment, resolve hits or change authoritative damage.
-
-The native model review adds `art/pixel/survivor-components-v3.png`, one targeted
-ImageGen edit replacing the four curved walking-leg cutouts with neutral standing
-legs. v1/v2 remain retained source assets. The exact edit prompt and both original
-and metadata-bearing SHA-256 are in `art/pixel/survivor-components-v3-source.json`;
-the prompt is embedded in the PNG and indexed in pixel provenance. Generated
-RGBA is retained without raster postprocessing. The runtime separately corrects
-part layering, shoulder contours and fitted equipment masks. MIT license.
-
 `art/pixel/canonical-parts-v1.png` reconstructs only clean torso, sleeve, hand
 and wearable layers from the canonical menu-survivor reference using built-in
 ImageGen. Exact original head/hair and lower-body pixels are reused directly
@@ -134,7 +111,8 @@ from `menu-survivors-v1.png` by runtime UV masks; the generated upper-clothing
 kit is a reconstruction. `canonical-parts-source.json` records both prompts,
 reference hashes, source bounds, calibration notes and the original/embedded
 file hashes. The final edit prompt is also embedded in the PNG. Raw RGBA is
-preserved; previous kits remain historical assets. MIT license.
+preserved. The earlier survivor-component kits were removed with the retired
+rig. MIT license.
 
 `art/pixel/player-underlayers-v1.png` adds two coordinated charcoal underlayer
 garment bundles with independent torso, sleeve and cuff pieces for unequipped
