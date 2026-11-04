@@ -114,6 +114,17 @@ pub struct Runtime {
     reset_success: Option<String>,
     pub fixed_calls: u64,
     pub simulated_ticks: u64,
+    /// `dev`: command/input recording in progress.
+    #[cfg(feature = "dev")]
+    recorder: Option<crate::debug_tools::recording::Recorder>,
+    /// `dev`: pending single-tick requests (F5), consumed in `FixedUpdate`.
+    #[cfg(feature = "dev")]
+    step_requests: u32,
+    /// `dev`: newest root event sequence number seen, and settlement failures so far.
+    #[cfg(feature = "dev")]
+    last_event_seq: Option<u64>,
+    #[cfg(feature = "dev")]
+    settlement_issue_total: usize,
 }
 
 impl Runtime {
@@ -250,6 +261,14 @@ impl Runtime {
     fn advance(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> bool {
         let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Simulation);
         self.fixed_calls += 1;
+        #[cfg(feature = "dev")]
+        if self.step_requests > 0 {
+            self.step_requests -= 1;
+            // A request that cannot act is dropped and the ordinary tick follows.
+            if let Some(finished) = self.step_once(game, cues) {
+                return finished;
+            }
+        }
         if !self.controls.enabled
             || self.durable_transition_pending()
             || game.global_paused
@@ -259,24 +278,130 @@ impl Runtime {
             return false;
         }
         for _ in 0..self.controls.speed {
-            let input = self.input();
-            let had_attempt = game.attempt.is_some();
-            game.tick(input);
-            self.simulated_ticks += 1;
-            self.save_ticks += 1;
-            tick_sounds(game, self.observed_battle, cues);
-            if self.save_ticks >= 600 {
-                self.dirty = true;
-            }
-            if had_attempt && game.attempt.is_none() {
-                self.dirty = true;
-                self.clear_input();
-                game.set_paused(true);
-                self.controls.enabled = false;
+            if self.run_tick(game, cues) {
                 return true;
             }
         }
         false
+    }
+    /// One authoritative tick with the current input. True when it finished the
+    /// attempt, which pauses the game and disables further controls.
+    fn run_tick(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> bool {
+        let input = self.input();
+        #[cfg(feature = "dev")]
+        if let Some(recorder) = &mut self.recorder {
+            recorder.input(self.simulated_ticks, &input);
+        }
+        let had_attempt = game.attempt.is_some();
+        game.tick(input);
+        self.simulated_ticks += 1;
+        self.save_ticks += 1;
+        let newest_event = tick_sounds(game, self.observed_battle, cues);
+        #[cfg(feature = "dev")]
+        {
+            self.last_event_seq = newest_event.or(self.last_event_seq);
+        }
+        #[cfg(not(feature = "dev"))]
+        let _ = newest_event;
+        if self.save_ticks >= 600 {
+            self.dirty = true;
+        }
+        if had_attempt && game.attempt.is_none() {
+            self.dirty = true;
+            self.clear_input();
+            game.set_paused(true);
+            self.controls.enabled = false;
+            return true;
+        }
+        false
+    }
+}
+/// Runner state shown by the F3 panel.
+#[cfg(feature = "dev")]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct RuntimeDebug {
+    pub speed: u32,
+    pub controls_enabled: bool,
+    pub queued_commands: usize,
+    pub save_requests: usize,
+    pub durable_transition: bool,
+    pub user_save_pending: bool,
+    pub reset_in_progress: bool,
+    pub simulated_ticks: u64,
+    pub last_event_seq: Option<u64>,
+    pub settlement_issue_total: usize,
+    pub step_requests: u32,
+}
+/// `dev` hooks: recording and single-tick stepping.
+#[cfg(feature = "dev")]
+impl Runtime {
+    pub(crate) fn start_recording(&mut self, recorder: crate::debug_tools::recording::Recorder) {
+        self.recorder = Some(recorder);
+    }
+    /// Ends and flushes the recording; true when one was running.
+    pub(crate) fn stop_recording(&mut self, game: &Game, reason: &str) -> bool {
+        let Some(recorder) = self.recorder.take() else {
+            return false;
+        };
+        recorder.finish(self.simulated_ticks, game, reason);
+        true
+    }
+    /// What the F3 panel shows about the runner.
+    pub(crate) fn debug_snapshot(&self) -> RuntimeDebug {
+        RuntimeDebug {
+            speed: self.controls.speed,
+            controls_enabled: self.controls.enabled,
+            queued_commands: self.queue.len(),
+            save_requests: self.save_requests.len(),
+            durable_transition: self.durable_transition_pending(),
+            user_save_pending: self.user_save_pending(),
+            reset_in_progress: self.reset_in_progress(),
+            simulated_ticks: self.simulated_ticks,
+            last_event_seq: self.last_event_seq,
+            settlement_issue_total: self.settlement_issue_total,
+            step_requests: self.step_requests,
+        }
+    }
+    pub(crate) fn recording_path(&self) -> Option<&std::path::Path> {
+        self.recorder.as_ref().map(|r| r.path())
+    }
+    /// Pushes buffered recording lines to the file; called once per frame.
+    pub(crate) fn flush_recording(&mut self) {
+        if let Some(recorder) = &mut self.recorder
+            && let Err(error) = recorder.flush()
+        {
+            warn!("Recording stopped: {error}");
+            self.recorder = None;
+        }
+    }
+    fn record_command(&mut self, command: &Command) {
+        if let Some(recorder) = &mut self.recorder {
+            recorder.command(self.simulated_ticks, command);
+        }
+    }
+    /// F5: asks the next fixed pass for one tick even while paused.
+    pub(crate) fn request_step(&mut self) {
+        self.step_requests = (self.step_requests + 1).min(8);
+    }
+    /// One tick of a paused game: unpause, tick, re-pause, all through
+    /// `Game::apply` so a recording replays it. `None` (nothing consumed, no
+    /// tick run) while the game is running, has no attempt, or a durable
+    /// transition is pending; otherwise `Some(attempt finished)`.
+    fn step_once(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> Option<bool> {
+        let paused = game.global_paused || game.attempt.as_ref().is_some_and(|a| a.paused);
+        if !paused || game.attempt.is_none() || self.durable_transition_pending() {
+            return None;
+        }
+        let unpause = Command::SetPaused(false);
+        self.record_command(&unpause);
+        let _ = game.apply(&unpause);
+        let finished = self.run_tick(game, cues);
+        if !finished {
+            let command = Command::SetPaused(true);
+            self.record_command(&command);
+            let _ = game.apply(&command);
+        }
+        Some(finished)
     }
 }
 fn merge_actions(into: &mut Input, from: &Input) {
@@ -361,9 +486,14 @@ fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
 /// Sounds for one tick's drained events. The main deployment is always
 /// audible; camp observation hears the observed expedition in full and only
 /// important cues from the others, without multiplying ordinary shots.
-fn tick_sounds(game: &mut Game, observed: Option<u64>, cues: &mut Vec<SoundCue>) {
+/// Returns the newest root event sequence number it drained.
+fn tick_sounds(game: &mut Game, observed: Option<u64>, cues: &mut Vec<SoundCue>) -> Option<u64> {
     let camp = game.attempt.is_none();
+    let mut newest = None;
     for record in game.drain_events() {
+        if record.battle == BattleId::Root {
+            newest = Some(record.seq);
+        }
         let audible = match record.battle {
             BattleId::Root => true,
             BattleId::Expedition(id) => {
@@ -396,6 +526,7 @@ fn tick_sounds(game: &mut Game, observed: Option<u64>, cues: &mut Vec<SoundCue>)
     if fire {
         push_cue(cues, SoundCue::Fire);
     }
+    newest
 }
 
 /// Everything one runner pass touches. Systems build it from resources and
@@ -465,6 +596,8 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
             });
             continue;
         }
+        #[cfg(feature = "dev")]
+        ctx.runtime.record_command(&command);
         let result = ctx.game.apply(&command);
         ctx.game_changed = true;
         if result.is_ok() {
@@ -491,12 +624,21 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
 fn report_settlement_issues(ctx: &mut RuntimeCtx) {
     let issues = ctx.game.take_settlement_issues();
     if !issues.is_empty() {
+        #[cfg(feature = "dev")]
+        {
+            ctx.runtime.settlement_issue_total += issues.len();
+        }
         ctx.game_changed = true;
         ctx.notice(RuntimeNotice::SettlementIssues(issues));
     }
 }
 /// The reset is a serialized storage barrier. Live state swaps only on its ack.
 fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result<(), String> {
+    // The live state is swapped on the storage acknowledgement, at a tick a
+    // recording cannot place, so the recording ends here.
+    #[cfg(feature = "dev")]
+    ctx.runtime
+        .stop_recording(ctx.game, "a new journey cannot be replayed");
     let path = ctx.paths.campaign();
     let old = ctx.game.clone();
     let mut fresh = Game::default();

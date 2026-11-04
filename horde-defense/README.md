@@ -123,12 +123,28 @@ Every option the game reads is parsed once at startup; print the full list with:
 cargo run --locked -p horde-defense -- --help
 ```
 
-Arguments are `--smoke` and `--help`; everything else is a `LASTLIGHT_*` environment variable (empty values count as unset). Incompatible combinations, such as a capture sequence outside an isolated motion review, exit with an error before a window opens.
+Arguments are `--smoke`, `--help` and (with the `dev` feature) `--record <file>` / `--replay <file>`; everything else is a `LASTLIGHT_*` environment variable (empty values count as unset). Incompatible combinations, such as a capture sequence outside an isolated motion review, exit with an error before a window opens.
 
 Cargo features of `horde-defense`:
 
 - `review` (default): model workshop and parity screens, review fixtures, automated captures (`LASTLIGHT_REVIEW_CAPTURE`/`_EXIT`), capture sequences and frame reports. A build without it ignores review options (and non-practice scenes) with a logged warning; practice scenes (`LASTLIGHT_PRACTICE=1` with `LASTLIGHT_REVIEW_SCREEN`) and F12 screenshots work in every build.
-- `dev`: Bevy `file_watcher` (asset hot reload), `track_location` and `sysinfo_plugin`, e.g. `cargo run -p horde-defense --features dev`. (`bevy_dev_tools` is not included: no `bevy_dev_tools` release matches the locked `bevy_internal` 0.20.1.)
+- `dev`: Bevy `file_watcher` (asset hot reload), `track_location` and `sysinfo_plugin`, plus the debug tools below, e.g. `cargo run -p horde-defense --features dev`. (`bevy_dev_tools` is not included: no `bevy_dev_tools` release matches the locked `bevy_internal` 0.20.1, so the overlays are hand-rolled egui.) Default and `--no-default-features` builds contain none of it.
+
+### Debug tools (`dev` feature)
+
+| Key | Action |
+| --- | --- |
+| F2 | Frame-time / FPS overlay |
+| F3 | Simulation panel: attempt id, seed, tick, enemies/cap, corpses, speed, runner/persistence queue state, last event sequence, settlement-issue count, recording state |
+| F5 | While paused in a battle, run exactly one fixed tick. The runner performs it (unpause, tick, re-pause as recorded commands); nothing mutates the game from the overlay |
+| F6 | Dump the game (the save payload JSON) to `<save dir>/dumps/game-<unix-ts>.json` and log the path |
+| F7 | Start or stop command recording to `<save dir>/recordings/rec-<unix-ts>.jsonl` |
+
+F12 remains the screenshot key. These keys are read directly from the keyboard, so avoid rebinding a gameplay action to F2, F3, F5, F6 or F7 in a `dev` build.
+
+Recording: `--record <file>` or `LASTLIGHT_RECORD=<file>` starts with the session. A recording is JSONL: a `header` (`seed`, save `version`, `ruleset`, `content_fingerprint`, the starting `start_tick` and the full starting game state, so a recording begun mid-session replays exactly), then `{"tick", "kind":"command"}` lines for every command the runner applies, `{"tick", "kind":"input"}` lines whenever the per-tick input differs from the previous tick's, and an `end` line with the final state digest. Lines are buffered and flushed once per frame (no per-line fsync); an unclean stop leaves a recording without an `end` line, which still replays to its last input. Starting a new journey ends the recording, because the state swap cannot be placed on a tick.
+
+Replay: `horde-defense --replay <file>` (no window) rebuilds the game from the header, replays it, prints `state_digest: <16 hex digits>` and exits 0. A different ruleset, save version or content fingerprint is reported as a warning. If the recording has an `end` digest and the replay differs, it prints `MISMATCH` to stderr and exits 1.
 
 The root helper also recognizes this experiment:
 

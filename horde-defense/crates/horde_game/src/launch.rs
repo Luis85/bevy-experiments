@@ -18,6 +18,9 @@ pub enum LaunchAction {
     Smoke,
     /// `--help`: print `HELP` and exit.
     Help,
+    /// `--replay <path>` (`dev` feature): headless replay of a recording.
+    #[cfg(feature = "dev")]
+    Replay,
 }
 
 /// Isolated review and measurement switches. Present only when at least one
@@ -88,6 +91,13 @@ pub struct LaunchConfig {
     pub catalogs: Vec<(&'static str, Option<PathBuf>)>,
     /// Non-fatal problems found while parsing, logged once logging is up.
     pub warnings: Vec<String>,
+    /// `--record <path>` or `LASTLIGHT_RECORD` (`dev` feature): command recording
+    /// that starts with the session.
+    #[cfg(feature = "dev")]
+    pub record: Option<PathBuf>,
+    /// `--replay <path>` (`dev` feature): the recording to replay headless.
+    #[cfg(feature = "dev")]
+    pub replay: Option<PathBuf>,
 }
 impl Default for LaunchConfig {
     /// Ordinary play with no options: what hermetic tests construct.
@@ -103,6 +113,10 @@ impl Default for LaunchConfig {
             capture_dir: None,
             catalogs: Vec::new(),
             warnings: Vec::new(),
+            #[cfg(feature = "dev")]
+            record: None,
+            #[cfg(feature = "dev")]
+            replay: None,
         }
     }
 }
@@ -112,10 +126,14 @@ Lastlight: Horde Defense
 
 USAGE:
     horde-defense [--smoke | --help]
+    horde-defense [--record <file>]        (`dev` feature)
+    horde-defense --replay <file>          (`dev` feature)
 
 OPTIONS:
     --smoke    Validate catalogues, run a headless campaign self-check and exit
     -h, --help Print this help and exit
+    --record <file>  Record commands and per-tick input to a JSONL file (F7 toggles in game)
+    --replay <file>  Replay a recording headless, print the final state digest and exit
 
 ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
   Play
@@ -145,6 +163,8 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_PERF_CPU            CPU label recorded in the report
     LASTLIGHT_PERF_AUDIO          Flag: keep audio in the perf-audio fixture
     LASTLIGHT_PERF_NPC_SPEED      Observation speed 1, 2 or 4 for perf fixtures
+  Developer tools (builds with the `dev` feature; otherwise rejected or ignored)
+    LASTLIGHT_RECORD              Same as --record
   Logging
     RUST_LOG                      Replaces the default log filter
 ";
@@ -232,10 +252,32 @@ impl LaunchConfig {
         var: impl Fn(&str) -> Option<OsString>,
     ) -> Result<Self, String> {
         let mut action = LaunchAction::Play;
-        for arg in args {
+        #[cfg(feature = "dev")]
+        let (mut record, mut replay) = (None, None);
+        let mut args = args.into_iter();
+        // Without `dev` no flag consumes a value, so only the dev build needs `next()`.
+        #[cfg_attr(not(feature = "dev"), allow(clippy::while_let_on_iterator))]
+        while let Some(arg) = args.next() {
             match arg.to_str() {
                 Some("--smoke") => action = LaunchAction::Smoke,
                 Some("--help" | "-h") => return Ok(Self::help()),
+                Some(flag @ ("--record" | "--replay")) => {
+                    #[cfg(feature = "dev")]
+                    {
+                        let path = args
+                            .next()
+                            .filter(|path| !path.is_empty())
+                            .ok_or_else(|| format!("{flag} needs a file path"))?;
+                        if flag == "--record" {
+                            record = Some(PathBuf::from(path));
+                        } else {
+                            replay = Some(PathBuf::from(path));
+                            action = LaunchAction::Replay;
+                        }
+                    }
+                    #[cfg(not(feature = "dev"))]
+                    return Err(format!("{flag} needs a build with the `dev` feature."));
+                }
                 _ => {
                     return Err(format!(
                         "Unknown argument {}. Run with --help for options.",
@@ -318,6 +360,12 @@ impl LaunchConfig {
                 _ => return Err("LASTLIGHT_PERF_NPC_SPEED must be 1, 2 or 4".into()),
             });
         }
+        #[cfg(feature = "dev")]
+        let record = record.or_else(|| env.path("LASTLIGHT_RECORD"));
+        #[cfg(not(feature = "dev"))]
+        if env.string("LASTLIGHT_RECORD").is_some() {
+            warnings.push("Ignoring LASTLIGHT_RECORD: this build has no `dev` feature".into());
+        }
         let config = Self {
             action,
             scenario,
@@ -332,6 +380,10 @@ impl LaunchConfig {
                 .map(|&(_, name)| (name, env.path(name)))
                 .collect(),
             warnings,
+            #[cfg(feature = "dev")]
+            record,
+            #[cfg(feature = "dev")]
+            replay,
         };
         config.validate()?;
         Ok(config)
@@ -356,6 +408,10 @@ impl LaunchConfig {
             return Err(
                 "Animation export requires an isolated motion review and cannot be combined with performance measurement or a persistent campaign".into(),
             );
+        }
+        #[cfg(feature = "dev")]
+        if self.replay.is_some() && self.record.is_some() {
+            return Err("--replay cannot be combined with recording".into());
         }
         Ok(())
     }
@@ -510,6 +566,34 @@ mod tests {
         assert_eq!(parse(&["-h"], &[]).unwrap().action, LaunchAction::Help);
         assert!(parse(&["--bogus"], &[]).is_err());
         assert!(HELP.contains("LASTLIGHT_REVIEW_SCREEN"));
+    }
+    #[cfg(feature = "dev")]
+    #[test]
+    fn record_and_replay_flags_take_a_path() {
+        let c = parse(&["--record", "run.jsonl"], &[]).unwrap();
+        assert_eq!(c.record, Some(PathBuf::from("run.jsonl")));
+        assert_eq!(c.action, LaunchAction::Play);
+        let c = parse(&[], &[("LASTLIGHT_RECORD", "env.jsonl")]).unwrap();
+        assert_eq!(c.record, Some(PathBuf::from("env.jsonl")));
+        let c = parse(&["--replay", "run.jsonl"], &[]).unwrap();
+        assert_eq!(c.action, LaunchAction::Replay);
+        assert_eq!(c.replay, Some(PathBuf::from("run.jsonl")));
+        assert!(parse(&["--record"], &[]).is_err());
+        assert!(parse(&["--replay"], &[]).is_err());
+        assert!(parse(&["--replay", "a", "--record", "b"], &[]).is_err());
+    }
+    #[cfg(not(feature = "dev"))]
+    #[test]
+    fn builds_without_dev_reject_recording_flags() {
+        assert!(parse(&["--record", "a"], &[]).is_err());
+        assert!(parse(&["--replay", "a"], &[]).is_err());
+        assert_eq!(
+            parse(&[], &[("LASTLIGHT_RECORD", "a")])
+                .unwrap()
+                .warnings
+                .len(),
+            1
+        );
     }
     #[cfg(feature = "review")]
     #[test]
