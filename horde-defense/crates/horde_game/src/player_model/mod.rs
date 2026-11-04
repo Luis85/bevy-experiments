@@ -54,7 +54,9 @@ pub fn bundled_catalogue() -> Result<PlayerModelCatalogue, String> {
 pub fn builtin() -> Result<&'static CompiledCatalogue, String> {
     static CACHE: std::sync::OnceLock<Result<CompiledCatalogue, String>> =
         std::sync::OnceLock::new();
-    match CACHE.get_or_init(|| startup::compile_bundled(&startup::bundled_asset_root())) {
+    match CACHE.get_or_init(|| {
+        startup::bundled_asset_root().and_then(|root| startup::compile_bundled(&root))
+    }) {
         Ok(value) => Ok(value),
         Err(e) => Err(e.clone()),
     }

@@ -112,7 +112,7 @@ fn model_parity(root: &egui::Ui, f: &UiCtx, id: &str) {
     ));
     let viewport = ctx.content_rect();
     painter.rect_filled(viewport, 0., INK);
-    let result = paint_model_parity(&painter, f, id, viewport, ctx.pixels_per_point());
+    let result = paint_model_parity(&painter, id, viewport, ctx.pixels_per_point());
     match result {
         Ok(layout) => {
             ctx.data_mut(|data| data.insert_temp(parity_layout_id(), layout));
@@ -131,7 +131,6 @@ fn model_parity(root: &egui::Ui, f: &UiCtx, id: &str) {
 
 fn paint_model_parity(
     painter: &egui::Painter,
-    f: &UiCtx,
     id: &str,
     viewport: egui::Rect,
     pixels_per_point: f32,
@@ -147,10 +146,12 @@ fn paint_model_parity(
     let source = catalogue
         .source(&model.definition.source.id)
         .ok_or("Missing compiled original source")?;
-    let texture = f
-        .textures
-        .menu_idle
-        .ok_or("Original managed texture is still loading")?;
+    // Bound through the model backend's own uploads of the compiled sources,
+    // so a modded manifest cannot pair a different texture with these UVs.
+    let texture_bindings = crate::player_model::backend_egui::textures(painter.ctx())?;
+    let texture = *texture_bindings
+        .get(&source.id)
+        .ok_or("Original managed texture is missing")?;
     let source_frame = model.definition.source.layout_frame;
     let width = source_frame[2] - source_frame[0];
     let height = source_frame[3] - source_frame[1];
@@ -169,7 +170,6 @@ fn paint_model_parity(
             egui::vec2(rect[2] as f32 * scale, rect[3] as f32 * scale),
         )
     };
-    let texture_bindings = std::collections::BTreeMap::from([(source.id.clone(), texture)]);
     let identity = resolve_model(
         catalogue,
         id,
@@ -294,7 +294,7 @@ fn model_parts(root: &egui::Ui, f: &UiCtx, id: &str) {
     ));
     let viewport = root.ctx().content_rect();
     painter.rect_filled(viewport, 0., INK);
-    let result = paint_model_parts(&painter, f, id, viewport);
+    let result = paint_model_parts(&painter, id, viewport);
     if let Err(error) = result {
         painter.text(
             viewport.center(),
@@ -308,7 +308,6 @@ fn model_parts(root: &egui::Ui, f: &UiCtx, id: &str) {
 
 fn paint_model_parts(
     painter: &egui::Painter,
-    f: &UiCtx,
     id: &str,
     viewport: egui::Rect,
 ) -> Result<(), String> {
@@ -319,11 +318,10 @@ fn paint_model_parts(
     let model = catalogue
         .model(id)
         .ok_or_else(|| format!("Unknown model {id}"))?;
-    let source = catalogue
+    catalogue
         .source(&model.definition.source.id)
         .ok_or("Missing original source")?;
-    let texture = f.textures.menu_idle.ok_or("Original texture is loading")?;
-    let bindings = std::collections::BTreeMap::from([(source.id.clone(), texture)]);
+    let bindings = crate::player_model::backend_egui::textures(painter.ctx())?;
     let original = resolve_model(
         catalogue,
         id,
