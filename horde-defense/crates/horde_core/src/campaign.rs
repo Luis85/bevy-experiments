@@ -47,8 +47,9 @@ pub struct Campaign {
     #[serde(default)]
     pub defeated_bosses: Vec<crate::content::BossKind>,
     pub coins: u64,
-    pub unlocked: usize,
-    pub first_clears: [bool; 5],
+    /// Stable IDs of every level cleared at least once. The deployable
+    /// frontier ([`Campaign::unlocked`]) is derived from it.
+    pub first_clears: BTreeSet<String>,
     pub player: Player,
     pub npc: Npc,
     pub items: Vec<Item>,
@@ -103,8 +104,7 @@ impl Default for Campaign {
             selected_survivor: None,
             defeated_bosses: Vec::new(),
             coins: 0,
-            unlocked: 1,
-            first_clears: [false; 5],
+            first_clears: BTreeSet::new(),
             player: Player {
                 legacy_graph_points: 0,
                 level: 1,
@@ -130,8 +130,8 @@ impl Default for Campaign {
                 successful_hits: 0,
                 combat_ticks: 0,
                 objectives_claimed: [false; 2],
-                first_clears: [false; 5],
-                first_clear_claimed: [0; 5],
+                first_clears: BTreeSet::new(),
+                first_clear_claimed: BTreeMap::new(),
                 policy: Policy::Balanced,
                 recall_percent: 0,
                 prefer_aim: true,
@@ -219,8 +219,7 @@ impl Campaign {
             selected_survivor: self.selected_survivor,
             defeated_bosses: self.defeated_bosses.clone(),
             coins: self.coins,
-            unlocked: self.unlocked,
-            first_clears: self.first_clears,
+            first_clears: self.first_clears.clone(),
             player: self.player.clone(),
             npc: self.npc.clone(),
             items: self.items.clone(),
@@ -280,12 +279,11 @@ impl Campaign {
         if self.items.windows(2).any(|pair| pair[0].id >= pair[1].id) {
             return Err("Armory identities must remain in increasing creation order".into());
         }
-        let frontier = self
+        if self
             .first_clears
             .iter()
-            .rposition(|clear| *clear)
-            .map_or(1, |index| (index + 2).min(content().levels.len()));
-        if self.unlocked != frontier {
+            .any(|id| content().level_index(id).is_none())
+        {
             return Err("Invalid campaign frontier".into());
         }
         let mut ids = std::collections::BTreeSet::new();
@@ -651,15 +649,16 @@ mod tests {
             coins: 10000,
             ..Campaign::default()
         };
-        c.first_clears[0] = true;
-        c.unlocked = 2;
+        let first = content().levels[0].id.clone();
+        c.first_clears.insert(first.clone());
+        assert_eq!(c.unlocked(), 2);
         for _ in 0..20 {
             c.buy_training_point().unwrap();
         }
         assert!(!c.first_clear(0, Mode::Npc));
-        assert_eq!(c.npc.first_clear_claimed[0], 0);
+        assert_eq!(c.npc.first_clear_claimed.get(&first), None);
         c.first_clear(1, Mode::Personal);
-        assert_eq!(c.npc.first_clear_claimed[0], 2);
+        assert_eq!(c.npc.first_clear_claimed[&first], 2);
         assert_eq!(c.npc.awarded, 22);
         assert!(c.validate().is_ok());
     }

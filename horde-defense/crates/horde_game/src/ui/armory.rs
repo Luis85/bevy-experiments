@@ -359,7 +359,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .clicked()
                 {
                     f.dispatch(
-                        Command::BuyItem(offer.definition),
+                        Command::BuyItem(offer.id.clone()),
                         "Equipment added. Select it below to compare before equipping.",
                     );
                 }
@@ -576,7 +576,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                 .clicked()
             {
                 f.dispatch(
-                    Command::BuyItem(offer.definition),
+                    Command::BuyItem(offer.id.clone()),
                     "Equipment added. Select it above to compare before equipping.",
                 );
             }

@@ -14,6 +14,9 @@
 //! Save v5 re-bless (format-only, approved): the ordnance counters became
 //! kind-keyed maps, which changes the serialized payload of every run but no
 //! gameplay; `GAMEPLAY_TRACE` pins the unchanged outcomes of the same runs.
+//!
+//! Save v6 re-bless (format-only): level progress and level references are
+//! keyed by stable level ID; `GAMEPLAY_TRACE` is again unchanged.
 mod support;
 use horde_core::content::{Mode, Policy};
 use horde_core::sim::{Game, smoke_input};
@@ -23,19 +26,23 @@ const TICKS: u32 = 1800;
 const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
 
 /// `(seed, mode)` -> digest after [`TICKS`] ticks of the headless bot.
+/// Re-blessed for save v6: level progress (`first_clears`, NPC claims) is
+/// serialized as level-ID sets/maps, the redundant `unlocked` frontier is no
+/// longer saved and attempt/report levels serialize as level IDs. The payload
+/// of every run changed, no gameplay did: `GAMEPLAY_TRACE` is unchanged.
 const GOLDEN: [(u64, Mode, u64); 6] = [
-    (1, Mode::Personal, 0x2e20_3b0e_cbb0_a2df),
-    (1, Mode::Npc, 0x666d_d978_5ba3_8601),
-    (0x1A57_1167, Mode::Personal, 0x4da1_2071_d6c2_a94a),
-    (0x1A57_1167, Mode::Npc, 0xa0d0_31d1_3edd_1996),
-    (0xDEAD_BEEF_2026, Mode::Personal, 0x9900_ad25_4673_28e2),
-    (0xDEAD_BEEF_2026, Mode::Npc, 0x72f7_f039_a9dd_7280),
+    (1, Mode::Personal, 0x303e_a36f_ac6a_070b),
+    (1, Mode::Npc, 0xeede_2391_290b_b381),
+    (0x1A57_1167, Mode::Personal, 0x3be1_3138_6490_e3b2),
+    (0x1A57_1167, Mode::Npc, 0x6a2b_a00f_7e40_18d8),
+    (0xDEAD_BEEF_2026, Mode::Personal, 0x5aaf_1f08_0eb1_da92),
+    (0xDEAD_BEEF_2026, Mode::Npc, 0xc1bb_9ef2_0792_5afc),
 ];
 
 /// `(seed, mode)` -> FNV-1a of the per-tick gameplay trace (tick, hp, coins,
 /// enemy ids/hp/positions and the event queue; no serialized format) recorded
 /// on the v4 build (commit c6f518d) before the ordnance arrays became kind
-/// maps. The save-v5 re-bless of `GOLDEN` is format-only: this trace proves
+/// maps. The save-v5 and save-v6 re-blesses of `GOLDEN` are format-only: this trace proves
 /// the gameplay outcomes of the same six runs did not move.
 const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xa6ca_a6de_7fd9_2b1a),

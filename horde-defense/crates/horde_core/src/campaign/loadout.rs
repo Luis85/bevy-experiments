@@ -526,7 +526,7 @@ impl Campaign {
                     && i.slot == slot
                     && (i.tier > current_item.tier
                         || (i.tier == current_item.tier && self.shop_item_level() > current_level))
-                    && i.tier <= self.unlocked
+                    && i.tier <= self.unlocked()
                     && i.buy_value > 0
             })
             .min_by_key(|(_, i)| i.buy_value);

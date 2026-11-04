@@ -335,6 +335,8 @@ pub struct Attempt {
     #[serde(default)]
     pub progression: crate::progression::ProgressionSnapshot,
     pub id: u64,
+    /// Catalogue level position; saved as the level's stable ID.
+    #[serde(with = "crate::content::level_ref")]
     pub level: usize,
     pub mode: Mode,
     pub tick: u64,
@@ -648,6 +650,8 @@ pub struct Report {
     #[serde(default)]
     pub loot_events: Vec<crate::quality::LootEvent>,
     pub outcome: Outcome,
+    /// Catalogue level position; saved as the level's stable ID.
+    #[serde(with = "crate::content::level_ref")]
     pub level: usize,
     pub mode: Mode,
     pub elapsed: f32,

@@ -38,7 +38,7 @@ impl Campaign {
         if def.tier == 0 {
             return Err("Protected starter equipment is already owned".into());
         }
-        if def.tier > self.unlocked {
+        if def.tier > self.unlocked() {
             return Err("Clear more stages to unlock this equipment tier".into());
         }
         let price = self.buy_price(definition)?;

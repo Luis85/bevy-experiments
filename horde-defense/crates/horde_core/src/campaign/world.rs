@@ -10,13 +10,22 @@ pub struct Placement {
 }
 
 impl Campaign {
+    /// Number of catalogue levels open for deployment: everything up to one
+    /// past the furthest cleared level (in catalogue order), at least one.
+    /// Derived from the ID-keyed clears, so it is never saved separately.
+    pub fn unlocked(&self) -> usize {
+        let levels = &content().levels;
+        levels
+            .iter()
+            .rposition(|level| self.first_clears.contains(&level.id))
+            .map_or(1, |index| (index + 2).min(levels.len()))
+    }
     /// Bosses already beaten join ordinary wave pools; pre-history saves derive their clear flags.
     pub fn unlocked_bosses(&self) -> Vec<crate::content::BossKind> {
         let mut unlocked = self.defeated_bosses.clone();
-        for (index, cleared) in self.first_clears.iter().enumerate() {
-            let boss = content().levels[index].boss;
-            if *cleared && !unlocked.contains(&boss) {
-                unlocked.push(boss);
+        for level in &content().levels {
+            if self.first_clears.contains(&level.id) && !unlocked.contains(&level.boss) {
+                unlocked.push(level.boss);
             }
         }
         unlocked.sort_by_key(|boss| *boss as u8);
@@ -24,9 +33,9 @@ impl Campaign {
         unlocked
     }
     pub fn first_clear(&mut self, level: usize, mode: Mode) -> bool {
-        if level >= 5 {
+        let Some(id) = content().levels.get(level).map(|l| l.id.clone()) else {
             return false;
-        }
+        };
         self.migrate_threat_history();
         let completion_xp = self.completion_xp_preview();
         self.award_player_xp(completion_xp);
@@ -34,23 +43,18 @@ impl Campaign {
         if !self.defeated_bosses.contains(&boss) {
             self.defeated_bosses.push(boss);
         }
-        let first = !self.first_clears[level];
-        self.first_clears[level] = true;
-        self.unlocked = self.unlocked.max((level + 2).min(5));
+        let first = self.first_clears.insert(id.clone());
         self.victories = self.victories.saturating_add(1);
         if mode == Mode::Npc {
             self.npc.victories += 1;
-            if !self.npc.first_clears[level] {
-                self.npc.first_clears[level] = true;
-            }
+            self.npc.first_clears.insert(id);
         }
         self.claim_objectives();
         first
     }
     pub fn blueprint_available(&self, kind: StructureKind) -> bool {
         if self.legacy_features {
-            return self.first_clears.iter().filter(|x| **x).count()
-                >= content().structure(kind).unlock_clear;
+            return self.first_clears.len() >= content().structure(kind).unlock_clear;
         }
         skills().nodes.iter().find(|node|node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::Blueprint(value) if *value==kind))).is_some_and(|node|self.has_node(&node.id)||(self.victories>=node.minimum_victories&&self.liberated_count()>=node.minimum_liberated&&node.prerequisites.iter().all(|id|self.has_node(id))))
     }

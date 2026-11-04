@@ -13,7 +13,7 @@ impl Game {
             return Err("Finish or recall the active deployment first".into());
         }
         if level >= content().levels.len()
-            || (country_stage.is_none() && level >= self.campaign.unlocked)
+            || (country_stage.is_none() && level >= self.campaign.unlocked())
         {
             return Err("This stage is not unlocked".into());
         }

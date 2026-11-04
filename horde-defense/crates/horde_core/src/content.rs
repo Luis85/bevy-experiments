@@ -95,6 +95,27 @@ impl std::fmt::Display for ItemDefId {
         f.write_str(&self.0)
     }
 }
+/// Serde adapter for a level reference: a catalogue position in memory (the
+/// simulation indexes `content().levels` with it), the level's stable authored
+/// ID on disk, so saves survive level reordering.
+pub mod level_ref {
+    use super::content;
+    use serde::{Deserialize, Deserializer, Serializer, de, ser};
+
+    pub fn serialize<S: Serializer>(index: &usize, serializer: S) -> Result<S::Ok, S::Error> {
+        let level = content()
+            .levels
+            .get(*index)
+            .ok_or_else(|| ser::Error::custom(format!("unknown level position {index}")))?;
+        serializer.serialize_str(&level.id)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<usize, D::Error> {
+        let id = String::deserialize(deserializer)?;
+        content()
+            .level_index(&id)
+            .ok_or_else(|| de::Error::custom(format!("unknown level id {id}")))
+    }
+}
 /// Authored content IDs are short lowercase ASCII slugs.
 fn valid_content_id(id: &str) -> bool {
     !id.is_empty()
@@ -314,6 +335,10 @@ impl Content {
     }
     pub fn item(&self, id: &ItemDefId) -> Option<&ItemDefinition> {
         self.item_index(id).map(|index| &self.items[index])
+    }
+    /// Catalogue position of a level ID (five levels; a scan is cheapest).
+    pub fn level_index(&self, id: &str) -> Option<usize> {
+        self.levels.iter().position(|level| level.id == id)
     }
     pub fn from_json(text: &str) -> Result<Self, String> {
         Self::from_json_str(text).map_err(ContentError::into_message)

@@ -276,9 +276,12 @@ pub struct Npc {
     pub successful_hits: u64,
     pub combat_ticks: u64,
     pub objectives_claimed: [bool; 2],
-    pub first_clears: [bool; 5],
+    /// Stable IDs of levels this defender cleared first.
+    pub first_clears: BTreeSet<String>,
+    /// Advancement points already granted per first-cleared level ID (at most
+    /// two each); levels with nothing claimed are absent.
     #[serde(default)]
-    pub first_clear_claimed: [u32; 5],
+    pub first_clear_claimed: BTreeMap<String, u32>,
     pub policy: Policy,
     pub recall_percent: u32,
     pub prefer_aim: bool,
@@ -306,11 +309,19 @@ impl Npc {
                 self.objectives_claimed[index] = true;
             }
         }
-        for index in 0..5 {
-            if self.first_clears[index] && self.first_clear_claimed[index] < 2 {
-                let remaining = 2 - self.first_clear_claimed[index];
-                let grant = award(self, remaining);
-                self.first_clear_claimed[index] += grant;
+        // Catalogue order decides who is paid first when the allowance is short.
+        for level in &content().levels {
+            let claimed = self
+                .first_clear_claimed
+                .get(&level.id)
+                .copied()
+                .unwrap_or(0);
+            if self.first_clears.contains(&level.id) && claimed < 2 {
+                let grant = award(self, 2 - claimed);
+                if grant > 0 {
+                    self.first_clear_claimed
+                        .insert(level.id.clone(), claimed + grant);
+                }
             }
         }
         self.awarded - before
@@ -348,10 +359,10 @@ impl Campaign {
         self.has_feature(crate::skill_catalog::CampaignFeature::Companion)
     }
     pub fn allowance(&self) -> u32 {
-        12 + 8 * self.first_clears.iter().filter(|x| **x).count() as u32
+        12 + 8 * self.first_clears.len() as u32
     }
     pub fn body_cap(&self) -> u32 {
-        5 + 3 * self.first_clears.iter().filter(|x| **x).count() as u32
+        5 + 3 * self.first_clears.len() as u32
     }
     pub fn has_skill(&self, s: Skill) -> bool {
         self.skills.contains(&s) || self.skill_nodes.contains(s.id())
@@ -445,7 +456,7 @@ impl Campaign {
             .values()
             .copied()
             .sum::<usize>()
-            .max(self.first_clears.iter().filter(|v| **v).count()) as u32
+            .max(self.first_clears.len()) as u32
     }
     pub fn migrate_threat_history(&mut self) {
         if self.threat_revision == 0 {
@@ -777,22 +788,15 @@ impl Campaign {
         if npc.name.trim().is_empty()
             || npc.name.len() > 80
             || npc.recall_percent > 75
-            || npc
-                .first_clear_claimed
-                .iter()
-                .zip(npc.first_clears)
-                .any(|(claimed, clear)| *claimed > 2 || (*claimed > 0 && !clear))
+            || npc.first_clear_claimed.iter().any(|(id, claimed)| {
+                *claimed > 2 || (*claimed > 0 && !npc.first_clears.contains(id))
+            })
             || (npc.objectives_claimed[0] && npc.successful_hits < 20)
             || (npc.objectives_claimed[1] && npc.combat_ticks < 7200)
         {
             return Err("Invalid NPC identity, policy or achievement ledger".into());
         }
-        if npc
-            .first_clears
-            .iter()
-            .zip(self.first_clears)
-            .any(|(personal, shared)| *personal && !shared)
-        {
+        if !npc.first_clears.is_subset(&self.first_clears) {
             return Err("NPC achievement precedes its campaign milestone".into());
         }
         let spent = npc
@@ -806,7 +810,7 @@ impl Campaign {
         if npc.awarded > self.allowance() || npc.unspent.checked_add(spent) != Some(npc.awarded) {
             return Err("Invalid advancement ledger".into());
         }
-        if npc.first_clear_claimed.iter().any(|n| *n > 2) {
+        if npc.first_clear_claimed.values().any(|n| *n > 2) {
             return Err("Invalid NPC achievement ledger".into());
         }
         Ok(())

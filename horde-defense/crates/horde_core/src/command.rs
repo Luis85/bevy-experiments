@@ -3,7 +3,7 @@
 //! the campaign/strategy/sim methods it calls, never in a frontend.
 use crate::balance::BalanceSettings;
 use crate::campaign::NpcTraining;
-use crate::content::{Mode, Policy, StructureKind};
+use crate::content::{ItemDefId, Mode, Policy, StructureKind};
 use crate::sim::{Game, JourneyContinuation};
 use crate::strategy::RecruitStatus;
 use crate::survivors::SurvivorId;
@@ -51,7 +51,8 @@ pub enum Command {
     ClearLayout,
     RespecPlayer,
     BuySkillNode(String),
-    BuyItem(usize),
+    /// Buy one of the catalogue item named by its stable definition ID.
+    BuyItem(ItemDefId),
     Equip {
         mode: Mode,
         id: u64,
@@ -285,7 +286,12 @@ impl Game {
                 self.campaign.purchase_node(id)?;
                 Applied
             }
-            Command::BuyItem(index) => Id(self.campaign.buy_item(*index)?),
+            Command::BuyItem(definition) => {
+                let index = definition
+                    .index()
+                    .ok_or_else(|| CommandError::Rejected("Unknown equipment".into()))?;
+                Id(self.campaign.buy_item(index)?)
+            }
             Command::Equip { mode, id } => {
                 self.campaign.equip(*mode, *id)?;
                 Applied
@@ -522,20 +528,27 @@ mod tests {
             .unwrap();
         let price = game.campaign.buy_price(index).unwrap();
         game.campaign.coins = price + 7;
-        let outcome = game.apply(&Command::BuyItem(index)).unwrap();
+        let definition = crate::content::ItemDefId::at(index);
+        let outcome = game.apply(&Command::BuyItem(definition.clone())).unwrap();
         let CommandOutcome::Id(id) = outcome else {
             panic!("purchase returns an item id, got {outcome:?}");
         };
         let item = game.campaign.items.iter().find(|item| item.id == id);
-        assert_eq!(item.unwrap().definition_index(), index);
+        assert_eq!(item.unwrap().definition, definition);
         assert_eq!(game.campaign.coins, 7);
         game.campaign.coins = 0;
         let before = snapshot(&game);
         assert!(matches!(
-            game.apply(&Command::BuyItem(index)),
+            game.apply(&Command::BuyItem(definition)),
             Err(CommandError::Rejected(_))
         ));
         assert_eq!(snapshot(&game), before);
+        game.campaign.coins = price + 7;
+        assert!(matches!(
+            game.apply(&Command::BuyItem("no_such_item".into())),
+            Err(CommandError::Rejected(_))
+        ));
+        assert_eq!(game.campaign.coins, price + 7);
     }
     #[test]
     fn worker_commands_target_only_active_expeditions() {

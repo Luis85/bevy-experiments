@@ -204,10 +204,37 @@ fn decode_generation(bytes: &[u8]) -> Result<Game, SaveError> {
     validate_game(&game, 0).map_err(SaveError::Invalid)?;
     Ok(game)
 }
+/// Which envelope metadata drifted from this build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum Drift {
+    Ruleset,
+    Content,
+}
+/// Record a drift and report whether it is new: true exactly once per distinct
+/// `(kind, saved, current)` in `seen`.
+fn first_sighting(
+    seen: &mut BTreeSet<(Drift, u64, u64)>,
+    kind: Drift,
+    saved: u64,
+    current: u64,
+) -> bool {
+    seen.insert((kind, saved, current))
+}
+/// Process-wide [`first_sighting`]: every decode (including the verify read
+/// during each save) checks drift, but each distinct pair is logged once.
+fn should_warn(kind: Drift, saved: u64, current: u64) -> bool {
+    static SEEN: std::sync::Mutex<BTreeSet<(Drift, u64, u64)>> =
+        std::sync::Mutex::new(BTreeSet::new());
+    let mut seen = SEEN
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    first_sighting(&mut seen, kind, saved, current)
+}
 /// Saves stay loadable across rules or catalogue changes; drift is only logged.
 fn warn_on_catalog_drift(envelope: &SaveEnvelope) {
     if let Some(saved) = envelope.ruleset_version
         && saved != RULESET_VERSION
+        && should_warn(Drift::Ruleset, saved.into(), RULESET_VERSION.into())
     {
         tracing::warn!(
             saved,
@@ -218,6 +245,7 @@ fn warn_on_catalog_drift(envelope: &SaveEnvelope) {
     let current = crate::catalog::content_fingerprint();
     if let Some(saved) = envelope.content_fingerprint
         && saved != current
+        && should_warn(Drift::Content, saved, current)
     {
         tracing::warn!(
             saved = format_args!("{saved:016x}"),
@@ -306,9 +334,6 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         || (depth == 1 && !game.battles.is_empty())
     {
         return Err("Invalid expedition tree".into());
-    }
-    if game.campaign.unlocked == 0 || game.campaign.unlocked > content().levels.len() {
-        return Err("Invalid campaign stage".into());
     }
     if let Some(a) = &game.attempt {
         crate::quality::validate_loot_events(
@@ -828,5 +853,23 @@ mod tests {
             Game::decode_save_generation(&serde_json::to_vec(&corrupt).unwrap()),
             Err(SaveError::ChecksumMismatch)
         ));
+    }
+
+    #[test]
+    fn catalogue_drift_is_reported_once_per_distinct_saved_and_current_pair() {
+        let mut seen = BTreeSet::new();
+        assert!(first_sighting(&mut seen, Drift::Content, 1, 2));
+        // Repeated decodes (including each save's verify read) stay quiet.
+        assert!(!first_sighting(&mut seen, Drift::Content, 1, 2));
+        assert!(!first_sighting(&mut seen, Drift::Content, 1, 2));
+        // A different saved or current value, or the other metadata, is new.
+        assert!(first_sighting(&mut seen, Drift::Content, 3, 2));
+        assert!(first_sighting(&mut seen, Drift::Content, 1, 4));
+        assert!(first_sighting(&mut seen, Drift::Ruleset, 1, 2));
+        assert!(!first_sighting(&mut seen, Drift::Ruleset, 1, 2));
+        // The process-wide gate behaves the same (unique values: tests share it).
+        let saved = u64::from(std::process::id()) << 32 | 0xD81F;
+        assert!(should_warn(Drift::Content, saved, !saved));
+        assert!(!should_warn(Drift::Content, saved, !saved));
     }
 }

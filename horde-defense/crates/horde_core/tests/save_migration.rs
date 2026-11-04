@@ -557,3 +557,75 @@ fn v5_fixture_continues_exactly_as_the_v5_build_did() {
     assert_eq!(trace.lines().count(), 12);
     assert_eq!(fnv, V5_CONTINUATION_FNV, "{trace}");
 }
+
+/// Level progress of a decoded game: campaign clears, frontier, NPC clears and
+/// claimed first-clear points, keyed by stable level id.
+type LevelProgress<'a> = (Vec<&'a str>, usize, Vec<&'a str>, Vec<(&'a str, u32)>);
+
+fn level_progress(game: &Game) -> LevelProgress<'_> {
+    let c = &game.campaign;
+    (
+        c.first_clears.iter().map(String::as_str).collect(),
+        c.unlocked(),
+        c.npc.first_clears.iter().map(String::as_str).collect(),
+        c.npc
+            .first_clear_claimed
+            .iter()
+            .map(|(id, n)| (id.as_str(), *n))
+            .collect(),
+    )
+}
+
+#[test]
+fn v5_fixture_level_progress_becomes_level_ids_with_the_same_frontier() {
+    let game = fixture_v5();
+    assert_eq!(
+        level_progress(&game),
+        (
+            vec!["ashwood_crossing", "the_old_road"],
+            3,
+            vec!["the_old_road"],
+            vec![("the_old_road", 2)]
+        )
+    );
+    // In-memory level positions are unchanged; on disk they are level ids.
+    assert_eq!(game.attempt.as_ref().unwrap().level, 2);
+    assert_eq!(game.campaign.run_history[0].template, 1);
+    let saved = serde_json::to_value(&game).unwrap();
+    assert_eq!(saved["attempt"]["level"], "depot_nine");
+    assert_eq!(
+        saved["campaign"]["run_history"][0]["template"],
+        "ashwood_crossing"
+    );
+    assert!(saved["campaign"].get("unlocked").is_none());
+    assert_eq!(
+        saved["campaign"]["first_clears"],
+        serde_json::json!(["ashwood_crossing", "the_old_road"])
+    );
+    assert_eq!(
+        saved["campaign"]["npc"]["first_clear_claimed"],
+        serde_json::json!({"the_old_road": 2})
+    );
+}
+
+#[test]
+fn every_legacy_fixture_keeps_its_clears_frontier_and_claims() {
+    let none = || (vec![], 1, vec![], vec![]);
+    assert_eq!(
+        level_progress(&fixture()),
+        (
+            vec!["ashwood_crossing", "depot_nine", "the_old_road"],
+            4,
+            vec!["the_old_road"],
+            vec![("the_old_road", 2)]
+        )
+    );
+    assert_eq!(level_progress(&fixture_v2()), none());
+    assert_eq!(level_progress(&fixture_v3()), none());
+    assert_eq!(level_progress(&fixture_v4()), none());
+    for game in [fixture(), fixture_v2(), fixture_v3(), fixture_v4()] {
+        assert_eq!(game.attempt.as_ref().unwrap().level, 0);
+    }
+    assert_eq!(fixture().campaign.run_history[0].template, 0);
+    assert_eq!(fixture_v3().campaign.run_history[0].template, 0);
+}

@@ -25,7 +25,7 @@ pub fn peak_render_fixture() -> Result<Game, String> {
             .items
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.slot == slot && item.tier <= g.campaign.unlocked)
+            .filter(|(_, item)| item.slot == slot && item.tier <= g.campaign.unlocked())
             .max_by_key(|(_, item)| item.tier)
             .map(|(n, _)| n)
             .ok_or("Missing fixture equipment")?;
@@ -115,7 +115,7 @@ pub fn maximum_progression_render_fixture() -> Result<Game, String> {
             .items
             .iter()
             .enumerate()
-            .filter(|(_, i)| i.slot == slot && i.tier > 0 && i.tier <= g.campaign.unlocked)
+            .filter(|(_, i)| i.slot == slot && i.tier > 0 && i.tier <= g.campaign.unlocked())
             .max_by_key(|(_, i)| i.tier)
             .map(|(n, _)| n)
             .ok_or("Missing maximum fixture equipment")?;
