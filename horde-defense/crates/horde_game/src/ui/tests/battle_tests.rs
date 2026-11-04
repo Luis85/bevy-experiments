@@ -528,7 +528,7 @@ fn locked_throwables_are_disabled_buttons_that_explain_where_to_learn_them() {
         shown |= output.shapes.iter().any(|clipped| {
             shape_has_text(
                 &clipped.shape,
-                "Grenade locked. Learn it in the Ordnance branch of Survival skills",
+                "Grenade locked. Learn it in the Ordnance branch of Journey upgrades",
             )
         });
     }

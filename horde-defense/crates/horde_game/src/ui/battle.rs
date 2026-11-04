@@ -684,7 +684,7 @@ fn throwable_state(
         None => (gun(), TEXT),
         Some(slot) if !slot.unlocked => (
             format!(
-                "{label} locked. Learn it in the Ordnance branch of Survival skills after this attempt."
+                "{label} locked. Learn it in the Ordnance branch of Journey upgrades after this attempt."
             ),
             MUTED,
         ),
@@ -883,7 +883,11 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) 
                 kind,
                 format!("{} · {}", def.name, def.supply),
             );
-        });
+        })
+        .response
+        .on_disabled_hover_text(
+            "Learn this blueprint in the Fortification branch of Journey upgrades.",
+        );
     }
     let def = content().structure(f.battle.build_kind);
     muted(

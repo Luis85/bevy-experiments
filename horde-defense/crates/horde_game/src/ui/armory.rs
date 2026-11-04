@@ -13,6 +13,8 @@ use view::{ArmoryOffer, OfferTraining};
 const STATUS_COLUMN_WIDTH: f32 = 96.0;
 /// Shown instead of a before/after comparison for an equipped selection.
 pub(super) const CURRENTLY_EQUIPPED: &str = "Currently equipped";
+/// Hover reason on a disabled purchase.
+const NEED_COINS_REASON: &str = "Not enough coins yet. Earn more in your next defense.";
 /// Hover reason on the disabled `Equip selected` action.
 const ALREADY_EQUIPPED_REASON: &str =
     "Already equipped in this loadout. Select another item to compare or equip it.";
@@ -411,6 +413,11 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                         offer.tier_unlocked && offer.affordable,
                         egui::Button::new(format!("Buy · {} coins", offer.price)),
                     )
+                    .on_disabled_hover_text(if offer.tier_unlocked {
+                        NEED_COINS_REASON
+                    } else {
+                        "This quality tier unlocks with later victories."
+                    })
                     .clicked()
                 {
                     f.dispatch(
@@ -586,6 +593,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                     offer.affordable,
                     egui::Button::new(format!("Buy · {} coins", offer.price)),
                 )
+                .on_disabled_hover_text(NEED_COINS_REASON)
                 .clicked()
             {
                 f.dispatch(
@@ -843,6 +851,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
         let mut locked = item.locked;
         if ui
             .add_enabled(!item.protected, egui::Checkbox::new(&mut locked, "Lock"))
+            .on_disabled_hover_text("Starter equipment is always protected.")
             .changed()
         {
             f.dispatch(
@@ -954,6 +963,9 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
         .add_enabled(
             quote > 0,
             egui::Button::new(format!("Sell unprotected extras · {quote} coins")),
+        )
+        .on_disabled_hover_text(
+            "Nothing to sell. Equipped, protected, locked, favorite and preset items are kept, and sales wait while a defender is deployed.",
         )
         .clicked()
     {

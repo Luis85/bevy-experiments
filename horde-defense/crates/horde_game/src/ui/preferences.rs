@@ -274,6 +274,11 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
                 valid.is_ok() && changed,
                 egui::Button::new("Apply to next run"),
             )
+            .on_disabled_hover_text(if valid.is_err() {
+                "Fix the highlighted value first."
+            } else {
+                "Nothing to apply: the draft matches the next run."
+            })
             .clicked();
         if changed {
             muted(ui, "Unapplied draft. Apply before saving and returning.");
