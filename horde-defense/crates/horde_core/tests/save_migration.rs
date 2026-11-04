@@ -9,6 +9,10 @@
 //! (commit 5c91e05): a personal attempt at tick 42 with every unlock skill
 //! (piercing, second wind, brace, sweep, grenade, Molotov), brace active
 //! (259 ticks) and two hit-stopped Runner snapshots (5 ticks) beside a Shambler.
+//!
+//! `fixtures/save_v3.json` was written by `Game::save` at save format v3
+//! (commit 804b2bb): a live personal attempt with positional quality-indexed
+//! loot counters `[0,2,1,0,1,1]` and a finished run with `[1,1,0,2,0,0]`.
 use horde_core::campaign::{BodyAttribute, NpcTraining};
 use horde_core::content::{EnemyKind, ItemDefId, StructureKind};
 use horde_core::quality::Quality;
@@ -18,6 +22,7 @@ use horde_core::status::StatusId;
 
 const FIXTURE: &str = include_str!("fixtures/save_v1.json");
 const FIXTURE_V2: &str = include_str!("fixtures/save_v2.json");
+const FIXTURE_V3: &str = include_str!("fixtures/save_v3.json");
 
 fn fixture() -> Game {
     Game::decode_save_generation(FIXTURE.as_bytes()).expect("v1 fixture migrates and validates")
@@ -298,4 +303,110 @@ fn v2_fixture_continues_exactly_as_the_v2_build_did() {
 #[test]
 fn migrated_v2_fixture_resaves_as_current_version_and_resumes_byte_identically() {
     resave_and_resume_byte_identically(fixture_v2(), "v2");
+}
+
+fn fixture_v3() -> Game {
+    Game::decode_save_generation(FIXTURE_V3.as_bytes()).expect("v3 fixture migrates and validates")
+}
+
+#[test]
+fn v3_fixture_quality_arrays_become_kind_maps_with_the_same_counts() {
+    let game = fixture_v3();
+    let counts = |map: &horde_core::kind_map::KindMap<Quality, u32>| {
+        Quality::ALL.map(|quality| map[quality])
+    };
+    assert_eq!(
+        counts(&game.attempt.as_ref().unwrap().loot_quality_counts),
+        [0, 2, 1, 0, 1, 1]
+    );
+    assert_eq!(
+        counts(&game.campaign.run_history[0].loot_by_quality),
+        [1, 1, 0, 2, 0, 0]
+    );
+    assert_eq!(game.attempt.as_ref().unwrap().loot, 6);
+}
+
+#[test]
+fn migrated_v3_fixture_resaves_as_current_version_and_resumes_byte_identically() {
+    resave_and_resume_byte_identically(fixture_v3(), "v3");
+}
+
+#[test]
+fn v3_fixture_is_a_real_v3_generation() {
+    let envelope: serde_json::Value = serde_json::from_str(FIXTURE_V3).unwrap();
+    assert_eq!(envelope["version"], 3);
+    let payload: serde_json::Value =
+        serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        payload["attempt"]["loot_quality_counts"],
+        serde_json::json!([0, 2, 1, 0, 1, 1])
+    );
+    assert_eq!(
+        payload["campaign"]["run_history"][0]["loot_by_quality"],
+        serde_json::json!([1, 1, 0, 2, 0, 0])
+    );
+}
+
+/// Trace of the v3 fixture continued for 600 idle ticks, recorded on the v3
+/// build (commit 804b2bb) before the quality arrays became kind maps.
+const V3_CONTINUATION_FNV: u64 = 0x83c6_c668_77ca_ad9f;
+
+#[test]
+fn v3_fixture_continues_exactly_as_the_v3_build_did() {
+    let mut g = fixture_v3();
+    let mut trace = String::new();
+    for t in 0..600u32 {
+        g.tick(Input::default());
+        if t % 50 == 49 {
+            let a = g.attempt.as_ref().unwrap();
+            trace.push_str(&format!(
+                "t{} hp{} loot{} coins{} rng{} enemies{:?}
+",
+                a.tick,
+                a.hp,
+                a.loot,
+                a.coins,
+                a.rng.state,
+                a.enemies
+                    .iter()
+                    .map(|e| (e.id, e.hp, e.x.to_bits()))
+                    .collect::<Vec<_>>()
+            ));
+        }
+    }
+    let fnv = trace.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    });
+    assert_eq!(trace.lines().count(), 12);
+    assert_eq!(fnv, V3_CONTINUATION_FNV, "{trace}");
+}
+
+#[test]
+fn migrated_attempt_gear_snapshots_carry_stable_item_ids() {
+    let ids = |game: &Game| -> Vec<String> {
+        game.attempt
+            .as_ref()
+            .unwrap()
+            .gear_snapshot
+            .iter()
+            .map(|gear| gear.definition.as_str().to_owned())
+            .collect()
+    };
+    assert_eq!(
+        ids(&fixture_v2()),
+        [
+            "worn_service_pistol",
+            "crowbar",
+            "work_jacket",
+            "field_webbing"
+        ]
+    );
+    assert_eq!(ids(&fixture_v3()), ids(&fixture_v2()));
+    let v1 = ids(&fixture());
+    assert!(!v1.is_empty());
+    assert!(v1.iter().all(|id| {
+        horde_core::content::content()
+            .item_index(&id.as_str().into())
+            .is_some()
+    }));
 }

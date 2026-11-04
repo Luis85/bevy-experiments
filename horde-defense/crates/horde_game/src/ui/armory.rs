@@ -3,9 +3,12 @@ use super::{Tab, UiCtx, chrome, mode_selector, muted};
 use crate::art::{AMBER, GREEN, INK, RED, TEXT};
 use bevy_egui::egui::{self, Align, Color32, Layout, Rect, RichText, Sense, Stroke, vec2};
 use horde_core::{
+    campaign::UpgradeFocus,
     command::Command,
     content::{Mode, Slot, content},
 };
+mod view;
+use view::{ArmoryOffer, OfferTraining};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ArmorySort {
     Newest,
@@ -326,51 +329,37 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         "Choose equipment for the next defense. Deployed and guarding survivors reserve their unique items.",
     );
     mode_selector(ui, f);
-    let rank = f.game.campaign.progression_rank();
-    let level = f.game.campaign.shop_item_level();
-    let tuning = horde_core::progression::catalog();
-    let next = level.saturating_mul(tuning.item_level_rank_step);
-    let reachable_max = tuning.snapshot(tuning.threat_guard_rank).item_level;
+    let view = view::view_model(
+        f.game,
+        f.campaign.mode,
+        f.campaign.improvement_focus.as_ref(),
+    );
+    let (rank, level) = (view.rank, view.shop_level);
     muted(
         ui,
-        if level < reachable_max && next <= tuning.threat_guard_rank {
-            format!(
+        match view.next_gear_rank {
+            Some(next) => format!(
                 "New equipment: Lv {level} · threat rank {rank} · next gear level at rank {next}"
-            )
-        } else {
-            format!("New equipment: Lv {level} · maximum authored item level reached")
+            ),
+            None => format!("New equipment: Lv {level} · maximum authored item level reached"),
         },
     );
-    let recommended_purchase = match f.campaign.improvement_focus {
-        Some(horde_core::campaign::RecommendationAction::BuyEquipment(index)) => Some(index),
-        _ => None,
-    };
-    if let Some(horde_core::campaign::RecommendationAction::Equip(id)) =
-        f.campaign.improvement_focus
-        && f.game.campaign.item(id).is_some()
-    {
+    if let Some(id) = view.equip_focus {
         f.armory.selected_item = Some(id);
     }
-    if let Some(index) = recommended_purchase
-        && let Some(item) = content().items.get(index)
-    {
-        let price = f
-            .game
-            .campaign
-            .buy_price(index)
-            .expect("catalogue definition exists");
+    if let Some(offer) = &view.recommended {
         ui.push_id("recommended_equipment", |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.strong(format!("Recommended: {}", item.name));
+                ui.strong(format!("Recommended: {}", offer.item.name));
                 if ui
                     .add_enabled(
-                        item.tier <= f.game.campaign.unlocked && f.game.campaign.coins >= price,
-                        egui::Button::new(format!("Buy · {} coins", price)),
+                        offer.tier_unlocked && offer.affordable,
+                        egui::Button::new(format!("Buy · {} coins", offer.price)),
                     )
                     .clicked()
                 {
                     f.dispatch(
-                        Command::BuyItem(index),
+                        Command::BuyItem(offer.definition),
                         "Equipment added. Select it below to compare before equipping.",
                     );
                 }
@@ -569,34 +558,25 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             }
         });
     });
-    egui::CollapsingHeader::new("Quartermaster · guaranteed equipment").open(recommended_purchase.map(|_| true)).show(ui, |ui| {
+    egui::CollapsingHeader::new("Quartermaster · guaranteed equipment").open(view.recommended.as_ref().map(|_| true)).show(ui, |ui| {
         muted(ui, "Progression never requires a rare drop. Purchases go to the armory; equip them separately.");
-    let unlocked = f.game.campaign.unlocked;
-    for (index, item) in content()
-        .items
-        .iter()
-        .enumerate()
-        .filter(|(_, item)| item.tier > 0 && item.tier <= unlocked)
-    {
-        let price = f.game.campaign.buy_price(index).expect("catalogue definition exists");
-        let offered_level = f.game.campaign.shop_item_level();
-        let offered = horde_core::progression::scale_item(item.clone(), offered_level);
+    for ArmoryOffer { preview: offer, weapon } in &view.offers {
+        let item = &offer.item;
         ui.horizontal(|ui| {
-            slot_art(ui, f, index, item.base_quality);
-            ui.label(RichText::new(format!("{} · {} · {:?} · Lv {}", item.name, item.base_quality.name(), item.slot, offered_level)).color(quality_color(item.base_quality))).on_hover_text(format!("Personal: {} damage · {} armor · {} health. NPC: {}d{:+} · {} armor. Stats include this offered item level.", offered.personal.damage, offered.personal.armor, offered.personal.health, offered.npc.damage_dice, offered.npc.damage_add, offered.npc.armor));
-            if item.slot == Slot::Ranged {
-                let weapon = horde_core::weapons::WeaponSpec::from_item(item);
-                ui.label(format!("{} · {}", weapon.class.name(), if item.npc_only { "NPC issued gear" } else if f.game.campaign.can_use_weapon(f.campaign.mode, index) { "trained" } else { "training required" }));
+            slot_art(ui, f, offer.definition, item.base_quality);
+            ui.label(RichText::new(format!("{} · {} · {:?} · Lv {}", item.name, item.base_quality.name(), item.slot, offer.level)).color(quality_color(item.base_quality))).on_hover_text(format!("Personal: {} damage · {} armor · {} health. NPC: {}d{:+} · {} armor. Stats include this offered item level.", item.personal.damage, item.personal.armor, item.personal.health, item.npc.damage_dice, item.npc.damage_add, item.npc.armor));
+            if let Some((class, training)) = weapon {
+                ui.label(format!("{} · {}", class.name(), match training { OfferTraining::NpcIssued => "NPC issued gear", OfferTraining::Trained => "trained", OfferTraining::TrainingRequired => "training required" }));
             }
             if ui
                 .add_enabled(
-                    f.game.campaign.coins >= price,
-                    egui::Button::new(format!("Buy · {} coins", price)),
+                    offer.affordable,
+                    egui::Button::new(format!("Buy · {} coins", offer.price)),
                 )
                 .clicked()
             {
                 f.dispatch(
-                    Command::BuyItem(index),
+                    Command::BuyItem(offer.definition),
                     "Equipment added. Select it above to compare before equipping.",
                 );
             }
@@ -851,9 +831,11 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             ),
         );
         if !trained && !npc_restricted && ui.button("Open weapon training").clicked() {
-            let training = horde_core::skill_catalog::skills().nodes.iter().find(|n| n.effects.iter().any(|e| matches!(e, horde_core::skill_catalog::SkillEffect::WeaponTraining(class) if *class == weapon.class)));
-            f.campaign.improvement_focus = training
-                .map(|n| horde_core::campaign::RecommendationAction::LearnNode(n.id.clone()));
+            f.campaign.improvement_focus = f
+                .game
+                .campaign
+                .recommendation_fallback(UpgradeFocus::WeaponTraining(weapon.class))
+                .map(|r| r.action);
             f.open_preparation(Tab::Skills);
         }
     }

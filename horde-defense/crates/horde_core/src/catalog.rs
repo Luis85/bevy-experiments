@@ -226,7 +226,7 @@ pub(crate) fn install<T>(
 /// Stored in save envelopes so a load against different content is diagnosable.
 pub fn content_fingerprint() -> u64 {
     let content = crate::content::content();
-    let sections: [(&str, Vec<&str>); 6] = [
+    fingerprint_sections(&[
         (
             "items",
             content.items.iter().map(|i| i.id.as_str()).collect(),
@@ -261,12 +261,15 @@ pub fn content_fingerprint() -> u64 {
                 .map(|n| n.id.as_str())
                 .collect(),
         ),
-    ];
+    ])
+}
+
+fn fingerprint_sections(sections: &[(&str, Vec<&str>)]) -> u64 {
     let mut hash = 0xcbf29ce484222325_u64;
     for (section, ids) in sections {
         // Separators keep ("ab", "c") distinct from ("a", "bc").
-        for byte in std::iter::once(section)
-            .chain(ids)
+        for byte in std::iter::once(*section)
+            .chain(ids.iter().copied())
             .flat_map(|id| id.bytes().chain([0xff]))
         {
             hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
@@ -312,6 +315,33 @@ mod tests {
     fn content_fingerprint_is_deterministic_and_covers_item_ids() {
         assert_eq!(content_fingerprint(), content_fingerprint());
         assert_ne!(content_fingerprint(), 0xcbf29ce484222325);
+        // Pinned: equals the fingerprint inside the checked-in v2/v3 save
+        // fixtures. Changing authored ids changes it on purpose; update this
+        // (and review save compatibility) only when the ids really change.
+        assert_eq!(content_fingerprint(), 13_545_676_443_720_933_061);
+    }
+
+    #[test]
+    fn changing_one_item_id_changes_the_fingerprint() {
+        let content = crate::content::content();
+        fn ids(items: &[String]) -> Vec<(&str, Vec<&str>)> {
+            vec![
+                ("items", items.iter().map(String::as_str).collect()),
+                ("levels", vec!["l"]),
+            ]
+        }
+        let original: Vec<String> = content.items.iter().map(|i| i.id.to_string()).collect();
+        let baseline = fingerprint_sections(&ids(&original));
+        assert_eq!(baseline, fingerprint_sections(&ids(&original)));
+        for index in [0, original.len() / 2, original.len() - 1] {
+            let mut changed = original.clone();
+            changed[index].push('x');
+            assert_ne!(baseline, fingerprint_sections(&ids(&changed)), "{index}");
+        }
+        // Order is positional for loot and stage selection, so it counts too.
+        let mut swapped = original.clone();
+        swapped.swap(0, 1);
+        assert_ne!(baseline, fingerprint_sections(&ids(&swapped)));
     }
 
     #[test]

@@ -13,27 +13,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 const RECOVERY_TICKS: u64 = 24;
 
+/// Pose weight of the brace stance at `tick`; the rule lives in core.
 pub fn brace_at(attempt: &Attempt, tick: u64) -> f32 {
-    if tick > attempt.tick {
-        return 0.;
-    }
-    let remaining = attempt.brace_remaining_ticks();
-    if remaining > 0 {
-        let end = attempt.tick.saturating_add(u64::from(remaining));
-        let start = end.saturating_sub(u64::from(horde_core::sim::BRACE_DURATION_TICKS));
-        if tick >= start && tick < end {
-            return 1.;
-        }
-    }
-    if tick == attempt.tick {
-        return 0.;
-    }
-    if attempt.events.iter().rev().any(|event| {
-        event.kind == EventKind::Ability
-            && event.value == 0
-            && event.tick <= tick
-            && tick - event.tick < u64::from(horde_core::sim::BRACE_DURATION_TICKS)
-    }) {
+    if attempt.brace_active_at(tick) {
         1.
     } else {
         0.

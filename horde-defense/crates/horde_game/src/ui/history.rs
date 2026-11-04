@@ -243,11 +243,11 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
             }
         });
     ui.horizontal_wrapped(|ui| {
-        for (index, quality) in horde_core::quality::Quality::ALL.into_iter().enumerate() {
-            if r.loot_by_quality[index] > 0 {
+        for quality in horde_core::quality::Quality::ALL {
+            if r.loot_by_quality[quality] > 0 {
                 ui.colored_label(
                     armory::quality_color(quality),
-                    format!("{} {}", r.loot_by_quality[index], quality.name()),
+                    format!("{} {}", r.loot_by_quality[quality], quality.name()),
                 );
             }
         }

@@ -2,6 +2,8 @@
 use super::{Screen, UiCtx, battle, chrome, damage, loot, muted, reticle};
 use crate::art::{self, AMBER, RED};
 use bevy_egui::egui::{self, Sense, vec2};
+use view::country_name;
+mod view;
 use horde_core::{
     campaign::NpcTraining,
     command::Command,
@@ -10,8 +12,9 @@ use horde_core::{
 };
 
 pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
-    use horde_core::strategy::{OutbreakOutcome, RecruitStatus};
+    use horde_core::strategy::RecruitStatus;
     let config = &world().strategy_config;
+    let view = view::view_model(f.game);
     chrome::page_title(
         ui,
         "Operations",
@@ -19,13 +22,13 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     );
     muted(
         ui,
-        if f.game.global_paused {
+        if view.paused {
             "World clock paused · every field and outbreak timer is paused."
         } else {
             "World clock running · expeditions and outbreak deadlines advance together."
         },
     );
-    if f.game.attempt.is_some() {
+    if view.field_active {
         ui.horizontal_wrapped(|ui| {
             ui.strong("Your active field");
             if ui.button("Return to active defense").clicked() {
@@ -33,31 +36,21 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             }
         });
     }
-    let outbreaks: Vec<_> = f
-        .game
-        .strategy
-        .outbreaks
-        .iter()
-        .filter(|o| o.outcome == OutbreakOutcome::Active)
-        .cloned()
-        .collect();
-    if !outbreaks.is_empty() {
+    if !view.outbreaks.is_empty() {
         chrome::section(ui, "Urgent outbreaks");
-        for outbreak in outbreaks {
+        for outbreak in &view.outbreaks {
             ui.horizontal_wrapped(|ui| {
                 ui.colored_label(
                     RED,
                     format!(
                         "{} · {} groups · {:.0}s remaining",
-                        country_name(&outbreak.country_id),
-                        outbreak.strength,
-                        outbreak.deadline_tick.saturating_sub(f.game.strategy.tick) as f32 / 60.0
+                        outbreak.country, outbreak.strength, outbreak.seconds_left
                     ),
                 );
                 if ui.button("Plan outbreak response").clicked() {
                     f.campaign.selected_country = outbreak.country_id.clone();
                     f.dispatch(
-                        Command::EnterCountry(outbreak.country_id),
+                        Command::EnterCountry(outbreak.country_id.clone()),
                         "Replay a defense here or dispatch a survivor to contain the outbreak.",
                     );
                 }
@@ -65,90 +58,59 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     }
     chrome::section(ui, "Live expeditions");
-    let summaries: Vec<_> = f
-        .game
-        .battles
-        .iter()
-        .map(|b| {
-            (
-                b.id,
-                b.recruit_id,
-                b.country_id.clone(),
-                b.stage,
-                b.settled,
-                b.game
-                    .attempt
-                    .as_ref()
-                    .map(|a| (a.hp, a.max_hp, a.elapsed(), a.kills, a.decision.clone())),
-                b.game.last_result.clone(),
-            )
-        })
-        .collect();
-    let live = summaries
-        .iter()
-        .filter(|(_, _, _, _, settled, state, _)| !*settled && state.is_some())
-        .count();
-    if live == 0 {
+    if view.live.is_empty() {
         muted(
             ui,
             "No expeditions in progress. Ready survivors can be sent from the roster below once parallel battles unlock.",
         );
     }
-    for (id, recruit, country, stage, settled, state, _) in &summaries {
-        if *settled {
-            continue;
-        }
-        let Some((hp, max, elapsed, kills, decision)) = state else {
-            continue;
-        };
-        let name = f
-            .game
-            .strategy
-            .roster
-            .iter()
-            .find(|r| r.id == *recruit)
-            .map(|r| r.name.clone())
-            .unwrap_or_else(|| "Survivor".into());
+    for line in &view.live {
+        let id = line.id;
         ui.horizontal_wrapped(|ui| {
             ui.strong(format!(
-                "{name} · {} · defense {}",
-                country_name(country),
-                stage + 1
+                "{} · {} · defense {}",
+                line.recruit,
+                line.country,
+                line.stage + 1
             ));
-            ui.label(format!("HP {hp}/{max} · {elapsed:.0}s · {kills} kills"));
+            ui.label(format!(
+                "HP {}/{} · {:.0}s · {} kills",
+                line.hp, line.max_hp, line.elapsed, line.kills
+            ));
             if ui.button(format!("Observe #{id}")).clicked() {
-                f.campaign.observed = Some(*id);
+                f.campaign.observed = Some(id);
             }
             if ui.button(format!("Recall #{id}")).clicked() {
                 f.dispatch(
-                    Command::RecallSurvivor(*id),
+                    Command::RecallSurvivor(id),
                     "Expedition recalled; earned rewards retained.",
                 );
             }
         });
-        muted(ui, decision);
+        muted(ui, &line.decision);
         ui.separator();
     }
-    if summaries.iter().any(|(_, _, _, _, settled, _, _)| *settled) {
+    if view.any_settled {
         egui::CollapsingHeader::new("Completed expedition reports").show(ui, |ui| {
-            for (id, _, country, stage, settled, _, report) in &summaries {
-                if *settled && let Some(report) = report {
-                    ui.label(format!(
-                        "Expedition #{id} · {} · defense {} · {:?} · {} kills · {} coins",
-                        country_name(country),
-                        stage + 1,
-                        report.outcome,
-                        report.kills,
-                        report.coins
-                    ));
-                }
+            for report in &view.reports {
+                ui.label(format!(
+                    "Expedition #{} · {} · defense {} · {:?} · {} kills · {} coins",
+                    report.id,
+                    report.country,
+                    report.stage + 1,
+                    report.outcome,
+                    report.kills,
+                    report.coins
+                ));
             }
         });
     }
     chrome::section(ui, "Survivor orders");
-    let recruit_unlocked = f.game.strategy.recruitment_unlocked(&f.game.campaign);
-    let parallel = f.game.strategy.parallel_unlocked(&f.game.campaign);
-    let strategy = f.game.strategy.grand_strategy_unlocked(&f.game.campaign);
+    let (recruit_unlocked, parallel, strategy) = (
+        view.recruit_unlocked,
+        view.parallel_unlocked,
+        view.strategy_unlocked,
+    );
     if !recruit_unlocked {
         muted(
             ui,
@@ -373,11 +335,4 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             muted(ui, line);
         }
     });
-}
-
-fn country_name(id: &str) -> &str {
-    world()
-        .country(id)
-        .map(|country| country.name.as_str())
-        .unwrap_or(id)
 }

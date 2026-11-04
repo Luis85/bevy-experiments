@@ -1,21 +1,8 @@
 mod support;
-use horde_core::content::{EnemyKind, Mode};
+use horde_core::content::Mode;
 use horde_core::sim::{BattleId, Game, Input, Outcome, SimEvent, SimEventRecord};
-use support::legacy_game;
+use support::{decode_value, enemy, game, strategic_game};
 
-fn game(mode: Mode) -> Game {
-    let mut g = legacy_game();
-    g.campaign.attempts = 1;
-    g.deploy(0, mode).unwrap();
-    g.set_paused(false);
-    g
-}
-fn enemy(g: &mut Game, lane: u8, x: f32, boss: bool) {
-    let mut a = g.attempt.take().unwrap();
-    g.spawn_enemy(&mut a, EnemyKind::Shambler, lane, boss);
-    a.enemies.last_mut().unwrap().x = x;
-    g.attempt = Some(a);
-}
 /// An unconscious boss is reaped on the next tick, finishing the attempt.
 fn doom_boss(g: &mut Game) {
     enemy(g, 5, 20.0, true);
@@ -133,20 +120,7 @@ fn melee_cooldown_readiness_is_an_event() {
 
 #[test]
 fn expedition_events_carry_their_battle_id_through_the_final_tick() {
-    let mut g = legacy_game();
-    let countries: Vec<_> = horde_core::world::world()
-        .countries
-        .iter()
-        .take(4)
-        .map(|c| (c.id.clone(), c.level_count()))
-        .collect();
-    g.campaign.choose_start_country(&countries[0].0).unwrap();
-    for (id, count) in countries {
-        g.campaign.world.country_levels.insert(id.clone(), count);
-        g.campaign.world.cleared.push(id);
-    }
-    g.campaign.coins = 10000;
-    g.campaign.attempts = 1;
+    let mut g = strategic_game();
     let country = g.campaign.world.cleared[0].clone();
     let recruit = g.strategy.recruit(&mut g.campaign, &country).unwrap();
     let battle = g.deploy_survivor(recruit, &country, 0).unwrap();
@@ -191,22 +165,6 @@ fn sequence_numbers_never_repeat_across_save_resume_and_attempts() {
     original.set_paused(false);
     enemy(&mut original, 5, 8.0, false);
     assert!(ticks(&mut original, 120).iter().all(|r| r.seq > finished));
-}
-
-fn decode_value(value: serde_json::Value) -> Result<Game, String> {
-    let payload = serde_json::to_string(&value).unwrap();
-    let checksum = payload
-        .as_bytes()
-        .iter()
-        .fold(0xcbf29ce484222325_u64, |hash, byte| {
-            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
-        });
-    Ok(Game::decode_save_generation(
-        &serde_json::to_vec(&serde_json::json!({
-            "version": 1, "checksum": checksum, "payload": payload,
-        }))
-        .unwrap(),
-    )?)
 }
 
 #[test]
