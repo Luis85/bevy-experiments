@@ -18,6 +18,8 @@
 //! (commit c6f518d): a live personal attempt at tick 481 with both throws
 //! unlocked, one grenade and one Molotov thrown (positional ordnance counters:
 //! charges `[1,1]`, cooldowns `[10,61]`) and the Molotov's fire zone burning.
+mod support;
+
 use horde_core::campaign::{BodyAttribute, NpcTraining};
 use horde_core::content::{EnemyKind, ItemDefId, StructureKind};
 use horde_core::ordnance::OrdnanceKind;
@@ -162,9 +164,7 @@ fn v1_fixture_continues_exactly_as_the_v2_build_did() {
             ));
         }
     }
-    let fnv = trace.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
-    });
+    let fnv = support::fnv1a(trace.as_bytes());
     assert_eq!(trace.lines().count(), 12);
     assert_eq!(fnv, V1_CONTINUATION_FNV, "{trace}");
 }
@@ -381,9 +381,7 @@ fn v3_fixture_continues_exactly_as_the_v3_build_did() {
             ));
         }
     }
-    let fnv = trace.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
-    });
+    let fnv = support::fnv1a(trace.as_bytes());
     assert_eq!(trace.lines().count(), 12);
     assert_eq!(fnv, V3_CONTINUATION_FNV, "{trace}");
 }
@@ -451,9 +449,7 @@ fn v4_fixture_continues_exactly_as_the_v4_build_did() {
             ));
         }
     }
-    let fnv = trace.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
-    });
+    let fnv = support::fnv1a(trace.as_bytes());
     assert_eq!(trace.lines().count(), 12);
     assert_eq!(fnv, V4_CONTINUATION_FNV, "{trace}");
 }

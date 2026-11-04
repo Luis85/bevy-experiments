@@ -6,6 +6,18 @@ use horde_core::campaign::Campaign;
 use horde_core::content::{EnemyKind, Mode};
 use horde_core::sim::{Game, Input};
 
+/// FNV-1a (64-bit) of `bytes`, as used by save checksums and pinned digests.
+pub fn fnv1a(bytes: &[u8]) -> u64 {
+    fnv1a_extend(0xcbf2_9ce4_8422_2325, bytes)
+}
+
+/// Continue an FNV-1a hash over more `bytes`.
+pub fn fnv1a_extend(hash: u64, bytes: &[u8]) -> u64 {
+    bytes.iter().fold(hash, |hash, byte| {
+        (hash ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
 /// A default game with the legacy (fixed, unscaled) balance and features.
 pub fn legacy_game() -> Game {
     let mut game = Game::default();
@@ -59,12 +71,7 @@ pub fn country_game(country: &str) -> Game {
 /// way an old build's save would reach migration.
 pub fn decode_value(value: serde_json::Value) -> Result<Game, String> {
     let payload = serde_json::to_string(&value).unwrap();
-    let checksum = payload
-        .as_bytes()
-        .iter()
-        .fold(0xcbf29ce484222325_u64, |hash, byte| {
-            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
-        });
+    let checksum = fnv1a(payload.as_bytes());
     Ok(Game::decode_save_generation(
         &serde_json::to_vec(&serde_json::json!({
             "version": 1, "checksum": checksum, "payload": payload,

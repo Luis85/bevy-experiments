@@ -47,6 +47,8 @@ It runs format check, Clippy with warnings denied, and workspace tests. Frontlin
 targets its maintained game/tooling packages, excluding historical `probe_*` packages, and
 excludes its device/BRP/milestone test families by default, matching its ordinary
 gate; use `-IncludeDeviceTests` for the complete suite on suitable hardware.
+Horde Defense additionally lints `--no-default-features` and `--features dev`
+and tests `--features dev`.
 Use focused package tests while iterating and the workspace's additional gate
 before completion. See `CONTRIBUTING.md` and the nested guide.
 

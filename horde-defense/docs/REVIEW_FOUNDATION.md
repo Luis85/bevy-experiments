@@ -212,3 +212,44 @@ None of this is urgent for playing the game. All of it gets more expensive with 
 4. Split `Frontend`, plugins and system sets, then `States` (P1.6–P1.8).
 5. `LaunchConfig`, the `dev` feature and `ContentDb` (P1.9–P1.10).
 6. Behaviour registry, status effects and `BattleViewModel` (P1.11–P1.13), driven by the next content you actually want to add.
+
+## Status after hardening (2026-11-04)
+
+Evidence is the foundation-hardening branch (merge `51b31ac` plus the final-review fixes). Statuses are honest: "Partially" and "Deferred" items are listed again under follow-ups.
+
+| Item | Status | Evidence |
+|---|---|---|
+| P0.1 Version control and CI | Done | `horde-defense` is tracked; `ci.yml` matrix and `scripts/dev.ps1 verify` cover it, now including the `--no-default-features` and `--features dev` clippy/test runs. |
+| P0.2 Core command API | Partially | `Game::apply` and typed `CommandError` live in `horde_core/src/command.rs`; widgets only see `&Game`. Core fields are still `pub` (deferred by ruling). |
+| P0.3 Typed sim event stream | Done | `sim/events.rs` `SimEvent` stream; final-tick events delivered; settlement failures surface as `SettlementIssue`. |
+| P0.4 Stable IDs in saves | Partially | Items, unlocks, statuses and enum-keyed `KindMap`s use IDs (saves v2-v5 with migrations and fixtures). Level-positional progress remains. |
+| P0.5 Logging and crash reports | Partially | `LogPlugin` file logs, crash file, `playtest` profile. The crash report does not include the last log lines. |
+| P1.6 Split `Frontend` | Done | `GameSession`, `Runtime`, `ProfilePaths`, settings and per-screen resources; `UiCtx` borrows them. |
+| P1.7 Plugins and system sets | Done | `SimRuntimePlugin`, `UiPlugin`, `SfxPlugin`, `ReviewToolsPlugin` with named sets. |
+| P1.8 Screens as `States` | Done | `Screen`/`Tab` Bevy states, `Navigation`, one notice system. |
+| P1.9 `LaunchConfig` and `dev` feature | Done | `launch.rs` parsed once in `main`; `dev` feature with debug tools, recorder and headless replay. |
+| P1.10 Fallible, injectable catalogues | Partially | `ContentError` and `init_catalogs` are fallible. Process-wide accessors remain; `ContentDb` injection deferred. |
+| P1.11 New kinds without shotgun surgery | Partially | Data-driven enemy composition and visuals, skills with `Unlock(UnlockId)`, generic `StatusEffect`s. The procedural fallback art still matches on `EnemyKind`. |
+| P1.12 Rules out of views | Partially | UI rules moved to core view helpers (`node_status`, recommendations, shop offers); `BattleViewModel` seam. The battle screen still reads the attempt directly in places. |
+| P1.13 ECS-ready presentation seam | Partially | `BattleViewModel` with tick interpolation and an event-driven art pipeline; no ECS presentation yet (not required). |
+| P2 Testability | Done | Pure `FrontendParts::new`, hermetic `test_frontend()`; no test touches the real save. |
+| P2 Errors | Done | `CommandError`, `ContentError`, `SaveError`, `SettlementIssue`; settlement no longer discards results. |
+| P2 Persistence versioning | Done | Envelope v5, ordered migration chain, checked-in `save_v1..v5` fixtures with continuation traces. |
+| P2 Determinism hardening | Deferred | Golden digests and properties exist; RNG sub-streams and fixed-point positions deferred. |
+| P2 Debug tooling | Done | `dev`-gated debug plugin, command recorder, headless replay, `Game::state_digest`. |
+| P2 Dead weight | Done | Retired `character_rig` and the `#[path]` modules removed; render fixtures kept un-gated deliberately (shipped practice scenes use them). Orphaned rig assets remain. |
+| P2 God files | Done | `sim`, `campaign`, `runner`, `visual_assets`, ui tests and review fixtures split along phase seams. |
+| P2 Lints | Done | `[workspace.lints]` (`unsafe_code = "forbid"`, `dbg_macro`, print and `todo` lints); fmt enforced in CI. |
+| P2 Missing tests | Done | Determinism digests, seeded property tests, headless runner/App tests, egui harness tests. |
+
+### Tracked follow-ups
+
+- Core field visibility: make `Game` fields private behind accessors (the P0.2 remainder).
+- Level-positional progress (`first_clears`, `unlocked`, `Command::BuyItem(usize)`) must move to stable IDs before levels are reordered.
+- The crash report lacks the last log lines.
+- The battle screen still reads the attempt directly in places (the view model is partial).
+- Procedural fallback art matches on `EnemyKind`; a new sprite needs a `VisualSprite` variant.
+- RNG sub-streams and fixed-point positions are deferred.
+- `ContentDb` injection is deferred (catalogues are still process-wide).
+- Content drift warns on every save after a content change, not once.
+- Orphaned rig assets remain in `assets/`.

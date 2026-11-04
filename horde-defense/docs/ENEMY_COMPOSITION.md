@@ -15,6 +15,10 @@ configure the other encounter/equipment definitions independently.
 
 ## Authoring a type
 
+Every archetype and component record needs a stable `id`; saves refer to them
+by id, so keep ids unchanged once players have saves and add ids to any
+override written before they were required. `target_urgency` is optional.
+
 An archetype names one reusable record from each component table:
 
 | Table | Authored values |

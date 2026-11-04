@@ -416,9 +416,7 @@ fn leaving_journey_persists_without_erasing_report_and_old_resume_infers_only_on
         .unwrap()
         .remove("journey_revision");
     let payload = serde_json::to_string(&old).unwrap();
-    let checksum = payload.bytes().fold(0xcbf29ce484222325u64, |hash, value| {
-        (hash ^ u64::from(value)).wrapping_mul(0x100000001b3)
-    });
+    let checksum = support::fnv1a(payload.as_bytes());
     let migrated = Game::decode_save_generation(
         &serde_json::to_vec(
             &serde_json::json!({"version":1,"checksum":checksum,"payload":payload}),

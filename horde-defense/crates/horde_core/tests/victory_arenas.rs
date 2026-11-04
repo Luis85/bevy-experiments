@@ -369,9 +369,7 @@ fn legacy_eleven_lane_checkpoint_remains_eleven_after_player_levels_up_and_old_h
         .unwrap()
         .remove("threat_revision");
     let payload = serde_json::to_string(&value).unwrap();
-    let checksum = payload.bytes().fold(0xcbf29ce484222325u64, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
-    });
+    let checksum = support::fnv1a(payload.as_bytes());
     let restored = Game::decode_save_generation(
         &serde_json::to_vec(
             &serde_json::json!({"version":1,"checksum":checksum,"payload":payload}),

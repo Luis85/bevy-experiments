@@ -30,6 +30,14 @@ pwsh -NoProfile -File scripts/package_playtest.ps1
 
 The script builds the `playtest` profile (release optimisation with line tables for readable crash backtraces) by default; pass `-Profile debug` or `-Profile release` to choose another. Packages are built with `--no-default-features`, leaving out the `review` tooling (practice scenes still work); pass `-Review` to include it, which `verify_playtest.ps1 -NativeCapture` needs. It creates a versioned Windows x64 folder and ZIP under `target/playtest/`, with the executable, pixel art, audio, font/geography notices, editable content JSON, manifest and playtest documentation. `Play Lastlight.cmd` opens the ordinary persistent campaign; `Battle practice.cmd` and `Strategy practice.cmd` open separate resumable practice profiles with clearly staged resources. No Rust installation is needed to run this build. See the [playtest guide](docs/PLAYTEST_GUIDE.md).
 
+#### Editing content / overrides
+
+The packaged `content/*.json` files are editable overrides of the compiled-in defaults (see [Skills, weapons and ordnance](docs/SKILLS_AND_WEAPONS.md) for the variables). Authored entries are identified by a stable `id`, not by their position:
+
+- Every `levels`, `items` and `structures` entry in the encounters/equipment file requires an `id`; skills and enemy archetypes already do. An override from before the identity work that lacks ids is rejected with an explanatory error; copy the current shipped JSON as the starting point or add ids to the old file.
+- Skill unlock effects use `Unlock` effects naming an unlock id (for example `{"kind": "Unlock", "value": "piercing"}` in the shipped `skills.json`), and enemy archetypes may set an optional `target_urgency` (default derived from `base_enemy_kind`).
+- Keep ids stable once players have saves: saves reference items, skills, countries and enemies by id, so renaming or removing an id orphans that progress. Change `name` for display text and add a new id for new content. A save made under a different catalogue only logs a content-drift warning; it still loads.
+
 The packaged launchers load `content/world.json`, `content/encounters.json`, `content/skills.json`, `content/enemy_catalog.json` `content/ordnance.json`, `content/progression.json`, `content/quality.json` and `content/balance.json` through the same validated override interfaces as development. Changes load on restart; use separate saves when testing incompatible content changes.
 
 The optional **Play Lastlight (DirectX12).cmd** launcher selects DirectX 12 for that process; the ordinary launcher keeps automatic backend selection. Backend evidence and limitations are recorded by build in [VALIDATION.md](docs/VALIDATION.md).
@@ -100,7 +108,7 @@ Later milestones add recruiting local survivors, parallel autonomous country bat
 
 On Windows, saves and settings live under `%LOCALAPPDATA%\LastlightHordeDefense`. Set `LASTLIGHT_SAVE_DIR` to use a separate campaign directory, useful for testing. If `LOCALAPPDATA` is absent, the fallback is `saves/` relative to the working directory. Runtime saves and build products are not source assets.
 
-The game serializes campaign, armory, active encounters, action timers, random state, reward accounting, recruited survivors and strategic pressure together. Saves use a versioned envelope, checksum, synchronized temporary write and a previous-generation backup. Save and quit acknowledges a completed save before closing. No progress is simulated while closed. Unreadable generations are preserved before replacement. Format v1 has a technical 64 MiB encoded-generation ceiling: oversized writes fail before touching existing saves, and no collected loot is discarded. See the acceptance ledger for exact persistence evidence.
+The game serializes campaign, armory, active encounters, action timers, random state, reward accounting, recruited survivors and strategic pressure together. Saves use a versioned envelope, checksum, synchronized temporary write and a previous-generation backup. Save and quit acknowledges a completed save before closing. No progress is simulated while closed. Unreadable generations are preserved before replacement. Every save format has a technical 64 MiB encoded-generation ceiling (the envelope is currently v5; the limit does not depend on the version): oversized writes fail before touching existing saves, and no collected loot is discarded. See the acceptance ledger for exact persistence evidence.
 
 ## Logging and crash reports
 
@@ -112,7 +120,9 @@ The game logs through Bevy's `LogPlugin` to the console and to a plain-text file
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo clippy --locked -p horde-defense --all-targets --no-default-features -- -D warnings
+cargo clippy --locked -p horde-defense --all-targets --features dev -- -D warnings
 cargo test --locked --workspace
+cargo test --locked -p horde-defense --features dev
 ```
 
 ### Launch options and features

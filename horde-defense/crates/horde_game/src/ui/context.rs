@@ -128,11 +128,7 @@ pub(crate) fn ambience_target(
     let observed = if screen == Screen::Camp && tab == Tab::Operations {
         campaign
             .observed
-            .and_then(|id| {
-                game.battles
-                    .iter()
-                    .find(|battle| battle.id == id && !battle.settled)
-            })
+            .and_then(|id| game.active_battle(id))
             .and_then(|battle| battle.game.attempt.as_ref())
     } else {
         None
