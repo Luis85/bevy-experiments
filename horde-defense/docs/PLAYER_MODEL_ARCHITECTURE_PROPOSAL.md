@@ -54,8 +54,8 @@ Current partial safeguards are useful but incomplete:
   single immutable resolved pose should supply all those consumers.
 
 The latest frozen, unvalidated work touches `character_rig.rs`, `canonical.rs`,
-`canonical_tests.rs`, `visual_assets.rs` and `canonical-rig.json`: starter-review
-snapshots, carriage variants, torso width/top consumption, source-sleeve masks
+`canonical_tests.rs`, `visual_assets.rs` and `canonical-rig.json` (the rig files
+and `canonical-rig.json` have since been removed): starter-review snapshots, carriage variants, torso width/top consumption, source-sleeve masks
 and legacy test-loader configuration. It is a working checkpoint, not the
 approved architecture or an accepted parity result. Existing
 `CHARACTER_COMPONENTS.md` describes earlier iterations and is historical

@@ -329,6 +329,77 @@ fn edge_shade(p: &Painter, canvas: Rect) {
     p.add(egui::Shape::mesh(mesh));
 }
 
+/// How the procedural fallback figure draws one enemy kind when no sprite is
+/// available: coat tint plus optional overlays.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct FallbackLook {
+    coat: C,
+    /// Chest plate with an amber stripe.
+    armor_plate: bool,
+    /// Raised charge pack on a pole.
+    charge_pack: bool,
+}
+impl FallbackLook {
+    const fn plain(coat: C) -> Self {
+        Self {
+            coat,
+            armor_plate: false,
+            charge_pack: false,
+        }
+    }
+}
+
+/// One row per enemy kind; a new kind only adds a row here. Kinds without a
+/// row draw as the first row (the unit tests require full coverage).
+const FALLBACK_LOOKS: &[(EnemyKind, FallbackLook)] = &[
+    (
+        EnemyKind::Shambler,
+        FallbackLook::plain(C::from_rgb(126, 144, 104)),
+    ),
+    (
+        EnemyKind::Runner,
+        FallbackLook::plain(C::from_rgb(193, 151, 102)),
+    ),
+    (
+        EnemyKind::Brute,
+        FallbackLook::plain(C::from_rgb(123, 108, 89)),
+    ),
+    (
+        EnemyKind::Armored,
+        FallbackLook {
+            coat: C::from_rgb(133, 154, 158),
+            armor_plate: true,
+            charge_pack: false,
+        },
+    ),
+    (
+        EnemyKind::Demolisher,
+        FallbackLook {
+            coat: C::from_rgb(197, 150, 61),
+            armor_plate: false,
+            charge_pack: true,
+        },
+    ),
+];
+/// Bosses keep their kind's overlays, wear this coat and always get a plate.
+const BOSS_COAT: C = C::from_rgb(135, 73, 53);
+
+fn fallback_look(kind: EnemyKind, boss: bool) -> FallbackLook {
+    let base = FALLBACK_LOOKS
+        .iter()
+        .find(|(row, _)| *row == kind)
+        .map_or(FALLBACK_LOOKS[0].1, |&(_, look)| look);
+    if boss {
+        FallbackLook {
+            coat: BOSS_COAT,
+            armor_plate: true,
+            ..base
+        }
+    } else {
+        base
+    }
+}
+
 pub fn figure(
     p: &Painter,
     at: Pos2,
@@ -339,17 +410,8 @@ pub fn figure(
     outline: bool,
 ) {
     let s = size;
-    let coat = if boss {
-        C::from_rgb(135, 73, 53)
-    } else {
-        match kind {
-            EnemyKind::Shambler => C::from_rgb(126, 144, 104),
-            EnemyKind::Runner => C::from_rgb(193, 151, 102),
-            EnemyKind::Brute => C::from_rgb(123, 108, 89),
-            EnemyKind::Armored => C::from_rgb(133, 154, 158),
-            EnemyKind::Demolisher => C::from_rgb(197, 150, 61),
-        }
-    };
+    let look = fallback_look(kind, boss);
+    let coat = look.coat;
     let skin = C::from_rgb(164, 163, 121);
     p.add(egui::Shape::ellipse_filled(
         at + vec2(s * 0.1, s * 0.55),
@@ -402,7 +464,7 @@ pub fn figure(
         vec2(s * 0.15, s * 0.08),
         C::from_rgb(64, 59, 47),
     );
-    if matches!(kind, EnemyKind::Armored) || boss {
+    if look.armor_plate {
         box_at(
             p,
             at + vec2(sway, -s * 0.05),
@@ -417,7 +479,7 @@ pub fn figure(
             AMBER.gamma_multiply(0.7),
         );
     }
-    if matches!(kind, EnemyKind::Demolisher) {
+    if look.charge_pack {
         line(
             p,
             at + vec2(-s * 0.6, 0.0),
@@ -799,6 +861,56 @@ pub fn country_scene(p: &Painter, r: Rect, biome: &str, culture: &str, stage: us
         FontId::proportional(11.0),
         TEXT,
     );
+}
+
+#[cfg(test)]
+mod fallback_look_tests {
+    use super::*;
+
+    /// The coat colours of the former per-kind `match` in `figure`, frozen.
+    const LEGACY_COATS: [(EnemyKind, [u8; 3]); 5] = [
+        (EnemyKind::Shambler, [126, 144, 104]),
+        (EnemyKind::Runner, [193, 151, 102]),
+        (EnemyKind::Brute, [123, 108, 89]),
+        (EnemyKind::Armored, [133, 154, 158]),
+        (EnemyKind::Demolisher, [197, 150, 61]),
+    ];
+
+    /// The former `figure` logic: boss coat override, plate on Armored or any
+    /// boss, charge pack on Demolisher.
+    fn legacy_look(kind: EnemyKind, [r, g, b]: [u8; 3], boss: bool) -> FallbackLook {
+        FallbackLook {
+            coat: if boss {
+                C::from_rgb(135, 73, 53)
+            } else {
+                C::from_rgb(r, g, b)
+            },
+            armor_plate: kind == EnemyKind::Armored || boss,
+            charge_pack: kind == EnemyKind::Demolisher,
+        }
+    }
+
+    #[test]
+    fn table_has_exactly_one_row_per_enemy_kind() {
+        assert_eq!(FALLBACK_LOOKS.len(), EnemyKind::ALL.len());
+        for kind in EnemyKind::ALL {
+            let rows = FALLBACK_LOOKS.iter().filter(|(k, _)| *k == kind).count();
+            assert_eq!(rows, 1, "{kind:?} needs exactly one fallback row");
+        }
+    }
+
+    #[test]
+    fn table_reproduces_the_legacy_colours_and_overlays() {
+        for (kind, coat) in LEGACY_COATS {
+            for boss in [false, true] {
+                assert_eq!(
+                    fallback_look(kind, boss),
+                    legacy_look(kind, coat, boss),
+                    "{kind:?} boss={boss}"
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]
