@@ -82,7 +82,11 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
                 ctx.runtime.request_save(SaveIntent::Menu);
             }
             if matches!(command, Command::Withdraw) {
-                push_cue(ctx.cues, SoundCue::Retreat);
+                // The terminal `AttemptFinished` plays `Retreat` exactly once.
+                ctx.runtime.drain_sounds(ctx.game, ctx.cues);
+            }
+            if confirms_purchase(&command) {
+                push_cue(ctx.cues, SoundCue::Confirm);
             }
         }
         ctx.notice(RuntimeNotice::CommandCompleted {
@@ -95,6 +99,21 @@ pub fn flush(ctx: &mut RuntimeCtx) -> bool {
         report_settlement_issues(ctx);
     }
     persist_pending(ctx)
+}
+/// Camp purchases, training and equipment changes that earn a confirmation cue.
+fn confirms_purchase(command: &Command) -> bool {
+    matches!(
+        command,
+        Command::BuySkillNode(_)
+            | Command::BuyItem(_)
+            | Command::Equip { .. }
+            | Command::EquipRecruit { .. }
+            | Command::BuyNpcPoint
+            | Command::TrainNpc(_)
+            | Command::BuyRecruitPoint(_)
+            | Command::TrainRecruit { .. }
+            | Command::Recruit(_)
+    )
 }
 /// Settlement runs inside ticks and recalls; its failures become one notice.
 pub(super) fn report_settlement_issues(ctx: &mut RuntimeCtx) {
