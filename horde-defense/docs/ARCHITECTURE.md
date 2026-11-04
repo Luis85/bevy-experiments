@@ -23,7 +23,8 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | `sfx` (`SfxPlugin`) | Reads `SoundCue` messages; voice budget, priorities, variant rotation and the effects bus | Deciding what happened in combat |
 | `ui/*` (`UiPlugin`), `worldmap`, `inspector` | `Screen`/`Tab` states, `Navigation`, per-screen UI resources; read state, display decisions, collect intent; one notice system turns `RuntimeNotice`s into feedback and `NextState` | Mutating `GameSession`, ticking the game or paying rewards |
 | `review_tools` (`ReviewToolsPlugin`, `review` feature) | Automated captures, capture sequences, frame reports; scheduled only for review launches | Ordinary play or practice |
-| `art`, `visual_assets`, `animation` | Asset handles, padded atlas poses, read-only tick/event animation and bounded scene histories | Accuracy rolls, health, range or rewards |
+| `battle_view` (`BattleViewPlugin`) | `BattleViewModel`: a pure per-frame snapshot of one attempt (actors with id/kind/interpolated position/pose/health, structures, ordnance, fx, particles, defender) built from the attempt and cosmetic caches; pre-tick actor positions and the fixed-overstep blend fraction (1 in capture sequences and automated screenshots) | Writing to the attempt or deciding outcomes |
+| `art` (`art/battlefield/{terrain,structures,enemies,ordnance,fx}`), `visual_assets`, `animation` | Asset handles, padded atlas poses, the egui renderer of the view model, read-only tick/event animation and bounded scene histories. Enemy sprite cells, anchors, gaits and heights are data (`assets/art/enemy_visuals.json`, keyed by the catalogue's visual sprite id, validated at startup by `visual_assets::enemy_visuals`) | Accuracy rolls, health, range or rewards |
 | `atmosphere_audio` | Scene classification, six persistent environment channels, normalized crossfades and audio-bus gain | Combat clocks, weather damage or new hit resolution |
 
 ## Closed enums inside the workspace
@@ -49,11 +50,12 @@ flowchart LR
         Next[NextState Screen / Tab] --> Enter[OnEnter Screen::Battle: new-deployment reset]
     end
     subgraph FixedUpdate 60 Hz
-        Advance[RuntimeSet::Advance: whole ticks 1x / 2x / 4x]
+        Snapshot[battle_view: record pre-tick actor positions] --> Advance[RuntimeSet::Advance: whole ticks 1x / 2x / 4x]
     end
     subgraph Update
         Persist[RuntimeSet::Persist: saves] --> Sfx[SfxPlugin play_sounds]
         Ambience[publish_scene_audio, when inputs change] --> Atmos[AmbienceUpdate]
+        Blend[battle_view: overstep blend fraction]
     end
     subgraph PostUpdate
         Draw[EguiPrimaryContextPass: register_textures then draw]
@@ -66,7 +68,7 @@ flowchart LR
     Session[(GameSession)] -->|read-only| Draw
 ```
 
-Only real dependencies are ordered: notices after `Apply` (so command outcomes transition before this frame's draw), `play_sounds` after `Persist`, scene audio before `AmbienceUpdate`, texture registration before draw, and the native cursor after egui output. Notices written by `Advance`/`Persist` are read the next frame, before its state transition. `show_window` runs under a run condition until the window is visible. Runner passes take `GameSession` without change detection and mark it changed only when they mutated the game, so `Res<GameSession>` change ticks mean real changes; drawing cannot mutate it at all.
+Only real dependencies are ordered: position snapshots before `Advance`, notices after `Apply` (so command outcomes transition before this frame's draw), `play_sounds` after `Persist`, scene audio before `AmbienceUpdate`, texture registration before draw, and the native cursor after egui output. Notices written by `Advance`/`Persist` are read the next frame, before its state transition. `show_window` runs under a run condition until the window is visible. Runner passes take `GameSession` without change detection and mark it changed only when they mutated the game, so `Res<GameSession>` change ticks mean real changes; drawing cannot mutate it at all.
 
 | Resource / state | Owner | Purpose |
 |---|---|---|

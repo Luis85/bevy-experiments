@@ -123,6 +123,8 @@ pub(crate) struct BattleUi {
     pub(super) custom_cursor_requested: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
+    /// Pre-tick actor positions and this frame's blend; see `battle_view`.
+    pub(crate) interpolation: crate::battle_view::ActorInterpolation,
 }
 impl BattleUi {
     fn new(aim: [f32; 2]) -> Self {
@@ -144,6 +146,7 @@ impl BattleUi {
             custom_cursor_requested: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,
+            interpolation: crate::battle_view::ActorInterpolation::default(),
         }
     }
 }
