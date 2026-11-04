@@ -390,22 +390,11 @@ impl<'a> Graph<'a> {
                 );
             }
             pictogram(&painter, icon_rect.shrink(12.0 * scale), node.icon, color);
-            let width = (160.0 * scale).clamp(120.0, 180.0);
-            let mut job = egui::text::LayoutJob::simple(
-                node.title.clone(),
-                FontId::proportional((15.0 * scale).clamp(12.0, 20.0)),
-                TEXT,
-                width,
-            );
-            job.wrap = egui::text::TextWrapping::truncate_at_width(width);
-            let galley = painter.layout_job(job);
+            let galley = painter.layout_job(caption_job(&node.title, scale));
             let title_top = icon_rect.bottom() + 7.0;
             let state_y = title_top - node_center.y + galley.size().y + 10.0;
-            painter.galley(
-                pos2(node_center.x - galley.size().x * 0.5, title_top),
-                galley,
-                TEXT,
-            );
+            // Centre-aligned galleys are laid out around x = 0.
+            painter.galley(pos2(node_center.x, title_top), galley, TEXT);
             let compact_caption = !self.defenses && (compact || scale < 0.8);
             let badge = if compact_caption {
                 short_state(&node.state)
@@ -429,6 +418,8 @@ impl<'a> Graph<'a> {
 }
 
 const MIN_SKILL_SCALE: f32 = 0.75;
+/// Node captions wrap to at most this many centred rows.
+const TITLE_ROWS: usize = 2;
 fn bounded_pan(
     pan: egui::Vec2,
     viewport: egui::Vec2,
@@ -437,6 +428,25 @@ fn bounded_pan(
 ) -> egui::Vec2 {
     let limit = ((bounds * scale - viewport) * 0.5).max(egui::Vec2::ZERO);
     pan.clamp(-limit, limit)
+}
+/// A node name wraps onto a second centred line; only a pathological third
+/// line is elided. Authored nodes are spaced for two caption rows.
+fn caption_job(title: &str, scale: f32) -> egui::text::LayoutJob {
+    let width = (160.0 * scale).clamp(120.0, 180.0);
+    let mut job = egui::text::LayoutJob::simple(
+        title.to_owned(),
+        FontId::proportional((15.0 * scale).clamp(12.0, 20.0)),
+        TEXT,
+        width,
+    );
+    job.wrap = egui::text::TextWrapping {
+        max_width: width,
+        max_rows: TITLE_ROWS,
+        break_anywhere: false,
+        overflow_character: Some('…'),
+    };
+    job.halign = Align::Center;
+    job
 }
 fn short_state(state: &str) -> String {
     match state {
@@ -1035,5 +1045,39 @@ mod tests {
         let state = state.expect("Node state must remain separate");
         assert!(title.bottom() + 2.0 <= state.top());
         output.textures_delta.clear();
+    }
+    #[test]
+    fn every_authored_node_name_wraps_to_two_centred_rows_without_eliding() {
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        let catalog = horde_core::skill_catalog::skills();
+        let mut checked = 0;
+        let mut output = ctx.run_ui(egui::RawInput::default(), |ui| {
+            for scale in [MIN_SKILL_SCALE, 1.0, 1.4] {
+                for node in &catalog.nodes {
+                    let job = caption_job(&node.name, scale);
+                    let width = job.wrap.max_width;
+                    let galley = ui.painter().layout_job(job);
+                    assert!(!galley.elided, "{} elided at {scale}", node.name);
+                    assert!(galley.rows.len() <= TITLE_ROWS, "{}", node.name);
+                    assert!(galley.rect.width() <= width + 0.1, "{}", node.name);
+                    assert!(
+                        galley.rect.center().x.abs() < 0.5,
+                        "{} not centred",
+                        node.name
+                    );
+                    checked += 1;
+                }
+            }
+        });
+        output.textures_delta.clear();
+        // egui may run a pass more than once.
+        assert!(checked > 0 && checked % (catalog.nodes.len() * 3) == 0);
+        assert!(
+            catalog
+                .nodes
+                .iter()
+                .any(|n| n.name == "Survivor foundations")
+        );
     }
 }

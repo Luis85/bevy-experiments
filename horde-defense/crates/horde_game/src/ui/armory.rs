@@ -9,6 +9,20 @@ use horde_core::{
 };
 mod view;
 use view::{ArmoryOffer, OfferTraining};
+/// Right-aligned item-row column holding `Equip` or the `Equipped` status.
+const STATUS_COLUMN_WIDTH: f32 = 96.0;
+/// Shown instead of a before/after comparison for an equipped selection.
+pub(super) const CURRENTLY_EQUIPPED: &str = "Currently equipped";
+/// Hover reason on the disabled `Equip selected` action.
+const ALREADY_EQUIPPED_REASON: &str =
+    "Already equipped in this loadout. Select another item to compare or equip it.";
+fn mode_loadout_contains(f: &UiCtx, id: u64) -> bool {
+    if f.campaign.mode == Mode::Personal {
+        f.game.campaign.player.loadout.contains(&id)
+    } else {
+        f.game.campaign.npc.loadout.contains(&id)
+    }
+}
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ArmorySort {
     Newest,
@@ -130,17 +144,34 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
             );
         });
     });
+    // An equipped selection would repeat identical before/after columns.
+    let equipped = mode_loadout_contains(f, id);
+    if equipped {
+        ui.colored_label(GREEN, CURRENTLY_EQUIPPED);
+        muted(
+            ui,
+            "These are your current loadout values. Select another item to compare it.",
+        );
+    }
     egui::Grid::new(("item_comparison", id))
-        .num_columns(3)
+        .num_columns(if equipped { 2 } else { 3 })
         .spacing([18.0, 6.0])
         .show(ui, |ui| {
             ui.label("Loadout effect");
-            ui.strong("Equipped");
-            ui.strong("With this item");
+            if equipped {
+                ui.strong("Current loadout");
+            } else {
+                ui.strong("Equipped");
+                ui.strong("With this item");
+            }
             ui.end_row();
             let mut row = |label: &str, old: String, new: String, better: bool, worse: bool| {
                 ui.label(label);
                 ui.label(old);
+                if equipped {
+                    ui.end_row();
+                    return;
+                }
                 ui.colored_label(
                     if better {
                         GREEN
@@ -371,10 +402,13 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         });
     }
     ui.horizontal_wrapped(|ui| {
+        let row = chrome::begin_filter_row(ui);
         ui.add(
             egui::TextEdit::singleline(&mut f.armory.search)
                 .hint_text("Search equipment")
-                .desired_width(180.0),
+                .desired_width(180.0)
+                .min_size(vec2(180.0, row))
+                .vertical_align(Align::Center),
         );
         egui::ComboBox::from_id_salt("armory_slot")
             .selected_text(
@@ -599,21 +633,22 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
                     .campaign
                     .item_quality(item.id)
                     .expect("owned equipment");
-                let loadout = if f.campaign.mode == Mode::Personal {
-                    f.game.campaign.player.loadout
-                } else {
-                    f.game.campaign.npc.loadout
-                };
-                let equipped = loadout.contains(&item.id);
+                let equipped = mode_loadout_contains(f, item.id);
                 let reserved = f.game.campaign.item_reserved(item.id);
                 ui.push_id(item.id, |ui| {
                     ui.horizontal_top(|ui| {
                         slot_art(ui, f, item.definition_index(), quality);
-                        let name_width = (ui.available_width() - 100.0).max(150.0);
+                        // A fixed-width name column keeps every row's status
+                        // column at the same x, whatever the item name length.
+                        let name_width = (ui.available_width()
+                            - STATUS_COLUMN_WIDTH
+                            - ui.spacing().item_spacing.x)
+                            .max(150.0);
                         ui.allocate_ui_with_layout(
                             vec2(name_width, 62.0),
                             Layout::top_down(Align::Min),
                             |ui| {
+                                ui.set_width(name_width);
                                 // Rarity text retains contrast when selected; the
                                 // ordinary amber selection fill muddies blue/purple.
                                 ui.visuals_mut().selection.bg_fill = INK;
@@ -654,39 +689,65 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
                                 );
                             },
                         );
-                        if equipped {
-                            ui.colored_label(GREEN, "Equipped");
-                        } else if ui
-                            .add_enabled(
-                                !reserved
-                                    && f.game
-                                        .campaign
-                                        .can_use_weapon(f.campaign.mode, item.definition_index()),
-                                egui::Button::new("Equip"),
-                            )
-                            .on_disabled_hover_text(if reserved {
-                                "Reserved by a deployed survivor or guard."
-                            } else {
-                                f.game
-                                    .campaign
-                                    .weapon_access(f.campaign.mode, item.definition_index())
-                                    .err()
-                                    .unwrap_or_default()
-                            })
-                            .clicked()
-                        {
-                            f.dispatch(
-                                Command::Equip {
-                                    mode: f.campaign.mode,
-                                    id: item.id,
-                                },
-                                "Equipment changed.",
-                            );
-                        }
+                        ui.allocate_ui_with_layout(
+                            vec2(STATUS_COLUMN_WIDTH, 36.0),
+                            Layout::right_to_left(Align::Center),
+                            |ui| {
+                                status_cell(
+                                    ui,
+                                    f,
+                                    item.id,
+                                    item.definition_index(),
+                                    equipped,
+                                    reserved,
+                                )
+                            },
+                        );
                     });
                 });
             }
         });
+}
+
+/// One fixed-size slot per row, so `Equip` and `Equipped` share a centre line.
+fn status_cell(
+    ui: &mut egui::Ui,
+    f: &mut UiCtx,
+    id: u64,
+    definition: usize,
+    equipped: bool,
+    reserved: bool,
+) {
+    let size = vec2(STATUS_COLUMN_WIDTH - 8.0, 28.0);
+    if equipped {
+        ui.add_sized(
+            size,
+            egui::Label::new(RichText::new("Equipped").color(GREEN)),
+        );
+        return;
+    }
+    let usable = !reserved && f.game.campaign.can_use_weapon(f.campaign.mode, definition);
+    let response = ui
+        .add_enabled_ui(usable, |ui| ui.add_sized(size, egui::Button::new("Equip")))
+        .inner
+        .on_disabled_hover_text(if reserved {
+            "Reserved by a deployed survivor or guard."
+        } else {
+            f.game
+                .campaign
+                .weapon_access(f.campaign.mode, definition)
+                .err()
+                .unwrap_or_default()
+        });
+    if response.clicked() {
+        f.dispatch(
+            Command::Equip {
+                mode: f.campaign.mode,
+                id,
+            },
+            "Equipment changed.",
+        );
+    }
 }
 
 fn selected_item(ui: &mut egui::Ui, f: &mut UiCtx) {
@@ -705,23 +766,21 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     else {
         return;
     };
-    let loadout = if f.campaign.mode == Mode::Personal {
-        f.game.campaign.player.loadout
-    } else {
-        f.game.campaign.npc.loadout
-    };
+    let equipped = mode_loadout_contains(f, item.id);
     let reserved = f.game.campaign.item_reserved(item.id);
     ui.horizontal_wrapped(|ui| {
         if ui
             .add_enabled(
                 !reserved
-                    && !loadout.contains(&item.id)
+                    && !equipped
                     && f.game
                         .campaign
                         .can_use_weapon(f.campaign.mode, item.definition_index()),
                 egui::Button::new("Equip selected"),
             )
-            .on_disabled_hover_text(if reserved {
+            .on_disabled_hover_text(if equipped {
+                ALREADY_EQUIPPED_REASON
+            } else if reserved {
                 "Reserved by a deployed survivor or guard."
             } else {
                 f.game

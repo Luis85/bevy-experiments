@@ -100,7 +100,12 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
     muted(
         ui,
-        format!("{} · {} · {}", scene.title, scene.weather, scene.lighting),
+        format!(
+            "{} · {} · {}",
+            scene.title,
+            chrome::display_label(&scene.weather),
+            chrome::display_label(&scene.lighting)
+        ),
     );
     ui.add_space(8.0);
     let wide = ui.available_width() >= 820.0;

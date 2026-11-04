@@ -303,3 +303,103 @@ fn visible_quality_drop_receipts_never_grant_the_item_or_coins_twice() {
         1
     );
 }
+
+fn text_rect(output: &FullOutput, exact: &str) -> Vec<Rect> {
+    fn collect(shape: &egui::epaint::Shape, exact: &str, out: &mut Vec<Rect>) {
+        match shape {
+            egui::epaint::Shape::Text(text) if text.galley.text() == exact => {
+                out.push(text.galley.rect.translate(text.pos.to_vec2()));
+            }
+            egui::epaint::Shape::Vec(shapes) => {
+                shapes.iter().for_each(|shape| collect(shape, exact, out));
+            }
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for clipped in &output.shapes {
+        collect(&clipped.shape, exact, &mut out);
+    }
+    out
+}
+
+#[test]
+fn equip_buttons_and_equipped_labels_share_one_status_column() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign.coins = 65;
+    f.game.campaign.purchase_node("quick_reload").unwrap();
+    f.game.campaign.purchase_node("rifle_training").unwrap();
+    // Names of different lengths must not move the status column.
+    for definition in 0..content().items.len().min(4) {
+        f.game.campaign.add_item(definition).unwrap();
+    }
+    // Newest first: the equipped rifle is the top visible row.
+    let rifle = f.game.campaign.add_item(4).unwrap();
+    f.game.campaign.equip(Mode::Personal, rifle).unwrap();
+    // An equipped selection keeps the comparison header out of this check.
+    f.armory.selected_item = Some(rifle);
+    let output = h.frame(f, View::Armory, vec![]);
+    let equipped = text_rect(&output, "Equipped");
+    let equip = text_rect(&output, "Equip");
+    assert!(
+        !equipped.is_empty() && equip.len() >= 2,
+        "{equipped:?} {equip:?}"
+    );
+    let centre = equipped[0].center().x;
+    for rect in equipped.iter().chain(&equip) {
+        assert!(
+            (rect.center().x - centre).abs() < 1.0,
+            "status column is ragged: {centre} vs {rect:?}"
+        );
+    }
+}
+
+#[test]
+fn equipped_selection_says_so_instead_of_repeating_identical_columns() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign.coins = 65;
+    f.game.campaign.purchase_node("quick_reload").unwrap();
+    f.game.campaign.purchase_node("rifle_training").unwrap();
+    let rifle = f.game.campaign.add_item(4).unwrap();
+    let spare = f.game.campaign.add_item(4).unwrap();
+    f.game.campaign.equip(Mode::Personal, rifle).unwrap();
+    let has = |output: &FullOutput, text: &str| {
+        output.shapes.iter().any(|s| shape_has_text(&s.shape, text))
+    };
+    f.armory.selected_item = Some(rifle);
+    let output = h.frame(f, View::Armory, vec![]);
+    assert!(has(&output, crate::ui::armory::CURRENTLY_EQUIPPED));
+    assert!(has(&output, "Current loadout"));
+    assert!(!has(&output, "With this item"));
+    let before = f.game.campaign.player.loadout;
+    h.click(f, View::Armory, "Equip selected");
+    assert_eq!(f.game.campaign.player.loadout, before);
+    f.armory.selected_item = Some(spare);
+    let output = h.frame(f, View::Armory, vec![]);
+    assert!(!has(&output, crate::ui::armory::CURRENTLY_EQUIPPED));
+    assert!(has(&output, "With this item"));
+}
+
+#[test]
+fn armory_filter_row_shares_one_centre_line() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    let output = h.frame(f, View::Armory, vec![]);
+    let centre = |text: &str| {
+        text_rect(&output, text)
+            .first()
+            .unwrap_or_else(|| panic!("{text} not painted"))
+            .center()
+            .y
+    };
+    let row = centre("Search equipment");
+    for sibling in ["All slots", "All qualities", "Newest first"] {
+        let y = centre(sibling);
+        assert!((y - row).abs() < 1.0, "{sibling} at {y}, search at {row}");
+    }
+}

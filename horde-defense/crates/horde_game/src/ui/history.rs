@@ -12,6 +12,8 @@ pub(crate) struct HistoryUi {
     front: String,
     selected: Option<u64>,
 }
+/// The one next step offered while the settlement ledger is empty.
+const EMPTY_NEXT_STEP: &str = "Finish or retreat from a defense to record your first run.";
 fn outcome_name(outcome: Outcome) -> &'static str {
     match outcome {
         Outcome::Victory => "Victory",
@@ -51,6 +53,7 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
         let records = &f.game.campaign.run_history;
         let state = &mut f.history;
         ui.horizontal_wrapped(|ui| {
+            let row = chrome::begin_filter_row(ui);
             egui::ComboBox::from_id_salt("history-mode").selected_text(state.mode.map_or("All modes", mode_name)).show_ui(ui, |ui| {
                 ui.selectable_value(&mut state.mode, None, "All modes");
                 for mode in [Mode::Personal, Mode::Npc] { ui.selectable_value(&mut state.mode, Some(mode), mode_name(mode)); }
@@ -59,7 +62,7 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
                 ui.selectable_value(&mut state.outcome, None, "All outcomes");
                 for outcome in [Outcome::Victory, Outcome::Defeat, Outcome::Withdrawal] { ui.selectable_value(&mut state.outcome, Some(outcome), outcome_name(outcome)); }
             });
-            ui.add(egui::TextEdit::singleline(&mut state.front).hint_text("Filter front / country").desired_width(180.0));
+            ui.add(egui::TextEdit::singleline(&mut state.front).hint_text("Filter front / country").desired_width(180.0).min_size(vec2(180.0, row)).vertical_align(egui::Align::Center));
             if ui.small_button("Clear filters").clicked() { state.mode = None; state.outcome = None; state.front.clear(); }
         });
         let rows = matching(records, state);
@@ -68,6 +71,8 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
         if records.is_empty() {
             chrome::section(ui, "Your first report starts here");
             ui.label("Completed defenses, defeats and withdrawals are recorded automatically. Older saves begin with an empty ledger; past results are not invented.");
+            ui.add_space(6.0);
+            ui.colored_label(AMBER, EMPTY_NEXT_STEP);
             return;
         }
         if rows.is_empty() { ui.label("No runs match these filters."); return; }
