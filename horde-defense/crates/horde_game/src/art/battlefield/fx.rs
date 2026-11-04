@@ -335,16 +335,37 @@ pub(super) fn events(
                 // Currency feedback stays separate from the real-time resolved
                 // damage-number cache used by battlefield presentation.
                 if numbers && e.kind == EventKind::Kill && e.value > 0 {
-                    p.text(
-                        at + vec2(0.0, -10.0 - if reduced { 0. } else { age * 24.0 }),
-                        Align2::CENTER_CENTER,
-                        format!("+{}c", e.value),
-                        FontId::proportional(13.0),
-                        color.gamma_multiply(alpha),
-                    );
+                    let rise = if reduced { 0.0 } else { age * 24.0 };
+                    coin_popup(p, at + vec2(0.0, -12.0 - rise), e.value, alpha, reduced);
                 }
             }
             _ => {}
         }
     }
+}
+/// Banked-coin pop-up: amber with the same eight-way dark outline as the
+/// damage numbers, so it reads against any ground. Reduced effects keep it
+/// still (the caller drops the drift) with a thinner outline.
+fn coin_popup(p: &Painter, center: Pos2, coins: i32, alpha: f32, reduced: bool) {
+    let galley = p.layout_no_wrap(
+        format!("+{coins}c"),
+        FontId::proportional(if reduced { 15.0 } else { 16.0 }),
+        AMBER,
+    );
+    let origin = center - galley.size() * 0.5;
+    let outline = C::from_black_alpha((235.0 * alpha.clamp(0.0, 1.0)) as u8);
+    let border = if reduced { 1.0 } else { 1.5 };
+    for direction in [
+        vec2(-1.0, -1.0),
+        vec2(0.0, -1.0),
+        vec2(1.0, -1.0),
+        vec2(-1.0, 0.0),
+        vec2(1.0, 0.0),
+        vec2(-1.0, 1.0),
+        vec2(0.0, 1.0),
+        vec2(1.0, 1.0),
+    ] {
+        p.galley_with_override_text_color(origin + direction * border, galley.clone(), outline);
+    }
+    p.galley_with_override_text_color(origin, galley, AMBER.gamma_multiply(alpha));
 }

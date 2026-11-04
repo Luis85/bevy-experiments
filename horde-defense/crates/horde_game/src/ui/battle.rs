@@ -589,13 +589,21 @@ fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx, view: &hud::HudVie
                 ));
                 ui.label(
                     RichText::new(format!(
-                        "{}-enemy groups · gear Lv{}",
-                        view.batch_size, view.gear_level
+                        "{} · gear Lv{}",
+                        arrival_groups(view.batch_size),
+                        view.gear_level
                     ))
                     .size(10.0),
                 );
             });
     });
+}
+/// How enemies arrive, in words: "single arrivals" or "groups of 3".
+fn arrival_groups(size: u32) -> String {
+    match size {
+        0 | 1 => "single arrivals".to_owned(),
+        size => format!("groups of {size}"),
+    }
 }
 fn attack_selector_rect(canvas: Rect, arena: Rect) -> Rect {
     Rect::from_min_max(
@@ -617,15 +625,38 @@ fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
         ] {
             let slot = selection.ordnance().map(|kind| view.slot(kind));
             let unlocked = slot.is_none_or(|slot| slot.unlocked);
-            let hint = if let Some(slot) = slot.filter(|_| unlocked) {
-                format!("{label}: {} charges. Select, then click a ground cell to throw.", slot.charges)
-            } else if slot.is_none() {
-                format!("{class}: hold {} to fire.", f.settings.bindings[Action::Fire as usize])
-            } else {
-                format!("Learn {label} handling in the Ordnance branch of Survival skills after this attempt.")
-            };
-            if ui.add_enabled_ui(unlocked, |ui| ui.add_sized(vec2(button_width, 26.0), egui::Button::selectable(f.battle.attack_selection == selection, RichText::new(label).size(12.0))))
-                .inner.on_hover_text(&hint).on_disabled_hover_text(&hint).clicked() {
+            let fire = &f.settings.bindings[Action::Fire as usize];
+            let (hint, color) =
+                throwable_state(label, slot, || format!("{class}: hold {fire} to fire."));
+            let selected = f.battle.attack_selection == selection;
+            let button = egui::Button::new(RichText::new(label).size(12.0).color(color))
+                .selected(selected)
+                .frame(true);
+            let response = ui
+                .add_enabled_ui(unlocked, |ui| {
+                    ui.add_sized(vec2(button_width, 26.0), button)
+                })
+                .inner;
+            // Cooldown progress underlines a recharging throwable.
+            if let Some(slot) =
+                slot.filter(|slot| slot.unlocked && slot.cooldown > 0 && slot.charges > 0)
+            {
+                let rect = response.rect.shrink2(vec2(4.0, 2.0));
+                let ready = 1.0 - (slot.cooldown as f32 / slot.cooldown_total).clamp(0.0, 1.0);
+                let y = rect.bottom();
+                ui.painter().line_segment(
+                    [
+                        pos2(rect.left(), y),
+                        pos2(rect.left() + rect.width() * ready, y),
+                    ],
+                    Stroke::new(2.0, AMBER),
+                );
+            }
+            if response
+                .on_hover_text(&hint)
+                .on_disabled_hover_text(&hint)
+                .clicked()
+            {
                 f.battle.attack_selection = selection;
                 f.battle.fire_latched = false;
                 f.battle.pending.fire = false;
@@ -653,6 +684,42 @@ fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
     };
     ui.add(egui::Label::new(RichText::new(&helper).size(11.0).color(MUTED)).truncate())
         .on_hover_text(helper);
+}
+/// Hover reason and label colour of one attack selector. A locked throwable
+/// names where it is learned; an unlocked one states its charges or cooldown.
+fn throwable_state(
+    label: &str,
+    slot: Option<&battle_view::OrdnanceSlotView>,
+    gun: impl FnOnce() -> String,
+) -> (String, Color32) {
+    match slot {
+        None => (gun(), TEXT),
+        Some(slot) if !slot.unlocked => (
+            format!(
+                "{label} locked. Learn it in the Ordnance branch of Survival skills after this attempt."
+            ),
+            MUTED,
+        ),
+        Some(slot) if slot.charges == 0 => (
+            format!("{label}: no charges left. Renewed next attempt."),
+            RED,
+        ),
+        Some(slot) if slot.cooldown > 0 => (
+            format!(
+                "{label}: {} charges · ready in {:.1}s. Select, then click a ground cell to throw.",
+                slot.charges,
+                slot.cooldown as f32 / 60.0
+            ),
+            AMBER,
+        ),
+        Some(slot) => (
+            format!(
+                "{label}: {} charges. Select, then click a ground cell to throw.",
+                slot.charges
+            ),
+            TEXT,
+        ),
+    }
 }
 fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx, view: &BattleScreen) {
     let arena = projection(f, r);
@@ -749,8 +816,11 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen, hud_view
     muted(
         ui,
         format!(
-            "{:.0} yd path · {} difficulty · groups {} · new gear Lv{}",
-            view.width_yards, field.difficulty, field.batch_size, field.gear_level
+            "{:.0} yd path · {} difficulty · {} · new gear Lv{}",
+            view.width_yards,
+            field.difficulty,
+            arrival_groups(field.batch_size),
+            field.gear_level
         ),
     );
     hud::dps(ui, &hud_view.dps);
@@ -938,6 +1008,12 @@ mod selector_layout_tests {
             });
             output.textures_delta.clear();
         }
+    }
+    #[test]
+    fn arrival_groups_read_naturally() {
+        assert_eq!(arrival_groups(1), "single arrivals");
+        assert_eq!(arrival_groups(2), "groups of 2");
+        assert_eq!(arrival_groups(5), "groups of 5");
     }
     #[test]
     fn shorter_opening_clearing_grows_at_stable_yard_scale_and_stays_in_its_canvas() {
