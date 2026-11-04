@@ -487,3 +487,41 @@ fn equipment_keeps_its_loadout_comparison_on_screen_at_desktop_size() {
         );
     }
 }
+
+#[test]
+fn defender_picker_label_shares_its_buttons_centre_line() {
+    for tab in [Tab::Armory, Tab::Briefing] {
+        let mut fixture = IsolatedFrontend::new();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.game.campaign_mut().attempts = 1;
+        assert!(
+            f.game
+                .campaign()
+                .has_feature(horde_core::skill_catalog::CampaignFeature::Companion)
+        );
+        f.act(|c| c.open_preparation(tab));
+        let npc = f.game.campaign().npc.name.clone();
+        for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+            settings::configure(&h.ctx, scale);
+            f.settings.scale = scale;
+            let output = h.frame_size(f, View::WorldWithChrome, vec![], size);
+            let centre = |text: &str| {
+                text_rect(&output, text)
+                    .first()
+                    .unwrap_or_else(|| panic!("{tab:?} {size:?}: {text} not painted"))
+                    .center()
+                    .y
+            };
+            let label = centre("Defender");
+            for button in ["You", npc.as_str()] {
+                let y = centre(button);
+                assert!(
+                    (y - label).abs() < 1.0,
+                    "{tab:?} {size:?}: {button} at {y}, Defender at {label}"
+                );
+            }
+        }
+    }
+}

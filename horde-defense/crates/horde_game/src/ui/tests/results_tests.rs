@@ -213,7 +213,7 @@ fn the_upgrade_home_shares_the_camp_header_and_orders_its_actions() {
             .unwrap_or_else(|| panic!("{label} painted"))
             .left()
     };
-    let order = ["Try again", "Run analysis", "More", "Leave journey"];
+    let order = ["Try again", "Run history", "More", "Leave journey"];
     for pair in order.windows(2) {
         assert!(x(pair[0]) < x(pair[1]), "{} before {}", pair[0], pair[1]);
     }

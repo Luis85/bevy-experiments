@@ -38,7 +38,8 @@ pub(super) fn mode_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
         return;
     }
     let previous = f.campaign.mode;
-    ui.horizontal_wrapped(|ui| {
+    // Its own centred row, so the label meets its buttons wherever it is placed.
+    row(ui, |ui| {
         ui.label("Defender");
         ui.selectable_value(&mut f.campaign.mode, Mode::Personal, "You");
         let available = f.game.campaign().npc_available();
@@ -72,6 +73,21 @@ pub(super) fn begin_filter_row(ui: &mut egui::Ui) -> f32 {
     ui.set_min_height(row);
     row
 }
+/// A wrapped row whose labels and buttons share one centre line. Use it for
+/// any row that mixes plain text with buttons or pickers.
+pub(super) fn row<R>(
+    ui: &mut egui::Ui,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> egui::InnerResponse<R> {
+    ui.horizontal_wrapped(|ui| {
+        begin_filter_row(ui);
+        add(ui)
+    })
+}
+/// `count` followed by the singular or plural noun: `1 alert`, `2 alerts`.
+pub(super) fn count_noun(count: usize, singular: &str, plural: &str) -> String {
+    format!("{count} {}", if count == 1 { singular } else { plural })
+}
 /// Sentence-case label for an authored snake_case or kebab-case content id,
 /// such as a stage theme's weather (`ground_fog` → `Ground fog`) or lighting.
 /// Theme ids have no separate authored display name, so presentation derives one.
@@ -89,7 +105,17 @@ pub(super) fn display_label(id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::display_label;
+    use super::{count_noun, display_label};
+
+    #[test]
+    fn counts_agree_with_their_noun() {
+        assert_eq!(count_noun(1, "alert", "alerts"), "1 alert");
+        assert_eq!(count_noun(0, "alert", "alerts"), "0 alerts");
+        assert_eq!(
+            count_noun(3, "live expedition", "live expeditions"),
+            "3 live expeditions"
+        );
+    }
 
     #[test]
     fn display_label_humanises_authored_theme_ids() {

@@ -22,16 +22,18 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                         .font(FontId::new(24.0, egui::FontFamily::Name("display".into())))
                         .color(AMBER),
                 );
-                if ui.available_width() > 670.0 {
-                    muted(
-                        ui,
-                        match f.screen {
-                            Screen::Battle => "Hold the line",
-                            Screen::Settings => "Settings",
-                            Screen::History => "Run analysis",
-                            _ => "Field command",
-                        },
-                    );
+                // Each screen is named once. The upgrade home is named by its
+                // selected tab, and Settings and run history by their page
+                // titles, so the header adds no subtitle there.
+                let subtitle = match f.screen {
+                    Screen::Battle => Some("Hold the line"),
+                    Screen::Results | Screen::Settings | Screen::History => None,
+                    _ => Some("Field command"),
+                };
+                if let Some(subtitle) = subtitle
+                    && ui.available_width() > 670.0
+                {
+                    muted(ui, subtitle);
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if f.screen != Screen::Settings && ui.button("Settings").clicked() {
@@ -39,10 +41,10 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                     }
                     // Camp and the upgrade home share one header grammar.
                     let between_runs = matches!(f.screen, Screen::Camp | Screen::Results);
-                    if between_runs && ui.small_button("History").clicked() {
+                    if between_runs && ui.button("History").clicked() {
                         f.open_history();
                     }
-                    if between_runs && ui.small_button("Menu").clicked() {
+                    if between_runs && ui.button("Menu").clicked() {
                         f.dispatch(Command::SetPaused(true), "");
                         f.request_save(SaveIntent::Menu);
                     }
@@ -57,7 +59,12 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                     if alerts > 0
                         && ui
                             .add(egui::Button::new(
-                                RichText::new(format!("{alerts} plague alerts")).color(RED),
+                                RichText::new(super::chrome::count_noun(
+                                    alerts,
+                                    "plague alert",
+                                    "plague alerts",
+                                ))
+                                .color(RED),
                             ))
                             .clicked()
                     {
@@ -131,7 +138,7 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
                 .inner_margin(egui::Margin::symmetric(18, 6)),
         )
         .show(root, |ui| {
-            ui.horizontal_wrapped(|ui| {
+            super::chrome::row(ui, |ui| {
                 for entry in camp_entries(f) {
                     let selected = match entry {
                         NavEntry::Upgrades => f.screen == Screen::Results,
@@ -184,7 +191,7 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
                 .inner_margin(egui::Margin::symmetric(18, 7)),
         )
         .show(root, |ui| {
-            ui.horizontal_wrapped(|ui| {
+            super::chrome::row(ui, |ui| {
                 if let Some(a) = f.game.attempt() {
                     ui.strong(format!(
                         "Active defense · {}",
@@ -196,7 +203,11 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
                     ));
                 }
                 if fields > 0 {
-                    ui.label(format!("{fields} live expeditions"));
+                    ui.label(super::chrome::count_noun(
+                        fields,
+                        "live expedition",
+                        "live expeditions",
+                    ));
                     if ui.button("View live fields").clicked() {
                         if f.screen != Screen::Camp {
                             f.dispatch(Command::SetPaused(true), "");
@@ -210,7 +221,14 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
                     }
                 }
                 if alerts > 0 {
-                    ui.colored_label(RED, format!("{alerts} outbreaks need a response"));
+                    ui.colored_label(
+                        RED,
+                        if alerts == 1 {
+                            "1 outbreak needs a response".to_owned()
+                        } else {
+                            format!("{alerts} outbreaks need a response")
+                        },
+                    );
                 }
                 muted(
                     ui,

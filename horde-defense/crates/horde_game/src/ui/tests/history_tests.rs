@@ -40,7 +40,7 @@ fn history_is_reachable_from_menu_camp_and_results_without_repaying_settled_runs
     h.click(f, View::History, "Back");
     assert!(f.screen == Screen::Camp);
     f.screen = Screen::Results;
-    h.click(f, View::Results, "Run analysis");
+    h.click(f, View::Results, "Run history");
     assert!(f.screen == Screen::History);
     h.click(f, View::History, "Back");
     assert!(f.screen == Screen::Results);

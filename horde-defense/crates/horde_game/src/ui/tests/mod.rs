@@ -424,6 +424,7 @@ mod battle_tests;
 mod briefing_tests;
 mod camp_tests;
 mod character_tests;
+mod chrome_tests;
 mod feedback_tests;
 mod history_tests;
 mod menu_tests;

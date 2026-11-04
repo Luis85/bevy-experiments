@@ -148,7 +148,7 @@ fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             f.open_campaign();
         }
     }
-    if ui.button("Run analysis").clicked() {
+    if ui.button("Run history").clicked() {
         f.open_history();
     }
     ui.menu_button("More", |ui| {

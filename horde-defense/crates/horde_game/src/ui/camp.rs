@@ -39,15 +39,15 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
             }
             ui.add_space(5.0);
             if f.game.campaign().world.start.is_some() {
-                ui.horizontal_wrapped(|ui| {
-                    if ui.small_button("Save campaign").clicked() {
+                chrome::row(ui, |ui| {
+                    if ui.button("Save campaign").clicked() {
                         f.request_save(SaveIntent::Manual);
                     }
                     if f.operations_available() {
                         time_controls(ui, f);
                     }
                 });
-            } else if ui.small_button("Back to survivor").clicked() {
+            } else if ui.button("Back to survivor").clicked() {
                 f.open_survivor_selection();
             }
             if !f.status.message.is_empty()
@@ -79,14 +79,15 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
 fn world_ui(ui: &mut egui::Ui, f: &mut UiCtx) {
     let compact = ui.available_width() < 900.0;
     if compact {
-        ui.label(
-            RichText::new(if f.game.campaign().world.start.is_none() {
+        // The same display title as every page, without its description.
+        chrome::page_title(
+            ui,
+            if f.game.campaign().world.start.is_none() {
                 "Choose your starting country"
             } else {
                 "Campaign map"
-            })
-            .size(22.0)
-            .strong(),
+            },
+            "",
         );
     } else {
         chrome::page_title(
@@ -351,8 +352,9 @@ fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
         muted(
             ui,
             format!(
-                "{fields} expeditions · {} alerts",
-                f.game.strategy().active_outbreaks()
+                "{} · {}",
+                chrome::count_noun(fields, "expedition", "expeditions"),
+                chrome::count_noun(f.game.strategy().active_outbreaks(), "alert", "alerts")
             ),
         );
     }

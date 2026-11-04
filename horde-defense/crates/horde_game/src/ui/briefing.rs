@@ -148,7 +148,7 @@ fn heading(ui: &mut egui::Ui, title: &str) {
     ui.label(RichText::new(title).size(18.0).strong());
 }
 fn loadout(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
-    ui.horizontal(|ui| {
+    chrome::row(ui, |ui| {
         heading(ui, "Field loadout");
         ui.add_space(12.0);
         if ui.button("Change equipment").clicked() {

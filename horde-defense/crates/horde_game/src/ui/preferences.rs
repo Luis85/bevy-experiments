@@ -21,7 +21,7 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK).inner_margin(20))
         .show(root, |ui| {
-            ui.horizontal_wrapped(|ui| {
+            chrome::row(ui, |ui| {
                 chrome::page_title(ui, "Settings", "");
                 ui.add_enabled_ui(!f.runtime.durable_transition_pending(), |ui| {
                     if primary(ui, f.settings_return_label()) {
@@ -202,7 +202,7 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
             .prefs
             .balance_draft
             .get_or_insert_with(|| committed.clone());
-        ui.horizontal_wrapped(|ui| {
+        chrome::row(ui, |ui| {
             for preset in BalancePreset::ALL {
                 if ui
                     .selectable_label(draft.preset == preset, preset.name())

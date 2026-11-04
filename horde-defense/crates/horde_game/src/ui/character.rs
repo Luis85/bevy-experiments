@@ -29,12 +29,14 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
     ui.horizontal_wrapped(|ui| {
         if f.game.campaign().legacy_features {
             ui.strong(format!("{} legacy CP available in the tree", p.points));
+            ui.add_space(16.0);
         }
         ui.label(format!(
             "Level {} · body development in the upgrade tree",
             p.level
         ));
         if f.game.campaign().legacy_features {
+            ui.add_space(16.0);
             muted(
                 ui,
                 format!(
@@ -170,11 +172,13 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
     let n = f.game.campaign().npc.clone();
     ui.horizontal_wrapped(|ui| {
         ui.strong(format!("{} CP available", n.unspent));
+        ui.add_space(16.0);
         ui.label(format!(
             "{} / {} advancement awarded",
             n.awarded,
             f.game.campaign().allowance()
         ));
+        ui.add_space(16.0);
         ui.label(format!(
             "Guns {} · Melee {} · HP {} · FP {} · Dodge {}",
             n.guns,
@@ -205,7 +209,7 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
             continue;
         }
         ui.push_id(t.name(), |ui| {
-            ui.horizontal_wrapped(|ui| {
+            chrome::row(ui, |ui| {
                 ui.strong(t.name());
                 ui.label(format!("{} CP", t.cost()));
                 let supported = t != NpcTraining::Strength || n.st < 20;

@@ -35,7 +35,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     if !view.outbreaks.is_empty() {
         chrome::section(ui, "Urgent outbreaks");
         for outbreak in &view.outbreaks {
-            ui.horizontal_wrapped(|ui| {
+            chrome::row(ui, |ui| {
                 ui.colored_label(
                     RED,
                     format!(
@@ -62,7 +62,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     for line in &view.live {
         let id = line.id;
-        ui.horizontal_wrapped(|ui| {
+        chrome::row(ui, |ui| {
             ui.strong(format!(
                 "{} · {} · defense {}",
                 line.recruit,
@@ -121,16 +121,32 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             f.open_briefing();
         }
     } else {
-        ui.horizontal_wrapped(|ui| {
+        chrome::row(ui, |ui| {
             ui.label("Orders for");
-            egui::ComboBox::from_id_salt("operations_country").selected_text(country_name(&f.campaign.selected_country)).show_ui(ui, |ui| {
-                for country in &world().countries {
-                    if f.game.campaign().world.can_enter(&country.id) { ui.selectable_value(&mut f.campaign.selected_country, country.id.clone(), &country.name); }
-                }
-            });
-            let liberated = f.game.campaign().world.cleared.contains(&f.campaign.selected_country);
+            egui::ComboBox::from_id_salt("operations_country")
+                .selected_text(country_name(&f.campaign.selected_country))
+                .show_ui(ui, |ui| {
+                    for country in &world().countries {
+                        if f.game.campaign().world.can_enter(&country.id) {
+                            ui.selectable_value(
+                                &mut f.campaign.selected_country,
+                                country.id.clone(),
+                                &country.name,
+                            );
+                        }
+                    }
+                });
+            let liberated = f
+                .game
+                .campaign()
+                .world
+                .cleared
+                .contains(&f.campaign.selected_country);
             let space = f.game.strategy().roster.len() < config.max_roster;
-            let can_recruit = liberated && space && f.game.campaign().coins >= config.recruit_cost && f.game.campaign().reserved.is_none();
+            let can_recruit = liberated
+                && space
+                && f.game.campaign().coins >= config.recruit_cost
+                && f.game.campaign().reserved.is_none();
             if ui.add_enabled(can_recruit, egui::Button::new(format!("Recruit survivor · {} coins", config.recruit_cost))).on_disabled_hover_text("Choose a liberated country, keep space in the roster and enough coins, and return the active defender to camp.").clicked() { f.dispatch(Command::Recruit(f.campaign.selected_country.clone()), "Survivor recruited with independent protected equipment."); }
         });
         muted(
@@ -158,7 +174,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     for recruit in f.game.strategy().roster.clone() {
         ui.push_id(recruit.id, |ui| {
-            ui.horizontal_wrapped(|ui| {
+            chrome::row(ui, |ui| {
                 ui.strong(&recruit.name);
                 ui.label(format!("{:?} · from {}", recruit.status, country_name(&recruit.origin)));
                 if let Some(guard) = f.game.strategy().guards.iter().find(|g| g.recruit_id == recruit.id) { ui.colored_label(AMBER, format!("Guarding {}", country_name(&guard.country_id))); }

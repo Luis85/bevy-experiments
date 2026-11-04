@@ -45,9 +45,9 @@ fn matching<'a>(records: &'a [RunRecord], state: &HistoryUi) -> Vec<&'a RunRecor
 pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
     let mut close = false;
     egui::CentralPanel::default().frame(egui::Frame::new().fill(INK).inner_margin(20)).show(root, |ui| {
-        // The page title and its one way back share a row; the global header
-        // already names the screen ("Run analysis").
-        ui.horizontal(|ui| {
+        // The page title names the screen (the global header does not
+        // repeat it) and shares a row with its one way back.
+        chrome::row(ui, |ui| {
             ui.label(RichText::new("Run history").font(FontId::new(28.0, egui::FontFamily::Name("display".into()))));
             ui.add_space(16.0);
             if ui.button("Back").on_hover_text("Return to the page you opened history from").clicked() { close = true; }
