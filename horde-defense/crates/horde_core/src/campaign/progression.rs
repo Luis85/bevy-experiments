@@ -1,0 +1,814 @@
+//! Skills, body attributes, player and survivor development, level and lane progression.
+
+use super::*;
+
+pub(super) fn legacy_training_default() -> bool {
+    true
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum BodyAttribute {
+    Vitality,
+    Strength,
+    Coordination,
+    Endurance,
+    Perception,
+}
+
+impl BodyAttribute {
+    pub const ALL: [Self; 5] = [
+        Self::Vitality,
+        Self::Strength,
+        Self::Coordination,
+        Self::Endurance,
+        Self::Perception,
+    ];
+    pub fn index(self) -> usize {
+        self as usize
+    }
+}
+
+impl StableKind for BodyAttribute {
+    const ALL: &'static [Self] = &Self::ALL;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Skill {
+    Piercing,
+    QuickReload,
+    Sweep,
+    SecondWind,
+    Brace,
+    Engineering,
+}
+
+impl Skill {
+    pub const ALL: [Self; 6] = [
+        Self::Piercing,
+        Self::QuickReload,
+        Self::Sweep,
+        Self::SecondWind,
+        Self::Brace,
+        Self::Engineering,
+    ];
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Piercing => "piercing",
+            Self::QuickReload => "quick_reload",
+            Self::Sweep => "sweep",
+            Self::SecondWind => "second_wind",
+            Self::Brace => "brace",
+            Self::Engineering => "engineering",
+        }
+    }
+    pub fn name(self) -> &'static str {
+        &skills()
+            .node(self.id())
+            .expect("validated legacy skill")
+            .name
+    }
+    pub fn description(self) -> &'static str {
+        &skills()
+            .node(self.id())
+            .expect("validated legacy skill")
+            .description
+    }
+    pub fn price(self) -> u64 {
+        skills()
+            .node(self.id())
+            .expect("validated legacy skill")
+            .price
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub enum NpcTraining {
+    Strength,
+    Dexterity,
+    Intelligence,
+    Health,
+    Guns,
+    Melee,
+    HitPoints,
+    Fatigue,
+}
+
+impl NpcTraining {
+    pub const ALL: [Self; 8] = [
+        Self::Strength,
+        Self::Dexterity,
+        Self::Intelligence,
+        Self::Health,
+        Self::Guns,
+        Self::Melee,
+        Self::HitPoints,
+        Self::Fatigue,
+    ];
+}
+
+impl StableKind for NpcTraining {
+    const ALL: &'static [Self] = &Self::ALL;
+}
+
+impl NpcTraining {
+    pub fn cost(self) -> u32 {
+        match self {
+            Self::Strength | Self::Health => 10,
+            Self::Dexterity | Self::Intelligence => 20,
+            Self::Guns | Self::Melee => 4,
+            Self::HitPoints => 2,
+            Self::Fatigue => 3,
+        }
+    }
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Strength => "ST +1",
+            Self::Dexterity => "DX +1 (skills +1)",
+            Self::Intelligence => "IQ +1 (informational)",
+            Self::Health => "HT +1",
+            Self::Guns => "Guns (Rifle) +1",
+            Self::Melee => "Broadsword +1",
+            Self::HitPoints => "HP (train ST)",
+            Self::Fatigue => "FP (train HT)",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Player {
+    #[serde(default)]
+    pub legacy_graph_points: u32,
+    pub level: u32,
+    pub xp: u64,
+    pub points: u32,
+    pub body: KindMap<BodyAttribute, u32>,
+    pub loadout: [u64; 4],
+}
+
+impl Player {
+    pub fn level_cap() -> u32 {
+        crate::progression::catalog().player_level_cap
+    }
+    pub fn is_max_level(&self) -> bool {
+        self.level >= Self::level_cap()
+    }
+    pub fn next_level_xp(&self) -> u64 {
+        (20.0 + 15.0 * ((self.level.saturating_sub(1)) as f64).powf(1.3)).round() as u64
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct NpcCreation {
+    pub archetype: String,
+    pub st: i32,
+    pub dx: i32,
+    pub iq: i32,
+    pub ht: i32,
+    pub guns: i32,
+    pub melee: i32,
+    pub budget: u32,
+}
+
+impl Default for NpcCreation {
+    fn default() -> Self {
+        Self {
+            archetype: "Marksman".into(),
+            st: 10,
+            dx: 12,
+            iq: 10,
+            ht: 12,
+            guns: 16,
+            melee: 13,
+            budget: 76,
+        }
+    }
+}
+
+impl NpcCreation {
+    pub fn archetype(index: usize) -> Self {
+        match index % 4 {
+            0 => Self::default(),
+            1 => Self {
+                archetype: "Guardian".into(),
+                st: 12,
+                dx: 11,
+                iq: 10,
+                ht: 12,
+                guns: 13,
+                melee: 14,
+                budget: 76,
+            },
+            2 => Self {
+                archetype: "Scout".into(),
+                st: 10,
+                dx: 13,
+                iq: 10,
+                ht: 10,
+                guns: 16,
+                melee: 15,
+                budget: 76,
+            },
+            _ => Self {
+                archetype: "Steadfast".into(),
+                st: 11,
+                dx: 11,
+                iq: 10,
+                ht: 13,
+                guns: 14,
+                melee: 13,
+                budget: 76,
+            },
+        }
+    }
+    pub fn points(&self) -> Option<i32> {
+        let stats = Stats {
+            st: self.st,
+            dx: self.dx,
+            iq: self.iq,
+            ht: self.ht,
+        };
+        Some(
+            stats.point_cost()
+                + crate::rules::skill_point_cost(
+                    self.guns - self.dx,
+                    crate::rules::Difficulty::Easy,
+                )? as i32
+                + crate::rules::skill_point_cost(
+                    self.melee - self.dx,
+                    crate::rules::Difficulty::Average,
+                )? as i32,
+        )
+    }
+    pub fn valid(&self) -> bool {
+        !self.archetype.trim().is_empty()
+            && self.archetype.len() <= 48
+            && [self.st, self.dx, self.iq, self.ht]
+                .into_iter()
+                .all(|n| (8..=14).contains(&n))
+            && (3..=20).contains(&self.guns)
+            && (3..=20).contains(&self.melee)
+            && self.guns - self.dx >= 2
+            && self.melee - self.dx >= 1
+            && self.budget == 76
+            && self
+                .points()
+                .is_some_and(|p| p >= 0 && p as u32 == self.budget)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Npc {
+    pub name: String,
+    #[serde(default)]
+    pub creation: NpcCreation,
+    pub st: i32,
+    pub dx: i32,
+    pub iq: i32,
+    pub ht: i32,
+    pub guns: i32,
+    pub melee: i32,
+    pub extra_hp: i32,
+    pub extra_fp: i32,
+    pub awarded: u32,
+    pub unspent: u32,
+    pub investments: KindMap<NpcTraining, u32>,
+    pub successful_hits: u64,
+    pub combat_ticks: u64,
+    pub objectives_claimed: [bool; 2],
+    pub first_clears: [bool; 5],
+    #[serde(default)]
+    pub first_clear_claimed: [u32; 5],
+    pub policy: Policy,
+    pub recall_percent: u32,
+    pub prefer_aim: bool,
+    pub early_reload: bool,
+    pub allow_risk: bool,
+    pub loadout: [u64; 4],
+    pub attempts: u64,
+    pub victories: u64,
+}
+
+impl Npc {
+    pub fn claim_objectives(&mut self, allowance: u32) -> u32 {
+        let before = self.awarded;
+        let award = |npc: &mut Self, points: u32| {
+            let grant = points.min(allowance.saturating_sub(npc.awarded));
+            npc.awarded += grant;
+            npc.unspent += grant;
+            grant
+        };
+        for (index, ready) in [self.successful_hits >= 20, self.combat_ticks >= 7200]
+            .into_iter()
+            .enumerate()
+        {
+            if ready && !self.objectives_claimed[index] && award(self, 1) > 0 {
+                self.objectives_claimed[index] = true;
+            }
+        }
+        for index in 0..5 {
+            if self.first_clears[index] && self.first_clear_claimed[index] < 2 {
+                let remaining = 2 - self.first_clear_claimed[index];
+                let grant = award(self, remaining);
+                self.first_clear_claimed[index] += grant;
+            }
+        }
+        self.awarded - before
+    }
+    pub fn stats(&self) -> Stats {
+        Stats {
+            st: self.st,
+            dx: self.dx,
+            iq: self.iq,
+            ht: self.ht,
+        }
+    }
+    pub fn max_hp(&self) -> i32 {
+        self.st + self.extra_hp
+    }
+    pub fn max_fp(&self) -> i32 {
+        self.ht + self.extra_fp
+    }
+    pub fn basic_speed(&self) -> f32 {
+        (self.dx + self.ht) as f32 / 4.0
+    }
+    pub fn dodge(&self) -> i32 {
+        self.basic_speed().floor() as i32 + 3
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NodePayment {
+    Coins(u64),
+    LegacyBodyPoints(u32),
+}
+
+impl Campaign {
+    pub fn npc_available(&self) -> bool {
+        self.has_feature(crate::skill_catalog::CampaignFeature::Companion)
+    }
+    pub fn allowance(&self) -> u32 {
+        12 + 8 * self.first_clears.iter().filter(|x| **x).count() as u32
+    }
+    pub fn body_cap(&self) -> u32 {
+        5 + 3 * self.first_clears.iter().filter(|x| **x).count() as u32
+    }
+    pub fn has_skill(&self, s: Skill) -> bool {
+        self.skills.contains(&s) || self.skill_nodes.contains(s.id())
+    }
+    pub(super) fn owns_node_definition(&self, node: &crate::skill_catalog::SkillNode) -> bool {
+        self.owns_node_with_body(node, &self.player.body)
+    }
+    fn owns_node_with_body(
+        &self,
+        node: &crate::skill_catalog::SkillNode,
+        body: &KindMap<BodyAttribute, u32>,
+    ) -> bool {
+        self.skill_nodes.contains(&node.id)
+            || self.skills.iter().any(|s| s.id() == node.id)
+            || (node.id == "pistol_training" && self.legacy_weapon_training)
+            || node.effects.iter().any(|effect| match effect {
+                crate::skill_catalog::SkillEffect::BodyDevelopment { attribute, rank } => {
+                    body[*attribute] >= *rank
+                }
+                crate::skill_catalog::SkillEffect::Blueprint(kind) => self.blueprints[*kind],
+                crate::skill_catalog::SkillEffect::StructureRank { kind, rank } => {
+                    self.structure_upgrades[*kind] >= *rank
+                }
+                _ => false,
+            })
+    }
+    pub fn has_node(&self, id: &str) -> bool {
+        skills()
+            .node(id)
+            .is_some_and(|node| self.owns_node_definition(node))
+    }
+    pub fn liberated_count(&self) -> u32 {
+        crate::world::world()
+            .countries
+            .iter()
+            .filter(|country| {
+                self.world.cleared.contains(&country.id)
+                    || self
+                        .world
+                        .clear_high_water
+                        .get(&country.id)
+                        .copied()
+                        .unwrap_or(0)
+                        == country.level_count()
+            })
+            .count() as u32
+    }
+    pub fn has_feature(&self, feature: crate::skill_catalog::CampaignFeature) -> bool {
+        if self.legacy_features
+            && (feature != crate::skill_catalog::CampaignFeature::Companion || self.attempts > 0)
+        {
+            return true;
+        }
+        self.skill_nodes.iter().map(String::as_str).chain(self.skills.iter().map(|skill|skill.id())).filter_map(|id|skills().node(id)).any(|node|node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::FeatureUnlock(value) if *value==feature)))
+    }
+    pub fn body_rank(&self, attribute: BodyAttribute) -> u32 {
+        self.player.body[attribute].max(self.modifiers().body_development[attribute])
+    }
+    pub fn modifiers(&self) -> SkillModifiers {
+        let mut result = SkillModifiers::default();
+        // Catalogue order, rather than purchase order, fixes floating-point stacking.
+        for node in &skills().nodes {
+            if self.owns_node_definition(node) {
+                for effect in &node.effects {
+                    result.apply(effect);
+                }
+            }
+        }
+        if self.legacy_weapon_training {
+            result.weapon_classes.extend(WeaponClass::ALL);
+        }
+        result
+    }
+    pub fn progression_rank(&self) -> u32 {
+        let victories = if self.threat_revision == 0 {
+            self.victories.max(self.legacy_clear_rank() as u64)
+        } else {
+            self.victories
+        };
+        u32::try_from(victories).unwrap_or(u32::MAX)
+    }
+    fn legacy_clear_rank(&self) -> u32 {
+        let mut cleared = self.world.clear_high_water.clone();
+        for (id, count) in &self.world.country_levels {
+            cleared
+                .entry(id.clone())
+                .and_modify(|n| *n = (*n).max(*count))
+                .or_insert(*count);
+        }
+        cleared
+            .values()
+            .copied()
+            .sum::<usize>()
+            .max(self.first_clears.iter().filter(|v| **v).count()) as u32
+    }
+    pub fn migrate_threat_history(&mut self) {
+        if self.threat_revision == 0 {
+            self.victories = self.victories.max(u64::from(self.legacy_clear_rank()));
+            self.threat_revision = 1;
+        }
+        if self.player.is_max_level() {
+            self.player.xp = 0;
+        }
+    }
+    pub fn player_level_cap(&self) -> u32 {
+        Player::level_cap()
+    }
+    pub fn lane_count(&self) -> u8 {
+        self.balance_settings.geometry(self.player.level).0
+    }
+    pub fn next_lane_unlock_level(&self) -> Option<u32> {
+        (self.player.level.saturating_add(1)..=self.player_level_cap())
+            .find(|level| self.balance_settings.geometry(*level).0 > self.lane_count())
+    }
+    pub fn completion_xp_preview(&self) -> u64 {
+        if self.player.is_max_level() {
+            return 0;
+        }
+        let mut needed = self.player.next_level_xp().saturating_sub(self.player.xp);
+        for level in self.player.level + 1..self.player_level_cap() {
+            let mut p = self.player.clone();
+            p.level = level;
+            needed = needed.saturating_add(p.next_level_xp());
+        }
+        needed.min(crate::progression::catalog().victory_player_xp)
+    }
+    pub fn level_after_victory(&self) -> u32 {
+        let mut player = self.player.clone();
+        Self::award_xp_to(
+            &mut player,
+            self.completion_xp_preview(),
+            self.legacy_features,
+        );
+        player.level
+    }
+    pub fn lane_count_after_victory(&self) -> u8 {
+        self.balance_settings.geometry(self.level_after_victory()).0
+    }
+    fn progression_for(
+        &self,
+        mode: Mode,
+        rank: u32,
+        lanes: u8,
+    ) -> Result<crate::progression::ProgressionSnapshot, String> {
+        let cfg = crate::progression::catalog();
+        if rank > cfg.threat_guard_rank {
+            return Err("Supported victory-threat numerical limit reached".into());
+        }
+        let mut result = cfg.snapshot(rank);
+        result.enemy_health =
+            1.0 + (result.enemy_health - 1.0) * self.balance_settings.threat_growth;
+        result.enemy_damage =
+            1.0 + (result.enemy_damage - 1.0) * self.balance_settings.threat_growth;
+        result.enemy_cap = cfg.population_for_lanes(result.enemy_cap, lanes);
+        if mode == Mode::Npc {
+            result.arrival_multiplier *= cfg.npc_arrival_factor;
+        }
+        Ok(result)
+    }
+    pub fn deployment_progression(
+        &self,
+        mode: Mode,
+    ) -> Result<crate::progression::ProgressionSnapshot, String> {
+        self.progression_for(mode, self.progression_rank(), self.lane_count())
+    }
+    /// Preview includes known completion XP only, not unearned future kill XP.
+    pub fn next_victory_progression(
+        &self,
+        mode: Mode,
+    ) -> Result<crate::progression::ProgressionSnapshot, String> {
+        self.progression_for(
+            mode,
+            self.progression_rank().saturating_add(1),
+            self.lane_count_after_victory(),
+        )
+    }
+    pub fn shop_item_level(&self) -> u32 {
+        crate::progression::catalog()
+            .snapshot(self.progression_rank())
+            .item_level
+    }
+    pub fn purchase_node(&mut self, id: &str) -> Result<(), String> {
+        self.can_purchase_node(id)?;
+        let payment = self.node_payment(id)?;
+        let node = skills().node(id).expect("preflight node");
+        match payment {
+            NodePayment::Coins(price) => self.spend(price)?,
+            NodePayment::LegacyBodyPoints(points) => {
+                self.player.points -= points;
+                self.player.legacy_graph_points += points;
+            }
+        }
+        self.skill_nodes.insert(id.to_owned());
+        for effect in &node.effects {
+            match effect {
+                crate::skill_catalog::SkillEffect::Blueprint(kind) => self.blueprints[*kind] = true,
+                crate::skill_catalog::SkillEffect::StructureRank { kind, rank } => {
+                    self.structure_upgrades[*kind] = self.structure_upgrades[*kind].max(*rank)
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+    pub fn node_payment(&self, id: &str) -> Result<NodePayment, String> {
+        let node = skills().node(id).ok_or("Unknown skill node")?;
+        if self.legacy_features && self.player.points>0 && node.effects.len()==1 && node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::BodyDevelopment{rank,..} if *rank<=self.body_cap())) {{self.player.legacy_graph_points.checked_add(1).ok_or("Legacy graph point ledger exhausted")?;Ok(NodePayment::LegacyBodyPoints(1))}}else{Ok(NodePayment::Coins(node.price))}
+    }
+    /// The first unmet catalogue gate (prerequisites, liberation, victories);
+    /// shared by the purchase preflight and `node_status`.
+    pub(crate) fn node_requirement_error(
+        &self,
+        node: &crate::skill_catalog::SkillNode,
+    ) -> Option<String> {
+        if node
+            .prerequisites
+            .iter()
+            .any(|parent| !self.has_node(parent))
+        {
+            return Some("Learn the required prerequisite skills first".into());
+        }
+        if self.liberated_count() < node.minimum_liberated {
+            return Some(format!(
+                "Liberate {} countries first",
+                node.minimum_liberated
+            ));
+        }
+        if self.victories < node.minimum_victories {
+            return Some(format!("Win {} defenses first", node.minimum_victories));
+        }
+        None
+    }
+    pub fn can_purchase_node(&self, id: &str) -> Result<(), String> {
+        self.preparation()?;
+        let node = skills().node(id).ok_or("Unknown skill node")?;
+        if self.has_node(id) {
+            return Err("Already learned".into());
+        }
+        if node.price == 0 {
+            return Err("Starter proficiency is granted only at campaign creation".into());
+        }
+        if let Some(reason) = self.node_requirement_error(node) {
+            return Err(reason);
+        }
+        if let NodePayment::Coins(price) = self.node_payment(id)?
+            && self.coins < price
+        {
+            return Err(format!("Need {} more coins", price - self.coins));
+        }
+        Ok(())
+    }
+    /// Compatibility entry point: same catalogue price and prerequisite checks.
+    pub fn purchase_skill(&mut self, skill: Skill) -> Result<(), String> {
+        self.purchase_node(skill.id())?;
+        // Old callers may inspect this ledger directly. Mirroring the ID here
+        // retains that API; modifiers deduplicate through has_node.
+        self.skills.push(skill);
+        Ok(())
+    }
+    pub fn allocate_body(&mut self, attribute: BodyAttribute) -> Result<(), String> {
+        self.preparation()?;
+        if !self.legacy_features {
+            return Err("Purchase body-development nodes in the skill tree".into());
+        }
+        if self.player.points == 0 {
+            return Err("Earn a character point by leveling up".into());
+        }
+        if self.player.body[attribute] >= self.body_cap() {
+            return Err("Attribute at campaign tier cap".into());
+        }
+        self.player.points -= 1;
+        self.player.body[attribute] += 1;
+        Ok(())
+    }
+    pub fn respec_player(&mut self) -> Result<(), String> {
+        self.preparation()?;
+        if !self.legacy_features {
+            return Err("Coin-trained body nodes are permanent".into());
+        }
+        // Legacy ranks can supply the prerequisite floor for permanent graph
+        // purchases. Check the proposed refund without removing that ownership.
+        for id in &self.skill_nodes {
+            let node = skills()
+                .node(id)
+                .ok_or_else(|| format!("Unknown owned skill node: {id}"))?;
+            if node.prerequisites.iter().any(|prerequisite| {
+                !skills()
+                    .node(prerequisite)
+                    .is_some_and(|required| self.owns_node_with_body(required, &KindMap::default()))
+            }) {
+                return Err(format!(
+                    "Cannot refund legacy body points: learned skill {id} requires those ranks"
+                ));
+            }
+        }
+        self.player.points += self.player.body.values().sum::<u32>();
+        self.player.body = KindMap::default();
+        Ok(())
+    }
+    pub(super) fn award_player_xp(&mut self, xp: u64) -> u64 {
+        Self::award_xp_to(&mut self.player, xp, self.legacy_features)
+    }
+    fn award_xp_to(player: &mut Player, mut xp: u64, legacy_points: bool) -> u64 {
+        let mut credited = 0;
+        while xp > 0 && !player.is_max_level() {
+            let needed = player.next_level_xp().saturating_sub(player.xp);
+            let grant = xp.min(needed);
+            player.xp += grant;
+            credited += grant;
+            xp -= grant;
+            if player.xp >= player.next_level_xp() {
+                player.xp = 0;
+                player.level += 1;
+                if legacy_points {
+                    player.points = player.points.saturating_add(1);
+                }
+            }
+        }
+        if player.is_max_level() {
+            player.xp = 0;
+        }
+        credited
+    }
+    fn award_npc_points(&mut self, points: u32) -> u32 {
+        let award = points.min(self.allowance().saturating_sub(self.npc.awarded));
+        self.npc.awarded += award;
+        self.npc.unspent += award;
+        award
+    }
+    pub fn record_npc_progress(&mut self, hits: u64, ticks: u64) {
+        self.npc.successful_hits = self.npc.successful_hits.saturating_add(hits);
+        self.npc.combat_ticks = self.npc.combat_ticks.saturating_add(ticks);
+        self.claim_objectives();
+    }
+    pub fn claim_objectives(&mut self) {
+        let allowance = self.allowance();
+        self.npc.claim_objectives(allowance);
+    }
+    pub fn buy_training_point(&mut self) -> Result<(), String> {
+        self.preparation()?;
+        self.claim_objectives();
+        if self.npc.awarded >= self.allowance() {
+            return Err("Advancement allowance reached; clear a new stage".into());
+        }
+        self.spend(25)?;
+        self.award_npc_points(1);
+        Ok(())
+    }
+    pub fn train_npc(&mut self, training: NpcTraining) -> Result<(), String> {
+        self.preparation()?;
+        if training == NpcTraining::Strength && self.npc.st >= 20 {
+            return Err("The supported human melee damage table ends at ST 20".into());
+        }
+        if training == NpcTraining::Intelligence {
+            return Err(
+                "IQ is informational in the supported combat scope; training is disabled".into(),
+            );
+        }
+        if matches!(training, NpcTraining::HitPoints | NpcTraining::Fatigue) {
+            return Err("Independent HP/FP purchases are outside the pinned Lite subset; train ST/HT instead".into());
+        }
+        let cost = training.cost();
+        if self.npc.unspent < cost {
+            return Err(format!("Requires {cost} NPC character points"));
+        }
+        self.npc.unspent -= cost;
+        self.npc.investments[training] += 1;
+        match training {
+            NpcTraining::Strength => self.npc.st += 1,
+            NpcTraining::Dexterity => {
+                self.npc.dx += 1;
+                self.npc.guns += 1;
+                self.npc.melee += 1;
+            }
+            NpcTraining::Intelligence => {}
+            NpcTraining::Health => self.npc.ht += 1,
+            NpcTraining::Guns => self.npc.guns += 1,
+            NpcTraining::Melee => self.npc.melee += 1,
+            NpcTraining::HitPoints => self.npc.extra_hp += 1,
+            NpcTraining::Fatigue => self.npc.extra_fp += 1,
+        };
+        Ok(())
+    }
+    pub fn respec_npc(&mut self) -> Result<(), String> {
+        self.preparation()?;
+        self.npc.st = self.npc.creation.st;
+        self.npc.dx = self.npc.creation.dx;
+        self.npc.iq = self.npc.creation.iq;
+        self.npc.ht = self.npc.creation.ht;
+        self.npc.guns = self.npc.creation.guns;
+        self.npc.melee = self.npc.creation.melee;
+        self.npc.extra_hp = 0;
+        self.npc.extra_fp = 0;
+        self.npc.unspent = self.npc.awarded;
+        self.npc.investments = KindMap::default();
+        Ok(())
+    }
+    pub fn validate_npc(&self, npc: &Npc) -> Result<(), String> {
+        use NpcTraining::*;
+        let i = |training: NpcTraining| npc.investments[training];
+        if !npc.creation.valid()
+            || npc.investments.values().any(|n| *n > self.allowance())
+            || i(Intelligence) != 0
+            || i(HitPoints) != 0
+            || i(Fatigue) != 0
+        {
+            return Err("Invalid NPC creation or supported advancement traits".into());
+        }
+        let base = &npc.creation;
+        if !npc.stats().valid()
+            || npc.st > 20
+            || npc.st != base.st + i(Strength) as i32
+            || npc.dx != base.dx + i(Dexterity) as i32
+            || npc.iq != base.iq
+            || npc.ht != base.ht + i(Health) as i32
+            || npc.guns != base.guns + i(Dexterity) as i32 + i(Guns) as i32
+            || npc.melee != base.melee + i(Dexterity) as i32 + i(Melee) as i32
+            || npc.extra_hp != 0
+            || npc.extra_fp != 0
+        {
+            return Err("NPC traits do not match their advancement ledger".into());
+        }
+        if npc.name.trim().is_empty()
+            || npc.name.len() > 80
+            || npc.recall_percent > 75
+            || npc
+                .first_clear_claimed
+                .iter()
+                .zip(npc.first_clears)
+                .any(|(claimed, clear)| *claimed > 2 || (*claimed > 0 && !clear))
+            || (npc.objectives_claimed[0] && npc.successful_hits < 20)
+            || (npc.objectives_claimed[1] && npc.combat_ticks < 7200)
+        {
+            return Err("Invalid NPC identity, policy or achievement ledger".into());
+        }
+        if npc
+            .first_clears
+            .iter()
+            .zip(self.first_clears)
+            .any(|(personal, shared)| *personal && !shared)
+        {
+            return Err("NPC achievement precedes its campaign milestone".into());
+        }
+        let spent = npc
+            .investments
+            .entries()
+            .try_fold(0u32, |total, (training, n)| {
+                n.checked_mul(training.cost())
+                    .and_then(|cost| total.checked_add(cost))
+            })
+            .ok_or("Invalid advancement investment total")?;
+        if npc.awarded > self.allowance() || npc.unspent.checked_add(spent) != Some(npc.awarded) {
+            return Err("Invalid advancement ledger".into());
+        }
+        if npc.first_clear_claimed.iter().any(|n| *n > 2) {
+            return Err("Invalid NPC achievement ledger".into());
+        }
+        Ok(())
+    }
+}
