@@ -690,7 +690,7 @@
         -3200,
         1000
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 0,
       "effects": [
         {
@@ -715,7 +715,7 @@
         -3200,
         1170
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 0,
       "effects": [
         {
@@ -740,7 +740,7 @@
         -3200,
         1340
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 0,
       "effects": [
         {
@@ -765,7 +765,7 @@
         -3200,
         1510
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 0,
       "effects": [
         {
@@ -790,7 +790,7 @@
         -3200,
         1680
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 0,
       "effects": [
         {
@@ -815,7 +815,7 @@
         -3200,
         1850
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 1,
       "effects": [
         {
@@ -840,7 +840,7 @@
         -3200,
         2020
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 1,
       "effects": [
         {
@@ -865,7 +865,7 @@
         -3200,
         2190
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 1,
       "effects": [
         {
@@ -890,7 +890,7 @@
         -3200,
         2360
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 2,
       "effects": [
         {
@@ -915,7 +915,7 @@
         -3200,
         2530
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 2,
       "effects": [
         {
@@ -940,7 +940,7 @@
         -3200,
         2700
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 2,
       "effects": [
         {
@@ -965,7 +965,7 @@
         -3200,
         2870
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 3,
       "effects": [
         {
@@ -990,7 +990,7 @@
         -3200,
         3040
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 3,
       "effects": [
         {
@@ -1015,7 +1015,7 @@
         -3200,
         3210
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 3,
       "effects": [
         {
@@ -1040,7 +1040,7 @@
         -3200,
         3380
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 4,
       "effects": [
         {
@@ -1065,7 +1065,7 @@
         -3200,
         3550
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 4,
       "effects": [
         {
@@ -1090,7 +1090,7 @@
         -3200,
         3720
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 4,
       "effects": [
         {
@@ -1115,7 +1115,7 @@
         -3200,
         3890
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 5,
       "effects": [
         {
@@ -1140,7 +1140,7 @@
         -3200,
         4060
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 5,
       "effects": [
         {
@@ -1165,7 +1165,7 @@
         -3200,
         4230
       ],
-      "icon": "body",
+      "icon": "vitality",
       "minimum_victories": 5,
       "effects": [
         {
@@ -1190,7 +1190,7 @@
         -2910,
         1000
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1215,7 +1215,7 @@
         -2910,
         1170
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1240,7 +1240,7 @@
         -2910,
         1340
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1265,7 +1265,7 @@
         -2910,
         1510
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1290,7 +1290,7 @@
         -2910,
         1680
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1315,7 +1315,7 @@
         -2910,
         1850
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 1,
       "effects": [
         {
@@ -1340,7 +1340,7 @@
         -2910,
         2020
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 1,
       "effects": [
         {
@@ -1365,7 +1365,7 @@
         -2910,
         2190
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 1,
       "effects": [
         {
@@ -1390,7 +1390,7 @@
         -2910,
         2360
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 2,
       "effects": [
         {
@@ -1415,7 +1415,7 @@
         -2910,
         2530
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 2,
       "effects": [
         {
@@ -1440,7 +1440,7 @@
         -2910,
         2700
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 2,
       "effects": [
         {
@@ -1465,7 +1465,7 @@
         -2910,
         2870
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 3,
       "effects": [
         {
@@ -1490,7 +1490,7 @@
         -2910,
         3040
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 3,
       "effects": [
         {
@@ -1515,7 +1515,7 @@
         -2910,
         3210
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 3,
       "effects": [
         {
@@ -1540,7 +1540,7 @@
         -2910,
         3380
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 4,
       "effects": [
         {
@@ -1565,7 +1565,7 @@
         -2910,
         3550
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 4,
       "effects": [
         {
@@ -1590,7 +1590,7 @@
         -2910,
         3720
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 4,
       "effects": [
         {
@@ -1615,7 +1615,7 @@
         -2910,
         3890
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 5,
       "effects": [
         {
@@ -1640,7 +1640,7 @@
         -2910,
         4060
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 5,
       "effects": [
         {
@@ -1665,7 +1665,7 @@
         -2910,
         4230
       ],
-      "icon": "body",
+      "icon": "strength",
       "minimum_victories": 5,
       "effects": [
         {
@@ -1690,7 +1690,7 @@
         -2620,
         1000
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1715,7 +1715,7 @@
         -2620,
         1170
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1740,7 +1740,7 @@
         -2620,
         1340
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1765,7 +1765,7 @@
         -2620,
         1510
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1790,7 +1790,7 @@
         -2620,
         1680
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 0,
       "effects": [
         {
@@ -1815,7 +1815,7 @@
         -2620,
         1850
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 1,
       "effects": [
         {
@@ -1840,7 +1840,7 @@
         -2620,
         2020
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 1,
       "effects": [
         {
@@ -1865,7 +1865,7 @@
         -2620,
         2190
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 1,
       "effects": [
         {
@@ -1890,7 +1890,7 @@
         -2620,
         2360
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 2,
       "effects": [
         {
@@ -1915,7 +1915,7 @@
         -2620,
         2530
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 2,
       "effects": [
         {
@@ -1940,7 +1940,7 @@
         -2620,
         2700
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 2,
       "effects": [
         {
@@ -1965,7 +1965,7 @@
         -2620,
         2870
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 3,
       "effects": [
         {
@@ -1990,7 +1990,7 @@
         -2620,
         3040
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 3,
       "effects": [
         {
@@ -2015,7 +2015,7 @@
         -2620,
         3210
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 3,
       "effects": [
         {
@@ -2040,7 +2040,7 @@
         -2620,
         3380
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 4,
       "effects": [
         {
@@ -2065,7 +2065,7 @@
         -2620,
         3550
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 4,
       "effects": [
         {
@@ -2090,7 +2090,7 @@
         -2620,
         3720
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 4,
       "effects": [
         {
@@ -2115,7 +2115,7 @@
         -2620,
         3890
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 5,
       "effects": [
         {
@@ -2140,7 +2140,7 @@
         -2620,
         4060
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 5,
       "effects": [
         {
@@ -2165,7 +2165,7 @@
         -2620,
         4230
       ],
-      "icon": "body",
+      "icon": "coordination",
       "minimum_victories": 5,
       "effects": [
         {
@@ -2190,7 +2190,7 @@
         -2330,
         1000
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2215,7 +2215,7 @@
         -2330,
         1170
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2240,7 +2240,7 @@
         -2330,
         1340
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2265,7 +2265,7 @@
         -2330,
         1510
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2290,7 +2290,7 @@
         -2330,
         1680
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2315,7 +2315,7 @@
         -2330,
         1850
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 1,
       "effects": [
         {
@@ -2340,7 +2340,7 @@
         -2330,
         2020
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 1,
       "effects": [
         {
@@ -2365,7 +2365,7 @@
         -2330,
         2190
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 1,
       "effects": [
         {
@@ -2390,7 +2390,7 @@
         -2330,
         2360
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 2,
       "effects": [
         {
@@ -2415,7 +2415,7 @@
         -2330,
         2530
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 2,
       "effects": [
         {
@@ -2440,7 +2440,7 @@
         -2330,
         2700
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 2,
       "effects": [
         {
@@ -2465,7 +2465,7 @@
         -2330,
         2870
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 3,
       "effects": [
         {
@@ -2490,7 +2490,7 @@
         -2330,
         3040
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 3,
       "effects": [
         {
@@ -2515,7 +2515,7 @@
         -2330,
         3210
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 3,
       "effects": [
         {
@@ -2540,7 +2540,7 @@
         -2330,
         3380
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 4,
       "effects": [
         {
@@ -2565,7 +2565,7 @@
         -2330,
         3550
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 4,
       "effects": [
         {
@@ -2590,7 +2590,7 @@
         -2330,
         3720
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 4,
       "effects": [
         {
@@ -2615,7 +2615,7 @@
         -2330,
         3890
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 5,
       "effects": [
         {
@@ -2640,7 +2640,7 @@
         -2330,
         4060
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 5,
       "effects": [
         {
@@ -2665,7 +2665,7 @@
         -2330,
         4230
       ],
-      "icon": "body",
+      "icon": "endurance",
       "minimum_victories": 5,
       "effects": [
         {
@@ -2690,7 +2690,7 @@
         -2040,
         1000
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2715,7 +2715,7 @@
         -2040,
         1170
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2740,7 +2740,7 @@
         -2040,
         1340
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2765,7 +2765,7 @@
         -2040,
         1510
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2790,7 +2790,7 @@
         -2040,
         1680
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 0,
       "effects": [
         {
@@ -2815,7 +2815,7 @@
         -2040,
         1850
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 1,
       "effects": [
         {
@@ -2840,7 +2840,7 @@
         -2040,
         2020
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 1,
       "effects": [
         {
@@ -2865,7 +2865,7 @@
         -2040,
         2190
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 1,
       "effects": [
         {
@@ -2890,7 +2890,7 @@
         -2040,
         2360
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 2,
       "effects": [
         {
@@ -2915,7 +2915,7 @@
         -2040,
         2530
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 2,
       "effects": [
         {
@@ -2940,7 +2940,7 @@
         -2040,
         2700
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 2,
       "effects": [
         {
@@ -2965,7 +2965,7 @@
         -2040,
         2870
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 3,
       "effects": [
         {
@@ -2990,7 +2990,7 @@
         -2040,
         3040
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 3,
       "effects": [
         {
@@ -3015,7 +3015,7 @@
         -2040,
         3210
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 3,
       "effects": [
         {
@@ -3040,7 +3040,7 @@
         -2040,
         3380
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 4,
       "effects": [
         {
@@ -3065,7 +3065,7 @@
         -2040,
         3550
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 4,
       "effects": [
         {
@@ -3090,7 +3090,7 @@
         -2040,
         3720
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 4,
       "effects": [
         {
@@ -3115,7 +3115,7 @@
         -2040,
         3890
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 5,
       "effects": [
         {
@@ -3140,7 +3140,7 @@
         -2040,
         4060
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 5,
       "effects": [
         {
@@ -3165,7 +3165,7 @@
         -2040,
         4230
       ],
-      "icon": "body",
+      "icon": "perception",
       "minimum_victories": 5,
       "effects": [
         {

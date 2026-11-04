@@ -24,6 +24,10 @@ pub(super) enum Icon {
     Firearm,
     Grenade,
     Flame,
+    /// Endurance (stamina): a lightning bolt.
+    Stamina,
+    /// Perception (weak spots): an aiming sight.
+    Sight,
     Defense(StructureKind, u32),
 }
 
@@ -778,6 +782,12 @@ pub(super) fn skill_icon(name: &str) -> Icon {
         "turret" => Icon::Defense(StructureKind::Turret, 0),
         "grenade" => Icon::Grenade,
         "flame" => Icon::Flame,
+        // Body development: each attribute reuses the pictogram of what it raises.
+        "vitality" => Icon::Skill(Skill::SecondWind),
+        "strength" => Icon::Skill(Skill::Sweep),
+        "coordination" => Icon::Skill(Skill::QuickReload),
+        "endurance" => Icon::Stamina,
+        "perception" => Icon::Sight,
         _ => Icon::Firearm,
     }
 }
@@ -845,7 +855,25 @@ pub(super) fn pictogram(p: &egui::Painter, rect: Rect, icon: Icon, color: Color3
                 segment(a, b);
             }
         }
-
+        Icon::Stamina => {
+            for (a, b) in [
+                ([15.0, 2.0], [6.0, 13.0]),
+                ([6.0, 13.0], [12.0, 13.0]),
+                ([12.0, 13.0], [9.0, 22.0]),
+                ([9.0, 22.0], [18.0, 10.0]),
+                ([18.0, 10.0], [12.0, 10.0]),
+                ([12.0, 10.0], [15.0, 2.0]),
+            ] {
+                segment(a, b);
+            }
+        }
+        Icon::Sight => {
+            p.circle_stroke(point(12.0, 12.0), 7.0 * unit, stroke);
+            segment([12.0, 1.0], [12.0, 8.0]);
+            segment([12.0, 16.0], [12.0, 23.0]);
+            segment([1.0, 12.0], [8.0, 12.0]);
+            segment([16.0, 12.0], [23.0, 12.0]);
+        }
         Icon::Skill(Skill::Piercing) => {
             segment([2.0, 12.0], [22.0, 12.0]);
             segment([17.0, 7.0], [22.0, 12.0]);
