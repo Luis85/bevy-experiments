@@ -23,9 +23,7 @@ pub use loadout::{
 };
 use progression::legacy_training_default;
 pub use progression::{BodyAttribute, NodePayment, Npc, NpcCreation, NpcTraining, Player, Skill};
-pub use tree_view::{
-    NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta,
-};
+pub use tree_view::{NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta};
 pub use view::{NodeStatus, OfferPreview, UpgradeFocus};
 pub use world::Placement;
 

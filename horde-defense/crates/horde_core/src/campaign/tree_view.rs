@@ -20,9 +20,14 @@ pub enum NodeState {
     /// Purchasable now at this payment.
     Buyable(NodePayment),
     /// Every gate is met except the price; `short` coins are missing.
-    NeedsCoins { payment: NodePayment, short: u64 },
+    NeedsCoins {
+        payment: NodePayment,
+        short: u64,
+    },
     /// Direct prerequisites not yet owned, as node ids in catalogue order.
-    NeedsPrerequisites { missing: Vec<String> },
+    NeedsPrerequisites {
+        missing: Vec<String>,
+    },
     /// Prerequisites are owned but a milestone is unmet. Each field is
     /// `(have, need)` and is `Some` only when that milestone is unmet.
     NeedsMilestone {
@@ -32,7 +37,9 @@ pub enum NodeState {
     /// Cannot be bought for another reason (unknown id, the innate starter
     /// root, an exhausted legacy ledger, or an active deployment). `reason`
     /// is player wording.
-    Unavailable { reason: String },
+    Unavailable {
+        reason: String,
+    },
 }
 
 impl NodeState {
@@ -241,8 +248,14 @@ fn stat_snapshot(c: &Campaign) -> (Vec<(PreviewStat, f32)>, BTreeSet<String>) {
                 * coordination_reload_factor(rank(BodyAttribute::Coordination)),
         ),
         (PreviewStat::ShotInterval, modifiers.cadence_multiplier),
-        (PreviewStat::GrenadeCharges, modifiers.grenade_charges as f32),
-        (PreviewStat::MolotovCharges, modifiers.molotov_charges as f32),
+        (
+            PreviewStat::GrenadeCharges,
+            modifiers.grenade_charges as f32,
+        ),
+        (
+            PreviewStat::MolotovCharges,
+            modifiers.molotov_charges as f32,
+        ),
         (
             PreviewStat::OrdnanceDamage,
             modifiers.ordnance_damage_multiplier,
@@ -251,12 +264,18 @@ fn stat_snapshot(c: &Campaign) -> (Vec<(PreviewStat, f32)>, BTreeSet<String>) {
             PreviewStat::OrdnanceRadius,
             modifiers.ordnance_radius_multiplier,
         ),
-        (PreviewStat::BurnDuration, modifiers.burn_duration_multiplier),
+        (
+            PreviewStat::BurnDuration,
+            modifiers.burn_duration_multiplier,
+        ),
         (
             PreviewStat::OrdnanceCooldown,
             modifiers.ordnance_cooldown_multiplier,
         ),
-        (PreviewStat::StructurePower, modifiers.engineering_multiplier),
+        (
+            PreviewStat::StructurePower,
+            modifiers.engineering_multiplier,
+        ),
     ];
     stats.extend(StructureKind::ALL.map(|kind| {
         (
@@ -264,9 +283,7 @@ fn stat_snapshot(c: &Campaign) -> (Vec<(PreviewStat, f32)>, BTreeSet<String>) {
             c.structure_upgrades[kind] as f32,
         )
     }));
-    stats.extend(
-        BodyAttribute::ALL.map(|a| (PreviewStat::BodyRank(a), rank(a) as f32)),
-    );
+    stats.extend(BodyAttribute::ALL.map(|a| (PreviewStat::BodyRank(a), rank(a) as f32)));
     let mut unlocked = BTreeSet::new();
     for class in &modifiers.weapon_classes {
         unlocked.insert(format!("{} proficiency", class.name()));
@@ -469,7 +486,7 @@ impl Campaign {
                 path.blocking = self.milestone_block(node);
             }
             for (&child, remaining) in pending.iter_mut() {
-                if nodes[child].prerequisites.iter().any(|p| *p == node.id) {
+                if nodes[child].prerequisites.contains(&node.id) {
                     *remaining -= 1;
                     if *remaining == 0 {
                         ready.insert(child);
@@ -668,7 +685,11 @@ mod tests {
                 }
                 for r in &requirements {
                     let first = r.label.chars().next().unwrap();
-                    assert!(first.is_uppercase() || first.is_ascii_digit(), "{}", r.label);
+                    assert!(
+                        first.is_uppercase() || first.is_ascii_digit(),
+                        "{}",
+                        r.label
+                    );
                     assert!(!r.label.ends_with('.'), "{}", r.label);
                 }
             }
@@ -963,7 +984,11 @@ mod tests {
             "Unlocks SMG proficiency"
         );
         assert_eq!(
-            delta(&c, "grenade_training", PreviewStat::Unlock("Grenades".into())),
+            delta(
+                &c,
+                "grenade_training",
+                PreviewStat::Unlock("Grenades".into())
+            ),
             (0.0, 1.0)
         );
         assert_eq!(
@@ -1042,7 +1067,10 @@ mod tests {
                 if d.stat == PreviewStat::ReloadTime {
                     let m = c.modifiers();
                     let rank = c.body_rank(BodyAttribute::Coordination);
-                    assert_eq!(m.reload_multiplier * coordination_reload_factor(rank), d.after);
+                    assert_eq!(
+                        m.reload_multiplier * coordination_reload_factor(rank),
+                        d.after
+                    );
                 }
             }
             // Owning the node leaves nothing further to preview.

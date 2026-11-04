@@ -842,6 +842,11 @@ mod tests {
         trimmed
             .nodes
             .retain(|n| !n.effects.contains(&SkillEffect::Unlock("molotov".into())));
-        assert!(trimmed.upgrade_goals().iter().all(|g| g.label != "Molotovs"));
+        assert!(
+            trimmed
+                .upgrade_goals()
+                .iter()
+                .all(|g| g.label != "Molotovs")
+        );
     }
 }
