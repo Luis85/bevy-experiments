@@ -1,13 +1,17 @@
 [CmdletBinding()]
 param(
     [ValidateSet('debug', 'release', 'playtest')][string]$Profile = 'playtest',
-    [string]$OutputDirectory = 'target/playtest'
+    [string]$OutputDirectory = 'target/playtest',
+    # Include the `review` feature (captures, review fixtures, perf reports).
+    # Ordinary playtest packages leave it out; practice scenes still work.
+    [switch]$Review
 )
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
 Push-Location $workspace
 try {
     $buildArguments = @('build', '--locked', '-p', 'horde-defense')
+    if (-not $Review) { $buildArguments += '--no-default-features' }
     if ($Profile -eq 'release') { $buildArguments += '--release' }
     elseif ($Profile -ne 'debug') { $buildArguments += @('--profile', $Profile) }
     & cargo @buildArguments

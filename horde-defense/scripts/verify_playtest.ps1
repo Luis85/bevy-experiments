@@ -49,7 +49,7 @@ try {
         $env:LASTLIGHT_REVIEW_EXIT = '1'
         $env:LASTLIGHT_REVIEW_CAPTURE = Join-Path $verificationRoot 'portable-peak.png'
         & (Join-Path $bundle 'Lastlight.exe')
-        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $env:LASTLIGHT_REVIEW_CAPTURE)) { throw 'Copied executable native capture failed' }
+        if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $env:LASTLIGHT_REVIEW_CAPTURE)) { throw 'Copied executable native capture failed (needs a package built with package_playtest.ps1 -Review)' }
     }
     Write-Output "PASS: $(@($manifest.files).Count) manifest hashes; copied executable smoke; native capture=$NativeCapture"
     Write-Output $verificationRoot

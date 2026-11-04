@@ -33,6 +33,8 @@ pub struct LocalMesh {
     pub vertices: Vec<SourceVertex>,
     pub indices: Vec<u32>,
 }
+// Read by review verification (`review` feature) and tests.
+#[cfg_attr(not(feature = "review"), allow(dead_code))]
 #[derive(Clone, Debug)]
 pub struct CompiledSource {
     pub id: String,

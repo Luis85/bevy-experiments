@@ -21,6 +21,8 @@ pub struct PlayerPoseSample {
     pub reduced_effects: bool,
 }
 
+// Read by review verification (`review` feature) and tests.
+#[cfg_attr(not(feature = "review"), allow(dead_code))]
 #[derive(Clone, Debug)]
 pub struct DrawPacket {
     pub part_id: String,
@@ -36,6 +38,8 @@ pub struct DrawPacket {
     pub source_to_bind: super::bind::Affine2,
     pub bone_transform: super::bind::Affine2,
 }
+// Read by review verification (`review` feature) and tests.
+#[cfg_attr(not(feature = "review"), allow(dead_code))]
 #[derive(Clone, Debug)]
 pub struct ResolvedPlayerPose {
     pub model_id: String,

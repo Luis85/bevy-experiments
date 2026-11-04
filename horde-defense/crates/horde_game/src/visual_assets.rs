@@ -10,7 +10,9 @@ use horde_core::{ordnance::OrdnanceKind, weapons::WeaponClass};
 use std::sync::OnceLock;
 // Characters and equipment previews share the source-owned model resolver.
 mod player_preview;
-pub use player_preview::{defender_preview, hold_sample, paint_model};
+pub use player_preview::defender_preview;
+#[cfg(feature = "review")]
+pub use player_preview::{hold_sample, paint_model};
 
 /// Source catalogue selection is an application compatibility seam, not a
 /// gender-specific painter. The production manifest can remap these keys.
@@ -176,6 +178,7 @@ pub struct VisualAssets {
     egui_textures: [OnceLock<Result<bevy_egui::egui::TextureHandle, String>>; 7],
 }
 impl VisualAssets {
+    #[cfg(feature = "review")]
     pub fn all_loaded(&self, images: &Assets<Image>) -> bool {
         [
             &self.actors,

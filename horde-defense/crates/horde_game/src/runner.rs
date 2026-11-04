@@ -12,6 +12,7 @@ use horde_core::{
 use std::collections::VecDeque;
 use std::path::PathBuf;
 mod persistence;
+#[cfg(feature = "review")]
 pub use persistence::PersistenceMetrics;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -196,6 +197,7 @@ impl Runtime {
         self.storage = service;
         gate
     }
+    #[cfg(feature = "review")]
     pub fn persistence_metrics(&self) -> PersistenceMetrics {
         let mut metrics = self.storage.metrics();
         metrics.pending |= !self.save_requests.is_empty();

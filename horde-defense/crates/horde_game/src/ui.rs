@@ -25,11 +25,13 @@ use horde_core::{
 };
 use std::path::PathBuf;
 
+mod plugin;
 mod startup;
 #[cfg(test)]
 mod test_support;
 #[cfg(test)]
 mod tests;
+pub use plugin::UiPlugin;
 pub use startup::ProfilePaths;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -799,6 +801,7 @@ fn progress(ui: &mut egui::Ui, value: f32, text: String, color: Color32) {
 
 /// Diagnostic metadata produced by the actual last rendered model review.
 /// The screenshot service owns serialization and disk I/O.
+#[cfg(feature = "review")]
 pub(crate) fn player_model_review_report(ctx: &egui::Context) -> Option<review::NativeModelReport> {
     review::model_report(ctx)
 }
@@ -863,6 +866,7 @@ pub fn draw(
     }
     navigation::field_status(root, &mut f);
     let previous_screen = f.screen;
+    #[cfg(feature = "review")]
     if review::model_workshop(root, &f) {
         publish_controls(ctx, &mut f, false, false);
         ctx.request_repaint();
