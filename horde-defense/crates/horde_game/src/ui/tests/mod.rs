@@ -18,6 +18,13 @@ use horde_core::{
 };
 use std::path::PathBuf;
 
+/// The summed catalogue price of the named skill nodes.
+fn nodes_price(ids: &[&str]) -> u64 {
+    ids.iter()
+        .map(|id| horde_core::skill_catalog::skills().node(id).unwrap().price)
+        .sum()
+}
+
 struct IsolatedFrontend {
     frontend: FrontendParts,
     directory: PathBuf,

@@ -85,3 +85,20 @@ fn blank_and_unreadable_saved_generations_still_require_new_game_confirmation_wi
         assert_eq!(serde_json::to_value(&f.game).unwrap(), model);
     }
 }
+
+#[test]
+fn escape_closes_the_new_journey_confirmation_without_a_reset() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.set_paused(true);
+    f.screen = Screen::Menu;
+    f.game.save(&f.paths.campaign()).unwrap();
+    let before = serde_json::to_value(&f.game).unwrap();
+    h.click(f, View::Menu, "New game");
+    assert!(f.menu.new_journey_confirm);
+    h.key(f, View::Menu, Key::Escape);
+    assert!(!f.menu.new_journey_confirm);
+    assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
+}

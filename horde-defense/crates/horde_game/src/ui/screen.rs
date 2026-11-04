@@ -61,17 +61,6 @@ impl Screen {
             Screen::Camp | Screen::Battle | Screen::History => ScreenAmbience::Live,
         }
     }
-    /// Screens the custom battle cursor may replace the native pointer on.
-    pub fn allows_custom_cursor(self) -> bool {
-        match self {
-            Screen::Battle | Screen::Camp => true,
-            Screen::Menu
-            | Screen::SurvivorSelection
-            | Screen::Results
-            | Screen::History
-            | Screen::Settings => false,
-        }
-    }
 }
 
 #[derive(SubStates, Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]

@@ -52,7 +52,7 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                     if ui.available_width() > 230.0 && !f.game.campaign().world.cleared.is_empty() {
                         muted(
                             ui,
-                            format!("{} freed", f.game.campaign().world.cleared.len()),
+                            format!("{} liberated", f.game.campaign().world.cleared.len()),
                         );
                     }
                     let alerts = f.game.strategy().active_outbreaks();

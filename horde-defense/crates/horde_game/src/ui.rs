@@ -26,7 +26,6 @@ pub(crate) use context::request_save;
 pub(crate) use context::{UiCtx, UiParams, ambience_target};
 pub use plugin::UiPlugin;
 pub use screen::{Screen, ScreenAmbience, Tab};
-pub use state::CustomCursor;
 pub(crate) use state::{
     ArmoryUi, BattleUi, CampaignUi, FrontendParts, MenuUi, Navigation, SettingsUi, StatusUi,
 };
@@ -70,7 +69,6 @@ pub(super) fn draw(
     mut contexts: EguiContexts,
     mut params: UiParams,
     mut sounds: MessageWriter<crate::audio::Cue>,
-    mut cursor: ResMut<CustomCursor>,
     time: Res<Time>,
     frames: Res<bevy::diagnostic::FrameCount>,
     render_device: Res<bevy::render::renderer::RenderDevice>,
@@ -79,7 +77,6 @@ pub(super) fn draw(
     let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Interface);
     let mut cues = Vec::new();
     let mut f = params.ctx(&mut cues);
-    f.battle.custom_cursor_requested = false;
     f.runtime.begin_frame(frames.0);
     let ctx = contexts.ctx_mut()?;
     if !*initialized {
@@ -95,7 +92,6 @@ pub(super) fn draw(
         return Ok(());
     }
     draw_screen(ctx, &mut f, time.elapsed_secs());
-    cursor.0 = f.custom_cursor_requested();
     sounds.write_batch(cues);
     ctx.request_repaint();
     Ok(())

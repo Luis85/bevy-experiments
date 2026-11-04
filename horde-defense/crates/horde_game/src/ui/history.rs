@@ -14,13 +14,6 @@ pub(crate) struct HistoryUi {
 }
 /// The one next step offered while the settlement ledger is empty.
 const EMPTY_NEXT_STEP: &str = "Finish or retreat from a defense to record your first run.";
-fn outcome_name(outcome: Outcome) -> &'static str {
-    match outcome {
-        Outcome::Victory => "Victory",
-        Outcome::Defeat => "Defeat",
-        Outcome::Withdrawal => "Withdrawal",
-    }
-}
 fn mode_name(mode: Mode) -> &'static str {
     match mode {
         Mode::Personal => "Personal",
@@ -70,12 +63,14 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
                 ui.selectable_value(&mut state.mode, None, "All modes");
                 for mode in [Mode::Personal, Mode::Npc] { ui.selectable_value(&mut state.mode, Some(mode), mode_name(mode)); }
             });
-            egui::ComboBox::from_id_salt("history-outcome").selected_text(state.outcome.map_or("All outcomes", outcome_name)).show_ui(ui, |ui| {
+            egui::ComboBox::from_id_salt("history-outcome").selected_text(state.outcome.map_or("All outcomes", Outcome::label)).show_ui(ui, |ui| {
                 ui.selectable_value(&mut state.outcome, None, "All outcomes");
-                for outcome in [Outcome::Victory, Outcome::Defeat, Outcome::Withdrawal] { ui.selectable_value(&mut state.outcome, Some(outcome), outcome_name(outcome)); }
+                for outcome in [Outcome::Victory, Outcome::Defeat, Outcome::Withdrawal] { ui.selectable_value(&mut state.outcome, Some(outcome), outcome.label()); }
             });
             ui.add(egui::TextEdit::singleline(&mut state.front).hint_text("Filter front / country").desired_width(180.0).min_size(vec2(180.0, row)).vertical_align(egui::Align::Center));
-            if ui.small_button("Clear filters").clicked() { state.mode = None; state.outcome = None; state.front.clear(); }
+            // Same height as the dropdowns beside it; nothing to clear, nothing to press.
+            let filtered = state.mode.is_some() || state.outcome.is_some() || !state.front.is_empty();
+            if ui.add_enabled(filtered, egui::Button::new("Clear filters").min_size(vec2(0.0, row))).clicked() { state.mode = None; state.outcome = None; state.front.clear(); }
             muted(ui, format!("{shown} of {} runs · newest first", records.len()));
         });
         // A filter changed this frame applies before the list renders.
@@ -131,7 +126,7 @@ fn run_list(ui: &mut egui::Ui, rows: &[&RunRecord], selected: &mut Option<u64>) 
                 let label = format!(
                     "#{} · {} · {}\n{} · defense {} · {:.0}s · {}",
                     run.id,
-                    outcome_name(run.outcome),
+                    run.outcome.label(),
                     mode_name(run.mode),
                     run.country_name,
                     run.stage + 1,
@@ -153,7 +148,7 @@ fn run_list(ui: &mut egui::Ui, rows: &[&RunRecord], selected: &mut Option<u64>) 
         });
 }
 fn detail(ui: &mut egui::Ui, r: &RunRecord) {
-    chrome::section(ui, &format!("Run #{} · {}", r.id, outcome_name(r.outcome)));
+    chrome::section(ui, &format!("Run #{} · {}", r.id, r.outcome.label()));
     ui.label(format!(
         "{} · {} · defense {} · template {}",
         r.defender_name,

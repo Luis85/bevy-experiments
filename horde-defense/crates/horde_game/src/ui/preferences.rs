@@ -151,7 +151,11 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
                     _ => None,
                 })
             });
-            if let Some(key) = pressed {
+            if pressed.as_deref() == Some("Escape") {
+                // Escape cancels the rebind; it is never captured as a binding
+                // from this prompt.
+                f.prefs.rebind = None;
+            } else if let Some(key) = pressed {
                 if let Some(other) = f
                     .settings
                     .bindings

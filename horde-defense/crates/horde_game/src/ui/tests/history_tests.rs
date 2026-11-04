@@ -29,7 +29,7 @@ fn history_is_reachable_from_menu_camp_and_results_without_repaying_settled_runs
             output
                 .shapes
                 .iter()
-                .any(|s| shape_has_text(&s.shape, "Withdrawal"))
+                .any(|s| shape_has_text(&s.shape, "Retreated"))
         );
     }
     h.click(f, View::History, "Back");
@@ -40,7 +40,7 @@ fn history_is_reachable_from_menu_camp_and_results_without_repaying_settled_runs
     h.click(f, View::History, "Back");
     assert!(f.screen == Screen::Camp);
     f.screen = Screen::Results;
-    h.click(f, View::Results, "Run history");
+    h.click(f, View::Header, "History");
     assert!(f.screen == Screen::History);
     h.click(f, View::History, "Back");
     assert!(f.screen == Screen::Results);
@@ -98,6 +98,40 @@ fn history_filters_share_one_centre_line_with_the_run_count() {
     }
 }
 
+/// Height of the smallest painted frame around the text reading `label`:
+/// the widget's own background.
+fn frame_height(output: &egui::FullOutput, label: &str) -> f32 {
+    let (text, _) = clipped_bounds(output, label).unwrap_or_else(|| panic!("{label} not painted"));
+    fn rects(shape: &egui::epaint::Shape, out: &mut Vec<Rect>) {
+        match shape {
+            egui::epaint::Shape::Rect(r) => out.push(r.rect),
+            egui::epaint::Shape::Vec(v) => v.iter().for_each(|s| rects(s, out)),
+            _ => {}
+        }
+    }
+    let mut all = Vec::new();
+    output.shapes.iter().for_each(|c| rects(&c.shape, &mut all));
+    all.into_iter()
+        .filter(|r| r.contains_rect(text) && r.height() < 80.0)
+        .min_by(|a, b| a.area().total_cmp(&b.area()))
+        .unwrap_or_else(|| panic!("{label} has no frame"))
+        .height()
+}
+
+#[test]
+fn clear_filters_is_as_tall_as_the_dropdowns_beside_it() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = one_run(&mut fixture);
+    let output = h.frame(f, View::History, vec![]);
+    let dropdown = frame_height(&output, "All modes");
+    let clear = frame_height(&output, "Clear filters");
+    assert!(
+        (dropdown - clear).abs() < 1.0,
+        "Clear filters {clear} vs dropdown {dropdown}"
+    );
+}
+
 #[test]
 fn history_title_and_back_share_one_row_at_both_review_sizes() {
     let mut fixture = IsolatedFrontend::new();
@@ -117,7 +151,7 @@ fn history_title_and_back_share_one_row_at_both_review_sizes() {
             output
                 .shapes
                 .iter()
-                .any(|s| shape_has_text(&s.shape, &format!("#{first} · Withdrawal"))),
+                .any(|s| shape_has_text(&s.shape, &format!("#{first} · Retreated"))),
             "{size:?}"
         );
     }

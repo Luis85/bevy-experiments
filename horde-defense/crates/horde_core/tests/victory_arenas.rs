@@ -6,7 +6,7 @@ use horde_core::{
     progression::catalog,
     sim::{Game, Input, MAX_LANES, Outcome},
 };
-use support::legacy_game;
+use support::{legacy_game, nodes_price};
 
 fn arena(level: u32) -> Game {
     let mut g = legacy_game();
@@ -108,7 +108,11 @@ fn seventeen_lane_targeting_defender_origin_contact_telemetry_and_throws_share_r
         assert_eq!(a.telemetry.damage_by_lane.len(), 17);
     }
     let mut g = arena(50);
-    g.campaign_mut().reward(55, 0, Mode::Personal);
+    g.campaign_mut().reward(
+        nodes_price(&["grenade_training", "molotov_training"]),
+        0,
+        Mode::Personal,
+    );
     g.campaign_mut().purchase_node("grenade_training").unwrap();
     g.campaign_mut().purchase_node("molotov_training").unwrap();
     g.deploy(0, Mode::Personal).unwrap();

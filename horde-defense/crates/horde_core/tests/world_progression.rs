@@ -7,7 +7,7 @@ use horde_core::{
     sim::{Game, Input, Outcome, smoke_input, smoke_prepare},
     survivors::{Appearance, SurvivorId},
 };
-use support::legacy_game;
+use support::{legacy_game, nodes_price};
 
 #[test]
 fn survivors_are_cosmetic_and_legacy_saves_keep_the_original_identity() {
@@ -144,7 +144,11 @@ fn older_checkpoint_fields_default_without_resetting_actions_or_creating_levelle
 fn item_levels_change_both_profiles_without_transferring_personal_skills_or_breaking_legacy_items()
 {
     let mut c = Campaign::default();
-    c.reward(65, 0, Mode::Personal);
+    c.reward(
+        nodes_price(&["quick_reload", "rifle_training"]),
+        0,
+        Mode::Personal,
+    );
     c.purchase_node("quick_reload").unwrap();
     c.purchase_node("rifle_training").unwrap();
     let one = c.add_item_at_level(4, 1).unwrap();
@@ -161,7 +165,7 @@ fn item_levels_change_both_profiles_without_transferring_personal_skills_or_brea
     assert!(p9.personal.damage > p1.personal.damage);
     assert!(n9.npc.damage_add > n1.npc.damage_add);
     let frozen = n9.clone();
-    c.reward(20, 0, Mode::Personal);
+    c.reward(nodes_price(&["steady_hands"]), 0, Mode::Personal);
     c.purchase_node("steady_hands").unwrap();
     let after = c.profile(Mode::Npc);
     assert_eq!(after.npc, frozen.npc);

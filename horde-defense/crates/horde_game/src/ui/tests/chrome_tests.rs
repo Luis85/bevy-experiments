@@ -82,14 +82,15 @@ fn the_header_names_each_screen_once() {
 }
 
 #[test]
-fn the_results_route_to_history_uses_the_page_name() {
+fn results_reach_history_through_the_header_only() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = unlocked(&mut fixture);
     f.screen = Screen::Results;
     let output = h.frame(f, View::Results, vec![]);
     assert_eq!(text_count(&output, "Run analysis"), 0);
-    h.click(f, View::Results, "Run history");
+    assert_eq!(text_count(&output, "Run history"), 0, "duplicate route");
+    h.click(f, View::Header, "History");
     assert!(f.screen == Screen::History);
 }
 

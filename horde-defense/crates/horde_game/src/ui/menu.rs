@@ -215,7 +215,7 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
             );
         });
     if f.menu.new_journey_confirm {
-        egui::Modal::new(egui::Id::new("new-journey-confirm")).show(root.ctx(),|ui| {
+        let modal = egui::Modal::new(egui::Id::new("new-journey-confirm")).show(root.ctx(),|ui| {
             ui.set_max_width(400.0);
             ui.heading("Start a new journey?");
             ui.label("Your current journey, equipment and active fields will be archived before a fresh campaign starts. Display, audio, controls and difficulty settings are kept.");
@@ -227,6 +227,11 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
             if f.status.save_pending||f.runtime.reset_in_progress(){muted(ui,"Archiving and saving the new journey...");}
             if f.status.message_error {ui.colored_label(RED,&f.status.message);}
         });
+        // Escape or a backdrop click keeps the current journey, unless the
+        // reset is already under way.
+        if modal.should_close() && !f.status.save_pending && !f.runtime.reset_in_progress() {
+            f.menu.new_journey_confirm = false;
+        }
     }
 }
 

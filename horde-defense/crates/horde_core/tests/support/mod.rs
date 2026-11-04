@@ -5,6 +5,7 @@ use horde_core::balance::BalanceSettings;
 use horde_core::campaign::Campaign;
 use horde_core::content::{EnemyKind, Mode};
 use horde_core::sim::{Game, Input};
+use horde_core::skill_catalog::skills;
 
 /// FNV-1a (64-bit) of `bytes`, as used by save checksums and pinned digests.
 pub fn fnv1a(bytes: &[u8]) -> u64 {
@@ -50,10 +51,21 @@ pub fn advance(game: &mut Game, count: u32) {
     }
 }
 
-/// A fresh campaign with `coins` earned and the named skill nodes bought.
-pub fn trained_campaign(coins: u64, nodes: &[&str]) -> Campaign {
+/// The catalogue price of skill node `id`.
+pub fn node_price(id: &str) -> u64 {
+    skills().node(id).unwrap().price
+}
+
+/// The summed catalogue price of the named skill nodes.
+pub fn nodes_price(nodes: &[&str]) -> u64 {
+    nodes.iter().map(|id| node_price(id)).sum()
+}
+
+/// A fresh campaign that bought the named skill nodes and still holds
+/// `spare` coins.
+pub fn trained_campaign(spare: u64, nodes: &[&str]) -> Campaign {
     let mut campaign = Campaign::default();
-    campaign.reward(coins, 0, Mode::Personal);
+    campaign.reward(spare + nodes_price(nodes), 0, Mode::Personal);
     for node in nodes {
         campaign.purchase_node(node).unwrap();
     }

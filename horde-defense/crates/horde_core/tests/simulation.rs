@@ -3,7 +3,7 @@ mod support;
 use horde_core::content::{EnemyKind, Mode, StructureKind, content};
 use horde_core::sim::{DEFENSE_LINE, Game, Input, Outcome};
 use horde_core::status::StatusId;
-use support::{advance, enemy, game, legacy_game, strategic_game};
+use support::{advance, enemy, game, legacy_game, nodes_price, strategic_game};
 
 #[test]
 fn pause_freezes_every_authoritative_clock() {
@@ -1093,7 +1093,11 @@ fn a_boss_defeat_stops_piercing_followups_and_later_turrets() {
         // boss armor. Purchase a rifle and prepare it through real training;
         // starter-pistol damage and caps are covered independently.
         let mut g = legacy_game();
-        g.campaign_mut().reward(130, 0, Mode::Personal);
+        g.campaign_mut().reward(
+            nodes_price(&["quick_reload", "rifle_training"]) + content().items[4].buy_value,
+            0,
+            Mode::Personal,
+        );
         g.campaign_mut().purchase_node("quick_reload").unwrap();
         g.campaign_mut().purchase_node("rifle_training").unwrap();
         let rifle = g.campaign_mut().buy_item(4).unwrap();

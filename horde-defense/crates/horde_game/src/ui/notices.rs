@@ -255,6 +255,25 @@ impl UiCtx<'_> {
                     outcome,
                     AppOutcome::Command(CommandOutcome::CountryLiberated)
                 ) {
+                    // Name the liberation and preselect the easiest front it
+                    // opened, so the map's next step is already chosen.
+                    let freed = self.game.last_result().and_then(|r| r.country_id.clone());
+                    let fronts = freed
+                        .as_deref()
+                        .map(|id| self.game.campaign().world.fronts_opened_by(id))
+                        .unwrap_or_default();
+                    if let Some(first) = fronts.first() {
+                        self.campaign.selected_country = first.id.clone();
+                    }
+                    self.status.message = match (self.game.last_result(), fronts.len()) {
+                        (Some(r), 0) => format!("{} liberated.", r.country_name),
+                        (Some(r), n) => format!(
+                            "{} liberated · {n} new {} open on the map.",
+                            r.country_name,
+                            if n == 1 { "front" } else { "fronts" }
+                        ),
+                        (None, _) => String::new(),
+                    };
                     self.open_campaign();
                 } else {
                     self.start_battle();

@@ -479,10 +479,9 @@ impl Campaign {
                 );
             }
         }
-        if mode == Mode::Personal && !self.has_skill(Skill::QuickReload) {
-            let node = skills()
-                .node("quick_reload")
-                .expect("validated compatibility node");
+        if mode == Mode::Personal
+            && let Some(node) = self.best_buyable_node(mode)
+        {
             return make(
                 format!("Learn {}", node.name),
                 format!(

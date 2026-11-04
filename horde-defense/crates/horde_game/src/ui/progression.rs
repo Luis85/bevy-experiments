@@ -261,6 +261,9 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
     let mut state = ui
         .ctx()
         .data_mut(|d| d.get_temp::<TreeState>(id).unwrap_or_default());
+    if let Some(seed) = f.campaign.tree_search_seed.take() {
+        state.search = seed;
+    }
     let frame = ui.ctx().cumulative_frame_nr();
     let now = ui.input(|i| i.time);
     // Re-entering the screen (or a new explicit focus) selects the next useful

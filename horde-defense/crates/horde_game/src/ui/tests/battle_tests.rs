@@ -58,6 +58,7 @@ fn owned_defense_blueprints_allow_live_building_without_an_automatic_pause() {
     let f = &mut fixture.frontend;
     h.click(f, View::Dossier, "Start journey");
     assert!(!f.battle.construction);
+    h.click(f, View::Battle, "Begin defense");
     assert!(!f.game.attempt().unwrap().paused);
     h.click(f, View::Battle, "Build defenses");
     assert!(f.battle.construction);
@@ -369,7 +370,13 @@ fn locked_construction_stays_out_of_the_first_battle_and_explains_the_gate() {
     assert!(!f.game.global_paused());
     assert!(!f.battle.construction);
     assert_eq!(f.game.attempt().unwrap().supply, supply);
-    assert!(f.status.message.contains("first boss clear"));
+    // The message names the next missing step from the core, not a guess.
+    let blocker = f.game.campaign().construction_blocker().unwrap();
+    assert!(
+        f.status.message.starts_with(&blocker),
+        "{}",
+        f.status.message
+    );
 }
 
 #[test]
@@ -746,4 +753,31 @@ fn retreat_is_the_one_visible_withdraw_and_management_keeps_its_tools() {
             "{gone} duplicates the retreat"
         );
     }
+}
+
+#[test]
+fn the_first_defense_teaches_on_the_field_and_always_names_the_keys() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    h.click(f, View::Dossier, "Start journey");
+    assert_eq!(f.game.campaign().attempts, 0);
+    let painted = |output: &FullOutput, text: &str| {
+        output.shapes.iter().any(|s| shape_has_text(&s.shape, text))
+    };
+    let output = h.frame(f, View::Battle, vec![]);
+    // Default bindings are named even though none was changed.
+    assert!(painted(&output, "Mouse1 fire · Mouse2 melee · R reload"));
+    // The opening lesson is on the field, not only inside Management.
+    assert!(painted(&output, "Press Begin defense or Escape to start."));
+    assert!(painted(&output, "READY · Begin defense or Escape"));
+    h.click(f, View::Battle, "Begin defense");
+    let output = h.frame(f, View::Battle, vec![]);
+    assert!(!painted(&output, "READY"));
+    f.game.tick(Input::default());
+    h.click(f, View::Battle, "Pause");
+    let output = h.frame(f, View::Battle, vec![]);
+    assert!(painted(&output, "PAUSED · Escape to resume"));
+    h.click(f, View::Battle, "Hide hints");
+    assert!(!f.settings.show_guidance);
 }

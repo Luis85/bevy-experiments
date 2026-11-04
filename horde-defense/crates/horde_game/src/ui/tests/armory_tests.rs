@@ -27,7 +27,7 @@ fn preset_sale_warning_names_the_actual_reference_before_confirmation() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign_mut().coins = 65;
+    f.game.campaign_mut().coins = nodes_price(&["quick_reload", "rifle_training"]);
     f.game.campaign_mut().purchase_node("quick_reload").unwrap();
     f.game
         .campaign_mut()
@@ -336,7 +336,7 @@ fn equip_buttons_and_equipped_labels_share_one_status_column() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign_mut().coins = 65;
+    f.game.campaign_mut().coins = nodes_price(&["quick_reload", "rifle_training"]);
     f.game.campaign_mut().purchase_node("quick_reload").unwrap();
     f.game
         .campaign_mut()
@@ -372,7 +372,7 @@ fn equipped_selection_says_so_instead_of_repeating_identical_columns() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign_mut().coins = 65;
+    f.game.campaign_mut().coins = nodes_price(&["quick_reload", "rifle_training"]);
     f.game.campaign_mut().purchase_node("quick_reload").unwrap();
     f.game
         .campaign_mut()

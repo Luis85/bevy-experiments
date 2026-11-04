@@ -530,10 +530,99 @@ impl Campaign {
         deltas
     }
 
+    /// How much `node` would do for `mode` right now: 2 when an effect acts
+    /// at once, 1 for an incremental body rank (or a marginal ordnance
+    /// cooldown), 0 when nothing can act yet (a weapon class without its
+    /// gun, construction or structure upgrades without a blueprint, a
+    /// personal effect for Mara).
+    fn node_value(&self, node: &SkillNode, mode: Mode) -> u8 {
+        let personal = mode == Mode::Personal;
+        let any_blueprint = self.blueprints.iter().any(|owned| *owned);
+        let liberated = self.liberated_count();
+        let blueprint_can_follow = skills().nodes.iter().any(|n| {
+            n.effects
+                .iter()
+                .any(|e| matches!(e, SkillEffect::Blueprint(_)))
+                && self.victories >= n.minimum_victories
+                && liberated >= n.minimum_liberated
+        });
+        node.effects
+            .iter()
+            .map(|effect| match effect {
+                SkillEffect::BodyDevelopment { .. }
+                | SkillEffect::OrdnanceCooldownMultiplier(_) => u8::from(personal),
+                SkillEffect::FeatureUnlock(CampaignFeature::Construction) => {
+                    if any_blueprint || blueprint_can_follow {
+                        2
+                    } else {
+                        0
+                    }
+                }
+                SkillEffect::FeatureUnlock(_) | SkillEffect::Blueprint(_) => 2,
+                SkillEffect::StructureRank { kind, .. } => {
+                    if self.blueprints[*kind] {
+                        2
+                    } else {
+                        0
+                    }
+                }
+                SkillEffect::EngineeringMultiplier(_) => {
+                    if any_blueprint {
+                        2
+                    } else {
+                        0
+                    }
+                }
+                SkillEffect::WeaponTraining(class) => {
+                    // Mara's starter guns are not the survivor's.
+                    let owned = self.items.iter().any(|item| {
+                        item.definition().slot == crate::content::Slot::Ranged
+                            && !item.definition().npc_only
+                            && !self.npc.loadout.contains(&item.id)
+                            && crate::weapons::WeaponSpec::from_item(item.definition()).class
+                                == *class
+                    });
+                    if personal && owned { 2 } else { 0 }
+                }
+                _ => {
+                    if personal {
+                        2
+                    } else {
+                        0
+                    }
+                }
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Whether learning `id` would act at once for `mode` (see the
+    /// recommendation). Unknown ids never help.
+    pub fn node_helps_now(&self, id: &str, mode: Mode) -> bool {
+        skills()
+            .node(id)
+            .is_some_and(|node| self.node_value(node, mode) == 2)
+    }
+
+    /// The buyable node worth learning now: the most useful class first
+    /// (acts now, then body ranks), cheapest within it, catalogue order on
+    /// ties. Never a node that cannot act yet.
+    pub(super) fn best_buyable_node(&self, mode: Mode) -> Option<&'static SkillNode> {
+        skills()
+            .nodes
+            .iter()
+            .filter(|n| n.price > 0 && self.node_state(&n.id).is_buyable())
+            .map(|n| (n, self.node_value(n, mode)))
+            .filter(|(_, value)| *value > 0)
+            .min_by_key(|(n, value)| (std::cmp::Reverse(*value), n.price))
+            .map(|(n, _)| n)
+    }
+
     /// The node a tree screen should focus: the campaign recommendation when
-    /// it is an unowned node, else the cheapest buyable node, else the node
-    /// with the cheapest path free of milestone blocks. Ties go to catalogue
-    /// order. Never an owned node or the free starter root.
+    /// it is an unowned node, else the best buyable node (see
+    /// [`Self::best_buyable_node`]), else the useful node with the cheapest
+    /// path free of milestone blocks, else the cheapest buyable node. Ties go
+    /// to catalogue order. Never an owned node or the free starter root.
     pub fn recommended_node(&self, mode: Mode) -> Option<String> {
         let nodes = &skills().nodes;
         let unowned = |id: &str| {
@@ -549,20 +638,103 @@ impl Campaign {
         if let Some(id) = suggested.filter(|id| unowned(id)) {
             return Some(id);
         }
-        nodes
-            .iter()
-            .filter(|n| n.price > 0 && self.node_state(&n.id).is_buyable())
-            .min_by_key(|n| n.price)
+        self.best_buyable_node(mode)
             .or_else(|| {
                 nodes
                     .iter()
                     .filter(|n| unowned(&n.id))
-                    .map(|n| (n, self.path_to_node(&n.id)))
-                    .filter(|(_, path)| path.blocking.is_none())
-                    .min_by_key(|(_, path)| path.total_coins)
-                    .map(|(n, _)| n)
+                    .map(|n| (n, self.node_value(n, mode), self.path_to_node(&n.id)))
+                    .filter(|(_, value, path)| *value > 0 && path.blocking.is_none())
+                    .min_by_key(|(_, value, path)| (std::cmp::Reverse(*value), path.total_coins))
+                    .map(|(n, ..)| n)
+            })
+            .or_else(|| {
+                nodes
+                    .iter()
+                    .filter(|n| n.price > 0 && self.node_state(&n.id).is_buyable())
+                    .min_by_key(|n| n.price)
             })
             .map(|n| n.id.clone())
+    }
+
+    /// Unowned nodes whose victory or liberation gate the current counts
+    /// have just reached (the count equals the gate), in catalogue order. A
+    /// result screen names them once, on the round that opened them. Rank
+    /// ladders (body and structure ranks) are left out: they are steps of a
+    /// ladder already shown, not new things to learn.
+    pub fn milestone_opened_nodes(&self) -> Vec<&'static SkillNode> {
+        let liberated = self.liberated_count();
+        skills()
+            .nodes
+            .iter()
+            .filter(|n| !self.owns_node_definition(n))
+            .filter(|n| {
+                !n.effects.iter().all(|e| {
+                    matches!(
+                        e,
+                        SkillEffect::BodyDevelopment { .. } | SkillEffect::StructureRank { .. }
+                    )
+                })
+            })
+            .filter(|n| self.victories >= n.minimum_victories && liberated >= n.minimum_liberated)
+            .filter(|n| {
+                (n.minimum_victories > 0 && self.victories == n.minimum_victories)
+                    || (n.minimum_liberated > 0 && liberated == n.minimum_liberated)
+            })
+            .collect()
+    }
+
+    /// The next missing step before defenses can be built, in player
+    /// wording, or `None` when construction and a blueprint are owned.
+    pub fn construction_blocker(&self) -> Option<String> {
+        let nodes = &skills().nodes;
+        if !self.has_feature(CampaignFeature::Construction) {
+            let feature = nodes.iter().find(|n| {
+                n.effects
+                    .contains(&SkillEffect::FeatureUnlock(CampaignFeature::Construction))
+            })?;
+            return Some(format!(
+                "Learn {} in Journey upgrades to build defenses.",
+                feature.name
+            ));
+        }
+        if self.blueprints.iter().any(|owned| *owned) {
+            return None;
+        }
+        let blueprint = nodes
+            .iter()
+            .filter(|n| {
+                n.effects
+                    .iter()
+                    .any(|e| matches!(e, SkillEffect::Blueprint(_)))
+            })
+            .min_by_key(|n| (n.minimum_liberated, n.minimum_victories, n.price))?;
+        Some(match self.milestone_gaps(blueprint) {
+            (_, Some((have, need))) => format!(
+                "Liberate {} more {} to open the {}.",
+                need - have,
+                if need - have == 1 {
+                    "country"
+                } else {
+                    "countries"
+                },
+                blueprint.name
+            ),
+            (Some((have, need)), None) => format!(
+                "Win {} {} to open the {}.",
+                need - have,
+                if need - have == 1 {
+                    "defense"
+                } else {
+                    "defenses"
+                },
+                blueprint.name
+            ),
+            (None, None) => format!(
+                "Learn the {} in Journey upgrades to build defenses.",
+                blueprint.name
+            ),
+        })
     }
 
     /// The compatibility note for body-development nodes on legacy profiles
@@ -584,11 +756,71 @@ mod tests {
     use super::*;
     use crate::survivors::SurvivorId;
 
+    #[test]
+    fn a_milestone_just_met_names_the_nodes_it_opened() {
+        let mut c = started();
+        assert!(c.milestone_opened_nodes().is_empty());
+        c.victories = 1;
+        let ids = |c: &Campaign| {
+            c.milestone_opened_nodes()
+                .iter()
+                .map(|n| n.id.clone())
+                .collect::<Vec<_>>()
+        };
+        assert!(ids(&c).contains(&"trap_blueprint".to_owned()));
+        assert!(!ids(&c).contains(&"wall_blueprint".to_owned()));
+        c.victories = 2;
+        assert!(ids(&c).contains(&"wall_blueprint".to_owned()));
+        assert!(
+            !ids(&c).contains(&"trap_blueprint".to_owned()),
+            "opened earlier"
+        );
+        c.coins = 1000;
+        c.purchase_node("engineering").unwrap();
+        c.purchase_node("trap_blueprint").unwrap();
+        c.purchase_node("wall_blueprint").unwrap();
+        assert!(!ids(&c).contains(&"wall_blueprint".to_owned()), "owned");
+        c.victories = 3;
+        assert!(
+            !ids(&c)
+                .iter()
+                .any(|id| id.contains("_rank_") || id.starts_with("body_")),
+            "rank ladders are not announced: {:?}",
+            ids(&c)
+        );
+    }
+
+    #[test]
+    fn construction_blocker_names_the_next_missing_step() {
+        let mut c = started();
+        c.coins = 1000;
+        assert_eq!(
+            c.construction_blocker().as_deref(),
+            Some("Learn Field engineering in Journey upgrades to build defenses.")
+        );
+        c.purchase_node("engineering").unwrap();
+        assert_eq!(
+            c.construction_blocker().as_deref(),
+            Some("Win 1 defense to open the Trap blueprint.")
+        );
+        c.victories = 1;
+        assert_eq!(
+            c.construction_blocker().as_deref(),
+            Some("Learn the Trap blueprint in Journey upgrades to build defenses.")
+        );
+        c.purchase_node("trap_blueprint").unwrap();
+        assert_eq!(c.construction_blocker(), None);
+    }
+
     fn started() -> Campaign {
         let mut c = Campaign::default();
         c.choose_survivor(SurvivorId::Rook).unwrap();
         c.choose_start_country("DEU").unwrap();
         c
+    }
+
+    fn price(id: &str) -> u64 {
+        skills().node(id).unwrap().price
     }
 
     fn index(id: &str) -> usize {
@@ -713,18 +945,19 @@ mod tests {
                 missing: vec!["smg_training".into(), "rifle_training".into()]
             }
         );
+        let fitness = price("field_fitness");
         c.coins = 5;
         assert_eq!(
             c.node_state("field_fitness"),
             NodeState::NeedsCoins {
-                payment: NodePayment::Coins(20),
-                short: 15
+                payment: NodePayment::Coins(fitness),
+                short: fitness - 5
             }
         );
         c.coins = 1000;
         assert_eq!(
             c.node_state("field_fitness"),
-            NodeState::Buyable(NodePayment::Coins(20))
+            NodeState::Buyable(NodePayment::Coins(fitness))
         );
         c.purchase_node("field_fitness").unwrap();
         assert_eq!(
@@ -778,7 +1011,10 @@ mod tests {
             labels(&c, "shotgun_training"),
             [
                 ("Learn Steady hands".to_owned(), false),
-                ("35 coins (have 25)".to_owned(), false)
+                (
+                    format!("{} coins (have 25)", price("shotgun_training")),
+                    false
+                )
             ]
         );
         assert_eq!(
@@ -886,7 +1122,13 @@ mod tests {
                 "machine_gun_training"
             ]
         );
-        assert_eq!(mg.total_coins, 25 + 30 + 40 + 60);
+        assert_eq!(
+            mg.total_coins,
+            price("quick_reload")
+                + price("smg_training")
+                + price("rifle_training")
+                + price("machine_gun_training")
+        );
         assert_eq!(mg.blocking, None);
         assert_eq!(
             c.path_to_node("companion_contact").blocking.as_deref(),
@@ -1096,6 +1338,110 @@ mod tests {
         assert_eq!(unlock.label(), "Grenades");
         assert_eq!(unlock.format(1.0), "Unlocked");
         assert_eq!(unlock.format(0.0), "Locked");
+    }
+
+    /// Buys the recommendation repeatedly with `coins`; returns the order.
+    fn recommended_route(c: &mut Campaign, coins: u64) -> Vec<String> {
+        c.coins = coins;
+        let mut route = Vec::new();
+        while let Some(id) = c.recommended_node(Mode::Personal) {
+            if c.purchase_node(&id).is_err() {
+                break;
+            }
+            route.push(id);
+        }
+        route
+    }
+
+    #[test]
+    fn the_recommendation_buys_what_helps_now_before_body_ranks() {
+        let mut c = started();
+        let route = recommended_route(&mut c, 400);
+        let first_body = route
+            .iter()
+            .position(|id| id.starts_with("body_"))
+            .unwrap_or(route.len());
+        // Every dedicated starter that acts now comes before any +5 body rank.
+        for id in [
+            "steady_hands",
+            "field_fitness",
+            "quick_reload",
+            "endurance_drill",
+        ] {
+            let at = route.iter().position(|r| r == id).unwrap_or(usize::MAX);
+            assert!(
+                at < first_body,
+                "{id} at {at}, first body rank at {first_body}: {route:?}"
+            );
+        }
+        // Nothing that cannot act yet: no class without its gun, no
+        // construction or frames before a blueprint can be learned.
+        for useless in [
+            "smg_training",
+            "shotgun_training",
+            "rifle_training",
+            "engineering",
+            "reinforced_frames",
+        ] {
+            assert!(!route.contains(&useless.to_owned()), "{useless}: {route:?}");
+        }
+    }
+
+    #[test]
+    fn the_first_recommendation_is_the_cheapest_node_that_helps_now() {
+        let mut c = started();
+        c.coins = 100_000;
+        let cheapest = skills()
+            .nodes
+            .iter()
+            .filter(|n| c.node_state(&n.id).is_buyable() && c.node_helps_now(&n.id, Mode::Personal))
+            .map(|n| n.price)
+            .min()
+            .unwrap();
+        c.coins = cheapest;
+        let id = c.recommended_node(Mode::Personal).unwrap();
+        assert!(c.node_state(&id).is_buyable(), "{id}");
+        assert_eq!(price(&id), cheapest, "{id}");
+        assert_ne!(id, "quick_reload", "affordable stronger starter skipped");
+    }
+
+    #[test]
+    fn nodes_help_only_once_they_can_act() {
+        let mut c = started();
+        assert!(c.node_helps_now("steady_hands", Mode::Personal));
+        assert!(
+            !c.node_helps_now("engineering", Mode::Personal),
+            "no blueprint yet"
+        );
+        assert!(
+            !c.node_helps_now("rifle_training", Mode::Personal),
+            "no rifle owned"
+        );
+        assert!(
+            !c.node_helps_now("steady_hands", Mode::Npc),
+            "personal-only effect"
+        );
+        c.victories = 1;
+        assert!(
+            c.node_helps_now("engineering", Mode::Personal),
+            "trap blueprint can follow"
+        );
+        let rifle = crate::content::content()
+            .items
+            .iter()
+            .position(|i| {
+                i.slot == crate::content::Slot::Ranged
+                    && !i.npc_only
+                    && crate::weapons::WeaponSpec::from_item(i).class
+                        == crate::weapons::WeaponClass::Rifle
+            })
+            .unwrap();
+        c.add_item(rifle).unwrap();
+        assert!(c.node_helps_now("rifle_training", Mode::Personal));
+        assert!(
+            !c.node_helps_now("body_vitality_1", Mode::Personal),
+            "a rank, not a step"
+        );
     }
 
     #[test]

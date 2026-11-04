@@ -122,7 +122,7 @@ fn failed_outbreak_front_change_keeps_operations_and_the_requested_country_conte
             ready_turns: 0,
         });
     let before = serde_json::to_value(&f.game).unwrap();
-    h.click(f, View::Camp, "Plan outbreak response");
+    h.click(f, View::Camp, "Defend now");
     assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Operations);
     assert_eq!(f.campaign.selected_country, "FRA");
     assert_eq!(f.game.attempt().unwrap().country_id.as_deref(), Some("DEU"));

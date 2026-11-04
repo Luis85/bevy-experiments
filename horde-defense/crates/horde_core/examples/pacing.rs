@@ -7,10 +7,7 @@ use horde_core::skill_catalog::CampaignFeature;
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let max_runs = args
-        .iter()
-        .find_map(|a| a.parse().ok())
-        .unwrap_or(60usize);
+    let max_runs = args.iter().find_map(|a| a.parse().ok()).unwrap_or(60usize);
     let list_runs = args.iter().any(|a| a == "--runs");
     let mut rows = vec![
         ("First victory".to_owned(), Milestone::FirstVictory),

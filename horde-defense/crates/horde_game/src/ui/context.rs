@@ -224,11 +224,6 @@ impl UiCtx<'_> {
             None
         }
     }
-    pub(super) fn custom_cursor_requested(&self) -> bool {
-        self.battle.custom_cursor_requested
-            && self.screen.allows_custom_cursor()
-            && !self.status.feedback.details_open
-    }
     pub(super) fn settings_return_label(&self) -> &'static str {
         self.nav.return_screen.settings_return_label()
     }

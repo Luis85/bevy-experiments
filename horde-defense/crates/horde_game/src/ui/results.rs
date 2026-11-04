@@ -35,24 +35,70 @@ fn continue_label(f: &UiCtx) -> &'static str {
         None => "Continue journey",
     }
 }
-fn retreat_hint(cause: &str) -> String {
-    let lower = cause.to_ascii_lowercase();
-    if lower.contains("rest") && lower.contains("train") {
-        cause.to_owned()
-    } else if cause.trim().is_empty() {
-        "Rest and train before trying again.".into()
-    } else {
-        format!("{cause} Rest and train before trying again.")
+/// Why the round ended and what to try next, from the core report.
+fn reason_line(report: &Report) -> String {
+    let cause = report.cause.trim().trim_end_matches('.');
+    match (cause.is_empty(), report.tip.trim().is_empty()) {
+        (true, true) => "Rest and train before trying again.".into(),
+        (true, false) => report.tip.trim().to_owned(),
+        (false, true) => format!("{cause}."),
+        (false, false) => format!("{cause}. {}", report.tip.trim()),
     }
 }
 /// One outcome line in the page-title face (outcome · country · defense)
 /// with the banked rewards beside it, and at most one muted hint under it.
 /// The header shows the wallet; this strip only names what was banked.
-fn outcome_strip(ui: &mut egui::Ui, report: &Report) {
-    let (label, color) = match report.outcome {
-        Outcome::Victory => ("Victory", GREEN),
-        Outcome::Defeat => ("Defeat", RED),
-        Outcome::Withdrawal => ("Retreated", AMBER),
+/// What a victory opened, from core queries: the fronts a liberation
+/// unlocked, then the nodes whose milestone this round reached.
+fn victory_line(f: &UiCtx, report: &Report) -> Option<String> {
+    let campaign = f.game.campaign();
+    let mut parts = Vec::new();
+    if let Some(id) = report.country_id.as_deref()
+        && campaign.world.cleared.iter().any(|c| c == id)
+        && report.country_freed
+    {
+        let fronts: Vec<&str> = campaign
+            .world
+            .fronts_opened_by(id)
+            .iter()
+            .map(|c| c.name.as_str())
+            .collect();
+        parts.push(if fronts.is_empty() {
+            format!("{} liberated.", report.country_name)
+        } else {
+            format!(
+                "{} liberated. New fronts: {}.",
+                report.country_name,
+                fronts.join(", ")
+            )
+        });
+    }
+    let opened: Vec<&str> = campaign
+        .milestone_opened_nodes()
+        .iter()
+        .map(|n| n.name.as_str())
+        .collect();
+    if !opened.is_empty() {
+        let shown = opened.len().min(4);
+        let more = opened.len() - shown;
+        parts.push(format!(
+            "Now open in the tree: {}{}.",
+            opened[..shown].join(", "),
+            if more > 0 {
+                format!(" and {more} more")
+            } else {
+                String::new()
+            }
+        ));
+    }
+    (!parts.is_empty()).then(|| parts.join(" "))
+}
+fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
+    let label = report.outcome.label();
+    let color = match report.outcome {
+        Outcome::Victory => GREEN,
+        Outcome::Defeat => RED,
+        Outcome::Withdrawal => AMBER,
     };
     let title = |color| TextFormat {
         font_id: FontId::new(24.0, egui::FontFamily::Name("display".into())),
@@ -77,17 +123,20 @@ fn outcome_strip(ui: &mut egui::Ui, report: &Report) {
             ..TextFormat::default()
         },
     );
-    ui.label(line);
-    if report.outcome != Outcome::Victory {
-        ui.add(
-            egui::Label::new(
-                RichText::new(retreat_hint(&report.cause))
-                    .size(12.0)
-                    .color(MUTED),
-            )
-            .truncate(),
-        )
-        .on_hover_text(&report.cause);
+    // One line at every width: a long country name truncates (full text on
+    // hover) instead of pushing the actions down.
+    let full = line.text.clone();
+    ui.add(egui::Label::new(line).truncate())
+        .on_hover_text(full);
+    // The reason is the point of this screen after a loss; after a win it
+    // names what opened. Wrapped, never cut.
+    let next = if report.outcome == Outcome::Victory {
+        victory_line(f, report)
+    } else {
+        Some(reason_line(report))
+    };
+    if let Some(next) = next {
+        ui.add(egui::Label::new(RichText::new(next).size(13.0).color(TEXT)).wrap());
     }
 }
 pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
@@ -102,7 +151,7 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
                 ui.label(RichText::new("Journey upgrades").size(26.0).strong());
             }
             if let Some(report) = f.game.last_result() {
-                outcome_strip(ui, report);
+                outcome_strip(ui, f, report);
             } else {
                 muted(
                     ui,
@@ -148,9 +197,6 @@ fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             f.open_campaign();
         }
     }
-    if ui.button("Run history").clicked() {
-        f.open_history();
-    }
     ui.menu_button("More", |ui| {
         if !live
             && (f.game.campaign().legacy_features || f.game.campaign().victories > 0)
@@ -164,9 +210,14 @@ fn actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             ui.close();
         }
     });
+    // A durable transition (a save or reset) would reject the leave and
+    // strand "Saving…", so the exit waits for it.
     if !live
         && ui
-            .add(egui::Button::new(RichText::new("Leave journey").color(MUTED)).frame(false))
+            .add_enabled(
+                !f.runtime.durable_transition_pending(),
+                egui::Button::new(RichText::new("Leave journey").color(MUTED)).frame(false),
+            )
             .on_hover_text(
                 "End this journey and return to the main menu. Banked coins, items and upgrades stay.",
             )

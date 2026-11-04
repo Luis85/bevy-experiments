@@ -304,3 +304,18 @@ fn older_autosave_ack_keeps_navigation_busy_and_freezes_raw_settings_binding_cap
     assert!(f.screen == Screen::Camp);
     assert!(!f.status.save_pending);
 }
+
+#[test]
+fn escape_cancels_a_rebind_instead_of_binding_escape() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    h.click(f, View::Settings, "R");
+    assert!(f.prefs.rebind == Some(Action::Reload));
+    h.frame(f, View::Settings, vec![]);
+    h.key(f, View::Settings, Key::Escape);
+    assert!(f.prefs.rebind.is_none());
+    assert_eq!(f.settings.bindings[Action::Reload as usize], "R");
+    assert_eq!(f.settings.bindings[Action::Pause as usize], "Escape");
+}

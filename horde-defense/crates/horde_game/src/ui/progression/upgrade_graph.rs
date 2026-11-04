@@ -28,6 +28,8 @@ pub(super) enum Icon {
     Stamina,
     /// Perception (weak spots): an aiming sight.
     Sight,
+    /// Companions and world: two survivors side by side.
+    Companion,
     Defense(StructureKind, u32),
 }
 
@@ -799,6 +801,8 @@ pub(super) fn skill_icon(name: &str) -> Icon {
         "coordination" => Icon::Skill(Skill::QuickReload),
         "endurance" => Icon::Stamina,
         "perception" => Icon::Sight,
+        "companion" => Icon::Companion,
+        "pistol" | "firearm" => Icon::Firearm,
         _ => Icon::Firearm,
     }
 }
@@ -874,6 +878,19 @@ pub(super) fn pictogram(p: &egui::Painter, rect: Rect, icon: Icon, color: Color3
                 ([9.0, 22.0], [18.0, 10.0]),
                 ([18.0, 10.0], [12.0, 10.0]),
                 ([12.0, 10.0], [15.0, 2.0]),
+            ] {
+                segment(a, b);
+            }
+        }
+        Icon::Companion => {
+            p.circle_stroke(point(8.0, 7.0), 3.0 * unit, stroke);
+            p.circle_stroke(point(16.0, 7.0), 3.0 * unit, stroke);
+            for (a, b) in [
+                ([2.0, 21.0], [3.0, 14.0]),
+                ([3.0, 14.0], [13.0, 14.0]),
+                ([13.0, 14.0], [14.0, 21.0]),
+                ([13.0, 14.0], [21.0, 14.0]),
+                ([21.0, 14.0], [22.0, 21.0]),
             ] {
                 segment(a, b);
             }
@@ -976,6 +993,29 @@ pub(super) fn pictogram(p: &egui::Painter, rect: Rect, icon: Icon, color: Color3
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn world_nodes_draw_survivors_and_fortification_nodes_draw_their_structure() {
+        let catalog = horde_core::skill_catalog::skills();
+        for node in &catalog.nodes {
+            let icon = skill_icon(&node.icon);
+            if node.branch == "Companions and world" {
+                assert!(matches!(icon, Icon::Companion), "{}", node.id);
+            }
+            for (prefix, kind) in [
+                ("trap_", StructureKind::Trap),
+                ("wall_", StructureKind::Wall),
+                ("turret_", StructureKind::Turret),
+            ] {
+                if node.id.starts_with(prefix) {
+                    assert!(
+                        matches!(icon, Icon::Defense(k, _) if k == kind),
+                        "{}",
+                        node.id
+                    );
+                }
+            }
+        }
+    }
     fn catalogue_nodes() -> Vec<Node> {
         let catalog = horde_core::skill_catalog::skills();
         catalog

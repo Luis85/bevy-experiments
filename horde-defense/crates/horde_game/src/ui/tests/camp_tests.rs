@@ -2,7 +2,7 @@
 use super::*;
 
 #[test]
-fn first_country_selection_immediately_starts_and_saves_a_live_personal_defense() {
+fn first_country_selection_starts_and_saves_a_personal_defense_waiting_to_begin() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
@@ -10,14 +10,17 @@ fn first_country_selection_immediately_starts_and_saves_a_live_personal_defense(
     assert_eq!(f.game.campaign().world.start.as_deref(), Some("DEU"));
     assert!(f.screen == Screen::Battle);
     assert!(!f.battle.construction);
+    // The first defense waits for "Begin defense" so the controls can be read.
     let a = f.game.attempt().unwrap();
-    assert!(!a.paused);
+    assert!(a.paused);
     assert_eq!(a.tick, 0);
     assert_eq!(a.country_id.as_deref(), Some("DEU"));
     assert_eq!(a.mode, Mode::Personal);
     let restored = Game::load(&f.paths.campaign()).unwrap();
     assert_eq!(restored.attempt().unwrap().tick, 0);
-    assert!(!restored.attempt().unwrap().paused);
+    assert!(restored.attempt().unwrap().paused);
+    h.click(f, View::Battle, "Begin defense");
+    assert!(!f.game.attempt().unwrap().paused);
 }
 
 #[test]

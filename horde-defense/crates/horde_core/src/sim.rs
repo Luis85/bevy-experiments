@@ -652,6 +652,24 @@ pub enum Outcome {
     Defeat,
     Withdrawal,
 }
+impl Outcome {
+    /// The one player-facing name every screen uses for this outcome.
+    pub fn label(self) -> &'static str {
+        match self {
+            Outcome::Victory => "Victory",
+            Outcome::Defeat => "Defeat",
+            Outcome::Withdrawal => "Retreated",
+        }
+    }
+}
+/// Why a Personal defense was lost: the lane of the last hit when one was
+/// recorded, never an invented lane.
+pub(crate) fn overrun_cause(last_damage_lane: Option<u8>) -> String {
+    match last_damage_lane {
+        Some(lane) => format!("Overrun at the line in lane {}", lane + 1),
+        None => "Overrun at the line".into(),
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Report {
     #[serde(default)]
@@ -1126,14 +1144,8 @@ impl Game {
             return;
         }
         if a.hp <= 0 && a.mode == Mode::Personal {
-            let lane = a.last_damage_lane.map_or(6, |l| l + 1);
-            self.finish(
-                a,
-                Outcome::Defeat,
-                format!(
-                    "Retreated from the overrun line in lane {lane}; rest and train before retrying"
-                ),
-            );
+            let cause = overrun_cause(a.last_damage_lane);
+            self.finish(a, Outcome::Defeat, cause);
             return;
         }
         if a.mode == Mode::Npc && a.injury.terminal() {
@@ -1222,6 +1234,19 @@ fn enemy_dodge(a: &Attempt, e: &Enemy) -> i32 {
     }
 }
 
+#[cfg(test)]
+mod outcome_tests {
+    use super::*;
+    #[test]
+    fn outcomes_have_one_name_and_a_defeat_never_reads_as_a_retreat() {
+        assert_eq!(Outcome::Withdrawal.label(), "Retreated");
+        assert_eq!(Outcome::Defeat.label(), "Defeat");
+        assert_eq!(Outcome::Victory.label(), "Victory");
+        assert_eq!(overrun_cause(Some(1)), "Overrun at the line in lane 2");
+        assert_eq!(overrun_cause(None), "Overrun at the line");
+        assert!(!overrun_cause(Some(0)).contains("Retreat"));
+    }
+}
 #[cfg(test)]
 mod reload_duration_tests {
     use super::*;

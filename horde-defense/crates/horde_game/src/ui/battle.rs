@@ -75,7 +75,10 @@ pub(super) fn controls(ctx: &egui::Context, f: &mut UiCtx) {
             f.battle.construction = !f.battle.construction;
         } else {
             f.battle.construction = false;
-            f.status.message="Your first boss clear opens trap blueprints. Combat continues; use Pause when you need time.".into();
+            f.status.message = format!(
+                "{} Combat continues; use Pause when you need time.",
+                f.game.campaign().construction_blocker().unwrap_or_default()
+            );
             f.status.message_error = false;
             f.status.feedback_revision = f.status.feedback_revision.wrapping_add(1);
         }
@@ -273,21 +276,34 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                 ui.input(|i| i.raw.focused),
                 ctx.any_popup_open() || f.status.feedback.details_open,
             ) {
+                // The OS crosshair marks the aim with no presentation lag;
+                // the painted readout follows it. Captures have no OS
+                // cursor, so the diagnostic preview paints the cross.
                 if owns_cursor {
-                    f.battle.custom_cursor_requested = true;
-                    ctx.set_cursor_icon(egui::CursorIcon::None);
+                    ctx.set_cursor_icon(egui::CursorIcon::Crosshair);
                 }
                 reticle::paint(
                     ui,
                     &view.reticle(f.battle.attack_selection.ordnance()),
                     arena,
                     f.battle.aim,
-                    f.battle.construction,
-                    f.settings.reduced_effects,
+                    reticle::Marks {
+                        cross: !owns_cursor,
+                        building: f.battle.construction,
+                        reduced: f.settings.reduced_effects,
+                    },
                 );
             }
             damage::draw(ui, r, f);
             loot::draw(ui, r, f);
+            // Both sit in the field margin around the clearing, so neither
+            // covers the defender or the other at the minimum size.
+            if view.paused && !f.battle.construction {
+                pause_banner(ui, maximum, &view, &f.settings.bindings);
+            }
+            if f.settings.show_guidance && view.first_deployment && view.personal() {
+                field_hint_callout(ui, maximum, f, &view);
+            }
             corner_hud(ui, canvas, f, &hud_view);
             if let Some(receipt) = &view.last_loot {
                 let area = Rect::from_min_max(
@@ -329,11 +345,8 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         });
                 });
             }
-            if f.settings
-                .bindings
-                .iter()
-                .zip(["Mouse1", "Mouse2", "R", "1", "2", "B", "Escape", "F"])
-                .any(|(a, b)| a != b)
+            // The controls are always named; a new player has no other
+            // place to learn the defaults.
             {
                 ui.painter().text(
                     pos2(canvas.left() + 12., canvas.bottom() - 2.),
@@ -593,6 +606,76 @@ fn arrival_groups(size: u32) -> String {
         size => format!("groups of {size}"),
     }
 }
+/// The first-defense lesson for `hint`, naming the player's own keys.
+/// `bindings` follows `settings::Action` order: fire, melee, reload, heal,
+/// brace, build, pause.
+fn hint_text(hint: FieldHint, paused: bool, bindings: &[String]) -> String {
+    let key = |index: usize| bindings.get(index).map_or("?", String::as_str);
+    match hint {
+        FieldHint::Opening if paused => format!(
+            "Enemies walk in from the right. Hold {} to shoot, {} reloads, {} strikes an enemy at your line. Press Begin defense or {} to start.",
+            key(0),
+            key(2),
+            key(1),
+            key(6)
+        ),
+        FieldHint::Opening | FieldHint::Shoot => format!(
+            "Aim at the nearest enemy and hold {} to shoot.",
+            key(0)
+        ),
+        FieldHint::Reload => format!(
+            "Press {} in a quiet moment: reloading is free, an empty gun is not.",
+            key(2)
+        ),
+        FieldHint::Contact => format!(
+            "An enemy at your line hurts you. Aim at its lane and press {} to strike it.",
+            key(1)
+        ),
+        FieldHint::Banked => "Coins and items are already banked. Kill the boss to win, or Retreat & train to spend them.".to_owned(),
+    }
+}
+/// The current first-defense lesson as one line over the top of the field.
+fn field_hint_callout(ui: &mut egui::Ui, arena: Rect, f: &mut UiCtx, view: &BattleScreen) {
+    let text = hint_text(view.field.hint, view.paused, &f.settings.bindings);
+    let width = (arena.width() - 24.0).clamp(160.0, 620.0);
+    let area = Rect::from_min_size(
+        pos2(arena.center().x - width * 0.5, arena.top() + 4.0),
+        vec2(width, 84.0),
+    );
+    ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
+        egui::Frame::new()
+            .fill(Color32::from_black_alpha(215))
+            .stroke(Stroke::new(1.0, AMBER))
+            .inner_margin(egui::Margin::symmetric(10, 6))
+            .show(ui, |ui| {
+                // Text above, the opt-out under it: one column fits every width.
+                ui.set_width(width - 22.0);
+                ui.add(egui::Label::new(RichText::new(text).size(13.0).color(TEXT)).wrap());
+                if ui.small_button("Hide hints").clicked() {
+                    f.settings.show_guidance = false;
+                }
+            });
+    });
+}
+/// Names the paused state on the field, so a frozen field never reads as a
+/// hang.
+fn pause_banner(ui: &egui::Ui, arena: Rect, view: &BattleScreen, bindings: &[String]) {
+    let pause = bindings.get(6).map_or("Escape", String::as_str);
+    let text = if view.tick == 0 {
+        format!("READY · Begin defense or {pause}")
+    } else {
+        format!("PAUSED · {pause} to resume")
+    };
+    let painter = ui.painter_at(arena);
+    let galley = painter.layout_no_wrap(text, FontId::proportional(18.0), AMBER);
+    let at = pos2(arena.center().x, arena.bottom() - 18.0) - galley.size() * 0.5;
+    painter.rect_filled(
+        Rect::from_min_size(at - vec2(10.0, 5.0), galley.size() + vec2(20.0, 10.0)),
+        0.0,
+        Color32::from_black_alpha(200),
+    );
+    painter.galley(at, galley, AMBER);
+}
 fn attack_selector_rect(canvas: Rect, arena: Rect) -> Rect {
     Rect::from_min_max(
         pos2(canvas.left() + 350.0, canvas.top() + 12.0),
@@ -825,21 +908,7 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen, hud_view
     }
     if f.settings.show_guidance && view.first_deployment {
         chrome::section(ui, "Your first defense");
-        let hint = match field.hint {
-            FieldHint::Opening => {
-                "You stay at the center of the defense. Combat is live: aim across every lane. Retreat banks your rewards for training."
-            }
-            FieldHint::Shoot => "Aim at a visible enemy and hold fire. Reload during a safe gap.",
-            FieldHint::Reload => {
-                "Reload renews the magazine without spending coins. Melee cancels an unfinished reload."
-            }
-            FieldHint::Contact => {
-                "An enemy reaching any part of the left line can hurt you. Aim at that lane and strike back."
-            }
-            FieldHint::Banked => {
-                "Coins and equipment are already banked. Defeat the boss, or return to camp to improve."
-            }
-        };
+        let hint = hint_text(field.hint, view.paused, &f.settings.bindings);
         ui.label(hint);
         if ui.small_button("Hide field hints").clicked() {
             f.settings.show_guidance = false;

@@ -5,7 +5,7 @@ use horde_core::{
     sim::{ENEMY_HIT_STOP_TICKS, EventKind, Game, Input, Outcome},
 };
 use std::sync::atomic::{AtomicU64, Ordering};
-use support::{advance, legacy_game};
+use support::{advance, legacy_game, nodes_price};
 
 fn game(mode: Mode, unlock: bool) -> Game {
     let mut game = legacy_game();
@@ -13,7 +13,7 @@ fn game(mode: Mode, unlock: bool) -> Game {
         game.campaign_mut().attempts = 1;
     }
     if unlock {
-        game.campaign_mut().coins = 100;
+        game.campaign_mut().coins = nodes_price(&["grenade_training", "molotov_training"]) + 45;
         game.campaign_mut()
             .purchase_node("grenade_training")
             .unwrap();

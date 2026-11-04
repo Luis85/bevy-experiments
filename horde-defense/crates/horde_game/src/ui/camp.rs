@@ -295,7 +295,13 @@ fn camp_controls(ctx: &egui::Context, f: &mut UiCtx) {
     if feedback::overlay_owns_keyboard(ctx, f) || f.prefs.rebind.is_some() {
         return;
     }
-    if f.settings.pressed(ctx, Action::Pause, false) {
+    // The camp's pause key drives the world clock only where the clock is
+    // shown, and never resumes a waiting main defense from here: that has
+    // its own "Return to active defense".
+    if f.operations_available()
+        && f.game.attempt().is_none()
+        && f.settings.pressed(ctx, Action::Pause, false)
+    {
         toggle_time(f);
     }
 }

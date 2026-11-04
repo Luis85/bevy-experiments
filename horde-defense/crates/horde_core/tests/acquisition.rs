@@ -6,7 +6,10 @@ use horde_core::{
 use support::trained_campaign;
 
 fn rifle_trained_campaign() -> Campaign {
-    trained_campaign(130, &["quick_reload", "rifle_training"])
+    trained_campaign(
+        content().items[4].buy_value,
+        &["quick_reload", "rifle_training"],
+    )
 }
 
 #[test]
@@ -69,7 +72,7 @@ fn personal_rifles_require_a_real_purchase_or_loot_instance_as_well_as_training(
 
 #[test]
 fn recommendations_do_not_offer_training_to_unlock_npc_issued_equipment() {
-    let campaign = trained_campaign(200, &["quick_reload"]);
+    let campaign = trained_campaign(175, &["quick_reload"]);
     let recommendation = campaign.recommendation(Mode::Personal);
     assert!(
         !matches!(recommendation.action, RecommendationAction::LearnNode(ref id) if id == "rifle_training")

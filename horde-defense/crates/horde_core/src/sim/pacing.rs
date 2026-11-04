@@ -120,15 +120,14 @@ fn pacing_input(g: &Game, aim: PacingAim, held: &mut [f32; 2]) -> Input {
             let Some(a) = &g.attempt else {
                 return Input::default();
             };
-            if a.tick % 30 == 0 {
-                if let Some(e) = a
+            if a.tick % 30 == 0
+                && let Some(e) = a
                     .enemies
                     .iter()
                     .filter(|e| e.in_view())
                     .min_by(|e, f| e.x.total_cmp(&f.x).then(e.id.cmp(&f.id)))
-                {
-                    *held = [e.x, e.y()];
-                }
+            {
+                *held = [e.x, e.y()];
             }
             Input {
                 aim: *held,
@@ -136,6 +135,24 @@ fn pacing_input(g: &Game, aim: PacingAim, held: &mut [f32; 2]) -> Input {
                 melee: a.enemies.iter().any(|e| e.contact()) && a.stamina >= 25.0,
                 ..Input::default()
             }
+        }
+    }
+}
+/// Places every owned structure kind across the lanes while supply lasts,
+/// traps nearest the line, as a player who bought fortifications would.
+fn build_owned_structures(g: &mut Game) {
+    for (column, kind) in [
+        (0, StructureKind::Trap),
+        (1, StructureKind::Wall),
+        (2, StructureKind::Turret),
+    ] {
+        if !g.campaign.blueprints[kind] {
+            continue;
+        }
+        let lanes = g.attempt.as_ref().map_or(0, |a| a.lane_count);
+        for lane in construction_lane_order(lanes) {
+            // Rejections (supply, an occupied cell) just skip the cell.
+            let _ = g.place(kind, lane, column);
         }
     }
 }
@@ -195,11 +212,7 @@ pub fn simulate_pacing(profile: &PacingProfile) -> Result<PacingReport, String> 
                             g.campaign.world.can_enter(&c.id)
                                 && !g.campaign.world.cleared.contains(&c.id)
                         })
-                        .min_by(|a, b| {
-                            a.difficulty
-                                .total_cmp(&b.difficulty)
-                                .then(a.id.cmp(&b.id))
-                        })
+                        .min_by(|a, b| a.difficulty.total_cmp(&b.difficulty).then(a.id.cmp(&b.id)))
                         .ok_or("No country left to enter")?
                         .id
                         .clone();
@@ -209,6 +222,7 @@ pub fn simulate_pacing(profile: &PacingProfile) -> Result<PacingReport, String> 
                 }
             }
         }
+        build_owned_structures(&mut g);
         g.set_paused(false);
         let mut held = [15.0, 5.5];
         for _ in 0..60 * 600 {

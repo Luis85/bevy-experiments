@@ -405,10 +405,21 @@ impl Campaign {
 #[cfg(test)]
 mod tests {
     use super::*;
+    /// The summed catalogue price of the named skill nodes.
+    fn price(ids: &[&str]) -> u64 {
+        ids.iter().map(|id| skills().node(id).unwrap().price).sum()
+    }
     #[test]
     fn authored_purchases_stack_and_reject_unmet_prerequisites_without_spending() {
         let mut c = Campaign {
-            coins: 500,
+            coins: price(&[
+                "steady_hands",
+                "stopping_power",
+                "quick_reload",
+                "rapid_cycle",
+                "combat_reload",
+                "field_fitness",
+            ]),
             ..Campaign::default()
         };
         let before = c.clone();
@@ -552,7 +563,11 @@ mod tests {
     #[test]
     fn reserved_equipment_cannot_be_sold_or_changed() {
         let mut c = Campaign::default();
-        c.reward(65, 0, Mode::Personal);
+        c.reward(
+            price(&["quick_reload", "rifle_training"]),
+            0,
+            Mode::Personal,
+        );
         c.purchase_node("quick_reload").unwrap();
         c.purchase_node("rifle_training").unwrap();
         let id = c.add_item(4).unwrap();
@@ -578,7 +593,11 @@ mod tests {
     #[test]
     fn presets_reference_owned_items_and_never_duplicate() {
         let mut c = Campaign::default();
-        c.reward(65, 0, Mode::Personal);
+        c.reward(
+            price(&["quick_reload", "rifle_training"]),
+            0,
+            Mode::Personal,
+        );
         c.purchase_node("quick_reload").unwrap();
         c.purchase_node("rifle_training").unwrap();
         let id = c.add_item(4).unwrap();
@@ -752,21 +771,28 @@ mod tests {
             RecommendationAction::ChooseCountry
         );
         c.choose_start_country("DEU").unwrap();
-        c.reward(25, 0, Mode::Personal);
+        let steady = price(&["steady_hands"]);
+        c.reward(steady, 0, Mode::Personal);
+        // The cheapest node that acts now, not a fixed first pick.
         let next = c.recommendation(Mode::Personal);
         assert_eq!(
             next.action,
-            RecommendationAction::LearnNode("quick_reload".into())
+            RecommendationAction::LearnNode("steady_hands".into())
         );
         assert!(next.affordable);
-        assert_eq!(next.price, 25);
+        assert_eq!(next.price, steady);
+        c.reward(
+            Skill::QuickReload.price().saturating_sub(c.coins),
+            0,
+            Mode::Personal,
+        );
         c.purchase_skill(Skill::QuickReload).unwrap();
         let id = c.add_item(4).unwrap();
         assert_eq!(
             c.recommendation(Mode::Personal).action,
             RecommendationAction::LearnNode("rifle_training".into())
         );
-        c.reward(40, 0, Mode::Personal);
+        c.reward(price(&["rifle_training"]), 0, Mode::Personal);
         c.purchase_node("rifle_training").unwrap();
         assert_eq!(
             c.recommendation(Mode::Personal).action,

@@ -402,7 +402,7 @@ impl MapCache {
         painter.text(
             rect.left_bottom() + vec2(12.0, -12.0),
             Align2::LEFT_BOTTOM,
-            "SELECT A COUNTRY · G: GARRISON · D: DEPLOYMENT",
+            "SELECT A COUNTRY",
             FontId::proportional(11.0),
             MUTED,
         );

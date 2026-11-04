@@ -205,7 +205,9 @@ impl Game {
                 let mut selected = self.clone();
                 selected.campaign.choose_start_country(id)?;
                 selected.deploy_country_stage(0, Mode::Personal)?;
-                selected.set_paused(false);
+                // The journey's first defense waits for "Begin defense", so
+                // the controls can be read before anything moves.
+                selected.set_paused(true);
                 *self = selected;
                 Applied
             }
@@ -447,6 +449,18 @@ mod tests {
         }
     }
 
+    #[test]
+    fn the_first_defense_waits_for_the_player_to_begin() {
+        let mut game = Game::default();
+        game.apply(&Command::ChooseSurvivor(SurvivorId::Rook))
+            .unwrap();
+        game.apply(&Command::ChooseStart("DEU".into())).unwrap();
+        let a = game.attempt.as_ref().unwrap();
+        assert!(a.paused && game.global_paused, "first defense starts live");
+        assert_eq!(a.tick, 0);
+        game.apply(&Command::SetPaused(false)).unwrap();
+        assert!(!game.attempt.as_ref().unwrap().paused);
+    }
     #[test]
     fn recall_threshold_above_limit_is_rejected_without_mutation() {
         let mut game = Game::default();

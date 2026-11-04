@@ -27,14 +27,28 @@ fn readout_origin(rect: Rect, center: egui::Pos2, text: egui::Vec2) -> egui::Pos
         center.y + 27.0,
     )
 }
+/// What [`paint`] draws besides the resource readout.
+#[derive(Clone, Copy)]
+pub(super) struct Marks {
+    /// Paint the aim cross. Off while the OS crosshair cursor marks the aim,
+    /// which has no presentation lag.
+    pub cross: bool,
+    /// Construction shows only the cross.
+    pub building: bool,
+    pub reduced: bool,
+}
 pub(super) fn paint(
     ui: &egui::Ui,
     state: &ReticleReadout,
     arena: art::ArenaProjection,
     aim: [f32; 2],
-    building: bool,
-    reduced: bool,
+    marks: Marks,
 ) {
+    let Marks {
+        cross,
+        building,
+        reduced,
+    } = marks;
     let at = arena.world(aim[0], aim[1]);
     let p = ui.painter_at(arena.effects_clip);
     let color = if state.remaining == 0 {
@@ -49,7 +63,10 @@ pub(super) fn paint(
         vec2(-1.0, 0.0),
         vec2(0.0, 1.0),
         vec2(0.0, -1.0),
-    ] {
+    ]
+    .into_iter()
+    .filter(|_| cross)
+    {
         p.line_segment(
             [at + d * 4.0, at + d * 10.0],
             Stroke::new(3.0, Color32::BLACK),

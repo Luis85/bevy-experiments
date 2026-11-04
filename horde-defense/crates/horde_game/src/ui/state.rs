@@ -73,6 +73,8 @@ pub(crate) struct CampaignUi {
     pub(super) search: String,
     pub(super) map: MapCache,
     pub(super) improvement_focus: Option<RecommendationAction>,
+    /// Search text the tree applies once on its next draw (review scenes).
+    pub(super) tree_search_seed: Option<String>,
     /// The expedition shown on the operations tab.
     pub(super) observed: Option<u64>,
 }
@@ -120,7 +122,6 @@ pub(crate) struct BattleUi {
     pub(super) arena_rect: Option<Rect>,
     pub(super) effects_rect: Option<Rect>,
     pub(super) arena_hover: bool,
-    pub(super) custom_cursor_requested: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
     /// Pre-tick actor positions and this frame's blend; see `battle_view`.
@@ -143,7 +144,6 @@ impl BattleUi {
             arena_rect: None,
             effects_rect: None,
             arena_hover: false,
-            custom_cursor_requested: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,
             interpolation: crate::battle_view::ActorInterpolation::default(),
@@ -163,10 +163,6 @@ pub(crate) struct SettingsUi {
 pub(crate) struct MenuUi {
     pub(super) new_journey_confirm: bool,
 }
-
-/// Whether the arena owns the pointer this frame (read by the native cursor).
-#[derive(Resource, Default)]
-pub struct CustomCursor(pub bool);
 
 /// Every frontend resource as owned values. Startup builds one, applies review
 /// or practice scenarios, then `insert_into` splits it into App resources and
@@ -280,6 +276,7 @@ impl FrontendParts {
                 search: String::new(),
                 map: MapCache::default(),
                 improvement_focus: None,
+                tree_search_seed: None,
                 observed: None,
             },
             armory: ArmoryUi::default(),
@@ -366,7 +363,6 @@ impl FrontendParts {
             .insert_resource(history)
             .insert_resource(prefs)
             .insert_resource(menu)
-            .init_resource::<CustomCursor>()
             .insert_state(screen)
             .insert_resource(NextState::Pending(tab))
             .add_sub_state::<Tab>();

@@ -5,7 +5,6 @@ mod audio;
 mod battle_view;
 #[cfg(feature = "review")]
 mod capture_sequence;
-mod cursor;
 #[cfg(feature = "dev")]
 mod debug_tools;
 mod defender_presentation;
@@ -115,6 +114,9 @@ fn main() -> AppExit {
                         title: "Lastlight · Horde Defense".into(),
                         visible: false,
                         resolution: WindowResolution::new(width, height),
+                        // One queued frame instead of Bevy's two: the arena
+                        // aims at the pointer, so presentation latency is felt.
+                        desired_maximum_frame_latency: std::num::NonZero::new(1),
                         resize_constraints: bevy::window::WindowResizeConstraints {
                             min_width: 1050.0,
                             min_height: 700.0,

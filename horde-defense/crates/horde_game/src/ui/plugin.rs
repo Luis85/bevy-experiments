@@ -1,10 +1,10 @@
 //! `UiPlugin`: egui, the camera, the screen draw pass, notice-driven
-//! navigation, the native cursor, the window lifecycle and the scene-audio
+//! navigation, the window lifecycle and the scene-audio
 //! bridge. Expects `FrontendParts::insert_into` to have inserted the resources
 //! and states.
 use super::{CampaignUi, Screen, Tab, notices};
 use crate::{
-    atmosphere_audio, cursor,
+    atmosphere_audio,
     launch::LaunchConfig,
     runner::{AppCommand, GameSession, Runtime, RuntimeSet, SaveIntent},
     settings::Settings,
@@ -15,7 +15,7 @@ use bevy::{
     render::view::screenshot::{Screenshot, save_to_disk},
     window::{PrimaryWindow, WindowCloseRequested},
 };
-use bevy_egui::{EguiPlugin, EguiPostUpdateSet, EguiPrimaryContextPass};
+use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
 pub struct UiPlugin;
 impl Plugin for UiPlugin {
@@ -25,10 +25,6 @@ impl Plugin for UiPlugin {
             .add_systems(
                 EguiPrimaryContextPass,
                 (visual_assets::refresh_art, super::draw).chain(),
-            )
-            .add_systems(
-                PostUpdate,
-                cursor::sync_native_cursor.after(EguiPostUpdateSet::ProcessOutput),
             )
             .add_systems(
                 Update,

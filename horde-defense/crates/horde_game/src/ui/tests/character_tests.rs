@@ -50,7 +50,8 @@ fn immersive_skill_choices_and_purchase_remain_visible_in_the_compact_first_view
     h.frame_size(f, View::Results, vec![], size);
     let output = h.frame_size(f, View::Results, vec![], size);
     let area = h.ctx.content_rect();
-    for text in ["Controlled penetration", "Learn skill · 55 coins"] {
+    let learn = format!("Learn skill · {} coins", nodes_price(&["piercing"]));
+    for text in ["Controlled penetration", learn.as_str()] {
         let p = output
             .shapes
             .iter()
@@ -92,7 +93,7 @@ fn a_fresh_campaign_previews_then_confirms_survivor_before_selecting_a_country()
         a.profile.weapon.class,
         horde_core::weapons::WeaponClass::Pistol
     );
-    assert!(!a.paused);
+    assert!(a.paused, "the first defense waits for Begin defense");
 }
 
 #[test]

@@ -503,6 +503,24 @@ impl WorldProgress {
         }
         Ok(())
     }
+    /// The fronts a liberation of `id` opened: its enterable neighbours not
+    /// yet liberated, easiest first. Empty while `id` is not liberated.
+    pub fn fronts_opened_by(&self, id: &str) -> Vec<&'static Country> {
+        let Some(country) = world().country(id) else {
+            return Vec::new();
+        };
+        if !self.cleared.iter().any(|c| c == id) {
+            return Vec::new();
+        }
+        let mut fronts: Vec<&'static Country> = country
+            .neighbors
+            .iter()
+            .filter(|n| self.can_enter(n) && !self.cleared.contains(n))
+            .filter_map(|n| world().country(n))
+            .collect();
+        fronts.sort_by(|a, b| a.difficulty.total_cmp(&b.difficulty).then(a.id.cmp(&b.id)));
+        fronts
+    }
     /// Boss transactions call once with the attempted local stage. Replays are
     /// legal, but cannot clear a different stage or reopen neighboring rewards.
     /// Returns true only for the transaction that newly clears this country.
@@ -619,6 +637,38 @@ impl WorldProgress {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn a_liberation_names_the_fronts_it_opened_easiest_first() {
+        let mut progress = WorldProgress::default();
+        progress.choose_start("LUX").unwrap();
+        assert!(progress.fronts_opened_by("LUX").is_empty(), "not freed yet");
+        for stage in 0..world().country("LUX").unwrap().level_count() {
+            progress.record_clear(stage).unwrap();
+        }
+        let fronts: Vec<&str> = progress
+            .fronts_opened_by("LUX")
+            .iter()
+            .map(|c| c.id.as_str())
+            .collect();
+        let mut expected = world().country("LUX").unwrap().neighbors.clone();
+        expected.sort();
+        let mut sorted = fronts.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        sorted.sort();
+        assert_eq!(sorted, expected);
+        let difficulty = |id: &str| world().country(id).unwrap().difficulty;
+        assert!(
+            fronts
+                .windows(2)
+                .all(|w| difficulty(w[0]) <= difficulty(w[1]))
+        );
+        progress.cleared.push(fronts[0].to_owned());
+        assert!(
+            !progress
+                .fronts_opened_by("LUX")
+                .iter()
+                .any(|c| c.id == fronts[0])
+        );
+    }
     #[test]
     fn catalogue_includes_small_states_and_valid_real_boundaries() {
         let data = world();

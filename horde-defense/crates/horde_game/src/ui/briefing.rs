@@ -217,7 +217,10 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
     } else {
         muted(
             ui,
-            "Fortifications unlock through encounter clears. A starting layout is optional.",
+            f.game
+                .campaign()
+                .construction_blocker()
+                .unwrap_or_else(|| "A starting layout is optional.".into()),
         );
     }
 }

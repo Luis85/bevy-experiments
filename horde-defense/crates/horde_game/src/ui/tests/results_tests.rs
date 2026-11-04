@@ -4,7 +4,7 @@ use super::*;
 #[test]
 fn results_keep_rewards_banked_and_open_the_actual_recovered_equipment() {
     let mut fixture = IsolatedFrontend::new();
-    fixture.frontend.game.campaign_mut().coins = 75;
+    fixture.frontend.game.campaign_mut().coins = nodes_price(&["steady_hands", "stopping_power"]);
     fixture
         .frontend
         .game
@@ -213,7 +213,12 @@ fn the_upgrade_home_shares_the_camp_header_and_orders_its_actions() {
             .unwrap_or_else(|| panic!("{label} painted"))
             .left()
     };
-    let order = ["Try again", "Run history", "More", "Leave journey"];
+    assert_eq!(
+        text_count(&output, "Run history"),
+        0,
+        "the header has History"
+    );
+    let order = ["Try again", "More", "Leave journey"];
     for pair in order.windows(2) {
         assert!(x(pair[0]) < x(pair[1]), "{} before {}", pair[0], pair[1]);
     }
@@ -343,4 +348,74 @@ fn victory_outcome_names_the_win_without_a_retreat_hint() {
             .iter()
             .any(|s| shape_has_text(&s.shape, "Rest and train"))
     );
+}
+
+#[test]
+fn a_loss_shows_its_cause_and_the_core_tip_in_full_at_both_sizes() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    let report = f.game.last_result_mut().as_mut().unwrap();
+    report.outcome = Outcome::Defeat;
+    report.cause = "Overrun at the line in lane 2".into();
+    report.tip = "Aim at the nearest runner first.".into();
+    f.screen = Screen::Results;
+    f.game.set_paused(true);
+    let reason = "Overrun at the line in lane 2. Aim at the nearest runner first.";
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::ResultsWithChrome, vec![], size);
+        assert!(fully_visible(&output, reason), "{size:?}: reason cut");
+    }
+}
+
+#[test]
+fn a_liberation_names_the_freed_country_and_the_fronts_it_opened() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    let count = horde_core::world::world()
+        .country("DEU")
+        .unwrap()
+        .level_count();
+    for stage in 0..count {
+        f.game
+            .staging()
+            .campaign()
+            .record_country_stage_clear(stage)
+            .unwrap();
+    }
+    let report = f.game.last_result_mut().as_mut().unwrap();
+    report.outcome = Outcome::Victory;
+    report.country_freed = true;
+    f.screen = Screen::Results;
+    f.game.set_paused(true);
+    let first = f.game.campaign().world.fronts_opened_by("DEU")[0]
+        .name
+        .clone();
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::ResultsWithChrome, vec![], size);
+        assert!(
+            output.shapes.iter().any(|s| shape_has_text(
+                &s.shape,
+                &format!("Germany liberated. New fronts: {first}")
+            )),
+            "{size:?}"
+        );
+        assert!(
+            output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, "Now open in the tree: Meet Mara")),
+            "{size:?}"
+        );
+        assert_eq!(text_count(&output, "1 liberated"), 1, "{size:?}");
+    }
 }

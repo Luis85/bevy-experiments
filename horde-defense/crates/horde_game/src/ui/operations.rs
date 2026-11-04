@@ -43,11 +43,16 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         outbreak.country, outbreak.strength, outbreak.seconds_left
                     ),
                 );
-                if ui.button("Plan outbreak response").clicked() {
+                // Entering the country deploys at once; the label says so.
+                if ui
+                    .button("Defend now")
+                    .on_hover_text("Starts a live defense in this country to contain the outbreak.")
+                    .clicked()
+                {
                     f.campaign.selected_country = outbreak.country_id.clone();
                     f.dispatch(
                         Command::EnterCountry(outbreak.country_id.clone()),
-                        "Replay a defense here or dispatch a survivor to contain the outbreak.",
+                        "Outbreak defense started.",
                     );
                 }
             });
@@ -90,11 +95,11 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         egui::CollapsingHeader::new("Completed expedition reports").show(ui, |ui| {
             for report in &view.reports {
                 ui.label(format!(
-                    "Expedition #{} · {} · defense {} · {:?} · {} kills · {} coins",
+                    "Expedition #{} · {} · defense {} · {} · {} kills · {} coins",
                     report.id,
                     report.country,
                     report.stage + 1,
-                    report.outcome,
+                    report.outcome.label(),
                     report.kills,
                     report.coins
                 ));
@@ -111,8 +116,13 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         muted(
             ui,
             format!(
-                "Liberate {} country to recruit local survivors. Parallel battles unlock after {}; country operations and guards after {}.",
+                "Recruiting local survivors needs {} liberated {}. Parallel battles need {}; country operations and guards need {}.",
                 config.recruitment_unlock_freed,
+                if config.recruitment_unlock_freed == 1 {
+                    "country"
+                } else {
+                    "countries"
+                },
                 config.parallel_unlock_freed,
                 config.strategy_unlock_freed
             ),
@@ -292,8 +302,8 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     damage::draw_for(ui,a,projection,id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode());
                     if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode()) { f.notify_rare_loot(); }
                     if response.hover_pos().is_some_and(|p| r.contains(p)) && ui.input(|i|i.raw.focused) && !ui.ctx().any_popup_open() {
-                        f.battle.custom_cursor_requested=true;ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-                        reticle::paint(ui,&crate::battle_view::ReticleReadout::build(a,None),projection,aim,false,f.settings.reduced_effects);
+                        ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
+                        reticle::paint(ui,&crate::battle_view::ReticleReadout::build(a,None),projection,aim,reticle::Marks{cross:false,building:false,reduced:f.settings.reduced_effects});
                     }
                     crate::inspector::hover(&response, a, aim);
                     let build_cell = a.build_cell_at(aim);

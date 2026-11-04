@@ -10,6 +10,7 @@ use horde_core::{
     content::{Mode, StructureKind},
     ordnance::OrdnanceKind,
     sim::{Game, Input, SettlementIssue},
+    skill_catalog::skills,
 };
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -223,7 +224,10 @@ fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
     game.apply(&Command::BuySkillNode("steady_hands".into()))
         .unwrap();
     assert!(game.campaign().has_node("steady_hands"));
-    assert_eq!(game.campaign().coins, 80);
+    assert_eq!(
+        game.campaign().coins,
+        100 - skills().node("steady_hands").unwrap().price
+    );
     let before = game.clone();
     assert!(
         game.apply(&Command::BuySkillNode("steady_hands".into()))
@@ -412,7 +416,10 @@ fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
             .enqueue(Command::BuySkillNode("quick_reload".into()), "Learned")
     );
     assert!(!flush_for_test(&mut host.ctx()));
-    assert_eq!(host.game.campaign().coins, 75);
+    assert_eq!(
+        host.game.campaign().coins,
+        100 - skills().node("quick_reload").unwrap().price
+    );
     assert!(host.game.campaign().has_node("quick_reload"));
     assert_eq!(
         host.notices
