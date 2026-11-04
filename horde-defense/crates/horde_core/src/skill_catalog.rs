@@ -1,4 +1,5 @@
 //! Validated, extensible skill DAG. Ownership stores stable string IDs, never node indices.
+use crate::catalog::{self, ContentError};
 use crate::weapons::WeaponClass;
 use crate::{campaign::BodyAttribute, content::StructureKind};
 use serde::{Deserialize, Serialize};
@@ -206,10 +207,21 @@ pub struct SkillCatalog {
     pub nodes: Vec<SkillNode>,
 }
 impl SkillCatalog {
+    /// Pure parse + validate, so tests can build alternative catalogues in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
+        catalog::parse_validated("skills", text, 4 * catalog::MIB, Self::validate)
+    }
     pub fn from_json(text: &str) -> Result<Self, String> {
-        let catalog: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
-        catalog.validate()?;
-        Ok(catalog)
+        Self::from_json_str(text).map_err(ContentError::into_message)
+    }
+    /// Bundled default, or the `LASTLIGHT_SKILLS` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        catalog::load(
+            "skills",
+            4 * catalog::MIB,
+            include_str!("../skills.json"),
+            Self::from_json_str,
+        )
     }
     pub fn node(&self, id: &str) -> Option<&SkillNode> {
         self.nodes.iter().find(|n| n.id == id)
@@ -369,28 +381,13 @@ impl SkillCatalog {
         Ok(())
     }
 }
+static SKILLS: OnceLock<SkillCatalog> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static SkillCatalog, ContentError> {
+    catalog::install(&SKILLS, SkillCatalog::try_load)
+}
 pub fn skills() -> &'static SkillCatalog {
-    static SKILLS: OnceLock<SkillCatalog> = OnceLock::new();
-    SKILLS.get_or_init(|| {
-        let (text, source) = match std::env::var_os("LASTLIGHT_SKILLS") {
-            Some(path) => {
-                if std::fs::metadata(&path).is_ok_and(|m| m.len() > 4 * 1024 * 1024) {
-                    panic!("LASTLIGHT_SKILLS exceeds 4 MiB authoring limit");
-                }
-                (
-                    std::fs::read_to_string(&path).unwrap_or_else(|e| {
-                        panic!("Could not read LASTLIGHT_SKILLS {path:?}: {e}")
-                    }),
-                    format!("{path:?}"),
-                )
-            }
-            None => (
-                include_str!("../skills.json").to_owned(),
-                "bundled skills.json".to_owned(),
-            ),
-        };
-        SkillCatalog::from_json(&text)
-            .unwrap_or_else(|e| panic!("Invalid skills from {source}: {e}"))
+    catalog::lazy(&SKILLS, "skills", SkillCatalog::try_load, || {
+        SkillCatalog::from_json_str(include_str!("../skills.json"))
     })
 }
 

@@ -1,4 +1,5 @@
 //! Bounded world-clear progression, frozen per encounter. Retries never add rank.
+use crate::catalog::{self as shared, ContentError};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -56,10 +57,21 @@ fn finite(v: f32, min: f32, max: f32) -> bool {
     v.is_finite() && (min..=max).contains(&v)
 }
 impl ProgressionCatalog {
+    /// Pure parse + validate, so tests can build alternative catalogues in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
+        shared::parse_validated("progression", text, shared::MIB, Self::validate)
+    }
     pub fn from_json(text: &str) -> Result<Self, String> {
-        let value: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
-        value.validate()?;
-        Ok(value)
+        Self::from_json_str(text).map_err(ContentError::into_message)
+    }
+    /// Bundled default, or the `LASTLIGHT_PROGRESSION` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        shared::load(
+            "progression",
+            shared::MIB,
+            include_str!("../progression.json"),
+            Self::from_json_str,
+        )
     }
     pub fn validate(&self) -> Result<(), String> {
         if !(1..=10_000).contains(&self.threat_guard_rank)
@@ -253,19 +265,13 @@ impl ProgressionSnapshot {
         Ok(())
     }
 }
+static VALUE: OnceLock<ProgressionCatalog> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static ProgressionCatalog, ContentError> {
+    shared::install(&VALUE, ProgressionCatalog::try_load)
+}
 pub fn catalog() -> &'static ProgressionCatalog {
-    static VALUE: OnceLock<ProgressionCatalog> = OnceLock::new();
-    VALUE.get_or_init(|| {
-        let text = if let Some(path) = std::env::var_os("LASTLIGHT_PROGRESSION") {
-            if std::fs::metadata(&path).is_ok_and(|m| m.len() > 1_048_576) {
-                panic!("Progression catalog exceeds 1 MiB");
-            }
-            std::fs::read_to_string(path).expect("Could not read LASTLIGHT_PROGRESSION")
-        } else {
-            include_str!("../progression.json").to_owned()
-        };
-        ProgressionCatalog::from_json(&text)
-            .unwrap_or_else(|e| panic!("Invalid progression catalog: {e}"))
+    shared::lazy(&VALUE, "progression", ProgressionCatalog::try_load, || {
+        ProgressionCatalog::from_json_str(include_str!("../progression.json"))
     })
 }
 pub fn level_one() -> u32 {

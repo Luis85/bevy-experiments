@@ -1,5 +1,6 @@
 //! Personal ordnance is an authored, enemy-only area attack. Flight, fire and
 //! charges belong to the attempt; presentation never resolves damage or refills.
+use crate::catalog::{self as shared, ContentError};
 use crate::{content::Mode, skill_catalog::SkillModifiers};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, sync::OnceLock};
@@ -74,10 +75,21 @@ pub struct OrdnanceCatalog {
     pub molotov: OrdnanceDefinition,
 }
 impl OrdnanceCatalog {
+    /// Pure parse + validate, so tests can build alternative catalogues in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
+        shared::parse_validated("ordnance", text, shared::MIB, Self::validate)
+    }
     pub fn from_json(text: &str) -> Result<Self, String> {
-        let value: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
-        value.validate()?;
-        Ok(value)
+        Self::from_json_str(text).map_err(ContentError::into_message)
+    }
+    /// Bundled default, or the `LASTLIGHT_ORDNANCE` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        shared::load(
+            "ordnance",
+            shared::MIB,
+            include_str!("../ordnance.json"),
+            Self::from_json_str,
+        )
     }
     pub fn validate(&self) -> Result<(), String> {
         if !self.grenade.valid()
@@ -98,20 +110,13 @@ impl OrdnanceCatalog {
         }
     }
 }
+static CATALOG: OnceLock<OrdnanceCatalog> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static OrdnanceCatalog, ContentError> {
+    shared::install(&CATALOG, OrdnanceCatalog::try_load)
+}
 pub fn catalog() -> &'static OrdnanceCatalog {
-    static CATALOG: OnceLock<OrdnanceCatalog> = OnceLock::new();
-    CATALOG.get_or_init(|| {
-        let text = if let Some(path) = std::env::var_os("LASTLIGHT_ORDNANCE") {
-            if std::fs::metadata(&path).is_ok_and(|m| m.len() > 1024 * 1024) {
-                panic!("LASTLIGHT_ORDNANCE exceeds 1 MiB authoring limit");
-            }
-            std::fs::read_to_string(&path)
-                .unwrap_or_else(|e| panic!("Could not read LASTLIGHT_ORDNANCE {path:?}: {e}"))
-        } else {
-            include_str!("../ordnance.json").to_owned()
-        };
-        OrdnanceCatalog::from_json(&text)
-            .unwrap_or_else(|e| panic!("Invalid ordnance catalog: {e}"))
+    shared::lazy(&CATALOG, "ordnance", OrdnanceCatalog::try_load, || {
+        OrdnanceCatalog::from_json_str(include_str!("../ordnance.json"))
     })
 }
 pub fn validate_catalog() -> Result<(), String> {

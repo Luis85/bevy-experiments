@@ -25,14 +25,8 @@ use bevy::{
 use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
 
 fn validate_startup_catalogs() -> Result<(), String> {
-    horde_core::content::content().validate()?;
-    horde_core::world::world().validate()?;
-    horde_core::skill_catalog::skills().validate()?;
-    let _ = horde_core::enemy_catalog::enemy_catalog();
-    horde_core::ordnance::validate_catalog()?;
-    horde_core::progression::catalog().validate()?;
-    horde_core::quality::catalog().validate()?;
-    horde_core::balance::catalog().validate()?;
+    // Loads, validates and installs every catalogue; a bad override is a clean error.
+    horde_core::catalog::init_catalogs().map_err(|error| error.to_string())?;
     player_model::startup::initialize_player_models(&asset_directory())?;
     for (name, source) in environment::catalog_sources() {
         // Runs before LogPlugin installs the subscriber, so stderr is the only channel.

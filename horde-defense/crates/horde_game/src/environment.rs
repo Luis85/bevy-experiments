@@ -24,27 +24,18 @@ pub fn flag(name: &str) -> bool {
 
 /// Explain every once-loaded authored source in the startup diagnostic console.
 pub fn catalog_sources() -> Vec<(&'static str, String)> {
-    [
-        "LASTLIGHT_CONTENT",
-        "LASTLIGHT_WORLD",
-        "LASTLIGHT_SKILLS",
-        "LASTLIGHT_ENEMIES",
-        "LASTLIGHT_ORDNANCE",
-        "LASTLIGHT_PROGRESSION",
-        "LASTLIGHT_QUALITY",
-        "LASTLIGHT_BALANCE",
-    ]
-    .into_iter()
-    .map(|name| {
-        (
-            name,
-            path(name).map_or_else(
-                || "bundled defaults".to_owned(),
-                |p| p.display().to_string(),
-            ),
-        )
-    })
-    .collect()
+    horde_core::catalog::CATALOG_OVERRIDES
+        .iter()
+        .map(|&(_, name)| {
+            (
+                name,
+                path(name).map_or_else(
+                    || "bundled defaults".to_owned(),
+                    |p| p.display().to_string(),
+                ),
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]

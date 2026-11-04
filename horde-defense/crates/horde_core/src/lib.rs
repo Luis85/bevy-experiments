@@ -1,5 +1,6 @@
 pub mod balance;
 pub mod campaign;
+pub mod catalog;
 pub mod command;
 pub mod content;
 pub mod enemy_catalog;

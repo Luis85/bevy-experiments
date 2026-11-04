@@ -1,4 +1,5 @@
 //! Data-driven geographical campaign, independent of renderer and battle rules.
+use crate::catalog::{self, ContentError};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
@@ -420,33 +421,28 @@ impl WorldContent {
         Ok(())
     }
 }
+impl WorldContent {
+    /// Pure parse + validate, so tests can build alternative worlds in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
+        catalog::parse_validated("world", text, 32 * catalog::MIB, Self::validate)
+    }
+    /// Bundled default, or the `LASTLIGHT_WORLD` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        catalog::load(
+            "world",
+            32 * catalog::MIB,
+            include_str!("world.json"),
+            Self::from_json_str,
+        )
+    }
+}
+static WORLD: OnceLock<WorldContent> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static WorldContent, ContentError> {
+    catalog::install(&WORLD, WorldContent::try_load)
+}
 pub fn world() -> &'static WorldContent {
-    static WORLD: OnceLock<WorldContent> = OnceLock::new();
-    WORLD.get_or_init(|| {
-        let (json, source) = if let Some(path) = std::env::var_os("LASTLIGHT_WORLD") {
-            let path = std::path::PathBuf::from(path);
-            if std::fs::metadata(&path).is_ok_and(|m| m.len() > 32 * 1024 * 1024) {
-                panic!(
-                    "LASTLIGHT_WORLD '{}' exceeds the supported 32 MiB authoring limit",
-                    path.display()
-                );
-            }
-            let json = std::fs::read_to_string(&path).unwrap_or_else(|error| {
-                panic!("Cannot load LASTLIGHT_WORLD '{}': {error}", path.display())
-            });
-            (json, format!("LASTLIGHT_WORLD '{}'", path.display()))
-        } else {
-            (
-                include_str!("world.json").to_owned(),
-                "bundled world.json".to_owned(),
-            )
-        };
-        let content: WorldContent = serde_json::from_str(&json)
-            .unwrap_or_else(|error| panic!("Cannot parse {source}: {error}"));
-        content
-            .validate()
-            .unwrap_or_else(|error| panic!("Invalid {source}: {error}"));
-        content
+    catalog::lazy(&WORLD, "world", WorldContent::try_load, || {
+        WorldContent::from_json_str(include_str!("world.json"))
     })
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]

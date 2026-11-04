@@ -1,5 +1,6 @@
 //! Item quality is independent of level and definition unlock tier. Quality
 //! generation uses its own counter key and never consumes the combat RNG.
+use crate::catalog::{self as shared, ContentError};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, sync::OnceLock};
 
@@ -47,10 +48,21 @@ pub struct QualityCatalog {
     pub tiers: Vec<QualityDefinition>,
 }
 impl QualityCatalog {
+    /// Pure parse + validate, so tests can build alternative catalogues in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
+        shared::parse_validated("quality", text, shared::MIB, Self::validate)
+    }
     pub fn from_json(text: &str) -> Result<Self, String> {
-        let value: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
-        value.validate()?;
-        Ok(value)
+        Self::from_json_str(text).map_err(ContentError::into_message)
+    }
+    /// Bundled default, or the `LASTLIGHT_QUALITY` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        shared::load(
+            "quality",
+            shared::MIB,
+            include_str!("../quality.json"),
+            Self::from_json_str,
+        )
     }
     pub fn definition(&self, quality: Quality) -> &QualityDefinition {
         &self.tiers[quality as usize]
@@ -120,19 +132,13 @@ impl QualityCatalog {
         Quality::Common
     }
 }
+static VALUE: OnceLock<QualityCatalog> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static QualityCatalog, ContentError> {
+    shared::install(&VALUE, QualityCatalog::try_load)
+}
 pub fn catalog() -> &'static QualityCatalog {
-    static VALUE: OnceLock<QualityCatalog> = OnceLock::new();
-    VALUE.get_or_init(|| {
-        let text = if let Some(path) = std::env::var_os("LASTLIGHT_QUALITY") {
-            if std::fs::metadata(&path).is_ok_and(|m| m.len() > 1_048_576) {
-                panic!("Quality catalogue exceeds 1 MiB");
-            }
-            std::fs::read_to_string(path).expect("Could not read LASTLIGHT_QUALITY")
-        } else {
-            include_str!("../quality.json").to_owned()
-        };
-        QualityCatalog::from_json(&text)
-            .unwrap_or_else(|e| panic!("Invalid quality catalogue: {e}"))
+    shared::lazy(&VALUE, "quality", QualityCatalog::try_load, || {
+        QualityCatalog::from_json_str(include_str!("../quality.json"))
     })
 }
 pub fn stat_ratio(base: Quality, rolled: Option<Quality>) -> f32 {

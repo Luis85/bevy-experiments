@@ -1,4 +1,5 @@
 //! Validated next-deployment controls. Active encounters retain a complete copy.
+use crate::catalog::{self as shared, ContentError};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,10 +152,21 @@ pub struct BalanceCatalog {
     pub presets: Vec<BalancePresetDefinition>,
 }
 impl BalanceCatalog {
+    /// Pure parse + validate, so tests can build alternative catalogues in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
+        shared::parse_validated("balance", text, shared::MIB, Self::validate)
+    }
     pub fn from_json(text: &str) -> Result<Self, String> {
-        let v: Self = serde_json::from_str(text).map_err(|e| e.to_string())?;
-        v.validate()?;
-        Ok(v)
+        Self::from_json_str(text).map_err(ContentError::into_message)
+    }
+    /// Bundled default, or the `LASTLIGHT_BALANCE` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        shared::load(
+            "balance",
+            shared::MIB,
+            include_str!("../balance.json"),
+            Self::from_json_str,
+        )
     }
     pub fn validate(&self) -> Result<(), String> {
         if self.default_preset == BalancePreset::Custom || self.presets.len() != 3 {
@@ -176,18 +188,12 @@ impl BalanceCatalog {
         Ok(())
     }
 }
+static VALUE: OnceLock<BalanceCatalog> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static BalanceCatalog, ContentError> {
+    shared::install(&VALUE, BalanceCatalog::try_load)
+}
 pub fn catalog() -> &'static BalanceCatalog {
-    static VALUE: OnceLock<BalanceCatalog> = OnceLock::new();
-    VALUE.get_or_init(|| {
-        let text = if let Some(path) = std::env::var_os("LASTLIGHT_BALANCE") {
-            if std::fs::metadata(&path).is_ok_and(|m| m.len() > 1_048_576) {
-                panic!("Balance catalogue exceeds 1 MiB");
-            }
-            std::fs::read_to_string(path).expect("Could not read LASTLIGHT_BALANCE")
-        } else {
-            include_str!("../balance.json").to_owned()
-        };
-        BalanceCatalog::from_json(&text)
-            .unwrap_or_else(|e| panic!("Invalid balance catalogue: {e}"))
+    shared::lazy(&VALUE, "balance", BalanceCatalog::try_load, || {
+        BalanceCatalog::from_json_str(include_str!("../balance.json"))
     })
 }
