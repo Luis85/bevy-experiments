@@ -143,6 +143,15 @@ For an offline comparison, [listen to the survival audition reel](audio/survival
 
 Record the country, local stage, weather/lighting tags, defender, master/effects/atmosphere values and whether you used speakers or headphones. File/header checks do not establish listening quality; report masking, repetition or a missing source cue as a playtest result.
 
+## Reporting a bug with a recording
+
+Packaged playtest builds do not include recording. For a reproducible bug, use a developer build (`cargo run --locked -p horde-defense --features dev`, optionally with `LASTLIGHT_SAVE_DIR` pointing at a copy of the save):
+
+1. Start recording with **F7** (or launch with `--record bug.jsonl`) shortly before the problem; the file is `<save dir>/recordings/rec-<timestamp>.jsonl`.
+2. Reproduce the problem, then press **F7** again to stop. Press **F6** to dump the game state if the screen shows something wrong, and **F12** for a screenshot.
+3. Attach the recording, the dump, the newest log and crash file (see Logs and crash reports) and say what you expected.
+4. A developer replays it with `horde-defense --replay bug.jsonl`, which prints the final `state_digest`; the same recording must give the same digest on the same build.
+
 ## Feedback to record
 
 - Which personal identity, country, threat, frozen lane count, defender, equipment IDs/levels/qualities and policy were used?

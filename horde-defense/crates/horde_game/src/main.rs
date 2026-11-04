@@ -5,6 +5,8 @@ mod audio;
 #[cfg(feature = "review")]
 mod capture_sequence;
 mod cursor;
+#[cfg(feature = "dev")]
+mod debug_tools;
 mod defender_presentation;
 mod diagnostics;
 mod gear_appearance;
@@ -69,6 +71,16 @@ fn main() -> AppExit {
         }
         return AppExit::Success;
     }
+    #[cfg(feature = "dev")]
+    if config.action == launch::LaunchAction::Replay
+        && let Some(path) = &config.replay
+    {
+        // Headless: builds the recorded Game directly, no window or App.
+        return match debug_tools::run_replay(path) {
+            0 => AppExit::Success,
+            code => AppExit::from_code(code as u8),
+        };
+    }
     let (width, height) = config.window;
     diagnostics::enable_work_timing(config.perf().is_some());
     let mut app = App::new();
@@ -127,6 +139,8 @@ fn main() -> AppExit {
     }
     #[cfg(not(feature = "review"))]
     let _ = review;
+    #[cfg(feature = "dev")]
+    app.add_plugins(debug_tools::DebugPlugin);
     app.run()
 }
 
