@@ -313,8 +313,8 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
             }
             if f.battle.construction {
                 let panel = Rect::from_min_size(
-                    pos2(canvas.right() - 252.0, r.top() + 8.0),
-                    vec2(236.0, (r.height() - 16.0).max(180.0)),
+                    pos2(canvas.right() - 296.0, r.top() + 8.0),
+                    vec2(280.0, (r.height() - 16.0).max(180.0)),
                 );
                 ui.scope_builder(egui::UiBuilder::new().max_rect(panel), |ui| {
                     egui::Frame::new()
@@ -322,7 +322,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         .stroke(Stroke::new(1., TEXT))
                         .inner_margin(10)
                         .show(ui, |ui| {
-                            ui.set_width(214.0);
+                            ui.set_width(258.0);
                             egui::ScrollArea::vertical()
                                 .max_height(panel.height() - 24.0)
                                 .show(ui, |ui| construction_controls(ui, f, &view));
@@ -879,13 +879,14 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen, hud_view
 }
 fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
     ui.strong(format!("{} supply remaining", view.supply));
+    muted(ui, "Cost in supply per defense");
     for kind in StructureKind::ALL {
         let def = content().structure(kind);
         ui.add_enabled_ui(view.blueprints[kind], |ui| {
             ui.selectable_value(
                 &mut f.battle.build_kind,
                 kind,
-                format!("{} · {} supply", def.name, def.supply),
+                format!("{} · {}", def.name, def.supply),
             );
         });
     }
@@ -897,19 +898,7 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) 
             def.health, def.damage, def.range
         ),
     );
-    ui.add_space(14.0);
-    muted(
-        ui,
-        "Before combat: full refund. During combat: salvage half the remaining-health value, rounded down.",
-    );
-    muted(
-        ui,
-        if view.global_paused {
-            "Paused explicitly"
-        } else {
-            "Combat continues while building"
-        },
-    );
+    ui.add_space(8.0);
     if ui.button("Save country plan").clicked() {
         f.dispatch(
             Command::SaveStartingLayout,
@@ -922,6 +911,19 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) 
             "Country plan cleared; deployed defenses remain.",
         );
     }
+    ui.add_space(10.0);
+    muted(
+        ui,
+        "Before combat: full refund. During combat: salvage half the remaining-health value, rounded down.",
+    );
+    muted(
+        ui,
+        if view.global_paused {
+            "Paused explicitly"
+        } else {
+            "Combat continues while building"
+        },
+    );
     if !view.any_blueprint() {
         muted(
             ui,
