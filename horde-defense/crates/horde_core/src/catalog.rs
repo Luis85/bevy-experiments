@@ -220,6 +220,62 @@ pub(crate) fn install<T>(
     Ok(cell.get_or_init(|| value))
 }
 
+/// Stable FNV-1a hash of the loaded catalogues' authored IDs that saves can
+/// reference: items, levels and structures (in authored order, since loot and
+/// stage selection are positional), countries, enemy archetypes and skill nodes.
+/// Stored in save envelopes so a load against different content is diagnosable.
+pub fn content_fingerprint() -> u64 {
+    let content = crate::content::content();
+    let sections: [(&str, Vec<&str>); 6] = [
+        (
+            "items",
+            content.items.iter().map(|i| i.id.as_str()).collect(),
+        ),
+        (
+            "levels",
+            content.levels.iter().map(|l| l.id.as_str()).collect(),
+        ),
+        (
+            "structures",
+            content.structures.iter().map(|s| s.id.as_str()).collect(),
+        ),
+        (
+            "countries",
+            crate::world::world()
+                .countries
+                .iter()
+                .map(|c| c.id.as_str())
+                .collect(),
+        ),
+        (
+            "enemies",
+            crate::enemy_catalog::enemy_catalog()
+                .archetype_ids()
+                .collect(),
+        ),
+        (
+            "skills",
+            crate::skill_catalog::skills()
+                .nodes
+                .iter()
+                .map(|n| n.id.as_str())
+                .collect(),
+        ),
+    ];
+    let mut hash = 0xcbf29ce484222325_u64;
+    for (section, ids) in sections {
+        // Separators keep ("ab", "c") distinct from ("a", "bc").
+        for byte in std::iter::once(section)
+            .chain(ids)
+            .flat_map(|id| id.bytes().chain([0xff]))
+        {
+            hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+        }
+        hash = (hash ^ 0xfe).wrapping_mul(0x100000001b3);
+    }
+    hash
+}
+
 /// Load and validate every catalogue, installing them for the process-wide accessors.
 /// Call once at startup so a bad override is a clean error instead of a later panic.
 pub fn init_catalogs() -> Result<CatalogReport, ContentError> {
@@ -250,6 +306,12 @@ mod tests {
     #[derive(Debug, serde::Deserialize)]
     struct Tiny {
         n: u32,
+    }
+
+    #[test]
+    fn content_fingerprint_is_deterministic_and_covers_item_ids() {
+        assert_eq!(content_fingerprint(), content_fingerprint());
+        assert_ne!(content_fingerprint(), 0xcbf29ce484222325);
     }
 
     #[test]

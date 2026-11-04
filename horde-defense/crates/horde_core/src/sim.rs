@@ -1,21 +1,27 @@
 mod events;
 mod journey;
+mod migrations;
 mod parallel;
 mod persistence;
 pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
 pub use journey::JourneyContinuation;
+pub use migrations::SAVE_VERSION;
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;
 use persistence::validate_game;
+pub use persistence::{RULESET_VERSION, SaveError};
 
 use crate::campaign::{Campaign, DefenderProfile};
-use crate::content::{BossKind, BossTiming, EnemyKind, Mode, Policy, StructureKind, content};
+use crate::content::{
+    BossKind, BossTiming, EnemyKind, ItemDefId, Mode, Policy, StructureKind, content,
+};
+use crate::kind_map::KindMap;
 use crate::ordnance::{self, FireZone, OrdnanceKind, OrdnanceState, ThrowRequest, ThrownOrdnance};
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
 use crate::world::Modifiers;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, VecDeque};
-use tracing::{debug, info, info_span, trace};
+use tracing::{debug, debug_span, info, info_span, trace};
 
 pub const TICKS_PER_SECOND: u32 = 60;
 pub const ENEMY_HIT_STOP_TICKS: u32 = 6;
@@ -262,7 +268,9 @@ struct EventMetadata {
     duration_ticks: u32,
     ordnance: Option<OrdnanceKind>,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum NpcManeuver {
     #[default]
     DoNothing,
@@ -273,6 +281,18 @@ pub enum NpcManeuver {
     Recover,
     Posture,
     AllOutDefense,
+}
+impl crate::kind_map::StableKind for NpcManeuver {
+    const ALL: &'static [Self] = &[
+        Self::DoNothing,
+        Self::Aim,
+        Self::Attack,
+        Self::Ready,
+        Self::Reload,
+        Self::Recover,
+        Self::Posture,
+        Self::AllOutDefense,
+    ];
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CombatTelemetry {
@@ -286,10 +306,10 @@ pub struct CombatTelemetry {
     pub contact_attacks: u32,
     #[serde(default = "legacy_damage_lanes")]
     pub damage_by_lane: Vec<u64>,
-    pub kills_by_kind: [u32; 5],
+    pub kills_by_kind: KindMap<EnemyKind, u32>,
     pub structure_losses: u32,
     pub structure_damage_taken: u64,
-    pub npc_decisions: [u32; 8],
+    pub npc_decisions: KindMap<NpcManeuver, u32>,
     pub boss_arrival_tick: Option<u64>,
     pub boss_defeat_tick: Option<u64>,
     pub defender_damage: u64,
@@ -886,10 +906,10 @@ impl Game {
                     .campaign
                     .item(loadout[slot.index()])
                     .expect("validated loadout");
-                let definition = &content().items[item.definition];
+                let definition = item.definition();
                 crate::stats::GearRecord {
                     slot,
-                    definition: item.definition,
+                    definition: item.definition.clone(),
                     name: definition.name.clone(),
                     level: item.level,
                     quality: self.campaign.item_quality(item.id).expect("owned"),
@@ -1047,7 +1067,7 @@ impl Game {
         if lane >= a.lane_count || column >= 5 {
             return Err("Footprint must remain wholly in the left-half build zone".into());
         }
-        if !self.campaign.blueprints[kind.index()] {
+        if !self.campaign.blueprints[kind] {
             return Err("Purchase the unlocked blueprint in camp".into());
         }
         if a.supply < content().structure(kind).supply {
@@ -1076,7 +1096,7 @@ impl Game {
         let id = a.next_id;
         a.next_id += 1;
         let durability = (d.health as f32
-            * structure_bonus(a, self.campaign.structure_upgrades[kind.index()]))
+            * structure_bonus(a, self.campaign.structure_upgrades[kind]))
         .round() as i32;
         a.structures.push(Structure {
             position_x: Some(a.build_cell_center(lane, column).expect("valid cell")[0]),
@@ -1160,8 +1180,10 @@ impl Game {
             self.attempt = Some(a);
             return;
         }
+        // Per-tick span stays below the shipped `info` filter; attempt start
+        // and finish keep their info-level spans.
         let _battle =
-            info_span!("battle", attempt = a.id, mode = ?a.mode, seed = self.seed).entered();
+            debug_span!("battle", attempt = a.id, mode = ?a.mode, seed = self.seed).entered();
         a.event_seq = a.event_seq.max(self.next_event_seq);
         a.tick += 1;
         trace!(tick = a.tick, enemies = a.enemies.len(), hp = a.hp, "tick");
@@ -1232,7 +1254,7 @@ impl Game {
                 decision = %a.decision,
                 "npc decision"
             );
-            a.telemetry.npc_decisions[a.maneuver as usize] += 1;
+            a.telemetry.npc_decisions[a.maneuver] += 1;
             self.reap(&mut a);
         }
         if a.boss_spawned && !a.enemies.iter().any(|e| e.boss) {
@@ -2166,7 +2188,7 @@ impl Game {
                 ..Default::default()
             };
             a.event_with(EventKind::Shot, origin, point, 0, meta);
-            let bonus = structure_bonus(a, self.campaign.structure_upgrades[d.kind.index()]);
+            let bonus = structure_bonus(a, self.campaign.structure_upgrades[d.kind]);
             let damage = if a.mode == Mode::Personal {
                 let damage = ((d.damage as f32 * bonus).round() as i32
                     - enemy_armor(a, &a.enemies[target]))
@@ -2918,7 +2940,7 @@ impl Game {
             a.kill_xp = a
                 .kill_xp
                 .saturating_add(self.campaign.reward(coins, xp, a.mode));
-            a.telemetry.kills_by_kind[e.kind as usize] += 1;
+            a.telemetry.kills_by_kind[e.kind] += 1;
             if e.boss {
                 a.telemetry.boss_defeat_tick = Some(a.tick);
             }
@@ -2961,7 +2983,7 @@ impl Game {
                         a.loot_events.push(crate::quality::LootEvent {
                             at: [e.x, e.y()],
                             item_id,
-                            definition,
+                            definition: ItemDefId::at(definition),
                             level: a.progression.item_level,
                             quality,
                             name: content().items[definition].name.clone(),
@@ -3326,7 +3348,7 @@ pub fn smoke_seed(seed: u64) -> Result<String, String> {
             for retry in 0..6 {
                 smoke_prepare(&mut g, mode)?;
                 g.deploy(level, mode)?;
-                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap.index()] {
+                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap] {
                     for lane in
                         construction_lane_order(g.attempt.as_ref().expect("deployed").lane_count)
                     {
@@ -3377,7 +3399,7 @@ pub fn smoke_seed(seed: u64) -> Result<String, String> {
 pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
     if mode == Mode::Npc
         && g.campaign.blueprint_available(StructureKind::Trap)
-        && !g.campaign.blueprints[StructureKind::Trap.index()]
+        && !g.campaign.blueprints[StructureKind::Trap]
         && g.campaign.coins >= content().structure(StructureKind::Trap).blueprint_price
     {
         g.campaign.purchase_blueprint(StructureKind::Trap)?;
@@ -3483,7 +3505,10 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
             g.campaign.npc.allow_risk = true;
         }
     } else {
-        while g.campaign.player.points > 0 && g.campaign.player.body[0] < g.campaign.body_cap() {
+        while g.campaign.player.points > 0
+            && g.campaign.player.body[crate::campaign::BodyAttribute::Vitality]
+                < g.campaign.body_cap()
+        {
             g.campaign
                 .allocate_body(crate::campaign::BodyAttribute::Vitality)?;
         }
@@ -3615,7 +3640,7 @@ pub fn maximum_progression_render_fixture() -> Result<Game, String> {
     }
     g.campaign.player.level = g.campaign.player_level_cap();
     g.campaign.player.xp = 0;
-    g.campaign.player.body = [0; 5];
+    g.campaign.player.body = KindMap::default();
     g.campaign.player.points = g.campaign.player.level - 1;
     g.campaign.first_clear(4, Mode::Npc);
     g.campaign.victories = u64::from(crate::progression::catalog().max_rank);

@@ -170,7 +170,7 @@ impl StrategyState {
         let mut bundles: Vec<u64> = campaign
             .items
             .iter()
-            .filter(|i| i.protected && i.definition == 0 && i.id > 4)
+            .filter(|i| i.protected && i.definition_index() == 0 && i.id > 4)
             .map(|i| i.id)
             .collect();
         bundles.sort_unstable();
@@ -186,9 +186,10 @@ impl StrategyState {
             for slot in 0..4 {
                 if campaign.item(recruit.npc.loadout[slot]).is_none() {
                     let fallback = first + slot as u64;
-                    recruit.npc.loadout[slot] = if campaign.item(fallback).is_some_and(|i| {
-                        i.protected && content().items[i.definition].slot.index() == slot
-                    }) {
+                    recruit.npc.loadout[slot] = if campaign
+                        .item(fallback)
+                        .is_some_and(|i| i.protected && i.definition().slot.index() == slot)
+                    {
                         fallback
                     } else {
                         slot as u64 + 1
@@ -399,7 +400,7 @@ impl StrategyState {
             return Err("Equipment is reserved by another deployed survivor or guard".into());
         }
         let item = campaign.item(item_id).ok_or("Item is no longer owned")?;
-        r.npc.loadout[content().items[item.definition].slot.index()] = item_id;
+        r.npc.loadout[item.definition().slot.index()] = item_id;
         Ok(())
     }
     pub fn train_recruit(
@@ -983,13 +984,13 @@ impl StrategyState {
     }
 }
 fn item_definition(campaign: &Campaign, npc: &Npc, slot: Slot) -> crate::content::ItemDefinition {
-    let index = campaign
-        .item(npc.loadout[slot.index()])
-        .map(|i| i.definition)
-        .unwrap_or(slot.index());
+    let definition = campaign.item(npc.loadout[slot.index()]).map_or(
+        &content().items[slot.index()],
+        crate::campaign::Item::definition,
+    );
     campaign
         .effective_item(npc.loadout[slot.index()])
-        .unwrap_or_else(|_| content().items[index].clone())
+        .unwrap_or_else(|_| definition.clone())
 }
 
 #[cfg(test)]

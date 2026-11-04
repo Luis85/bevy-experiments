@@ -1,5 +1,6 @@
 //! Validated, extensible skill DAG. Ownership stores stable string IDs, never node indices.
 use crate::catalog::{self, ContentError};
+use crate::kind_map::KindMap;
 use crate::weapons::WeaponClass;
 use crate::{campaign::BodyAttribute, content::StructureKind};
 use serde::{Deserialize, Serialize};
@@ -65,9 +66,9 @@ pub enum CampaignFeature {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SkillModifiers {
-    pub body_development: [u32; 5],
-    pub blueprints: [bool; 3],
-    pub structure_ranks: [u32; 3],
+    pub body_development: KindMap<BodyAttribute, u32>,
+    pub blueprints: KindMap<StructureKind, bool>,
+    pub structure_ranks: KindMap<StructureKind, u32>,
     pub features: BTreeSet<CampaignFeature>,
     pub damage_add: i32,
     pub damage_multiplier: f32,
@@ -96,9 +97,9 @@ pub struct SkillModifiers {
 impl Default for SkillModifiers {
     fn default() -> Self {
         Self {
-            body_development: [0; 5],
-            blueprints: [false; 3],
-            structure_ranks: [0; 3],
+            body_development: KindMap::default(),
+            blueprints: KindMap::default(),
+            structure_ranks: KindMap::default(),
             features: BTreeSet::new(),
             damage_add: 0,
             damage_multiplier: 1.0,
@@ -129,8 +130,8 @@ impl Default for SkillModifiers {
 impl SkillModifiers {
     /// Validate frozen save snapshots independently of the current catalogue.
     pub fn validate(&self) -> Result<(), String> {
-        if self.body_development.iter().any(|rank| *rank > 1000)
-            || self.structure_ranks.iter().any(|rank| *rank > 10)
+        if self.body_development.values().any(|rank| *rank > 1000)
+            || self.structure_ranks.values().any(|rank| *rank > 10)
             || [
                 self.damage_add,
                 self.health_add,
@@ -162,12 +163,11 @@ impl SkillModifiers {
     pub fn apply(&mut self, effect: &SkillEffect) {
         match *effect {
             SkillEffect::BodyDevelopment { attribute, rank } => {
-                self.body_development[attribute.index()] =
-                    self.body_development[attribute.index()].max(rank)
+                self.body_development[attribute] = self.body_development[attribute].max(rank)
             }
-            SkillEffect::Blueprint(kind) => self.blueprints[kind.index()] = true,
+            SkillEffect::Blueprint(kind) => self.blueprints[kind] = true,
             SkillEffect::StructureRank { kind, rank } => {
-                self.structure_ranks[kind.index()] = self.structure_ranks[kind.index()].max(rank)
+                self.structure_ranks[kind] = self.structure_ranks[kind].max(rank)
             }
             SkillEffect::FeatureUnlock(feature) => {
                 self.features.insert(feature);

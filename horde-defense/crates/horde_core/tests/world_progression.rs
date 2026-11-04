@@ -306,7 +306,7 @@ fn eight_real_country_defenses_are_achievable_with_earned_levelled_shop_gear_in_
                 let boss_floor = a.progression.boss_health_floor;
                 assert!(boss_floor >= last_boss);
                 last_boss = boss_floor;
-                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap.index()] {
+                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap] {
                     for lane in horde_core::sim::construction_lane_order(
                         g.attempt.as_ref().unwrap().lane_count,
                     ) {

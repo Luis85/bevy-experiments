@@ -52,7 +52,7 @@ fn personal_rifles_require_a_real_purchase_or_loot_instance_as_well_as_training(
             campaign.add_item(4).unwrap()
         };
         assert_ne!(id, 1);
-        assert!(!content().items[campaign.item(id).unwrap().definition].npc_only);
+        assert!(!campaign.item(id).unwrap().definition().npc_only);
         assert_eq!(
             campaign.coins,
             before

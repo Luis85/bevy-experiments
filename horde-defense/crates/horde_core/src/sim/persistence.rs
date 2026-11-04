@@ -1,15 +1,94 @@
 //! Filesystem storage adapter, generation recovery, and save-state validation.
+use super::migrations::{SAVE_VERSION, migrate};
 use super::*;
+use std::fmt;
 use std::path::Path;
 
 const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
 
+/// Revision of the gameplay rules. Bump when the same saved state and inputs
+/// would produce different outcomes; a mismatch on load is logged, not fatal.
+pub const RULESET_VERSION: u32 = 1;
+
+/// A save or load failure. `Display` keeps the player-facing wording.
+#[derive(Debug)]
+pub enum SaveError {
+    /// The generation could not be inspected, read or staged.
+    Io(std::io::Error),
+    /// The staged generation could not replace the committed one.
+    Commit(std::io::Error),
+    /// The encoded generation exceeds the inclusive storage limit.
+    TooLarge {
+        length: u64,
+        limit: u64,
+    },
+    /// The envelope or payload is not valid JSON for its schema.
+    Encoding(serde_json::Error),
+    UnsupportedVersion(u32),
+    ChecksumMismatch,
+    /// A legacy payload could not be upgraded to the current format.
+    Migration(String),
+    /// The decoded state violates a simulation invariant.
+    Invalid(String),
+    /// Neither the primary nor the backup generation could be read.
+    Recovery {
+        primary: Box<SaveError>,
+        backup: Box<SaveError>,
+    },
+}
+impl fmt::Display for SaveError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Io(error) => write!(f, "{error}"),
+            Self::Commit(error) => write!(f, "Could not commit save: {error}"),
+            Self::TooLarge { length, limit } => write!(
+                f,
+                "Save generation exceeds the supported storage limit ({length} bytes; maximum {limit} bytes)."
+            ),
+            Self::Encoding(error) => write!(f, "{error}"),
+            Self::UnsupportedVersion(version) => write!(f, "Unsupported save version {version}"),
+            Self::ChecksumMismatch => f.write_str("Save checksum mismatch"),
+            Self::Migration(reason) => write!(f, "Save migration failed: {reason}"),
+            Self::Invalid(reason) => f.write_str(reason),
+            Self::Recovery { primary, backup } => write!(
+                f,
+                "Save recovery failed. Primary: {primary}. Backup: {backup}"
+            ),
+        }
+    }
+}
+impl std::error::Error for SaveError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) | Self::Commit(error) => Some(error),
+            Self::Encoding(error) => Some(error),
+            _ => None,
+        }
+    }
+}
+impl From<std::io::Error> for SaveError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+impl From<serde_json::Error> for SaveError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::Encoding(error)
+    }
+}
+/// Frontends that report failures as text can keep using `?`.
+impl From<SaveError> for String {
+    fn from(error: SaveError) -> Self {
+        error.to_string()
+    }
+}
+
 impl Game {
     /// Decode exactly one generation without filesystem access, fallback or writes.
-    pub fn decode_save_generation(bytes: &[u8]) -> Result<Self, String> {
+    pub fn decode_save_generation(bytes: &[u8]) -> Result<Self, SaveError> {
         decode_generation(bytes)
     }
-    pub fn save(&self, path: &Path) -> Result<(), String> {
+    pub fn save(&self, path: &Path) -> Result<(), SaveError> {
         tracing::info!(path = %path.display(), "save started");
         let result = self.save_inner(path);
         match &result {
@@ -18,25 +97,28 @@ impl Game {
         }
         result
     }
-    fn save_inner(&self, path: &Path) -> Result<(), String> {
-        validate_game(self, usize::from(self.worker))?;
-        let payload = serde_json::to_string(self).map_err(|e| e.to_string())?;
+    fn save_inner(&self, path: &Path) -> Result<(), SaveError> {
+        validate_game(self, usize::from(self.worker)).map_err(SaveError::Invalid)?;
+        let payload = serde_json::to_string(self)?;
         let envelope = SaveEnvelope {
-            version: 1,
+            version: SAVE_VERSION,
             checksum: checksum(payload.as_bytes()),
+            ruleset_version: Some(RULESET_VERSION),
+            content_fingerprint: Some(crate::catalog::content_fingerprint()),
             payload,
         };
-        let bytes = serde_json::to_vec(&envelope).map_err(|e| e.to_string())?;
+        let bytes = serde_json::to_vec(&envelope)?;
         commit_generation(path, &bytes, MAX_GENERATION_BYTES)
     }
-    pub fn load(path: &Path) -> Result<Self, String> {
+    pub fn load(path: &Path) -> Result<Self, SaveError> {
         tracing::info!(path = %path.display(), "load started");
         let result = match read_save(path) {
             Ok(game) => Ok(game),
             Err(primary) => {
                 tracing::warn!(path = %path.display(), reason = %primary, "primary save unreadable, trying backup");
-                read_save(&path.with_extension("bak")).map_err(|backup| {
-                    format!("Save recovery failed. Primary: {primary}. Backup: {backup}")
+                read_save(&path.with_extension("bak")).map_err(|backup| SaveError::Recovery {
+                    primary: Box::new(primary),
+                    backup: Box::new(backup),
                 })
             }
         };
@@ -48,40 +130,41 @@ impl Game {
     }
 }
 
-fn ensure_generation_size(length: u64, limit: u64) -> Result<(), String> {
+fn ensure_generation_size(length: u64, limit: u64) -> Result<(), SaveError> {
     if length > limit {
-        return Err(format!(
-            "Save generation exceeds the supported storage limit ({length} bytes; maximum {limit} bytes)."
-        ));
+        return Err(SaveError::TooLarge { length, limit });
     }
     Ok(())
 }
 
-fn commit_generation(path: &Path, bytes: &[u8], limit: u64) -> Result<(), String> {
+fn commit_generation(path: &Path, bytes: &[u8], limit: u64) -> Result<(), SaveError> {
     // Guard the complete encoded envelope before creating a directory or
     // touching either committed generation or an existing temporary file.
     ensure_generation_size(bytes.len() as u64, limit)?;
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(parent)?;
     }
     let temporary = path.with_extension("tmp");
     let backup = path.with_extension("bak");
     use std::io::Write;
-    let mut file = std::fs::File::create(&temporary).map_err(|e| e.to_string())?;
-    file.write_all(bytes)
-        .and_then(|()| file.sync_all())
-        .map_err(|e| e.to_string())?;
+    let mut file = std::fs::File::create(&temporary)?;
+    file.write_all(bytes).and_then(|()| file.sync_all())?;
     if path.exists() && read_save(path).is_ok() {
-        std::fs::copy(path, &backup).map_err(|e| e.to_string())?;
+        std::fs::copy(path, &backup)?;
     }
-    std::fs::rename(&temporary, path).map_err(|e| format!("Could not commit save: {e}"))?;
+    std::fs::rename(&temporary, path).map_err(SaveError::Commit)?;
     Ok(())
 }
 
+/// v1 envelopes predate the ruleset/fingerprint fields; both are optional.
 #[derive(Serialize, Deserialize)]
 struct SaveEnvelope {
     version: u32,
     checksum: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    ruleset_version: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    content_fingerprint: Option<u64>,
     payload: String,
 }
 fn checksum(bytes: &[u8]) -> u64 {
@@ -89,27 +172,53 @@ fn checksum(bytes: &[u8]) -> u64 {
         (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
     })
 }
-fn read_save(path: &Path) -> Result<Game, String> {
-    ensure_generation_size(
-        std::fs::metadata(path).map_err(|e| e.to_string())?.len(),
-        MAX_GENERATION_BYTES,
-    )?;
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+fn read_save(path: &Path) -> Result<Game, SaveError> {
+    ensure_generation_size(std::fs::metadata(path)?.len(), MAX_GENERATION_BYTES)?;
+    let bytes = std::fs::read(path)?;
     Game::decode_save_generation(&bytes)
 }
-fn decode_generation(bytes: &[u8]) -> Result<Game, String> {
+fn decode_generation(bytes: &[u8]) -> Result<Game, SaveError> {
     ensure_generation_size(bytes.len() as u64, MAX_GENERATION_BYTES)?;
-    let envelope: SaveEnvelope = serde_json::from_slice(bytes).map_err(|e| e.to_string())?;
-    if envelope.version != 1 {
-        return Err("Unsupported save version".into());
+    let envelope: SaveEnvelope = serde_json::from_slice(bytes)?;
+    if envelope.version == 0 || envelope.version > SAVE_VERSION {
+        return Err(SaveError::UnsupportedVersion(envelope.version));
     }
     if checksum(envelope.payload.as_bytes()) != envelope.checksum {
-        return Err("Save checksum mismatch".into());
+        return Err(SaveError::ChecksumMismatch);
     }
-    let mut game: Game = serde_json::from_str(&envelope.payload).map_err(|e| e.to_string())?;
+    warn_on_catalog_drift(&envelope);
+    let mut game: Game = if envelope.version == SAVE_VERSION {
+        serde_json::from_str(&envelope.payload)?
+    } else {
+        // Legacy formats are upgraded on raw JSON before any typed decode.
+        let value = serde_json::from_str(&envelope.payload)?;
+        serde_json::from_value(migrate(value, envelope.version)?)?
+    };
     reconcile_saved_game(&mut game);
-    validate_game(&game, 0)?;
+    validate_game(&game, 0).map_err(SaveError::Invalid)?;
     Ok(game)
+}
+/// Saves stay loadable across rules or catalogue changes; drift is only logged.
+fn warn_on_catalog_drift(envelope: &SaveEnvelope) {
+    if let Some(saved) = envelope.ruleset_version
+        && saved != RULESET_VERSION
+    {
+        tracing::warn!(
+            saved,
+            current = RULESET_VERSION,
+            "save was written under a different ruleset version"
+        );
+    }
+    let current = crate::catalog::content_fingerprint();
+    if let Some(saved) = envelope.content_fingerprint
+        && saved != current
+    {
+        tracing::warn!(
+            saved = format_args!("{saved:016x}"),
+            current = format_args!("{current:016x}"),
+            "save was written against different content catalogues"
+        );
+    }
 }
 fn reconcile_saved_game(game: &mut Game) {
     if game.campaign.journey_revision == 0 {
@@ -485,11 +594,15 @@ mod tests {
         fn decode(game: &Game) -> Result<Game, String> {
             let payload = serde_json::to_string(game).unwrap();
             let envelope = SaveEnvelope {
-                version: 1,
+                version: SAVE_VERSION,
                 checksum: checksum(payload.as_bytes()),
+                ruleset_version: Some(RULESET_VERSION),
+                content_fingerprint: None,
                 payload,
             };
-            Game::decode_save_generation(&serde_json::to_vec(&envelope).unwrap())
+            Ok(Game::decode_save_generation(
+                &serde_json::to_vec(&envelope).unwrap(),
+            )?)
         }
         let mut game = Game::default();
         game.campaign.coins = 1000;
@@ -566,11 +679,13 @@ mod tests {
 
     #[test]
     fn ordinary_population_cannot_borrow_the_reserved_boss_slot_on_restore() {
-        fn restore(game: &Game) -> Result<Game, String> {
+        fn restore(game: &Game) -> Result<Game, SaveError> {
             let payload = serde_json::to_string(game).unwrap();
             let envelope = SaveEnvelope {
-                version: 1,
+                version: SAVE_VERSION,
                 checksum: checksum(payload.as_bytes()),
+                ruleset_version: None,
+                content_fingerprint: None,
                 payload,
             };
             Game::decode_save_generation(&serde_json::to_vec(&envelope).unwrap())
@@ -633,7 +748,8 @@ mod tests {
         // avoiding a 64 MiB object/fixture allocation in the regression suite.
         let length = primary_before.len() as u64;
         let error = commit_generation(&primary, &primary_before, length - 1).unwrap_err();
-        assert!(error.contains("storage limit"));
+        assert!(matches!(error, SaveError::TooLarge { .. }));
+        assert!(error.to_string().contains("storage limit"));
         assert_eq!(std::fs::read(&primary).unwrap(), primary_before);
         assert_eq!(std::fs::read(&backup).unwrap(), backup_before);
         assert_eq!(std::fs::read(&temporary).unwrap(), temporary_before);
@@ -651,5 +767,56 @@ mod tests {
             std::fs::remove_file(path).unwrap();
         }
         std::fs::remove_dir(root).unwrap();
+    }
+
+    #[test]
+    fn envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions() {
+        static NEXT: AtomicU64 = AtomicU64::new(0);
+        let path = std::env::temp_dir().join(format!(
+            "lastlight-envelope-{}-{}.json",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let game = Game::default();
+        game.save(&path).unwrap();
+        let bytes = std::fs::read(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        let envelope: SaveEnvelope = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(envelope.version, SAVE_VERSION);
+        assert_eq!(envelope.ruleset_version, Some(RULESET_VERSION));
+        assert_eq!(
+            envelope.content_fingerprint,
+            Some(crate::catalog::content_fingerprint())
+        );
+        // Drifted metadata is tolerated: the save still loads.
+        let drifted = SaveEnvelope {
+            ruleset_version: Some(RULESET_VERSION + 1),
+            content_fingerprint: Some(!crate::catalog::content_fingerprint()),
+            ..envelope
+        };
+        let restored =
+            Game::decode_save_generation(&serde_json::to_vec(&drifted).unwrap()).unwrap();
+        assert_eq!(restored.campaign, game.campaign);
+        for version in [0, SAVE_VERSION + 1] {
+            let future = SaveEnvelope {
+                version,
+                checksum: drifted.checksum,
+                ruleset_version: None,
+                content_fingerprint: None,
+                payload: drifted.payload.clone(),
+            };
+            assert!(matches!(
+                Game::decode_save_generation(&serde_json::to_vec(&future).unwrap()),
+                Err(SaveError::UnsupportedVersion(v)) if v == version
+            ));
+        }
+        let corrupt = SaveEnvelope {
+            checksum: drifted.checksum ^ 1,
+            ..drifted
+        };
+        assert!(matches!(
+            Game::decode_save_generation(&serde_json::to_vec(&corrupt).unwrap()),
+            Err(SaveError::ChecksumMismatch)
+        ));
     }
 }

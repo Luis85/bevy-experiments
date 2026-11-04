@@ -270,8 +270,8 @@ mod tests {
                 assert!(owned.acquired);
                 assert!(!owned.available);
                 assert_eq!(owned.state, "OWNED");
-                assert!(campaign.blueprints[kind.index()]);
-                assert_eq!(campaign.structure_upgrades[kind.index()], rank);
+                assert!(campaign.blueprints[kind]);
+                assert_eq!(campaign.structure_upgrades[kind], rank);
             }
         }
     }

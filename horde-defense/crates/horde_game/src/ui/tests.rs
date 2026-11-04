@@ -1994,7 +1994,7 @@ fn visible_quality_drop_receipts_never_grant_the_item_or_coins_twice() {
     let a = f.game.attempt.as_mut().unwrap();
     a.loot_events.push(horde_core::quality::LootEvent {
         item_id: id,
-        definition: 4,
+        definition: horde_core::content::ItemDefId::at(4),
         level: 2,
         quality,
         name: content().items[4].name.clone(),

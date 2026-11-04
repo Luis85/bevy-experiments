@@ -350,8 +350,9 @@ impl Attempt {
 }
 
 impl Game {
-    /// Typed events emitted since the last call, in emission order. Root
-    /// events are followed by those forwarded from expeditions as they tick.
+    /// Typed events emitted since the last call, in publication order. Within
+    /// one tick, records forwarded from expeditions (whose worker games tick
+    /// first) come before the root attempt's own records.
     pub fn drain_events(&mut self) -> std::vec::Drain<'_, SimEventRecord> {
         self.collect_attempt_events();
         self.event_outbox.drain(..)

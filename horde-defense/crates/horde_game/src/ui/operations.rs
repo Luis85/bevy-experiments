@@ -217,10 +217,10 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
                         }
                     });
                     for slot in Slot::ALL {
-                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{:?}: {}", slot, f.game.campaign.item(recruit.npc.loadout[slot.index()]).map(|i| content().items[i.definition].name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
-                            for item in f.game.campaign.items.clone().iter().filter(|i| content().items[i.definition].slot == slot) {
+                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{:?}: {}", slot, f.game.campaign.item(recruit.npc.loadout[slot.index()]).map(|i| i.definition().name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
+                            for item in f.game.campaign.items.clone().iter().filter(|i| i.definition().slot == slot) {
                                 let reserved = f.game.campaign.item_reserved(item.id);
-                                if ui.add_enabled(!reserved, egui::Button::selectable(recruit.npc.loadout.contains(&item.id), format!("{} #{} · Lv {}{}", content().items[item.definition].name, item.id, item.level, if reserved { " · reserved" } else { "" }))).clicked() { f.dispatch(Command::EquipRecruit { id: recruit.id, item: item.id }, "Survivor equipment updated."); }
+                                if ui.add_enabled(!reserved, egui::Button::selectable(recruit.npc.loadout.contains(&item.id), format!("{} #{} · Lv {}{}", item.definition().name, item.id, item.level, if reserved { " · reserved" } else { "" }))).clicked() { f.dispatch(Command::EquipRecruit { id: recruit.id, item: item.id }, "Survivor equipment updated."); }
                             }
                         });
                     }

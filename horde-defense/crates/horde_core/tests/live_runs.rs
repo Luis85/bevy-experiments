@@ -24,12 +24,12 @@ fn decode_value(value: serde_json::Value) -> Result<Game, String> {
         .fold(0xcbf29ce484222325_u64, |hash, byte| {
             (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
         });
-    Game::decode_save_generation(
+    Ok(Game::decode_save_generation(
         &serde_json::to_vec(&serde_json::json!({
             "version": 1, "checksum": checksum, "payload": payload,
         }))
         .unwrap(),
-    )
+    )?)
 }
 
 #[test]

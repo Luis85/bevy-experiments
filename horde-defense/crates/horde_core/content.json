@@ -1,6 +1,7 @@
 {
   "levels": [
     {
+      "id": "the_old_road",
       "name": "The Old Road",
       "subtitle": "Abandoned roadside position",
       "boss": "Breacher",
@@ -42,6 +43,7 @@
       }
     },
     {
+      "id": "ashwood_crossing",
       "name": "Ashwood Crossing",
       "subtitle": "Suburban barricade",
       "boss": "Caller",
@@ -83,6 +85,7 @@
       }
     },
     {
+      "id": "depot_nine",
       "name": "Depot Nine",
       "subtitle": "Warehouse access road",
       "boss": "SiegeBrute",
@@ -124,6 +127,7 @@
       }
     },
     {
+      "id": "the_iron_yard",
       "name": "The Iron Yard",
       "subtitle": "Industrial loading yard",
       "boss": "Breacher",
@@ -165,6 +169,7 @@
       }
     },
     {
+      "id": "lastlight_checkpoint",
       "name": "Lastlight Checkpoint",
       "subtitle": "Fortified checkpoint",
       "boss": "SiegeBrute",
@@ -300,6 +305,7 @@
   ],
   "items": [
     {
+      "id": "service_carbine",
       "name": "Service carbine",
       "npc_only": true,
       "slot": "Ranged",
@@ -338,6 +344,7 @@
       "visual_style": ""
     },
     {
+      "id": "crowbar",
       "name": "Crowbar",
       "slot": "Melee",
       "tier": 0,
@@ -369,6 +376,7 @@
       "visual_style": "melee.crowbar"
     },
     {
+      "id": "work_jacket",
       "name": "Work jacket",
       "slot": "Outfit",
       "tier": 0,
@@ -400,6 +408,7 @@
       "visual_style": "armor.cloth"
     },
     {
+      "id": "field_webbing",
       "name": "Field webbing",
       "slot": "Accessory",
       "tier": 0,
@@ -431,6 +440,7 @@
       "visual_style": "accessory.pouch"
     },
     {
+      "id": "marksman_rifle",
       "name": "Marksman rifle",
       "slot": "Ranged",
       "tier": 1,
@@ -468,6 +478,7 @@
       "visual_style": ""
     },
     {
+      "id": "fire_axe",
       "name": "Fire axe",
       "slot": "Melee",
       "tier": 1,
@@ -499,6 +510,7 @@
       "visual_style": "melee.axe"
     },
     {
+      "id": "padded_vest",
       "name": "Padded vest",
       "slot": "Outfit",
       "tier": 1,
@@ -530,6 +542,7 @@
       "visual_style": "armor.leather"
     },
     {
+      "id": "first_aid_rig",
       "name": "First aid rig",
       "slot": "Accessory",
       "tier": 1,
@@ -561,6 +574,7 @@
       "visual_style": "accessory.medic"
     },
     {
+      "id": "patrol_rifle",
       "name": "Patrol rifle",
       "slot": "Ranged",
       "tier": 2,
@@ -598,6 +612,7 @@
       "visual_style": ""
     },
     {
+      "id": "forged_machete",
       "name": "Forged machete",
       "slot": "Melee",
       "tier": 2,
@@ -629,6 +644,7 @@
       "visual_style": "melee.machete"
     },
     {
+      "id": "scavenged_ballistic_vest",
       "name": "Scavenged ballistic vest",
       "slot": "Outfit",
       "tier": 2,
@@ -660,6 +676,7 @@
       "visual_style": "armor.vest"
     },
     {
+      "id": "rangefinder",
       "name": "Rangefinder",
       "slot": "Accessory",
       "tier": 2,
@@ -691,6 +708,7 @@
       "visual_style": "accessory.radio"
     },
     {
+      "id": "longwatch_rifle",
       "name": "Longwatch rifle",
       "slot": "Ranged",
       "tier": 3,
@@ -728,6 +746,7 @@
       "visual_style": ""
     },
     {
+      "id": "breach_hammer",
       "name": "Breach hammer",
       "slot": "Melee",
       "tier": 3,
@@ -759,6 +778,7 @@
       "visual_style": "melee.hammer"
     },
     {
+      "id": "riot_armor",
       "name": "Riot armor",
       "slot": "Outfit",
       "tier": 3,
@@ -790,6 +810,7 @@
       "visual_style": "armor.plate"
     },
     {
+      "id": "survival_harness",
       "name": "Survival harness",
       "slot": "Accessory",
       "tier": 3,
@@ -821,6 +842,7 @@
       "visual_style": "accessory.satchel"
     },
     {
+      "id": "checkpoint_rifle",
       "name": "Checkpoint rifle",
       "slot": "Ranged",
       "tier": 4,
@@ -858,6 +880,7 @@
       "visual_style": ""
     },
     {
+      "id": "tempered_saber",
       "name": "Tempered saber",
       "slot": "Melee",
       "tier": 4,
@@ -889,6 +912,7 @@
       "visual_style": "melee.saber"
     },
     {
+      "id": "fortress_armor",
       "name": "Fortress armor",
       "slot": "Outfit",
       "tier": 4,
@@ -920,6 +944,7 @@
       "visual_style": "armor.plate"
     },
     {
+      "id": "veteran_kit",
       "name": "Veteran kit",
       "slot": "Accessory",
       "tier": 4,
@@ -951,6 +976,7 @@
       "visual_style": "accessory.rig"
     },
     {
+      "id": "worn_service_pistol",
       "name": "Worn service pistol",
       "slot": "Ranged",
       "tier": 0,
@@ -988,6 +1014,7 @@
       "visual_style": ""
     },
     {
+      "id": "compact_service_pistol",
       "name": "Compact service pistol",
       "slot": "Ranged",
       "tier": 1,
@@ -1025,6 +1052,7 @@
       "visual_style": ""
     },
     {
+      "id": "compact_smg",
       "name": "Compact SMG",
       "slot": "Ranged",
       "tier": 1,
@@ -1062,6 +1090,7 @@
       "visual_style": ""
     },
     {
+      "id": "pump_shotgun",
       "name": "Pump shotgun",
       "slot": "Ranged",
       "tier": 1,
@@ -1099,6 +1128,7 @@
       "visual_style": ""
     },
     {
+      "id": "patrol_rifle_tier1",
       "name": "Patrol rifle",
       "slot": "Ranged",
       "tier": 1,
@@ -1136,6 +1166,7 @@
       "visual_style": ""
     },
     {
+      "id": "scout_marksman_rifle",
       "name": "Scout marksman rifle",
       "slot": "Ranged",
       "tier": 1,
@@ -1173,6 +1204,7 @@
       "visual_style": ""
     },
     {
+      "id": "belt_fed_machine_gun",
       "name": "Belt-fed machine gun",
       "slot": "Ranged",
       "tier": 1,
@@ -1210,6 +1242,7 @@
       "visual_style": ""
     },
     {
+      "id": "heavy_revolver",
       "name": "Heavy revolver",
       "slot": "Ranged",
       "tier": 1,
@@ -1247,6 +1280,7 @@
       "visual_style": ""
     },
     {
+      "id": "double_barrel_shotgun",
       "name": "Double-barrel shotgun",
       "slot": "Ranged",
       "tier": 1,
@@ -1286,6 +1320,7 @@
   ],
   "structures": [
     {
+      "id": "shrapnel_trap",
       "kind": "Trap",
       "name": "Shrapnel trap",
       "supply": 4,
@@ -1309,6 +1344,7 @@
       "npc_skill": 14
     },
     {
+      "id": "scrap_barricade",
       "kind": "Wall",
       "name": "Scrap barricade",
       "supply": 3,
@@ -1332,6 +1368,7 @@
       "npc_skill": 0
     },
     {
+      "id": "watchtower_turret",
       "kind": "Turret",
       "name": "Watchtower turret",
       "supply": 10,

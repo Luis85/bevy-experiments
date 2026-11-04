@@ -10,7 +10,7 @@ pub(crate) const UNKNOWN_EXPEDITION: &str = "No active expedition with that ID";
 pub enum SettlementIssue {
     LootLost {
         battle: u64,
-        definition: usize,
+        definition: ItemDefId,
         level: u32,
         error: String,
     },
@@ -214,13 +214,14 @@ impl Game {
                 .iter()
                 .filter(|item| item.id >= battle.synced_item_id)
             {
-                if let Err(error) =
-                    self.campaign
-                        .add_item_with_quality(item.definition, item.level, item.quality)
-                {
+                if let Err(error) = self.campaign.add_item_with_quality(
+                    item.definition_index(),
+                    item.level,
+                    item.quality,
+                ) {
                     self.settlement_issues.push(SettlementIssue::LootLost {
                         battle: battle.id,
-                        definition: item.definition,
+                        definition: item.definition.clone(),
                         level: item.level,
                         error,
                     });
@@ -288,13 +289,14 @@ impl Game {
                     battle.game.campaign.player.level = self.campaign.player.level;
                     battle.game.campaign.player.xp = self.campaign.player.xp;
                     battle.game.campaign.player.points = self.campaign.player.points;
-                    battle.game.campaign.player.body = self.campaign.player.body;
+                    battle.game.campaign.player.body = self.campaign.player.body.clone();
                     battle.game.campaign.player.legacy_graph_points =
                         self.campaign.player.legacy_graph_points;
                     battle.game.campaign.skill_nodes = self.campaign.skill_nodes.clone();
                     battle.game.campaign.skills = self.campaign.skills.clone();
-                    battle.game.campaign.blueprints = self.campaign.blueprints;
-                    battle.game.campaign.structure_upgrades = self.campaign.structure_upgrades;
+                    battle.game.campaign.blueprints = self.campaign.blueprints.clone();
+                    battle.game.campaign.structure_upgrades =
+                        self.campaign.structure_upgrades.clone();
                     for (id, count) in self
                         .campaign
                         .world

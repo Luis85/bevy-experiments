@@ -165,7 +165,7 @@ fn boss_timer_is_not_victory_and_boss_transaction_is_atomic() {
 #[test]
 fn construction_bounds_invalid_spend_salvage_and_blocking() {
     let mut g = game(Mode::Personal);
-    g.campaign.blueprints = [true; 3];
+    g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
     g.set_paused(true);
     let supply = g.attempt.as_ref().unwrap().supply;
     assert!(g.place(StructureKind::Wall, 11, 0).is_err());
@@ -368,7 +368,7 @@ fn failed_parallel_loot_insert_is_reported_once_instead_of_silently_lost() {
         issues,
         vec![SettlementIssue::LootLost {
             battle,
-            definition: 4,
+            definition: horde_core::content::ItemDefId::at(4),
             level: 9,
             error: "Persistent item identity space exhausted".into(),
         }]
@@ -838,7 +838,7 @@ fn npc_impacts_distinguish_misses_defenses_protection_and_injury() {
                 && event.lane == Some(5)),
             "Missing {kind:?} authoritative impact"
         );
-        assert_eq!(a.telemetry.npc_decisions.iter().sum::<u32>(), 1);
+        assert_eq!(a.telemetry.npc_decisions.values().sum::<u32>(), 1);
         if let Some(enemy) = a.enemies.iter().find(|enemy| enemy.id == target) {
             assert_eq!(
                 enemy.hit_stop_left,
@@ -970,7 +970,7 @@ fn traps_and_turrets_hold_only_positive_injuries_in_both_modes() {
         for kind in [StructureKind::Trap, StructureKind::Turret] {
             for armor in [0, 1000] {
                 let mut g = game(mode);
-                g.campaign.blueprints = [true; 3];
+                g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
                 g.set_paused(true);
                 g.place(kind, 5, 0).unwrap();
                 g.set_paused(false);
@@ -1032,7 +1032,7 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
     assert_eq!(a.enemies[0].hp, hp);
     assert_eq!(serde_json::to_string(&a.rng).unwrap(), rng);
     assert_eq!(a.shots, 1);
-    assert_eq!(a.telemetry.npc_decisions.iter().sum::<u32>(), 1);
+    assert_eq!(a.telemetry.npc_decisions.values().sum::<u32>(), 1);
     ticks(&mut g, 1);
     assert!(g.attempt.as_ref().unwrap().enemies[0].x < x);
     ticks(&mut g, 53);
@@ -1042,7 +1042,7 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
             .unwrap()
             .telemetry
             .npc_decisions
-            .iter()
+            .values()
             .sum::<u32>(),
         2
     );
@@ -1136,7 +1136,7 @@ fn a_boss_defeat_stops_piercing_followups_and_later_turrets() {
         g.deploy(0, Mode::Personal).unwrap();
         g.set_paused(false);
         if use_turrets {
-            g.campaign.blueprints = [true; 3];
+            g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
             g.set_paused(true);
             g.place(StructureKind::Turret, 5, 0).unwrap();
             g.place(StructureKind::Turret, 5, 1).unwrap();
@@ -1420,7 +1420,7 @@ fn parallel_loot_cursors_and_reports_do_not_duplicate_an_unused_shared_stash() {
 fn npc_turret_uses_its_authored_skill_and_a_critical_failure_requires_ready() {
     use horde_core::{rules::Rng, sim::EventKind};
     let mut g = game(Mode::Npc);
-    g.campaign.blueprints = [true; 3];
+    g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
     g.set_paused(true);
     g.place(StructureKind::Turret, 5, 4).unwrap();
     g.set_paused(false);
