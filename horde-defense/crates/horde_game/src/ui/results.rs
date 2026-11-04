@@ -1,11 +1,17 @@
 //! Primary home after every main round. All rewards have already been settled.
 use super::{Screen, Tab, UiCtx, muted, navigation, progression, status};
 use crate::{
-    art::{INK, MUTED, TEXT},
+    art::{AMBER, GREEN, INK, MUTED, RED, TEXT},
     runner::SaveIntent,
 };
-use bevy_egui::egui::{self, Color32, RichText, Stroke, vec2};
-use horde_core::{command::Command, sim::Outcome, world::world};
+use bevy_egui::egui::{
+    self, Align, Color32, FontId, RichText, Stroke, TextFormat, text::LayoutJob, vec2,
+};
+use horde_core::{
+    command::Command,
+    sim::{Outcome, Report},
+    world::world,
+};
 fn continue_label(f: &UiCtx) -> &'static str {
     if !f.game.campaign().journey_active || f.game.last_result().is_none() {
         return "Choose a country";
@@ -39,6 +45,51 @@ fn retreat_hint(cause: &str) -> String {
         format!("{cause} Rest and train before trying again.")
     }
 }
+/// One outcome line in the page-title face (outcome · country · defense)
+/// with the banked rewards beside it, and at most one muted hint under it.
+/// The header shows the wallet; this strip only names what was banked.
+fn outcome_strip(ui: &mut egui::Ui, report: &Report) {
+    let (label, color) = match report.outcome {
+        Outcome::Victory => ("Victory", GREEN),
+        Outcome::Defeat => ("Defeat", RED),
+        Outcome::Withdrawal => ("Retreated", AMBER),
+    };
+    let title = |color| TextFormat {
+        font_id: FontId::new(24.0, egui::FontFamily::Name("display".into())),
+        color,
+        valign: Align::Center,
+        ..TextFormat::default()
+    };
+    let mut line = LayoutJob::default();
+    line.append(label, 0.0, title(color));
+    line.append(
+        &format!(" · {} · Defense {}", report.country_name, report.stage + 1),
+        0.0,
+        title(TEXT),
+    );
+    line.append(
+        &format!(" · banked +{} coins · {} items", report.coins, report.loot),
+        0.0,
+        TextFormat {
+            font_id: FontId::proportional(16.0),
+            color: MUTED,
+            valign: Align::Center,
+            ..TextFormat::default()
+        },
+    );
+    ui.label(line);
+    if report.outcome != Outcome::Victory {
+        ui.add(
+            egui::Label::new(
+                RichText::new(retreat_hint(&report.cause))
+                    .size(12.0)
+                    .color(MUTED),
+            )
+            .truncate(),
+        )
+        .on_hover_text(&report.cause);
+    }
+}
 pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
     // The same row as the camp; its selected first tab names this page.
     let with_row = f.game.campaign().world.start.is_some();
@@ -51,39 +102,14 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
                 ui.label(RichText::new("Journey upgrades").size(26.0).strong());
             }
             if let Some(report) = f.game.last_result() {
-                let label = match report.outcome {
-                    Outcome::Victory => "Victory",
-                    Outcome::Defeat => "Retreated to camp",
-                    Outcome::Withdrawal => "Retreated to camp",
-                };
-                ui.label(format!(
-                    "{label} · {} · defense {} · Already banked: +{} coins · {} recovered items",
-                    report.country_name,
-                    report.stage + 1,
-                    report.coins,
-                    report.loot
-                ));
+                outcome_strip(ui, report);
             } else {
                 muted(
                     ui,
                     "Spend retained coins, choose an upgrade, then continue your journey.",
                 );
             }
-            if let Some(report) = f
-                .game
-                .last_result()
-                .filter(|r| r.outcome != Outcome::Victory)
-            {
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(retreat_hint(&report.cause))
-                            .size(12.0)
-                            .color(MUTED),
-                    )
-                    .truncate(),
-                )
-                .on_hover_text(&report.cause);
-            }
+            ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| actions(ui, f));
             if f.status.message_error || f.status.save_pending {
                 status(ui, f);

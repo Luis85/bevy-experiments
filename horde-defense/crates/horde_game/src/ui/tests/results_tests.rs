@@ -43,7 +43,7 @@ fn results_keep_rewards_banked_and_open_the_actual_recovered_equipment() {
             output
                 .shapes
                 .iter()
-                .any(|shape| shape_has_text(&shape.shape, "Already banked:"))
+                .any(|shape| shape_has_text(&shape.shape, " · banked +"))
         );
     }
     assert_eq!(f.game.campaign().coins, coins);
@@ -248,4 +248,99 @@ fn the_upgrade_home_shares_the_camp_header_and_orders_its_actions() {
     h.click(f, View::ResultsWithChrome, "Menu");
     f.flush_for_test();
     assert!(f.screen == Screen::Menu);
+}
+
+#[test]
+fn results_outcome_is_one_line_with_one_muted_hint_and_no_second_wallet() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    for _ in 0..120 {
+        f.game.tick(Input::default());
+    }
+    f.game.withdraw();
+    f.screen = Screen::Results;
+    f.game.set_paused(true);
+    let report = f.game.last_result().unwrap().clone();
+    let line = format!(
+        "Retreated · {} · Defense {} · banked +{} coins · {} items",
+        report.country_name,
+        report.stage + 1,
+        report.coins,
+        report.loot
+    );
+    let wallet = format!("{} coins", f.game.campaign().coins);
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::ResultsWithChrome, vec![], size);
+        assert_eq!(text_count(&output, &line), 1, "{size:?}: {line}");
+        assert!(fully_visible(&output, &line), "{size:?}");
+        assert_eq!(text_count(&output, &wallet), 1, "{size:?}: wallet repeated");
+        assert!(
+            !output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, "Already banked")),
+            "{size:?}"
+        );
+        // One muted hint under the outcome, above the actions.
+        let (outcome, _) = clipped_bounds(&output, &line).unwrap();
+        let (actions, _) = clipped_bounds(&output, "Try again").unwrap();
+        let between = output
+            .shapes
+            .iter()
+            .filter(|clipped| {
+                let mut found = false;
+                fn walk(shape: &egui::epaint::Shape, top: f32, bottom: f32, found: &mut bool) {
+                    match shape {
+                        egui::epaint::Shape::Text(text) => {
+                            let y = text.pos.y + text.galley.rect.center().y;
+                            *found |= y > top && y < bottom && !text.galley.text().is_empty();
+                        }
+                        egui::epaint::Shape::Vec(v) => {
+                            v.iter().for_each(|s| walk(s, top, bottom, found));
+                        }
+                        _ => {}
+                    }
+                }
+                walk(
+                    &clipped.shape,
+                    outcome.bottom(),
+                    actions.top() - 6.0,
+                    &mut found,
+                );
+                found
+            })
+            .count();
+        assert_eq!(between, 1, "{size:?}: expected one hint line");
+    }
+}
+
+#[test]
+fn victory_outcome_names_the_win_without_a_retreat_hint() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    f.game.last_result_mut().as_mut().unwrap().outcome = Outcome::Victory;
+    f.screen = Screen::Results;
+    let report = f.game.last_result().unwrap().clone();
+    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    let line = format!(
+        "Victory · {} · Defense {} · banked +{} coins · {} items",
+        report.country_name,
+        report.stage + 1,
+        report.coins,
+        report.loot
+    );
+    assert_eq!(text_count(&output, &line), 1);
+    assert!(
+        !output
+            .shapes
+            .iter()
+            .any(|s| shape_has_text(&s.shape, "Rest and train"))
+    );
 }
