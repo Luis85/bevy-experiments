@@ -1,6 +1,7 @@
 //! Personal ordnance is an authored, enemy-only area attack. Flight, fire and
 //! charges belong to the attempt; presentation never resolves damage or refills.
 use crate::catalog::{self as shared, ContentError};
+use crate::kind_map::{KindMap, StableKind};
 use crate::{content::Mode, skill_catalog::SkillModifiers};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, sync::OnceLock};
@@ -8,13 +9,17 @@ use std::{collections::BTreeSet, sync::OnceLock};
 pub const MAX_ACTIVE_ORDNANCE: usize = 32;
 pub const MAX_CHARGES: u32 = 128;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum OrdnanceKind {
     Grenade,
     Molotov,
 }
+impl StableKind for OrdnanceKind {
+    const ALL: &'static [Self] = &[Self::Grenade, Self::Molotov];
+}
 impl OrdnanceKind {
-    pub fn index(self) -> usize {
+    /// Legacy `Event::value` payload of a throw (the declaration slot).
+    pub(crate) fn event_value(self) -> i32 {
         match self {
             Self::Grenade => 0,
             Self::Molotov => 1,
@@ -188,41 +193,52 @@ pub struct FireZone {
 pub struct OrdnanceState {
     pub projectiles: Vec<ThrownOrdnance>,
     pub fire_zones: Vec<FireZone>,
-    pub cooldowns: [u32; 2],
-    pub charges: [u32; 2],
-    pub issued: [u32; 2],
-    pub spent: [u32; 2],
+    pub cooldowns: KindMap<OrdnanceKind, u32>,
+    pub charges: KindMap<OrdnanceKind, u32>,
+    pub issued: KindMap<OrdnanceKind, u32>,
+    pub spent: KindMap<OrdnanceKind, u32>,
     /// Number of throws issued in this attempt; actor IDs use Attempt.next_id.
     pub next_id: u64,
 }
 fn valid_radius(radius: f32) -> bool {
     radius.is_finite() && (0.1..=15.0).contains(&radius)
 }
-pub fn allowance(mode: Mode, modifiers: &SkillModifiers) -> [u32; 2] {
-    if mode != Mode::Personal {
-        return [0; 2];
-    }
-    [
-        if modifiers.unlocked(OrdnanceKind::Grenade.unlock()) {
-            modifiers.grenade_charges.min(MAX_CHARGES)
-        } else {
-            0
-        },
-        if modifiers.unlocked(OrdnanceKind::Molotov.unlock()) {
-            modifiers.molotov_charges.min(MAX_CHARGES)
-        } else {
-            0
-        },
-    ]
+pub fn allowance(mode: Mode, modifiers: &SkillModifiers) -> KindMap<OrdnanceKind, u32> {
+    KindMap::from_fn(|kind: OrdnanceKind| {
+        if mode != Mode::Personal || !modifiers.unlocked(kind.unlock()) {
+            return 0;
+        }
+        match kind {
+            OrdnanceKind::Grenade => modifiers.grenade_charges,
+            OrdnanceKind::Molotov => modifiers.molotov_charges,
+        }
+        .min(MAX_CHARGES)
+    })
 }
 impl OrdnanceState {
     pub fn for_deployment(mode: Mode, modifiers: &SkillModifiers) -> Self {
         let issued = allowance(mode, modifiers);
         Self {
+            charges: issued.clone(),
             issued,
-            charges: issued,
             ..Self::default()
         }
+    }
+    pub fn charges(&self, kind: OrdnanceKind) -> u32 {
+        self.charges[kind]
+    }
+    pub fn cooldown(&self, kind: OrdnanceKind) -> u32 {
+        self.cooldowns[kind]
+    }
+    pub fn issued(&self, kind: OrdnanceKind) -> u32 {
+        self.issued[kind]
+    }
+    pub fn spent(&self, kind: OrdnanceKind) -> u32 {
+        self.spent[kind]
+    }
+    /// A throw of `kind` is allowed: a charge remains and the cooldown elapsed.
+    pub fn ready(&self, kind: OrdnanceKind) -> bool {
+        self.charges[kind] > 0 && self.cooldowns[kind] == 0
     }
     pub fn validate(
         &self,
@@ -243,20 +259,22 @@ impl OrdnanceState {
         .into_iter()
         .any(|value| !value.is_finite() || value <= 0.0 || value > 10_000.0)
             || self.projectiles.len() + self.fire_zones.len() > MAX_ACTIVE_ORDNANCE
-            || (0..2).any(|i| {
-                self.issued[i] > allowed[i]
-                    || self.charges[i].checked_add(self.spent[i]) != Some(self.issued[i])
-                    || self.cooldowns[i] > 3600
+            || OrdnanceKind::ALL.iter().any(|&kind| {
+                self.issued[kind] > allowed[kind]
+                    || self.charges[kind].checked_add(self.spent[kind]) != Some(self.issued[kind])
+                    || self.cooldowns[kind] > 3600
             })
-            || self.next_id != u64::from(self.spent[0]) + u64::from(self.spent[1])
+            || self.next_id != self.spent.values().map(|&n| u64::from(n)).sum::<u64>()
             || self.projectiles.len() + self.fire_zones.len() > self.next_id as usize
-            || (0..2).any(|index| {
-                self.projectiles
-                    .iter()
-                    .filter(|p| p.kind.index() == index)
-                    .count()
-                    + if index == 1 { self.fire_zones.len() } else { 0 }
-                    > self.spent[index] as usize
+            || OrdnanceKind::ALL.iter().any(|&kind| {
+                // Fire zones are left behind by Molotovs.
+                self.projectiles.iter().filter(|p| p.kind == kind).count()
+                    + if kind == OrdnanceKind::Molotov {
+                        self.fire_zones.len()
+                    } else {
+                        0
+                    }
+                    > self.spent[kind] as usize
             })
             || (mode != Mode::Personal && self != &Self::default())
         {

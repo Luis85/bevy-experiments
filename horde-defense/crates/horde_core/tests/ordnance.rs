@@ -82,19 +82,65 @@ fn skill_unlock_cells_cooldowns_and_finite_attempt_charges_are_authoritative() {
     for cell in [[30, 5], [15, 11], [255, 255]] {
         throw(&mut game, OrdnanceKind::Grenade, cell);
     }
-    assert_eq!(game.attempt.as_ref().unwrap().ordnance.charges, [2, 2]);
+    assert_eq!(
+        game.attempt
+            .as_ref()
+            .unwrap()
+            .ordnance
+            .charges
+            .values()
+            .copied()
+            .collect::<Vec<_>>(),
+        [2, 2]
+    );
     for _ in 0..3 {
         throw(&mut game, OrdnanceKind::Grenade, [15, 5]);
-        let charges = game.attempt.as_ref().unwrap().ordnance.charges[0];
+        let charges = game
+            .attempt
+            .as_ref()
+            .unwrap()
+            .ordnance
+            .charges(OrdnanceKind::Grenade);
         throw(&mut game, OrdnanceKind::Grenade, [15, 5]);
-        assert_eq!(game.attempt.as_ref().unwrap().ordnance.charges[0], charges);
+        assert_eq!(
+            game.attempt
+                .as_ref()
+                .unwrap()
+                .ordnance
+                .charges(OrdnanceKind::Grenade),
+            charges
+        );
         advance(&mut game, ordnance::catalog().grenade.cooldown_ticks);
     }
-    assert_eq!(game.attempt.as_ref().unwrap().ordnance.charges[0], 0);
-    assert_eq!(game.attempt.as_ref().unwrap().ordnance.spent[0], 2);
+    assert_eq!(
+        game.attempt
+            .as_ref()
+            .unwrap()
+            .ordnance
+            .charges(OrdnanceKind::Grenade),
+        0
+    );
+    assert_eq!(
+        game.attempt
+            .as_ref()
+            .unwrap()
+            .ordnance
+            .spent(OrdnanceKind::Grenade),
+        2
+    );
     game.withdraw();
     game.retry().unwrap();
-    assert_eq!(game.attempt.as_ref().unwrap().ordnance.charges, [2, 2]);
+    assert_eq!(
+        game.attempt
+            .as_ref()
+            .unwrap()
+            .ordnance
+            .charges
+            .values()
+            .copied()
+            .collect::<Vec<_>>(),
+        [2, 2]
+    );
 }
 
 #[test]
@@ -190,7 +236,7 @@ fn flight_and_fire_save_resume_are_identical_and_forged_ammo_is_rejected() {
         );
     }
     let mut forged = original.clone();
-    forged.attempt.as_mut().unwrap().ordnance.charges[1] += 1;
+    forged.attempt.as_mut().unwrap().ordnance.charges[OrdnanceKind::Molotov] += 1;
     assert!(forged.save(&path).is_err());
     let mut forged = original;
     forged.attempt.as_mut().unwrap().ordnance.fire_zones[0].radius = f32::INFINITY;

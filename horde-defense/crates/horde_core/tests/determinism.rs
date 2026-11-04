@@ -10,6 +10,10 @@
 //! needs explicit approval. To re-bless: run
 //! `cargo test -p horde_core --test determinism -- --nocapture`, copy the
 //! printed digests into `GOLDEN`, and state in the commit why every seed moved.
+//!
+//! Save v5 re-bless (format-only, approved): the ordnance counters became
+//! kind-keyed maps, which changes the serialized payload of every run but no
+//! gameplay; `GAMEPLAY_TRACE` pins the unchanged outcomes of the same runs.
 mod support;
 use horde_core::content::{Mode, Policy};
 use horde_core::sim::{Game, smoke_input};
@@ -20,16 +24,35 @@ const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
 
 /// `(seed, mode)` -> digest after [`TICKS`] ticks of the headless bot.
 const GOLDEN: [(u64, Mode, u64); 6] = [
-    (1, Mode::Personal, 0x0b18_ef9e_9f3f_db8f),
-    (1, Mode::Npc, 0x13e5_aa1a_f902_4db9),
-    (0x1A57_1167, Mode::Personal, 0x2175_368a_9d8d_176a),
-    (0x1A57_1167, Mode::Npc, 0x8441_e448_9411_5e96),
-    (0xDEAD_BEEF_2026, Mode::Personal, 0x6579_9cfc_9dd3_de72),
-    (0xDEAD_BEEF_2026, Mode::Npc, 0x57c7_5e07_a11d_c660),
+    (1, Mode::Personal, 0x2e20_3b0e_cbb0_a2df),
+    (1, Mode::Npc, 0x666d_d978_5ba3_8601),
+    (0x1A57_1167, Mode::Personal, 0x4da1_2071_d6c2_a94a),
+    (0x1A57_1167, Mode::Npc, 0xa0d0_31d1_3edd_1996),
+    (0xDEAD_BEEF_2026, Mode::Personal, 0x9900_ad25_4673_28e2),
+    (0xDEAD_BEEF_2026, Mode::Npc, 0x72f7_f039_a9dd_7280),
 ];
 
-/// The first-stage encounter the `smoke` command plays, for `TICKS` ticks.
+/// `(seed, mode)` -> FNV-1a of the per-tick gameplay trace (tick, hp, coins,
+/// enemy ids/hp/positions and the event queue; no serialized format) recorded
+/// on the v4 build (commit c6f518d) before the ordnance arrays became kind
+/// maps. The save-v5 re-bless of `GOLDEN` is format-only: this trace proves
+/// the gameplay outcomes of the same six runs did not move.
+const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
+    (1, Mode::Personal, 0xa6ca_a6de_7fd9_2b1a),
+    (1, Mode::Npc, 0x2966_10f8_ded8_a91f),
+    (0x1A57_1167, Mode::Personal, 0x8beb_3e2e_0553_347a),
+    (0x1A57_1167, Mode::Npc, 0x85ec_9e52_63ea_48af),
+    (0xDEAD_BEEF_2026, Mode::Personal, 0x46a2_adc6_720f_8678),
+    (0xDEAD_BEEF_2026, Mode::Npc, 0x1fda_7a06_49d4_4756),
+];
+
 fn run(seed: u64, mode: Mode) -> Game {
+    run_observed(seed, mode, |_| {})
+}
+
+/// The first-stage encounter the `smoke` command plays, for `TICKS` ticks;
+/// `observe` sees the game after every tick.
+fn run_observed(seed: u64, mode: Mode, mut observe: impl FnMut(&Game)) -> Game {
     let mut g = Game::default();
     g.seed = seed;
     g.campaign.attempts = 1;
@@ -42,8 +65,34 @@ fn run(seed: u64, mode: Mode) -> Game {
     for _ in 0..TICKS {
         let input = smoke_input(&g);
         g.tick(input);
+        observe(&g);
     }
     g
+}
+
+#[test]
+fn seeded_headless_runs_keep_their_pinned_gameplay_traces() {
+    for (seed, mode, expected) in GAMEPLAY_TRACE {
+        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        run_observed(seed, mode, |g| {
+            let a = g.attempt.as_ref().unwrap();
+            let line = format!(
+                "t{} hp{} coins{} e{:?} ev{:?}\n",
+                a.tick,
+                a.hp,
+                a.coins,
+                a.enemies
+                    .iter()
+                    .map(|e| (e.id, e.hp, e.x.to_bits(), e.y().to_bits()))
+                    .collect::<Vec<_>>(),
+                a.events
+            );
+            hash = line.bytes().fold(hash, |h, b| {
+                (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+            });
+        });
+        assert_eq!(hash, expected, "seed {seed:#x} {mode:?} gameplay moved");
+    }
 }
 
 #[test]
