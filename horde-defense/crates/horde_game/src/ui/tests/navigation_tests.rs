@@ -204,10 +204,9 @@ fn settings_and_history_return_to_the_page_they_were_opened_from() {
 #[test]
 fn the_single_row_stays_one_line_inside_the_minimum_window() {
     let mut fixture = IsolatedFrontend::new();
+    // Harness::new installs the shipped fonts (Atkinson Hyperlegible body).
     let h = Harness::new();
     settings::configure(&h.ctx, 1.35);
-    // The shipped pixel face is wider than egui's default; measure with it.
-    settings::install_font(&h.ctx);
     let f = between_runs(&mut fixture);
     f.settings.scale = 1.35;
     f.game.campaign_mut().legacy_features = true;
@@ -226,7 +225,36 @@ fn the_single_row_stays_one_line_inside_the_minimum_window() {
                 .unwrap_or_else(|| panic!("{label} painted"))
         })
         .collect();
-    let area = h.ctx.content_rect();
+    // The measured frame really ran at the scaled minimum window. (After a
+    // pass the context reports its default rect, so the area is derived from
+    // the frame's own scale rather than read back.)
+    assert!((output.pixels_per_point - 1.35).abs() < 1e-3);
+    let area = Rect::from_min_size(Pos2::ZERO, size / output.pixels_per_point);
+    // ...and laid the row out in the shipped body face, not egui's default.
+    let body = egui::FontId::proportional(16.0);
+    let width = |ctx: &egui::Context| {
+        ctx.fonts_mut(|fonts| {
+            fonts
+                .layout_no_wrap("Journey upgrades".into(), body.clone(), Color32::WHITE)
+                .size()
+                .x
+        })
+    };
+    let fallback = egui::Context::default();
+    fallback
+        .run_ui(RawInput::default(), |_| {})
+        .textures_delta
+        .clear();
+    let (shipped, default_face) = (width(&h.ctx), width(&fallback));
+    assert!(
+        (bounds[0].width() - shipped).abs() < 0.5,
+        "row measured with the shipped face: {} vs {shipped}",
+        bounds[0].width()
+    );
+    assert!(
+        (shipped - default_face).abs() > 1.0,
+        "shipped face {shipped} must differ from egui's default {default_face}"
+    );
     let top = bounds.iter().map(|r| r.top()).fold(f32::MAX, f32::min);
     let bottom = bounds.iter().map(|r| r.bottom()).fold(f32::MIN, f32::max);
     for rect in &bounds {
