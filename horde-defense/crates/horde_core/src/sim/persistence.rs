@@ -126,6 +126,16 @@ fn reconcile_saved_game(game: &mut Game) {
             a.dps.totals.structures = a.structure_damage;
             a.dps.buckets.clear();
         }
+        if a.event_seq == 0 && !a.events.is_empty() {
+            // Legacy windows predate sequence numbers; presentation dedupes by
+            // them, so give every retained event a distinct one.
+            let mut seq = game.next_event_seq;
+            for event in &mut a.events {
+                event.seq = seq;
+                seq += 1;
+            }
+            a.event_seq = seq;
+        }
         for e in &mut a.enemies {
             if e.boss && e.boss_kind.is_none() {
                 e.boss_kind = Some(

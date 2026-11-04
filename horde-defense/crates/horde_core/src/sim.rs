@@ -1,8 +1,11 @@
+mod events;
 mod journey;
 mod parallel;
 mod persistence;
+pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
 pub use journey::JourneyContinuation;
 pub use parallel::SettlementIssue;
+pub(crate) use parallel::UNKNOWN_EXPEDITION;
 use persistence::validate_game;
 
 use crate::campaign::{Campaign, DefenderProfile};
@@ -11,7 +14,8 @@ use crate::ordnance::{self, FireZone, OrdnanceKind, OrdnanceState, ThrowRequest,
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
 use crate::world::Modifiers;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, VecDeque};
+use tracing::{debug, info, info_span, trace};
 
 pub const TICKS_PER_SECOND: u32 = 60;
 pub const ENEMY_HIT_STOP_TICKS: u32 = 6;
@@ -245,6 +249,10 @@ pub struct Event {
     pub lane: Option<u8>,
     #[serde(default)]
     pub duration_ticks: u32,
+    /// Shared with the matching `SimEventRecord`; zero only in legacy saves
+    /// before load-time renumbering.
+    #[serde(default)]
+    pub seq: u64,
 }
 #[derive(Clone, Copy, Debug, Default)]
 struct EventMetadata {
@@ -252,6 +260,7 @@ struct EventMetadata {
     target_id: Option<u64>,
     lane: Option<u8>,
     duration_ticks: u32,
+    ordnance: Option<OrdnanceKind>,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NpcManeuver {
@@ -366,8 +375,13 @@ pub struct Attempt {
     pub coins: u64,
     pub loot: u32,
     pub decision: String,
-    pub events: Vec<Event>,
+    /// Bounded presentation window for scene replay; the typed stream is
+    /// `Game::drain_events`.
+    pub events: VecDeque<Event>,
     pub log: Vec<String>,
+    /// Latest rules resolution (attack roll, defense, injury) for inspection.
+    #[serde(default)]
+    pub latest_resolution: Option<String>,
     pub last_damage_lane: Option<u8>,
     pub profile: DefenderProfile,
     pub rng: Rng,
@@ -405,6 +419,11 @@ pub struct Attempt {
     boss_warning_sent: bool,
     #[serde(default)]
     caller_lanes: Option<[u8; 2]>,
+    /// Next event sequence number; the live attempt owns the game's cursor.
+    #[serde(default)]
+    event_seq: u64,
+    #[serde(skip)]
+    emitted: Vec<SimEventRecord>,
 }
 impl Attempt {
     /// The surviving structures as a reusable country layout plan.
@@ -524,34 +543,38 @@ impl Attempt {
     fn event(&mut self, kind: EventKind, from: [f32; 2], to: [f32; 2], value: i32) {
         self.event_with(kind, from, to, value, EventMetadata::default());
     }
-    fn event_with(
-        &mut self,
-        kind: EventKind,
-        from: [f32; 2],
-        to: [f32; 2],
-        value: i32,
-        meta: EventMetadata,
-    ) {
-        if self.events.len() == MAX_EVENTS {
-            self.events.remove(0);
-        }
-        self.events.push(Event {
-            kind,
-            from,
-            to,
-            value,
-            tick: self.tick,
-            actor_id: meta.actor_id,
-            target_id: meta.target_id,
-            lane: meta.lane,
-            duration_ticks: meta.duration_ticks,
-        });
-    }
     fn note(&mut self, text: String) {
         self.log.push(text);
         if self.log.len() > MAX_LOG {
             self.log.remove(0);
         }
+    }
+    /// Log a rules resolution and publish it as typed, inspectable data.
+    fn resolved(
+        &mut self,
+        attacker_id: Option<u64>,
+        target_id: Option<u64>,
+        result: &rules::AttackResult,
+        line: String,
+    ) {
+        debug!(
+            attacker = ?attacker_id,
+            target = ?target_id,
+            roll = result.attack_roll,
+            skill = result.effective_skill,
+            hit = result.hit,
+            defended = result.defended,
+            injury = result.injury,
+            "rule resolution"
+        );
+        let attacker = self.actor(attacker_id, None);
+        self.latest_resolution = Some(line.clone());
+        self.emit(SimEvent::RuleResolved {
+            attacker,
+            target_id,
+            summary: line.clone(),
+        });
+        self.note(line);
     }
     fn resolution_event(
         &mut self,
@@ -646,6 +669,12 @@ pub struct Game {
     /// Transient settlement failures awaiting a frontend; never persisted.
     #[serde(skip)]
     settlement_issues: Vec<SettlementIssue>,
+    /// Event sequence cursor between attempts; a live attempt owns it.
+    #[serde(default)]
+    next_event_seq: u64,
+    /// Transient typed event outbox; see `drain_events`.
+    #[serde(skip)]
+    event_outbox: Vec<SimEventRecord>,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ParallelBattle {
@@ -678,6 +707,8 @@ impl Default for Game {
             global_paused: false,
             worker: false,
             settlement_issues: Vec::new(),
+            next_event_seq: 0,
+            event_outbox: Vec::new(),
         }
     }
 }
@@ -906,8 +937,9 @@ impl Game {
             coins: 0,
             loot: 0,
             decision: "Ready to deploy".into(),
-            events: vec![],
+            events: VecDeque::new(),
             log: vec![],
+            latest_resolution: None,
             last_damage_lane: None,
             ordnance: OrdnanceState::for_deployment(mode, &profile.modifiers),
             profile,
@@ -940,7 +972,18 @@ impl Game {
             caller_tick: 0,
             boss_warning_sent: false,
             caller_lanes: None,
+            event_seq: self.next_event_seq,
+            emitted: Vec::new(),
         };
+        info_span!("battle", attempt = id, mode = ?mode, seed = self.seed).in_scope(|| {
+            info!(
+                worker = self.worker,
+                country = ?a.country_id,
+                stage = a.stage,
+                level,
+                "attempt started"
+            );
+        });
         self.last_result = None;
         self.attempt = Some(a);
         if !self.worker {
@@ -1096,7 +1139,13 @@ impl Game {
         a.supply += refund;
         Ok(refund)
     }
+    /// Advance one fixed tick. Events it emits, including those of a finishing
+    /// attempt and of expeditions, are available from `drain_events`.
     pub fn tick(&mut self, input: Input) {
+        self.advance_tick(input);
+        self.collect_attempt_events();
+    }
+    fn advance_tick(&mut self, input: Input) {
         if self.global_paused || self.attempt.as_ref().is_some_and(|a| a.paused) {
             return;
         }
@@ -1111,10 +1160,17 @@ impl Game {
             self.attempt = Some(a);
             return;
         }
+        let _battle =
+            info_span!("battle", attempt = a.id, mode = ?a.mode, seed = self.seed).entered();
+        a.event_seq = a.event_seq.max(self.next_event_seq);
         a.tick += 1;
+        trace!(tick = a.tick, enemies = a.enemies.len(), hp = a.hp, "tick");
         a.events
             .retain(|e| a.tick.saturating_sub(e.tick) < u64::from(e.duration_ticks.max(30)));
         a.shot_cooldown = a.shot_cooldown.saturating_sub(1);
+        if a.melee_cooldown == 1 {
+            a.emit(SimEvent::CooldownReady);
+        }
         a.melee_cooldown = a.melee_cooldown.saturating_sub(1);
         a.melee_commit = a.melee_commit.saturating_sub(1);
         a.brace_left = a.brace_left.saturating_sub(1);
@@ -1170,6 +1226,12 @@ impl Game {
         if a.mode == Mode::Npc && a.tick.is_multiple_of(60) {
             self.campaign.record_npc_progress(0, 60);
             self.npc_turn(&mut a);
+            debug!(
+                maneuver = ?a.maneuver,
+                target = ?a.decision_target,
+                decision = %a.decision,
+                "npc decision"
+            );
             a.telemetry.npc_decisions[a.maneuver as usize] += 1;
             self.reap(&mut a);
         }
@@ -1521,6 +1583,7 @@ impl Game {
                 actor_id: Some(projectile.id),
                 lane: Some(request.cell[1]),
                 duration_ticks: projectile.flight_ticks,
+                ordnance: Some(projectile.kind),
                 ..Default::default()
             },
         );
@@ -1541,7 +1604,7 @@ impl Game {
         }
         a.ordnance.fire_zones.retain(|z| z.ticks_left > 0);
         for (id, cell, radius, damage) in pulses {
-            self.ordnance_area_damage(a, id, cell, radius, damage, 1.0);
+            self.ordnance_area_damage(a, (id, OrdnanceKind::Molotov), cell, radius, damage, 1.0);
         }
         let mut impacts = Vec::new();
         for projectile in &mut a.ordnance.projectiles {
@@ -1564,12 +1627,13 @@ impl Game {
                     actor_id: Some(projectile.id),
                     lane: Some(projectile.cell[1]),
                     duration_ticks: 30,
+                    ordnance: Some(projectile.kind),
                     ..Default::default()
                 },
             );
             self.ordnance_area_damage(
                 a,
-                projectile.id,
+                (projectile.id, projectile.kind),
                 projectile.cell,
                 projectile.radius,
                 projectile.damage,
@@ -1585,6 +1649,7 @@ impl Game {
                         actor_id: Some(projectile.id),
                         lane: Some(projectile.cell[1]),
                         duration_ticks: projectile.burn_ticks,
+                        ordnance: Some(OrdnanceKind::Molotov),
                         ..Default::default()
                     },
                 );
@@ -1603,7 +1668,7 @@ impl Game {
     fn ordnance_area_damage(
         &mut self,
         a: &mut Attempt,
-        source: u64,
+        (source, ordnance): (u64, OrdnanceKind),
         cell: [u8; 2],
         radius: f32,
         raw_damage: i32,
@@ -1633,6 +1698,7 @@ impl Game {
                 actor_id: Some(source),
                 target_id: Some(enemy.id),
                 lane: Some(enemy.lane),
+                ordnance: Some(ordnance),
                 ..Default::default()
             };
             a.enemies[index].apply_damage(damage, Mode::Personal);
@@ -2009,6 +2075,7 @@ impl Game {
                             target_id: blocker,
                             lane: Some(lane),
                             duration_ticks: duration,
+                            ..Default::default()
                         };
                         a.event_with(EventKind::Contact, point, point, 0, meta);
                         a.event_with(
@@ -2146,12 +2213,17 @@ impl Game {
                     a.structures[n].ready_turns = 1;
                 }
                 a.resolution_event(&result, origin, point, meta, true);
-                a.note(format!(
-                    "{} → lane {}: {}",
-                    d.name,
-                    a.enemies[target].lane + 1,
-                    result.explanation()
-                ));
+                a.resolved(
+                    meta.actor_id,
+                    meta.target_id,
+                    &result,
+                    format!(
+                        "{} → lane {}: {}",
+                        d.name,
+                        a.enemies[target].lane + 1,
+                        result.explanation()
+                    ),
+                );
                 result.injury
             };
             a.enemies[target].apply_damage(damage, a.mode);
@@ -2451,13 +2523,18 @@ impl Game {
             result.injury.max(0) as u64,
         );
         a.telemetry.defender_damage += result.injury.max(0) as u64;
-        a.note(format!(
-            "{} {} in lane {}: {}",
-            if melee { "Strike" } else { "Shoot" },
-            target_name,
-            lane + 1,
-            result.explanation()
-        ));
+        a.resolved(
+            None,
+            Some(id),
+            &result,
+            format!(
+                "{} {} in lane {}: {}",
+                if melee { "Strike" } else { "Shoot" },
+                target_name,
+                lane + 1,
+                result.explanation()
+            ),
+        );
         a.decision = format!(
             "{} {} in lane {} · {}",
             if melee {
@@ -2520,6 +2597,7 @@ impl Game {
                         target_id: e.target_structure,
                         lane: Some(e.lane),
                         duration_ticks: duration,
+                        ..Default::default()
                     };
                     a.event_with(
                         EventKind::Windup,
@@ -2691,12 +2769,17 @@ impl Game {
                         meta,
                         false,
                     );
-                    a.note(format!(
-                        "{} → structure in lane {}: {}",
-                        d.name,
-                        lane + 1,
-                        result.explanation()
-                    ));
+                    a.resolved(
+                        Some(actor_id),
+                        target_id,
+                        &result,
+                        format!(
+                            "{} → structure in lane {}: {}",
+                            d.name,
+                            lane + 1,
+                            result.explanation()
+                        ),
+                    );
                 } else {
                     let dodge = a
                         .injury
@@ -2720,12 +2803,17 @@ impl Game {
                     damage = result.injury;
                     a.hp = a.injury.hp;
                     a.resolution_event(&result, origin, a.defender_position(), meta, false);
-                    a.note(format!(
-                        "{} → survivor from lane {}: {}",
-                        d.name,
-                        lane + 1,
-                        result.explanation()
-                    ));
+                    a.resolved(
+                        Some(actor_id),
+                        None,
+                        &result,
+                        format!(
+                            "{} → survivor from lane {}: {}",
+                            d.name,
+                            lane + 1,
+                            result.explanation()
+                        ),
+                    );
                 }
                 a.enemies[n].injury.clear_shock();
             } else if let Some(s) = structure {
@@ -2905,7 +2993,17 @@ impl Game {
             }
         }
     }
-    fn finish(&mut self, a: Attempt, outcome: Outcome, cause: String) {
+    fn finish(&mut self, mut a: Attempt, outcome: Outcome, cause: String) {
+        info_span!("battle", attempt = a.id, mode = ?a.mode, seed = self.seed).in_scope(|| {
+            info!(
+                outcome = ?outcome,
+                ticks = a.tick,
+                kills = a.kills,
+                %cause,
+                "attempt finished"
+            );
+        });
+        self.finish_events(&mut a, outcome, &cause);
         if !self.worker {
             self.repeat_remaining = 0;
         }

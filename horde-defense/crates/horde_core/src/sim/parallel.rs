@@ -1,6 +1,9 @@
 //! Multi-expedition orchestration and monotonic shared-reward settlement.
 use super::*;
 
+/// Single source for the unknown-expedition message shared with `command`.
+pub(crate) const UNKNOWN_EXPEDITION: &str = "No active expedition with that ID";
+
 /// A shared-campaign transfer that settlement could not complete. Settlement
 /// still advances its cursors, so each issue is reported exactly once.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -180,8 +183,9 @@ impl Game {
     pub fn recall_survivor(&mut self, battle_id: u64) -> Result<(), String> {
         let battle = self
             .active_battle_mut(battle_id)
-            .ok_or_else(|| crate::command::CommandError::UnknownExpedition.to_string())?;
+            .ok_or_else(|| UNKNOWN_EXPEDITION.to_string())?;
         battle.game.withdraw();
+        self.forward_expedition_events();
         self.settle_parallel();
         Ok(())
     }
@@ -191,6 +195,7 @@ impl Game {
                 battle.game.tick(Input::default());
             }
         }
+        self.forward_expedition_events();
         self.settle_parallel();
     }
     fn settle_parallel(&mut self) {

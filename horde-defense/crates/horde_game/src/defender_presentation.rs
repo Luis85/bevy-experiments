@@ -177,12 +177,16 @@ pub fn sample(
     }
 }
 
-pub fn release_tick(tick: u64, events: &[Event], projectile: &ThrownOrdnance) -> u64 {
+pub fn release_tick<'a>(
+    tick: u64,
+    events: impl IntoIterator<Item = &'a Event, IntoIter: DoubleEndedIterator>,
+    projectile: &ThrownOrdnance,
+) -> u64 {
     if let Some(cues) = projectile.release_cues {
         return cues.tick;
     }
     events
-        .iter()
+        .into_iter()
         .rev()
         .find(|event| {
             event.kind == EventKind::Throw
@@ -270,6 +274,7 @@ mod tests {
             target_id: None,
             lane: Some(1),
             duration_ticks: 36,
+            seq: 0,
         }
     }
 
@@ -392,13 +397,13 @@ mod tests {
         let attempt = game.attempt.as_mut().unwrap();
         attempt.tick = 101;
         let thrown = event(EventKind::Throw, 100, Some(17));
-        attempt.events = vec![thrown.clone(), event(EventKind::Melee, 101, None)];
+        attempt.events = vec![thrown.clone(), event(EventKind::Melee, 101, None)].into();
         let aim = [500., 300.];
         assert_eq!(
             sample(attempt, &DefenderPose::default(), aim, 0., false).action,
             PlayerAction::Melee { phase: 0. }
         );
-        attempt.events = vec![thrown.clone()];
+        attempt.events = vec![thrown.clone()].into();
         attempt.reload_left = (attempt.profile.personal.reload.max(0.5) * 60.).ceil() as u32;
         let reloading = DefenderPose {
             reload_progress: Some(0.),
@@ -408,13 +413,13 @@ mod tests {
             sample(attempt, &reloading, aim, 0., false).action,
             PlayerAction::Reload { phase: 0. }
         );
-        attempt.events.push(event(EventKind::Shot, 101, None));
+        attempt.events.push_back(event(EventKind::Shot, 101, None));
         attempt.reload_left = 0;
         assert_eq!(
             sample(attempt, &DefenderPose::default(), aim, 0., false).action,
             PlayerAction::Hold
         );
-        attempt.events = vec![thrown];
+        attempt.events = vec![thrown].into();
         assert_eq!(
             sample(attempt, &DefenderPose::default(), aim, 0., false).action,
             PlayerAction::Throw { phase: 1. / 24. }
@@ -455,7 +460,7 @@ mod tests {
         thrown.to = [9., 2.5];
         let mut later_damage = event(EventKind::Damage, 101, None);
         later_damage.value = 5;
-        attempt.events = vec![event(EventKind::Shot, 98, None), thrown, later_damage];
+        attempt.events = vec![event(EventKind::Shot, 98, None), thrown, later_damage].into();
         let release = release_sample(attempt, 100, [500., 300.], false);
         assert_eq!(release.recoil, (1_f32 - 2. / 10.).powi(2));
         assert_eq!(
