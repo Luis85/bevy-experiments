@@ -12,7 +12,7 @@ The fresh route is survivor confirmation → infected starting country → live 
 
 ## Every main round returns to upgrades
 
-The Results screen is the single Journey upgrades home after a main victory, defeat or withdrawal. Its outcome strip reports already-banked coins/items; it does not award them again. The same screen contains the complete connected progression graph and explicit Equipment, Run analysis and Continue/Leave actions. Parallel workers retain their own orchestration and do not force the main screen to change.
+The Results screen is the single Journey upgrades home after a main victory, defeat or withdrawal. Its outcome strip reports already-banked coins/items; it does not award them again. It shares the camp header and navigation row (Journey upgrades selected), holds the complete connected progression graph, and its action row is the primary Continue/Try again (or Return to active defense), Run history, More (plan or replay a defense, save) and a quiet Leave journey. It is the only route to the tree: the retired Skills and Fortifications tabs redirect here, and Fortifications frames its branch. Parallel workers retain their own orchestration and do not force the main screen to change.
 
 `Game::continue_journey` rejects workers and unfinished main attempts. A victory continues the country's next completed frontier; defeat/withdrawal retries the reported stage, preserving control mode. A fully liberated country returns `CountryLiberated` so the UI can show eligible map neighbors. Failed deployment restores the prior world selection. Continue performs no purchase or automatic training and starts a legal new round live.
 
@@ -20,7 +20,7 @@ The Results screen is the single Journey upgrades home after a main victory, def
 
 ## One connected personal tree
 
-The current authored `skills.json` contains 169 nodes in one connected DAG rooted at stable `pistol_training` (displayed as Survivor foundations). The seven branch labels—Foundations, Body development, Firearms, Survival, Ordnance, Fortification, Companions and world—are camera-focus/navigation labels, not separate filtered trees. All 32 prior node IDs remain available.
+The current authored `skills.json` contains 169 nodes in one connected DAG rooted at stable `pistol_training` (displayed as Survivor foundations). The seven branch labels—Foundations, Body development, Firearms, Survival, Ordnance, Fortification, Companions and world—are camera-focus/navigation chips with owned/total counts, not separate filtered trees. All 32 prior node IDs remain available.
 
 Selection/focus only inspects. `can_purchase_node` checks preparation/reservations, ownership, every prerequisite, `minimum_victories`, `minimum_liberated` and payment. `node_payment` returns Coins or eligible LegacyBodyPoints; `purchase_node` preflights before consuming either. Prices, requirements and errors come from that same kernel.
 
@@ -50,7 +50,9 @@ NewJourney increments a profile epoch and serializes old-save completion, full a
 
 PersistenceMetrics and Runtime.persistence_metrics expose pending work and completed/failed background saves/write timing. Measurements and user-stutter conclusions are separate in VALIDATION.md; moving IO is not by itself a universal FPS claim.
 
-The complete graph keeps one-row node names visible with separate payment/state captions and full hover text. Path focus names the selected branch but never filters away other branches. Compact starting-country choice reserves the map before a collapsed dossier, rather than presenting management details first. The upgrade home owns one heading/wallet and deduplicated retreat guidance.
+The complete graph keeps one-row node names visible with separate payment/state captions and full hover text. Path focus names the selected branch but never filters away other branches.
+
+Tree presentation reads only core view helpers in `horde_core::campaign::tree_view`: `node_state` (Owned, Buyable, NeedsCoins, NeedsPrerequisites, NeedsMilestone, Unavailable) styles each node and the detail chip; `node_requirements` is the ✓/✗ checklist; `path_to_node` gives the unowned chain, total coins and first blocking milestone that the canvas highlights; `node_stat_preview` is the before→after "What changes" table; `recommended_node` is the default selection (never the owned root); `search_nodes` and `upgrade_goals` back the search box and the "Path to…" menu; `legacy_node_note` explains body-rank floors only to legacy profiles. The canvas zooms on the wheel, pans on drag, moves with arrow keys, learns with Enter and jumps to the recommendation with Home; long cross-graph edges draw as labelled stubs; a translucent minimap moves the view. Learning still goes through `Command::BuySkillNode`, plays the confirm cue and pulses the node unless reduced effects is on. At narrow widths or large scale the detail panel goes below the canvas. Compact starting-country choice reserves the map before a collapsed dossier, rather than presenting management details first. The upgrade home shows one outcome line, the wallet only in the shared header, and deduplicated retreat guidance.
 
 ## Equipped presentation boundary
 

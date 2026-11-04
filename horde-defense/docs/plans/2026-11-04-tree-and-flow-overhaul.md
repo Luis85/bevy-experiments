@@ -135,4 +135,39 @@ Each agent works in its own worktree and branch with its own `CARGO_TARGET_DIR`,
 
 ## Outcome
 
-_Filled in at the end._
+**Process deviation.** A hook confines each session's agents to its own worktree, so the per-wave worktrees could not be written. Wave 1A's commits were fast-forwarded and 1B's diff was ported into this worktree. Waves 2C, 2D and 3E then ran one at a time here, each with captures and the full gate.
+
+**Findings resolved**
+
+| Finding | Result |
+|---|---|
+| T1, T10 | Default selection is `recommended_node` (never the owned root). Body-rank text dropped the legacy sentence; `legacy_node_note` shows it only to legacy profiles. Each body attribute has its own pictogram. |
+| T2 | Owned, buyable, short-of-coins ("need N"), prerequisite-locked and milestone-locked ("Win N"/"Free N") nodes are styled differently, with a matching detail chip. |
+| T3 | Edges over 900 units draw as labelled "from …" stubs unless on the highlighted path; unrelated wires dim. |
+| T4, T5 | Wheel zooms around the cursor, arrows move between nodes, Enter learns, Home and "Recommended" jump. Branch chips show owned/total. A translucent minimap moves the view. |
+| T6, T7 | Search (name, description, category) and "Path to…" goals. The detail panel has before→after "What changes", a ✓/✗ checklist and "N steps · M coins" with "Select next step". |
+| T8 | At 1050×700 @1.35 the toolbar is one row and the detail panel sits below a canvas taking more than half the height. |
+| T9 | Learning pulses the node, reports the main delta, and plays the existing confirm cue. |
+| F1–F4 | One camp nav row shared with the upgrade home. Skills/Fortifications tabs redirect to the single tree. Prepare footers say "Go to briefing". There is one "Return to active defense". |
+| F5 | Equipment's header and filters compressed; inventory starts above the fold at 1050×700. |
+| F6 | Management's duplicate Withdraw removed; "Retreat & train" is the one withdraw. |
+| F7 | Results uses the shared header; each screen names itself once. |
+| F8 | Briefing leads with loadout ("Change equipment") and readiness. |
+
+**Added on request.** The body font is now Atkinson Hyperlegible (SIL OFL); Pixelify stays on display text.
+
+**Content.** Only text and `icon` fields changed in `skills.json`. Ids, prices, gates and positions are unchanged, so no balance change needs a reason.
+
+**Verification.** Final HEAD:
+- fmt check passes.
+- clippy `-D warnings` passes for the workspace, `--no-default-features` and `--features dev`.
+- Workspace tests pass with and without `--features dev`, including determinism and save migration.
+- `--smoke` exits 0.
+- 38 native captures are in `target/review-3e/`; selected before/after pairs are in `docs/screenshots/overhaul/`.
+
+**Follow-ups**
+- The root and "Companions and world" nodes still use the pistol pictogram.
+- The canvas has no gamepad D-pad mapping.
+- There is no review scene for a search or goal state, because the search text lives in egui memory.
+- History's "Clear filters" is a small button beside full-size dropdowns.
+- The results outcome line wraps rather than truncates below 1050 wide.
