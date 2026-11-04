@@ -48,7 +48,8 @@ struct SequenceFrame {
 }
 pub fn capture_frames(
     mut commands: Commands,
-    mut frontend: ResMut<crate::ui::Frontend>,
+    session: Res<crate::runner::GameSession>,
+    mut battle: ResMut<crate::ui::BattleUi>,
     mut state: Local<SequenceCapture>,
     config: Res<crate::launch::LaunchConfig>,
     mut exit: MessageWriter<AppExit>,
@@ -70,7 +71,7 @@ pub fn capture_frames(
     }
     state.frame += 1;
     let frame = state.frame;
-    frontend.schedule_gesture_review(frame);
+    crate::ui::schedule_gesture_review(&config, &session.game, &mut battle, frame);
     if frame >= FIRST && (frame - FIRST).is_multiple_of(STEP) && (frame - FIRST) / STEP < COUNT {
         let Some(directory) = state.directory.clone() else {
             return;
@@ -79,7 +80,7 @@ pub fn capture_frames(
         commands
             .spawn(Screenshot::primary_window())
             .observe(save_to_disk(directory.join(&file)));
-        let attempt = frontend.game.attempt.as_ref();
+        let attempt = session.game.attempt.as_ref();
         use horde_core::sim::EventKind;
         let latest = |kind| {
             attempt.and_then(|attempt| attempt.events.iter().rev().find(|event| event.kind == kind))

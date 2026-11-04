@@ -1,8 +1,14 @@
-//! Hermetic `Frontend` construction for tests: a default `LaunchConfig` (no
-//! process environment), no real save directory, no filesystem reads.
-use super::{Frontend, ProfilePaths};
-use crate::launch::LaunchConfig;
-use crate::{runner::LoadedProfile, settings::Settings};
+//! Hermetic `FrontendParts` for tests: a default `LaunchConfig` (never the
+//! process environment), no real save directory, no filesystem reads. The
+//! helpers below stand in for the App's schedules: the runner passes, the
+//! notice system and the state transition (with its `OnEnter` handler).
+use super::FrontendParts;
+use crate::{
+    launch::LaunchConfig,
+    profile::{LoadedProfile, ProfilePaths},
+    runner,
+    settings::Settings,
+};
 use horde_core::sim::Game;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -17,22 +23,66 @@ fn unique_temp_dir() -> std::path::PathBuf {
 }
 
 /// Default game and settings, persisted paths under a private temp directory.
-pub(super) fn test_frontend() -> Frontend {
+pub(super) fn test_frontend() -> FrontendParts {
     let paths = ProfilePaths::in_directory(unique_temp_dir());
     let profile = LoadedProfile {
         game: Game::default(),
         settings: Settings::default(),
         warning: String::new(),
     };
-    Frontend::new(profile, &LaunchConfig::default(), &paths)
+    FrontendParts::new(profile, &LaunchConfig::default(), &paths)
+}
+
+impl FrontendParts {
+    fn after_runner(&mut self) {
+        self.apply_notices();
+        self.apply_transitions();
+    }
+    /// `RuntimeSet::Apply` plus waiting for every save to commit.
+    pub(super) fn flush_for_test(&mut self) -> bool {
+        let quit = runner::flush_for_test(&mut self.runtime_ctx());
+        self.after_runner();
+        quit
+    }
+    /// `RuntimeSet::Apply` without waiting for storage.
+    pub(super) fn flush(&mut self) -> bool {
+        let quit = runner::flush(&mut self.runtime_ctx());
+        self.after_runner();
+        quit
+    }
+    pub(super) fn poll_one_save_for_test(&mut self) -> bool {
+        let quit = runner::poll_one_save_for_test(&mut self.runtime_ctx());
+        self.after_runner();
+        quit
+    }
+    /// One `RuntimeSet::Advance` pass, watching the battle the UI observes.
+    pub(super) fn step(&mut self) {
+        let observed = self.ctx().observed_battle();
+        self.runtime.observe_battle(observed);
+        runner::step(&mut self.runtime_ctx());
+        self.after_runner();
+    }
 }
 
 #[test]
 fn test_frontend_saves_only_under_the_temp_directory() {
     let f = test_frontend();
     let temp = std::env::temp_dir();
-    assert!(f.save_path.starts_with(&temp), "{:?}", f.save_path);
-    assert!(f.settings_path.starts_with(&temp), "{:?}", f.settings_path);
-    assert!(!f.practice_profile);
-    assert!(!f.profile_exists);
+    assert!(
+        f.paths.campaign().starts_with(&temp),
+        "{:?}",
+        f.paths.campaign()
+    );
+    assert!(
+        f.paths.settings().starts_with(&temp),
+        "{:?}",
+        f.paths.settings()
+    );
+    assert!(!f.status.practice_profile);
+    assert!(!f.status.profile_exists);
+    assert_eq!(
+        f.launch,
+        LaunchConfig::default(),
+        "never the process environment"
+    );
 }

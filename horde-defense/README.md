@@ -28,7 +28,7 @@ The smoke check validates authored content and an identical save/resume round tr
 pwsh -NoProfile -File scripts/package_playtest.ps1
 ```
 
-The script builds the `playtest` profile (release optimisation with line tables for readable crash backtraces) by default; pass `-Profile debug` or `-Profile release` to choose another. It creates a versioned Windows x64 folder and ZIP under `target/playtest/`, with the executable, pixel art, audio, font/geography notices, editable content JSON, manifest and playtest documentation. `Play Lastlight.cmd` opens the ordinary persistent campaign; `Battle practice.cmd` and `Strategy practice.cmd` open separate resumable practice profiles with clearly staged resources. No Rust installation is needed to run this build. See the [playtest guide](docs/PLAYTEST_GUIDE.md).
+The script builds the `playtest` profile (release optimisation with line tables for readable crash backtraces) by default; pass `-Profile debug` or `-Profile release` to choose another. Packages are built with `--no-default-features`, leaving out the `review` tooling (practice scenes still work); pass `-Review` to include it, which `verify_playtest.ps1 -NativeCapture` needs. It creates a versioned Windows x64 folder and ZIP under `target/playtest/`, with the executable, pixel art, audio, font/geography notices, editable content JSON, manifest and playtest documentation. `Play Lastlight.cmd` opens the ordinary persistent campaign; `Battle practice.cmd` and `Strategy practice.cmd` open separate resumable practice profiles with clearly staged resources. No Rust installation is needed to run this build. See the [playtest guide](docs/PLAYTEST_GUIDE.md).
 
 The packaged launchers load `content/world.json`, `content/encounters.json`, `content/skills.json`, `content/enemy_catalog.json` `content/ordnance.json`, `content/progression.json`, `content/quality.json` and `content/balance.json` through the same validated override interfaces as development. Changes load on restart; use separate saves when testing incompatible content changes.
 
@@ -111,8 +111,24 @@ The game logs through Bevy's `LogPlugin` to the console and to a plain-text file
 ```powershell
 cargo fmt --all -- --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked -p horde-defense --all-targets --no-default-features -- -D warnings
 cargo test --locked --workspace
 ```
+
+### Launch options and features
+
+Every option the game reads is parsed once at startup; print the full list with:
+
+```powershell
+cargo run --locked -p horde-defense -- --help
+```
+
+Arguments are `--smoke` and `--help`; everything else is a `LASTLIGHT_*` environment variable (empty values count as unset). Incompatible combinations, such as a capture sequence outside an isolated motion review, exit with an error before a window opens.
+
+Cargo features of `horde-defense`:
+
+- `review` (default): model workshop and parity screens, review fixtures, automated captures (`LASTLIGHT_REVIEW_CAPTURE`/`_EXIT`), capture sequences and frame reports. A build without it rejects review options; practice scenes (`LASTLIGHT_PRACTICE=1` with `LASTLIGHT_REVIEW_SCREEN`) and F12 screenshots work in every build.
+- `dev`: Bevy `file_watcher` (asset hot reload), `track_location` and `sysinfo_plugin`, e.g. `cargo run -p horde-defense --features dev`. (`bevy_dev_tools` is not included: no `bevy_dev_tools` release matches the locked `bevy_internal` 0.20.1.)
 
 The root helper also recognizes this experiment:
 

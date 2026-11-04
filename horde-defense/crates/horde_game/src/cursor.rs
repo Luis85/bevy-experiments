@@ -8,15 +8,11 @@ pub(crate) fn visible(custom_requested: bool, focused: bool, inside_window: bool
     !(custom_requested && focused && inside_window)
 }
 pub fn sync_native_cursor(
-    frontend: Res<crate::ui::Frontend>,
+    custom: Res<crate::ui::CustomCursor>,
     mut windows: Query<(&Window, &mut CursorOptions), With<PrimaryWindow>>,
 ) {
     for (window, mut options) in &mut windows {
-        options.visible = visible(
-            frontend.custom_cursor_requested(),
-            window.focused,
-            window.cursor_position().is_some(),
-        );
+        options.visible = visible(custom.0, window.focused, window.cursor_position().is_some());
     }
 }
 #[cfg(test)]

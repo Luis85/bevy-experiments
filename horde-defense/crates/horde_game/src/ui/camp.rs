@@ -1,7 +1,17 @@
 //! Campaign selection and the persistent preparation shell.
-use super::*;
+use super::{
+    Screen, Tab, UiCtx, armory, briefing, character, chrome, engineering, feedback, muted,
+    navigation, operations, primary, progress, skills, status, survivor,
+};
+use crate::{
+    art::{AMBER, GREEN, INK, PANEL, RED},
+    runner::SaveIntent,
+    settings::Action,
+};
+use bevy_egui::egui::{self, Align, Layout, RichText, vec2};
+use horde_core::{command::Command, content::Mode, world::world};
 
-pub(super) fn camp(root: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
     camp_controls(root.ctx(), f);
     if matches!(f.tab, Tab::Skills | Tab::Engineering) {
         upgrade_surface(root, f);
@@ -38,7 +48,11 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut Frontend) {
             } else if ui.small_button("Back to survivor").clicked() {
                 f.open_survivor_selection();
             }
-            if !f.message.is_empty() || f.message_error || f.save_pending || f.practice_profile {
+            if !f.status.message.is_empty()
+                || f.status.message_error
+                || f.status.save_pending
+                || f.status.practice_profile
+            {
                 status(ui, f);
             }
         });
@@ -60,7 +74,7 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut Frontend) {
                 });
         });
 }
-fn upgrade_surface(root: &mut egui::Ui, f: &mut Frontend) {
+fn upgrade_surface(root: &mut egui::Ui, f: &mut UiCtx) {
     egui::Panel::top("upgrade_navigation")
         .frame(
             egui::Frame::new()
@@ -116,7 +130,7 @@ fn upgrade_surface(root: &mut egui::Ui, f: &mut Frontend) {
         .frame(egui::Frame::new().fill(INK).inner_margin(10))
         .show(root, |ui| {
             briefing::mission_actions(ui, f);
-            if f.message_error || f.save_pending || f.practice_profile {
+            if f.status.message_error || f.status.save_pending || f.status.practice_profile {
                 status(ui, f);
             }
         });
@@ -135,7 +149,7 @@ fn upgrade_surface(root: &mut egui::Ui, f: &mut Frontend) {
                 });
         });
 }
-fn world_ui(ui: &mut egui::Ui, f: &mut Frontend) {
+fn world_ui(ui: &mut egui::Ui, f: &mut UiCtx) {
     let compact = ui.available_width() < 900.0;
     if compact {
         ui.label(
@@ -161,13 +175,13 @@ fn world_ui(ui: &mut egui::Ui, f: &mut Frontend) {
     ui.horizontal(|ui| {
         ui.label("Find country");
         ui.add(
-            egui::TextEdit::singleline(&mut f.search)
+            egui::TextEdit::singleline(&mut f.campaign.search)
                 .id(egui::Id::new("country_search"))
                 .hint_text("Name or country code")
                 .desired_width(ui.available_width().min(320.0)),
         );
     });
-    if !f.search.trim().is_empty() {
+    if !f.campaign.search.trim().is_empty() {
         country_results_with_height(ui, f, if compact { 28.0 } else { 112.0 });
     }
     ui.add_space(8.0);
@@ -176,7 +190,9 @@ fn world_ui(ui: &mut egui::Ui, f: &mut Frontend) {
         ui.horizontal_top(|ui| {
             ui.vertical(|ui| {
                 ui.set_width(width);
-                f.map.show(ui, &f.game, &mut f.selected_country);
+                f.campaign
+                    .map
+                    .show(ui, f.game, &mut f.campaign.selected_country);
             });
             ui.add_space(14.0);
             ui.vertical(|ui| {
@@ -191,10 +207,12 @@ fn world_ui(ui: &mut egui::Ui, f: &mut Frontend) {
             vec2(ui.available_width(), 260.0),
             Layout::top_down(Align::Min),
             |ui| {
-                f.map.show(ui, &f.game, &mut f.selected_country);
+                f.campaign
+                    .map
+                    .show(ui, f.game, &mut f.campaign.selected_country);
             },
         );
-        if let Some(country) = world().country(&f.selected_country) {
+        if let Some(country) = world().country(&f.campaign.selected_country) {
             egui::CollapsingHeader::new(format!(
                 "{} · {} defenses · country details",
                 country.name,
@@ -203,21 +221,21 @@ fn world_ui(ui: &mut egui::Ui, f: &mut Frontend) {
             .show(ui, |ui| country_summary(ui, f));
         }
     }
-    if f.search.trim().is_empty() {
+    if f.campaign.search.trim().is_empty() {
         egui::CollapsingHeader::new("Browse available countries")
             .show(ui, |ui| country_results(ui, f));
     }
 }
-fn country_results(ui: &mut egui::Ui, f: &mut Frontend) {
+fn country_results(ui: &mut egui::Ui, f: &mut UiCtx) {
     country_results_with_height(ui, f, 112.0);
 }
-fn country_results_with_height(ui: &mut egui::Ui, f: &mut Frontend, height: f32) {
+fn country_results_with_height(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
     egui::ScrollArea::vertical()
         .id_salt("countries")
         .max_height(height)
         .show(ui, |ui| {
             ui.horizontal_wrapped(|ui| {
-                let query = f.search.trim().to_lowercase();
+                let query = f.campaign.search.trim().to_lowercase();
                 for country in &world().countries {
                     if !query.is_empty()
                         && !country.name.to_lowercase().contains(&query)
@@ -226,24 +244,24 @@ fn country_results_with_height(ui: &mut egui::Ui, f: &mut Frontend, height: f32)
                         continue;
                     }
                     if query.is_empty()
-                        && country.id != f.selected_country
+                        && country.id != f.campaign.selected_country
                         && f.game.campaign.world.start.is_some()
                         && !f.game.campaign.world.can_enter(&country.id)
                     {
                         continue;
                     }
                     if ui
-                        .selectable_label(f.selected_country == country.id, &country.name)
+                        .selectable_label(f.campaign.selected_country == country.id, &country.name)
                         .clicked()
                     {
-                        f.selected_country = country.id.clone();
+                        f.campaign.selected_country = country.id.clone();
                     }
                 }
             });
         });
 }
-fn country_summary(ui: &mut egui::Ui, f: &Frontend) {
-    let Some(country) = world().country(&f.selected_country) else {
+fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
+    let Some(country) = world().country(&f.campaign.selected_country) else {
         return;
     };
     ui.label(RichText::new(&country.name).size(23.0).strong());
@@ -278,14 +296,14 @@ fn country_summary(ui: &mut egui::Ui, f: &Frontend) {
         }
     });
 }
-fn country_action(ui: &mut egui::Ui, f: &mut Frontend) {
-    let Some(country) = world().country(&f.selected_country) else {
+fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
+    let Some(country) = world().country(&f.campaign.selected_country) else {
         return;
     };
     if f.game.attempt.is_some() {
         if primary(ui, "Return to active defense") {
-            f.screen = Screen::Battle;
-            f.fire_latched = false;
+            f.go(Screen::Battle);
+            f.battle.fire_latched = false;
         }
         return;
     }
@@ -314,7 +332,7 @@ fn country_action(ui: &mut egui::Ui, f: &mut Frontend) {
                         Command::ChooseStart(country.id.clone()),
                         "First defense underway. Aim, earn coins, then retreat to train.",
                     );
-                    f.stage = 0;
+                    f.campaign.stage = 0;
                 } else {
                     f.dispatch(
                         Command::EnterCountry(country.id.clone()),
@@ -335,39 +353,39 @@ fn country_action(ui: &mut egui::Ui, f: &mut Frontend) {
     });
 }
 #[cfg(test)]
-pub(super) fn country_dossier(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn country_dossier(ui: &mut egui::Ui, f: &mut UiCtx) {
     country_summary(ui, f);
     country_action(ui, f);
 }
 
-fn camp_controls(ctx: &egui::Context, f: &mut Frontend) {
+fn camp_controls(ctx: &egui::Context, f: &mut UiCtx) {
     let frame = ctx.cumulative_frame_nr();
-    if f.last_control_frame == frame {
+    if f.battle.last_control_frame == frame {
         return;
     }
-    f.last_control_frame = frame;
-    if feedback::overlay_owns_keyboard(ctx, f) || f.rebind.is_some() {
+    f.battle.last_control_frame = frame;
+    if feedback::overlay_owns_keyboard(ctx, f) || f.prefs.rebind.is_some() {
         return;
     }
     if f.settings.pressed(ctx, Action::Pause, false) {
         toggle_time(f);
     }
 }
-fn toggle_time(f: &mut Frontend) {
+fn toggle_time(f: &mut UiCtx) {
     let paused = f.game.global_paused
         || f.game
             .attempt
             .as_ref()
             .is_some_and(|attempt| attempt.paused);
     if paused && f.game.attempt.is_some() {
-        f.screen = Screen::Battle;
-        f.construction = false;
+        f.go(Screen::Battle);
+        f.battle.construction = false;
     }
     f.dispatch(Command::SetPaused(!paused), "");
-    f.fire_latched = false;
+    f.battle.fire_latched = false;
     f.runtime.clear_input();
 }
-fn time_controls(ui: &mut egui::Ui, f: &mut Frontend) {
+fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
     let paused = f.game.global_paused
         || f.game
             .attempt
@@ -423,7 +441,7 @@ fn time_controls(ui: &mut egui::Ui, f: &mut Frontend) {
         } else {
             ui.label("Observe");
             for speed in [1, 2, 4] {
-                ui.selectable_value(&mut f.speed, speed, format!("{speed}×"));
+                ui.selectable_value(&mut f.battle.speed, speed, format!("{speed}×"));
             }
         }
     }

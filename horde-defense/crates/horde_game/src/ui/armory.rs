@@ -1,5 +1,11 @@
 //! Armory presentation. Game changes are queued typed intents.
-use super::*;
+use super::{Tab, UiCtx, chrome, mode_selector, muted};
+use crate::art::{AMBER, GREEN, INK, RED, TEXT};
+use bevy_egui::egui::{self, Align, Color32, Layout, Rect, RichText, Sense, Stroke, vec2};
+use horde_core::{
+    command::Command,
+    content::{Mode, Slot, content},
+};
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum ArmorySort {
     Newest,
@@ -72,7 +78,7 @@ pub(super) fn paint_item_icon(
 }
 fn slot_art(
     ui: &mut egui::Ui,
-    f: &Frontend,
+    f: &UiCtx,
     definition: usize,
     quality: horde_core::quality::Quality,
 ) {
@@ -91,13 +97,13 @@ fn slot_art(
         egui::StrokeKind::Inside,
     );
 }
-fn inventory_comparison(ui: &mut egui::Ui, f: &Frontend, id: u64) {
+fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
     let Some(item) = f.game.campaign.item(id) else {
         return;
     };
     let definition = &content().items[item.definition];
     let quality = f.game.campaign.item_quality(id).expect("owned equipment");
-    let Ok(comparison) = f.game.campaign.compare_item(f.mode, id) else {
+    let Ok(comparison) = f.game.campaign.compare_item(f.campaign.mode, id) else {
         return;
     };
     let before = &comparison.before;
@@ -144,7 +150,7 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &Frontend, id: u64) {
                 );
                 ui.end_row();
             };
-            if f.mode == Mode::Personal {
+            if f.campaign.mode == Mode::Personal {
                 row(
                     "Bullet damage",
                     before.damage.to_string(),
@@ -213,7 +219,7 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &Frontend, id: u64) {
                     after.accuracy < before.accuracy,
                 );
             }
-            if f.mode == Mode::Personal {
+            if f.campaign.mode == Mode::Personal {
                 row(
                     "Weak-point bonus",
                     format!("{:.0}%", before.weak_bonus * 100.0),
@@ -245,7 +251,7 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &Frontend, id: u64) {
                 );
             }
             row(
-                if f.mode == Mode::Personal {
+                if f.campaign.mode == Mode::Personal {
                     "Stamina"
                 } else {
                     "Fatigue points"
@@ -306,14 +312,14 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &Frontend, id: u64) {
             );
         }
     }
-    if f.mode == Mode::Npc {
+    if f.campaign.mode == Mode::Npc {
         muted(
             ui,
             "Weapon dice describe basic damage before protection. Attack success, defense and injury remain separate stages.",
         );
     }
 }
-pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::page_title(
         ui,
         "Equipment",
@@ -335,14 +341,15 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
             format!("New equipment: Lv {level} · maximum authored item level reached")
         },
     );
-    let recommended_purchase = match f.improvement_focus {
+    let recommended_purchase = match f.campaign.improvement_focus {
         Some(horde_core::campaign::RecommendationAction::BuyEquipment(index)) => Some(index),
         _ => None,
     };
-    if let Some(horde_core::campaign::RecommendationAction::Equip(id)) = f.improvement_focus
+    if let Some(horde_core::campaign::RecommendationAction::Equip(id)) =
+        f.campaign.improvement_focus
         && f.game.campaign.item(id).is_some()
     {
-        f.selected_item = Some(id);
+        f.armory.selected_item = Some(id);
     }
     if let Some(index) = recommended_purchase
         && let Some(item) = content().items.get(index)
@@ -376,39 +383,41 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
     }
     ui.horizontal_wrapped(|ui| {
         ui.add(
-            egui::TextEdit::singleline(&mut f.armory_search)
+            egui::TextEdit::singleline(&mut f.armory.search)
                 .hint_text("Search equipment")
                 .desired_width(180.0),
         );
         egui::ComboBox::from_id_salt("armory_slot")
             .selected_text(
-                f.armory_slot
+                f.armory
+                    .slot
                     .map(|s| format!("{s:?}"))
                     .unwrap_or_else(|| "All slots".into()),
             )
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut f.armory_slot, None, "All slots");
+                ui.selectable_value(&mut f.armory.slot, None, "All slots");
                 for slot in Slot::ALL {
-                    ui.selectable_value(&mut f.armory_slot, Some(slot), format!("{slot:?}"));
+                    ui.selectable_value(&mut f.armory.slot, Some(slot), format!("{slot:?}"));
                 }
             });
         egui::ComboBox::from_id_salt("armory_quality")
             .selected_text(
-                f.armory_quality
+                f.armory
+                    .quality
                     .map_or("All qualities", horde_core::quality::Quality::name),
             )
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut f.armory_quality, None, "All qualities");
+                ui.selectable_value(&mut f.armory.quality, None, "All qualities");
                 for quality in horde_core::quality::Quality::ALL {
                     ui.selectable_value(
-                        &mut f.armory_quality,
+                        &mut f.armory.quality,
                         Some(quality),
                         RichText::new(quality.name()).color(quality_color(quality)),
                     );
                 }
             });
         egui::ComboBox::from_id_salt("armory_sort")
-            .selected_text(f.armory_sort.name())
+            .selected_text(f.armory.sort.name())
             .show_ui(ui, |ui| {
                 for sort in [
                     ArmorySort::Newest,
@@ -417,7 +426,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
                     ArmorySort::Level,
                     ArmorySort::Quality,
                 ] {
-                    ui.selectable_value(&mut f.armory_sort, sort, sort.name());
+                    ui.selectable_value(&mut f.armory.sort, sort, sort.name());
                 }
             });
     });
@@ -430,7 +439,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
             );
         }
     });
-    let query = f.armory_search.trim().to_lowercase();
+    let query = f.armory.search.trim().to_lowercase();
     // Definition matching is done once per definition, rather than allocating
     // lowercase names once per owned instance in an unlimited stash.
     let matches: Vec<_> = content()
@@ -450,9 +459,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
         .enumerate()
         .filter(|(_, item)| {
             matches[item.definition]
-                && f.armory_slot
+                && f.armory
+                    .slot
                     .is_none_or(|slot| content().items[item.definition].slot == slot)
-                && f.armory_quality.is_none_or(|quality| {
+                && f.armory.quality.is_none_or(|quality| {
                     f.game.campaign.item_quality(item.id).ok() == Some(quality)
                 })
         })
@@ -461,7 +471,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
     indices.sort_by(|&a, &b| {
         let a = &f.game.campaign.items[a];
         let b = &f.game.campaign.items[b];
-        match f.armory_sort {
+        match f.armory.sort {
             ArmorySort::Newest => b.id.cmp(&a.id),
             ArmorySort::Name => content().items[a.definition]
                 .name
@@ -492,10 +502,11 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
     );
 
     // Selection is view state only. Never change equipment implicitly.
-    if f.selected_item
+    if f.armory
+        .selected_item
         .is_none_or(|id| f.game.campaign.item(id).is_none())
     {
-        f.selected_item = indices
+        f.armory.selected_item = indices
             .first()
             .map(|index| f.game.campaign.items[*index].id);
     }
@@ -525,7 +536,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
         });
     } else {
         inventory_list(ui, f, &indices);
-        if let Some(id) = f.selected_item {
+        if let Some(id) = f.armory.selected_item {
             let name = f
                 .game
                 .campaign
@@ -549,10 +560,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
     egui::CollapsingHeader::new("Loadout presets").show(ui, |ui| {
         muted(ui, "Save references to your current equipment. Referenced items are retained by bulk sales.");
         ui.horizontal_wrapped(|ui| {
-            ui.add(egui::TextEdit::singleline(&mut f.preset_name).hint_text("Preset name").desired_width(180.0));
-            if ui.button("Save loadout preset").clicked() { f.dispatch(Command::SavePreset { name: f.preset_name.clone(), mode: f.mode }, "Loadout saved by reference."); }
+            ui.add(egui::TextEdit::singleline(&mut f.armory.preset_name).hint_text("Preset name").desired_width(180.0));
+            if ui.button("Save loadout preset").clicked() { f.dispatch(Command::SavePreset { name: f.armory.preset_name.clone(), mode: f.campaign.mode }, "Loadout saved by reference."); }
             for (index, preset) in f.game.campaign.presets.clone().iter().enumerate() {
-                if ui.button(format!("Use {}", preset.name)).clicked() { f.dispatch(Command::ApplyPreset { index, mode: f.mode }, "Loadout equipped."); }
+                if ui.button(format!("Use {}", preset.name)).clicked() { f.dispatch(Command::ApplyPreset { index, mode: f.campaign.mode }, "Loadout equipped."); }
             }
         });
     });
@@ -573,7 +584,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
             ui.label(RichText::new(format!("{} · {} · {:?} · Lv {}", item.name, item.base_quality.name(), item.slot, offered_level)).color(quality_color(item.base_quality))).on_hover_text(format!("Personal: {} damage · {} armor · {} health. NPC: {}d{:+} · {} armor. Stats include this offered item level.", offered.personal.damage, offered.personal.armor, offered.personal.health, offered.npc.damage_dice, offered.npc.damage_add, offered.npc.armor));
             if item.slot == Slot::Ranged {
                 let weapon = horde_core::weapons::WeaponSpec::from_item(item);
-                ui.label(format!("{} · {}", weapon.class.name(), if item.npc_only { "NPC issued gear" } else if f.game.campaign.can_use_weapon(f.mode, index) { "trained" } else { "training required" }));
+                ui.label(format!("{} · {}", weapon.class.name(), if item.npc_only { "NPC issued gear" } else if f.game.campaign.can_use_weapon(f.campaign.mode, index) { "trained" } else { "training required" }));
             }
             if ui
                 .add_enabled(
@@ -592,7 +603,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut Frontend) {
     });
 }
 
-fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
+fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
     let viewport = (ui.clip_rect().height() * 0.46).clamp(150.0, 330.0);
     egui::ScrollArea::vertical()
         .id_salt("armory")
@@ -606,7 +617,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
                     .campaign
                     .item_quality(item.id)
                     .expect("owned equipment");
-                let loadout = if f.mode == Mode::Personal {
+                let loadout = if f.campaign.mode == Mode::Personal {
                     f.game.campaign.player.loadout
                 } else {
                     f.game.campaign.npc.loadout
@@ -626,7 +637,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
                                 ui.visuals_mut().selection.bg_fill = INK;
                                 if ui
                                     .selectable_label(
-                                        f.selected_item == Some(item.id),
+                                        f.armory.selected_item == Some(item.id),
                                         RichText::new(format!(
                                             "{} #{} · Lv {}",
                                             definition.name, item.id, item.level
@@ -635,7 +646,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
                                     )
                                     .clicked()
                                 {
-                                    f.selected_item = Some(item.id);
+                                    f.armory.selected_item = Some(item.id);
                                 }
                                 muted(
                                     ui,
@@ -666,7 +677,9 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
                         } else if ui
                             .add_enabled(
                                 !reserved
-                                    && f.game.campaign.can_use_weapon(f.mode, item.definition),
+                                    && f.game
+                                        .campaign
+                                        .can_use_weapon(f.campaign.mode, item.definition),
                                 egui::Button::new("Equip"),
                             )
                             .on_disabled_hover_text(if reserved {
@@ -674,7 +687,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
                             } else {
                                 f.game
                                     .campaign
-                                    .weapon_access(f.mode, item.definition)
+                                    .weapon_access(f.campaign.mode, item.definition)
                                     .err()
                                     .unwrap_or_default()
                             })
@@ -682,7 +695,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
                         {
                             f.dispatch(
                                 Command::Equip {
-                                    mode: f.mode,
+                                    mode: f.campaign.mode,
                                     id: item.id,
                                 },
                                 "Equipment changed.",
@@ -694,22 +707,23 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut Frontend, indices: &[usize]) {
         });
 }
 
-fn selected_item(ui: &mut egui::Ui, f: &mut Frontend) {
+fn selected_item(ui: &mut egui::Ui, f: &mut UiCtx) {
     selected_actions(ui, f);
-    if let Some(id) = f.selected_item {
+    if let Some(id) = f.armory.selected_item {
         inventory_comparison(ui, f, id);
     }
 }
 
-fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
+fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(item) = f
+        .armory
         .selected_item
         .and_then(|id| f.game.campaign.item(id))
         .cloned()
     else {
         return;
     };
-    let loadout = if f.mode == Mode::Personal {
+    let loadout = if f.campaign.mode == Mode::Personal {
         f.game.campaign.player.loadout
     } else {
         f.game.campaign.npc.loadout
@@ -720,7 +734,9 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
             .add_enabled(
                 !reserved
                     && !loadout.contains(&item.id)
-                    && f.game.campaign.can_use_weapon(f.mode, item.definition),
+                    && f.game
+                        .campaign
+                        .can_use_weapon(f.campaign.mode, item.definition),
                 egui::Button::new("Equip selected"),
             )
             .on_disabled_hover_text(if reserved {
@@ -728,7 +744,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
             } else {
                 f.game
                     .campaign
-                    .weapon_access(f.mode, item.definition)
+                    .weapon_access(f.campaign.mode, item.definition)
                     .err()
                     .unwrap_or_default()
             })
@@ -736,7 +752,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
         {
             f.dispatch(
                 Command::Equip {
-                    mode: f.mode,
+                    mode: f.campaign.mode,
                     id: item.id,
                 },
                 "Equipment changed.",
@@ -780,18 +796,19 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
             .on_disabled_hover_text(sale.err().unwrap_or_default())
             .clicked()
         {
-            f.pending_sale = Some(item.id);
+            f.armory.pending_sale = Some(item.id);
         }
     });
     let definition = &content().items[item.definition];
-    let npc_restricted =
-        definition.npc_only && f.mode == Mode::Personal && !f.game.campaign.legacy_weapon_training;
+    let npc_restricted = definition.npc_only
+        && f.campaign.mode == Mode::Personal
+        && !f.game.campaign.legacy_weapon_training;
     if definition.npc_only {
         muted(
             ui,
             if npc_restricted {
                 "NPC issued gear"
-            } else if f.mode == Mode::Personal {
+            } else if f.campaign.mode == Mode::Personal {
                 "NPC issued gear · legacy personal access retained"
             } else {
                 "NPC issued gear"
@@ -803,20 +820,23 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
             ui,
             f.game
                 .campaign
-                .weapon_access(f.mode, item.definition)
+                .weapon_access(f.campaign.mode, item.definition)
                 .err()
                 .unwrap_or_default(),
         );
     }
     if definition.slot == Slot::Ranged {
         let weapon = horde_core::weapons::WeaponSpec::from_item(definition);
-        let trained = f.game.campaign.can_use_weapon(f.mode, item.definition);
+        let trained = f
+            .game
+            .campaign
+            .can_use_weapon(f.campaign.mode, item.definition);
         muted(
             ui,
             format!(
                 "{} · {} · owned item #{}",
                 weapon.class.name(),
-                if f.mode == Mode::Npc {
+                if f.campaign.mode == Mode::Npc {
                     "NPC Guns training"
                 } else if npc_restricted {
                     "NPC issue only"
@@ -830,7 +850,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
         );
         if !trained && !npc_restricted && ui.button("Open weapon training").clicked() {
             let training = horde_core::skill_catalog::skills().nodes.iter().find(|n| n.effects.iter().any(|e| matches!(e, horde_core::skill_catalog::SkillEffect::WeaponTraining(class) if *class == weapon.class)));
-            f.improvement_focus = training
+            f.campaign.improvement_focus = training
                 .map(|n| horde_core::campaign::RecommendationAction::LearnNode(n.id.clone()));
             f.open_preparation(Tab::Skills);
         }
@@ -844,7 +864,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut Frontend) {
     }
 }
 
-fn sale_confirmation(ui: &mut egui::Ui, f: &mut Frontend) {
+fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
     let quote = f.game.sell_extras_quote();
     if ui
         .add_enabled(
@@ -853,9 +873,9 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut Frontend) {
         )
         .clicked()
     {
-        f.sell_confirm = true;
+        f.armory.sell_confirm = true;
     }
-    if f.sell_confirm {
+    if f.armory.sell_confirm {
         ui.horizontal_wrapped(|ui| {
             ui.colored_label(
                 AMBER,
@@ -866,17 +886,17 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut Frontend) {
                     Command::SellUnprotected,
                     "Extras sold; equipped and preset items retained.",
                 );
-                f.sell_confirm = false;
+                f.armory.sell_confirm = false;
             }
             if ui.button("Cancel").clicked() {
-                f.sell_confirm = false;
+                f.armory.sell_confirm = false;
             }
         });
     }
 }
 
-fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut Frontend) {
-    if let Some(id) = f.pending_sale {
+fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
+    if let Some(id) = f.armory.pending_sale {
         ui.add_space(8.0);
         match f.game.sale_preview(id) {
             Ok(quote) => {
@@ -910,14 +930,14 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut Frontend) {
                         );
                     }
                     if ui.button("Keep item").clicked() {
-                        f.pending_sale = None;
+                        f.armory.pending_sale = None;
                     }
                 });
             }
             Err(reason) => {
                 ui.colored_label(RED, reason);
                 if ui.button("Dismiss sale").clicked() {
-                    f.pending_sale = None;
+                    f.armory.pending_sale = None;
                 }
             }
         }

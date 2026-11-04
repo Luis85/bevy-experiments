@@ -1,7 +1,14 @@
 //! Character presentation. Game changes are queued typed intents.
-use super::*;
+use super::{Tab, UiCtx, chrome, muted, progress};
+use crate::art::AMBER;
+use bevy_egui::egui::{self, Sense, vec2};
+use horde_core::{
+    campaign::NpcTraining,
+    command::{Command, MAX_RECALL_PERCENT, NpcTactics},
+    content::{Mode, Policy, Slot},
+};
 
-pub(super) fn character(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::page_title(
         ui,
         "Character",
@@ -106,7 +113,7 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut Frontend) {
     ));
     ui.horizontal_wrapped(|ui| {
         if ui.button("Change personal equipment").clicked() {
-            f.mode = Mode::Personal;
+            f.campaign.mode = Mode::Personal;
             f.open_preparation(Tab::Armory);
         }
     });
@@ -115,7 +122,7 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut Frontend) {
         muted(ui, "Body-development nodes share one journey tree. Legacy point payments and refunds remain in that tree; Mara retains separate training.");
     });
 }
-pub(super) fn policy(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
     let npc = &f.game.campaign.npc;
     let mut proposed = NpcTactics {
         policy: npc.policy,
@@ -151,7 +158,7 @@ pub(super) fn policy(ui: &mut egui::Ui, f: &mut Frontend) {
     }
 }
 
-pub(super) fn survivor(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::page_title(
         ui,
         "Mara Vale",
@@ -180,7 +187,7 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut Frontend) {
     chrome::section(ui, "Training");
     ui.horizontal_wrapped(|ui| {
         if ui.add_enabled(f.game.campaign.coins >= 25 && n.awarded < f.game.campaign.allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(Command::BuyNpcPoint, "Training point awarded."); }
-        if ui.button("Change Mara's equipment").clicked() { f.mode = Mode::Npc; f.open_preparation(Tab::Armory); }
+        if ui.button("Change Mara's equipment").clicked() { f.campaign.mode = Mode::Npc; f.open_preparation(Tab::Armory); }
     });
     muted(
         ui,
@@ -235,6 +242,6 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut Frontend) {
     });
 }
 
-pub(super) fn mode_selector(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn mode_selector(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::mode_picker(ui, f);
 }

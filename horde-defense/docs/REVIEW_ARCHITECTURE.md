@@ -24,18 +24,18 @@ for native controls and presentation, with no custom input backend in core.
 `runner.rs` supplies a small application service layer:
 
 - `Runtime` owns typed command queues, same-frame intent deduplication, held and
-  one-shot input, save requests, autosave timing and pending sound cues.
+  one-shot input, save requests and autosave timing. Sound cues leave as
+  `SoundCue` messages played by `SfxPlugin`.
 - `GameCommand` names legal operations such as deployment, equipment changes,
   training, tactical pause, building, country orders and recall. Commands call
   the public core APIs; they do not duplicate combat or reward procedures.
 - `RuntimeNotice` reports a command's exact result, a durable save result or a
   finished main attempt. The UI changes navigation and messages from those
   results instead of assuming a purchase or write succeeded.
-- `RuntimeHost` exposes only the game/runtime pair, current settings, save paths
-  and a notice receiver. The existing `Frontend.game` aggregate is retained as
-  a facade so the refactor does not require rewriting every presentation helper.
-  It can later become a separate `GameSession` Bevy resource without changing
-  the engine-free core or the typed command protocol.
+- `RuntimeCtx` lends the runner the `GameSession` game, `Runtime`, settings,
+  profile paths and notice/cue sinks. In the App it is built from resources
+  and its sinks become `RuntimeNotice`/`SoundCue` messages; the UI only reads
+  `GameSession`.
 - `load_profile` centralizes startup reads and backup recovery selection. Runtime
   saves use the core's validated atomic generation procedure; settings are
   coordinated by the same application service.
@@ -44,13 +44,15 @@ Production systems are named and scheduled explicitly:
 
 | Schedule | System | Responsibility |
 |---|---|---|
-| `PreUpdate` | `runner::apply_commands::<Frontend>` | Apply queued semantic intents once; acknowledge requested saves after commit. |
-| `FixedUpdate` at 60 Hz | `runner::advance::<Frontend>` | Advance authoritative whole ticks and consume one-shot controls once. |
-| `Update` | `runner::persist::<Frontend>` | Commit due autosaves outside rendering and fixed combat procedures. |
-| `Update` | `runner::play_sounds::<Frontend>` | Consume bounded authoritative sound cues and spawn native audio players. |
-| egui context pass | `ui::draw` | Read state, render controls, publish input snapshots and queue commands. |
+| `PreUpdate` (`RuntimeSet::Apply`) | `runner::apply_commands` | Apply queued semantic intents once; acknowledge requested saves after commit. |
+| `PreUpdate`, after `Apply` | `ui::notices::handle_notices` | Turn `RuntimeNotice` messages into feedback and `NextState<Screen>`. |
+| `OnEnter(Screen::Battle)` | `ui::notices::enter_battle` | Reset controls for a new deployment. |
+| `FixedUpdate` at 60 Hz (`RuntimeSet::Advance`) | `runner::advance` | Advance authoritative whole ticks and consume one-shot controls once. |
+| `Update` (`RuntimeSet::Persist`) | `runner::persist` | Commit due autosaves outside rendering and fixed combat procedures. |
+| `Update`, after `Persist` | `sfx::play_sounds` | Consume bounded `SoundCue` messages and spawn native audio players. |
+| egui context pass | `ui::register_textures`, `ui::draw` | Read state, render controls, publish input snapshots and queue commands. |
 
-`flush(&mut host)` and `step(&mut host)` are the same services used by production
+`flush(&mut ctx)` and `step(&mut ctx)` are the same services used by production
 systems and headless widget/schedule tests. They require no OS window or GPU.
 Their boundaries make input and persistence behavior testable without pretending
 that those tests establish graphical quality.

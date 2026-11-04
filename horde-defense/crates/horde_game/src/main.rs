@@ -12,10 +12,12 @@ mod inspector;
 mod launch;
 mod logging;
 mod player_model;
+mod profile;
 #[cfg(feature = "review")]
 mod review_tools;
 mod runner;
 mod settings;
+mod sfx;
 mod ui;
 mod visual_assets;
 mod worldmap;
@@ -81,7 +83,6 @@ fn main() -> AppExit {
     // Performance sampling keeps ordinary window scheduling. Only deterministic
     // visual export above overrides time and redraw cadence.
     app.insert_resource(ClearColor(Color::srgb(0.067, 0.09, 0.094)))
-        .insert_resource(Time::<Fixed>::from_hz(60.0))
         .add_plugins(
             DefaultPlugins
                 // `RUST_LOG`, when set, overrides this filter entirely.
@@ -111,25 +112,16 @@ fn main() -> AppExit {
                 }),
         );
     // After LogPlugin so Game::load startup events reach the console and log file.
-    let frontend = ui::Frontend::load(app.world().resource::<launch::LaunchConfig>());
-    let review = app
-        .world()
-        .resource::<launch::LaunchConfig>()
-        .review()
-        .is_some();
-    app.insert_resource(frontend)
-        .add_systems(Startup, log_launch_warnings)
-        .add_plugins((ui::UiPlugin, atmosphere_audio::AtmosphereAudioPlugin))
-        .add_systems(PreUpdate, runner::apply_commands::<ui::Frontend>)
-        .add_systems(FixedUpdate, runner::advance::<ui::Frontend>)
-        .add_systems(
-            Update,
-            (
-                runner::persist::<ui::Frontend>,
-                runner::play_sounds::<ui::Frontend>,
-                runner::update_effects_gain::<ui::Frontend>,
-            ),
-        );
+    let config = app.world().resource::<launch::LaunchConfig>().clone();
+    // After LogPlugin so Game::load startup events reach the console and log file.
+    ui::FrontendParts::load(&config).insert_into(&mut app);
+    let review = config.review().is_some();
+    app.add_systems(Startup, log_launch_warnings).add_plugins((
+        runner::SimRuntimePlugin,
+        sfx::SfxPlugin,
+        ui::UiPlugin,
+        atmosphere_audio::AtmosphereAudioPlugin,
+    ));
     #[cfg(feature = "review")]
     if review {
         app.add_plugins(review_tools::ReviewToolsPlugin);

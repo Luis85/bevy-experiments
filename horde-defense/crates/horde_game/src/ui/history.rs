@@ -1,9 +1,12 @@
 //! Read-only run analysis from the authoritative, persistent settlement ledger.
-use super::*;
+use super::{UiCtx, armory, chrome, muted};
+use crate::art::{AMBER, GREEN, INK, MUTED, PANEL, RED};
+use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke, pos2, vec2};
 use horde_core::stats::RunRecord;
+use horde_core::{content::Mode, sim::Outcome};
 
-#[derive(Default)]
-pub(super) struct HistoryState {
+#[derive(bevy::prelude::Resource, Default)]
+pub(crate) struct HistoryUi {
     mode: Option<Mode>,
     outcome: Option<Outcome>,
     front: String,
@@ -22,7 +25,7 @@ fn mode_name(mode: Mode) -> &'static str {
         Mode::Npc => "NPC",
     }
 }
-fn matching<'a>(records: &'a [RunRecord], state: &HistoryState) -> Vec<&'a RunRecord> {
+fn matching<'a>(records: &'a [RunRecord], state: &HistoryUi) -> Vec<&'a RunRecord> {
     let front = state.front.trim().to_lowercase();
     records
         .iter()
@@ -37,7 +40,7 @@ fn matching<'a>(records: &'a [RunRecord], state: &HistoryState) -> Vec<&'a RunRe
         })
         .collect()
 }
-pub(super) fn show(root: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
     let mut close = false;
     egui::CentralPanel::default().frame(egui::Frame::new().fill(INK).inner_margin(20)).show(root, |ui| {
         ui.horizontal_wrapped(|ui| {
@@ -305,6 +308,9 @@ fn trend(ui: &mut egui::Ui, title: &str, values: &[(u64, f64)], color: Color32) 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use horde_core::sim::Game;
+    use horde_core::sim::Input;
+    use horde_core::survivors::SurvivorId;
     #[test]
     fn filters_preserve_settlement_order_and_read_real_records_without_mutation() {
         let mut game = Game::default();
@@ -320,7 +326,7 @@ mod tests {
         }
         assert_eq!(game.campaign.run_history.len(), 3);
         let before = serde_json::to_value(&game).unwrap();
-        let state = HistoryState {
+        let state = HistoryUi {
             mode: Some(Mode::Personal),
             outcome: Some(Outcome::Withdrawal),
             front: "deu".into(),
@@ -332,14 +338,14 @@ mod tests {
         assert_eq!(rows[0].duration_ticks, 120);
         assert_eq!((rows[0].lane_count, rows[0].width_yards), (3, 12.0));
         assert_eq!(rows[0].average_dps, 0.0);
-        let missing = HistoryState {
+        let missing = HistoryUi {
             front: "no such country".into(),
-            ..HistoryState::default()
+            ..HistoryUi::default()
         };
         assert!(matching(&game.campaign.run_history, &missing).is_empty());
-        let npc = HistoryState {
+        let npc = HistoryUi {
             mode: Some(Mode::Npc),
-            ..HistoryState::default()
+            ..HistoryUi::default()
         };
         assert_eq!(matching(&game.campaign.run_history, &npc).len(), 1);
         assert_eq!(serde_json::to_value(&game).unwrap(), before);

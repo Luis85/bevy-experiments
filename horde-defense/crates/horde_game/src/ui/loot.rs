@@ -1,6 +1,8 @@
 //! Bounded, real-time feedback for already-banked model receipts. No rewards
 //! or authoritative random state are produced by this presentation cache.
-use super::*;
+use super::{UiCtx, armory, review};
+use crate::art;
+use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
 use horde_core::quality::{LootEvent, Quality};
 use std::collections::{BTreeMap, BTreeSet};
 const LIFETIME: f64 = 1.5;
@@ -129,12 +131,12 @@ impl Feedback {
             .observe(attempt, tick, receipts, now)
     }
 }
-pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut Frontend) {
+pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     let Some(attempt) = f.game.attempt.as_ref() else {
         return;
     };
     let projection = art::ArenaProjection::for_attempt(arena, attempt)
-        .with_effects_clip(f.effects_rect.unwrap_or(arena));
+        .with_effects_clip(f.battle.effects_rect.unwrap_or(arena));
     let capture = f.launch.loot_capture_mode();
     if draw_for(
         ui,
@@ -142,10 +144,10 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut Frontend) {
         attempt,
         0,
         f.textures,
-        &mut f.loot_feedback,
+        &mut f.battle.loot_feedback,
         capture,
     ) {
-        f.runtime.notify_rare_loot();
+        f.notify_rare_loot();
     }
 }
 pub(super) fn draw_for(
@@ -225,6 +227,9 @@ pub(super) fn draw_for(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use horde_core::content::Mode;
+    use horde_core::sim::Game;
+    use horde_core::survivors::SurvivorId;
     fn receipt(id: u64, quality: Quality) -> LootEvent {
         LootEvent {
             item_id: id,

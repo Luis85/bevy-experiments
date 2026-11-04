@@ -89,7 +89,11 @@ fn quantile(sorted: &[f64], percent: f64) -> f64 {
 pub fn capture_performance(
     mut state: Local<FrameCapture>,
     time: Res<Time<Real>>,
-    mut frontend: ResMut<crate::ui::Frontend>,
+    (session, mut runtime, mut status): (
+        Res<crate::runner::GameSession>,
+        ResMut<crate::runner::Runtime>,
+        ResMut<crate::ui::StatusUi>,
+    ),
     window: Single<&Window>,
     adapter: Option<Res<RenderAdapterInfo>>,
     config: Res<crate::launch::LaunchConfig>,
@@ -108,7 +112,7 @@ pub fn capture_performance(
         return;
     }
     let work = take_work();
-    if let Some(a) = &frontend.game.attempt {
+    if let Some(a) = &session.game.attempt {
         if state.initial_battle.is_none() {
             state.initial_battle = Some(BattleContext {
                 mode: a.mode,
@@ -123,11 +127,11 @@ pub fn capture_performance(
         state.peak_corpses = state.peak_corpses.max(a.corpses.len());
     }
     let attempt_finished =
-        state.active_only && frontend.game.attempt.is_none() && !state.samples.is_empty();
+        state.active_only && session.game.attempt.is_none() && !state.samples.is_empty();
     if !attempt_finished {
         if state.active_only
-            && (frontend.game.global_paused
-                || frontend.game.attempt.as_ref().is_none_or(|a| a.paused))
+            && (session.game.global_paused
+                || session.game.attempt.as_ref().is_none_or(|a| a.paused))
         {
             return;
         }
@@ -149,7 +153,7 @@ pub fn capture_performance(
     let mean = state.samples.iter().sum::<f64>() / state.samples.len() as f64;
     let mut sorted = state.samples.clone();
     sorted.sort_by(f64::total_cmp);
-    let attempt = frontend.game.attempt.as_ref();
+    let attempt = session.game.attempt.as_ref();
     let mut longest: Vec<_> = state.samples.iter().copied().enumerate().collect();
     longest.sort_by(|a, b| b.1.total_cmp(&a.1));
     longest.truncate(20);
@@ -185,7 +189,7 @@ pub fn capture_performance(
         initial_battle: state.initial_battle.clone(),
         peak_visible_enemies: state.peak_enemies,
         peak_corpses: state.peak_corpses,
-        persistence: frontend.runtime.persistence_metrics(),
+        persistence: runtime.persistence_metrics(),
         mean_frame_ms: mean,
         median_frame_ms: quantile(&sorted, 0.5),
         p95_frame_ms: quantile(&sorted, 0.95),
@@ -197,9 +201,9 @@ pub fn capture_performance(
         population_cap: attempt.map(|a| a.enemy_cap()),
         threat_rank: attempt.map(|a| a.progression.rank),
         visible_structures: attempt.map_or(0, |a| a.structures.len()),
-        parallel_battles: frontend.game.battles.iter().filter(|b| !b.settled).count(),
-        simulation_ticks: frontend.runtime.simulated_ticks,
-        paused: frontend.game.global_paused || attempt.is_some_and(|a| a.paused),
+        parallel_battles: session.game.battles.iter().filter(|b| !b.settled).count(),
+        simulation_ticks: runtime.simulated_ticks,
+        paused: session.game.global_paused || attempt.is_some_and(|a| a.paused),
         window_focused: window.focused,
         unfocused_sample_frames: state.unfocused_samples,
         frames_over_33ms: state.samples.iter().filter(|&&ms| ms > 33.).count(),
@@ -231,7 +235,7 @@ pub fn capture_performance(
             info!("Native frame evidence: {}", path.display());
             // The ordinary persistence service owns the durable close barrier.
             // Do not exit over an older periodic checkpoint still in flight.
-            frontend.request_save(crate::runner::SaveIntent::Quit);
+            crate::ui::request_save(&mut runtime, &mut status, crate::runner::SaveIntent::Quit);
         }
         Err(error) => {
             error!("Frame report failed: {error}");

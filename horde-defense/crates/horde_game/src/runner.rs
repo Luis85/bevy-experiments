@@ -1,8 +1,9 @@
 //! Native application orchestration. Rendering publishes intents; these services
-//! apply commands, advance fixed simulation ticks, persist and consume audio.
-//! No Bevy types cross the horde_core boundary.
-use crate::settings::{self, Settings};
-use bevy::{app::AppExit, prelude::*};
+//! apply commands, advance fixed simulation ticks and persist. Sound cues and
+//! runtime notices leave as Bevy messages. No Bevy types cross the horde_core
+//! boundary.
+use crate::{audio::Cue as SoundCue, profile::ProfilePaths, settings::Settings};
+use bevy::{app::AppExit, ecs::system::SystemParam, prelude::*};
 use horde_core::{
     command::{Command, CommandOutcome},
     content::{Mode, StructureKind},
@@ -14,6 +15,13 @@ use std::path::PathBuf;
 mod persistence;
 #[cfg(feature = "review")]
 pub use persistence::PersistenceMetrics;
+
+/// The authoritative game. Only the runner mutates it (through `Game::apply`
+/// and fixed ticks); rendering reads it, so its change ticks mean real changes.
+#[derive(Resource)]
+pub struct GameSession {
+    pub game: Game,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SaveIntent {
@@ -42,7 +50,9 @@ pub enum AppOutcome {
     Command(CommandOutcome),
     JourneyArchived(Option<PathBuf>),
 }
-#[derive(Clone, Debug)]
+/// Outcomes the frontend reacts to; the UI's notice system turns them into
+/// feedback text and screen transitions.
+#[derive(Message, Clone, Debug)]
 pub enum RuntimeNotice {
     CommandCompleted {
         command: AppCommand,
@@ -57,17 +67,6 @@ pub enum RuntimeNotice {
     RecoveryCopies(Vec<PathBuf>),
     /// Expedition transfers that could not be applied to the shared campaign.
     SettlementIssues(Vec<SettlementIssue>),
-}
-/// Minimal bridge for the existing native frontend. Game remains an engine-free
-/// aggregate; this facade can later be split into independent Bevy resources.
-pub trait RuntimeHost: Resource<Mutability = bevy::ecs::component::Mutable> {
-    fn runtime_parts(&mut self) -> (&mut Game, &mut Runtime);
-    fn runtime_settings(&self) -> &Settings;
-    fn runtime_paths(&self) -> (PathBuf, PathBuf);
-    fn runtime_notice(&mut self, notice: RuntimeNotice);
-    fn runtime_observed_battle(&self) -> Option<u64> {
-        None
-    }
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct AttackAims {
@@ -98,46 +97,7 @@ struct QueuedCommand {
     command: AppCommand,
     success: String,
 }
-use crate::audio::Cue as SoundCue;
-impl SoundCue {
-    fn priority(self) -> u8 {
-        match self {
-            Self::Boss | Self::Retreat => 0,
-            Self::Wave => 1,
-            Self::Structure | Self::Explosion | Self::Molotov => 2,
-            Self::Damage => 3,
-            Self::Melee | Self::Throw => 4,
-            Self::Reload => 5,
-            Self::Ready => 6,
-            Self::Armor | Self::Impact => 7,
-            Self::Trap => 8,
-            Self::Pistol
-            | Self::Smg
-            | Self::Shotgun
-            | Self::Rifle
-            | Self::Marksman
-            | Self::MachineGun => 9,
-            Self::NpcShot => 10,
-            Self::TurretShot => 11,
-            Self::Incoming => 12,
-            Self::Fire => 13,
-        }
-    }
-    fn fire(self) -> bool {
-        matches!(
-            self,
-            Self::Pistol
-                | Self::Smg
-                | Self::Shotgun
-                | Self::Rifle
-                | Self::Marksman
-                | Self::MachineGun
-                | Self::NpcShot
-                | Self::TurretShot
-        )
-    }
-}
-#[derive(Debug, Default)]
+#[derive(Resource, Debug, Default)]
 pub struct Runtime {
     frame: Option<u32>,
     seen: Vec<AppCommand>,
@@ -146,9 +106,6 @@ pub struct Runtime {
     pending: Input,
     pending_aims: AttackAims,
     save_requests: Vec<SaveIntent>,
-    sounds: Vec<SoundCue>,
-    audio_rotation: u64,
-    cue_gate: crate::audio::CueGate,
     observed_battle: Option<u64>,
     dirty: bool,
     save_ticks: u64,
@@ -259,6 +216,11 @@ impl Runtime {
             _ => 1,
         };
     }
+    /// The expedition the camp is watching, published by the UI each frame;
+    /// it hears its ordinary cues in full.
+    pub fn observe_battle(&mut self, battle: Option<u64>) {
+        self.observed_battle = battle;
+    }
     pub fn request_save(&mut self, intent: SaveIntent) {
         if !self.save_requests.contains(&intent) {
             self.save_requests.push(intent);
@@ -268,9 +230,6 @@ impl Runtime {
         self.pending = Input::default();
         self.pending_aims = AttackAims::default();
         self.controls.held = Input::default();
-    }
-    pub fn notify_rare_loot(&mut self) {
-        self.sound(SoundCue::Ready);
     }
     pub fn pending_commands(&self) -> usize {
         self.queue.len()
@@ -288,114 +247,7 @@ impl Runtime {
         self.pending_aims = AttackAims::default();
         input
     }
-    fn sound(&mut self, cue: SoundCue) {
-        if !self.sounds.contains(&cue) {
-            self.sounds.push(cue);
-        }
-    }
-    fn event_sound(&mut self, event: &SimEvent) {
-        if let SimEvent::Hit(strike)
-        | SimEvent::Armor(strike)
-        | SimEvent::Miss(strike)
-        | SimEvent::Defended(strike) = event
-            && matches!(
-                strike.attacker,
-                Actor::Structure {
-                    kind: StructureKind::Trap,
-                    ..
-                }
-            )
-        {
-            self.sound(SoundCue::Trap);
-        }
-        let cue = match event {
-            SimEvent::Boss { .. } => Some(SoundCue::Boss),
-            SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => Some(SoundCue::Wave),
-            SimEvent::BossExposure { .. } | SimEvent::CooldownReady => Some(SoundCue::Ready),
-            SimEvent::StructureLost { .. } => Some(SoundCue::Structure),
-            SimEvent::Damage(_) => Some(SoundCue::Damage),
-            SimEvent::Melee(_) => Some(SoundCue::Melee),
-            SimEvent::Reload => Some(SoundCue::Reload),
-            SimEvent::Shot { shooter, .. } => match *shooter {
-                Actor::Structure {
-                    kind: StructureKind::Trap,
-                    ..
-                } => Some(SoundCue::Trap),
-                Actor::Structure {
-                    kind: StructureKind::Turret,
-                    ..
-                } => Some(SoundCue::TurretShot),
-                Actor::Defender {
-                    mode: Mode::Npc, ..
-                } => Some(SoundCue::NpcShot),
-                Actor::Defender { weapon, .. } => Some(match weapon {
-                    horde_core::weapons::WeaponClass::Pistol => SoundCue::Pistol,
-                    horde_core::weapons::WeaponClass::Smg => SoundCue::Smg,
-                    horde_core::weapons::WeaponClass::Shotgun => SoundCue::Shotgun,
-                    horde_core::weapons::WeaponClass::Rifle => SoundCue::Rifle,
-                    horde_core::weapons::WeaponClass::Marksman => SoundCue::Marksman,
-                    horde_core::weapons::WeaponClass::MachineGun => SoundCue::MachineGun,
-                }),
-                // A source that no longer exists has no reliable timbre.
-                _ => None,
-            },
-            SimEvent::Throw { .. } => Some(SoundCue::Throw),
-            SimEvent::Explosion {
-                ordnance: OrdnanceKind::Molotov,
-                ..
-            } => Some(SoundCue::Molotov),
-            SimEvent::Explosion { .. } => Some(SoundCue::Explosion),
-            SimEvent::Burn { .. } => Some(SoundCue::Fire),
-            SimEvent::Hit(_) | SimEvent::WeakPoint(_) => Some(SoundCue::Impact),
-            SimEvent::Armor(_) => Some(SoundCue::Armor),
-            SimEvent::Spawn { .. } => Some(SoundCue::Incoming),
-            _ => None,
-        };
-        if let Some(cue) = cue {
-            self.sound(cue);
-        }
-    }
-    /// Sounds for one tick's drained events. The main deployment is always
-    /// audible; camp observation hears the observed expedition in full and only
-    /// important cues from the others, without multiplying ordinary shots.
-    fn tick_sounds(&mut self, game: &mut Game) {
-        let observed = self.observed_battle;
-        let camp = game.attempt.is_none();
-        for record in game.drain_events() {
-            let audible = match record.battle {
-                BattleId::Root => true,
-                BattleId::Expedition(id) => {
-                    camp && (observed == Some(id)
-                        || matches!(
-                            record.event,
-                            SimEvent::Boss { .. }
-                                | SimEvent::BossWarning { .. }
-                                | SimEvent::Reinforcements { .. }
-                                | SimEvent::StructureLost { .. }
-                        ))
-                }
-            };
-            if audible {
-                self.event_sound(&record.event);
-            }
-        }
-        let fire = match &game.attempt {
-            Some(a) => !a.ordnance.fire_zones.is_empty(),
-            None => game.battles.iter().any(|battle| {
-                !battle.settled
-                    && observed == Some(battle.id)
-                    && battle
-                        .game
-                        .attempt
-                        .as_ref()
-                        .is_some_and(|a| !a.ordnance.fire_zones.is_empty())
-            }),
-        };
-        if fire {
-            self.sound(SoundCue::Fire);
-        }
-    }
-    fn advance(&mut self, game: &mut Game) -> bool {
+    fn advance(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> bool {
         let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Simulation);
         self.fixed_calls += 1;
         if !self.controls.enabled
@@ -412,7 +264,7 @@ impl Runtime {
             game.tick(input);
             self.simulated_ticks += 1;
             self.save_ticks += 1;
-            self.tick_sounds(game);
+            tick_sounds(game, self.observed_battle, cues);
             if self.save_ticks >= 600 {
                 self.dirty = true;
             }
@@ -438,13 +290,136 @@ fn merge_actions(into: &mut Input, from: &Input) {
     }
 }
 
+/// Queues `cue` once per batch.
+pub(crate) fn push_cue(cues: &mut Vec<SoundCue>, cue: SoundCue) {
+    if !cues.contains(&cue) {
+        cues.push(cue);
+    }
+}
+fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
+    if let SimEvent::Hit(strike)
+    | SimEvent::Armor(strike)
+    | SimEvent::Miss(strike)
+    | SimEvent::Defended(strike) = event
+        && matches!(
+            strike.attacker,
+            Actor::Structure {
+                kind: StructureKind::Trap,
+                ..
+            }
+        )
+    {
+        push_cue(cues, SoundCue::Trap);
+    }
+    let cue = match event {
+        SimEvent::Boss { .. } => Some(SoundCue::Boss),
+        SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => Some(SoundCue::Wave),
+        SimEvent::BossExposure { .. } | SimEvent::CooldownReady => Some(SoundCue::Ready),
+        SimEvent::StructureLost { .. } => Some(SoundCue::Structure),
+        SimEvent::Damage(_) => Some(SoundCue::Damage),
+        SimEvent::Melee(_) => Some(SoundCue::Melee),
+        SimEvent::Reload => Some(SoundCue::Reload),
+        SimEvent::Shot { shooter, .. } => match *shooter {
+            Actor::Structure {
+                kind: StructureKind::Trap,
+                ..
+            } => Some(SoundCue::Trap),
+            Actor::Structure {
+                kind: StructureKind::Turret,
+                ..
+            } => Some(SoundCue::TurretShot),
+            Actor::Defender {
+                mode: Mode::Npc, ..
+            } => Some(SoundCue::NpcShot),
+            Actor::Defender { weapon, .. } => Some(match weapon {
+                horde_core::weapons::WeaponClass::Pistol => SoundCue::Pistol,
+                horde_core::weapons::WeaponClass::Smg => SoundCue::Smg,
+                horde_core::weapons::WeaponClass::Shotgun => SoundCue::Shotgun,
+                horde_core::weapons::WeaponClass::Rifle => SoundCue::Rifle,
+                horde_core::weapons::WeaponClass::Marksman => SoundCue::Marksman,
+                horde_core::weapons::WeaponClass::MachineGun => SoundCue::MachineGun,
+            }),
+            // A source that no longer exists has no reliable timbre.
+            _ => None,
+        },
+        SimEvent::Throw { .. } => Some(SoundCue::Throw),
+        SimEvent::Explosion {
+            ordnance: OrdnanceKind::Molotov,
+            ..
+        } => Some(SoundCue::Molotov),
+        SimEvent::Explosion { .. } => Some(SoundCue::Explosion),
+        SimEvent::Burn { .. } => Some(SoundCue::Fire),
+        SimEvent::Hit(_) | SimEvent::WeakPoint(_) => Some(SoundCue::Impact),
+        SimEvent::Armor(_) => Some(SoundCue::Armor),
+        SimEvent::Spawn { .. } => Some(SoundCue::Incoming),
+        _ => None,
+    };
+    if let Some(cue) = cue {
+        push_cue(cues, cue);
+    }
+}
+/// Sounds for one tick's drained events. The main deployment is always
+/// audible; camp observation hears the observed expedition in full and only
+/// important cues from the others, without multiplying ordinary shots.
+fn tick_sounds(game: &mut Game, observed: Option<u64>, cues: &mut Vec<SoundCue>) {
+    let camp = game.attempt.is_none();
+    for record in game.drain_events() {
+        let audible = match record.battle {
+            BattleId::Root => true,
+            BattleId::Expedition(id) => {
+                camp && (observed == Some(id)
+                    || matches!(
+                        record.event,
+                        SimEvent::Boss { .. }
+                            | SimEvent::BossWarning { .. }
+                            | SimEvent::Reinforcements { .. }
+                            | SimEvent::StructureLost { .. }
+                    ))
+            }
+        };
+        if audible {
+            event_sound(cues, &record.event);
+        }
+    }
+    let fire = match &game.attempt {
+        Some(a) => !a.ordnance.fire_zones.is_empty(),
+        None => game.battles.iter().any(|battle| {
+            !battle.settled
+                && observed == Some(battle.id)
+                && battle
+                    .game
+                    .attempt
+                    .as_ref()
+                    .is_some_and(|a| !a.ordnance.fire_zones.is_empty())
+        }),
+    };
+    if fire {
+        push_cue(cues, SoundCue::Fire);
+    }
+}
+
+/// Everything one runner pass touches. Systems build it from resources and
+/// forward `notices`/`cues` as messages; tests build it from plain values.
+pub struct RuntimeCtx<'a> {
+    pub game: &'a mut Game,
+    pub runtime: &'a mut Runtime,
+    pub settings: &'a Settings,
+    pub paths: &'a ProfilePaths,
+    pub notices: &'a mut Vec<RuntimeNotice>,
+    pub cues: &'a mut Vec<SoundCue>,
+    /// Set when the pass mutated `game`, so `GameSession` change ticks stay honest.
+    pub game_changed: bool,
+}
+impl RuntimeCtx<'_> {
+    fn notice(&mut self, notice: RuntimeNotice) {
+        self.notices.push(notice);
+    }
+}
+
 /// Pure application service: applies pending typed commands and durable saves.
 /// Returns true only when a requested Quit has committed successfully.
-pub fn flush<H: RuntimeHost>(host: &mut H) -> bool {
-    let commands = {
-        let (_, runtime) = host.runtime_parts();
-        std::mem::take(&mut runtime.queue)
-    };
+pub fn flush(ctx: &mut RuntimeCtx) -> bool {
+    let commands = std::mem::take(&mut ctx.runtime.queue);
     let mut commands = commands.into_iter();
     while let Some(queued) = commands.next() {
         // Save and reset intents are durable runner concerns; only gameplay
@@ -452,12 +427,12 @@ pub fn flush<H: RuntimeHost>(host: &mut H) -> bool {
         let command = match queued.command {
             AppCommand::Game(command) => command,
             AppCommand::Save(intent) => {
-                host.runtime_parts().1.request_save(intent);
+                ctx.runtime.request_save(intent);
                 continue;
             }
             AppCommand::NewJourney => {
-                if let Err(error) = begin_new_journey(host, queued.success.clone()) {
-                    host.runtime_notice(RuntimeNotice::CommandCompleted {
+                if let Err(error) = begin_new_journey(ctx, queued.success.clone()) {
+                    ctx.notice(RuntimeNotice::CommandCompleted {
                         command: AppCommand::NewJourney,
                         result: Err(error),
                         success: queued.success,
@@ -467,71 +442,69 @@ pub fn flush<H: RuntimeHost>(host: &mut H) -> bool {
                 // They must survive this barrier and be recaptured after reset.
                 for trailing in commands.by_ref() {
                     if let AppCommand::Save(intent) = trailing.command {
-                        host.runtime_parts().1.request_save(intent);
+                        ctx.runtime.request_save(intent);
                     } else {
-                        host.runtime_notice(RuntimeNotice::CommandCompleted {
+                        ctx.notice(RuntimeNotice::CommandCompleted {
                             command: trailing.command,
                             result: Err("Command superseded by the new journey transition".into()),
                             success: trailing.success,
                         });
                     }
                 }
-                if !host.runtime_parts().1.reset_in_progress() {
-                    requeue_deferred_saves(host);
+                if !ctx.runtime.reset_in_progress() {
+                    requeue_deferred_saves(ctx);
                 }
                 break;
             }
         };
-        if host.runtime_parts().1.durable_transition_pending() {
-            host.runtime_notice(RuntimeNotice::CommandCompleted {
+        if ctx.runtime.durable_transition_pending() {
+            ctx.notice(RuntimeNotice::CommandCompleted {
                 command: AppCommand::Game(command),
                 result: Err("Wait for the current durable transition to finish".into()),
                 success: queued.success,
             });
             continue;
         }
-        let result = {
-            let (game, runtime) = host.runtime_parts();
-            let result = game.apply(&command);
-            if result.is_ok() {
-                runtime.dirty = true;
-                if matches!(command, Command::LeaveJourney) {
-                    runtime.request_save(SaveIntent::Menu);
-                }
-                if matches!(command, Command::Withdraw) {
-                    runtime.sound(SoundCue::Retreat);
-                }
+        let result = ctx.game.apply(&command);
+        ctx.game_changed = true;
+        if result.is_ok() {
+            ctx.runtime.dirty = true;
+            if matches!(command, Command::LeaveJourney) {
+                ctx.runtime.request_save(SaveIntent::Menu);
             }
-            result
-        };
-        host.runtime_notice(RuntimeNotice::CommandCompleted {
+            if matches!(command, Command::Withdraw) {
+                push_cue(ctx.cues, SoundCue::Retreat);
+            }
+        }
+        ctx.notice(RuntimeNotice::CommandCompleted {
             command: AppCommand::Game(command),
             result: result
                 .map(AppOutcome::Command)
                 .map_err(|error| error.to_string()),
             success: queued.success,
         });
-        report_settlement_issues(host);
+        report_settlement_issues(ctx);
     }
-    persist_pending(host)
+    persist_pending(ctx)
 }
 /// Settlement runs inside ticks and recalls; its failures become one notice.
-fn report_settlement_issues<H: RuntimeHost>(host: &mut H) {
-    let issues = host.runtime_parts().0.take_settlement_issues();
+fn report_settlement_issues(ctx: &mut RuntimeCtx) {
+    let issues = ctx.game.take_settlement_issues();
     if !issues.is_empty() {
-        host.runtime_notice(RuntimeNotice::SettlementIssues(issues));
+        ctx.game_changed = true;
+        ctx.notice(RuntimeNotice::SettlementIssues(issues));
     }
 }
 /// The reset is a serialized storage barrier. Live state swaps only on its ack.
-fn begin_new_journey<H: RuntimeHost>(host: &mut H, success: String) -> Result<(), String> {
-    let (path, _) = host.runtime_paths();
-    let old = host.runtime_parts().0.clone();
+fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result<(), String> {
+    let path = ctx.paths.campaign();
+    let old = ctx.game.clone();
     let mut fresh = Game::default();
     fresh
         .campaign
         .set_balance_settings(old.campaign.balance_settings.clone())?;
     let cancelled = {
-        let (_, runtime) = host.runtime_parts();
+        let runtime = &mut *ctx.runtime;
         let mut cancelled = runtime.storage.reset(old, fresh, path)?;
         persistence::dedup(&mut cancelled, std::mem::take(&mut runtime.save_requests));
         runtime.reset_success = Some(success);
@@ -541,7 +514,7 @@ fn begin_new_journey<H: RuntimeHost>(host: &mut H, success: String) -> Result<()
         cancelled
     };
     for intent in cancelled {
-        host.runtime_notice(RuntimeNotice::Saved {
+        ctx.notice(RuntimeNotice::Saved {
             intent,
             result: Err("Save superseded by the confirmed new journey".into()),
         });
@@ -551,34 +524,18 @@ fn begin_new_journey<H: RuntimeHost>(host: &mut H, success: String) -> Result<()
 
 /// One native FixedUpdate opportunity. Observation speed advances 1/2/4 whole
 /// authoritative ticks; one-shot controls are consumed only by the first tick.
-pub fn step<H: RuntimeHost>(host: &mut H) {
-    let observed = host.runtime_observed_battle();
-    let finished = {
-        let (game, runtime) = host.runtime_parts();
-        runtime.observed_battle = observed;
-        runtime.advance(game)
-    };
-    report_settlement_issues(host);
+pub fn step(ctx: &mut RuntimeCtx) {
+    let before = ctx.runtime.simulated_ticks;
+    let finished = ctx.runtime.advance(ctx.game, ctx.cues);
+    ctx.game_changed |= ctx.runtime.simulated_ticks != before;
+    report_settlement_issues(ctx);
     if finished {
-        host.runtime_notice(RuntimeNotice::SimulationFinished);
+        ctx.notice(RuntimeNotice::SimulationFinished);
     }
 }
-pub fn apply_commands<H: RuntimeHost>(mut host: ResMut<H>, mut exit: MessageWriter<AppExit>) {
-    if flush(&mut *host) {
-        exit.write(AppExit::Success);
-    }
-}
-pub fn advance<H: RuntimeHost>(mut host: ResMut<H>) {
-    step(&mut *host);
-}
-pub fn persist<H: RuntimeHost>(mut host: ResMut<H>, mut exit: MessageWriter<AppExit>) {
-    if persist_pending(&mut *host) {
-        exit.write(AppExit::Success);
-    }
-}
-fn requeue_deferred_saves<H: RuntimeHost>(host: &mut H) {
+fn requeue_deferred_saves(ctx: &mut RuntimeCtx) {
     let (deferred, rejected) = {
-        let (_, runtime) = host.runtime_parts();
+        let runtime = &mut *ctx.runtime;
         let mut deferred = std::mem::take(&mut runtime.save_requests);
         let mut rejected = Vec::new();
         for queued in std::mem::take(&mut runtime.queue) {
@@ -597,7 +554,7 @@ fn requeue_deferred_saves<H: RuntimeHost>(host: &mut H) {
         (deferred, rejected)
     };
     for queued in rejected {
-        host.runtime_notice(RuntimeNotice::CommandCompleted {
+        ctx.notice(RuntimeNotice::CommandCompleted {
             command: queued.command,
             result: Err("Command superseded by the new journey transition".into()),
             success: queued.success,
@@ -609,40 +566,31 @@ fn requeue_deferred_saves<H: RuntimeHost>(host: &mut H) {
             SaveIntent::Menu | SaveIntent::Quit | SaveIntent::SettingsBack
         )
     }) {
-        host.runtime_parts().1.enqueue(Command::SetPaused(true), "");
+        ctx.runtime.enqueue(Command::SetPaused(true), "");
     }
     for intent in deferred {
-        host.runtime_parts().1.enqueue(AppCommand::Save(intent), "");
+        ctx.runtime.enqueue(AppCommand::Save(intent), "");
     }
 }
 
-fn poll_storage<H: RuntimeHost>(host: &mut H) -> bool {
+fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
     let mut quit = false;
-    loop {
-        let done = host.runtime_parts().1.storage.poll();
-        let Some(done) = done else {
-            break;
-        };
+    while let Some(done) = ctx.runtime.storage.poll() {
         if !done.recovered.is_empty() {
-            host.runtime_notice(RuntimeNotice::RecoveryCopies(done.recovered));
+            ctx.notice(RuntimeNotice::RecoveryCopies(done.recovered));
         }
-        if done.epoch != host.runtime_parts().1.storage.epoch() {
+        if done.epoch != ctx.runtime.storage.epoch() {
             continue;
         }
         if done.reset {
-            let success = host
-                .runtime_parts()
-                .1
-                .reset_success
-                .take()
-                .unwrap_or_default();
+            let success = ctx.runtime.reset_success.take().unwrap_or_default();
             let result = match done.result {
                 Ok(persistence::Commit::Reset { game, archive }) => {
-                    let (current, runtime) = host.runtime_parts();
-                    *current = *game;
+                    *ctx.game = *game;
+                    ctx.game_changed = true;
+                    let runtime = &mut *ctx.runtime;
                     runtime.clear_input();
                     runtime.controls = ControlFrame::default();
-                    runtime.sounds.clear();
                     runtime.observed_battle = None;
                     runtime.dirty = false;
                     runtime.save_ticks = 0;
@@ -654,8 +602,8 @@ fn poll_storage<H: RuntimeHost>(host: &mut H) -> bool {
                 }
                 Err(error) => Err(error),
             };
-            requeue_deferred_saves(host);
-            host.runtime_notice(RuntimeNotice::CommandCompleted {
+            requeue_deferred_saves(ctx);
+            ctx.notice(RuntimeNotice::CommandCompleted {
                 command: AppCommand::NewJourney,
                 result,
                 success,
@@ -665,7 +613,7 @@ fn poll_storage<H: RuntimeHost>(host: &mut H) -> bool {
                 persistence::Commit::Saved => Ok(()),
                 _ => Err("Storage acknowledgement mismatch".into()),
             });
-            let runtime = host.runtime_parts().1;
+            let runtime = &mut *ctx.runtime;
             if result.is_err() {
                 runtime.dirty = true;
                 runtime.retry_save_at = runtime.simulated_ticks + 600;
@@ -674,7 +622,7 @@ fn poll_storage<H: RuntimeHost>(host: &mut H) -> bool {
             }
             quit |= result.is_ok() && done.intents.contains(&SaveIntent::Quit);
             for intent in done.intents {
-                host.runtime_notice(RuntimeNotice::Saved {
+                ctx.notice(RuntimeNotice::Saved {
                     intent,
                     result: result.clone(),
                 });
@@ -683,12 +631,12 @@ fn poll_storage<H: RuntimeHost>(host: &mut H) -> bool {
     }
     quit
 }
-fn persist_pending<H: RuntimeHost>(host: &mut H) -> bool {
+fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
     // This main-thread phase measures only polling, snapshot capture and enqueue.
     let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Persistence);
-    let quit = poll_storage(host);
+    let quit = poll_storage(ctx);
     let intents = {
-        let (_, runtime) = host.runtime_parts();
+        let runtime = &mut *ctx.runtime;
         if runtime.storage.reset_pending() {
             return quit;
         }
@@ -700,16 +648,14 @@ fn persist_pending<H: RuntimeHost>(host: &mut H) -> bool {
     if intents.is_empty() {
         return quit;
     }
-    let (campaign_path, settings_path) = host.runtime_paths();
-    let settings = host.runtime_settings().clone();
+    let snapshot = persistence::Snapshot {
+        game: ctx.game.clone(),
+        settings: ctx.settings.clone(),
+        campaign_path: ctx.paths.campaign(),
+        settings_path: ctx.paths.settings(),
+    };
     let result = {
-        let (game, runtime) = host.runtime_parts();
-        let snapshot = persistence::Snapshot {
-            game: game.clone(),
-            settings,
-            campaign_path,
-            settings_path,
-        };
+        let runtime = &mut *ctx.runtime;
         let result = runtime.storage.save(snapshot, intents.clone());
         if result.is_ok() {
             runtime.dirty = false;
@@ -722,7 +668,7 @@ fn persist_pending<H: RuntimeHost>(host: &mut H) -> bool {
     };
     if let Err(error) = result {
         for intent in intents {
-            host.runtime_notice(RuntimeNotice::Saved {
+            ctx.notice(RuntimeNotice::Saved {
                 intent,
                 result: Err(error.clone()),
             });
@@ -731,24 +677,25 @@ fn persist_pending<H: RuntimeHost>(host: &mut H) -> bool {
     quit
 }
 #[cfg(test)]
-pub(crate) fn poll_one_save_for_test<H: RuntimeHost>(host: &mut H) -> bool {
-    persistence::wait_for_test(&mut host.runtime_parts().1.storage);
-    persist_pending(host)
+pub(crate) fn poll_one_save_for_test(ctx: &mut RuntimeCtx) -> bool {
+    persistence::wait_for_test(&mut ctx.runtime.storage);
+    persist_pending(ctx)
 }
 /// Test drivers may wait for real worker acknowledgements without advancing any
 /// game clock. Production enqueue/poll never waits for filesystem completion.
 #[cfg(test)]
-pub(crate) fn flush_for_test<H: RuntimeHost>(host: &mut H) -> bool {
-    let mut quit = flush(host);
+pub(crate) fn flush_for_test(ctx: &mut RuntimeCtx) -> bool {
+    let mut quit = flush(ctx);
     loop {
-        if !host.runtime_parts().1.storage.pending() {
+        if !ctx.runtime.storage.pending() {
             break;
         }
-        persistence::wait_for_test(&mut host.runtime_parts().1.storage);
-        quit |= persist_pending(host);
+        persistence::wait_for_test(&mut ctx.runtime.storage);
+        quit |= persist_pending(ctx);
     }
     quit
 }
+
 fn preserve_unreadable(
     path: &std::path::Path,
     preserved: &mut Vec<(PathBuf, u64)>,
@@ -827,213 +774,86 @@ fn write_settings(settings: &Settings, path: &std::path::Path) -> Result<(), Str
     std::fs::rename(&temporary, path).map_err(|error| error.to_string())
 }
 
-pub const MAX_EFFECT_VOICES: usize = crate::audio::MAX_EFFECT_VOICES;
-#[derive(Component)]
-pub struct EffectVoice {
-    priority: u8,
-    last_gain: f32,
-    cue_gain: f32,
-    cue: SoundCue,
+/// Runner phases. Only `Apply` has dependants (the UI's notice handling runs
+/// after it); the phases are in different schedules, so no chain is needed.
+#[derive(SystemSet, Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum RuntimeSet {
+    /// PreUpdate: queued commands reach `Game::apply`; finished saves are polled.
+    Apply,
+    /// FixedUpdate (60 Hz): whole authoritative ticks.
+    Advance,
+    /// Update: storage acknowledgements and autosave submission.
+    Persist,
 }
-fn safe_bus_gain(master: f32, effects: f32) -> f32 {
-    fn level(x: f32) -> f32 {
-        if x.is_finite() {
-            x.clamp(0.0, 1.0)
-        } else {
-            0.0
-        }
-    }
-    level(master) * level(effects) * 0.7
-}
-fn select_sounds(mut sounds: Vec<SoundCue>, rotation: u64) -> Vec<SoundCue> {
-    // A warning already communicates arrival; avoid stacking a second spawn cue.
-    if sounds.contains(&SoundCue::Wave) {
-        sounds.retain(|cue| *cue != SoundCue::Incoming);
-    }
-    sounds.sort_by_key(|cue| cue.priority());
-    sounds.dedup();
-    let mut selected = Vec::with_capacity(2);
-    selected.extend(
-        sounds
-            .iter()
-            .copied()
-            .filter(|cue| cue.priority() <= 3)
-            .take(2),
-    );
-    if selected.is_empty()
-        && let Some(cue) = sounds
-            .iter()
-            .copied()
-            .find(|cue| !cue.fire() && cue.priority() <= 8)
-    {
-        selected.push(cue);
-    }
-    let fire: Vec<_> = sounds.iter().copied().filter(|cue| cue.fire()).collect();
-    for n in 0..fire.len() {
-        if selected.len() == 2 {
-            break;
-        }
-        selected.push(fire[(rotation as usize + n) % fire.len()]);
-    }
-    for cue in sounds {
-        if selected.len() == 2 {
-            break;
-        }
-        if !selected.contains(&cue) {
-            selected.push(cue);
-        }
-    }
-    selected
-}
-pub fn play_sounds<H: RuntimeHost>(
-    mut commands: Commands,
-    assets: Res<AssetServer>,
-    time: Res<Time<Real>>,
-    mut host: ResMut<H>,
-    voices: Query<(Entity, &EffectVoice)>,
-) {
-    let gain = safe_bus_gain(
-        host.runtime_settings().master,
-        host.runtime_settings().effects,
-    );
-    let reduced = host.runtime_settings().reduced_effects;
-    let now_ms = (time.elapsed_secs_f64() * 1000.0) as u64;
-    let (sounds, rotation) = {
-        let (_, runtime) = host.runtime_parts();
-        let sounds = std::mem::take(&mut runtime.sounds);
-        let rotation = runtime.audio_rotation;
-        runtime.audio_rotation = runtime
-            .audio_rotation
-            .wrapping_add(u64::from(!sounds.is_empty()));
-        (sounds, rotation)
-    };
-    if gain == 0.0 {
-        return;
-    }
-    let mut live: Vec<_> = voices
-        .iter()
-        .map(|(entity, voice)| (entity, voice.priority))
-        .collect();
-    for cue in select_sounds(sounds, rotation) {
-        let replace = if live.len() >= MAX_EFFECT_VOICES {
-            let Some((index, (_, priority))) = live
-                .iter()
-                .enumerate()
-                .max_by_key(|(_, (_, priority))| *priority)
-            else {
-                continue;
-            };
-            if cue.priority() >= *priority {
-                continue;
-            }
-            Some(index)
-        } else {
-            None
-        };
-        if !host.runtime_parts().1.cue_gate.accept(cue, now_ms, reduced) {
-            continue;
-        }
-        if let Some(index) = replace {
-            let (entity, _) = live.remove(index);
-            commands.entity(entity).despawn();
-        }
-        let cue_gain = cue.gain(reduced);
-        let voice_gain = gain * cue_gain;
-        let entity = commands
-            .spawn((
-                EffectVoice {
-                    priority: cue.priority(),
-                    last_gain: voice_gain,
-                    cue_gain,
-                    cue,
-                },
-                AudioPlayer::new(assets.load(crate::audio::variant_path(cue, rotation))),
-                PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(voice_gain)),
-            ))
-            .id();
-        live.push((entity, cue.priority()));
-    }
-}
-/// Both pending PlaybackSettings and live sinks follow the current SFX bus.
-pub fn update_effects_gain<H: RuntimeHost>(
-    host: Res<H>,
-    mut voices: Query<(
-        &mut EffectVoice,
-        &mut PlaybackSettings,
-        Option<&mut AudioSink>,
-    )>,
-) {
-    let gain = safe_bus_gain(
-        host.runtime_settings().master,
-        host.runtime_settings().effects,
-    );
-    let reduced = host.runtime_settings().reduced_effects;
-    for (mut voice, mut settings, sink) in &mut voices {
-        voice.cue_gain = voice.cue.gain(reduced);
-        let voice_gain = gain * voice.cue_gain;
-        if (voice.last_gain - voice_gain).abs() > 0.00001 {
-            settings.volume = bevy::audio::Volume::Linear(voice_gain);
-            if let Some(mut sink) = sink {
-                sink.set_volume(settings.volume);
-            }
-            voice.last_gain = voice_gain;
-        }
+
+/// Owns the fixed clock and the command/tick/persist services over
+/// `GameSession` and `Runtime`.
+pub struct SimRuntimePlugin;
+impl Plugin for SimRuntimePlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(Time::<Fixed>::from_hz(60.0))
+            .add_message::<RuntimeNotice>()
+            .add_message::<SoundCue>()
+            .add_systems(PreUpdate, apply_commands.in_set(RuntimeSet::Apply))
+            .add_systems(FixedUpdate, advance.in_set(RuntimeSet::Advance))
+            .add_systems(Update, persist.in_set(RuntimeSet::Persist));
     }
 }
 
-pub struct LoadedProfile {
-    pub game: Game,
-    pub settings: Settings,
-    pub warning: String,
+/// The resources one runner pass reads and writes.
+#[derive(SystemParam)]
+pub struct RuntimeParams<'w> {
+    session: ResMut<'w, GameSession>,
+    runtime: ResMut<'w, Runtime>,
+    settings: Res<'w, Settings>,
+    paths: Res<'w, ProfilePaths>,
+    notices: MessageWriter<'w, RuntimeNotice>,
+    cues: MessageWriter<'w, SoundCue>,
 }
-/// Keep resumable practice profiles separate; screenshot fixtures are ephemeral.
-pub fn profile_directory(base: PathBuf, scenario: Option<&str>, practice: bool) -> PathBuf {
-    if practice {
-        let tag: String = scenario
-            .unwrap_or("battle")
-            .chars()
-            .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_'))
-            .take(48)
-            .collect();
-        base.join("practice")
-            .join(if tag.is_empty() { "battle" } else { &tag })
-    } else if scenario.is_some() {
-        std::env::temp_dir().join(format!("lastlight-review-{}", std::process::id()))
-    } else {
-        base
+impl RuntimeParams<'_> {
+    fn run<R>(&mut self, pass: impl FnOnce(&mut RuntimeCtx) -> R) -> R {
+        let mut notices = Vec::new();
+        let mut cues = Vec::new();
+        let (result, changed) = {
+            let mut ctx = RuntimeCtx {
+                // Marked changed below only when the pass really mutated it.
+                game: &mut self.session.bypass_change_detection().game,
+                runtime: &mut self.runtime,
+                settings: &self.settings,
+                paths: &self.paths,
+                notices: &mut notices,
+                cues: &mut cues,
+                game_changed: false,
+            };
+            let result = pass(&mut ctx);
+            (result, ctx.game_changed)
+        };
+        if changed {
+            self.session.set_changed();
+        }
+        self.notices.write_batch(notices);
+        self.cues.write_batch(cues);
+        result
     }
 }
-/// Startup read service, separate from widget layout and the command runner.
-pub fn load_profile(directory: PathBuf) -> LoadedProfile {
-    let campaign_path = directory.join("campaign.json");
-    let settings_path = directory.join("settings.json");
-    let (game, warning) = if campaign_path.exists() || campaign_path.with_extension("bak").exists()
-    {
-        match Game::load(&campaign_path) {
-            Ok(game) => (
-                game,
-                "Campaign restored. Continue to resume the exact deployment.".into(),
-            ),
-            Err(error) => (
-                Game::default(),
-                format!(
-                    "Save could not be read: {error}. Starting fresh in memory. Original files remain unchanged; unreadable generations will be preserved as recovery copies before any new save replaces them."
-                ),
-            ),
-        }
-    } else {
-        (Game::default(), String::new())
-    };
-    LoadedProfile {
-        game,
-        settings: settings::Settings::load(&settings_path),
-        warning,
+fn apply_commands(mut params: RuntimeParams, mut exit: MessageWriter<AppExit>) {
+    if params.run(flush) {
+        exit.write(AppExit::Success);
+    }
+}
+fn advance(mut params: RuntimeParams) {
+    params.run(step);
+}
+fn persist(mut params: RuntimeParams, mut exit: MessageWriter<AppExit>) {
+    if params.run(persist_pending) {
+        exit.write(AppExit::Success);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::profile::{load_profile, profile_directory};
     use std::sync::atomic::{AtomicU64, Ordering};
 
     #[test]
@@ -1068,9 +888,9 @@ mod tests {
             from: horde_core::sim::DEFENDER,
             to: [15.0, 5.5],
         };
-        host.runtime.event_sound(&shot);
-        assert_eq!(host.runtime.sounds, vec![SoundCue::Pistol]);
-        host.runtime.sounds.clear();
+        event_sound(&mut host.cues, &shot);
+        assert_eq!(host.cues, vec![SoundCue::Pistol]);
+        host.cues.clear();
         let throw = SimEvent::Throw {
             projectile_id: 7,
             ordnance: OrdnanceKind::Grenade,
@@ -1079,22 +899,25 @@ mod tests {
             to: [15.0, 5.5],
             flight_ticks: 30,
         };
-        host.runtime.event_sound(&throw);
-        assert_eq!(host.runtime.sounds, vec![SoundCue::Throw]);
-        host.runtime.sounds.clear();
+        event_sound(&mut host.cues, &throw);
+        assert_eq!(host.cues, vec![SoundCue::Throw]);
+        host.cues.clear();
         for (ordnance, cue) in [
             (OrdnanceKind::Grenade, SoundCue::Explosion),
             (OrdnanceKind::Molotov, SoundCue::Molotov),
         ] {
-            host.runtime.event_sound(&SimEvent::Explosion {
-                projectile_id: 7,
-                ordnance,
-                lane: Some(5),
-                at: [15.0, 5.5],
-                radius: 1.5,
-            });
-            assert_eq!(host.runtime.sounds, vec![cue]);
-            host.runtime.sounds.clear();
+            event_sound(
+                &mut host.cues,
+                &SimEvent::Explosion {
+                    projectile_id: 7,
+                    ordnance,
+                    lane: Some(5),
+                    at: [15.0, 5.5],
+                    radius: 1.5,
+                },
+            );
+            assert_eq!(host.cues, vec![cue]);
+            host.cues.clear();
         }
         assert_eq!(serde_json::to_value(&host.game).unwrap(), before);
     }
@@ -1110,9 +933,9 @@ mod tests {
             enabled: true,
             ..ControlFrame::default()
         });
-        step(&mut host);
+        step(&mut host.ctx());
         assert!(host.game.attempt.is_none());
-        assert!(host.runtime.sounds.contains(&SoundCue::Reload));
+        assert!(host.cues.contains(&SoundCue::Reload));
         assert!(
             host.notices
                 .iter()
@@ -1128,8 +951,8 @@ mod tests {
             enabled: true,
             ..ControlFrame::default()
         });
-        step(&mut host);
-        assert!(host.runtime.sounds.contains(&SoundCue::Ready));
+        step(&mut host.ctx());
+        assert!(host.cues.contains(&SoundCue::Ready));
     }
     #[test]
     fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
@@ -1177,7 +1000,7 @@ mod tests {
     #[test]
     fn trap_shots_never_fabricate_a_turret_and_missing_sources_stay_silent() {
         use horde_core::sim::{Actor, SimEvent, Strike};
-        let mut runtime = Runtime::default();
+        let mut cues = Vec::new();
         let shot = |shooter| SimEvent::Shot {
             shooter,
             target_id: None,
@@ -1189,128 +1012,43 @@ mod tests {
             id: 9000,
             kind: StructureKind::Trap,
         };
-        runtime.event_sound(&shot(trap));
-        assert_eq!(runtime.sounds, vec![SoundCue::Trap]);
-        runtime.sounds.clear();
-        runtime.event_sound(&shot(Actor::Structure {
-            id: 9000,
-            kind: StructureKind::Turret,
-        }));
-        assert_eq!(runtime.sounds, vec![SoundCue::TurretShot]);
-        runtime.sounds.clear();
-        runtime.event_sound(&shot(Actor::Unknown { id: 9000 }));
-        assert!(runtime.sounds.is_empty());
-        runtime.event_sound(&SimEvent::Miss(Strike {
-            attacker: trap,
-            target_id: Some(1),
-            lane: Some(0),
-            from: [4.2, 0.5],
-            to: [5.0, 0.5],
-            value: 0,
-        }));
-        assert_eq!(runtime.sounds, vec![SoundCue::Trap]);
+        event_sound(&mut cues, &shot(trap));
+        assert_eq!(cues, vec![SoundCue::Trap]);
+        cues.clear();
+        event_sound(
+            &mut cues,
+            &shot(Actor::Structure {
+                id: 9000,
+                kind: StructureKind::Turret,
+            }),
+        );
+        assert_eq!(cues, vec![SoundCue::TurretShot]);
+        cues.clear();
+        event_sound(&mut cues, &shot(Actor::Unknown { id: 9000 }));
+        assert!(cues.is_empty());
+        event_sound(
+            &mut cues,
+            &SimEvent::Miss(Strike {
+                attacker: trap,
+                target_id: Some(1),
+                lane: Some(0),
+                from: [4.2, 0.5],
+                to: [5.0, 0.5],
+                value: 0,
+            }),
+        );
+        assert_eq!(cues, vec![SoundCue::Trap]);
     }
 
-    #[test]
-    fn important_audio_cues_are_not_displaced_by_fire_and_sources_take_turns() {
-        let selected = select_sounds(
-            vec![
-                SoundCue::Rifle,
-                SoundCue::TurretShot,
-                SoundCue::Wave,
-                SoundCue::Incoming,
-            ],
-            0,
-        );
-        assert!(selected.contains(&SoundCue::Wave));
-        assert_eq!(selected.len(), 2);
-        assert_eq!(
-            select_sounds(vec![SoundCue::Boss, SoundCue::Damage, SoundCue::Rifle], 0),
-            vec![SoundCue::Boss, SoundCue::Damage]
-        );
-        assert_eq!(
-            select_sounds(vec![SoundCue::Wave, SoundCue::Incoming], 0),
-            vec![SoundCue::Wave]
-        );
-        let a = select_sounds(
-            vec![SoundCue::Armor, SoundCue::NpcShot, SoundCue::TurretShot],
-            0,
-        );
-        let b = select_sounds(
-            vec![SoundCue::Armor, SoundCue::NpcShot, SoundCue::TurretShot],
-            1,
-        );
-        assert!(a.contains(&SoundCue::Armor) && a.contains(&SoundCue::NpcShot));
-        assert!(b.contains(&SoundCue::Armor) && b.contains(&SoundCue::TurretShot));
-    }
-    #[test]
-    fn effect_bus_updates_pending_voices_and_mutes_without_recreating_them() {
-        let mut host = Host::new();
-        host.settings.master = 0.0;
-        let mut app = App::new();
-        app.insert_resource(host)
-            .add_systems(Update, update_effects_gain::<Host>);
-        let voice = app
-            .world_mut()
-            .spawn((
-                EffectVoice {
-                    priority: 9,
-                    last_gain: 0.7,
-                    cue_gain: 1.0,
-                    cue: SoundCue::Explosion,
-                },
-                PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(0.7)),
-            ))
-            .id();
-        app.update();
-        assert_eq!(
-            app.world()
-                .entity(voice)
-                .get::<PlaybackSettings>()
-                .unwrap()
-                .volume,
-            bevy::audio::Volume::Linear(0.0)
-        );
-        {
-            let mut host = app.world_mut().resource_mut::<Host>();
-            host.settings.master = 1.0;
-            host.settings.effects = 0.5;
-        }
-        app.update();
-        assert_eq!(
-            app.world()
-                .entity(voice)
-                .get::<PlaybackSettings>()
-                .unwrap()
-                .volume,
-            bevy::audio::Volume::Linear(0.35)
-        );
-        app.world_mut()
-            .resource_mut::<Host>()
-            .settings
-            .reduced_effects = true;
-        app.update();
-        let reduced = app
-            .world()
-            .entity(voice)
-            .get::<PlaybackSettings>()
-            .unwrap()
-            .volume;
-        assert_eq!(
-            reduced,
-            bevy::audio::Volume::Linear(0.35 * SoundCue::Explosion.gain(true))
-        );
-        assert_eq!(safe_bus_gain(f32::NAN, 1.0), 0.0);
-        assert_eq!(safe_bus_gain(9.0, 9.0), 0.7);
-    }
-
-    #[derive(Resource)]
+    /// Owned runner state; `ctx()` lends it to the pure runner functions.
     struct Host {
         game: Game,
         runtime: Runtime,
         settings: Settings,
         directory: PathBuf,
+        paths: ProfilePaths,
         notices: Vec<RuntimeNotice>,
+        cues: Vec<SoundCue>,
     }
     impl Host {
         fn new() -> Self {
@@ -1333,8 +1071,21 @@ mod tests {
                 game,
                 runtime: Runtime::default(),
                 settings: Settings::default(),
+                paths: ProfilePaths::in_directory(directory.clone()),
                 directory,
                 notices: vec![],
+                cues: vec![],
+            }
+        }
+        fn ctx(&mut self) -> RuntimeCtx<'_> {
+            RuntimeCtx {
+                game: &mut self.game,
+                runtime: &mut self.runtime,
+                settings: &self.settings,
+                paths: &self.paths,
+                notices: &mut self.notices,
+                cues: &mut self.cues,
+                game_changed: false,
             }
         }
         fn deploy(&mut self) {
@@ -1376,23 +1127,6 @@ mod tests {
             let _ = std::fs::remove_dir(&self.directory);
         }
     }
-    impl RuntimeHost for Host {
-        fn runtime_parts(&mut self) -> (&mut Game, &mut Runtime) {
-            (&mut self.game, &mut self.runtime)
-        }
-        fn runtime_settings(&self) -> &Settings {
-            &self.settings
-        }
-        fn runtime_paths(&self) -> (PathBuf, PathBuf) {
-            (
-                self.directory.join("campaign.json"),
-                self.directory.join("settings.json"),
-            )
-        }
-        fn runtime_notice(&mut self, notice: RuntimeNotice) {
-            self.notices.push(notice);
-        }
-    }
     fn state(game: &Game) -> serde_json::Value {
         serde_json::to_value(game).unwrap()
     }
@@ -1412,7 +1146,7 @@ mod tests {
                 .runtime
                 .enqueue(Command::BuySkillNode("quick_reload".into()), "Learned")
         );
-        assert!(!flush_for_test(&mut host));
+        assert!(!flush_for_test(&mut host.ctx()));
         assert_eq!(host.game.campaign.coins, 75);
         assert!(host.game.campaign.has_node("quick_reload"));
         assert_eq!(
@@ -1469,7 +1203,7 @@ mod tests {
             .add_item_with_quality(4, 9, None)
             .unwrap();
         host.runtime.enqueue(Command::RecallSurvivor(battle), "");
-        flush(&mut host);
+        flush(&mut host.ctx());
         assert!(host.notices.iter().any(|n| matches!(
             n,
             RuntimeNotice::CommandCompleted { result: Err(error), .. }
@@ -1519,7 +1253,7 @@ mod tests {
             pressed_aims: AttackAims::default(),
         });
         for _ in 0..125 {
-            step(&mut host);
+            step(&mut host.ctx());
         }
         let attempt = host.game.attempt.as_ref().unwrap();
         assert_eq!(attempt.tick, 500);
@@ -1547,12 +1281,12 @@ mod tests {
         });
         let before = state(&host.game);
         for _ in 0..120 {
-            step(&mut host);
+            step(&mut host.ctx());
         }
         assert_eq!(before, state(&host.game));
         assert_eq!(host.runtime.simulated_ticks, 0);
         host.game.set_paused(false);
-        step(&mut host);
+        step(&mut host.ctx());
         assert_eq!(host.game.attempt.as_ref().unwrap().tick, 4);
         assert_eq!(host.game.attempt.as_ref().unwrap().shots, 0);
     }
@@ -1573,10 +1307,10 @@ mod tests {
             ..ControlFrame::default()
         });
         for _ in 0..240 {
-            step(&mut normal);
+            step(&mut normal.ctx());
         }
         for _ in 0..60 {
-            step(&mut fast);
+            step(&mut fast.ctx());
         }
         assert_eq!(state(&normal.game), state(&fast.game));
         assert_eq!(normal.runtime.simulated_ticks, fast.runtime.simulated_ticks);
@@ -1587,7 +1321,7 @@ mod tests {
         host.deploy();
         host.game.attempt.as_mut().unwrap().reload_left = 37;
         host.runtime.request_save(SaveIntent::Quit);
-        assert!(flush_for_test(&mut host));
+        assert!(flush_for_test(&mut host.ctx()));
         let restored = Game::load(&host.directory.join("campaign.json")).unwrap();
         assert_eq!(state(&host.game), state(&restored));
         assert!(host.notices.iter().any(|n| matches!(
@@ -1612,7 +1346,7 @@ mod tests {
         std::fs::create_dir(host.directory.join("campaign.tmp")).unwrap();
         let before = state(&host.game);
         host.runtime.request_save(SaveIntent::Quit);
-        assert!(!flush_for_test(&mut host));
+        assert!(!flush_for_test(&mut host.ctx()));
         assert_eq!(before, state(&host.game));
         assert!(host.notices.iter().any(|n| matches!(
             n,
@@ -1638,11 +1372,11 @@ mod tests {
             speed: 4,
             ..ControlFrame::default()
         });
-        step(&mut host);
+        step(&mut host.ctx());
         assert!(host.game.attempt.is_none());
         assert_eq!(host.runtime.simulated_ticks, 1);
         for _ in 0..10 {
-            step(&mut host);
+            step(&mut host.ctx());
         }
         assert_eq!(host.runtime.simulated_ticks, 1);
         assert_eq!(
@@ -1671,7 +1405,7 @@ mod tests {
         );
         host.runtime
             .enqueue(Command::ChooseStart("DEU".into()), "New country selected");
-        assert!(!flush_for_test(&mut host));
+        assert!(!flush_for_test(&mut host.ctx()));
         let copies: Vec<_> = host
             .notices
             .iter()
@@ -1700,16 +1434,17 @@ mod tests {
         let mut main = Host::new();
         main.game.campaign.coins = 7;
         main.runtime.request_save(SaveIntent::Manual);
-        flush_for_test(&mut main);
+        flush_for_test(&mut main.ctx());
         let normal_bytes = std::fs::read(main.directory.join("campaign.json")).unwrap();
         let directory = profile_directory(main.directory.clone(), Some("operations"), true);
         {
             let mut practice = Host::new();
             practice.directory = directory.clone();
+            practice.paths = ProfilePaths::in_directory(directory.clone());
             practice.game.campaign.choose_start_country("DEU").unwrap();
             practice.game.campaign.coins = 300;
             practice.runtime.request_save(SaveIntent::Manual);
-            flush_for_test(&mut practice);
+            flush_for_test(&mut practice.ctx());
             let loaded = load_profile(directory);
             assert_eq!(loaded.game.campaign.coins, 300);
             assert_eq!(loaded.game.campaign.world.start.as_deref(), Some("DEU"));
@@ -1729,13 +1464,18 @@ mod tests {
             ..ControlFrame::default()
         });
         let mut app = App::new();
-        app.insert_resource(host)
-            .add_systems(FixedUpdate, advance::<Host>);
+        app.insert_resource(GameSession {
+            game: std::mem::take(&mut host.game),
+        })
+        .insert_resource(std::mem::take(&mut host.runtime))
+        .insert_resource(host.settings.clone())
+        .insert_resource(host.paths.clone())
+        .add_plugins(SimRuntimePlugin);
         app.world_mut().run_schedule(FixedUpdate);
         app.world_mut().run_schedule(FixedUpdate);
         assert_eq!(
             app.world()
-                .resource::<Host>()
+                .resource::<GameSession>()
                 .game
                 .attempt
                 .as_ref()
@@ -1743,6 +1483,25 @@ mod tests {
                 .tick,
             2
         );
+        app.world_mut()
+            .resource_mut::<Runtime>()
+            .finish_storage_for_test();
+    }
+    #[test]
+    fn paused_fixed_steps_report_no_game_change() {
+        let mut host = Host::new();
+        host.deploy();
+        host.game.set_paused(true);
+        host.runtime.publish(ControlFrame {
+            enabled: true,
+            ..ControlFrame::default()
+        });
+        let mut ctx = host.ctx();
+        step(&mut ctx);
+        assert!(!ctx.game_changed, "paused steps must not dirty GameSession");
+        ctx.game.set_paused(false);
+        step(&mut ctx);
+        assert!(ctx.game_changed);
     }
     #[test]
     fn confirmed_new_journey_archives_the_exact_current_game_and_preserves_preferences() {
@@ -1758,7 +1517,7 @@ mod tests {
         let before = state(&host.game);
         let balance = host.game.campaign.balance_settings.clone();
         host.runtime.enqueue(AppCommand::NewJourney, "");
-        assert!(!flush_for_test(&mut host));
+        assert!(!flush_for_test(&mut host.ctx()));
         let archive = host
             .notices
             .iter()
@@ -1805,7 +1564,7 @@ mod tests {
                 std::fs::create_dir(path.with_extension("tmp")).unwrap();
             }
             host.runtime.enqueue(AppCommand::NewJourney, "");
-            assert!(!flush_for_test(&mut host));
+            assert!(!flush_for_test(&mut host.ctx()));
             assert_eq!(state(&host.game), before);
             assert_eq!(std::fs::read(&path).unwrap(), saved);
             assert!(host.notices.iter().any(|n| matches!(
@@ -1832,7 +1591,7 @@ mod tests {
         let coins = host.game.campaign.coins;
         let records = host.game.campaign.run_history.len();
         host.runtime.enqueue(Command::LeaveJourney, "");
-        flush_for_test(&mut host);
+        flush_for_test(&mut host.ctx());
         let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
         assert!(!saved.campaign.journey_active);
         assert_eq!(saved.campaign.coins, coins);
@@ -1853,30 +1612,30 @@ mod tests {
         let (service, gate) = persistence::gated();
         host.runtime.storage = service;
         host.runtime.request_save(SaveIntent::Quit);
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         gate.started();
         let original = state(&host.game);
         host.runtime.enqueue(AppCommand::NewJourney, "");
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         host.runtime
             .enqueue(Command::BuySkillNode("steady_hands".into()), "");
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         host.runtime.publish(ControlFrame {
             enabled: true,
             speed: 4,
             ..Default::default()
         });
-        step(&mut host);
+        step(&mut host.ctx());
         assert_eq!(state(&host.game), original);
         assert_eq!(host.runtime.simulated_ticks, 0);
         gate.release();
         persistence::wait_for_test(&mut host.runtime.storage);
-        assert!(!persist_pending(&mut host));
+        assert!(!persist_pending(&mut host.ctx()));
         assert!(gate.started().reset);
         assert_eq!(state(&host.game), original);
         gate.release();
         persistence::wait_for_test(&mut host.runtime.storage);
-        assert!(!persist_pending(&mut host));
+        assert!(!persist_pending(&mut host.ctx()));
         assert!(host.game.campaign.world.start.is_none());
         assert_eq!(host.game.campaign.coins, 0);
         assert!(!host.notices.iter().any(|n| matches!(
@@ -1899,26 +1658,26 @@ mod tests {
             let (service, gate) = persistence::gated();
             host.runtime.storage = service;
             host.runtime.request_save(SaveIntent::Autosave);
-            assert!(!persist_pending(&mut host));
+            assert!(!persist_pending(&mut host.ctx()));
             gate.started();
             host.game.campaign.coins = 77;
             host.settings.master = 0.41;
             host.runtime.request_save(intent);
-            assert!(!persist_pending(&mut host));
+            assert!(!persist_pending(&mut host.ctx()));
             assert!(gate.no_next_job());
             assert!(!host.notices.iter().any(
                 |n| matches!(n,RuntimeNotice::Saved{intent:found,result:Ok(())} if *found==intent)
             ));
             gate.release();
             persistence::wait_for_test(&mut host.runtime.storage);
-            assert!(!persist_pending(&mut host));
+            assert!(!persist_pending(&mut host.ctx()));
             assert_eq!(gate.started().coins, 77);
             assert!(!host.notices.iter().any(
                 |n| matches!(n,RuntimeNotice::Saved{intent:found,result:Ok(())} if *found==intent)
             ));
             gate.release();
             persistence::wait_for_test(&mut host.runtime.storage);
-            assert_eq!(persist_pending(&mut host), intent == SaveIntent::Quit);
+            assert_eq!(persist_pending(&mut host.ctx()), intent == SaveIntent::Quit);
             let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
             assert_eq!(saved.campaign.coins, 77);
             assert_eq!(
@@ -1942,7 +1701,7 @@ mod tests {
             host.runtime.enqueue(Command::SetPaused(true), "");
             host.runtime.enqueue(AppCommand::Save(intent), "");
             assert!(host.runtime.durable_transition_pending());
-            assert!(!flush(&mut host));
+            assert!(!flush(&mut host.ctx()));
             gate.started();
             assert!(host.game.global_paused);
             let state_before = state(&host.game);
@@ -1963,14 +1722,14 @@ mod tests {
                 speed: 4,
                 ..Default::default()
             });
-            step(&mut host);
+            step(&mut host.ctx());
             assert_eq!(state(&host.game), state_before);
             assert_eq!(host.runtime.simulated_ticks, 0);
-            assert!(!flush(&mut host));
+            assert!(!flush(&mut host.ctx()));
             assert!(gate.no_next_job());
             gate.release();
             persistence::wait_for_test(&mut host.runtime.storage);
-            assert_eq!(persist_pending(&mut host), intent == SaveIntent::Quit);
+            assert_eq!(persist_pending(&mut host.ctx()), intent == SaveIntent::Quit);
             assert_eq!(
                 state(&Game::load(&host.directory.join("campaign.json")).unwrap()),
                 state_before
@@ -1984,23 +1743,23 @@ mod tests {
         let (service, gate) = persistence::gated();
         host.runtime.storage = service;
         host.runtime.enqueue(AppCommand::NewJourney, "");
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         assert!(gate.started().reset);
         host.runtime.enqueue(AppCommand::Save(SaveIntent::Quit), "");
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         gate.release();
         persistence::wait_for_test(&mut host.runtime.storage);
-        assert!(!persist_pending(&mut host));
+        assert!(!persist_pending(&mut host.ctx()));
         assert_eq!(host.game.campaign.coins, 0);
         assert!(host.runtime.durable_transition_pending());
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         let next = gate.started();
         assert!(!next.reset);
         assert_eq!(next.coins, 0);
         assert!(host.game.global_paused);
         gate.release();
         persistence::wait_for_test(&mut host.runtime.storage);
-        assert!(persist_pending(&mut host));
+        assert!(persist_pending(&mut host.ctx()));
         let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
         assert!(saved.global_paused);
         assert_eq!(saved.campaign.coins, 0);
@@ -2016,21 +1775,21 @@ mod tests {
         // reject this old-state pause; the deferred fresh pause is mandatory.
         host.runtime.enqueue(Command::SetPaused(true), "");
         assert!(host.runtime.enqueue(AppCommand::Save(SaveIntent::Quit), ""));
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         assert!(gate.started().reset);
         gate.release();
         persistence::wait_for_test(&mut host.runtime.storage);
-        assert!(!persist_pending(&mut host));
+        assert!(!persist_pending(&mut host.ctx()));
         assert_eq!(host.game.campaign.coins, 0);
         assert!(host.runtime.durable_transition_pending());
-        assert!(!flush(&mut host));
+        assert!(!flush(&mut host.ctx()));
         let saved = gate.started();
         assert!(!saved.reset);
         assert_eq!(saved.coins, 0);
         assert!(host.game.global_paused);
         gate.release();
         persistence::wait_for_test(&mut host.runtime.storage);
-        assert!(persist_pending(&mut host));
+        assert!(persist_pending(&mut host.ctx()));
         let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
         assert_eq!(saved.campaign.coins, 0);
         assert!(saved.global_paused);

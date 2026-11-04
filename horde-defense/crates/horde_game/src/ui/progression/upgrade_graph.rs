@@ -1,5 +1,10 @@
 //! Inspectable progression canvas. Geometry and view state are presentation-only.
-use super::super::*;
+use crate::art::{AMBER, INK, MUTED, TEXT};
+use crate::ui::muted;
+use bevy_egui::egui::{
+    self, Align, Align2, Color32, FontId, Layout, Rect, Sense, Stroke, pos2, vec2,
+};
+use horde_core::{campaign::Skill, content::StructureKind};
 
 #[derive(Clone, Copy)]
 pub(super) enum Icon {

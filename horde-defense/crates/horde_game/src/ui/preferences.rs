@@ -1,10 +1,17 @@
 //! Settings presentation. Changes persist through the existing save-and-return intent.
-use super::*;
+use super::{Screen, UiCtx, chrome, muted, primary, status};
+use crate::{
+    art::{AMBER, INK, RED},
+    runner::SaveIntent,
+    settings::{Action, Settings},
+};
+use bevy_egui::egui;
+use horde_core::command::Command;
 
-pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
     let ctx = root.ctx().clone();
     if !f.runtime.durable_transition_pending()
-        && f.rebind.is_none()
+        && f.prefs.rebind.is_none()
         && !ctx.text_edit_focused()
         && !ctx.any_popup_open()
         && ctx.input(|input| input.key_pressed(egui::Key::Escape))
@@ -20,7 +27,7 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut Frontend) {
                     if primary(ui, f.settings_return_label()) {
                         f.request_save(SaveIntent::SettingsBack);
                     }
-                    if !matches!(f.return_screen, Screen::Menu | Screen::SurvivorSelection | Screen::Settings)
+                    if !matches!(f.nav.return_screen, Screen::Menu | Screen::SurvivorSelection | Screen::Settings)
                         && ui.button("Save and return to main menu").clicked()
                     {
                         f.save_settings_to_menu();
@@ -28,11 +35,11 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut Frontend) {
                 });
             });
             muted(ui, format!("Escape: {}. All fields stay paused while you adjust settings.", f.settings_return_label()));
-            if f.message_error {
+            if f.status.message_error {
                 // Save failures must stay readable without hovering, opening a
                 // transient details popup, or leaving this screen.
-                ui.colored_label(RED, &f.message);
-            } else if !f.message.is_empty() {
+                ui.colored_label(RED, &f.status.message);
+            } else if !f.status.message.is_empty() {
                 status(ui, f);
             }
             ui.add_enabled_ui(!f.runtime.durable_transition_pending(),|ui| {
@@ -40,23 +47,23 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut Frontend) {
                 gameplay_settings(ui, f);
                 if ui.available_width() >= 800.0 {
                     ui.columns(2, |columns| {
-                        display_settings(&mut columns[0], &mut f.settings);
-                        combat_settings(&mut columns[0], &mut f.settings);
-                        audio_settings(&mut columns[0], &mut f.settings);
+                        display_settings(&mut columns[0], f.settings);
+                        combat_settings(&mut columns[0], f.settings);
+                        audio_settings(&mut columns[0], f.settings);
                         remap_settings(&mut columns[1], f, &ctx);
                     });
                 } else {
-                    display_settings(ui, &mut f.settings);
-                    combat_settings(ui, &mut f.settings);
-                    audio_settings(ui, &mut f.settings);
+                    display_settings(ui, f.settings);
+                    combat_settings(ui, f.settings);
+                    audio_settings(ui, f.settings);
                     remap_settings(ui, f, &ctx);
                 }
                 chrome::section(ui, "Profile");
                 if ui.button("Restore display, audio & control defaults").clicked() {
-                    f.settings = Settings::default();
-                    f.rebind = None;
+                    *f.settings = Settings::default();
+                    f.prefs.rebind = None;
                 }
-                muted(ui, format!("Save location: {}", f.save_path.display()));
+                muted(ui, format!("Save location: {}", f.paths.campaign().display()));
                 muted(ui, "Every important sound has a visual cue. The camera is fixed; aiming never shakes.");
             });});
         });
@@ -92,7 +99,7 @@ fn audio_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     ui.add(egui::Slider::new(&mut settings.effects, 0.0..=1.0).text("Combat effects"));
     ui.add(egui::Slider::new(&mut settings.ambience, 0.0..=1.0).text("Atmosphere"));
 }
-fn remap_settings(ui: &mut egui::Ui, f: &mut Frontend, ctx: &egui::Context) {
+fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
     chrome::section(ui, "Controls");
     muted(
         ui,
@@ -106,24 +113,24 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut Frontend, ctx: &egui::Context) {
             for action in Action::ALL {
                 ui.label(action.name());
                 if ui
-                    .button(if f.rebind == Some(action) {
+                    .button(if f.prefs.rebind == Some(action) {
                         "Press key or mouse button…".into()
                     } else {
                         f.settings.bindings[action as usize].clone()
                     })
                     .clicked()
                 {
-                    f.rebind = Some(action);
-                    f.binding_armed = false;
+                    f.prefs.rebind = Some(action);
+                    f.prefs.binding_armed = false;
                     clicked = true;
                 }
                 ui.end_row();
             }
         });
-    if let Some(action) = f.rebind
+    if let Some(action) = f.prefs.rebind
         && !f.runtime.durable_transition_pending()
     {
-        if f.binding_armed && !clicked {
+        if f.prefs.binding_armed && !clicked {
             let pressed = ctx.input(|input| {
                 input.events.iter().find_map(|event| match event {
                     egui::Event::Key {
@@ -155,15 +162,15 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut Frontend, ctx: &egui::Context) {
                 } else {
                     f.settings.bindings[action as usize] = key;
                 }
-                f.rebind = None;
+                f.prefs.rebind = None;
             }
         } else if !clicked {
-            f.binding_armed = true;
+            f.prefs.binding_armed = true;
         }
     }
 }
 
-fn gameplay_settings(ui: &mut egui::Ui, f: &mut Frontend) {
+fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
     use horde_core::balance::{BalancePreset, BalanceSettings};
     chrome::section(ui, "Gameplay · difficulty");
     ui.colored_label(
@@ -191,7 +198,10 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut Frontend) {
     }
     let apply = {
         let committed = &f.game.campaign.balance_settings;
-        let draft = f.balance_draft.get_or_insert_with(|| committed.clone());
+        let draft = f
+            .prefs
+            .balance_draft
+            .get_or_insert_with(|| committed.clone());
         ui.horizontal_wrapped(|ui| {
             for preset in BalancePreset::ALL {
                 if ui

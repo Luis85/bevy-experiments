@@ -216,7 +216,8 @@ pub fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
         egui_textures: std::array::from_fn(|_| OnceLock::new()),
     });
 }
-#[derive(Clone, Copy, Default, Debug)]
+/// Egui texture ids for the loaded art, re-registered each frame.
+#[derive(Resource, Clone, Copy, Default, Debug)]
 pub struct ArtTextures {
     pub actors: Option<TextureId>,
     pub props: Option<TextureId>,

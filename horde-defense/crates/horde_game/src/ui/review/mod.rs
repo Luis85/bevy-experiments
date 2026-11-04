@@ -1,6 +1,17 @@
 //! Explicit isolated screenshot fixtures. These startup-only staged campaigns
 //! are never claimed as balance proof or used by the ordinary user profile.
-use super::*;
+#[cfg(feature = "review")]
+use super::BattleUi;
+use super::{FrontendParts, Screen, Tab, armory, battle};
+use crate::settings::Settings;
+use horde_core::{
+    campaign::{BodyAttribute, NpcTraining, Skill},
+    content::{Mode, Slot, StructureKind, content},
+    ordnance::{OrdnanceKind, ThrowRequest},
+    sim::{Game, Input, Outcome},
+    survivors::SurvivorId,
+    world::world,
+};
 
 #[cfg(feature = "review")]
 mod player_model;
@@ -62,43 +73,45 @@ fn scheduled_gesture_input(
     Some(input)
 }
 
+/// Capture-service timing bridge. Only explicit isolated gesture exports
+/// can enqueue these ordinary controls; fixed runtime/core owns all effects.
 #[cfg(feature = "review")]
-impl Frontend {
-    /// Capture-service timing bridge. Only explicit isolated gesture exports
-    /// can enqueue these ordinary controls; fixed runtime/core owns all effects.
-    pub(crate) fn schedule_gesture_review(&mut self, frame: u32) {
-        let Some(kind) = gesture_fixture(
-            self.launch.scenario.as_deref(),
-            self.launch.motion_review(),
-            self.launch.sequence_path().is_some(),
-            self.launch.practice,
-        ) else {
-            return;
+pub(crate) fn schedule_gesture_review(
+    launch: &crate::launch::LaunchConfig,
+    game: &Game,
+    battle: &mut BattleUi,
+    frame: u32,
+) {
+    let Some(kind) = gesture_fixture(
+        launch.scenario.as_deref(),
+        launch.motion_review(),
+        launch.sequence_path().is_some(),
+        launch.practice,
+    ) else {
+        return;
+    };
+    let Some(attempt) = game
+        .attempt
+        .as_ref()
+        .filter(|attempt| attempt.mode == Mode::Personal && !attempt.paused)
+    else {
+        return;
+    };
+    let Some(input) = scheduled_gesture_input(kind, frame, attempt) else {
+        return;
+    };
+    battle.aim = input.aim;
+    battle.pending.aim = input.aim;
+    if input.melee {
+        battle.pending.melee = true;
+        battle.pending_attack_aims.melee = Some(input.aim);
+    }
+    if let Some(request) = input.throw {
+        battle.attack_selection = match request.kind {
+            OrdnanceKind::Grenade => battle::AttackSelection::Grenade,
+            OrdnanceKind::Molotov => battle::AttackSelection::Molotov,
         };
-        let Some(attempt) = self
-            .game
-            .attempt
-            .as_ref()
-            .filter(|attempt| attempt.mode == Mode::Personal && !attempt.paused)
-        else {
-            return;
-        };
-        let Some(input) = scheduled_gesture_input(kind, frame, attempt) else {
-            return;
-        };
-        self.aim = input.aim;
-        self.pending.aim = input.aim;
-        if input.melee {
-            self.pending.melee = true;
-            self.pending_attack_aims.melee = Some(input.aim);
-        }
-        if let Some(request) = input.throw {
-            self.attack_selection = match request.kind {
-                OrdnanceKind::Grenade => battle::AttackSelection::Grenade,
-                OrdnanceKind::Molotov => battle::AttackSelection::Molotov,
-            };
-            self.pending.throw = Some(request);
-        }
+        battle.pending.throw = Some(request);
     }
 }
 
@@ -158,7 +171,7 @@ impl crate::launch::LaunchConfig {
 /// Review-only presentation override. Persistent and ordinary profiles keep
 /// their chosen preference, and no game clock or random state is inspected.
 pub(super) fn apply_reduced_override(
-    f: &mut Frontend,
+    f: &mut FrontendParts,
     scenario_present: bool,
     practice: bool,
     force_reduced: bool,
@@ -168,7 +181,7 @@ pub(super) fn apply_reduced_override(
     }
 }
 
-pub(super) fn prepare(f: &mut Frontend) {
+pub(super) fn prepare(f: &mut FrontendParts) {
     let launch = f.launch.clone();
     let Some(screen) = launch.scenario.clone() else {
         return;
@@ -184,13 +197,13 @@ pub(super) fn prepare(f: &mut Frontend) {
     if let Some(scale) = launch.review().and_then(|r| r.scale) {
         f.settings.scale = scale;
     }
-    f.message = "Practice scenario - progress is isolated from your campaign".into();
+    f.status.message = "Practice scenario - progress is isolated from your campaign".into();
     if screen == "menu" {
         return;
     }
     if screen == "survivor-select" {
         f.screen = Screen::SurvivorSelection;
-        f.preview_survivor = SurvivorId::Rook;
+        f.campaign.preview_survivor = SurvivorId::Rook;
         return;
     }
     let identity = if matches!(
@@ -205,7 +218,7 @@ pub(super) fn prepare(f: &mut Frontend) {
         .campaign
         .choose_survivor(identity)
         .expect("review survivor identity");
-    f.preview_survivor = identity;
+    f.campaign.preview_survivor = identity;
     if screen == "menu-female" {
         f.screen = Screen::Menu;
         return;
@@ -218,16 +231,16 @@ pub(super) fn prepare(f: &mut Frontend) {
             horde_core::sim::peak_render_fixture().expect("valid paused peak-render fixture")
         };
         f.screen = Screen::Battle;
-        f.mode = Mode::Npc;
-        f.selected_country = "USA".into();
-        f.message = if matches!(screen.as_str(),"progressed-peak"|"max-lanes") { "Synthetic maximum-rank fixture · authored population cap plus boss · no gameplay or FPS claim" } else { "Paused peak-render fixture · no simulation FPS claim" }.into();
+        f.campaign.mode = Mode::Npc;
+        f.campaign.selected_country = "USA".into();
+        f.status.message = if matches!(screen.as_str(),"progressed-peak"|"max-lanes") { "Synthetic maximum-rank fixture · authored population cap plus boss · no gameplay or FPS claim" } else { "Paused peak-render fixture · no simulation FPS claim" }.into();
         return;
     }
     f.screen = Screen::Camp;
     if screen == "history-empty" {
         f.screen = Screen::History;
-        f.history_return = Screen::Menu;
-        f.history_world_paused = true;
+        f.nav.history_return = Screen::Menu;
+        f.nav.history_world_paused = true;
         f.game.set_paused(true);
         return;
     }
@@ -244,13 +257,13 @@ pub(super) fn prepare(f: &mut Frontend) {
         .campaign
         .choose_start_country(country)
         .expect("review country");
-    f.selected_country = country.into();
+    f.campaign.selected_country = country.into();
     if matches!(screen.as_str(), "briefing" | "briefing-npc") {
         if screen == "briefing-npc" {
             prepare_progression(&mut f.game);
-            f.mode = Mode::Npc;
+            f.campaign.mode = Mode::Npc;
         }
-        f.open_briefing();
+        f.act(|c| c.open_briefing());
         f.game.set_paused(true);
         return;
     }
@@ -274,8 +287,8 @@ pub(super) fn prepare(f: &mut Frontend) {
             f.game.withdraw();
         }
         f.game.set_paused(true);
-        f.mode = Mode::Personal;
-        f.focus_next_upgrade();
+        f.campaign.mode = Mode::Personal;
+        f.act(|c| c.focus_next_upgrade());
         f.screen = Screen::Results;
         return;
     }
@@ -284,7 +297,7 @@ pub(super) fn prepare(f: &mut Frontend) {
             .deploy_country_stage(0, Mode::Personal)
             .expect("first-defense fixture");
         f.screen = Screen::Battle;
-        f.mode = Mode::Personal;
+        f.campaign.mode = Mode::Personal;
         f.game.set_paused(true);
         return;
     }
@@ -313,7 +326,7 @@ pub(super) fn prepare(f: &mut Frontend) {
                 .campaign
                 .enter_country("POL")
                 .expect("neighbor after liberation");
-            f.selected_country = "POL".into();
+            f.campaign.selected_country = "POL".into();
         }
     }
     prepare_progression(&mut f.game);
@@ -331,23 +344,23 @@ pub(super) fn prepare(f: &mut Frontend) {
             );
             prepare_gesture_battle(f, screen == "gesture-melee");
         }
-        "character" => f.tab = Tab::Character,
+        "character" => f.nav.tab = Tab::Character,
         "character-max" => {
             f.game.campaign.player.level = f.game.campaign.player_level_cap();
             f.game.campaign.player.xp = 0;
             f.game.campaign.player.points =
                 f.game.campaign.player.level - 1 - f.game.campaign.player.body.iter().sum::<u32>();
-            f.tab = Tab::Character;
+            f.nav.tab = Tab::Character;
         }
-        "campaign" => f.tab = Tab::World,
+        "campaign" => f.nav.tab = Tab::World,
         "active-camp" => {
             prepare_battle(f, "npc");
             f.screen = Screen::Camp;
-            f.tab = Tab::World;
+            f.nav.tab = Tab::World;
         }
-        "survivor" => f.tab = Tab::Survivor,
+        "survivor" => f.nav.tab = Tab::Survivor,
         "armory" | "leveled-armory" | "quality-armory" => {
-            f.tab = Tab::Armory;
+            f.nav.tab = Tab::Armory;
             if screen == "quality-armory" {
                 let definition = content()
                     .items
@@ -355,18 +368,18 @@ pub(super) fn prepare(f: &mut Frontend) {
                     .position(|i| i.slot == Slot::Ranged && i.tier == 1)
                     .expect("review rifle");
                 for quality in horde_core::quality::Quality::ALL {
-                    f.selected_item = Some(
+                    f.armory.selected_item = Some(
                         f.game
                             .campaign
                             .add_item_with_quality(definition, 4, Some(quality))
                             .expect("explicit quality fixture entitlement"),
                     );
                 }
-                f.armory_sort = armory::ArmorySort::Quality;
+                f.armory.sort = armory::ArmorySort::Quality;
                 f.game.set_paused(true);
                 return;
             }
-            f.selected_item = f
+            f.armory.selected_item = f
                 .game
                 .campaign
                 .items
@@ -376,19 +389,20 @@ pub(super) fn prepare(f: &mut Frontend) {
         }
         "skills" | "skills-survival" | "skills-ordnance" => {
             f.screen = Screen::Results;
-            f.tab = Tab::Skills;
-            f.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
-                match screen.as_str() {
-                    "skills-survival" => "field_fitness",
-                    "skills-ordnance" => "grenade_training",
-                    _ => "pistol_training",
-                }
-                .into(),
-            ));
+            f.nav.tab = Tab::Skills;
+            f.campaign.improvement_focus =
+                Some(horde_core::campaign::RecommendationAction::LearnNode(
+                    match screen.as_str() {
+                        "skills-survival" => "field_fitness",
+                        "skills-ordnance" => "grenade_training",
+                        _ => "pistol_training",
+                    }
+                    .into(),
+                ));
         }
         "engineering" => {
             f.screen = Screen::Results;
-            f.improvement_focus = horde_core::skill_catalog::skills()
+            f.campaign.improvement_focus = horde_core::skill_catalog::skills()
                 .nodes
                 .iter()
                 .find(|n| n.branch == "Fortification")
@@ -439,15 +453,15 @@ pub(super) fn prepare(f: &mut Frontend) {
                     ..Default::default()
                 });
             }
-            f.aim = [
+            f.battle.aim = [
                 f.game.attempt.as_ref().unwrap().width_yards * 0.6,
                 f.game.attempt.as_ref().unwrap().defender_position()[1],
             ];
         }
         "damage-4x" => {
             prepare_battle(f, "npc");
-            f.speed = 4;
-            f.aim = [
+            f.battle.speed = 4;
+            f.battle.aim = [
                 f.game.attempt.as_ref().unwrap().width_yards * 0.6,
                 f.game.attempt.as_ref().unwrap().defender_position()[1],
             ];
@@ -464,7 +478,7 @@ pub(super) fn prepare(f: &mut Frontend) {
             enemy.hp = -2;
             enemy.injury.hp = -2;
             f.game.attempt = Some(a);
-            f.speed = 4;
+            f.battle.speed = 4;
         }
         "quality-loot" => {
             prepare_battle(f, "battle");
@@ -493,12 +507,12 @@ pub(super) fn prepare(f: &mut Frontend) {
         }
         "battle" | "battle-female" | "progressed-battle" | "construction" | "ordnance" | "npc"
         | "boss" | "results" | "arid" | "tropical" => prepare_battle(f, &screen),
-        _ => f.tab = Tab::World,
+        _ => f.nav.tab = Tab::World,
     }
     f.game.set_paused(true);
 }
 /// Strict opt-in copied checkpoint; production and source files are never targets.
-fn prepare_copied_npc(f: &mut Frontend) {
+fn prepare_copied_npc(f: &mut FrontendParts) {
     let launch = f.launch.clone();
     assert!(
         !launch.practice,
@@ -518,10 +532,10 @@ fn prepare_copied_npc(f: &mut Frontend) {
     for source in [&canonical, &copied_settings] {
         if let Ok(source) = source.canonicalize() {
             for target in [
-                &f.save_path,
-                &f.save_path.with_extension("bak"),
-                &f.save_path.with_extension("tmp"),
-                &f.settings_path,
+                &f.paths.campaign(),
+                &f.paths.campaign().with_extension("bak"),
+                &f.paths.campaign().with_extension("tmp"),
+                &f.paths.settings(),
             ] {
                 if let Ok(target) = target.canonicalize() {
                     assert_ne!(
@@ -547,20 +561,20 @@ fn prepare_copied_npc(f: &mut Frontend) {
         f.settings.scale = scale;
     }
     f.game.set_paused(false);
-    f.mode = Mode::Npc;
+    f.campaign.mode = Mode::Npc;
     f.screen = Screen::Battle;
-    f.speed = launch.review().and_then(|r| r.perf.npc_speed).unwrap_or(1);
+    f.battle.speed = launch.review().and_then(|r| r.perf.npc_speed).unwrap_or(1);
     assert!(
-        matches!(f.speed, 1 | 2 | 4),
+        matches!(f.battle.speed, 1 | 2 | 4),
         "NPC diagnostic speed must be1,2or4"
     );
     let a = f.game.attempt.as_ref().unwrap();
-    f.aim = [a.width_yards * 0.6, a.defender_position()[1]];
-    f.message = "Copied checkpoint/resumed NPC battle · isolated performance review".into();
+    f.battle.aim = [a.width_yards * 0.6, a.defender_position()[1]];
+    f.status.message = "Copied checkpoint/resumed NPC battle · isolated performance review".into();
 }
 
 /// Staged near-defeated boss; real core settlement supplies the report/rewards.
-fn prepare_journey_victory(f: &mut Frontend, liberated: bool) {
+fn prepare_journey_victory(f: &mut FrontendParts, liberated: bool) {
     let count = f
         .game
         .campaign
@@ -601,8 +615,8 @@ fn prepare_journey_victory(f: &mut Frontend, liberated: bool) {
         Outcome::Victory
     );
     f.game.set_paused(true);
-    f.mode = Mode::Personal;
-    f.focus_next_upgrade();
+    f.campaign.mode = Mode::Personal;
+    f.act(|c| c.focus_next_upgrade());
     f.screen = Screen::Results;
 }
 
@@ -685,7 +699,7 @@ fn prepare_progression(game: &mut Game) {
         .save_preset("Prepared patrol".into(), Mode::Personal)
         .expect("fixture preset");
 }
-fn prepare_history(f: &mut Frontend) {
+fn prepare_history(f: &mut FrontendParts) {
     // Real model deployments/inputs/settlements, never authored plot points.
     for mode in [Mode::Personal, Mode::Npc, Mode::Personal] {
         f.game
@@ -707,11 +721,11 @@ fn prepare_history(f: &mut Frontend) {
             f.game.withdraw();
         }
     }
-    f.history_return = Screen::Camp;
-    f.history_world_paused = true;
+    f.nav.history_return = Screen::Camp;
+    f.nav.history_world_paused = true;
     f.screen = Screen::History;
 }
-fn prepare_battle(f: &mut Frontend, screen: &str) {
+fn prepare_battle(f: &mut FrontendParts, screen: &str) {
     let mode = if screen == "npc" {
         Mode::Npc
     } else {
@@ -791,8 +805,8 @@ fn prepare_battle(f: &mut Frontend, screen: &str) {
             }),
             ..Input::default()
         });
-        f.attack_selection = battle::AttackSelection::Molotov;
-        f.aim = [
+        f.battle.attack_selection = battle::AttackSelection::Molotov;
+        f.battle.aim = [
             f.game.attempt.as_ref().unwrap().width_yards * 0.6,
             f.game.attempt.as_ref().unwrap().defender_position()[1],
         ];
@@ -809,23 +823,23 @@ fn prepare_battle(f: &mut Frontend, screen: &str) {
         );
         f.screen = Screen::Battle;
     }
-    f.mode = mode;
-    f.construction = screen == "construction";
+    f.campaign.mode = mode;
+    f.battle.construction = screen == "construction";
     if let Some(enemy) = f.game.attempt.as_ref().and_then(|a| {
         a.enemies
             .iter()
             .find(|e| e.boss)
             .or_else(|| a.enemies.first())
     }) {
-        f.aim = [enemy.x, enemy.y()];
+        f.battle.aim = [enemy.x, enemy.y()];
     }
 }
 
-fn prepare_gesture_battle(f: &mut Frontend, melee: bool) {
+fn prepare_gesture_battle(f: &mut FrontendParts, melee: bool) {
     prepare_battle(f, "battle");
-    f.fire_latched = false;
-    f.speed = 1;
-    f.pending = Input::default();
+    f.battle.fire_latched = false;
+    f.battle.speed = 1;
+    f.battle.pending = Input::default();
     // Remove automated damage using the actual legal salvage operation. The
     // single contact placement below is initial fixture staging, never an
     // invented action event, damage result, cooldown or later-frame teleport.
@@ -859,15 +873,15 @@ fn prepare_gesture_battle(f: &mut Frontend, melee: bool) {
         target.x = horde_core::sim::DEFENSE_LINE;
         target.pass_offset = 0.;
     }
-    f.aim = [
+    f.battle.aim = [
         attempt.width_yards * 0.6,
         f32::from(attempt.lane_count / 2) + 0.5,
     ];
-    f.mode = Mode::Personal;
+    f.campaign.mode = Mode::Personal;
     f.screen = Screen::Battle;
 }
-fn prepare_operations(f: &mut Frontend) {
-    f.tab = Tab::Operations;
+fn prepare_operations(f: &mut FrontendParts) {
+    f.nav.tab = Tab::Operations;
     for id in ["DEU", "FRA", "CHE", "AUT"] {
         f.game.campaign.world.cleared.push(id.into());
         f.game
@@ -930,7 +944,7 @@ mod loot_capture_tests {
             );
         }
     }
-    fn prepared_frontend() -> Frontend {
+    fn prepared_frontend() -> FrontendParts {
         let mut f = crate::ui::test_support::test_frontend();
         f.game = Game::default();
         f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();

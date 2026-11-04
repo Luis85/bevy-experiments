@@ -12,7 +12,7 @@ source: "crates/horde_game/src/ui.rs::draw"
 Application shell for the campaign, personal defense and delegated operations.
 
 - **Entry, exit and actions:** Launch opens main-menu; fresh profiles choose survivor-selection before the first country. Screen routing also chooses campaign, preparation, battle, debrief, run history or settings.
-- **State boundary:** Game and Runtime own campaign and attempt state. Frontend owns screen, selected tabs and transient presentation.
+- **State boundary:** Game and Runtime own campaign and attempt state. The UI owns the `Screen`/`Tab` states, `Navigation` and per-screen UI resources (transient presentation).
 - **Responsiveness and accessibility:** Preserve readable controls at the supported minimum window and interface scales. Important sound cues also have visible feedback.
 
 **Current increment contract:** Confirm a personal survivor before the first country. Choosing that country immediately deploys a live personal defense. Each main outcome routes to Journey upgrades with explicit preparation and continuation actions. Earned coins/items remain banked. Roughly 3–5 early runs is a pacing target; dated checks and their limits belong in VALIDATION.md. Every committed victory, including a replay or NPC/worker success, raises future threat and grants once-only completion XP; defeat and withdrawal do not. Character MAX and lane/population caps do not cap future health/damage growth.

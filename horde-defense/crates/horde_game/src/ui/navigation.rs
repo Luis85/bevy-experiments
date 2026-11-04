@@ -1,7 +1,13 @@
 //! Task navigation and active-field wayfinding; authority stays in commands.
-use super::*;
+use super::{Screen, Tab, UiCtx, feedback, muted};
+use crate::{
+    art::{AMBER, PANEL, RED},
+    runner::SaveIntent,
+};
+use bevy_egui::egui::{self, Align, Color32, FontId, Layout, RichText, Stroke, pos2};
+use horde_core::{command::Command, content::Mode};
 
-pub(super) fn header(root: &mut egui::Ui, f: &mut Frontend, accent: f32) {
+pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
     let header = egui::Panel::top("header")
         .exact_size(44.0)
         .frame(
@@ -52,9 +58,9 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut Frontend, accent: f32) {
                             .clicked()
                     {
                         f.dispatch(Command::SetPaused(true), "");
-                        f.fire_latched = false;
-                        f.screen = Screen::Camp;
-                        f.tab = Tab::Operations;
+                        f.battle.fire_latched = false;
+                        f.go(Screen::Camp);
+                        f.go_tab(Tab::Operations);
                     }
                 });
             });
@@ -66,7 +72,7 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut Frontend, accent: f32) {
     );
 }
 
-pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
     if f.game.campaign.world.start.is_none() {
         return;
     }
@@ -83,7 +89,7 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut Frontend) {
                 }
                 let response = ui.selectable_label(f.tab == Tab::World, "Campaign");
                 if response.clicked() {
-                    f.tab = Tab::World;
+                    f.go_tab(Tab::World);
                 }
                 feedback::tab_marker(
                     ui,
@@ -95,7 +101,7 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut Frontend) {
                 let prep = !matches!(f.tab, Tab::World | Tab::Operations);
                 let response = ui.selectable_label(prep, "Prepare");
                 if response.clicked() {
-                    f.open_preparation(f.last_prepare_tab);
+                    f.open_preparation(f.nav.last_prepare_tab);
                 }
                 feedback::tab_marker(
                     ui,
@@ -107,7 +113,7 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut Frontend) {
                 if f.operations_available() {
                     let response = ui.selectable_label(f.tab == Tab::Operations, "Operations");
                     if response.clicked() {
-                        f.tab = Tab::Operations;
+                        f.go_tab(Tab::Operations);
                     }
                     feedback::tab_marker(
                         ui,
@@ -145,8 +151,8 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut Frontend) {
                             continue;
                         }
                         if ui.selectable_label(f.tab == tab, label).clicked() {
-                            f.tab = tab;
-                            f.last_prepare_tab = tab;
+                            f.go_tab(tab);
+                            f.nav.last_prepare_tab = tab;
                         }
                     }
                 });
@@ -154,7 +160,7 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut Frontend) {
         });
 }
 
-pub(super) fn field_status(root: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
     if !matches!(f.screen, Screen::Camp | Screen::Results) {
         return;
     }
@@ -181,8 +187,8 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut Frontend) {
                         }
                     ));
                     if ui.button("Return to active defense").clicked() {
-                        f.screen = Screen::Battle;
-                        f.fire_latched = false;
+                        f.go(Screen::Battle);
+                        f.battle.fire_latched = false;
                     }
                 }
                 if fields > 0 {
@@ -191,10 +197,11 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut Frontend) {
                         if f.screen != Screen::Camp {
                             f.dispatch(Command::SetPaused(true), "");
                         }
-                        f.screen = Screen::Camp;
-                        f.tab = Tab::Operations;
-                        if f.observed.is_none() {
-                            f.observed = f.game.battles.iter().find(|b| !b.settled).map(|b| b.id);
+                        f.go(Screen::Camp);
+                        f.go_tab(Tab::Operations);
+                        if f.campaign.observed.is_none() {
+                            f.campaign.observed =
+                                f.game.battles.iter().find(|b| !b.settled).map(|b| b.id);
                         }
                     }
                 }

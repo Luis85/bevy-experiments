@@ -1,9 +1,12 @@
 //! Review-only player-model workshop, parity, parts, matrix and repair screens.
 //! Built only with the `review` feature; drawn instead of the game screens when
 //! an isolated review names one of them.
-use super::*;
+use super::player_model;
+use crate::art::INK;
+use crate::ui::UiCtx;
+use bevy_egui::egui;
 
-pub(in crate::ui) fn model_workshop(root: &mut egui::Ui, f: &Frontend) -> bool {
+pub(in crate::ui) fn model_workshop(root: &mut egui::Ui, f: &UiCtx) -> bool {
     let scene = f.launch.scenario.clone();
     if let Some(id) = scene
         .as_deref()
@@ -23,14 +26,14 @@ pub(in crate::ui) fn model_workshop(root: &mut egui::Ui, f: &Frontend) -> bool {
         .as_deref()
         .and_then(|scene| scene.strip_prefix("model-matrix-"))
     {
-        model_matrix(root, &f.launch, id);
+        model_matrix(root, f.launch, id);
         return true;
     }
     if let Some(id) = scene
         .as_deref()
         .and_then(|scene| scene.strip_prefix("model-repairs-"))
     {
-        model_repairs(root, &f.launch, id);
+        model_repairs(root, f.launch, id);
         return true;
     }
     if !matches!(
@@ -94,7 +97,7 @@ pub(super) fn parity_layout(ctx: &egui::Context) -> Option<NativeParityLayout> {
     ctx.data(|data| data.get_temp(parity_layout_id()))
 }
 
-fn model_parity(root: &egui::Ui, f: &Frontend, id: &str) {
+fn model_parity(root: &egui::Ui, f: &UiCtx, id: &str) {
     let launch = &f.launch;
     assert!(!launch.practice, "Model parity is isolated review only");
     assert!(
@@ -128,7 +131,7 @@ fn model_parity(root: &egui::Ui, f: &Frontend, id: &str) {
 
 fn paint_model_parity(
     painter: &egui::Painter,
-    f: &Frontend,
+    f: &UiCtx,
     id: &str,
     viewport: egui::Rect,
     pixels_per_point: f32,
@@ -277,7 +280,7 @@ fn paint_model_parity(
 
 /// Human semantic inspection complements whole-image parity: every thumbnail
 /// is the production packet renderer with exactly one actual part selected.
-fn model_parts(root: &egui::Ui, f: &Frontend, id: &str) {
+fn model_parts(root: &egui::Ui, f: &UiCtx, id: &str) {
     let launch = &f.launch;
     assert!(!launch.practice, "Model parts are isolated review only");
     assert!(
@@ -304,7 +307,7 @@ fn model_parts(root: &egui::Ui, f: &Frontend, id: &str) {
 
 fn paint_model_parts(
     painter: &egui::Painter,
-    f: &Frontend,
+    f: &UiCtx,
     id: &str,
     viewport: egui::Rect,
 ) -> Result<(), String> {

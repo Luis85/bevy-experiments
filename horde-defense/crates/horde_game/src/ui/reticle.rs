@@ -1,5 +1,8 @@
 //! A cursor readout of frozen authoritative ammunition and action timers.
-use super::*;
+use super::battle;
+use crate::art::{self, AMBER, GREEN, MUTED, RED, TEXT};
+use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
+use horde_core::content::Mode;
 use horde_core::sim::Attempt;
 #[derive(Clone, Debug, PartialEq)]
 struct Resources {
@@ -151,6 +154,7 @@ pub(super) fn paint(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use horde_core::sim::Game;
     #[test]
     fn reticle_uses_exact_ammo_and_frozen_reload_ticks_without_a_presentation_clock() {
         let mut game = Game::default();

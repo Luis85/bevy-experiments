@@ -1,6 +1,8 @@
 //! Compact authoritative HUD readouts. Values are read directly from the battle;
 //! no easing, wall-clock interpolation or gameplay mutations hide action timing.
-use super::*;
+use crate::art::{AMBER, GREEN, MUTED, RED};
+use bevy_egui::egui::{self, FontId, RichText, Sense, Stroke, pos2, vec2};
+use horde_core::content::Mode;
 use horde_core::sim::{Attempt, EnemyPhase, EventKind};
 
 pub(super) fn action(ui: &mut egui::Ui, attempt: &Attempt) {

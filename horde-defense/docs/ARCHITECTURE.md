@@ -14,8 +14,12 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | `sim/events` | Typed `SimEvent` stream: saved per-`Game` sequence numbers, the transient `drain_events` outbox and expedition forwarding | Presentation decisions or persistence of the outbox |
 | `sim/parallel` | Worker battle ownership, reservations, idempotent settlement and reported `SettlementIssue`s | A second combat implementation |
 | `sim/persistence` | Versioned coherent generations, checksums, validation and atomic writes | New combat decisions during load |
-| `runner` | `AppCommand` queue (gameplay `Command`s plus durable reset/save intents), fixed-step execution, input edges, save coordination and sound consumption | Drawing, domain rule checks or alternative combat rules |
-| `ui/*`, `worldmap`, `inspector` | Read state, display decisions, collect intent and manage presentation-only selections | Ticking the game or paying rewards |
+| `launch` | `LaunchConfig`: every argument and `LASTLIGHT_*` variable, parsed and validated once in `main` (`--help` lists them) | Reading the environment anywhere else |
+| `profile` | `ProfilePaths` and the startup `LoadedProfile` read | Saving (the runner's storage service does) |
+| `runner` (`SimRuntimePlugin`) | `GameSession` (the only mutable `Game`), `Runtime`: `AppCommand` queue (gameplay `Command`s plus durable reset/save intents), fixed-step execution, input edges, save coordination; writes `RuntimeNotice` and `SoundCue` messages | Drawing, playing audio, domain rule checks or alternative combat rules |
+| `sfx` (`SfxPlugin`) | Reads `SoundCue` messages; voice budget, priorities, variant rotation and the effects bus | Deciding what happened in combat |
+| `ui/*` (`UiPlugin`), `worldmap`, `inspector` | `Screen`/`Tab` states, `Navigation`, per-screen UI resources; read state, display decisions, collect intent; one notice system turns `RuntimeNotice`s into feedback and `NextState` | Mutating `GameSession`, ticking the game or paying rewards |
+| `review_tools` (`ReviewToolsPlugin`, `review` feature) | Automated captures, capture sequences, frame reports; scheduled only for review launches | Ordinary play or practice |
 | `art`, `visual_assets`, `animation` | Asset handles, padded atlas poses, read-only tick/event animation and bounded scene histories | Accuracy rolls, health, range or rewards |
 | `atmosphere_audio` | Scene classification, six persistent environment channels, normalized crossfades and audio-bus gain | Combat clocks, weather damage or new hit resolution |
 
@@ -23,16 +27,42 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 
 ```mermaid
 flowchart LR
-    UI[egui views] -->|AppCommand / ControlFrame| Runtime
-    Runtime -->|PreUpdate: Game::apply once| Game[Engine-free Game aggregate]
-    Fixed[FixedUpdate: 60 Hz] --> Runtime
-    Runtime -->|whole ticks, 1x / 2x / 4x| Game
-    Game -->|drain_events: typed SimEvent records and reports| Runtime
-    Runtime -->|Update| Save[Atomic save adapter]
-    Runtime -->|Update| Audio[Native audio players]
-    Game -->|read-only state| UI
-    Game -->|read-only events| Art[Textures and feedback]
+    subgraph PreUpdate
+        Apply[RuntimeSet::Apply: Game::apply once] --> Notices[ui handle_notices]
+    end
+    subgraph StateTransition
+        Next[NextState Screen / Tab] --> Enter[OnEnter Screen::Battle: new-deployment reset]
+    end
+    subgraph FixedUpdate 60 Hz
+        Advance[RuntimeSet::Advance: whole ticks 1x / 2x / 4x]
+    end
+    subgraph Update
+        Persist[RuntimeSet::Persist: saves] --> Sfx[SfxPlugin play_sounds]
+        Ambience[publish_scene_audio, when inputs change] --> Atmos[AmbienceUpdate]
+    end
+    subgraph PostUpdate
+        Draw[EguiPrimaryContextPass: register_textures then draw]
+    end
+    Draw -->|AppCommand / ControlFrame on Runtime| Apply
+    Draw -->|NextState| Next
+    Notices -->|NextState| Next
+    Apply & Advance & Persist -->|RuntimeNotice messages| Notices
+    Apply & Advance & Persist -->|SoundCue messages| Sfx
+    Session[(GameSession)] -->|read-only| Draw
 ```
+
+Only real dependencies are ordered: notices after `Apply` (so command outcomes transition before this frame's draw), `play_sounds` after `Persist`, scene audio before `AmbienceUpdate`, texture registration before draw, and the native cursor after egui output. Notices written by `Advance`/`Persist` are read the next frame, before its state transition. `show_window` runs under a run condition until the window is visible. Runner passes take `GameSession` without change detection and mark it changed only when they mutated the game, so `Res<GameSession>` change ticks mean real changes; drawing cannot mutate it at all.
+
+| Resource / state | Owner | Purpose |
+|---|---|---|
+| `LaunchConfig` | `main` | Parsed arguments and environment |
+| `GameSession { game }` | runner | Authoritative game |
+| `Runtime` | runner | Command queue, controls, storage service |
+| `ProfilePaths`, `Settings` (user settings) | profile / preferences | Save files and preferences |
+| `State<Screen>`, `State<Tab>` (sub-state of `Screen::Camp`) | ui | Current view and camp tab |
+| `Navigation` | ui | Remembered tab, return stack for settings/history, pending battle reset |
+| `StatusUi`, `CampaignUi`, `ArmoryUi`, `BattleUi`, `HistoryUi`, `SettingsUi`, `MenuUi` | ui | Per-screen UI state |
+| `ArtTextures`, `CustomCursor` | ui | Per-frame egui textures; whether the arena owns the pointer |
 
 Egui may repeat layout passes. A repeated render pass cannot buy an item twice, advance combat or write a file: `Runtime` deduplicates same-frame semantic commands and holds pressed actions until a real fixed step consumes them. Held input and pressed edges are separate. Observation speed executes complete authoritative ticks, never scaled damage or extra actions per simulated second. Tactical pause covers the main battlefield, parallel workers, recovery, spawns, rewards and plague pressure.
 
@@ -54,7 +84,7 @@ Authored catalogues load once at startup. Validation checks finite values, suppo
 
 The application uses named systems, explicit schedule placement, a configured `Time<Fixed>`, resources for application ownership, AssetServer handles, and a single camera. The fixed core deliberately remains a plain Rust aggregate instead of mirroring every authoritative actor into mutable Bevy components. This preserves deterministic order and lets the same rules run in headless tests and parallel workers. Rendering uses a native egui canvas, with gameplay-independent textures and read-only inspection.
 
-`Frontend` construction is split: `StartupConfig::from_env` and `ProfilePaths::from_env` read the environment, `LoadedProfile::load` reads the save, and `Frontend::new` touches neither (`Frontend::load` composes them and applies review scenarios). Tests build frontends through `ui/test_support.rs::test_frontend`, which never sees `LOCALAPPDATA`, the real save or `LASTLIGHT_*` variables. `Frontend` currently holds the game and runtime as a facade exposed through `RuntimeHost`; screen modules use typed commands instead of direct transaction paths. A future split into separate `GameSession` and UI resources can keep the existing command protocol. Persistence uses a named single-writer background service; only coherent immutable Game/settings snapshots cross that boundary. Snapshot capture/enqueue/poll stay on the main frame, while filesystem work is outside rendering/combat. CPU and native frame benchmarks measure that choice rather than claiming that decomposition alone proves performance.
+Startup is split: `LaunchConfig::from_process` is the only reader of arguments and the environment, `LoadedProfile::load` reads the save, and `FrontendParts::new` touches neither (`FrontendParts::load` composes them and applies review or practice scenarios, then `insert_into` turns the parts into App resources and the initial `Screen` state). Widgets take a `UiCtx` that borrows those resources (`&Game`, `&mut Runtime`, UI state, `NextState` requests); the draw system builds it from `UiParams`, tests build it from an owned `FrontendParts`. Tests use `ui/test_support.rs::test_frontend`, which is constructed from `LaunchConfig::default()` and a private temp directory, so it never sees `LOCALAPPDATA`, the real save or `LASTLIGHT_*` variables; its helpers stand in for the runner passes, the notice system and the state transition. The runner's pure functions take a `RuntimeCtx` (game, runtime, settings, paths, notice and cue sinks), so headless runner tests need no App. Persistence uses a named single-writer background service; only coherent immutable Game/settings snapshots cross that boundary. Snapshot capture/enqueue/poll stay on the main frame, while filesystem work is outside rendering/combat. CPU and native frame benchmarks measure that choice rather than claiming that decomposition alone proves performance.
 
 See [REVIEW_ARCHITECTURE.md](REVIEW_ARCHITECTURE.md), [REVIEW_COMBAT.md](REVIEW_COMBAT.md), [REVIEW_CAMPAIGN.md](REVIEW_CAMPAIGN.md) and [VALIDATION.md](VALIDATION.md) for the review findings, regressions and evidence limits.
 

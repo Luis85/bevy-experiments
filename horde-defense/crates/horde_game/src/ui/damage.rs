@@ -1,5 +1,10 @@
 //! Read-only, real-time presentation of already-resolved combat results.
-use super::*;
+use super::{UiCtx, review};
+use crate::{
+    art::{self, AMBER, GREEN, MUTED, RED, TEXT},
+    settings::Settings,
+};
+use bevy_egui::egui::{self, Color32, FontId, Rect, pos2, vec2};
 use horde_core::sim::{Attempt, Event, EventKind};
 use std::collections::{BTreeMap, BTreeSet};
 const LIFE: f64 = 0.9;
@@ -161,16 +166,16 @@ fn motion(age: f64, reduced: bool) -> (f32, f32, f32) {
     };
     (scale, rise, fade)
 }
-pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut Frontend) {
+pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     if let Some(a) = f.game.attempt.as_ref() {
         draw_for(
             ui,
             a,
             art::ArenaProjection::for_attempt(arena, a)
-                .with_effects_clip(f.effects_rect.unwrap_or(arena)),
+                .with_effects_clip(f.battle.effects_rect.unwrap_or(arena)),
             0,
-            &mut f.damage_feedback,
-            &f.settings,
+            &mut f.battle.damage_feedback,
+            f.settings,
             f.launch.damage_capture_mode(),
         );
     }
@@ -279,6 +284,8 @@ pub(super) fn draw_for(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use horde_core::content::Mode;
+    use horde_core::sim::Game;
     fn fixture() -> Game {
         let mut game = Game::default();
         game.campaign.choose_start_country("DEU").unwrap();

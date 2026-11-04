@@ -38,7 +38,8 @@ impl Action {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// The user settings resource: display, audio, controls and accessibility.
+#[derive(bevy::prelude::Resource, Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
     pub scale: f32,
