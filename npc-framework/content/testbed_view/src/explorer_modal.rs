@@ -12,8 +12,8 @@
 //! reaches the world behind it. OK takes effect after that frame's input,
 //! so the click or key that closes the modal never reaches the game either.
 //!
-//! Copy hands the text to `testbed_content::explorer::clipboard::copy` (the
-//! platform's copy tool: `clip.exe`, `pbcopy`, or `wl-copy` / `xclip` /
+//! Copy hands canonical prompt text to `testbed_content::explorer::clipboard::copy_prompt` (the
+//! platform's copy tool: PowerShell, `pbcopy`, or `wl-copy` / `xclip` /
 //! `xsel`) on a background thread; "Copied" shows only when it reports
 //! success. A copy that has not reported after [`COPY_TIMEOUT`], or whose
 //! thread panicked, ends in the failure note naming the prompt file, and
@@ -195,11 +195,14 @@ fn on_copy(
     }
     let now = time.map(|t| t.elapsed()).unwrap_or_default();
     let write = clipboard.map_or(
-        testbed_content::explorer::clipboard::copy as fn(&str) -> _,
+        testbed_content::explorer::clipboard::copy_prompt as fn(&str) -> _,
         |c| c.0,
     );
     let job = CopyJob::default();
-    let (slot, text) = (Arc::clone(&job), modal.text.clone());
+    let (slot, text) = (
+        Arc::clone(&job),
+        testbed_content::explorer::prompt::normalize_prompt(&modal.text),
+    );
     let spawned = std::thread::Builder::new()
         .name("prompt-copy".into())
         .spawn(move || {
@@ -621,13 +624,30 @@ mod tests {
 
     #[test]
     fn copy_puts_text_on_clipboard_and_says_copied() {
+        // Other modal tests copy concurrently. Give this encoding assertion an
+        // independent destination so another test cannot replace the captured text.
+        static CANONICAL_COPY: Mutex<Option<String>> = Mutex::new(None);
+        fn capture_canonical(text: &str) -> Result<(), String> {
+            *CANONICAL_COPY.lock().unwrap() = Some(text.to_owned());
+            Ok(())
+        }
         let mut app = app(true);
-        app.insert_resource(PromptClipboard(fake_clipboard));
+        let original = app.world().resource::<PromptModal>().text.clone();
+        let older_prompt = format!("\u{feff}{original}\u{200b}\r\n");
+        app.world_mut().resource_mut::<PromptModal>().text = older_prompt.clone();
+        app.update(); // Render the changed prompt before activating its Copy control.
+        app.insert_resource(PromptClipboard(capture_canonical));
         activate::<CopyButton>(&mut app);
         settle(&mut app);
         app.update();
-        let text = app.world().resource::<PromptModal>().text.clone();
-        assert_eq!(PASTED.lock().unwrap().as_deref(), Some(&*text));
+        let text = testbed_content::explorer::prompt::normalize_prompt(&older_prompt);
+        assert_eq!(CANONICAL_COPY.lock().unwrap().as_deref(), Some(&*text));
+        assert!(
+            !text
+                .chars()
+                .any(|c| matches!(c, '\u{feff}' | '\u{200b}' | '\r'))
+        );
+        assert_eq!(app.world().resource::<PromptModal>().text, older_prompt);
         assert_eq!(text_of::<CopyLabel>(&mut app), COPIED);
         // Copy does not close.
         assert!(app.world().resource::<PromptModal>().open);

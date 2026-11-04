@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 use bevy::input_focus::{AutoFocus, InputFocus};
 use bevy::prelude::*;
 use bevy::text::EditableText;
-use bevy::ui_widgets::{Activate, ScrollArea};
+use bevy::ui_widgets::{Activate, ScrollArea, ScrollIntoView};
 use testbed_content::explorer::names::NameKind;
 
 use crate::detached::{self, DetachedPlugin, OpKind};
@@ -44,6 +44,8 @@ pub enum Screen {
     ExplorerMismatch,
     /// A detached world: prompt, URL, tick, Open in window, Stop.
     ExplorerDetached,
+    /// Read private AI session logs and metrics for one saved or running agent.
+    AgentHistory,
     /// A game or a build is running.
     Running,
     /// The chosen game is not built.
@@ -79,9 +81,10 @@ impl Screen {
                 Some(Self::Main)
             }
             Self::ExplorerNew | Self::ExplorerResume => Some(Self::Explorer),
-            Self::ExplorerCheck | Self::ExplorerMismatch | Self::ExplorerDetached => {
-                Some(Self::ExplorerResume)
-            }
+            Self::ExplorerCheck
+            | Self::ExplorerMismatch
+            | Self::ExplorerDetached
+            | Self::AgentHistory => Some(Self::ExplorerResume),
         }
     }
 }
@@ -103,12 +106,16 @@ pub enum Action {
     PickWorld(String),
     /// Shows the agent's detached world.
     Watch(String),
+    AgentHistory(String),
     /// The agent's detached world into the window, on its port.
     OpenInWindow(String),
     /// Stops the agent's detached world (it saves first).
     StopDetached(String),
     /// The Detached screen's Copy: the prompt to the OS clipboard.
     CopyPrompt,
+    StartAi(testbed_content::explorer::ai_client::Provider),
+    StopAi,
+    ToggleAiDetails,
     /// Revoke the current credential and refresh the agent's MCP handbook.
     RotateToken {
         agent: String,
@@ -163,16 +170,25 @@ impl Missing {
 #[derive(Resource, Clone, Debug, Default)]
 struct SettingsStatus(Option<Result<String, String>>);
 
+#[derive(Resource, Default)]
+struct PendingSettingsSave(Option<(Entity, u64)>);
+
 #[derive(Component)]
 struct AgentsDirField;
 #[derive(Component)]
 struct ActorsDirField;
 #[derive(Component)]
 struct WorldsDirField;
+#[derive(Component)]
+struct AiMetricsDirField;
+#[derive(Component)]
+struct AiLogsDirField;
 type SettingsFieldFilter = Or<(
     With<AgentsDirField>,
     With<ActorsDirField>,
     With<WorldsDirField>,
+    With<AiMetricsDirField>,
+    With<AiLogsDirField>,
 )>;
 #[derive(Component)]
 struct SettingsStatusText;
@@ -200,12 +216,18 @@ impl Plugin for ScreensPlugin {
         app.insert_state(self.start)
             .init_resource::<MainNotice>()
             .init_resource::<SettingsStatus>()
+            .init_resource::<PendingSettingsSave>()
+            .add_observer(enter_saves)
             .add_systems(OnEnter(Screen::Main), spawn_main)
             .add_systems(OnEnter(Screen::Testbed), spawn_testbed)
             .add_systems(OnEnter(Screen::Settings), spawn_settings)
-            .add_systems(OnExit(Screen::Settings), |mut s: ResMut<SettingsStatus>| {
-                s.0 = None;
-            })
+            .add_systems(
+                OnExit(Screen::Settings),
+                |mut s: ResMut<SettingsStatus>, mut pending: ResMut<PendingSettingsSave>| {
+                    s.0 = None;
+                    pending.0 = None;
+                },
+            )
             .add_systems(OnEnter(Screen::Explorer), spawn_explorer)
             .add_plugins((
                 ExplorerPlugin,
@@ -220,8 +242,6 @@ impl Plugin for ScreensPlugin {
                 (
                     run::poll_child.run_if(in_state(Screen::Running)),
                     escape_goes_back,
-                    enter_saves.run_if(in_state(Screen::Settings)),
-                    show_settings_status.run_if(in_state(Screen::Settings)),
                     show_fog_checkbox.run_if(in_state(Screen::Settings)),
                     ui::refresh_buttons,
                     ui::refresh_fields,
@@ -231,6 +251,25 @@ impl Plugin for ScreensPlugin {
             .add_systems(
                 Last,
                 run::stop_build_on_exit.after(bevy::window::ExitSystems),
+            )
+            .add_systems(
+                PostUpdate,
+                reveal_settings_focus
+                    .after(bevy::ui::ui_layout_system)
+                    .run_if(in_state(Screen::Settings)),
+            )
+            .add_systems(
+                PostUpdate,
+                commit_settings_save
+                    .after(bevy::text::apply_text_edits)
+                    .after(crate::paste::ClipboardSystems::Complete)
+                    .run_if(in_state(Screen::Settings)),
+            )
+            .add_systems(
+                PostUpdate,
+                show_settings_status
+                    .after(commit_settings_save)
+                    .run_if(in_state(Screen::Settings)),
             );
     }
 }
@@ -250,19 +289,23 @@ pub fn apply_action(world: &mut World, action: Action) {
             world.insert_resource(MainNotice::default());
             run::launch(world, entry);
         }
-        Action::SaveSettings => save_settings(world),
+        Action::SaveSettings => request_settings_save(world),
         Action::ToggleFog => toggle_fog(world),
         Action::RandomName(kind) => explorer::reroll_name(world, kind),
         Action::StartNew(mode) => explorer::start_new(world, mode),
         Action::PickActor(id) => explorer::pick_actor(world, &id),
         Action::PickWorld(id) => explorer::pick_world(world, &id),
         Action::Watch(agent) => detached::watch(world, &agent),
+        Action::AgentHistory(agent) => crate::agent_history::open(world, agent),
         Action::OpenInWindow(agent) => {
             world.insert_resource(MainNotice::default());
             detached::begin_op(world, &agent, OpKind::Open);
         }
         Action::StopDetached(agent) => detached::begin_op(world, &agent, OpKind::Stop),
         Action::CopyPrompt => detached::copy_prompt(world),
+        Action::StartAi(provider) => detached::start_ai(world, provider),
+        Action::StopAi => detached::stop_ai(world),
+        Action::ToggleAiDetails => detached::toggle_ai_details(world),
         Action::RotateToken { agent, dir } => explorer::rotate_token(world, &agent, dir),
         Action::Build => {
             let tools = world.resource::<BuildTools>().clone();
@@ -303,6 +346,55 @@ pub fn close_quits(
     }
 }
 
+fn request_settings_save(world: &mut World) {
+    if world
+        .get_resource::<State<Screen>>()
+        .is_none_or(|screen| *screen.get() != Screen::Settings)
+    {
+        return;
+    }
+    let mut fields = world.query_filtered::<Entity, With<AgentsDirField>>();
+    let Ok(field) = fields.single(world) else {
+        return;
+    };
+    let revision = world
+        .get_resource::<crate::paste::ClipboardJobs>()
+        .map_or(0, |jobs| jobs.failure_revision());
+    world.resource_mut::<PendingSettingsSave>().0 = Some((field, revision));
+}
+
+fn commit_settings_save(world: &mut World) {
+    let Some((field, revision)) = world.resource::<PendingSettingsSave>().0 else {
+        return;
+    };
+    let leaving = matches!(world.resource::<NextState<Screen>>(), NextState::Pending(next) if *next != Screen::Settings);
+    if leaving || world.get::<AgentsDirField>(field).is_none() {
+        world.resource_mut::<PendingSettingsSave>().0 = None;
+        return;
+    }
+    let clipboard = world.get_resource::<crate::paste::ClipboardJobs>();
+    if clipboard.is_some_and(|jobs| jobs.failure_revision() != revision) {
+        world.resource_mut::<PendingSettingsSave>().0 = None;
+        world.resource_mut::<SettingsStatus>().0 = Some(Err(
+            "Clipboard input changed or failed. Review the fields, then save again.".into(),
+        ));
+        return;
+    }
+    if clipboard.is_some_and(|jobs| !jobs.is_empty()) {
+        world.resource_mut::<SettingsStatus>().0 =
+            Some(Ok("Finishing clipboard input before saving...".into()));
+        return;
+    }
+    let composing = world
+        .query_filtered::<&EditableText, SettingsFieldFilter>()
+        .iter(world)
+        .any(|text| text.is_composing());
+    world.resource_mut::<PendingSettingsSave>().0 = None;
+    if !composing {
+        save_settings(world);
+    }
+}
+
 fn save_settings(world: &mut World) {
     let mut fields = world.query_filtered::<&EditableText, With<AgentsDirField>>();
     let Ok(text) = fields.single(world).map(|t| t.value().to_string()) else {
@@ -324,15 +416,36 @@ fn save_settings(world: &mut World) {
         .map(|v| v.value().to_string().trim().to_owned())
         .filter(|s| !s.is_empty())
         .map(PathBuf::from);
-    let status =
-        match launch::save_settings_with_folders(&text, fog, actors, worlds, file.as_deref()) {
-            Ok(settings) => {
-                let msg = format!("saved: {}", settings.agents_dir.display());
-                world.resource_mut::<AppSettings>().0 = settings;
-                Ok(msg)
-            }
-            Err(e) => Err(e),
-        };
+    let mut metrics_fields = world.query_filtered::<&EditableText, With<AiMetricsDirField>>();
+    let metrics = metrics_fields
+        .single(world)
+        .ok()
+        .map(|value| value.value().to_string().trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
+    let mut logs_fields = world.query_filtered::<&EditableText, With<AiLogsDirField>>();
+    let logs = logs_fields
+        .single(world)
+        .ok()
+        .map(|value| value.value().to_string().trim().to_owned())
+        .filter(|value| !value.is_empty())
+        .map(PathBuf::from);
+    let status = match launch::save_settings_with_client_folders(
+        &text,
+        fog,
+        actors,
+        worlds,
+        metrics,
+        logs,
+        file.as_deref(),
+    ) {
+        Ok(settings) => {
+            let msg = format!("saved: {}", settings.agents_dir.display());
+            world.resource_mut::<AppSettings>().0 = settings;
+            Ok(msg)
+        }
+        Err(e) => Err(e),
+    };
     world.resource_mut::<SettingsStatus>().0 = Some(status);
 }
 
@@ -384,6 +497,8 @@ fn escape_goes_back(
     {
         if *state.get() == Screen::Worlds {
             commands.queue(crate::worlds::escape);
+        } else if *state.get() == Screen::AgentHistory {
+            commands.queue(crate::agent_history::close);
         } else {
             next.set(back);
         }
@@ -393,12 +508,19 @@ fn escape_goes_back(
 /// Enter in the agents-folder field saves (the field takes no newlines, so
 /// the key reaches here).
 fn enter_saves(
-    keys: Res<ButtonInput<KeyCode>>,
-    focus: Res<InputFocus>,
-    fields: Query<(), SettingsFieldFilter>,
+    event: On<bevy::input_focus::FocusedInput<bevy::input::keyboard::KeyboardInput>>,
+    fields: Query<&EditableText, SettingsFieldFilter>,
+    ime: Option<Res<crate::menu_input::ImeBatch>>,
     mut commands: Commands,
 ) {
-    if keys.just_pressed(KeyCode::Enter) && focus.get().is_some_and(|e| fields.contains(e)) {
+    if matches!(event.input.key_code, KeyCode::Enter | KeyCode::NumpadEnter)
+        && event.input.state.is_pressed()
+        && !event.input.repeat
+        && !ime.is_some_and(|ime| ime.contains(event.input.window))
+        && fields
+            .get(event.focused_entity)
+            .is_ok_and(|text| !text.is_composing())
+    {
         commands.queue(|world: &mut World| apply_action(world, Action::SaveSettings));
     }
 }
@@ -538,45 +660,94 @@ fn spawn_testbed(mut commands: Commands) {
 
 fn spawn_settings(mut commands: Commands, settings: Res<AppSettings>, paths: Res<Paths>) {
     let panel = ui::spawn_screen(&mut commands, DespawnOnExit(Screen::Settings), "Settings");
-    ui::scroll_panel(&mut commands, panel);
+    commands.entity(panel).queue(|mut entity: EntityWorldMut| {
+        let mut node = entity.get_mut::<Node>().expect("screen panel has a Node");
+        node.height = percent(94);
+        node.min_height = px(0);
+    });
     let current = settings.0.agents_dir.display().to_string();
     let file = paths.settings_file.as_ref().map_or_else(
         || "(no settings folder)".to_owned(),
         |f| f.display().to_string(),
     );
     commands.entity(panel).with_children(|p| {
-        p.spawn(ui::label("Agents folder", 18.0, TEXT));
-        p.spawn(ui::label(
-            "Every AI agent gets a folder in here (its prompts, diary, proposals and world save).",
-            14.0,
-            ui::DIM,
-        ));
-        p.spawn((AgentsDirField, ui::text_field(current, 0, "Agents folder"), AutoFocus));
-        p.spawn(ui::label("Actors folder (optional)", 18.0, TEXT));
-        p.spawn((ActorsDirField, ui::text_field(&settings.0.actors_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 1, "Actors folder")));
-        p.spawn(ui::label("Blank uses npc-actors beside the agents folder. Used by Actors and New agents.", 12.0, ui::DIM));
-        p.spawn(ui::label("Worlds folder (optional)", 18.0, TEXT));
-        p.spawn((WorldsDirField, ui::text_field(settings.0.worlds_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 2, "Worlds folder")));
-        p.spawn(ui::label("Blank uses npc-worlds beside the agents folder. Used by Worlds and New agents.", 12.0, ui::DIM));
-        p.spawn(ui::label("Explorer window", 18.0, TEXT));
-        let fog = button(
-            p,
-            fog_checkbox_label(settings.0.fog_of_war),
-            Some(
-                "Show the world as the agent's actor knows it: black where it has never been, greyed as last seen where it is not looking, no units it cannot sense. F8 toggles it in the game.",
-            ),
-            true,
-            3,
-            Action::ToggleFog,
-        );
-        p.commands().entity(fog).insert(FogCheckbox);
-        p.spawn((SettingsStatusText, ui::label("", 14.0, NOTE)));
-        p.spawn(ui::label(format!("Saved to {file}"), 12.0, ui::DIM));
-        ui::row(p, |r| {
-            button(r, "Save", None, true, 4, Action::SaveSettings);
-            back_button(r, Screen::Settings, 5);
+        // Keep the title and actions visible; only the potentially long form scrolls.
+        p.spawn((Node {
+            flex_direction: FlexDirection::Column,
+            flex_grow: 1.0,
+            flex_basis: px(0),
+            min_height: px(0),
+            overflow: Overflow::scroll_y(),
+            ..default()
+        }, ScrollArea)).with_children(|viewport| {
+            viewport.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                flex_shrink: 0.0,
+                width: percent(100),
+                row_gap: px(10),
+                ..default()
+            }).with_children(|form| {
+                form.spawn(ui::label("Agents folder", 18.0, TEXT));
+                form.spawn(ui::label(
+                    "Every AI agent gets a folder in here (its prompts, diary, proposals and world save).",
+                    14.0,
+                    ui::DIM,
+                ));
+                form.spawn((AgentsDirField, ui::text_field(current, 0, "Agents folder"), AutoFocus));
+                form.spawn(ui::label("Actors folder (optional)", 18.0, TEXT));
+                form.spawn((ActorsDirField, ui::text_field(&settings.0.actors_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 1, "Actors folder")));
+                form.spawn(ui::label("Blank uses npc-actors beside the agents folder. Used by Actors and New agents.", 12.0, ui::DIM));
+                form.spawn(ui::label("Worlds folder (optional)", 18.0, TEXT));
+                form.spawn((WorldsDirField, ui::text_field(settings.0.worlds_dir.as_ref().map(|p| p.display().to_string()).unwrap_or_default(), 2, "Worlds folder")));
+                form.spawn(ui::label("Blank uses npc-worlds beside the agents folder. Used by Worlds and New agents.", 12.0, ui::DIM));
+                form.spawn(ui::label("AI metrics folder (optional)", 18.0, TEXT));
+                form.spawn((AiMetricsDirField, ui::text_field(settings.0.ai_metrics_dir.as_ref().map(|path| path.display().to_string()).unwrap_or_default(), 3, "AI metrics folder")));
+                form.spawn(ui::label("Session JSON: model, effort, token usage and cost when reported. Blank keeps the client default.", 12.0, ui::DIM));
+                form.spawn(ui::label("AI logs folder (optional)", 18.0, TEXT));
+                form.spawn((AiLogsDirField, ui::text_field(settings.0.ai_logs_dir.as_ref().map(|path| path.display().to_string()).unwrap_or_default(), 4, "AI logs folder")));
+                form.spawn(ui::label("Private Markdown transcripts for new client runs. Blank keeps the client environment/default.", 12.0, ui::DIM));
+                form.spawn(ui::label("Explorer window", 18.0, TEXT));
+                let fog = button(
+                    form,
+                    fog_checkbox_label(settings.0.fog_of_war),
+                    Some(
+                        "Show the world as the agent's actor knows it: black where it has never been, greyed as last seen where it is not looking, no units it cannot sense. F8 toggles it in the game.",
+                    ),
+                    true,
+                    5,
+                    Action::ToggleFog,
+                );
+                form.commands().entity(fog).insert(FogCheckbox);
+            });
+        });
+        p.spawn(Node {
+            flex_direction: FlexDirection::Column,
+            flex_shrink: 0.0,
+            row_gap: px(10),
+            ..default()
+        }).with_children(|footer| {
+            footer.spawn((SettingsStatusText, ui::label("", 14.0, NOTE)));
+            footer.spawn(ui::label(format!("Saved to {file}"), 12.0, ui::DIM));
+            ui::row(footer, |r| {
+                button(r, "Save", None, true, 6, Action::SaveSettings);
+                back_button(r, Screen::Settings, 7);
+            });
         });
     });
+}
+
+fn reveal_settings_focus(
+    focus: Res<InputFocus>,
+    fields: Query<(), SettingsFieldFilter>,
+    fog: Query<(), With<FogCheckbox>>,
+    mut commands: Commands,
+) {
+    if focus.is_changed()
+        && let Some(entity) = focus.get()
+        && (fields.contains(entity) || fog.contains(entity))
+    {
+        commands.trigger(ScrollIntoView { entity });
+    }
 }
 
 fn show_settings_status(
@@ -699,9 +870,11 @@ pub fn settings_file(flag: Option<PathBuf>) -> Option<PathBuf> {
 #[cfg(test)]
 pub(crate) mod tests {
     use std::process::Command;
+    use std::time::Duration;
 
     use bevy::state::app::StatesPlugin;
     use bevy::ui::InteractionDisabled;
+    use bevy::window::PrimaryWindow;
     use testbed_content::explorer::settings::Settings;
 
     use super::*;
@@ -725,6 +898,8 @@ pub(crate) mod tests {
                 fog_of_war: true,
                 actors_dir: None,
                 worlds_dir: None,
+                ai_metrics_dir: None,
+                ai_logs_dir: None,
             }))
             .insert_resource(BuildTools {
                 cargo: None,
@@ -739,6 +914,371 @@ pub(crate) mod tests {
             });
         app.update();
         app
+    }
+
+    fn raw_key(
+        window: Entity,
+        code: KeyCode,
+        logical: bevy::input::keyboard::Key,
+        pressed: bool,
+        text: Option<&str>,
+    ) -> bevy::input::keyboard::KeyboardInput {
+        bevy::input::keyboard::KeyboardInput {
+            window,
+            key_code: code,
+            logical_key: logical,
+            state: if pressed {
+                bevy::input::ButtonState::Pressed
+            } else {
+                bevy::input::ButtonState::Released
+            },
+            text: text.map(Into::into),
+            repeat: false,
+        }
+    }
+    fn raw_settings_app(root: &Path) -> (App, Entity, Entity, PathBuf) {
+        let mut app = app(root, &root.join("agents"));
+        app.add_plugins((
+            bevy::input::InputPlugin,
+            bevy::input_focus::InputFocusPlugin,
+            bevy::input_focus::InputDispatchPlugin,
+        ))
+        .add_message::<bevy::window::Ime>()
+        .add_message::<bevy::picking::events::PointerRelease>()
+        .init_resource::<bevy::picking::events::PointerState>()
+        .init_resource::<bevy::ui::UiScale>()
+        .add_plugins(bevy::ui_widgets::TextInputPlugin)
+        .insert_resource(crate::paste::ClipboardTools {
+            paste: || Err("unexpected mock clipboard request".into()),
+            copy: |_| Ok(()),
+        })
+        .add_plugins(crate::paste::FieldClipboardPlugin);
+        let window = app
+            .world_mut()
+            .spawn((Window::default(), PrimaryWindow))
+            .id();
+        let font = bevy::text::Font::from_bytes(bevy::text::DEFAULT_FONT_DATA.to_vec());
+        {
+            let mut fonts = app.world_mut().resource_mut::<bevy::text::FontCx>();
+            let ids: Vec<_> = fonts
+                .collection
+                .register_fonts(font.data, None)
+                .into_iter()
+                .map(|(id, _)| id)
+                .collect();
+            for family in [
+                bevy::text::GenericFontFamily::SansSerif,
+                bevy::text::GenericFontFamily::Serif,
+                bevy::text::GenericFontFamily::Monospace,
+                bevy::text::GenericFontFamily::SystemUi,
+            ] {
+                fonts
+                    .collection
+                    .set_generic_families(family.into(), ids.iter().copied());
+            }
+        }
+        let file = root.join("settings.json");
+        app.world_mut().resource_mut::<Paths>().settings_file = Some(file.clone());
+        run::set_screen(app.world_mut(), Screen::Settings);
+        app.update();
+        let field = app
+            .world_mut()
+            .query_filtered::<Entity, With<AiLogsDirField>>()
+            .single(app.world())
+            .unwrap();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(field, bevy::input_focus::FocusCause::Navigated);
+        app.update();
+        (app, window, field, file)
+    }
+    fn raw_replace(app: &mut App, window: Entity, text: Option<&str>, paste: bool, enter: bool) {
+        use bevy::input::keyboard::Key;
+        let (modifier, key) = if cfg!(target_os = "macos") {
+            (KeyCode::SuperLeft, Key::Super)
+        } else {
+            (KeyCode::ControlLeft, Key::Control)
+        };
+        let mut events = vec![
+            raw_key(window, modifier, key.clone(), true, None),
+            raw_key(
+                window,
+                KeyCode::KeyA,
+                Key::Character("a".into()),
+                true,
+                None,
+            ),
+            raw_key(
+                window,
+                KeyCode::KeyA,
+                Key::Character("a".into()),
+                false,
+                None,
+            ),
+        ];
+        if paste {
+            events.extend([
+                raw_key(
+                    window,
+                    KeyCode::KeyV,
+                    Key::Character("v".into()),
+                    true,
+                    None,
+                ),
+                raw_key(
+                    window,
+                    KeyCode::KeyV,
+                    Key::Character("v".into()),
+                    false,
+                    None,
+                ),
+            ]);
+        }
+        events.push(raw_key(window, modifier, key, false, None));
+        if let Some(text) = text {
+            events.push(raw_key(
+                window,
+                KeyCode::KeyQ,
+                Key::Character(text.into()),
+                true,
+                Some(text),
+            ));
+        }
+        if enter {
+            events.extend([
+                raw_key(window, KeyCode::Enter, Key::Enter, true, None),
+                raw_key(window, KeyCode::Enter, Key::Enter, false, None),
+            ]);
+        }
+        for event in events {
+            app.world_mut().write_message(event);
+        }
+    }
+
+    #[test]
+    fn same_batch_raw_replacement_then_enter_or_save_button_persists_the_new_folder() {
+        for button in [false, true] {
+            let root = tmp(if button {
+                "raw-save-button"
+            } else {
+                "raw-save-enter"
+            });
+            let (mut app, window, field, file) = raw_settings_app(&root);
+            let folder = root.join("new private logs");
+            raw_replace(
+                &mut app,
+                window,
+                Some(&folder.display().to_string()),
+                false,
+                !button,
+            );
+            if button {
+                let save = button_for(&mut app, |action| matches!(action, Action::SaveSettings));
+                app.world_mut().trigger(Activate { entity: save });
+                app.world_mut().flush();
+            }
+            app.update();
+            assert_eq!(
+                app.world()
+                    .get::<EditableText>(field)
+                    .unwrap()
+                    .value()
+                    .to_string(),
+                folder.display().to_string()
+            );
+            assert_eq!(Settings::load(&file, &root).ai_logs_dir, Some(folder));
+            assert!(app.world().resource::<PendingSettingsSave>().0.is_none());
+            let resolved = root.canonicalize().unwrap();
+            assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+            std::fs::remove_dir_all(resolved).unwrap();
+        }
+    }
+    static SAVE_PASTE_STARTED: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+    static SAVE_PASTE_RELEASE: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+    static SAVE_PASTE_TEXT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
+    struct ReleaseSavePaste;
+    impl Drop for ReleaseSavePaste {
+        fn drop(&mut self) {
+            SAVE_PASTE_RELEASE.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+    fn save_paste() -> Result<String, String> {
+        use std::sync::atomic::Ordering;
+        SAVE_PASTE_STARTED.store(true, Ordering::SeqCst);
+        let deadline = std::time::Instant::now() + Duration::from_secs(2);
+        while !SAVE_PASTE_RELEASE.load(Ordering::SeqCst) {
+            if std::time::Instant::now() >= deadline {
+                return Err("owned clipboard fixture timed out".into());
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        Ok(SAVE_PASTE_TEXT.lock().unwrap().clone())
+    }
+    #[test]
+    fn paste_then_enter_waits_for_input_and_never_saves_a_cancelled_or_closed_form() {
+        use std::sync::atomic::Ordering;
+        for leave in [false, true] {
+            SAVE_PASTE_STARTED.store(false, Ordering::SeqCst);
+            SAVE_PASTE_RELEASE.store(false, Ordering::SeqCst);
+            let _release = ReleaseSavePaste;
+            let root = tmp(if leave {
+                "paste-save-leave"
+            } else {
+                "paste-save-wait"
+            });
+            let (mut app, window, _, file) = raw_settings_app(&root);
+            let folder = root.join("pasted logs");
+            *SAVE_PASTE_TEXT.lock().unwrap() = folder.display().to_string();
+            app.world_mut()
+                .resource_mut::<crate::paste::ClipboardTools>()
+                .paste = save_paste;
+            raw_replace(&mut app, window, None, true, true);
+            app.update();
+            assert!(
+                !file.exists(),
+                "Enter cannot write old settings while Paste is unresolved"
+            );
+            for _ in 0..200 {
+                app.update();
+                if SAVE_PASTE_STARTED.load(Ordering::SeqCst) {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            assert!(SAVE_PASTE_STARTED.load(Ordering::SeqCst));
+            assert!(!file.exists());
+            if leave {
+                run::set_screen(app.world_mut(), Screen::Main);
+                app.update();
+            }
+            SAVE_PASTE_RELEASE.store(true, Ordering::SeqCst);
+            for _ in 0..400 {
+                app.update();
+                if app
+                    .world()
+                    .resource::<crate::paste::ClipboardJobs>()
+                    .is_empty()
+                    && app.world().resource::<PendingSettingsSave>().0.is_none()
+                {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(5));
+            }
+            assert!(
+                app.world()
+                    .resource::<crate::paste::ClipboardJobs>()
+                    .is_empty()
+            );
+            assert!(app.world().resource::<PendingSettingsSave>().0.is_none());
+            if leave {
+                assert!(!file.exists(), "leaving Settings cancels the deferred save");
+            } else {
+                assert_eq!(Settings::load(&file, &root).ai_logs_dir, Some(folder));
+            }
+            let resolved = root.canonicalize().unwrap();
+            assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+            std::fs::remove_dir_all(resolved).unwrap();
+        }
+    }
+    #[test]
+    fn enter_from_a_foreign_window_or_an_active_ime_does_not_save_settings() {
+        use bevy::input::keyboard::Key;
+        let root = tmp("raw-save-boundaries");
+        let (mut app, _, field, file) = raw_settings_app(&root);
+        let other = app.world_mut().spawn(Window::default()).id();
+        app.world_mut()
+            .write_message(raw_key(other, KeyCode::Enter, Key::Enter, true, None));
+        app.update();
+        assert!(!file.exists());
+        app.world_mut()
+            .get_mut::<EditableText>(field)
+            .unwrap()
+            .queue_edit(bevy::text::TextEdit::ImeSetCompose {
+                value: "compose".into(),
+                cursor: None,
+            });
+        app.update();
+        assert!(
+            app.world()
+                .get::<EditableText>(field)
+                .unwrap()
+                .is_composing()
+        );
+        app.world_mut()
+            .trigger(bevy::input_focus::FocusedInput::new(
+                field,
+                raw_key(other, KeyCode::Enter, Key::Enter, true, None),
+                other,
+            ));
+        app.world_mut().flush();
+        app.update();
+        assert!(!file.exists());
+        let resolved = root.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(resolved).unwrap();
+    }
+
+    #[test]
+    fn same_batch_ime_preedit_commit_and_confirming_enter_only_commit_text() {
+        use bevy::input::keyboard::Key;
+        let root = tmp("ime-batch-save");
+        let (mut app, window, field, file) = raw_settings_app(&root);
+        let folder = root.join("IME committed private logs");
+        let folder_text = folder.display().to_string();
+        assert!(
+            !app.world()
+                .get::<EditableText>(field)
+                .unwrap()
+                .is_composing()
+        );
+        let revision = app
+            .world()
+            .resource::<crate::paste::ClipboardJobs>()
+            .failure_revision();
+        app.world_mut().write_message(bevy::window::Ime::Preedit {
+            window,
+            value: "composition".into(),
+            cursor: None,
+        });
+        app.world_mut().write_message(bevy::window::Ime::Commit {
+            window,
+            value: folder_text.clone(),
+        });
+        // The raw key batch also contains an edit shortcut and printable text.
+        // They belong to this IME transaction, not a second text edit or Save.
+        raw_replace(&mut app, window, Some("must-not-duplicate"), true, true);
+        app.update();
+        let text = app.world().get::<EditableText>(field).unwrap();
+        assert_eq!(text.value().to_string(), folder_text);
+        assert!(!text.is_composing());
+        assert!(text.pending_edits.is_empty());
+        assert!(
+            !file.exists(),
+            "the Enter confirming IME text must not save the form"
+        );
+        assert!(app.world().resource::<PendingSettingsSave>().0.is_none());
+        let jobs = app.world().resource::<crate::paste::ClipboardJobs>();
+        assert!(jobs.is_empty());
+        assert_eq!(
+            jobs.failure_revision(),
+            revision,
+            "IME keystrokes must not start or cancel a duplicate OS paste"
+        );
+        app.world_mut()
+            .write_message(raw_key(window, KeyCode::Enter, Key::Enter, true, None));
+        app.world_mut()
+            .write_message(raw_key(window, KeyCode::Enter, Key::Enter, false, None));
+        app.update();
+        assert_eq!(
+            Settings::load(&file, &root).ai_logs_dir,
+            Some(folder),
+            "a subsequent explicit Enter saves the committed value"
+        );
+        let resolved = root.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(resolved).unwrap();
     }
 
     pub(crate) fn screen(app: &App) -> Screen {
@@ -782,6 +1322,7 @@ pub(crate) mod tests {
         assert_eq!(Screen::ExplorerNew.back(), Some(Screen::Explorer));
         assert_eq!(Screen::Main.back(), None);
         assert_eq!(Screen::Running.back(), None);
+        assert_eq!(Screen::AgentHistory.back(), Some(Screen::ExplorerResume));
     }
 
     #[test]
@@ -838,6 +1379,116 @@ pub(crate) mod tests {
         press(&mut app, fog);
         assert!(Settings::load(&file, &d).fog_of_war);
         let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[test]
+    fn ai_metrics_folder_native_setting_saves_and_blank_restores_default() {
+        let d = tmp("metrics-preference");
+        let mut app = app(&d, &d.join("agents"));
+        let file = d.join("settings.json");
+        app.world_mut().resource_mut::<Paths>().settings_file = Some(file.clone());
+        let settings = button_for(&mut app, |action| {
+            matches!(action, Action::Go(Screen::Settings))
+        });
+        press(&mut app, settings);
+        let metrics = d.join("session-metrics");
+        let mut fields = app
+            .world_mut()
+            .query_filtered::<&mut EditableText, With<AiMetricsDirField>>();
+        *fields.single_mut(app.world_mut()).unwrap() =
+            EditableText::new(metrics.display().to_string());
+        let save = button_for(&mut app, |action| matches!(action, Action::SaveSettings));
+        press(&mut app, save);
+        assert_eq!(
+            Settings::load(&file, &d).ai_metrics_dir,
+            Some(metrics.clone())
+        );
+        let fog = button_for(&mut app, |action| matches!(action, Action::ToggleFog));
+        press(&mut app, fog);
+        assert_eq!(Settings::load(&file, &d).ai_metrics_dir, Some(metrics));
+        *fields.single_mut(app.world_mut()).unwrap() = EditableText::new("");
+        press(&mut app, save);
+        assert!(Settings::load(&file, &d).ai_metrics_dir.is_none());
+        let resolved = d.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(resolved).unwrap();
+    }
+
+    #[test]
+    fn ai_log_folder_native_setting_saves_clears_and_preserves_metrics() {
+        let d = tmp("logs-preference");
+        let mut app = app(&d, &d.join("agents"));
+        let file = d.join("settings.json");
+        app.world_mut().resource_mut::<Paths>().settings_file = Some(file.clone());
+        let settings = button_for(&mut app, |action| {
+            matches!(action, Action::Go(Screen::Settings))
+        });
+        press(&mut app, settings);
+        let logs = d.join("private-session-logs");
+        let metrics = d.join("session-metrics");
+        let mut metric_fields = app
+            .world_mut()
+            .query_filtered::<&mut EditableText, With<AiMetricsDirField>>();
+        *metric_fields.single_mut(app.world_mut()).unwrap() =
+            EditableText::new(metrics.display().to_string());
+        let mut log_fields = app
+            .world_mut()
+            .query_filtered::<&mut EditableText, With<AiLogsDirField>>();
+        *log_fields.single_mut(app.world_mut()).unwrap() =
+            EditableText::new(logs.display().to_string());
+        let save = button_for(&mut app, |action| matches!(action, Action::SaveSettings));
+        press(&mut app, save);
+        assert_eq!(Settings::load(&file, &d).ai_logs_dir, Some(logs.clone()));
+        assert_eq!(
+            Settings::load(&file, &d).ai_metrics_dir,
+            Some(metrics.clone())
+        );
+        let fog = button_for(&mut app, |action| matches!(action, Action::ToggleFog));
+        press(&mut app, fog);
+        assert_eq!(Settings::load(&file, &d).ai_logs_dir, Some(logs));
+        *log_fields.single_mut(app.world_mut()).unwrap() = EditableText::new("");
+        press(&mut app, save);
+        assert!(Settings::load(&file, &d).ai_logs_dir.is_none());
+        assert_eq!(Settings::load(&file, &d).ai_metrics_dir, Some(metrics));
+        let before = std::fs::read(&file).unwrap();
+        *log_fields.single_mut(app.world_mut()).unwrap() = EditableText::new("relative/logs");
+        press(&mut app, save);
+        assert!(
+            matches!(&app.world().resource::<SettingsStatus>().0, Some(Err(message)) if message.contains("AI logs folder"))
+        );
+        assert_eq!(std::fs::read(&file).unwrap(), before);
+        let resolved = d.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(resolved).unwrap();
+    }
+
+    #[test]
+    fn keyboard_focus_reveals_settings_controls_without_resetting_manual_scroll() {
+        #[derive(Resource, Default)]
+        struct Revealed(Vec<Entity>);
+
+        let mut app = App::new();
+        app.init_resource::<InputFocus>()
+            .init_resource::<Revealed>()
+            .add_systems(Update, reveal_settings_focus)
+            .add_observer(
+                |event: On<ScrollIntoView>, mut revealed: ResMut<Revealed>| {
+                    revealed.0.push(event.entity);
+                },
+            );
+        let metrics = app.world_mut().spawn(AiMetricsDirField).id();
+        let logs = app.world_mut().spawn(AiLogsDirField).id();
+        let fog = app.world_mut().spawn(FogCheckbox).id();
+        let footer = app.world_mut().spawn(Action::SaveSettings).id();
+        for entity in [metrics, logs, fog, footer] {
+            app.world_mut()
+                .resource_mut::<InputFocus>()
+                .set(entity, bevy::input_focus::FocusCause::Navigated);
+            app.update();
+            // An unchanged focus must not pull the viewport back after a mouse-wheel scroll.
+            app.update();
+        }
+        assert_eq!(app.world().resource::<Revealed>().0, [metrics, logs, fog]);
     }
 
     #[test]
@@ -1259,9 +1910,20 @@ pub(crate) mod tests {
             .resource_mut::<InputFocus>()
             .set(field, bevy::input_focus::FocusCause::Navigated);
         type_agents_dir(&mut app, &d.join("via-enter").display().to_string());
+        let window = app.world_mut().spawn(Window::default()).id();
         app.world_mut()
-            .resource_mut::<ButtonInput<KeyCode>>()
-            .press(KeyCode::Enter);
+            .trigger(bevy::input_focus::FocusedInput::new(
+                field,
+                raw_key(
+                    window,
+                    KeyCode::Enter,
+                    bevy::input::keyboard::Key::Enter,
+                    true,
+                    None,
+                ),
+                window,
+            ));
+        app.world_mut().flush();
         app.update();
         app.update();
         assert!(

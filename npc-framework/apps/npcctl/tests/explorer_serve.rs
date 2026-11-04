@@ -515,6 +515,7 @@ fn explorer_flags_are_checked() {
     let home = home("flags");
     let h = home.to_str().unwrap();
     let actors = home.join("actors");
+    let worlds = home.join("actors/worlds");
     // An invalid preset (a rover whose LIDAR has no beams; the built-in
     // rover is valid since Task 12).
     std::fs::create_dir_all(&actors).unwrap();
@@ -526,6 +527,7 @@ fn explorer_flags_are_checked() {
     )
     .unwrap();
     let actors = actors.to_str().unwrap();
+    let worlds = worlds.to_str().unwrap();
     for (args, needle) in [
         (vec!["--world-preset", "survival"], "--explorer-home"),
         (
@@ -559,6 +561,8 @@ fn explorer_flags_are_checked() {
                 "broken",
                 "--actors-dir",
                 actors,
+                "--worlds-dir",
+                worlds,
             ],
             // Task 11: an invalid preset is refused before anything starts.
             "actor preset `broken` is invalid",

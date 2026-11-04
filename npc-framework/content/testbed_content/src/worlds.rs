@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub const PLAIN_EXPLORER: &str = "plain_explorer";
-pub const BUILTIN_PRESETS: [(&str, &str); 4] = [
+pub const BUILTIN_PRESETS: [(&str, &str); 6] = [
     (
         PLAIN_EXPLORER,
         include_str!("../worlds/plain_explorer.json"),
@@ -21,11 +21,23 @@ pub const BUILTIN_PRESETS: [(&str, &str); 4] = [
         "island_village",
         include_str!("../worlds/island_village.json"),
     ),
+    (
+        "living_island",
+        include_str!("../worlds/living_island.json"),
+    ),
+    (
+        "living_homestead",
+        include_str!("../worlds/living_homestead.json"),
+    ),
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldPreset {
+    #[serde(default, skip_serializing_if = "EconomyModel::is_fixed")]
+    pub economy: EconomyModel,
+    #[serde(default, skip_serializing_if = "IslandGeography::is_compact")]
+    pub island_geography: IslandGeography,
     #[serde(
         default,
         skip_serializing_if = "npc_framework::agent_io::scheduler::SchedulerPolicy::is_default"
@@ -42,6 +54,32 @@ pub struct WorldPreset {
     pub perception: PerceptionRulesSpec,
     pub systems: SystemsSpec,
     pub inhabitants: InhabitantsSpec,
+}
+/// Opt-in content model; existing presets keep their exact fixed-economy shape.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EconomyModel {
+    #[default]
+    Fixed,
+    NeedsDriven,
+}
+impl EconomyModel {
+    pub fn is_fixed(&self) -> bool {
+        *self == Self::Fixed
+    }
+}
+/// Immutable construction profile, retained in each saved world's preset copy.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IslandGeography {
+    #[default]
+    Compact,
+    Expanded,
+}
+impl IslandGeography {
+    pub fn is_compact(&self) -> bool {
+        *self == Self::Compact
+    }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -116,6 +154,14 @@ pub struct InhabitantsSpec {
 
 pub fn validate(p: &WorldPreset) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
+    if p.island_geography == IslandGeography::Expanded
+        && (p.scene != WorldScene::IslandVillage || p.economy != EconomyModel::NeedsDriven)
+    {
+        errors.push("Expanded island geography requires the Living Island Village economy.".into());
+    }
+    if p.economy == EconomyModel::NeedsDriven && p.scene != WorldScene::IslandVillage {
+        errors.push("The needs-driven economy requires the Island Village scene.".into());
+    }
     if let Err(error) = p.ai_scheduler.validate() {
         errors.push(error);
     }
@@ -129,7 +175,9 @@ pub fn validate(p: &WorldPreset) -> Result<(), Vec<String>> {
             errors.push("Island Village needs Crafting enabled for its production chains.".into());
         }
         if p.inhabitants.workers != 0 || p.inhabitants.skeletons != 0 {
-            errors.push("Island Village supplies its own nine residents; extra workers and skeletons must be zero.".into());
+            errors.push(if p.economy == EconomyModel::NeedsDriven {
+                "Living Island Village supplies its own twelve residents; extra workers and skeletons must be zero.".into()
+            } else { "Island Village supplies its own nine residents; extra workers and skeletons must be zero.".into() });
         }
     }
     if p.name.trim().is_empty() {
@@ -224,19 +272,23 @@ pub fn install_builtins(dir: &Path) -> Result<(), String> {
             return Ok(());
         }
         // A new shipped scene is additive to existing installations; never replace a user's preset.
-        let path = dir.join("island_village.json");
-        match std::fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(path)
+        for (id, text) in BUILTIN_PRESETS
+            .iter()
+            .filter(|(id, _)| matches!(*id, "island_village" | "living_island"))
         {
-            Ok(mut file) => {
-                use std::io::Write;
-                file.write_all(include_str!("../worlds/island_village.json").as_bytes())
-                    .map_err(|e| e.to_string())?;
+            let path = dir.join(format!("{id}.json"));
+            match std::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(path)
+            {
+                Ok(mut file) => {
+                    use std::io::Write;
+                    file.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+                Err(e) => return Err(e.to_string()),
             }
-            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
-            Err(e) => return Err(e.to_string()),
         }
         return Ok(());
     }

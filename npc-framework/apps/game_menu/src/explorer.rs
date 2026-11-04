@@ -432,7 +432,10 @@ impl Plugin for ExplorerPlugin {
                 Update,
                 (
                     (refresh_new, refresh_picker_buttons, enter_starts)
-                        .run_if(in_state(Screen::ExplorerNew)),
+                        .run_if(in_state(Screen::ExplorerNew))
+                        // Picker rebuilding despawns old buttons. Flush those changes before
+                        // accessibility synchronization queues updates for surviving controls.
+                        .before(ui::refresh_accessible_buttons),
                     poll_save_check.run_if(in_state(Screen::ExplorerCheck)),
                     finish_run_scan.run_if(in_state(Screen::ExplorerResume)),
                     show_token_notice,
@@ -888,7 +891,7 @@ fn spawn_resume(
             ))
             .with_children(|list| {
                 for (i, (a, state)) in agents.iter().zip(&states).enumerate() {
-                    let tab = i32::try_from(i * 4).unwrap_or(i32::MAX);
+                    let tab = i32::try_from(i * 5).unwrap_or(i32::MAX);
                     list.spawn((
                         ResumeRow(i),
                         Node {
@@ -944,7 +947,7 @@ fn finish_run_scan(
             continue;
         };
         let state = checked_state(&mut worlds, &a, run);
-        let tab = i32::try_from(i * 4).unwrap_or(i32::MAX);
+        let tab = i32::try_from(i * 5).unwrap_or(i32::MAX);
         let name_px = scan.name_px;
         for (row, _) in rows.iter().filter(|(_, r)| r.0 == i) {
             commands
@@ -1042,6 +1045,12 @@ fn resume_row(
             agent: agent.clone(),
             dir: a.dir.dir.clone(),
         },
+    );
+    small(
+        "Logs & metrics",
+        true,
+        tab + 4,
+        Action::AgentHistory(agent.clone()),
     );
     if enabled && !*focused {
         row.commands().entity(id).insert(AutoFocus);
@@ -1509,8 +1518,13 @@ mod tests {
         let agents = d.join("agents");
         let mut app = app(&d, &agents);
         open(&mut app, Screen::ExplorerNew);
-        let line = |name: &str| format!("open your AI tool in {}", agents.join(name).display());
-        let has = |app: &mut App, text: &str| texts(app).iter().any(|t| t.contains(text));
+        let line = |name: &str| {
+            format!(
+                "After Start, choose a logged-in Codex or Claude CLI in AI agent controls. Agent folder: {}",
+                agents.join(name).display()
+            )
+        };
+        let has = |app: &mut App, text: &str| texts(app).iter().any(|t| t == text);
         type_name(&mut app, NameKind::Agent, " Brin Marlow ");
         // The folder actor_testbed will use: `<agents>/<slug(agent)>`.
         assert!(has(&mut app, &line("brin-marlow")), "{:?}", texts(&mut app));
@@ -1521,14 +1535,24 @@ mod tests {
             "{:?}",
             texts(&mut app)
         );
-        assert!(!has(&mut app, "brin-marlow"));
+        assert!(
+            !texts(&mut app)
+                .iter()
+                .any(|text| text.contains("brin-marlow"))
+        );
         // A name without a folder name names no folder.
         type_name(&mut app, NameKind::Agent, "?!");
         assert!(
-            !has(&mut app, "open your AI tool in"),
+            !texts(&mut app)
+                .iter()
+                .any(|text| text.contains("Agent folder:")),
             "{:?}",
             texts(&mut app)
         );
+        assert!(has(
+            &mut app,
+            &format!("The agent's folder goes into {}", agents.display())
+        ));
         let _ = std::fs::remove_dir_all(&d);
     }
 

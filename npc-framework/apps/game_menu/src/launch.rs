@@ -303,11 +303,48 @@ pub fn save_settings_with_actors(
     save_settings_with_folders(agents_dir, fog_of_war, actors_dir, worlds, file)
 }
 
+#[cfg(test)]
 pub fn save_settings_with_folders(
     agents_dir: &str,
     fog_of_war: bool,
     actors_dir: Option<PathBuf>,
     worlds_dir: Option<PathBuf>,
+    file: Option<&Path>,
+) -> Result<Settings, String> {
+    let metrics = file.and_then(|f| Settings::load(f, Path::new("")).ai_metrics_dir);
+    save_settings_with_metrics(
+        agents_dir, fog_of_war, actors_dir, worlds_dir, metrics, file,
+    )
+}
+
+#[cfg(test)]
+pub fn save_settings_with_metrics(
+    agents_dir: &str,
+    fog_of_war: bool,
+    actors_dir: Option<PathBuf>,
+    worlds_dir: Option<PathBuf>,
+    ai_metrics_dir: Option<PathBuf>,
+    file: Option<&Path>,
+) -> Result<Settings, String> {
+    let logs = file.and_then(|f| Settings::load(f, Path::new("")).ai_logs_dir);
+    save_settings_with_client_folders(
+        agents_dir,
+        fog_of_war,
+        actors_dir,
+        worlds_dir,
+        ai_metrics_dir,
+        logs,
+        file,
+    )
+}
+
+pub fn save_settings_with_client_folders(
+    agents_dir: &str,
+    fog_of_war: bool,
+    actors_dir: Option<PathBuf>,
+    worlds_dir: Option<PathBuf>,
+    ai_metrics_dir: Option<PathBuf>,
+    ai_logs_dir: Option<PathBuf>,
     file: Option<&Path>,
 ) -> Result<Settings, String> {
     let dir = PathBuf::from(agents_dir.trim());
@@ -318,6 +355,12 @@ pub fn save_settings_with_folders(
     if let Some(worlds) = &worlds_dir {
         validate_agents_dir(worlds).map_err(|e| format!("worlds folder: {e}"))?;
     }
+    if let Some(metrics) = &ai_metrics_dir {
+        validate_agents_dir(metrics).map_err(|e| format!("AI metrics folder: {e}"))?;
+    }
+    if let Some(logs) = &ai_logs_dir {
+        validate_agents_dir(logs).map_err(|e| format!("AI logs folder: {e}"))?;
+    }
     let file = file.ok_or("no settings folder: APPDATA, XDG_CONFIG_HOME and HOME are unset")?;
     std::fs::create_dir_all(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
     let settings = Settings {
@@ -325,6 +368,8 @@ pub fn save_settings_with_folders(
         fog_of_war,
         actors_dir,
         worlds_dir,
+        ai_metrics_dir,
+        ai_logs_dir,
     };
     settings
         .save(file)
@@ -527,7 +572,7 @@ pub fn agent_folder_line(root: &Path, agent: &str) -> String {
         return format!("The agent's folder goes into {}", root.display());
     }
     format!(
-        "After Start, open your AI tool in {} and paste the prompt.",
+        "After Start, choose a logged-in Codex or Claude CLI in AI agent controls. Agent folder: {}",
         root.join(slug(agent)).display()
     )
 }
@@ -605,6 +650,8 @@ mod tests {
             fog_of_war: true,
             actors_dir: None,
             worlds_dir: None,
+            ai_metrics_dir: None,
+            ai_logs_dir: None,
         }
     }
 
@@ -693,6 +740,116 @@ mod tests {
         let saved = save_settings(&agents.display().to_string(), false, Some(&file)).unwrap();
         assert_eq!(saved.worlds_dir, Some(worlds));
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn ai_metrics_folder_validates_before_writes_and_survives_legacy_preference_saves() {
+        let root = tmp("metrics-setting");
+        let file = root.join("settings.json");
+        let agents = root.join("agents");
+        assert!(
+            save_settings_with_metrics(
+                &agents.display().to_string(),
+                true,
+                None,
+                None,
+                Some("relative/metrics".into()),
+                Some(&file)
+            )
+            .is_err()
+        );
+        assert!(!file.exists() && !agents.exists());
+        let metrics = root.join("chosen-metrics");
+        let saved = save_settings_with_metrics(
+            &agents.display().to_string(),
+            true,
+            None,
+            None,
+            Some(metrics.clone()),
+            Some(&file),
+        )
+        .unwrap();
+        assert_eq!(saved.ai_metrics_dir, Some(metrics.clone()));
+        assert!(
+            !metrics.exists(),
+            "saving a preference does not create an export directory"
+        );
+        let saved = save_settings(&agents.display().to_string(), false, Some(&file)).unwrap();
+        assert_eq!(saved.ai_metrics_dir, Some(metrics));
+        let resolved = root.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(resolved).unwrap();
+    }
+
+    #[test]
+    fn ai_log_folder_validates_before_writes_and_survives_other_settings_saves() {
+        let root = tmp("logs-setting");
+        let file = root.join("settings.json");
+        let agents = root.join("agents");
+        assert!(
+            save_settings_with_client_folders(
+                &agents.display().to_string(),
+                true,
+                None,
+                None,
+                None,
+                Some("relative/logs".into()),
+                Some(&file)
+            )
+            .is_err()
+        );
+        assert!(!file.exists() && !agents.exists());
+        let logs = root.join("chosen-private-logs");
+        let metrics = root.join("chosen-metrics");
+        let saved = save_settings_with_client_folders(
+            &agents.display().to_string(),
+            true,
+            None,
+            None,
+            Some(metrics.clone()),
+            Some(logs.clone()),
+            Some(&file),
+        )
+        .unwrap();
+        assert_eq!(saved.ai_logs_dir, Some(logs.clone()));
+        assert!(
+            !logs.exists() && !metrics.exists(),
+            "saving destinations must not create or publish client artifacts"
+        );
+        let saved = save_settings_with_metrics(
+            &agents.display().to_string(),
+            false,
+            None,
+            None,
+            Some(metrics.clone()),
+            Some(&file),
+        )
+        .unwrap();
+        assert_eq!(saved.ai_logs_dir, Some(logs.clone()));
+        let saved = save_settings(&agents.display().to_string(), true, Some(&file)).unwrap();
+        assert_eq!(saved.ai_logs_dir, Some(logs));
+        assert_eq!(saved.ai_metrics_dir, Some(metrics));
+        let before = std::fs::read(&file).unwrap();
+        let log_file = root.join("not-a-folder");
+        std::fs::write(&log_file, "owned file").unwrap();
+        let new_agents = root.join("must-not-be-created");
+        assert!(
+            save_settings_with_client_folders(
+                &new_agents.display().to_string(),
+                true,
+                None,
+                None,
+                None,
+                Some(log_file),
+                Some(&file)
+            )
+            .is_err()
+        );
+        assert_eq!(std::fs::read(&file).unwrap(), before);
+        assert!(!new_agents.exists());
+        let resolved = root.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(resolved).unwrap();
     }
 
     #[test]

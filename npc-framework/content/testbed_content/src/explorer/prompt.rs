@@ -61,10 +61,43 @@ pub fn render_prompt(kind: PromptKind, v: &PromptVars) -> String {
         PromptKind::ResumeChanged => RESUME_CHANGED,
         PromptKind::ResumeRebuilt => RESUME_REBUILT,
     };
-    fill(
+    normalize_prompt(&fill(
         &format!("{}\n\n{}", head.trim_end(), COMMON.trim_start()),
         &prompt_values(v),
-    )
+    ))
+}
+
+/// Canonical text shared by the shown/copied prompt and its saved body. Remove
+/// transport/formatting controls, not Unicode spelling: NBSP and other genuine
+/// spaces, combining marks, joiners used by scripts/emoji and literal paths stay
+/// intact. In particular, words separated by NBSP must never be concatenated.
+pub fn normalize_prompt(text: &str) -> String {
+    let mut normalized = String::with_capacity(text.len());
+    let mut characters = text.chars().peekable();
+    while let Some(character) = characters.next() {
+        match character {
+            '\r' => {
+                if characters.peek() == Some(&'\n') {
+                    characters.next();
+                }
+                normalized.push('\n');
+            }
+            '\u{85}' | '\u{2028}' | '\u{2029}' => normalized.push('\n'),
+            '\n' | '\t' => normalized.push(character),
+            '\u{ad}'
+            | '\u{61c}'
+            | '\u{200b}'
+            | '\u{200e}'
+            | '\u{200f}'
+            | '\u{202a}'..='\u{202e}'
+            | '\u{2060}'
+            | '\u{2066}'..='\u{206f}'
+            | '\u{feff}' => {}
+            _ if character.is_control() => {}
+            _ => normalized.push(character),
+        }
+    }
+    normalized
 }
 
 /// A path with forward slashes: command lines and paths in the text work in
@@ -154,6 +187,36 @@ mod tests {
             dir: PathBuf::from(r"C:\agents\wren-ashdown"),
             npcctl_missing: missing,
             map_enabled: true,
+        }
+    }
+
+    #[test]
+    fn prompt_normalization_removes_format_controls_and_preserves_unicode_paths_and_spacing() {
+        let raw = "\u{feff}Read\u{200b} this\u{ad}\r\n\u{202e}C:/Zoë/👩\u{200d}💻/نامه\u{200c}ها\u{2069}\rNext\u{85}one\u{a0}two\t`markdown`\0";
+        let normalized = normalize_prompt(raw);
+        assert_eq!(
+            normalized,
+            "Read this\nC:/Zoë/👩\u{200d}💻/نامه\u{200c}ها\nNext\none\u{a0}two\t`markdown`"
+        );
+        assert_eq!(normalize_prompt(&normalized), normalized);
+    }
+
+    #[test]
+    fn start_resume_and_all_other_variants_use_the_same_clean_final_render_boundary() {
+        let mut v = vars(false);
+        v.agent = "\u{feff}Her\u{200b}p".into();
+        v.world = "Café\u{2066} Island\u{2069}".into();
+        v.dir = PathBuf::from("C:/agents/Zoë 🌊/one\u{a0}two");
+        for kind in ALL {
+            let prompt = render_prompt(kind, &v);
+            assert_eq!(prompt, normalize_prompt(&prompt), "{kind:?} final boundary");
+            assert!(prompt.contains("Herp") && prompt.contains("Café Island"));
+            assert!(prompt.contains("C:/agents/Zoë 🌊/one\u{a0}two/AGENTS.md"));
+            assert!(
+                !prompt
+                    .chars()
+                    .any(|c| matches!(c, '\u{feff}' | '\u{200b}' | '\u{2066}' | '\u{2069}' | '\r'))
+            );
         }
     }
 

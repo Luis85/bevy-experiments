@@ -50,7 +50,7 @@ pub const CONTENT: &str = "testbed";
 
 /// The embedded scenario files: `(name, JSON)`. `testbed` is the default
 /// showcase; the others focus on one feature each (see the README).
-pub const SCENARIO_FILES: [(&str, &str); 12] = [
+pub const SCENARIO_FILES: [(&str, &str); 13] = [
     ("testbed", include_str!("../scenarios/testbed.json")),
     ("doors", include_str!("../scenarios/doors.json")),
     (
@@ -66,6 +66,10 @@ pub const SCENARIO_FILES: [(&str, &str); 12] = [
     ("smithy", include_str!("../scenarios/smithy.json")),
     ("explorer", include_str!("../scenarios/explorer.json")),
     ("ai_village", include_str!("../scenarios/ai_village.json")),
+    (
+        "living_village",
+        include_str!("../scenarios/living_village.json"),
+    ),
 ];
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
@@ -102,6 +106,8 @@ pub enum Detection {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct WorldSpec {
+    pub economy: crate::worlds::EconomyModel,
+    pub island_geography: crate::worlds::IslandGeography,
     pub ai_scheduler: Option<npc_framework::agent_io::scheduler::SchedulerPolicy>,
     /// Present only in host-generated explorer descriptors; pure replay data.
     pub explorer_context: Option<crate::explorer::context::ExplorerContext>,
@@ -117,6 +123,8 @@ pub struct WorldSpec {
 impl Default for WorldSpec {
     fn default() -> Self {
         Self {
+            economy: crate::worlds::EconomyModel::Fixed,
+            island_geography: crate::worlds::IslandGeography::Compact,
             ai_scheduler: None,
             explorer_context: None,
             layout: Layout::Compound,
@@ -136,6 +144,16 @@ impl WorldSpec {
             return Ok(Self::default());
         }
         let spec: Self = serde_json::from_value(v.clone()).map_err(|e| format!("world: {e}"))?;
+        if spec.island_geography == crate::worlds::IslandGeography::Expanded
+            && (spec.layout != Layout::Island
+                || spec.economy != crate::worlds::EconomyModel::NeedsDriven)
+        {
+            return Err("expanded island geography requires a needs-driven island".into());
+        }
+        if spec.economy == crate::worlds::EconomyModel::NeedsDriven && spec.layout != Layout::Island
+        {
+            return Err("the needs-driven economy requires an island layout".into());
+        }
         if let Some(policy) = &spec.ai_scheduler {
             policy.validate()?;
         }
@@ -200,7 +218,16 @@ pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -
             .and_then(|c| c.world.as_ref())
             .map(|s| s.preset.clone())
             .unwrap_or_else(|| {
-                crate::worlds::builtin_preset("island_village").expect("shipped island rules")
+                let mut preset = crate::worlds::builtin_preset(
+                    if world.economy == crate::worlds::EconomyModel::NeedsDriven {
+                        "living_island"
+                    } else {
+                        "island_village"
+                    },
+                )
+                .expect("shipped island rules");
+                preset.island_geography = world.island_geography;
+                preset
             });
         crate::village::prepare(&mut app, &preset);
     }
@@ -416,6 +443,10 @@ pub fn embedded_scenarios() -> &'static [(&'static str, &'static str)] {
         (
             "ai_village",
             "An island village: earn coins, buy food and lodging, survive the seasons, and leave a diary.",
+        ),
+        (
+            "living_village",
+            "A needs-driven island: gather, hunt, craft and trade in a physical adaptive economy.",
         ),
     ];
     &LIST

@@ -911,6 +911,7 @@ mod tests {
             started: started.into(),
             agent: agent.into(),
             world: "Moor".into(),
+            projection: None,
         }
         .write(&dir)
         .unwrap();
@@ -1544,6 +1545,7 @@ mod tests {
             started: "2026-10-26T01:00:00Z".into(),
             agent: "Cara Vell".into(),
             world: "Dune".into(),
+            projection: None,
         }
         .write(&cara)
         .unwrap();

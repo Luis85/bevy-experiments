@@ -1,0 +1,524 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-29T12:04:11.220Z",
+  "title": "Design System: NPC World Viewer",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "tonalRamp": [
+          "oklch(15.00% 0.0302 179.22)",
+          "oklch(26.43% 0.0302 179.22)",
+          "oklch(37.86% 0.0302 179.22)",
+          "oklch(49.29% 0.0302 179.22)",
+          "oklch(60.71% 0.0302 179.22)",
+          "oklch(72.14% 0.0302 179.22)",
+          "oklch(83.57% 0.0302 179.22)",
+          "oklch(95.00% 0.0302 179.22)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "tonalRamp": [
+          "oklch(15.00% 0.0210 165.79)",
+          "oklch(26.43% 0.0210 165.79)",
+          "oklch(37.86% 0.0210 165.79)",
+          "oklch(49.29% 0.0210 165.79)",
+          "oklch(60.71% 0.0210 165.79)",
+          "oklch(72.14% 0.0210 165.79)",
+          "oklch(83.57% 0.0210 165.79)",
+          "oklch(95.00% 0.0210 165.79)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Line",
+        "tonalRamp": [
+          "oklch(15.00% 0.0219 118.26)",
+          "oklch(26.43% 0.0219 118.26)",
+          "oklch(37.86% 0.0219 118.26)",
+          "oklch(49.29% 0.0219 118.26)",
+          "oklch(60.71% 0.0219 118.26)",
+          "oklch(72.14% 0.0219 118.26)",
+          "oklch(83.57% 0.0219 118.26)",
+          "oklch(95.00% 0.0219 118.26)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "tonalRamp": [
+          "oklch(15.00% 0.0108 95.16)",
+          "oklch(26.43% 0.0108 95.16)",
+          "oklch(37.86% 0.0108 95.16)",
+          "oklch(49.29% 0.0108 95.16)",
+          "oklch(60.71% 0.0108 95.16)",
+          "oklch(72.14% 0.0108 95.16)",
+          "oklch(83.57% 0.0108 95.16)",
+          "oklch(95.00% 0.0108 95.16)"
+        ]
+      },
+      "accent": {
+        "role": "primary",
+        "displayName": "Accent",
+        "tonalRamp": [
+          "oklch(15.00% 0.0570 168.60)",
+          "oklch(26.43% 0.0570 168.60)",
+          "oklch(37.86% 0.0570 168.60)",
+          "oklch(49.29% 0.0570 168.60)",
+          "oklch(60.71% 0.0570 168.60)",
+          "oklch(72.14% 0.0570 168.60)",
+          "oklch(83.57% 0.0570 168.60)",
+          "oklch(95.00% 0.0570 168.60)"
+        ]
+      },
+      "sea": {
+        "role": "secondary",
+        "displayName": "Sea",
+        "tonalRamp": [
+          "oklch(15.00% 0.0657 225.34)",
+          "oklch(26.43% 0.0657 225.34)",
+          "oklch(37.86% 0.0657 225.34)",
+          "oklch(49.29% 0.0657 225.34)",
+          "oklch(60.71% 0.0657 225.34)",
+          "oklch(72.14% 0.0657 225.34)",
+          "oklch(83.57% 0.0657 225.34)",
+          "oklch(95.00% 0.0657 225.34)"
+        ]
+      },
+      "grass": {
+        "role": "secondary",
+        "displayName": "Grass",
+        "tonalRamp": [
+          "oklch(15.00% 0.1037 127.41)",
+          "oklch(26.43% 0.1037 127.41)",
+          "oklch(37.86% 0.1037 127.41)",
+          "oklch(49.29% 0.1037 127.41)",
+          "oklch(60.71% 0.1037 127.41)",
+          "oklch(72.14% 0.1037 127.41)",
+          "oklch(83.57% 0.1037 127.41)",
+          "oklch(95.00% 0.1037 127.41)"
+        ]
+      },
+      "grass-light": {
+        "role": "secondary",
+        "displayName": "Grass Light",
+        "tonalRamp": [
+          "oklch(15.00% 0.1045 127.14)",
+          "oklch(26.43% 0.1045 127.14)",
+          "oklch(37.86% 0.1045 127.14)",
+          "oklch(49.29% 0.1045 127.14)",
+          "oklch(60.71% 0.1045 127.14)",
+          "oklch(72.14% 0.1045 127.14)",
+          "oklch(83.57% 0.1045 127.14)",
+          "oklch(95.00% 0.1045 127.14)"
+        ]
+      },
+      "sand": {
+        "role": "secondary",
+        "displayName": "Sand",
+        "tonalRamp": [
+          "oklch(15.00% 0.0793 90.42)",
+          "oklch(26.43% 0.0793 90.42)",
+          "oklch(37.86% 0.0793 90.42)",
+          "oklch(49.29% 0.0793 90.42)",
+          "oklch(60.71% 0.0793 90.42)",
+          "oklch(72.14% 0.0793 90.42)",
+          "oklch(83.57% 0.0793 90.42)",
+          "oklch(95.00% 0.0793 90.42)"
+        ]
+      },
+      "road": {
+        "role": "secondary",
+        "displayName": "Road",
+        "tonalRamp": [
+          "oklch(15.00% 0.0689 83.15)",
+          "oklch(26.43% 0.0689 83.15)",
+          "oklch(37.86% 0.0689 83.15)",
+          "oklch(49.29% 0.0689 83.15)",
+          "oklch(60.71% 0.0689 83.15)",
+          "oklch(72.14% 0.0689 83.15)",
+          "oklch(83.57% 0.0689 83.15)",
+          "oklch(95.00% 0.0689 83.15)"
+        ]
+      },
+      "road-inset": {
+        "role": "secondary",
+        "displayName": "Road Inset",
+        "tonalRamp": [
+          "oklch(15.00% 0.0697 88.31)",
+          "oklch(26.43% 0.0697 88.31)",
+          "oklch(37.86% 0.0697 88.31)",
+          "oklch(49.29% 0.0697 88.31)",
+          "oklch(60.71% 0.0697 88.31)",
+          "oklch(72.14% 0.0697 88.31)",
+          "oklch(83.57% 0.0697 88.31)",
+          "oklch(95.00% 0.0697 88.31)"
+        ]
+      },
+      "live": {
+        "role": "primary",
+        "displayName": "Live",
+        "tonalRamp": [
+          "oklch(15.00% 0.0783 156.44)",
+          "oklch(26.43% 0.0783 156.44)",
+          "oklch(37.86% 0.0783 156.44)",
+          "oklch(49.29% 0.0783 156.44)",
+          "oklch(60.71% 0.0783 156.44)",
+          "oklch(72.14% 0.0783 156.44)",
+          "oklch(83.57% 0.0783 156.44)",
+          "oklch(95.00% 0.0783 156.44)"
+        ]
+      },
+      "warning": {
+        "role": "primary",
+        "displayName": "Warning",
+        "tonalRamp": [
+          "oklch(15.00% 0.1104 73.81)",
+          "oklch(26.43% 0.1104 73.81)",
+          "oklch(37.86% 0.1104 73.81)",
+          "oklch(49.29% 0.1104 73.81)",
+          "oklch(60.71% 0.1104 73.81)",
+          "oklch(72.14% 0.1104 73.81)",
+          "oklch(83.57% 0.1104 73.81)",
+          "oklch(95.00% 0.1104 73.81)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15.00% 0.1185 78.95)",
+          "oklch(26.43% 0.1185 78.95)",
+          "oklch(37.86% 0.1185 78.95)",
+          "oklch(49.29% 0.1185 78.95)",
+          "oklch(60.71% 0.1185 78.95)",
+          "oklch(72.14% 0.1185 78.95)",
+          "oklch(83.57% 0.1185 78.95)",
+          "oklch(95.00% 0.1185 78.95)"
+        ]
+      },
+      "button": {
+        "role": "neutral",
+        "displayName": "Button",
+        "tonalRamp": [
+          "oklch(15.00% 0.0162 95.23)",
+          "oklch(26.43% 0.0162 95.23)",
+          "oklch(37.86% 0.0162 95.23)",
+          "oklch(49.29% 0.0162 95.23)",
+          "oklch(60.71% 0.0162 95.23)",
+          "oklch(72.14% 0.0162 95.23)",
+          "oklch(83.57% 0.0162 95.23)",
+          "oklch(95.00% 0.0162 95.23)"
+        ]
+      },
+      "button-hover": {
+        "role": "neutral",
+        "displayName": "Button Hover",
+        "tonalRamp": [
+          "oklch(15.00% 0.0347 90.52)",
+          "oklch(26.43% 0.0347 90.52)",
+          "oklch(37.86% 0.0347 90.52)",
+          "oklch(49.29% 0.0347 90.52)",
+          "oklch(60.71% 0.0347 90.52)",
+          "oklch(72.14% 0.0347 90.52)",
+          "oklch(83.57% 0.0347 90.52)",
+          "oklch(95.00% 0.0347 90.52)"
+        ]
+      },
+      "button-pressed": {
+        "role": "primary",
+        "displayName": "Button Pressed",
+        "tonalRamp": [
+          "oklch(15.00% 0.0819 86.07)",
+          "oklch(26.43% 0.0819 86.07)",
+          "oklch(37.86% 0.0819 86.07)",
+          "oklch(49.29% 0.0819 86.07)",
+          "oklch(60.71% 0.0819 86.07)",
+          "oklch(72.14% 0.0819 86.07)",
+          "oklch(83.57% 0.0819 86.07)",
+          "oklch(95.00% 0.0819 86.07)"
+        ]
+      },
+      "row-hover": {
+        "role": "neutral",
+        "displayName": "Row Hover",
+        "tonalRamp": [
+          "oklch(15.00% 0.0184 127.15)",
+          "oklch(26.43% 0.0184 127.15)",
+          "oklch(37.86% 0.0184 127.15)",
+          "oklch(49.29% 0.0184 127.15)",
+          "oklch(60.71% 0.0184 127.15)",
+          "oklch(72.14% 0.0184 127.15)",
+          "oklch(83.57% 0.0184 127.15)",
+          "oklch(95.00% 0.0184 127.15)"
+        ]
+      },
+      "row-selected": {
+        "role": "neutral",
+        "displayName": "Row Selected",
+        "tonalRamp": [
+          "oklch(15.00% 0.0428 115.87)",
+          "oklch(26.43% 0.0428 115.87)",
+          "oklch(37.86% 0.0428 115.87)",
+          "oklch(49.29% 0.0428 115.87)",
+          "oklch(60.71% 0.0428 115.87)",
+          "oklch(72.14% 0.0428 115.87)",
+          "oklch(83.57% 0.0428 115.87)",
+          "oklch(95.00% 0.0428 115.87)"
+        ]
+      },
+      "field": {
+        "role": "neutral",
+        "displayName": "Field",
+        "tonalRamp": [
+          "oklch(15.00% 0.0067 97.35)",
+          "oklch(26.43% 0.0067 97.35)",
+          "oklch(37.86% 0.0067 97.35)",
+          "oklch(49.29% 0.0067 97.35)",
+          "oklch(60.71% 0.0067 97.35)",
+          "oklch(72.14% 0.0067 97.35)",
+          "oklch(83.57% 0.0067 97.35)",
+          "oklch(95.00% 0.0067 97.35)"
+        ]
+      },
+      "player-tag": {
+        "role": "primary",
+        "displayName": "Player Tag",
+        "tonalRamp": [
+          "oklch(15.00% 0.0832 83.81)",
+          "oklch(26.43% 0.0832 83.81)",
+          "oklch(37.86% 0.0832 83.81)",
+          "oklch(49.29% 0.0832 83.81)",
+          "oklch(60.71% 0.0832 83.81)",
+          "oklch(72.14% 0.0832 83.81)",
+          "oklch(83.57% 0.0832 83.81)",
+          "oklch(95.00% 0.0832 83.81)"
+        ]
+      },
+      "meter-track": {
+        "role": "neutral",
+        "displayName": "Meter Track",
+        "tonalRamp": [
+          "oklch(15.00% 0.0188 113.36)",
+          "oklch(26.43% 0.0188 113.36)",
+          "oklch(37.86% 0.0188 113.36)",
+          "oklch(49.29% 0.0188 113.36)",
+          "oklch(60.71% 0.0188 113.36)",
+          "oklch(72.14% 0.0188 113.36)",
+          "oklch(83.57% 0.0188 113.36)",
+          "oklch(95.00% 0.0188 113.36)"
+        ]
+      },
+      "meter-good": {
+        "role": "neutral",
+        "displayName": "Meter Good",
+        "tonalRamp": [
+          "oklch(15.00% 0.0694 142.11)",
+          "oklch(26.43% 0.0694 142.11)",
+          "oklch(37.86% 0.0694 142.11)",
+          "oklch(49.29% 0.0694 142.11)",
+          "oklch(60.71% 0.0694 142.11)",
+          "oklch(72.14% 0.0694 142.11)",
+          "oklch(83.57% 0.0694 142.11)",
+          "oklch(95.00% 0.0694 142.11)"
+        ]
+      },
+      "meter-warning": {
+        "role": "neutral",
+        "displayName": "Meter Warning",
+        "tonalRamp": [
+          "oklch(15.00% 0.1004 83.01)",
+          "oklch(26.43% 0.1004 83.01)",
+          "oklch(37.86% 0.1004 83.01)",
+          "oklch(49.29% 0.1004 83.01)",
+          "oklch(60.71% 0.1004 83.01)",
+          "oklch(72.14% 0.1004 83.01)",
+          "oklch(83.57% 0.1004 83.01)",
+          "oklch(95.00% 0.1004 83.01)"
+        ]
+      },
+      "meter-low": {
+        "role": "neutral",
+        "displayName": "Meter Low",
+        "tonalRamp": [
+          "oklch(15.00% 0.0893 43.08)",
+          "oklch(26.43% 0.0893 43.08)",
+          "oklch(37.86% 0.0893 43.08)",
+          "oklch(49.29% 0.0893 43.08)",
+          "oklch(60.71% 0.0893 43.08)",
+          "oklch(72.14% 0.0893 43.08)",
+          "oklch(83.57% 0.0893 43.08)",
+          "oklch(95.00% 0.0893 43.08)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Pixel identity",
+        "purpose": "Self-hosted Silkscreen island title; 16px at widths up to 800px."
+      },
+      "title": {
+        "displayName": "Section title",
+        "purpose": "Inspector and directory headings."
+      },
+      "entity-title": {
+        "displayName": "Selected entity",
+        "purpose": "Selected person or place name."
+      },
+      "body": {
+        "displayName": "Utility body",
+        "purpose": "Facts, directory names and text controls."
+      },
+      "label": {
+        "displayName": "Metadata",
+        "purpose": "Secondary utility labels."
+      },
+      "map-label": {
+        "displayName": "Canvas nameplate",
+        "purpose": "Monospace names drawn into cached bitmap sprites."
+      }
+    },
+    "shadows": [
+      {
+        "name": "toolbar",
+        "value": "0 5px 16px #142f3b40",
+        "purpose": "Lift the dark toolbar frame above the sea."
+      },
+      {
+        "name": "map-heading-text",
+        "value": "0 2px 4px #183f4d",
+        "purpose": "Text shadow for readable map captions."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-color",
+        "value": "background 0.15s, color 0.15s",
+        "purpose": "Local control feedback; removed under prefers-reduced-motion."
+      },
+      {
+        "name": "button-active",
+        "value": "translateY(1px)",
+        "purpose": "Pressed button displacement."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1600px"
+      },
+      {
+        "name": "stack-map",
+        "value": "800px"
+      },
+      {
+        "name": "stack-sidebar",
+        "value": "480px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Map button",
+      "kind": "button",
+      "refersTo": "map-button",
+      "description": "Local camera control on the map toolbar.",
+      "html": "<button class=\"ds-button ds-map-button\">Fit island</button>",
+      "css": ".ds-button { font-family: \"Segoe UI\", sans-serif; cursor: pointer; border: 0; border-radius: 0; transition: background .15s, color .15s; } .ds-button:active { transform: translateY(1px); } .ds-button:disabled { opacity: .5; cursor: default; } .ds-button:focus-visible { outline: 3px solid #c89740; outline-offset: 3px; } @media (prefers-reduced-motion: reduce) { .ds-button { transition: none; } } .ds-map-button { background: #f4f1e5; color: #29443c; min-height: 38px; min-width: 38px; padding: 0 12px; font-size: 12px; font-weight: 600; } .ds-map-button:hover { background: #e8dfc6; }"
+    },
+    {
+      "name": "Map toggle",
+      "kind": "button",
+      "refersTo": "map-toggle-active",
+      "description": "Pressed label or player-follow view toggle.",
+      "html": "<button class=\"ds-button ds-map-toggle\" aria-pressed=\"true\">Labels</button>",
+      "css": ".ds-button { font-family: \"Segoe UI\", sans-serif; cursor: pointer; border: 0; border-radius: 0; transition: background .15s, color .15s; } .ds-button:active { transform: translateY(1px); } .ds-button:disabled { opacity: .5; cursor: default; } .ds-button:focus-visible { outline: 3px solid #c89740; outline-offset: 3px; } @media (prefers-reduced-motion: reduce) { .ds-button { transition: none; } } .ds-map-toggle { background: #f4f1e5; color: #29443c; min-height: 38px; min-width: 38px; padding: 0 12px; font-size: 12px; font-weight: 600; } .ds-map-toggle:hover { background: #e8dfc6; } .ds-map-toggle[aria-pressed=\"true\"] { background: #e5ca8f; }"
+    },
+    {
+      "name": "Directory search",
+      "kind": "input",
+      "refersTo": "search-field",
+      "description": "Search entities by their displayed name or role.",
+      "html": "<label class=\"ds-search\"><svg viewBox=\"0 0 20 20\" aria-hidden=\"true\"><circle cx=\"8\" cy=\"8\" r=\"5\"/><path d=\"m12 12 5 5\"/></svg><input type=\"search\" aria-label=\"Search entities\" placeholder=\"Find someone or somewhere\"></label>",
+      "css": ".ds-search { display: flex; align-items: center; gap: 7px; border: 1px solid #cdd4c4; background: #fffef9; padding: 10px 9px; } .ds-search svg { width: 17px; height: 17px; stroke: #647667; fill: none; stroke-width: 1.5; flex: none; } .ds-search input { font-family: \"Segoe UI\", sans-serif; width: 100%; min-width: 0; border: 0; background: none; font-size: 12px; color: var(--ink, #263d38); caret-color: #a27332; } .ds-search input::placeholder { color: #69766a; } .ds-search input:focus-visible { outline: 3px solid #c89740; outline-offset: 8px; }"
+    },
+    {
+      "name": "Directory filter",
+      "kind": "button",
+      "refersTo": "directory-filter-active",
+      "description": "Active filter uses text and underline together.",
+      "html": "<button class=\"ds-button ds-filter\" aria-pressed=\"true\">People</button>",
+      "css": ".ds-button { font-family: \"Segoe UI\", sans-serif; cursor: pointer; border: 0; border-radius: 0; transition: background .15s, color .15s; } .ds-button:active { transform: translateY(1px); } .ds-button:disabled { opacity: .5; cursor: default; } .ds-button:focus-visible { outline: 3px solid #c89740; outline-offset: 3px; } @media (prefers-reduced-motion: reduce) { .ds-button { transition: none; } } .ds-filter { background: none; border-bottom: 2px solid transparent; font-size: 11px; color: var(--muted, #62716a); padding: 7px 0 10px; } .ds-filter[aria-pressed=\"true\"] { border-bottom-color: var(--accent, #315e4e); color: var(--accent, #315e4e); font-weight: 700; } .ds-filter:hover { color: var(--ink, #263d38); }"
+    },
+    {
+      "name": "Directory row",
+      "kind": "custom",
+      "refersTo": "directory-row",
+      "description": "Selected person with role and current activity.",
+      "html": "<button class=\"ds-button ds-row\" aria-pressed=\"true\"><span class=\"ds-person\" aria-hidden=\"true\"></span><span class=\"ds-row-copy\"><strong>Ada</strong><small>Farmer</small></span><span class=\"ds-activity\">gathering</span></button>",
+      "css": ".ds-button { font-family: \"Segoe UI\", sans-serif; cursor: pointer; border: 0; border-radius: 0; transition: background .15s, color .15s; } .ds-button:active { transform: translateY(1px); } .ds-button:disabled { opacity: .5; cursor: default; } .ds-button:focus-visible { outline: 3px solid #c89740; outline-offset: 3px; } @media (prefers-reduced-motion: reduce) { .ds-button { transition: none; } } .ds-row { width: 100%; display: flex; align-items: center; gap: 10px; background: none; border-bottom: 1px solid #e6e8dc; text-align: left; padding: 12px 3px; min-height: 54px; color: var(--ink, #263d38); } .ds-row:hover { background: #eaf0e3; } .ds-row[aria-pressed=\"true\"] { background: #e4eaca; } .ds-row-copy { flex: 1; min-width: 0; } .ds-row strong { display: block; font-size: 12px; font-weight: 600; overflow-wrap: anywhere; } .ds-row small { display: block; font-size: 10px; color: var(--muted, #62716a); margin-top: 4px; text-transform: capitalize; } .ds-person { position: relative; display: block; flex: none; width: 10px; height: 12px; background: #7a9770; margin: 0 3px; } .ds-person:before { content: \"\"; position: absolute; width: 6px; height: 5px; background: #b69a6c; top: -5px; left: 2px; } .ds-activity { color: var(--muted, #62716a); font-size: 10px; }"
+    },
+    {
+      "name": "Played character tag",
+      "kind": "chip",
+      "refersTo": "player-tag",
+      "description": "Static directory identifier for the played character.",
+      "html": "<span class=\"ds-player-tag\">You</span>",
+      "css": ".ds-player-tag { font-family: \"Segoe UI\", sans-serif; background: #e6c88d; padding: 4px 6px; font-size: 9px; color: #4b492f; }"
+    },
+    {
+      "name": "Need meter",
+      "kind": "custom",
+      "refersTo": "need-meter",
+      "description": "Native satisfaction meter with an explicit percentage.",
+      "html": "<label class=\"ds-need\"><span>Energy<strong>74%</strong></span><meter min=\"0\" max=\"100000\" low=\"30000\" high=\"60000\" optimum=\"100000\" value=\"74000\">74%</meter></label>",
+      "css": ".ds-need { display: block; margin: 11px 0; font-family: \"Segoe UI\", sans-serif; color: var(--ink, #263d38); } .ds-need > span { display: flex; justify-content: space-between; font-size: 11px; text-transform: capitalize; } .ds-need strong { font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; } .ds-need meter { display: block; width: 100%; height: 9px; margin-top: 5px; border: 0; background: #e5e7d9; } .ds-need meter::-webkit-meter-bar { background: #e5e7d9; border: 0; border-radius: 0; } .ds-need meter::-webkit-meter-optimum-value { background: #71946d; } .ds-need meter::-webkit-meter-suboptimum-value { background: #b9954d; } .ds-need meter::-webkit-meter-even-less-good-value { background: #ac6d53; } .ds-need meter::-moz-meter-bar { background: #71946d; }"
+    },
+    {
+      "name": "Connection status",
+      "kind": "custom",
+      "description": "Text explains a stale source file alongside the warning square.",
+      "html": "<div class=\"ds-connection\"><span class=\"ds-signal\" aria-hidden=\"true\"></span><div><strong role=\"status\">Snapshot is stale</strong><small>Last file update 12s ago · check the simulation host</small></div></div>",
+      "css": ".ds-connection { display: flex; gap: 10px; align-items: center; max-width: 460px; font-family: \"Segoe UI\", sans-serif; color: var(--ink, #263d38); } .ds-signal { width: 8px; height: 8px; background: #b58237; flex: none; } .ds-connection strong { font-size: 12px; font-weight: 650; display: block; } .ds-connection small { font-size: 11px; display: block; color: var(--muted, #62716a); margin-top: 4px; line-height: 1.5; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Pixel island, paper observer",
+    "overview": "The user-selected pixel-art world is the visual center: a blue sea, stepped sandy coastline, green land and distinct little village landmarks. Original cached bitmap sprites give people, workplaces and resources recognizable silhouettes. The surrounding interface is a quiet, warm paper surface for reading current simulation facts.\n\nThe pixel title establishes the world's character; utility text stays readable in a familiar sans serif. Map controls and inspection are deliberately modest. Status language reports the freshness of the source file, including stale or interrupted states.",
+    "keyCharacteristics": [
+      "Crisp original pixel artwork and square geometry.",
+      "Green, sand and sea world colors beside warm paper and dark green ink.",
+      "Pixel identity paired with compact, readable operator text.",
+      "Map-led desktop layout that becomes a vertical flow on phones.",
+      "Selection and freshness states remain explicit in text."
+    ],
+    "rules": [
+      {
+        "name": "The Status Has Words Rule",
+        "body": "Pair freshness color with the actual connection message; a rendered map can be retained while its snapshot is stale.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Utility Rule",
+        "body": "Keep the pixel face for the identity; retain the sans-serif hierarchy for detailed inspection and controls.",
+        "section": "typography"
+      }
+    ],
+    "dos": [
+      "Do preserve crisp nearest-neighbor rendering and original bitmap landmark silhouettes.",
+      "Do keep detailed utility text in Segoe UI and reserve Silkscreen for the identity.",
+      "Do preserve explicit selected, pressed, focus and freshness states.",
+      "Do keep the map first and let inspection flow below it on narrow screens.",
+      "Do keep camera, labels, search and selection controls read-only."
+    ],
+    "donts": [
+      "Don't smooth or blur the pixel artwork when scaling the map.",
+      "Don't imply a stale retained snapshot is live.",
+      "Don't turn view controls into simulation or gameplay commands.",
+      "Don't replace the continuous paper sidebar with decorative floating cards."
+    ]
+  }
+}

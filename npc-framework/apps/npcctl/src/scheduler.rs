@@ -15,6 +15,8 @@ pub enum SchedulerCmd {
     Bind(BindArgs),
     /// Remove a link; the host stops dispatching further continuation turns.
     Unbind(IdentityArgs),
+    /// Check the local link, workspace, CLI and locks without launching a turn or checking provider login.
+    Check(IdentityArgs),
     /// Read the host supervisor's current actor/activity states (never session UUIDs or credentials).
     Status {
         #[arg(long,default_value=crate::agent::DEFAULT_URL)]
@@ -114,8 +116,26 @@ fn client(url: &str) -> Result<RpcClient, Failure> {
         .map(|c| c.with_token(std::env::var("NPC_SCHEDULER_BEARER_TOKEN").ok()))
         .map_err(|_| Failure::usage("invalid game URL"))
 }
+fn save_link(
+    path: &std::path::Path,
+    binding: RunnerBinding,
+    turn_finished: bool,
+) -> Result<(), String> {
+    binding.validate()?;
+    // Refusing an unverifiable runner lock must not leave a newly activated link behind.
+    if turn_finished {
+        scheduler::clear_stale_runner_lock(path, &binding)?;
+    }
+    scheduler::write_binding(path, binding)
+}
 pub fn run(cmd: &SchedulerCmd, out: &mut Out) -> Result<u8, Failure> {
     match cmd {
+        SchedulerCmd::Check(args) => {
+            let (controller, path, _) = identity(args)?;
+            let report = scheduler::check_binding(&path, &controller).map_err(Failure::usage)?;
+            out.json(&report)?;
+            return Ok(if report.configuration_ready { 0 } else { 1 });
+        }
         SchedulerCmd::Status { url } => {
             let result = client(url)?
                 .call("scheduler/status", serde_json::Value::Null)
@@ -173,10 +193,7 @@ pub fn run(cmd: &SchedulerCmd, out: &mut Out) -> Result<u8, Failure> {
                 client_pid: args.client_pid,
                 revision: 0,
             };
-            scheduler::write_binding(&path, binding.clone()).map_err(Failure::usage)?;
-            if args.turn_finished {
-                scheduler::clear_stale_runner_lock(&path, &binding).map_err(Failure::usage)?;
-            }
+            save_link(&path, binding, args.turn_finished).map_err(Failure::usage)?;
             out.json(&json!({"linked":true,"controller":controller,"unit":unit,"provider":format!("{:?}",args.provider).to_lowercase(),"session":"[configured]","bindings":path}))?;
         }
     }
@@ -186,6 +203,37 @@ pub fn run(cmd: &SchedulerCmd, out: &mut Out) -> Result<u8, Failure> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn refusing_an_unverifiable_lock_does_not_activate_a_new_link() {
+        let dir = std::env::temp_dir().join(format!("npcctl-bind-lock-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("locks")).unwrap();
+        let file = dir.join("bindings.json");
+        let binding = RunnerBinding {
+            controller: "playtest".into(),
+            unit: 1,
+            provider: RunnerProvider::Codex,
+            session_id: "00000000-0000-4000-8000-000000000001".into(),
+            cwd: dir.canonicalize().unwrap(),
+            program: None,
+            args: vec![],
+            client_pid: None,
+            revision: 0,
+        };
+        let lock = dir
+            .join("locks")
+            .join("Codex-00000000-0000-4000-8000-000000000001.lock");
+        std::fs::write(&lock, "not a verifiable process owner").unwrap();
+        let error = save_link(&file, binding, true).unwrap_err();
+        assert!(error.contains("cannot be verified"));
+        assert!(
+            !file.exists(),
+            "a failed bind must not activate a continuation link"
+        );
+        assert!(lock.is_file());
+        let resolved = dir.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        std::fs::remove_dir_all(resolved).unwrap();
+    }
     #[test]
     fn debug_does_not_print_conversation_identity() {
         let a = BindArgs {

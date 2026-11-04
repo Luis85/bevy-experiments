@@ -156,6 +156,7 @@ fn resume_refuses_an_agent_that_is_running() {
         started: "2026-10-25T12:00:00Z".into(),
         agent: "Wren".into(),
         world: "Moor".into(),
+        projection: None,
     };
     run.write(&dir).unwrap();
     let mut child = Command::new(env!("CARGO_BIN_EXE_actor_testbed"))

@@ -13,7 +13,7 @@ const MAX_DISTANCE: f32 = 80.0;
 const MIN_PITCH: f32 = 0.35;
 const MAX_PITCH: f32 = 1.45;
 /// Pan limit around the compound, metres.
-const PAN_LIMIT: f32 = 30.0;
+pub(crate) const PAN_LIMIT: f32 = 30.0;
 
 /// Orbit camera state: looks at `focus` from `distance` at `pitch` above the
 /// ground plane, rotated `yaw` around +Y (yaw 0 = camera on the +Z side).
@@ -60,13 +60,23 @@ pub struct CameraFocusOnSelected {
     pub distance: Option<f32>,
 }
 
+/// Actual camera input intent, outside simulation state. A serial distinguishes a fresh input
+/// system run from stale state while modal/UI focus suppresses the camera's input set.
+#[derive(Resource, Default)]
+pub(crate) struct CameraManualIntent {
+    pub serial: u64,
+    pub active: bool,
+}
+
 pub(crate) fn plugin(app: &mut App) {
-    app.add_systems(Startup, spawn_camera).add_systems(
-        Update,
-        (focus_at_start, rts_camera)
-            .chain()
-            .in_set(ViewSystems::Input),
-    );
+    app.init_resource::<CameraManualIntent>()
+        .add_systems(Startup, spawn_camera)
+        .add_systems(
+            Update,
+            (focus_at_start, rts_camera)
+                .chain()
+                .in_set(ViewSystems::Input),
+        );
 }
 
 fn spawn_camera(mut commands: Commands, start: Option<Res<CameraStart>>) {
@@ -120,9 +130,26 @@ fn rts_camera(
     index: Option<Res<SimIndex>>,
     positions: Query<&SimPos>,
     mut cameras: Query<(&mut RtsCamera, &mut Transform)>,
+    mut manual: ResMut<CameraManualIntent>,
 ) {
     let dt = time.delta_secs();
     let focus_target = selected_pos(selected.as_deref(), index.as_deref(), &positions);
+    manual.serial = manual.serial.saturating_add(1);
+    manual.active = keys.as_deref().is_some_and(|keys| {
+        [
+            KeyCode::KeyW,
+            KeyCode::KeyA,
+            KeyCode::KeyS,
+            KeyCode::KeyD,
+            KeyCode::ArrowUp,
+            KeyCode::ArrowLeft,
+            KeyCode::ArrowDown,
+            KeyCode::ArrowRight,
+        ]
+        .into_iter()
+        .any(|key| keys.pressed(key))
+            || (keys.just_pressed(KeyCode::KeyF) && focus_target.is_some())
+    });
     for (mut rts, mut transform) in &mut cameras {
         if let Some(keys) = keys.as_deref() {
             let pressed = |a: KeyCode, b: KeyCode| keys.pressed(a) || keys.pressed(b);

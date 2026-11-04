@@ -1,5 +1,5 @@
 //! Autonomous production and survival, in sorted Effects order.
-use super::{catalog, economy as econ, model::*};
+use super::{VillageAct, catalog, economy as econ, model::*};
 use bevy_ecs::prelude::*;
 use npc_framework::crafting::{CraftSource, Crafting, RecipeRegistry, begin_craft, cancel_craft};
 use npc_framework::interaction::items::{self, entity_of};
@@ -8,8 +8,11 @@ use npc_framework::prelude::*;
 use serde_json::json;
 
 pub fn tick(world: &mut World) {
+    if super::needs_driven(world) {
+        super::living::climate_tick(world);
+    }
     let now = world.resource::<SimClock>().tick;
-    let (day, season, night) = calendar(world);
+    let (day, season, _) = calendar(world);
     let mut people: Vec<_> = world
         .query::<(Entity, &SimId, &Villager)>()
         .iter(world)
@@ -42,67 +45,354 @@ pub fn tick(world: &mut World) {
         }
     }
     finish_gathers(world, now);
+    if super::needs_driven(world) {
+        super::hunting::tick(world);
+    }
     dividends(world, day);
-    for (_, e, old) in people {
-        if !living(world, e) || old.role == Role::Visitor {
-            continue;
-        }
-        let v = world.get::<Villager>(e).expect("villager").clone();
-        if now < v.next_decision
-            || now < v.resting_until
-            || world.get::<Gathering>(e).is_some()
-            || world.get::<Crafting>(e).is_some()
-        {
-            continue;
-        }
-        world
-            .get_mut::<Villager>(e)
-            .expect("villager")
-            .next_decision = now + 20;
-        if satisfy(
-            world,
-            e,
-            "Thirst",
-            catalog::WATER,
-            Role::WaterKeeper,
-            55_000,
-            90_000,
-        ) {
-            continue;
-        }
-        if satisfy(world, e, "Hunger", "bread", Role::Baker, 50_000, 80_000) {
-            continue;
-        }
-        if econ::need(world, e, "Energy") < 30_000
-            || (night && econ::need(world, e, "Energy") < 85_000)
-        {
-            if travel(world, e, v.home) {
-                start_rest(world, e, 300, 400);
-            }
-            continue;
-        }
-        recover_found(world, e);
-        if night {
-            travel(world, e, v.home);
-            continue;
-        }
-        match v.role {
-            Role::Farmer => gather_for(world, e, catalog::GRAIN),
-            Role::WaterKeeper => gather_for(world, e, catalog::WATER),
-            Role::Woodcutter => gather_for(world, e, "log"),
-            Role::Miner => gather_for(world, e, "ore"),
-            Role::Miller | Role::Baker | Role::Carpenter | Role::Smith => manufacture(world, e, &v),
-            Role::Innkeeper => {
-                for (kind, target) in [("log", 4), (catalog::BOWL, 2), ("hammer", 1)] {
-                    if econ::count(world, e, kind) < target {
-                        buy_input(world, e, kind, target);
-                        break;
-                    }
+    if super::needs_driven(world) {
+        super::production::refresh(world);
+        super::market::tick(world);
+    }
+    super::behavior::advance(world);
+}
+
+/// One profession decision. All physical work uses the same action validation,
+/// inventory, crafting and navigation seams as a player-controlled actor.
+pub(super) fn work(world: &mut World, e: Entity) {
+    if super::needs_driven(world) {
+        living_work(world, e);
+        return;
+    }
+    let v = world.get::<Villager>(e).expect("villager").clone();
+    match v.role {
+        Role::Farmer => gather_for(world, e, catalog::GRAIN),
+        Role::WaterKeeper => gather_for(world, e, catalog::WATER),
+        Role::Woodcutter => gather_for(world, e, "log"),
+        Role::Miner => gather_for(world, e, "ore"),
+        Role::Miller | Role::Baker | Role::Carpenter | Role::Smith => manufacture(world, e, &v),
+        Role::Innkeeper => {
+            for (kind, target) in [("log", 4), (catalog::BOWL, 2), ("hammer", 1)] {
+                if econ::count(world, e, kind) < target {
+                    buy_input(world, e, kind, target);
+                    break;
                 }
             }
-            Role::Visitor => {}
+        }
+        Role::Visitor | Role::Hunter | Role::Tanner | Role::Tailor => {}
+    }
+}
+
+/// Select a real, affordable advertised seller, including explicit player offers.
+/// Distance is the only settlement condition deferred while approaching.
+pub(super) fn market_supplier(world: &World, buyer: Entity, kind: &str) -> Option<Entity> {
+    let coins = world.get::<Wallet>(buyer)?.coins;
+    let here = *world.get::<SimPos>(buyer)?;
+    world
+        .resource::<SimIndex>()
+        .map
+        .iter()
+        .filter_map(|(id, seller)| {
+            if *seller == buyer
+                || !super::market::sells(world, *seller, kind)
+                || super::market::available_to_sell(world, *seller, kind) == 0
+            {
+                return None;
+            }
+            let price = super::market::asking_price(world, *seller, kind)?;
+            if super::production::purchase_bid_limit(world, buyer, kind)
+                .is_some_and(|limit| price > limit)
+            {
+                return None;
+            }
+            if price > coins
+                || world
+                    .get::<Wallet>(*seller)?
+                    .coins
+                    .checked_add(price)
+                    .is_none()
+            {
+                return None;
+            }
+            let goods = econ::selected(world, *seller, kind, 1).ok()?;
+            econ::fit(
+                world,
+                buyer,
+                &goods.into_iter().map(|(_, item)| item).collect::<Vec<_>>(),
+            )
+            .ok()?;
+            let distance = here.dist2(*world.get::<SimPos>(*seller)?);
+            Some((price, distance, *id, *seller))
+        })
+        .min_by_key(|(price, distance, id, _)| (*price, *distance, *id))
+        .map(|(_, _, _, seller)| seller)
+}
+
+fn buy_market_input(world: &mut World, actor: Entity, kind: &str, wanted: u32) -> bool {
+    let Some(seller) = market_supplier(world, actor, kind) else {
+        return false;
+    };
+    let target = *world.get::<SimId>(seller).expect("seller identity");
+    super::production::intent(world, actor, "buy", kind, "", Some(target));
+    if !approach_work(world, actor, seller) {
+        return true;
+    }
+    let price = super::market::asking_price(world, seller, kind)
+        .unwrap_or(u32::MAX)
+        .max(1);
+    let quantity = wanted
+        .saturating_sub(econ::count(world, actor, kind))
+        .min(super::market::available_to_sell(world, seller, kind))
+        .min(8)
+        .min(world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins) / price);
+    let mut command = VillageAct::new(*world.get::<SimId>(actor).expect("actor"), "buy");
+    command.target = Some(target);
+    command.kind = kind.into();
+    command.limit_price = Some(
+        super::production::purchase_bid_limit(world, actor, kind)
+            .map_or(price, |limit| limit.min(price)),
+    );
+    for count in (1..=quantity).rev() {
+        command.quantity = count;
+        if command.perform(world).is_ok() {
+            return true;
         }
     }
+    false
+}
+
+/// Actionable finite subsistence, ignoring only the approach distance. This is
+/// also the need guard's source of truth; an empty patch or full pack must not
+/// suppress other executable work.
+pub(super) fn can_forage(world: &World, actor: Entity, kind: &str) -> bool {
+    gather_source(world, actor, kind).is_some()
+}
+
+fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<(SimId, Entity)> {
+    if econ::fit(world, actor, &[Item::new(kind)]).is_err() {
+        return None;
+    }
+    let here = world.get::<SimPos>(actor).copied().unwrap_or_default();
+    world
+        .resource::<SimIndex>()
+        .map
+        .iter()
+        .filter_map(|(id, e)| {
+            let patch = world.get::<ResourcePatch>(*e)?;
+            let pos = *world.get::<SimPos>(*e)?;
+            (patch.kind == kind && patch.remaining > 0).then_some((here.dist2(pos), *id, *e))
+        })
+        .min_by_key(|(distance, id, _)| (*distance, *id))
+        .map(|(_, id, entity)| (id, entity))
+}
+
+fn gather_job(world: &mut World, actor: Entity, kind: &str) -> bool {
+    let Some((target, source)) = gather_source(world, actor, kind) else {
+        return false;
+    };
+    super::production::intent(world, actor, "gather", kind, "", Some(target));
+    if approach_work(world, actor, source) {
+        let mut command = VillageAct::new(*world.get::<SimId>(actor).expect("actor"), "gather");
+        command.target = Some(target);
+        return command.perform(world).is_ok();
+    }
+    true
+}
+
+fn living_work(world: &mut World, actor: Entity) {
+    use super::{market, production};
+    let id = *world.get::<SimId>(actor).expect("actor identity");
+    let role = world.get::<Villager>(actor).expect("villager").role;
+    // Lack of purchasing power is not lack of a physical survival action.
+    // Use the exact finite gather command a player uses, then the ordinary
+    // thirst branch consumes the real item on its next decision.
+    if econ::need(world, actor, "Thirst") < 55_000
+        && econ::count(world, actor, catalog::WATER) == 0
+        && market_supplier(world, actor, catalog::WATER).is_none()
+        && gather_job(world, actor, catalog::WATER)
+    {
+        return;
+    }
+    if !production::garment_equipped(world, actor)
+        && npc_framework::agent_io::registry::verb_gate(world, actor, "equip").is_none()
+        && let Some(item) =
+            npc_framework::interaction::items::carried_matching(world, actor, catalog::WARM_CLOTHES)
+        && npc_framework::interaction::begin(
+            world,
+            actor,
+            "equip",
+            item,
+            None,
+            npc_framework::interaction::Source::Command,
+        )
+        .is_ok()
+    {
+        production::intent(world, actor, "equip", catalog::WARM_CLOTHES, "", Some(item));
+        return;
+    }
+    // Subsistence remains a physical action when all posted food is absent or
+    // unaffordable; this never creates a free recovery effect for NPCs.
+    if econ::need(world, actor, "Hunger") < 40_000
+        && production::food_choice(world, actor).is_none()
+        && gather_job(world, actor, catalog::BERRIES)
+    {
+        return;
+    }
+
+    let mut procure: Vec<_> = catalog::trade_kinds(world)
+        .iter()
+        .filter_map(|kind| {
+            let wanted = production::desired_stock(world, actor, kind);
+            if wanted <= econ::count(world, actor, kind) {
+                return None;
+            }
+            let supplier = market_supplier(world, actor, kind)?;
+            let priority = if *kind == catalog::WATER {
+                0
+            } else if catalog::food_restore(kind).is_some() {
+                1
+            } else if *kind == catalog::WARM_CLOTHES {
+                2
+            } else {
+                3
+            };
+            let here = *world.get::<SimPos>(actor)?;
+            let distance = here.dist2(*world.get::<SimPos>(supplier)?);
+            Some((priority, distance, *kind, wanted))
+        })
+        .collect();
+    procure.sort_by_key(|(priority, distance, kind, _)| (*priority, *distance, *kind));
+    // Personal reserves retain priority. Industrial buffers must not send an
+    // actor away from a complete, financed job already waiting in their pack.
+    for (_, _, kind, wanted) in procure.iter().filter(|(priority, ..)| *priority < 3) {
+        if buy_market_input(world, actor, kind, *wanted) {
+            return;
+        }
+    }
+
+    // Candidate scores use the shared integer market and actual recipe costs.
+    // A pending need is required: price alone never causes inventory quotas.
+    let mut candidates = Vec::new();
+    for name in catalog::recipes_for(world, role) {
+        let Some(recipe) = world.resource::<RecipeRegistry>().recipes.get(*name) else {
+            continue;
+        };
+        let demand: u32 = recipe
+            .outputs
+            .iter()
+            .map(|output| production::production_demand(world, actor, &output.kind))
+            .fold(0, u32::saturating_add);
+        if demand == 0
+            || recipe
+                .inputs
+                .iter()
+                .any(|input| econ::count(world, actor, &input.key) < input.count)
+        {
+            continue;
+        }
+        let revenue = recipe
+            .outputs
+            .iter()
+            .map(|output| {
+                u64::from(market::unit_price(world, &output.kind).unwrap_or(0))
+                    * u64::from(output.count)
+            })
+            .sum::<u64>();
+        let cost = u64::from(market::input_cost(world, name).unwrap_or(u32::MAX));
+        // The planner has already financed this genuine job. Real inputs in
+        // the actor's pack need no second payment at their current book value.
+        // Keep that value for ranking, not as a refusal of ready owned work.
+        let new_cash_required = recipe
+            .inputs
+            .iter()
+            .map(|input| {
+                u64::from(
+                    input
+                        .count
+                        .saturating_sub(econ::count(world, actor, &input.key)),
+                ) * u64::from(market::unit_price(world, &input.key).unwrap_or(u32::MAX))
+            })
+            .sum::<u64>();
+        let essential = recipe.outputs.iter().any(|output| {
+            catalog::food_restore(&output.kind).is_some()
+                || output.kind == catalog::WARM_CLOTHES
+                || production::internal_demand(world, actor, &output.kind) > 0
+        });
+        if revenue <= new_cash_required && !essential {
+            continue;
+        }
+        let score = revenue
+            .saturating_sub(cost)
+            .max(1)
+            .saturating_mul(u64::from(demand.min(16)))
+            .saturating_mul(10_000)
+            / u64::from(recipe.duration_ticks.max(1));
+        candidates.push((score, name.to_string(), recipe.outputs[0].kind.clone()));
+    }
+    candidates.sort_by(|(a, ar, _), (b, br, _)| b.cmp(a).then_with(|| ar.cmp(br)));
+    if npc_framework::agent_io::registry::verb_gate(world, actor, "craft").is_none() {
+        for (_, recipe, good) in candidates {
+            let workplace = world.get::<Villager>(actor).expect("villager").workplace;
+            let Some(station) = entity_of(world, workplace) else {
+                continue;
+            };
+            let Some(pos) = world.get::<SimPos>(station).copied() else {
+                continue;
+            };
+            production::intent(world, actor, "craft", &good, &recipe, Some(workplace));
+            if !travel(world, actor, pos) {
+                return;
+            }
+            if begin_craft(
+                world,
+                actor,
+                &recipe,
+                Some(workplace),
+                CraftSource::Command,
+                None,
+            )
+            .is_ok()
+            {
+                return;
+            }
+        }
+    }
+    if role == Role::Hunter
+        && (production::production_demand(world, actor, catalog::RAW_MEAT) > 0
+            || production::production_demand(world, actor, catalog::HIDE) > 0)
+        && npc_framework::interaction::items::carried_matching(world, actor, catalog::SPEAR)
+            .is_some()
+        && let Some((target, prey, _)) = super::hunting::available_prey(world).into_iter().next()
+    {
+        production::intent(world, actor, "hunt", catalog::RAW_MEAT, "", Some(target));
+        if !approach_work(world, actor, prey) {
+            return;
+        }
+        let mut command = VillageAct::new(id, "hunt");
+        command.target = Some(target);
+        if command.perform(world).is_ok() {
+            return;
+        }
+    }
+    for (_, _, kind, wanted) in procure.into_iter().filter(|(priority, ..)| *priority == 3) {
+        if buy_market_input(world, actor, kind, wanted) {
+            return;
+        }
+    }
+    let mut raw: Vec<_> = catalog::outputs_for(world, role)
+        .iter()
+        .filter_map(|kind| {
+            let demand = production::production_demand(world, actor, kind);
+            (demand > 0).then_some((demand, *kind))
+        })
+        .collect();
+    raw.sort_by(|(a, ak), (b, bk)| b.cmp(a).then_with(|| ak.cmp(bk)));
+    for (_, kind) in raw {
+        if gather_job(world, actor, kind) {
+            return;
+        }
+    }
+    production::clear_intent(world, actor);
+    world.entity_mut(actor).remove::<MoveIntent>();
 }
 fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) {
     let mut v = *world.get::<Vitality>(e).expect("vitality");
@@ -197,9 +487,17 @@ fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) 
     }
 }
 pub(crate) fn stop_work(world: &mut World, e: Entity, reason: &str) {
+    if world.get::<super::homestead::CottageBuild>(e).is_some() {
+        super::homestead::cancel(world, e);
+    }
     npc_framework::agent_io::control::cancel_all(world, e);
     npc_framework::command::cancel_orders(world, e, reason);
     cancel_craft(world, e, reason);
+    super::hunting::cancel(world, e, reason);
+    if super::needs_driven(world) {
+        npc_framework::interaction::cancel(world, e, reason);
+        super::production::clear_intent(world, e);
+    }
     world.entity_mut(e).remove::<(Gathering, MoveIntent)>();
 }
 pub(crate) fn start_rest(world: &mut World, e: Entity, ticks: u64, rate: i32) {
@@ -297,42 +595,94 @@ pub(crate) fn travel(world: &mut World, e: Entity, pos: SimPos) -> bool {
     }
     false
 }
-fn resident(world: &mut World, role: Role, kind: &str) -> Option<Entity> {
-    let mut people: Vec<_> = world
-        .query::<(Entity, &SimId, &Villager)>()
-        .iter(world)
-        .filter(|(e, _, v)| v.role == role && living(world, *e) && econ::count(world, *e, kind) > 0)
-        .map(|(e, id, _)| (*id, e))
-        .collect();
-    people.sort_by_key(|(id, _)| *id);
-    people.first().map(|(_, e)| *e)
+
+/// Living work uses the very same reach as its shared actor action. Home rest
+/// deliberately keeps the original tighter approach in `travel`.
+fn approach_work(world: &mut World, actor: Entity, target: Entity) -> bool {
+    if econ::near(world, actor, target) {
+        world.entity_mut(actor).remove::<MoveIntent>();
+        return true;
+    }
+    let Some(pos) = world.get::<SimPos>(target).copied() else {
+        return false;
+    };
+    let speed = world
+        .get::<Commandable>(actor)
+        .map_or(70, |c| c.speed_mm_per_tick);
+    let mut intent = MoveIntent::to(pos, speed);
+    intent.tolerance_mm = 1500;
+    if world.get::<MoveIntent>(actor) != Some(&intent) {
+        world.entity_mut(actor).insert(intent);
+    }
+    false
 }
-fn satisfy(
+pub(super) fn satisfy(
     world: &mut World,
     e: Entity,
     need: &str,
     good: &str,
     seller: Role,
     threshold: i32,
-    amount: i32,
+    _amount: i32,
 ) -> bool {
     if econ::need(world, e, need) >= threshold {
         return false;
     }
-    if econ::consume(world, e, good, 1).is_ok() {
-        econ::restore(world, e, need, amount);
+    let id = *world.get::<SimId>(e).expect("sim actor");
+    let verb = if need == "Thirst" { "drink" } else { "eat" };
+    let selected_food = super::needs_driven(world)
+        .then(|| super::production::food_choice(world, e))
+        .flatten();
+    let good = if need == "Hunger" {
+        selected_food.unwrap_or(good)
+    } else {
+        good
+    };
+    let mut consume = VillageAct::new(id, verb);
+    if super::needs_driven(world) && need == "Hunger" {
+        consume.kind = good.into();
+    }
+    if consume.perform(world).is_ok() {
         return true;
     }
-    if let Some(s) = resident(world, seller, good) {
-        if world.get::<Wallet>(e).map_or(0, |w| w.coins) < catalog::price(good).unwrap_or(u32::MAX)
-        {
+    if let Some(s) = super::behavior::supplier(world, e, seller, good) {
+        let price = if super::needs_driven(world) {
+            super::market::asking_price(world, s, good)
+        } else {
+            catalog::price(good)
+        };
+        if world.get::<Wallet>(e).map_or(0, |w| w.coins) < price.unwrap_or(u32::MAX) {
             return false;
         }
-        let pos = world.get::<SimPos>(s).copied().unwrap_or_default();
-        if travel(world, e, pos) {
-            return econ::trade(world, e, s, good, 1).is_ok();
+        let reached = if super::needs_driven(world) {
+            approach_work(world, e, s)
+        } else {
+            let pos = world.get::<SimPos>(s).copied().unwrap_or_default();
+            travel(world, e, pos)
+        };
+        if reached {
+            let mut command = VillageAct::new(id, "buy");
+            command.target = world.get::<SimId>(s).copied();
+            command.kind = good.into();
+            if super::needs_driven(world) {
+                command.limit_price = super::market::asking_price(world, s, good).map(|price| {
+                    super::production::purchase_bid_limit(world, e, good)
+                        .map_or(price, |limit| limit.min(price))
+                });
+            }
+            return command.perform(world).is_ok();
         }
         return true;
+    }
+    // Need recovery remains available at night and during optional recovery:
+    // gather a real finite item, then consume it through the ordinary branch.
+    if super::needs_driven(world) {
+        let subsistence = if need == "Thirst" {
+            catalog::WATER
+        } else {
+            catalog::BERRIES
+        };
+        return gather_job(world, e, subsistence);
     }
     // Supply can be empty. Producers must be able to restart that chain while hungry/thirsty.
     false
@@ -348,10 +698,12 @@ fn gather_for(world: &mut World, e: Entity, kind: &str) {
         .map(|(e, id, _, p)| (*id, e, *p))
         .collect();
     patches.sort_by_key(|(id, _, _)| *id);
-    if let Some((id, p, pos)) = patches.first().copied()
+    if let Some((id, _, pos)) = patches.first().copied()
         && travel(world, e, pos)
     {
-        let _ = begin_gather(world, e, p, id);
+        let mut command = VillageAct::new(*world.get::<SimId>(e).expect("sim actor"), "gather");
+        command.target = Some(id);
+        let _ = command.perform(world);
     }
 }
 pub(crate) fn begin_gather(
@@ -371,6 +723,9 @@ pub(crate) fn begin_gather(
     }
     if world.get::<Gathering>(e).is_some() || world.get::<Crafting>(e).is_some() {
         return Err("already working".into());
+    }
+    if world.get::<super::hunting::Hunting>(e).is_some() {
+        return Err("already hunting".into());
     }
     econ::fit(world, e, &[Item::new(&p.kind)])?;
     let ends = world.resource::<SimClock>().tick + u64::from(p.gather_ticks);
@@ -411,6 +766,7 @@ fn finish_gathers(world: &mut World, now: u64) {
             .remaining -= 1;
         econ::grant(world, e, Item::new(&p.kind));
         econ::produce(world, &p.kind, 1);
+        super::production::completed(world, id, &p.kind, 1);
         record_effect(
             world,
             Some(id),
@@ -445,12 +801,26 @@ fn buy_input(world: &mut World, e: Entity, kind: &str, wanted: u32) -> bool {
             .min(8)
             .min(coins / catalog::price(kind).unwrap_or(1));
         if n > 0 {
-            let _ = econ::trade(world, e, seller, kind, n);
+            let mut command = VillageAct::new(*world.get::<SimId>(e).expect("sim actor"), "buy");
+            command.target = world.get::<SimId>(seller).copied();
+            command.kind = kind.into();
+            // Prefer the buffer, but a small pack must still be able to buy
+            // the smaller usable amount through exactly the same trade checks.
+            for quantity in (1..=n).rev() {
+                command.quantity = quantity;
+                if command.check(world).is_ok() {
+                    let _ = command.perform(world);
+                    break;
+                }
+            }
         }
     }
     true
 }
 fn manufacture(world: &mut World, e: Entity, v: &Villager) {
+    if npc_framework::agent_io::registry::verb_gate(world, e, "craft").is_some() {
+        return;
+    }
     let secondary = match v.role {
         Role::Carpenter => {
             econ::count(world, e, "plank") >= 8 && econ::count(world, e, catalog::BOWL) < 6
@@ -476,7 +846,11 @@ fn manufacture(world: &mut World, e: Entity, v: &Villager) {
     }
     for input in &def.inputs {
         if econ::count(world, e, &input.key) < input.count {
-            buy_input(world, e, &input.key, input.count.max(4));
+            // A supplier is a moving resident, often across the island. Stock
+            // several batches per paid visit so the food chain spends daylight
+            // producing instead of repeatedly crossing the same route. This is
+            // still an ordinary finite, capacity-checked trade (at most eight).
+            buy_input(world, e, &input.key, input.count.max(8));
             return;
         }
     }
@@ -547,7 +921,7 @@ fn dividends(world: &mut World, day: u64) {
         &json!({"day":day,"contributed":contributed,"paid":paid,"balance":fund}),
     );
 }
-fn recover_found(world: &mut World, e: Entity) {
+pub(super) fn recover_found(world: &mut World, e: Entity) {
     let mut lost: Vec<_> = world
         .query::<(Entity, &SimId, &Item)>()
         .iter(world)
@@ -562,16 +936,14 @@ fn recover_found(world: &mut World, e: Entity) {
         .map(|(e, id, _)| (*id, e))
         .collect();
     lost.sort_by_key(|(id, _)| *id);
-    if let Some((_, item)) = lost.first().copied() {
-        if let Some(purse) = world.get::<CoinPurse>(item).copied() {
-            if let Some(mut wallet) = world.get_mut::<Wallet>(e)
-                && let Some(coins) = wallet.coins.checked_add(purse.coins)
-            {
-                wallet.coins = coins;
-                world.despawn(item);
-            }
-        } else if items::can_store(world, e, item).is_ok() {
-            items::put_in_inventory(world, e, item);
-        }
+    if let Some((target, item)) = lost.first().copied() {
+        let verb = if world.get::<CoinPurse>(item).is_some() {
+            "collect_coins"
+        } else {
+            "recover_diary"
+        };
+        let mut command = VillageAct::new(*world.get::<SimId>(e).expect("sim actor"), verb);
+        command.target = Some(target);
+        let _ = command.perform(world);
     }
 }

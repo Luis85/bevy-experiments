@@ -707,6 +707,7 @@ fn mcp_stdio_round_trip() {
             "observe",
             "act",
             "act_and_wait",
+            "talk",
             "cancel",
             "events",
             "attach",

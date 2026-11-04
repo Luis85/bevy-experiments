@@ -699,6 +699,9 @@ type VisualSimKinds = Or<(
     With<TestbedUnit>,
     With<testbed_content::village::VillagePlace>,
     With<testbed_content::village::ResourcePatch>,
+    With<testbed_content::village::hunting::Wildlife>,
+    With<testbed_content::village::homestead::HomesteadPlot>,
+    With<testbed_content::village::homestead::Cottage>,
 )>;
 pub(crate) fn despawn_visuals(
     mut commands: Commands,
@@ -1145,6 +1148,55 @@ mod tests {
     use testbed_content::layout::{cart_vehicle, wagon_vehicle};
 
     use super::*;
+
+    #[test]
+    fn living_wildlife_visuals_survive_cleanup_until_the_animal_is_gone() {
+        let mut app = testbed_content::new_sim_app(7, "living_village");
+        app.init_resource::<VisualIndex>()
+            .add_systems(Update, despawn_visuals);
+        let animals: Vec<_> = app
+            .world_mut()
+            .query_filtered::<Entity, With<testbed_content::village::hunting::Wildlife>>()
+            .iter(app.world())
+            .collect();
+        assert_eq!(animals.len(), 8);
+        let roots: Vec<_> = animals
+            .into_iter()
+            .map(|animal| {
+                let visual = app.world_mut().spawn(VisualOf(animal)).id();
+                app.world_mut()
+                    .resource_mut::<VisualIndex>()
+                    .map
+                    .insert(animal, visual);
+                (animal, visual)
+            })
+            .collect();
+        for _ in 0..5 {
+            app.update();
+            assert_eq!(app.world().resource::<VisualIndex>().map.len(), 8);
+            assert!(
+                roots
+                    .iter()
+                    .all(|(_, visual)| app.world().get_entity(*visual).is_ok())
+            );
+        }
+        let (animal, visual) = roots[0];
+        app.world_mut().despawn(animal);
+        app.update();
+        assert!(app.world().get_entity(visual).is_err());
+        assert!(
+            !app.world()
+                .resource::<VisualIndex>()
+                .map
+                .contains_key(&animal)
+        );
+        assert_eq!(app.world().resource::<VisualIndex>().map.len(), 7);
+        assert!(
+            roots[1..]
+                .iter()
+                .all(|(_, visual)| app.world().get_entity(*visual).is_ok())
+        );
+    }
 
     #[test]
     fn village_buildings_and_patches_survive_visual_cleanup_until_the_sim_entity_is_removed() {

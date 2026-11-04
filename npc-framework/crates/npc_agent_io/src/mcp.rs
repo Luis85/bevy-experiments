@@ -148,6 +148,16 @@ pub fn tools() -> Value {
             "inputSchema": schema(wait_props, &["unit", "controller"]),
         },
         {
+            "name": "talk",
+            "title": "Speak to an actor or aloud",
+            "description": "Say a short public line aloud, or address a nearby living actor using its observed target id. Consult your scene's affordances for speech availability and reach. This is spoken dialogue, not a private notebook or hidden reasoning. The ordinary recorded talk action and control rules apply.",
+            "inputSchema": schema(json!({
+                "unit": unit, "controller": controller,
+                "target": {"type":"integer", "minimum":1, "description":"Optional observed actor to address; omit to speak aloud"},
+                "text": {"type":"string", "minLength":1, "maxLength":240, "description":"One public line, at most 240 characters / 1024 bytes; no control characters"}
+            }), &["unit", "controller", "text"]),
+        },
+        {
             "name": "cancel",
             "title": "Cancel an action",
             "description": "Cancel a queued or running action by handle (default: the running one).",
@@ -299,6 +309,46 @@ fn prepare_call(
             "agent/observe"
         }
         "act" => "agent/act",
+        "talk" => {
+            let fields = args.as_object_mut().expect("object checked above");
+            if fields
+                .keys()
+                .any(|key| !matches!(key.as_str(), "unit" | "controller" | "target" | "text"))
+            {
+                return Err((
+                    -32602,
+                    "talk accepts only text, target and the tool's actor identity".into(),
+                ));
+            }
+            let text = fields
+                .remove("text")
+                .ok_or_else(|| (-32602, "talk needs text".into()))?;
+            let Some(line) = text.as_str() else {
+                return Err((-32602, "talk text must be a string".into()));
+            };
+            if line.trim().is_empty()
+                || line.chars().count() > 240
+                || line.len() > 1024
+                || line
+                    .chars()
+                    .any(|c| c.is_control() || matches!(c, '\u{2028}' | '\u{2029}'))
+            {
+                return Err((-32602, "talk text must be one nonempty public line, at most 240 characters / 1024 bytes".into()));
+            }
+            if fields.get("target").is_some_and(|target| {
+                target
+                    .as_u64()
+                    .is_none_or(|id| id == 0 || id > u64::from(u32::MAX))
+            }) {
+                return Err((
+                    -32602,
+                    "talk target must be a positive observed actor id".into(),
+                ));
+            }
+            fields.insert("verb".into(), json!("talk"));
+            fields.insert("args".into(), json!({"text":text}));
+            "agent/act"
+        }
         "act_and_wait" => {
             if args.get("nonce").is_none() {
                 args["nonce"] = json!(request_nonce().map_err(|e| (e.code, e.message))?);
@@ -449,6 +499,49 @@ pub fn serve(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn talk_shortcut_preserves_recorded_action_and_registered_identity_boundaries() {
+        let (method, args) =
+            prepare_call(None, "talk", json!({"text":"Hello, neighbor!","target":42})).unwrap();
+        assert_eq!(method, "agent/act");
+        assert_eq!(
+            args,
+            json!({"verb":"talk","target":42,"args":{"text":"Hello, neighbor!"}})
+        );
+        let (_, aloud) = prepare_call(
+            Some("one"),
+            "talk",
+            json!({"unit":7,"controller":"one","text":"Good morning."}),
+        )
+        .unwrap();
+        assert_eq!(aloud["unit"], 7);
+        assert_eq!(aloud["controller"], "one");
+        assert!(aloud.get("target").is_none());
+        let tools = registered_tools();
+        let talk = tools
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["name"] == "talk")
+            .unwrap();
+        assert_eq!(talk["inputSchema"]["required"], json!(["text"]));
+        for private in ["unit", "controller", "session"] {
+            assert!(talk["inputSchema"]["properties"].get(private).is_none());
+        }
+        for invalid in [
+            json!({"text":""}),
+            json!({"text":"\n"}),
+            json!({"text":"hello\u{2028}world"}),
+            json!({"text":"hello\u{2029}world"}),
+            json!({"text":"x".repeat(241)}),
+            json!({"text":"hello","target":0}),
+            json!({"text":"hello","target":"42"}),
+            json!({"text":"hello","verb":"new_life"}),
+            json!({"text":"hello","args":{"body":"unexpected"}}),
+        ] {
+            assert_eq!(prepare_call(None, "talk", invalid).unwrap_err().0, -32602);
+        }
+    }
 
     #[test]
     fn rpc_errors_keep_their_reason() {
@@ -516,6 +609,7 @@ mod tests {
                 "observe",
                 "act",
                 "act_and_wait",
+                "talk",
                 "cancel",
                 "events",
                 "attach",

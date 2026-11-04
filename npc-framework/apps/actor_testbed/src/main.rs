@@ -80,8 +80,10 @@
 //! `SimControl` (digits are the control groups of the command UI).
 
 mod actor_editor;
+mod ai_client;
 mod editor_mode;
 mod explorer;
+mod projection;
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -115,6 +117,7 @@ const USAGE: &str = "usage: actor_testbed [--scenario NAME|FILE] [--seed N] [--s
 [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE] [--screenshot PATH] \
 [--after-secs S] [--panels journal,perf,sheet,perception,explorer,map] [--journal FILE] [--record FILE] [--paused] [--perf-warn] \
 [--fog on|off] [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote] [--out-dir DIR]
+[--world-state-out FILE [--world-state-interval-ms 50..60000]]
        actor_testbed --explorer-home DIR --agent NAME [--world NAME [--preset ID] [--world-preset ID] | --resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog] [--actors-dir DIR] [--worlds-dir DIR] [other flags except --scenario and --seed]
        (explorer mode: BRP is always on, on the first free port from --remote-port N on, N..=N+19, default 15702;
         --exact-port N: exactly N, waited for up to 10 s, else exit 4)
@@ -143,6 +146,7 @@ struct Args {
     remote: RemoteArgs,
     /// Explorer mode (`--explorer-home`).
     explorer: Option<ExplorerArgs>,
+    projection: projection::ProjectionArgs,
 }
 
 fn usage(msg: &str) -> ! {
@@ -232,6 +236,7 @@ fn parse_args() -> Args {
         // `debug-tools`).
         remote: RemoteArgs::new(cfg!(debug_assertions) && cfg!(feature = "debug-tools")),
         explorer: None,
+        projection: projection::ProjectionArgs::default(),
     };
     let (mut explorer, mut scenario_given) = (ExplorerFlags::default(), false);
     let mut it = std::env::args().skip(1);
@@ -260,6 +265,10 @@ fn parse_args() -> Args {
             continue;
         }
         if explorer.value(&flag, &value) {
+            continue;
+        }
+        if let Some(result) = args.projection.value(&flag, &value) {
+            result.unwrap_or_else(|error| usage(&error));
             continue;
         }
         match flag.as_str() {
@@ -304,6 +313,9 @@ fn parse_args() -> Args {
         explorer::refuse_recording_on_resume(ex, args.record.is_some(), args.commands.is_some())
             .unwrap_or_else(|e| usage(&e));
     }
+    args.projection
+        .validate()
+        .unwrap_or_else(|error| usage(&error));
     args
 }
 
@@ -475,9 +487,8 @@ fn explorer_app(ex: &ExplorerArgs, args: &Args, port: u16) -> App {
             if ex.exact_port.is_some() {
                 // The agent is already playing: no modal.
                 explorer::show_moved_notice(&mut app);
-            } else {
-                explorer::show_prompt_modal(&mut app);
             }
+            ai_client::install(&mut app, dir.clone(), ex.exact_port.is_none());
             explorer::install_close_to_detached(&mut app, &ex.home, &ex.agent, port);
             if ex.show_close_dialog {
                 explorer::open_close_dialog(&mut app);
@@ -546,6 +557,9 @@ fn main() {
         }
         None => scenario_app(&args),
     };
+    args.projection
+        .install(&mut app)
+        .unwrap_or_else(|error| usage(&error));
     if let Some(path) = &args.journal {
         match JournalSink::create(path) {
             Ok(sink) => app.world_mut().resource_mut::<Journal>().sink = Some(sink),

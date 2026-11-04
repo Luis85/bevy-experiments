@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#143746" />
+        <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23315e4e' d='M3 16h18v5H3zM6 10h12v6H6zM9 4h6v6H9z'/%3E%3C/svg%3E" />
+        <title>Island Village · NPC World Viewer</title>
+    </head>
+    <body>
+        <div id="app">
+            <header>
+                <div class="identity">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 16h18v5H3zM6 10h12v6H6zM9 4h6v6H9z" />
+                    </svg>
+                    <div>
+                        <h1 id="world-name">Island Village</h1>
+                        <p>NPC World Viewer <span> / </span> ExcaliburJS</p>
+                    </div>
+                </div>
+                <div class="connection">
+                    <span id="signal"></span>
+                    <div>
+                        <strong id="status" role="status">Connecting…</strong
+                        ><small id="updated">Waiting for world state</small>
+                    </div>
+                </div>
+            </header>
+            <main>
+                <section class="viewport" aria-label="Interactive island map">
+                    <canvas
+                        id="world"
+                        tabindex="0"
+                        aria-label="Island map. Drag or use arrow keys to pan. Use plus and minus to zoom. Select villagers using the directory."
+                    ></canvas>
+                    <div class="map-heading">
+                        <span id="calendar">Island observer</span
+                        ><span id="tick">No snapshot</span>
+                    </div>
+                    <p id="plot-legend" class="plot-legend" hidden>Open plots · house sites and gardens</p>
+                    <div id="empty" class="empty">
+                        <h2>Waiting at the shore</h2>
+                        <p>
+                            Start the island simulation with world-state export
+                            enabled. The village will appear here automatically.
+                        </p>
+                        <code
+                            >--world-state-out
+                            target/world-state/island.json</code
+                        >
+                    </div>
+                    <div class="map-tools" aria-label="Map controls">
+                        <button id="zoom-in" aria-label="Zoom in">+</button
+                        ><button id="zoom-out" aria-label="Zoom out">−</button
+                        ><button id="fit">Fit island</button
+                        ><button id="follow" aria-pressed="false">
+                            Follow player</button
+                        ><button id="labels" aria-pressed="true">Labels</button>
+                    </div>
+                    <div class="map-footer">
+                        <span>Drag to explore · Scroll to zoom</span
+                        ><span id="scale">Read-only world projection</span>
+                    </div>
+                </section>
+                <aside>
+                    <section class="inspector" id="inspector">
+                        <div class="section-title">
+                            <h2>In the village</h2>
+                            <span id="population">—</span>
+                        </div>
+                        <p id="selection-hint">
+                            Select a villager, building or resource on the map
+                            to look closer.
+                        </p>
+                        <div id="detail"></div>
+                    </section>
+                    <section id="market-panel" class="market-panel" hidden>
+                        <div class="section-title"><h2>Village market</h2><span>Coins / unit</span></div>
+                        <p>Published offers and financed needs. Goods still travel through the world.</p>
+                        <div id="market-goods"></div>
+                    </section>
+                    <section class="directory">
+                        <div class="section-title">
+                            <h2>Residents & places</h2>
+                            <span id="entity-count">—</span>
+                        </div>
+                        <label class="search"
+                            ><svg viewBox="0 0 20 20" aria-hidden="true">
+                                <circle cx="8" cy="8" r="5" />
+                                <path d="m12 12 5 5" /></svg
+                            ><input
+                                id="search"
+                                type="search"
+                                placeholder="Find someone or somewhere"
+                                aria-label="Search entities"
+                        /></label>
+                        <div class="filters" aria-label="Directory filter">
+                            <button data-filter="all" aria-pressed="true">
+                                All</button
+                            ><button data-filter="person" aria-pressed="false">
+                                People</button
+                            ><button
+                                data-filter="building"
+                                aria-pressed="false"
+                            >
+                                Places
+                            </button>
+                        </div>
+                        <div id="directory"><p class="no-results">Waiting for a world snapshot.</p></div>
+                    </section>
+                    <footer>
+                        <strong>Observer mode</strong>
+                        <p>
+                            The simulation owns this world.<br />This window
+                            shows its latest snapshot.
+                        </p>
+                        <p id="source">Local JSON file · awaiting connection</p>
+                    </footer>
+                </aside>
+            </main>
+        </div>
+        <script type="module" src="/src/main.ts"></script>
+    </body>
+</html>
