@@ -57,3 +57,42 @@ fn briefing_scene_line_humanises_weather_and_lighting_ids() {
         "raw theme ids leaked: {raw:?}"
     );
 }
+
+#[test]
+fn briefing_loadout_and_readiness_sit_above_the_footer_at_both_review_sizes() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.act(|c| c.open_preparation(Tab::Briefing));
+    let ranged = f
+        .game
+        .campaign()
+        .equipped(Mode::Personal, Slot::Ranged)
+        .name
+        .clone();
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::WorldWithChrome, vec![], size);
+        for label in ["Field loadout", "Change equipment", "Deploy personally"] {
+            assert!(
+                fully_visible(&output, label),
+                "{size:?}: {label} hidden: {:?}",
+                clipped_bounds(&output, label)
+            );
+        }
+        assert!(
+            output
+                .shapes
+                .iter()
+                .any(|s| shape_has_text(&s.shape, &ranged)),
+            "{size:?}: equipped ranged weapon not listed"
+        );
+        if scale == 1.0 {
+            assert!(fully_visible(&output, "Before you deploy"), "{size:?}");
+        }
+    }
+    h.click(f, View::Camp, "Change equipment");
+    assert!(f.nav.tab == Tab::Armory);
+}

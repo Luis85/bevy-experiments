@@ -17,12 +17,19 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
     };
     let (country, mode) = (view.country, f.campaign.mode);
     f.campaign.stage = view.stage;
-    chrome::page_title(
-        ui,
-        &format!("{} · Defense {}", country.name, view.stage + 1),
-        "Review the encounter, choose a defender, then deploy into live combat. Pause whenever you need time.",
-    );
+    // One header row: the defense, its picker and the defender. Readiness
+    // and the field loadout follow directly, above the encounter detail.
     ui.horizontal_wrapped(|ui| {
+        // Labels and pickers share the row's centre line with the title.
+        chrome::begin_filter_row(ui);
+        ui.label(
+            RichText::new(format!("{} · Defense {}", country.name, view.stage + 1))
+                .font(egui::FontId::new(28.0, egui::FontFamily::Name("display".into()))),
+        )
+        .on_hover_text(
+            "Review the encounter, choose a defender, then deploy into live combat. Pause whenever you need time.",
+        );
+        ui.add_space(16.0);
         ui.label("Local defense");
         egui::ComboBox::from_id_salt("local_stage")
             .selected_text(format!("{} of {}", f.campaign.stage + 1, view.levels))
@@ -35,17 +42,38 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
                     );
                 }
             });
+        ui.add_space(16.0);
         chrome::mode_picker(ui, f);
     });
+    ui.add_space(6.0);
     // A stage or defender picked this frame renders immediately.
     let view = if (f.campaign.stage, f.campaign.mode) == (view.stage, mode) {
         view
     } else {
         view::view_model(f.game, f.campaign.mode, f.campaign.stage).expect("active country")
     };
+    if ui.available_width() >= 820.0 {
+        let width = (ui.available_width() - 28.0) * 0.55;
+        ui.horizontal_top(|ui| {
+            ui.vertical(|ui| {
+                ui.set_width(width);
+                loadout(ui, f, &view);
+            });
+            ui.add_space(24.0);
+            ui.vertical(|ui| {
+                ui.set_width(ui.available_width());
+                readiness(ui, f, &view);
+            });
+        });
+    } else {
+        loadout(ui, f, &view);
+        ui.add_space(6.0);
+        readiness(ui, f, &view);
+    }
+    ui.add_space(12.0);
     let level = view.level;
     let scene = country.stage_theme(view.stage);
-    if ui.available_width() >= 820.0 && ui.available_height() > 420.0 {
+    if ui.available_width() >= 820.0 && ui.clip_rect().height() > 420.0 {
         let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 76.0), Sense::hover());
         art::country_scene_textured(
             &ui.painter_at(rect),
@@ -107,25 +135,6 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
             chrome::display_label(&scene.lighting)
         ),
     );
-    ui.add_space(8.0);
-    let wide = ui.available_width() >= 820.0;
-    if wide {
-        let width = (ui.available_width() - 28.0) * 0.55;
-        ui.horizontal_top(|ui| {
-            ui.vertical(|ui| {
-                ui.set_width(width);
-                loadout(ui, f, &view);
-            });
-            ui.add_space(24.0);
-            ui.vertical(|ui| {
-                ui.set_width(ui.available_width());
-                readiness(ui, f, &view);
-            });
-        });
-    } else {
-        loadout(ui, f, &view);
-        readiness(ui, f, &view);
-    }
     egui::CollapsingHeader::new("Encounter conditions and field rules").show(ui,|ui|{
         for text in &country.boosts{ui.colored_label(AMBER,text);}
         for text in &country.buffs{ui.colored_label(GREEN,text);}
@@ -134,23 +143,34 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.label("Survive until the boss arrives, then defeat it. The timer alone does not clear the defense. Coins and recovered items are banked as you earn them.");
     });
 }
+/// A briefing column heading; the loadout's carries its one action.
+fn heading(ui: &mut egui::Ui, title: &str) {
+    ui.label(RichText::new(title).size(18.0).strong());
+}
 fn loadout(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
-    chrome::section(ui, "Field loadout");
+    ui.horizontal(|ui| {
+        heading(ui, "Field loadout");
+        ui.add_space(12.0);
+        if ui.button("Change equipment").clicked() {
+            f.open_preparation(Tab::Armory);
+        }
+    });
+    // Two slots per row keep the loadout to two lines above the fold.
+    let per_row = if ui.available_width() >= 520.0 { 2 } else { 1 };
     egui::Grid::new("briefing_equipment")
-        .spacing([20.0, 7.0])
+        .spacing([16.0, 6.0])
         .show(ui, |ui| {
-            for line in &view.loadout {
+            for (index, line) in view.loadout.iter().enumerate() {
                 muted(ui, line.label);
                 ui.label(format!("{} · Lv {}", line.name, line.level));
-                ui.end_row();
+                if (index + 1) % per_row == 0 {
+                    ui.end_row();
+                }
             }
         });
-    if ui.button("Review equipment").clicked() {
-        f.open_preparation(Tab::Armory);
-    }
 }
 fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
-    chrome::section(ui, "Before you deploy");
+    heading(ui, "Before you deploy");
     if view.heal_ready {
         ui.horizontal(|ui| {
             let (r, _) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::hover());
