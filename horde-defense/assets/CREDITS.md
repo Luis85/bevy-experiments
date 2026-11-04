@@ -20,6 +20,11 @@ repository MIT license.
 The complete upstream notice is in `fonts/PixelifySans-OFL.txt`; the font and
 notice were sourced from the [official Google Fonts directory](https://github.com/google/fonts/tree/main/ofl/pixelifysans).
 
+`fonts/AtkinsonHyperlegible-Regular.ttf` is the unmodified Atkinson Hyperlegible
+Regular font, Copyright 2020 Braille Institute of America, Inc., under SIL OFL 1.1.
+The complete upstream notice is in `fonts/AtkinsonHyperlegible-OFL.txt`; the font
+and notice were sourced from the [official Google Fonts directory](https://github.com/google/fonts/tree/main/ofl/atkinsonhyperlegible).
+
 ## Original game art and sound
 
 Lastlight's tactical overlays, particles and fallback drawings are original

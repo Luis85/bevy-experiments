@@ -178,6 +178,14 @@ pub fn install_font(ctx: &Context) {
             "../../../assets/fonts/PixelifySans.ttf"
         ))),
     );
+    fonts.font_data.insert(
+        "atkinson".into(),
+        std::sync::Arc::new(egui::FontData::from_static(include_bytes!(
+            "../../../assets/fonts/AtkinsonHyperlegible-Regular.ttf"
+        ))),
+    );
+    // Pixelify carries the pixel identity on headings and the wordmark only;
+    // body text, buttons and labels use a face built for legibility.
     fonts.families.insert(
         egui::FontFamily::Name("display".into()),
         vec!["pixelify".into()],
@@ -186,11 +194,6 @@ pub fn install_font(ctx: &Context) {
         .families
         .entry(egui::FontFamily::Proportional)
         .or_default()
-        .insert(0, "pixelify".into());
-    fonts
-        .families
-        .entry(egui::FontFamily::Monospace)
-        .or_default()
-        .insert(0, "pixelify".into());
+        .insert(0, "atkinson".into());
     ctx.set_fonts(fonts);
 }

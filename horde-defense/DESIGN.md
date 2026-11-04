@@ -42,10 +42,10 @@ typography:
     fontFamily: "Pixelify Sans"
     fontSize: "24px"
   body:
-    fontFamily: "Pixelify Sans"
+    fontFamily: "Atkinson Hyperlegible"
     fontSize: "16px"
   label:
-    fontFamily: "Pixelify Sans"
+    fontFamily: "Atkinson Hyperlegible"
     fontSize: "12px"
 rounded:
   flat: "0px"
@@ -103,7 +103,7 @@ components:
 
 Lastlight is a grounded survivor/plague world expressed through crisp pixel figures, muted biome ground, worn improvised defenses and small amber signals. The user's seven reference screenshots and explicit pixel-art survival choice establish the visual world. A full-window battlefield and compact corner instruments make the surrounding place visible while every lane of the deployed arena remains readable.
 
-Combat and visual progression use space generously; management remains compact and practical. Scenery belongs around the combat rectangle, while purchases belong beside the selected upgrade. Pixelify Sans, square controls and the living checkpoint scene carry the same pixel identity. Reduced effects preserves a static checkpoint pose. This document records the implemented native Rust/Bevy/egui system; dated execution evidence and its limits belong in [docs/VALIDATION.md](docs/VALIDATION.md).
+Combat and visual progression use space generously; management remains compact and practical. Scenery belongs around the combat rectangle, while purchases belong beside the selected upgrade. Pixelify Sans titles, square controls and the living checkpoint scene carry the same pixel identity, while Atkinson Hyperlegible keeps body text readable. Reduced effects preserves a static checkpoint pose. This document records the implemented native Rust/Bevy/egui system; dated execution evidence and its limits belong in [docs/VALIDATION.md](docs/VALIDATION.md).
 
 **Key Characteristics:**
 
@@ -139,7 +139,7 @@ Ink is the canvas; panel is the slightly lighter management surface. Parchment i
 
 ## Typography
 
-The unmodified bundled **Pixelify Sans** variable font is registered first in egui's proportional and monospace families and is the named `display` family's sole face. Monospace is an egui family routing choice here, not a claim that Pixelify Sans has fixed-width glyphs. Default egui fallback families remain available for proportional/monospace coverage. Barlow Condensed and its license remain retained historical assets; it is not an active font.
+The unmodified bundled **Pixelify Sans** variable font is the named `display` family's sole face, used for page titles, headings, the wordmark and combat numbers. The unmodified bundled **Atkinson Hyperlegible** Regular is registered first in egui's proportional family, so body text, buttons and labels read clearly at small sizes and large UI scales; Pixelify proved hard to read in dense panels. Monospace keeps egui's default fixed-width face. Default egui fallback families remain available for glyph coverage. Barlow Condensed and its license remain retained historical assets; it is not an active font.
 
 The display role gives the menu wordmark its maximum size. The menu initially chooses a size between 52 and 88 logical units, measures `LASTLIGHT` as one unwrapped galley and reduces it further when needed to fit the actual available width. Never wrap the last letter onto a second row. Result titles use the result role; page titles use page-title; native headings and progression headings use heading; the ordinary compact header uses wordmark. Body and buttons use body, while secondary explanations and compact action timing use label. Strong text uses egui's native strong treatment; no fixed font weight or fabricated letter spacing is prescribed.
 
@@ -235,7 +235,7 @@ Country polygons convey selected, freed, active, accessible and locked states, w
 
 - **Do** preserve the complete deployment-frozen arena, shared contact line and stable aiming origin.
 - **Do** keep continuous ground quiet and peripheral props outside tactical space.
-- **Do** use Pixelify Sans through the installed native families and measure the single-line menu wordmark.
+- **Do** use Pixelify Sans through the `display` family for titles, headings and the wordmark, and Atkinson Hyperlegible for body text, buttons and labels; measure the single-line menu wordmark.
 - **Do** expose actual upgrade costs, availability and purchase prerequisites beside the selection.
 - **Do** pair color with labels, shape or tactical location and honor reduced-effects preferences.
 - **Do** keep native capture, interaction, listening and package evidence separate from source and headless checks.
