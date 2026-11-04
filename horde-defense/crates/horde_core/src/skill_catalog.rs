@@ -94,6 +94,217 @@ pub enum CampaignFeature {
     Parallel,
     Operations,
 }
+impl CampaignFeature {
+    pub const ALL: [Self; 5] = [
+        Self::Construction,
+        Self::Companion,
+        Self::Recruitment,
+        Self::Parallel,
+        Self::Operations,
+    ];
+    /// Player-facing name of the unlocked feature, also its upgrade-goal label.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Construction => "Fortifications",
+            Self::Companion => "Mara",
+            Self::Recruitment => "Recruitment",
+            Self::Parallel => "Parallel defenses",
+            Self::Operations => "Country operations",
+        }
+    }
+}
+
+/// Player-facing grouping of skill effects, used for search and filtering.
+/// A node may belong to several categories (one per distinct effect group).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum EffectCategory {
+    /// Personal firearm damage, reload, fire rate and piercing.
+    Firearms,
+    /// Permission to equip an owned weapon class.
+    WeaponClass,
+    /// Health, stamina, armor and the personal heal and brace actives.
+    Survival,
+    /// Melee damage and the contact sweep.
+    Melee,
+    /// Grenades, Molotovs and their upgrades.
+    Ordnance,
+    /// Structure building, engineering, blueprints and mastery ranks.
+    Fortification,
+    /// Body-development attribute ranks.
+    Body,
+    /// Mara, recruitment, parallel defenses and country operations.
+    Companions,
+}
+
+impl EffectCategory {
+    pub const ALL: [Self; 8] = [
+        Self::Firearms,
+        Self::WeaponClass,
+        Self::Survival,
+        Self::Melee,
+        Self::Ordnance,
+        Self::Fortification,
+        Self::Body,
+        Self::Companions,
+    ];
+    /// Sentence-case label for chips and filters.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Firearms => "Firearms",
+            Self::WeaponClass => "Weapon proficiency",
+            Self::Survival => "Survival",
+            Self::Melee => "Melee",
+            Self::Ordnance => "Ordnance",
+            Self::Fortification => "Fortification",
+            Self::Body => "Body development",
+            Self::Companions => "Companions and world",
+        }
+    }
+}
+
+/// Player wording for an implemented capability unlock id (see [`unlocks`]);
+/// unknown ids fall back to the id itself.
+pub fn unlock_label(id: &str) -> &str {
+    match id {
+        unlocks::PIERCING => "Piercing shots",
+        unlocks::SWEEP => "Contact sweep",
+        unlocks::HEAL => "Emergency aid",
+        unlocks::BRACE => "Brace",
+        unlocks::GRENADE => "Grenades",
+        unlocks::MOLOTOV => "Molotovs",
+        other => other,
+    }
+}
+
+impl SkillEffect {
+    /// The player-facing category this effect belongs to.
+    pub fn category(&self) -> EffectCategory {
+        use EffectCategory as C;
+        match self {
+            Self::BodyDevelopment { .. } => C::Body,
+            Self::Blueprint(_) | Self::StructureRank { .. } | Self::EngineeringMultiplier(_) => {
+                C::Fortification
+            }
+            Self::FeatureUnlock(CampaignFeature::Construction) => C::Fortification,
+            Self::FeatureUnlock(_) => C::Companions,
+            Self::DamageAdd(_)
+            | Self::DamageMultiplier(_)
+            | Self::ReloadMultiplier(_)
+            | Self::CadenceMultiplier(_) => C::Firearms,
+            Self::HealthAdd(_) | Self::StaminaAdd(_) | Self::ArmorAdd(_) => C::Survival,
+            Self::MeleeAdd(_) => C::Melee,
+            Self::WeaponTraining(_) => C::WeaponClass,
+            Self::Unlock(id) => match id.as_str() {
+                unlocks::PIERCING => C::Firearms,
+                unlocks::SWEEP => C::Melee,
+                unlocks::GRENADE | unlocks::MOLOTOV => C::Ordnance,
+                _ => C::Survival,
+            },
+            Self::GrenadeCharges(_)
+            | Self::MolotovCharges(_)
+            | Self::OrdnanceDamageMultiplier(_)
+            | Self::OrdnanceRadiusMultiplier(_)
+            | Self::BurnDurationMultiplier(_)
+            | Self::OrdnanceCooldownMultiplier(_) => C::Ordnance,
+        }
+    }
+    /// Lowercase search keywords for this effect (for example `"shotgun"`,
+    /// `"health"`, `"reload"`, `"grenade"`, `"mara"`).
+    pub fn keywords(&self) -> Vec<&'static str> {
+        let structure = |kind: StructureKind| match kind {
+            StructureKind::Trap => "trap",
+            StructureKind::Wall => "wall",
+            StructureKind::Turret => "turret",
+        };
+        match self {
+            Self::BodyDevelopment { attribute, .. } => match attribute {
+                BodyAttribute::Vitality => vec!["vitality", "health"],
+                BodyAttribute::Strength => vec!["strength", "melee"],
+                BodyAttribute::Coordination => vec!["coordination", "reload"],
+                BodyAttribute::Endurance => vec!["endurance", "stamina"],
+                BodyAttribute::Perception => vec!["perception", "weak spot"],
+            },
+            Self::Blueprint(kind) => vec![structure(*kind), "blueprint", "structure"],
+            Self::StructureRank { kind, .. } => vec![structure(*kind), "mastery", "structure"],
+            Self::FeatureUnlock(feature) => match feature {
+                CampaignFeature::Construction => vec!["construction", "build", "structure"],
+                CampaignFeature::Companion => vec!["mara", "companion"],
+                CampaignFeature::Recruitment => vec!["recruit", "recruitment", "survivor"],
+                CampaignFeature::Parallel => vec!["parallel"],
+                CampaignFeature::Operations => vec!["operations"],
+            },
+            Self::DamageAdd(_) | Self::DamageMultiplier(_) => vec!["damage"],
+            Self::ReloadMultiplier(_) => vec!["reload"],
+            Self::CadenceMultiplier(_) => vec!["fire rate", "cadence"],
+            Self::HealthAdd(_) => vec!["health"],
+            Self::StaminaAdd(_) => vec!["stamina"],
+            Self::ArmorAdd(_) => vec!["armor"],
+            Self::MeleeAdd(_) => vec!["melee", "damage"],
+            Self::EngineeringMultiplier(_) => vec!["engineering", "structure"],
+            Self::WeaponTraining(class) => vec![
+                match class {
+                    WeaponClass::Pistol => "pistol",
+                    WeaponClass::Smg => "smg",
+                    WeaponClass::Shotgun => "shotgun",
+                    WeaponClass::Rifle => "rifle",
+                    WeaponClass::Marksman => "marksman",
+                    WeaponClass::MachineGun => "machine gun",
+                },
+                "weapon",
+                "proficiency",
+            ],
+            Self::Unlock(id) => match id.as_str() {
+                unlocks::PIERCING => vec!["piercing", "penetration"],
+                unlocks::SWEEP => vec!["sweep", "melee"],
+                unlocks::HEAL => vec!["heal", "health"],
+                unlocks::BRACE => vec!["brace", "stamina"],
+                unlocks::GRENADE => vec!["grenade"],
+                unlocks::MOLOTOV => vec!["molotov", "incendiary"],
+                _ => vec!["ability"],
+            },
+            Self::GrenadeCharges(_) => vec!["grenade", "charges"],
+            Self::MolotovCharges(_) => vec!["molotov", "charges"],
+            Self::OrdnanceDamageMultiplier(_)
+            | Self::OrdnanceRadiusMultiplier(_)
+            | Self::OrdnanceCooldownMultiplier(_) => vec!["grenade", "molotov", "ordnance"],
+            Self::BurnDurationMultiplier(_) => vec!["molotov", "burn", "incendiary"],
+        }
+    }
+}
+
+impl SkillNode {
+    /// Distinct categories of this node's effects, in [`EffectCategory`] order.
+    pub fn categories(&self) -> Vec<EffectCategory> {
+        let set: BTreeSet<_> = self.effects.iter().map(SkillEffect::category).collect();
+        set.into_iter().collect()
+    }
+    /// Whether `query` (lowercase, trimmed, non-empty) matches the name,
+    /// description, branch, category labels or effect keywords.
+    fn matches(&self, query: &str) -> bool {
+        [&self.name, &self.description, &self.branch]
+            .into_iter()
+            .any(|text| text.to_lowercase().contains(query))
+            || self
+                .categories()
+                .into_iter()
+                .any(|c| c.label().to_lowercase().contains(query))
+            || self
+                .effects
+                .iter()
+                .flat_map(SkillEffect::keywords)
+                .any(|keyword| keyword.contains(query))
+    }
+}
+
+/// A named destination in the tree ("Shotgun proficiency", "Mara") that the
+/// UI can offer as "Path to…". Derived from effects, never from fixed ids.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UpgradeGoal {
+    /// Player-facing goal name.
+    pub label: String,
+    /// The first catalogue node granting the goal.
+    pub node_id: String,
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SkillModifiers {
@@ -248,6 +459,54 @@ impl SkillCatalog {
     }
     pub fn node(&self, id: &str) -> Option<&SkillNode> {
         self.nodes.iter().find(|n| n.id == id)
+    }
+    /// Nodes matching `query` case-insensitively against name, description,
+    /// branch, category labels and effect keywords, in catalogue order. An
+    /// empty or whitespace-only query returns nothing.
+    pub fn search(&self, query: &str) -> Vec<&SkillNode> {
+        let query = query.trim().to_lowercase();
+        if query.is_empty() {
+            return Vec::new();
+        }
+        self.nodes.iter().filter(|n| n.matches(&query)).collect()
+    }
+    /// One goal per weapon-class training node (the innate free root
+    /// excluded), then grenades, Molotovs and each [`CampaignFeature`]
+    /// (fortifications, Mara, recruitment, parallel defenses, country
+    /// operations), in that order. Each goal names the first catalogue node
+    /// granting it; goals the catalogue does not grant are omitted.
+    pub fn upgrade_goals(&self) -> Vec<UpgradeGoal> {
+        let first = |grants: &dyn Fn(&SkillEffect) -> bool| {
+            self.nodes
+                .iter()
+                .find(|n| n.price > 0 && n.effects.iter().any(grants))
+                .map(|n| n.id.clone())
+        };
+        let mut goals = Vec::new();
+        let mut push = |label: String, node_id: Option<String>| {
+            if let Some(node_id) = node_id {
+                goals.push(UpgradeGoal { label, node_id });
+            }
+        };
+        for class in WeaponClass::ALL {
+            push(
+                format!("{} proficiency", class.name()),
+                first(&|e| *e == SkillEffect::WeaponTraining(class)),
+            );
+        }
+        for id in [unlocks::GRENADE, unlocks::MOLOTOV] {
+            push(
+                unlock_label(id).to_owned(),
+                first(&|e| matches!(e, SkillEffect::Unlock(u) if u.as_str() == id)),
+            );
+        }
+        for feature in CampaignFeature::ALL {
+            push(
+                feature.label().to_owned(),
+                first(&|e| *e == SkillEffect::FeatureUnlock(feature)),
+            );
+        }
+        goals
     }
     pub fn validate(&self) -> Result<(), String> {
         if self.nodes.is_empty() || self.nodes.len() > 256 {
@@ -418,6 +677,14 @@ pub fn skills() -> &'static SkillCatalog {
         SkillCatalog::from_json_str(include_str!("../skills.json"))
     })
 }
+/// [`SkillCatalog::search`] over the installed catalogue.
+pub fn search_nodes(query: &str) -> Vec<&'static SkillNode> {
+    skills().search(query)
+}
+/// [`SkillCatalog::upgrade_goals`] over the installed catalogue.
+pub fn upgrade_goals() -> Vec<UpgradeGoal> {
+    skills().upgrade_goals()
+}
 
 #[cfg(test)]
 mod tests {
@@ -478,5 +745,103 @@ mod tests {
         assert!(bad.validate().is_err());
         modifiers.unlocks.insert("granade".into());
         assert!(modifiers.validate().is_err());
+    }
+
+    #[test]
+    fn every_effect_has_a_category_and_nodes_list_distinct_categories() {
+        for category in EffectCategory::ALL {
+            assert!(!category.label().is_empty());
+        }
+        let catalog = skills();
+        let category = |id: &str| catalog.node(id).unwrap().categories();
+        assert_eq!(category("quick_reload"), [EffectCategory::Firearms]);
+        assert_eq!(category("piercing"), [EffectCategory::Firearms]);
+        assert_eq!(category("engineering"), [EffectCategory::Fortification]);
+        assert_eq!(category("trap_rank_2"), [EffectCategory::Fortification]);
+        assert_eq!(category("shotgun_training"), [EffectCategory::WeaponClass]);
+        assert_eq!(category("body_vitality_3"), [EffectCategory::Body]);
+        assert_eq!(category("companion_contact"), [EffectCategory::Companions]);
+        assert_eq!(category("grenade_training"), [EffectCategory::Ordnance]);
+        assert_eq!(category("slow_burn"), [EffectCategory::Ordnance]);
+        assert_eq!(category("sweep"), [EffectCategory::Melee]);
+        assert_eq!(category("field_fitness"), [EffectCategory::Survival]);
+        assert_eq!(category("brace"), [EffectCategory::Survival]);
+        for node in &catalog.nodes {
+            assert!(!node.categories().is_empty(), "{}", node.id);
+            for effect in &node.effects {
+                assert!(!effect.keywords().is_empty(), "{}", node.id);
+            }
+        }
+        for id in unlocks::ALL {
+            assert_ne!(unlock_label(id), id);
+        }
+        for feature in CampaignFeature::ALL {
+            assert!(!feature.label().is_empty());
+        }
+    }
+
+    #[test]
+    fn search_matches_names_descriptions_branches_categories_and_keywords() {
+        assert!(search_nodes("").is_empty());
+        assert!(search_nodes("   ").is_empty());
+        let ids = |query: &str| -> Vec<&str> {
+            search_nodes(query).iter().map(|n| n.id.as_str()).collect()
+        };
+        assert!(ids("SHOTGUN").contains(&"shotgun_training"));
+        assert!(ids("mara").contains(&"companion_contact"));
+        let health = ids("Health");
+        for id in ["field_fitness", "veteran_vitality", "body_vitality_1"] {
+            assert!(health.contains(&id), "{id}");
+        }
+        let reload = ids("reload");
+        assert!(reload.contains(&"quick_reload") && reload.contains(&"combat_reload"));
+        assert!(reload.contains(&"body_coordination_4"));
+        let grenade = ids(" grenade ");
+        assert!(grenade.contains(&"grenade_training") && grenade.contains(&"grenade_bandolier"));
+        assert!(ids("fortification").contains(&"trap_rank_3"));
+        assert!(ids("weapon proficiency").contains(&"rifle_training"));
+        assert!(ids("body development").contains(&"body_perception_20"));
+        assert!(ids("zzzz-no-match").is_empty());
+        // Catalogue order, no duplicates.
+        let positions: Vec<_> = search_nodes("a")
+            .iter()
+            .map(|n| skills().nodes.iter().position(|m| m.id == n.id).unwrap())
+            .collect();
+        assert!(positions.len() > 10);
+        assert!(positions.windows(2).all(|w| w[0] < w[1]));
+    }
+
+    #[test]
+    fn upgrade_goals_are_derived_from_effects() {
+        let goals = upgrade_goals();
+        let find = |label: &str| {
+            goals
+                .iter()
+                .find(|g| g.label == label)
+                .unwrap_or_else(|| panic!("missing goal {label}: {goals:?}"))
+                .node_id
+                .as_str()
+        };
+        assert_eq!(find("Shotgun proficiency"), "shotgun_training");
+        assert_eq!(find("SMG proficiency"), "smg_training");
+        assert_eq!(find("Rifle proficiency"), "rifle_training");
+        assert_eq!(find("Marksman proficiency"), "marksman_training");
+        assert_eq!(find("Machine gun proficiency"), "machine_gun_training");
+        assert_eq!(find("Grenades"), "grenade_training");
+        assert_eq!(find("Molotovs"), "molotov_training");
+        assert_eq!(find("Fortifications"), "engineering");
+        assert_eq!(find("Mara"), "companion_contact");
+        assert_eq!(find("Recruitment"), "recruitment_network");
+        assert_eq!(find("Parallel defenses"), "parallel_command");
+        assert_eq!(find("Country operations"), "country_operations");
+        // The innate pistol root is never a goal.
+        assert!(goals.iter().all(|g| g.node_id != "pistol_training"));
+        assert_eq!(goals.len(), 5 + 2 + 5);
+        // A catalogue without a goal's effect omits it.
+        let mut trimmed = skills().clone();
+        trimmed
+            .nodes
+            .retain(|n| !n.effects.contains(&SkillEffect::Unlock("molotov".into())));
+        assert!(trimmed.upgrade_goals().iter().all(|g| g.label != "Molotovs"));
     }
 }
