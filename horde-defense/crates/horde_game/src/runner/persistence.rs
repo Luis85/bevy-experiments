@@ -1,6 +1,8 @@
 //! Single-writer storage service. Only immutable engine/settings snapshots cross
 //! the worker boundary; commands, epochs and navigation remain on the main thread.
-use super::{Game, SaveIntent, Settings};
+use super::{apply, command::SaveIntent};
+use crate::settings::Settings;
+use horde_core::sim::Game;
 use std::{
     collections::VecDeque,
     path::PathBuf,
@@ -89,13 +91,13 @@ impl Backend for FileStore {
         let result = (|| match job.payload {
             Payload::Save(snapshot) => {
                 recovered =
-                    super::preserve_unreadable(&snapshot.campaign_path, &mut self.preserved)?;
+                    apply::preserve_unreadable(&snapshot.campaign_path, &mut self.preserved)?;
                 snapshot.game.save(&snapshot.campaign_path)?;
-                super::write_settings(&snapshot.settings, &snapshot.settings_path)?;
+                apply::write_settings(&snapshot.settings, &snapshot.settings_path)?;
                 Ok(Commit::Saved)
             }
             Payload::Reset { old, fresh, path } => {
-                recovered = super::preserve_unreadable(&path, &mut self.preserved)?;
+                recovered = apply::preserve_unreadable(&path, &mut self.preserved)?;
                 let archive = archive_old_journey(&old, &path)?;
                 // This commit is the reset linearization point. Settings are
                 // retained; nothing fallible may follow it before success.
