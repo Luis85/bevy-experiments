@@ -165,6 +165,37 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
             }
         }
     }
+    smoke_buy_gear(g, mode)?;
+    if mode == Mode::Npc {
+        while g.campaign.npc.unspent < 4
+            && g.campaign.coins >= 25
+            && g.campaign.npc.awarded < g.campaign.allowance()
+        {
+            g.campaign.buy_training_point()?;
+        }
+        if g.campaign.npc.unspent >= 4 {
+            g.campaign.train_npc(crate::campaign::NpcTraining::Guns)?;
+        }
+        if g.campaign.npc.guns >= 17 {
+            // A trained defender facing a dense horde trades
+            // optional Aim turns for more legal attack attempts.
+            g.campaign.npc.prefer_aim = false;
+            g.campaign.npc.allow_risk = true;
+        }
+    } else {
+        while g.campaign.player.points > 0
+            && g.campaign.player.body[crate::campaign::BodyAttribute::Vitality]
+                < g.campaign.body_cap()
+        {
+            g.campaign
+                .allocate_body(crate::campaign::BodyAttribute::Vitality)?;
+        }
+    }
+    Ok(())
+}
+/// The earned shop half of [`smoke_prepare`]: buy and equip the best
+/// affordable upgrade per slot. Shared with the pacing simulation.
+pub(crate) fn smoke_buy_gear(g: &mut Game, mode: Mode) -> Result<(), String> {
     let mut market: Vec<usize> = content()
         .items
         .iter()
@@ -224,31 +255,6 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
             let id = g.campaign.buy_item(n)?;
             g.campaign.equip(mode, id)?;
             bought[slot] = true;
-        }
-    }
-    if mode == Mode::Npc {
-        while g.campaign.npc.unspent < 4
-            && g.campaign.coins >= 25
-            && g.campaign.npc.awarded < g.campaign.allowance()
-        {
-            g.campaign.buy_training_point()?;
-        }
-        if g.campaign.npc.unspent >= 4 {
-            g.campaign.train_npc(crate::campaign::NpcTraining::Guns)?;
-        }
-        if g.campaign.npc.guns >= 17 {
-            // A trained defender facing a dense horde trades
-            // optional Aim turns for more legal attack attempts.
-            g.campaign.npc.prefer_aim = false;
-            g.campaign.npc.allow_risk = true;
-        }
-    } else {
-        while g.campaign.player.points > 0
-            && g.campaign.player.body[crate::campaign::BodyAttribute::Vitality]
-                < g.campaign.body_cap()
-        {
-            g.campaign
-                .allocate_body(crate::campaign::BodyAttribute::Vitality)?;
         }
     }
     Ok(())

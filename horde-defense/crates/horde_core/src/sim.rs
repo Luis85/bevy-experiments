@@ -8,6 +8,7 @@ mod manual;
 mod migrations;
 mod movement;
 mod npc;
+mod pacing;
 mod parallel;
 mod persistence;
 mod smoke;
@@ -18,6 +19,10 @@ pub use fixtures::{Staging, maximum_progression_render_fixture, peak_render_fixt
 pub use journey::JourneyContinuation;
 pub use migrations::SAVE_VERSION;
 use npc::structure_bonus;
+pub use pacing::{
+    Milestone, PacingAim, PacingProfile, PacingReport, PacingRun, PacingSpend, node_depths,
+    pacing_profiles, simulate_pacing, tier_cost,
+};
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;
 pub use persistence::{RULESET_VERSION, SaveError};
