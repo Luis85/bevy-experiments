@@ -469,6 +469,32 @@ impl Attempt {
     pub fn brace_remaining_ticks(&self) -> u32 {
         self.statuses.remaining(StatusId::Brace)
     }
+    /// Whether the brace stance covers `tick` (at or before the current tick).
+    /// The saved status clock is authoritative; past ticks after the status
+    /// ended fall back to retained brace ability events (`value == 0`).
+    pub fn brace_active_at(&self, tick: u64) -> bool {
+        if tick > self.tick {
+            return false;
+        }
+        let duration = u64::from(BRACE_DURATION_TICKS);
+        let remaining = self.statuses.remaining(StatusId::Brace);
+        if remaining > 0 {
+            let end = self.tick.saturating_add(u64::from(remaining));
+            let start = end.saturating_sub(duration);
+            if tick >= start && tick < end {
+                return true;
+            }
+        }
+        if tick == self.tick {
+            return false;
+        }
+        self.events.iter().rev().any(|event| {
+            event.kind == EventKind::Ability
+                && event.value == 0
+                && event.tick <= tick
+                && tick - event.tick < duration
+        })
+    }
     /// The defender's timed status effects (saved, authoritative).
     pub fn statuses(&self) -> &Statuses {
         &self.statuses
@@ -3707,4 +3733,41 @@ pub fn maximum_progression_render_fixture() -> Result<Game, String> {
     g.set_paused(true);
     validate_game(&g, 0)?;
     Ok(g)
+}
+
+#[cfg(test)]
+mod brace_tests {
+    use super::*;
+
+    #[test]
+    fn brace_active_at_reads_the_status_clock_then_retained_ability_events() {
+        let mut game = Game::default();
+        game.deploy(0, Mode::Personal).unwrap();
+        game.attempt.as_mut().unwrap().profile.brace = true;
+        game.tick(Input {
+            brace: true,
+            ..Default::default()
+        });
+        let born = game.attempt.as_ref().unwrap().tick;
+        for _ in 0..3 {
+            game.tick(Input::default());
+        }
+        let a = game.attempt.as_mut().unwrap();
+        assert!(a.brace_remaining_ticks() > 0);
+        assert!(a.brace_active_at(a.tick));
+        assert!(a.brace_active_at(born));
+        assert!(!a.brace_active_at(born.saturating_sub(1)));
+        assert!(!a.brace_active_at(a.tick + 1));
+        // Without the status clock only past ticks covered by the event qualify.
+        a.statuses.remove(StatusId::Brace);
+        assert!(!a.brace_active_at(a.tick));
+        let event_tick = a
+            .events
+            .iter()
+            .find(|e| e.kind == EventKind::Ability && e.value == 0)
+            .expect("brace event retained")
+            .tick;
+        assert!(a.brace_active_at(event_tick));
+        assert!(!a.brace_active_at(event_tick.saturating_sub(1)));
+    }
 }

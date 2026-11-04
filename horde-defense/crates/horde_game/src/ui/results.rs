@@ -5,6 +5,7 @@ use crate::{
     runner::SaveIntent,
 };
 use bevy_egui::egui::{self, Align, Color32, Layout, RichText, Stroke, vec2};
+use horde_core::campaign::UpgradeFocus;
 use horde_core::skill_catalog::CampaignFeature;
 use horde_core::{command::Command, content::Mode, sim::Outcome, world::world};
 fn continue_label(f: &UiCtx) -> &'static str {
@@ -152,15 +153,11 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
                         }) && ui.button(label).clicked()
                         {
                             if feature == CampaignFeature::Construction {
-                                f.campaign.improvement_focus = horde_core::skill_catalog::skills()
-                                    .nodes
-                                    .iter()
-                                    .find(|n| n.branch == "Fortification")
-                                    .map(|n| {
-                                        horde_core::campaign::RecommendationAction::LearnNode(
-                                            n.id.clone(),
-                                        )
-                                    });
+                                f.campaign.improvement_focus = f
+                                    .game
+                                    .campaign
+                                    .recommendation_fallback(UpgradeFocus::Fortification)
+                                    .map(|r| r.action);
                             }
                             f.open_preparation(tab);
                             ui.close();

@@ -17,7 +17,7 @@ use crate::{
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_egui::egui;
 use horde_core::{
-    campaign::RecommendationAction, command::Command, sim::Game, skill_catalog::CampaignFeature,
+    campaign::UpgradeFocus, command::Command, sim::Game, skill_catalog::CampaignFeature,
     world::world,
 };
 
@@ -294,28 +294,11 @@ impl UiCtx<'_> {
         );
     }
     pub(super) fn focus_next_upgrade(&mut self) {
-        let suggested = self.game.campaign.recommendation(self.campaign.mode).action;
-        self.campaign.improvement_focus = match suggested {
-            RecommendationAction::LearnNode(_) | RecommendationAction::LearnSkill(_) => {
-                Some(suggested)
-            }
-            _ => horde_core::skill_catalog::skills()
-                .nodes
-                .iter()
-                .find(|n| {
-                    !self.game.campaign.has_node(&n.id)
-                        && self.game.campaign.can_purchase_node(&n.id).is_ok()
-                })
-                .or_else(|| {
-                    horde_core::skill_catalog::skills().nodes.iter().find(|n| {
-                        !self.game.campaign.has_node(&n.id)
-                            && n.prerequisites
-                                .iter()
-                                .all(|id| self.game.campaign.has_node(id))
-                    })
-                })
-                .map(|n| RecommendationAction::LearnNode(n.id.clone())),
-        };
+        self.campaign.improvement_focus = self
+            .game
+            .campaign
+            .recommendation_fallback(UpgradeFocus::Next(self.campaign.mode))
+            .map(|r| r.action);
     }
 
     // ----- navigation -----
