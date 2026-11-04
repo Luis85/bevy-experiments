@@ -58,3 +58,59 @@ pub(super) fn mode_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
         f.campaign.improvement_focus = None;
     }
 }
+/// Height of a padded button or combo box. Wrapped filter rows set their
+/// interact height to this before adding widgets: egui centres each widget in
+/// the row height known when it is placed, so a shorter start leaves the first
+/// widget above its taller siblings.
+pub(super) fn filter_row_height(ui: &egui::Ui) -> f32 {
+    ui.text_style_height(&egui::TextStyle::Button) + 2.0 * ui.spacing().button_padding.y
+}
+/// Starts a wrapped filter row whose widgets share one centre line.
+pub(super) fn begin_filter_row(ui: &mut egui::Ui) -> f32 {
+    let row = filter_row_height(ui);
+    ui.spacing_mut().interact_size.y = row;
+    ui.set_min_height(row);
+    row
+}
+/// Sentence-case label for an authored snake_case or kebab-case content id,
+/// such as a stage theme's weather (`ground_fog` → `Ground fog`) or lighting.
+/// Theme ids have no separate authored display name, so presentation derives one.
+pub(super) fn display_label(id: &str) -> String {
+    let words: Vec<&str> = id
+        .split(['_', '-', ' '])
+        .filter(|word| !word.is_empty())
+        .collect();
+    let mut label = words.join(" ").to_lowercase();
+    if let Some(first) = label.chars().next() {
+        label.replace_range(..first.len_utf8(), &first.to_uppercase().to_string());
+    }
+    label
+}
+
+#[cfg(test)]
+mod tests {
+    use super::display_label;
+
+    #[test]
+    fn display_label_humanises_authored_theme_ids() {
+        assert_eq!(display_label("ground_fog"), "Ground fog");
+        assert_eq!(display_label("light_rain"), "Light rain");
+        assert_eq!(display_label("dawn"), "Dawn");
+        assert_eq!(display_label("sea-mist"), "Sea mist");
+        assert_eq!(display_label("_double__under_"), "Double under");
+        assert_eq!(display_label("Overcast"), "Overcast");
+        assert_eq!(display_label(""), "");
+    }
+
+    #[test]
+    fn every_authored_weather_and_lighting_id_has_a_readable_label() {
+        let themes = &horde_core::world::world().stage_themes;
+        assert!(!themes.is_empty());
+        for theme in themes {
+            for id in [&theme.weather, &theme.lighting] {
+                let label = display_label(id);
+                assert!(!label.is_empty() && !label.contains('_'), "{id} -> {label}");
+            }
+        }
+    }
+}
