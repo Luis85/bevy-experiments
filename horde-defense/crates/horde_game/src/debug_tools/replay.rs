@@ -1,7 +1,6 @@
 //! Headless replay: rebuilds the recorded `Game` from the header and feeds it
 //! the recorded commands and inputs. No Bevy `App` is involved.
 use super::recording::{FORMAT, Header, Line, hex};
-use super::replay_digest;
 use horde_core::{
     command::Command,
     sim::{Game, Input, RULESET_VERSION, SAVE_VERSION},
@@ -143,7 +142,7 @@ pub fn replay(lines: Vec<Line>) -> Result<ReplayReport, String> {
     Ok(ReplayReport {
         ticks: tick - header.start_tick,
         commands,
-        digest: replay_digest(&game),
+        digest: game.state_digest(),
         recorded_digest,
         warnings,
     })

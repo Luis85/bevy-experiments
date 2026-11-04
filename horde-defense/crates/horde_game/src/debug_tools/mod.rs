@@ -21,20 +21,6 @@ use bevy_egui::{EguiContexts, EguiPrimaryContextPass, egui};
 use horde_core::sim::Game;
 use std::path::{Path, PathBuf};
 
-/// FNV-1a 64 over the serialized save payload (`serde_json::to_string(game)`,
-/// the bytes `Game::save` wraps in its envelope).
-///
-/// Stand-in until merge: Task 13a adds `Game::state_digest`, with the same
-/// definition, and this function is swapped for it then.
-pub fn replay_digest(game: &Game) -> u64 {
-    const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-    const PRIME: u64 = 0x0000_0100_0000_01b3;
-    let payload = serde_json::to_vec(game).unwrap_or_default();
-    payload.iter().fold(OFFSET, |hash, byte| {
-        (hash ^ u64::from(*byte)).wrapping_mul(PRIME)
-    })
-}
-
 /// `--replay <path>`: replays headless and prints the final digest.
 /// Returns the process exit code.
 #[allow(clippy::print_stdout, clippy::print_stderr)]

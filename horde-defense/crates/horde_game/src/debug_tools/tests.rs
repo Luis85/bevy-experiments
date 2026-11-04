@@ -40,7 +40,7 @@ fn camp_game() -> Game {
 }
 
 /// Drives the real runner passes for a scripted session and returns the final game.
-fn scripted_session(game: &mut Game, runtime: &mut Runtime, scratch: &Scratch) {
+fn scripted_session(game: &mut Game, runtime: &mut Runtime, scratch: &Scratch) -> Vec<u64> {
     let settings = Settings::default();
     let paths = ProfilePaths::in_directory(scratch.0.clone());
     let (mut notices, mut cues) = (Vec::new(), Vec::new());
@@ -74,6 +74,7 @@ fn scripted_session(game: &mut Game, runtime: &mut Runtime, scratch: &Scratch) {
         enabled: true,
         ..ControlFrame::default()
     });
+    let mut ticks_after = Vec::new();
     for tick in 0..240u32 {
         match tick {
             10 => {
@@ -108,7 +109,9 @@ fn scripted_session(game: &mut Game, runtime: &mut Runtime, scratch: &Scratch) {
             ..ControlFrame::default()
         });
         next(game, runtime);
+        ticks_after.push(runtime.debug_snapshot().simulated_ticks);
     }
+    ticks_after
 }
 
 #[test]
@@ -119,13 +122,23 @@ fn a_session_recorded_through_the_runner_replays_to_the_same_digest() {
     let mut runtime = Runtime::default();
     runtime.start_recording(Recorder::create(&path, &game, 0).unwrap());
 
-    scripted_session(&mut game, &mut runtime, &scratch);
+    let ticks_after = scripted_session(&mut game, &mut runtime, &scratch);
+    let added = |frame: usize| ticks_after[frame] - ticks_after[frame - 1];
+    assert_eq!(added(61), 0, "paused: no tick");
+    for frame in 62..=64 {
+        assert_eq!(
+            added(frame),
+            1,
+            "F5 step at frame {frame} adds exactly one tick"
+        );
+    }
+    assert_eq!(added(65), 0, "re-paused after the step");
     assert!(
         game.attempt.as_ref().is_some_and(|a| a.tick > 100),
         "the scripted session really simulated ticks"
     );
     assert!(runtime.stop_recording(&game, "test"));
-    let expected = replay_digest(&game);
+    let expected = game.state_digest();
     runtime.finish_storage_for_test();
 
     let lines = read_lines(&path).unwrap();
@@ -209,19 +222,23 @@ fn header_mismatches_warn_and_garbage_is_an_error() {
 fn digest_is_stable_and_state_sensitive() {
     horde_core::catalog::init_catalogs().unwrap();
     let mut game = Game::default();
-    let first = replay_digest(&game);
-    assert_eq!(first, replay_digest(&game.clone()));
+    let first = game.state_digest();
+    assert_eq!(first, game.clone().state_digest());
     game.seed ^= 1;
-    assert_ne!(first, replay_digest(&game));
+    assert_ne!(first, game.state_digest());
 }
 
 #[test]
-fn step_does_nothing_while_the_game_runs() {
+fn an_unusable_step_request_is_dropped_and_the_ordinary_tick_still_runs() {
     let scratch = Scratch::new("record-step");
     let mut game = camp_game();
     game.deploy_country_stage(0, Mode::Personal).unwrap();
     game.set_paused(false);
     let mut runtime = Runtime::default();
+    runtime.publish(ControlFrame {
+        enabled: true,
+        ..ControlFrame::default()
+    });
     runtime.request_step();
     let settings = Settings::default();
     let paths = ProfilePaths::in_directory(scratch.0.clone());
@@ -236,8 +253,17 @@ fn step_does_nothing_while_the_game_runs() {
         game_changed: false,
     };
     step(&mut ctx);
-    assert_eq!(runtime.debug_snapshot().simulated_ticks, 0);
-    assert_eq!(runtime.debug_snapshot().step_requests, 0);
+    assert_eq!(
+        runtime.debug_snapshot().simulated_ticks,
+        1,
+        "ordinary tick ran"
+    );
+    assert_eq!(
+        runtime.debug_snapshot().step_requests,
+        0,
+        "request consumed"
+    );
+    assert_eq!(game.attempt.as_ref().unwrap().tick, 1);
 }
 
 #[test]

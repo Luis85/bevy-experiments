@@ -264,7 +264,10 @@ impl Runtime {
         #[cfg(feature = "dev")]
         if self.step_requests > 0 {
             self.step_requests -= 1;
-            return self.step_once(game, cues);
+            // A request that cannot act is dropped and the ordinary tick follows.
+            if let Some(finished) = self.step_once(game, cues) {
+                return finished;
+            }
         }
         if !self.controls.enabled
             || self.durable_transition_pending()
@@ -381,12 +384,13 @@ impl Runtime {
         self.step_requests = (self.step_requests + 1).min(8);
     }
     /// One tick of a paused game: unpause, tick, re-pause, all through
-    /// `Game::apply` so a recording replays it. Does nothing while running
-    /// (the ordinary clock ticks) or during a durable transition.
-    fn step_once(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> bool {
+    /// `Game::apply` so a recording replays it. `None` (nothing consumed, no
+    /// tick run) while the game is running, has no attempt, or a durable
+    /// transition is pending; otherwise `Some(attempt finished)`.
+    fn step_once(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> Option<bool> {
         let paused = game.global_paused || game.attempt.as_ref().is_some_and(|a| a.paused);
         if !paused || game.attempt.is_none() || self.durable_transition_pending() {
-            return false;
+            return None;
         }
         let unpause = Command::SetPaused(false);
         self.record_command(&unpause);
@@ -397,7 +401,7 @@ impl Runtime {
             self.record_command(&command);
             let _ = game.apply(&command);
         }
-        finished
+        Some(finished)
     }
 }
 fn merge_actions(into: &mut Input, from: &Input) {

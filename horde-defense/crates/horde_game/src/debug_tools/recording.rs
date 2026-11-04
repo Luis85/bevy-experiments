@@ -143,9 +143,11 @@ impl Recorder {
     pub fn finish(mut self, tick: u64, game: &Game, reason: &str) {
         self.write(&Line::End {
             tick,
-            digest: hex(super::replay_digest(game)),
+            digest: hex(game.state_digest()),
             reason: reason.into(),
         });
-        let _ = self.out.flush();
+        if let Err(error) = self.flush() {
+            bevy::log::warn!("Recording end line not written: {error}");
+        }
     }
 }
