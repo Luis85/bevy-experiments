@@ -13,8 +13,14 @@
 //! `fixtures/save_v3.json` was written by `Game::save` at save format v3
 //! (commit 804b2bb): a live personal attempt with positional quality-indexed
 //! loot counters `[0,2,1,0,1,1]` and a finished run with `[1,1,0,2,0,0]`.
+//!
+//! `fixtures/save_v4.json` was written by `Game::save` at save format v4
+//! (commit c6f518d): a live personal attempt at tick 481 with both throws
+//! unlocked, one grenade and one Molotov thrown (positional ordnance counters:
+//! charges `[1,1]`, cooldowns `[10,61]`) and the Molotov's fire zone burning.
 use horde_core::campaign::{BodyAttribute, NpcTraining};
 use horde_core::content::{EnemyKind, ItemDefId, StructureKind};
+use horde_core::ordnance::OrdnanceKind;
 use horde_core::quality::Quality;
 use horde_core::sim::{Game, Input, NpcManeuver, SAVE_VERSION};
 use horde_core::skill_catalog::unlocks;
@@ -23,6 +29,7 @@ use horde_core::status::StatusId;
 const FIXTURE: &str = include_str!("fixtures/save_v1.json");
 const FIXTURE_V2: &str = include_str!("fixtures/save_v2.json");
 const FIXTURE_V3: &str = include_str!("fixtures/save_v3.json");
+const FIXTURE_V4: &str = include_str!("fixtures/save_v4.json");
 
 fn fixture() -> Game {
     Game::decode_save_generation(FIXTURE.as_bytes()).expect("v1 fixture migrates and validates")
@@ -379,6 +386,76 @@ fn v3_fixture_continues_exactly_as_the_v3_build_did() {
     });
     assert_eq!(trace.lines().count(), 12);
     assert_eq!(fnv, V3_CONTINUATION_FNV, "{trace}");
+}
+
+fn fixture_v4() -> Game {
+    Game::decode_save_generation(FIXTURE_V4.as_bytes()).expect("v4 fixture migrates and validates")
+}
+
+#[test]
+fn v4_fixture_is_a_real_v4_generation() {
+    let envelope: serde_json::Value = serde_json::from_str(FIXTURE_V4).unwrap();
+    assert_eq!(envelope["version"], 4);
+    let payload: serde_json::Value =
+        serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+    let ordnance = &payload["attempt"]["ordnance"];
+    assert_eq!(ordnance["cooldowns"], serde_json::json!([10, 61]));
+    assert_eq!(ordnance["charges"], serde_json::json!([1, 1]));
+    assert_eq!(ordnance["issued"], serde_json::json!([2, 2]));
+    assert_eq!(ordnance["spent"], serde_json::json!([1, 1]));
+}
+
+#[test]
+fn v4_fixture_ordnance_arrays_become_kind_maps_with_the_same_counts() {
+    let game = fixture_v4();
+    let o = &game.attempt.as_ref().unwrap().ordnance;
+    let counts = |map: &horde_core::kind_map::KindMap<OrdnanceKind, u32>| {
+        [map[OrdnanceKind::Grenade], map[OrdnanceKind::Molotov]]
+    };
+    assert_eq!(counts(&o.cooldowns), [10, 61]);
+    assert_eq!(counts(&o.charges), [1, 1]);
+    assert_eq!(counts(&o.issued), [2, 2]);
+    assert_eq!(counts(&o.spent), [1, 1]);
+    assert_eq!(o.fire_zones.len(), 1);
+}
+
+#[test]
+fn migrated_v4_fixture_resaves_as_current_version_and_resumes_byte_identically() {
+    resave_and_resume_byte_identically(fixture_v4(), "v4");
+}
+
+/// Trace of the v4 fixture continued for 600 idle ticks, recorded on the v4
+/// build (commit c6f518d) before the ordnance arrays became kind maps.
+const V4_CONTINUATION_FNV: u64 = 0x6e44_5102_4b8b_cc56;
+
+#[test]
+fn v4_fixture_continues_exactly_as_the_v4_build_did() {
+    let mut g = fixture_v4();
+    let mut trace = String::new();
+    for t in 0..600u32 {
+        g.tick(Input::default());
+        if t % 50 == 49 {
+            let a = g.attempt.as_ref().unwrap();
+            trace.push_str(&format!(
+                "t{} hp{} loot{} coins{} rng{} enemies{:?} ord{:?}\n",
+                a.tick,
+                a.hp,
+                a.loot,
+                a.coins,
+                a.rng.state,
+                a.enemies
+                    .iter()
+                    .map(|e| (e.id, e.hp, e.x.to_bits()))
+                    .collect::<Vec<_>>(),
+                (a.ordnance.projectiles.len(), a.ordnance.fire_zones.len())
+            ));
+        }
+    }
+    let fnv = trace.bytes().fold(0xcbf2_9ce4_8422_2325_u64, |h, b| {
+        (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
+    });
+    assert_eq!(trace.lines().count(), 12);
+    assert_eq!(fnv, V4_CONTINUATION_FNV, "{trace}");
 }
 
 #[test]

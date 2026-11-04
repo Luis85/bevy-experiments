@@ -1557,11 +1557,10 @@ impl Game {
     }
 
     fn throw_ordnance(&mut self, a: &mut Attempt, request: ThrowRequest) {
-        let index = request.kind.index();
+        let kind = request.kind;
         if a.mode != Mode::Personal
             || !ordnance::valid_cell_for_arena(request.cell, a.lane_count, a.width_yards)
-            || a.ordnance.charges[index] == 0
-            || a.ordnance.cooldowns[index] > 0
+            || !a.ordnance.ready(kind)
             || a.reload_left > 0
             || a.melee_commit > 0
             || a.ordnance.projectiles.len() + a.ordnance.fire_zones.len()
@@ -1629,9 +1628,9 @@ impl Game {
         };
         a.next_id += 1;
         a.ordnance.next_id += 1;
-        a.ordnance.charges[index] -= 1;
-        a.ordnance.spent[index] += 1;
-        a.ordnance.cooldowns[index] = (definition.cooldown_ticks as f32
+        a.ordnance.charges[kind] -= 1;
+        a.ordnance.spent[kind] += 1;
+        a.ordnance.cooldowns[kind] = (definition.cooldown_ticks as f32
             * modifiers.ordnance_cooldown_multiplier)
             .round()
             .clamp(1.0, 3600.0) as u32;
@@ -1639,7 +1638,7 @@ impl Game {
             EventKind::Throw,
             a.defender_position(),
             ordnance::cell_center(request.cell),
-            index as i32,
+            kind.event_value(),
             EventMetadata {
                 actor_id: Some(projectile.id),
                 lane: Some(request.cell[1]),
@@ -1651,7 +1650,7 @@ impl Game {
         a.ordnance.projectiles.push(projectile);
     }
     fn advance_ordnance(&mut self, a: &mut Attempt) {
-        for cooldown in &mut a.ordnance.cooldowns {
+        for cooldown in a.ordnance.cooldowns.values_mut() {
             *cooldown = cooldown.saturating_sub(1);
         }
         let mut pulses = Vec::new();

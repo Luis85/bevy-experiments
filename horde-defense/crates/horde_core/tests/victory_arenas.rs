@@ -123,7 +123,7 @@ fn seventeen_lane_targeting_defender_origin_contact_telemetry_and_throws_share_r
         g.attempt.as_ref().unwrap().ordnance.projectiles[0].cell,
         [15, 16]
     );
-    let before = g.attempt.as_ref().unwrap().ordnance.charges;
+    let before = g.attempt.as_ref().unwrap().ordnance.charges.clone();
     g.tick(Input {
         throw: Some(ThrowRequest {
             kind: OrdnanceKind::Molotov,

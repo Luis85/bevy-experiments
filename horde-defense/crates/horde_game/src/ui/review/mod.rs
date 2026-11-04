@@ -1023,11 +1023,13 @@ mod loot_capture_tests {
                         .all(|event| event.tick > start + 60 && event.actor_id.is_some())
                 );
                 assert_eq!(
-                    a.ordnance.charges[0],
+                    a.ordnance
+                        .charges(horde_core::ordnance::OrdnanceKind::Grenade),
                     a.profile.modifiers.grenade_charges - 1
                 );
                 assert_eq!(
-                    a.ordnance.charges[1],
+                    a.ordnance
+                        .charges(horde_core::ordnance::OrdnanceKind::Molotov),
                     a.profile.modifiers.molotov_charges - 1
                 );
                 assert!(a.tick - throws.last().unwrap().tick >= 24);

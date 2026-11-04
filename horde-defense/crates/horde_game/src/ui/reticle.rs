@@ -25,8 +25,7 @@ fn resources(a: &Attempt, selection: battle::AttackSelection) -> Resources {
     if a.mode == Mode::Personal
         && let Some(kind) = selection.ordnance()
     {
-        let index = kind.index();
-        let left = a.ordnance.cooldowns[index];
+        let left = a.ordnance.cooldown(kind);
         let total = (horde_core::ordnance::catalog()
             .definition(kind)
             .cooldown_ticks as f32
@@ -34,13 +33,13 @@ fn resources(a: &Attempt, selection: battle::AttackSelection) -> Resources {
             .round()
             .clamp(1.0, 3600.0);
         Resources {
-            remaining: a.ordnance.charges[index],
-            capacity: a.ordnance.issued[index].max(1),
+            remaining: a.ordnance.charges(kind),
+            capacity: a.ordnance.issued(kind).max(1),
             progress: reload.or((left > 0).then(|| (1.0 - left as f32 / total).clamp(0.0, 1.0))),
             label: if reload.is_some() {
                 "RELOAD".into()
             } else {
-                format!("{} left", a.ordnance.charges[index])
+                format!("{} left", a.ordnance.charges(kind))
             },
         }
     } else {

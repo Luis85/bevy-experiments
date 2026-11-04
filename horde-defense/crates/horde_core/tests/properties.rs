@@ -159,7 +159,12 @@ fn settling_twice_changes_nothing() {
             enemy(&mut b.game, 5, 20.0, true);
             let a = b.game.attempt.as_mut().unwrap();
             a.boss_spawned = true;
-            a.enemies[0].injury.unconscious = true;
+            a.enemies
+                .iter_mut()
+                .find(|e| e.boss)
+                .expect("the boss was just spawned")
+                .injury
+                .unconscious = true;
         }
         advance(&mut g, 1);
         assert!(g.battles.iter().all(|b| b.settled), "seed {seed}");
@@ -200,7 +205,12 @@ fn event_sequence_numbers_strictly_increase_per_battle() {
                     enemy(&mut b.game, 5, 20.0, true);
                     let a = b.game.attempt.as_mut().unwrap();
                     a.boss_spawned = true;
-                    a.enemies[0].injury.unconscious = true;
+                    a.enemies
+                        .iter_mut()
+                        .find(|e| e.boss)
+                        .expect("the boss was just spawned")
+                        .injury
+                        .unconscious = true;
                 }
             }
             g.tick(Input::default());
