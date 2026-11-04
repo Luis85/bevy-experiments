@@ -87,7 +87,7 @@ fn large_armory_renders_only_visible_rows_and_filters_without_discarding_items()
         output
             .shapes
             .iter()
-            .any(|shape| shape_has_text(&shape.shape, "Showing 0 of 1005 items"))
+            .any(|shape| shape_has_text(&shape.shape, "0 of 1005 items"))
     );
     assert_eq!(f.game.campaign().items.len(), 1005);
 }
@@ -415,5 +415,75 @@ fn armory_filter_row_shares_one_centre_line() {
     for sibling in ["All slots", "All qualities", "Newest first"] {
         let y = centre(sibling);
         assert!((y - row).abs() < 1.0, "{sibling} at {y}, search at {row}");
+    }
+}
+
+/// The newest owned item's row label, the first row under "Newest first".
+fn newest_row_label(f: &FrontendParts) -> String {
+    let item = f
+        .game
+        .campaign()
+        .items
+        .iter()
+        .max_by_key(|item| item.id)
+        .unwrap();
+    format!(
+        "{} #{} · Lv {}",
+        item.definition().name,
+        item.id,
+        item.level
+    )
+}
+
+#[test]
+fn equipment_shows_inventory_above_the_fold_at_both_review_sizes() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    for definition in 0..6 {
+        f.game.campaign_mut().add_item(definition).unwrap();
+    }
+    f.act(|c| c.open_preparation(Tab::Armory));
+    let first = newest_row_label(f);
+    for (size, scale) in [(vec2(1440.0, 900.0), 1.0), (vec2(1050.0, 700.0), 1.35)] {
+        settings::configure(&h.ctx, scale);
+        f.settings.scale = scale;
+        let output = h.frame_size(f, View::WorldWithChrome, vec![], size);
+        assert!(
+            fully_visible(&output, &first),
+            "{size:?}: first inventory row {first:?} is not visible: {:?}",
+            clipped_bounds(&output, &first)
+        );
+        // The row's status column is on screen with it.
+        let (row, clip) = clipped_bounds(&output, &first).unwrap();
+        let status = text_rect(&output, "Equip")
+            .into_iter()
+            .chain(text_rect(&output, "Equipped"))
+            .find(|rect| (rect.center().y - row.center().y).abs() < 40.0)
+            .expect("status cell beside the first row");
+        assert!(
+            clip.contains_rect(status),
+            "{size:?}: status {status:?} clipped"
+        );
+        // The legend no longer repeats the quality filter.
+        assert_eq!(text_count(&output, "Poor"), 0, "{size:?}");
+    }
+}
+
+#[test]
+fn equipment_keeps_its_loadout_comparison_on_screen_at_desktop_size() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.act(|c| c.open_preparation(Tab::Armory));
+    let output = h.frame_size(f, View::WorldWithChrome, vec![], vec2(1440.0, 900.0));
+    for label in ["Equip selected", "Maximum health"] {
+        assert!(
+            fully_visible(&output, label),
+            "{label}: {:?}",
+            clipped_bounds(&output, label)
+        );
     }
 }

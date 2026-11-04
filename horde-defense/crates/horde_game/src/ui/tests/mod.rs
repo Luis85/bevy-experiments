@@ -407,6 +407,18 @@ fn labeled_bounds(shape: &egui::epaint::Shape, label: &str) -> Option<Rect> {
     }
 }
 
+/// The painted bounds of the text run reading exactly `label`, with the clip
+/// rect it was painted under (a scroll viewport clips its content).
+fn clipped_bounds(output: &FullOutput, label: &str) -> Option<(Rect, Rect)> {
+    output.shapes.iter().find_map(|clipped| {
+        labeled_bounds(&clipped.shape, label).map(|rect| (rect, clipped.clip_rect))
+    })
+}
+/// Whether the text run reading exactly `label` is painted and fully visible.
+fn fully_visible(output: &FullOutput, label: &str) -> bool {
+    clipped_bounds(output, label).is_some_and(|(rect, clip)| clip.contains_rect(rect))
+}
+
 mod armory_tests;
 mod battle_tests;
 mod briefing_tests;

@@ -1,6 +1,6 @@
 //! Armory presentation. Game changes are queued typed intents.
 use super::{Tab, UiCtx, chrome, mode_selector, muted};
-use crate::art::{AMBER, GREEN, INK, RED, TEXT};
+use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, Color32, Layout, Rect, RichText, Sense, Stroke, vec2};
 use horde_core::{
     campaign::UpgradeFocus,
@@ -353,27 +353,48 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
         );
     }
 }
+/// The page purpose, kept off the fold and shown on the title's hover.
+const ARMORY_PURPOSE: &str = "Choose equipment for the next defense. Deployed and guarding survivors reserve their unique items.";
+/// The gear-level line: a short form for the header row, the full one on hover.
+fn gear_level_line(f: &UiCtx) -> (String, String) {
+    let campaign = f.game.campaign();
+    let (rank, level) = (campaign.progression_rank(), campaign.shop_item_level());
+    match campaign.next_gear_level_rank() {
+        Some(next) => (
+            format!("New gear Lv {level} · next at rank {next}"),
+            format!(
+                "New equipment: Lv {level} · threat rank {rank} · next gear level at rank {next}"
+            ),
+        ),
+        None => (
+            format!("New gear Lv {level} · maximum"),
+            format!("New equipment: Lv {level} · maximum authored item level reached"),
+        ),
+    }
+}
 pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
-    chrome::page_title(
-        ui,
-        "Equipment",
-        "Choose equipment for the next defense. Deployed and guarding survivors reserve their unique items.",
-    );
-    mode_selector(ui, f);
+    // One header row (title, defender, gear level) and one filter row, so the
+    // inventory starts above the fold at the minimum scaled window.
+    ui.horizontal_wrapped(|ui| {
+        // Labels and pickers share the row's centre line with the title.
+        chrome::begin_filter_row(ui);
+        ui.label(RichText::new("Equipment").font(egui::FontId::new(
+            28.0,
+            egui::FontFamily::Name("display".into()),
+        )))
+        .on_hover_text(ARMORY_PURPOSE);
+        ui.add_space(16.0);
+        mode_selector(ui, f);
+        ui.add_space(16.0);
+        let (short, detail) = gear_level_line(f);
+        ui.label(RichText::new(short).color(MUTED))
+            .on_hover_text(detail);
+    });
+    ui.add_space(4.0);
     let view = view::view_model(
         f.game,
         f.campaign.mode,
         f.campaign.improvement_focus.as_ref(),
-    );
-    let (rank, level) = (view.rank, view.shop_level);
-    muted(
-        ui,
-        match view.next_gear_rank {
-            Some(next) => format!(
-                "New equipment: Lv {level} · threat rank {rank} · next gear level at rank {next}"
-            ),
-            None => format!("New equipment: Lv {level} · maximum authored item level reached"),
-        },
     );
     if let Some(id) = view.equip_focus {
         f.armory.selected_item = Some(id);
@@ -381,7 +402,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
     if let Some(offer) = &view.recommended {
         ui.push_id("recommended_equipment", |ui| {
             ui.horizontal_wrapped(|ui| {
-                ui.strong(format!("Recommended: {}", offer.item.name));
+                ui.strong(format!("Recommended: {}", offer.item.name))
+                    .on_hover_text(
+                        "Purchase this item for your next defense, then choose whether to equip it.",
+                    );
                 if ui
                     .add_enabled(
                         offer.tier_unlocked && offer.affordable,
@@ -395,19 +419,24 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                     );
                 }
             });
-            muted(
-                ui,
-                "Purchase this item for your next defense, then choose whether to equip it.",
-            );
         });
     }
+    // The count sits in the filter row; a filter changed this frame
+    // re-filters before the list renders.
+    let filters = (
+        f.armory.search.clone(),
+        f.armory.slot,
+        f.armory.quality,
+        f.armory.sort,
+    );
+    let mut indices = filtered_indices(f);
     ui.horizontal_wrapped(|ui| {
         let row = chrome::begin_filter_row(ui);
         ui.add(
             egui::TextEdit::singleline(&mut f.armory.search)
                 .hint_text("Search equipment")
-                .desired_width(180.0)
-                .min_size(vec2(180.0, row))
+                .desired_width(160.0)
+                .min_size(vec2(160.0, row))
                 .vertical_align(Align::Center),
         );
         egui::ComboBox::from_id_salt("armory_slot")
@@ -424,11 +453,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                 }
             });
         egui::ComboBox::from_id_salt("armory_quality")
-            .selected_text(
-                f.armory
-                    .quality
-                    .map_or("All qualities", horde_core::quality::Quality::name),
-            )
+            .selected_text(f.armory.quality.map_or_else(
+                || RichText::new("All qualities"),
+                |quality| RichText::new(quality.name()).color(quality_color(quality)),
+            ))
             .show_ui(ui, |ui| {
                 ui.selectable_value(&mut f.armory.quality, None, "All qualities");
                 for quality in horde_core::quality::Quality::ALL {
@@ -452,79 +480,27 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                     ui.selectable_value(&mut f.armory.sort, sort, sort.name());
                 }
             });
+        ui.label(
+            RichText::new(format!(
+                "{} of {} items",
+                indices.len(),
+                f.game.campaign().items.len()
+            ))
+            .color(MUTED),
+        )
+        .on_hover_text("Storage has no item limit.");
     });
-    ui.horizontal_wrapped(|ui| {
-        for quality in horde_core::quality::Quality::ALL {
-            ui.label(
-                RichText::new(quality.name())
-                    .size(12.0)
-                    .color(quality_color(quality)),
-            );
-        }
-    });
-    let query = f.armory.search.trim().to_lowercase();
-    // Definition matching is done once per definition, rather than allocating
-    // lowercase names once per owned instance in an unlimited stash.
-    let matches: Vec<_> = content()
-        .items
-        .iter()
-        .map(|item| {
-            query.is_empty()
-                || item.name.to_lowercase().contains(&query)
-                || item.rarity.to_lowercase().contains(&query)
-        })
-        .collect();
-    let mut indices: Vec<_> = f
-        .game
-        .campaign()
-        .items
-        .iter()
-        .enumerate()
-        .filter(|(_, item)| {
-            matches[item.definition_index()]
-                && f.armory
-                    .slot
-                    .is_none_or(|slot| item.definition().slot == slot)
-                && f.armory.quality.is_none_or(|quality| {
-                    f.game.campaign().item_quality(item.id).ok() == Some(quality)
-                })
-        })
-        .map(|(index, _)| index)
-        .collect();
-    indices.sort_by(|&a, &b| {
-        let a = &f.game.campaign().items[a];
-        let b = &f.game.campaign().items[b];
-        match f.armory.sort {
-            ArmorySort::Newest => b.id.cmp(&a.id),
-            ArmorySort::Name => a
-                .definition()
-                .name
-                .cmp(&b.definition().name)
-                .then(a.id.cmp(&b.id)),
-            ArmorySort::Level => b.level.cmp(&a.level).then(b.id.cmp(&a.id)),
-            ArmorySort::Quality => f
-                .game
-                .campaign()
-                .item_quality(b.id)
-                .expect("owned item")
-                .cmp(&f.game.campaign().item_quality(a.id).expect("owned item"))
-                .then(b.level.cmp(&a.level))
-                .then(b.id.cmp(&a.id)),
-            ArmorySort::Tier => b
-                .definition()
-                .tier
-                .cmp(&a.definition().tier)
-                .then(a.id.cmp(&b.id)),
-        }
-    });
-    muted(
-        ui,
-        format!(
-            "Showing {} of {} items · storage has no item limit",
-            indices.len(),
-            f.game.campaign().items.len()
-        ),
-    );
+    if filters
+        != (
+            f.armory.search.clone(),
+            f.armory.slot,
+            f.armory.quality,
+            f.armory.sort,
+        )
+    {
+        indices = filtered_indices(f);
+    }
+    ui.add_space(4.0);
 
     // Selection is view state only. Never change equipment implicitly.
     if f.armory
@@ -544,11 +520,13 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
     if ui.available_width() >= 920.0 {
         let available = ui.available_width();
         let list_width = available * 0.52;
+        // Beside the comparison, the list may use the page height.
+        let viewport = (ui.clip_rect().bottom() - ui.cursor().top() - 8.0).clamp(150.0, 520.0);
         ui.horizontal_top(|ui| {
             ui.allocate_ui_with_layout(
-                vec2(list_width, 280.0),
+                vec2(list_width, viewport),
                 Layout::top_down(Align::Min),
-                |ui| inventory_list(ui, f, &indices),
+                |ui| inventory_list(ui, f, &indices, viewport),
             );
             ui.separator();
             ui.allocate_ui_with_layout(
@@ -560,7 +538,8 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             );
         });
     } else {
-        inventory_list(ui, f, &indices);
+        let viewport = (ui.clip_rect().height() * 0.46).clamp(150.0, 330.0);
+        inventory_list(ui, f, &indices, viewport);
         if let Some(id) = f.armory.selected_item {
             let name = f
                 .game
@@ -619,8 +598,67 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
 }
 
-fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
-    let viewport = (ui.clip_rect().height() * 0.46).clamp(150.0, 330.0);
+/// Owned item indices matching the armory filters, in the chosen order.
+fn filtered_indices(f: &UiCtx) -> Vec<usize> {
+    let query = f.armory.search.trim().to_lowercase();
+    // Definition matching is done once per definition, rather than allocating
+    // lowercase names once per owned instance in an unlimited stash.
+    let matches: Vec<_> = content()
+        .items
+        .iter()
+        .map(|item| {
+            query.is_empty()
+                || item.name.to_lowercase().contains(&query)
+                || item.rarity.to_lowercase().contains(&query)
+        })
+        .collect();
+    let mut indices: Vec<_> = f
+        .game
+        .campaign()
+        .items
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| {
+            matches[item.definition_index()]
+                && f.armory
+                    .slot
+                    .is_none_or(|slot| item.definition().slot == slot)
+                && f.armory.quality.is_none_or(|quality| {
+                    f.game.campaign().item_quality(item.id).ok() == Some(quality)
+                })
+        })
+        .map(|(index, _)| index)
+        .collect();
+    indices.sort_by(|&a, &b| {
+        let a = &f.game.campaign().items[a];
+        let b = &f.game.campaign().items[b];
+        match f.armory.sort {
+            ArmorySort::Newest => b.id.cmp(&a.id),
+            ArmorySort::Name => a
+                .definition()
+                .name
+                .cmp(&b.definition().name)
+                .then(a.id.cmp(&b.id)),
+            ArmorySort::Level => b.level.cmp(&a.level).then(b.id.cmp(&a.id)),
+            ArmorySort::Quality => f
+                .game
+                .campaign()
+                .item_quality(b.id)
+                .expect("owned item")
+                .cmp(&f.game.campaign().item_quality(a.id).expect("owned item"))
+                .then(b.level.cmp(&a.level))
+                .then(b.id.cmp(&a.id)),
+            ArmorySort::Tier => b
+                .definition()
+                .tier
+                .cmp(&a.definition().tier)
+                .then(a.id.cmp(&b.id)),
+        }
+    });
+    indices
+}
+
+fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize], viewport: f32) {
     egui::ScrollArea::vertical()
         .id_salt("armory")
         .max_height(viewport)
