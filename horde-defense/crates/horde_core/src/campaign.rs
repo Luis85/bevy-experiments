@@ -12,6 +12,7 @@ mod armory;
 mod ledger;
 mod loadout;
 mod progression;
+mod tree_view;
 mod view;
 mod world;
 pub use armory::{Item, Preset};
@@ -22,6 +23,9 @@ pub use loadout::{
 };
 use progression::legacy_training_default;
 pub use progression::{BodyAttribute, NodePayment, Npc, NpcCreation, NpcTraining, Player, Skill};
+pub use tree_view::{
+    NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta,
+};
 pub use view::{NodeStatus, OfferPreview, UpgradeFocus};
 pub use world::Placement;
 

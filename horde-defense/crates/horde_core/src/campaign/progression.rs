@@ -26,6 +26,16 @@ impl BodyAttribute {
     pub fn index(self) -> usize {
         self as usize
     }
+    /// Player-facing attribute name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Vitality => "Vitality",
+            Self::Strength => "Strength",
+            Self::Coordination => "Coordination",
+            Self::Endurance => "Endurance",
+            Self::Perception => "Perception",
+        }
+    }
 }
 
 impl StableKind for BodyAttribute {
@@ -555,7 +565,14 @@ impl Campaign {
                 self.player.legacy_graph_points += points;
             }
         }
-        self.skill_nodes.insert(id.to_owned());
+        self.grant_node(node);
+        Ok(())
+    }
+    /// Record ownership of `node` and mirror its blueprint and structure-rank
+    /// effects into the campaign ledgers. No preflight and no payment: the
+    /// purchase path and read-only previews (on a clone) share this step.
+    pub(super) fn grant_node(&mut self, node: &crate::skill_catalog::SkillNode) {
+        self.skill_nodes.insert(node.id.clone());
         for effect in &node.effects {
             match effect {
                 crate::skill_catalog::SkillEffect::Blueprint(kind) => self.blueprints[*kind] = true,
@@ -565,7 +582,6 @@ impl Campaign {
                 _ => {}
             }
         }
-        Ok(())
     }
     pub fn node_payment(&self, id: &str) -> Result<NodePayment, String> {
         let node = skills().node(id).ok_or("Unknown skill node")?;

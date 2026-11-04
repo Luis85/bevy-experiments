@@ -59,6 +59,11 @@ pub struct Recommendation {
     pub affordable: bool,
 }
 
+/// Personal reload-duration factor from the Coordination rank (2.5% per rank).
+pub(crate) fn coordination_reload_factor(rank: u32) -> f32 {
+    1.0 - 0.025 * rank as f32
+}
+
 pub(crate) fn mean_basic_damage(damage: crate::rules::Damage) -> f32 {
     let minimum = damage.minimum();
     if i32::from(damage.dice) + damage.adds >= minimum {
@@ -197,7 +202,7 @@ impl Campaign {
         if mode == Mode::Personal {
             personal.health += b[0] as i32 * 5;
             personal.melee_damage += b[1] as i32 * 5;
-            personal.reload = (personal.reload * (1.0 - 0.025 * b[2] as f32)).max(0.65);
+            personal.reload = (personal.reload * coordination_reload_factor(b[2])).max(0.65);
             personal.stamina += b[3] as i32 * 5;
             personal.weak_bonus = (personal.weak_bonus + 0.03 * b[4] as f32).min(1.0);
             personal.reload = (personal.reload * modifiers.reload_multiplier).max(0.65);

@@ -59,6 +59,14 @@ impl StructureKind {
     pub fn index(self) -> usize {
         self as usize
     }
+    /// Player-facing structure name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Trap => "Trap",
+            Self::Wall => "Wall",
+            Self::Turret => "Turret",
+        }
+    }
 }
 impl StableKind for StructureKind {
     const ALL: &'static [Self] = &Self::ALL;
