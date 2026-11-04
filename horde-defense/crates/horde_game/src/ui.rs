@@ -30,7 +30,7 @@ mod startup;
 mod test_support;
 #[cfg(test)]
 mod tests;
-pub use startup::{ProfilePaths, StartupConfig};
+pub use startup::ProfilePaths;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -116,18 +116,18 @@ pub struct Frontend {
     custom_cursor_requested: bool,
     last_control_frame: u64,
     last_toggle_frame: u64,
+    launch: crate::launch::LaunchConfig,
 }
 impl Frontend {
-    /// Production startup: reads the environment and the save, then applies review scenarios.
-    pub fn load() -> Self {
-        let config = StartupConfig::from_env();
-        let paths = ProfilePaths::from_env(&config);
+    /// Production startup: reads the save, then applies review scenarios.
+    pub fn load(config: &crate::launch::LaunchConfig) -> Self {
+        let paths = ProfilePaths::from_config(config);
         let profile = LoadedProfile::load(&paths);
         let resumed_practice = config.practice
             && (profile.game.campaign.selected_survivor.is_some()
                 || profile.game.campaign.attempts > 0
                 || profile.game.campaign.world.start.is_some());
-        let mut f = Self::new(profile, &config, &paths);
+        let mut f = Self::new(profile, config, &paths);
         if !resumed_practice {
             review::prepare(&mut f);
         } else {
@@ -137,11 +137,11 @@ impl Frontend {
             &mut f,
             config.scenario.is_some(),
             config.practice,
-            config.review_reduced,
+            config.review().is_some_and(|r| r.reduced),
         );
         // Explicit automated-motion fixtures use a separate temporary profile.
         // This changes startup state only; fixed systems still own every tick.
-        if config.scenario.is_some() && !config.practice && config.review_motion {
+        if config.scenario.is_some() && !config.practice && config.motion_review() {
             f.game.set_paused(false);
             f.construction = false;
             f.message = "Live motion review · progress is isolated from your campaign".into();
@@ -149,7 +149,11 @@ impl Frontend {
         f
     }
     /// Pure construction: touches no files and no environment variables.
-    pub fn new(profile: LoadedProfile, config: &StartupConfig, paths: &ProfilePaths) -> Self {
+    pub fn new(
+        profile: LoadedProfile,
+        config: &crate::launch::LaunchConfig,
+        paths: &ProfilePaths,
+    ) -> Self {
         let profile_exists = profile.game.campaign.selected_survivor.is_some()
             || profile.game.campaign.attempts > 0
             || profile.game.campaign.world.start.is_some();
@@ -237,6 +241,7 @@ impl Frontend {
             custom_cursor_requested: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,
+            launch: config.clone(),
         }
     }
     pub fn ambience_target(&self) -> crate::atmosphere_audio::SceneAudioTarget {

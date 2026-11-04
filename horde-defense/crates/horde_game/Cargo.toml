@@ -15,4 +15,12 @@ bevy_egui = "=0.43.1"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
-
+[features]
+default = ["review"]
+# Isolated review tooling: model workshop, review fixtures and screens, capture
+# sequence, automated screenshots and performance reports. Playtest packages
+# build without it (`--no-default-features`).
+review = []
+# Developer conveniences: Bevy dev tools, asset hot reload, change-location
+# tracking and system information diagnostics.
+dev = ["bevy/file_watcher", "bevy/track_location", "bevy/sysinfo_plugin"]

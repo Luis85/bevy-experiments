@@ -23,10 +23,6 @@ const LOG_SUFFIX: &str = ".log";
 /// Number of `lastlight-*.log` files kept, including the current run.
 const KEEP_LOGS: usize = 10;
 
-pub fn log_directory() -> PathBuf {
-    crate::settings::save_directory().join("logs")
-}
-
 fn unix_seconds() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -35,8 +31,12 @@ fn unix_seconds() -> u64 {
 
 /// `LogPlugin::custom_layer`: a plain-text file layer, or `None` (console only)
 /// when the log file cannot be created.
-pub fn file_layer(_app: &mut App) -> Option<BoxedLayer> {
-    let directory = log_directory();
+/// The directory comes from the `LaunchConfig` resource `main` inserts first.
+pub fn file_layer(app: &mut App) -> Option<BoxedLayer> {
+    let directory = app
+        .world()
+        .get_resource::<crate::launch::LaunchConfig>()?
+        .log_directory();
     let file = match open_log_file(&directory, unix_seconds()) {
         Ok(file) => file,
         Err(error) => {
@@ -88,7 +88,7 @@ fn prune_logs(directory: &Path, keep: usize) {
 
 /// Installs a panic hook that writes `crash-<unix-ts>.txt` and logs at `error`,
 /// then chains the previously installed (default) hook.
-pub fn install_panic_hook() {
+pub fn install_panic_hook(directory: PathBuf) {
     let previous = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         let report = crash_report(
@@ -96,7 +96,6 @@ pub fn install_panic_hook() {
             &std::backtrace::Backtrace::force_capture().to_string(),
         );
         error!("{report}");
-        let directory = log_directory();
         let path = directory.join(format!("crash-{}.txt", unix_seconds()));
         if std::fs::create_dir_all(&directory)
             .and_then(|()| std::fs::write(&path, &report))

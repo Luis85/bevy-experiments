@@ -60,12 +60,11 @@ impl Frontend {
     /// Capture-service timing bridge. Only explicit isolated gesture exports
     /// can enqueue these ordinary controls; fixed runtime/core owns all effects.
     pub(crate) fn schedule_gesture_review(&mut self, frame: u32) {
-        let scene = crate::environment::string("LASTLIGHT_REVIEW_SCREEN");
         let Some(kind) = gesture_fixture(
-            scene.as_deref(),
-            crate::environment::flag("LASTLIGHT_REVIEW_MOTION"),
-            crate::environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_some(),
-            crate::environment::flag("LASTLIGHT_PRACTICE"),
+            self.launch.scenario.as_deref(),
+            self.launch.motion_review(),
+            self.launch.sequence_path().is_some(),
+            self.launch.practice,
         ) else {
             return;
         };
@@ -119,34 +118,34 @@ fn select_loot_capture_mode(
         LootCaptureMode::Disabled
     }
 }
-pub(super) fn reticle_capture_preview() -> bool {
-    matches!(
-        crate::environment::string("LASTLIGHT_REVIEW_SCREEN").as_deref(),
-        Some("reticle-reload" | "damage" | "damage-4x")
-    ) && !crate::environment::flag("LASTLIGHT_PRACTICE")
-        && (crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some()
-            || (crate::environment::flag("LASTLIGHT_REVIEW_MOTION")
-                && crate::environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_some()))
-}
-pub(super) fn damage_capture_mode() -> LootCaptureMode {
-    let scene = crate::environment::string("LASTLIGHT_REVIEW_SCREEN");
-    let allowed = matches!(scene.as_deref(), Some("damage" | "damage-4x"));
-    select_loot_capture_mode(
-        if allowed { Some("quality-loot") } else { None },
-        crate::environment::flag("LASTLIGHT_REVIEW_MOTION"),
-        crate::environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_some(),
-        crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some(),
-        crate::environment::flag("LASTLIGHT_PRACTICE"),
-    )
-}
-pub(super) fn loot_capture_mode() -> LootCaptureMode {
-    select_loot_capture_mode(
-        crate::environment::string("LASTLIGHT_REVIEW_SCREEN").as_deref(),
-        crate::environment::flag("LASTLIGHT_REVIEW_MOTION"),
-        crate::environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_some(),
-        crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some(),
-        crate::environment::flag("LASTLIGHT_PRACTICE"),
-    )
+impl crate::launch::LaunchConfig {
+    pub(super) fn reticle_capture_preview(&self) -> bool {
+        matches!(
+            self.scenario.as_deref(),
+            Some("reticle-reload" | "damage" | "damage-4x")
+        ) && !self.practice
+            && (self.capture_path().is_some()
+                || (self.motion_review() && self.sequence_path().is_some()))
+    }
+    pub(super) fn damage_capture_mode(&self) -> LootCaptureMode {
+        let allowed = matches!(self.scenario.as_deref(), Some("damage" | "damage-4x"));
+        select_loot_capture_mode(
+            if allowed { Some("quality-loot") } else { None },
+            self.motion_review(),
+            self.sequence_path().is_some(),
+            self.capture_path().is_some(),
+            self.practice,
+        )
+    }
+    pub(super) fn loot_capture_mode(&self) -> LootCaptureMode {
+        select_loot_capture_mode(
+            self.scenario.as_deref(),
+            self.motion_review(),
+            self.sequence_path().is_some(),
+            self.capture_path().is_some(),
+            self.practice,
+        )
+    }
 }
 
 /// Review-only presentation override. Persistent and ordinary profiles keep
@@ -163,7 +162,7 @@ pub(super) fn apply_reduced_override(
 }
 
 pub(super) fn model_workshop(root: &mut egui::Ui, f: &Frontend) -> bool {
-    let scene = crate::environment::string("LASTLIGHT_REVIEW_SCREEN");
+    let scene = f.launch.scenario.clone();
     if let Some(id) = scene
         .as_deref()
         .and_then(|scene| scene.strip_prefix("model-parity-"))
@@ -182,14 +181,14 @@ pub(super) fn model_workshop(root: &mut egui::Ui, f: &Frontend) -> bool {
         .as_deref()
         .and_then(|scene| scene.strip_prefix("model-matrix-"))
     {
-        model_matrix(root, id);
+        model_matrix(root, &f.launch, id);
         return true;
     }
     if let Some(id) = scene
         .as_deref()
         .and_then(|scene| scene.strip_prefix("model-repairs-"))
     {
-        model_repairs(root, id);
+        model_repairs(root, &f.launch, id);
         return true;
     }
     if !matches!(
@@ -198,13 +197,10 @@ pub(super) fn model_workshop(root: &mut egui::Ui, f: &Frontend) -> bool {
     ) {
         return false;
     }
+    let launch = &f.launch;
+    assert!(!launch.practice, "Model workshop is isolated review only");
     assert!(
-        !crate::environment::flag("LASTLIGHT_PRACTICE"),
-        "Model workshop is isolated review only"
-    );
-    assert!(
-        crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some()
-            || crate::environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_some(),
+        launch.capture_path().is_some() || launch.sequence_path().is_some(),
         "Model workshop requires explicit capture output"
     );
     egui::CentralPanel::default()
@@ -257,12 +253,10 @@ pub(super) fn parity_layout(ctx: &egui::Context) -> Option<NativeParityLayout> {
 }
 
 fn model_parity(root: &egui::Ui, f: &Frontend, id: &str) {
+    let launch = &f.launch;
+    assert!(!launch.practice, "Model parity is isolated review only");
     assert!(
-        !crate::environment::flag("LASTLIGHT_PRACTICE"),
-        "Model parity is isolated review only"
-    );
-    assert!(
-        crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some(),
+        launch.capture_path().is_some(),
         "Model parity requires an explicit native screenshot"
     );
     let ctx = root.ctx();
@@ -442,12 +436,10 @@ fn paint_model_parity(
 /// Human semantic inspection complements whole-image parity: every thumbnail
 /// is the production packet renderer with exactly one actual part selected.
 fn model_parts(root: &egui::Ui, f: &Frontend, id: &str) {
+    let launch = &f.launch;
+    assert!(!launch.practice, "Model parts are isolated review only");
     assert!(
-        !crate::environment::flag("LASTLIGHT_PRACTICE"),
-        "Model parts are isolated review only"
-    );
-    assert!(
-        crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some(),
+        launch.capture_path().is_some(),
         "Model parts require explicit native capture"
     );
     let painter = root.ctx().layer_painter(egui::LayerId::new(
@@ -798,13 +790,10 @@ fn model_matrix_cases() -> Result<Vec<ModelMatrixCase>, String> {
     Ok(cases)
 }
 
-fn model_matrix(root: &egui::Ui, id: &str) {
+fn model_matrix(root: &egui::Ui, launch: &crate::launch::LaunchConfig, id: &str) {
+    assert!(!launch.practice, "Model matrix is isolated review only");
     assert!(
-        !crate::environment::flag("LASTLIGHT_PRACTICE"),
-        "Model matrix is isolated review only"
-    );
-    assert!(
-        crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some(),
+        launch.capture_path().is_some(),
         "Model matrix requires explicit native capture"
     );
     let ctx = root.ctx();
@@ -1015,13 +1004,10 @@ fn project_review_pose(
     out
 }
 
-fn model_repairs(root: &egui::Ui, id: &str) {
+fn model_repairs(root: &egui::Ui, launch: &crate::launch::LaunchConfig, id: &str) {
+    assert!(!launch.practice, "Repair isolation is diagnostic only");
     assert!(
-        !crate::environment::flag("LASTLIGHT_PRACTICE"),
-        "Repair isolation is diagnostic only"
-    );
-    assert!(
-        crate::environment::path("LASTLIGHT_REVIEW_CAPTURE").is_some(),
+        launch.capture_path().is_some(),
         "Repair isolation requires explicit native capture"
     );
     let ctx = root.ctx();
@@ -1228,7 +1214,8 @@ fn paint_model_repairs(
 }
 
 pub(super) fn prepare(f: &mut Frontend) {
-    let Some(screen) = crate::environment::string("LASTLIGHT_REVIEW_SCREEN") else {
+    let launch = f.launch.clone();
+    let Some(screen) = launch.scenario.clone() else {
         return;
     };
     if screen == "npc-stutter" {
@@ -1236,11 +1223,11 @@ pub(super) fn prepare(f: &mut Frontend) {
         return;
     }
     f.game = Game::default();
-    if !crate::environment::flag("LASTLIGHT_PRACTICE") {
+    if !launch.practice {
         f.settings.master = 0.0;
     }
-    if let Ok(scale) = std::env::var("LASTLIGHT_REVIEW_SCALE") {
-        f.settings.scale = scale.parse().unwrap_or(1.0);
+    if let Some(scale) = launch.review().and_then(|r| r.scale) {
+        f.settings.scale = scale;
     }
     f.message = "Practice scenario - progress is isolated from your campaign".into();
     if screen == "menu" {
@@ -1380,9 +1367,9 @@ pub(super) fn prepare(f: &mut Frontend) {
             assert!(
                 gesture_fixture(
                     Some(&screen),
-                    crate::environment::flag("LASTLIGHT_REVIEW_MOTION"),
-                    crate::environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_some(),
-                    crate::environment::flag("LASTLIGHT_PRACTICE")
+                    launch.motion_review(),
+                    launch.sequence_path().is_some(),
+                    launch.practice
                 )
                 .is_some(),
                 "Gesture fixtures require isolated motion+sequence opt-ins"
@@ -1557,11 +1544,14 @@ pub(super) fn prepare(f: &mut Frontend) {
 }
 /// Strict opt-in copied checkpoint; production and source files are never targets.
 fn prepare_copied_npc(f: &mut Frontend) {
+    let launch = f.launch.clone();
     assert!(
-        !crate::environment::flag("LASTLIGHT_PRACTICE"),
+        !launch.practice,
         "npc-stutter requires isolated non-practice review"
     );
-    let input = crate::environment::path("LASTLIGHT_REVIEW_INPUT_SAVE")
+    let input = launch
+        .review()
+        .and_then(|r| r.input_save.clone())
         .expect("npc-stutter requires LASTLIGHT_REVIEW_INPUT_SAVE copied generation");
     let canonical = input
         .canonicalize()
@@ -1595,26 +1585,16 @@ fn prepare_copied_npc(f: &mut Frontend) {
         "Copied checkpoint must contain the active NPC battle"
     );
     f.settings = Settings::load(&copied_settings);
-    if !(crate::environment::flag("LASTLIGHT_PERF_AUDIO")
-        && crate::environment::path("LASTLIGHT_PERF_REPORT").is_some())
-    {
+    if !launch.perf().is_some_and(|perf| perf.audio) {
         f.settings.master = 0.0;
     }
-    if let Some(scale) =
-        crate::environment::string("LASTLIGHT_REVIEW_SCALE").and_then(|s| s.parse().ok())
-    {
+    if let Some(scale) = launch.review().and_then(|r| r.scale) {
         f.settings.scale = scale;
     }
     f.game.set_paused(false);
     f.mode = Mode::Npc;
     f.screen = Screen::Battle;
-    f.speed = crate::environment::string("LASTLIGHT_PERF_NPC_SPEED")
-        .map(|value| {
-            value
-                .parse::<u32>()
-                .expect("NPC diagnostic speed must be1,2or4")
-        })
-        .unwrap_or(1);
+    f.speed = launch.review().and_then(|r| r.perf.npc_speed).unwrap_or(1);
     assert!(
         matches!(f.speed, 1 | 2 | 4),
         "NPC diagnostic speed must be1,2or4"

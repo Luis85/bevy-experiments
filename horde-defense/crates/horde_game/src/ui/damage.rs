@@ -170,8 +170,8 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut Frontend) {
                 .with_effects_clip(f.effects_rect.unwrap_or(arena)),
             0,
             &mut f.damage_feedback,
-            f.settings.numbers,
-            f.settings.reduced_effects,
+            &f.settings,
+            f.launch.damage_capture_mode(),
         );
     }
 }
@@ -181,10 +181,10 @@ pub(super) fn draw_for(
     arena: art::ArenaProjection,
     battle: u64,
     state: &mut Feedback,
-    enabled: bool,
-    reduced: bool,
+    settings: &Settings,
+    mode: review::LootCaptureMode,
 ) {
-    let mode = review::damage_capture_mode();
+    let (enabled, reduced) = (settings.numbers, settings.reduced_effects);
     let frame = ui.ctx().cumulative_frame_nr();
     let replay = battle == 0
         && mode != review::LootCaptureMode::Disabled

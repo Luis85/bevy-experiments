@@ -1,6 +1,7 @@
-//! Hermetic `Frontend` construction for tests: no environment variables, no
-//! real save directory, no filesystem reads.
-use super::{Frontend, ProfilePaths, StartupConfig};
+//! Hermetic `Frontend` construction for tests: a default `LaunchConfig` (no
+//! process environment), no real save directory, no filesystem reads.
+use super::{Frontend, ProfilePaths};
+use crate::launch::LaunchConfig;
 use crate::{runner::LoadedProfile, settings::Settings};
 use horde_core::sim::Game;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -23,7 +24,7 @@ pub(super) fn test_frontend() -> Frontend {
         settings: Settings::default(),
         warning: String::new(),
     };
-    Frontend::new(profile, &StartupConfig::default(), &paths)
+    Frontend::new(profile, &LaunchConfig::default(), &paths)
 }
 
 #[test]

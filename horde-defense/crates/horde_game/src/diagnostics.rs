@@ -3,10 +3,7 @@ use bevy::{app::AppExit, prelude::*, render::renderer::RenderAdapterInfo};
 use serde::Serialize;
 use std::{
     path::PathBuf,
-    sync::{
-        OnceLock,
-        atomic::{AtomicU64, Ordering},
-    },
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Instant,
 };
 
@@ -17,7 +14,11 @@ pub enum WorkPhase {
     Interface,
 }
 static WORK_NS: [AtomicU64; 3] = [const { AtomicU64::new(0) }; 3];
-static MEASURE_WORK: OnceLock<bool> = OnceLock::new();
+static MEASURE_WORK: AtomicBool = AtomicBool::new(false);
+/// Set once by `main` from `LaunchConfig`: only performance reports time work.
+pub fn enable_work_timing(enabled: bool) {
+    MEASURE_WORK.store(enabled, Ordering::Relaxed);
+}
 pub struct WorkTimer {
     phase: usize,
     start: Instant,
@@ -30,30 +31,14 @@ impl Drop for WorkTimer {
 }
 /// Opt-in aggregate work costs. No timer, allocation or filesystem IO in normal play.
 pub fn work_timer(phase: WorkPhase) -> Option<WorkTimer> {
-    (*MEASURE_WORK.get_or_init(|| crate::environment::path("LASTLIGHT_PERF_REPORT").is_some()))
-        .then(|| WorkTimer {
-            phase: phase as usize,
-            start: Instant::now(),
-        })
+    MEASURE_WORK.load(Ordering::Relaxed).then(|| WorkTimer {
+        phase: phase as usize,
+        start: Instant::now(),
+    })
 }
 fn take_work() -> [f64; 3] {
     std::array::from_fn(|i| WORK_NS[i].swap(0, Ordering::Relaxed) as f64 / 1_000_000.)
 }
-fn bounded_count(value: Option<&str>, default: u32, min: u32, max: u32) -> u32 {
-    let Some(raw) = value else {
-        return default;
-    };
-    match raw.parse::<u32>() {
-        Ok(v) if (min..=max).contains(&v) => v,
-        _ => {
-            warn!(
-                "Ignoring out-of-range diagnostic count {raw:?} (allowed {min}..={max}); using {default}"
-            );
-            default
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct FrameCapture {
     initialized: bool,
@@ -142,26 +127,17 @@ pub fn capture_performance(
     mut frontend: ResMut<crate::ui::Frontend>,
     window: Single<&Window>,
     adapter: Option<Res<RenderAdapterInfo>>,
+    config: Res<crate::launch::LaunchConfig>,
     mut exit: MessageWriter<AppExit>,
 ) {
     if !state.initialized {
         state.initialized = true;
-        state.path = crate::environment::path("LASTLIGHT_PERF_REPORT");
-        state.warmup = bounded_count(
-            std::env::var("LASTLIGHT_PERF_WARMUP_FRAMES")
-                .ok()
-                .as_deref(),
-            90,
-            0,
-            600,
-        );
-        state.target_samples = bounded_count(
-            std::env::var("LASTLIGHT_PERF_FRAMES").ok().as_deref(),
-            300,
-            300,
-            3600,
-        );
-        state.active_only = crate::environment::flag("LASTLIGHT_PERF_ACTIVE_ONLY");
+        if let Some(perf) = config.perf() {
+            state.path = perf.report.clone();
+            state.warmup = perf.warmup_frames;
+            state.target_samples = perf.frames;
+            state.active_only = perf.active_only;
+        }
     }
     if state.path.is_none() || state.done {
         return;
@@ -218,10 +194,15 @@ pub fn capture_performance(
     let work_max_ms = std::array::from_fn(|i| state.work.iter().map(|w| w[i]).fold(0., f64::max));
     let report = FrameReport {
         version: 2,
-        scene: std::env::var("LASTLIGHT_REVIEW_SCREEN")
-            .unwrap_or_else(|_| "ordinary-session".into()),
+        scene: config
+            .scenario
+            .clone()
+            .unwrap_or_else(|| "ordinary-session".into()),
         scope: "Observed native application frame intervals including VSync and OS scheduling; not GPU timestamps or a minimum-spec guarantee",
-        cpu: std::env::var("LASTLIGHT_PERF_CPU").unwrap_or_else(|_| "not recorded".into()),
+        cpu: config
+            .perf()
+            .and_then(|perf| perf.cpu.clone())
+            .unwrap_or_else(|| "not recorded".into()),
         adapter: adapter
             .as_ref()
             .map_or_else(|| "not reported".into(), |a| a.name.clone()),
@@ -231,10 +212,7 @@ pub fn capture_performance(
         width_physical: window.resolution.physical_width(),
         height_physical: window.resolution.physical_height(),
         windows_scale: f64::from(window.resolution.scale_factor()),
-        ui_scale: std::env::var("LASTLIGHT_REVIEW_SCALE")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(1.),
+        ui_scale: config.review().and_then(|r| r.scale).unwrap_or(1.),
         warmup_frames: state.warmup,
         sample_frames: sorted.len(),
         requested_sample_frames: state.target_samples,
@@ -306,14 +284,5 @@ mod tests {
         assert_eq!(quantile(&data, 0.95), 100.);
         assert_eq!(quantile(&data, 0.99), 100.);
         assert_eq!(quantile(&[], 0.95), 0.);
-    }
-    #[test]
-    fn diagnostic_sample_budget_is_bounded_without_silently_shortening_measurements() {
-        assert_eq!(bounded_count(None, 300, 300, 3600), 300);
-        assert_eq!(bounded_count(Some("1800"), 300, 300, 3600), 1800);
-        for bad in ["299", "3601", "-1", "NaN", "999999999999"] {
-            assert_eq!(bounded_count(Some(bad), 300, 300, 3600), 300);
-        }
-        assert_eq!(bounded_count(Some("0"), 90, 0, 600), 0);
     }
 }

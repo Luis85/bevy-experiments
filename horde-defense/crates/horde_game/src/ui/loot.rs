@@ -135,7 +135,16 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut Frontend) {
     };
     let projection = art::ArenaProjection::for_attempt(arena, attempt)
         .with_effects_clip(f.effects_rect.unwrap_or(arena));
-    if draw_for(ui, projection, attempt, 0, f.textures, &mut f.loot_feedback) {
+    let capture = f.launch.loot_capture_mode();
+    if draw_for(
+        ui,
+        projection,
+        attempt,
+        0,
+        f.textures,
+        &mut f.loot_feedback,
+        capture,
+    ) {
         f.runtime.notify_rare_loot();
     }
 }
@@ -146,6 +155,7 @@ pub(super) fn draw_for(
     battle: u64,
     textures: crate::visual_assets::ArtTextures,
     state: &mut Feedback,
+    capture: review::LootCaptureMode,
 ) -> bool {
     let ready = textures.actors.is_some()
         && textures.props.is_some()
@@ -159,7 +169,7 @@ pub(super) fn draw_for(
         battle,
         ui.input(|i| i.time),
         ui.ctx().cumulative_frame_nr(),
-        review::loot_capture_mode(),
+        capture,
         ready,
     );
     let painter = ui.painter_at(projection.effects_clip);

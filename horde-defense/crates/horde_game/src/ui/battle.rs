@@ -225,7 +225,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut Frontend) {
             );
             f.arena_rect = Some(r);
             f.arena_hover = response.hovered();
-            let diagnostic_reticle = review::reticle_capture_preview();
+            let diagnostic_reticle = f.launch.reticle_capture_preview();
             if diagnostic_reticle {
                 f.aim = preview_aim(arena);
             } else if let Some(pointer) = response.hover_pos() {
@@ -400,10 +400,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut Frontend) {
                         let mut popup = egui::Popup::menu(&response)
                             .width(300.0)
                             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
-                        if crate::environment::string("LASTLIGHT_REVIEW_SCREEN").as_deref()
-                            == Some("npc-expanded")
-                            && !crate::environment::flag("LASTLIGHT_PRACTICE")
-                        {
+                        if f.launch.reviewing("npc-expanded") {
                             popup = popup.open(true);
                         }
                         popup.show(|ui| {
@@ -416,6 +413,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut Frontend) {
                                     crate::inspector::npc_decision(
                                         ui,
                                         f.game.attempt.as_ref().unwrap(),
+                                        f.launch.reviewing("npc-expanded"),
                                     );
                                     policy(ui, f);
                                 });

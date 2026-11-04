@@ -188,7 +188,8 @@ pub fn dossier(ui: &mut egui::Ui, attempt: &Attempt, aim: [f32; 2]) {
         }
     }
 }
-pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt) {
+/// `expanded` opens the latest resolution (the `npc-expanded` review fixture).
+pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt, expanded: bool) {
     if attempt.mode != Mode::Npc {
         return;
     }
@@ -206,11 +207,7 @@ pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt) {
     }
     if let Some(line) = attempt.latest_resolution.as_deref() {
         egui::CollapsingHeader::new("Latest resolution")
-            .default_open(
-                crate::environment::string("LASTLIGHT_REVIEW_SCREEN").as_deref()
-                    == Some("npc-expanded")
-                    && !crate::environment::flag("LASTLIGHT_PRACTICE"),
-            )
+            .default_open(expanded)
             .show(ui, |ui| {
                 ui.label(RichText::new(line).size(12.0));
                 ui.colored_label(
