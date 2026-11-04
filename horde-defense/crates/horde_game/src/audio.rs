@@ -30,11 +30,32 @@ pub enum Cue {
     Structure,
     Trap,
     Incoming,
+    // Presentation cues that reuse a synthesized family's bank (see `bank`).
+    // They come last so the synthesized families keep their seeds.
+    /// An enemy died.
+    Kill,
+    /// Attempt-finished stingers. A withdrawal plays `Retreat`.
+    Victory,
+    Defeat,
+    /// A purchase, training or equip command succeeded.
+    Confirm,
 }
-const CUE_COUNT: usize = 24;
+const CUE_COUNT: usize = 28;
 impl Cue {
+    /// The synthesized family whose WAV variants this cue plays. Alias cues
+    /// differ from their bank only in priority, gain and repeat gating.
+    pub fn bank(self) -> Self {
+        match self {
+            Self::Kill => Self::Impact,
+            Self::Victory => Self::Wave,
+            Self::Defeat => Self::Structure,
+            Self::Confirm => Self::Ready,
+            cue => cue,
+        }
+    }
     fn name(self) -> &'static str {
         match self {
+            Self::Kill | Self::Victory | Self::Defeat | Self::Confirm => self.bank().name(),
             Self::Pistol => "pistol",
             Self::Smg => "smg",
             Self::Shotgun => "shotgun",
@@ -66,10 +87,13 @@ impl Cue {
         let gain = match self {
             Self::Explosion | Self::Boss | Self::Shotgun => 1.0,
             Self::Pistol | Self::Rifle | Self::Marksman | Self::MachineGun => 0.9,
+            Self::Victory | Self::Defeat => 0.8,
             Self::Smg | Self::NpcShot | Self::Damage | Self::Structure | Self::Trap => 0.75,
             Self::TurretShot | Self::Melee | Self::Molotov | Self::Retreat | Self::Wave => 0.65,
             Self::Impact | Self::Reload | Self::Throw => 0.55,
-            Self::Armor | Self::Ready => 0.45,
+            // Quieter than a hit: a horde's kills must not mask the guns.
+            Self::Kill => 0.5,
+            Self::Armor | Self::Ready | Self::Confirm => 0.45,
             Self::Fire | Self::Incoming => 0.3,
         };
         gain * if reduced { 0.65 } else { 1.0 }
@@ -86,7 +110,9 @@ impl Cue {
             Self::Reload | Self::Throw | Self::Explosion | Self::Molotov | Self::Melee => 180,
             Self::Fire => 850,
             Self::Retreat => 1500,
-            Self::Boss => 3000,
+            Self::Boss | Self::Victory | Self::Defeat => 3000,
+            Self::Kill => 160,
+            Self::Confirm => 250,
             Self::Wave => 1800,
             Self::Damage => 240,
             Self::Ready => 400,
@@ -210,6 +236,7 @@ mod synthesis {
             Cue::Ready => 0.34,
             Cue::Structure => 1.2,
             Cue::Incoming => 0.3,
+            Cue::Kill | Cue::Victory | Cue::Defeat | Cue::Confirm => duration(cue.bank()),
         }
     }
     fn gun(cue: Cue, t: f32, noise: [f32; 3], shift: f32) -> f32 {
@@ -357,6 +384,9 @@ mod synthesis {
                     knock(t, 0.015, mid, 710.0 * shift, 0.01) * 0.5
                         + knock(t, 0.075, mid, 1020.0 * shift, 0.008) * 0.35
                 }
+                Cue::Kill | Cue::Victory | Cue::Defeat | Cue::Confirm => {
+                    unreachable!("alias cues play their bank's files and are never synthesized")
+                }
                 Cue::Structure => [0.001, 0.14, 0.29, 0.51]
                     .into_iter()
                     .enumerate()
@@ -480,6 +510,37 @@ mod tests {
             variant_path(Cue::Explosion, 7),
             "audio/survival_explosion_1.wav"
         );
+    }
+    #[test]
+    fn alias_cues_play_existing_synthesized_banks() {
+        let assets = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../assets");
+        for (alias, bank) in [
+            (Cue::Kill, Cue::Impact),
+            (Cue::Victory, Cue::Wave),
+            (Cue::Defeat, Cue::Structure),
+            (Cue::Confirm, Cue::Ready),
+        ] {
+            assert_eq!(alias.bank(), bank);
+            assert!(
+                !ALL.contains(&alias),
+                "{alias:?} must not be re-synthesized"
+            );
+            assert!(ALL.contains(&bank));
+            for variant in 0..3 {
+                let path = variant_path(alias, variant);
+                assert_eq!(path, variant_path(bank, variant));
+                assert!(assets.join(&path).is_file(), "missing {path}");
+            }
+            assert!(alias.gain(true) < alias.gain(false));
+        }
+        assert!(Cue::Kill.gain(false) < Cue::Impact.gain(false));
+        // A horde's kills are rate limited like other repeated feedback.
+        let mut gate = CueGate::default();
+        assert!(gate.accept(Cue::Kill, 0, false));
+        assert!(!gate.accept(Cue::Kill, 100, false));
+        assert!(gate.accept(Cue::Impact, 100, false));
+        assert!(gate.accept(Cue::Kill, 160, false));
+        assert!(gate.accept(Cue::Confirm, 160, false));
     }
     #[test]
     #[ignore = "Offline asset authoring: explicitly set LASTLIGHT_AUDIO_EXPORT to workspace root"]

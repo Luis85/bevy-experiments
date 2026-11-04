@@ -20,6 +20,17 @@ Listen to [the audition reel](audio/survival-audition.wav). Its [CSV timeline](a
 | Retreat / wave / incoming | Short radio squelch and relay clicks |
 | Boss / structure | Low industrial warning / layered physical collapse |
 
+Four presentation cues reuse a synthesized family's files instead of adding new ones. They differ from their bank only in mixer priority, gain and repeat gate, and the exporter never synthesizes them:
+
+| Cue | Bank | Trigger | Mix |
+| --- | --- | --- | --- |
+| Kill | Impact | An enemy dies (`SimEvent::Kill`) | Gain 0.5, below a hit; gated to one per 160 ms; replaces that update's impact |
+| Victory | Wave | `AttemptFinished` with a victory | Top priority, gain 0.8; replaces that update's wave call |
+| Defeat | Structure | `AttemptFinished` with a defeat | Top priority, gain 0.8; replaces that update's collapse |
+| Confirm | Ready | A successful skill-node, item, training, recruit or equip command | Gain 0.45; gated to one per 250 ms |
+
+A withdrawal plays the existing Retreat cue once, from its `AttemptFinished` event. A `Withdraw` command drains that event immediately because it pauses the game.
+
 `crates/horde_game/src/audio.rs` defines timbre metadata and the offline synthesizer. It contains no simulation calls. Weapon selection and resolved events choose cues; procedural variations use presentation counters and their own fixed seeds. They never consume combat randomness, determine hits or pay rewards.
 
 The mixer caps effects at six concurrent voices and selects at most two new cues per update. Real-time per-cue gates suppress repeated damage/arrival/fire feedback when many simulation ticks advance together. Important warnings retain their existing visual equivalents. Pending and playing voices follow master/effects changes, including immediate mute; reduced effects lowers individual gains and increases minimum repeat intervals. The existing separate ambience bus continues to crossfade the six scene/biome/weather layers, including quieter menu and paused contexts.

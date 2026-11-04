@@ -113,6 +113,110 @@ fn melee_readiness_event_plays_the_ready_cue() {
     assert!(host.cues.contains(&SoundCue::Ready));
 }
 #[test]
+fn kill_and_attempt_finished_events_map_to_their_cues() {
+    use horde_core::sim::{Outcome, SimEvent};
+    let mut cues = Vec::new();
+    event_sound(
+        &mut cues,
+        &SimEvent::Kill {
+            enemy_id: 3,
+            lane: Some(1),
+            at: [4.0, 5.0],
+            coins: 18,
+        },
+    );
+    assert_eq!(cues, vec![SoundCue::Kill]);
+    for (outcome, cue) in [
+        (Outcome::Victory, SoundCue::Victory),
+        (Outcome::Defeat, SoundCue::Defeat),
+        (Outcome::Withdrawal, SoundCue::Retreat),
+    ] {
+        cues.clear();
+        event_sound(
+            &mut cues,
+            &SimEvent::AttemptFinished {
+                attempt_id: 1,
+                outcome,
+                mode: Mode::Personal,
+                cause: String::new(),
+            },
+        );
+        assert_eq!(cues, vec![cue]);
+    }
+}
+#[test]
+fn boss_kill_on_the_finishing_tick_plays_kill_and_victory() {
+    let mut host = Host::new();
+    host.deploy();
+    let mut attempt = host.game.attempt.take().unwrap();
+    attempt.boss_spawned = true;
+    host.game
+        .spawn_enemy(&mut attempt, horde_core::content::EnemyKind::Brute, 5, true);
+    attempt.enemies.last_mut().unwrap().hp = 0;
+    host.game.attempt = Some(attempt);
+    host.runtime.publish(ControlFrame {
+        enabled: true,
+        ..ControlFrame::default()
+    });
+    step(&mut host.ctx());
+    assert!(host.game.attempt.is_none());
+    assert!(host.cues.contains(&SoundCue::Kill), "{:?}", host.cues);
+    assert!(host.cues.contains(&SoundCue::Victory), "{:?}", host.cues);
+    assert!(!host.cues.contains(&SoundCue::Defeat));
+}
+#[test]
+fn overrun_on_the_finishing_tick_plays_the_defeat_stinger() {
+    let mut host = Host::new();
+    host.deploy();
+    host.game.attempt.as_mut().unwrap().hp = 0;
+    host.runtime.publish(ControlFrame {
+        enabled: true,
+        ..ControlFrame::default()
+    });
+    step(&mut host.ctx());
+    assert!(host.game.attempt.is_none());
+    assert!(host.cues.contains(&SoundCue::Defeat), "{:?}", host.cues);
+    assert!(!host.cues.contains(&SoundCue::Victory));
+}
+#[test]
+fn withdrawal_plays_retreat_once_without_waiting_for_a_tick() {
+    let mut host = Host::new();
+    host.deploy();
+    host.runtime.begin_frame(1);
+    assert!(host.runtime.enqueue(Command::Withdraw, "Recalled"));
+    flush_for_test(&mut host.ctx());
+    assert!(host.game.attempt.is_none());
+    assert_eq!(host.cues, vec![SoundCue::Retreat]);
+    // The terminal event was drained with the command: later camp ticks
+    // cannot replay it.
+    host.cues.clear();
+    host.game.set_paused(false);
+    host.runtime.publish(ControlFrame {
+        enabled: true,
+        ..ControlFrame::default()
+    });
+    for _ in 0..3 {
+        step(&mut host.ctx());
+    }
+    assert!(!host.cues.contains(&SoundCue::Retreat), "{:?}", host.cues);
+}
+#[test]
+fn successful_purchases_confirm_and_rejected_ones_stay_silent() {
+    let mut host = Host::new();
+    host.game.campaign.coins = 100;
+    host.runtime.begin_frame(1);
+    host.runtime
+        .enqueue(Command::BuySkillNode("steady_hands".into()), "Learned");
+    flush_for_test(&mut host.ctx());
+    assert_eq!(host.cues, vec![SoundCue::Confirm]);
+    host.cues.clear();
+    host.runtime.begin_frame(2);
+    host.runtime
+        .enqueue(Command::BuySkillNode("steady_hands".into()), "Learned");
+    flush_for_test(&mut host.ctx());
+    assert!(host.cues.is_empty(), "{:?}", host.cues);
+}
+#[test]
 fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
     let mut game = Game::default();
     game.campaign.coins = 100;

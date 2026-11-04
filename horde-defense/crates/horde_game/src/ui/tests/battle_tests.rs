@@ -499,6 +499,45 @@ fn battle_management_popup_cannot_leak_reload_or_fire_input() {
 }
 
 #[test]
+fn locked_throwables_are_disabled_buttons_that_explain_where_to_learn_them() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    h.ctx
+        .all_styles_mut(|style| style.interaction.tooltip_delay = 0.0);
+    let f = &mut fixture.frontend;
+    let slot = crate::battle_view::OrdnanceSlotView::of(
+        f.game.attempt.as_ref().unwrap(),
+        horde_core::ordnance::OrdnanceKind::Grenade,
+    );
+    assert!(!slot.unlocked);
+    let position = h
+        .frame(f, View::Battle, vec![])
+        .shapes
+        .iter()
+        .find_map(|clipped| text_position(&clipped.shape, "Grenade"))
+        .unwrap();
+    let mut shown = false;
+    for frame in 0..4 {
+        let events = if frame == 0 {
+            vec![Event::PointerMoved(position)]
+        } else {
+            vec![]
+        };
+        let output = h.frame(f, View::Battle, events);
+        shown |= output.shapes.iter().any(|clipped| {
+            shape_has_text(
+                &clipped.shape,
+                "Grenade locked. Learn it in the Ordnance branch of Survival skills",
+            )
+        });
+    }
+    assert!(shown, "hovering a locked throwable must show its reason");
+    // Clicking a locked selector keeps the gun.
+    h.click(f, View::Battle, "Grenade");
+    assert_eq!(f.battle.attack_selection, battle::AttackSelection::Gun);
+}
+#[test]
 fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_toggle() {
     let mut fixture = IsolatedFrontend::new();
     fixture.frontend.game.campaign.coins = 100;

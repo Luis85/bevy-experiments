@@ -234,10 +234,23 @@ pub(in crate::ui) fn danger(attempt: &Attempt) -> DangerReadout {
 
 pub(in crate::ui) fn dps(attempt: &Attempt) -> DpsReadout {
     DpsReadout {
-        live: attempt.live_dps(),
-        average_and_peak: (!attempt.gear_snapshot.is_empty())
-            .then(|| (attempt.average_dps(), attempt.peak_dps())),
+        live: shown_dps(attempt.live_dps()),
+        average_and_peak: (!attempt.gear_snapshot.is_empty()).then(|| {
+            (
+                shown_dps(attempt.average_dps()),
+                shown_dps(attempt.peak_dps()),
+            )
+        }),
         totals: attempt.dps.totals,
+    }
+}
+/// A DPS value fit for display: never negative (so `{:.1}` cannot print the
+/// `-0.0` an empty window yields) and zero when not finite.
+pub(in crate::ui) fn shown_dps(value: f32) -> f32 {
+    if value.is_finite() && value > 0.0 {
+        value
+    } else {
+        0.0
     }
 }
 
@@ -246,6 +259,17 @@ mod tests {
     use super::*;
     use horde_core::sim::Input;
 
+    #[test]
+    fn dps_readout_never_prints_negative_zero() {
+        for value in [-0.0, -0.04, f32::NAN, f32::NEG_INFINITY, f32::INFINITY] {
+            assert_eq!(format!("{:.1}", shown_dps(value)), "0.0", "{value}");
+        }
+        assert_eq!(format!("{:.1}", shown_dps(12.345)), "12.3");
+        let game = battle(Mode::Personal);
+        let readout = dps(game.attempt.as_ref().unwrap());
+        assert_eq!(format!("DPS {:.1}", readout.live), "DPS 0.0");
+        assert!(readout.live.is_sign_positive());
+    }
     fn battle(mode: Mode) -> Game {
         let mut game = Game::default();
         if mode == Mode::Npc {

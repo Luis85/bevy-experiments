@@ -29,13 +29,13 @@ struct SfxState {
 impl SoundCue {
     fn priority(self) -> u8 {
         match self {
-            Self::Boss | Self::Retreat => 0,
+            Self::Boss | Self::Retreat | Self::Victory | Self::Defeat => 0,
             Self::Wave => 1,
             Self::Structure | Self::Explosion | Self::Molotov => 2,
-            Self::Damage => 3,
+            Self::Damage | Self::Confirm => 3,
             Self::Melee | Self::Throw => 4,
             Self::Reload => 5,
-            Self::Ready => 6,
+            Self::Ready | Self::Kill => 6,
             Self::Armor | Self::Impact => 7,
             Self::Trap => 8,
             Self::Pistol
@@ -87,6 +87,17 @@ fn select_sounds(mut sounds: Vec<SoundCue>, rotation: u64) -> Vec<SoundCue> {
     // A warning already communicates arrival; avoid stacking a second spawn cue.
     if sounds.contains(&SoundCue::Wave) {
         sounds.retain(|cue| *cue != SoundCue::Incoming);
+    }
+    // A kill subsumes the hit that caused it, and a defeat stinger the
+    // collapse that ended the defense (they share the same bank).
+    if sounds.contains(&SoundCue::Kill) {
+        sounds.retain(|cue| *cue != SoundCue::Impact);
+    }
+    if sounds.contains(&SoundCue::Defeat) {
+        sounds.retain(|cue| *cue != SoundCue::Structure);
+    }
+    if sounds.contains(&SoundCue::Victory) {
+        sounds.retain(|cue| *cue != SoundCue::Wave);
     }
     sounds.sort_by_key(|cue| cue.priority());
     sounds.dedup();
@@ -244,6 +255,36 @@ mod tests {
         );
         assert!(a.contains(&SoundCue::Armor) && a.contains(&SoundCue::NpcShot));
         assert!(b.contains(&SoundCue::Armor) && b.contains(&SoundCue::TurretShot));
+    }
+    #[test]
+    fn stingers_and_kills_replace_the_cues_they_subsume() {
+        assert_eq!(
+            select_sounds(vec![SoundCue::Rifle, SoundCue::Impact, SoundCue::Kill], 0),
+            vec![SoundCue::Kill, SoundCue::Rifle]
+        );
+        assert_eq!(
+            select_sounds(
+                vec![
+                    SoundCue::Kill,
+                    SoundCue::Victory,
+                    SoundCue::Boss,
+                    SoundCue::Rifle
+                ],
+                0
+            ),
+            vec![SoundCue::Victory, SoundCue::Boss]
+        );
+        assert_eq!(
+            select_sounds(
+                vec![SoundCue::Structure, SoundCue::Damage, SoundCue::Defeat],
+                0
+            ),
+            vec![SoundCue::Defeat, SoundCue::Damage]
+        );
+        assert_eq!(
+            select_sounds(vec![SoundCue::Fire, SoundCue::Confirm], 0),
+            vec![SoundCue::Confirm, SoundCue::Fire]
+        );
     }
     #[test]
     fn effect_bus_updates_pending_voices_and_mutes_without_recreating_them() {

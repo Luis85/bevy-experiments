@@ -8,7 +8,7 @@ use horde_core::command::Command;
 use horde_core::{
     content::{Mode, StructureKind},
     ordnance::OrdnanceKind,
-    sim::{Actor, BattleId, Game, Input, SimEvent},
+    sim::{Actor, BattleId, Game, Input, Outcome, SimEvent},
 };
 #[cfg(feature = "review")]
 use persistence::PersistenceMetrics;
@@ -224,13 +224,7 @@ impl Runtime {
         game.tick(input);
         self.simulated_ticks += 1;
         self.save_ticks += 1;
-        let newest_event = tick_sounds(game, self.observed_battle, cues);
-        #[cfg(feature = "dev")]
-        {
-            self.last_event_seq = newest_event.or(self.last_event_seq);
-        }
-        #[cfg(not(feature = "dev"))]
-        let _ = newest_event;
+        self.drain_sounds(game, cues);
         if self.save_ticks >= 600 {
             self.dirty = true;
         }
@@ -242,6 +236,18 @@ impl Runtime {
             return true;
         }
         false
+    }
+    /// Turns the game's undrained events into cues now. Ticks call it, and so
+    /// does a command that finishes the attempt outside a tick (`Withdraw`
+    /// pauses the game, so its terminal event would otherwise wait).
+    pub(super) fn drain_sounds(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) {
+        let newest_event = tick_sounds(game, self.observed_battle, cues);
+        #[cfg(feature = "dev")]
+        {
+            self.last_event_seq = newest_event.or(self.last_event_seq);
+        }
+        #[cfg(not(feature = "dev"))]
+        let _ = newest_event;
     }
 }
 /// Runner state shown by the F3 panel.
@@ -405,6 +411,12 @@ pub(super) fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
         SimEvent::Hit(_) | SimEvent::WeakPoint(_) => Some(SoundCue::Impact),
         SimEvent::Armor(_) => Some(SoundCue::Armor),
         SimEvent::Spawn { .. } => Some(SoundCue::Incoming),
+        SimEvent::Kill { .. } => Some(SoundCue::Kill),
+        SimEvent::AttemptFinished { outcome, .. } => Some(match outcome {
+            Outcome::Victory => SoundCue::Victory,
+            Outcome::Defeat => SoundCue::Defeat,
+            Outcome::Withdrawal => SoundCue::Retreat,
+        }),
         _ => None,
     };
     if let Some(cue) = cue {

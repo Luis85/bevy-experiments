@@ -115,7 +115,7 @@ fn run_list(ui: &mut egui::Ui, rows: &[&RunRecord], selected: &mut Option<u64>) 
                 let dps = if run.legacy {
                     "DPS —".to_owned()
                 } else {
-                    format!("{:.1} DPS", run.average_dps)
+                    format!("{:.1} DPS", super::hud::shown_dps(run.average_dps))
                 };
                 let label = format!(
                     "#{} · {} · {}\n{} · defense {} · {:.0}s · {}",
@@ -168,7 +168,9 @@ fn detail(ui: &mut egui::Ui, r: &RunRecord) {
     } else {
         ui.label(format!(
             "DPS {:.1} average · {:.1} peak (5s) · {} kills",
-            r.average_dps, r.peak_dps, r.kills
+            super::hud::shown_dps(r.average_dps),
+            super::hud::shown_dps(r.peak_dps),
+            r.kills
         ));
     }
     muted(
