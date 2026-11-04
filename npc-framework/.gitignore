@@ -11,3 +11,4 @@ build.log
 # Operator-owned AI scheduler links and process leases
 .npc-ai-scheduler/
 .ai-scheduler/
+.ai-client/

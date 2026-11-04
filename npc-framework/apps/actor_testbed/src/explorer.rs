@@ -23,8 +23,8 @@ use npc_framework::view_helpers::ViewSystems;
 use testbed_content::explorer::home::{AgentDir, slug};
 pub use testbed_content::explorer::host::{ExplorerSession, Mismatch, Start};
 use testbed_content::explorer::host::{
-    HostArgs, RunFile, RunMode, build_world_with, detach_command, detached_resume_args,
-    insert_notes, rfc3339, save_now, write_session_files,
+    HostArgs, ProjectionLaunch, RunFile, RunMode, append_projection_args, build_world_with,
+    detach_command, detached_resume_args, insert_notes, rfc3339, save_now, write_session_files,
 };
 use testbed_content::explorer::prompt::PromptKind;
 use testbed_view::{ExplorerModalPlugin, ExplorerModalSystems, PromptModal, PromptModalClosed};
@@ -551,6 +551,22 @@ pub struct Running {
     /// What was written.
     pub file: RunFile,
 }
+/// Retain the native publisher's canonical launch data in this host's discovery file. This is
+/// written after common native setup, once the initial projection has succeeded.
+pub fn retain_projection_launch(
+    world: &mut World,
+    projection: &ProjectionLaunch,
+) -> Result<(), String> {
+    projection.validate()?;
+    if let Some(mut running) = world.get_resource_mut::<Running>() {
+        running.file.projection = Some(projection.clone());
+        running
+            .file
+            .write(&running.dir)
+            .map_err(|error| format!("cannot retain projection handover metadata: {error}"))?;
+    }
+    Ok(())
+}
 
 /// `--exact-port`: the world moved here from a detached host, so no prompt
 /// modal (the agent is already playing): the sim runs at once and a notice
@@ -665,6 +681,7 @@ pub fn prepare_session(
         started: now_rfc3339(),
         agent: session.meta.agent.clone(),
         world: session.meta.world.clone(),
+        projection: None,
     };
     if let Err(e) = run.write(dir) {
         warn!(
@@ -779,6 +796,14 @@ struct CloseErrorText;
 /// The detached host's arguments for `target`.
 pub fn detach_args(target: &DetachTarget) -> Vec<String> {
     detached_resume_args(&target.home, &target.agent, target.port)
+}
+fn detach_args_with_projection(
+    target: &DetachTarget,
+    projection: Option<&ProjectionLaunch>,
+) -> Result<Vec<String>, String> {
+    let mut args = detach_args(target);
+    append_projection_args(&mut args, projection)?;
+    Ok(args)
 }
 
 /// Explorer windows (spec §8, G7): closing the window asks "Keep it running
@@ -942,7 +967,14 @@ fn move_to_detached(world: &mut World) -> Result<(), String> {
             "the save failed: {e}; the world stays in the window"
         ));
     }
-    let args = detach_args(&target);
+    let args = match detach_args_with_projection(&target, world.get_resource::<ProjectionLaunch>())
+    {
+        Ok(args) => args,
+        Err(error) => {
+            restore(world);
+            return Err(error);
+        }
+    };
     let spawn = world.resource::<DetachSpawner>().0.clone();
     let pid = match spawn(&npcctl, &args) {
         Ok(pid) => pid,
@@ -2001,6 +2033,7 @@ mod tests {
             started: "2026-10-25T12:00:00Z".into(),
             agent: "Wren".into(),
             world: "W".into(),
+            projection: None,
         };
         run.write(dir).unwrap();
         run
@@ -2111,6 +2144,78 @@ mod tests {
     }
 
     /// `run.json` (mode window) while the window runs; removed on exit.
+    #[test]
+    fn native_projection_metadata_updates_only_the_running_host_and_never_the_simulation() {
+        let home = tmp("projection-metadata");
+        let dir = AgentDir {
+            dir: home.join("herp"),
+        };
+        std::fs::create_dir_all(&dir.dir).unwrap();
+        let mut app = testbed_content::new_sim_app(1, "ai_village");
+        let file = RunFile {
+            pid: std::process::id(),
+            port: 15702,
+            mode: RunMode::Window,
+            started: "2026-10-29T10:00:00Z".into(),
+            agent: "Herp".into(),
+            world: "Island".into(),
+            projection: None,
+        };
+        file.write(&dir).unwrap();
+        app.insert_resource(Running {
+            dir: dir.clone(),
+            file,
+        });
+        let projection = ProjectionLaunch {
+            output: home.join("world state.json"),
+            interval_ms: 500,
+        };
+        let before = npc_framework::prelude::state_hash(app.world_mut());
+        retain_projection_launch(app.world_mut(), &projection).unwrap();
+        assert_eq!(
+            RunFile::read_any(&dir).unwrap().projection,
+            Some(projection.clone())
+        );
+        assert_eq!(
+            app.world().resource::<Running>().file.projection,
+            Some(projection)
+        );
+        assert_eq!(npc_framework::prelude::state_hash(app.world_mut()), before);
+        let _ = std::fs::remove_dir_all(home);
+    }
+    #[test]
+    fn native_detach_preserves_optional_canonical_projection_flags_without_changing_legacy_args() {
+        let target = DetachTarget {
+            home: std::env::current_dir().unwrap().join("target/agents"),
+            agent: "Herp".into(),
+            port: 15702,
+            npcctl: (PathBuf::from("npcctl"), false),
+        };
+        let projection = ProjectionLaunch {
+            output: std::env::current_dir()
+                .unwrap()
+                .join("target/public state.json"),
+            interval_ms: 250,
+        };
+        let legacy = detach_args(&target);
+        assert_eq!(detach_args_with_projection(&target, None).unwrap(), legacy);
+        let forwarded = detach_args_with_projection(&target, Some(&projection)).unwrap();
+        assert_eq!(&forwarded[..legacy.len()], legacy.as_slice());
+        assert!(
+            forwarded
+                .windows(2)
+                .any(|pair| pair[0] == "--world-state-out"
+                    && pair[1] == projection.output.display().to_string())
+        );
+        assert!(
+            forwarded
+                .windows(2)
+                .any(|pair| pair == ["--world-state-interval-ms", "250"])
+        );
+        let mut invalid = projection;
+        invalid.output = "relative.json".into();
+        assert!(detach_args_with_projection(&target, Some(&invalid)).is_err());
+    }
     #[test]
     fn the_window_writes_run_json_and_removes_it_on_exit() {
         use testbed_content::explorer::host::{RunFile, RunMode};

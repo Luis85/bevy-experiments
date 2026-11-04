@@ -292,6 +292,7 @@ pub fn cmd_serve_explorer(a: &crate::agent::ServeArgs, out: &mut Out) -> Result<
             }
             failure
         })?;
+    let mut publisher = a.projection.start(app.world_mut())?;
     let server = server
         .into_inner()
         .ok_or_else(|| Failure::usage("no server bound"))?;
@@ -312,6 +313,10 @@ pub fn cmd_serve_explorer(a: &crate::agent::ServeArgs, out: &mut Out) -> Result<
         started: now,
         agent: session.meta.agent.clone(),
         world: session.meta.world.clone(),
+        projection: app
+            .world()
+            .get_resource::<testbed_content::explorer::host::ProjectionLaunch>()
+            .cloned(),
     };
     if let Err(err) = run.write(&dir) {
         tracing::warn!(
@@ -339,15 +344,21 @@ pub fn cmd_serve_explorer(a: &crate::agent::ServeArgs, out: &mut Out) -> Result<
         tracing::warn!("npcctl serve: Ctrl+C will not save ({err}); use `npcctl session stop`");
     }
     let start_tick = app.world().resource::<SimClock>().tick;
+    let mut autosave = autosave(
+        dir.clone(),
+        Duration::from_secs(e.autosave_secs.max(1)),
+        start_tick,
+    );
     let stopped_at: Rc<Cell<Option<u64>>> = Rc::new(Cell::new(None));
     let options = SessionOptions {
         tick_hz: a.tick_hz,
         seed: Some(session.seed),
-        on_frame: Some(autosave(
-            dir.clone(),
-            Duration::from_secs(e.autosave_secs.max(1)),
-            start_tick,
-        )),
+        on_frame: Some(Box::new(move |world| {
+            autosave(world);
+            if let Some(publisher) = &mut publisher {
+                publisher.frame(world);
+            }
+        })),
         on_stop: Some(save_on_stop(dir.clone(), Rc::clone(&stopped_at))),
         rebuild: Some(rebuild(session.clone(), dir.clone(), e.paused)),
         stop: Some(stop),

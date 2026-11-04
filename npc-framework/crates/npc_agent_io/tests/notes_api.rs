@@ -414,6 +414,7 @@ fn mcp_lists_every_field() {
             "observe",
             "act",
             "act_and_wait",
+            "talk",
             "cancel",
             "events",
             "attach",

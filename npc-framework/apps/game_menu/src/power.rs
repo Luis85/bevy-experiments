@@ -161,7 +161,12 @@ fn set_update_mode(
 ) {
     let detached = worlds.is_some_and(|w| w.wants_frames())
         || scan.is_some_and(|s| s.is_pending())
-        || screen.is_some_and(|s| matches!(s.get(), Screen::ExplorerDetached | Screen::Quitting));
+        || screen.is_some_and(|s| {
+            matches!(
+                s.get(),
+                Screen::ExplorerDetached | Screen::AgentHistory | Screen::Quitting
+            )
+        });
     let wants = Wants {
         game: running.as_ref().is_some_and(|r| !r.is_build()),
         child: running.is_some() || check.is_some() || detached,

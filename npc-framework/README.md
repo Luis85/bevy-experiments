@@ -10,8 +10,20 @@ a headless CLI, a JSON-RPC interface on the running game, a journal of every dec
 **Island Village** is a new AI explorer world: nine residents run finite food/material/tool chains, while
 the visiting actor earns coins by gathering or crafting and buys necessities. It has blocked water,
 day/night, seasons, lethal needs and permanent actor lives with recoverable diaries. Scene-level AI
-supervision can resume a linked Codex/Claude CLI session after the external actor goes idle.
+interaction uses a dedicated AI client that starts and continues Codex/Claude CLI
+sessions automatically through an existing subscription login.
 [Play and configure it](docs/ai-village.md).
+Residents now run an inspectable daily-life behavior tree and share survival, production and recovery
+actions with clients. [NPC life and the environment API](docs/npc-life-and-environment.md).
+
+**Living Island Village** adds a needs-driven economy with twelve residents, adaptive prices,
+finite hunting, and production chains joining food, tools, leather, thread and warm clothing.
+Players and AI actors use the same physical actions and can offer their crafted goods to NPC buyers.
+[Create a fresh living world and participate](docs/living-island-economy.md).
+The expanded **Living Island Homestead** preset adds connected trade districts and six clear sites,
+with shared actions to claim land, build a material-backed cottage, water grain beds and use or sell
+the harvest. In the native game, **F2** opens **Home & farm** with player controls, supplies,
+recipes and food/trade actions. [Your little home and garden](docs/living-homestead.md).
 
 | The village | The Actor Testbed | A foreign RTS host | The AI explorer |
 |---|---|---|---|
@@ -33,12 +45,14 @@ supervision can resume a linked Codex/Claude CLI session after the external acto
   bisecting a desync, the slowest mechanic, screenshots at a tick).
 - **[Agent experiments](docs/agent-experiments.md)**: let an AI agent play an actor in real time (CLI or MCP),
   then replay and analyse its run; registered AI explorers, actor/world presets, notebooks and landmarks.
+- **[AI Agent Game Client](docs/ai-agent-game-client.md)**: native Codex/Claude start, stop and status,
+  automatic prompts and game tools, exact session continuation and recovery.
 - [Adding a host app to this workspace](docs/adding-a-host-app.md): the one extra step (`deny.toml`) for a new
   windowed app inside this repository.
 - **Entity reference**: one page per ECS [component](docs/entities/components/index.md) (fields and units, who
   adds, reads and writes it, hashed and/or saved in world snapshots) and per [system](docs/entities/systems/index.md)
   (schedule and set, reads/writes, determinism, perf mechanic).
-- Decisions: [`docs/adr/`](docs/adr/) (0001–0023). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
+- Decisions: [`docs/adr/`](docs/adr/) (0001–0034). History: [`CHANGELOG.md`](CHANGELOG.md). Specs and plans:
   `docs/superpowers/`. Benchmarks: [`bench/README.md`](bench/README.md). Agent workflow: [`CLAUDE.md`](CLAUDE.md).
 
 ## Features
@@ -82,14 +96,17 @@ cargo run --locked -p rts_units_demo -- --headless-ticks 1500   # no window: a J
 
 The menu starts each game as a child process and comes back when it closes. A missing binary shows its build
 command and a **Build** button; `cargo build --locked -p game_menu -p actor_testbed -p village -p rts_units_demo
--p npcctl` builds all five. **Settings** selects the agents folder, optional actors/worlds folders and fog of war.
+-p npcctl` builds the games, tooling and dedicated AI client. **Settings** selects the agents folder, optional actors/worlds folders and fog of war.
 **Actors** opens the standalone preset editor with a rotating 3D preview; **Worlds** edits needs, day/night,
 perception, systems and inhabitants. **Explore with an AI agent → New** selects both an actor and a world preset,
 then starts in a window or detached. Resume lists each saved actor/world choice.
 
-The explorer opens with a prompt to copy into your AI tool. Open the tool in the agent's folder and read
-`AGENTS.md`: its generated `.mcp.json` starts `npcctl mcp --registered` for that world's URL. Register with the
-private credentials from the handbook, call `enter_world` to meet the assigned character, then `take_control`.
+The explorer opens **Your AI agent** controls: choose **Start Codex** or **Start Claude** using an installed,
+logged-in CLI. The dedicated `ai-agent-game-client` supplies the mission, agent folder and registered game
+tools automatically, then continues that exact conversation when later events or inactivity need attention.
+**F10** reopens controls; **Stop agent** leaves the world running. The detached-world screen offers the same
+controls. There is no prompt copying or manual conversation binding in the normal flow. The agent reads its
+handbook, registers privately, calls `enter_world` and `take_control` through its game tools.
 The assigned actor starts idle and unattached on New, Resume, reset and host handover; taking control uses the
 recorded command path. A pending claim needs the world's next tick, so a paused world must be resumed by the
 player/developer. Notes and map tools work after registration, before control. Legacy unlocked scenarios retain

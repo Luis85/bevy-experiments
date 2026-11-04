@@ -4,10 +4,11 @@ use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use bevy::input_focus::InputFocus;
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextEdit};
 use bevy::ui::InteractionDisabled;
-use bevy::ui_widgets::{Activate, ScrollArea};
+use bevy::ui_widgets::{Activate, ScrollArea, ScrollIntoView};
 use serde_json::Value;
 use testbed_content::explorer::home::slug;
 use testbed_content::worlds::{self, WorldPreset};
@@ -26,6 +27,25 @@ const PAGES: [&str; 8] = [
     "AI scheduler",
 ];
 const NEEDS: [&str; 4] = ["hunger", "thirst", "energy", "battery"];
+
+/// Screenshot-only initial page, supplied by the menu's validated capture CLI.
+#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ScreenshotPage {
+    AiScheduler,
+}
+impl ScreenshotPage {
+    pub fn from_name(name: &str) -> Result<Self, String> {
+        match name {
+            "ai_scheduler" => Ok(Self::AiScheduler),
+            _ => Err("--worlds-page supports only ai_scheduler".into()),
+        }
+    }
+    fn index(self) -> usize {
+        match self {
+            Self::AiScheduler => 7,
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 struct Draft {
@@ -60,6 +80,8 @@ impl Draft {
         let mut value = serde_json::to_value(preset).expect("WorldPreset serializes");
         value["ai_scheduler"] =
             serde_json::to_value(&preset.ai_scheduler).expect("scheduler policy serializes");
+        // The default event switch is omitted from saved descriptors but remains editable.
+        value["ai_scheduler"]["events_enabled"] = preset.ai_scheduler.events_enabled.into();
         flatten("", &value, &mut values);
         Self { values }
     }
@@ -70,8 +92,11 @@ impl Draft {
         let mut value =
             serde_json::to_value(worlds::plain_preset()).expect("WorldPreset serializes");
         value["scene"] = "explorer".into();
+        value["economy"] = "fixed".into();
+        value["island_geography"] = "compact".into();
         value["ai_scheduler"] = serde_json::to_value(worlds::plain_preset().ai_scheduler)
             .expect("scheduler policy serializes");
+        value["ai_scheduler"]["events_enabled"] = true.into();
         let mut errors = Vec::new();
         for (key, text) in &self.values {
             let pointer = format!("/{}", key.replace('.', "/"));
@@ -296,6 +321,12 @@ enum WorldAction {
 #[derive(Component)]
 struct EditorRoot;
 #[derive(Component)]
+struct EditorBody;
+#[derive(Component)]
+struct EditorFieldsViewport;
+#[derive(Component)]
+struct EditorFooter;
+#[derive(Component)]
 struct Field(String);
 #[derive(Component)]
 struct Status;
@@ -311,16 +342,50 @@ struct DetectionLabel;
 pub struct WorldsPlugin;
 impl Plugin for WorldsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(Screen::Worlds), open).add_systems(
-            Update,
-            (sync_fields, rebuild, refresh)
-                .chain()
-                .run_if(in_state(Screen::Worlds)),
-        );
+        app.init_resource::<InputFocus>()
+            .add_systems(OnEnter(Screen::Worlds), open)
+            .add_systems(
+                Update,
+                (sync_fields, rebuild, refresh)
+                    .chain()
+                    // Rebuild despawns old controls; accessibility must see only the replacement
+                    // hierarchy, never queue label inserts for entities pending despawn.
+                    .before(ui::refresh_accessible_buttons)
+                    .run_if(in_state(Screen::Worlds)),
+            )
+            .add_systems(
+                PostUpdate,
+                reveal_editor_focus
+                    .after(bevy::ui::ui_layout_system)
+                    .run_if(in_state(Screen::Worlds)),
+            );
     }
 }
-fn open(mut commands: Commands, settings: Res<AppSettings>) {
-    commands.insert_resource(WorldEditor::new(settings.0.worlds_dir()));
+fn reveal_editor_focus(
+    focus: Res<InputFocus>,
+    fields: Query<(), With<Field>>,
+    actions: Query<&WorldAction>,
+    mut commands: Commands,
+) {
+    if focus.is_changed()
+        && let Some(entity) = focus.get()
+        && (fields.contains(entity)
+            || actions.get(entity).is_ok_and(|action| {
+                matches!(
+                    action,
+                    WorldAction::Toggle(_) | WorldAction::Detection | WorldAction::Select(_)
+                )
+            }))
+    {
+        commands.trigger(ScrollIntoView { entity });
+    }
+}
+fn open(mut commands: Commands, settings: Res<AppSettings>, capture: Option<Res<ScreenshotPage>>) {
+    let mut editor = WorldEditor::new(settings.0.worlds_dir());
+    if let Some(page) = capture {
+        editor.page = page.index();
+    }
+    commands.insert_resource(editor);
 }
 fn activate(event: On<Activate>, actions: Query<&WorldAction>, mut commands: Commands) {
     if let Ok(action) = actions.get(event.entity) {
@@ -567,6 +632,7 @@ fn rebuild(
         node.width = percent(96);
         node.max_width = px(1200);
         node.height = percent(94);
+        node.min_height = px(0);
         node.padding = UiRect::all(px(22));
     });
     commands.entity(panel).with_children(|p| {
@@ -575,16 +641,23 @@ fn rebuild(
             13.0,
             ui::DIM,
         ));
-        p.spawn(Node {
-            flex_grow: 1.0,
-            min_height: px(0),
-            column_gap: px(22),
-            ..default()
-        })
+        p.spawn((
+            EditorBody,
+            Node {
+                flex_grow: 1.0,
+                flex_basis: px(0),
+                min_height: px(0),
+                overflow: Overflow::clip(),
+                column_gap: px(22),
+                ..default()
+            },
+        ))
         .with_children(|body| {
             body.spawn((
                 Node {
                     width: px(245),
+                    height: percent(100),
+                    min_height: px(0),
                     flex_shrink: 0.0,
                     flex_direction: FlexDirection::Column,
                     row_gap: px(8),
@@ -637,6 +710,8 @@ fn rebuild(
             body.spawn(Node {
                 flex_direction: FlexDirection::Column,
                 flex_grow: 1.0,
+                flex_basis: px(0),
+                height: percent(100),
                 min_width: px(0),
                 min_height: px(0),
                 row_gap: px(10),
@@ -661,39 +736,63 @@ fn rebuild(
                     }
                 });
                 form.spawn((
+                    EditorFieldsViewport,
                     Node {
                         flex_direction: FlexDirection::Column,
                         row_gap: px(8),
                         overflow: Overflow::scroll_y(),
                         flex_grow: 1.0,
+                        flex_basis: px(0),
                         min_height: px(0),
                         padding: UiRect::right(px(10)),
                         ..default()
                     },
                     ScrollArea,
                 ))
-                .with_children(|fields| page_fields(fields, &editor));
+                .with_children(|viewport| {
+                    viewport
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            flex_shrink: 0.0,
+                            width: percent(100),
+                            row_gap: px(8),
+                            ..default()
+                        })
+                        .with_children(|fields| page_fields(fields, &editor));
+                });
             });
         });
-        p.spawn((Destination, ui::label("", 12.0, ui::DIM)));
-        p.spawn((Status, ui::label("", 13.0, ui::NOTE)));
-        if editor.discard.is_some() {
-            ui::row(p, |r| {
-                button(r, "Discard edits", WorldAction::Discard, 900);
-                button(r, "Cancel", WorldAction::Cancel, 901);
+        // Form content may exceed the window; status and save/navigation actions never scroll away.
+        p.spawn((
+            EditorFooter,
+            Node {
+                flex_direction: FlexDirection::Column,
+                flex_shrink: 0.0,
+                row_gap: px(10),
+                ..default()
+            },
+        ))
+        .with_children(|footer| {
+            footer.spawn((Destination, ui::label("", 12.0, ui::DIM)));
+            footer.spawn((Status, ui::label("", 13.0, ui::NOTE)));
+            if editor.discard.is_some() {
+                ui::row(footer, |r| {
+                    button(r, "Discard edits", WorldAction::Discard, 900);
+                    button(r, "Cancel", WorldAction::Cancel, 901);
+                });
+            }
+            if editor.overwrite.is_some() {
+                ui::row(footer, |r| {
+                    button(r, "Replace file", WorldAction::Replace, 902);
+                    button(r, "Cancel", WorldAction::Cancel, 903);
+                });
+            }
+            ui::row(footer, |r| {
+                let save = button(r, "Save world", WorldAction::Save, 910);
+                r.commands().entity(save).insert(SaveButton);
+                button(r, "Revert", WorldAction::Revert, 911);
+                button(r, "Back", WorldAction::Back, 912);
             });
-        }
-        if editor.overwrite.is_some() {
-            ui::row(p, |r| {
-                button(r, "Replace file", WorldAction::Replace, 902);
-                button(r, "Cancel", WorldAction::Cancel, 903);
-            });
-        }
-        ui::row(p, |r| {
-            let save = button(r, "Save world", WorldAction::Save, 910);
-            r.commands().entity(save).insert(SaveButton);
-            button(r, "Revert", WorldAction::Revert, 911);
-            button(r, "Back", WorldAction::Back, 912);
         });
     });
 }
@@ -819,7 +918,7 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                 p,
                 d,
                 "ai_scheduler.enabled",
-                "Resume idle AI CLI sessions",
+                "Resume AI for events and inactivity",
                 200,
             );
             toggle(
@@ -828,6 +927,13 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                 "ai_scheduler.skip_paused",
                 "Wait while the game is paused",
                 201,
+            );
+            toggle(
+                p,
+                d,
+                "ai_scheduler.events_enabled",
+                "Dispatch relevant game events to connected AI",
+                202,
             );
             for (i, (key, label)) in [
                 (
@@ -857,7 +963,7 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
                     d,
                     &format!("ai_scheduler.{key}"),
                     label,
-                    202 + i as i32,
+                    203 + i as i32,
                     false,
                 );
             }
@@ -943,6 +1049,133 @@ fn refresh(
 mod tests {
     use super::*;
     use crate::screens::tests::{app, tmp};
+    #[test]
+    fn screenshot_page_opens_scheduler_without_editing_the_preset_or_dirtying_the_draft() {
+        let dir = tmp("world-screenshot-page");
+        let mut captured = app(&dir, &dir.join("agents"));
+        captured.insert_resource(ScreenshotPage::from_name("ai_scheduler").unwrap());
+        captured
+            .world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(Screen::Worlds);
+        captured.update();
+        captured.update();
+        let editor = captured.world().resource::<WorldEditor>();
+        assert_eq!(PAGES[editor.page], "AI scheduler");
+        assert!(!editor.dirty());
+        assert_eq!(editor.draft.values, editor.baseline.values);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn scheduler_form_scrolls_independently_of_save_footer_and_reveals_keyboard_focus() {
+        #[derive(Resource, Default)]
+        struct Revealed(Vec<Entity>);
+        let dir = tmp("world-bounded-form");
+        let mut app = app(&dir, &dir.join("agents"));
+        let presets = app.world().resource::<AppSettings>().0.worlds_dir();
+        worlds::install_builtins(&presets).unwrap();
+        app.init_resource::<Revealed>().add_observer(
+            |event: On<ScrollIntoView>, mut revealed: ResMut<Revealed>| {
+                revealed.0.push(event.entity);
+            },
+        );
+        app.world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(Screen::Worlds);
+        app.update();
+        app.update();
+        apply(app.world_mut(), WorldAction::Page(7));
+        app.update();
+        app.update();
+        let body = app
+            .world_mut()
+            .query_filtered::<Entity, With<EditorBody>>()
+            .single(app.world())
+            .unwrap();
+        let footer = app
+            .world_mut()
+            .query_filtered::<Entity, With<EditorFooter>>()
+            .single(app.world())
+            .unwrap();
+        let viewport = app
+            .world_mut()
+            .query_filtered::<Entity, With<EditorFieldsViewport>>()
+            .single(app.world())
+            .unwrap();
+        assert_eq!(app.world().get::<Node>(body).unwrap().flex_basis, px(0));
+        assert_eq!(app.world().get::<Node>(body).unwrap().min_height, px(0));
+        assert_eq!(app.world().get::<Node>(footer).unwrap().flex_shrink, 0.0);
+        assert_eq!(
+            app.world().get::<ChildOf>(body).unwrap().parent(),
+            app.world().get::<ChildOf>(footer).unwrap().parent(),
+            "fixed footer must be a sibling of the bounded editor body"
+        );
+        let scroll = app.world().get::<Node>(viewport).unwrap();
+        assert_eq!(scroll.flex_basis, px(0));
+        assert_eq!(scroll.min_height, px(0));
+        assert_eq!(scroll.overflow, Overflow::scroll_y());
+        assert!(app.world().get::<ScrollArea>(viewport).is_some());
+        let content = app.world().get::<Children>(viewport).unwrap()[0];
+        assert_eq!(
+            app.world().get::<Node>(content).unwrap().flex_shrink,
+            0.0,
+            "fields retain their full height inside the scroll viewport"
+        );
+        let save = app
+            .world_mut()
+            .query_filtered::<Entity, With<SaveButton>>()
+            .single(app.world())
+            .unwrap();
+        let save_row = app.world().get::<ChildOf>(save).unwrap().parent();
+        assert_eq!(
+            app.world().get::<ChildOf>(save_row).unwrap().parent(),
+            footer,
+            "Save/Revert/Back stay outside the scrolling form"
+        );
+        let last_field = app
+            .world_mut()
+            .query::<(Entity, &Field)>()
+            .iter(app.world())
+            .find(|(_, field)| field.0 == "ai_scheduler.max_concurrent")
+            .unwrap()
+            .0;
+        let event_toggle = app.world_mut().query::<(Entity, &WorldAction)>().iter(app.world()).find(|(_, action)| matches!(action, WorldAction::Toggle(key) if key == "ai_scheduler.events_enabled")).unwrap().0;
+        for entity in [last_field, event_toggle, save] {
+            app.world_mut()
+                .resource_mut::<InputFocus>()
+                .set(entity, bevy::input_focus::FocusCause::Navigated);
+            app.update();
+            app.update();
+        }
+        assert_eq!(
+            app.world().resource::<Revealed>().0,
+            [last_field, event_toggle],
+            "keyboard focus reveals form controls once, while footer focus never scrolls the form or resets manual scrolling"
+        );
+        let resolved = dir.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        drop(app);
+        std::fs::remove_dir_all(resolved).unwrap();
+    }
+    #[test]
+    fn event_dispatch_switch_round_trips_even_when_omitted_from_the_saved_default() {
+        let mut preset = worlds::plain_preset();
+        let mut draft = Draft::new(&preset);
+        assert_eq!(draft.text("ai_scheduler.events_enabled"), "true");
+        draft
+            .values
+            .insert("ai_scheduler.events_enabled".into(), "false".into());
+        preset.ai_scheduler.events_enabled = false;
+        assert_eq!(draft.parse().unwrap(), preset);
+        assert_eq!(
+            Draft::new(&preset).text("ai_scheduler.events_enabled"),
+            "false"
+        );
+        draft
+            .values
+            .insert("ai_scheduler.events_enabled".into(), "true".into());
+        assert!(draft.parse().unwrap().ai_scheduler.events_enabled);
+    }
     #[test]
     fn all_world_fields_round_trip_and_revalidate() {
         for (id, _) in worlds::BUILTIN_PRESETS {

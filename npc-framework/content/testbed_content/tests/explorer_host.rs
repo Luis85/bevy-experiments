@@ -437,6 +437,7 @@ fn run_file(pid: u32, mode: RunMode, port: u16) -> RunFile {
         started: NOW.into(),
         agent: "Wren".into(),
         world: "W".into(),
+        projection: None,
     }
 }
 
@@ -1283,6 +1284,190 @@ fn host_resume_cancels_saved_control_and_work_without_changing_generic_snapshot_
     );
     assert!(reset.world().resource::<CommandQueue>().pending.is_empty());
     let _ = std::fs::remove_dir_all(home);
+}
+
+/// Fixture materials and relocation isolate the host boundary; this is not an
+/// unaided farming rehearsal. Started crop growth is saved world state, while
+/// pending inputs belong to the process/controller that queued them.
+#[test]
+fn host_resume_discards_pending_homestead_inputs_but_preserves_growing_crops() {
+    use npc_framework::kernel::commands::{CommandQueue, SimCommand, submit_deferred};
+    use npc_framework::prelude::Item;
+    use testbed_content::explorer::host::reset_world;
+    use testbed_content::village::{
+        Villager, catalog, economy,
+        homestead::{self, HomesteadAct, HomesteadPlot},
+    };
+
+    for verb in ["claim_plot", "build_cottage", "plant"] {
+        let home = tmp(&format!("homestead-host-boundary-{verb}"));
+        let args = HostArgs {
+            world_preset: Some("living_homestead".into()),
+            ..new_args(&home, "Wren", "W")
+        };
+        let (mut app, _, dir) = build_explorer_app(&args, |_| {}).unwrap();
+        let wren = actor(&app, "Wren");
+        let wren_entity = entity(&app, wren);
+        let plots = homestead::plots(app.world());
+        let (house_id, house) = plots
+            .iter()
+            .copied()
+            .find(|(_, plot)| {
+                homestead::definition(app.world(), *plot).unwrap().use_kind == "housing"
+            })
+            .unwrap();
+        let (garden_id, garden) = plots
+            .iter()
+            .copied()
+            .find(|(_, plot)| {
+                homestead::definition(app.world(), *plot).unwrap().use_kind == "garden"
+            })
+            .unwrap();
+        let house_center = *app.world().get::<SimPos>(house).unwrap();
+        stand(&mut app, wren, house_center, (0, 1));
+        HomesteadAct::new(wren, "claim_plot", house_id)
+            .perform(app.world_mut())
+            .unwrap();
+        economy::grant(
+            app.world_mut(),
+            wren_entity,
+            Item::new(catalog::GRAIN).stack(2),
+        );
+        economy::grant(app.world_mut(), wren_entity, Item::new(catalog::WATER));
+        economy::grant(app.world_mut(), wren_entity, Item::new("plank").stack(8));
+        economy::grant(app.world_mut(), wren_entity, Item::new("log").stack(4));
+        let first_bed = homestead::bed_position(app.world(), house, 0).unwrap();
+        stand(&mut app, wren, first_bed, (0, 1));
+        HomesteadAct::new(wren, "plant", house_id)
+            .perform(app.world_mut())
+            .unwrap();
+        HomesteadAct::new(wren, "water_crop", house_id)
+            .perform(app.world_mut())
+            .unwrap();
+        run_ticks(app.world_mut(), 33);
+
+        let mut intent = HomesteadAct::new(wren, verb, house_id);
+        let approach = match verb {
+            "claim_plot" => {
+                intent.target = garden_id;
+                *app.world().get::<SimPos>(garden).unwrap()
+            }
+            "build_cottage" => homestead::front_door(house_center),
+            "plant" => {
+                intent.bed = 1;
+                homestead::bed_position(app.world(), house, intent.bed).unwrap()
+            }
+            _ => unreachable!(),
+        };
+        stand(&mut app, wren, approach, (0, 1));
+        intent.check(app.world()).unwrap();
+        assert!(app.world().resource::<SimControl>().paused);
+        let tick = app.world().resource::<SimClock>().tick;
+        submit_deferred(
+            app.world_mut(),
+            Some(tick + 10),
+            SimCommand::content(&intent),
+        )
+        .unwrap();
+
+        let foreign = app
+            .world()
+            .resource::<SimIndex>()
+            .map
+            .iter()
+            .find(|(id, entity)| **id != wren && app.world().get::<Villager>(**entity).is_some())
+            .map(|(id, _)| *id)
+            .unwrap();
+        let foreign_intent = HomesteadAct::new(foreign, "claim_plot", garden_id);
+        submit_deferred(
+            app.world_mut(),
+            Some(tick + 10_000),
+            SimCommand::content(&foreign_intent),
+        )
+        .unwrap();
+        let estate = app.world().get::<HomesteadPlot>(house).unwrap().clone();
+        let original_home = app.world().get::<Villager>(wren_entity).unwrap().home;
+        let hash = state_hash(app.world_mut());
+        save_now(app.world_mut(), &dir, NOW).unwrap();
+        let saved = snapshot::read(&dir.save("W")).unwrap();
+        let descriptor = app.world().resource::<ExplorerSession>().clone();
+        let mut raw = reset_world(&descriptor, SEED, |_| {}).unwrap();
+        snapshot::load(raw.world_mut(), &saved, snapshot::LoadMode::Strict).unwrap();
+        assert_eq!(
+            state_hash(raw.world_mut()),
+            hash,
+            "generic restore preserves {verb} input"
+        );
+        assert_eq!(raw.world().resource::<CommandQueue>().pending.len(), 2);
+
+        let (mut back, _, _) =
+            build_explorer_app(&resume_args(&home, "Wren", None), |_| {}).unwrap();
+        assert_eq!(back.world().resource::<SimClock>().tick, tick);
+        assert!(back.world().resource::<SimControl>().paused);
+        let pending = &back.world().resource::<CommandQueue>().pending;
+        assert_eq!(
+            pending.len(),
+            1,
+            "stale assigned-actor {verb} must be discarded"
+        );
+        assert!(
+            pending.values().all(|command| {
+                matches!(command, SimCommand::Content {kind, payload}
+                if kind == "HomesteadAct"
+                && payload.to_typed::<HomesteadAct>().ok() == Some(foreign_intent.clone()))
+            }),
+            "another actor's pending homestead input must survive"
+        );
+        let restored_house = entity(&back, house_id);
+        assert_eq!(
+            back.world().get::<HomesteadPlot>(restored_house),
+            Some(&estate)
+        );
+        let ready_at = estate.beds[0].as_ref().unwrap().ready_at.unwrap();
+        run_ticks(back.world_mut(), ready_at - tick);
+        assert!(
+            !back
+                .world()
+                .get::<HomesteadPlot>(restored_house)
+                .unwrap()
+                .beds[0]
+                .as_ref()
+                .unwrap()
+                .ready_announced,
+            "growth waits for the actual ready tick"
+        );
+        run_ticks(back.world_mut(), 1);
+        let mut matured = estate;
+        matured.beds[0].as_mut().unwrap().ready_announced = true;
+        assert_eq!(
+            back.world().get::<HomesteadPlot>(restored_house),
+            Some(&matured)
+        );
+        assert_eq!(
+            back.world()
+                .get::<Villager>(entity(&back, wren))
+                .unwrap()
+                .home,
+            original_home
+        );
+        assert_eq!(
+            back.world()
+                .get::<HomesteadPlot>(entity(&back, garden_id))
+                .unwrap()
+                .owner,
+            None
+        );
+        assert_eq!(
+            economy::count(back.world(), entity(&back, wren), "plank"),
+            8
+        );
+        assert_eq!(economy::count(back.world(), entity(&back, wren), "log"), 4);
+        assert_eq!(
+            economy::count(back.world(), entity(&back, wren), catalog::GRAIN),
+            1
+        );
+        let _ = std::fs::remove_dir_all(home);
+    }
 }
 
 #[test]

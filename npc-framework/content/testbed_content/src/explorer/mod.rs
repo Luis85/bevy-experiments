@@ -4,6 +4,8 @@
 //! that builds or resumes an explorer world ([`host`]; the notes themselves
 //! are `npc_framework::agent_io::notes`).
 
+pub mod ai_client;
+pub mod ai_history;
 pub mod clipboard;
 pub mod context;
 pub mod home;

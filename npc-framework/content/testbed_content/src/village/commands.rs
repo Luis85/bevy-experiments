@@ -1,5 +1,5 @@
 //! Recorded village actions and the explicit host-to-world diary publication boundary.
-use super::{ai, catalog, economy as econ, model::*};
+use super::{ai, catalog, economy as econ, market, model::*};
 use bevy_ecs::prelude::*;
 use npc_framework::interaction::items::{self, entity_of};
 use npc_framework::interaction::{CarriedBy, Item};
@@ -7,6 +7,13 @@ use npc_framework::kernel::commands::{CommandError, entity};
 use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+/// Shared by resident policy, client affordances and command application.
+pub const HOME_REST_REACH_MM: i32 = 800;
+pub const HOME_REST_TICKS: u64 = 300;
+pub const HOME_REST_RATE: i32 = 400;
+pub const GROUND_REST_TICKS: u64 = 300;
+pub const GROUND_REST_RATE: i32 = 40;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -25,9 +32,40 @@ pub struct VillageAct {
     pub title: String,
     #[serde(default)]
     pub body: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub text: String,
+    /// Maximum buy price, minimum sell price, or minimum posted offer price.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit_price: Option<u32>,
 }
 fn one() -> u32 {
     1
+}
+/// Shared by agent planning and application-time command validation.
+pub(super) fn verb_gate(world: &World, e: Entity, verb: &str) -> Option<String> {
+    let v = world.get::<Vitality>(e)?;
+    if v.died_at.is_some() {
+        return (verb != "new_life").then(|| {
+            "this actor is permanently dead; begin a new life in the same village".into()
+        });
+    }
+    let person = world.get::<Villager>(e)?;
+    if let Some(reason) = super::homestead::busy(world, e)
+        && !matches!(verb, "stop_work" | "talk" | "read_diary" | "write_diary")
+    {
+        return Some(reason.into());
+    }
+    if world.get::<super::hunting::Hunting>(e).is_some()
+        && (verb.eq_ignore_ascii_case("craft") || verb.starts_with("craft:") || verb == "gather")
+    {
+        return Some("finish or stop the current hunt before starting other work".into());
+    }
+    if person.resting_until > world.resource::<SimClock>().tick
+        && !matches!(verb, "rest" | "read_diary" | "write_diary" | "stop_work")
+    {
+        return Some(format!("resting until tick {}", person.resting_until));
+    }
+    None
 }
 impl VillageAct {
     pub fn new(unit: SimId, verb: &str) -> Self {
@@ -40,6 +78,8 @@ impl VillageAct {
             page: 1,
             title: String::new(),
             body: String::new(),
+            text: String::new(),
+            limit_price: None,
         }
     }
     fn target(&self, world: &World) -> Result<Entity, String> {
@@ -66,28 +106,77 @@ impl VillageAct {
         if !living(world, actor) {
             return Err("this actor is dead; begin a new life in the same village".into());
         }
+        if let Some(reason) = verb_gate(world, actor, &self.verb) {
+            return Err(reason);
+        }
+        if self.verb != "talk" && !self.text.is_empty() {
+            return Err("speech text is supported only by talk".into());
+        }
+        if self
+            .limit_price
+            .is_some_and(|price| !(1..=market::MAX_UNIT_PRICE).contains(&price))
+        {
+            return Err(format!(
+                "limit_price must be 1..={}",
+                market::MAX_UNIT_PRICE
+            ));
+        }
+        if self.limit_price.is_some()
+            && !matches!(self.verb.as_str(), "buy" | "sell" | "offer_goods")
+        {
+            return Err("limit_price is supported only by buy, sell and offer_goods".into());
+        }
         match self.verb.as_str() {
             "stop_work" => Ok(()),
-            "buy" | "sell" => econ::merchant_check(
+            "hunt" => super::hunting::check(
                 world,
                 actor,
-                self.target(world)?,
-                &self.kind,
-                self.quantity,
-                self.verb == "buy",
+                self.target.ok_or("hunt requires a prey target")?,
             ),
+            "buy" | "sell" => {
+                let trader = self.target(world)?;
+                let buy = self.verb == "buy";
+                econ::merchant_check(world, actor, trader, &self.kind, self.quantity, buy)?;
+                let (buyer, seller) = if buy {
+                    (actor, trader)
+                } else {
+                    (trader, actor)
+                };
+                let quoted = market::quote(world, buyer, seller, &self.kind, self.quantity)?;
+                if self.limit_price.is_some_and(|limit| {
+                    if buy {
+                        quoted.unit_price > limit
+                    } else {
+                        quoted.unit_price < limit
+                    }
+                }) {
+                    return Err("the current quote is outside your limit_price".into());
+                }
+                Ok(())
+            }
+            "offer_goods" => {
+                market::check_offer(world, actor, &self.kind, self.quantity, self.limit_price)
+            }
+            "withdraw_offer" => {
+                if market::has_offer(world, actor, &self.kind) {
+                    Ok(())
+                } else {
+                    Err("this actor has no active offer for that good".into())
+                }
+            }
             "gather" => {
                 let target = self.target(world)?;
                 let p = world
                     .get::<ResourcePatch>(target)
                     .ok_or("not a resource patch")?;
-                if p.remaining == 0 {
-                    return Err("resource patch is depleted until tomorrow".into());
-                }
                 if !econ::near(world, actor, target) {
                     return Err("move within 1.5 m of the resource patch".into());
                 }
+                if p.remaining == 0 {
+                    return Err("resource patch is depleted until tomorrow".into());
+                }
                 if world.get::<Gathering>(actor).is_some()
+                    || world.get::<super::hunting::Hunting>(actor).is_some()
                     || world
                         .get::<npc_framework::crafting::Crafting>(actor)
                         .is_some()
@@ -98,12 +187,35 @@ impl VillageAct {
             }
             "eat" | "drink" => {
                 let kind = if self.verb == "eat" {
-                    "bread"
+                    if self.kind.is_empty() {
+                        "bread"
+                    } else {
+                        self.kind.as_str()
+                    }
                 } else {
                     catalog::WATER
                 };
+                if self.verb == "eat"
+                    && (catalog::food_restore(kind).is_none()
+                        || (!super::needs_driven(world) && kind != "bread"))
+                {
+                    return Err(
+                        "eat needs a finished edible good; raw materials must be cooked".into(),
+                    );
+                }
                 if econ::count(world, actor, kind) == 0 {
                     return Err(format!("buy {kind} first"));
+                }
+                Ok(())
+            }
+            "rest_home" | "rest_ground" => {
+                let person = world.get::<Villager>(actor).ok_or("actor has no home")?;
+                if self.verb == "rest_home"
+                    && world.get::<SimPos>(actor).is_none_or(|pos| {
+                        pos.dist2(person.home) > i64::from(HOME_REST_REACH_MM).pow(2)
+                    })
+                {
+                    return Err("move within 0.8 m of your own home before resting".into());
                 }
                 Ok(())
             }
@@ -118,8 +230,15 @@ impl VillageAct {
                 if !econ::near(world, actor, inn) {
                     return Err("move within 1.5 m of the innkeeper".into());
                 }
-                if world.get::<Wallet>(actor).map_or(0, |w| w.coins) < 3 {
-                    return Err("a bed costs 3 coins".into());
+                if world.get::<Wallet>(actor).map_or(0, |w| w.coins) < catalog::BED_PRICE {
+                    return Err(format!("a bed costs {} coins", catalog::BED_PRICE));
+                }
+                if world
+                    .get::<Wallet>(inn)
+                    .and_then(|wallet| wallet.coins.checked_add(catalog::BED_PRICE))
+                    .is_none()
+                {
+                    return Err("the innkeeper's wallet is full".into());
                 }
                 if world.get::<Villager>(actor).is_some_and(|v| {
                     v.resting_until > world.resource::<SimClock>().tick && v.rest_rate >= 400
@@ -128,6 +247,9 @@ impl VillageAct {
                 }
                 Ok(())
             }
+            "talk" if !self.text.is_empty() || self.target.is_none() => {
+                super::speech::check(world, actor, self.target, &self.text)
+            }
             "talk" | "ask_diary" => {
                 let target = self.target(world)?;
                 if !living(world, target)
@@ -135,6 +257,16 @@ impl VillageAct {
                     || !econ::near(world, actor, target)
                 {
                     return Err("move within 1.5 m of a living villager".into());
+                }
+                if actor == target {
+                    return Err("omit target and supply text to speak aloud".into());
+                }
+                if self.verb == "talk"
+                    && world
+                        .get::<Villager>(target)
+                        .is_some_and(|v| v.role == Role::Visitor)
+                {
+                    return Err("include text when speaking to a visiting actor".into());
                 }
                 if self.verb == "ask_diary" {
                     if world
@@ -205,6 +337,19 @@ impl VillageAct {
                 }
                 Ok(())
             }
+            "recover_diary" => {
+                let target = self.target(world)?;
+                if world.get::<DroppedDiary>(target).is_none() {
+                    return Err("target is not a dropped diary".into());
+                }
+                if world.get::<CarriedBy>(target).is_some() {
+                    return Err("this diary is already carried; ask its holder for it".into());
+                }
+                if !econ::near(world, actor, target) {
+                    return Err("move within 1.5 m of the dropped diary".into());
+                }
+                items::can_store(world, actor, target)
+            }
             _ => Err("unknown village action".into()),
         }
     }
@@ -212,6 +357,7 @@ impl VillageAct {
         self.check(world)?;
         let actor = entity(world, self.unit).map_err(|e| e.to_string())?;
         match self.verb.as_str() {
+            "hunt" => super::hunting::begin(world, actor, self.target.expect("checked prey")),
             "stop_work" => {
                 ai::stop_work(world, actor, "stopped by actor");
                 let now = world.resource::<SimClock>().tick;
@@ -230,13 +376,26 @@ impl VillageAct {
                     econ::trade(world, trader, actor, &self.kind, self.quantity)
                 }
             }
+            "offer_goods" => {
+                market::post_offer(world, actor, &self.kind, self.quantity, self.limit_price)
+            }
+            "withdraw_offer" => market::withdraw_offer(world, actor, &self.kind),
             "gather" => {
                 let target = self.target(world)?;
                 ai::begin_gather(world, actor, target, self.target.expect("checked target"))
             }
             "eat" | "drink" => {
                 let (kind, need, amount) = if self.verb == "eat" {
-                    ("bread", "Hunger", 80_000)
+                    let kind = if self.kind.is_empty() {
+                        "bread"
+                    } else {
+                        self.kind.as_str()
+                    };
+                    (
+                        kind,
+                        "Hunger",
+                        catalog::food_restore(kind).expect("checked food"),
+                    )
                 } else {
                     (catalog::WATER, "Thirst", 90_000)
                 };
@@ -250,30 +409,63 @@ impl VillageAct {
                 );
                 Ok(())
             }
+            "rest_home" | "rest_ground" => {
+                let (kind, ticks, rate) = if self.verb == "rest_home" {
+                    ("home", HOME_REST_TICKS, HOME_REST_RATE)
+                } else {
+                    ("ground", GROUND_REST_TICKS, GROUND_REST_RATE)
+                };
+                ai::stop_work(world, actor, "resting");
+                ai::start_rest(world, actor, ticks, rate);
+                record_effect(
+                    world,
+                    Some(SimId(self.unit)),
+                    "VillageRested",
+                    &json!({"kind":kind,"ticks":ticks,"energy_per_tick":rate}),
+                );
+                Ok(())
+            }
             "rest" => {
                 let keeper = self.target(world)?;
                 ai::stop_work(world, actor, "renting a bed");
-                world.get_mut::<Wallet>(actor).expect("wallet").coins -= 3;
-                world.get_mut::<Wallet>(keeper).expect("wallet").coins += 3;
-                ai::start_rest(world, actor, 300, 400);
+                world.get_mut::<Wallet>(actor).expect("wallet").coins -= catalog::BED_PRICE;
+                world.get_mut::<Wallet>(keeper).expect("wallet").coins += catalog::BED_PRICE;
+                ai::start_rest(world, actor, catalog::BED_TICKS, 400);
                 record_effect(
                     world,
                     Some(SimId(self.unit)),
                     "VillageBedRented",
-                    &json!({"coins":3,"ticks":300}),
+                    &json!({"coins":catalog::BED_PRICE,"ticks":catalog::BED_TICKS}),
                 );
                 Ok(())
             }
             "talk" => {
+                if !self.text.is_empty() {
+                    super::speech::speak(world, SimId(self.unit), self.target, &self.text);
+                    return Ok(());
+                }
                 let target = self.target(world)?;
                 let v = world.get::<Villager>(target).expect("villager");
-                let offers:Vec<_>=catalog::outputs(v.role).iter().map(|kind|json!({"kind":kind,"quantity":econ::count(world,target,kind),"price":catalog::price(kind)})).collect();
+                let offered = if market::enabled(world) {
+                    catalog::trade_kinds(world)
+                        .iter()
+                        .copied()
+                        .filter(|kind| market::sells(world, target, kind))
+                        .collect()
+                } else {
+                    catalog::outputs(v.role).to_vec()
+                };
+                let offers: Vec<_> = offered.iter()
+                    .map(|kind| json!({"kind":kind,
+                        "quantity":if market::enabled(world) { market::available_to_sell(world,target,kind) } else { econ::count(world,target,kind) },
+                        "price":market::asking_price(world,target,kind)})).collect();
                 record_effect(
                     world,
                     Some(SimId(self.unit)),
                     "VillageConversation",
-                    &json!({"name":v.name,"role":v.role,"offers":offers,"bed_price":if v.role==Role::Innkeeper{Some(3)}else{None}}),
+                    &json!({"name":v.name,"role":v.role,"offers":offers,"bed_price":if v.role==Role::Innkeeper{Some(catalog::BED_PRICE)}else{None}}),
                 );
+                super::speech::speak(world, SimId(self.unit), self.target, "What do you offer?");
                 Ok(())
             }
             "read_diary" => {
@@ -314,7 +506,19 @@ impl VillageAct {
                 let target = self.target(world)?;
                 let coins = world.get::<CoinPurse>(target).expect("purse").coins;
                 world.get_mut::<Wallet>(actor).expect("wallet").coins += coins;
+                items::take_from_holder(world, target);
                 world.despawn(target);
+                Ok(())
+            }
+            "recover_diary" => {
+                let target = self.target(world)?;
+                items::put_in_inventory(world, actor, target);
+                record_effect(
+                    world,
+                    Some(SimId(self.unit)),
+                    "VillageDiaryRecovered",
+                    &json!({"diary":self.target}),
+                );
                 Ok(())
             }
             _ => Err("unknown village action".into()),

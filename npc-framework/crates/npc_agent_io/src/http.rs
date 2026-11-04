@@ -43,9 +43,9 @@
 
 use std::io::{self, BufRead, BufReader, Read, Write};
 use std::net::{Ipv4Addr, Shutdown, SocketAddr, TcpListener, TcpStream, ToSocketAddrs};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, SyncSender};
+use std::sync::{Arc, Condvar, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -53,6 +53,9 @@ use serde_json::{Value, json};
 
 use crate::api::{RpcError, RpcResult, codes};
 use crate::stats::wall_now;
+
+#[path = "http_budget.rs"]
+mod budget;
 
 /// Largest request body accepted (`413` beyond).
 pub const MAX_BODY: usize = 1024 * 1024;
@@ -116,12 +119,57 @@ pub struct Incoming {
     pub method: String,
     pub params: Option<Value>,
     reply: Sender<RpcResult>,
+    completion: Arc<ResponseCompletion>,
 }
 
 impl Incoming {
     /// Sends the answer (a dropped client is fine).
     pub fn reply(self, result: RpcResult) {
         let _ = self.reply.send(result);
+    }
+
+    /// Reply without blocking the host. The receipt covers the entire HTTP response/batch,
+    /// so shutdown must answer all other calls and close the request queue before awaiting it.
+    pub(crate) fn reply_with_receipt(self, result: RpcResult) -> ReplyReceipt {
+        let receipt = ReplyReceipt(Arc::clone(&self.completion));
+        self.reply(result);
+        receipt
+    }
+}
+
+#[derive(Default)]
+struct ResponseCompletion {
+    written: Mutex<Option<bool>>,
+    changed: Condvar,
+}
+
+/// A transport-only completion, never stored in a simulation world or journal.
+pub(crate) struct ReplyReceipt(Arc<ResponseCompletion>);
+
+impl ReplyReceipt {
+    /// Wait only for a connection flush/close or failure, with a shared shutdown time budget.
+    pub(crate) fn wait_timeout(&self, timeout: Duration) -> bool {
+        let Ok(written) = self.0.written.lock() else {
+            return false;
+        };
+        self.0
+            .changed
+            .wait_timeout_while(written, timeout, |written| written.is_none())
+            .is_ok_and(|(written, _)| *written == Some(true))
+    }
+}
+
+struct CompleteResponse {
+    completion: Arc<ResponseCompletion>,
+    written: bool,
+}
+
+impl Drop for CompleteResponse {
+    fn drop(&mut self) {
+        if let Ok(mut written) = self.completion.written.lock() {
+            *written = Some(self.written);
+            self.completion.changed.notify_all();
+        }
     }
 }
 
@@ -186,13 +234,28 @@ impl HttpServer {
     pub fn try_recv(&self) -> Option<Incoming> {
         self.rx.try_recv().ok()
     }
+
+    /// Stop accepting host requests and disconnect the queue. A batch worker can then finish
+    /// later members with stopping errors instead of waiting for a host that is awaiting flush.
+    pub(crate) fn close_requests(&mut self) -> Vec<Incoming> {
+        self.stop_listener();
+        let (tx, rx) = mpsc::channel();
+        drop(tx);
+        let pending = std::mem::replace(&mut self.rx, rx);
+        pending.try_iter().collect()
+    }
+
+    fn stop_listener(&self) {
+        if !self.stop.swap(true, Ordering::SeqCst) {
+            // Wake the accept loop exactly once, including an explicit shutdown before Drop.
+            let _ = TcpStream::connect_timeout(&self.addr, Duration::from_millis(200));
+        }
+    }
 }
 
 impl Drop for HttpServer {
     fn drop(&mut self) {
-        self.stop.store(true, Ordering::SeqCst);
-        // Wake the accept loop.
-        let _ = TcpStream::connect_timeout(&self.addr, Duration::from_millis(200));
+        self.stop_listener();
     }
 }
 
@@ -473,7 +536,11 @@ fn error_response(id: Value, err: &RpcError) -> Value {
 }
 
 /// Handles one JSON-RPC request object; `None` for a notification.
-fn handle_call(req: &Value, tx: &Sender<Incoming>) -> Option<Value> {
+fn handle_call(
+    req: &Value,
+    tx: &Sender<Incoming>,
+    completion: &Arc<ResponseCompletion>,
+) -> Option<Value> {
     let id = req.get("id").cloned();
     let Some(method) = req.get("method").and_then(Value::as_str) else {
         return Some(error_response(
@@ -488,15 +555,22 @@ fn handle_call(req: &Value, tx: &Sender<Incoming>) -> Option<Value> {
         method: method.to_owned(),
         params,
         reply,
+        completion: Arc::clone(completion),
     });
     let result = match sent {
         Err(_) => Err(RpcError::new(
             codes::INTERNAL,
-            "the session is shutting down",
+            "the session is stopping: this call was not run",
         )),
-        Ok(()) => rx
-            .recv_timeout(timeout)
-            .unwrap_or_else(|_| Err(RpcError::new(codes::INTERNAL, "no reply from the session"))),
+        Ok(()) => rx.recv_timeout(timeout).unwrap_or_else(|error| {
+            let message = match error {
+                mpsc::RecvTimeoutError::Disconnected => {
+                    "the session is stopping: this call was not run"
+                }
+                mpsc::RecvTimeoutError::Timeout => "no reply from the session",
+            };
+            Err(RpcError::new(codes::INTERNAL, message))
+        }),
     };
     let id = id?;
     Some(match result {
@@ -506,7 +580,11 @@ fn handle_call(req: &Value, tx: &Sender<Incoming>) -> Option<Value> {
 }
 
 /// The response to a parsed body (`None`: only notifications, no body).
-fn respond(parsed: Result<Value, serde_json::Error>, tx: &Sender<Incoming>) -> Option<Value> {
+fn respond(
+    parsed: Result<Value, serde_json::Error>,
+    tx: &Sender<Incoming>,
+    completion: &Arc<ResponseCompletion>,
+) -> Option<Value> {
     match parsed {
         Err(e) => Some(error_response(
             Value::Null,
@@ -527,14 +605,21 @@ fn respond(parsed: Result<Value, serde_json::Error>, tx: &Sender<Incoming>) -> O
             ),
         )),
         Ok(Value::Array(calls)) => {
-            let out: Vec<Value> = calls.iter().filter_map(|c| handle_call(c, tx)).collect();
+            let out: Vec<Value> = calls
+                .iter()
+                .filter_map(|c| handle_call(c, tx, completion))
+                .collect();
             (!out.is_empty()).then_some(Value::Array(out))
         }
-        Ok(call) => handle_call(&call, tx),
+        Ok(call) => handle_call(&call, tx, completion),
     }
 }
 
 fn handle_connection(stream: TcpStream, tx: &Sender<Incoming>, conf: &Conf) -> io::Result<()> {
+    let mut completion = CompleteResponse {
+        completion: Arc::new(ResponseCompletion::default()),
+        written: false,
+    };
     stream.set_write_timeout(Some(Duration::from_secs(10)))?;
     let mut reader = BufReader::new(DeadlineReader {
         inner: stream.try_clone()?,
@@ -558,10 +643,12 @@ fn handle_connection(stream: TcpStream, tx: &Sender<Incoming>, conf: &Conf) -> i
             "body shorter than Content-Length",
         );
     }
-    match respond(serde_json::from_slice(&body), tx) {
+    let result = match respond(serde_json::from_slice(&body), tx, &completion.completion) {
         Some(r) => write_response(&mut stream, "200 OK", &r.to_string()),
         None => write_response(&mut stream, "200 OK", ""),
-    }
+    };
+    completion.written = result.is_ok();
+    result
 }
 
 // ---------------------------------------------------------------- client
@@ -789,6 +876,56 @@ mod tests {
         );
         done.store(true, Ordering::SeqCst);
         host.join().expect("host");
+    }
+
+    #[test]
+    fn shutdown_receipt_covers_the_entire_batch_and_closing_requests_unblocks_later_members() {
+        let mut server = HttpServer::bind(0).expect("bind");
+        let port = server.port();
+        let client = thread::spawn(move || {
+            post(
+                port,
+                "",
+                r#"[
+                {"jsonrpc":"2.0","id":1,"method":"session/stop"},
+                {"jsonrpc":"2.0","id":2,"method":"queued"},
+                {"jsonrpc":"2.0","id":3,"method":"after_close"}
+            ]"#,
+            )
+        });
+        let stop = server.rx.recv_timeout(REPLY_GRACE).expect("stop arrives");
+        assert_eq!(stop.method, "session/stop");
+        let receipt = stop.reply_with_receipt(Ok(json!({"stopped":true})));
+        let queued = server
+            .rx
+            .recv_timeout(REPLY_GRACE)
+            .expect("next batch member arrives");
+        assert_eq!(queued.method, "queued");
+        // Holding this member deterministically prevents the whole response from being written.
+        assert!(!receipt.wait_timeout(Duration::ZERO));
+        assert!(server.close_requests().is_empty());
+        queued.reply(Err(RpcError::new(
+            codes::INTERNAL,
+            "the session is stopping",
+        )));
+        assert!(
+            receipt.wait_timeout(REPLY_GRACE),
+            "accepted stop must flush before shutdown returns"
+        );
+        let (status, response) = client.join().expect("client completes");
+        assert_eq!(status, 200, "{response}");
+        let batch = response.as_array().expect("batch response");
+        assert_eq!(batch.len(), 3);
+        assert_eq!(batch[0]["result"]["stopped"], true);
+        for answer in &batch[1..] {
+            assert_eq!(answer["error"]["code"], codes::INTERNAL);
+            assert!(
+                answer["error"]["message"]
+                    .as_str()
+                    .unwrap()
+                    .starts_with("the session is stopping")
+            );
+        }
     }
 
     /// An echo host loop on its own thread; stops when the server is dropped

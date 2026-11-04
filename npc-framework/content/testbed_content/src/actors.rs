@@ -736,6 +736,12 @@ pub fn apply_preset(world: &mut World, entity: Entity, p: &ActorPreset) {
 /// are never refused here (`interact` and `order` ask about the verb they
 /// run).
 pub fn verb_gate(world: &World, entity: Entity, verb: &str) -> Option<String> {
+    // Named recipe affordances carry the same actor capability as canonical craft.
+    let verb = if verb.starts_with("craft:") {
+        CRAFT
+    } else {
+        verb
+    };
     if world
         .get_resource::<crate::village::VillageState>()
         .is_some()

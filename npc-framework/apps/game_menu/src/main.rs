@@ -6,7 +6,7 @@
 //!
 //! ```text
 //! cargo run -p game_menu -- [--settings FILE] [--screen NAME] [--resume AGENT]
-//!     [--detached AGENT] [--screenshot PATH [--after-secs S]]
+//!     [--detached AGENT] [--screenshot PATH [--after-secs S]] [--worlds-page ai_scheduler]
 //! ```
 //!
 //! Screens: Main (Explore with an AI agent, Actor Testbed, Village, RTS
@@ -45,9 +45,11 @@
 //! Ctrl+X and Ctrl+V (Cmd on macOS) in a text field copy, cut and paste
 //! through the OS clipboard ([`paste`]). Usage errors exit with code 2.
 
+mod agent_history;
 mod detached;
 mod explorer;
 mod launch;
+mod menu_input;
 mod paste;
 mod power;
 mod quit;
@@ -69,7 +71,7 @@ use screens::{Action, Screen, ScreensPlugin};
 use testbed_content::explorer::settings::Settings;
 
 const USAGE: &str = "usage: game_menu [--settings FILE] [--screen NAME] [--resume AGENT] \
-     [--detached AGENT] [--screenshot PATH [--after-secs S]]";
+     [--detached AGENT] [--sessions AGENT] [--session-view metrics|logs] [--screenshot PATH [--after-secs S] [--capture-size WIDTHxHEIGHT] [--settings-focus ai_logs]] [--worlds-page ai_scheduler]";
 
 /// The settings in use.
 #[derive(Resource, Clone, Debug)]
@@ -91,6 +93,41 @@ pub struct ScreenshotAt {
     after_secs: f32,
 }
 
+impl Args {
+    fn validate(&self) -> Result<(), String> {
+        if self.settings_logs_focus
+            && (self.screenshot.is_none()
+                || self.screen != Screen::Settings
+                || self.sessions.is_some())
+        {
+            return Err(
+                "--settings-focus ai_logs requires --screen settings and --screenshot".into(),
+            );
+        }
+        if self.capture_size.is_some() && self.screenshot.is_none() {
+            return Err("--capture-size requires --screenshot".into());
+        }
+        if self.sessions.is_some() && self.worlds_page.is_some() {
+            return Err("--sessions cannot be combined with --worlds-page".into());
+        }
+        if self.sessions.is_some() && (self.resume.is_some() || self.detached.is_some()) {
+            return Err("--sessions cannot be combined with --resume or --detached".into());
+        }
+        if self.session_view.is_some() && (self.sessions.is_none() || self.screenshot.is_none()) {
+            return Err("--session-view requires --sessions and --screenshot".into());
+        }
+        if self.worlds_page.is_some()
+            && (self.screenshot.is_none() || self.screen != Screen::Worlds)
+        {
+            return Err("--worlds-page requires --screenshot and --screen worlds".into());
+        }
+        if self.worlds_page.is_some() && (self.resume.is_some() || self.detached.is_some()) {
+            return Err("--worlds-page cannot be combined with --resume or --detached".into());
+        }
+        Ok(())
+    }
+}
+
 struct Args {
     settings: Option<PathBuf>,
     screen: Screen,
@@ -98,6 +135,11 @@ struct Args {
     detached: Option<String>,
     screenshot: Option<PathBuf>,
     after_secs: f32,
+    worlds_page: Option<worlds::ScreenshotPage>,
+    sessions: Option<String>,
+    session_view: Option<agent_history::Tab>,
+    capture_size: Option<(u32, u32)>,
+    settings_logs_focus: bool,
 }
 
 fn usage(msg: &str) -> ! {
@@ -116,6 +158,11 @@ fn parse_args() -> Args {
         detached: None,
         screenshot: None,
         after_secs: 3.0,
+        worlds_page: None,
+        sessions: None,
+        session_view: None,
+        capture_size: None,
+        settings_logs_focus: false,
     };
     let mut it = std::env::args().skip(1);
     while let Some(flag) = it.next() {
@@ -137,7 +184,39 @@ fn parse_args() -> Args {
             }
             "--resume" => args.resume = Some(value),
             "--detached" => args.detached = Some(value),
+            "--sessions" => args.sessions = Some(value),
+            "--session-view" => {
+                args.session_view = Some(match value.as_str() {
+                    "metrics" => agent_history::Tab::Metrics,
+                    "logs" => agent_history::Tab::Logs,
+                    _ => usage("--session-view must be metrics or logs"),
+                })
+            }
+            "--capture-size" => {
+                let parsed = value
+                    .split_once('x')
+                    .and_then(|(width, height)| {
+                        Some((width.parse::<u32>().ok()?, height.parse::<u32>().ok()?))
+                    })
+                    .filter(|(width, height)| {
+                        (320..=3840).contains(width) && (320..=2160).contains(height)
+                    });
+                args.capture_size = Some(parsed.unwrap_or_else(|| {
+                    usage("--capture-size must be WIDTHxHEIGHT (320..3840 by 320..2160)")
+                }));
+            }
+            "--settings-focus" => {
+                if value != "ai_logs" {
+                    usage("--settings-focus supports ai_logs");
+                }
+                args.settings_logs_focus = true;
+            }
             "--screenshot" => args.screenshot = Some(PathBuf::from(value)),
+            "--worlds-page" => {
+                args.worlds_page = Some(
+                    worlds::ScreenshotPage::from_name(&value).unwrap_or_else(|error| usage(&error)),
+                )
+            }
             "--after-secs" => {
                 args.after_secs = value
                     .parse()
@@ -146,6 +225,7 @@ fn parse_args() -> Args {
             other => usage(&format!("unknown flag `{other}`")),
         }
     }
+    args.validate().unwrap_or_else(|error| usage(&error));
     args
 }
 
@@ -166,7 +246,7 @@ fn main() {
     app.add_plugins(DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: "npc-framework: game menu".into(),
-            resolution: (960, 720).into(),
+            resolution: args.capture_size.unwrap_or((960, 720)).into(),
             ..default()
         }),
         // Closing quits: every process the game started stops first
@@ -188,6 +268,7 @@ fn main() {
             ScreensPlugin { start: args.screen },
             FieldClipboardPlugin,
             PowerPlugin,
+            agent_history::AgentHistoryPlugin,
         ))
         .add_systems(Startup, |mut commands: Commands| {
             commands.spawn(Camera2d);
@@ -203,10 +284,20 @@ fn main() {
             commands.queue(move |w: &mut World| screens::apply_action(w, Action::Launch(entry)));
         });
     }
+    if let Some(page) = args.worlds_page {
+        app.insert_resource(page);
+    }
     if let Some(agent) = args.detached {
         app.add_systems(Startup, move |mut commands: Commands| {
             let agent = agent.clone();
             commands.queue(move |w: &mut World| detached::watch_running(w, &agent));
+        });
+    }
+    if let Some(agent) = args.sessions {
+        let tab = args.session_view.unwrap_or(agent_history::Tab::Metrics);
+        app.add_systems(Startup, move |mut commands: Commands| {
+            let agent = agent.clone();
+            commands.queue(move |world: &mut World| agent_history::open_tab(world, agent, tab));
         });
     }
     if let Some(path) = args.screenshot {
@@ -216,7 +307,24 @@ fn main() {
         })
         .add_systems(Last, take_screenshot);
     }
+    if args.settings_logs_focus {
+        app.add_systems(Update, focus_logs_for_capture);
+    }
     app.run();
+}
+
+fn focus_logs_for_capture(
+    fields: Query<(Entity, &bevy::ui::prelude::AccessibleLabel), With<bevy::text::EditableText>>,
+    mut focus: ResMut<bevy::input_focus::InputFocus>,
+    mut applied: Local<bool>,
+) {
+    if *applied {
+        return;
+    }
+    if let Some((entity, _)) = fields.iter().find(|(_, label)| label.0 == "AI logs folder") {
+        focus.set(entity, bevy::input_focus::FocusCause::Navigated);
+        *applied = true;
+    }
 }
 
 fn take_screenshot(
@@ -242,4 +350,77 @@ fn take_screenshot(
             exit.write(AppExit::Success);
         },
     );
+}
+
+#[cfg(test)]
+mod capture_args_tests {
+    use super::*;
+    #[test]
+    fn worlds_page_is_known_and_requires_a_worlds_screenshot_without_launch_actions() {
+        assert!(worlds::ScreenshotPage::from_name("unknown").is_err());
+        let mut args = Args {
+            settings: None,
+            screen: Screen::Main,
+            resume: None,
+            detached: None,
+            screenshot: None,
+            after_secs: 3.0,
+            worlds_page: None,
+            sessions: None,
+            session_view: None,
+            capture_size: None,
+            settings_logs_focus: false,
+        };
+        assert!(
+            args.validate().is_ok(),
+            "ordinary menu defaults are unchanged"
+        );
+        args.worlds_page = Some(worlds::ScreenshotPage::from_name("ai_scheduler").unwrap());
+        assert!(args.validate().is_err());
+        args.screen = Screen::Worlds;
+        assert!(
+            args.validate().is_err(),
+            "page selection is screenshot-only"
+        );
+        args.screenshot = Some(PathBuf::from("target/shots/worlds-ai-scheduler.png"));
+        args.validate().unwrap();
+        args.screen = Screen::Main;
+        assert!(args.validate().is_err());
+        args.screen = Screen::Worlds;
+        args.resume = Some("Herp".into());
+        assert!(args.validate().is_err());
+        args.resume = None;
+        args.detached = Some("Herp".into());
+        assert!(args.validate().is_err());
+    }
+    #[test]
+    fn history_capture_flags_are_bounded_and_do_not_mix_with_world_launches() {
+        let mut args = Args {
+            settings: None,
+            screen: Screen::Main,
+            resume: None,
+            detached: None,
+            screenshot: None,
+            after_secs: 3.0,
+            worlds_page: None,
+            sessions: Some("Fixture".into()),
+            session_view: None,
+            capture_size: None,
+            settings_logs_focus: false,
+        };
+        args.validate().unwrap();
+        args.session_view = Some(agent_history::Tab::Logs);
+        assert!(args.validate().is_err());
+        args.screenshot = Some("target/shots/logs.png".into());
+        args.capture_size = Some((480, 720));
+        args.validate().unwrap();
+        args.detached = Some("Fixture".into());
+        assert!(args.validate().is_err());
+        args.detached = None;
+        args.resume = Some("Fixture".into());
+        assert!(args.validate().is_err());
+        args.resume = None;
+        args.worlds_page = Some(worlds::ScreenshotPage::from_name("ai_scheduler").unwrap());
+        assert!(args.validate().is_err());
+    }
 }

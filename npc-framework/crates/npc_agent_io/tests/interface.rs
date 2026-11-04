@@ -112,6 +112,59 @@ fn statuses(app: &mut App) -> Vec<String> {
 }
 
 #[test]
+fn public_action_notices_cover_accepted_steps_without_arguments_or_rejected_intentions() {
+    use npc_agent_io::stats::ActionNotices;
+    let mut app = toy_app();
+    let reply = act(
+        &mut app,
+        json!({"steps":[
+            {"verb":"hop","args":{"n":3,"private_note":"PRIVATE_NOTE_SENTINEL"}},
+            {"verb":"hop","args":{"n":4}}
+        ]}),
+    );
+    assert_eq!(reply["accepted"], true);
+    let notices = app.world().resource::<ActionNotices>();
+    assert_eq!(notices.entries.len(), 2);
+    assert!(
+        notices
+            .entries
+            .iter()
+            .all(|notice| notice.unit == 1 && notice.verb == "hop")
+    );
+    assert!(notices.entries[0].seq < notices.entries[1].seq);
+    assert!(!format!("{:?}", notices.entries).contains("PRIVATE_NOTE_SENTINEL"));
+    let rejected = act(
+        &mut app,
+        json!({"steps":[{"verb":"hop"},{"verb":"missing"}]}),
+    );
+    assert_eq!(rejected["accepted"], false);
+    assert_eq!(app.world().resource::<ActionNotices>().entries.len(), 2);
+    run_ticks(app.world_mut(), 1);
+    call(&mut app, "agent/cancel", json!({"unit":1,"controller":"c"}));
+    assert_eq!(
+        app.world()
+            .resource::<ActionNotices>()
+            .entries
+            .back()
+            .unwrap()
+            .verb,
+        "cancel"
+    );
+    assert!(
+        api::call(
+            app.world_mut(),
+            "agent/cancel",
+            Some(json!({"unit":1,"controller":"other"}))
+        )
+        .is_err()
+    );
+    assert_eq!(app.world().resource::<ActionNotices>().entries.len(), 3);
+    let before = npc_kernel::hash::state_hash(app.world_mut());
+    app.world_mut().remove_resource::<ActionNotices>();
+    assert_eq!(npc_kernel::hash::state_hash(app.world_mut()), before);
+}
+
+#[test]
 fn multi_step_acts_are_all_or_nothing() {
     let mut app = toy_app();
     let r = act(

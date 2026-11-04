@@ -40,10 +40,12 @@ mod explorer_modal;
 mod explorer_panel;
 mod field_clipboard;
 mod fog;
+mod homestead_panel;
 mod landmarks;
 mod model_preview;
 mod overlay;
 mod panels;
+mod player_actions;
 mod robots;
 mod scene;
 mod village;
@@ -115,6 +117,7 @@ impl Plugin for TestbedViewPlugin {
             assets::plugin,
             village_world::plugin,
             village::plugin,
+            homestead_panel::plugin,
             robots::plugin,
             scene::plugin,
             camera::plugin,

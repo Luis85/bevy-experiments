@@ -59,6 +59,7 @@ use npc_framework::prelude::{
     CarriedBy, CellCoord, GridBounds, Item, MountedIn, SimClock, SimId, SimPos, SpatialGrid,
 };
 use npc_framework::view_helpers::{ViewHidden, ViewSystems, VisualOf};
+use testbed_content::village::hunting::Wildlife;
 use testbed_content::{Prop, PropKind, TestbedUnit};
 
 /// Mask alpha of a never-explored cell: black.
@@ -477,6 +478,7 @@ fn decide_looks(
         &SimId,
         Option<&SimPos>,
         Has<TestbedUnit>,
+        Has<Wildlife>,
         Option<&Prop>,
         Has<Item>,
         Option<&CarriedBy>,
@@ -500,7 +502,7 @@ fn decide_looks(
     let lens = lens.as_ref();
     let mut hidden = ViewHidden::default();
     for (of, mut fogged, mut dim, mut vis) in &mut roots {
-        let Ok((&id, pos, unit, prop, item, carried)) = sims.get(of.0) else {
+        let Ok((&id, pos, unit, wildlife, prop, item, carried)) = sims.get(of.0) else {
             continue;
         };
         let look = if item {
@@ -510,7 +512,7 @@ fn decide_looks(
                 continue;
             };
             match prop.map(|p| p.kind) {
-                _ if unit => unit_look(lens, id),
+                _ if unit || wildlife => unit_look(lens, id),
                 Some(PropKind::Cart | PropKind::Wagon) => unit_look(lens, id),
                 // Its pieces are fogged one by one.
                 Some(PropKind::Wall) => Look::Live,
@@ -934,6 +936,122 @@ mod tests {
         lens.memory = None;
         assert_eq!(unit_look(Some(&lens), SimId(12)), Look::Live);
         assert_eq!(unit_look(Some(&lens), SimId(5)), Look::Hidden);
+    }
+
+    #[test]
+    fn wildlife_visuals_require_current_perception_even_in_a_visible_cell() {
+        use npc_framework::view_helpers::{Selectable, command_ui::pick_unit, sim_to_world};
+
+        let mut fixture = World::new();
+        fixture.see(1, 0);
+        let deer_id = SimId(7);
+        let pos = at(1, 0);
+        assert_eq!(
+            static_look(Some(&fixture.lens()), deer_id, pos),
+            Look::Live,
+            "visible ground alone would expose this animal if it used the static branch"
+        );
+        let mut app = App::new();
+        app.insert_resource(fixture.grid)
+            .insert_resource(FogOfWar { enabled: true })
+            .insert_resource(SimClock::default())
+            .init_resource::<ViewHidden>()
+            .add_systems(Update, decide_looks);
+        let observer = app
+            .world_mut()
+            .spawn((
+                SimId(1),
+                RevealsFog,
+                fixture.explored,
+                fixture.visible,
+                fixture.seen,
+                fixture.memory,
+            ))
+            .id();
+        let deer = app
+            .world_mut()
+            .spawn((
+                deer_id,
+                pos,
+                Wildlife { habitat: SimId(8) },
+                testbed_content::village::Vitality::default(),
+            ))
+            .id();
+        let feet = sim_to_world(pos);
+        let visual = app
+            .world_mut()
+            .spawn((
+                VisualOf(deer),
+                Fogged::default(),
+                FogDim::default(),
+                Visibility::Inherited,
+                Selectable,
+                GlobalTransform::from_translation(feet),
+            ))
+            .id();
+        let origin = feet + Vec3::new(0.0, 10.0, 10.0);
+        let body = feet + Vec3::Y * npc_framework::view_helpers::PICK_HEIGHT;
+        let ray = Ray3d::new(origin, Dir3::new(body - origin).unwrap());
+        app.update();
+        assert_eq!(app.world().get::<Fogged>(visual).unwrap().0, Look::Hidden);
+        assert_eq!(
+            app.world().get::<Visibility>(visual),
+            Some(&Visibility::Hidden)
+        );
+        assert!(app.world().resource::<ViewHidden>().hides(deer));
+        assert_eq!(
+            pick_unit(app.world_mut(), ray),
+            None,
+            "an unsensed animal cannot be picked"
+        );
+
+        app.world_mut()
+            .get_mut::<PerceptionMemory>(observer)
+            .unwrap()
+            .percepts
+            .insert(
+                deer_id,
+                Percept {
+                    last_seen_tick: 1,
+                    pos,
+                    via: SenseKind::Vision,
+                    confidence: 1000,
+                    kinds: testbed_content::world::kinds::UNIT,
+                    sensed: true,
+                },
+            );
+        app.world_mut().resource_mut::<SimClock>().tick = 1;
+        app.update();
+        assert_eq!(app.world().get::<Fogged>(visual).unwrap().0, Look::Live);
+        assert_eq!(
+            app.world().get::<Visibility>(visual),
+            Some(&Visibility::Inherited)
+        );
+        assert!(!app.world().resource::<ViewHidden>().hides(deer));
+        assert_eq!(
+            pick_unit(app.world_mut(), ray),
+            Some((deer_id, deer)),
+            "the actual picker can select a currently sensed animal"
+        );
+
+        app.world_mut()
+            .get_mut::<PerceptionMemory>(observer)
+            .unwrap()
+            .percepts
+            .get_mut(&deer_id)
+            .unwrap()
+            .sensed = false;
+        app.world_mut().resource_mut::<SimClock>().tick = 2;
+        app.update();
+        assert_eq!(
+            app.world().get::<Visibility>(visual),
+            Some(&Visibility::Hidden)
+        );
+        assert_eq!(
+            pick_unit(app.world_mut(), ray),
+            None,
+            "stale memory does not keep an animal selectable"
+        );
     }
 
     #[test]

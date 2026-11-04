@@ -387,7 +387,8 @@ pub fn intrinsic_recovery(world: &World, e: Entity, verb: &str) -> bool {
 }
 pub fn verb_gate(world: &World, e: Entity, verb: &str) -> Option<String> {
     let p = &world.get_resource::<ActiveWorld>()?.0;
-    if (!p.systems.crafting && verb.eq_ignore_ascii_case("craft"))
+    let base_verb = verb.split_once(':').map_or(verb, |(base, _)| base);
+    if (!p.systems.crafting && base_verb.eq_ignore_ascii_case("craft"))
         || (!p.systems.locked_doors && matches!(verb, "lock" | "unlock"))
         || (!p.systems.vehicles && matches!(verb, "mount" | "dismount" | "drive_to" | "unload"))
         || (!p.systems.progression && matches!(verb, "study" | "teach" | "spend_points"))

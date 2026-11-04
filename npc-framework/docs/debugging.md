@@ -12,6 +12,10 @@ spec (`…/2026-10-23-agent-control-design.md`), ADRs 0006 and 0010. Agent exper
 
 The [Island Village guide](ai-village.md) covers its economy, permanent death/diaries and scene AI
 supervision (`npcctl scheduler bind|unbind|status`, real-time idle/cooldown policy and owned fake-runner checks).
+The [AI Agent Game Client guide](ai-agent-game-client.md) describes automatic
+Codex/Claude session creation, game-supplied prompts, native Start/Stop controls,
+client status, ownership and subscription-login troubleshooting. Manual scheduler
+binding is the compatibility path for separately managed conversations.
 
 - [1. Which tool for which question](#1-which-tool-for-which-question)
 - [2. npcctl, the headless CLI](#2-npcctl-the-headless-cli)
@@ -413,7 +417,7 @@ name.
 | `.` | one tick (while paused) | one tick | one tick |
 | speed | 1 / 2 / 3 / 4 = 1×, 3×, 10×, 0× | `-` / `=` slower / faster (1×, 3×, 10×) | – |
 | F1 | overlay (needs, tree path, target, reservations, state hash) | overlay (pose, interaction, crafting, ride, needs, tree path, order queue, equipment, inventory) | – |
-| F2 | – | – | path gizmos |
+| F2 | – | Home & farm (expanded Living island): native plot/build/crop, supplies and food/trade controls | path gizmos |
 | F3 / F4 | journal / perf panel | journal / perf panel | journal / perf panel |
 | F5 / F6 | – | character sheet / perception (cone, LOS, memory) | – |
 | mouse | left click selects a villager | select / box (Shift adds), right click context order (Shift queues), Ctrl+1–9 / 1–9 groups, Z/X/C/V formations, H/B/U hold/stop/unload | select / box, right click `Move` (A: `AttackMove`, P: `Patrol`, Shift: queue), Ctrl+1–9 / 1–9, Z/X/C/V, S/H |
@@ -1116,6 +1120,17 @@ cargo run -p village -- --seed 1 --screenshot "$PWD/target/shots/quick.png" --af
 cargo run -p actor_testbed -- --select 38 --panels sheet,perception --screenshot "$PWD/target/shots/tb.png" --after-secs 8
 cargo run -p rts_units_demo -- --screenshot "$PWD/target/shots/rts.png" --after-secs 18
 ```
+
+For a background capture of the Worlds editor's AI scheduler page, prepare an
+existing disposable settings file with agents/worlds folders under `target/`, then run:
+
+```powershell
+cargo run --locked -p game_menu -- --settings target/capture/menu-settings.json --screen worlds --worlds-page ai_scheduler --screenshot target/capture/worlds-ai-scheduler.png --after-secs 5
+```
+
+`--worlds-page ai_scheduler` requires `--screen worlds` and `--screenshot`.
+It selects the initial page without editing the preset. No mouse/keyboard input
+or debug server is needed; ordinary menu startup is unchanged.
 
 At an exact tick (the sim is deterministic, the frame is not):
 

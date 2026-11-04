@@ -22,6 +22,12 @@ pub struct Settings {
     pub actors_dir: Option<PathBuf>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub worlds_dir: Option<PathBuf>,
+    /// Optional JSON metrics destination for dedicated AI clients (operator data).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_metrics_dir: Option<PathBuf>,
+    /// Optional private Markdown-log destination for dedicated AI clients.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_logs_dir: Option<PathBuf>,
 }
 
 /// The actor presets folder beside the agents folder:
@@ -54,6 +60,8 @@ impl Settings {
             fog_of_war: true,
             actors_dir: None,
             worlds_dir: None,
+            ai_metrics_dir: None,
+            ai_logs_dir: None,
         }
     }
 
@@ -157,6 +165,8 @@ mod tests {
             fog_of_war: false,
             actors_dir: Some(d.join("my-actors")),
             worlds_dir: Some(d.join("my-worlds")),
+            ai_metrics_dir: Some(d.join("ai-metrics")),
+            ai_logs_dir: Some(d.join("ai-logs")),
         };
         s.save(&f).unwrap();
         assert_eq!(Settings::load(&f, &home), s);
@@ -176,6 +186,8 @@ mod tests {
         let s = Settings::load(&f, &home);
         assert_eq!(s.agents_dir, PathBuf::from("/x/agents"));
         assert!(s.fog_of_war);
+        assert!(s.ai_metrics_dir.is_none());
+        assert!(s.ai_logs_dir.is_none());
         let _ = std::fs::remove_dir_all(&d);
     }
 
@@ -275,6 +287,8 @@ mod tests {
             fog_of_war: true,
             actors_dir: None,
             worlds_dir: None,
+            ai_metrics_dir: None,
+            ai_logs_dir: None,
         };
         let json = serde_json::to_string(&s).unwrap();
         std::fs::write(&f, format!("\u{feff}{json}")).unwrap();

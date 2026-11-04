@@ -38,7 +38,7 @@ use crate::notes::{
 use crate::observe;
 use crate::registration::{self, Authorization};
 use crate::registry::{ActionPlan, ActionRequest, AgentCtx, AgentRegistry, Rejection};
-use crate::stats::AgentStats;
+use crate::stats::{AgentStats, LastRejection};
 
 /// JSON-RPC error codes (the BRP ones where they exist).
 pub mod codes {
@@ -178,7 +178,11 @@ pub fn epoch(world: &World) -> u64 {
 /// The `agent/*`, `notes/*` and `world/*` method names this module serves
 /// (the session host adds `world/load_scenario`, `world/reset`,
 /// `session/stop` and a subset of `npc/*`).
-pub const METHODS: [&str; 28] = [
+pub const METHODS: [&str; 32] = [
+    "client/claim",
+    "client/poll",
+    "client/release",
+    "client/turn",
     "scheduler/status",
     "agent/register",
     "agent/enter_world",
@@ -252,6 +256,12 @@ fn submit_cmd(world: &mut World, cmd: SimCommand) -> Result<(u64, u32), RpcError
 /// [`events_result`], [`act_and_wait_start`], [`act_wait_ready`] and
 /// [`act_wait_result`].
 pub fn call(world: &mut World, method: &str, mut p: Option<Value>) -> RpcResult {
+    if matches!(
+        method,
+        "client/claim" | "client/poll" | "client/release" | "client/turn"
+    ) {
+        return crate::scheduler::client_host::call(world, method, p);
+    }
     if registration::bootstrap(method) {
         return registration::call(world, method, p);
     }
@@ -516,12 +526,17 @@ struct CancelParams {
 }
 
 fn cancel(world: &mut World, p: CancelParams) -> RpcResult {
+    let notice_tick = now(world)?;
     let cmd = AgentCancel {
         unit: p.unit,
         controller: p.controller,
         handle: p.handle,
     };
     let (tick, _) = submit_cmd(world, SimCommand::content(&cmd))?;
+    let notice_epoch = epoch(world);
+    world
+        .get_resource_or_init::<crate::stats::ActionNotices>()
+        .accepted(notice_epoch, notice_tick, p.unit, "cancel");
     stamp(
         world,
         json!({"unit": p.unit, "handle": p.handle, "applies_at": tick}),
@@ -529,11 +544,16 @@ fn cancel(world: &mut World, p: CancelParams) -> RpcResult {
 }
 
 fn clear(world: &mut World, p: OwnerParams) -> RpcResult {
+    let notice_tick = now(world)?;
     let cmd = AgentClear {
         unit: p.unit,
         controller: p.controller,
     };
     let (tick, _) = submit_cmd(world, SimCommand::content(&cmd))?;
+    let notice_epoch = epoch(world);
+    world
+        .get_resource_or_init::<crate::stats::ActionNotices>()
+        .accepted(notice_epoch, notice_tick, p.unit, "clear");
     stamp(world, json!({"unit": p.unit, "applies_at": tick}))
 }
 
@@ -612,6 +632,15 @@ fn observe_method(world: &mut World, p: ObserveParams) -> RpcResult {
     let changes = p
         .since_seq
         .map(|s| observe::changes(world, SimId(p.unit), s));
+    // Unattributed operator inspection must not consume the connected AI's notifications.
+    if let Some(controller) = p
+        .controller
+        .as_deref()
+        .filter(|id| owner.as_deref() == Some(*id))
+        && let Some(seq) = obs["seq"].as_u64()
+    {
+        crate::scheduler::acknowledge(world, controller, SimId(p.unit), seq);
+    }
     Ok(match p.format {
         Format::Json => {
             if let Some(c) = changes {
@@ -789,6 +818,24 @@ fn reject_with(
         .get_resource::<SimIndex>()
         .and_then(|i| i.get(SimId(unit)))
         .map(|_| SimId(unit));
+    if let Some(unit) = unit {
+        let tick = world
+            .get_resource::<SimClock>()
+            .map_or(0, |clock| clock.tick);
+        if let Some(stats) = world
+            .resource_mut::<AgentStats>()
+            .controllers
+            .get_mut(controller)
+        {
+            stats.last_rejection = Some(LastRejection {
+                unit: unit.0,
+                tick,
+                verb: verb.chars().take(128).collect(),
+                reason: r.reason.chars().take(128).collect(),
+                message: r.message.chars().take(1024).collect(),
+            });
+        }
+    }
     let (c, v, reason) = (controller.to_owned(), verb.to_owned(), r.reason.clone());
     journal::record(world, unit, || JournalKind::ActionRejected {
         controller: c,
@@ -1294,6 +1341,12 @@ pub fn act(world: &mut World, p: ActParams) -> RpcResult {
     world
         .get_resource_or_init::<AgentStats>()
         .accepted(&controller);
+    let action_epoch = epoch(world);
+    for verb in &verbs {
+        world
+            .get_resource_or_init::<crate::stats::ActionNotices>()
+            .accepted(action_epoch, tick, unit, verb);
+    }
     let handles: Vec<Value> = report
         .iter()
         .map(|r| r["handle"].clone())
@@ -1783,6 +1836,18 @@ pub fn events_result(world: &mut World, p: &EventsParams, timed_out: bool) -> Rp
     } else {
         0
     };
+    // A filtered read must not acknowledge kinds the caller did not receive.
+    // Only the assigned owner's ordinary complete stream consumes notifications.
+    if (p.kinds.is_empty() || p.kinds.iter().any(|kind| kind.eq_ignore_ascii_case("all")))
+        && let (Some(unit), Some(controller)) = (p.unit, p.controller.as_deref())
+        && world
+            .get_resource::<SimIndex>()
+            .and_then(|index| index.get(SimId(unit)))
+            .and_then(|entity| world.get::<ExternalController>(entity))
+            .is_some_and(|owner| owner.id == controller)
+    {
+        crate::scheduler::acknowledge(world, controller, SimId(unit), next_seq);
+    }
     let journal_on = journal::is_recording(world);
     let events: Value = if p.dedupe {
         Value::Array(dedupe(&found))

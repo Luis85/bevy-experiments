@@ -28,6 +28,9 @@ pub enum Role {
     Miner,
     Smith,
     Innkeeper,
+    Hunter,
+    Tanner,
+    Tailor,
 }
 impl Role {
     pub const RESIDENTS: [Self; 9] = [
@@ -53,6 +56,9 @@ impl Role {
             Self::Miner => "miner",
             Self::Smith => "blacksmith",
             Self::Innkeeper => "innkeeper",
+            Self::Hunter => "hunter",
+            Self::Tanner => "tanner",
+            Self::Tailor => "tailor",
         }
     }
     pub fn person(self) -> &'static str {
@@ -67,6 +73,9 @@ impl Role {
             Self::Miner => "Bram",
             Self::Smith => "Ivo",
             Self::Innkeeper => "Tess",
+            Self::Hunter => "Rhea",
+            Self::Tanner => "Sage",
+            Self::Tailor => "Lina",
         }
     }
     pub fn tag(self) -> u8 {
@@ -293,7 +302,11 @@ pub enum Season {
 pub fn calendar(world: &World) -> (u64, Season, bool) {
     let tick = world.resource::<SimClock>().tick;
     let config = world.resource::<SimConfig>();
-    let day = tick / config.day_length.max(1);
+    calendar_at(tick, config, super::needs_driven(world))
+}
+/// Shared simulation/observer calendar; Living starts in late autumn.
+pub fn calendar_at(tick: u64, config: &SimConfig, needs_driven: bool) -> (u64, Season, bool) {
+    let day = tick / config.day_length.max(1) + if needs_driven { 19 } else { 0 };
     let season = match day / DAYS_PER_SEASON % 4 {
         0 => Season::Spring,
         1 => Season::Summer,

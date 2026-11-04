@@ -8,7 +8,136 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Native homestead play
+
+- Add Home & farm (F2): explicit human control, plot claiming, material-backed cottage building,
+  individual crop beds, gathering, workshop recipes, food/rest and actual market actions.
+- Walk to the selected door, bed or remembered worksite before revalidating shared actions;
+  preserve foreign control, fog knowledge and cancellation across actor/world changes.
+- Keep saved growing crops while discarding the hero's stale queued homestead input on host resume.
+
+### Expanded Living Village and homesteads
+
+- Add immutable compact/expanded island profiles. New Living worlds have roughly 56% more
+  land, connected trade routes, three districts and six clear house/garden plots; saved compact
+  worlds retain their shoreline. Add the `living_homestead` preset without overwriting user files.
+- Let all living actors claim plots, build cottages from real reserved planks/logs, plant and water
+  grain, harvest it and use the ordinary food/market chains. Preserve ownership, home and crop
+  deadlines through save/resume; release construction claims on stop, failure or death.
+- Prefer ready NPC work over buffer shopping, enable actionable emergency subsistence during
+  night/recovery, and share client work reach. Verify continued survival and trade over fourteen days.
+- Draw actual homes/crop stages in native and browser views, preserve fog knowledge, improve
+  names/inventory/market/inspector feedback, and notify agents of closed homestead outcomes.
+- Keep newer applied actor effects visible after long action histories in the generic bounded
+  observation summary; detailed clients retain incremental event-stream consumption.
+
+### Living Island Village economy
+
+- Add the opt-in `living_island` preset and `living_village` scenario, with hunter,
+  tanner and tailor professions. Hunger, thirst and cold generate demand that
+  propagates through real recipes to gathering, hunting, production and trade.
+- Add saved deterministic market prices, bounded trading history and cash-backed
+  purchasing plans. Protect urgent survival and complete manufacturing input bundles;
+  keep conditional affordability bids within the buyer's working capital.
+- Let clients offer actual carried goods for physical NPC purchases, withdraw offers,
+  and set buy/sell price limits through the shared action API. New chains make meals,
+  spears, leather, thread and equipped clothing from finite resources and wildlife.
+- Show jobs, wildlife, warmth, clothing and market prices in the native/browser views;
+  publish closed hunting, listing, rest and clothing events for AI continuation.
+  This mode requires a fresh world. See `docs/living-island-economy.md` for commands,
+  the independently BazaarBot-inspired design and its scope.
+
+### NPC life and shared environment actions
+
+- Run island residents through the existing reactive behavior-tree runtime, with
+  inspectable water/food/recovery/night/profession goals, critical need interruption,
+  shared order execution, external-control suspension and deterministic saved decisions.
+- Give NPCs and clients the same validated consumption, trade, gather and recovery paths.
+  Add `rest_home`, `rest_ground` and `recover_diary`, and clean up redeemed coin purses
+  from their holder's inventory. NPC manufacturing respects world crafting settings.
+- Register every named island recipe for headless clients and share crafting policy
+  between aliases and canonical actions. Improve paid ingredient logistics with
+  bounded batches and smaller purchases for tight packs, sustaining the food chain.
+- Add perception-scoped resource stock/renewal and workstation input/output information;
+  expose public decisions, production recipes and renewal timing in the observer views.
+  Island content hashes change; this increment requires a fresh island rather than
+  silently migrating old island saves. See `docs/npc-life-and-environment.md`.
+
+### Dedicated AI Agent Game Client
+
+- Add native Sessions views for logs and metrics in explorer controls and the
+  game menu, with history/page navigation, live following, keyboard scrolling and
+  read-only background loading. Add an independent AI logs folder in Settings;
+  normal/fresh starts reread saved folder preferences. Keep workspace-owned links
+  to earlier output folders and show actual/requested metadata and cost availability.
+
+- Automatically save a private Markdown log for every client run, covering prompts,
+  CLI conversation/tool output, game notifications, usage and lifecycle. Redact
+  credentials before writing, preserve previous runs, and support `--logs-dir` /
+  `NPC_AI_LOGS_DIR` independently of JSON metrics. Logging failure stops dispatch
+  while preserving accepted identity and accounting.
+
+- Add `ai-agent-game-client` alongside `npcctl` to create and resume Codex or Claude
+  CLI conversations using existing subscription login. The client supplies the
+  initial mission and registered game tools automatically, with bounded event/idle
+  continuation, cancellation, private session persistence and explicit fresh-session recovery.
+- Add native explorer and detached-world Start Codex/Start Claude/Stop agent/status
+  controls; F10 reopens windowed controls. Prompt copying and manual session binding
+  remain optional compatibility tools.
+- Add authenticated host leases, shared turn capacity and bounded actor notification
+  feeds outside simulation state. Reuse observation acknowledgments and prevent
+  legacy/client duplicate dispatch. Cover both provider protocols with real-host,
+  fake-provider process rehearsals, including Windows crash cleanup and recovery.
+- Resolve Codex gameplay model and effort from its effective workspace configuration
+  and visible catalog before dispatch, preserving supported choices and otherwise
+  using only validated advertised defaults through process-local arguments. Record
+  selection intent separately from provider-reported execution metrics; workspace
+  preflight performs metadata requests without starting a model turn.
+- Add explicit Codex `--approve-game-tools` consent for only the 16 validated
+  registered game tools on owned processes, with native Start scope text and
+  refusal of conflicting CLI approval settings. Report canonical game-tool
+  cancellation as a closed failure, stop without retry, and preserve reported
+  usage and private session continuity without retaining tool payloads.
+- Stop on provider identity faults across normal polling and reconnect cleanup,
+  preserve the original private conversation, and exclude foreign-session usage
+  from its accounting even when a cancellation precedes the identity fault.
+- Correct Codex CLI 0.145.0 token accounting across resumed conversations. Metrics
+  format 2 preserves legacy preimages, labels unverified history and partial
+  coverage, and keeps reported session snapshots separate from tracked deltas.
+
+### Browser world observer
+
+- Add opt-in `npcctl serve --world-state-out FILE --world-state-interval-ms N` for ordinary and explorer
+  island hosts. Publish versioned read-only JSON between ticks through atomic replacement, preserving
+  simulation hashes and private agent/diary data. The sibling `npc-world-viewer` TypeScript project
+  follows the file with an interactive pixel-art ExcaliburJS island and entity inspection.
+
 ### Island Village and AI continuation
+
+- Publish fresh successor notebooks during new-life registration, preserving
+  previous-life files and removing the delay before notebook access.
+
+- Clean generated Start/Resume prompt text and remove the BOM-prefixed Windows copy transport;
+  prompt copies use UTF-8 stdin with no text in executable arguments. Preserve Unicode spelling and
+  meaningful spacing, and align the briefing with speech and saved event-continuation settings.
+
+- Add recorded actor dialogue, an explicit session-bound MCP `talk` tool, nearby addressed/aloud
+  hearing and bounded resident replies. Read-only thought/action and speech bubbles explain public
+  actions and dialogue for stream viewers; incoming speech can notify its connected AI recipient.
+
+- Make AI continuation event-aware: route bounded, deduplicated actor outcomes and public phase
+  changes to the exact connected conversation, acknowledge observed cursors, retain pending events
+  through busy/paused/cooldown states, and expose event delivery controls/status in the native UI.
+  Content summaries stay behind a host adapter; raw journal payloads and private data are excluded.
+
+- Prepare Herp's stream with a dedicated operator run sheet, clearer remaining-reserve and queued-action
+  guidance, registered cancellation/restart/Diary regressions, and three-day economy/season-boundary
+  fixtures. Throttled actor captions explain residents' current work; the observer HUD reports actual
+  gathering, purchases, sales, meals and lodging, including the visiting actor's seller perspective.
+
+- Expose perceived merchant demand, concrete trade refusals and actor activity without revealing
+  merchant wallets. Add island onboarding and MCP-only Codex workspace configuration, native activity
+  and recovery feedback, read-only continuation preflight, and maintained first-playtest fixtures/runbook.
 
 - Polish world captions with measured, bounded placement and actor priority; stabilize the diary reader's
   selected book, page boundaries and scroll position. Scheduler controls name their next action and status

@@ -412,7 +412,14 @@ pub fn start_game(world: &mut World, entry: Entry) {
         return;
     }
     let settings = world.resource::<AppSettings>().0.clone();
-    let (stem, args) = launch::command_for(&entry, &settings);
+    let (stem, mut args) = launch::command_for(&entry, &settings);
+    if let Err(error) = detached::append_projection_handover_args(world, &entry, &mut args) {
+        world.insert_resource(MainNotice::error(format!(
+            "cannot preserve world projection: {error}"
+        )));
+        set_screen(world, Screen::Main);
+        return;
+    }
     let exe_dir = world.resource::<Paths>().exe_dir.clone();
     let Some(exe) = launch::find_exe(stem, &exe_dir) else {
         world.insert_resource(Missing::new(stem, entry, &exe_dir));
@@ -436,6 +443,11 @@ pub fn start_game(world: &mut World, entry: Entry) {
     let mut cmd = Command::new(&exe);
     cmd.args(&args).stderr(Stdio::piped());
     if entry.agent().is_some() {
+        client_settings_environment(
+            &mut cmd,
+            &settings,
+            world.resource::<Paths>().settings_file.as_deref(),
+        );
         // The line of a window that moved its world to detached.
         cmd.stdout(Stdio::piped());
     }
@@ -642,6 +654,76 @@ pub(crate) fn show_window(world: &mut World, visible: bool) {
 
 pub fn set_screen(world: &mut World, screen: Screen) {
     world.resource_mut::<NextState<Screen>>().set(screen);
+}
+
+fn client_settings_environment(
+    command: &mut Command,
+    settings: &testbed_content::explorer::settings::Settings,
+    file: Option<&Path>,
+) {
+    let file = file.and_then(|path| std::path::absolute(path).ok());
+    command.env(
+        "NPC_AI_SETTINGS_FILE",
+        file.as_ref()
+            .map(|path| path.as_os_str())
+            .unwrap_or_default(),
+    );
+    // Re-read the exact file when Start is pressed. Do not freeze its folder
+    // preferences into inherited environment that survives a later Clear/Save.
+    if file.is_none() {
+        if let Some(metrics) = &settings.ai_metrics_dir {
+            command.env("NPC_AI_METRICS_DIR", metrics);
+        }
+        if let Some(logs) = &settings.ai_logs_dir {
+            command.env("NPC_AI_LOGS_DIR", logs);
+        }
+    }
+}
+
+#[cfg(test)]
+mod client_folder_tests {
+    use super::*;
+    #[test]
+    fn custom_settings_file_is_forwarded_without_freezing_its_folder_values() {
+        let mut settings =
+            testbed_content::explorer::settings::Settings::default_for(&std::env::temp_dir());
+        settings.ai_metrics_dir = Some(std::env::temp_dir().join("metrics"));
+        settings.ai_logs_dir = Some(std::env::temp_dir().join("logs"));
+        let mut command = Command::new("owned-fixture-never-spawned");
+        client_settings_environment(
+            &mut command,
+            &settings,
+            Some(Path::new("relative-settings.json")),
+        );
+        let env: std::collections::BTreeMap<_, _> = command
+            .get_envs()
+            .map(|(key, value)| (key.to_owned(), value.map(ToOwned::to_owned)))
+            .collect();
+        assert!(
+            Path::new(
+                env[std::ffi::OsStr::new("NPC_AI_SETTINGS_FILE")]
+                    .as_ref()
+                    .unwrap()
+            )
+            .is_absolute()
+        );
+        assert!(!env.contains_key(std::ffi::OsStr::new("NPC_AI_METRICS_DIR")));
+        assert!(!env.contains_key(std::ffi::OsStr::new("NPC_AI_LOGS_DIR")));
+        let mut command = Command::new("owned-fixture-never-spawned");
+        client_settings_environment(&mut command, &settings, None);
+        let env: std::collections::BTreeMap<_, _> = command
+            .get_envs()
+            .map(|(key, value)| (key.to_owned(), value.map(ToOwned::to_owned)))
+            .collect();
+        assert_eq!(
+            env[std::ffi::OsStr::new("NPC_AI_SETTINGS_FILE")],
+            Some(std::ffi::OsString::new())
+        );
+        assert_eq!(
+            env[std::ffi::OsStr::new("NPC_AI_LOGS_DIR")].as_deref(),
+            settings.ai_logs_dir.as_ref().map(|path| path.as_os_str())
+        );
+    }
 }
 
 /// Where the menu looks for the games and whether it can build them.

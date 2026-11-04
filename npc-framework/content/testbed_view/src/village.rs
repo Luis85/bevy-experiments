@@ -11,6 +11,8 @@ use npc_framework::agent_io::scheduler::{
     self, SchedulerPolicy, SchedulerRuntime, SchedulerStatus,
 };
 use npc_framework::interaction::CarriedBy;
+use npc_framework::kernel::commands::CommandQueue;
+use npc_framework::kernel::journal::{Journal, JournalEntry, JournalKind};
 use npc_framework::prelude::{SimClock, SimCommand, SimConfig, SimId, SimIndex, submit};
 use npc_framework::view_helpers::{Selected, ViewSystems};
 use testbed_content::village::{
@@ -31,6 +33,13 @@ struct Reader {
     last_actor: Option<SimId>,
     message: String,
     refresh: f32,
+}
+/// A bounded presentation snapshot. Never registered as simulation state.
+#[derive(Resource, Default)]
+struct ObserverFeedback {
+    activity: String,
+    next: String,
+    last_result: String,
 }
 #[derive(Component)]
 struct VillageControl;
@@ -54,6 +63,7 @@ enum Action {
     NextBook,
     NewLife,
     PauseNudges,
+    FollowHero,
 }
 
 pub(crate) fn plugin(app: &mut App) {
@@ -84,6 +94,8 @@ pub(crate) fn plugin(app: &mut App) {
     }
     app.init_resource::<InputFocus>()
         .init_resource::<Reader>()
+        .init_resource::<ObserverFeedback>()
+        .init_resource::<super::village_world::FollowHero>()
         .add_observer(activate)
         .add_observer(focus)
         .configure_sets(Update, ViewSystems::Input.run_if(not(input_active)))
@@ -91,7 +103,7 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Update, (keys, shield).in_set(ViewSystems::OverlayInput))
         .add_systems(
             Update,
-            (refresh, scheduler_caption, paint)
+            (observer_feedback, refresh, scheduler_caption, paint)
                 .chain()
                 .in_set(ViewSystems::Present),
         );
@@ -130,7 +142,7 @@ fn button(p: &mut ChildSpawnerCommands, label: &str, action: Action) {
     ))
     .with_child(text(label, 12.0, TEXT));
 }
-fn spawn(mut commands: Commands) {
+fn spawn(mut commands: Commands, active: Option<Res<testbed_content::world_runtime::ActiveWorld>>) {
     commands
         .spawn((
             Name::new("village status"),
@@ -152,8 +164,18 @@ fn spawn(mut commands: Commands) {
             BackgroundColor(PANEL),
         ))
         .with_children(|p| {
-            p.spawn(text("Island Village", 17.0, GOLD));
-            p.spawn((HudText, text("", 12.0, TEXT)));
+            p.spawn(text(
+                active
+                    .as_ref()
+                    .map_or("Island Village", |active| active.0.name.as_str()),
+                17.0,
+                GOLD,
+            ));
+            p.spawn((
+                HudText,
+                text("", 12.0, TEXT),
+                TextLayout::default().with_linebreak(bevy::text::LineBreak::WordOrCharacter),
+            ));
             p.spawn(Node {
                 column_gap: px(6),
                 row_gap: px(6),
@@ -163,6 +185,7 @@ fn spawn(mut commands: Commands) {
             .with_children(|p| {
                 button(p, "Found diaries", Action::Books);
                 button(p, "AI scheduler", Action::Setup);
+                button(p, "Follow hero", Action::FollowHero);
                 button(p, "New life", Action::NewLife);
             });
         });
@@ -176,7 +199,8 @@ fn spawn(mut commands: Commands) {
             Node {
                 position_type: PositionType::Absolute,
                 right: percent(2),
-                bottom: px(12),
+                // The native AI-client status/footer remains visible below modal reader content.
+                bottom: px(44),
                 width: percent(92),
                 max_width: px(740),
                 height: percent(60),
@@ -215,18 +239,33 @@ fn spawn(mut commands: Commands) {
                     ..default()
                 },
             ))
-            .with_child((BookText, text("", 13.0, TEXT)));
+            .with_child((
+                BookText,
+                text("", 13.0, TEXT),
+                TextLayout::default().with_linebreak(bevy::text::LineBreak::WordOrCharacter),
+            ));
         });
 }
+#[derive(SystemParam)]
+struct ActivationUi<'w> {
+    reader: ResMut<'w, Reader>,
+    follow: ResMut<'w, super::village_world::FollowHero>,
+    input: ResMut<'w, InputFocus>,
+}
+
 fn activate(
     event: On<Activate>,
     actions: Query<(Entity, &Action)>,
-    mut reader: ResMut<Reader>,
+    ui: ActivationUi,
     state: Res<VillageState>,
     mut policy: ResMut<SchedulerPolicy>,
-    mut input: ResMut<InputFocus>,
     mut commands: Commands,
 ) {
+    let ActivationUi {
+        mut reader,
+        mut follow,
+        mut input,
+    } = ui;
     let Ok((_, action)) = actions.get(event.entity) else {
         return;
     };
@@ -268,6 +307,7 @@ fn activate(
             policy.enabled = !policy.enabled;
             reader.refresh = 1.0;
         }
+        Action::FollowHero => follow.toggle(),
         Action::NewLife => {
             let actor = state.played;
             commands.queue(move |world: &mut World| {
@@ -347,6 +387,253 @@ fn shield(
     }
     drag.start = None;
 }
+fn compact(value: &str, limit: usize) -> String {
+    let line = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    if line.chars().count() <= limit {
+        line
+    } else {
+        let mut short: String = line.chars().take(limit.saturating_sub(1)).collect();
+        short.push('…');
+        short
+    }
+}
+fn outcome(kind: &JournalKind) -> Option<String> {
+    match kind {
+        JournalKind::ActionRejected { verb, reason, .. } => {
+            Some(format!("{verb} rejected: {reason}; AI: observe and retry"))
+        }
+        JournalKind::Interacted {
+            verb,
+            outcome,
+            reason,
+            ..
+        } if outcome != "started" => Some(format!(
+            "{verb}: {outcome}{}",
+            reason
+                .as_ref()
+                .map(|r| format!(" — {r}"))
+                .unwrap_or_default()
+        )),
+        JournalKind::ExternalAction { verb, status, .. }
+            if matches!(
+                status.as_str(),
+                "done" | "failed" | "cancelled" | "rejected"
+            ) =>
+        {
+            Some(format!("{verb}: {status}"))
+        }
+        JournalKind::OrderDone { order } => Some(format!("{order}: done")),
+        JournalKind::OrderFailed { order, reason, .. } => Some(format!("{order}: {reason}")),
+        JournalKind::CraftDone { recipe, .. } => Some(format!("{recipe}: crafted")),
+        JournalKind::CraftFailed { recipe, reason, .. } => Some(format!("{recipe}: {reason}")),
+        _ => None,
+    }
+}
+fn actor_outcome(entry: &JournalEntry, actor: SimId) -> Option<String> {
+    if let JournalKind::Effect {
+        effect,
+        applied: true,
+    } = &entry.kind
+    {
+        let kind = effect.get("type")?.as_str()?;
+        let good = || {
+            effect
+                .get("kind")
+                .and_then(|v| v.as_str())
+                .map(|name| compact(name.trim_start_matches("village_"), 32))
+        };
+        if kind == "VillageTrade" {
+            // A sale is journaled on the buyer. Read the two public participants, rather than
+            // dropping the visitor's successful sale or displaying an unrelated resident trade.
+            let id = u64::from(actor.0);
+            let direction = if effect.get("buyer")?.as_u64()? == id {
+                "Bought"
+            } else if effect.get("seller")?.as_u64()? == id {
+                "Sold"
+            } else {
+                return None;
+            };
+            return Some(format!(
+                "{direction} {} {} for {} coins",
+                effect.get("quantity")?.as_u64()?,
+                good()?,
+                effect.get("coins")?.as_u64()?,
+            ));
+        }
+        if entry.unit != Some(actor) {
+            return None;
+        }
+        return match kind {
+            "VillageSaleCompleted" => Some(format!(
+                "Sold {} {} for {} coins",
+                effect.get("quantity")?.as_u64()?,
+                good()?,
+                effect.get("coins")?.as_u64()?,
+            )),
+            "VillageGathered" => Some(format!(
+                "Gathered {} {}",
+                effect.get("quantity")?.as_u64()?,
+                good()?,
+            )),
+            "VillageConsumed" => Some(format!("Consumed {}", good()?)),
+            "VillageBedRented" => Some(format!(
+                "Rented bed for {} coins ({} ticks)",
+                effect.get("coins")?.as_u64()?,
+                effect.get("ticks")?.as_u64()?,
+            )),
+            "VillageDiaryRead" => Some("Read a recovered diary".into()),
+            "VillageConversation" => Some("Talked with a resident; offers observed".into()),
+            "VillageNewLife" => Some("New life arrived; enter_world and take_control".into()),
+            "VillageDeath" => Some("Permanently died; the village continues".into()),
+            _ => None,
+        };
+    }
+    (entry.unit == Some(actor))
+        .then(|| outcome(&entry.kind))
+        .flatten()
+}
+fn observer_feedback(world: &mut World) {
+    // Match the HUD's twice-per-second refresh, including while paused.
+    if world.resource::<Reader>().refresh + world.resource::<Time<Real>>().delta_secs() < 0.5 {
+        return;
+    }
+    let actor = world.resource::<VillageState>().played;
+    let Some(entity) = world.resource::<SimIndex>().get(actor) else {
+        return;
+    };
+    let (activity, _, recovery) = village::activity(world, entity);
+    let activity = format!("Activity: {activity}");
+    let dead = world
+        .get::<Vitality>(entity)
+        .is_some_and(|v| v.died_at.is_some());
+    let paused = world
+        .get_resource::<npc_framework::prelude::SimControl>()
+        .is_some_and(|s| s.is_stopped());
+    let pending = world.get_resource::<CommandQueue>().is_some_and(|q| {
+        q.pending.values().any(|c| {
+            matches!(c, SimCommand::Content { kind, payload }
+            if kind == "AttachController"
+                && payload.get("unit").and_then(|v| v.as_u64()) == Some(u64::from(actor.0)))
+        })
+    });
+    let next = if dead {
+        "Operator / AI: choose New life, then enter_world and take_control.".into()
+    } else if pending && paused {
+        "Control queued. Operator: resume the world to apply it.".into()
+    } else if paused {
+        "World paused. Operator: resume to advance actions and needs.".into()
+    } else if pending {
+        "Control queued. Host: applying at the next simulation tick.".into()
+    } else if world.contains_resource::<testbed_content::explorer::host::ExplorerSession>()
+        && world
+            .get::<npc_framework::agent_io::ExternalController>(entity)
+            .is_none()
+    {
+        "AI: enter_world, then take_control. Operator: connect the chosen CLI.".into()
+    } else {
+        format!("AI: {recovery}")
+    };
+    let last_result = world
+        .get_resource::<Journal>()
+        .and_then(|j| {
+            j.entries.iter().rev().find_map(|entry| {
+                actor_outcome(entry, actor).map(|mut result| {
+                    if let JournalKind::ActionRejected {
+                        controller,
+                        verb,
+                        reason,
+                    } = &entry.kind
+                    {
+                        let details = world
+                            .get_resource::<npc_framework::agent_io::stats::AgentStats>()
+                            .and_then(|stats| stats.controllers.get(controller))
+                            .and_then(|stats| stats.last_rejection.as_ref())
+                            .filter(|details| {
+                                details.unit == actor.0
+                                    && details.tick == entry.tick
+                                    && details.verb == *verb
+                                    && details.reason == *reason
+                            });
+                        result = public_refusal(
+                            world,
+                            verb,
+                            reason,
+                            details.map(|details| details.message.as_str()),
+                        );
+                    }
+                    format!("Last (tick {}): {}", entry.tick, compact(&result, 120))
+                })
+            })
+        })
+        .unwrap_or_else(|| "Last action: none recorded yet".into());
+    *world.resource_mut::<ObserverFeedback>() = ObserverFeedback {
+        activity,
+        next,
+        last_result,
+    };
+}
+fn public_refusal(world: &World, verb: &str, reason: &str, details: Option<&str>) -> String {
+    let Some(verb) = super::village_world::public_verb(world, verb) else {
+        return "Action rejected; AI: observe and choose an available action".into();
+    };
+    // Handler errors may echo unknown argument keys/values, affordance IDs or input text.
+    // Only exact static scene guidance is suitable for a public stream HUD. Full diagnostics
+    // remain available in the authorized API response and host tooling.
+    let static_guidance = details
+        .filter(|message| {
+            reason == "unavailable"
+                && matches!(
+                    *message,
+                    "buy bread first"
+                        | "buy water first"
+                        | "buy village_water first"
+                        | "move within 1.5 m of the trader"
+                        | "move within 1.5 m of the trader, then observe again"
+                        | "merchant cannot afford this trade; try another buyer or wait for trade"
+                )
+        })
+        .map(|message| {
+            if message == "buy village_water first" {
+                "buy clean water first"
+            } else {
+                message
+            }
+        });
+    let category = match reason {
+        "invalid_args" => "invalid arguments",
+        "stale" => "observation is outdated",
+        "read_only" | "not_controller" | "not_attached" => "control is unavailable",
+        _ => "unavailable",
+    };
+    format!(
+        "{verb} rejected: {}; AI: observe and retry",
+        static_guidance.unwrap_or(category)
+    )
+}
+fn supervisor_feedback(state: &str, idle_seconds: u64, threshold: u64) -> String {
+    match state {
+        "unlinked" => {
+            "Unlinked. F10: Start Codex / Start Claude; manual linking is only for legacy sessions."
+                .into()
+        }
+        "idle timer" => format!(
+            "Idle: {}s until nudge (scheduler)",
+            threshold.saturating_sub(idle_seconds)
+        ),
+        "running" => "Running a continuation (AI); no overlapping turn.".into(),
+        "cooldown" => "Cooldown / failure backoff; scheduler waits.".into(),
+        "ready" => "Ready; scheduler checks on its next poll.".into(),
+        "game paused" => "World paused. Operator: resume the world.".into(),
+        "registration revoked or disconnected" => {
+            "Disconnected. AI: enter_world and take_control again.".into()
+        }
+        "hourly limit" => "Hourly cap reached; scheduler waits for a slot.".into(),
+        state if state.starts_with("busy:") => {
+            format!("{}; waiting for the actor.", compact(state, 70))
+        }
+        state => compact(state, 100),
+    }
+}
 #[derive(SystemParam)]
 struct LiveData<'w, 's> {
     state: Res<'w, VillageState>,
@@ -362,6 +649,8 @@ struct LiveData<'w, 's> {
     session: Option<Res<'w, testbed_content::explorer::host::ExplorerSession>>,
     needs: Query<'w, 's, &'static npc_framework::needs::Needs>,
     registry: Res<'w, npc_framework::needs::NeedRegistry>,
+    feedback: Res<'w, ObserverFeedback>,
+    market: Option<Res<'w, village::market::MarketState>>,
 }
 #[allow(clippy::too_many_arguments)]
 fn refresh(
@@ -390,6 +679,8 @@ fn refresh(
         session,
         needs,
         registry,
+        feedback,
+        market,
     } = data;
     reader.refresh += time.delta_secs();
     if reader.last_actor != Some(state.played) {
@@ -496,18 +787,28 @@ fn refresh(
         return;
     }
     reader.refresh = 0.0;
-    let day = clock.tick / config.day_length.max(1);
-    let season = match day / village::DAYS_PER_SEASON % 4 {
-        0 => "Spring",
-        1 => "Summer",
-        2 => "Autumn",
-        _ => "Winter",
+    let (day, season, _) = village::calendar_at(clock.tick, &config, market.is_some());
+    let season = match season {
+        village::Season::Spring => "Spring",
+        village::Season::Summer => "Summer",
+        village::Season::Autumn => "Autumn",
+        village::Season::Winter => "Winter",
     };
     let reserve = |name: &str| {
         registry
             .id(name)
-            .and_then(|id| needs.get(e).ok().map(|n| n.get(id).value / 1000))
-            .unwrap_or(100)
+            .and_then(|id| {
+                needs.get(e).ok().map(|n| {
+                    let need = n.get(id);
+                    let urgency = match need.level {
+                        npc_framework::prelude::NeedLevel::Ok => "",
+                        npc_framework::prelude::NeedLevel::Low => " low",
+                        npc_framework::prelude::NeedLevel::Urgent => " URGENT",
+                    };
+                    format!("{}%{urgency}", need.value / 1000)
+                })
+            })
+            .unwrap_or_else(|| "n/a".into())
     };
     let supervisor = if vital.died_at.is_some() {
         "actor is permanently dead".into()
@@ -517,17 +818,21 @@ fn refresh(
         status
             .as_ref()
             .and_then(|s| s.agents.iter().find(|a| a.unit == state.played.0))
-            .map(|a| format!("{} (idle {}s)", a.state, a.idle_seconds))
+            .map(|a| supervisor_feedback(&a.state, a.idle_seconds, policy.idle_seconds))
             .unwrap_or_else(|| {
-                if policy.enabled {
-                    "waiting for AI connection".into()
-                } else {
-                    "disabled".into()
-                }
+                "Waiting for AI control; operator connects, AI takes control.".into()
             })
     };
+    let price = |kind: &str| {
+        market
+            .as_ref()
+            .and_then(|market| market.price(kind))
+            .or_else(|| village::catalog::price(kind))
+            .map(|p| p.to_string())
+            .unwrap_or_else(|| "n/a".into())
+    };
     let mut header = format!(
-        "Day {} | {} | {}\n{} | life {}\n{} coins | Health {}%\nFood {}% | Water {}% | Energy {}%\nBread 6 coins | Water 1 | Bed 3\nAI scheduler: {}",
+        "Day {} | {} | {}\n{} | life {}\n{} coins | Health {}%\nFood {} | Water {} | Energy {}\nBread {} coins | Water {} | Bed {}\n{}\n{}\n{}\nLegacy scheduler: {}",
         day + 1,
         season,
         if config.is_night(clock.tick) {
@@ -535,19 +840,31 @@ fn refresh(
         } else {
             "Day"
         },
-        person.name,
+        compact(&person.name, 40),
         person.life,
         wallet.coins,
         vital.health / 1000,
         reserve("Hunger"),
         reserve("Thirst"),
         reserve("Energy"),
+        price("bread"),
+        price(village::catalog::WATER),
+        village::catalog::BED_PRICE,
+        feedback.activity,
+        feedback.last_result,
+        feedback.next,
         supervisor
     );
     if vital.died_at.is_some() {
         header.push_str("\nPermanently dead. The village continues.\nYour dropped diary can be recovered by others.");
     } else {
-        header.push_str("\nGather or craft, sell useful goods, then buy supplies.\nDiary drops on death; Memory and Proposals stay private.");
+        header.push_str("\nGather / craft > sell > buy > eat, drink, rest.\nDiary drops on death; private books stay private.");
+    }
+    if market.is_some() {
+        header.push_str(&format!(
+            "\nWarmth {} | Needs-driven market\nGather, hunt, craft or post goods for sale.",
+            reserve("Warmth")
+        ));
     }
     header.push_str("\nF1 controls | F7 notebook");
     if session.is_some()
@@ -556,33 +873,60 @@ fn refresh(
         && controllers.get(e).is_err()
     {
         header.push_str(
-            "\nNew life has arrived. Re-enter the world, take control, then link its AI session.",
+            "\nNew life has arrived. Press F10 and start your AI client for the new actor.",
         );
     }
     if let Some(error) = bridge.as_ref().and_then(|b| b.error.as_deref()) {
-        header.push_str(&format!("\n{error}"));
+        header.push_str(&format!("\n{}", compact(error, 160)));
     }
     if let Some(error) = status.as_ref().and_then(|b| b.error.as_deref()) {
-        header.push_str(&format!("\nAI scheduler: {error}"));
+        header.push_str(&format!("\nLegacy scheduler: {}", compact(error, 160)));
     }
     if !reader.message.is_empty() {
-        header.push_str(&format!("\n{}", reader.message));
+        header.push_str(&format!("\n{}", compact(&reader.message, 160)));
     }
     let body = if reader.setup {
-        let link=session.as_ref().map(|s|format!("npcctl scheduler bind --home \"{}\" --agent \"{}\" --provider codex --session-id SESSION_UUID --turn-finished",s.dir.dir.parent().unwrap_or(&s.dir.dir).display(),s.meta.agent)).unwrap_or_else(||"npcctl scheduler bind --bindings FILE --controller visitor --unit ACTOR_ID --cwd AI_WORKSPACE --provider codex --session-id SESSION_UUID --turn-finished".into());
+        let client_help = if session.is_some() {
+            "Press F10 for AI agent controls. Choose Start Codex or Start Claude using an installed, logged-in CLI. The dedicated client prepares and prompts the agent automatically; Stop agent leaves the game running."
+        } else {
+            "Launch an explorer world from the game menu for integrated AI agent controls."
+        };
+        let event_status = status
+            .as_ref()
+            .and_then(|s| s.agents.iter().find(|a| a.unit == state.played.0));
+        let event_feedback = format!(
+            "Event dispatch: {} | {} pending groups\nQueued / last trigger: {} | missed/evicted events: {}",
+            if policy.events_enabled {
+                "enabled"
+            } else {
+                "disabled"
+            },
+            event_status.map_or(0, |a| a.pending_events),
+            event_status
+                .and_then(|a| a.trigger.as_deref())
+                .unwrap_or("none"),
+            event_status.map_or(0, |a| a.event_overflow),
+        );
         format!(
-            "AI scheduler\n\n{}\nIdle threshold: {} real seconds\nCooldown: {} seconds after a turn\nLimit: {} nudges per hour; {} at a time\n\nConnect the AI and let it take control. Link its exact existing CLI conversation once:\n\n{}\n\nUse --provider claude for Claude Code. Use --client-pid PID while the original one-shot CLI is still running. The supervisor resumes the linked conversation after the actor is idle; busy actions and a paused game wait.\n\nConfigure defaults under Worlds > AI scheduler. Pause / resume here changes this running session only. A different actor needs its own new link.\n\nStatus: {}",
+            "AI agent supervision\n\n{}\n\nLegacy host scheduler: {}\n{}\nIdle threshold: {} real seconds\nCooldown: {} seconds after a turn (longer after failures)\nLimit: {} nudges per hour; {} at a time\n\nRelevant events can continue an AI conversation before the idle threshold. Busy actors, active turns and paused worlds wait. The agent observes current state before acting. The dedicated client owns sessions separately and starts from F10, even when legacy host nudges are paused.\n\nConfigure timing defaults under Worlds > AI scheduler. Pause / resume nudges here affects only the legacy host supervisor. Advanced compatibility commands are in docs/ai-agent-game-client.md.\n\nLegacy status: {}\nLast legacy continuation: {}",
+            client_help,
             if policy.enabled {
                 "Nudges enabled"
             } else {
                 "Nudges paused"
             },
+            event_feedback,
             policy.idle_seconds,
             policy.cooldown_seconds,
             policy.max_nudges_per_hour,
             policy.max_concurrent,
-            link,
-            supervisor
+            supervisor,
+            status
+                .as_ref()
+                .and_then(|s| s.agents.iter().find(|a| a.unit == state.played.0))
+                .and_then(|a| a.last_result.as_deref())
+                .map(|s| compact(s, 160))
+                .unwrap_or_else(|| "none".into())
         )
     } else if held.is_empty() {
         "Found diaries\n\nPick up a dropped diary, or ask a villager who recovered one. Your own F7 Diary will become a readable item on death; Memory and Proposals stay private.".into()
@@ -628,28 +972,44 @@ fn refresh(
 fn scheduler_caption(
     mut commands: Commands,
     policy: Res<SchedulerPolicy>,
+    follow: Res<super::village_world::FollowHero>,
     controls: Query<(Entity, &Action, &Children)>,
     mut captions: Query<&mut Text>,
 ) {
-    if !policy.is_changed() {
+    if !policy.is_changed() && !follow.is_changed() {
         return;
     }
-    let caption = if policy.enabled {
-        "Pause nudges"
-    } else {
-        "Resume nudges"
-    };
     for (entity, action, children) in &controls {
-        if *action != Action::PauseNudges {
-            continue;
-        }
-        commands
-            .entity(entity)
-            .insert(AccessibleLabel::new(caption));
-        for child in children {
-            if let Ok(mut text) = captions.get_mut(*child) {
-                text.0 = caption.into();
+        let caption = match action {
+            Action::PauseNudges => {
+                if policy.enabled {
+                    "Pause nudges"
+                } else {
+                    "Resume nudges"
+                }
             }
+            Action::FollowHero => {
+                if follow.enabled {
+                    "Stop following"
+                } else {
+                    "Follow hero"
+                }
+            }
+            _ => continue,
+        };
+        let mut changed = false;
+        for child in children {
+            if let Ok(mut text) = captions.get_mut(*child)
+                && text.0 != caption
+            {
+                text.0 = caption.into();
+                changed = true;
+            }
+        }
+        if changed {
+            commands
+                .entity(entity)
+                .insert(AccessibleLabel::new(caption));
         }
     }
 }
@@ -764,6 +1124,276 @@ mod tests {
         );
         npc_framework::interaction::items::put_in_inventory(app.world_mut(), holder, entity);
         (id, entity)
+    }
+    #[test]
+    fn observer_reports_the_visitors_sale_from_the_buyers_effect_without_other_trades() {
+        let mut app = app();
+        let actor = app.world().resource::<VillageState>().played;
+        let buyer = SimId(u32::MAX - 1);
+        let mut journal = app.world_mut().resource_mut::<Journal>();
+        journal.enabled = true;
+        journal.push(1, Some(buyer), JournalKind::effect(
+            "VillageTrade",
+            &serde_json::json!({"buyer":buyer,"seller":actor,"kind":"log","quantity":2,"coins":6}),
+        ));
+        journal.push(2, Some(buyer), JournalKind::effect(
+            "VillageTrade",
+            &serde_json::json!({"buyer":buyer,"seller":SimId(u32::MAX),"kind":"ore","quantity":1,"coins":3}),
+        ));
+        let before = state_hash(app.world_mut());
+        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
+        observer_feedback(app.world_mut());
+        let result = &app.world().resource::<ObserverFeedback>().last_result;
+        assert_eq!(result, "Last (tick 1): Sold 2 log for 6 coins");
+        assert_eq!(state_hash(app.world_mut()), before);
+    }
+    #[test]
+    fn observer_summarizes_needs_actions_without_diary_content() {
+        let actor = SimId(1);
+        let entry = |kind: &str, payload: serde_json::Value| JournalEntry {
+            tick: 1,
+            seq: 0,
+            unit: Some(actor),
+            kind: JournalKind::effect(kind, &payload),
+        };
+        assert_eq!(
+            actor_outcome(
+                &entry(
+                    "VillageConsumed",
+                    serde_json::json!({"kind":"village_water","need":"Thirst"})
+                ),
+                actor
+            )
+            .as_deref(),
+            Some("Consumed water")
+        );
+        assert_eq!(
+            actor_outcome(
+                &entry(
+                    "VillageBedRented",
+                    serde_json::json!({"coins":3,"ticks":300})
+                ),
+                actor
+            )
+            .as_deref(),
+            Some("Rented bed for 3 coins (300 ticks)")
+        );
+        assert_eq!(
+            actor_outcome(
+                &entry(
+                    "VillageDiaryRead",
+                    serde_json::json!({"entry":{"body":"private body not for the HUD"}})
+                ),
+                actor
+            )
+            .as_deref(),
+            Some("Read a recovered diary")
+        );
+        assert!(
+            actor_outcome(
+                &entry("VillageConsumed", serde_json::json!({"kind":"bread"})),
+                SimId(2)
+            )
+            .is_none()
+        );
+    }
+    #[test]
+    fn follow_hero_button_changes_view_intent_and_accessible_caption_without_changing_the_sim() {
+        let mut app = app();
+        let before = state_hash(app.world_mut());
+        assert!(
+            !app.world()
+                .resource::<super::super::village_world::FollowHero>()
+                .enabled
+        );
+        press(&mut app, Action::FollowHero);
+        assert!(
+            app.world()
+                .resource::<super::super::village_world::FollowHero>()
+                .enabled
+        );
+        let button = control(&mut app, Action::FollowHero);
+        assert!(
+            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Stop following")
+        );
+        press(&mut app, Action::FollowHero);
+        assert!(
+            !app.world()
+                .resource::<super::super::village_world::FollowHero>()
+                .enabled
+        );
+        assert!(
+            format!("{:?}", app.world().get::<AccessibleLabel>(button)).contains("Follow hero")
+        );
+        assert_eq!(state_hash(app.world_mut()), before);
+        press(&mut app, Action::Setup);
+        let node = app
+            .world_mut()
+            .query_filtered::<&Node, With<BookPanel>>()
+            .single(app.world())
+            .unwrap();
+        assert_eq!(
+            node.bottom,
+            px(44),
+            "scrolling setup/diary content must end above the AI footer"
+        );
+    }
+    #[test]
+    fn public_hud_never_echoes_unknown_verbs_affordances_or_argument_keys() {
+        let mut app = app();
+        app.world_mut().resource_mut::<Journal>().enabled = true;
+        let actor = app.world().resource::<VillageState>().played;
+        const CANARY: &str = "PRIVATE_NOTEBOOK_CREDENTIAL_CANARY";
+        let mut malformed =
+            serde_json::json!({"unit":actor.0,"controller":"visitor","verb":"eat","args":{}});
+        malformed["args"][CANARY] = serde_json::json!("private argument value");
+        for request in [
+            serde_json::json!({"unit":actor.0,"controller":"visitor","verb":CANARY}),
+            serde_json::json!({"unit":actor.0,"controller":"visitor","affordance":CANARY}),
+            malformed,
+        ] {
+            let before = state_hash(app.world_mut());
+            let response =
+                npc_framework::agent_io::api::call(app.world_mut(), "agent/act", Some(request))
+                    .unwrap();
+            assert_eq!(response["accepted"], false);
+            assert!(
+                response["message"]
+                    .as_str()
+                    .is_some_and(|message| message.contains(CANARY)),
+                "fixture must exercise an echoed private input"
+            );
+            app.world_mut().resource_mut::<Reader>().refresh = 1.0;
+            observer_feedback(app.world_mut());
+            let feedback = &app.world().resource::<ObserverFeedback>().last_result;
+            assert!(
+                !feedback.contains(CANARY) && !feedback.contains("private argument value"),
+                "{feedback}"
+            );
+            assert!(feedback.contains("rejected"));
+            assert_eq!(state_hash(app.world_mut()), before);
+        }
+    }
+    #[test]
+    fn actual_action_refusal_keeps_its_concrete_message_in_host_feedback_only() {
+        let mut app = app();
+        app.world_mut().resource_mut::<Journal>().enabled = true;
+        let actor = app.world().resource::<VillageState>().played;
+        let before = state_hash(app.world_mut());
+        let result = npc_framework::agent_io::api::call(
+            app.world_mut(),
+            "agent/act",
+            Some(serde_json::json!({"unit":actor.0,"controller":"visitor","verb":"eat"})),
+        )
+        .unwrap();
+        assert_eq!(result["accepted"], false);
+        assert_eq!(result["message"], "buy bread first");
+        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
+        observer_feedback(app.world_mut());
+        let feedback = &app.world().resource::<ObserverFeedback>().last_result;
+        assert!(
+            feedback.contains("eat rejected: buy bread first"),
+            "{feedback}"
+        );
+        assert_eq!(state_hash(app.world_mut()), before);
+        let report = app
+            .world()
+            .resource::<npc_framework::agent_io::stats::AgentStats>()
+            .report(None);
+        assert!(
+            !serde_json::to_string(&report)
+                .unwrap()
+                .contains("buy bread first")
+        );
+    }
+    #[test]
+    fn observer_feedback_names_work_and_only_the_current_actors_result() {
+        let mut app = app();
+        let actor = app.world().resource::<VillageState>().played;
+        let entity = app.world().resource::<SimIndex>().get(actor).unwrap();
+        app.world_mut()
+            .entity_mut(entity)
+            .insert(village::Gathering {
+                patch: actor,
+                ends: 100,
+            });
+        {
+            let mut journal = app.world_mut().resource_mut::<Journal>();
+            journal.enabled = true;
+            journal.push(
+                1,
+                Some(actor),
+                JournalKind::ActionRejected {
+                    controller: "visitor".into(),
+                    verb: "buy".into(),
+                    reason: "unavailable".into(),
+                },
+            );
+            journal.push(
+                2,
+                Some(SimId(u32::MAX)),
+                JournalKind::ActionRejected {
+                    controller: "someone else".into(),
+                    verb: "private-other-result".into(),
+                    reason: "not the visitor".into(),
+                },
+            );
+        }
+        let before = state_hash(app.world_mut());
+        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
+        observer_feedback(app.world_mut());
+        let feedback = app.world().resource::<ObserverFeedback>();
+        assert_eq!(feedback.activity, "Activity: gathering");
+        assert!(feedback.next.contains("stop_work"));
+        assert!(feedback.last_result.contains("buy rejected: unavailable"));
+        assert!(!feedback.last_result.contains("private-other-result"));
+        assert_eq!(state_hash(app.world_mut()), before);
+    }
+    #[test]
+    fn queued_control_and_paused_world_explain_the_operators_next_step() {
+        use npc_framework::agent_io::control::{AttachController, ControlMode, IdlePolicy};
+        let mut app = app();
+        let actor = app.world().resource::<VillageState>().played;
+        app.insert_resource(npc_framework::prelude::SimControl {
+            paused: true,
+            ..Default::default()
+        });
+        submit(
+            app.world_mut(),
+            None,
+            SimCommand::content(&AttachController {
+                unit: actor.0,
+                controller: "playtest".into(),
+                mode: ControlMode::Direct,
+                on_idle: IdlePolicy::Idle,
+                force: true,
+            }),
+        )
+        .unwrap();
+        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
+        observer_feedback(app.world_mut());
+        assert_eq!(
+            app.world().resource::<ObserverFeedback>().next,
+            "Control queued. Operator: resume the world to apply it."
+        );
+    }
+    #[test]
+    fn supervisor_recovery_countdown_and_long_feedback_are_bounded() {
+        let unlinked = supervisor_feedback("unlinked", 0, 120);
+        assert!(unlinked.contains("F10: Start Codex / Start Claude"));
+        assert!(unlinked.contains("manual linking is only for legacy sessions"));
+        assert!(supervisor_feedback("idle timer", 90, 120).contains("30s until nudge"));
+        assert!(supervisor_feedback("idle timer", 125, 120).contains("0s until nudge"));
+        assert!(supervisor_feedback("running", 0, 120).contains("AI"));
+        assert!(supervisor_feedback("cooldown", 0, 120).contains("backoff"));
+        assert_eq!(
+            compact("\nfull   inventory\r\ntry another buyer", 100),
+            "full inventory try another buyer"
+        );
+        let long = "長".repeat(300);
+        assert_eq!(compact(&long, 40).chars().count(), 40);
+        assert!(compact(&long, 40).ends_with('…'));
+        assert!(supervisor_feedback(&long, 0, 120).chars().count() <= 100);
     }
     #[test]
     fn diary_navigation_is_stable_bounded_and_resets_scroll() {

@@ -553,6 +553,7 @@ fn acquire_notes_focus(
 #[derive(SystemParam)]
 struct KeyboardContext<'w, 's> {
     focus: ResMut<'w, InputFocus>,
+    windows: Query<'w, 's, (), With<Window>>,
     navigation: TabNavigation<'w, 's>,
     roots: Query<'w, 's, Entity, With<ExplorerPanel>>,
     forms: Query<'w, 's, Entity, With<FormBox>>,
@@ -572,12 +573,11 @@ fn keys(
     mut commands: Commands,
 ) {
     let Some(keys) = keys else { return };
-    // Another overlay owns the keyboard; do not initialize our form on its Tab.
-    if keyboard
-        .focus
-        .get()
-        .is_some_and(|entity| !keyboard.controls.contains(entity))
-    {
+    // Bevy gives the primary window initial focus: that is ordinary world
+    // input, not another overlay. A focused foreign control still owns its keys.
+    if keyboard.focus.get().is_some_and(|entity| {
+        !keyboard.controls.contains(entity) && !keyboard.windows.contains(entity)
+    }) {
         return;
     }
     let typing = keyboard
@@ -1708,6 +1708,12 @@ mod tests {
     /// The panel without a window, open on `dir`. `TextPlugin` applies the
     /// queued `TextEdit`s (in `PostUpdate`), as in the game.
     fn app(dir: &Path) -> App {
+        let mut app = unstarted_app(dir);
+        app.update();
+        app
+    }
+
+    fn unstarted_app(dir: &Path) -> App {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, AssetPlugin::default(), TextPlugin))
             .init_resource::<InputFocus>()
@@ -1735,7 +1741,6 @@ mod tests {
                     }
                 },
             );
-        app.update();
         app
     }
 
@@ -2466,6 +2471,54 @@ mod tests {
             );
         }
         assert_eq!(list(&mut app, &dir, Book::Diary)[0].body, "Preserved body");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn primary_window_startup_focus_allows_f7_but_foreign_controls_still_shield_it() {
+        use bevy::input_focus::InputFocusPlugin;
+        use bevy::window::PrimaryWindow;
+
+        let dir = tmp("window-focus");
+        let mut app = unstarted_app(&dir);
+        app.add_plugins(InputFocusPlugin);
+        let window = app
+            .world_mut()
+            .spawn((Window::default(), PrimaryWindow))
+            .id();
+        app.world_mut().resource_mut::<TestbedPanels>().explorer = false;
+        app.update();
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(window));
+        for shown in [true, false] {
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .reset_all();
+            app.world_mut()
+                .resource_mut::<ButtonInput<KeyCode>>()
+                .press(KeyCode::F7);
+            app.update();
+            assert_eq!(app.world().resource::<TestbedPanels>().explorer, shown);
+            let mut roots = app
+                .world_mut()
+                .query_filtered::<&Node, With<ExplorerPanel>>();
+            assert_eq!(
+                roots.single(app.world()).unwrap().display,
+                if shown { Display::Flex } else { Display::None }
+            );
+        }
+        let foreign = app.world_mut().spawn((Node::default(), TabIndex(0))).id();
+        app.world_mut()
+            .resource_mut::<InputFocus>()
+            .set(foreign, FocusCause::Navigated);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .reset_all();
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F7);
+        app.update();
+        assert!(!app.world().resource::<TestbedPanels>().explorer);
+        assert_eq!(app.world().resource::<InputFocus>().get(), Some(foreign));
         std::fs::remove_dir_all(dir).unwrap();
     }
 

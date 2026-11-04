@@ -141,9 +141,11 @@ impl AgentEvent {
     }
 
     /// The controller's own outcomes: its actions and their rejections,
-    /// interactions, their skill rolls, items, orders, crafts.
+    /// interactions, their skill rolls, items, orders, crafts and applied
+    /// actor-attributed content effects. The caller still filters the unit.
     pub fn is_own_outcome(&self) -> bool {
-        (self.kind == "Roll" && !self.is_perception_roll())
+        matches!(&self.event, JournalKind::Effect { applied: true, .. })
+            || (self.kind == "Roll" && !self.is_perception_roll())
             || matches!(
                 self.kind.as_str(),
                 "ExternalAction"
@@ -433,5 +435,64 @@ mod tests {
             },
         );
         assert!(done.interrupts_for(&[]));
+    }
+
+    #[test]
+    fn recent_applied_actor_effect_is_not_starved_by_a_full_old_outcome_window() {
+        let mut world = World::new();
+        let mut buffer = AgentEvents::default();
+        for seq in 1..=30 {
+            buffer.events.push_back(ev(
+                seq,
+                JournalKind::OrderDone {
+                    order: "Move".into(),
+                },
+            ));
+        }
+        buffer.events.push_back(ev(
+            31,
+            JournalKind::effect("CustomActorChange", &serde_json::json!({"quantity":3})),
+        ));
+        let mut foreign = ev(
+            32,
+            JournalKind::effect("CustomActorChange", &serde_json::json!({"quantity":9})),
+        );
+        foreign.unit = Some(SimId(2));
+        buffer.events.push_back(foreign);
+        buffer.events.push_back(ev(
+            33,
+            JournalKind::Perceived {
+                target: SimId(8),
+                via: "vision".into(),
+            },
+        ));
+        buffer.next_seq = 34;
+        let original = buffer.events.clone();
+        world.insert_resource(buffer);
+        let selected = recent(&world, SimId(1), 30);
+        assert_eq!(selected.len(), 30);
+        assert!(
+            selected.iter().any(|event| event.seq == 31),
+            "a newer attributed effect must remain visible after a long action history"
+        );
+        assert_eq!(selected.first().unwrap().seq, 2);
+        assert!(selected.windows(2).all(|pair| pair[0].seq < pair[1].seq));
+        assert!(!selected.iter().any(|event| event.unit != Some(SimId(1))));
+        assert_eq!(
+            world.resource::<AgentEvents>().events,
+            original,
+            "summary reads never consume or reorder the event buffer"
+        );
+        assert_eq!(recent(&world, SimId(1), 30), selected);
+        assert!(recent(&world, SimId(1), 0).is_empty());
+    }
+
+    #[test]
+    fn failed_content_effects_do_not_claim_own_outcome_priority() {
+        let mut effect = JournalKind::effect("CustomActorChange", &serde_json::json!({}));
+        if let JournalKind::Effect { applied, .. } = &mut effect {
+            *applied = false;
+        }
+        assert!(!ev(1, effect).is_own_outcome());
     }
 }

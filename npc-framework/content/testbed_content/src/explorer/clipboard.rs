@@ -2,7 +2,7 @@
 //! Bevy `system_clipboard` feature: its `clipboard-win` dependency is
 //! BSL-1.0, which `deny.toml` does not allow).
 //!
-//! [`copy`] pipes text into `clip.exe` / `pbcopy` / `wl-copy` / `xclip` /
+//! [`copy`] pipes text into PowerShell / `pbcopy` / `wl-copy` / `xclip` /
 //! `xsel`; [`paste`] reads it with PowerShell `Get-Clipboard` / `pbpaste` /
 //! `wl-paste` / `xclip` / `xsel`. Both block the calling thread (callers run
 //! them off the frame) for at most [`TOOL_TIMEOUT`] per tool; a tool that
@@ -21,8 +21,8 @@ pub const TOOL_TIMEOUT: Duration = Duration::from_secs(5);
 /// How long the waiter thread sleeps between `try_wait` calls.
 const POLL: Duration = Duration::from_millis(10);
 
-/// Puts `text` on the OS clipboard. `clip.exe` on Windows (fed UTF-16LE with
-/// a BOM, it mangles non-ASCII UTF-8), `pbcopy` on macOS, else the first of
+/// Puts `text` on the OS clipboard. PowerShell on Windows (UTF-8 stdin,
+/// no byte-order mark added to the text), `pbcopy` on macOS, else the first of
 /// `wl-copy`, `xclip -selection clipboard`, `xsel --clipboard --input` that
 /// works.
 ///
@@ -31,7 +31,7 @@ const POLL: Duration = Duration::from_millis(10);
 pub fn copy(text: &str) -> Result<(), String> {
     let utf8 = text.as_bytes().to_vec();
     let tools: Vec<(&str, &[&str], Vec<u8>)> = if cfg!(windows) {
-        vec![("clip.exe", &[], utf16le_with_bom(text))]
+        vec![windows_copy_tool(text)]
     } else if cfg!(target_os = "macos") {
         vec![("pbcopy", &[], utf8)]
     } else {
@@ -49,6 +49,29 @@ pub fn copy(text: &str) -> Result<(), String> {
         }
     }
     Err(errors.join("; "))
+}
+
+/// Prompt-only boundary. Ordinary editable-field copy preserves the user's text;
+/// generated or older saved prompt copies share the renderer's canonical form.
+pub fn copy_prompt(text: &str) -> Result<(), String> {
+    copy(&super::prompt::normalize_prompt(text))
+}
+
+/// The script is fixed; untrusted text is data on stdin, never executable argv.
+/// The previous clip.exe transport prefixed FF FE, which can become a leading
+/// U+FEFF in pasted text. Do not reintroduce an encoding marker into this payload.
+fn windows_copy_tool(text: &str) -> (&'static str, &'static [&'static str], Vec<u8>) {
+    (
+        "powershell",
+        &[
+            "-NoProfile",
+            "-NonInteractive",
+            "-STA",
+            "-Command",
+            "$ErrorActionPreference = 'Stop'; [Console]::InputEncoding = [Text.UTF8Encoding]::new($false); $clipboardText = [Console]::In.ReadToEnd(); Set-Clipboard -Value $clipboardText",
+        ],
+        text.as_bytes().to_vec(),
+    )
 }
 
 /// Reads the OS clipboard as text: `powershell -NoProfile -Command
@@ -106,7 +129,8 @@ pub fn paste_text(raw: &str, single_line: bool) -> String {
     raw.lines().collect::<Vec<_>>().join("\n")
 }
 
-/// `text` as UTF-16LE bytes after a byte-order mark (what `clip.exe` reads).
+/// Legacy UTF-16LE codec retained for callers. Clipboard copy no longer uses
+/// this helper: its encoding marker can become an invisible pasted character.
 #[must_use]
 pub fn utf16le_with_bom(text: &str) -> Vec<u8> {
     let mut bytes = vec![0xFF, 0xFE];
@@ -220,6 +244,58 @@ fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn windows_copy_uses_bom_free_utf8_stdin_and_preserves_unicode_and_trailing_newlines() {
+        let text = "Café 🌊\nC:/Zoë/one\u{a0}two\n\n";
+        let (tool, args, payload) = windows_copy_tool(text);
+        assert_eq!(tool, "powershell");
+        for flag in ["-NoProfile", "-NonInteractive", "-STA"] {
+            assert!(args.contains(&flag));
+        }
+        let script = args.last().unwrap();
+        assert!(
+            script.contains("InputEncoding")
+                && script.contains("UTF8Encoding")
+                && script.contains("ReadToEnd()")
+                && script.contains("Set-Clipboard")
+        );
+        assert!(
+            !args.iter().any(|argument| argument.contains(text)),
+            "clipboard text never becomes executable arguments"
+        );
+        assert_eq!(payload, text.as_bytes());
+        assert!(!payload.starts_with(&[0xef, 0xbb, 0xbf]) && !payload.starts_with(&[0xff, 0xfe]));
+        assert_eq!(String::from_utf8(payload).unwrap(), text);
+    }
+
+    #[test]
+    fn start_resume_and_other_prompt_copy_payloads_equal_the_normalized_rendered_text() {
+        use crate::explorer::prompt::{PromptKind, PromptVars, normalize_prompt, render_prompt};
+        let vars = PromptVars {
+            agent: "Herp".into(),
+            world: "Café Island".into(),
+            url: "http://127.0.0.1:15702".into(),
+            unit: 1,
+            npcctl: std::path::PathBuf::from("C:/games/npcctl.exe"),
+            dir: std::path::PathBuf::from("C:/agents/Zoë 🌊"),
+            npcctl_missing: false,
+            map_enabled: true,
+        };
+        for kind in [
+            PromptKind::Start,
+            PromptKind::Resume,
+            PromptKind::ResumeChanged,
+            PromptKind::ResumeRebuilt,
+        ] {
+            let shown = render_prompt(kind, &vars);
+            let (_, _, bytes) = windows_copy_tool(&shown);
+            let copied = String::from_utf8(bytes).unwrap();
+            assert_eq!(copied, shown, "{kind:?} render/copy equivalence");
+            assert_eq!(copied, normalize_prompt(&copied));
+            assert!(!copied.starts_with('\u{feff}'));
+        }
+    }
 
     #[test]
     fn utf16le_with_bom_encodes_clip_exe_input() {

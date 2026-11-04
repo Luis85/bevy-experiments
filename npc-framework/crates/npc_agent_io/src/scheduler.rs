@@ -1,4 +1,4 @@
-//! Host-only idle supervision for external AI CLI sessions. Never run this from NpcSimTick.
+//! Host-only idle and event supervision for external AI CLI sessions. Never run this from NpcSimTick.
 //! Policy and process state are not hashed, snapshotted or read by simulation systems.
 use crate::{
     api,
@@ -16,6 +16,15 @@ use std::{
     process::{Child, Command, Stdio},
     time::Instant,
 };
+#[path = "client_host.rs"]
+pub mod client_host;
+#[path = "scheduler_events.rs"]
+mod notifications;
+use notifications::{EventFeed, EventInbox, Receipts};
+pub use notifications::{
+    MAX_PENDING_EVENTS, SchedulerEventClassifier, SchedulerEventKind, SchedulerEventSummary,
+    SchedulerNotification, acknowledge,
+};
 
 pub const BINDINGS_FILE: &str = "bindings.json";
 const NUDGE: &str = "Continue playing the game in your existing assigned role. Your actor has been idle and your previous turn has ended. Use your existing game connection instructions: observe your actor, check needs and current work, then continue your previous goal with useful game actions. Respect permanent death, saves, ownership and the game's rules. Report a concrete blocker if you cannot proceed. Do not change game or scheduler configuration to avoid playing.";
@@ -24,6 +33,8 @@ const NUDGE: &str = "Continue playing the game in your existing assigned role. Y
 #[serde(default, deny_unknown_fields)]
 pub struct SchedulerPolicy {
     pub enabled: bool,
+    #[serde(skip_serializing_if = "is_true")]
+    pub events_enabled: bool,
     pub idle_seconds: u64,
     pub cooldown_seconds: u64,
     pub poll_seconds: u64,
@@ -36,6 +47,7 @@ impl Default for SchedulerPolicy {
     fn default() -> Self {
         Self {
             enabled: false,
+            events_enabled: true,
             idle_seconds: 120,
             cooldown_seconds: 180,
             poll_seconds: 1,
@@ -45,6 +57,9 @@ impl Default for SchedulerPolicy {
             skip_paused: true,
         }
     }
+}
+fn is_true(value: &bool) -> bool {
+    *value
 }
 impl SchedulerPolicy {
     pub fn is_default(&self) -> bool {
@@ -110,6 +125,13 @@ impl fmt::Debug for RunnerBinding {
 }
 impl RunnerBinding {
     pub fn validate(&self) -> Result<(), String> {
+        self.validate_stored()?;
+        if !self.cwd.is_dir() {
+            return Err("runner working directory must be an existing absolute directory; restore the workspace or rebind with --cwd".into());
+        }
+        Ok(())
+    }
+    fn validate_stored(&self) -> Result<(), String> {
         if self.controller.is_empty()
             || self.controller.len() > 200
             || self.controller.contains(['\n', '\r'])
@@ -132,8 +154,8 @@ impl RunnerBinding {
         {
             return Err("use the exact CLI session UUID, not --last or a conversation name".into());
         }
-        if !self.cwd.is_absolute() || !self.cwd.is_dir() {
-            return Err("runner working directory must be an existing absolute directory".into());
+        if !self.cwd.is_absolute() {
+            return Err("runner working directory must be an existing absolute directory; restore the workspace or rebind with --cwd".into());
         }
         if self.provider == RunnerProvider::Custom
             && (self.program.is_none() || self.args.len() > 64)
@@ -193,6 +215,58 @@ impl RunnerBinding {
 pub struct RunnerBindings {
     pub bindings: Vec<RunnerBinding>,
 }
+/// Local configuration checks only: no CLI invocation, authentication request or lock mutation.
+#[derive(Clone, Debug, Serialize)]
+pub struct RunnerPreflight {
+    pub linked: bool,
+    pub configuration_ready: bool,
+    pub issues: Vec<String>,
+    pub authentication: &'static str,
+}
+pub fn check_binding(path: &Path, controller: &str) -> Result<RunnerPreflight, String> {
+    if path.exists() && !path.is_file() {
+        return Err(
+            "scheduler bindings path is not a file; select the operator-owned bindings JSON".into(),
+        );
+    }
+    let bindings = read_bindings(path)?;
+    let binding = bindings
+        .bindings
+        .iter()
+        .find(|b| b.controller == controller);
+    let mut issues = Vec::new();
+    if let Some(binding) = binding {
+        if !binding.cwd.is_dir() {
+            issues.push(
+                "runner workspace is unavailable; restore the workspace or rebind with --cwd"
+                    .into(),
+            );
+        }
+        if resolve_executable(&binding.invocation().0).is_none() {
+            issues.push("configured CLI executable is unavailable; install the selected CLI or rebind with --program to its executable".into());
+        }
+        if let Some(parent) = path.parent() {
+            if parent.join(".bindings-write.lock").exists() {
+                issues.push("bindings edit lock exists; confirm no operator edit is running before inspecting a stale edit lock".into());
+            }
+            if parent
+                .join("locks")
+                .join(format!("{}.lock", binding.target_key()))
+                .exists()
+            {
+                issues.push("runner lock exists; do not overlap turns. After a crash confirm the previous turn finished, then rebind with --turn-finished; an unverifiable lock needs operator inspection".into());
+            }
+        }
+    } else {
+        issues.push("unlinked; connect the AI, take control, then use scheduler bind with the exact conversation UUID and a finished-turn declaration or original one-shot --client-pid".into());
+    }
+    Ok(RunnerPreflight {
+        linked: binding.is_some(),
+        configuration_ready: issues.is_empty(),
+        issues,
+        authentication: "not checked; use the selected provider CLI's login/status instructions outside the game. If a turn fails, check login, usage availability and local runner configuration before retrying",
+    })
+}
 pub fn read_bindings(path: &Path) -> Result<RunnerBindings, String> {
     if !path.is_file() {
         return Ok(RunnerBindings::default());
@@ -213,7 +287,9 @@ pub fn read_bindings(path: &Path) -> Result<RunnerBindings, String> {
     let mut ids = std::collections::BTreeSet::new();
     let mut targets = std::collections::BTreeSet::new();
     for b in &value.bindings {
-        b.validate()?;
+        // Stored links must remain editable/unlinkable if a workspace was moved or deleted.
+        // Existence is checked at preflight and again before a launch.
+        b.validate_stored()?;
         if !ids.insert(&b.controller) {
             return Err("duplicate controller in scheduler bindings".into());
         }
@@ -305,7 +381,7 @@ fn write_file(
     }
     fs::rename(tmp, path).map_err(|_| "cannot replace scheduler bindings".into())
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct AgentPulse {
     pub controller: String,
     pub unit: u32,
@@ -322,10 +398,15 @@ pub struct SchedulerAgentStatus {
     pub idle_seconds: u64,
     pub nudges_last_hour: usize,
     pub last_result: Option<String>,
+    pub pending_events: usize,
+    pub event_overflow: u64,
+    pub trigger: Option<String>,
+    pub last_delivery_seq: Option<u64>,
 }
 #[derive(Resource, Clone, Debug, Default, Serialize)]
 pub struct SchedulerStatus {
     pub enabled: bool,
+    pub events_enabled: bool,
     pub agents: Vec<SchedulerAgentStatus>,
     pub error: Option<String>,
 }
@@ -340,6 +421,8 @@ struct Track {
     failures: u32,
     last_result: Option<String>,
     binding: Option<RunnerBinding>,
+    events: EventInbox,
+    last_trigger: Option<String>,
 }
 impl Track {
     fn update(&mut self, p: &AgentPulse, now: u64) {
@@ -403,7 +486,9 @@ impl Track {
         {
             return "cooldown".into();
         }
-        if now.saturating_sub(self.idle_since) < policy.idle_seconds * 1000 {
+        if !(policy.events_enabled && !self.events.pending.is_empty())
+            && now.saturating_sub(self.idle_since) < policy.idle_seconds * 1000
+        {
             return "idle timer".into();
         }
         if !capacity {
@@ -453,6 +538,7 @@ pub struct SchedulerRuntime {
     last_poll: Option<u64>,
     tracks: BTreeMap<String, Track>,
     runs: Vec<OwnedRun>,
+    external_slots: usize,
     last_status: SchedulerStatus,
 }
 impl SchedulerRuntime {
@@ -463,6 +549,7 @@ impl SchedulerRuntime {
             last_poll: None,
             tracks: BTreeMap::new(),
             runs: Vec::new(),
+            external_slots: 0,
             last_status: SchedulerStatus::default(),
         }
     }
@@ -477,8 +564,18 @@ impl SchedulerRuntime {
         pulses: Vec<AgentPulse>,
         now: u64,
     ) -> SchedulerStatus {
+        self.poll_at_with_events(policy, pulses, now, None)
+    }
+    fn poll_at_with_events(
+        &mut self,
+        policy: &SchedulerPolicy,
+        pulses: Vec<AgentPulse>,
+        now: u64,
+        feed: Option<&EventFeed<'_>>,
+    ) -> SchedulerStatus {
         let mut status = SchedulerStatus {
             enabled: policy.enabled,
+            events_enabled: policy.events_enabled,
             ..Default::default()
         };
         if let Err(e) = policy.validate() {
@@ -490,6 +587,7 @@ impl SchedulerRuntime {
             .last_poll
             .is_some_and(|last| now.saturating_sub(last) < policy.poll_seconds * 1000)
             && self.last_status.enabled == policy.enabled
+            && self.last_status.events_enabled == policy.events_enabled
         {
             return self.last_status.clone();
         }
@@ -557,6 +655,20 @@ impl SchedulerRuntime {
             })
             .map(|p| p.controller.clone())
             .collect();
+        // Release/reclaim must not reset hourly caps or failure backoff. Keep rate history for
+        // operator-bound controllers while discarding their private event backlog when absent.
+        self.tracks.retain(|controller, track| {
+            if pulses.iter().any(|pulse| &pulse.controller == controller) {
+                true
+            } else {
+                track.events = EventInbox::default();
+                track.last_trigger = None;
+                bindings
+                    .bindings
+                    .iter()
+                    .any(|binding| &binding.controller == controller)
+            }
+        });
         for pulse in pulses {
             let binding = bindings
                 .bindings
@@ -572,12 +684,29 @@ impl SchedulerRuntime {
                 .iter()
                 .any(|r| r.controller == pulse.controller && r.unit == pulse.unit);
             let t = self.tracks.entry(pulse.controller.clone()).or_default();
+            let changed_actor = t.unit != pulse.unit;
             t.update(&pulse, now);
-            if t.binding.as_ref() != binding {
+            let changed_binding = t.binding.as_ref() != binding;
+            if changed_binding {
                 t.binding = binding.cloned();
                 t.failures = 0;
                 t.last_nudge = None;
                 t.last_result = None;
+                t.last_trigger = None;
+            }
+            if let Some(feed) = feed {
+                let clear_events = changed_actor
+                    || changed_binding
+                    || !policy.events_enabled
+                    || binding.is_none_or(|b| b.unit != pulse.unit)
+                    || pulse
+                        .blocked
+                        .as_deref()
+                        .is_some_and(|reason| reason != "game paused");
+                t.events
+                    .ingest(feed, &pulse.controller, SimId(pulse.unit), clear_events);
+            } else if changed_actor || changed_binding || !policy.events_enabled {
+                t.events = EventInbox::default();
             }
             let mut state = t.state(
                 &pulse,
@@ -585,7 +714,8 @@ impl SchedulerRuntime {
                 binding,
                 now,
                 running,
-                self.runs.len() < policy.max_concurrent as usize,
+                self.runs.len().saturating_add(self.external_slots)
+                    < policy.max_concurrent as usize,
             );
             if state == "ready"
                 && can_dispatch
@@ -594,8 +724,18 @@ impl SchedulerRuntime {
                 if binding.client_pid.is_some_and(process_alive) {
                     state = "original CLI client is still running".into();
                 } else {
-                    match launch(binding, &self.bindings_path, now) {
+                    let trigger = if policy.events_enabled && !t.events.pending.is_empty() {
+                        "events"
+                    } else {
+                        "idle"
+                    };
+                    let prompt = notifications::prompt(&t.events.pending, t.events.overflow);
+                    match launch(binding, &self.bindings_path, now, &prompt) {
                         Ok(run) => {
+                            t.last_trigger = Some(trigger.into());
+                            if trigger == "events" {
+                                t.events.delivered();
+                            }
                             t.last_nudge = Some(now);
                             t.attempts.push_back(now);
                             self.runs.push(run);
@@ -618,6 +758,14 @@ impl SchedulerRuntime {
                 idle_seconds: now.saturating_sub(t.idle_since) / 1000,
                 nudges_last_hour: t.attempts.len(),
                 last_result: t.last_result.clone(),
+                pending_events: t.events.pending.len(),
+                event_overflow: t.events.overflow,
+                trigger: if !t.events.pending.is_empty() {
+                    Some("events".into())
+                } else {
+                    t.last_trigger.clone()
+                },
+                last_delivery_seq: t.events.last_delivery_seq,
             });
         }
         self.last_status = status.clone();
@@ -666,7 +814,12 @@ pub fn process_alive(pid: u32) -> bool {
             })
     }
 }
-fn launch(binding: &RunnerBinding, path: &Path, now: u64) -> Result<OwnedRun, String> {
+fn launch(
+    binding: &RunnerBinding,
+    path: &Path,
+    now: u64,
+    prompt: &str,
+) -> Result<OwnedRun, String> {
     binding.validate()?;
     let locks = path
         .parent()
@@ -710,7 +863,7 @@ fn launch(binding: &RunnerBinding, path: &Path, now: u64) -> Result<OwnedRun, St
         .take()
         .ok_or("runner stdin is unavailable")
         .and_then(|mut pipe| {
-            pipe.write_all(NUDGE.as_bytes())
+            pipe.write_all(prompt.as_bytes())
                 .map_err(|_| "cannot deliver the continuation prompt")
         });
     if let Err(e) = input {
@@ -738,17 +891,30 @@ fn resolve_executable(program: &Path) -> Option<PathBuf> {
     if program.components().count() != 1 {
         return None;
     }
-    for dir in std::env::split_paths(&std::env::var_os("PATH")?) {
+    resolve_from_path(program, &std::env::var_os("PATH")?)
+}
+fn resolve_from_path(program: &Path, search: &std::ffi::OsStr) -> Option<PathBuf> {
+    for dir in std::env::split_paths(search) {
         let candidate = dir.join(program);
         if candidate.is_file() {
-            return Some(candidate);
+            // Resolve relative PATH entries against the host now, before current_dir is set
+            // to the agent workspace when the child starts.
+            return if candidate.is_absolute() {
+                Some(candidate)
+            } else {
+                candidate.canonicalize().ok()
+            };
         }
         #[cfg(windows)]
         if candidate.extension().is_none() {
             for ext in ["exe", "cmd"] {
                 let p = candidate.with_extension(ext);
                 if p.is_file() {
-                    return Some(p);
+                    return if p.is_absolute() {
+                        Some(p)
+                    } else {
+                        p.canonicalize().ok()
+                    };
                 }
             }
         }
@@ -839,14 +1005,17 @@ pub fn frame(world: &mut World) {
             .last_poll
             .is_some_and(|last| now.saturating_sub(last) < policy.poll_seconds * 1000)
             && runtime.last_status.enabled == policy.enabled
+            && runtime.last_status.events_enabled == policy.events_enabled
         {
             return;
         }
     }
-    let input = pulses(world, &policy);
+    let mut input = pulses(world, &policy);
+    client_host::suppress_legacy(world, &mut input);
     if !world.contains_resource::<SchedulerRuntime>() {
         world.insert_resource(SchedulerStatus {
             enabled: policy.enabled,
+            events_enabled: policy.events_enabled,
             agents: input
                 .into_iter()
                 .map(|p| SchedulerAgentStatus {
@@ -861,14 +1030,32 @@ pub fn frame(world: &mut World) {
                     idle_seconds: 0,
                     nudges_last_hour: 0,
                     last_result: None,
+                    pending_events: 0,
+                    event_overflow: 0,
+                    trigger: None,
+                    last_delivery_seq: None,
                 })
                 .collect(),
             error: None,
         });
         return;
     }
-    let status =
-        world.resource_scope(|_, mut runtime: Mut<SchedulerRuntime>| runtime.poll(&policy, input));
+    crate::events::harvest(world);
+    let external_slots = client_host::running_slots(world);
+    let status = world.resource_scope(|world, mut runtime: Mut<SchedulerRuntime>| {
+        runtime.external_slots = external_slots;
+        let feed = world
+            .get_resource::<crate::events::AgentEvents>()
+            .map(|events| EventFeed {
+                epoch: api::epoch(world),
+                events,
+                receipts: world.get_resource::<Receipts>(),
+                classifier: world.get_resource::<SchedulerEventClassifier>().copied(),
+            });
+        let now =
+            u64::try_from(wall_now().duration_since(runtime.start).as_millis()).unwrap_or(u64::MAX);
+        runtime.poll_at_with_events(&policy, input, now, feed.as_ref())
+    });
     world.insert_resource(status);
 }
 
@@ -898,12 +1085,14 @@ pub fn read_status(world: &mut World) -> SchedulerStatus {
         .get_resource::<SchedulerPolicy>()
         .cloned()
         .unwrap_or_default();
-    let input = pulses(world, &policy);
+    let mut input = pulses(world, &policy);
+    client_host::suppress_legacy(world, &mut input);
     let mut status = world
         .get_resource::<SchedulerStatus>()
         .cloned()
         .unwrap_or_default();
     status.enabled = policy.enabled;
+    status.events_enabled = policy.events_enabled;
     status.agents.retain(|a| {
         input
             .iter()
@@ -959,6 +1148,10 @@ pub fn read_status(world: &mut World) -> SchedulerStatus {
                 idle_seconds: 0,
                 nudges_last_hour: 0,
                 last_result: None,
+                pending_events: 0,
+                event_overflow: 0,
+                trigger: None,
+                last_delivery_seq: None,
             });
         }
     }
@@ -1015,6 +1208,21 @@ mod tests {
         assert_eq!(
             claude.invocation().1,
             vec!["--print", "--resume", &claude.session_id]
+        );
+    }
+    #[test]
+    fn relative_path_entry_is_resolved_before_entering_an_agent_workspace() {
+        // File discovery alone is enough here; no executable is launched or PATH changed.
+        let program = Path::new("Cargo.toml");
+        let resolved = resolve_from_path(program, std::ffi::OsStr::new(".")).unwrap();
+        assert!(resolved.is_absolute());
+        assert_eq!(
+            resolved,
+            std::env::current_dir()
+                .unwrap()
+                .join(program)
+                .canonicalize()
+                .unwrap()
         );
     }
     #[test]
@@ -1094,6 +1302,248 @@ mod tests {
         };
         (dir, b, policy)
     }
+    fn event_push(events: &mut crate::events::AgentEvents, kind: npc_kernel::journal::JournalKind) {
+        let seq = events.next_seq;
+        events.next_seq += 1;
+        events.events.push_back(crate::events::AgentEvent {
+            seq,
+            tick: seq,
+            unit: Some(SimId(1)),
+            kind: kind.name().into(),
+            event: kind,
+        });
+    }
+    fn poll_events(
+        runtime: &mut SchedulerRuntime,
+        policy: &SchedulerPolicy,
+        pulse: AgentPulse,
+        now: u64,
+        events: &crate::events::AgentEvents,
+    ) -> SchedulerStatus {
+        runtime.poll_at_with_events(
+            policy,
+            vec![pulse],
+            now,
+            Some(&EventFeed {
+                epoch: 1,
+                events,
+                receipts: None,
+                classifier: None,
+            }),
+        )
+    }
+    #[test]
+    fn event_policy_is_additive_to_legacy_presets_without_rewriting_their_serialization() {
+        let policy: SchedulerPolicy =
+            serde_json::from_value(serde_json::json!({"enabled":true})).unwrap();
+        assert!(policy.events_enabled);
+        assert!(
+            serde_json::to_value(&policy)
+                .unwrap()
+                .get("events_enabled")
+                .is_none()
+        );
+        let disabled = SchedulerPolicy {
+            events_enabled: false,
+            ..policy
+        };
+        assert_eq!(
+            serde_json::to_value(disabled).unwrap()["events_enabled"],
+            false
+        );
+    }
+    #[test]
+    fn events_wait_through_busy_pause_running_cooldown_and_caps_then_deliver_historical_stdin() {
+        use npc_kernel::journal::JournalKind;
+        let (dir, b, mut policy) = fixture();
+        fs::write(dir.join("sleep"), "").unwrap();
+        let file = dir.join("bindings.json");
+        write_binding(&file, b.clone()).unwrap();
+        let mut runtime = SchedulerRuntime::new(file);
+        let mut events = crate::events::AgentEvents::default();
+        let mut p = pulse();
+        poll_events(&mut runtime, &policy, p.clone(), 0, &events);
+        event_push(
+            &mut events,
+            JournalKind::OrderDone {
+                order: "private-order-name".into(),
+            },
+        );
+        p.busy = Some("crafting".into());
+        let busy = poll_events(&mut runtime, &policy, p.clone(), 1000, &events);
+        assert_eq!(busy.agents[0].pending_events, 1);
+        assert!(runtime.runs.is_empty());
+        p.busy = None;
+        p.blocked = Some("game paused".into());
+        let paused = poll_events(&mut runtime, &policy, p.clone(), 2000, &events);
+        assert_eq!(paused.agents[0].state, "game paused");
+        assert_eq!(paused.agents[0].pending_events, 1);
+        p.blocked = None;
+        let running = poll_events(&mut runtime, &policy, p.clone(), 3000, &events);
+        assert_eq!(
+            running.agents[0].state, "running",
+            "pending events bypass only the idle timer"
+        );
+        assert_eq!(running.agents[0].trigger.as_deref(), Some("events"));
+        assert_eq!(running.agents[0].last_delivery_seq, Some(1));
+        assert_eq!(running.agents[0].pending_events, 0);
+        wait_file(&dir.join("received-prompt.txt"));
+        let prompt = fs::read_to_string(dir.join("received-prompt.txt")).unwrap();
+        assert!(prompt.contains("Historical events") && prompt.contains("Observe your actor"));
+        assert!(prompt.contains("OrderDone") && prompt.contains("order_completed"));
+        assert!(!prompt.contains("private-order-name") && !prompt.contains(&b.session_id));
+        event_push(
+            &mut events,
+            JournalKind::NeedLevel {
+                need: "private-need-name".into(),
+                from: npc_kernel::journal::NeedLevel::Ok,
+                to: npc_kernel::journal::NeedLevel::Urgent,
+            },
+        );
+        let active = poll_events(&mut runtime, &policy, p.clone(), 4000, &events);
+        assert_eq!(active.agents[0].state, "running");
+        assert_eq!(active.agents[0].pending_events, 1);
+        assert_eq!(runtime.runs.len(), 1);
+        policy.max_nudges_per_hour = 1;
+        let capped = poll_events(&mut runtime, &policy, p.clone(), 14000, &events);
+        assert_eq!(capped.agents[0].state, "hourly limit");
+        assert_eq!(
+            capped.agents[0].last_result.as_deref(),
+            Some("runner timed out")
+        );
+        assert_eq!(capped.agents[0].pending_events, 1);
+        policy.max_nudges_per_hour = 60;
+        let cooldown = poll_events(&mut runtime, &policy, p, 15000, &events);
+        assert_eq!(cooldown.agents[0].state, "cooldown");
+        assert_eq!(cooldown.agents[0].pending_events, 1);
+        drop(runtime);
+        cleanup(dir);
+    }
+    #[test]
+    fn releasing_and_reclaiming_control_preserves_hourly_cap_and_failure_cooldown() {
+        use npc_kernel::journal::JournalKind;
+        let (dir, binding, mut policy) = fixture();
+        fs::write(dir.join("sleep"), "").unwrap();
+        let file = dir.join("bindings.json");
+        write_binding(&file, binding).unwrap();
+        policy.max_nudges_per_hour = 1;
+        let mut runtime = SchedulerRuntime::new(file);
+        let mut events = crate::events::AgentEvents::default();
+        poll_events(&mut runtime, &policy, pulse(), 0, &events);
+        event_push(
+            &mut events,
+            JournalKind::OrderDone {
+                order: "Move".into(),
+            },
+        );
+        assert_eq!(
+            poll_events(&mut runtime, &policy, pulse(), 1000, &events).agents[0].state,
+            "running"
+        );
+        wait_file(&dir.join("received-prompt.txt"));
+        // The actor releases control, cancelling only the scheduler-owned run.
+        runtime.poll_at_with_events(
+            &policy,
+            Vec::new(),
+            2000,
+            Some(&EventFeed {
+                epoch: 1,
+                events: &events,
+                receipts: None,
+                classifier: None,
+            }),
+        );
+        assert!(runtime.runs.is_empty());
+        assert_eq!(runtime.tracks["a"].attempts.len(), 1);
+        assert!(runtime.tracks["a"].events.pending.is_empty());
+        let reclaimed = poll_events(&mut runtime, &policy, pulse(), 3000, &events);
+        assert_eq!(reclaimed.agents[0].state, "hourly limit");
+        event_push(
+            &mut events,
+            JournalKind::OrderDone {
+                order: "Move".into(),
+            },
+        );
+        let capped = poll_events(&mut runtime, &policy, pulse(), 4000, &events);
+        assert_eq!(capped.agents[0].state, "hourly limit");
+        assert_eq!(capped.agents[0].pending_events, 1);
+        policy.max_nudges_per_hour = 60;
+        let cooldown = poll_events(&mut runtime, &policy, pulse(), 5000, &events);
+        assert_eq!(cooldown.agents[0].state, "cooldown");
+        assert_eq!(cooldown.agents[0].pending_events, 1);
+        assert!(runtime.runs.is_empty());
+        drop(runtime);
+        cleanup(dir);
+    }
+    #[test]
+    fn failed_event_launch_retains_notifications_and_original_clients_and_policy_gates_are_respected()
+     {
+        use npc_kernel::journal::JournalKind;
+        let (dir, mut b, mut policy) = fixture();
+        b.program = Some(dir.join("missing-cli"));
+        let file = dir.join("bindings.json");
+        write_binding(&file, b.clone()).unwrap();
+        let mut runtime = SchedulerRuntime::new(file.clone());
+        let mut events = crate::events::AgentEvents::default();
+        let mut p = pulse();
+        poll_events(&mut runtime, &policy, p.clone(), 0, &events);
+        event_push(
+            &mut events,
+            JournalKind::OrderDone {
+                order: "Move".into(),
+            },
+        );
+        let failed = poll_events(&mut runtime, &policy, p.clone(), 1000, &events);
+        assert!(failed.agents[0].state.contains("cannot start"));
+        assert_eq!(failed.agents[0].pending_events, 1);
+        assert_eq!(failed.agents[0].last_delivery_seq, None);
+        assert_eq!(
+            poll_events(&mut runtime, &policy, p.clone(), 2000, &events).agents[0].state,
+            "cooldown"
+        );
+        policy.enabled = false;
+        let disabled = poll_events(&mut runtime, &policy, p.clone(), 3000, &events);
+        assert_eq!(disabled.agents[0].state, "disabled");
+        assert_eq!(
+            disabled.agents[0].pending_events, 1,
+            "master pause retains bounded historical events"
+        );
+        policy.events_enabled = false;
+        assert_eq!(
+            poll_events(&mut runtime, &policy, p.clone(), 4000, &events).agents[0].pending_events,
+            0
+        );
+        policy.enabled = true;
+        policy.events_enabled = true;
+        b.client_pid = Some(std::process::id());
+        write_binding(&file, b).unwrap();
+        assert_eq!(
+            poll_events(&mut runtime, &policy, p.clone(), 5000, &events).agents[0].pending_events,
+            0,
+            "new links rebaseline"
+        );
+        event_push(
+            &mut events,
+            JournalKind::OrderDone {
+                order: "Move".into(),
+            },
+        );
+        let original = poll_events(&mut runtime, &policy, p.clone(), 6000, &events);
+        assert_eq!(
+            original.agents[0].state,
+            "original CLI client is still running"
+        );
+        assert_eq!(original.agents[0].pending_events, 1);
+        assert!(runtime.runs.is_empty());
+        p.blocked = Some("registration revoked or disconnected".into());
+        assert_eq!(
+            poll_events(&mut runtime, &policy, p, 7000, &events).agents[0].pending_events,
+            0
+        );
+        assert!(process_alive(std::process::id()));
+        drop(runtime);
+        cleanup(dir);
+    }
     fn wait_file(path: &Path) {
         let start = wall_now();
         while !path.is_file() && start.elapsed() < std::time::Duration::from_secs(30) {
@@ -1114,7 +1564,11 @@ mod tests {
         use std::io::Read;
         let mut input = String::new();
         std::io::stdin().read_to_string(&mut input).unwrap();
-        fs::write("received-prompt.txt", input).unwrap();
+        // Publish readiness only after the full file is written and closed. `fs::write` creates
+        // its destination before writing, so waiting on that destination alone races an empty
+        // or partial read in the parent, especially when the scheduler test suite runs in parallel.
+        fs::write("received-prompt.partial", input).unwrap();
+        fs::rename("received-prompt.partial", "received-prompt.txt").unwrap();
         if Path::new("sleep").is_file() {
             std::thread::sleep(std::time::Duration::from_secs(120));
         }
@@ -1142,6 +1596,7 @@ mod tests {
         wait_file(&dir.join("received-prompt.txt"));
         let prompt = fs::read_to_string(dir.join("received-prompt.txt")).unwrap();
         assert!(prompt.contains("Continue playing"));
+        assert_eq!(prompt, NUDGE, "fake CLI must receive the complete prompt");
         assert!(!prompt.contains(&b.session_id));
         let same = runtime.poll_at(&policy, vec![p.clone()], 6000);
         assert_eq!(same.agents[0].nudges_last_hour, 1);
@@ -1204,6 +1659,120 @@ mod tests {
                 .contains(&b.session_id)
         );
         drop(runtime);
+        cleanup(dir);
+    }
+    #[test]
+    fn read_only_preflight_finds_missing_cli_link_workspace_and_locks_without_running_or_writing() {
+        let (dir, mut b, _) = fixture();
+        let file = dir.join("bindings.json");
+        let absent = check_binding(&file, "a").unwrap();
+        assert!(!absent.linked && !absent.configuration_ready);
+        assert!(absent.issues[0].contains("exact conversation UUID"));
+        assert!(!file.exists());
+
+        b.program = Some(dir.join("missing-cli"));
+        write_binding(&file, b.clone()).unwrap();
+        let bytes = fs::read(&file).unwrap();
+        let missing_cli = check_binding(&file, "a").unwrap();
+        assert!(missing_cli.linked && !missing_cli.configuration_ready);
+        assert!(missing_cli.issues[0].contains("--program"));
+        assert!(missing_cli.authentication.contains("not checked"));
+        assert_eq!(fs::read(&file).unwrap(), bytes);
+        assert!(!dir.join("locks").exists());
+
+        b.program = Some(std::env::current_exe().unwrap());
+        write_binding(&file, b.clone()).unwrap();
+        assert!(check_binding(&file, "a").unwrap().configuration_ready);
+        assert!(!dir.join("received-prompt.txt").exists());
+        fs::create_dir(dir.join("locks")).unwrap();
+        let lock = dir.join("locks").join(format!("{}.lock", b.target_key()));
+        fs::write(&lock, "unverifiable lock fixture").unwrap();
+        let locked = check_binding(&file, "a").unwrap();
+        assert!(!locked.configuration_ready);
+        assert!(locked.issues[0].contains("--turn-finished"));
+        assert_eq!(
+            fs::read_to_string(&lock).unwrap(),
+            "unverifiable lock fixture"
+        );
+        assert!(
+            !serde_json::to_string(&locked)
+                .unwrap()
+                .contains(&b.session_id)
+        );
+        assert!(!dir.join("received-prompt.txt").exists());
+
+        let workspace = dir.join("disposable-workspace");
+        fs::create_dir(&workspace).unwrap();
+        b.cwd = workspace.clone();
+        write_binding(&file, b.clone()).unwrap();
+        fs::remove_dir(&workspace).unwrap();
+        let unavailable = check_binding(&file, "a").unwrap();
+        assert!(!unavailable.configuration_ready);
+        assert!(
+            unavailable
+                .issues
+                .iter()
+                .any(|e| e.contains("restore the workspace or rebind with --cwd"))
+        );
+        b.cwd = dir.clone();
+        write_binding(&file, b.clone()).unwrap();
+        assert_eq!(read_bindings(&file).unwrap().bindings[0].cwd, dir);
+        b.cwd = workspace.clone();
+        fs::create_dir(&workspace).unwrap();
+        write_binding(&file, b).unwrap();
+        fs::remove_dir(&workspace).unwrap();
+        remove_binding(&file, "a").unwrap();
+        assert!(!check_binding(&file, "a").unwrap().linked);
+        cleanup(dir);
+    }
+    #[test]
+    fn failure_backoff_restart_and_unlink_preserve_owned_runner_lifecycle() {
+        let (dir, b, policy) = fixture();
+        fs::write(dir.join("fail"), "").unwrap();
+        let file = dir.join("bindings.json");
+        write_binding(&file, b.clone()).unwrap();
+        let mut runtime = SchedulerRuntime::new(file.clone());
+        runtime.poll_at(&policy, vec![pulse()], 0);
+        runtime.poll_at(&policy, vec![pulse()], 5000);
+        wait_file(&dir.join("received-prompt.txt"));
+        assert!(!runtime.runs[0].child.wait().unwrap().success());
+        let failed = runtime.poll_at(&policy, vec![pulse()], 6000);
+        assert!(
+            failed.agents[0]
+                .last_result
+                .as_deref()
+                .unwrap()
+                .contains("check provider login")
+        );
+        assert_eq!(
+            runtime.poll_at(&policy, vec![pulse()], 15000).agents[0].state,
+            "cooldown"
+        );
+        assert!(runtime.runs.is_empty());
+        assert!(check_binding(&file, "a").unwrap().configuration_ready);
+        drop(runtime);
+
+        // Restart begins a fresh idle interval. Unlinking then stops only the owned continuation.
+        fs::remove_file(dir.join("fail")).unwrap();
+        fs::remove_file(dir.join("received-prompt.txt")).unwrap();
+        fs::write(dir.join("sleep"), "").unwrap();
+        let mut restarted = SchedulerRuntime::new(file.clone());
+        assert_eq!(
+            restarted.poll_at(&policy, vec![pulse()], 0).agents[0].state,
+            "idle timer"
+        );
+        assert_eq!(
+            restarted.poll_at(&policy, vec![pulse()], 5000).agents[0].state,
+            "running"
+        );
+        wait_file(&dir.join("received-prompt.txt"));
+        remove_binding(&file, "a").unwrap();
+        let stopped = restarted.poll_at(&policy, vec![pulse()], 6000);
+        assert_eq!(stopped.agents[0].state, "unlinked");
+        assert!(restarted.runs.is_empty());
+        assert!(fs::read_dir(dir.join("locks")).unwrap().next().is_none());
+        assert!(!check_binding(&file, "a").unwrap().linked);
+        drop(restarted);
         cleanup(dir);
     }
     #[test]

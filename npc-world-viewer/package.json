@@ -1,0 +1,27 @@
+{
+  "name": "npc-world-viewer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "tsx server/main.ts",
+    "build": "tsc --noEmit && vite build",
+    "start": "tsx server/main.ts --production",
+    "test": "tsx --test tests/*.test.ts",
+    "check:state": "tsx scripts/check-state.ts"
+  },
+  "dependencies": {
+    "@fontsource/silkscreen": "5.2.6",
+    "excalibur": "^0.32.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vite": "^7.2.2"
+  }
+}

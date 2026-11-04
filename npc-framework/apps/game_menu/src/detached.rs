@@ -29,6 +29,7 @@
 //! the dev chose **Quit anyway** for, is killed by its own pid. A world
 //! that exits on its own is dropped from the list.
 
+use std::collections::BTreeMap;
 use std::io::{BufRead as _, BufReader, Read};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -41,10 +42,12 @@ use bevy::prelude::*;
 use bevy::ui_widgets::ScrollArea;
 use serde::Deserialize;
 use serde_json::Value;
+use testbed_content::explorer::ai_client::{self, Provider};
 use testbed_content::explorer::home::{AgentDir, read_lossy, slug};
 use testbed_content::explorer::host::{
-    DetachedLine, RemoteError, RunFile, detach_command, latest_prompt, parse_rfc3339, pid_alive,
-    prompt_text, remote_call, remote_call_checked, session_call,
+    DetachedLine, ProjectionLaunch, RemoteError, RunFile, append_projection_args, detach_command,
+    latest_prompt, parse_rfc3339, pid_alive, prompt_text, remote_call, remote_call_checked,
+    session_call,
 };
 
 use crate::explorer::{ResumeInfo, ResumeNotice};
@@ -170,6 +173,91 @@ impl Control for RpcControl {
 /// The [`Control`] in use.
 #[derive(Resource, Clone)]
 pub struct Controls(pub Arc<dyn Control>);
+
+#[derive(Clone)]
+struct ProjectionHandover {
+    world: String,
+    port: u16,
+    projection: ProjectionLaunch,
+}
+/// Short-lived launch intent, scoped to the exact agent folder/world/port. It survives a failed
+/// window move so the existing detached restart path uses the same public file.
+#[derive(Resource, Default)]
+struct ProjectionHandovers(BTreeMap<PathBuf, ProjectionHandover>);
+
+fn remember_projection_run(world: &mut World, run: &RunFile, dir: &AgentDir) -> Result<(), String> {
+    if let Some(projection) = &run.projection {
+        projection.validate()?;
+    }
+    let mut handovers = world.get_resource_or_init::<ProjectionHandovers>();
+    if let Some(projection) = &run.projection {
+        handovers.0.insert(
+            dir.dir.clone(),
+            ProjectionHandover {
+                world: run.world.clone(),
+                port: run.port,
+                projection: projection.clone(),
+            },
+        );
+    } else {
+        handovers.0.remove(&dir.dir);
+    }
+    while handovers.0.len() > 128 {
+        let first = handovers
+            .0
+            .keys()
+            .next()
+            .cloned()
+            .expect("nonempty handover map");
+        handovers.0.remove(&first);
+    }
+    Ok(())
+}
+fn remember_projection_before_stop(world: &mut World, agent: &str) -> Result<(), String> {
+    let dir = agent_dir(world, agent);
+    if let Some(run) = RunFile::read_any(&dir) {
+        if run.agent != agent
+            || world
+                .resource::<DetachedWorlds>()
+                .get(agent)
+                .is_some_and(|tracked| tracked.world != run.world || tracked.port != run.port)
+        {
+            return Err("projection handover metadata belongs to a different world or port".into());
+        }
+        remember_projection_run(world, &run, &dir)?;
+    }
+    Ok(())
+}
+/// Called by the ordinary menu launcher; other entry types and disabled exports are unchanged.
+pub fn append_projection_handover_args(
+    world: &mut World,
+    entry: &Entry,
+    args: &mut Vec<String>,
+) -> Result<(), String> {
+    let (agent, port) = match entry {
+        Entry::ExplorerMove { agent, port } | Entry::ExplorerRestart { agent, port } => {
+            (agent, *port)
+        }
+        _ => return Ok(()),
+    };
+    let dir = agent_dir(world, agent);
+    let Some(handover) = world
+        .get_resource::<ProjectionHandovers>()
+        .and_then(|handover| handover.0.get(&dir.dir))
+        .cloned()
+    else {
+        return Ok(());
+    };
+    let metadata = testbed_content::explorer::home::read_meta(&dir)?;
+    if handover.world != metadata.world || handover.port != port {
+        world
+            .resource_mut::<ProjectionHandovers>()
+            .0
+            .remove(&dir.dir);
+        return Ok(());
+    }
+    append_projection_args(args, Some(&handover.projection))
+}
 
 impl Default for Controls {
     fn default() -> Self {
@@ -517,6 +605,101 @@ pub struct PromptCopy {
     error: Option<String>,
 }
 
+#[derive(Resource)]
+struct AiDisplay {
+    workspace: Option<PathBuf>,
+    line: String,
+    ready: bool,
+    active: bool,
+    launching: Option<(u32, Instant)>,
+    details: bool,
+    checked: Instant,
+    pending: Option<Rx<(PathBuf, ai_client::Status)>>,
+}
+impl Default for AiDisplay {
+    fn default() -> Self {
+        Self {
+            workspace: None,
+            line: String::new(),
+            ready: false,
+            active: false,
+            launching: None,
+            details: false,
+            checked: Instant::now(),
+            pending: None,
+        }
+    }
+}
+impl AiDisplay {
+    fn select(&mut self, workspace: PathBuf) {
+        if self.workspace.as_ref() == Some(&workspace) {
+            return;
+        }
+        self.workspace = Some(workspace);
+        self.line = "Checking this actor's AI client...".into();
+        self.ready = false;
+        self.active = false;
+        self.launching = None;
+        self.details = false;
+        // An old worker may finish, but its receiver and workspace association are discarded.
+        self.pending = None;
+        self.checked = Instant::now()
+            .checked_sub(Duration::from_secs(1))
+            .unwrap_or_else(Instant::now);
+    }
+    fn accept(&mut self, workspace: PathBuf, status: ai_client::Status) {
+        if self.workspace.as_ref() != Some(&workspace) {
+            return;
+        }
+        if let Some((pid, started)) = self.launching {
+            if status.pid != pid && started.elapsed() < Duration::from_secs(10) {
+                return;
+            }
+            self.launching = None;
+        }
+        self.ready = true;
+        self.active = status.is_active();
+        self.line = status.line();
+    }
+    fn can_start(&self) -> bool {
+        self.ready && !self.active && self.launching.is_none()
+    }
+    fn can_stop(&self) -> bool {
+        self.active || self.launching.is_some()
+    }
+}
+fn poll_ai_status(
+    worlds: Res<DetachedWorlds>,
+    settings: Res<AppSettings>,
+    mut display: ResMut<AiDisplay>,
+) {
+    let Some(w) = worlds.shown_world() else {
+        return;
+    };
+    let dir = settings.0.agents_dir.join(slug(&w.agent));
+    display.select(dir.clone());
+    if let Some(job) = &display.pending {
+        match job.try_recv() {
+            Ok((workspace, status)) => {
+                display.pending = None;
+                display.accept(workspace, status);
+            }
+            Err(TryRecvError::Disconnected) => display.pending = None,
+            Err(TryRecvError::Empty) => (),
+        }
+    }
+    if display.pending.is_some() || display.checked.elapsed() < Duration::from_secs(1) {
+        return;
+    }
+    display.checked = Instant::now();
+    let (tx, rx) = mpsc::channel();
+    display.pending = Some(Rx::new(rx));
+    std::thread::spawn(move || {
+        let status = ai_client::read_status(&dir);
+        let _ = tx.send((dir, status));
+    });
+}
+
 impl PromptCopy {
     /// A copy is in flight.
     pub fn is_pending(&self) -> bool {
@@ -533,12 +716,15 @@ impl Plugin for DetachedPlugin {
             .init_resource::<Controls>()
             .init_resource::<Spawner>()
             .init_resource::<PromptCopy>()
+            .init_resource::<AiDisplay>()
             .add_systems(OnEnter(Screen::ExplorerDetached), spawn_detached)
             .add_systems(
                 Update,
                 (
                     track,
-                    (finish_copy, refresh_detached).run_if(in_state(Screen::ExplorerDetached)),
+                    (finish_copy, poll_ai_status, refresh_detached)
+                        .chain()
+                        .run_if(in_state(Screen::ExplorerDetached)),
                 )
                     .chain(),
             );
@@ -647,6 +833,18 @@ pub fn adopt_moved(world: &mut World, moved: DetachedLine) {
 /// stopped next).
 pub fn adopt_moved_quietly(world: &mut World, moved: DetachedLine) {
     let dir = agent_dir(world, &moved.agent);
+    let projection = match RunFile::read_any(&dir).filter(|run| {
+        run.agent == moved.agent && run.world == moved.world && run.port == moved.port
+    }) {
+        Some(run) => run.projection,
+        // The old window can remove run.json before the new detached child writes it. Retain
+        // only the matching in-flight world's known descriptor through that handover gap.
+        None => world
+            .get_resource::<ProjectionHandovers>()
+            .and_then(|handovers| handovers.0.get(&dir.dir))
+            .filter(|handover| handover.world == moved.world && handover.port == moved.port)
+            .map(|handover| handover.projection.clone()),
+    };
     let run = RunFile {
         pid: moved.pid,
         port: moved.port,
@@ -654,7 +852,11 @@ pub fn adopt_moved_quietly(world: &mut World, moved: DetachedLine) {
         started: String::new(),
         agent: moved.agent.clone(),
         world: moved.world,
+        projection,
     };
+    if let Err(error) = remember_projection_run(world, &run, &dir) {
+        warn!("game_menu: cannot retain projection handover: {error}");
+    }
     let mut worlds = world.resource_mut::<DetachedWorlds>();
     worlds.remove(&moved.agent);
     adopt(&mut worlds, &run, &dir);
@@ -752,6 +954,18 @@ pub fn start_op(world: &mut World, agent: &str, kind: OpKind) -> bool {
         Some(w) if w.is_running() => save_path(world, w),
         _ => return false,
     };
+    if kind == OpKind::Open
+        && let Err(error) = remember_projection_before_stop(world, agent)
+    {
+        set_notice(
+            world,
+            agent,
+            Notice::error(format!(
+                "Open in window aborted: {error}; the world keeps running detached"
+            )),
+        );
+        return false;
+    }
     let mut worlds = world.resource_mut::<DetachedWorlds>();
     let Some(w) = worlds.get_mut(agent) else {
         return false;
@@ -1335,6 +1549,7 @@ pub fn copy_prompt(world: &mut World) {
     if world.resource::<PromptCopy>().is_pending() {
         return;
     }
+    let text = testbed_content::explorer::prompt::normalize_prompt(&text);
     let copy = world
         .get_resource::<ClipboardTools>()
         .copied()
@@ -1347,6 +1562,85 @@ pub fn copy_prompt(world: &mut World) {
     let mut state = world.resource_mut::<PromptCopy>();
     state.pending = Some(Rx::new(rx));
     state.error = None;
+}
+
+/// Start the dedicated AI client for the selected detached world, without prompt copying.
+pub fn start_ai(world: &mut World, provider: Provider) {
+    let Some(agent) = world.resource::<DetachedWorlds>().shown.clone() else {
+        return;
+    };
+    if !world
+        .resource::<DetachedWorlds>()
+        .get(&agent)
+        .is_some_and(DetachedWorld::is_running)
+    {
+        return;
+    }
+    let dir = agent_dir(world, &agent);
+    let blocked_message = {
+        let mut display = world.resource_mut::<AiDisplay>();
+        display.select(dir.dir.clone());
+        if !display.can_start() {
+            Some(if display.can_stop() {
+                "An AI client is already active. Stop it before choosing a provider."
+            } else {
+                "Checking this actor's AI status. Try again when the controls are ready."
+            })
+        } else {
+            None
+        }
+    };
+    if let Some(message) = blocked_message {
+        set_notice(world, &agent, Notice::info(message));
+        return;
+    }
+    let metrics_dir = world.resource::<AppSettings>().0.ai_metrics_dir.clone();
+    let logs_dir = world.resource::<AppSettings>().0.ai_logs_dir.clone();
+    let notice = match ai_client::launch_with_folders(
+        &dir.dir,
+        provider,
+        metrics_dir.as_deref(),
+        logs_dir.as_deref(),
+    ) {
+        Ok(pid) => {
+            let mut display = world.resource_mut::<AiDisplay>();
+            display.launching = Some((pid, Instant::now()));
+            display.line = format!(
+                "Starting {}. Checking subscription login and game tools...",
+                provider.name()
+            );
+            Notice::info(format!(
+                "Starting {}. The client will connect and prompt your agent automatically.",
+                provider.name()
+            ))
+        }
+        Err(error) => Notice::error(error),
+    };
+    set_notice(world, &agent, notice);
+}
+
+pub fn stop_ai(world: &mut World) {
+    let Some(agent) = world.resource::<DetachedWorlds>().shown.clone() else {
+        return;
+    };
+    if !world
+        .resource::<DetachedWorlds>()
+        .get(&agent)
+        .is_some_and(DetachedWorld::is_running)
+    {
+        return;
+    }
+    let dir = agent_dir(world, &agent);
+    let notice = match ai_client::request_stop(&dir.dir) {
+        Ok(()) => Notice::info("Stopping agent. The world keeps running."),
+        Err(error) => Notice::error(error),
+    };
+    set_notice(world, &agent, notice);
+}
+
+pub fn toggle_ai_details(world: &mut World) {
+    let mut display = world.resource_mut::<AiDisplay>();
+    display.details = !display.details;
 }
 
 fn finish_copy(mut copy: ResMut<PromptCopy>) {
@@ -1375,6 +1669,7 @@ fn finish_copy(mut copy: ResMut<PromptCopy>) {
 #[derive(Component, Clone, Copy, PartialEq, Eq)]
 enum Line {
     Status,
+    AiStatus,
     Url,
     Folder,
     Prompt,
@@ -1389,13 +1684,28 @@ struct OpButton;
 #[derive(Component)]
 struct CopyButton;
 
-fn spawn_detached(mut commands: Commands, worlds: Res<DetachedWorlds>, settings: Res<AppSettings>) {
+#[derive(Component, Clone, Copy)]
+enum AiControl {
+    Start,
+    Stop,
+}
+
+#[derive(Component)]
+struct ConnectionDetails;
+
+fn spawn_detached(
+    mut commands: Commands,
+    worlds: Res<DetachedWorlds>,
+    settings: Res<AppSettings>,
+    mut display: ResMut<AiDisplay>,
+) {
     let Some(w) = worlds.shown_world() else {
         commands.queue(|w: &mut World| run::set_screen(w, Screen::ExplorerResume));
         return;
     };
     let agent = w.agent.clone();
     let dir = settings.0.agents_dir.join(slug(&agent));
+    display.select(dir.clone());
     let panel = ui::spawn_screen(
         &mut commands,
         DespawnOnExit(Screen::ExplorerDetached),
@@ -1404,34 +1714,96 @@ fn spawn_detached(mut commands: Commands, worlds: Res<DetachedWorlds>, settings:
     commands.entity(panel).with_children(|p| {
         p.spawn((Line::Status, ui::label(w.status(), 18.0, TEXT)));
         p.spawn((Line::Url, ui::label("", 14.0, ui::DIM)));
-        p.spawn((
-            Line::Folder,
-            ui::label(
-                format!(
-                    "Open your AI tool in {} and paste this prompt:",
-                    dir.display()
-                ),
-                14.0,
-                ui::DIM,
+        p.spawn(ui::label("AI agent", 22.0, TEXT));
+        p.spawn(ui::label(
+            format!(
+                "Choose a logged-in CLI. {}",
+                ai_client::START_PERMISSION_NOTICE
             ),
+            15.0,
+            TEXT,
         ));
+        p.spawn((Line::AiStatus, ui::label(&display.line, 14.0, ui::NOTE)));
+        ui::row(p, |r| {
+            for (provider, label, tab) in [
+                (Provider::Codex, "Start Codex", 0),
+                (Provider::Claude, "Start Claude", 1),
+            ] {
+                let control = button(
+                    r,
+                    label,
+                    None,
+                    w.is_running() && display.can_start(),
+                    tab,
+                    Action::StartAi(provider),
+                );
+                r.commands().entity(control).insert(AiControl::Start);
+            }
+            let control = button(
+                r,
+                "Stop agent",
+                None,
+                w.is_running() && display.can_stop(),
+                2,
+                Action::StopAi,
+            );
+            r.commands().entity(control).insert(AiControl::Stop);
+        });
+        button(
+            p,
+            "Logs & metrics",
+            Some("Read this agent's session history without leaving the game"),
+            true,
+            3,
+            Action::AgentHistory(w.agent.clone()),
+        );
+        button(
+            p,
+            "Connection help",
+            Some("Optional details for custom or manually managed clients"),
+            true,
+            4,
+            Action::ToggleAiDetails,
+        );
         p.spawn((
+            ConnectionDetails,
             Node {
-                overflow: Overflow::scroll_y(),
+                flex_direction: FlexDirection::Column,
+                row_gap: px(8),
+                display: if display.details {
+                    Display::Flex
+                } else {
+                    Display::None
+                },
                 flex_grow: 1.0,
-                flex_shrink: 1.0,
-                min_height: px(60),
-                padding: UiRect::all(px(8)),
-                border_radius: BorderRadius::all(px(4)),
+                min_height: px(0),
                 ..default()
             },
-            ScrollArea,
-            BackgroundColor(ui::FIELD),
         ))
-        .with_child((Line::Prompt, ui::label("", 13.0, TEXT)));
-        ui::row(p, |r| {
-            let copy = button(r, "Copy", None, false, 0, Action::CopyPrompt);
-            r.commands().entity(copy).insert(CopyButton);
+        .with_children(|details| {
+            details.spawn((
+                Line::Folder,
+                ui::label(format!("Agent folder: {}", dir.display()), 14.0, ui::DIM),
+            ));
+            details
+                .spawn((
+                    Node {
+                        overflow: Overflow::scroll_y(),
+                        flex_grow: 1.0,
+                        flex_shrink: 1.0,
+                        min_height: px(60),
+                        padding: UiRect::all(px(8)),
+                        border_radius: BorderRadius::all(px(4)),
+                        ..default()
+                    },
+                    ScrollArea,
+                    BackgroundColor(ui::FIELD),
+                ))
+                .with_child((Line::Prompt, ui::label("", 13.0, TEXT)));
+            ui::row(details, |r| {
+                let copy = button(r, "Copy", None, false, 5, Action::CopyPrompt);
+                r.commands().entity(copy).insert(CopyButton);
+            });
         });
         p.spawn((Line::Notice, ui::label("", 14.0, ERROR)));
         crate::explorer::token_notice(p);
@@ -1441,16 +1813,16 @@ fn spawn_detached(mut commands: Commands, worlds: Res<DetachedWorlds>, settings:
                 "Open in window",
                 None,
                 false,
-                1,
+                6,
                 Action::OpenInWindow(agent.clone()),
             );
             r.commands().entity(open).insert((OpButton, AutoFocus));
             let stop = button(
                 r,
-                "Stop",
+                "Stop world",
                 None,
                 false,
-                2,
+                7,
                 Action::StopDetached(agent.clone()),
             );
             r.commands().entity(stop).insert(OpButton);
@@ -1459,14 +1831,14 @@ fn spawn_detached(mut commands: Commands, worlds: Res<DetachedWorlds>, settings:
                 "New token",
                 None,
                 false,
-                3,
+                8,
                 Action::RotateToken {
                     agent: agent.clone(),
                     dir: dir.clone(),
                 },
             );
             r.commands().entity(token).insert(OpButton);
-            button(r, "Back", None, true, 4, Action::Go(Screen::ExplorerResume));
+            button(r, "Back", None, true, 9, Action::Go(Screen::ExplorerResume));
         });
     });
 }
@@ -1483,13 +1855,17 @@ type ButtonLabels<'w, 's> = (
 
 /// The Detached screen from the shown world: status, URL, prompt, notice,
 /// Copy's label, and Open / Stop enabled while it runs idle.
+#[allow(clippy::too_many_arguments)]
 fn refresh_detached(
     mut commands: Commands,
     worlds: Res<DetachedWorlds>,
     copy: Res<PromptCopy>,
+    ai: Res<AiDisplay>,
     mut lines: LineQuery,
     ops: Query<(Entity, Has<bevy::ui::InteractionDisabled>), With<OpButton>>,
     copies: Query<(Entity, Has<bevy::ui::InteractionDisabled>), With<CopyButton>>,
+    ai_controls: Query<(Entity, &AiControl, Has<bevy::ui::InteractionDisabled>)>,
+    mut connection_details: Query<&mut Node, With<ConnectionDetails>>,
     (children, mut colors, mut labels): ButtonLabels,
 ) {
     let Some(w) = worlds.shown_world() else {
@@ -1499,6 +1875,7 @@ fn refresh_detached(
     for (line, mut text, mut color) in &mut lines {
         let (want, tint) = match line {
             Line::Status => (w.status(), TEXT),
+            Line::AiStatus => (ai.line.clone(), ui::NOTE),
             Line::Url => (
                 if w.phase == Phase::Starting {
                     String::new()
@@ -1536,6 +1913,23 @@ fn refresh_detached(
         color.set_if_neq(TextColor(tint));
     }
     let idle = w.is_running();
+    for mut node in &mut connection_details {
+        node.display = if ai.details {
+            Display::Flex
+        } else {
+            Display::None
+        };
+    }
+    for (button, control, disabled) in &ai_controls {
+        let enabled = idle
+            && match control {
+                AiControl::Start => ai.can_start(),
+                AiControl::Stop => ai.can_stop(),
+            };
+        if disabled == enabled {
+            ui::set_enabled(&mut commands, button, enabled, &children, &mut colors);
+        }
+    }
     for (b, off) in &ops {
         if off == idle {
             ui::set_enabled(&mut commands, b, idle, &children, &mut colors);
@@ -1577,6 +1971,84 @@ pub(crate) mod tests {
     use crate::run::{self, Running, Spawner};
     use crate::screens::tests::{app, button_for, press, screen, test_child_until, tmp};
     use crate::screens::{Action, Screen};
+
+    #[test]
+    fn ai_status_cannot_cross_agents_when_background_results_arrive_late() {
+        let mut display = AiDisplay::default();
+        let first = PathBuf::from("agents/first");
+        let second = PathBuf::from("agents/second");
+        display.select(first.clone());
+        display.details = true;
+        display.accept(
+            first.clone(),
+            ai_client::Status {
+                state: "running".into(),
+                provider: "codex".into(),
+                ..default()
+            },
+        );
+        assert!(display.can_stop());
+        display.select(second.clone());
+        assert!(!display.details && !display.ready && !display.can_stop());
+        display.accept(
+            first,
+            ai_client::Status {
+                state: "running".into(),
+                provider: "codex".into(),
+                ..default()
+            },
+        );
+        assert!(!display.ready && !display.line.contains("codex"));
+        display.accept(
+            second,
+            ai_client::Status {
+                state: "stopped".into(),
+                provider: "claude".into(),
+                ..default()
+            },
+        );
+        assert!(display.can_start() && !display.can_stop());
+        assert!(display.line.contains("claude"));
+    }
+
+    #[test]
+    fn launching_ai_disables_duplicate_start_until_the_same_client_reports_status() {
+        let mut display = AiDisplay::default();
+        let workspace = PathBuf::from("agents/current");
+        display.select(workspace.clone());
+        display.accept(workspace.clone(), ai_client::Status::default());
+        assert!(display.can_start());
+        display.launching = Some((42, Instant::now()));
+        display.accept(
+            workspace.clone(),
+            ai_client::Status {
+                pid: 7,
+                state: "stopped".into(),
+                ..default()
+            },
+        );
+        assert!(!display.can_start() && display.can_stop());
+        display.accept(
+            workspace.clone(),
+            ai_client::Status {
+                pid: 42,
+                state: "running".into(),
+                ..default()
+            },
+        );
+        assert!(!display.can_start() && display.can_stop());
+        display.accept(
+            workspace,
+            ai_client::Status {
+                pid: 42,
+                state: "error".into(),
+                message: "Sign in with your CLI".into(),
+                ..default()
+            },
+        );
+        assert!(display.can_start() && !display.can_stop());
+        assert!(display.line.contains("Sign in with your CLI"));
+    }
 
     /// One child the fake spawner starts: prints `stdout` / `stderr`, waits
     /// for `until` to exist (when set), then exits with `code`.
@@ -1806,6 +2278,19 @@ pub(crate) mod tests {
         assert!(!has_text(&mut app, "generated: true"));
         assert!(has_text(&mut app, "http://127.0.0.1:15790"));
         button_for(&mut app, |a| matches!(a, Action::CopyPrompt));
+        assert!(
+            has_text(&mut app, "Stop world"),
+            "world and agent stop actions have distinct targets"
+        );
+        let mut navigation = app
+            .world_mut()
+            .query::<(&Action, &bevy::input_focus::tab_navigation::TabIndex)>();
+        let mut tabs: Vec<_> = navigation.iter(app.world()).map(|(_, tab)| tab.0).collect();
+        tabs.sort_unstable();
+        assert!(
+            tabs.windows(2).all(|pair| pair[0] < pair[1]),
+            "detached controls have a unique reading-order keyboard sequence"
+        );
         // The first answer, then the next one about 2 s later (not every frame).
         assert!(
             until(&mut app, Duration::from_secs(30), |a| has_text(
@@ -2042,6 +2527,90 @@ pub(crate) mod tests {
     /// A window closed with "keep it running detached" (or F9) prints its
     /// detached host: the menu tracks it and shows its Detached screen.
     #[test]
+    fn projection_descriptor_survives_detached_stop_window_move_and_failed_move_restart_only_for_its_world()
+     {
+        let d = tmp("projection-handover");
+        let mut app = menu(&d);
+        let dir =
+            create_agent(&d.join("agents"), "Herp", "Island", "2026-10-29T10:00:00Z").unwrap();
+        let descriptor = ProjectionLaunch {
+            output: d.join("stream/world state.json"),
+            interval_ms: 750,
+        };
+        let run = RunFile {
+            pid: std::process::id(),
+            port: 15794,
+            mode: RunMode::Detached,
+            started: "2026-10-29T10:00:00Z".into(),
+            agent: "Herp".into(),
+            world: "Island".into(),
+            projection: Some(descriptor.clone()),
+        };
+        run.write(&dir).unwrap();
+        adopt(
+            &mut app.world_mut().resource_mut::<DetachedWorlds>(),
+            &run,
+            &dir,
+        );
+        remember_projection_before_stop(app.world_mut(), "Herp").unwrap();
+        run.remove(&dir).unwrap(); // A successful stop removes run.json before the next launch.
+        adopt_moved_quietly(
+            app.world_mut(),
+            DetachedLine {
+                pid: std::process::id(),
+                port: 15794,
+                agent: "Herp".into(),
+                world: "Island".into(),
+            },
+        );
+        // The window-to-detached stdout notice can arrive in the run.json replacement gap.
+        for entry in [
+            Entry::ExplorerMove {
+                agent: "Herp".into(),
+                port: 15794,
+            },
+            Entry::ExplorerRestart {
+                agent: "Herp".into(),
+                port: 15794,
+            },
+        ] {
+            let settings = app.world().resource::<AppSettings>().0.clone();
+            let (_, mut args) = launch::command_for(&entry, &settings);
+            append_projection_handover_args(app.world_mut(), &entry, &mut args).unwrap();
+            assert!(args.windows(2).any(|pair| pair[0] == "--world-state-out"
+                && pair[1] == descriptor.output.display().to_string()));
+            assert!(
+                args.windows(2)
+                    .any(|pair| pair == ["--world-state-interval-ms", "750"])
+            );
+            assert_eq!(
+                args.iter()
+                    .filter(|arg| *arg == "--world-state-out")
+                    .count(),
+                1
+            );
+        }
+        let unrelated = Entry::Testbed("ai_village");
+        let mut unrelated_args = Vec::new();
+        append_projection_handover_args(app.world_mut(), &unrelated, &mut unrelated_args).unwrap();
+        assert!(unrelated_args.is_empty());
+        let wrong_port = Entry::ExplorerMove {
+            agent: "Herp".into(),
+            port: 15795,
+        };
+        let mut args = Vec::new();
+        append_projection_handover_args(app.world_mut(), &wrong_port, &mut args).unwrap();
+        assert!(
+            args.is_empty(),
+            "another world/port must not inherit a previous export"
+        );
+        assert!(
+            !RunFile::path(&dir).exists(),
+            "argument propagation never starts or advertises another host"
+        );
+        let _ = std::fs::remove_dir_all(d);
+    }
+    #[test]
     fn a_window_that_moved_to_detached_is_tracked() {
         let d = tmp("d-moved");
         let mut app = menu(&d);
@@ -2120,6 +2689,7 @@ pub(crate) mod tests {
             started: "2026-10-26T01:00:00Z".into(),
             agent: "Wren Ashdown".into(),
             world: "Moor".into(),
+            projection: None,
         }
         .write(&wren)
         .unwrap();
@@ -2157,6 +2727,7 @@ pub(crate) mod tests {
             started: "2026-10-26T01:00:00Z".into(),
             agent: "Wren Ashdown".into(),
             world: "Moor".into(),
+            projection: None,
         }
         .write(&wren)
         .unwrap();
@@ -2274,6 +2845,7 @@ pub(crate) mod tests {
                 started: "2026-10-26T01:00:00Z".into(),
                 agent: agent.into(),
                 world: world.into(),
+                projection: None,
             }
             .write(dir)
             .unwrap();

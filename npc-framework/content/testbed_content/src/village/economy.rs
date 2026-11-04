@@ -1,8 +1,8 @@
 //! Atomic inventory/currency operations. No output or currency is fabricated by trade.
-use super::{catalog, model::*};
+use super::{catalog, market, model::*};
 use bevy_ecs::prelude::*;
 use npc_framework::interaction::items::{self, entity_of};
-use npc_framework::interaction::{Inventory, Item};
+use npc_framework::interaction::{CarriedBy, Inventory, Item};
 use npc_framework::prelude::*;
 use serde_json::json;
 
@@ -30,13 +30,46 @@ pub fn count(world: &World, holder: Entity, kind: &str) -> u32 {
         .sum()
 }
 pub fn fit(world: &World, holder: Entity, incoming: &[Item]) -> Result<(), String> {
+    fit_without(world, holder, incoming, &[])
+}
+
+/// Pure post-spend capacity check. Only actual items carried by this holder
+/// may free weight or slots; unrelated IDs never create imaginary capacity.
+pub fn fit_without(
+    world: &World,
+    holder: Entity,
+    incoming: &[Item],
+    spent: &[SimId],
+) -> Result<(), String> {
     let inv = world.get::<Inventory>(holder).ok_or("no inventory")?;
+    let holder_id = world.get::<SimId>(holder).copied();
+    let carried = items::carried_items(world, holder);
+    let excluded: Vec<_> = carried
+        .iter()
+        .copied()
+        .filter(|id| {
+            spent.contains(id)
+                && entity_of(world, *id).is_some_and(|e| {
+                    world
+                        .get::<CarriedBy>(e)
+                        .is_some_and(|c| Some(c.holder) == holder_id)
+                })
+        })
+        .collect();
     let mut stacks: Vec<Item> = inv
         .items
         .iter()
+        .filter(|id| !excluded.contains(id))
         .filter_map(|id| world.get::<Item>(entity_of(world, *id)?).cloned())
         .collect();
-    let mut weight = items::carried_weight(world, holder);
+    let mut weight = carried
+        .iter()
+        .filter(|id| !excluded.contains(id))
+        .filter_map(|id| world.get::<Item>(entity_of(world, *id)?))
+        .try_fold(0_u32, |sum, item| {
+            sum.checked_add(items::item_weight(world, item))
+        })
+        .ok_or("too much weight")?;
     for item in incoming {
         let def = items::kind_def(world, &item.kind).ok_or("unknown item")?;
         weight = weight
@@ -172,31 +205,7 @@ pub fn check_trade(
     kind: &str,
     n: u32,
 ) -> Result<(), String> {
-    if buyer == seller || !living(world, buyer) || !living(world, seller) {
-        return Err("trade needs two living actors".into());
-    }
-    if !(1..=20).contains(&n) {
-        return Err("quantity must be 1..=20".into());
-    }
-    if !near(world, buyer, seller) {
-        return Err("move within 1.5 m of the trader".into());
-    }
-    let unit_price = catalog::price(kind).ok_or("this good is not traded here")?;
-    let cost = unit_price.checked_mul(n).ok_or("price overflow")?;
-    let b = world.get::<Wallet>(buyer).ok_or("buyer has no wallet")?;
-    let s = world.get::<Wallet>(seller).ok_or("seller has no wallet")?;
-    if b.coins < cost {
-        return Err(format!("needs {cost} coins; buyer has {}", b.coins));
-    }
-    if s.coins.checked_add(cost).is_none() {
-        return Err("seller wallet is full".into());
-    }
-    let goods = selected(world, seller, kind, n)?;
-    fit(
-        world,
-        buyer,
-        &goods.into_iter().map(|(_, i)| i).collect::<Vec<_>>(),
-    )
+    market::quote(world, buyer, seller, kind, n).map(|_| ())
 }
 pub fn trade(
     world: &mut World,
@@ -205,9 +214,9 @@ pub fn trade(
     kind: &str,
     n: u32,
 ) -> Result<(), String> {
-    check_trade(world, buyer, seller, kind, n)?;
+    let quoted = market::quote(world, buyer, seller, kind, n)?;
     let goods = selected(world, seller, kind, n)?;
-    let cost = catalog::price(kind).expect("checked price") * n;
+    let cost = quoted.total;
     if items::kind_def(world, kind).is_some_and(|def| def.stackable) {
         consume(world, seller, kind, n)?;
         for (_, item) in goods {
@@ -229,14 +238,20 @@ pub fn trade(
         .expect("checked wallet")
         .coins += cost;
     world.resource_mut::<VillageState>().transactions += 1;
+    market::record_trade(world, buyer, seller, kind, n, cost);
     let bid = *world.get::<SimId>(buyer).expect("sim buyer");
     let sid = *world.get::<SimId>(seller).expect("sim seller");
-    record_effect(
-        world,
-        Some(bid),
-        "VillageTrade",
-        &json!({"buyer":bid,"seller":sid,"kind":kind,"quantity":n,"coins":cost}),
-    );
+    let mut receipt = json!({"buyer":bid,"seller":sid,"kind":kind,"quantity":n,"coins":cost});
+    let mut sale_receipt = json!({"kind":kind,"quantity":n,"coins":cost});
+    if market::enabled(world) {
+        receipt["unit_price"] = json!(quoted.unit_price);
+        sale_receipt["unit_price"] = json!(quoted.unit_price);
+    }
+    record_effect(world, Some(bid), "VillageTrade", &receipt);
+    // A controlled seller needs its own receipt: the agent event ring retains
+    // controlled-unit effects, not the merchant buyer's private event stream.
+    // This journals the seller's completed sale without creating a second trade.
+    record_effect(world, Some(sid), "VillageSaleCompleted", &sale_receipt);
     Ok(())
 }
 pub fn merchant_check(
@@ -247,24 +262,51 @@ pub fn merchant_check(
     n: u32,
     buy: bool,
 ) -> Result<(), String> {
+    // Public listing presence is stable knowledge; its current remaining stock
+    // is only actionable when the two actors can physically trade.
+    if market::enabled(world) && !near(world, actor, trader) {
+        return Err("move within 1.5 m of the trader".into());
+    }
     let role = world
         .get::<Villager>(trader)
         .ok_or("target is not a villager")?
         .role;
-    if role == Role::Visitor {
+    if role == Role::Visitor
+        && !(market::enabled(world) && buy && market::sells(world, trader, kind))
+    {
         return Err("target is not a shopkeeper".into());
     }
     if buy {
-        if !catalog::outputs(role).contains(&kind) {
+        if !market::sells(world, trader, kind) {
             return Err("this shop does not sell that good".into());
         }
         check_trade(world, actor, trader, kind, n)
     } else {
-        if !catalog::wants(role, kind) {
+        if !catalog::wants_for(world, role, kind) {
             return Err("this shop has no use for that good".into());
         }
-        if count(world, trader, kind).saturating_add(n) > catalog::stock_limit(kind) {
-            return Err("the shop has enough stock".into());
+        // Dynamic merchant stock is discoverable only while trading nearby.
+        // Validate reach first, including direct command/handler requests.
+        if !near(world, actor, trader) {
+            return Err("move within 1.5 m of the trader".into());
+        }
+        let limit = if market::enabled(world) {
+            super::production::purchase_target(world, trader, kind)
+        } else {
+            catalog::stock_limit(kind)
+        };
+        if count(world, trader, kind).saturating_add(n) > limit {
+            return Err(if market::enabled(world) {
+                "the buyer has no open procurement demand for that quantity".into()
+            } else {
+                "the shop has enough stock".into()
+            });
+        }
+        if market::enabled(world)
+            && let Some(limit) = super::production::purchase_bid_limit(world, trader, kind)
+            && market::quote(world, trader, actor, kind, n)?.unit_price > limit
+        {
+            return Err("this quote exceeds the buyer's current procurement bid limit".into());
         }
         check_trade(world, trader, actor, kind, n)
     }

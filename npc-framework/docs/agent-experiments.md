@@ -1,5 +1,12 @@
 # Agent experiments: an AI controls an actor
 
+For normal explorer play, use the dedicated
+[AI Agent Game Client](ai-agent-game-client.md). The game starts and prompts a
+logged-in Codex or Claude CLI automatically, retains its exact session and sends
+later event/continuation prompts. No prompt copying or manual session binding is
+required. The low-level interfaces and experiments below remain available for
+custom clients and manual research.
+
 The headline experiment of the agent-control spec (`docs/superpowers/specs/2026-10-23-agent-control-design.md`):
 prompt an AI agent with what one actor sees, task it with a goal, and let it act as that actor while the world
 keeps running in real time. The framework provides the interfaces (`npc_agent_io`); any agent can use them:
@@ -433,8 +440,8 @@ without compounding; LIDAR/radar ranges stay unchanged. Plain retains its incumb
    file). **Explore with an AI agent** stays disabled until the folder is valid.
 2. **New**: the agent and world names come prefilled with random names (**Random** rolls again; Ctrl+C, Ctrl+X and
    Ctrl+V use the OS clipboard). **Start** stays disabled, with the reason inline, while a name is blank, has no
-   letters or digits a folder can use, or names an agent that exists. Under the names the screen says "After
-   Start, open your AI tool in <agents folder>/<slug(agent)> and paste the prompt": the folder the game prepares.
+   letters or digits a folder can use, or names an agent that exists. The game prepares
+   `<agents folder>/<slug(agent)>` for its dedicated AI client.
    **Start in window** runs `actor_testbed --explorer-home DIR --agent NAME --world NAME`: the `explorer` scenario
    (`content/testbed_content/README.md`, the `frontier` layout) with one assigned actor named after the agent,
    initially unattached, a wall-clock seed, saved at tick 0. On every start and resume the game writes
@@ -455,12 +462,15 @@ without compounding; LIDAR/radar ranges stay unchanged. Plain retains its incumb
    For a new world from the terminal, add `--preset rover` or `--preset sentinel`, `--world-preset survival`
    (and optionally `--actors-dir DIR` / `--worlds-dir DIR`)
    to `actor_testbed --explorer-home DIR --agent NAME --world NAME` or `npcctl serve` with the same explorer flags.
-3. The game window opens **paused** behind a modal with the prompt: **Copy** puts it on the OS clipboard (a
-   note names `prompts/<kind>.md` when the copy tool fails), **OK** closes the modal and starts the sim. Open the
-   MCP-capable agent tool (Claude Code, Codex or another MCP harness) **in the agent's folder**, paste the prompt into a
-   fresh session and press OK. Claude Code asks once to trust the folder; until then its settings (and so the
-   game's tools) are not applied. Other harnesses need the same MCP-only policy; the generated Claude settings
-   do not configure another product's permissions.
+3. The game window opens **paused** behind **Your AI agent**. Choose **Start Codex**
+   or **Start Claude** using an already logged-in CLI; Start resumes the world and
+   launches the dedicated client. The client supplies the mission and registered
+   game tools on every turn, retains its exact session and continues it for game
+   events or inactivity. There is no prompt copy/paste or manual session linking.
+   **Stop agent** leaves the world running. **F10** reopens the controls.
+   **Connection help** retains optional prompt/details for a separately managed
+   custom MCP client. See [the client guide](ai-agent-game-client.md) for setup,
+   subscription login and recovery.
 4. The agent uses the configured **npc MCP tools**: read its ID/token from `AGENTS.md`, **register**, **enter_world**
    to learn its assigned character, then **take_control**. Later tools act on its actor without unit/controller
    arguments. The generated `.mcp.json` selects registered mode; the token is never in the prompts or world save.
@@ -497,7 +507,7 @@ without compounding; LIDAR/radar ranges stay unchanged. Plain retains its incumb
    or order gizmos and cannot be selected (a selected one is deselected when it leaves the actor's senses). The F1
    item markers follow the fog (none where the item is hidden, at the last-seen spot where it is drawn as last
    seen); the rest of F1 and the F5, F6 and F7 panels are not fogged. A brand-new
-   world is black but for the actor until its first perception scan (a few ticks after OK).
+   world is black but for the actor until its first perception scan (a few ticks after Start).
 6. **Resume** lists the agents with their world and last save date ("no save yet" ones are disabled); a row starts
    the world in the window, its **Start detached** button without one. A world that runs detached (started by this
    menu, or found through its live `run.json`) shows "running detached on port N - Open / Stop" with those buttons
@@ -570,7 +580,7 @@ lacks keep their built value; the modal's notes list both. **Fresh world, keep t
 the same folder, so the diary and proposals stay. An unreadable save offers only Fresh world. Without the menu,
 `actor_testbed --resume` on such a save exits with code 3.
 
-**By hand** (what the menu runs; the sim starts paused, so either press OK or, from a script, `npc/resume` over
+**By hand** (what the menu runs; the sim starts paused, so choose Start in the AI panel or, from a script, `npc/resume` over
 BRP, [debugging.md §3.3](debugging.md#33-npc-methods)):
 
 ```sh
@@ -595,8 +605,10 @@ target/debug/npcctl session stop --url http://127.0.0.1:15702      # or Ctrl+C: 
 target/debug/actor_testbed --explorer-home ~/npc-agents --agent "Wren" --resume --exact-port 15702
 ```
 
-The detached world runs at once (no modal; `--paused` keeps it paused): give the agent `prompts/<kind>.md` from
-the listening line. It writes the workspace for its URL and `run.json` (`{pid, port, mode, started, agent,
+The detached world runs at once (no modal; `--paused` keeps it paused). Start
+`ai-agent-game-client run --workspace <agents folder>/<slug(agent)> --provider codex`
+beside it (or use `--provider claude`); the client reads and sends the generated
+mission automatically. The host writes the workspace for its URL and `run.json` (`{pid, port, mode, started, agent,
 world}`; the window writes one too, mode `window`) so another menu can find it; a stale one (dead pid) is
 ignored. It saves every 60 s and on stop. **Moving it into the window**: stop it (`session stop`: it saves; a
 failed save refuses the stop and the world keeps running), then start `actor_testbed ... --resume --exact-port
@@ -612,8 +624,10 @@ for 5 s. The agent sees connection errors for the seconds the switch takes, and 
 --explorer-home DIR --agent NAME [--world W | --resume ..]` in a separate process group (hidden on Windows; closing the
 menu's terminal or Ctrl+C there does not reach it; the menu's **Quit** stops it, see **Quitting the game** below) and
 opens the **Detached** screen: "<agent> in <world> running detached on port N,
-tick T" (`session/info` every 2 s, off the frame), the URL, the prompt with **Copy**, **Open in window**, **Stop**
-and Back (it keeps running). **Stop** sends `session/stop` and waits up to 15 s for the exit, then Resume says
+tick T" (`session/info` every 2 s, off the frame), the URL, **Start Codex** /
+**Start Claude**, **Stop agent** and live AI status. **Connection help** reveals
+optional prompt/details and **Copy**. **Open in window**, **Stop** and Back retain
+their world lifecycle behavior. **Stop** sends `session/stop` and waits up to 15 s for the exit, then Resume says
 "<agent> stopped at tick T and was saved."; a refused stop (the save failed) says why and the world keeps running.
 **Open in window** does the same stop and wait, then starts `actor_testbed ... --resume --exact-port N`: a refused
 stop, or a process still running after 15 s, aborts and keeps it detached; a process that exited with an error, or

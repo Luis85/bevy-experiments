@@ -71,6 +71,7 @@ fn polish_scheduler_status_reflects_live_eligibility_without_dispatch_or_simulat
     });
     app.insert_resource(SchedulerStatus {
         enabled: true,
+        events_enabled: true,
         error: None,
         agents: vec![SchedulerAgentStatus {
             controller: "visitor".into(),
@@ -79,6 +80,10 @@ fn polish_scheduler_status_reflects_live_eligibility_without_dispatch_or_simulat
             idle_seconds: 123,
             nudges_last_hour: 0,
             last_result: None,
+            pending_events: 0,
+            event_overflow: 0,
+            trigger: None,
+            last_delivery_seq: None,
         }],
     });
     let before = state_hash(app.world_mut());
@@ -347,6 +352,110 @@ fn failed_trade_is_atomic_and_cannot_sell_claimed_or_unowned_items() {
         village::economy::merchant_check(app.world(), buyer, baker, "village_diary", 1, false)
             .is_err()
     );
+}
+
+#[test]
+fn a_poor_merchants_refusal_does_not_reveal_their_private_wallet() {
+    let mut app = scene();
+    let actor = entity(&app, id(&app, "human"));
+    let trader = entity(&app, id(&app, "Tess"));
+    let pos = *app.world().get::<SimPos>(trader).unwrap();
+    // Labeled refusal fixture: position and finite coins are arranged by the operator.
+    app.world_mut().entity_mut(actor).insert(pos);
+    app.world_mut().get_mut::<Wallet>(trader).unwrap().coins = 2;
+    village::economy::grant(app.world_mut(), actor, Item::new("log"));
+    let before = state_hash(app.world_mut());
+    let reason =
+        village::economy::merchant_check(app.world(), actor, trader, "log", 1, false).unwrap_err();
+    assert!(
+        reason.contains("3 coins"),
+        "public cost should be actionable: {reason}"
+    );
+    assert!(
+        !reason.contains("has 2"),
+        "merchant wallet leaked: {reason}"
+    );
+    assert_eq!(state_hash(app.world_mut()), before);
+}
+
+#[test]
+fn distant_sell_refusals_do_not_reveal_a_merchants_current_stock() {
+    let mut app = scene();
+    let unit = id(&app, "human");
+    let actor = entity(&app, unit);
+    let merchant = id(&app, "Tess");
+    let trader = entity(&app, merchant);
+    assert!(!village::economy::near(app.world(), actor, trader));
+    let mut sell = VillageAct::new(unit, "sell");
+    sell.target = Some(merchant);
+    sell.kind = "log".into();
+    let before = sell.check(app.world()).unwrap_err();
+    assert!(before.contains("within 1.5 m"), "{before}");
+    // Operator-only privacy fixture: fill the distant shop without moving the
+    // actor. An attempted sale must not reveal whether unseen stock changed.
+    let existing = village::economy::count(app.world(), trader, "log");
+    let capacity = village::catalog::stock_limit("log");
+    village::economy::grant(
+        app.world_mut(),
+        trader,
+        Item::new("log").stack(capacity - existing),
+    );
+    let hash = state_hash(app.world_mut());
+    let after = sell.check(app.world()).unwrap_err();
+    assert_eq!(
+        after, before,
+        "distant refusal disclosed current merchant stock"
+    );
+    assert_eq!(
+        state_hash(app.world_mut()),
+        hash,
+        "validation must be read-only"
+    );
+}
+
+#[test]
+fn stopped_crafting_releases_claims_without_consuming_or_duplicating_inputs() {
+    use npc_framework::crafting::{CraftSource, Crafting, begin_craft};
+    let mut app = scene();
+    run_ticks(app.world_mut(), 1);
+    let unit = id(&app, "human");
+    let actor = entity(&app, unit);
+    let station = id(&app, &format!("village_{}", Role::Carpenter.tag()));
+    let pos = *app.world().get::<SimPos>(entity(&app, station)).unwrap();
+    // Labeled interruption fixture: arrange one input and proximity, never claim
+    // this privileged unit setup as a first-income or registered-client run.
+    app.world_mut().entity_mut(actor).insert(pos);
+    village::economy::grant(app.world_mut(), actor, Item::new("log"));
+    let total = money(&mut app);
+    for _ in 0..3 {
+        begin_craft(
+            app.world_mut(),
+            actor,
+            village::catalog::SAW,
+            Some(station),
+            CraftSource::Command,
+            None,
+        )
+        .unwrap();
+        let craft = app.world().get::<Crafting>(actor).unwrap().clone();
+        assert!(!craft.claimed.is_empty());
+        assert_eq!(
+            village::economy::count(app.world(), actor, "log"),
+            0,
+            "claimed input is unavailable for a concurrent sale"
+        );
+        act(&mut app, unit, json!({"verb":"stop_work"}));
+        run_ticks(app.world_mut(), 1);
+        assert!(app.world().get::<Crafting>(actor).is_none());
+        for claim in craft.claimed {
+            assert_eq!(app.world().resource::<Reservations>().count(claim), 0);
+        }
+        assert_eq!(village::economy::count(app.world(), actor, "log"), 1);
+    }
+    run_ticks(app.world_mut(), 200);
+    assert_eq!(village::economy::count(app.world(), actor, "log"), 1);
+    assert_eq!(village::economy::count(app.world(), actor, "plank"), 0);
+    assert_eq!(money(&mut app), total);
 }
 
 #[test]

@@ -40,7 +40,10 @@
 //! before the server closes, every parked long-poll and every step in
 //! progress is answered with an error starting "the session is stopping"
 //! (nothing more runs on the world, so the final save is the last state),
-//! `--record` is written and [`Session::run`] returns.
+//! `--record` is written, the HTTP request queue is closed, and shutdown waits for response
+//! connections to finish flushing (one bounded transport budget) before [`Session::run`] returns.
+//! A batch may contain a stop followed by other calls; the wait happens only after the queue is
+//! disconnected and all parked replies are sent, never inside the stop handler.
 //!
 //! [`Session::start_app`] hosts a world its host built (the detached
 //! explorer, `npcctl serve --explorer-home`) instead of a scenario: no
@@ -66,7 +69,7 @@ use serde_json::{Value, json};
 
 use crate::api::{self, ActWait, EventsParams, RpcError, RpcResult, codes};
 use crate::events;
-use crate::http::{HttpServer, Incoming, ServerOptions};
+use crate::http::{HttpServer, Incoming, ReplyReceipt, ServerOptions};
 use crate::scenario::{self, ScenarioDoc, ScenarioLoaders, SessionRecord};
 use crate::stats::wall_now;
 
@@ -80,6 +83,8 @@ pub const STEP_SLICE: u64 = 50;
 pub const STEP_BUDGET: Duration = Duration::from_millis(5);
 /// Most ticks one `npc/step` may ask for (as on BRP).
 pub const MAX_STEP: u64 = 1_000_000;
+/// One bounded transport-drain budget after the final save and all shutdown replies.
+const STOP_REPLY_WAIT: Duration = Duration::from_secs(10);
 
 /// A host hook on the session's world, run between ticks.
 pub type WorldHook = Box<dyn FnMut(&mut World)>;
@@ -207,6 +212,7 @@ pub struct Session {
     steps: VecDeque<PendingStep>,
     options: SessionOptions,
     stopping: bool,
+    stop_replies: Vec<ReplyReceipt>,
 }
 
 fn build(
@@ -258,11 +264,11 @@ fn prepare(app: &mut App) -> Result<(), String> {
 }
 
 /// Answers a call that came after the stop.
-fn refuse_stopping(call: Incoming) {
-    call.reply(Err(RpcError::new(
+fn refuse_stopping(call: Incoming) -> ReplyReceipt {
+    call.reply_with_receipt(Err(RpcError::new(
         codes::INTERNAL,
         format!("{STOPPING}: this call was not run"),
-    )));
+    )))
 }
 
 /// Listens on `options.port`.
@@ -351,6 +357,7 @@ impl Session {
             steps: VecDeque::new(),
             options,
             stopping: false,
+            stop_replies: Vec::new(),
         }
     }
 
@@ -400,23 +407,40 @@ impl Session {
                 std::thread::sleep((next - now).min(Duration::from_millis(1)));
             }
         }
+        self.stopping = true;
         if let Some(path) = self.options.record.clone() {
-            self.write_record(&path)?;
-            written = Some(path);
+            match self.write_record(&path) {
+                Ok(()) => written = Some(path),
+                // A record error must still drain accepted stop responses and parked calls.
+                Err(error) => stop_error = Some(error),
+            }
         }
         // Answer what is still parked or queued; nothing runs any more.
         for p in std::mem::take(&mut self.polls) {
-            p.call.reply(Err(RpcError::new(codes::INTERNAL, STOPPING)));
+            self.stop_replies.push(
+                p.call
+                    .reply_with_receipt(Err(RpcError::new(codes::INTERNAL, STOPPING))),
+            );
         }
         for p in std::mem::take(&mut self.act_polls) {
-            p.call.reply(Err(RpcError::new(
-                codes::INTERNAL,
-                format!("{STOPPING} (the act was submitted before the stop)"),
-            )));
+            self.stop_replies
+                .push(p.call.reply_with_receipt(Err(RpcError::new(
+                    codes::INTERNAL,
+                    format!("{STOPPING} (the act was submitted before the stop)"),
+                ))));
         }
         self.abort_steps(STOPPING);
-        while let Some(call) = self.server.try_recv() {
-            refuse_stopping(call);
+        for call in self.server.close_requests() {
+            self.stop_replies.push(refuse_stopping(call));
+        }
+        // A receipt covers an entire HTTP batch. Never wait in the stop handler: later batch
+        // members may still need the host. Closing the queue above lets those members finish.
+        let deadline = wall_now() + STOP_REPLY_WAIT;
+        for receipt in std::mem::take(&mut self.stop_replies) {
+            if !receipt.wait_timeout(deadline.saturating_duration_since(wall_now())) {
+                // A disconnected client is allowed; never expose its request or provider data.
+                tracing::debug!(target: "npc_agent_io", "shutdown response connection ended or exceeded its flush budget");
+            }
         }
         match stop_error {
             Some(e) => Err(e),
@@ -483,10 +507,15 @@ impl Session {
     fn abort_steps(&mut self, why: &str) {
         for s in std::mem::take(&mut self.steps) {
             let done = s.ticks - s.left;
-            s.call.reply(Err(RpcError::new(
+            let result = Err(RpcError::new(
                 codes::INTERNAL,
                 format!("{why}: npc/step stopped after {done} of {} ticks", s.ticks),
-            )));
+            ));
+            if self.stopping {
+                self.stop_replies.push(s.call.reply_with_receipt(result));
+            } else {
+                s.call.reply(result);
+            }
         }
     }
 
@@ -540,9 +569,14 @@ impl Session {
         while let Some(call) = self.server.try_recv() {
             if self.stopping {
                 // The final save is taken: the world must not change.
-                refuse_stopping(call);
+                self.stop_replies.push(refuse_stopping(call));
             } else {
                 self.handle(call);
+            }
+            if self.stopping {
+                // Enter shutdown promptly even if clients keep filling the queue. `run` closes
+                // it and answers the bounded outstanding connections without applying commands.
+                break;
             }
         }
         if self.stopping {
@@ -750,7 +784,11 @@ impl Session {
             m if api::NPC_METHODS.contains(&m) => api::call_npc(self.app.world_mut(), m, params),
             m => api::call(self.app.world_mut(), m, params),
         };
-        call.reply(result);
+        if self.stopping {
+            self.stop_replies.push(call.reply_with_receipt(result));
+        } else {
+            call.reply(result);
+        }
     }
 
     /// `world/load_scenario {scenario, seed?}`: the document inline (`npcctl
