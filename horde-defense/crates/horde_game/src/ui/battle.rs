@@ -14,7 +14,6 @@ use horde_core::{
     content::{Mode, StructureKind, content},
     ordnance::{OrdnanceKind, ThrowRequest},
     sim::Input,
-    survivors::{Appearance, SurvivorId},
     world::world,
 };
 
@@ -536,7 +535,7 @@ fn battle_arena(canvas: Rect, construction: bool) -> Rect {
     )
 }
 fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
-    let a = f.game.attempt.as_ref().unwrap();
+    let view = hud::view_model(f.game).expect("battle HUD needs an attempt");
     let left = Rect::from_min_size(canvas.min + vec2(14., 12.), vec2(322., 108.));
     ui.scope_builder(egui::UiBuilder::new().max_rect(left), |ui| {
         egui::Frame::new()
@@ -549,7 +548,7 @@ fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
                     crate::visual_assets::portrait(
                         ui.painter(),
                         f.textures,
-                        a.mode == Mode::Npc || a.profile.appearance == Appearance::Female,
+                        view.female_portrait,
                         portrait.center(),
                         portrait.size(),
                     );
@@ -557,38 +556,24 @@ fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
                         ui.set_width(250.);
                         progress(
                             ui,
-                            a.hp.max(0) as f32 / a.max_hp as f32,
-                            format!(
-                                "{} · HP {} / {}",
-                                if a.mode == Mode::Personal {
-                                    f.game
-                                        .campaign
-                                        .selected_survivor
-                                        .map_or("YOU", SurvivorId::name)
-                                } else {
-                                    "MARA"
-                                },
-                                a.hp.max(0),
-                                a.max_hp
-                            ),
+                            view.hp as f32 / view.max_hp as f32,
+                            format!("{} · HP {} / {}", view.defender, view.hp, view.max_hp),
                             RED,
                         );
                         ui.horizontal(|ui| {
-                            ui.strong(format!("{} / {} ammo", a.ammo, a.magazine));
+                            ui.strong(format!("{} / {} ammo", view.ammo, view.magazine));
                             ui.label(
                                 RichText::new(format!(
                                     "{} {:.0}/{:.0}",
-                                    if a.mode == Mode::Npc { "FP" } else { "Stamina" },
-                                    a.stamina,
-                                    a.max_stamina
+                                    view.stamina_label, view.stamina, view.max_stamina
                                 ))
                                 .size(12.0),
                             );
                         });
-                        hud::action(ui, a);
+                        hud::action(ui, &view.action);
                         ui.horizontal(|ui| {
-                            hud::danger(ui, a);
-                            hud::dps(ui, a);
+                            hud::danger(ui, &view.danger);
+                            hud::dps(ui, &view.dps);
                         });
                     });
                 });
@@ -605,48 +590,47 @@ fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
             .inner_margin(6)
             .show(ui, |ui| {
                 ui.set_width(176.);
-                if let Some(boss) = a.enemies.iter().find(|e| e.boss) {
-                    progress(
+                match view.boss {
+                    hud::BossReadout::Present {
+                        health,
+                        critical,
+                        hp,
+                    } => progress(
                         ui,
-                        boss.hp.max(0) as f32 / boss.max_hp as f32,
-                        if boss.critically_wounded(a.mode) {
-                            format!("CRITICAL · {} HP", boss.injury.hp)
+                        health,
+                        if critical {
+                            format!("CRITICAL · {hp} HP")
                         } else {
-                            format!("BOSS · {} HP", boss.hp.max(0))
+                            format!("BOSS · {hp} HP")
                         },
                         RED,
-                    );
-                } else {
-                    ui.strong(format!(
-                        "BOSS IN {:02}:{:02}",
-                        a.boss_countdown() as u32 / 60,
-                        a.boss_countdown() as u32 % 60
-                    ));
+                    ),
+                    hud::BossReadout::Incoming { seconds } => {
+                        ui.strong(format!("BOSS IN {:02}:{:02}", seconds / 60, seconds % 60));
+                    }
                 }
                 ui.label(
                     RichText::new(format!(
                         "{:.0}s · {} kills · +{} coins",
-                        a.elapsed(),
-                        a.kills,
-                        a.coins
+                        view.elapsed, view.kills, view.coins
                     ))
                     .size(12.),
                 );
                 ui.label(
                     RichText::new(format!(
                         "{} lanes · {:.0} yd · threat {}",
-                        a.lane_count, a.width_yards, a.progression.rank
+                        view.lanes, view.width_yards, view.threat_rank
                     ))
                     .size(10.0),
                 )
                 .on_hover_text(format!(
                     "{} difficulty, frozen at deployment",
-                    a.balance.preset.name()
+                    view.difficulty
                 ));
                 ui.label(
                     RichText::new(format!(
                         "{}-enemy groups · gear Lv{}",
-                        a.progression.batch_size, a.progression.item_level
+                        view.batch_size, view.gear_level
                     ))
                     .size(10.0),
                 );
@@ -828,7 +812,7 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx) {
             a.progression.item_level
         ),
     );
-    hud::dps(ui, a);
+    hud::dps(ui, &hud::dps_readout(a));
     muted(ui, &content().levels[a.level].name);
     if a.mode == Mode::Personal {
         muted(
