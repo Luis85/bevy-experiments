@@ -1,6 +1,7 @@
 //! Original-pixel player models: cached source ownership, frozen equipment,
 //! shared posed draw packets/effect sockets and a backend-only egui adapter.
 pub mod appearance;
+#[cfg(any(test, feature = "review"))]
 pub mod assembly;
 pub mod attachment_compile;
 pub mod attachments;
@@ -13,9 +14,11 @@ pub mod source_masks;
 pub mod startup;
 #[cfg(test)]
 mod tests;
+#[cfg(any(test, feature = "review"))]
 pub mod verification;
 
 pub use appearance::{ResolvedAppearance, resolve_appearance};
+#[cfg(any(test, feature = "review"))]
 pub use assembly::resolve_model;
 pub use backend_egui::draw_egui;
 pub use bind::{ModelPlacement, SourceToDisplay};
@@ -29,6 +32,7 @@ pub use source_masks::{
     SourceImageView, compile_catalogue,
 };
 
+#[cfg(any(test, feature = "review"))]
 pub fn bundled_catalogue() -> Result<PlayerModelCatalogue, String> {
     PlayerModelCatalogue::from_json(
         &[
@@ -38,6 +42,7 @@ pub fn bundled_catalogue() -> Result<PlayerModelCatalogue, String> {
         include_str!("../../../../assets/player_models/skins.json"),
     )
 }
+#[cfg(any(test, feature = "review"))]
 pub fn builtin() -> Result<&'static CompiledCatalogue, String> {
     static CACHE: std::sync::OnceLock<Result<CompiledCatalogue, String>> =
         std::sync::OnceLock::new();

@@ -1,13 +1,17 @@
 [CmdletBinding()]
 param(
     [ValidateSet('debug', 'release', 'playtest')][string]$Profile = 'playtest',
-    [string]$OutputDirectory = 'target/playtest'
+    [string]$OutputDirectory = 'target/playtest',
+    # Include the `review` feature (captures, review fixtures, perf reports).
+    # Ordinary playtest packages leave it out; practice scenes still work.
+    [switch]$Review
 )
 $ErrorActionPreference = 'Stop'
 $workspace = Split-Path -Parent $PSScriptRoot
 Push-Location $workspace
 try {
     $buildArguments = @('build', '--locked', '-p', 'horde-defense')
+    if (-not $Review) { $buildArguments += '--no-default-features' }
     if ($Profile -eq 'release') { $buildArguments += '--release' }
     elseif ($Profile -ne 'debug') { $buildArguments += @('--profile', $Profile) }
     & cargo @buildArguments
@@ -54,7 +58,7 @@ Practice modes use separate profiles. Run one ordinary campaign window at a time
         @{ Name = 'Battle practice.cmd'; Scene = 'construction' },
         @{ Name = 'Strategy practice.cmd'; Scene = 'operations' }
     )) {
-        $lines = @('@echo off', 'setlocal DisableDelayedExpansion', 'set "LASTLIGHT_PLAYTEST_HOME=%~dp0"', 'set "LASTLIGHT_ASSET_DIR=%~dp0assets"', 'set "LASTLIGHT_WORLD=%~dp0content\world.json"', 'set "LASTLIGHT_CONTENT=%~dp0content\encounters.json"', 'set "LASTLIGHT_SKILLS=%~dp0content\skills.json"', 'set "LASTLIGHT_ENEMIES=%~dp0content\enemy_catalog.json"', 'set "LASTLIGHT_ORDNANCE=%~dp0content\ordnance.json"', 'set "LASTLIGHT_PROGRESSION=%~dp0content\progression.json"', 'set "LASTLIGHT_QUALITY=%~dp0content\quality.json"', 'set "LASTLIGHT_BALANCE=%~dp0content\balance.json"', 'set "LASTLIGHT_REVIEW_EXIT="', 'set "LASTLIGHT_REVIEW_CAPTURE="', 'set "LASTLIGHT_PERF_REPORT="', 'set "LASTLIGHT_CAPTURE_SEQUENCE="', 'set "LASTLIGHT_REVIEW_MOTION="', 'set "LASTLIGHT_REVIEW_REDUCED="')
+        $lines = @('@echo off', 'setlocal DisableDelayedExpansion', 'set "LASTLIGHT_PLAYTEST_HOME=%~dp0"', 'set "LASTLIGHT_ASSET_DIR=%~dp0assets"', 'set "LASTLIGHT_WORLD=%~dp0content\world.json"', 'set "LASTLIGHT_CONTENT=%~dp0content\encounters.json"', 'set "LASTLIGHT_SKILLS=%~dp0content\skills.json"', 'set "LASTLIGHT_ENEMIES=%~dp0content\enemy_catalog.json"', 'set "LASTLIGHT_ORDNANCE=%~dp0content\ordnance.json"', 'set "LASTLIGHT_PROGRESSION=%~dp0content\progression.json"', 'set "LASTLIGHT_QUALITY=%~dp0content\quality.json"', 'set "LASTLIGHT_BALANCE=%~dp0content\balance.json"', 'set "LASTLIGHT_REVIEW_EXIT="', 'set "LASTLIGHT_REVIEW_CAPTURE="', 'set "LASTLIGHT_PERF_REPORT="', 'set "LASTLIGHT_CAPTURE_SEQUENCE="', 'set "LASTLIGHT_REVIEW_MOTION="', 'set "LASTLIGHT_REVIEW_REDUCED="', 'set "LASTLIGHT_REVIEW_SCALE="', 'set "LASTLIGHT_REVIEW_INPUT_SAVE="', 'set "LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT="', 'set "LASTLIGHT_PLAYER_MODEL_PARITY_REPORT="', 'set "LASTLIGHT_PERF_WARMUP_FRAMES="', 'set "LASTLIGHT_PERF_FRAMES="', 'set "LASTLIGHT_PERF_ACTIVE_ONLY="', 'set "LASTLIGHT_PERF_CPU="', 'set "LASTLIGHT_PERF_AUDIO="', 'set "LASTLIGHT_PERF_NPC_SPEED="')
         if ($launcher.Backend) { $lines += "set `"WGPU_BACKEND=$($launcher.Backend)`"" }
         if ($launcher.Scene) {
             $lines += 'set "LASTLIGHT_PRACTICE=1"'

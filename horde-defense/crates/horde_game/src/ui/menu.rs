@@ -1,5 +1,15 @@
 //! Menu presentation. Game changes are queued typed intents.
-use super::*;
+use super::{Screen, UiCtx, muted, primary, status};
+use crate::{
+    art::{self, AMBER, INK, MUTED, RED, TEXT},
+    runner::{AppCommand, SaveIntent},
+    settings::Action,
+};
+use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Sense, pos2, vec2};
+use horde_core::{
+    command::Command,
+    survivors::{Appearance, SurvivorId},
+};
 
 fn title_galley(ui: &egui::Ui, width: f32) -> std::sync::Arc<egui::Galley> {
     let mut size = (width * 0.205).clamp(52.0, 88.0);
@@ -24,7 +34,7 @@ fn title_galley(ui: &egui::Ui, width: f32) -> std::sync::Arc<egui::Galley> {
     galley
 }
 
-pub(super) fn menu(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
+pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK))
         .show(root, |ui| {
@@ -33,7 +43,7 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
                 .game
                 .campaign
                 .selected_survivor
-                .unwrap_or(f.preview_survivor);
+                .unwrap_or(f.campaign.preview_survivor);
             let lanes = f
                 .game
                 .attempt
@@ -98,7 +108,7 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
                             .color(TEXT),
                         );
                         ui.add_space(if compact { 16.0 } else { 30.0 });
-                        let has_journey = f.profile_exists
+                        let has_journey = f.status.profile_exists
                             || f.game.campaign.selected_survivor.is_some()
                             || f.game.campaign.world.start.is_some();
                         if primary(
@@ -129,7 +139,7 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
                                 f.open_survivor_selection();
                             }
                         }
-                        if f.practice_profile {
+                        if f.status.practice_profile {
                             ui.label(RichText::new("Practice profile").color(AMBER).strong());
                             ui.add(
                                 egui::Label::new(
@@ -183,11 +193,16 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
                                 ),
                             );
                         });
-                        if !f.message.is_empty() && (!f.practice_profile || f.message_error) {
+                        if !f.status.message.is_empty()
+                            && (!f.status.practice_profile || f.status.message_error)
+                        {
                             ui.add_space(8.0);
-                            ui.colored_label(if f.message_error { RED } else { MUTED }, &f.message);
+                            ui.colored_label(
+                                if f.status.message_error { RED } else { MUTED },
+                                &f.status.message,
+                            );
                         }
-                        if f.save_pending {
+                        if f.status.save_pending {
                             muted(ui, "Saving your campaign...");
                         }
                     });
@@ -200,18 +215,18 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
                 MUTED,
             );
         });
-    if f.new_journey_confirm {
+    if f.menu.new_journey_confirm {
         egui::Modal::new(egui::Id::new("new-journey-confirm")).show(root.ctx(),|ui| {
             ui.set_max_width(400.0);
             ui.heading("Start a new journey?");
             ui.label("Your current journey, equipment and active fields will be archived before a fresh campaign starts. Display, audio, controls and difficulty settings are kept.");
             ui.add_space(10.0);
-            ui.add_enabled_ui(!f.save_pending&&!f.runtime.reset_in_progress(),|ui| {ui.horizontal(|ui| {
+            ui.add_enabled_ui(!f.status.save_pending&&!f.runtime.reset_in_progress(),|ui| {ui.horizontal(|ui| {
                 if ui.button("Start new journey").clicked() {f.dispatch(AppCommand::NewJourney,"New journey ready.");}
-                if ui.button("Keep current journey").clicked() {f.new_journey_confirm=false;}
+                if ui.button("Keep current journey").clicked() {f.menu.new_journey_confirm=false;}
             });});
-            if f.save_pending||f.runtime.reset_in_progress(){muted(ui,"Archiving and saving the new journey...");}
-            if f.message_error {ui.colored_label(RED,&f.message);}
+            if f.status.save_pending||f.runtime.reset_in_progress(){muted(ui,"Archiving and saving the new journey...");}
+            if f.status.message_error {ui.colored_label(RED,&f.status.message);}
         });
     }
 }
@@ -326,7 +341,7 @@ fn checkpoint_scene(
     }
 }
 
-pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut Frontend, time: f32) {
+pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK))
         .show(root, |ui| {
@@ -335,7 +350,7 @@ pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut Frontend, time: f3
                 ui.painter(),
                 canvas,
                 f.textures,
-                f.preview_survivor,
+                f.campaign.preview_survivor,
                 time,
                 f.settings.reduced_effects,
             );
@@ -378,35 +393,39 @@ pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut Frontend, time: f3
                                         .add_sized(
                                             vec2(width, 36.0),
                                             egui::Button::selectable(
-                                                f.preview_survivor == identity,
+                                                f.campaign.preview_survivor == identity,
                                                 identity.name(),
                                             ),
                                         )
                                         .on_hover_text(identity.description())
                                         .clicked()
                                     {
-                                        f.preview_survivor = identity;
+                                        f.campaign.preview_survivor = identity;
                                     }
                                 });
                             }
                         });
                         ui.add(
                             egui::Label::new(
-                                RichText::new(f.preview_survivor.description()).color(MUTED),
+                                RichText::new(f.campaign.preview_survivor.description())
+                                    .color(MUTED),
                             )
                             .truncate(),
                         );
                         ui.add_space(6.0);
-                        if primary(ui, &format!("Continue as {}", f.preview_survivor.name())) {
+                        if primary(
+                            ui,
+                            &format!("Continue as {}", f.campaign.preview_survivor.name()),
+                        ) {
                             f.dispatch(
-                                Command::ChooseSurvivor(f.preview_survivor),
+                                Command::ChooseSurvivor(f.campaign.preview_survivor),
                                 "Survivor chosen. Select your starting country.",
                             );
                         }
                         if ui.button("Back to main menu").clicked() {
-                            f.screen = Screen::Menu;
+                            f.go(Screen::Menu);
                         }
-                        if f.message_error {
+                        if f.status.message_error {
                             status(ui, f);
                         }
                     });
@@ -417,6 +436,9 @@ pub(super) fn survivor_selection(root: &mut egui::Ui, f: &mut Frontend, time: f3
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::settings;
+    use horde_core::content::Mode;
+    use horde_core::sim::Game;
 
     fn text_shape<'a>(
         shape: &'a egui::epaint::Shape,
@@ -479,11 +501,11 @@ mod tests {
             let viewport = Rect::from_min_size(egui::Pos2::ZERO, vec2(1050.0, 700.0) / 1.35);
             let mut f = crate::ui::test_support::test_frontend();
             f.game = Game::default();
-            f.runtime = Runtime::default();
+            f.runtime = crate::runner::Runtime::default();
             f.screen = Screen::Menu;
-            f.practice_profile = practice;
-            f.message.clear();
-            f.save_pending = false;
+            f.status.practice_profile = practice;
+            f.status.message.clear();
+            f.status.save_pending = false;
             if chosen {
                 f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
             }
@@ -500,10 +522,10 @@ mod tests {
                         screen_rect: Some(viewport),
                         ..Default::default()
                     },
-                    |ui| menu(ui, &mut f, 0.0),
+                    |ui| menu(ui, &mut f.ctx(), 0.0),
                 );
                 output.textures_delta.clear();
-                let launch = if f.profile_exists
+                let launch = if f.status.profile_exists
                     || f.game.campaign.selected_survivor.is_some()
                     || f.game.campaign.world.start.is_some()
                 {

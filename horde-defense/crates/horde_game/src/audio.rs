@@ -3,7 +3,7 @@
 
 pub const MAX_EFFECT_VOICES: usize = 6;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(bevy::prelude::Message, Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(usize)]
 pub enum Cue {
     Pistol,

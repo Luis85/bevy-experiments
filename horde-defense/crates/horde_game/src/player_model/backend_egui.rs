@@ -1,8 +1,8 @@
 //! Egui is only the output adapter. It consumes the compiled topology and the
 //! single resolved transform; it cannot select skins, bones or source pixels.
-use super::{
-    CompiledCatalogue, PlayerModelCatalogue, ResolvedPlayerPose, SourceImageView, compile_catalogue,
-};
+use super::{CompiledCatalogue, ResolvedPlayerPose};
+#[cfg(any(test, feature = "review"))]
+use super::{PlayerModelCatalogue, SourceImageView, compile_catalogue};
 use bevy_egui::egui::{self, Color32, Painter, TextureId, pos2};
 use std::collections::BTreeMap;
 
@@ -111,6 +111,7 @@ pub fn draw_egui(
 }
 /// Startup/diagnostic convenience. Runtime callers can instead compile using
 /// already decoded main-world image pixels through SourceImageView.
+#[cfg(any(test, feature = "review"))]
 pub(super) fn decode_bundled(
     definition: PlayerModelCatalogue,
 ) -> Result<CompiledCatalogue, String> {

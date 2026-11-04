@@ -48,13 +48,15 @@ struct SequenceFrame {
 }
 pub fn capture_frames(
     mut commands: Commands,
-    mut frontend: ResMut<crate::ui::Frontend>,
+    session: Res<crate::runner::GameSession>,
+    mut battle: ResMut<crate::ui::BattleUi>,
     mut state: Local<SequenceCapture>,
+    config: Res<crate::launch::LaunchConfig>,
     mut exit: MessageWriter<AppExit>,
 ) {
     if !state.initialized {
         state.initialized = true;
-        state.directory = crate::environment::path("LASTLIGHT_CAPTURE_SEQUENCE");
+        state.directory = config.sequence_path().cloned();
         if let Some(directory) = &state.directory
             && let Err(error) = prepare_directory(directory)
         {
@@ -69,7 +71,7 @@ pub fn capture_frames(
     }
     state.frame += 1;
     let frame = state.frame;
-    frontend.schedule_gesture_review(frame);
+    crate::ui::schedule_gesture_review(&config, &session.game, &mut battle, frame);
     if frame >= FIRST && (frame - FIRST).is_multiple_of(STEP) && (frame - FIRST) / STEP < COUNT {
         let Some(directory) = state.directory.clone() else {
             return;
@@ -78,7 +80,7 @@ pub fn capture_frames(
         commands
             .spawn(Screenshot::primary_window())
             .observe(save_to_disk(directory.join(&file)));
-        let attempt = frontend.game.attempt.as_ref();
+        let attempt = session.game.attempt.as_ref();
         use horde_core::sim::EventKind;
         let latest = |kind| {
             attempt.and_then(|attempt| attempt.events.iter().rev().find(|event| event.kind == kind))
@@ -134,7 +136,7 @@ pub fn capture_frames(
             exit.write(AppExit::error());
             return;
         }
-        let report = serde_json::json!({"version":1,"scene":crate::environment::string("LASTLIGHT_REVIEW_SCREEN"),"timing":"Fixed presentation timestep per native frame; authoritative ticks advance only in combat fixtures. NOT a real-time FPS measurement","nominal_video_fps":60/STEP,"frames":state.records});
+        let report = serde_json::json!({"version":1,"scene":config.scenario,"timing":"Fixed presentation timestep per native frame; authoritative ticks advance only in combat fixtures. NOT a real-time FPS measurement","nominal_video_fps":60/STEP,"frames":state.records});
         let result = serde_json::to_vec_pretty(&report)
             .map_err(|e| e.to_string())
             .and_then(|bytes| {

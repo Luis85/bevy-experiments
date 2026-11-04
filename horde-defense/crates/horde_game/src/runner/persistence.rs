@@ -215,6 +215,7 @@ impl Service {
     pub fn epoch(&self) -> u64 {
         self.epoch
     }
+    #[cfg(any(test, feature = "review"))]
     pub fn pending(&self) -> bool {
         self.in_flight.is_some() || self.pending.is_some() || !self.ready.is_empty()
     }
@@ -253,6 +254,7 @@ impl Service {
                 c.epoch == self.epoch && c.intents.iter().any(|i| *i != SaveIntent::Autosave)
             })
     }
+    #[cfg(any(test, feature = "review"))]
     pub fn metrics(&self) -> PersistenceMetrics {
         PersistenceMetrics {
             pending: self.pending(),

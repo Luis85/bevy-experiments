@@ -1,7 +1,13 @@
 //! Primary home after every main round. All rewards have already been settled.
-use super::*;
+use super::{Tab, UiCtx, armory, muted, progression, status};
+use crate::{
+    art::{AMBER, INK, MUTED, TEXT},
+    runner::SaveIntent,
+};
+use bevy_egui::egui::{self, Align, Color32, Layout, RichText, Stroke, vec2};
 use horde_core::skill_catalog::CampaignFeature;
-fn continue_label(f: &Frontend) -> &'static str {
+use horde_core::{command::Command, content::Mode, sim::Outcome, world::world};
+fn continue_label(f: &UiCtx) -> &'static str {
     if !f.game.campaign.journey_active || f.game.last_result.is_none() {
         return "Choose a country";
     }
@@ -34,7 +40,7 @@ fn retreat_hint(cause: &str) -> String {
         format!("{cause} Rest and train before trying again.")
     }
 }
-pub(super) fn results(root: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK).inner_margin(14))
         .show(root, |ui| {
@@ -100,16 +106,16 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut Frontend) {
                 }
                 if ui.button("Leave journey").clicked() {
                     f.dispatch(Command::LeaveJourney, "");
-                    f.save_pending = true;
+                    f.status.save_pending = true;
                 }
                 if ui.button("Equipment").clicked() {
-                    f.mode = f
+                    f.campaign.mode = f
                         .game
                         .last_result
                         .as_ref()
                         .map_or(Mode::Personal, |r| r.mode);
-                    f.armory_sort = armory::ArmorySort::Newest;
-                    f.selected_item = f.game.campaign.items.last().map(|i| i.id);
+                    f.armory.sort = armory::ArmorySort::Newest;
+                    f.armory.selected_item = f.game.campaign.items.last().map(|i| i.id);
                     f.open_preparation(Tab::Armory);
                 }
                 if ui.button("Run analysis").clicked() {
@@ -146,7 +152,7 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut Frontend) {
                         }) && ui.button(label).clicked()
                         {
                             if feature == CampaignFeature::Construction {
-                                f.improvement_focus = horde_core::skill_catalog::skills()
+                                f.campaign.improvement_focus = horde_core::skill_catalog::skills()
                                     .nodes
                                     .iter()
                                     .find(|n| n.branch == "Fortification")
@@ -166,7 +172,7 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut Frontend) {
                     }
                 });
             });
-            if f.message_error || f.save_pending {
+            if f.status.message_error || f.status.save_pending {
                 status(ui, f);
             }
             let height = (ui.clip_rect().bottom() - ui.cursor().top())

@@ -1,7 +1,10 @@
 //! A planned deployment is UI intent, never an extra authoritative attempt.
-use super::*;
+use super::{Screen, Tab, UiCtx, chrome, muted, primary};
+use crate::art::{self, AMBER, GREEN, RED};
+use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
+use horde_core::content::{Mode, Slot, content};
 
-pub(super) fn briefing(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(country) = f.game.campaign.world.active_country() else {
         chrome::page_title(
             ui,
@@ -14,20 +17,20 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut Frontend) {
     let name = country.name.clone();
     let levels = country.level_count();
     let completed = f.game.campaign.world.completed(&id);
-    f.stage = f.stage.min(completed.min(levels - 1));
+    f.campaign.stage = f.campaign.stage.min(completed.min(levels - 1));
     chrome::page_title(
         ui,
-        &format!("{} · Defense {}", name, f.stage + 1),
+        &format!("{} · Defense {}", name, f.campaign.stage + 1),
         "Review the encounter, choose a defender, then deploy into live combat. Pause whenever you need time.",
     );
     ui.horizontal_wrapped(|ui| {
         ui.label("Local defense");
         egui::ComboBox::from_id_salt("local_stage")
-            .selected_text(format!("{} of {}", f.stage + 1, levels))
+            .selected_text(format!("{} of {}", f.campaign.stage + 1, levels))
             .show_ui(ui, |ui| {
                 for n in 0..=completed.min(levels - 1) {
                     ui.selectable_value(
-                        &mut f.stage,
+                        &mut f.campaign.stage,
                         n,
                         format!("{} · {}", n + 1, content().levels[n % 5].name),
                     );
@@ -35,8 +38,8 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut Frontend) {
             });
         chrome::mode_picker(ui, f);
     });
-    let level = &content().levels[f.stage % 5];
-    let scene = country.stage_theme(f.stage);
+    let level = &content().levels[f.campaign.stage % 5];
+    let scene = country.stage_theme(f.campaign.stage);
     if ui.available_width() >= 820.0 && ui.available_height() > 420.0 {
         let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 76.0), Sense::hover());
         art::country_scene_textured(
@@ -44,13 +47,13 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut Frontend) {
             rect,
             &scene.biome,
             &country.culture,
-            f.stage,
+            f.campaign.stage,
             f.textures,
         );
     }
     ui.add_space(12.0);
     ui.label(RichText::new(&level.name).size(22.0).strong());
-    let pressure = match f.game.campaign.deployment_progression(f.mode) {
+    let pressure = match f.game.campaign.deployment_progression(f.campaign.mode) {
         Ok(snapshot) => snapshot,
         Err(error) => {
             ui.colored_label(RED, error);
@@ -65,7 +68,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut Frontend) {
     let next_pressure = f
         .game
         .campaign
-        .next_victory_progression(f.mode)
+        .next_victory_progression(f.campaign.mode)
         .unwrap_or_else(|_| pressure.clone());
     let supply = (level.supply as i64
         + i64::from(country.modifiers.supply)
@@ -99,7 +102,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut Frontend) {
         ui.label(format!("Rank {} → {} · groups {} → {} · new gear Lv {} → {}", pressure.rank, next_pressure.rank, pressure.batch_size, next_pressure.batch_size, pressure.item_level, next_pressure.item_level));
         muted(ui, format!("Threat-only enemy health {:.2}× → {:.2}× · contact damage {:.2}× → {:.2}× · rewards {:.2}× → {:.2}×", pressure.enemy_health, next_pressure.enemy_health, pressure.enemy_damage, next_pressure.enemy_damage, pressure.reward_multiplier, next_pressure.reward_multiplier));
         ui.label(format!("Completion XP forecast: character {} → {} · lanes {} → {} · population cap {} → {}",f.game.campaign.player.level,f.game.campaign.level_after_victory(),f.game.campaign.lane_count(),f.game.campaign.lane_count_after_victory(),pressure.enemy_cap,next_pressure.enemy_cap));
-        muted(ui,if f.game.campaign.player.is_max_level() {"Character MAX is reached; victories continue raising future threat."} else if f.mode==Mode::Npc {"NPC kills do not grant personal XP. The known victory completion reward develops the character."} else {"The forecast includes known victory XP; additional personal kill XP may develop the character further before completion."});
+        muted(ui,if f.game.campaign.player.is_max_level() {"Character MAX is reached; victories continue raising future threat."} else if f.campaign.mode==Mode::Npc {"NPC kills do not grant personal XP. The known victory completion reward develops the character."} else {"The forecast includes known victory XP; additional personal kill XP may develop the character further before completion."});
         ui.label(format!("Path forecast: {:.0} → {:.0} yd", f.game.campaign.arena_geometry().1, f.game.campaign.balance_settings.geometry(f.game.campaign.level_after_victory()).1));
         muted(ui, "Every victory raises future threat, including replays and NPC victories. Defeats and withdrawals do not. Threat keeps growing after character MAX; this deployment snapshots its lane count and pressure.");
     });
@@ -134,7 +137,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut Frontend) {
         ui.label("Survive until the boss arrives, then defeat it. The timer alone does not clear the defense. Coins and recovered items are banked as you earn them.");
     });
 }
-fn loadout(ui: &mut egui::Ui, f: &mut Frontend) {
+fn loadout(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::section(ui, "Field loadout");
     egui::Grid::new("briefing_equipment")
         .spacing([20.0, 7.0])
@@ -146,7 +149,7 @@ fn loadout(ui: &mut egui::Ui, f: &mut Frontend) {
                 (Slot::Accessory, "Accessory"),
             ] {
                 muted(ui, label);
-                let loadout = if f.mode == Mode::Personal {
+                let loadout = if f.campaign.mode == Mode::Personal {
                     f.game.campaign.player.loadout
                 } else {
                     f.game.campaign.npc.loadout
@@ -158,7 +161,7 @@ fn loadout(ui: &mut egui::Ui, f: &mut Frontend) {
                     .expect("equipped item exists");
                 ui.label(format!(
                     "{} · Lv {}",
-                    f.game.campaign.equipped(f.mode, slot).name,
+                    f.game.campaign.equipped(f.campaign.mode, slot).name,
                     item.level
                 ));
                 ui.end_row();
@@ -168,9 +171,9 @@ fn loadout(ui: &mut egui::Ui, f: &mut Frontend) {
         f.open_preparation(Tab::Armory);
     }
 }
-fn readiness(ui: &mut egui::Ui, f: &mut Frontend) {
+fn readiness(ui: &mut egui::Ui, f: &mut UiCtx) {
     chrome::section(ui, "Before you deploy");
-    if f.game.campaign.profile(f.mode).heal {
+    if f.game.campaign.profile(f.campaign.mode).heal {
         ui.horizontal(|ui| {
             let (r, _) = ui.allocate_exact_size(vec2(24.0, 24.0), Sense::hover());
             crate::visual_assets::prop(
@@ -184,7 +187,7 @@ fn readiness(ui: &mut egui::Ui, f: &mut Frontend) {
             ui.label("Emergency aid ready");
         });
     }
-    if f.mode == Mode::Personal {
+    if f.campaign.mode == Mode::Personal {
         let points = f.game.campaign.player.points;
         if points > 0 {
             ui.colored_label(AMBER, format!("{points} character points available"));
@@ -220,7 +223,7 @@ fn readiness(ui: &mut egui::Ui, f: &mut Frontend) {
         );
     }
 }
-pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     if f.tab != Tab::Briefing && f.game.attempt.is_none() && f.game.campaign.world.start.is_some() {
         if primary(
             ui,
@@ -240,18 +243,18 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut Frontend) {
     }
     if f.game.attempt.is_some() {
         if primary(ui, "Return to active defense") {
-            f.screen = Screen::Battle;
+            f.go(Screen::Battle);
         }
         return;
     }
     let Some(country) = f.game.campaign.world.active_country() else {
         if primary(ui, "Choose a country") {
-            f.tab = Tab::World;
+            f.go_tab(Tab::World);
         }
         return;
     };
     let name = country.name.clone();
-    f.stage = f.stage.min(
+    f.campaign.stage = f.campaign.stage.min(
         f.game
             .campaign
             .world
@@ -261,7 +264,7 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut Frontend) {
     ui.horizontal_wrapped(|ui| {
         if primary(
             ui,
-            if f.mode == Mode::Personal {
+            if f.campaign.mode == Mode::Personal {
                 "Deploy personally"
             } else {
                 "Deploy survivor"
@@ -271,7 +274,7 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut Frontend) {
         }
         ui.label(format!(
             "{name} · Defense {} · {}",
-            f.stage + 1,
+            f.campaign.stage + 1,
             chrome::defender_name(f)
         ));
         if f.tab != Tab::Briefing && ui.small_button("Back to briefing").clicked() {

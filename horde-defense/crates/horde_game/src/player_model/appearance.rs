@@ -139,6 +139,7 @@ pub fn resolve_appearance(
         frozen_equipment: Some(equipment.clone()),
     })
 }
+#[cfg(any(test, feature = "review"))]
 pub fn reference_appearance(
     catalogue: &CompiledCatalogue,
     model_id: &str,

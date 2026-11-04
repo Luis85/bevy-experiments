@@ -124,6 +124,7 @@ pub struct PlayerModelCatalogue {
 }
 
 impl PlayerModelCatalogue {
+    #[cfg(any(test, feature = "review"))]
     pub fn from_json(models: &[&str], skins: &str) -> Result<Self, String> {
         Self::from_documents(models, &[skins])
     }

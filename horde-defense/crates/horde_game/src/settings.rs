@@ -1,6 +1,6 @@
 use bevy_egui::egui::{self, Context, PointerButton};
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Action {
@@ -38,7 +38,8 @@ impl Action {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+/// The user settings resource: display, audio, controls and accessibility.
+#[derive(bevy::prelude::Resource, Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
     pub scale: f32,
@@ -122,16 +123,6 @@ impl Settings {
         })
     }
 }
-pub fn save_directory() -> PathBuf {
-    if let Some(path) = crate::environment::path("LASTLIGHT_SAVE_DIR") {
-        return path;
-    }
-    std::env::var_os("LOCALAPPDATA")
-        .map(PathBuf::from)
-        .map(|p| p.join("LastlightHordeDefense"))
-        .unwrap_or_else(|| PathBuf::from("saves"))
-}
-
 pub fn configure(ctx: &Context, scale: f32) {
     ctx.set_theme(egui::Theme::Dark);
     ctx.set_zoom_factor(scale.clamp(0.75, 1.35));

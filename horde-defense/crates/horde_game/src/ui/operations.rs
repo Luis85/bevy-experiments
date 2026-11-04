@@ -1,7 +1,15 @@
 //! Operations presentation. Game changes are queued typed intents.
-use super::*;
+use super::{Screen, UiCtx, battle, chrome, damage, loot, muted, reticle};
+use crate::art::{self, AMBER, RED};
+use bevy_egui::egui::{self, Sense, vec2};
+use horde_core::{
+    campaign::NpcTraining,
+    command::Command,
+    content::{Policy, Slot, StructureKind},
+    world::world,
+};
 
-pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     use horde_core::strategy::{OutbreakOutcome, RecruitStatus};
     let config = &world().strategy_config;
     chrome::page_title(
@@ -21,7 +29,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
         ui.horizontal_wrapped(|ui| {
             ui.strong("Your active field");
             if ui.button("Return to active defense").clicked() {
-                f.screen = Screen::Battle;
+                f.go(Screen::Battle);
             }
         });
     }
@@ -47,7 +55,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
                     ),
                 );
                 if ui.button("Plan outbreak response").clicked() {
-                    f.selected_country = outbreak.country_id.clone();
+                    f.campaign.selected_country = outbreak.country_id.clone();
                     f.dispatch(
                         Command::EnterCountry(outbreak.country_id),
                         "Replay a defense here or dispatch a survivor to contain the outbreak.",
@@ -109,7 +117,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
             ));
             ui.label(format!("HP {hp}/{max} · {elapsed:.0}s · {kills} kills"));
             if ui.button(format!("Observe #{id}")).clicked() {
-                f.observed = Some(*id);
+                f.campaign.observed = Some(*id);
             }
             if ui.button(format!("Recall #{id}")).clicked() {
                 f.dispatch(
@@ -157,15 +165,15 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
     } else {
         ui.horizontal_wrapped(|ui| {
             ui.label("Orders for");
-            egui::ComboBox::from_id_salt("operations_country").selected_text(country_name(&f.selected_country)).show_ui(ui, |ui| {
+            egui::ComboBox::from_id_salt("operations_country").selected_text(country_name(&f.campaign.selected_country)).show_ui(ui, |ui| {
                 for country in &world().countries {
-                    if f.game.campaign.world.can_enter(&country.id) { ui.selectable_value(&mut f.selected_country, country.id.clone(), &country.name); }
+                    if f.game.campaign.world.can_enter(&country.id) { ui.selectable_value(&mut f.campaign.selected_country, country.id.clone(), &country.name); }
                 }
             });
-            let liberated = f.game.campaign.world.cleared.contains(&f.selected_country);
+            let liberated = f.game.campaign.world.cleared.contains(&f.campaign.selected_country);
             let space = f.game.strategy.roster.len() < config.max_roster;
             let can_recruit = liberated && space && f.game.campaign.coins >= config.recruit_cost && f.game.campaign.reserved.is_none();
-            if ui.add_enabled(can_recruit, egui::Button::new(format!("Recruit survivor · {} coins", config.recruit_cost))).on_disabled_hover_text("Choose a liberated country, keep space in the roster and enough coins, and return the active defender to camp.").clicked() { f.dispatch(Command::Recruit(f.selected_country.clone()), "Survivor recruited with independent protected equipment."); }
+            if ui.add_enabled(can_recruit, egui::Button::new(format!("Recruit survivor · {} coins", config.recruit_cost))).on_disabled_hover_text("Choose a liberated country, keep space in the roster and enough coins, and return the active defender to camp.").clicked() { f.dispatch(Command::Recruit(f.campaign.selected_country.clone()), "Survivor recruited with independent protected equipment."); }
         });
         muted(
             ui,
@@ -201,11 +209,11 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
             if let Ok(readiness) = f.game.strategy.readiness(&f.game.campaign, recruit.id) { muted(ui, &readiness.summary); }
             if recruit.status == RecruitStatus::Ready {
                 ui.horizontal_wrapped(|ui| {
-                    let stage = f.game.campaign.world.completed(&f.selected_country).min(world().country(&f.selected_country).map(|c| c.level_count().saturating_sub(1)).unwrap_or(0));
-                    if parallel && ui.button("Deploy single defense").clicked() { f.dispatch(Command::DeploySurvivor { id: recruit.id, country: f.selected_country.clone(), stage }, "Expedition deployed. Its actual battle runs live."); }
+                    let stage = f.game.campaign.world.completed(&f.campaign.selected_country).min(world().country(&f.campaign.selected_country).map(|c| c.level_count().saturating_sub(1)).unwrap_or(0));
+                    if parallel && ui.button("Deploy single defense").clicked() { f.dispatch(Command::DeploySurvivor { id: recruit.id, country: f.campaign.selected_country.clone(), stage }, "Expedition deployed. Its actual battle runs live."); }
                     if strategy {
-                        if ui.button("Liberate country").on_hover_text("Chain real defenses until liberation, defeat, recall or invalid equipment. No automatic purchases or training.").clicked() { f.dispatch(Command::CountryOperation { id: recruit.id, country: f.selected_country.clone() }, "Country operation started; stops on liberation, defeat or recall."); }
-                        if ui.button("Guard selected country").clicked() { f.dispatch(Command::AssignGuard { id: recruit.id, country: f.selected_country.clone() }, "Garrison assigned. Equipment stays reserved during duty."); }
+                        if ui.button("Liberate country").on_hover_text("Chain real defenses until liberation, defeat, recall or invalid equipment. No automatic purchases or training.").clicked() { f.dispatch(Command::CountryOperation { id: recruit.id, country: f.campaign.selected_country.clone() }, "Country operation started; stops on liberation, defeat or recall."); }
+                        if ui.button("Guard selected country").clicked() { f.dispatch(Command::AssignGuard { id: recruit.id, country: f.campaign.selected_country.clone() }, "Garrison assigned. Equipment stays reserved during duty."); }
                     }
                 });
                 egui::CollapsingHeader::new(format!("Equipment, training & policy · {} CP available", recruit.npc.unspent)).show(ui, |ui| {
@@ -232,7 +240,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
             ui.separator();
         });
     }
-    if let Some(id) = f.observed {
+    if let Some(id) = f.campaign.observed {
         let mut open = true;
         egui::Window::new(format!("Live battlefield #{id}"))
             .default_size(vec2(
@@ -258,7 +266,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
                     if ui.button("Clear country plan").clicked() { f.dispatch(Command::ClearExpeditionLayout(id), "Country plan cleared; deployed structures remain."); }
                     muted(ui, "Build live: left click places, right click salvages. Pause all is optional.");
                     for kind in StructureKind::ALL {
-                        ui.selectable_value(&mut f.build_kind, kind, format!("{kind:?}"));
+                        ui.selectable_value(&mut f.battle.build_kind, kind, format!("{kind:?}"));
                     }
                 });
                 if let Some(b) = f.game.battles.iter().find(|b| b.id == id)
@@ -306,10 +314,10 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
                             textures: f.textures,
                         },
                     );
-                    damage::draw_for(ui,a,projection,id,&mut f.damage_feedback,f.settings.numbers,f.settings.reduced_effects);
-                    if loot::draw_for(ui,projection,a,id,f.textures,&mut f.loot_feedback) { f.runtime.notify_rare_loot(); }
+                    damage::draw_for(ui,a,projection,id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode());
+                    if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode()) { f.notify_rare_loot(); }
                     if response.hover_pos().is_some_and(|p| r.contains(p)) && ui.input(|i|i.raw.focused) && !ui.ctx().any_popup_open() {
-                        f.custom_cursor_requested=true;ui.ctx().set_cursor_icon(egui::CursorIcon::None);
+                        f.battle.custom_cursor_requested=true;ui.ctx().set_cursor_icon(egui::CursorIcon::None);
                         reticle::paint(ui,a,projection,aim,battle::AttackSelection::Gun,false,f.settings.reduced_effects);
                     }
                     crate::inspector::hover(&response, a, aim);
@@ -338,15 +346,15 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
                             f.dispatch(
                                 Command::PlaceExpedition {
                                     battle: id,
-                                    kind: f.build_kind,
+                                    kind: f.battle.build_kind,
                                     lane,
                                     column,
                                 },
                                 "Expedition defense placed.",
                             );
                         } else {
-                            f.message = "Build only in the left-half construction zone.".into();
-                            f.message_error = true;
+                            f.status.message = "Build only in the left-half construction zone.".into();
+                            f.status.message_error = true;
                         }
                     }
                 } else {
@@ -357,7 +365,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut Frontend) {
                 }
             });
         if !open {
-            f.observed = None;
+            f.campaign.observed = None;
         }
     }
     egui::CollapsingHeader::new("Strategic event log").show(ui, |ui| {

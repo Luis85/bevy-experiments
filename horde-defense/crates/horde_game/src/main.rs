@@ -2,33 +2,33 @@ mod animation;
 mod art;
 mod atmosphere_audio;
 mod audio;
+#[cfg(feature = "review")]
 mod capture_sequence;
 mod cursor;
 mod defender_presentation;
 mod diagnostics;
-mod environment;
 mod gear_appearance;
 mod inspector;
+mod launch;
 mod logging;
 mod player_model;
+mod profile;
+#[cfg(feature = "review")]
+mod review_tools;
 mod runner;
 mod settings;
+mod sfx;
 mod ui;
 mod visual_assets;
 mod worldmap;
 
-use bevy::{
-    app::AppExit,
-    prelude::*,
-    window::{WindowCloseRequested, WindowResolution},
-};
-use bevy_egui::{EguiPlugin, EguiPrimaryContextPass};
+use bevy::{app::AppExit, prelude::*, window::WindowResolution};
 
-fn validate_startup_catalogs() -> Result<(), String> {
+fn validate_startup_catalogs(config: &launch::LaunchConfig) -> Result<(), String> {
     // Loads, validates and installs every catalogue; a bad override is a clean error.
     horde_core::catalog::init_catalogs().map_err(|error| error.to_string())?;
-    player_model::startup::initialize_player_models(&asset_directory())?;
-    for (name, source) in environment::catalog_sources() {
+    player_model::startup::initialize_player_models(&asset_directory(config))?;
+    for (name, source) in config.catalog_sources() {
         // Runs before LogPlugin installs the subscriber, so stderr is the only channel.
         #[allow(clippy::print_stderr)]
         {
@@ -42,12 +42,24 @@ fn validate_startup_catalogs() -> Result<(), String> {
 // plain stdout/stderr.
 #[allow(clippy::print_stdout, clippy::print_stderr)]
 fn main() -> AppExit {
-    logging::install_panic_hook();
-    if let Err(error) = validate_startup_catalogs() {
+    // Parsed once, before anything else; nothing below reads the environment.
+    let config = match launch::LaunchConfig::from_process() {
+        Ok(config) => config,
+        Err(error) => {
+            eprintln!("{error}");
+            return AppExit::error();
+        }
+    };
+    if config.action == launch::LaunchAction::Help {
+        print!("{}", launch::HELP);
+        return AppExit::Success;
+    }
+    logging::install_panic_hook(config.log_directory());
+    if let Err(error) = validate_startup_catalogs(&config) {
         eprintln!("Invalid startup content: {error}");
         return AppExit::error();
     }
-    if std::env::args().any(|a| a == "--smoke") {
+    if config.action == launch::LaunchAction::Smoke {
         match smoke() {
             Ok(report) => println!("{report}"),
             Err(e) => {
@@ -57,33 +69,20 @@ fn main() -> AppExit {
         }
         return AppExit::Success;
     }
-    let (width, height) = std::env::var("LASTLIGHT_REVIEW_SIZE")
-        .ok()
-        .and_then(|s| {
-            s.split_once('x')
-                .and_then(|(w, h)| Some((w.parse().ok()?, h.parse().ok()?)))
-        })
-        .unwrap_or((1440, 900));
+    let (width, height) = config.window;
+    diagnostics::enable_work_timing(config.perf().is_some());
     let mut app = App::new();
-    if environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_some() {
-        if environment::path("LASTLIGHT_PERF_REPORT").is_some()
-            || environment::string("LASTLIGHT_REVIEW_SCREEN").is_none()
-            || environment::flag("LASTLIGHT_PRACTICE")
-            || !environment::flag("LASTLIGHT_REVIEW_MOTION")
-        {
-            // Before LogPlugin is installed, so stderr is the only channel.
-            eprintln!(
-                "Animation export requires an isolated motion review and cannot be combined with performance measurement or a persistent campaign"
-            );
-            return AppExit::error();
-        }
+    if config.sequence_path().is_some() {
+        // LaunchConfig already rejected exports outside an isolated motion review.
         app.insert_resource(bevy::time::TimeUpdateStrategy::FixedTimesteps(1));
         app.insert_resource(bevy::winit::WinitSettings::continuous());
     }
+    let asset_directory = asset_directory(&config);
+    // Inserted before LogPlugin so the file layer can find the save directory.
+    app.insert_resource(config);
     // Performance sampling keeps ordinary window scheduling. Only deterministic
     // visual export above overrides time and redraw cadence.
     app.insert_resource(ClearColor(Color::srgb(0.067, 0.09, 0.094)))
-        .insert_resource(Time::<Fixed>::from_hz(60.0))
         .add_plugins(
             DefaultPlugins
                 // `RUST_LOG`, when set, overrides this filter entirely.
@@ -93,7 +92,7 @@ fn main() -> AppExit {
                     ..default()
                 })
                 .set(AssetPlugin {
-                    file_path: asset_directory().to_string_lossy().into_owned(),
+                    file_path: asset_directory.to_string_lossy().into_owned(),
                     ..default()
                 })
                 .set(WindowPlugin {
@@ -111,58 +110,36 @@ fn main() -> AppExit {
                     close_when_requested: false,
                     ..default()
                 }),
-        )
-        // After LogPlugin so Game::load startup events reach the console and log file.
-        .insert_resource(ui::Frontend::load())
-        .add_plugins(EguiPlugin::default())
-        .add_plugins(atmosphere_audio::AtmosphereAudioPlugin)
-        .add_systems(
-            Startup,
-            (
-                |mut commands: Commands| {
-                    commands.spawn(Camera2d);
-                },
-                visual_assets::load_assets,
-            ),
-        )
-        .add_systems(EguiPrimaryContextPass, ui::draw)
-        .add_systems(
-            PostUpdate,
-            cursor::sync_native_cursor.after(bevy_egui::EguiPostUpdateSet::ProcessOutput),
-        )
-        .add_systems(PreUpdate, runner::apply_commands::<ui::Frontend>)
-        .add_systems(FixedUpdate, runner::advance::<ui::Frontend>)
-        .add_systems(
-            Update,
-            (
-                close_window,
-                runner::persist::<ui::Frontend>,
-                runner::play_sounds::<ui::Frontend>,
-                runner::update_effects_gain::<ui::Frontend>,
-                capture,
-                show_window,
-                diagnostics::capture_performance,
-                capture_sequence::capture_frames,
-            )
-                .chain(),
-        )
-        .add_systems(
-            Update,
-            publish_scene_audio.before(atmosphere_audio::AmbienceUpdate),
-        )
-        .run()
+        );
+    let config = app.world().resource::<launch::LaunchConfig>().clone();
+    // After LogPlugin so Game::load startup events reach the console and log file.
+    ui::FrontendParts::load(&config).insert_into(&mut app);
+    let review = config.review().is_some();
+    app.add_systems(Startup, log_launch_warnings).add_plugins((
+        runner::SimRuntimePlugin,
+        sfx::SfxPlugin,
+        ui::UiPlugin,
+        atmosphere_audio::AtmosphereAudioPlugin,
+    ));
+    #[cfg(feature = "review")]
+    if review {
+        app.add_plugins(review_tools::ReviewToolsPlugin);
+    }
+    #[cfg(not(feature = "review"))]
+    let _ = review;
+    app.run()
 }
 
-fn publish_scene_audio(
-    frontend: Res<ui::Frontend>,
-    mut target: ResMut<atmosphere_audio::SceneAudioTarget>,
-) {
-    *target = frontend.ambience_target();
+/// Parse warnings are collected before logging exists; report them once it does.
+fn log_launch_warnings(config: Res<launch::LaunchConfig>) {
+    for warning in &config.warnings {
+        warn!("{warning}");
+    }
 }
 
-fn asset_directory() -> std::path::PathBuf {
-    if let Some(path) = environment::path("LASTLIGHT_ASSET_DIR") {
-        return path;
+fn asset_directory(config: &launch::LaunchConfig) -> std::path::PathBuf {
+    if let Some(path) = &config.asset_dir {
+        return path.clone();
     }
     if let Ok(exe) = std::env::current_exe()
         && let Some(folder) = exe.parent()
@@ -174,117 +151,6 @@ fn asset_directory() -> std::path::PathBuf {
     }
     std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets"))
 }
-fn close_window(
-    mut close: MessageReader<WindowCloseRequested>,
-    mut frontend: ResMut<ui::Frontend>,
-) {
-    if close.read().next().is_some() {
-        frontend
-            .runtime
-            .enqueue(horde_core::command::Command::SetPaused(true), "");
-        frontend
-            .runtime
-            .enqueue(runner::AppCommand::Save(runner::SaveIntent::Quit), "");
-    }
-}
-
-fn show_window(mut window: Single<&mut Window>, frames: Res<bevy::diagnostic::FrameCount>) {
-    if frames.0 == 3 {
-        window.visible = true;
-    }
-}
-
-#[derive(Default)]
-struct StaticCapture {
-    frames: u32,
-    ready_frames: u32,
-    index: u32,
-    requested: Option<(u32, std::path::PathBuf)>,
-}
-fn capture(
-    mut commands: Commands,
-    keys: Res<ButtonInput<KeyCode>>,
-    mut state: Local<StaticCapture>,
-    assets: Res<visual_assets::VisualAssets>,
-    images: Res<Assets<Image>>,
-    mut contexts: bevy_egui::EguiContexts,
-    mut exit: MessageWriter<AppExit>,
-) {
-    state.frames += 1;
-    if assets.all_loaded(&images) {
-        state.ready_frames += 1;
-    } else {
-        state.ready_frames = 0;
-    }
-    // Warm up after real asset readiness, rather than waiting 120 frames in an
-    // unfocused window. Extra completed frames allow GPU uploads/fonts to settle.
-    let automated = if state.requested.is_none() && state.frames >= 12 && state.ready_frames >= 8 {
-        environment::path("LASTLIGHT_REVIEW_CAPTURE")
-    } else {
-        None
-    };
-    if keys.just_pressed(KeyCode::F12) || automated.is_some() {
-        use bevy::render::view::screenshot::{Screenshot, save_to_disk};
-        let path = automated.clone().unwrap_or_else(|| {
-            environment::path("LASTLIGHT_CAPTURE_DIR")
-                .unwrap_or_else(|| settings::save_directory().join("screenshots"))
-                .join(format!("lastlight-{}.png", state.index))
-        });
-        if let Some(folder) = path.parent()
-            && let Err(error) = std::fs::create_dir_all(folder)
-        {
-            error!("Could not create screenshot folder: {error}");
-            return;
-        }
-        if let Some(report_path) = environment::path("LASTLIGHT_PLAYER_MODEL_REVIEW_REPORT")
-            .or_else(|| environment::path("LASTLIGHT_PLAYER_MODEL_PARITY_REPORT"))
-        {
-            let report = contexts
-                .ctx_mut()
-                .ok()
-                .and_then(|ctx| ui::player_model_review_report(ctx));
-            let result = report
-                .ok_or_else(|| "Native player-model review metadata is unavailable".to_owned())
-                .and_then(|report| {
-                    serde_json::to_vec_pretty(&report).map_err(|error| error.to_string())
-                })
-                .and_then(|bytes| {
-                    if let Some(folder) = report_path.parent() {
-                        std::fs::create_dir_all(folder).map_err(|error| error.to_string())?;
-                    }
-                    std::fs::write(&report_path, bytes).map_err(|error| error.to_string())
-                });
-            if let Err(error) = result {
-                error!("Native player-model review manifest failed: {error}");
-                exit.write(AppExit::error());
-                return;
-            }
-        }
-        state.index += 1;
-        if automated.is_some() {
-            state.requested = Some((state.frames, path.clone()));
-        }
-        commands
-            .spawn(Screenshot::primary_window())
-            .observe(save_to_disk(path));
-    }
-    if environment::flag("LASTLIGHT_REVIEW_EXIT")
-        && environment::path("LASTLIGHT_PERF_REPORT").is_none()
-        && environment::path("LASTLIGHT_CAPTURE_SEQUENCE").is_none()
-    {
-        if state
-            .requested
-            .as_ref()
-            .is_some_and(|(frame, path)| state.frames >= frame + 4 && path.is_file())
-        {
-            exit.write(AppExit::Success);
-        } else if state.frames >= 120 {
-            error!("Native capture timed out before assets or the completed PNG were ready");
-            exit.write(AppExit::error());
-        }
-    }
-}
-
 fn smoke() -> Result<String, String> {
     use horde_core::{
         content::{Mode, content},

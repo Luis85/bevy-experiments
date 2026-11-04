@@ -1,16 +1,31 @@
 //! Event-driven tests of the shipped egui widgets. No OS window or user saves.
 use super::*;
-use crate::runner;
+use crate::profile::ProfilePaths;
+use crate::runner::{AttackAims, Runtime};
+use crate::{
+    art::{self, MUTED},
+    runner::{AppCommand, ControlFrame, SaveIntent},
+    settings::{self, Action, Settings},
+};
+use bevy_egui::egui::{self, Color32, Rect, pos2, vec2};
 use bevy_egui::egui::{Event, FullOutput, Key, Modifiers, PointerButton, Pos2, RawInput, Vec2};
+use horde_core::{
+    command::Command,
+    content::{Mode, Slot, StructureKind, content},
+    sim::{Game, Input, Outcome},
+    survivors::{Appearance, SurvivorId},
+    world::world,
+};
+use std::path::PathBuf;
 
 struct IsolatedFrontend {
-    frontend: Frontend,
+    frontend: FrontendParts,
     directory: PathBuf,
 }
 impl IsolatedFrontend {
     fn new() -> Self {
         let mut frontend = test_support::test_frontend();
-        let directory = frontend.save_path.parent().unwrap().to_path_buf();
+        let directory = frontend.paths.campaign().parent().unwrap().to_path_buf();
         frontend.game = Game::default();
         // Existing control/layout cases exercise compatibility campaigns.
         frontend.game.campaign.legacy_features = true;
@@ -26,32 +41,31 @@ impl IsolatedFrontend {
             .campaign
             .choose_survivor(SurvivorId::Rook)
             .unwrap();
-        frontend.preview_survivor = SurvivorId::Rook;
-        frontend.aim = [15.0, f32::from(frontend.game.campaign.lane_count()) * 0.5];
+        frontend.campaign.preview_survivor = SurvivorId::Rook;
+        frontend.battle.aim = [15.0, f32::from(frontend.game.campaign.lane_count()) * 0.5];
         frontend.settings = Settings::default();
         frontend.screen = Screen::Camp;
-        frontend.return_screen = Screen::Camp;
-        frontend.tab = Tab::World;
-        frontend.mode = Mode::Personal;
-        frontend.stage = 0;
-        frontend.selected_country = "DEU".into();
-        frontend.search.clear();
-        frontend.message.clear();
-        frontend.construction = false;
-        frontend.fire_latched = false;
-        frontend.rebind = None;
-        frontend.binding_armed = false;
-        frontend.pending = Input::default();
-        frontend.pending_attack_aims = AttackAims::default();
-        frontend.arena_rect = None;
-        frontend.initialized = true;
+        frontend.nav.return_screen = Screen::Camp;
+        frontend.nav.tab = Tab::World;
+        frontend.campaign.mode = Mode::Personal;
+        frontend.campaign.stage = 0;
+        frontend.campaign.selected_country = "DEU".into();
+        frontend.campaign.search.clear();
+        frontend.status.message.clear();
+        frontend.battle.construction = false;
+        frontend.battle.fire_latched = false;
+        frontend.prefs.rebind = None;
+        frontend.prefs.binding_armed = false;
+        frontend.battle.pending = Input::default();
+        frontend.battle.pending_attack_aims = AttackAims::default();
+        frontend.battle.arena_rect = None;
         frontend.runtime = Runtime::default();
-        frontend.save_pending = false;
-        frontend.message_error = false;
-        frontend.feedback = feedback::FeedbackState::default();
-        frontend.feedback_revision = 0;
-        frontend.practice_profile = false;
-        frontend.profile_exists = false;
+        frontend.status.save_pending = false;
+        frontend.status.message_error = false;
+        frontend.status.feedback = feedback::FeedbackState::default();
+        frontend.status.feedback_revision = 0;
+        frontend.status.practice_profile = false;
+        frontend.status.profile_exists = false;
         Self {
             frontend,
             directory,
@@ -131,62 +145,66 @@ impl Harness {
         warmup.textures_delta.clear();
         Self { ctx }
     }
-    fn frame(&self, f: &mut Frontend, view: View, events: Vec<Event>) -> FullOutput {
+    fn frame(&self, f: &mut FrontendParts, view: View, events: Vec<Event>) -> FullOutput {
         self.frame_size(f, view, events, vec2(1440.0, 900.0))
     }
     fn frame_size(
         &self,
-        f: &mut Frontend,
+        f: &mut FrontendParts,
         view: View,
         events: Vec<Event>,
         size: Vec2,
     ) -> FullOutput {
         f.runtime.begin_frame(self.ctx.cumulative_frame_nr() as u32);
-        let mut output = self.ctx.run_ui(
-            RawInput {
-                screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
-                events,
-                ..RawInput::default()
-            },
-            |ui| match view {
-                View::Menu => menu(ui, f, 0.0),
-                View::SurvivorSelection => menu::survivor_selection(ui, f, 0.0),
-                View::Header => navigation::header(ui, f, 1.0),
-                View::Dossier => {
-                    egui::CentralPanel::default().show(ui, |ui| country_dossier(ui, f));
-                }
-                View::Battle => {
-                    controls(ui.ctx(), f);
-                    battle(ui, f);
-                }
-                View::Settings => settings_ui(ui, f),
-                View::WorldWithChrome => {
-                    navigation::header(ui, f, 1.0);
-                    navigation::field_status(ui, f);
-                    camp(ui, f);
-                }
-                View::Camp => {
-                    navigation::field_status(ui, f);
-                    camp(ui, f);
-                }
-                View::Armory => {
-                    egui::CentralPanel::default().show(ui, |ui| armory(ui, f));
-                }
-                View::Results => results(ui, f),
-                View::History => history::show(ui, f),
-                View::Feedback => {
-                    egui::CentralPanel::default().show(ui, |ui| status(ui, f));
-                }
-            },
-        );
+        let mut output = {
+            let mut c = f.ctx();
+            let f = &mut c;
+            self.ctx.run_ui(
+                RawInput {
+                    screen_rect: Some(Rect::from_min_size(Pos2::ZERO, size)),
+                    events,
+                    ..RawInput::default()
+                },
+                |ui| match view {
+                    View::Menu => menu(ui, f, 0.0),
+                    View::SurvivorSelection => menu::survivor_selection(ui, f, 0.0),
+                    View::Header => navigation::header(ui, f, 1.0),
+                    View::Dossier => {
+                        egui::CentralPanel::default().show(ui, |ui| country_dossier(ui, f));
+                    }
+                    View::Battle => {
+                        controls(ui.ctx(), f);
+                        battle(ui, f);
+                    }
+                    View::Settings => settings_ui(ui, f),
+                    View::WorldWithChrome => {
+                        navigation::header(ui, f, 1.0);
+                        navigation::field_status(ui, f);
+                        camp(ui, f);
+                    }
+                    View::Camp => {
+                        navigation::field_status(ui, f);
+                        camp(ui, f);
+                    }
+                    View::Armory => {
+                        egui::CentralPanel::default().show(ui, |ui| armory(ui, f));
+                    }
+                    View::Results => results(ui, f),
+                    View::History => history::show(ui, f),
+                    View::Feedback => {
+                        egui::CentralPanel::default().show(ui, |ui| status(ui, f));
+                    }
+                },
+            )
+        };
         output.textures_delta.clear();
-        runner::flush_for_test(f);
+        f.flush_for_test();
         output
     }
-    fn click(&self, f: &mut Frontend, view: View, label: &str) {
+    fn click(&self, f: &mut FrontendParts, view: View, label: &str) {
         self.click_size(f, view, label, vec2(1440.0, 900.0));
     }
-    fn click_size(&self, f: &mut Frontend, view: View, label: &str, size: Vec2) {
+    fn click_size(&self, f: &mut FrontendParts, view: View, label: &str, size: Vec2) {
         let output = self.frame_size(f, view, vec![], size);
         let position = output
             .shapes
@@ -222,11 +240,11 @@ impl Harness {
             size,
         );
     }
-    fn key(&self, f: &mut Frontend, view: View, key: Key) {
+    fn key(&self, f: &mut FrontendParts, view: View, key: Key) {
         self.frame(f, view, vec![key_event(key, true)]);
         self.frame(f, view, vec![key_event(key, false)]);
     }
-    fn feedback_at(&self, f: &mut Frontend, time: f64) -> FullOutput {
+    fn feedback_at(&self, f: &mut FrontendParts, time: f64) -> FullOutput {
         let mut output = self.ctx.run_ui(
             RawInput {
                 screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))),
@@ -234,13 +252,13 @@ impl Harness {
                 ..RawInput::default()
             },
             |ui| {
-                egui::CentralPanel::default().show(ui, |ui| status(ui, f));
+                egui::CentralPanel::default().show(ui, |ui| status(ui, &mut f.ctx()));
             },
         );
         output.textures_delta.clear();
         output
     }
-    fn publish_combat(&self, f: &mut Frontend, events: Vec<Event>) {
+    fn publish_combat(&self, f: &mut FrontendParts, events: Vec<Event>) {
         f.runtime.begin_frame(self.ctx.cumulative_frame_nr() as u32);
         let mut output = self.ctx.run_ui(
             RawInput {
@@ -248,11 +266,11 @@ impl Harness {
                 events,
                 ..RawInput::default()
             },
-            |ui| publish_controls(ui.ctx(), f, true, false),
+            |ui| publish_controls(ui.ctx(), &mut f.ctx(), true, false),
         );
         output.textures_delta.clear();
     }
-    fn combat_input(&self, f: &mut Frontend, events: Vec<Event>) -> Input {
+    fn combat_input(&self, f: &mut FrontendParts, events: Vec<Event>) -> Input {
         let mut input = Input::default();
         let mut output = self.ctx.run_ui(
             RawInput {
@@ -260,7 +278,7 @@ impl Harness {
                 ..RawInput::default()
             },
             |ui| {
-                input = gather_combat_input(ui.ctx(), f);
+                input = gather_combat_input(ui.ctx(), &mut f.ctx());
             },
         );
         output.textures_delta.clear();
@@ -296,13 +314,13 @@ fn first_country_selection_immediately_starts_and_saves_a_live_personal_defense(
     h.click(f, View::Dossier, "Start journey");
     assert_eq!(f.game.campaign.world.start.as_deref(), Some("DEU"));
     assert!(f.screen == Screen::Battle);
-    assert!(!f.construction);
+    assert!(!f.battle.construction);
     let a = f.game.attempt.as_ref().unwrap();
     assert!(!a.paused);
     assert_eq!(a.tick, 0);
     assert_eq!(a.country_id.as_deref(), Some("DEU"));
     assert_eq!(a.mode, Mode::Personal);
-    let restored = Game::load(&f.save_path).unwrap();
+    let restored = Game::load(&f.paths.campaign()).unwrap();
     assert_eq!(restored.attempt.as_ref().unwrap().tick, 0);
     assert!(!restored.attempt.as_ref().unwrap().paused);
 }
@@ -322,7 +340,7 @@ fn pointer_pause_and_resume_freeze_and_restart_authoritative_ticks() {
     assert_eq!(serde_json::to_string(&f.game).unwrap(), frozen);
     h.click(f, View::Battle, "Begin defense");
     assert!(!f.game.global_paused);
-    assert!(!f.construction);
+    assert!(!f.battle.construction);
     for _ in 0..30 {
         f.game.tick(Input::default());
     }
@@ -340,7 +358,7 @@ fn npc_controls_do_not_take_a_permanent_column_from_the_fullscreen_arena() {
         f.game.deploy_country_stage(0, Mode::Npc).unwrap();
         f.screen = Screen::Battle;
         h.frame_size(f, View::Battle, vec![], size);
-        let arena = f.arena_rect.unwrap();
+        let arena = f.battle.arena_rect.unwrap();
         let canvas = h.ctx.content_rect();
         assert!(arena.left() >= canvas.left() && arena.right() <= canvas.right());
         assert!(
@@ -360,13 +378,13 @@ fn owned_defense_blueprints_allow_live_building_without_an_automatic_pause() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     h.click(f, View::Dossier, "Start journey");
-    assert!(!f.construction);
+    assert!(!f.battle.construction);
     assert!(!f.game.attempt.as_ref().unwrap().paused);
     h.click(f, View::Battle, "Build defenses");
-    assert!(f.construction);
+    assert!(f.battle.construction);
     assert!(!f.game.global_paused);
     assert!(!f.game.attempt.as_ref().unwrap().paused);
-    assert!(Game::load(&f.save_path).is_ok());
+    assert!(Game::load(&f.paths.campaign()).is_ok());
 }
 #[test]
 fn keyboard_pause_and_construction_stop_toggle_firing() {
@@ -375,19 +393,19 @@ fn keyboard_pause_and_construction_stop_toggle_firing() {
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.fire_latched = true;
+    f.battle.fire_latched = true;
     h.key(f, View::Battle, Key::Escape);
     assert!(f.game.global_paused);
-    assert!(!f.fire_latched);
+    assert!(!f.battle.fire_latched);
     h.key(f, View::Battle, Key::Escape);
     assert!(!f.game.global_paused);
-    f.fire_latched = true;
+    f.battle.fire_latched = true;
     h.key(f, View::Battle, Key::B);
-    assert!(f.construction);
+    assert!(f.battle.construction);
     assert!(!f.game.global_paused);
-    assert!(!f.fire_latched);
+    assert!(!f.battle.fire_latched);
     h.key(f, View::Battle, Key::B);
-    assert!(!f.construction);
+    assert!(!f.battle.construction);
     assert!(!f.game.global_paused);
 }
 #[test]
@@ -398,25 +416,25 @@ fn settings_from_main_menu_save_back_for_fresh_and_existing_profiles() {
         let f = &mut fixture.frontend;
         if existing {
             f.game.campaign.choose_start_country("DEU").unwrap();
-            f.game.save(&f.save_path).unwrap();
-            f.game = Game::load(&f.save_path).unwrap();
+            f.game.save(&f.paths.campaign()).unwrap();
+            f.game = Game::load(&f.paths.campaign()).unwrap();
         }
         f.screen = Screen::Menu;
         h.click(f, View::Menu, "Settings");
         assert!(f.screen == Screen::Settings);
-        assert!(f.return_screen == Screen::Menu);
+        assert!(f.nav.return_screen == Screen::Menu);
         f.settings.master = 0.23;
         h.click(f, View::Settings, "Save and return to main menu");
-        assert!(f.screen == Screen::Menu, "{}", f.message);
-        assert!(!f.message_error);
-        assert!(!f.save_pending);
-        let saved = Game::load(&f.save_path).unwrap();
+        assert!(f.screen == Screen::Menu, "{}", f.status.message);
+        assert!(!f.status.message_error);
+        assert!(!f.status.save_pending);
+        let saved = Game::load(&f.paths.campaign()).unwrap();
         assert_eq!(saved.campaign.world.start.is_some(), existing);
         assert!(saved.global_paused);
-        assert_eq!(Settings::load(&f.settings_path).master, 0.23);
+        assert_eq!(Settings::load(&f.paths.settings()).master, 0.23);
         h.click(f, View::Menu, "Settings");
         h.key(f, View::Settings, Key::Escape);
-        assert!(f.screen == Screen::Menu, "{}", f.message);
+        assert!(f.screen == Screen::Menu, "{}", f.status.message);
     }
 }
 #[test]
@@ -434,19 +452,19 @@ fn settings_name_the_origin_and_offer_a_durable_route_to_main_menu() {
         });
         assert!(f.game.attempt.as_ref().unwrap().reload_left > 0);
         f.screen = origin;
-        f.fire_latched = true;
+        f.battle.fire_latched = true;
         h.click(f, View::Header, "Settings");
         assert!(f.screen == Screen::Settings);
-        assert!(f.return_screen == origin);
+        assert!(f.nav.return_screen == origin);
         assert!(f.game.global_paused);
-        assert!(!f.fire_latched);
+        assert!(!f.battle.fire_latched);
         let paused = serde_json::to_value(&f.game).unwrap();
         let output = h.frame(f, View::Settings, vec![]);
         assert!(
             output
                 .shapes
                 .iter()
-                .any(|shape| { shape_has_text(&shape.shape, f.settings_return_label()) })
+                .any(|shape| { shape_has_text(&shape.shape, f.ctx().settings_return_label()) })
         );
         assert!(
             output
@@ -455,10 +473,10 @@ fn settings_name_the_origin_and_offer_a_durable_route_to_main_menu() {
                 .any(|shape| { shape_has_text(&shape.shape, "Save and return to main menu") })
         );
         h.click(f, View::Settings, "Save and return to main menu");
-        assert!(f.screen == Screen::Menu, "{}", f.message);
+        assert!(f.screen == Screen::Menu, "{}", f.status.message);
         assert!(f.game.global_paused);
         assert_eq!(serde_json::to_value(&f.game).unwrap(), paused);
-        let saved = Game::load(&f.save_path).unwrap();
+        let saved = Game::load(&f.paths.campaign()).unwrap();
         assert_eq!(serde_json::to_value(&saved).unwrap(), paused);
         h.click(f, View::Menu, "Resume journey");
         assert!(f.screen == Screen::Battle);
@@ -476,9 +494,9 @@ fn settings_return_to_camp_restores_its_previous_world_pause() {
         h.click(f, View::Header, "Settings");
         assert!(f.game.global_paused);
         h.click(f, View::Settings, "Save and return to camp");
-        assert!(f.screen == Screen::Camp, "{}", f.message);
+        assert!(f.screen == Screen::Camp, "{}", f.status.message);
         // The successful save queues restoration through the runtime.
-        runner::flush_for_test(f);
+        f.flush_for_test();
         assert_eq!(f.game.global_paused, paused);
     }
 }
@@ -491,32 +509,31 @@ fn settings_save_failure_is_visible_and_never_claims_a_return_or_success() {
         f.screen = Screen::Menu;
         h.click(f, View::Menu, "Settings");
         // A file cannot be used as a parent directory, on any supported OS.
-        std::fs::create_dir_all(f.save_path.parent().unwrap()).unwrap();
+        std::fs::create_dir_all(f.paths.campaign().parent().unwrap()).unwrap();
         let blocker = fixture.directory.join("blocked");
         std::fs::write(&blocker, b"blocked").unwrap();
         if fail_settings {
-            f.settings_path = blocker.join("settings.json");
+            f.paths = ProfilePaths::files(f.paths.campaign(), blocker.join("settings.json"));
         } else {
-            f.save_path = blocker.join("campaign.json");
+            f.paths = ProfilePaths::files(blocker.join("campaign.json"), f.paths.settings());
         }
         h.click(f, View::Settings, "Save and return to main menu");
         assert!(f.screen == Screen::Settings);
-        assert!(f.message_error);
-        assert!(!f.save_pending);
-        assert!(f.message.starts_with("Save failed:"));
+        assert!(f.status.message_error);
+        assert!(!f.status.save_pending);
+        assert!(f.status.message.starts_with("Save failed:"));
         let output = h.frame(f, View::Settings, vec![]);
         assert!(
             output
                 .shapes
                 .iter()
-                .any(|shape| { shape_has_text(&shape.shape, &f.message) })
+                .any(|shape| { shape_has_text(&shape.shape, &f.status.message) })
         );
         std::fs::remove_file(blocker).unwrap();
-        f.save_path = fixture.directory.join("campaign.json");
-        f.settings_path = fixture.directory.join("settings.json");
+        f.paths = ProfilePaths::in_directory(fixture.directory.clone());
         h.click(f, View::Settings, "Save and return to main menu");
-        assert!(f.screen == Screen::Menu, "{}", f.message);
-        assert!(!f.message_error);
+        assert!(f.screen == Screen::Menu, "{}", f.status.message);
+        assert!(!f.status.message_error);
     }
 }
 #[test]
@@ -526,16 +543,16 @@ fn binding_capture_ignores_its_activation_click_and_swaps_duplicates() {
     let f = &mut fixture.frontend;
     f.screen = Screen::Settings;
     h.click(f, View::Settings, "R");
-    assert!(f.rebind == Some(Action::Reload));
+    assert!(f.prefs.rebind == Some(Action::Reload));
     assert_eq!(f.settings.bindings[Action::Reload as usize], "R");
     h.frame(f, View::Settings, vec![]);
     h.key(f, View::Settings, Key::B);
-    assert!(f.rebind.is_none());
+    assert!(f.prefs.rebind.is_none());
     assert_eq!(f.settings.bindings[Action::Reload as usize], "B");
     assert_eq!(f.settings.bindings[Action::Build as usize], "R");
     h.click(f, View::Settings, "Save and return to camp");
     assert!(f.screen == Screen::Camp);
-    let saved = Settings::load(&f.settings_path);
+    let saved = Settings::load(&f.paths.settings());
     assert_eq!(saved.bindings[Action::Reload as usize], "B");
     fixture.unlock_trap();
     fixture.deploy();
@@ -554,7 +571,7 @@ fn binding_capture_ignores_its_activation_click_and_swaps_duplicates() {
             .any(|s| shape_has_text(&s.shape, "R build"))
     );
     h.key(f, View::Battle, Key::R);
-    assert!(f.construction);
+    assert!(f.battle.construction);
     assert!(!f.game.global_paused);
 }
 #[test]
@@ -565,8 +582,8 @@ fn mouse_reload_button_queues_a_legal_reload_without_firing() {
     let f = &mut fixture.frontend;
     f.game.attempt.as_mut().unwrap().ammo = 3;
     h.click(f, View::Battle, "Reload");
-    assert!(f.pending.reload);
-    f.game.tick(f.pending.clone());
+    assert!(f.battle.pending.reload);
+    f.game.tick(f.battle.pending.clone());
     let a = f.game.attempt.as_ref().unwrap();
     assert!(a.reload_left > 0);
     assert_eq!(a.ammo, 3);
@@ -580,10 +597,10 @@ fn legacy_body_points_are_spent_only_through_the_unified_upgrade_graph() {
     f.game.campaign.reward(0, 20, Mode::Personal);
     f.game.campaign.choose_start_country("DEU").unwrap();
     let before = f.game.campaign.profile(Mode::Personal).personal.health;
-    f.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
+    f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
         "body_vitality_1".into(),
     ));
-    f.open_preparation(Tab::Skills);
+    f.act(|c| c.open_preparation(Tab::Skills));
     h.click(f, View::Results, "Learn skill · 1 legacy CP");
     assert_eq!(f.game.campaign.player.points, 0);
     assert_eq!(f.game.campaign.player.legacy_graph_points, 1);
@@ -617,10 +634,10 @@ fn remapped_keyboard_fire_toggles_once_per_press_and_ignores_repeat_and_unbound_
     let f = &mut fixture.frontend;
     f.settings.bindings[Action::Fire as usize] = "Space".into();
     f.settings.toggle_fire = true;
-    f.arena_hover = false;
+    f.battle.arena_hover = false;
     assert!(h.combat_input(f, vec![key_event(Key::Space, true)]).fire);
     assert!(
-        f.fire_latched,
+        f.battle.fire_latched,
         "The remapped keyboard fire works outside the arena"
     );
     assert!(
@@ -640,9 +657,9 @@ fn remapped_keyboard_fire_toggles_once_per_press_and_ignores_repeat_and_unbound_
     );
     assert!(h.combat_input(f, vec![key_event(Key::Space, false)]).fire);
     assert!(!h.combat_input(f, vec![key_event(Key::Space, true)]).fire);
-    assert!(!f.fire_latched);
+    assert!(!f.battle.fire_latched);
     h.combat_input(f, vec![key_event(Key::Space, false)]);
-    f.arena_hover = true;
+    f.battle.arena_hover = true;
     assert!(
         !h.combat_input(f, vec![pointer_event(true)]).fire,
         "Unbound Mouse1 cannot toggle keyboard fire"
@@ -657,29 +674,29 @@ fn mouse_fire_toggle_is_restricted_to_the_arena_and_ui_clicks_preserve_its_state
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.settings.toggle_fire = true;
-    f.arena_hover = false;
+    f.battle.arena_hover = false;
     assert!(
         !h.combat_input(f, vec![pointer_event(true)]).fire,
         "Clicking a UI panel cannot begin firing"
     );
     h.combat_input(f, vec![pointer_event(false)]);
-    assert!(!f.fire_latched);
-    f.arena_hover = true;
+    assert!(!f.battle.fire_latched);
+    f.battle.arena_hover = true;
     assert!(h.combat_input(f, vec![pointer_event(true)]).fire);
     assert!(h.combat_input(f, vec![pointer_event(false)]).fire);
-    f.arena_hover = false;
+    f.battle.arena_hover = false;
     assert!(
         h.combat_input(f, vec![pointer_event(true)]).fire,
         "A UI click cannot silently stop an active latch"
     );
     h.combat_input(f, vec![pointer_event(false)]);
-    assert!(f.fire_latched);
-    f.arena_hover = true;
+    assert!(f.battle.fire_latched);
+    f.battle.arena_hover = true;
     assert!(
         !h.combat_input(f, vec![pointer_event(true)]).fire,
         "A second arena click stops firing"
     );
-    assert!(!f.fire_latched);
+    assert!(!f.battle.fire_latched);
 }
 fn pointer_event(pressed: bool) -> Event {
     Event::PointerButton {
@@ -698,17 +715,17 @@ fn item_sale_requires_review_and_confirmation_before_changing_the_wallet() {
     let id = f.game.campaign.add_item(4).unwrap();
     let price = content().items[4].sell_value;
     h.click(f, View::Armory, &format!("Review sale · {price}"));
-    assert_eq!(f.pending_sale, Some(id));
+    assert_eq!(f.armory.pending_sale, Some(id));
     assert!(f.game.campaign.item(id).is_some());
     assert_eq!(f.game.campaign.coins, 0);
     h.click(f, View::Armory, "Keep item");
-    assert!(f.pending_sale.is_none());
+    assert!(f.armory.pending_sale.is_none());
     assert!(f.game.campaign.item(id).is_some());
     h.click(f, View::Armory, &format!("Review sale · {price}"));
     h.click(f, View::Armory, "Confirm item sale");
     assert!(f.game.campaign.item(id).is_none());
     assert_eq!(f.game.campaign.coins, price);
-    assert!(f.pending_sale.is_none());
+    assert!(f.armory.pending_sale.is_none());
 }
 #[test]
 fn preset_sale_warning_names_the_actual_reference_before_confirmation() {
@@ -761,7 +778,7 @@ fn large_armory_renders_only_visible_rows_and_filters_without_discarding_items()
             &format!("{} #1005", content().items[4].name)
         ))
     );
-    f.armory_search = "no-matching-equipment-name".into();
+    f.armory.search = "no-matching-equipment-name".into();
     let output = h.frame(f, View::Armory, vec![]);
     assert!(
         output
@@ -772,7 +789,7 @@ fn large_armory_renders_only_visible_rows_and_filters_without_discarding_items()
     assert_eq!(f.game.campaign.items.len(), 1005);
 }
 
-fn input_enemy(f: &mut Frontend, lane: u8, x: f32) {
+fn input_enemy(f: &mut FrontendParts, lane: u8, x: f32) {
     let mut attempt = f.game.attempt.take().unwrap();
     f.game.spawn_enemy(
         &mut attempt,
@@ -799,9 +816,9 @@ fn quick_fire_tap_survives_release_and_reaim_before_a_fixed_opportunity() {
     let f = &mut fixture.frontend;
     input_enemy(f, 5, 8.0);
     let arena = Rect::from_min_size(Pos2::ZERO, vec2(600.0, 220.0));
-    f.arena_rect = Some(arena);
-    f.arena_hover = true;
-    f.aim = [8.0, 5.5];
+    f.battle.arena_rect = Some(arena);
+    f.battle.arena_hover = true;
+    f.battle.aim = [8.0, 5.5];
     let pressed = art::world(arena, 8.0, 5.5);
     h.publish_combat(
         f,
@@ -810,7 +827,7 @@ fn quick_fire_tap_survives_release_and_reaim_before_a_fixed_opportunity() {
             attack_pointer(pressed, PointerButton::Primary, true),
         ],
     );
-    f.aim = [27.0, 0.5];
+    f.battle.aim = [27.0, 0.5];
     let released = art::world(arena, 27.0, 0.5);
     h.publish_combat(
         f,
@@ -820,7 +837,7 @@ fn quick_fire_tap_survives_release_and_reaim_before_a_fixed_opportunity() {
         ],
     );
     assert_eq!(f.game.attempt.as_ref().unwrap().shots, 0);
-    runner::step(f);
+    f.step();
     let attempt = f.game.attempt.as_ref().unwrap();
     assert_eq!(attempt.shots, 1);
     assert_eq!(
@@ -828,7 +845,7 @@ fn quick_fire_tap_survives_release_and_reaim_before_a_fixed_opportunity() {
         "The released tap must retain its original target direction"
     );
     for _ in 0..60 {
-        runner::step(f);
+        f.step();
     }
     assert_eq!(f.game.attempt.as_ref().unwrap().shots, 1);
 }
@@ -840,9 +857,9 @@ fn one_render_frame_click_and_motion_uses_the_mouse_press_event_position() {
     let f = &mut fixture.frontend;
     input_enemy(f, 5, 8.0);
     let arena = Rect::from_min_size(Pos2::ZERO, vec2(600.0, 220.0));
-    f.arena_rect = Some(arena);
-    f.arena_hover = true;
-    f.aim = [27.0, 0.5];
+    f.battle.arena_rect = Some(arena);
+    f.battle.arena_hover = true;
+    f.battle.aim = [27.0, 0.5];
     let pressed = art::world(arena, 8.0, 5.5);
     let moved = art::world(arena, 27.0, 0.5);
     h.publish_combat(
@@ -854,7 +871,7 @@ fn one_render_frame_click_and_motion_uses_the_mouse_press_event_position() {
             Event::PointerMoved(moved),
         ],
     );
-    runner::step(f);
+    f.step();
     let attempt = f.game.attempt.as_ref().unwrap();
     assert_eq!(attempt.shots, 1);
     assert_eq!(attempt.hits, 1);
@@ -868,9 +885,9 @@ fn quick_outer_lane_melee_tap_keeps_its_selected_lane_after_release_and_motion()
     input_enemy(f, 0, horde_core::sim::DEFENSE_LINE);
     input_enemy(f, 0, 2.2);
     let arena = Rect::from_min_size(Pos2::ZERO, vec2(600.0, 220.0));
-    f.arena_rect = Some(arena);
-    f.arena_hover = true;
-    f.aim = [1.5, 0.5];
+    f.battle.arena_rect = Some(arena);
+    f.battle.arena_hover = true;
+    f.battle.aim = [1.5, 0.5];
     let pressed = art::world(arena, 1.5, 0.5);
     h.publish_combat(
         f,
@@ -879,7 +896,7 @@ fn quick_outer_lane_melee_tap_keeps_its_selected_lane_after_release_and_motion()
             attack_pointer(pressed, PointerButton::Secondary, true),
         ],
     );
-    f.aim = [1.5, 10.5];
+    f.battle.aim = [1.5, 10.5];
     h.publish_combat(
         f,
         vec![
@@ -889,7 +906,7 @@ fn quick_outer_lane_melee_tap_keeps_its_selected_lane_after_release_and_motion()
     );
     let mut strikes = 0;
     for tick in 0..150 {
-        runner::step(f);
+        f.step();
         let attempt = f.game.attempt.as_ref().unwrap();
         for event in attempt.events.iter().filter(|event| {
             event.tick == attempt.tick && event.kind == horde_core::sim::EventKind::Melee
@@ -916,11 +933,11 @@ fn sidebar_strike_button_uses_the_actual_selected_outer_contact_lane() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     input_enemy(f, 0, horde_core::sim::DEFENSE_LINE);
-    f.aim = [1.5, 0.5];
+    f.battle.aim = [1.5, 0.5];
     h.click(f, View::Battle, "Strike contact lane");
-    assert!(f.pending.melee);
+    assert!(f.battle.pending.melee);
     h.publish_combat(f, vec![]);
-    runner::step(f);
+    f.step();
     let attempt = f.game.attempt.as_ref().unwrap();
     let event = attempt
         .events
@@ -937,21 +954,21 @@ fn rapid_remapped_fire_taps_coalesce_without_bypassing_the_weapon_cadence() {
     let f = &mut fixture.frontend;
     input_enemy(f, 5, 8.0);
     f.settings.bindings[Action::Fire as usize] = "Space".into();
-    f.aim = [8.0, 5.5];
+    f.battle.aim = [8.0, 5.5];
     for _ in 0..8 {
         h.publish_combat(f, vec![key_event(Key::Space, true)]);
         h.publish_combat(f, vec![key_event(Key::Space, false)]);
     }
-    runner::step(f);
+    f.step();
     assert_eq!(f.game.attempt.as_ref().unwrap().shots, 1);
     for _ in 0..4 {
         h.publish_combat(f, vec![key_event(Key::Space, true)]);
         h.publish_combat(f, vec![key_event(Key::Space, false)]);
-        runner::step(f);
+        f.step();
     }
     assert_eq!(f.game.attempt.as_ref().unwrap().shots, 1);
     for _ in 0..60 {
-        runner::step(f);
+        f.step();
     }
     assert_eq!(
         f.game.attempt.as_ref().unwrap().shots,
@@ -1010,7 +1027,7 @@ fn camp_pause_binding_does_not_steal_text_from_country_search() {
         View::Camp,
         vec![key_event(Key::P, true), Event::Text("p".into())],
     );
-    assert_eq!(f.search, "p");
+    assert_eq!(f.campaign.search, "p");
     assert!(!f.game.global_paused);
 }
 #[test]
@@ -1029,9 +1046,9 @@ fn locked_construction_stays_out_of_the_first_battle_and_explains_the_gate() {
     let supply = f.game.attempt.as_ref().unwrap().supply;
     h.key(f, View::Battle, Key::B);
     assert!(!f.game.global_paused);
-    assert!(!f.construction);
+    assert!(!f.battle.construction);
     assert_eq!(f.game.attempt.as_ref().unwrap().supply, supply);
-    assert!(f.message.contains("first boss clear"));
+    assert!(f.status.message.contains("first boss clear"));
 }
 #[test]
 fn starting_country_action_is_above_the_fold_at_the_minimum_scaled_window() {
@@ -1063,8 +1080,8 @@ fn feedback_expires_success_but_keeps_errors_and_never_changes_a_battle() {
     f.settings.reduced_effects = true;
     let before = serde_json::to_value(&f.game).unwrap();
     let base = h.ctx.input(|input| input.time) + 1.0;
-    f.message = "Equipment changed.".into();
-    f.feedback_revision += 1;
+    f.status.message = "Equipment changed.".into();
+    f.status.feedback_revision += 1;
     let first = h.feedback_at(f, base);
     assert!(
         first
@@ -1079,9 +1096,9 @@ fn feedback_expires_success_but_keeps_errors_and_never_changes_a_battle() {
             .iter()
             .all(|shape| !shape_has_text(&shape.shape, "Equipment changed."))
     );
-    f.message = "Save failed. Retry saving before closing.".into();
-    f.message_error = true;
-    f.feedback_revision += 1;
+    f.status.message = "Save failed. Retry saving before closing.".into();
+    f.status.message_error = true;
+    f.status.feedback_revision += 1;
     h.feedback_at(f, base + 7.0);
     let error = h.feedback_at(f, base + 40.0);
     assert!(
@@ -1099,9 +1116,9 @@ fn field_guidance_defaults_on_for_old_settings_and_is_saved_when_changed() {
     let mut fixture = IsolatedFrontend::new();
     let f = &mut fixture.frontend;
     f.settings.show_guidance = false;
-    f.request_save(SaveIntent::Manual);
-    runner::flush_for_test(f);
-    assert!(!Settings::load(&f.settings_path).show_guidance);
+    f.act(|c| c.request_save(SaveIntent::Manual));
+    f.flush_for_test();
+    assert!(!Settings::load(&f.paths.settings()).show_guidance);
 }
 #[test]
 fn hud_reports_actual_reload_and_outer_lane_damage_without_advancing_them() {
@@ -1186,8 +1203,8 @@ fn results_keep_rewards_banked_and_open_the_actual_recovered_equipment() {
     assert_eq!(f.game.campaign.coins, coins);
     h.click(f, View::Results, "Equipment");
     assert!(f.screen == Screen::Camp);
-    assert!(f.tab == Tab::Armory);
-    assert!(f.selected_item.is_some());
+    assert!(f.nav.tab == Tab::Armory);
+    assert!(f.armory.selected_item.is_some());
     assert_eq!(f.game.campaign.coins, coins);
 }
 #[test]
@@ -1196,7 +1213,7 @@ fn ambience_selection_is_a_read_only_projection_of_actual_battle_and_pause() {
     fixture.deploy();
     let f = &mut fixture.frontend;
     let before = serde_json::to_value(&f.game).unwrap();
-    let active = f.ambience_target();
+    let active = f.ctx().ambience_target();
     assert_eq!(active.scene.mode, Some(Mode::Personal));
     assert_eq!(
         active.context,
@@ -1204,7 +1221,7 @@ fn ambience_selection_is_a_read_only_projection_of_actual_battle_and_pause() {
     );
     f.screen = Screen::Settings;
     assert_eq!(
-        f.ambience_target().context,
+        f.ctx().ambience_target().context,
         crate::atmosphere_audio::AudioContext::Paused
     );
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
@@ -1229,9 +1246,9 @@ fn dismissing_an_error_restores_neutral_feedback_without_claiming_success() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.message = "An operation failed. Retry when ready.".into();
-    f.message_error = true;
-    f.feedback_revision += 1;
+    f.status.message = "An operation failed. Retry when ready.".into();
+    f.status.message_error = true;
+    f.status.feedback_revision += 1;
     h.click(f, View::Feedback, "Dismiss");
     let output = h.frame(f, View::Feedback, vec![]);
     let color = output
@@ -1241,7 +1258,7 @@ fn dismissing_an_error_restores_neutral_feedback_without_claiming_success() {
         .expect("Neutral status should replace the dismissed acknowledgement");
     assert_eq!(color, MUTED);
     assert!(
-        f.message_error,
+        f.status.message_error,
         "Dismissal must not pretend the failed operation succeeded"
     );
 }
@@ -1339,12 +1356,12 @@ fn long_npc_action_is_one_elided_hud_line_without_changing_height_or_authority()
         // captures do after warmup; none of the geometry assertions are relaxed.
         h.frame_size(f, View::Battle, vec![], size);
         h.frame_size(f, View::Battle, vec![], size);
-        let short_arena = f.arena_rect.unwrap();
+        let short_arena = f.battle.arena_rect.unwrap();
         let long = "Attack: shoot Armored survivor in lane 11 — close engagement; preparing a fully aimed follow-up when the shared defense line is safe";
         f.game.attempt.as_mut().unwrap().decision = long.into();
         let before = serde_json::to_value(&f.game).unwrap();
         let output = h.frame_size(f, View::Battle, vec![], size);
-        let arena = f.arena_rect.unwrap();
+        let arena = f.battle.arena_rect.unwrap();
         let text = output
             .shapes
             .iter()
@@ -1384,15 +1401,15 @@ fn preparation_keeps_the_planned_replay_and_defender_without_creating_an_attempt
     f.game.campaign.choose_start_country("DEU").unwrap();
     f.game.campaign.attempts = 1;
     f.game.campaign.world.country_levels.insert("DEU".into(), 2);
-    f.mode = Mode::Npc;
-    f.stage = 0;
-    f.open_preparation(Tab::Armory);
+    f.campaign.mode = Mode::Npc;
+    f.campaign.stage = 0;
+    f.act(|c| c.open_preparation(Tab::Armory));
     let before = serde_json::to_value(&f.game).unwrap();
-    f.open_preparation(Tab::Briefing);
+    f.act(|c| c.open_preparation(Tab::Briefing));
     h.frame(f, View::Camp, vec![]);
-    assert!(f.tab == Tab::Briefing);
-    assert_eq!(f.stage, 0);
-    assert!(f.mode == Mode::Npc);
+    assert!(f.nav.tab == Tab::Briefing);
+    assert_eq!(f.campaign.stage, 0);
+    assert!(f.campaign.mode == Mode::Npc);
     assert!(f.game.attempt.is_none());
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
@@ -1437,7 +1454,7 @@ fn recommended_market_item_is_visible_and_purchased_only_after_explicit_input() 
         .iter()
         .position(|i| i.tier == 1 && i.slot == Slot::Ranged)
         .unwrap();
-    f.improvement_focus = Some(horde_core::campaign::RecommendationAction::BuyEquipment(
+    f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::BuyEquipment(
         index,
     ));
     let before = serde_json::to_value(&f.game).unwrap();
@@ -1459,7 +1476,7 @@ fn recommended_market_item_is_visible_and_purchased_only_after_explicit_input() 
         f.game.campaign.coins,
         coins - content().items[index].buy_value
     );
-    assert!(f.improvement_focus.is_none());
+    assert!(f.campaign.improvement_focus.is_none());
 }
 #[test]
 fn continuing_from_the_menu_preserves_a_saved_world_pause() {
@@ -1469,8 +1486,8 @@ fn continuing_from_the_menu_preserves_a_saved_world_pause() {
     f.game.set_paused(true);
     f.screen = Screen::Menu;
     let before = serde_json::to_value(&f.game).unwrap();
-    f.resume();
-    runner::flush_for_test(f);
+    f.act(|c| c.resume());
+    f.flush_for_test();
     assert!(f.screen == Screen::Camp);
     assert!(f.game.global_paused);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
@@ -1484,7 +1501,7 @@ fn a_personal_field_remains_returnable_from_operations_without_reset_or_resume()
     f.game.tick(Input::default());
     f.game.set_paused(true);
     f.screen = Screen::Camp;
-    f.tab = Tab::Operations;
+    f.nav.tab = Tab::Operations;
     let before = serde_json::to_value(&f.game).unwrap();
     h.click(f, View::Camp, "Return to active defense");
     assert!(f.screen == Screen::Battle);
@@ -1501,9 +1518,9 @@ fn leaving_a_debrief_keeps_strategic_time_paused_until_explicitly_resumed() {
     f.game.global_paused = false;
     let mut expected = f.game.clone();
     expected.set_paused(true);
-    f.open_campaign();
-    runner::flush_for_test(f);
-    assert!(f.screen == Screen::Camp && f.tab == Tab::World);
+    f.act(|c| c.open_campaign());
+    f.flush_for_test();
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::World);
     assert!(f.game.global_paused);
     assert_eq!(
         serde_json::to_value(&f.game).unwrap(),
@@ -1520,7 +1537,7 @@ fn battle_management_popup_cannot_leak_reload_or_fire_input() {
     f.game.attempt.as_mut().unwrap().ammo = 4;
     h.click(f, View::Battle, "Management");
     h.key(f, View::Battle, Key::R);
-    assert!(!f.pending.reload && !f.pending.fire);
+    assert!(!f.battle.pending.reload && !f.battle.pending.fire);
     assert_eq!(f.game.attempt.as_ref().unwrap().ammo, 4);
     assert_eq!(f.game.attempt.as_ref().unwrap().shots, 0);
 }
@@ -1616,7 +1633,7 @@ fn failed_outbreak_front_change_keeps_operations_and_the_requested_country_conte
     let f = &mut fixture.frontend;
     f.game.set_paused(true);
     f.screen = Screen::Camp;
-    f.tab = Tab::Operations;
+    f.nav.tab = Tab::Operations;
     f.game.campaign.world.cleared.push("FRA".into());
     f.game
         .campaign
@@ -1640,13 +1657,13 @@ fn failed_outbreak_front_change_keeps_operations_and_the_requested_country_conte
         });
     let before = serde_json::to_value(&f.game).unwrap();
     h.click(f, View::Camp, "Plan outbreak response");
-    assert!(f.screen == Screen::Camp && f.tab == Tab::Operations);
-    assert_eq!(f.selected_country, "FRA");
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Operations);
+    assert_eq!(f.campaign.selected_country, "FRA");
     assert_eq!(
         f.game.attempt.as_ref().unwrap().country_id.as_deref(),
         Some("DEU")
     );
-    assert!(f.message_error);
+    assert!(f.status.message_error);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
 
@@ -1657,11 +1674,11 @@ fn immersive_skill_choices_and_purchase_remain_visible_in_the_compact_first_view
     let f = &mut fixture.frontend;
     f.game.campaign.choose_start_country("DEU").unwrap();
     f.game.campaign.coins = 200;
-    f.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
+    f.campaign.improvement_focus = Some(horde_core::campaign::RecommendationAction::LearnNode(
         "piercing".into(),
     ));
-    f.open_preparation(Tab::Skills);
-    runner::flush_for_test(f);
+    f.act(|c| c.open_preparation(Tab::Skills));
+    f.flush_for_test();
     settings::configure(&h.ctx, 1.35);
     f.settings.scale = 1.35;
     let size = vec2(1050., 700.);
@@ -1695,11 +1712,11 @@ fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_togg
     let h = Harness::new();
     let f = &mut fixture.frontend;
     h.click(f, View::Battle, "Grenade");
-    assert_eq!(f.attack_selection, battle::AttackSelection::Grenade);
-    f.fire_latched = true;
+    assert_eq!(f.battle.attack_selection, battle::AttackSelection::Grenade);
+    f.battle.fire_latched = true;
     let arena = Rect::from_min_size(Pos2::ZERO, vec2(600.0, 220.0));
-    f.arena_rect = Some(arena);
-    f.arena_hover = true;
+    f.battle.arena_rect = Some(arena);
+    f.battle.arena_hover = true;
     let pressed = art::world(arena, 19.25, 3.75);
     h.publish_combat(
         f,
@@ -1708,18 +1725,18 @@ fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_togg
             attack_pointer(pressed, PointerButton::Primary, true),
         ],
     );
-    f.aim = [28.0, 9.0];
+    f.battle.aim = [28.0, 9.0];
     h.publish_combat(f, vec![Event::PointerMoved(art::world(arena, 28.0, 9.0))]);
-    runner::step(f);
+    f.step();
     let a = f.game.attempt.as_ref().unwrap();
     assert_eq!(a.ordnance.spent[0], 1);
     assert_eq!(a.ordnance.projectiles[0].cell, [19, 3]);
     assert_eq!(a.shots, 0);
     for _ in 0..180 {
-        runner::step(f);
+        f.step();
     }
     assert_eq!(f.game.attempt.as_ref().unwrap().ordnance.spent[0], 1);
-    assert!(!f.fire_latched);
+    assert!(!f.battle.fire_latched);
 }
 #[test]
 fn retreat_opens_retained_reward_skill_tree_and_retry_starts_live() {
@@ -1748,7 +1765,7 @@ fn a_fresh_campaign_previews_then_confirms_survivor_before_selecting_a_country()
     h.click(f, View::Menu, "New game");
     assert!(f.screen == Screen::SurvivorSelection);
     h.click(f, View::SurvivorSelection, "June");
-    assert_eq!(f.preview_survivor, SurvivorId::June);
+    assert_eq!(f.campaign.preview_survivor, SurvivorId::June);
     assert_eq!(
         serde_json::to_value(&f.game).unwrap(),
         original,
@@ -1756,10 +1773,10 @@ fn a_fresh_campaign_previews_then_confirms_survivor_before_selecting_a_country()
     );
     h.click(f, View::SurvivorSelection, "Continue as June");
     assert_eq!(f.game.campaign.selected_survivor, Some(SurvivorId::June));
-    assert!(f.screen == Screen::Camp && f.tab == Tab::World);
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::World);
     assert_eq!(f.game.campaign.coins, 0);
     assert_eq!(f.game.campaign.npc.name, "Mara Vale");
-    let saved = Game::load(&f.save_path).unwrap();
+    let saved = Game::load(&f.paths.campaign()).unwrap();
     assert_eq!(saved.campaign.selected_survivor, Some(SurvivorId::June));
     h.click(f, View::Dossier, "Start journey");
     let a = f.game.attempt.as_ref().unwrap();
@@ -1779,7 +1796,7 @@ fn both_survivor_choices_and_confirmation_fit_the_minimum_scaled_view() {
     f.screen = Screen::SurvivorSelection;
     let size = vec2(1050.0, 700.0) / 1.35;
     for choice in SurvivorId::ALL {
-        f.preview_survivor = choice;
+        f.campaign.preview_survivor = choice;
         let output = h.frame_size(f, View::SurvivorSelection, vec![], size);
         let viewport = h.ctx.content_rect();
         for label in [
@@ -1854,7 +1871,7 @@ fn leveled_equipment_ui_uses_the_same_price_and_comparison_as_the_transaction() 
     assert_eq!(f.game.campaign.coins, 1000 - price);
     let effective = f.game.campaign.effective_item(id).unwrap();
     assert!(effective.personal.damage > content().items[definition].personal.damage);
-    f.selected_item = Some(id);
+    f.armory.selected_item = Some(id);
     let output = h.frame(f, View::Armory, vec![]);
     assert!(
         output
@@ -1908,8 +1925,8 @@ fn quality_names_and_filter_sort_use_owned_quality_without_awarding_anything() {
                 .personal
                 .damage
     );
-    f.armory_sort = armory::ArmorySort::Quality;
-    f.armory_quality = Some(Quality::Legendary);
+    f.armory.sort = armory::ArmorySort::Quality;
+    f.armory.quality = Some(Quality::Legendary);
     let before = serde_json::to_value(&f.game).unwrap();
     let output = h.frame(f, View::Armory, vec![]);
     assert!(
@@ -1950,7 +1967,7 @@ fn npc_critical_state_stays_explicit_at_one_and_four_times_observation_speed() {
         horde_core::sim::EnemyCondition::Critical
     );
     for speed in [1, 4] {
-        f.speed = speed;
+        f.battle.speed = speed;
         let before = serde_json::to_value(&f.game).unwrap();
         let output = h.frame(f, View::Battle, vec![]);
         assert!(
@@ -2045,9 +2062,9 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
     f.screen = Screen::Battle;
     assert_eq!(f.game.attempt.as_ref().unwrap().lane_count, 17);
     h.key(f, View::Battle, Key::B);
-    assert!(f.construction);
+    assert!(f.battle.construction);
     h.frame(f, View::Battle, vec![]);
-    let rect = f.arena_rect.unwrap();
+    let rect = f.battle.arena_rect.unwrap();
     let projection = art::ArenaProjection::new(rect, 17);
     let point = projection.world(4.2, 16.5);
     h.frame(
@@ -2075,10 +2092,10 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
             .iter()
             .any(|structure| structure.lane == 16)
     );
-    f.construction = false;
-    f.attack_selection = battle::AttackSelection::Grenade;
+    f.battle.construction = false;
+    f.battle.attack_selection = battle::AttackSelection::Grenade;
     h.frame(f, View::Battle, vec![]);
-    let projection = art::ArenaProjection::new(f.arena_rect.unwrap(), 17);
+    let projection = art::ArenaProjection::new(f.battle.arena_rect.unwrap(), 17);
     let point = projection.world(20.5, 16.5);
     h.publish_combat(
         f,
@@ -2087,7 +2104,7 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
             attack_pointer(point, PointerButton::Primary, true),
         ],
     );
-    runner::step(f);
+    f.step();
     assert_eq!(
         f.game.attempt.as_ref().unwrap().ordnance.projectiles[0].cell,
         [20, 16]
@@ -2112,10 +2129,10 @@ fn active_legacy_geometry_stays_frozen_when_character_development_opens_more_lan
     let a = f.game.attempt.as_ref().unwrap();
     assert_eq!(a.lane_count, 11);
     assert_eq!(a.defender_position(), [0.5, 5.5]);
-    let projection = art::ArenaProjection::for_attempt(f.arena_rect.unwrap(), a);
+    let projection = art::ArenaProjection::for_attempt(f.battle.arena_rect.unwrap(), a);
     assert_eq!(
         projection.world(0.5, 5.5).y,
-        f.arena_rect.unwrap().center().y
+        f.battle.arena_rect.unwrap().center().y
     );
 }
 #[test]
@@ -2126,7 +2143,7 @@ fn character_max_has_an_explicit_full_bar_and_next_deployment_lane_preview() {
     f.game.campaign.player.level = f.game.campaign.player_level_cap();
     f.game.campaign.player.points = f.game.campaign.player.level - 1;
     f.game.campaign.player.xp = 0;
-    f.open_preparation(Tab::Character);
+    f.act(|c| c.open_preparation(Tab::Character));
     let output = h.frame(f, View::Camp, vec![]);
     assert!(
         output
@@ -2157,8 +2174,8 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
         ),
         (11, 30.0)
     );
-    f.open_settings();
-    runner::flush_for_test(f);
+    f.act(|c| c.open_settings());
+    f.flush_for_test();
     let active_snapshot = serde_json::to_value(f.game.attempt.as_ref().unwrap()).unwrap();
     h.click(f, View::Settings, "Normal");
     assert_eq!(f.game.campaign.balance_settings, original);
@@ -2173,7 +2190,7 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
     assert!(a.paused);
     assert_eq!(serde_json::to_value(a).unwrap(), active_snapshot);
     h.click(f, View::Settings, "Save and return to defense");
-    let restored = Game::load(&f.save_path).unwrap();
+    let restored = Game::load(&f.paths.campaign()).unwrap();
     assert_eq!(
         restored.campaign.balance_settings,
         f.game.campaign.balance_settings
@@ -2184,9 +2201,9 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
         enemy_speed: f32::NAN,
         ..BalanceSettings::default()
     };
-    f.dispatch(Command::SetBalance(invalid), "");
-    runner::flush_for_test(f);
-    assert!(f.message_error);
+    f.act(|c| c.dispatch(Command::SetBalance(invalid), ""));
+    f.flush_for_test();
+    assert!(f.status.message_error);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
     f.game.withdraw();
     f.game.deploy_country_stage(0, Mode::Personal).unwrap();
@@ -2252,7 +2269,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
     let h = Harness::new();
     let f = &mut fixture.frontend;
     h.frame_size(f, View::Battle, vec![], vec2(1050.0 / 1.35, 700.0 / 1.35));
-    let rect = f.arena_rect.unwrap();
+    let rect = f.battle.arena_rect.unwrap();
     let a = f.game.attempt.as_ref().unwrap();
     assert_eq!((a.lane_count, a.width_yards), (3, 12.0));
     assert!(rect.width() < 400.0 && rect.height() < 150.0);
@@ -2261,7 +2278,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
     let center = projection.inverse(rect.center());
     assert!((center[0] - 6.0).abs() < 0.0001 && (center[1] - 1.5).abs() < 0.0001);
     assert_eq!(projection.world(0.5, 1.5).y, rect.center().y);
-    f.attack_selection = battle::AttackSelection::Grenade;
+    f.battle.attack_selection = battle::AttackSelection::Grenade;
     let outside = rect.right_center() + vec2(8.0, 0.0);
     h.frame_size(
         f,
@@ -2274,8 +2291,8 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
         }],
         vec2(1050.0 / 1.35, 700.0 / 1.35),
     );
-    battle::gather_combat_input(&h.ctx, f);
-    assert!(f.pending.throw.is_none());
+    battle::gather_combat_input(&h.ctx, &mut f.ctx());
+    assert!(f.battle.pending.throw.is_none());
     h.frame_size(
         f,
         View::Battle,
@@ -2299,8 +2316,8 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
         }],
         vec2(1050.0 / 1.35, 700.0 / 1.35),
     );
-    battle::gather_combat_input(&h.ctx, f);
-    assert_eq!(f.pending.throw.unwrap().cell, [11, 2]);
+    battle::gather_combat_input(&h.ctx, &mut f.ctx());
+    assert_eq!(f.battle.pending.throw.unwrap().cell, [11, 2]);
 }
 
 #[test]
@@ -2313,13 +2330,13 @@ fn new_game_requires_confirmation_archives_previous_progress_and_restarts_surviv
     f.game.campaign.coins = 91;
     f.screen = Screen::Menu;
     f.settings.scale = 1.1;
-    f.game.save(&f.save_path).unwrap();
+    f.game.save(&f.paths.campaign()).unwrap();
     let before = serde_json::to_value(&f.game).unwrap();
     h.click(f, View::Menu, "New game");
-    assert!(f.new_journey_confirm);
+    assert!(f.menu.new_journey_confirm);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
     h.click(f, View::Menu, "Keep current journey");
-    assert!(!f.new_journey_confirm);
+    assert!(!f.menu.new_journey_confirm);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
     h.click(f, View::Menu, "New game");
     h.click(f, View::Menu, "Start new journey");
@@ -2329,13 +2346,19 @@ fn new_game_requires_confirmation_archives_previous_progress_and_restarts_surviv
     assert_eq!(f.game.campaign.coins, 0);
     assert!(!f.game.campaign.journey_active);
     assert_eq!(f.settings.scale, 1.1);
-    let archive = std::fs::read_dir(f.save_path.parent().unwrap().join("journey-archives"))
-        .unwrap()
-        .next()
-        .unwrap()
-        .unwrap()
-        .path()
-        .join("campaign.json");
+    let archive = std::fs::read_dir(
+        f.paths
+            .campaign()
+            .parent()
+            .unwrap()
+            .join("journey-archives"),
+    )
+    .unwrap()
+    .next()
+    .unwrap()
+    .unwrap()
+    .path()
+    .join("campaign.json");
     assert_eq!(
         serde_json::to_value(Game::load(&archive).unwrap()).unwrap(),
         before
@@ -2353,7 +2376,7 @@ fn defeat_and_withdraw_each_reach_upgrade_home_and_leave_resume_returns_to_the_m
         speed: 4,
         ..Default::default()
     });
-    runner::step(f);
+    f.step();
     assert!(f.screen == Screen::Results);
     assert!(f.game.attempt.is_none());
     assert!(f.game.global_paused);
@@ -2377,9 +2400,9 @@ fn defeat_and_withdraw_each_reach_upgrade_home_and_leave_resume_returns_to_the_m
     h.click(f, View::Results, "Leave journey");
     assert!(f.screen == Screen::Menu);
     assert!(!f.game.campaign.journey_active);
-    f.game = Game::load(&f.save_path).unwrap();
+    f.game = Game::load(&f.paths.campaign()).unwrap();
     h.click(f, View::Menu, "Resume journey");
-    assert!(f.screen == Screen::Camp && f.tab == Tab::World);
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::World);
     assert_eq!(f.game.campaign.coins, coins);
     assert_eq!(f.game.campaign.run_history.len(), records);
 }
@@ -2401,7 +2424,7 @@ fn liberated_country_continue_opens_map_and_does_not_autoselect_or_pay_again() {
     let coins = f.game.campaign.coins;
     let records = f.game.campaign.run_history.len();
     h.click(f, View::Results, "Choose next country");
-    assert!(f.screen == Screen::Camp && f.tab == Tab::World);
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::World);
     assert!(f.game.attempt.is_none());
     assert!(!f.game.campaign.journey_active);
     assert_eq!(f.game.campaign.world.active.as_deref(), Some("DEU"));
@@ -2416,20 +2439,20 @@ fn blank_and_unreadable_saved_generations_still_require_new_game_confirmation_wi
         let h = Harness::new();
         let f = &mut fixture.frontend;
         f.game = Game::default();
-        f.profile_exists = false;
+        f.status.profile_exists = false;
         f.screen = Screen::Menu;
         if unreadable {
-            std::fs::create_dir_all(f.save_path.parent().unwrap()).unwrap();
-            std::fs::write(&f.save_path, b"unreadable saved generation").unwrap();
+            std::fs::create_dir_all(f.paths.campaign().parent().unwrap()).unwrap();
+            std::fs::write(f.paths.campaign(), b"unreadable saved generation").unwrap();
         } else {
-            f.game.save(&f.save_path).unwrap();
+            f.game.save(&f.paths.campaign()).unwrap();
         }
-        let before = std::fs::read(&f.save_path).unwrap();
+        let before = std::fs::read(f.paths.campaign()).unwrap();
         let model = serde_json::to_value(&f.game).unwrap();
         h.click(f, View::Menu, "New game");
-        assert!(f.new_journey_confirm);
+        assert!(f.menu.new_journey_confirm);
         assert!(f.screen == Screen::Menu);
-        assert_eq!(std::fs::read(&f.save_path).unwrap(), before);
+        assert_eq!(std::fs::read(f.paths.campaign()).unwrap(), before);
         assert_eq!(serde_json::to_value(&f.game).unwrap(), model);
     }
 }
@@ -2440,20 +2463,20 @@ fn older_autosave_ack_keeps_navigation_busy_and_freezes_raw_settings_binding_cap
     let h = Harness::new();
     let f = &mut fixture.frontend;
     let gate = f.runtime.gated_storage_for_test();
-    f.dispatch(AppCommand::Save(SaveIntent::Autosave), "");
-    assert!(!runner::flush(f));
+    f.act(|c| c.dispatch(AppCommand::Save(SaveIntent::Autosave), ""));
+    assert!(!f.flush());
     gate.started();
-    f.open_settings();
-    f.request_save(SaveIntent::SettingsBack);
-    assert!(!runner::flush(f));
+    f.act(|c| c.open_settings());
+    f.act(|c| c.request_save(SaveIntent::SettingsBack));
+    assert!(!f.flush());
     gate.release();
-    assert!(!runner::poll_one_save_for_test(f));
+    assert!(!f.poll_one_save_for_test());
     gate.started();
     assert!(f.screen == Screen::Settings);
-    assert!(f.save_pending);
+    assert!(f.status.save_pending);
     assert!(f.runtime.durable_transition_pending());
-    f.rebind = Some(Action::Fire);
-    f.binding_armed = true;
+    f.prefs.rebind = Some(Action::Fire);
+    f.prefs.binding_armed = true;
     let settings = f.settings.clone();
     let mut output = h.ctx.run_ui(
         RawInput {
@@ -2461,16 +2484,16 @@ fn older_autosave_ack_keeps_navigation_busy_and_freezes_raw_settings_binding_cap
             events: vec![key_event(Key::X, true)],
             ..Default::default()
         },
-        |ui| settings_ui(ui, f),
+        |ui| settings_ui(ui, &mut f.ctx()),
     );
     output.textures_delta.clear();
     assert_eq!(f.settings.bindings, settings.bindings);
     assert_eq!(f.settings.scale, settings.scale);
-    assert!(f.save_pending);
+    assert!(f.status.save_pending);
     gate.release();
-    assert!(!runner::poll_one_save_for_test(f));
+    assert!(!f.poll_one_save_for_test());
     assert!(f.screen == Screen::Camp);
-    assert!(!f.save_pending);
+    assert!(!f.status.save_pending);
 }
 
 #[test]
@@ -2480,10 +2503,10 @@ fn compact_country_selection_keeps_a_useful_map_visible_before_the_fixed_journey
     settings::configure(&h.ctx, 1.35);
     let f = &mut fixture.frontend;
     f.settings.scale = 1.35;
-    f.practice_profile = true;
-    f.message = "Practice scenario - progress is isolated from your campaign".into();
+    f.status.practice_profile = true;
+    f.status.message = "Practice scenario - progress is isolated from your campaign".into();
     for search in ["", "deu", "a"] {
-        f.search = search.into();
+        f.campaign.search = search.into();
         let output = h.frame_size(f, View::WorldWithChrome, vec![], vec2(1050.0, 700.0));
         let map = output
             .shapes
@@ -2514,4 +2537,29 @@ fn compact_country_selection_keeps_a_useful_map_visible_before_the_fixed_journey
                 .any(|shape| shape_has_text(&shape.shape, "Find country"))
         );
     }
+}
+#[test]
+fn reselecting_the_current_camp_screen_keeps_strategy_ticks_running() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.set_paused(false);
+    assert!(f.game.attempt.is_none() && !f.game.global_paused);
+    let mut output = h.ctx.run_ui(
+        RawInput {
+            screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))),
+            ..RawInput::default()
+        },
+        |ui| {
+            let mut c = f.ctx();
+            c.go(Screen::Camp);
+            assert!(!c.leaving(), "same-screen request is not a transition");
+            draw_screen(ui.ctx(), &mut c, 0.0);
+        },
+    );
+    output.textures_delta.clear();
+    let before = f.runtime.simulated_ticks;
+    f.step();
+    assert_eq!(f.runtime.simulated_ticks, before + 1);
+    assert!(f.screen == Screen::Camp);
 }

@@ -1,6 +1,8 @@
 //! Presentation-only feedback and navigation motion. Time here never advances
 //! a battle, a reward, recovery or a strategic deadline.
-use super::*;
+use super::{Screen, UiCtx};
+use crate::art::{AMBER, GREEN, MUTED, RED};
+use bevy_egui::egui::{self, RichText, Stroke, pos2, vec2};
 
 #[derive(Default)]
 pub(super) struct FeedbackState {
@@ -23,28 +25,31 @@ impl FeedbackState {
         !self.dismissed && (sticky || now - self.started < 5.0)
     }
 }
-pub(super) fn status_line(ui: &mut egui::Ui, f: &mut Frontend) {
+pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
     let now = ui.input(|input| input.time);
-    f.feedback.observe(
+    f.status.feedback.observe(
         now,
-        &f.message,
-        f.feedback_revision,
-        f.message_error,
-        f.save_pending,
+        &f.status.message,
+        f.status.feedback_revision,
+        f.status.message_error,
+        f.status.save_pending,
     );
-    let critical = f.message_error
-        || f.message.starts_with("Save could not be read:")
-        || f.message.contains("Recovery copies:")
-        || f.message.starts_with("Original unreadable");
+    let critical = f.status.message_error
+        || f.status.message.starts_with("Save could not be read:")
+        || f.status.message.contains("Recovery copies:")
+        || f.status.message.starts_with("Original unreadable");
     let applying = f.runtime.pending_commands() > 0;
-    let working = f.save_pending || applying;
-    let visible =
-        working || !f.message.is_empty() && f.feedback.visible(now, critical || f.save_pending);
-    let text = if applying && !f.save_pending {
+    let working = f.status.save_pending || applying;
+    let visible = working
+        || !f.status.message.is_empty()
+            && f.status
+                .feedback
+                .visible(now, critical || f.status.save_pending);
+    let text = if applying && !f.status.save_pending {
         "Applying changes…".into()
     } else if visible {
-        f.message.clone()
-    } else if f.practice_profile {
+        f.status.message.clone()
+    } else if f.status.practice_profile {
         "Practice · separate campaign".into()
     } else {
         "Coins and equipment bank as they are earned.".into()
@@ -52,7 +57,7 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut Frontend) {
     let alpha = if !visible || critical || working || f.settings.reduced_effects {
         1.0
     } else {
-        ((5.0 - (now - f.feedback.started)) / 0.25).clamp(0.0, 1.0) as f32
+        ((5.0 - (now - f.status.feedback.started)) / 0.25).clamp(0.0, 1.0) as f32
     };
     ui.horizontal(|ui| {
         if working {
@@ -72,11 +77,11 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut Frontend) {
             MUTED
         } else if working {
             AMBER
-        } else if f.message_error {
+        } else if f.status.message_error {
             RED
         } else if critical {
             AMBER
-        } else if visible && !f.practice_profile {
+        } else if visible && !f.status.practice_profile {
             GREEN
         } else {
             MUTED
@@ -91,17 +96,17 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut Frontend) {
         });
         if visible && !working {
             if (critical || text.chars().count() > 95) && ui.small_button("Details").clicked() {
-                f.feedback.details = text.clone();
-                f.feedback.details_open = true;
+                f.status.feedback.details = text.clone();
+                f.status.feedback.details_open = true;
             }
             if ui.small_button("Dismiss").clicked() {
-                f.feedback.dismissed = true;
+                f.status.feedback.dismissed = true;
             }
         }
     });
-    let mut open = f.feedback.details_open;
+    let mut open = f.status.feedback.details_open;
     if open {
-        let details = f.feedback.details.clone();
+        let details = f.status.feedback.details.clone();
         egui::Window::new("Operation details")
             .id(egui::Id::new("feedback_details"))
             .default_width(440.0)
@@ -115,12 +120,12 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut Frontend) {
                     });
             });
     }
-    f.feedback.details_open = open;
+    f.status.feedback.details_open = open;
 }
-pub(super) fn overlay_owns_keyboard(ctx: &egui::Context, f: &mut Frontend) -> bool {
-    if f.feedback.details_open {
+pub(super) fn overlay_owns_keyboard(ctx: &egui::Context, f: &mut UiCtx) -> bool {
+    if f.status.feedback.details_open {
         if ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
-            f.feedback.details_open = false;
+            f.status.feedback.details_open = false;
         }
         return true;
     }
@@ -157,15 +162,7 @@ pub(super) fn tab_marker(
 }
 pub(super) fn view_progress(ctx: &egui::Context, screen: Screen, reduced: bool) -> f32 {
     let mut active = 1.0;
-    for view in [
-        Screen::Menu,
-        Screen::SurvivorSelection,
-        Screen::Camp,
-        Screen::Battle,
-        Screen::Results,
-        Screen::History,
-        Screen::Settings,
-    ] {
+    for view in Screen::ALL {
         let selected = view == screen;
         let value = if reduced {
             if selected { 1.0 } else { 0.0 }
