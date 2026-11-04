@@ -177,9 +177,10 @@ Source: `skill_catalog.rs`, `weapons.rs`, `ordnance.rs`, `campaign.rs`,
 [enemy composition](ENEMY_COMPOSITION.md), [view hierarchy](VIEW_HIERARCHY.md),
 [dated user overrides](EXPANSION.md) and [survival audio](AUDIO_SURVIVAL.md).
 
-The first-country loop starts live, retains rewards after retreat, leads to
-skills/training and permits immediate retry. Roughly 3–5 early runs remains the
-requested pacing target. Country-specific balance proof, human playthrough,
+The first defense waits for "Begin defense", retains rewards after retreat, leads to
+skills/training and permits immediate retry. Roughly 3–5 runs per early tier is the
+requested pacing target; `cargo run --locked --release -p horde_core --example pacing`
+measures it (see [the foundation pass](plans/2026-11-04-foundation-pass.md)). Country-specific balance proof, human playthrough,
 native GUI and listening evidence must be reported separately in
 [VALIDATION.md](VALIDATION.md); this authoring guide establishes no such result.
 

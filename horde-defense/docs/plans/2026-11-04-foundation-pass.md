@@ -153,7 +153,7 @@ Each wave ends with captures at both sizes and the full verify. Rules live in `h
 - **P1:**
   - Over the arena, show the native **crosshair** cursor instead of hiding it. The painted reticle keeps only its ammo/reload readout and the ordnance and placement rings.
   - Set `desired_maximum_frame_latency` to 1.
-  - Drop pipelined rendering. Frame work is at most about 10 ms, so serial main and render work still fit in 16.7 ms.
+  - Drop pipelined rendering. Frame work is at most about 10 ms, so serial main and render work still fit in 16.7 ms. *(Measured, not shipped; see the Outcome.)*
   - Re-measure the frame reports.
 - **B1, B3:** show the current first-defense hint as an on-field callout with "Hide hints", and always paint the key legend.
 - **B2:** in core, a profile's first deployment starts paused, and "Begin defense" teaches the controls.
@@ -172,7 +172,7 @@ Each wave ends with captures at both sizes and the full verify. Rules live in `h
 - **C2:** rename "Plan outbreak response" to "Defend now", which is what it does.
 - **C3, C4:** a core construction blocker and an operations unlock blocker name the exact missing step.
 - **C5:** remove the phantom G/D hint.
-- **G6:** drop "Run history" from Results (the header has History) and show the save status.
+- **G6:** drop "Run history" from Results (the header has History) and show the save status. *(The save status was reverted; see the Outcome.)*
 - **U1:** Escape in camp toggles the clock only when the clock is shown, and never jumps into a battle.
 - **U2:** make "Clear filters" full size.
 - **U4:** Escape cancels a rebind, and the new-journey modal closes on Escape.
@@ -201,3 +201,101 @@ Each wave ends with captures at both sizes and the full verify. Rules live in `h
 - **A new `SelectCountry` command for outbreaks.** That is a new command surface. The honest label removes the surprise now; the command is a follow-up.
 
 ## Outcome
+
+**Process deviation.** The waves were implemented in order in this worktree. However, the code for all three was in place before the first full gate ran, so the full verify, the after-captures and the pacing table cover the finished branch, not each wave separately. A fixture-only subagent updated the tests that depend on prices; it changed no rules or content.
+
+### Findings resolved
+
+| Finding | Result |
+|---|---|
+| P1 | Over the arena the **system crosshair cursor** is shown instead of being hidden, so the aim point has no presentation lag. The painted readout (ammo and reload ring, ordnance and placement rings) stays beside it, and the diagnostic capture still paints the cross. `desired_maximum_frame_latency` is 1, which saves one queued frame. The `CustomCursor` plumbing is removed. **Pipelined rendering is kept** (see Performance below). |
+| B1, B3 | The current first-defense lesson is a one-line callout over the field. It names the player's own keys and has a "Hide hints" button. The key legend is always painted. |
+| B2, B4 | Core: `ChooseStart` deploys the journey's first defense **paused**. A READY/PAUSED banner names a frozen field. |
+| G3, G4, U3 | Core `Outcome::label` (Victory / Defeat / Retreated) is used on Results, History and expedition reports. The defeat cause reads "Overrun at the line in lane N", with no lane when none was recorded. Results shows the cause and `Report.tip` wrapped. The outcome line truncates and shows the full text on hover. |
+| G5, C1 | Core `Campaign::milestone_opened_nodes` and `WorldProgress::fronts_opened_by`. A victory names what it opened: "Germany liberated. New fronts: …" and "Now open in the tree: Trap blueprint, Meet Mara, …" (rank ladders excluded, at most four names). After a liberation, the map opens with "<Country> liberated · N new fronts" and the easiest front preselected. The header says "N liberated". |
+| C2 | "Plan outbreak response" is now "Defend now" with hover text, because it deploys. |
+| C3, C4 | Core `Campaign::construction_blocker` names the next missing build step. The Build key and the Briefing now use it instead of the wrong "first boss clear" text. The Operations gate text is grammatical. |
+| C5 | The phantom "G: GARRISON · D: DEPLOYMENT" map hint is removed. |
+| G6 | "Run history" is removed from Results; the header has History. Showing a save confirmation on Results duplicated the tree's learned line, so it was reverted (see follow-ups). |
+| U1 | Escape in camp drives the clock only where the clock is shown, and never resumes a waiting main defense. |
+| U2 | "Clear filters" is as tall as the dropdowns and is inactive when no filter is set. |
+| U4 | Escape cancels a key rebind. The new-journey prompt closes on Escape. |
+| U5 | "Leave journey" is disabled while a save or reset is pending. |
+| S1 | Core `node_helps_now` / `best_buyable_node`. The recommendation is the cheapest affordable node that acts now, with body ranks after those. Weapon classes need an owned gun; construction needs a learnable blueprint; structure upgrades need a blueprint. The hard-coded Reload drill is gone. |
+| S2, G1, G2, B7 | Prices scale with depth: ×2 at depth 1, ×2.5 at depth 2, ×3 below that. Blueprints, feature unlocks and the root are unchanged. The tree goes from 18,125 to 52,180 coins. The stage-1 boss goes from 2,400 to 1,100 HP. Numbers are below. |
+| S4 | A vector `Companion` pictogram for the four world nodes. Blueprints and masteries draw the trap, wall and turret pictograms, and `pistol` is mapped. A test pins both. |
+| S5 | Text fixes:<br>• Brace: halves damage.<br>• Reload drill and Rapid cycling.<br>• Quick throw: cooldowns are per kind.<br>• Grenade and Molotov: damage and duration.<br>• Hardened.<br>• Field engineering: when the trap blueprint opens.<br>• Steady hands.<br>• The root node. |
+| Review scenes | Added `skills-search`: the search "reload" plus the goal path to Combat reload. The existing `intro`, `journey-victory` and `journey-liberated` scenes now show the first defense, the first victory and a liberation with the new lines. |
+
+**Balance and digests.** Ids, gates and positions are unchanged. The golden determinism digests and gameplay traces did **not** move: those runs buy nothing and last 30 s, ending before any boss. `--smoke` still clears five stages in both modes. Personal stage 1 still falls on attempt 3, with 488/610 coins instead of 515/616, because of the lower boss HP and the repricing.
+
+### Pacing table (after)
+
+`cargo run --locked --release -p horde_core --example pacing -- 60 --runs`; each cell is runs / battle minutes. The pacing bot now also builds the structures it owns, as smoke's NPC route does. This is a measurement change: a bot that buys fortification ranks but never builds understated its own power.
+
+| Milestone | expert DEU before → after | novice DEU before → after | novice LUX before → after |
+|---|---|---|---|
+| First victory | 5 / 18 → **4 / 13** | 6 / 21 → **3 / 9** | 4 / 14 → **2 / 6** |
+| First liberation | 13 / 52 → 14 / 60 | 14 / 54 → 14 / 59 | 6 / 21 → 5 / 18 |
+| Tier 1 affordable | 2 → 3 | 2 → 3 | 2 → 3 |
+| Tier 2 affordable | 4 → 5 | 4 → 5 | 4 → 5 |
+| Tier 3 affordable | 5 → 7 | 5 → 6 | 5 → 6 |
+| Tier 4 affordable | 6 → 7 | 6 → 7 | 5 → 7 |
+| Fortifications | 5 → 4 | 5 → 3 | 7 → 3 |
+| Mara | 13 → 14 | 14 → 14 | 8 → 5 |
+| Parallel defenses | 16 → 17 | 17 → 17 | 11 → 8 |
+| Country operations | 22 → 23 | 23 → 23 | 19 → 18 |
+| Defeats after the first victory | 0 → 2 (stages 5, 6) | 0 → 3 (stages 2, 4, 4) | 0 → 1 (stage 2) |
+| Last run with something left to learn | 23 (core tree done by 13) → 24 | 23 (by 14) → 24 | 19 → 26 |
+
+**Reading the table.**
+- The first victory now lands in the 2–4 target in every profile.
+- The mid-campaign pushes back with single defeats instead of a 55-run win streak.
+- The tree lasts about twice as long.
+- The unlock order is unchanged.
+- Early tiers now take about 2 runs each instead of 1–2. That is still under the 3–5 target. In an intermediate measurement, pushing prices further turned stage 5 into five straight defeats. The rest is left to a human playtest, since the bots aim almost perfectly.
+
+### Performance and mouse (after)
+
+Frame reports (300 samples, dev build, same machine):
+- Every case holds a **60 FPS median** with p95 ≤ 18.3 ms.
+- Interface work averages 0.9–1.7 ms, with a maximum of 7.6 ms. That is unchanged; the crosshair only removes work.
+- Some runs showed a single 0.5 s frame. A/B runs reproduced it at the same rate with Bevy's default frame latency and with pipelined rendering on or off. It is environmental, not caused by this change, but it pulls those runs' mean FPS down to 54.4.
+- Disabling pipelined rendering, which would save one more frame of latency, was measured but **not shipped**. The frame reports don't time the render world, so the risk on slower GPUs can't be bounded.
+- The crosshair itself can't be measured from frame reports: it replaces a painted cross that trailed by 3–4 frames with the OS cursor. Feeling it needs a human at the mouse.
+
+### Verification (final HEAD)
+- `cargo fmt --all -- --check` passes.
+- `cargo clippy -D warnings` passes for the workspace (all targets), with `--no-default-features`, and with `--features dev`.
+- `cargo test --locked --workspace`: 644 passed, 0 failed, 1 ignored (the offline audio exporter).
+- `cargo test --locked -p horde-defense --features dev`: 343 passed, 0 failed, 1 ignored.
+- `cargo run --locked -p horde-defense -- --smoke` passes.
+- Native captures: `target/foundation-before/` (40) and `target/foundation-after/` (42, including `skills-search`). Selected pairs are in `docs/screenshots/foundation/`.
+
+### Follow-ups
+- B4–B6:
+  - a larger boss-arrival banner;
+  - a low-HP warning;
+  - a confirmation for "Retreat & train";
+  - Escape should close construction without pausing.
+- HUD:
+  - at 1050×700 the bottom bar can wrap to three rows once Heal, Brace and Build are unlocked;
+  - construction mode rescales the arena.
+- C2: a core `SelectCountry` command, so an outbreak can be planned instead of only defended at once.
+- C4:
+  - announce finished expeditions;
+  - Operations should name the missing tree node.
+- C6: the starting-country choice should say that a large country (Germany: 9 defenses) delays Mara.
+- G6: a save confirmation on Results that doesn't duplicate the tree's learned line.
+- U4:
+  - Settings drops an unapplied difficulty draft without warning;
+  - the scale slider applies while dragging.
+- U6:
+  - one "Save" label everywhere;
+  - name Mara in her actions instead of "Survivor".
+- S3:
+  - Trap mastery and Quick throw stay weak;
+  - Steady hands and Hardened stay strong;
+  - rebalancing their effects is a content pass.
+- Pacing: early tiers take about 2 runs each against the 3–5 target. Revisit after a human playtest, because the bots overstate player skill.
+- Perf: time the render world in frame reports before reconsidering disabling pipelined rendering.

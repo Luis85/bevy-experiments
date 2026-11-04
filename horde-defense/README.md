@@ -44,7 +44,7 @@ The optional **Play Lastlight (DirectX12).cmd** launcher selects DirectX 12 for 
 
 ## First session
 
-Choose New game, confirm protection of an existing journey if prompted, then choose Rook or June and an infected starting country. The country begins live Personal combat. Every settled main round—victory, defeat or withdrawal—returns to Journey upgrades: one complete connected tree, Equipment/analysis routes and explicit Continue or Leave. New game archives before replacing a full profile; leaving keeps earned progression. Details: [JOURNEYS.md](docs/JOURNEYS.md).
+Choose New game, confirm protection of an existing journey if prompted, then choose Rook or June and an infected starting country. The first defense opens paused with on-field hints; Begin defense starts it. Every settled main round—victory, defeat or withdrawal—returns to Journey upgrades: one complete connected tree, Equipment/analysis routes and explicit Continue or Leave. New game archives before replacing a full profile; leaving keeps earned progression. Details: [JOURNEYS.md](docs/JOURNEYS.md).
 
 The survivor stays at the left-center of the frozen arena (initial Normal center lane 2). Aim/fire/reload and answer any contact lane with targeted melee. Faster approaches may overtake moving peers inside their assigned lane; intact walls/contact still stop and queue. Conscious zero/negative-HP NPC hostiles remain explicitly critical under the retained injury rules.
 

@@ -104,7 +104,7 @@ Only real dependencies are ordered: position snapshots before `Advance`, notices
 | `State<Screen>`, `State<Tab>` (sub-state of `Screen::Camp`) | ui | Current view and camp tab |
 | `Navigation` | ui | Remembered tab, return stack for settings/history, pending battle reset |
 | `StatusUi`, `CampaignUi`, `ArmoryUi`, `BattleUi`, `HistoryUi`, `SettingsUi`, `MenuUi` | ui | Per-screen UI state |
-| `ArtTextures`, `CustomCursor` | ui | Per-frame egui textures; whether the arena owns the pointer |
+| `ArtTextures` | ui | Per-frame egui textures |
 
 Egui may repeat layout passes. A repeated render pass cannot buy an item twice, advance combat or write a file: `Runtime` deduplicates same-frame semantic commands and holds pressed actions until a real fixed step consumes them. Held input and pressed edges are separate. Observation speed executes complete authoritative ticks, never scaled damage or extra actions per simulated second. Tactical pause covers the main battlefield, parallel workers, recovery, spawns, rewards and plague pressure.
 
@@ -169,7 +169,7 @@ BalanceSettings and Attempt.lane_count/width_yards freeze at deployment. Core ow
 
 DpsTracker uses 300 simulation ticks/five seconds and source totals, not frame time. Parent-only history retains every finished outcome through once-drained saved worker outboxes; child games do not clone the parent's ledger. The History screen reads/filters/plots while fields are paused. Settings holds an unapplied draft until a validated SetBalance command commits future-run parameters.
 
-Scene/effect atlases and manifest model sources use once-cached managed premultiplied conversion, NEAREST and actual RenderDevice budgets. Cursor visibility synchronizes after egui output; true aim is separate from its clamped resource badge. Damage/loot caches never mutate Game. See [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md), [PROGRESSION_SCALING.md](PROGRESSION_SCALING.md) and [VIEW_HIERARCHY.md](VIEW_HIERARCHY.md).
+Scene/effect atlases and manifest model sources use once-cached managed premultiplied conversion, NEAREST and actual RenderDevice budgets. The arena shows the native crosshair cursor (no presentation lag) and paints only the resource readout beside it; true aim is separate from its clamped resource badge. The window asks for one queued frame instead of two. Damage/loot caches never mutate Game. See [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md), [PROGRESSION_SCALING.md](PROGRESSION_SCALING.md) and [VIEW_HIERARCHY.md](VIEW_HIERARCHY.md).
 
 ## Current journey and component boundaries
 

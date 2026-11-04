@@ -88,3 +88,32 @@ Plan, findings and outcome: [plans/2026-11-04-tree-and-flow-overhaul.md](plans/2
   Sans stays for titles, headings, the wordmark and combat numbers.
 
 Before/after: `docs/screenshots/overhaul/before-*.png` and `after-*.png`.
+
+## Foundation pass — 4 November 2026
+
+Plan, findings, pacing table and outcome: [plans/2026-11-04-foundation-pass.md](plans/2026-11-04-foundation-pass.md).
+
+- **Pointer.** Over the arena the system crosshair marks the aim instead of a
+  painted cross, so the aim point has no presentation lag. The painted readout
+  (ammo, reload, ordnance and placement rings) stays beside it. The window
+  queues one frame instead of two.
+- **First defense.** It opens paused. A one-line lesson sits over the field and
+  names the player's own keys, with "Hide hints". The key legend is always
+  painted, and a READY/PAUSED banner names a frozen field.
+- **Results.** A loss shows its cause and the core tip in full. A victory names
+  what it opened: new fronts after a liberation, and newly gated nodes. The
+  outcome line truncates instead of wrapping. "Run history" moved to the header
+  only. Outcomes have one name on every screen: Victory, Defeat, Retreated.
+- **Escape.** Escape cancels a key rebind and closes the new-journey prompt. In
+  camp it drives the world clock only where the clock is shown, and it never
+  resumes a waiting defense.
+- **Smaller fixes.**
+  - History's "Clear filters" is as tall as the dropdowns and idle without a
+    filter.
+  - The outbreak button says "Defend now", because it deploys.
+  - The world map no longer advertises G/D keys.
+  - The header says "N liberated".
+  - Companion nodes draw a two-survivor pictogram. Blueprints and masteries
+    draw trap, wall and turret pictograms.
+
+Before/after: `docs/screenshots/foundation/before-*.png` and `after-*.png` (plus `after-skills-search.png`).

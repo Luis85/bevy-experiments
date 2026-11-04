@@ -18,7 +18,7 @@ If the default graphics backend fails on your device, the optional **Play Lastli
 
 ## Cursor and impact feedback
 
-Move from a menu/control into a focused unobscured battlefield and back. Expect one custom field crosshair, with the standard pointer restored for UI, popups and focus loss. Read exact ammo or selected throwable charges at the cursor; fire and reload to compare pips/progress with the corner HUD. Construction hides the resource ring while preserving its placement/aim cursor.
+Move from a menu/control into a focused unobscured battlefield and back. Expect the system crosshair over the field, with the standard pointer for UI, popups and focus loss; the crosshair must track the mouse without visible lag. Read exact ammo or selected throwable charges at the cursor; fire and reload to compare pips/progress with the corner HUD. Construction hides the resource ring while preserving its placement/aim cursor.
 
 With damage numbers enabled, compare an ordinary hit, weak point, absorbed armor, incoming loss, miss and defense. The larger outlined numbers punch, settle and rise for 0.9 real seconds; nearby resolved values can aggregate without extra injury. Repeat at 4× NPC observation and with reduced effects: counts stay readable and the reduced path has no punch or rise. These visuals never pay rewards or resolve another attack.
 
@@ -101,7 +101,7 @@ Open Settings → Gameplay · difficulty. Select Easy/Normal/Hard or edit Custom
 
 Read DPS as resolved injury over five simulation seconds, with a zero-padded opening; hover for average/peak/source totals. Pause/save/resume and 4× observation must preserve the simulation clock, independently of frame rate.
 
-Open History from menu/camp or Run analysis from results. Filter mode, Victory/Defeat/Withdrawal and country; inspect frozen gear/balance and last 40 matching DPS/coin/threat trends. Older finalized runs are not invented. Reopening results or settling workers cannot append/pay twice. Back restores the prior pause.
+Open History from the header on any screen. Filter mode, Victory/Defeat/Retreated and country; inspect frozen gear/balance and last 40 matching DPS/coin/threat trends. Older finalized runs are not invented. Reopening results or settling workers cannot append/pay twice. Back restores the prior pause.
 
 ## Journey safety and equipped parts
 
