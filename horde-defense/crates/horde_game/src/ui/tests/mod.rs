@@ -417,5 +417,6 @@ mod history_tests;
 mod menu_tests;
 mod navigation_tests;
 mod operations_tests;
+mod progression_tests;
 mod results_tests;
 mod settings_tests;
