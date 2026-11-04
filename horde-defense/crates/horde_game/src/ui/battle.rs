@@ -859,7 +859,7 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut Frontend) {
     ));
     for kind in StructureKind::ALL {
         let def = content().structure(kind);
-        ui.add_enabled_ui(f.game.campaign.blueprints[kind.index()], |ui| {
+        ui.add_enabled_ui(f.game.campaign.blueprints[kind], |ui| {
             ui.selectable_value(
                 &mut f.build_kind,
                 kind,

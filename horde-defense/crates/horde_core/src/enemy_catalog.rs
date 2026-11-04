@@ -1,6 +1,7 @@
 //! Validated, engine-free enemy composition. Resolved profiles are save snapshots.
 use crate::catalog::{self, ContentError};
 use crate::content::{BossKind, EnemyKind};
+use crate::kind_map::KindMap;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
@@ -111,7 +112,7 @@ pub struct WeightedEnemy {
 #[derive(Clone, Debug)]
 pub struct EnemyCatalog {
     resolved: BTreeMap<String, ResolvedEnemy>,
-    defaults: [String; 5],
+    defaults: KindMap<EnemyKind, String>,
     waves: Vec<Vec<WeightedEnemy>>,
 }
 
@@ -161,6 +162,11 @@ impl EnemyCatalog {
         )
     }
 
+    /// Every resolved archetype ID, in stable sorted order.
+    pub fn archetype_ids(&self) -> impl Iterator<Item = &str> {
+        self.resolved.keys().map(String::as_str)
+    }
+
     pub fn resolve(&self, id: &str) -> Result<ResolvedEnemy, String> {
         self.resolved
             .get(id)
@@ -173,7 +179,7 @@ impl EnemyCatalog {
     }
 
     pub fn default_for_kind(&self, kind: EnemyKind) -> &str {
-        &self.defaults[kind as usize]
+        &self.defaults[kind]
     }
 
     /// Stable ID order, positive bounded weights, and at least one eligible entry.
@@ -427,21 +433,21 @@ impl AuthoredCatalog {
             enemy.validate()?;
             resolved.insert(id.to_owned(), enemy);
         }
-        if self.defaults.len() != EnemyKind::ALL.len() {
-            return Err(
-                "Exactly one unrestricted default per legacy enemy kind is required".into(),
-            );
-        }
-        let mut defaults: [String; 5] = std::array::from_fn(|_| String::new());
+        let mut defaults = KindMap::<EnemyKind, String>::default();
         for default in self.defaults {
             let enemy = resolved
                 .get(&default.archetype_id)
                 .ok_or_else(|| format!("Unknown enemy default: {}", default.archetype_id))?;
-            let target = &mut defaults[default.kind as usize];
+            let target = &mut defaults[default.kind];
             if !target.is_empty() || enemy.kind != default.kind || enemy.unlocked_by.is_some() {
                 return Err("Duplicate, mismatched or locked legacy enemy default".into());
             }
             *target = default.archetype_id;
+        }
+        if defaults.values().any(String::is_empty) {
+            return Err(
+                "Exactly one unrestricted default per legacy enemy kind is required".into(),
+            );
         }
         if self.waves.is_empty() || self.waves.len() > MAX_RECORDS {
             return Err("Require 1..=4096 authored wave templates".into());

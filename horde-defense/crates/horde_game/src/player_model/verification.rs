@@ -42,7 +42,7 @@ pub fn review_equipment(
                     format!("Missing authored review equipment: {slot:?}/{style:?}/{class:?}")
                 })?;
             Ok::<_, String>(EquipmentVisualItem {
-                definition,
+                definition: horde_core::content::ItemDefId::at(definition),
                 level: 1,
                 quality: recipe.base_quality,
                 style: recipe.visual_style.clone(),

@@ -2,7 +2,7 @@
 use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EquipmentVisualItem {
-    pub definition: usize,
+    pub definition: crate::content::ItemDefId,
     pub level: u32,
     pub quality: crate::quality::Quality,
     pub style: String,
@@ -28,9 +28,9 @@ impl EquipmentVisual {
                 continue;
             };
             if !(1..=64).contains(&item.level)
-                || crate::content::content()
-                    .items
-                    .get(item.definition)
+                || item
+                    .definition
+                    .definition()
                     .is_none_or(|definition| definition.slot != slot)
                 || item.style.len() > 64
                 || !item

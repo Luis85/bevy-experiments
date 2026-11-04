@@ -232,7 +232,7 @@ fn counter_quality_is_reproducible_and_parallel_settlement_preserves_quality_lev
     assert_eq!(g.campaign.items.len(), count + 1);
     let item = g.campaign.items.last().unwrap();
     assert_eq!(
-        (item.definition, item.level, item.quality),
+        (item.definition_index(), item.level, item.quality),
         (4, 9, Some(Quality::Epic))
     );
     let id = item.id;

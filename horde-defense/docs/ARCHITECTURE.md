@@ -6,14 +6,16 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 
 | Boundary | Owns | Does not own |
 |---|---|---|
-| `content`, `world` | Validated encounter/equipment/country definitions and scene tags | Runtime input or rendering |
+| `content`, `world` | Validated encounter/equipment/country definitions with stable authored IDs (`ItemDefId`, level/structure/country IDs) and scene tags | Runtime input or rendering |
+| `kind_map` | `KindMap<K, V>`: complete enum-keyed maps saved as objects keyed by variant name, replacing positional per-kind arrays | Catalogue lookups |
 | `command` | Typed `Command` data and `Game::apply`, the single frontend mutation path, with every player-intent rule and typed `CommandError` | Queueing, saves or presentation |
 | `campaign`, `strategy` | Currency, unique gear, advancement, recruits, duties and outbreaks | Hit detection or cosmetic effects |
 | `rules` | Saved RNG and supported dice, defense, protection and injury procedures | NPC target policy or animation |
 | `sim` | One-field schedules, actors, collision/contact, maneuvers and reward events | UI, audio, filesystem calls |
 | `sim/events` | Typed `SimEvent` stream: saved per-`Game` sequence numbers, the transient `drain_events` outbox and expedition forwarding | Presentation decisions or persistence of the outbox |
 | `sim/parallel` | Worker battle ownership, reservations, idempotent settlement and reported `SettlementIssue`s | A second combat implementation |
-| `sim/persistence` | Versioned coherent generations, checksums, validation and atomic writes | New combat decisions during load |
+| `sim/persistence` | Versioned coherent generations (envelope v2 with `ruleset_version` and a content-ID fingerprint; drift only warns), checksums, typed `SaveError`, validation and atomic writes | New combat decisions during load |
+| `sim/migrations` | Ordered raw-JSON migration chain run before typed decoding; each step freezes its source version's meaning (v1→v2: item indices to IDs, per-kind arrays to maps) | Reading the current catalogues to interpret old data |
 | `runner` | `AppCommand` queue (gameplay `Command`s plus durable reset/save intents), fixed-step execution, input edges, save coordination and sound consumption | Drawing, domain rule checks or alternative combat rules |
 | `ui/*`, `worldmap`, `inspector` | Read state, display decisions, collect intent and manage presentation-only selections | Ticking the game or paying rewards |
 | `art`, `visual_assets`, `animation` | Asset handles, padded atlas poses, read-only tick/event animation and bounded scene histories | Accuracy rolls, health, range or rewards |
