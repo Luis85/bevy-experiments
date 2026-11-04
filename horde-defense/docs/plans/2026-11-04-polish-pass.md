@@ -78,3 +78,17 @@ Source: native 1440×900 review captures (`menu`, `world`, `briefing`, `intro`, 
 11. The Journey tree truncates node labels ("Survivor foundatio…"). Wrap them to two lines instead of eliding.
 
 **Pacing of the first 15 minutes.** The first defense is 180 s to the boss with a cap of 20 and three lanes. Starter-node prices are 20–40 c and a defense banks about 100 c, so 3–5 runs per tier matches the documented target. No rebalance is made without human evidence.
+
+## Outcome
+
+Every finding (1–11) and every Wave 1 and Wave 2 follow-up is merged on `claude/horde-polish-pass`. Final verify on the merged branch:
+
+| Check | Result |
+|---|---|
+| `cargo fmt --all -- --check` | clean |
+| clippy `-D warnings`: workspace, `--no-default-features`, `--features dev` | clean |
+| `cargo test --locked --workspace` | 587 passed, 0 failed, 1 ignored |
+| `cargo test --locked -p horde-defense --features dev` | 306 passed, 0 failed, 1 ignored |
+| `--smoke` | exit 0, Personal and Npc both clear stage 5 |
+
+The golden digests changed once, in the level-ID commit. The reason is the serialized shape: ID-keyed clears, no stored `unlocked`, and levels saved as IDs. `GAMEPLAY_TRACE` and every save continuation trace are unchanged.
