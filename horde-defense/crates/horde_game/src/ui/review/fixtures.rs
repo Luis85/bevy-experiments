@@ -48,7 +48,7 @@ pub(super) fn prepare_copied_npc(f: &mut FrontendParts) {
     f.game = Game::decode_save_generation(&bytes)
         .expect("Copied NPC generation invalid; no fallback is permitted");
     assert!(
-        f.game.attempt.as_ref().is_some_and(|a| a.mode == Mode::Npc),
+        f.game.attempt().is_some_and(|a| a.mode == Mode::Npc),
         "Copied checkpoint must contain the active NPC battle"
     );
     f.settings = Settings::load(&copied_settings);
@@ -66,7 +66,7 @@ pub(super) fn prepare_copied_npc(f: &mut FrontendParts) {
         matches!(f.battle.speed, 1 | 2 | 4),
         "NPC diagnostic speed must be1,2or4"
     );
-    let a = f.game.attempt.as_ref().unwrap();
+    let a = f.game.attempt().unwrap();
     f.battle.aim = [a.width_yards * 0.6, a.defender_position()[1]];
     f.status.message = "Copied checkpoint/resumed NPC battle · isolated performance review".into();
 }
@@ -75,7 +75,7 @@ pub(super) fn prepare_copied_npc(f: &mut FrontendParts) {
 pub(super) fn prepare_journey_victory(f: &mut FrontendParts, liberated: bool) {
     let count = f
         .game
-        .campaign
+        .campaign()
         .world
         .active_country()
         .expect("review country")
@@ -83,14 +83,15 @@ pub(super) fn prepare_journey_victory(f: &mut FrontendParts, liberated: bool) {
     let stage = if liberated { count - 1 } else { 0 };
     for n in 0..stage {
         f.game
-            .campaign
+            .staging()
+            .campaign()
             .record_country_stage_clear(n)
             .expect("explicit earlier-country review milestones");
     }
     f.game
         .deploy_country_stage(stage, Mode::Personal)
         .expect("journey outcome fixture");
-    let mut a = f.game.attempt.take().unwrap();
+    let mut a = f.game.staging().attempt_slot().take().unwrap();
     a.boss_spawned = true;
     let lane = a.lane_count / 2;
     f.game
@@ -100,18 +101,15 @@ pub(super) fn prepare_journey_victory(f: &mut FrontendParts, liberated: bool) {
     target.hp = 1;
     target.armor = 0;
     let aim = [target.x, target.y()];
-    f.game.attempt = Some(a);
+    *f.game.staging().attempt_slot() = Some(a);
     f.game.set_paused(false);
     f.game.tick(Input {
         fire: true,
         aim,
         ..Default::default()
     });
-    assert!(f.game.attempt.is_none());
-    assert_eq!(
-        f.game.last_result.as_ref().unwrap().outcome,
-        Outcome::Victory
-    );
+    assert!(f.game.attempt().is_none());
+    assert_eq!(f.game.last_result().unwrap().outcome, Outcome::Victory);
     f.game.set_paused(true);
     f.campaign.mode = Mode::Personal;
     f.act(|c| c.focus_next_upgrade());
@@ -121,7 +119,7 @@ pub(super) fn prepare_journey_victory(f: &mut FrontendParts, liberated: bool) {
 pub(super) fn prepare_progression(game: &mut Game) {
     // Explicit screenshot entitlements; use model methods for every owned item,
     // skill and point investment. This does not represent earned campaign income.
-    let campaign = &mut game.campaign;
+    let campaign = game.staging().campaign();
     // These pre-existing advanced view fixtures explicitly retain legacy ledgers.
     campaign.legacy_features = true;
     campaign.coins = 1800;
@@ -205,7 +203,7 @@ pub(super) fn prepare_history(f: &mut FrontendParts) {
             .expect("history review deployment");
         f.game.set_paused(false);
         for _ in 0..60 * 18 {
-            if f.game.attempt.is_none() {
+            if f.game.attempt().is_none() {
                 break;
             }
             let input = if mode == Mode::Personal {
@@ -215,7 +213,7 @@ pub(super) fn prepare_history(f: &mut FrontendParts) {
             };
             f.game.tick(input);
         }
-        if f.game.attempt.is_some() {
+        if f.game.attempt().is_some() {
             f.game.withdraw();
         }
     }
@@ -232,7 +230,7 @@ pub(super) fn prepare_battle(f: &mut FrontendParts, screen: &str) {
     f.game
         .deploy_country_stage(0, mode)
         .expect("review deployment");
-    let lanes = f.game.attempt.as_ref().unwrap().lane_count;
+    let lanes = f.game.attempt().unwrap().lane_count;
     let center = lanes / 2;
     // A legal mixed starting plan in the actual frozen rows.
     for (kind, lane, column) in [
@@ -249,11 +247,11 @@ pub(super) fn prepare_battle(f: &mut FrontendParts, screen: &str) {
     let target = match screen {
         "progressed-battle" => 60 * 15,
         "results" => 60 * 480,
-        "boss" => ((f.game.attempt.as_ref().unwrap().boss_time() + 12.0) * 60.0).ceil() as u32,
+        "boss" => ((f.game.attempt().unwrap().boss_time() + 12.0) * 60.0).ceil() as u32,
         _ => 60 * 38,
     };
     for _ in 0..target {
-        if f.game.attempt.is_none() {
+        if f.game.attempt().is_none() {
             break;
         }
         let input = if matches!(screen, "boss" | "results") {
@@ -264,23 +262,22 @@ pub(super) fn prepare_battle(f: &mut FrontendParts, screen: &str) {
         f.game.tick(input);
         if !matches!(screen, "boss" | "results")
             && f.game
-                .attempt
-                .as_ref()
+                .attempt()
                 .is_some_and(|a| a.elapsed() > 6.0 && a.hp < a.max_hp * 2 / 3)
         {
             break;
         }
-        if screen == "boss" && f.game.attempt.as_ref().is_some_and(|a| a.boss_spawned) {
+        if screen == "boss" && f.game.attempt().is_some_and(|a| a.boss_spawned) {
             for _ in 0..60 * 8 {
-                if f.game.attempt.is_some() {
+                if f.game.attempt().is_some() {
                     f.game.tick(Input::default());
                 }
             }
             break;
         }
     }
-    if screen == "ordnance" && f.game.attempt.is_some() {
-        let a = f.game.attempt.as_ref().unwrap();
+    if screen == "ordnance" && f.game.attempt().is_some() {
+        let a = f.game.attempt().unwrap();
         let molotov_cell = [(a.width_yards * 0.6).floor() as u8, a.lane_count / 2];
         let grenade_cell = [
             (a.width_yards * 0.75).floor() as u8,
@@ -305,25 +302,25 @@ pub(super) fn prepare_battle(f: &mut FrontendParts, screen: &str) {
         });
         f.battle.attack_selection = battle::AttackSelection::Molotov;
         f.battle.aim = [
-            f.game.attempt.as_ref().unwrap().width_yards * 0.6,
-            f.game.attempt.as_ref().unwrap().defender_position()[1],
+            f.game.attempt().unwrap().width_yards * 0.6,
+            f.game.attempt().unwrap().defender_position()[1],
         ];
     }
     if screen == "results" {
-        if f.game.attempt.is_some() {
+        if f.game.attempt().is_some() {
             f.game.withdraw();
         }
         f.screen = Screen::Results;
     } else {
         assert!(
-            f.game.attempt.is_some(),
+            f.game.attempt().is_some(),
             "review battle should still be active"
         );
         f.screen = Screen::Battle;
     }
     f.campaign.mode = mode;
     f.battle.construction = screen == "construction";
-    if let Some(enemy) = f.game.attempt.as_ref().and_then(|a| {
+    if let Some(enemy) = f.game.attempt().and_then(|a| {
         a.enemies
             .iter()
             .find(|e| e.boss)
@@ -343,8 +340,7 @@ pub(super) fn prepare_gesture_battle(f: &mut FrontendParts, melee: bool) {
     // invented action event, damage result, cooldown or later-frame teleport.
     let structures: Vec<_> = f
         .game
-        .attempt
-        .as_ref()
+        .attempt()
         .unwrap()
         .structures
         .iter()
@@ -355,7 +351,7 @@ pub(super) fn prepare_gesture_battle(f: &mut FrontendParts, melee: bool) {
             .salvage(id)
             .expect("isolated gesture fixture salvage");
     }
-    let attempt = f.game.attempt.as_mut().unwrap();
+    let attempt = f.game.staging().attempt().unwrap();
     if melee {
         let lane = attempt.lane_count / 2;
         let target = attempt
@@ -381,26 +377,23 @@ pub(super) fn prepare_gesture_battle(f: &mut FrontendParts, melee: bool) {
 pub(super) fn prepare_operations(f: &mut FrontendParts) {
     f.nav.tab = Tab::Operations;
     for id in ["DEU", "FRA", "CHE", "AUT"] {
-        f.game.campaign.world.cleared.push(id.into());
+        f.game.staging().campaign().world.cleared.push(id.into());
         f.game
-            .campaign
+            .staging()
+            .campaign()
             .world
             .country_levels
             .insert(id.into(), world().country(id).unwrap().level_count());
     }
-    let first = f
-        .game
-        .strategy
-        .recruit(&mut f.game.campaign, "DEU")
-        .expect("review guard");
-    let second = f
-        .game
-        .strategy
-        .recruit(&mut f.game.campaign, "FRA")
+    let (strategy, campaign) = f.game.staging().strategy_and_campaign();
+    let first = strategy.recruit(campaign, "DEU").expect("review guard");
+    let (strategy, campaign) = f.game.staging().strategy_and_campaign();
+    let second = strategy
+        .recruit(campaign, "FRA")
         .expect("review expedition");
-    f.game
-        .strategy
-        .assign_guard(&mut f.game.campaign, first, "DEU")
+    let (strategy, campaign) = f.game.staging().strategy_and_campaign();
+    strategy
+        .assign_guard(campaign, first, "DEU")
         .expect("review garrison");
     f.game
         .deploy_survivor(second, "POL", 0)
@@ -409,8 +402,8 @@ pub(super) fn prepare_operations(f: &mut FrontendParts) {
     for _ in 0..60 * 20 {
         f.game.tick(Input::default());
     }
-    f.game
-        .strategy
-        .trigger_outbreak(&f.game.campaign, "DEU")
+    let (strategy, campaign) = f.game.staging().strategy_and_campaign();
+    strategy
+        .trigger_outbreak(campaign, "DEU")
         .expect("review plague alert");
 }

@@ -123,9 +123,9 @@ fn archive_old_journey(old: &Game, path: &std::path::Path) -> Result<Option<Path
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT: AtomicU64 = AtomicU64::new(0);
     if !(path.try_exists().map_err(|e| e.to_string())?
-        || old.campaign.selected_survivor.is_some()
-        || old.campaign.world.start.is_some()
-        || old.campaign.attempts > 0)
+        || old.campaign().selected_survivor.is_some()
+        || old.campaign().world.start.is_some()
+        || old.campaign().attempts > 0)
     {
         return Ok(None);
     }
@@ -461,8 +461,8 @@ pub(super) fn gated() -> (Service, Gate) {
     impl Backend for Controlled {
         fn execute(&mut self, job: Job) -> Completion {
             let coins = match &job.payload {
-                Payload::Save(s) => s.game.campaign.coins,
-                Payload::Reset { old, .. } => old.campaign.coins,
+                Payload::Save(s) => s.game.campaign().coins,
+                Payload::Reset { old, .. } => old.campaign().coins,
             };
             self.started
                 .send(Stamp {
@@ -517,7 +517,7 @@ mod tests {
         }
         fn snapshot(&self, coins: u64) -> Snapshot {
             let mut game = Game::default();
-            game.campaign.coins = coins;
+            game.campaign_mut().coins = coins;
             Snapshot {
                 game,
                 settings: Settings::default(),
@@ -573,7 +573,7 @@ mod tests {
         assert_eq!(
             Game::load(&directory.0.join("campaign.json"))
                 .unwrap()
-                .campaign
+                .campaign()
                 .coins,
             1
         );
@@ -585,7 +585,7 @@ mod tests {
         assert_eq!(
             Game::load(&directory.0.join("campaign.json"))
                 .unwrap()
-                .campaign
+                .campaign()
                 .coins,
             3
         );
@@ -646,10 +646,14 @@ mod tests {
         let mut snapshot = directory.snapshot(0);
         snapshot
             .game
-            .campaign
+            .campaign_mut()
             .choose_survivor(SurvivorId::Rook)
             .unwrap();
-        snapshot.game.campaign.choose_start_country("DEU").unwrap();
+        snapshot
+            .game
+            .campaign_mut()
+            .choose_start_country("DEU")
+            .unwrap();
         snapshot
             .game
             .deploy_country_stage(0, Mode::Personal)
@@ -696,7 +700,7 @@ mod tests {
         assert_eq!(
             Game::load(&directory.0.join("campaign.json"))
                 .unwrap()
-                .campaign
+                .campaign()
                 .coins,
             9
         );

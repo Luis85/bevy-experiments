@@ -21,15 +21,15 @@ pub fn fnv1a_extend(hash: u64, bytes: &[u8]) -> u64 {
 /// A default game with the legacy (fixed, unscaled) balance and features.
 pub fn legacy_game() -> Game {
     let mut game = Game::default();
-    game.campaign.legacy_features = true;
-    game.campaign.balance_settings = BalanceSettings::legacy();
+    game.campaign_mut().legacy_features = true;
+    game.campaign_mut().balance_settings = BalanceSettings::legacy();
     game
 }
 
 /// A legacy game with an unpaused attempt deployed in `mode`.
 pub fn game(mode: Mode) -> Game {
     let mut g = legacy_game();
-    g.campaign.attempts = 1;
+    g.campaign_mut().attempts = 1;
     g.deploy(0, mode).unwrap();
     g.set_paused(false);
     g
@@ -37,10 +37,10 @@ pub fn game(mode: Mode) -> Game {
 
 /// Spawn a Shambler (or boss) in `lane` and move it to `x`.
 pub fn enemy(g: &mut Game, lane: u8, x: f32, boss: bool) {
-    let mut a = g.attempt.take().unwrap();
+    let mut a = g.attempt_slot_mut().take().unwrap();
     g.spawn_enemy(&mut a, EnemyKind::Shambler, lane, boss);
     a.enemies.last_mut().unwrap().x = x;
-    g.attempt = Some(a);
+    *g.attempt_slot_mut() = Some(a);
 }
 
 /// Tick with default (idle) input `count` times.
@@ -63,7 +63,7 @@ pub fn trained_campaign(coins: u64, nodes: &[&str]) -> Campaign {
 /// A default game that started its campaign in `country`.
 pub fn country_game(country: &str) -> Game {
     let mut game = Game::default();
-    game.campaign.choose_start_country(country).unwrap();
+    game.campaign_mut().choose_start_country(country).unwrap();
     game
 }
 
@@ -90,12 +90,17 @@ pub fn strategic_game() -> Game {
         .take(4)
         .map(|c| (c.id.clone(), c.level_count()))
         .collect();
-    g.campaign.choose_start_country(&countries[0].0).unwrap();
+    g.campaign_mut()
+        .choose_start_country(&countries[0].0)
+        .unwrap();
     for (id, count) in countries {
-        g.campaign.world.country_levels.insert(id.clone(), count);
-        g.campaign.world.cleared.push(id);
+        g.campaign_mut()
+            .world
+            .country_levels
+            .insert(id.clone(), count);
+        g.campaign_mut().world.cleared.push(id);
     }
-    g.campaign.coins = 10000;
-    g.campaign.attempts = 1;
+    g.campaign_mut().coins = 10000;
+    g.campaign_mut().attempts = 1;
     g
 }

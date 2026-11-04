@@ -14,7 +14,7 @@ fn fight(game: &mut Game) -> bool {
     game.set_paused(false);
     let mut injured_boss = false;
     for _ in 0..60 * 600 {
-        let Some(attempt) = game.attempt.as_ref() else {
+        let Some(attempt) = game.attempt() else {
             return injured_boss;
         };
         injured_boss |= attempt.enemies.iter().any(|e| e.boss && e.hp < e.max_hp);
@@ -40,8 +40,8 @@ fn buy_weapon(game: &mut Game, name: &str) {
         .iter()
         .position(|item| item.name == name)
         .unwrap();
-    let id = game.campaign.buy_item(definition).unwrap();
-    game.campaign.equip(Mode::Personal, id).unwrap();
+    let id = game.campaign_mut().buy_item(definition).unwrap();
+    game.campaign_mut().equip(Mode::Personal, id).unwrap();
 }
 
 #[test]
@@ -49,10 +49,10 @@ fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loo
     for seed in [1, 2026, 0x1A571167] {
         for country in ["DEU", "BRA", "EGY", "USA", "ISL"] {
             let mut game = country_game(country);
-            game.seed = seed;
-            assert_eq!(game.campaign.coins, 0);
+            game.set_seed(seed);
+            assert_eq!(game.campaign().coins, 0);
             assert_eq!(
-                game.campaign.profile(Mode::Personal).weapon.class,
+                game.campaign().profile(Mode::Personal).weapon.class,
                 WeaponClass::Pistol
             );
             let mut clear_run = None;
@@ -60,35 +60,35 @@ fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loo
                 match run {
                     2 => {
                         buy_weapon(&mut game, "Compact service pistol");
-                        game.campaign.purchase_node("quick_reload").unwrap();
+                        game.campaign_mut().purchase_node("quick_reload").unwrap();
                     }
                     3 => {
-                        game.campaign.purchase_node("steady_hands").unwrap();
-                        game.campaign.purchase_node("smg_training").unwrap();
+                        game.campaign_mut().purchase_node("steady_hands").unwrap();
+                        game.campaign_mut().purchase_node("smg_training").unwrap();
                         buy_weapon(&mut game, "Compact SMG");
                     }
                     4 => {
-                        game.campaign.purchase_node("stopping_power").unwrap();
-                        game.campaign.purchase_node("rapid_cycle").unwrap();
+                        game.campaign_mut().purchase_node("stopping_power").unwrap();
+                        game.campaign_mut().purchase_node("rapid_cycle").unwrap();
                     }
                     5 => {
-                        game.campaign.purchase_node("rifle_training").unwrap();
+                        game.campaign_mut().purchase_node("rifle_training").unwrap();
                         buy_weapon(&mut game, "Marksman rifle");
                     }
                     _ => {}
                 }
-                let banked_before = game.campaign.coins;
-                let weapon_before = game.campaign.player.loadout[Slot::Ranged.index()];
+                let banked_before = game.campaign().coins;
+                let weapon_before = game.campaign().player.loadout[Slot::Ranged.index()];
                 let injured_boss = fight(&mut game);
-                let report = game.last_result.as_ref().unwrap();
+                let report = game.last_result().unwrap();
                 eprintln!(
                     "country={country} seed={seed} run={run} {:?} elapsed={:.1} kills={} earned={} wallet={} profile={:?}",
                     report.outcome,
                     report.elapsed,
                     report.kills,
                     report.coins,
-                    game.campaign.coins,
-                    game.campaign.equipped(Mode::Personal, Slot::Ranged).name
+                    game.campaign().coins,
+                    game.campaign().equipped(Mode::Personal, Slot::Ranged).name
                 );
                 if run == 1 {
                     assert_eq!(
@@ -106,12 +106,12 @@ fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loo
                     "Every attempt must bank a meaningful guaranteed purchase budget"
                 );
                 assert_eq!(
-                    game.campaign.coins,
+                    game.campaign().coins,
                     banked_before + report.coins,
                     "Rewards bank once and survive defeat"
                 );
                 assert_eq!(
-                    game.campaign.player.loadout[Slot::Ranged.index()],
+                    game.campaign().player.loadout[Slot::Ranged.index()],
                     weapon_before,
                     "Dropped weapons never enter this progression proof"
                 );
@@ -145,7 +145,7 @@ fn fresh_country_pistols_can_injure_the_boss_during_authored_exposure() {
     for country in ["DEU", "BRA", "EGY", "USA", "ISL"] {
         let mut game = country_game(country);
         game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let mut attempt = game.attempt.take().unwrap();
+        let mut attempt = game.attempt_slot_mut().take().unwrap();
         let lane = attempt.lane_count / 2;
         game.spawn_enemy(&mut attempt, EnemyKind::Brute, lane, true);
         let boss = attempt.enemies.last_mut().unwrap();
@@ -154,7 +154,7 @@ fn fresh_country_pistols_can_injure_the_boss_during_authored_exposure() {
         let health = boss.hp;
         let aim = [boss.x, boss.y()];
         attempt.boss_spawned = true;
-        game.attempt = Some(attempt);
+        *game.attempt_slot_mut() = Some(attempt);
         game.set_paused(false);
         game.tick(Input {
             aim,
@@ -162,7 +162,7 @@ fn fresh_country_pistols_can_injure_the_boss_during_authored_exposure() {
             ..Input::default()
         });
         assert!(
-            game.attempt.as_ref().unwrap().enemies[0].hp < health,
+            game.attempt().unwrap().enemies[0].hp < health,
             "country {country}: no mandatory rare-weapon dependency"
         );
     }

@@ -28,14 +28,14 @@ impl Drop for Scratch {
 fn camp_game() -> Game {
     horde_core::catalog::init_catalogs().unwrap();
     let mut game = Game::default();
-    game.campaign.legacy_features = true;
-    game.campaign
+    game.campaign_mut().legacy_features = true;
+    game.campaign_mut()
         .set_balance_settings(horde_core::balance::BalanceSettings::legacy())
         .unwrap();
-    game.campaign
+    game.campaign_mut()
         .choose_survivor(horde_core::survivors::SurvivorId::Rook)
         .unwrap();
-    game.campaign.choose_start_country("DEU").unwrap();
+    game.campaign_mut().choose_start_country("DEU").unwrap();
     game
 }
 
@@ -134,7 +134,7 @@ fn a_session_recorded_through_the_runner_replays_to_the_same_digest() {
     }
     assert_eq!(added(65), 0, "re-paused after the step");
     assert!(
-        game.attempt.as_ref().is_some_and(|a| a.tick > 100),
+        game.attempt().is_some_and(|a| a.tick > 100),
         "the scripted session really simulated ticks"
     );
     assert!(runtime.stop_recording(&game, "test"));
@@ -224,7 +224,7 @@ fn digest_is_stable_and_state_sensitive() {
     let mut game = Game::default();
     let first = game.state_digest();
     assert_eq!(first, game.clone().state_digest());
-    game.seed ^= 1;
+    game.set_seed(game.seed() ^ 1);
     assert_ne!(first, game.state_digest());
 }
 
@@ -263,7 +263,7 @@ fn an_unusable_step_request_is_dropped_and_the_ordinary_tick_still_runs() {
         0,
         "request consumed"
     );
-    assert_eq!(game.attempt.as_ref().unwrap().tick, 1);
+    assert_eq!(game.attempt().unwrap().tick, 1);
 }
 
 #[test]

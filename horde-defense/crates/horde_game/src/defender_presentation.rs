@@ -268,16 +268,16 @@ mod tests {
         };
         let mut game = Game::default();
         game.deploy(0, Mode::Personal).unwrap();
-        game.attempt.as_mut().unwrap().profile.brace = true;
+        game.attempt_mut().unwrap().profile.brace = true;
         game.tick(Input {
             brace: true,
             ..Default::default()
         });
-        let born = game.attempt.as_ref().unwrap().tick;
+        let born = game.attempt().unwrap().tick;
         for _ in 0..40 {
             game.tick(Input::default());
         }
-        let attempt = game.attempt.as_ref().unwrap();
+        let attempt = game.attempt().unwrap();
         assert!(attempt.brace_remaining_ticks() > 0);
         assert!(
             !attempt
@@ -307,12 +307,14 @@ mod tests {
             sim::{Game, Input},
         };
         let mut game = Game::default();
-        game.campaign
+        game.campaign_mut()
             .set_balance_settings(BalanceSettings::legacy())
             .unwrap();
-        game.campaign.coins = 1000;
-        game.campaign.purchase_node("brace").unwrap();
-        game.campaign.purchase_node("grenade_training").unwrap();
+        game.campaign_mut().coins = 1000;
+        game.campaign_mut().purchase_node("brace").unwrap();
+        game.campaign_mut()
+            .purchase_node("grenade_training")
+            .unwrap();
         game.deploy(0, Mode::Personal).unwrap();
         game.set_paused(false);
         game.tick(Input {
@@ -334,7 +336,7 @@ mod tests {
             }),
             ..Default::default()
         });
-        let attempt = game.attempt.as_ref().unwrap();
+        let attempt = game.attempt().unwrap();
         assert_eq!(attempt.tick, 290);
         let projectile = &attempt.ordnance.projectiles[0];
         let cues = projectile.release_cues.unwrap();
@@ -346,7 +348,7 @@ mod tests {
         for _ in 0..15 {
             game.tick(Input::default());
         }
-        let attempt = game.attempt.as_mut().unwrap();
+        let attempt = game.attempt_mut().unwrap();
         assert_eq!(attempt.tick, 305);
         assert_eq!(attempt.brace_remaining_ticks(), 0);
         assert!(!attempt.ordnance.projectiles.is_empty());
@@ -362,7 +364,7 @@ mod tests {
         ));
         game.save(&path).unwrap();
         let resumed = Game::load(&path).unwrap();
-        let attempt = resumed.attempt.as_ref().unwrap();
+        let attempt = resumed.attempt().unwrap();
         let projectile = &attempt.ordnance.projectiles[0];
         assert_eq!(release_tick(attempt.tick, &attempt.events, projectile), 290);
         assert_eq!(
@@ -376,7 +378,7 @@ mod tests {
     fn newer_melee_reload_and_shot_interrupt_throw_recovery() {
         let mut game = horde_core::sim::Game::default();
         game.deploy(0, horde_core::content::Mode::Personal).unwrap();
-        let attempt = game.attempt.as_mut().unwrap();
+        let attempt = game.attempt_mut().unwrap();
         attempt.tick = 101;
         let thrown = event(EventKind::Throw, 100, Some(17));
         attempt.events = vec![thrown.clone(), event(EventKind::Melee, 101, None)].into();
@@ -436,7 +438,7 @@ mod tests {
     fn historical_release_uses_its_own_effects_and_throw_target_over_an_older_shot() {
         let mut game = horde_core::sim::Game::default();
         game.deploy(0, horde_core::content::Mode::Personal).unwrap();
-        let attempt = game.attempt.as_mut().unwrap();
+        let attempt = game.attempt_mut().unwrap();
         attempt.tick = 104;
         let mut thrown = event(EventKind::Throw, 100, Some(17));
         thrown.to = [9., 2.5];

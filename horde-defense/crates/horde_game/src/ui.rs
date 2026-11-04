@@ -142,13 +142,12 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
         Screen::Settings => settings_ui(root, f),
     }
     // A transition requested this frame ends live control immediately.
-    let active = f.screen == Screen::Battle
-        && !f.leaving()
-        && f.game.attempt.as_ref().is_some_and(|a| !a.paused);
+    let active =
+        f.screen == Screen::Battle && !f.leaving() && f.game.attempt().is_some_and(|a| !a.paused);
     let strategy_active = f.screen == Screen::Camp
         && !f.leaving()
-        && f.game.attempt.is_none()
-        && !f.game.global_paused;
+        && f.game.attempt().is_none()
+        && !f.game.global_paused();
     publish_controls(ctx, f, active, strategy_active);
 }
 
@@ -166,12 +165,7 @@ fn publish_controls(ctx: &egui::Context, f: &mut UiCtx, active: bool, strategy_a
     held.reload = false;
     held.heal = false;
     held.brace = false;
-    let speed = if f
-        .game
-        .attempt
-        .as_ref()
-        .is_some_and(|a| a.mode == Mode::Personal)
-    {
+    let speed = if f.game.attempt().is_some_and(|a| a.mode == Mode::Personal) {
         1
     } else {
         f.battle.speed

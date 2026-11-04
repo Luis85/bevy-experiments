@@ -199,8 +199,8 @@ impl Runtime {
         }
         if !self.controls.enabled
             || self.durable_transition_pending()
-            || game.global_paused
-            || game.attempt.as_ref().is_some_and(|a| a.paused)
+            || game.global_paused()
+            || game.attempt().is_some_and(|a| a.paused)
         {
             self.clear_input();
             return false;
@@ -220,7 +220,7 @@ impl Runtime {
         if let Some(recorder) = &mut self.recorder {
             recorder.input(self.simulated_ticks, &input);
         }
-        let had_attempt = game.attempt.is_some();
+        let had_attempt = game.attempt().is_some();
         game.tick(input);
         self.simulated_ticks += 1;
         self.save_ticks += 1;
@@ -228,7 +228,7 @@ impl Runtime {
         if self.save_ticks >= 600 {
             self.dirty = true;
         }
-        if had_attempt && game.attempt.is_none() {
+        if had_attempt && game.attempt().is_none() {
             self.dirty = true;
             self.clear_input();
             game.set_paused(true);
@@ -322,8 +322,8 @@ impl Runtime {
     /// tick run) while the game is running, has no attempt, or a durable
     /// transition is pending; otherwise `Some(attempt finished)`.
     pub(super) fn step_once(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> Option<bool> {
-        let paused = game.global_paused || game.attempt.as_ref().is_some_and(|a| a.paused);
-        if !paused || game.attempt.is_none() || self.durable_transition_pending() {
+        let paused = game.global_paused() || game.attempt().is_some_and(|a| a.paused);
+        if !paused || game.attempt().is_none() || self.durable_transition_pending() {
             return None;
         }
         let unpause = Command::SetPaused(false);
@@ -432,7 +432,7 @@ pub(super) fn tick_sounds(
     observed: Option<u64>,
     cues: &mut Vec<SoundCue>,
 ) -> Option<u64> {
-    let camp = game.attempt.is_none();
+    let camp = game.attempt().is_none();
     let mut newest = None;
     for record in game.drain_events() {
         if record.battle == BattleId::Root {
@@ -455,15 +455,14 @@ pub(super) fn tick_sounds(
             event_sound(cues, &record.event);
         }
     }
-    let fire = match &game.attempt {
+    let fire = match game.attempt() {
         Some(a) => !a.ordnance.fire_zones.is_empty(),
-        None => game.battles.iter().any(|battle| {
+        None => game.battles().iter().any(|battle| {
             !battle.settled
                 && observed == Some(battle.id)
                 && battle
-                    .game
-                    .attempt
-                    .as_ref()
+                    .game()
+                    .attempt()
                     .is_some_and(|a| !a.ordnance.fire_zones.is_empty())
         }),
     };

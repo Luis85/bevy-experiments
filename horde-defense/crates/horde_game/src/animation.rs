@@ -702,21 +702,21 @@ mod tests {
     use horde_core::sim::{Game, Input};
     fn fixture() -> Game {
         let mut game = Game::default();
-        game.campaign
+        game.campaign_mut()
             .set_balance_settings(horde_core::balance::BalanceSettings::legacy())
             .unwrap();
-        game.campaign.attempts = 1;
+        game.campaign_mut().attempts = 1;
         game.deploy(0, Mode::Personal).unwrap();
-        let mut a = game.attempt.take().unwrap();
+        let mut a = game.attempt_slot_mut().take().unwrap();
         game.spawn_enemy(&mut a, EnemyKind::Runner, 4, false);
         a.enemies[0].x = 20.;
-        game.attempt = Some(a);
+        *game.attempt_slot_mut() = Some(a);
         game
     }
     #[test]
     fn tick_based_walk_poses_vary_without_mutating_authority() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         let before = serde_json::to_string(a).unwrap();
         let first = SceneAnimation::sample(a, false);
         assert_eq!(first, SceneAnimation::sample(a, false));
@@ -731,7 +731,7 @@ mod tests {
     #[test]
     fn turret_holds_the_resolved_target_while_its_tracer_is_visible() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.enemies[0].x = 12.;
         let turret = Structure {
             id: 900,
@@ -778,17 +778,17 @@ mod tests {
         game.set_paused(true);
         let mut cache = SceneCache::default();
         let before = serde_json::to_string(&game).unwrap();
-        let first = cache.sample(game.attempt.as_ref().unwrap(), false);
+        let first = cache.sample(game.attempt().unwrap(), false);
         for _ in 0..60 {
             game.tick(Input::default());
-            assert_eq!(first, cache.sample(game.attempt.as_ref().unwrap(), false));
+            assert_eq!(first, cache.sample(game.attempt().unwrap(), false));
         }
         assert_eq!(before, serde_json::to_string(&game).unwrap());
     }
     #[test]
     fn reduced_effects_suppress_motion_and_particles_but_keep_windup_and_reload_information() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.enemies[0].attack_phase = EnemyPhase::Windup;
         a.enemies[0].windup_total = 60;
         a.enemies[0].attack_left = 15;
@@ -805,7 +805,7 @@ mod tests {
     fn effects_and_encounter_history_remain_bounded_under_repeated_sampling() {
         let mut game = fixture();
         let mut cache = SceneCache::default();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.events = (0..512)
             .map(|_| Event {
                 kind: EventKind::Shot,
@@ -824,7 +824,7 @@ mod tests {
         assert_eq!(cache.sample(a, false).particles.len(), MAX_PARTICLES);
         assert_eq!(serde_json::to_string(a).unwrap(), before);
         for id in 0..100 {
-            let a = game.attempt.as_mut().unwrap();
+            let a = game.attempt_mut().unwrap();
             a.id = id;
             let sampled = cache.sample(a, false);
             assert!(sampled.particles.len() <= MAX_PARTICLES);
@@ -843,7 +843,7 @@ mod tests {
     fn authoritative_remains_persist_without_events_and_after_save_resume() {
         let mut game = fixture();
         let mut cache = SceneCache::default();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         let enemy = a.enemies.remove(0);
         a.corpses.push(horde_core::sim::CorpseRecord {
             id: enemy.id,
@@ -869,7 +869,7 @@ mod tests {
     #[test]
     fn resolved_attack_events_drive_lunges_and_recoil_without_moving_the_anchors() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         let id = a.enemies[0].id;
         a.enemies[0].attack_phase = EnemyPhase::Windup;
         a.enemies[0].windup_total = 60;
@@ -917,7 +917,7 @@ mod tests {
     #[test]
     fn a_full_defeat_burst_keeps_every_body_and_bounds_only_transient_effects() {
         let mut game = fixture();
-        let mut a = game.attempt.take().unwrap();
+        let mut a = game.attempt_slot_mut().take().unwrap();
         for n in 1..64 {
             game.spawn_enemy(&mut a, EnemyKind::Shambler, (n % 11) as u8, false);
             a.enemies.last_mut().unwrap().x = 20.;
@@ -948,26 +948,20 @@ mod tests {
     fn loading_a_different_campaign_at_the_same_tick_does_not_leak_old_corpses() {
         let mut game = fixture();
         let mut cache = SceneCache::default();
-        cache.sample(game.attempt.as_ref().unwrap(), false);
+        cache.sample(game.attempt().unwrap(), false);
         game.set_paused(false);
-        game.attempt.as_mut().unwrap().enemies[0].hp = 1;
+        game.attempt_mut().unwrap().enemies[0].hp = 1;
         game.tick(Input {
             fire: true,
             aim: [20., 4.5],
             ..Input::default()
         });
-        assert_eq!(
-            cache
-                .sample(game.attempt.as_ref().unwrap(), false)
-                .deaths
-                .len(),
-            1
-        );
+        assert_eq!(cache.sample(game.attempt().unwrap(), false).deaths.len(), 1);
         let mut fresh = fixture();
-        fresh.attempt.as_mut().unwrap().tick = 1;
+        fresh.attempt_mut().unwrap().tick = 1;
         assert!(
             cache
-                .sample(fresh.attempt.as_ref().unwrap(), false)
+                .sample(fresh.attempt().unwrap(), false)
                 .deaths
                 .is_empty()
         );
@@ -975,7 +969,7 @@ mod tests {
     #[test]
     fn unrelated_new_events_do_not_teleport_an_existing_casing_trajectory() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.tick = 10;
         a.events = vec![Event {
             kind: EventKind::Shot,

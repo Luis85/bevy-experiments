@@ -7,17 +7,17 @@ fn first_country_selection_immediately_starts_and_saves_a_live_personal_defense(
     let h = Harness::new();
     let f = &mut fixture.frontend;
     h.click(f, View::Dossier, "Start journey");
-    assert_eq!(f.game.campaign.world.start.as_deref(), Some("DEU"));
+    assert_eq!(f.game.campaign().world.start.as_deref(), Some("DEU"));
     assert!(f.screen == Screen::Battle);
     assert!(!f.battle.construction);
-    let a = f.game.attempt.as_ref().unwrap();
+    let a = f.game.attempt().unwrap();
     assert!(!a.paused);
     assert_eq!(a.tick, 0);
     assert_eq!(a.country_id.as_deref(), Some("DEU"));
     assert_eq!(a.mode, Mode::Personal);
     let restored = Game::load(&f.paths.campaign()).unwrap();
-    assert_eq!(restored.attempt.as_ref().unwrap().tick, 0);
-    assert!(!restored.attempt.as_ref().unwrap().paused);
+    assert_eq!(restored.attempt().unwrap().tick, 0);
+    assert!(!restored.attempt().unwrap().paused);
 }
 
 #[test]
@@ -25,39 +25,38 @@ fn camp_escape_and_footer_control_pause_and_resume_all_parallel_work() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.choose_start_country("DEU").unwrap();
-    f.game.campaign.attempts = 1;
-    f.game.campaign.coins = 500;
-    f.game.campaign.first_clears = horde_core::content::content()
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().attempts = 1;
+    f.game.campaign_mut().coins = 500;
+    f.game.campaign_mut().first_clears = horde_core::content::content()
         .levels
         .iter()
         .map(|level| level.id.clone())
         .collect();
     for id in ["DEU", "FRA"] {
-        f.game.campaign.world.cleared.push(id.into());
+        f.game.campaign_mut().world.cleared.push(id.into());
         f.game
-            .campaign
+            .campaign_mut()
             .world
             .country_levels
             .insert(id.into(), world().country(id).unwrap().level_count());
     }
     let recruit = f
         .game
-        .strategy
-        .recruit(&mut f.game.campaign, "DEU")
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, "DEU"))
         .unwrap();
     f.game.deploy_survivor(recruit, "POL", 0).unwrap();
     h.key(f, View::Camp, Key::Escape);
-    assert!(f.game.global_paused);
+    assert!(f.game.global_paused());
     let frozen = serde_json::to_value(&f.game).unwrap();
     for _ in 0..60 {
         f.game.tick(Input::default());
     }
     assert_eq!(serde_json::to_value(&f.game).unwrap(), frozen);
     h.click(f, View::Camp, "Resume world clock");
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
     f.game.tick(Input::default());
-    assert!(f.game.battles[0].game.attempt.as_ref().unwrap().tick > 0);
+    assert!(f.game.battles_mut()[0].game().attempt().unwrap().tick > 0);
 }
 
 #[test]
@@ -75,7 +74,7 @@ fn camp_pause_binding_does_not_steal_text_from_country_search() {
         vec![key_event(Key::P, true), Event::Text("p".into())],
     );
     assert_eq!(f.campaign.search, "p");
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
 }
 
 #[test]
@@ -108,7 +107,7 @@ fn camp_observation_speed_never_offers_a_hidden_speedup_to_personal_combat() {
     let f = &mut fixture.frontend;
     f.screen = Screen::Camp;
     f.game.set_paused(true);
-    f.game.strategy.peak_freed = 4;
+    f.game.strategy_mut().peak_freed = 4;
     let before = serde_json::to_value(&f.game).unwrap();
     let output = h.frame(f, View::Camp, vec![]);
     assert!(
@@ -175,7 +174,7 @@ fn reselecting_the_current_camp_screen_keeps_strategy_ticks_running() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.set_paused(false);
-    assert!(f.game.attempt.is_none() && !f.game.global_paused);
+    assert!(f.game.attempt().is_none() && !f.game.global_paused());
     let mut output = h.ctx.run_ui(
         RawInput {
             screen_rect: Some(Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0))),

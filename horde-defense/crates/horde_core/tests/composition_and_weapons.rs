@@ -10,22 +10,22 @@ use support::legacy_game;
 #[test]
 fn boss_history_is_bounded_and_rejects_duplicate_kinds() {
     let mut game = legacy_game();
-    game.campaign.defeated_bosses = vec![BossKind::Breacher; 4];
-    assert!(game.campaign.validate().is_err());
-    game.campaign.defeated_bosses = vec![BossKind::Breacher; 2];
-    assert!(game.campaign.validate().is_err());
-    game.campaign.defeated_bosses =
+    game.campaign_mut().defeated_bosses = vec![BossKind::Breacher; 4];
+    assert!(game.campaign().validate().is_err());
+    game.campaign_mut().defeated_bosses = vec![BossKind::Breacher; 2];
+    assert!(game.campaign().validate().is_err());
+    game.campaign_mut().defeated_bosses =
         vec![BossKind::Breacher, BossKind::Caller, BossKind::SiegeBrute];
-    game.campaign.validate().unwrap();
+    game.campaign().validate().unwrap();
 }
 
 #[test]
 fn authored_contact_armor_preserves_integer_halving_for_odd_protection() {
     for mode in [Mode::Personal, Mode::Npc] {
         let mut game = legacy_game();
-        game.campaign.attempts = 1;
+        game.campaign_mut().attempts = 1;
         game.deploy(0, mode).unwrap();
-        let mut attempt = game.attempt.take().unwrap();
+        let mut attempt = game.attempt_slot_mut().take().unwrap();
         game.spawn_enemy(&mut attempt, EnemyKind::Armored, 5, false);
         assert_eq!(
             attempt.enemies[0]
@@ -64,7 +64,7 @@ fn pistol_cap_is_applied_once_after_all_pellets_and_weakpoint_damage() {
     for kind in EnemyKind::ALL {
         let mut game = legacy_game();
         game.deploy(0, Mode::Personal).unwrap();
-        let mut a = game.attempt.take().unwrap();
+        let mut a = game.attempt_slot_mut().take().unwrap();
         assert_eq!(a.profile.weapon.class, WeaponClass::Pistol);
         a.profile.weapon.pellets = 16;
         a.profile.weapon.spread_radians = 0.001;
@@ -73,14 +73,14 @@ fn pistol_cap_is_applied_once_after_all_pellets_and_weakpoint_damage() {
         game.spawn_enemy(&mut a, kind, 5, false);
         a.enemies[0].x = 12.0;
         let initial = a.enemies[0].max_hp;
-        game.attempt = Some(a);
+        *game.attempt_slot_mut() = Some(a);
         game.set_paused(false);
         game.tick(Input {
             aim: [12.0, 5.5],
             fire: true,
             ..Default::default()
         });
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         assert_eq!(a.shots, 1);
         assert_eq!(a.ammo + 1, a.magazine);
         assert_eq!(
@@ -98,12 +98,12 @@ fn pistol_cap_is_applied_once_after_all_pellets_and_weakpoint_damage() {
 fn boss_history_unlocks_ordinary_profiles_and_survives_serialization() {
     let mut game = legacy_game();
     game.deploy(0, Mode::Personal).unwrap();
-    let mut a = game.attempt.take().unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
     assert!(game.spawn_archetype(&mut a, "breacher-pack", 3).is_err());
     assert!(a.enemies.is_empty());
-    game.campaign.first_clear(0, Mode::Npc);
+    game.campaign_mut().first_clear(0, Mode::Npc);
     assert!(
-        game.campaign
+        game.campaign()
             .unlocked_bosses()
             .contains(&BossKind::Breacher)
     );
@@ -118,8 +118,8 @@ fn boss_history_unlocks_ordinary_profiles_and_survives_serialization() {
     assert_ne!(enemy.max_hp, content().levels[0].boss_health);
     let restored: Game = serde_json::from_str(&serde_json::to_string(&game).unwrap()).unwrap();
     assert_eq!(
-        restored.campaign.unlocked_bosses(),
-        game.campaign.unlocked_bosses()
+        restored.campaign().unlocked_bosses(),
+        game.campaign().unlocked_bosses()
     );
 }
 
@@ -127,15 +127,15 @@ fn boss_history_unlocks_ordinary_profiles_and_survives_serialization() {
 fn attack_components_carry_demolition_even_on_runner_bodies() {
     fn damaged_wall(multiplier: u8) -> i32 {
         let mut game = legacy_game();
-        game.campaign.first_clear(0, Mode::Personal);
-        game.campaign.first_clear(1, Mode::Personal);
-        game.campaign.reward(1000, 0, Mode::Personal);
-        game.campaign
+        game.campaign_mut().first_clear(0, Mode::Personal);
+        game.campaign_mut().first_clear(1, Mode::Personal);
+        game.campaign_mut().reward(1000, 0, Mode::Personal);
+        game.campaign_mut()
             .purchase_blueprint(StructureKind::Wall)
             .unwrap();
         game.deploy(0, Mode::Personal).unwrap();
         game.place(StructureKind::Wall, 5, 0).unwrap();
-        let mut a = game.attempt.take().unwrap();
+        let mut a = game.attempt_slot_mut().take().unwrap();
         let hp = a.structures[0].hp;
         game.spawn_enemy(&mut a, EnemyKind::Runner, 5, false);
         a.enemies[0].x = a.structures[0].x() + 0.65;
@@ -144,12 +144,12 @@ fn attack_components_carry_demolition_even_on_runner_bodies() {
             .as_mut()
             .unwrap()
             .structure_damage_multiplier = multiplier;
-        game.attempt = Some(a);
+        *game.attempt_slot_mut() = Some(a);
         game.set_paused(false);
         for _ in 0..120 {
             game.tick(Input::default());
         }
-        hp - game.attempt.as_ref().unwrap().structures[0].hp
+        hp - game.attempt().unwrap().structures[0].hp
     }
     let ordinary = damaged_wall(1);
     assert!(ordinary > 0);

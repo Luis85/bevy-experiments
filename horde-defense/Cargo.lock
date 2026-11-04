@@ -2793,6 +2793,7 @@ dependencies = [
 name = "horde_core"
 version = "0.1.0"
 dependencies = [
+ "horde_core",
  "serde",
  "serde_json",
  "tracing",

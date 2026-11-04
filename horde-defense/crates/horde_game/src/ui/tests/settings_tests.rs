@@ -8,7 +8,7 @@ fn settings_from_main_menu_save_back_for_fresh_and_existing_profiles() {
         let h = Harness::new();
         let f = &mut fixture.frontend;
         if existing {
-            f.game.campaign.choose_start_country("DEU").unwrap();
+            f.game.campaign_mut().choose_start_country("DEU").unwrap();
             f.game.save(&f.paths.campaign()).unwrap();
             f.game = Game::load(&f.paths.campaign()).unwrap();
         }
@@ -22,8 +22,8 @@ fn settings_from_main_menu_save_back_for_fresh_and_existing_profiles() {
         assert!(!f.status.message_error);
         assert!(!f.status.save_pending);
         let saved = Game::load(&f.paths.campaign()).unwrap();
-        assert_eq!(saved.campaign.world.start.is_some(), existing);
-        assert!(saved.global_paused);
+        assert_eq!(saved.campaign().world.start.is_some(), existing);
+        assert!(saved.global_paused());
         assert_eq!(Settings::load(&f.paths.settings()).master, 0.23);
         h.click(f, View::Menu, "Settings");
         h.key(f, View::Settings, Key::Escape);
@@ -39,18 +39,18 @@ fn settings_name_the_origin_and_offer_a_durable_route_to_main_menu() {
         let h = Harness::new();
         let f = &mut fixture.frontend;
         // A real reload is in progress; navigating must not reset its clock.
-        f.game.attempt.as_mut().unwrap().ammo = 3;
+        f.game.attempt_mut().unwrap().ammo = 3;
         f.game.tick(Input {
             reload: true,
             ..Input::default()
         });
-        assert!(f.game.attempt.as_ref().unwrap().reload_left > 0);
+        assert!(f.game.attempt().unwrap().reload_left > 0);
         f.screen = origin;
         f.battle.fire_latched = true;
         h.click(f, View::Header, "Settings");
         assert!(f.screen == Screen::Settings);
         assert!(f.nav.return_screen == origin);
-        assert!(f.game.global_paused);
+        assert!(f.game.global_paused());
         assert!(!f.battle.fire_latched);
         let paused = serde_json::to_value(&f.game).unwrap();
         let output = h.frame(f, View::Settings, vec![]);
@@ -68,13 +68,13 @@ fn settings_name_the_origin_and_offer_a_durable_route_to_main_menu() {
         );
         h.click(f, View::Settings, "Save and return to main menu");
         assert!(f.screen == Screen::Menu, "{}", f.status.message);
-        assert!(f.game.global_paused);
+        assert!(f.game.global_paused());
         assert_eq!(serde_json::to_value(&f.game).unwrap(), paused);
         let saved = Game::load(&f.paths.campaign()).unwrap();
         assert_eq!(serde_json::to_value(&saved).unwrap(), paused);
         h.click(f, View::Menu, "Resume journey");
         assert!(f.screen == Screen::Battle);
-        assert!(f.game.global_paused);
+        assert!(f.game.global_paused());
         assert_eq!(serde_json::to_value(&f.game).unwrap(), paused);
     }
 }
@@ -87,12 +87,12 @@ fn settings_return_to_camp_restores_its_previous_world_pause() {
         let f = &mut fixture.frontend;
         f.game.set_paused(paused);
         h.click(f, View::Header, "Settings");
-        assert!(f.game.global_paused);
+        assert!(f.game.global_paused());
         h.click(f, View::Settings, "Save and return to camp");
         assert!(f.screen == Screen::Camp, "{}", f.status.message);
         // The successful save queues restoration through the runtime.
         f.flush_for_test();
-        assert_eq!(f.game.global_paused, paused);
+        assert_eq!(f.game.global_paused(), paused);
     }
 }
 
@@ -169,7 +169,7 @@ fn binding_capture_ignores_its_activation_click_and_swaps_duplicates() {
     );
     h.key(f, View::Battle, Key::R);
     assert!(f.battle.construction);
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
 }
 
 #[test]
@@ -221,25 +221,25 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    let original = f.game.attempt.as_ref().unwrap().balance.clone();
+    let original = f.game.attempt().unwrap().balance.clone();
     assert_eq!(
         (
-            f.game.attempt.as_ref().unwrap().lane_count,
-            f.game.attempt.as_ref().unwrap().width_yards
+            f.game.attempt().unwrap().lane_count,
+            f.game.attempt().unwrap().width_yards
         ),
         (11, 30.0)
     );
     f.act(|c| c.open_settings());
     f.flush_for_test();
-    let active_snapshot = serde_json::to_value(f.game.attempt.as_ref().unwrap()).unwrap();
+    let active_snapshot = serde_json::to_value(f.game.attempt().unwrap()).unwrap();
     h.click(f, View::Settings, "Normal");
-    assert_eq!(f.game.campaign.balance_settings, original);
+    assert_eq!(f.game.campaign().balance_settings, original);
     h.click(f, View::Settings, "Apply to next run");
     assert_eq!(
-        f.game.campaign.balance_settings,
+        f.game.campaign().balance_settings,
         BalanceSettings::for_preset(BalancePreset::Normal)
     );
-    let a = f.game.attempt.as_ref().unwrap();
+    let a = f.game.attempt().unwrap();
     assert_eq!((a.lane_count, a.width_yards), (11, 30.0));
     assert_eq!(a.balance, original);
     assert!(a.paused);
@@ -247,10 +247,10 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
     h.click(f, View::Settings, "Save and return to defense");
     let restored = Game::load(&f.paths.campaign()).unwrap();
     assert_eq!(
-        restored.campaign.balance_settings,
-        f.game.campaign.balance_settings
+        restored.campaign().balance_settings,
+        f.game.campaign().balance_settings
     );
-    assert_eq!(restored.attempt.as_ref().unwrap().width_yards, 30.0);
+    assert_eq!(restored.attempt().unwrap().width_yards, 30.0);
     let before = serde_json::to_value(&f.game).unwrap();
     let invalid = BalanceSettings {
         enemy_speed: f32::NAN,
@@ -262,7 +262,7 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
     f.game.withdraw();
     f.game.deploy_country_stage(0, Mode::Personal).unwrap();
-    let a = f.game.attempt.as_ref().unwrap();
+    let a = f.game.attempt().unwrap();
     assert_eq!((a.lane_count, a.width_yards), (3, 12.0));
 }
 

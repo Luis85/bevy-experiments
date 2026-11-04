@@ -132,7 +132,7 @@ impl Feedback {
     }
 }
 pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
-    let Some(attempt) = f.game.attempt.as_ref() else {
+    let Some(attempt) = f.game.attempt() else {
         return;
     };
     let projection = art::ArenaProjection::for_attempt(arena, attempt)
@@ -248,19 +248,21 @@ mod tests {
     #[test]
     fn review_replays_one_banked_receipt_after_warmup_without_changing_game_items_coins_or_rng() {
         let mut game = Game::default();
-        game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut()
+            .choose_survivor(SurvivorId::Rook)
+            .unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game.deploy_country_stage(0, Mode::Personal).unwrap();
         let id = game
-            .campaign
+            .campaign_mut()
             .add_item_with_quality(4, 1, Some(Quality::Epic))
             .unwrap();
-        let attempt = game.attempt.as_mut().unwrap();
+        let attempt = game.attempt_mut().unwrap();
         let mut event = receipt(id, Quality::Epic);
         event.tick = attempt.tick;
         attempt.loot_events.push(event);
         let before = serde_json::to_value(&game).unwrap();
-        let attempt = game.attempt.as_ref().unwrap();
+        let attempt = game.attempt().unwrap();
         let mut feedback = Feedback::default();
         feedback.observe_for_capture(attempt, 0, 10.0, 1, review::LootCaptureMode::Motion, false);
         feedback.observe_for_capture(attempt, 0, 20.0, 47, review::LootCaptureMode::Motion, true);
@@ -301,9 +303,9 @@ mod tests {
     #[test]
     fn static_evidence_can_hold_mid_fade_while_normal_gameplay_keeps_real_time_expiry() {
         let mut game = Game::default();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let attempt = game.attempt.as_mut().unwrap();
+        let attempt = game.attempt_mut().unwrap();
         attempt.loot_events.push(receipt(6, Quality::Rare));
         let mut feedback = Feedback::default();
         let (_, time) = feedback.observe_for_capture(

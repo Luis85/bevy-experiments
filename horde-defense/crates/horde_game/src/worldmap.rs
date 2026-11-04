@@ -252,9 +252,9 @@ impl MapCache {
         let pointer = response.hover_pos();
         let mut hover: Option<usize> = None;
         for (n, country) in data.countries.iter().enumerate() {
-            let active = game.campaign.world.active.as_deref() == Some(country.id.as_str());
-            let cleared = game.campaign.world.cleared.contains(&country.id);
-            let accessible = game.campaign.world.can_enter(&country.id);
+            let active = game.campaign().world.active.as_deref() == Some(country.id.as_str());
+            let cleared = game.campaign().world.cleared.contains(&country.id);
+            let accessible = game.campaign().world.can_enter(&country.id);
             let chosen = country.id == *selected;
             let color = if chosen {
                 AMBER
@@ -325,7 +325,7 @@ impl MapCache {
             }
         }
         for alert in game
-            .strategy
+            .strategy()
             .outbreaks
             .iter()
             .filter(|o| o.outcome == horde_core::strategy::OutbreakOutcome::Active)
@@ -344,13 +344,13 @@ impl MapCache {
         }
         for country in &data.countries {
             let guards = game
-                .strategy
+                .strategy()
                 .guards
                 .iter()
                 .filter(|g| g.country_id == country.id)
                 .count();
             let deployments = game
-                .battles
+                .battles()
                 .iter()
                 .filter(|b| !b.settled && b.country_id == country.id)
                 .count();
@@ -421,7 +421,7 @@ impl MapCache {
                 RED,
                 format!(
                     "{} regions infected",
-                    data.countries.len() - game.campaign.world.cleared.len()
+                    data.countries.len() - game.campaign().world.cleared.len()
                 ),
             );
         });

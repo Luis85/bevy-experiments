@@ -28,21 +28,21 @@ impl IsolatedFrontend {
         let directory = frontend.paths.campaign().parent().unwrap().to_path_buf();
         frontend.game = Game::default();
         // Existing control/layout cases exercise compatibility campaigns.
-        frontend.game.campaign.legacy_features = true;
+        frontend.game.campaign_mut().legacy_features = true;
         // Existing layout/control fixtures explicitly exercise legacy11×30 arenas.
         // Fresh3×12 geometry is tested separately below.
         frontend
             .game
-            .campaign
+            .campaign_mut()
             .set_balance_settings(horde_core::balance::BalanceSettings::legacy())
             .unwrap();
         frontend
             .game
-            .campaign
+            .campaign_mut()
             .choose_survivor(SurvivorId::Rook)
             .unwrap();
         frontend.campaign.preview_survivor = SurvivorId::Rook;
-        frontend.battle.aim = [15.0, f32::from(frontend.game.campaign.lane_count()) * 0.5];
+        frontend.battle.aim = [15.0, f32::from(frontend.game.campaign().lane_count()) * 0.5];
         frontend.settings = Settings::default();
         frontend.screen = Screen::Camp;
         frontend.nav.return_screen = Screen::Camp;
@@ -72,19 +72,25 @@ impl IsolatedFrontend {
         }
     }
     fn unlock_trap(&mut self) {
-        self.frontend.game.campaign.first_clear(0, Mode::Personal);
-        self.frontend.game.campaign.finish_attempt();
-        self.frontend.game.campaign.reward(25, 0, Mode::Personal);
         self.frontend
             .game
-            .campaign
+            .campaign_mut()
+            .first_clear(0, Mode::Personal);
+        self.frontend.game.campaign_mut().finish_attempt();
+        self.frontend
+            .game
+            .campaign_mut()
+            .reward(25, 0, Mode::Personal);
+        self.frontend
+            .game
+            .campaign_mut()
             .purchase_blueprint(StructureKind::Trap)
             .unwrap();
     }
     fn deploy(&mut self) {
         self.frontend
             .game
-            .campaign
+            .campaign_mut()
             .choose_start_country("DEU")
             .unwrap();
         self.frontend
@@ -322,7 +328,7 @@ fn pointer_event(pressed: bool) -> Event {
     }
 }
 fn input_enemy(f: &mut FrontendParts, lane: u8, x: f32) {
-    let mut attempt = f.game.attempt.take().unwrap();
+    let mut attempt = f.game.attempt_slot_mut().take().unwrap();
     f.game.spawn_enemy(
         &mut attempt,
         horde_core::content::EnemyKind::Shambler,
@@ -330,7 +336,7 @@ fn input_enemy(f: &mut FrontendParts, lane: u8, x: f32) {
         false,
     );
     attempt.enemies.last_mut().unwrap().x = x;
-    f.game.attempt = Some(attempt);
+    *f.game.attempt_slot_mut() = Some(attempt);
 }
 fn attack_pointer(pos: Pos2, button: PointerButton, pressed: bool) -> Event {
     Event::PointerButton {

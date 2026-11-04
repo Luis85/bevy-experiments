@@ -50,7 +50,7 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
             if ui.button("Back").clicked() { close = true; }
         });
         muted(ui, "All fields are paused while you review. History records each settled run once; loot and coins are already banked.");
-        let records = &f.game.campaign.run_history;
+        let records = &f.game.campaign().run_history;
         let state = &mut f.history;
         ui.horizontal_wrapped(|ui| {
             let row = chrome::begin_filter_row(ui);
@@ -321,9 +321,11 @@ mod tests {
     #[test]
     fn filters_preserve_settlement_order_and_read_real_records_without_mutation() {
         let mut game = Game::default();
-        game.campaign.legacy_features = true;
-        game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut().legacy_features = true;
+        game.campaign_mut()
+            .choose_survivor(SurvivorId::Rook)
+            .unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         for mode in [Mode::Personal, Mode::Npc, Mode::Personal] {
             game.deploy_country_stage(0, mode).unwrap();
             for _ in 0..120 {
@@ -331,7 +333,7 @@ mod tests {
             }
             game.withdraw();
         }
-        assert_eq!(game.campaign.run_history.len(), 3);
+        assert_eq!(game.campaign().run_history.len(), 3);
         let before = serde_json::to_value(&game).unwrap();
         let state = HistoryUi {
             mode: Some(Mode::Personal),
@@ -339,7 +341,7 @@ mod tests {
             front: "deu".into(),
             selected: None,
         };
-        let rows = matching(&game.campaign.run_history, &state);
+        let rows = matching(&game.campaign().run_history, &state);
         assert_eq!(rows.len(), 2);
         assert!(rows[0].id < rows[1].id);
         assert_eq!(rows[0].duration_ticks, 120);
@@ -349,12 +351,12 @@ mod tests {
             front: "no such country".into(),
             ..HistoryUi::default()
         };
-        assert!(matching(&game.campaign.run_history, &missing).is_empty());
+        assert!(matching(&game.campaign().run_history, &missing).is_empty());
         let npc = HistoryUi {
             mode: Some(Mode::Npc),
             ..HistoryUi::default()
         };
-        assert_eq!(matching(&game.campaign.run_history, &npc).len(), 1);
+        assert_eq!(matching(&game.campaign().run_history, &npc).len(), 1);
         assert_eq!(serde_json::to_value(&game).unwrap(), before);
     }
 }

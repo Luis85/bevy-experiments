@@ -54,7 +54,7 @@ pub(super) struct BriefingView {
 /// The briefing for `stage` of the active country, or `None` before a front
 /// is chosen.
 pub(super) fn view_model(game: &Game, mode: Mode, stage: usize) -> Option<BriefingView> {
-    let campaign = &game.campaign;
+    let campaign = game.campaign();
     let country = campaign.world.active_country()?;
     let levels = country.level_count();
     let max_stage = campaign.world.completed(&country.id).min(levels - 1);
@@ -133,8 +133,10 @@ mod tests {
 
     fn started() -> Game {
         let mut game = Game::default();
-        game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut()
+            .choose_survivor(SurvivorId::Rook)
+            .unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game
     }
 
@@ -150,7 +152,7 @@ mod tests {
         assert_eq!((view.max_stage, view.stage), (0, 0));
         assert_eq!(view.country.id, "DEU");
         assert_eq!(view.levels, world().country("DEU").unwrap().level_count());
-        game.campaign.record_country_stage_clear(0).unwrap();
+        game.campaign_mut().record_country_stage_clear(0).unwrap();
         let view = view_model(&game, Mode::Personal, 7).unwrap();
         assert_eq!((view.max_stage, view.stage), (1, 1));
         assert_eq!(view.level.name, content().levels[1].name);
@@ -159,7 +161,7 @@ mod tests {
     #[test]
     fn forecast_and_deployment_facts_match_the_campaign() {
         let game = started();
-        let c = &game.campaign;
+        let c = game.campaign();
         let view = view_model(&game, Mode::Personal, 0).unwrap();
         let forecast = view.forecast.as_ref().unwrap();
         let pressure = c.deployment_progression(Mode::Personal).unwrap();
@@ -192,8 +194,8 @@ mod tests {
         let view = view_model(&game, Mode::Npc, 0).unwrap();
         assert_eq!(
             view.loadout[1].name,
-            game.campaign.equipped(Mode::Npc, Slot::Melee).name
+            game.campaign().equipped(Mode::Npc, Slot::Melee).name
         );
-        assert_eq!(view.npc_name, game.campaign.npc.name);
+        assert_eq!(view.npc_name, game.campaign().npc.name);
     }
 }

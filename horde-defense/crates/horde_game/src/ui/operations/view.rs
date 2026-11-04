@@ -60,7 +60,7 @@ pub(super) fn country_name(id: &str) -> &str {
 }
 
 pub(super) fn view_model(game: &Game) -> OperationsView {
-    let strategy = &game.strategy;
+    let strategy = game.strategy();
     let outbreaks = strategy
         .outbreaks
         .iter()
@@ -73,11 +73,11 @@ pub(super) fn view_model(game: &Game) -> OperationsView {
         })
         .collect();
     let live = game
-        .battles
+        .battles()
         .iter()
         .filter(|b| !b.settled)
         .filter_map(|b| {
-            let a = b.game.attempt.as_ref()?;
+            let a = b.game().attempt()?;
             Some(ExpeditionLine {
                 id: b.id,
                 recruit: strategy
@@ -97,11 +97,11 @@ pub(super) fn view_model(game: &Game) -> OperationsView {
         })
         .collect();
     let reports = game
-        .battles
+        .battles()
         .iter()
         .filter(|b| b.settled)
         .filter_map(|b| {
-            let report = b.game.last_result.as_ref()?;
+            let report = b.game().last_result()?;
             Some(ExpeditionReport {
                 id: b.id,
                 country: country_name(&b.country_id).to_owned(),
@@ -113,15 +113,15 @@ pub(super) fn view_model(game: &Game) -> OperationsView {
         })
         .collect();
     OperationsView {
-        paused: game.global_paused,
-        field_active: game.attempt.is_some(),
+        paused: game.global_paused(),
+        field_active: game.attempt().is_some(),
         outbreaks,
         live,
-        any_settled: game.battles.iter().any(|b| b.settled),
+        any_settled: game.battles().iter().any(|b| b.settled),
         reports,
-        recruit_unlocked: strategy.recruitment_unlocked(&game.campaign),
-        parallel_unlocked: strategy.parallel_unlocked(&game.campaign),
-        strategy_unlocked: strategy.grand_strategy_unlocked(&game.campaign),
+        recruit_unlocked: strategy.recruitment_unlocked(game.campaign()),
+        parallel_unlocked: strategy.parallel_unlocked(game.campaign()),
+        strategy_unlocked: strategy.grand_strategy_unlocked(game.campaign()),
     }
 }
 
@@ -133,7 +133,7 @@ mod tests {
     fn a_fresh_world_has_no_operations_and_locked_orders() {
         let game = Game::default();
         let view = view_model(&game);
-        assert_eq!(view.paused, game.global_paused);
+        assert_eq!(view.paused, game.global_paused());
         assert!(!view.field_active);
         assert!(view.outbreaks.is_empty());
         assert!(view.live.is_empty());
@@ -148,8 +148,8 @@ mod tests {
     fn active_outbreaks_report_country_and_remaining_seconds() {
         let mut game = Game::default();
         let country = world().countries[0].clone();
-        game.strategy.tick = 120;
-        game.strategy
+        game.strategy_mut().tick = 120;
+        game.strategy_mut()
             .outbreaks
             .push(horde_core::strategy::Outbreak {
                 id: 1,
@@ -161,10 +161,10 @@ mod tests {
                 outcome: OutbreakOutcome::Active,
                 ready_turns: 0,
             });
-        let mut resolved = game.strategy.outbreaks[0].clone();
+        let mut resolved = game.strategy().outbreaks[0].clone();
         resolved.id = 2;
         resolved.outcome = OutbreakOutcome::Contained;
-        game.strategy.outbreaks.push(resolved);
+        game.strategy_mut().outbreaks.push(resolved);
         let view = view_model(&game);
         assert_eq!(
             view.outbreaks,

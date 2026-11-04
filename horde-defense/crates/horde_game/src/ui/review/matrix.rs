@@ -41,7 +41,8 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         SurvivorId::Rook
     };
     f.game
-        .campaign
+        .staging()
+        .campaign()
         .choose_survivor(identity)
         .expect("review survivor identity");
     f.campaign.preview_survivor = identity;
@@ -80,7 +81,8 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         _ => "DEU",
     };
     f.game
-        .campaign
+        .staging()
+        .campaign()
         .choose_start_country(country)
         .expect("review country");
     f.campaign.selected_country = country.into();
@@ -103,13 +105,13 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
             .expect("first journey review round");
         f.game.set_paused(false);
         for _ in 0..60 * 300 {
-            if f.game.attempt.is_none() {
+            if f.game.attempt().is_none() {
                 break;
             }
             let input = horde_core::sim::smoke_input(&f.game);
             f.game.tick(input);
         }
-        if f.game.attempt.is_some() {
+        if f.game.attempt().is_some() {
             f.game.withdraw();
         }
         f.game.set_paused(true);
@@ -130,7 +132,7 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
     if matches!(screen.as_str(), "progressed-battle" | "leveled-armory") {
         let count = f
             .game
-            .campaign
+            .campaign()
             .world
             .active_country()
             .expect("review country")
@@ -139,17 +141,20 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         // balance proof. Repeated templates still count as victories.
         for stage in 0..count {
             f.game
-                .campaign
+                .staging()
+                .campaign()
                 .first_clear(stage % content().levels.len(), Mode::Personal);
-            f.game.campaign.finish_attempt();
+            f.game.staging().campaign().finish_attempt();
             f.game
-                .campaign
+                .staging()
+                .campaign()
                 .record_country_stage_clear(stage)
                 .expect("explicit review progression entitlement");
         }
         if screen == "progressed-battle" {
             f.game
-                .campaign
+                .staging()
+                .campaign()
                 .enter_country("POL")
                 .expect("neighbor after liberation");
             f.campaign.selected_country = "POL".into();
@@ -172,10 +177,12 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         }
         "character" => f.nav.tab = Tab::Character,
         "character-max" => {
-            f.game.campaign.player.level = f.game.campaign.player_level_cap();
-            f.game.campaign.player.xp = 0;
-            f.game.campaign.player.points =
-                f.game.campaign.player.level - 1 - f.game.campaign.player.body.iter().sum::<u32>();
+            f.game.staging().campaign().player.level =
+                f.game.staging().campaign().player_level_cap();
+            f.game.staging().campaign().player.xp = 0;
+            f.game.staging().campaign().player.points = f.game.staging().campaign().player.level
+                - 1
+                - f.game.staging().campaign().player.body.iter().sum::<u32>();
             f.nav.tab = Tab::Character;
         }
         "campaign" => f.nav.tab = Tab::World,
@@ -196,7 +203,8 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
                 for quality in horde_core::quality::Quality::ALL {
                     f.armory.selected_item = Some(
                         f.game
-                            .campaign
+                            .staging()
+                            .campaign()
                             .add_item_with_quality(definition, 4, Some(quality))
                             .expect("explicit quality fixture entitlement"),
                     );
@@ -207,7 +215,7 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
             }
             f.armory.selected_item = f
                 .game
-                .campaign
+                .campaign()
                 .items
                 .iter()
                 .find(|i| !i.protected)
@@ -242,9 +250,9 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
             f.game.set_paused(false);
             if screen == "reticle-reload" {
                 // Consume actual shots; the resource readout never invents ammo.
-                let half = f.game.attempt.as_ref().unwrap().magazine / 2;
+                let half = f.game.attempt().unwrap().magazine / 2;
                 for _ in 0..240 {
-                    let a = f.game.attempt.as_ref().expect("live reload review");
+                    let a = f.game.attempt().expect("live reload review");
                     if a.ammo <= half {
                         break;
                     }
@@ -263,15 +271,14 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
             } else {
                 let target = f
                     .game
-                    .attempt
-                    .as_ref()
+                    .attempt()
                     .unwrap()
                     .enemies
                     .first()
                     .map(|e| [e.x, e.y()])
                     .unwrap_or([
-                        f.game.attempt.as_ref().unwrap().width_yards * 0.6,
-                        f.game.attempt.as_ref().unwrap().defender_position()[1],
+                        f.game.attempt().unwrap().width_yards * 0.6,
+                        f.game.attempt().unwrap().defender_position()[1],
                     ]);
                 f.game.tick(Input {
                     aim: target,
@@ -280,22 +287,27 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
                 });
             }
             f.battle.aim = [
-                f.game.attempt.as_ref().unwrap().width_yards * 0.6,
-                f.game.attempt.as_ref().unwrap().defender_position()[1],
+                f.game.attempt().unwrap().width_yards * 0.6,
+                f.game.attempt().unwrap().defender_position()[1],
             ];
         }
         "damage-4x" => {
             prepare_battle(f, "npc");
             f.battle.speed = 4;
             f.battle.aim = [
-                f.game.attempt.as_ref().unwrap().width_yards * 0.6,
-                f.game.attempt.as_ref().unwrap().defender_position()[1],
+                f.game.attempt().unwrap().width_yards * 0.6,
+                f.game.attempt().unwrap().defender_position()[1],
             ];
         }
         "npc-expanded" => prepare_battle(f, "npc"),
         "critical-npc" => {
             prepare_battle(f, "npc");
-            let mut a = f.game.attempt.take().expect("live NPC review");
+            let mut a = f
+                .game
+                .staging()
+                .attempt_slot()
+                .take()
+                .expect("live NPC review");
             let lane = a.lane_count / 2;
             f.game
                 .spawn_enemy(&mut a, horde_core::content::EnemyKind::Brute, lane, false);
@@ -303,7 +315,7 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
             enemy.x = 9.0;
             enemy.hp = -2;
             enemy.injury.hp = -2;
-            f.game.attempt = Some(a);
+            *f.game.staging().attempt_slot() = Some(a);
             f.battle.speed = 4;
         }
         "quality-loot" => {
@@ -316,10 +328,11 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
             let quality = horde_core::quality::Quality::Epic;
             let item_id = f
                 .game
-                .campaign
+                .staging()
+                .campaign()
                 .add_item_with_quality(definition, 3, Some(quality))
                 .expect("explicit isolated loot fixture");
-            let a = f.game.attempt.as_mut().unwrap();
+            let a = f.game.staging().attempt().unwrap();
             a.loot += 1;
             a.loot_events.push(horde_core::quality::LootEvent {
                 item_id,

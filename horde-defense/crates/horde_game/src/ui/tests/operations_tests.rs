@@ -14,7 +14,7 @@ fn a_personal_field_remains_returnable_from_operations_without_reset_or_resume()
     let before = serde_json::to_value(&f.game).unwrap();
     h.click(f, View::Camp, "Return to active defense");
     assert!(f.screen == Screen::Battle);
-    assert!(f.game.attempt.as_ref().unwrap().paused);
+    assert!(f.game.attempt().unwrap().paused);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
 
@@ -26,16 +26,15 @@ fn npc_resolution_popup_and_observation_controls_fit_at_both_sizes() {
         let f = &mut fixture.frontend;
         settings::configure(&h.ctx, scale);
         f.settings.scale = scale;
-        f.game.campaign.choose_start_country("DEU").unwrap();
-        f.game.campaign.attempts = 1;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.game.campaign_mut().attempts = 1;
         f.game.deploy_country_stage(0, Mode::Npc).unwrap();
         f.game.set_paused(false);
         input_enemy(f, 5, 8.0);
         for _ in 0..600 {
             f.game.tick(Input::default());
             if f.game
-                .attempt
-                .as_ref()
+                .attempt()
                 .unwrap()
                 .log
                 .iter()
@@ -46,8 +45,7 @@ fn npc_resolution_popup_and_observation_controls_fit_at_both_sizes() {
         }
         assert!(
             f.game
-                .attempt
-                .as_ref()
+                .attempt()
                 .unwrap()
                 .log
                 .iter()
@@ -102,16 +100,16 @@ fn failed_outbreak_front_change_keeps_operations_and_the_requested_country_conte
     f.game.set_paused(true);
     f.screen = Screen::Camp;
     f.nav.tab = Tab::Operations;
-    f.game.campaign.world.cleared.push("FRA".into());
+    f.game.campaign_mut().world.cleared.push("FRA".into());
     f.game
-        .campaign
+        .campaign_mut()
         .world
         .country_levels
         .insert("FRA".into(), world().country("FRA").unwrap().level_count());
-    f.game.strategy.peak_freed = 1;
-    f.game.strategy.next_outbreak_id = 2;
+    f.game.strategy_mut().peak_freed = 1;
+    f.game.strategy_mut().next_outbreak_id = 2;
     f.game
-        .strategy
+        .strategy_mut()
         .outbreaks
         .push(horde_core::strategy::Outbreak {
             id: 1,
@@ -127,10 +125,7 @@ fn failed_outbreak_front_change_keeps_operations_and_the_requested_country_conte
     h.click(f, View::Camp, "Plan outbreak response");
     assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Operations);
     assert_eq!(f.campaign.selected_country, "FRA");
-    assert_eq!(
-        f.game.attempt.as_ref().unwrap().country_id.as_deref(),
-        Some("DEU")
-    );
+    assert_eq!(f.game.attempt().unwrap().country_id.as_deref(), Some("DEU"));
     assert!(f.status.message_error);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
@@ -140,11 +135,11 @@ fn npc_critical_state_stays_explicit_at_one_and_four_times_observation_speed() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.choose_start_country("DEU").unwrap();
-    f.game.campaign.attempts = 1;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().attempts = 1;
     f.game.deploy_country_stage(0, Mode::Npc).unwrap();
     input_enemy(f, 5, 8.0);
-    let a = f.game.attempt.as_mut().unwrap();
+    let a = f.game.attempt_mut().unwrap();
     let enemy = a.enemies.last_mut().unwrap();
     enemy.hp = -2;
     enemy.injury.hp = -2;
@@ -163,7 +158,7 @@ fn npc_critical_state_stays_explicit_at_one_and_four_times_observation_speed() {
                 .any(|s| shape_has_text(&s.shape, "CRIT · FIGHTING"))
         );
         let mut dossier = h.ctx.run_ui(RawInput::default(), |ui| {
-            crate::inspector::dossier(ui, f.game.attempt.as_ref().unwrap(), [8.0, 5.5])
+            crate::inspector::dossier(ui, f.game.attempt().unwrap(), [8.0, 5.5])
         });
         assert!(
             dossier

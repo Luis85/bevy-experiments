@@ -78,10 +78,10 @@ pub(in crate::ui) struct HudView {
 
 /// The player's own battle HUD, or `None` outside a battle.
 pub(in crate::ui) fn view_model(game: &Game) -> Option<HudView> {
-    let a = game.attempt.as_ref()?;
+    let a = game.attempt()?;
     Some(HudView {
         defender: if a.mode == Mode::Personal {
-            game.campaign
+            game.campaign()
                 .selected_survivor
                 .map_or("YOU", SurvivorId::name)
         } else {
@@ -266,7 +266,7 @@ mod tests {
         }
         assert_eq!(format!("{:.1}", shown_dps(12.345)), "12.3");
         let game = battle(Mode::Personal);
-        let readout = dps(game.attempt.as_ref().unwrap());
+        let readout = dps(game.attempt().unwrap());
         assert_eq!(format!("DPS {:.1}", readout.live), "DPS 0.0");
         assert!(readout.live.is_sign_positive());
     }
@@ -274,9 +274,9 @@ mod tests {
         let mut game = Game::default();
         if mode == Mode::Npc {
             // Legacy campaigns field Mara without the companion skill path.
-            game.campaign.legacy_features = true;
-            game.campaign.balance_settings = horde_core::balance::BalanceSettings::legacy();
-            game.campaign.attempts = 1;
+            game.campaign_mut().legacy_features = true;
+            game.campaign_mut().balance_settings = horde_core::balance::BalanceSettings::legacy();
+            game.campaign_mut().attempts = 1;
         }
         game.deploy(0, mode).unwrap();
         game
@@ -290,7 +290,7 @@ mod tests {
     #[test]
     fn view_model_reads_personal_vitals_and_a_quiet_line() {
         let game = battle(Mode::Personal);
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let view = view_model(&game).unwrap();
         assert_eq!(view.defender, "YOU");
         assert_eq!((view.hp, view.max_hp), (a.hp, a.max_hp));
@@ -329,7 +329,7 @@ mod tests {
     #[test]
     fn reload_readout_reports_remaining_time_and_progress() {
         let mut game = battle(Mode::Personal);
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.reload_left = 30;
         let total = (a.profile.personal.reload.max(0.5) * 60.0).ceil();
         assert_eq!(a.reload_duration_ticks() as f32, total);
@@ -342,12 +342,12 @@ mod tests {
     fn contact_lanes_are_counted_once_and_listed() {
         let mut game = battle(Mode::Personal);
         for _ in 0..3600 {
-            if !game.attempt.as_ref().unwrap().enemies.is_empty() {
+            if !game.attempt().unwrap().enemies.is_empty() {
                 break;
             }
             game.tick(Input::default());
         }
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.events.clear();
         for enemy in &mut a.enemies {
             enemy.x = 100.0;

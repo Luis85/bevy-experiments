@@ -138,7 +138,7 @@ fn retained_legacy_points_pay_inside_the_same_graph_with_an_exact_nonrefundable_
 fn legacy_refund_cannot_orphan_coin_or_point_purchased_graph_nodes() {
     for use_legacy_point in [false, true] {
         let mut g = Game::default();
-        let c = &mut g.campaign;
+        let c = g.campaign_mut();
         c.legacy_features = true;
         c.player.level = if use_legacy_point { 5 } else { 4 };
         c.player.body[BodyAttribute::Vitality] = 3;
@@ -172,7 +172,7 @@ fn legacy_refund_cannot_orphan_coin_or_point_purchased_graph_nodes() {
             std::process::id()
         ));
         g.save(&path).unwrap();
-        assert_eq!(Game::load(&path).unwrap().campaign, before);
+        assert_eq!(*Game::load(&path).unwrap().campaign(), before);
         std::fs::remove_file(&path).unwrap();
         if path.with_extension("bak").exists() {
             std::fs::remove_file(path.with_extension("bak")).unwrap();
@@ -199,25 +199,29 @@ fn legacy_refund_cannot_orphan_coin_or_point_purchased_graph_nodes() {
 fn fortification_nodes_have_real_effects_and_existing_blueprints_and_ranks_cannot_be_bought_twice()
 {
     let mut g = Game::default();
-    g.campaign.reward(5000, 0, Mode::Personal);
+    g.campaign_mut().reward(5000, 0, Mode::Personal);
     for stage in 0..3 {
-        g.campaign.first_clear(stage, Mode::Personal);
+        g.campaign_mut().first_clear(stage, Mode::Personal);
     }
-    assert!(!g.campaign.has_feature(CampaignFeature::Construction));
-    g.campaign.purchase_node("engineering").unwrap();
-    assert!(g.campaign.has_feature(CampaignFeature::Construction));
-    g.campaign.purchase_blueprint(StructureKind::Trap).unwrap();
-    assert!(g.campaign.has_node("trap_blueprint"));
-    g.campaign.upgrade_structure(StructureKind::Trap).unwrap();
-    assert_eq!(g.campaign.structure_upgrades[StructureKind::Trap], 1);
-    g.campaign.validate().unwrap();
-    let before = g.campaign.clone();
-    assert!(g.campaign.purchase_node("trap_rank_1").is_err());
-    assert_eq!(g.campaign, before);
+    assert!(!g.campaign().has_feature(CampaignFeature::Construction));
+    g.campaign_mut().purchase_node("engineering").unwrap();
+    assert!(g.campaign().has_feature(CampaignFeature::Construction));
+    g.campaign_mut()
+        .purchase_blueprint(StructureKind::Trap)
+        .unwrap();
+    assert!(g.campaign().has_node("trap_blueprint"));
+    g.campaign_mut()
+        .upgrade_structure(StructureKind::Trap)
+        .unwrap();
+    assert_eq!(g.campaign().structure_upgrades[StructureKind::Trap], 1);
+    g.campaign().validate().unwrap();
+    let before = g.campaign().clone();
+    assert!(g.campaign_mut().purchase_node("trap_rank_1").is_err());
+    assert_eq!(*g.campaign(), before);
     g.deploy(0, Mode::Personal).unwrap();
     g.place(StructureKind::Trap, 0, 0).unwrap();
-    assert!(g.attempt.as_ref().unwrap().structures[0].max_hp >= 1);
-    let mut old = legacy_game().campaign;
+    assert!(g.attempt().unwrap().structures[0].max_hp >= 1);
+    let mut old = legacy_game().campaign().clone();
     old.coins = 1000;
     old.first_clear(0, Mode::Personal);
     old.blueprints[StructureKind::Trap] = true;
@@ -263,90 +267,90 @@ fn companions_and_world_complexity_require_both_authored_unlock_nodes_and_countr
     let before = c.clone();
     assert!(c.purchase_node("parallel_command").is_err());
     assert_eq!(c, before);
-    let mut old = legacy_game().campaign;
+    let mut old = legacy_game().campaign().clone();
     old.attempts = 1;
     assert!(old.npc_available());
 }
 
 fn clear_active(g: &mut Game) {
-    let mut a = g.attempt.take().unwrap();
+    let mut a = g.attempt_slot_mut().take().unwrap();
     let lane = a.lane_count / 2;
     g.spawn_enemy(&mut a, EnemyKind::Brute, lane, true);
     a.boss_spawned = true;
     a.enemies.last_mut().unwrap().hp = 0;
-    g.attempt = Some(a);
+    *g.attempt_slot_mut() = Some(a);
     g.tick(Input::default());
-    assert_eq!(g.last_result.as_ref().unwrap().outcome, Outcome::Victory);
+    assert_eq!(g.last_result().unwrap().outcome, Outcome::Victory);
 }
 
 #[test]
 fn journey_every_outcome_stops_for_upgrades_and_continuation_uses_reported_country_safely() {
     let mut g = Game::default();
-    g.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-    g.campaign.choose_start_country("VAT").unwrap();
+    g.campaign_mut().choose_survivor(SurvivorId::Rook).unwrap();
+    g.campaign_mut().choose_start_country("VAT").unwrap();
     g.deploy_country_stage(0, Mode::Personal).unwrap();
     g.withdraw();
     g.set_paused(true);
-    assert!(g.global_paused);
-    assert_eq!(g.campaign.run_history.len(), 1);
+    assert!(g.global_paused());
+    assert_eq!(g.campaign().run_history.len(), 1);
     assert_eq!(g.continue_journey().unwrap(), JourneyContinuation::Deployed);
-    assert!(!g.global_paused);
+    assert!(!g.global_paused());
     let before = serde_json::to_string(&g).unwrap();
     assert!(g.continue_journey().is_err());
     assert_eq!(serde_json::to_string(&g).unwrap(), before);
-    g.attempt.as_mut().unwrap().hp = 0;
+    g.attempt_mut().unwrap().hp = 0;
     g.tick(Input::default());
     assert_eq!(g.continue_journey().unwrap(), JourneyContinuation::Deployed);
-    g.repeat_remaining = 10;
+    g.set_repeat_remaining(10);
     clear_active(&mut g);
-    assert_eq!(g.repeat_remaining, 0);
-    assert!(g.attempt.is_none());
+    assert_eq!(g.repeat_remaining(), 0);
+    assert!(g.attempt().is_none());
     assert_eq!(g.continue_journey().unwrap(), JourneyContinuation::Deployed);
-    assert_eq!(g.attempt.as_ref().unwrap().stage, 1);
+    assert_eq!(g.attempt().unwrap().stage, 1);
     clear_active(&mut g);
     g.continue_journey().unwrap();
     clear_active(&mut g);
-    let history = g.campaign.run_history.len();
+    let history = g.campaign().run_history.len();
     assert_eq!(
         g.continue_journey().unwrap(),
         JourneyContinuation::CountryLiberated
     );
-    assert!(g.global_paused);
-    assert!(g.attempt.is_none());
+    assert!(g.global_paused());
+    assert!(g.attempt().is_none());
     g.leave_journey();
-    assert_eq!(g.campaign.run_history.len(), history);
+    assert_eq!(g.campaign().run_history.len(), history);
 }
 
 #[test]
 fn equipped_visuals_are_authored_actual_instances_and_frozen_for_the_attempt() {
     let mut g = Game::default();
-    g.campaign.coins = 1000;
+    g.campaign_mut().coins = 1000;
     let outfit = content()
         .items
         .iter()
         .position(|item| item.name == "Padded vest")
         .unwrap();
-    let id = g.campaign.buy_item(outfit).unwrap();
-    g.campaign.equip(Mode::Personal, id).unwrap();
-    let profile = g.campaign.profile(Mode::Personal);
+    let id = g.campaign_mut().buy_item(outfit).unwrap();
+    g.campaign_mut().equip(Mode::Personal, id).unwrap();
+    let profile = g.campaign().profile(Mode::Personal);
     let visual = profile.equipment_visual.outfit.as_ref().unwrap();
     assert_eq!(visual.definition, ItemDefId::at(outfit));
-    assert_eq!(visual.level, g.campaign.item(id).unwrap().level);
+    assert_eq!(visual.level, g.campaign().item(id).unwrap().level);
     assert_eq!(visual.style, "armor.leather");
-    assert_eq!(visual.quality, g.campaign.item_quality(id).unwrap());
+    assert_eq!(visual.quality, g.campaign().item_quality(id).unwrap());
     assert_eq!(
         profile.equipment_visual.ranged.as_ref().unwrap().definition,
-        g.campaign
-            .item(g.campaign.player.loadout[Slot::Ranged.index()])
+        g.campaign()
+            .item(g.campaign().player.loadout[Slot::Ranged.index()])
             .unwrap()
             .definition
     );
     g.deploy(0, Mode::Personal).unwrap();
     assert_eq!(
-        g.attempt.as_ref().unwrap().profile.equipment_visual,
+        g.attempt().unwrap().profile.equipment_visual,
         profile.equipment_visual
     );
-    assert!(g.campaign.equip(Mode::Personal, 3).is_err());
+    assert!(g.campaign_mut().equip(Mode::Personal, 3).is_err());
     let mut old = serde_json::to_value(profile).unwrap();
     old.as_object_mut().unwrap().remove("equipment_visual");
     let restored: horde_core::campaign::DefenderProfile = serde_json::from_value(old).unwrap();
@@ -354,16 +358,14 @@ fn equipped_visuals_are_authored_actual_instances_and_frozen_for_the_attempt() {
     assert!(restored.equipment_visual.weapon_class.is_none());
     let mut invalid = g.clone();
     invalid
-        .attempt
-        .as_mut()
+        .attempt_mut()
         .unwrap()
         .profile
         .equipment_visual
         .weapon_class = Some(horde_core::weapons::WeaponClass::Smg);
     let path = std::env::temp_dir().join(format!("visual-class-check-{}.json", std::process::id()));
     assert!(invalid.save(&path).is_err());
-    g.attempt
-        .as_mut()
+    g.attempt_mut()
         .unwrap()
         .profile
         .equipment_visual
@@ -372,7 +374,7 @@ fn equipped_visuals_are_authored_actual_instances_and_frozen_for_the_attempt() {
     assert!(
         Game::load(&path)
             .unwrap()
-            .attempt
+            .attempt()
             .unwrap()
             .profile
             .equipment_visual
@@ -385,25 +387,25 @@ fn equipped_visuals_are_authored_actual_instances_and_frozen_for_the_attempt() {
 #[test]
 fn leaving_journey_persists_without_erasing_report_and_old_resume_infers_only_once() {
     let mut g = Game::default();
-    g.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-    g.campaign.choose_start_country("VAT").unwrap();
-    assert!(!g.campaign.journey_active);
+    g.campaign_mut().choose_survivor(SurvivorId::Rook).unwrap();
+    g.campaign_mut().choose_start_country("VAT").unwrap();
+    assert!(!g.campaign().journey_active);
     g.deploy_country_stage(0, Mode::Personal).unwrap();
-    assert!(g.campaign.journey_active);
+    assert!(g.campaign().journey_active);
     g.withdraw();
-    assert!(g.campaign.journey_active);
+    assert!(g.campaign().journey_active);
     let path = std::env::temp_dir().join(format!("journey-state-{}.json", std::process::id()));
     g.save(&path).unwrap();
     let mut resumed = Game::load(&path).unwrap();
-    assert!(resumed.campaign.journey_active);
+    assert!(resumed.campaign().journey_active);
     resumed.leave_journey();
-    assert!(!resumed.campaign.journey_active);
-    assert!(resumed.last_result.is_some());
-    let count = resumed.campaign.run_history.len();
+    assert!(!resumed.campaign().journey_active);
+    assert!(resumed.last_result().is_some());
+    let count = resumed.campaign().run_history.len();
     resumed.save(&path).unwrap();
     let resumed = Game::load(&path).unwrap();
-    assert!(!resumed.campaign.journey_active);
-    assert_eq!(resumed.campaign.run_history.len(), count);
+    assert!(!resumed.campaign().journey_active);
+    assert_eq!(resumed.campaign().run_history.len(), count);
     let mut check = resumed.clone();
     assert!(check.continue_journey().is_err());
     let mut old = serde_json::to_value(resumed).unwrap();
@@ -424,8 +426,8 @@ fn leaving_journey_persists_without_erasing_report_and_old_resume_infers_only_on
         .unwrap(),
     )
     .unwrap();
-    assert!(migrated.campaign.journey_active);
-    assert_eq!(migrated.campaign.journey_revision, 1);
+    assert!(migrated.campaign().journey_active);
+    assert_eq!(migrated.campaign().journey_revision, 1);
     std::fs::remove_file(&path).unwrap();
     if path.with_extension("bak").exists() {
         std::fs::remove_file(path.with_extension("bak")).unwrap();

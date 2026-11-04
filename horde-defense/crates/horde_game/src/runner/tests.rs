@@ -25,7 +25,7 @@ fn country_command_requires_confirmed_survivor_and_retains_cosmetic_identity() {
         .unwrap();
     game.apply(&Command::ChooseStart("DEU".into())).unwrap();
     assert_eq!(
-        game.attempt.as_ref().unwrap().profile.appearance,
+        game.attempt().unwrap().profile.appearance,
         Appearance::Female
     );
 }
@@ -35,7 +35,7 @@ fn authoritative_events_select_weapon_and_ordnance_sounds_without_mutating_the_g
     let mut host = Host::new();
     host.deploy();
     let before = serde_json::to_value(&host.game).unwrap();
-    let a = host.game.attempt.as_ref().unwrap();
+    let a = host.game.attempt().unwrap();
     let shot = SimEvent::Shot {
         shooter: Actor::Defender {
             mode: a.mode,
@@ -83,7 +83,7 @@ fn authoritative_events_select_weapon_and_ordnance_sounds_without_mutating_the_g
 fn a_sound_emitted_on_the_finishing_tick_is_played() {
     let mut host = Host::new();
     host.deploy();
-    let a = host.game.attempt.as_mut().unwrap();
+    let a = host.game.attempt_mut().unwrap();
     // The reload completes on the same tick the overrun defender retreats.
     a.hp = 0;
     a.reload_left = 1;
@@ -92,7 +92,7 @@ fn a_sound_emitted_on_the_finishing_tick_is_played() {
         ..ControlFrame::default()
     });
     step(&mut host.ctx());
-    assert!(host.game.attempt.is_none());
+    assert!(host.game.attempt().is_none());
     assert!(host.cues.contains(&SoundCue::Reload));
     assert!(
         host.notices
@@ -104,7 +104,7 @@ fn a_sound_emitted_on_the_finishing_tick_is_played() {
 fn melee_readiness_event_plays_the_ready_cue() {
     let mut host = Host::new();
     host.deploy();
-    host.game.attempt.as_mut().unwrap().melee_cooldown = 1;
+    host.game.attempt_mut().unwrap().melee_cooldown = 1;
     host.runtime.publish(ControlFrame {
         enabled: true,
         ..ControlFrame::default()
@@ -148,18 +148,18 @@ fn kill_and_attempt_finished_events_map_to_their_cues() {
 fn boss_kill_on_the_finishing_tick_plays_kill_and_victory() {
     let mut host = Host::new();
     host.deploy();
-    let mut attempt = host.game.attempt.take().unwrap();
+    let mut attempt = host.game.attempt_slot_mut().take().unwrap();
     attempt.boss_spawned = true;
     host.game
         .spawn_enemy(&mut attempt, horde_core::content::EnemyKind::Brute, 5, true);
     attempt.enemies.last_mut().unwrap().hp = 0;
-    host.game.attempt = Some(attempt);
+    *host.game.attempt_slot_mut() = Some(attempt);
     host.runtime.publish(ControlFrame {
         enabled: true,
         ..ControlFrame::default()
     });
     step(&mut host.ctx());
-    assert!(host.game.attempt.is_none());
+    assert!(host.game.attempt().is_none());
     assert!(host.cues.contains(&SoundCue::Kill), "{:?}", host.cues);
     assert!(host.cues.contains(&SoundCue::Victory), "{:?}", host.cues);
     assert!(!host.cues.contains(&SoundCue::Defeat));
@@ -168,13 +168,13 @@ fn boss_kill_on_the_finishing_tick_plays_kill_and_victory() {
 fn overrun_on_the_finishing_tick_plays_the_defeat_stinger() {
     let mut host = Host::new();
     host.deploy();
-    host.game.attempt.as_mut().unwrap().hp = 0;
+    host.game.attempt_mut().unwrap().hp = 0;
     host.runtime.publish(ControlFrame {
         enabled: true,
         ..ControlFrame::default()
     });
     step(&mut host.ctx());
-    assert!(host.game.attempt.is_none());
+    assert!(host.game.attempt().is_none());
     assert!(host.cues.contains(&SoundCue::Defeat), "{:?}", host.cues);
     assert!(!host.cues.contains(&SoundCue::Victory));
 }
@@ -185,7 +185,7 @@ fn withdrawal_plays_retreat_once_without_waiting_for_a_tick() {
     host.runtime.begin_frame(1);
     assert!(host.runtime.enqueue(Command::Withdraw, "Recalled"));
     flush_for_test(&mut host.ctx());
-    assert!(host.game.attempt.is_none());
+    assert!(host.game.attempt().is_none());
     assert_eq!(host.cues, vec![SoundCue::Retreat]);
     // The terminal event was drained with the command: later camp ticks
     // cannot replay it.
@@ -203,7 +203,7 @@ fn withdrawal_plays_retreat_once_without_waiting_for_a_tick() {
 #[test]
 fn successful_purchases_confirm_and_rejected_ones_stay_silent() {
     let mut host = Host::new();
-    host.game.campaign.coins = 100;
+    host.game.campaign_mut().coins = 100;
     host.runtime.begin_frame(1);
     host.runtime
         .enqueue(Command::BuySkillNode("steady_hands".into()), "Learned");
@@ -219,11 +219,11 @@ fn successful_purchases_confirm_and_rejected_ones_stay_silent() {
 #[test]
 fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
     let mut game = Game::default();
-    game.campaign.coins = 100;
+    game.campaign_mut().coins = 100;
     game.apply(&Command::BuySkillNode("steady_hands".into()))
         .unwrap();
-    assert!(game.campaign.has_node("steady_hands"));
-    assert_eq!(game.campaign.coins, 80);
+    assert!(game.campaign().has_node("steady_hands"));
+    assert_eq!(game.campaign().coins, 80);
     let before = game.clone();
     assert!(
         game.apply(&Command::BuySkillNode("steady_hands".into()))
@@ -321,12 +321,12 @@ impl Host {
             NEXT.fetch_add(1, Ordering::Relaxed)
         ));
         let mut game = Game::default();
-        game.campaign.legacy_features = true;
+        game.campaign_mut().legacy_features = true;
         // Runtime fixtures below explicitly preserve the legacy11×30 geometry.
-        game.campaign
+        game.campaign_mut()
             .set_balance_settings(horde_core::balance::BalanceSettings::legacy())
             .unwrap();
-        game.campaign
+        game.campaign_mut()
             .choose_survivor(horde_core::survivors::SurvivorId::Rook)
             .unwrap();
         Self {
@@ -351,7 +351,10 @@ impl Host {
         }
     }
     fn deploy(&mut self) {
-        self.game.campaign.choose_start_country("DEU").unwrap();
+        self.game
+            .campaign_mut()
+            .choose_start_country("DEU")
+            .unwrap();
         self.game.deploy_country_stage(0, Mode::Personal).unwrap();
         self.game.set_paused(false);
     }
@@ -396,7 +399,7 @@ fn state(game: &Game) -> serde_json::Value {
 #[test]
 fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
     let mut host = Host::new();
-    host.game.campaign.coins = 100;
+    host.game.campaign_mut().coins = 100;
     host.runtime.begin_frame(20);
     assert!(
         host.runtime
@@ -409,8 +412,8 @@ fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
             .enqueue(Command::BuySkillNode("quick_reload".into()), "Learned")
     );
     assert!(!flush_for_test(&mut host.ctx()));
-    assert_eq!(host.game.campaign.coins, 75);
-    assert!(host.game.campaign.has_node("quick_reload"));
+    assert_eq!(host.game.campaign().coins, 75);
+    assert!(host.game.campaign().has_node("quick_reload"));
     assert_eq!(
         host.notices
             .iter()
@@ -424,7 +427,7 @@ fn repeated_ui_layout_pass_cannot_repeat_a_purchase() {
 fn rejected_commands_and_settlement_failures_reach_notices_as_text() {
     let mut host = Host::new();
     let tactics = horde_core::command::NpcTactics {
-        policy: host.game.campaign.npc.policy,
+        policy: host.game.campaign().npc.policy,
         prefer_aim: false,
         early_reload: false,
         allow_risk: false,
@@ -438,30 +441,29 @@ fn rejected_commands_and_settlement_failures_reach_notices_as_text() {
         .map(|c| (c.id.clone(), c.level_count()))
         .collect();
     host.game
-        .campaign
+        .campaign_mut()
         .choose_start_country(&countries[0].0)
         .unwrap();
     for (id, count) in countries {
         host.game
-            .campaign
+            .campaign_mut()
             .world
             .country_levels
             .insert(id.clone(), count);
-        host.game.campaign.world.cleared.push(id);
+        host.game.campaign_mut().world.cleared.push(id);
     }
-    host.game.campaign.coins = 10_000;
-    host.game.campaign.attempts = 1;
-    let country = host.game.campaign.world.cleared[0].clone();
+    host.game.campaign_mut().coins = 10_000;
+    host.game.campaign_mut().attempts = 1;
+    let country = host.game.campaign().world.cleared[0].clone();
     let recruit = host
         .game
-        .strategy
-        .recruit(&mut host.game.campaign, &country)
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
         .unwrap();
     let battle = host.game.deploy_survivor(recruit, &country, 0).unwrap();
-    host.game.campaign.next_item_id = u64::MAX;
-    host.game.battles[0]
-        .game
-        .campaign
+    host.game.campaign_mut().next_item_id = u64::MAX;
+    host.game.battles_mut()[0]
+        .game_mut()
+        .campaign_mut()
         .add_item_with_quality(4, 9, None)
         .unwrap();
     host.runtime.enqueue(Command::RecallSurvivor(battle), "");
@@ -498,7 +500,7 @@ fn rejected_commands_and_settlement_failures_reach_notices_as_text() {
 fn pressed_reload_is_consumed_once_across_fixed_ticks_and_speed() {
     let mut host = Host::new();
     host.deploy();
-    host.game.attempt.as_mut().unwrap().ammo = 0;
+    host.game.attempt_mut().unwrap().ammo = 0;
     host.runtime.publish(ControlFrame {
         enabled: true,
         speed: 4,
@@ -517,7 +519,7 @@ fn pressed_reload_is_consumed_once_across_fixed_ticks_and_speed() {
     for _ in 0..125 {
         step(&mut host.ctx());
     }
-    let attempt = host.game.attempt.as_ref().unwrap();
+    let attempt = host.game.attempt().unwrap();
     assert_eq!(attempt.tick, 500);
     assert_eq!(attempt.shots, attempt.magazine);
     assert_eq!(attempt.ammo, 0);
@@ -549,8 +551,8 @@ fn pause_freezes_main_parallel_and_strategy_without_catch_up() {
     assert_eq!(host.runtime.simulated_ticks, 0);
     host.game.set_paused(false);
     step(&mut host.ctx());
-    assert_eq!(host.game.attempt.as_ref().unwrap().tick, 4);
-    assert_eq!(host.game.attempt.as_ref().unwrap().shots, 0);
+    assert_eq!(host.game.attempt().unwrap().tick, 4);
+    assert_eq!(host.game.attempt().unwrap().shots, 0);
 }
 #[test]
 fn observation_speed_changes_only_number_of_whole_ticks() {
@@ -581,7 +583,7 @@ fn observation_speed_changes_only_number_of_whole_ticks() {
 fn quit_is_acknowledged_only_after_durable_current_state_commit() {
     let mut host = Host::new();
     host.deploy();
-    host.game.attempt.as_mut().unwrap().reload_left = 37;
+    host.game.attempt_mut().unwrap().reload_left = 37;
     host.runtime.request_save(SaveIntent::Quit);
     assert!(flush_for_test(&mut host.ctx()));
     let restored = Game::load(&host.directory.join("campaign.json")).unwrap();
@@ -623,19 +625,19 @@ fn failed_commit_never_acknowledges_quit_or_runs_a_hidden_tick() {
 fn terminal_main_attempt_stops_remaining_fixed_catch_up_until_new_input() {
     let mut host = Host::new();
     host.deploy();
-    let mut attempt = host.game.attempt.take().unwrap();
+    let mut attempt = host.game.attempt_slot_mut().take().unwrap();
     attempt.boss_spawned = true;
     host.game
         .spawn_enemy(&mut attempt, horde_core::content::EnemyKind::Brute, 5, true);
     attempt.enemies.last_mut().unwrap().hp = 0;
-    host.game.attempt = Some(attempt);
+    *host.game.attempt_slot_mut() = Some(attempt);
     host.runtime.publish(ControlFrame {
         enabled: true,
         speed: 4,
         ..ControlFrame::default()
     });
     step(&mut host.ctx());
-    assert!(host.game.attempt.is_none());
+    assert!(host.game.attempt().is_none());
     assert_eq!(host.runtime.simulated_ticks, 1);
     for _ in 0..10 {
         step(&mut host.ctx());
@@ -689,12 +691,12 @@ fn corrupt_primary_and_backup_are_uniquely_preserved_before_new_campaign_autosav
     assert!(bytes.iter().any(|data| data == original));
     assert!(bytes.iter().any(|data| data == backup));
     let restored = Game::load(&host.directory.join("campaign.json")).unwrap();
-    assert_eq!(restored.campaign.world.start.as_deref(), Some("DEU"));
+    assert_eq!(restored.campaign().world.start.as_deref(), Some("DEU"));
 }
 #[test]
 fn practice_profiles_save_and_resume_without_changing_the_ordinary_campaign() {
     let mut main = Host::new();
-    main.game.campaign.coins = 7;
+    main.game.campaign_mut().coins = 7;
     main.runtime.request_save(SaveIntent::Manual);
     flush_for_test(&mut main.ctx());
     let normal_bytes = std::fs::read(main.directory.join("campaign.json")).unwrap();
@@ -703,13 +705,17 @@ fn practice_profiles_save_and_resume_without_changing_the_ordinary_campaign() {
         let mut practice = Host::new();
         practice.directory = directory.clone();
         practice.paths = ProfilePaths::in_directory(directory.clone());
-        practice.game.campaign.choose_start_country("DEU").unwrap();
-        practice.game.campaign.coins = 300;
+        practice
+            .game
+            .campaign_mut()
+            .choose_start_country("DEU")
+            .unwrap();
+        practice.game.campaign_mut().coins = 300;
         practice.runtime.request_save(SaveIntent::Manual);
         flush_for_test(&mut practice.ctx());
         let loaded = load_profile(directory);
-        assert_eq!(loaded.game.campaign.coins, 300);
-        assert_eq!(loaded.game.campaign.world.start.as_deref(), Some("DEU"));
+        assert_eq!(loaded.game.campaign().coins, 300);
+        assert_eq!(loaded.game.campaign().world.start.as_deref(), Some("DEU"));
         assert_eq!(
             std::fs::read(main.directory.join("campaign.json")).unwrap(),
             normal_bytes
@@ -739,8 +745,7 @@ fn named_fixed_schedule_advances_once_per_invocation_without_egui() {
         app.world()
             .resource::<GameSession>()
             .game
-            .attempt
-            .as_ref()
+            .attempt()
             .unwrap()
             .tick,
         2
@@ -770,14 +775,14 @@ fn confirmed_new_journey_archives_the_exact_current_game_and_preserves_preferenc
     let mut host = Host::new();
     host.deploy();
     host.game.set_paused(true);
-    host.game.campaign.coins = 123;
+    host.game.campaign_mut().coins = 123;
     host.settings.scale = 1.17;
     let path = host.directory.join("campaign.json");
     host.game.save(&path).unwrap();
     write_settings(&host.settings, &host.directory.join("settings.json")).unwrap();
     let settings = std::fs::read(host.directory.join("settings.json")).unwrap();
     let before = state(&host.game);
-    let balance = host.game.campaign.balance_settings.clone();
+    let balance = host.game.campaign().balance_settings.clone();
     host.runtime.enqueue(AppCommand::NewJourney, "");
     assert!(!flush_for_test(&mut host.ctx()));
     let archive = host
@@ -793,15 +798,15 @@ fn confirmed_new_journey_archives_the_exact_current_game_and_preserves_preferenc
         })
         .unwrap();
     assert_eq!(state(&Game::load(&archive).unwrap()), before);
-    assert!(host.game.campaign.selected_survivor.is_none());
-    assert!(host.game.campaign.world.start.is_none());
-    assert!(host.game.battles.is_empty());
-    assert!(host.game.attempt.is_none());
-    assert_eq!(host.game.campaign.coins, 0);
-    assert_eq!(host.game.campaign.attempts, 0);
-    assert!(!host.game.campaign.journey_active);
-    assert!(!host.game.campaign.legacy_features);
-    assert_eq!(host.game.campaign.balance_settings, balance);
+    assert!(host.game.campaign().selected_survivor.is_none());
+    assert!(host.game.campaign().world.start.is_none());
+    assert!(host.game.battles().is_empty());
+    assert!(host.game.attempt().is_none());
+    assert_eq!(host.game.campaign().coins, 0);
+    assert_eq!(host.game.campaign().attempts, 0);
+    assert!(!host.game.campaign().journey_active);
+    assert!(!host.game.campaign().legacy_features);
+    assert_eq!(host.game.campaign().balance_settings, balance);
     assert_eq!(state(&Game::load(&path).unwrap()), state(&host.game));
     assert_eq!(
         std::fs::read(host.directory.join("settings.json")).unwrap(),
@@ -850,14 +855,14 @@ fn leaving_journey_is_acknowledged_only_after_durable_save_and_never_loses_earne
     host.deploy();
     host.game.withdraw();
     host.game.set_paused(true);
-    let coins = host.game.campaign.coins;
-    let records = host.game.campaign.run_history.len();
+    let coins = host.game.campaign().coins;
+    let records = host.game.campaign().run_history.len();
     host.runtime.enqueue(Command::LeaveJourney, "");
     flush_for_test(&mut host.ctx());
     let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
-    assert!(!saved.campaign.journey_active);
-    assert_eq!(saved.campaign.coins, coins);
-    assert_eq!(saved.campaign.run_history.len(), records);
+    assert!(!saved.campaign().journey_active);
+    assert_eq!(saved.campaign().coins, coins);
+    assert_eq!(saved.campaign().run_history.len(), records);
     assert!(host.notices.iter().any(|n| matches!(
         n,
         RuntimeNotice::Saved {
@@ -870,7 +875,7 @@ fn leaving_journey_is_acknowledged_only_after_durable_save_and_never_loses_earne
 fn stale_quit_cannot_exit_a_new_journey_and_reset_blocks_old_domain_commands_and_ticks() {
     let mut host = Host::new();
     host.deploy();
-    host.game.campaign.coins = 100;
+    host.game.campaign_mut().coins = 100;
     let (service, gate) = persistence::gated();
     host.runtime.storage = service;
     host.runtime.request_save(SaveIntent::Quit);
@@ -898,8 +903,8 @@ fn stale_quit_cannot_exit_a_new_journey_and_reset_blocks_old_domain_commands_and
     gate.release();
     persistence::wait_for_test(&mut host.runtime.storage);
     assert!(!persist_pending(&mut host.ctx()));
-    assert!(host.game.campaign.world.start.is_none());
-    assert_eq!(host.game.campaign.coins, 0);
+    assert!(host.game.campaign().world.start.is_none());
+    assert_eq!(host.game.campaign().coins, 0);
     assert!(!host.notices.iter().any(|n| matches!(
         n,
         RuntimeNotice::Saved {
@@ -922,7 +927,7 @@ fn manual_and_navigation_requests_never_acknowledge_an_older_inflight_snapshot()
         host.runtime.request_save(SaveIntent::Autosave);
         assert!(!persist_pending(&mut host.ctx()));
         gate.started();
-        host.game.campaign.coins = 77;
+        host.game.campaign_mut().coins = 77;
         host.settings.master = 0.41;
         host.runtime.request_save(intent);
         assert!(!persist_pending(&mut host.ctx()));
@@ -941,7 +946,7 @@ fn manual_and_navigation_requests_never_acknowledge_an_older_inflight_snapshot()
         persistence::wait_for_test(&mut host.runtime.storage);
         assert_eq!(persist_pending(&mut host.ctx()), intent == SaveIntent::Quit);
         let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
-        assert_eq!(saved.campaign.coins, 77);
+        assert_eq!(saved.campaign().coins, 77);
         assert_eq!(
             Settings::load(&host.directory.join("settings.json")).master,
             0.41
@@ -955,9 +960,17 @@ fn manual_and_navigation_requests_never_acknowledge_an_older_inflight_snapshot()
 fn critical_save_barrier_rejects_legal_mutations_and_saves_the_ordered_paused_generation() {
     for intent in [SaveIntent::Menu, SaveIntent::Quit, SaveIntent::SettingsBack] {
         let mut host = Host::new();
-        host.game.campaign.choose_start_country("DEU").unwrap();
-        host.game.campaign.coins = 77;
-        assert!(host.game.campaign.can_purchase_node("steady_hands").is_ok());
+        host.game
+            .campaign_mut()
+            .choose_start_country("DEU")
+            .unwrap();
+        host.game.campaign_mut().coins = 77;
+        assert!(
+            host.game
+                .campaign()
+                .can_purchase_node("steady_hands")
+                .is_ok()
+        );
         let (service, gate) = persistence::gated();
         host.runtime.storage = service;
         host.runtime.enqueue(Command::SetPaused(true), "");
@@ -965,7 +978,7 @@ fn critical_save_barrier_rejects_legal_mutations_and_saves_the_ordered_paused_ge
         assert!(host.runtime.durable_transition_pending());
         assert!(!flush(&mut host.ctx()));
         gate.started();
-        assert!(host.game.global_paused);
+        assert!(host.game.global_paused());
         let state_before = state(&host.game);
         assert!(
             !host
@@ -1001,7 +1014,7 @@ fn critical_save_barrier_rejects_legal_mutations_and_saves_the_ordered_paused_ge
 #[test]
 fn quit_requested_during_reset_is_recaptured_after_fresh_state_and_pause_are_applied() {
     let mut host = Host::new();
-    host.game.campaign.coins = 77;
+    host.game.campaign_mut().coins = 77;
     let (service, gate) = persistence::gated();
     host.runtime.storage = service;
     host.runtime.enqueue(AppCommand::NewJourney, "");
@@ -1012,24 +1025,24 @@ fn quit_requested_during_reset_is_recaptured_after_fresh_state_and_pause_are_app
     gate.release();
     persistence::wait_for_test(&mut host.runtime.storage);
     assert!(!persist_pending(&mut host.ctx()));
-    assert_eq!(host.game.campaign.coins, 0);
+    assert_eq!(host.game.campaign().coins, 0);
     assert!(host.runtime.durable_transition_pending());
     assert!(!flush(&mut host.ctx()));
     let next = gate.started();
     assert!(!next.reset);
     assert_eq!(next.coins, 0);
-    assert!(host.game.global_paused);
+    assert!(host.game.global_paused());
     gate.release();
     persistence::wait_for_test(&mut host.runtime.storage);
     assert!(persist_pending(&mut host.ctx()));
     let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
-    assert!(saved.global_paused);
-    assert_eq!(saved.campaign.coins, 0);
+    assert!(saved.global_paused());
+    assert_eq!(saved.campaign().coins, 0);
 }
 #[test]
 fn same_batch_new_journey_then_native_close_preserves_quit_for_the_fresh_paused_generation() {
     let mut host = Host::new();
-    host.game.campaign.coins = 77;
+    host.game.campaign_mut().coins = 77;
     let (service, gate) = persistence::gated();
     host.runtime.storage = service;
     assert!(host.runtime.enqueue(AppCommand::NewJourney, ""));
@@ -1042,18 +1055,18 @@ fn same_batch_new_journey_then_native_close_preserves_quit_for_the_fresh_paused_
     gate.release();
     persistence::wait_for_test(&mut host.runtime.storage);
     assert!(!persist_pending(&mut host.ctx()));
-    assert_eq!(host.game.campaign.coins, 0);
+    assert_eq!(host.game.campaign().coins, 0);
     assert!(host.runtime.durable_transition_pending());
     assert!(!flush(&mut host.ctx()));
     let saved = gate.started();
     assert!(!saved.reset);
     assert_eq!(saved.coins, 0);
-    assert!(host.game.global_paused);
+    assert!(host.game.global_paused());
     gate.release();
     persistence::wait_for_test(&mut host.runtime.storage);
     assert!(persist_pending(&mut host.ctx()));
     let saved = Game::load(&host.directory.join("campaign.json")).unwrap();
-    assert_eq!(saved.campaign.coins, 0);
-    assert!(saved.global_paused);
-    assert!(saved.campaign.selected_survivor.is_none());
+    assert_eq!(saved.campaign().coins, 0);
+    assert!(saved.global_paused());
+    assert!(saved.campaign().selected_survivor.is_none());
 }

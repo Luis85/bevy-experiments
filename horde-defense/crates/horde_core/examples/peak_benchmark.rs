@@ -37,17 +37,17 @@ struct Report {
 fn prepare() -> Result<Game, String> {
     let mut g = Game::default();
     for level in 0..5 {
-        g.campaign.first_clear(level, Mode::Personal);
-        g.campaign.finish_attempt();
+        g.campaign_mut().first_clear(level, Mode::Personal);
+        g.campaign_mut().finish_attempt();
     }
-    g.campaign.reward(50_000, 0, Mode::Personal);
+    g.campaign_mut().reward(50_000, 0, Mode::Personal);
     for skill in Skill::ALL {
-        g.campaign.purchase_skill(skill)?;
+        g.campaign_mut().purchase_skill(skill)?;
     }
     for kind in StructureKind::ALL {
-        g.campaign.purchase_blueprint(kind)?;
+        g.campaign_mut().purchase_blueprint(kind)?;
         for _ in 0..3 {
-            g.campaign.upgrade_structure(kind)?;
+            g.campaign_mut().upgrade_structure(kind)?;
         }
     }
     let mut plan = Vec::new();
@@ -68,7 +68,7 @@ fn prepare() -> Result<Game, String> {
         lane: 5,
         column: 4,
     });
-    g.campaign.save_layout(plan, 4)?;
+    g.campaign_mut().save_layout(plan, 4)?;
     Ok(g)
 }
 fn best_gear(g: &mut Game, mode: Mode) -> Result<(), String> {
@@ -81,13 +81,13 @@ fn best_gear(g: &mut Game, mode: Mode) -> Result<(), String> {
             .max_by_key(|(_, item)| item.tier)
             .map(|(n, _)| n)
             .ok_or("Missing market gear")?;
-        let id = g.campaign.buy_item(definition)?;
-        g.campaign.equip(mode, id)?;
+        let id = g.campaign_mut().buy_item(definition)?;
+        g.campaign_mut().equip(mode, id)?;
     }
     Ok(())
 }
 fn populate(g: &mut Game, initial: bool) {
-    let Some(mut a) = g.attempt.take() else {
+    let Some(mut a) = g.attempt_slot_mut().take() else {
         return;
     };
     if initial {
@@ -110,7 +110,7 @@ fn populate(g: &mut Game, initial: bool) {
         g.spawn_enemy(&mut a, EnemyKind::Brute, 5, true);
         a.boss_spawned = true;
     }
-    g.attempt = Some(a);
+    *g.attempt_slot_mut() = Some(a);
 }
 fn single(mode: Mode) -> Result<Game, String> {
     let mut g = prepare()?;
@@ -122,18 +122,21 @@ fn single(mode: Mode) -> Result<Game, String> {
 }
 fn parallel() -> Result<Game, String> {
     let mut g = prepare()?;
-    g.campaign.choose_start_country("USA")?;
+    g.campaign_mut().choose_start_country("USA")?;
     for id in ["USA", "CAN", "MEX", "BRA"] {
         let count = world()
             .country(id)
             .ok_or("Missing benchmark country")?
             .level_count();
-        g.campaign.world.country_levels.insert(id.into(), count);
-        g.campaign.world.cleared.push(id.into());
-        g.campaign.world.unlocked.push(id.into());
+        g.campaign_mut()
+            .world
+            .country_levels
+            .insert(id.into(), count);
+        g.campaign_mut().world.cleared.push(id.into());
+        g.campaign_mut().world.unlocked.push(id.into());
     }
     for _ in 0..4 {
-        let recruit = g.strategy.recruit(&mut g.campaign, "USA")?;
+        let recruit = g.with_strategy(|strategy, campaign| strategy.recruit(campaign, "USA"))?;
         for slot in Slot::ALL {
             let definition = content()
                 .items
@@ -143,24 +146,24 @@ fn parallel() -> Result<Game, String> {
                 .max_by_key(|(_, item)| item.tier)
                 .map(|(n, _)| n)
                 .ok_or("Missing market gear")?;
-            let id = g.campaign.buy_item(definition)?;
-            g.strategy.equip_recruit(&g.campaign, recruit, id)?;
+            let id = g.campaign_mut().buy_item(definition)?;
+            g.with_strategy(|strategy, campaign| strategy.equip_recruit(campaign, recruit, id))?;
         }
         g.deploy_survivor(recruit, "USA", 4)?;
     }
-    for battle in &mut g.battles {
-        populate(&mut battle.game, true);
+    for battle in g.battles_mut() {
+        populate(battle.game_mut(), true);
     }
     Ok(g)
 }
 fn step(g: &mut Game) {
     populate(g, false);
-    for battle in &mut g.battles {
+    for battle in g.battles_mut() {
         if !battle.settled {
-            populate(&mut battle.game, false);
+            populate(battle.game_mut(), false);
         }
     }
-    let input = if g.attempt.as_ref().is_some_and(|a| a.mode == Mode::Personal) {
+    let input = if g.attempt().is_some_and(|a| a.mode == Mode::Personal) {
         smoke_input(g)
     } else {
         Input::default()
@@ -168,25 +171,20 @@ fn step(g: &mut Game) {
     g.tick(input);
 }
 fn measure(case: &'static str, fixture: Game, samples: usize) -> Measurement {
-    let is_parallel = !fixture.battles.is_empty();
+    let is_parallel = !fixture.battles().is_empty();
     let mut g = fixture.clone();
     let mut timings = Vec::with_capacity(samples);
     let mut resets = 0;
     let initial_live: usize = fixture
-        .attempt
-        .iter()
-        .chain(
-            fixture
-                .battles
-                .iter()
-                .filter_map(|b| b.game.attempt.as_ref()),
-        )
+        .attempt()
+        .into_iter()
+        .chain(fixture.battles().iter().filter_map(|b| b.game().attempt()))
         .map(|a| a.enemies.len())
         .sum();
     let (mut max_live, mut max_structures, mut max_events, mut max_logs) = (initial_live, 0, 0, 0);
     for n in 0..samples + 600 {
-        if (!is_parallel && g.attempt.is_none())
-            || (is_parallel && g.battles.iter().any(|b| b.settled))
+        if (!is_parallel && g.attempt().is_none())
+            || (is_parallel && g.battles().iter().any(|b| b.settled))
         {
             g = fixture.clone();
             resets += 1;
@@ -198,9 +196,9 @@ fn measure(case: &'static str, fixture: Game, samples: usize) -> Measurement {
             timings.push(elapsed);
         }
         let attempts = g
-            .attempt
-            .iter()
-            .chain(g.battles.iter().filter_map(|b| b.game.attempt.as_ref()));
+            .attempt()
+            .into_iter()
+            .chain(g.battles().iter().filter_map(|b| b.game().attempt()));
         let mut live = 0;
         let mut structures = 0;
         let mut events = 0;

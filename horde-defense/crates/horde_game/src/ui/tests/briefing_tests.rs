@@ -6,9 +6,13 @@ fn preparation_keeps_the_planned_replay_and_defender_without_creating_an_attempt
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.choose_start_country("DEU").unwrap();
-    f.game.campaign.attempts = 1;
-    f.game.campaign.world.country_levels.insert("DEU".into(), 2);
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().attempts = 1;
+    f.game
+        .campaign_mut()
+        .world
+        .country_levels
+        .insert("DEU".into(), 2);
     f.campaign.mode = Mode::Npc;
     f.campaign.stage = 0;
     f.act(|c| c.open_preparation(Tab::Armory));
@@ -18,7 +22,7 @@ fn preparation_keeps_the_planned_replay_and_defender_without_creating_an_attempt
     assert!(f.nav.tab == Tab::Briefing);
     assert_eq!(f.campaign.stage, 0);
     assert!(f.campaign.mode == Mode::Npc);
-    assert!(f.game.attempt.is_none());
+    assert!(f.game.attempt().is_none());
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
 
@@ -27,7 +31,7 @@ fn briefing_scene_line_humanises_weather_and_lighting_ids() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
     f.campaign.stage = 0;
     f.act(|c| c.open_preparation(Tab::Briefing));
     let output = h.frame_size(f, View::Camp, vec![], vec2(1440.0, 900.0));

@@ -18,9 +18,9 @@ const ALREADY_EQUIPPED_REASON: &str =
     "Already equipped in this loadout. Select another item to compare or equip it.";
 fn mode_loadout_contains(f: &UiCtx, id: u64) -> bool {
     if f.campaign.mode == Mode::Personal {
-        f.game.campaign.player.loadout.contains(&id)
+        f.game.campaign().player.loadout.contains(&id)
     } else {
-        f.game.campaign.npc.loadout.contains(&id)
+        f.game.campaign().npc.loadout.contains(&id)
     }
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -115,12 +115,12 @@ fn slot_art(
     );
 }
 fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
-    let Some(item) = f.game.campaign.item(id) else {
+    let Some(item) = f.game.campaign().item(id) else {
         return;
     };
     let definition = item.definition();
-    let quality = f.game.campaign.item_quality(id).expect("owned equipment");
-    let Ok(comparison) = f.game.campaign.compare_item(f.campaign.mode, id) else {
+    let quality = f.game.campaign().item_quality(id).expect("owned equipment");
+    let Ok(comparison) = f.game.campaign().compare_item(f.campaign.mode, id) else {
         return;
     };
     let before = &comparison.before;
@@ -476,7 +476,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         .collect();
     let mut indices: Vec<_> = f
         .game
-        .campaign
+        .campaign()
         .items
         .iter()
         .enumerate()
@@ -486,14 +486,14 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .slot
                     .is_none_or(|slot| item.definition().slot == slot)
                 && f.armory.quality.is_none_or(|quality| {
-                    f.game.campaign.item_quality(item.id).ok() == Some(quality)
+                    f.game.campaign().item_quality(item.id).ok() == Some(quality)
                 })
         })
         .map(|(index, _)| index)
         .collect();
     indices.sort_by(|&a, &b| {
-        let a = &f.game.campaign.items[a];
-        let b = &f.game.campaign.items[b];
+        let a = &f.game.campaign().items[a];
+        let b = &f.game.campaign().items[b];
         match f.armory.sort {
             ArmorySort::Newest => b.id.cmp(&a.id),
             ArmorySort::Name => a
@@ -504,10 +504,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             ArmorySort::Level => b.level.cmp(&a.level).then(b.id.cmp(&a.id)),
             ArmorySort::Quality => f
                 .game
-                .campaign
+                .campaign()
                 .item_quality(b.id)
                 .expect("owned item")
-                .cmp(&f.game.campaign.item_quality(a.id).expect("owned item"))
+                .cmp(&f.game.campaign().item_quality(a.id).expect("owned item"))
                 .then(b.level.cmp(&a.level))
                 .then(b.id.cmp(&a.id)),
             ArmorySort::Tier => b
@@ -522,18 +522,18 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         format!(
             "Showing {} of {} items · storage has no item limit",
             indices.len(),
-            f.game.campaign.items.len()
+            f.game.campaign().items.len()
         ),
     );
 
     // Selection is view state only. Never change equipment implicitly.
     if f.armory
         .selected_item
-        .is_none_or(|id| f.game.campaign.item(id).is_none())
+        .is_none_or(|id| f.game.campaign().item(id).is_none())
     {
         f.armory.selected_item = indices
             .first()
-            .map(|index| f.game.campaign.items[*index].id);
+            .map(|index| f.game.campaign().items[*index].id);
     }
     if indices.is_empty() {
         muted(
@@ -564,11 +564,11 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         if let Some(id) = f.armory.selected_item {
             let name = f
                 .game
-                .campaign
+                .campaign()
                 .item(id)
                 .map(|item| item.definition().name.as_str())
                 .unwrap_or("Item");
-            let quality = f.game.campaign.item_quality(id).expect("owned item");
+            let quality = f.game.campaign().item_quality(id).expect("owned item");
             ui.label(
                 RichText::new(format!("Selected: {name} #{id} · {}", quality.name()))
                     .strong()
@@ -587,7 +587,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.horizontal_wrapped(|ui| {
             ui.add(egui::TextEdit::singleline(&mut f.armory.preset_name).hint_text("Preset name").desired_width(180.0));
             if ui.button("Save loadout preset").clicked() { f.dispatch(Command::SavePreset { name: f.armory.preset_name.clone(), mode: f.campaign.mode }, "Loadout saved by reference."); }
-            for (index, preset) in f.game.campaign.presets.clone().iter().enumerate() {
+            for (index, preset) in f.game.campaign().presets.clone().iter().enumerate() {
                 if ui.button(format!("Use {}", preset.name)).clicked() { f.dispatch(Command::ApplyPreset { index, mode: f.campaign.mode }, "Loadout equipped."); }
             }
         });
@@ -626,15 +626,15 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
         .max_height(viewport)
         .show_rows(ui, 72.0, indices.len(), |ui, range| {
             for index in range {
-                let item = f.game.campaign.items[indices[index]].clone();
+                let item = f.game.campaign().items[indices[index]].clone();
                 let definition = item.definition();
                 let quality = f
                     .game
-                    .campaign
+                    .campaign()
                     .item_quality(item.id)
                     .expect("owned equipment");
                 let equipped = mode_loadout_contains(f, item.id);
-                let reserved = f.game.campaign.item_reserved(item.id);
+                let reserved = f.game.campaign().item_reserved(item.id);
                 ui.push_id(item.id, |ui| {
                     ui.horizontal_top(|ui| {
                         slot_art(ui, f, item.definition_index(), quality);
@@ -726,7 +726,10 @@ fn status_cell(
         );
         return;
     }
-    let usable = !reserved && f.game.campaign.can_use_weapon(f.campaign.mode, definition);
+    let usable = !reserved
+        && f.game
+            .campaign()
+            .can_use_weapon(f.campaign.mode, definition);
     let response = ui
         .add_enabled_ui(usable, |ui| ui.add_sized(size, egui::Button::new("Equip")))
         .inner
@@ -734,7 +737,7 @@ fn status_cell(
             "Reserved by a deployed survivor or guard."
         } else {
             f.game
-                .campaign
+                .campaign()
                 .weapon_access(f.campaign.mode, definition)
                 .err()
                 .unwrap_or_default()
@@ -761,20 +764,20 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(item) = f
         .armory
         .selected_item
-        .and_then(|id| f.game.campaign.item(id))
+        .and_then(|id| f.game.campaign().item(id))
         .cloned()
     else {
         return;
     };
     let equipped = mode_loadout_contains(f, item.id);
-    let reserved = f.game.campaign.item_reserved(item.id);
+    let reserved = f.game.campaign().item_reserved(item.id);
     ui.horizontal_wrapped(|ui| {
         if ui
             .add_enabled(
                 !reserved
                     && !equipped
                     && f.game
-                        .campaign
+                        .campaign()
                         .can_use_weapon(f.campaign.mode, item.definition_index()),
                 egui::Button::new("Equip selected"),
             )
@@ -784,7 +787,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                 "Reserved by a deployed survivor or guard."
             } else {
                 f.game
-                    .campaign
+                    .campaign()
                     .weapon_access(f.campaign.mode, item.definition_index())
                     .err()
                     .unwrap_or_default()
@@ -829,7 +832,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                 egui::Button::new(format!(
                     "Review sale · {}",
                     f.game
-                        .campaign
+                        .campaign()
                         .item_sale_value(item.id)
                         .expect("owned equipment")
                 )),
@@ -843,7 +846,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     let definition = item.definition();
     let npc_restricted = definition.npc_only
         && f.campaign.mode == Mode::Personal
-        && !f.game.campaign.legacy_weapon_training;
+        && !f.game.campaign().legacy_weapon_training;
     if definition.npc_only {
         muted(
             ui,
@@ -860,7 +863,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
         muted(
             ui,
             f.game
-                .campaign
+                .campaign()
                 .weapon_access(f.campaign.mode, item.definition_index())
                 .err()
                 .unwrap_or_default(),
@@ -870,7 +873,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
         let weapon = horde_core::weapons::WeaponSpec::from_item(definition);
         let trained = f
             .game
-            .campaign
+            .campaign()
             .can_use_weapon(f.campaign.mode, item.definition_index());
         muted(
             ui,
@@ -892,7 +895,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
         if !trained && !npc_restricted && ui.button("Open weapon training").clicked() {
             f.campaign.improvement_focus = f
                 .game
-                .campaign
+                .campaign()
                 .recommendation_fallback(UpgradeFocus::WeaponTraining(weapon.class))
                 .map(|r| r.action);
             f.open_preparation(Tab::Skills);
@@ -945,7 +948,7 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
             Ok(quote) => {
                 let name = f
                     .game
-                    .campaign
+                    .campaign()
                     .item(id)
                     .map(|item| item.definition().name.as_str())
                     .unwrap_or("Equipment");

@@ -46,10 +46,10 @@ impl Plugin for BattleViewPlugin {
 fn record_tick_snapshots(session: Res<GameSession>, mut battle: ResMut<BattleUi>) {
     let game = &session.game;
     battle.interpolation.record(
-        game.attempt.iter().map(|a| (None, a)).chain(
-            game.battles
+        game.attempt().into_iter().map(|a| (None, a)).chain(
+            game.battles()
                 .iter()
-                .filter_map(|b| b.game.attempt.as_ref().map(|a| (Some(b.id), a))),
+                .filter_map(|b| b.game().attempt().map(|a| (Some(b.id), a))),
         ),
     );
 }
@@ -420,8 +420,13 @@ impl BattleViewModel {
 /// The arena the battle screen projects onto: the attempt's, else the
 /// campaign's next deployment (lanes, width in yards).
 pub fn arena_geometry(game: &Game) -> (u8, f32) {
-    game.attempt.as_ref().map_or_else(
-        || (game.campaign.lane_count(), game.campaign.arena_geometry().1),
+    game.attempt().map_or_else(
+        || {
+            (
+                game.campaign().lane_count(),
+                game.campaign().arena_geometry().1,
+            )
+        },
         |a| (a.lane_count, a.width_yards),
     )
 }
@@ -599,7 +604,7 @@ pub struct BattleScreen {
 impl BattleScreen {
     /// The active battle's screen, or `None` outside a battle.
     pub fn build(game: &Game) -> Option<Self> {
-        let a = game.attempt.as_ref()?;
+        let a = game.attempt()?;
         let country = world().country(a.country_id.as_deref().unwrap_or(""));
         let theme = country
             .map(|country| match country.biome.to_lowercase().as_str() {
@@ -650,9 +655,9 @@ impl BattleScreen {
             },
             log_tail: a.log.iter().rev().take(LOG_TAIL).cloned().collect(),
             targets: a.enemies.iter().map(|e| [e.x, e.y()]).collect(),
-            blueprints: game.campaign.blueprints.clone(),
-            global_paused: game.global_paused,
-            first_deployment: game.campaign.attempts == 0,
+            blueprints: game.campaign().blueprints.clone(),
+            global_paused: game.global_paused(),
+            first_deployment: game.campaign().attempts == 0,
         })
     }
     pub fn personal(&self) -> bool {
@@ -711,7 +716,7 @@ pub fn placement_preview(
     kind: StructureKind,
     aim: [f32; 2],
 ) -> Option<PlacementPreview> {
-    let a = game.attempt.as_ref()?;
+    let a = game.attempt()?;
     let [lane, column] = a.build_cell_at(aim)?;
     Some(PlacementPreview {
         lane,
@@ -831,12 +836,12 @@ mod tests {
 
     fn fixture() -> Game {
         let mut game = Game::default();
-        game.campaign
+        game.campaign_mut()
             .set_balance_settings(horde_core::balance::BalanceSettings::legacy())
             .unwrap();
-        game.campaign.attempts = 1;
+        game.campaign_mut().attempts = 1;
         game.deploy(0, Mode::Personal).unwrap();
-        let mut a = game.attempt.take().unwrap();
+        let mut a = game.attempt_slot_mut().take().unwrap();
         game.spawn_enemy(&mut a, EnemyKind::Runner, 4, false);
         game.spawn_enemy(&mut a, EnemyKind::Brute, 1, false);
         game.spawn_enemy(&mut a, EnemyKind::Shambler, 2, true);
@@ -844,7 +849,7 @@ mod tests {
             e.x = 18. + n as f32;
         }
         a.paused = false;
-        game.attempt = Some(a);
+        *game.attempt_slot_mut() = Some(a);
         game
     }
     fn view(a: &Attempt, blend: SceneBlend) -> BattleViewModel {
@@ -865,7 +870,7 @@ mod tests {
         for _ in 0..30 {
             game.tick(Input::default());
         }
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let before = serde_json::to_string(a).unwrap();
         let view = view(a, SceneBlend::NONE);
         assert_eq!(before, serde_json::to_string(a).unwrap());
@@ -915,7 +920,7 @@ mod tests {
     #[test]
     fn legacy_enemies_without_a_profile_draw_their_kind_or_level_boss() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         for e in &mut a.enemies {
             e.resolved = None;
             e.boss_kind = None;
@@ -948,10 +953,9 @@ mod tests {
     fn actor_positions_blend_between_fixed_ticks_by_the_overstep() {
         let mut game = fixture();
         let mut cache = ActorInterpolation::default();
-        cache.record([(None, game.attempt.as_ref().unwrap())]);
+        cache.record([(None, game.attempt().unwrap())]);
         let before: BTreeMap<u64, [f32; 2]> = game
-            .attempt
-            .as_ref()
+            .attempt()
             .unwrap()
             .enemies
             .iter()
@@ -960,7 +964,7 @@ mod tests {
         for _ in 0..2 {
             game.tick(Input::default());
         }
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let moved = a
             .enemies
             .iter()
@@ -984,7 +988,7 @@ mod tests {
         for _ in 0..MAX_TICKS_PER_STEP {
             game.tick(Input::default());
         }
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let current = a.enemies.iter().find(|e| e.id == id).unwrap();
         assert_eq!(
             drawn_at(a, cache.scene(None, a), id),
@@ -996,10 +1000,9 @@ mod tests {
     fn a_full_four_tick_fixed_step_still_blends_from_its_snapshot() {
         let mut game = fixture();
         let mut cache = ActorInterpolation::default();
-        cache.record([(None, game.attempt.as_ref().unwrap())]);
+        cache.record([(None, game.attempt().unwrap())]);
         let before: BTreeMap<u64, [f32; 2]> = game
-            .attempt
-            .as_ref()
+            .attempt()
             .unwrap()
             .enemies
             .iter()
@@ -1008,7 +1011,7 @@ mod tests {
         for _ in 0..MAX_TICKS_PER_STEP {
             game.tick(Input::default());
         }
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let moved = a
             .enemies
             .iter()
@@ -1031,10 +1034,13 @@ mod tests {
         );
         assert_eq!(
             arena_geometry(&game),
-            (game.campaign.lane_count(), game.campaign.arena_geometry().1)
+            (
+                game.campaign().lane_count(),
+                game.campaign().arena_geometry().1
+            )
         );
         let game = fixture();
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         assert_eq!(arena_geometry(&game), (a.lane_count, a.width_yards));
     }
 
@@ -1044,9 +1050,9 @@ mod tests {
         for _ in 0..30 {
             game.tick(Input::default());
         }
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.log = (0..25).map(|n| format!("line {n}")).collect();
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let before = serde_json::to_string(a).unwrap();
         let view = BattleScreen::build(&game).unwrap();
         assert_eq!(before, serde_json::to_string(a).unwrap());
@@ -1102,39 +1108,39 @@ mod tests {
         assert_eq!(view.log_tail[0], "line 24");
         assert_eq!(view.log_tail[LOG_TAIL - 1], "line 7");
         assert_eq!(view.targets.len(), a.enemies.len());
-        assert_eq!(view.blueprints, game.campaign.blueprints);
+        assert_eq!(view.blueprints, game.campaign().blueprints);
         assert_eq!(
             view.any_blueprint(),
-            game.campaign.blueprints.iter().any(|b| *b)
+            game.campaign().blueprints.iter().any(|b| *b)
         );
-        assert_eq!(view.global_paused, game.global_paused);
+        assert_eq!(view.global_paused, game.global_paused());
         assert!(!view.first_deployment);
     }
 
     #[test]
     fn country_stages_carry_their_biome_theme_and_local_setting() {
         let mut game = Game::default();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let country = world().country(a.country_id.as_deref().unwrap()).unwrap();
         let view = BattleScreen::build(&game).unwrap();
         assert_eq!(view.field.setting, Some(country.stage_theme(a.stage)));
         assert!(view.theme <= 4);
         // Without a country the backdrop follows the level and no setting shows.
         let mut legacy = fixture();
-        legacy.attempt.as_mut().unwrap().country_id = None;
+        legacy.attempt_mut().unwrap().country_id = None;
         let view = BattleScreen::build(&legacy).unwrap();
-        assert_eq!(view.theme, legacy.attempt.as_ref().unwrap().level);
+        assert_eq!(view.theme, legacy.attempt().unwrap().level);
         assert_eq!(view.field.setting, None);
     }
 
     #[test]
     fn reticle_uses_exact_ammo_and_frozen_reload_ticks_without_a_presentation_clock() {
         let mut game = Game::default();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.ammo = 3;
         a.reload_left = 63;
         a.profile.personal.reload = 2.1;
@@ -1145,7 +1151,7 @@ mod tests {
         assert!(!state.observed);
         assert_eq!(ReticleReadout::build(a, None), state);
         assert_eq!(BattleScreen::build(&game).unwrap().reticle(None), state);
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.mode = Mode::Npc;
         a.profile.npc.reload_turns = 3;
         a.reload_left = 90;
@@ -1159,7 +1165,7 @@ mod tests {
     #[test]
     fn selected_throwables_report_charges_and_cooldown_on_the_reticle() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.reload_left = 0;
         let kind = OrdnanceKind::Grenade;
         let total = OrdnanceSlotView::of(a, kind).cooldown_total;
@@ -1169,7 +1175,7 @@ mod tests {
         let readout = view.reticle(Some(kind));
         assert_eq!(
             readout,
-            ReticleReadout::build(game.attempt.as_ref().unwrap(), Some(kind))
+            ReticleReadout::build(game.attempt().unwrap(), Some(kind))
         );
         assert_eq!(
             (readout.remaining, readout.capacity),
@@ -1210,27 +1216,27 @@ mod tests {
         let hint = |game: &Game| BattleScreen::build(game).unwrap().field.hint;
         assert!(BattleScreen::build(&game).unwrap().first_deployment);
         assert_eq!(hint(&game), FieldHint::Opening);
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.tick = 10;
         a.shots = 0;
         assert_eq!(hint(&game), FieldHint::Shoot);
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.shots = 2;
         a.reload_ticks = 0;
         a.ammo = a.magazine.saturating_sub(1);
         assert_eq!(hint(&game), FieldHint::Reload);
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.ammo = a.magazine;
         a.first_contact = None;
         assert_eq!(hint(&game), FieldHint::Contact);
-        game.attempt.as_mut().unwrap().first_contact = Some(3.0);
+        game.attempt_mut().unwrap().first_contact = Some(3.0);
         assert_eq!(hint(&game), FieldHint::Banked);
     }
 
     #[test]
     fn placement_preview_reports_the_aimed_cell_validity_and_occupant() {
         let game = fixture();
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let kind = StructureKind::ALL[0];
         assert_eq!(placement_preview(&game, kind, [-1.0, 0.5]), None);
         let center = a.build_cell_center(1, 2).unwrap();

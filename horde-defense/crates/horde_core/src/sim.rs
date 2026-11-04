@@ -14,14 +14,14 @@ mod smoke;
 mod structures;
 mod telemetry;
 pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
-pub use fixtures::{maximum_progression_render_fixture, peak_render_fixture};
+pub use fixtures::{Staging, maximum_progression_render_fixture, peak_render_fixture};
 pub use journey::JourneyContinuation;
 pub use migrations::SAVE_VERSION;
 use npc::structure_bonus;
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;
 pub use persistence::{RULESET_VERSION, SaveError};
-pub use smoke::{smoke, smoke_input, smoke_prepare, smoke_seed};
+pub use smoke::{desktop_smoke, smoke, smoke_input, smoke_prepare, smoke_seed};
 pub use telemetry::CombatTelemetry;
 
 use crate::campaign::{Campaign, DefenderProfile};
@@ -685,21 +685,28 @@ pub struct Report {
     pub telemetry: CombatTelemetry,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
+///
+/// Fields are crate-private. Frontends read through the accessors below and
+/// mutate only through [`Game::apply`](crate::command) or the few named core
+/// methods documented as non-command seams (save reconciliation, runtime
+/// pause/tick plumbing, settings application, fixture staging). The
+/// `test-support` feature adds `*_mut` accessors for tests only. Serde field
+/// names are the save format and must not change.
 pub struct Game {
     #[serde(default)]
     pending_runs: Vec<crate::stats::RunRecord>,
-    pub campaign: Campaign,
-    pub attempt: Option<Attempt>,
-    pub last_result: Option<Report>,
-    pub next_attempt_id: u64,
-    pub seed: u64,
-    pub repeat_remaining: u32,
+    pub(crate) campaign: Campaign,
+    pub(crate) attempt: Option<Attempt>,
+    pub(crate) last_result: Option<Report>,
+    pub(crate) next_attempt_id: u64,
+    pub(crate) seed: u64,
+    pub(crate) repeat_remaining: u32,
     #[serde(default)]
-    pub strategy: crate::strategy::StrategyState,
+    pub(crate) strategy: crate::strategy::StrategyState,
     #[serde(default)]
-    pub battles: Vec<ParallelBattle>,
+    pub(crate) battles: Vec<ParallelBattle>,
     #[serde(default)]
-    pub global_paused: bool,
+    pub(crate) global_paused: bool,
     #[serde(default)]
     worker: bool,
     /// Transient settlement failures awaiting a frontend; never persisted.
@@ -718,7 +725,8 @@ pub struct ParallelBattle {
     pub recruit_id: u64,
     pub country_id: String,
     pub stage: usize,
-    pub game: Box<Game>,
+    /// The worker's own game; read through [`ParallelBattle::game`].
+    pub(crate) game: Box<Game>,
     pub synced_coins: u64,
     pub synced_item_id: u64,
     #[serde(default)]
@@ -748,15 +756,101 @@ impl Default for Game {
         }
     }
 }
+impl ParallelBattle {
+    /// The expedition's isolated worker game (read-only for frontends).
+    pub fn game(&self) -> &Game {
+        &self.game
+    }
+    /// Test-only mutable access to the worker game.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn game_mut(&mut self) -> &mut Game {
+        &mut self.game
+    }
+}
+/// Read-only accessors: the frontend view of the authoritative state.
+impl Game {
+    pub fn campaign(&self) -> &Campaign {
+        &self.campaign
+    }
+    pub fn attempt(&self) -> Option<&Attempt> {
+        self.attempt.as_ref()
+    }
+    pub fn last_result(&self) -> Option<&Report> {
+        self.last_result.as_ref()
+    }
+    pub fn next_attempt_id(&self) -> u64 {
+        self.next_attempt_id
+    }
+    pub fn seed(&self) -> u64 {
+        self.seed
+    }
+    pub fn repeat_remaining(&self) -> u32 {
+        self.repeat_remaining
+    }
+    pub fn strategy(&self) -> &crate::strategy::StrategyState {
+        &self.strategy
+    }
+    pub fn battles(&self) -> &[ParallelBattle] {
+        &self.battles
+    }
+    pub fn global_paused(&self) -> bool {
+        self.global_paused
+    }
+}
+/// Test-only mutators (`test-support` feature, or this crate's unit tests).
+/// They bypass every rule `apply` enforces; production builds never see them.
+#[cfg(any(test, feature = "test-support"))]
+impl Game {
+    pub fn campaign_mut(&mut self) -> &mut Campaign {
+        &mut self.campaign
+    }
+    pub fn attempt_mut(&mut self) -> Option<&mut Attempt> {
+        self.attempt.as_mut()
+    }
+    /// The attempt slot itself, for tests that take, replace or clear it.
+    pub fn attempt_slot_mut(&mut self) -> &mut Option<Attempt> {
+        &mut self.attempt
+    }
+    pub fn last_result_mut(&mut self) -> &mut Option<Report> {
+        &mut self.last_result
+    }
+    pub fn strategy_mut(&mut self) -> &mut crate::strategy::StrategyState {
+        &mut self.strategy
+    }
+    pub fn battles_mut(&mut self) -> &mut Vec<ParallelBattle> {
+        &mut self.battles
+    }
+    /// Runs `f` with the strategy layer and the campaign it mutates, for
+    /// strategy calls that take `&mut Campaign` (recruiting, equipping).
+    pub fn with_strategy<R>(
+        &mut self,
+        f: impl FnOnce(&mut crate::strategy::StrategyState, &mut Campaign) -> R,
+    ) -> R {
+        f(&mut self.strategy, &mut self.campaign)
+    }
+    pub fn set_seed(&mut self, seed: u64) {
+        self.seed = seed;
+    }
+    pub fn set_next_attempt_id(&mut self, id: u64) {
+        self.next_attempt_id = id;
+    }
+    pub fn set_repeat_remaining(&mut self, count: u32) {
+        self.repeat_remaining = count;
+    }
+    pub fn set_global_paused(&mut self, paused: bool) {
+        self.global_paused = paused;
+    }
+}
 impl Game {
     /// An expedition that has not yet settled back into the shared campaign.
     pub fn active_battle(&self, id: u64) -> Option<&ParallelBattle> {
         self.battles.iter().find(|b| b.id == id && !b.settled)
     }
-    pub fn active_battle_mut(&mut self, id: u64) -> Option<&mut ParallelBattle> {
+    pub(crate) fn active_battle_mut(&mut self, id: u64) -> Option<&mut ParallelBattle> {
         self.battles.iter_mut().find(|b| b.id == id && !b.settled)
     }
-    /// Drains settlement failures recorded since the last call.
+    /// Drains settlement failures recorded since the last call. Non-command
+    /// runtime plumbing: it only empties a transient, never-saved outbox.
     pub fn take_settlement_issues(&mut self) -> Vec<SettlementIssue> {
         std::mem::take(&mut self.settlement_issues)
     }
@@ -792,6 +886,10 @@ impl Game {
         }
         self.deploy_internal(stage % content().levels.len(), mode, Some(stage))
     }
+    /// Pauses or resumes the whole game. `Command::SetPaused` is the player's
+    /// path; the runtime also calls this directly as pause plumbing (pausing on
+    /// a finished attempt, replay, startup review staging), where there is no
+    /// player command to record.
     pub fn set_paused(&mut self, paused: bool) {
         self.global_paused = paused;
         if let Some(a) = &mut self.attempt {

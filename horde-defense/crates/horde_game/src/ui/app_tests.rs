@@ -55,13 +55,17 @@ impl Drop for HeadlessApp {
 #[test]
 fn deploy_notice_enters_battle_resets_controls_and_camp_tab_is_a_real_sub_state() {
     let mut parts = test_frontend();
-    parts.game.campaign.legacy_features = true;
+    parts.game.campaign_mut().legacy_features = true;
     parts
         .game
-        .campaign
+        .campaign_mut()
         .choose_survivor(SurvivorId::Rook)
         .unwrap();
-    parts.game.campaign.choose_start_country("DEU").unwrap();
+    parts
+        .game
+        .campaign_mut()
+        .choose_start_country("DEU")
+        .unwrap();
     parts.screen = Screen::Camp;
     parts.nav.tab = Tab::Briefing;
     parts.battle.construction = true;
@@ -97,8 +101,8 @@ fn deploy_notice_enters_battle_resets_controls_and_camp_tab_is_a_real_sub_state(
         .world()
         .resource::<GameSession>()
         .game
-        .attempt
-        .clone()
+        .attempt()
+        .cloned()
         .expect("deployed");
     let battle = h.app.world().resource::<BattleUi>();
     assert!(!battle.construction && !battle.fire_latched);

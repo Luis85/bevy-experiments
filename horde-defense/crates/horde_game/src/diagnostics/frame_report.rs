@@ -112,7 +112,7 @@ pub fn capture_performance(
         return;
     }
     let work = take_work();
-    if let Some(a) = &session.game.attempt {
+    if let Some(a) = session.game.attempt() {
         if state.initial_battle.is_none() {
             state.initial_battle = Some(BattleContext {
                 mode: a.mode,
@@ -127,11 +127,10 @@ pub fn capture_performance(
         state.peak_corpses = state.peak_corpses.max(a.corpses.len());
     }
     let attempt_finished =
-        state.active_only && session.game.attempt.is_none() && !state.samples.is_empty();
+        state.active_only && session.game.attempt().is_none() && !state.samples.is_empty();
     if !attempt_finished {
         if state.active_only
-            && (session.game.global_paused
-                || session.game.attempt.as_ref().is_none_or(|a| a.paused))
+            && (session.game.global_paused() || session.game.attempt().is_none_or(|a| a.paused))
         {
             return;
         }
@@ -153,7 +152,7 @@ pub fn capture_performance(
     let mean = state.samples.iter().sum::<f64>() / state.samples.len() as f64;
     let mut sorted = state.samples.clone();
     sorted.sort_by(f64::total_cmp);
-    let attempt = session.game.attempt.as_ref();
+    let attempt = session.game.attempt();
     let mut longest: Vec<_> = state.samples.iter().copied().enumerate().collect();
     longest.sort_by(|a, b| b.1.total_cmp(&a.1));
     longest.truncate(20);
@@ -201,9 +200,9 @@ pub fn capture_performance(
         population_cap: attempt.map(|a| a.enemy_cap()),
         threat_rank: attempt.map(|a| a.progression.rank),
         visible_structures: attempt.map_or(0, |a| a.structures.len()),
-        parallel_battles: session.game.battles.iter().filter(|b| !b.settled).count(),
+        parallel_battles: session.game.battles().iter().filter(|b| !b.settled).count(),
         simulation_ticks: runtime.simulated_ticks,
-        paused: session.game.global_paused || attempt.is_some_and(|a| a.paused),
+        paused: session.game.global_paused() || attempt.is_some_and(|a| a.paused),
         window_focused: window.focused,
         unfocused_sample_frames: state.unfocused_samples,
         frames_over_33ms: state.samples.iter().filter(|&&ms| ms > 33.).count(),

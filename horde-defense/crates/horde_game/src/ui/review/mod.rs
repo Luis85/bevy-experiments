@@ -91,8 +91,7 @@ pub(crate) fn schedule_gesture_review(
         return;
     };
     let Some(attempt) = game
-        .attempt
-        .as_ref()
+        .attempt()
         .filter(|attempt| attempt.mode == Mode::Personal && !attempt.paused)
     else {
         return;

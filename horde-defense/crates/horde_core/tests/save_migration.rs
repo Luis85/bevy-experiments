@@ -63,7 +63,7 @@ fn v1_fixture_is_a_real_v1_generation() {
 fn v1_fixture_preserves_item_identities() {
     let game = fixture();
     let items: Vec<_> = game
-        .campaign
+        .campaign()
         .items
         .iter()
         .map(|i| (i.id, i.definition.as_str(), i.level, i.quality))
@@ -82,10 +82,10 @@ fn v1_fixture_preserves_item_identities() {
         ]
     );
     assert_eq!(
-        game.campaign.item(6).unwrap().definition().name,
+        game.campaign().item(6).unwrap().definition().name,
         "Compact SMG"
     );
-    let gear: Vec<_> = game.campaign.run_history[0]
+    let gear: Vec<_> = game.campaign().run_history[0]
         .gear
         .iter()
         .map(|g| g.definition.as_str())
@@ -99,7 +99,7 @@ fn v1_fixture_preserves_item_identities() {
             "field_webbing"
         ]
     );
-    let visual = &game.attempt.as_ref().unwrap().profile.equipment_visual;
+    let visual = &game.attempt().unwrap().profile.equipment_visual;
     assert_eq!(
         visual.ranged.as_ref().unwrap().definition,
         ItemDefId::from("service_carbine")
@@ -113,7 +113,7 @@ fn v1_fixture_preserves_item_identities() {
 #[test]
 fn v1_fixture_preserves_kind_indexed_counters() {
     let game = fixture();
-    let c = &game.campaign;
+    let c = game.campaign();
     assert!(StructureKind::ALL.iter().all(|kind| c.blueprints[*kind]));
     assert_eq!(c.structure_upgrades[StructureKind::Trap], 0);
     assert_eq!(c.structure_upgrades[StructureKind::Wall], 1);
@@ -124,7 +124,7 @@ fn v1_fixture_preserves_kind_indexed_counters() {
     assert_eq!(c.npc.investments[NpcTraining::Guns], 1);
     assert_eq!(c.npc.investments[NpcTraining::Melee], 1);
     assert_eq!(c.npc.investments.values().sum::<u32>(), 2);
-    let a = game.attempt.as_ref().unwrap();
+    let a = game.attempt().unwrap();
     assert_eq!(a.tick, 2400);
     assert_eq!(a.telemetry.kills_by_kind[EnemyKind::Shambler], 2);
     assert_eq!(a.telemetry.kills_by_kind[EnemyKind::Runner], 6);
@@ -158,7 +158,7 @@ fn v1_fixture_continues_exactly_as_the_v2_build_did() {
     for t in 0..1800u32 {
         g.tick(Input::default());
         if t % 150 == 149 {
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             trace.push_str(&format!(
                 "t{} hp{} kills{} target{:?} enemies{:?}\n",
                 a.tick,
@@ -225,7 +225,7 @@ fn v2_fixture_is_a_real_v2_generation() {
 #[test]
 fn v2_fixture_counters_become_statuses_with_the_same_clocks() {
     let game = fixture_v2();
-    let a = game.attempt.as_ref().unwrap();
+    let a = game.attempt().unwrap();
     assert_eq!(a.tick, 42);
     assert_eq!(a.brace_remaining_ticks(), 259);
     assert_eq!(a.statuses().iter().count(), 1);
@@ -250,7 +250,7 @@ fn v2_fixture_counters_become_statuses_with_the_same_clocks() {
 #[test]
 fn v2_fixture_unlock_flags_and_target_urgency_become_data() {
     let game = fixture_v2();
-    let a = game.attempt.as_ref().unwrap();
+    let a = game.attempt().unwrap();
     for id in unlocks::ALL {
         assert!(a.profile.modifiers.unlocked(id), "{id}");
     }
@@ -285,7 +285,7 @@ fn v2_fixture_continues_exactly_as_the_v2_build_did() {
     let mut g = fixture_v2();
     let mut trace = Vec::new();
     for t in 0..900u32 {
-        let aim = g.attempt.as_ref().and_then(|a| {
+        let aim = g.attempt().and_then(|a| {
             a.enemies
                 .iter()
                 .min_by(|x, y| x.x.total_cmp(&y.x))
@@ -298,7 +298,7 @@ fn v2_fixture_continues_exactly_as_the_v2_build_did() {
             ..Input::default()
         });
         if [3, 4, 5, 300, 500, 899].contains(&t) {
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             trace.push(format!(
                 "t{} hp{} brace{} kills{} enemies{:?}",
                 a.tick,
@@ -331,14 +331,14 @@ fn v3_fixture_quality_arrays_become_kind_maps_with_the_same_counts() {
         Quality::ALL.map(|quality| map[quality])
     };
     assert_eq!(
-        counts(&game.attempt.as_ref().unwrap().loot_quality_counts),
+        counts(&game.attempt().unwrap().loot_quality_counts),
         [0, 2, 1, 0, 1, 1]
     );
     assert_eq!(
-        counts(&game.campaign.run_history[0].loot_by_quality),
+        counts(&game.campaign().run_history[0].loot_by_quality),
         [1, 1, 0, 2, 0, 0]
     );
-    assert_eq!(game.attempt.as_ref().unwrap().loot, 6);
+    assert_eq!(game.attempt().unwrap().loot, 6);
 }
 
 #[test]
@@ -373,7 +373,7 @@ fn v3_fixture_continues_exactly_as_the_v3_build_did() {
     for t in 0..600u32 {
         g.tick(Input::default());
         if t % 50 == 49 {
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             trace.push_str(&format!(
                 "t{} hp{} loot{} coins{} rng{} enemies{:?}
 ",
@@ -414,7 +414,7 @@ fn v4_fixture_is_a_real_v4_generation() {
 #[test]
 fn v4_fixture_ordnance_arrays_become_kind_maps_with_the_same_counts() {
     let game = fixture_v4();
-    let o = &game.attempt.as_ref().unwrap().ordnance;
+    let o = &game.attempt().unwrap().ordnance;
     let counts = |map: &horde_core::kind_map::KindMap<OrdnanceKind, u32>| {
         [map[OrdnanceKind::Grenade], map[OrdnanceKind::Molotov]]
     };
@@ -441,7 +441,7 @@ fn v4_fixture_continues_exactly_as_the_v4_build_did() {
     for t in 0..600u32 {
         g.tick(Input::default());
         if t % 50 == 49 {
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             trace.push_str(&format!(
                 "t{} hp{} loot{} coins{} rng{} enemies{:?} ord{:?}\n",
                 a.tick,
@@ -465,8 +465,7 @@ fn v4_fixture_continues_exactly_as_the_v4_build_did() {
 #[test]
 fn migrated_attempt_gear_snapshots_carry_stable_item_ids() {
     let ids = |game: &Game| -> Vec<String> {
-        game.attempt
-            .as_ref()
+        game.attempt()
             .unwrap()
             .gear_snapshot
             .iter()
@@ -536,7 +535,7 @@ fn v5_fixture_continues_exactly_as_the_v5_build_did() {
     for t in 0..600u32 {
         g.tick(Input::default());
         if t % 50 == 49 {
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             trace.push_str(&format!(
                 "t{} hp{} loot{} coins{} rng{} level{} enemies{:?}
 ",
@@ -563,7 +562,7 @@ fn v5_fixture_continues_exactly_as_the_v5_build_did() {
 type LevelProgress<'a> = (Vec<&'a str>, usize, Vec<&'a str>, Vec<(&'a str, u32)>);
 
 fn level_progress(game: &Game) -> LevelProgress<'_> {
-    let c = &game.campaign;
+    let c = game.campaign();
     (
         c.first_clears.iter().map(String::as_str).collect(),
         c.unlocked(),
@@ -589,8 +588,8 @@ fn v5_fixture_level_progress_becomes_level_ids_with_the_same_frontier() {
         )
     );
     // In-memory level positions are unchanged; on disk they are level ids.
-    assert_eq!(game.attempt.as_ref().unwrap().level, 2);
-    assert_eq!(game.campaign.run_history[0].template, 1);
+    assert_eq!(game.attempt().unwrap().level, 2);
+    assert_eq!(game.campaign().run_history[0].template, 1);
     let saved = serde_json::to_value(&game).unwrap();
     assert_eq!(saved["attempt"]["level"], "depot_nine");
     assert_eq!(
@@ -624,8 +623,8 @@ fn every_legacy_fixture_keeps_its_clears_frontier_and_claims() {
     assert_eq!(level_progress(&fixture_v3()), none());
     assert_eq!(level_progress(&fixture_v4()), none());
     for game in [fixture(), fixture_v2(), fixture_v3(), fixture_v4()] {
-        assert_eq!(game.attempt.as_ref().unwrap().level, 0);
+        assert_eq!(game.attempt().unwrap().level, 0);
     }
-    assert_eq!(fixture().campaign.run_history[0].template, 0);
-    assert_eq!(fixture_v3().campaign.run_history[0].template, 0);
+    assert_eq!(fixture().campaign().run_history[0].template, 0);
+    assert_eq!(fixture_v3().campaign().run_history[0].template, 0);
 }

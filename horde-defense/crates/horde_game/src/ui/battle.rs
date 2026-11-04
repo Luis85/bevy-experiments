@@ -71,7 +71,7 @@ pub(super) fn controls(ctx: &egui::Context, f: &mut UiCtx) {
         f.battle.fire_latched = false;
     }
     if f.settings.pressed(ctx, Action::Build, false) {
-        if f.game.campaign.blueprints.iter().any(|owned| *owned) {
+        if f.game.campaign().blueprints.iter().any(|owned| *owned) {
             f.battle.construction = !f.battle.construction;
         } else {
             f.battle.construction = false;
@@ -213,7 +213,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
     let (Some(view), Some(hud_view), Some(a)) = (
         BattleScreen::build(game),
         hud::view_model(game),
-        game.attempt.as_ref(),
+        game.attempt(),
     ) else {
         f.go(Screen::Results);
         return;
@@ -1052,9 +1052,9 @@ mod selector_layout_tests {
                 max_width: width as u8,
                 ..Default::default()
             };
-            game.campaign.set_balance_settings(settings).unwrap();
+            game.campaign_mut().set_balance_settings(settings).unwrap();
             game.deploy(0, Mode::Personal).unwrap();
-            let a = game.attempt.as_ref().unwrap();
+            let a = game.attempt().unwrap();
             let arena = art::ArenaProjection::for_attempt(
                 clearing_rect(
                     Rect::from_min_size(pos2(20.0, 120.0), vec2(729.0, 310.0)),

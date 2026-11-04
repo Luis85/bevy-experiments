@@ -50,9 +50,9 @@ mod tests {
     #[test]
     fn legacy_rendering_recovers_only_deployed_gear_without_changing_the_game() {
         let mut game = Game::default();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let attempt = game.attempt.as_ref().unwrap();
+        let attempt = game.attempt().unwrap();
         let expected = attempt.profile.equipment_visual.clone();
         let mut legacy = attempt.profile.clone();
         legacy.equipment_visual = EquipmentVisual::default();

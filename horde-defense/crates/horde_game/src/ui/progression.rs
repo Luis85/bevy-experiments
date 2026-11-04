@@ -10,7 +10,7 @@ use upgrade_graph::{Graph, Node, View};
 pub(super) fn skills(ui: &mut egui::Ui, f: &mut UiCtx) {
     ui.horizontal_wrapped(|ui| {
         ui.heading("Journey upgrades");
-        ui.colored_label(AMBER, format!("{} coins", f.game.campaign.coins));
+        ui.colored_label(AMBER, format!("{} coins", f.game.campaign().coins));
     });
     skill_tree(ui, f, visible_height(ui));
 }
@@ -23,7 +23,7 @@ fn visible_height(ui: &egui::Ui) -> f32 {
         .max(0.0)
 }
 fn catalogue_nodes(f: &UiCtx) -> Vec<Node> {
-    catalogue_nodes_for(&f.game.campaign)
+    catalogue_nodes_for(f.game.campaign())
 }
 fn catalogue_nodes_for(campaign: &horde_core::campaign::Campaign) -> Vec<Node> {
     let catalog = horde_core::skill_catalog::skills();
@@ -150,12 +150,12 @@ fn skill_detail(
         );
         ui.label(RichText::new(&node.name).size(20.0).strong());
     });
-    let owned = f.game.campaign.has_node(&node.id);
-    let preflight = f.game.campaign.can_purchase_node(&node.id);
+    let owned = f.game.campaign().has_node(&node.id);
+    let preflight = f.game.campaign().can_purchase_node(&node.id);
     if owned {
         ui.colored_label(
             AMBER,
-            if f.game.campaign.skill_nodes.contains(&node.id)
+            if f.game.campaign().skill_nodes.contains(&node.id)
                 || node.effects.iter().all(|e| {
                     !matches!(
                         e,
@@ -174,7 +174,7 @@ fn skill_detail(
                 preflight.is_ok(),
                 egui::Button::new(format!(
                     "Learn skill · {}",
-                    payment_label(&f.game.campaign, &node.id)
+                    payment_label(f.game.campaign(), &node.id)
                 ))
                 .min_size(vec2(ui.available_width(), 36.0)),
             )
@@ -188,18 +188,18 @@ fn skill_detail(
     }
     egui::ScrollArea::vertical().id_salt(("skill-requirements",&node.id)).max_height((height-105.0).max(55.0)).show(ui,|ui| {
         ui.label(&node.description);
-        if node.effects.iter().any(|e|matches!(e,horde_core::skill_catalog::SkillEffect::BodyDevelopment{..})) && f.game.campaign.legacy_features && f.game.campaign.player.body.iter().any(|n|*n>0) && ui.button("Refund legacy body allocations").clicked() {f.dispatch(Command::RespecPlayer,"Legacy body points returned to the tree.");}
+        if node.effects.iter().any(|e|matches!(e,horde_core::skill_catalog::SkillEffect::BodyDevelopment{..})) && f.game.campaign().legacy_features && f.game.campaign().player.body.iter().any(|n|*n>0) && ui.button("Refund legacy body allocations").clicked() {f.dispatch(Command::RespecPlayer,"Legacy body points returned to the tree.");}
         ui.add_space(7.0);
         ui.strong("Requirements");
         if node.prerequisites.is_empty() {muted(ui,"Journey foundation");}
         for parent in &node.prerequisites {
             let name=horde_core::skill_catalog::skills().node(parent).map_or(parent.as_str(),|n|n.name.as_str());
-            let learned=f.game.campaign.has_node(parent);
+            let learned=f.game.campaign().has_node(parent);
             ui.colored_label(if learned {AMBER} else {MUTED},format!("{} {name}",if learned {"Owned:"}else{"Requires:"}));
         }
-        if node.minimum_victories>0 {ui.label(format!("Win {} rounds · {} won",node.minimum_victories,f.game.campaign.victories));}
-        if node.minimum_liberated>0 {ui.label(format!("Liberate {} countries · {} achieved",node.minimum_liberated,f.game.campaign.liberated_count()));}
-        if !owned {match f.game.campaign.node_payment(&node.id) {Ok(horde_core::campaign::NodePayment::LegacyBodyPoints(points))=>{muted(ui,format!("{points} legacy CP required · {} available",f.game.campaign.player.points));},_=>{muted(ui,format!("{} · {} coins available",payment_label(&f.game.campaign,&node.id),f.game.campaign.coins));}}}
+        if node.minimum_victories>0 {ui.label(format!("Win {} rounds · {} won",node.minimum_victories,f.game.campaign().victories));}
+        if node.minimum_liberated>0 {ui.label(format!("Liberate {} countries · {} achieved",node.minimum_liberated,f.game.campaign().liberated_count()));}
+        if !owned {match f.game.campaign().node_payment(&node.id) {Ok(horde_core::campaign::NodePayment::LegacyBodyPoints(points))=>{muted(ui,format!("{points} legacy CP required · {} available",f.game.campaign().player.points));},_=>{muted(ui,format!("{} · {} coins available",payment_label(f.game.campaign(),&node.id),f.game.campaign().coins));}}}
         muted(ui,"Weapon training and equipment ownership are separate. Buy or loot trained weapons in Equipment.");
     });
 }
