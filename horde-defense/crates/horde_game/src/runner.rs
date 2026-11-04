@@ -973,8 +973,6 @@ pub fn update_effects_gain<H: RuntimeHost>(
 pub struct LoadedProfile {
     pub game: Game,
     pub settings: Settings,
-    pub campaign_path: PathBuf,
-    pub settings_path: PathBuf,
     pub warning: String,
 }
 /// Keep resumable practice profiles separate; screenshot fixtures are ephemeral.
@@ -1018,8 +1016,6 @@ pub fn load_profile(directory: PathBuf) -> LoadedProfile {
     LoadedProfile {
         game,
         settings: settings::Settings::load(&settings_path),
-        campaign_path,
-        settings_path,
         warning,
     }
 }

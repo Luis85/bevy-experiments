@@ -477,7 +477,7 @@ mod tests {
             warmup.textures_delta.clear();
             // Native integrations report coordinates after applying UI zoom.
             let viewport = Rect::from_min_size(egui::Pos2::ZERO, vec2(1050.0, 700.0) / 1.35);
-            let mut f = Frontend::load();
+            let mut f = crate::ui::test_support::test_frontend();
             f.game = Game::default();
             f.runtime = Runtime::default();
             f.screen = Screen::Menu;

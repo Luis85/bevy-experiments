@@ -307,7 +307,7 @@ mod tests {
     }
     #[test]
     fn reopened_country_uses_the_same_ever_liberated_gate_as_the_purchase_preflight() {
-        let mut f = Frontend::load();
+        let mut f = crate::ui::test_support::test_frontend();
         f.game = Game::default();
         f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
         f.game.campaign.choose_start_country("DEU").unwrap();
