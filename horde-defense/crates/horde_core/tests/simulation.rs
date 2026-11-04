@@ -3,33 +3,15 @@ mod support;
 use horde_core::content::{EnemyKind, Mode, StructureKind, content};
 use horde_core::sim::{DEFENSE_LINE, Game, Input, Outcome};
 use horde_core::status::StatusId;
-use support::legacy_game;
+use support::{advance, enemy, game, legacy_game, strategic_game};
 
-fn game(mode: Mode) -> Game {
-    let mut g = legacy_game();
-    g.campaign.attempts = 1;
-    g.deploy(0, mode).unwrap();
-    g.set_paused(false);
-    g
-}
-fn enemy(g: &mut Game, lane: u8, x: f32, boss: bool) {
-    let mut a = g.attempt.take().unwrap();
-    g.spawn_enemy(&mut a, EnemyKind::Shambler, lane, boss);
-    a.enemies.last_mut().unwrap().x = x;
-    g.attempt = Some(a);
-}
-fn ticks(g: &mut Game, n: u32) {
-    for _ in 0..n {
-        g.tick(Input::default());
-    }
-}
 #[test]
 fn pause_freezes_every_authoritative_clock() {
     let mut g = game(Mode::Personal);
     enemy(&mut g, 0, 8.0, false);
     g.set_paused(true);
     let before = serde_json::to_string(&g).unwrap();
-    ticks(&mut g, 300);
+    advance(&mut g, 300);
     assert_eq!(serde_json::to_string(&g).unwrap(), before);
 }
 #[test]
@@ -37,11 +19,11 @@ fn enemies_keep_lanes_and_contact_has_a_windup() {
     let mut g = game(Mode::Personal);
     enemy(&mut g, 0, DEFENSE_LINE + 0.001, false);
     let hp = g.attempt.as_ref().unwrap().hp;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert_eq!(g.attempt.as_ref().unwrap().hp, hp);
-    ticks(&mut g, 30);
+    advance(&mut g, 30);
     assert_eq!(g.attempt.as_ref().unwrap().hp, hp);
-    ticks(&mut g, 120);
+    advance(&mut g, 120);
     let a = g.attempt.as_ref().unwrap();
     assert!(a.hp < hp);
     assert_eq!(a.enemies[0].lane, 0);
@@ -127,10 +109,10 @@ fn kills_pay_once_and_results_never_pay_again() {
     let mut g = game(Mode::Personal);
     enemy(&mut g, 5, 8.0, false);
     g.attempt.as_mut().unwrap().enemies[0].hp = 0;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     let coins = g.campaign.coins;
     assert!(coins > 0);
-    ticks(&mut g, 10);
+    advance(&mut g, 10);
     assert_eq!(g.campaign.coins, coins);
     g.withdraw();
     assert_eq!(g.campaign.coins, coins);
@@ -142,13 +124,13 @@ fn kills_pay_once_and_results_never_pay_again() {
 fn boss_timer_is_not_victory_and_boss_transaction_is_atomic() {
     let mut g = game(Mode::Personal);
     g.attempt.as_mut().unwrap().tick = (content().levels[0].boss_time * 60.0) as u64;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(g.last_result.is_none());
     assert!(g.attempt.as_ref().unwrap().boss_spawned);
     let a = g.attempt.as_mut().unwrap();
     a.enemies.iter_mut().find(|e| e.boss).unwrap().hp = 0;
     let before = g.campaign.coins;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(g.attempt.is_none());
     let r = g.last_result.as_ref().unwrap();
     assert_eq!(r.outcome, Outcome::Victory);
@@ -157,7 +139,7 @@ fn boss_timer_is_not_victory_and_boss_transaction_is_atomic() {
         g.campaign.coins - before,
         content().levels[0].boss_reward + content().levels[0].completion_bonus
     );
-    ticks(&mut g, 10);
+    advance(&mut g, 10);
     assert_eq!(
         g.campaign.coins - before,
         content().levels[0].boss_reward + content().levels[0].completion_bonus
@@ -181,7 +163,7 @@ fn construction_bounds_invalid_spend_salvage_and_blocking() {
     g.place(StructureKind::Wall, 0, 0).unwrap();
     enemy(&mut g, 0, 5.0, false);
     g.set_paused(false);
-    ticks(&mut g, 40);
+    advance(&mut g, 40);
     let a = g.attempt.as_ref().unwrap();
     assert!(a.enemies[0].x >= a.structures[0].x() + 0.69);
     let id = a.structures[0].id;
@@ -189,7 +171,7 @@ fn construction_bounds_invalid_spend_salvage_and_blocking() {
     let refund = g.salvage(id).unwrap();
     assert!(refund < content().structure(StructureKind::Wall).supply);
     g.set_paused(false);
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     assert!(g.attempt.as_ref().unwrap().enemies[0].x < 4.8);
 }
 #[test]
@@ -199,20 +181,20 @@ fn spawn_capacity_skips_without_a_deferred_burst() {
     for n in 0..cap {
         enemy(&mut g, (n % 11) as u8, 25.0, false);
     }
-    ticks(&mut g, 300);
+    advance(&mut g, 300);
     assert_eq!(g.attempt.as_ref().unwrap().enemies.len(), cap);
     g.attempt.as_mut().unwrap().enemies.clear();
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(g.attempt.as_ref().unwrap().enemies.len() <= 1);
 }
 #[test]
 fn save_resume_preserves_rng_actions_and_rewards_exactly() {
     let mut original = game(Mode::Npc);
-    ticks(&mut original, 400);
+    advance(&mut original, 400);
     let json = serde_json::to_string(&original).unwrap();
     let mut resumed: Game = serde_json::from_str(&json).unwrap();
-    ticks(&mut original, 900);
-    ticks(&mut resumed, 900);
+    advance(&mut original, 900);
+    advance(&mut resumed, 900);
     assert_eq!(
         serde_json::to_string(&original).unwrap(),
         serde_json::to_string(&resumed).unwrap()
@@ -224,7 +206,7 @@ fn wounded_npc_at_zero_is_not_automatically_dead() {
     let a = g.attempt.as_mut().unwrap();
     a.injury.hp = 0;
     a.hp = 0;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(g.attempt.is_some());
     assert!(!g.attempt.as_ref().unwrap().injury.dead);
 }
@@ -233,10 +215,10 @@ fn unconscious_hostile_and_boss_release_slot_and_pay_once() {
     let mut g = game(Mode::Npc);
     enemy(&mut g, 0, 1.5, false);
     g.attempt.as_mut().unwrap().enemies[0].injury.unconscious = true;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(g.attempt.as_ref().unwrap().enemies.is_empty());
     let coins = g.campaign.coins;
-    ticks(&mut g, 2);
+    advance(&mut g, 2);
     assert_eq!(g.campaign.coins, coins);
     enemy(&mut g, 5, 20.0, true);
     let a = g.attempt.as_mut().unwrap();
@@ -247,7 +229,7 @@ fn unconscious_hostile_and_boss_release_slot_and_pay_once() {
         .unwrap()
         .injury
         .unconscious = true;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert_eq!(g.last_result.as_ref().unwrap().outcome, Outcome::Victory);
 }
 #[test]
@@ -271,23 +253,6 @@ fn npc_manual_inputs_do_not_fire_or_reset_action_timers() {
         serde_json::to_string(&second).unwrap()
     );
 }
-fn strategic_game() -> Game {
-    let mut g = legacy_game();
-    let countries: Vec<_> = horde_core::world::world()
-        .countries
-        .iter()
-        .take(4)
-        .map(|c| (c.id.clone(), c.level_count()))
-        .collect();
-    g.campaign.choose_start_country(&countries[0].0).unwrap();
-    for (id, count) in countries {
-        g.campaign.world.country_levels.insert(id.clone(), count);
-        g.campaign.world.cleared.push(id);
-    }
-    g.campaign.coins = 10000;
-    g.campaign.attempts = 1;
-    g
-}
 #[test]
 fn parallel_battles_pause_and_resume_all_authoritative_state() {
     let mut g = strategic_game();
@@ -296,19 +261,19 @@ fn parallel_battles_pause_and_resume_all_authoritative_state() {
     let r2 = g.strategy.recruit(&mut g.campaign, &country).unwrap();
     g.deploy_survivor(r1, &country, 0).unwrap();
     g.deploy_survivor(r2, &country, 0).unwrap();
-    ticks(&mut g, 420);
+    advance(&mut g, 420);
     assert_eq!(g.battles[0].game.attempt.as_ref().unwrap().tick, 420);
     assert_eq!(g.battles[1].game.attempt.as_ref().unwrap().tick, 420);
     let mut other: Game = serde_json::from_str(&serde_json::to_string(&g).unwrap()).unwrap();
-    ticks(&mut g, 500);
-    ticks(&mut other, 500);
+    advance(&mut g, 500);
+    advance(&mut other, 500);
     assert_eq!(
         serde_json::to_string(&g).unwrap(),
         serde_json::to_string(&other).unwrap()
     );
     g.set_paused(true);
     let paused = serde_json::to_string(&g).unwrap();
-    ticks(&mut g, 120);
+    advance(&mut g, 120);
     assert_eq!(serde_json::to_string(&g).unwrap(), paused);
 }
 #[test]
@@ -334,13 +299,13 @@ fn parallel_rewards_and_unique_loot_settle_exactly_once() {
         .iter()
         .map(|b| (payout as f32 * b.game.attempt.as_ref().unwrap().modifiers.reward).round() as u64)
         .sum();
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert_eq!(g.campaign.coins - coins, expected_payout);
     assert_eq!(g.campaign.items.len(), items + 2);
     let ids: std::collections::BTreeSet<_> = g.campaign.items.iter().map(|i| i.id).collect();
     assert_eq!(ids.len(), g.campaign.items.len());
     let paid = g.campaign.coins;
-    ticks(&mut g, 2);
+    advance(&mut g, 2);
     assert_eq!(g.campaign.coins, paid);
     assert!(g.campaign.reserved_items.is_empty());
     assert!(g.battles.iter().all(|b| b.settled));
@@ -375,7 +340,7 @@ fn failed_parallel_loot_insert_is_reported_once_instead_of_silently_lost() {
         }]
     );
     assert!(issues[0].to_string().contains("was not stored"));
-    ticks(&mut g, 3);
+    advance(&mut g, 3);
     assert!(g.take_settlement_issues().is_empty());
 }
 #[test]
@@ -402,7 +367,7 @@ fn country_modifiers_and_replayed_clears_preserve_local_progress() {
     let a = g.attempt.as_mut().unwrap();
     a.boss_spawned = true;
     a.enemies[0].hp = 0;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert_eq!(g.campaign.world.completed(&id), 1);
     g.retry().unwrap();
     g.set_paused(false);
@@ -410,7 +375,7 @@ fn country_modifiers_and_replayed_clears_preserve_local_progress() {
     let a = g.attempt.as_mut().unwrap();
     a.boss_spawned = true;
     a.enemies[0].hp = 0;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert_eq!(g.campaign.world.completed(&id), 1);
 }
 #[test]
@@ -419,11 +384,11 @@ fn active_parallel_save_recovers_a_complete_previous_generation() {
     let country = g.campaign.world.cleared[0].clone();
     let id = g.strategy.recruit(&mut g.campaign, &country).unwrap();
     g.deploy_survivor(id, &country, 0).unwrap();
-    ticks(&mut g, 120);
+    advance(&mut g, 120);
     let path = std::env::temp_dir().join(format!("horde-save-{}.json", std::process::id()));
     g.save(&path).unwrap();
     let first = serde_json::to_string(&g).unwrap();
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     g.save(&path).unwrap();
     let loaded = Game::load(&path).unwrap();
     assert_eq!(
@@ -465,7 +430,7 @@ fn grand_strategy_country_operation_advances_until_country_is_free() {
         let a = b.game.attempt.as_mut().unwrap();
         a.boss_spawned = true;
         a.enemies[0].injury.unconscious = true;
-        ticks(&mut g, 1);
+        advance(&mut g, 1);
         assert_eq!(g.campaign.world.completed(&country.id), stage + 1);
         assert!(g.take_settlement_issues().is_empty());
     }
@@ -490,7 +455,7 @@ fn retry_keeps_reported_country_but_every_main_round_stops_for_upgrades() {
     let a = g.attempt.as_mut().unwrap();
     a.boss_spawned = true;
     a.enemies[0].injury.unconscious = true;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     g.campaign.enter_country(&other).unwrap();
     g.retry().unwrap();
     assert_eq!(
@@ -502,7 +467,7 @@ fn retry_keeps_reported_country_but_every_main_round_stops_for_upgrades() {
     let a = g.attempt.as_mut().unwrap();
     a.boss_spawned = true;
     a.enemies[0].injury.unconscious = true;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     g.campaign.enter_country(&other).unwrap();
     g.start_repeat(2).unwrap();
     assert_eq!(
@@ -514,7 +479,7 @@ fn retry_keeps_reported_country_but_every_main_round_stops_for_upgrades() {
     let a = g.attempt.as_mut().unwrap();
     a.boss_spawned = true;
     a.enemies[0].injury.unconscious = true;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(!g.continue_repeat().unwrap());
     assert!(g.attempt.is_none());
     assert_eq!(g.repeat_remaining, 0);
@@ -543,7 +508,7 @@ fn invalid_worker_reservation_cannot_replace_a_valid_save_generation() {
     let country = g.campaign.world.cleared[0].clone();
     let id = g.strategy.recruit(&mut g.campaign, &country).unwrap();
     g.deploy_survivor(id, &country, 0).unwrap();
-    ticks(&mut g, 120);
+    advance(&mut g, 120);
     let path = std::env::temp_dir().join(format!("horde-invalid-save-{}.json", std::process::id()));
     g.save(&path).unwrap();
     let valid = serde_json::to_string(&g).unwrap();
@@ -567,11 +532,11 @@ fn npc_draws_a_different_weapon_with_a_ready_turn_before_attacking() {
     g.campaign.npc.policy = horde_core::content::Policy::Guardian;
     enemy(&mut g, 0, 1.5, false);
     g.attempt.as_mut().unwrap().tick = 59;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     let a = g.attempt.as_ref().unwrap();
     assert!(a.decision.starts_with("Ready"));
     assert_eq!(a.active_damage, 0);
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     assert!(
         g.attempt
             .as_ref()
@@ -591,14 +556,14 @@ fn cautious_policy_aims_when_useful_even_if_optional_aiming_is_disabled() {
     a.profile.npc.skill_bonus = 0;
     a.profile.npc.accuracy = 5;
     let magazine = a.ammo;
-    ticks(&mut g, 59);
+    advance(&mut g, 59);
     assert_eq!(g.attempt.as_ref().unwrap().shots, 0);
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     let a = g.attempt.as_ref().unwrap();
     assert!(a.decision.starts_with("Aim at"));
     assert_eq!(a.ammo, magazine);
     assert_eq!(a.shots, 0);
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     let a = g.attempt.as_ref().unwrap();
     assert!(a.decision.starts_with("Attack: shoot"));
     assert_eq!(a.shots, 1);
@@ -616,7 +581,7 @@ fn risk_preference_changes_low_odds_actions_only_at_the_next_legal_turn() {
     a.profile.npc.accuracy = 0;
     let magazine = a.ammo;
     let initial_random_state = a.rng.state;
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     let a = g.attempt.as_ref().unwrap();
     assert!(a.decision.starts_with("Do Nothing"));
     assert_eq!(a.ammo, magazine);
@@ -625,7 +590,7 @@ fn risk_preference_changes_low_odds_actions_only_at_the_next_legal_turn() {
         a.rng.state, initial_random_state,
         "Declining a shot must not inspect or consume future dice"
     );
-    ticks(&mut g, 30);
+    advance(&mut g, 30);
     let before = serde_json::to_string(g.attempt.as_ref().unwrap()).unwrap();
     g.campaign.npc.allow_risk = true;
     assert_eq!(
@@ -633,15 +598,15 @@ fn risk_preference_changes_low_odds_actions_only_at_the_next_legal_turn() {
         before,
         "Changing policy cannot reset action state or clocks"
     );
-    ticks(&mut g, 29);
+    advance(&mut g, 29);
     assert_eq!(g.attempt.as_ref().unwrap().shots, 0);
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     let a = g.attempt.as_ref().unwrap();
     assert!(a.decision.starts_with("Attack: shoot"));
     assert_eq!(a.shots, 1);
     assert_eq!(a.ammo, magazine - 1);
     g.campaign.npc.allow_risk = false;
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     assert_eq!(
         g.attempt.as_ref().unwrap().shots,
         1,
@@ -691,7 +656,7 @@ fn every_contact_lane_publishes_a_traceable_windup_before_damage() {
     for lane in 0..11 {
         enemy(&mut g, lane, 1.5, false);
     }
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     let a = g.attempt.as_ref().unwrap();
     assert_eq!(a.hp, a.max_hp);
     for lane in 0..11 {
@@ -701,7 +666,7 @@ fn every_contact_lane_publishes_a_traceable_windup_before_damage() {
             && event.lane == Some(lane)
             && event.duration_ticks >= 30));
     }
-    ticks(&mut g, 100);
+    advance(&mut g, 100);
     let telemetry = g
         .attempt
         .as_ref()
@@ -744,7 +709,7 @@ fn caller_announces_specific_lanes_before_reinforcements_and_resume_preserves_th
     g.set_paused(false);
     let boss_tick = (content().levels[1].boss_time * 60.0) as u64;
     g.attempt.as_mut().unwrap().tick = boss_tick - 301;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(
         g.attempt
             .as_ref()
@@ -753,7 +718,7 @@ fn caller_announces_specific_lanes_before_reinforcements_and_resume_preserves_th
             .iter()
             .any(|e| e.kind == EventKind::BossWarning)
     );
-    ticks(&mut g, 300);
+    advance(&mut g, 300);
     let born = g
         .attempt
         .as_ref()
@@ -829,7 +794,7 @@ fn npc_impacts_distinguish_misses_defenses_protection_and_injury() {
     ] {
         let (mut g, _) = npc_attack_fixture(roll, defense, armor);
         let target = g.attempt.as_ref().unwrap().enemies[0].id;
-        ticks(&mut g, 60);
+        advance(&mut g, 60);
         let a = g.attempt.as_ref().unwrap();
         assert_eq!(a.shots, 1);
         assert!(
@@ -871,13 +836,13 @@ fn positive_personal_injury_holds_six_movement_steps_then_resumes_for_enemies_an
         });
         assert_eq!(g.attempt.as_ref().unwrap().enemies[0].hp, hp - 1);
         assert_eq!(g.attempt.as_ref().unwrap().enemies[0].x, 10.0);
-        ticks(&mut g, ENEMY_HIT_STOP_TICKS - 1);
+        advance(&mut g, ENEMY_HIT_STOP_TICKS - 1);
         let a = g.attempt.as_ref().unwrap();
         assert_eq!(a.enemies[0].x, 10.0);
         assert_eq!(a.enemies[0].hit_stop_remaining(), 0);
         assert_eq!(a.shots, 1);
         assert_eq!(a.enemies[0].hp, hp - 1);
-        ticks(&mut g, 1);
+        advance(&mut g, 1);
         assert!(g.attempt.as_ref().unwrap().enemies[0].x < 10.0);
     }
 }
@@ -902,8 +867,8 @@ fn repeated_injury_refreshes_without_accumulating_and_misses_or_armor_do_not_hol
         );
         assert_eq!(g.attempt.as_ref().unwrap().enemies[0].x, 10.0);
     }
-    ticks(&mut g, 5);
-    ticks(&mut g, 1);
+    advance(&mut g, 5);
+    advance(&mut g, 1);
     assert!(g.attempt.as_ref().unwrap().enemies[0].x < 10.0);
     for armor in [0, 100] {
         let mut g = game(Mode::Personal);
@@ -927,7 +892,7 @@ fn melee_and_sweep_hold_each_injured_enemy_without_extending_attack_windup() {
     for lane in [4, 5, 6] {
         enemy(&mut g, lane, DEFENSE_LINE, false);
     }
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     let a = g.attempt.as_mut().unwrap();
     a.profile.sweep = true;
     a.profile.personal.melee_damage = 2;
@@ -944,7 +909,7 @@ fn melee_and_sweep_hold_each_injured_enemy_without_extending_attack_windup() {
         assert_eq!(e.attack_left, windup - 1);
         e.x = 10.0;
     }
-    ticks(&mut g, 5);
+    advance(&mut g, 5);
     assert!(
         g.attempt
             .as_ref()
@@ -953,7 +918,7 @@ fn melee_and_sweep_hold_each_injured_enemy_without_extending_attack_windup() {
             .iter()
             .all(|e| e.x == 10.0)
     );
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(
         g.attempt
             .as_ref()
@@ -1027,22 +992,22 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
         e.hp = 1000;
         e.injury = horde_core::rules::InjuryState::new(1000, 10);
     }
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     let a = g.attempt.as_ref().unwrap();
     assert_eq!(a.enemies[0].hit_stop_remaining(), 6);
     let x = a.enemies[0].x;
     let hp = a.enemies[0].hp;
     let rng = serde_json::to_string(&a.rng).unwrap();
-    ticks(&mut g, 6);
+    advance(&mut g, 6);
     let a = g.attempt.as_ref().unwrap();
     assert_eq!(a.enemies[0].x, x);
     assert_eq!(a.enemies[0].hp, hp);
     assert_eq!(serde_json::to_string(&a.rng).unwrap(), rng);
     assert_eq!(a.shots, 1);
     assert_eq!(a.telemetry.npc_decisions.values().sum::<u32>(), 1);
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(g.attempt.as_ref().unwrap().enemies[0].x < x);
-    ticks(&mut g, 53);
+    advance(&mut g, 53);
     assert_eq!(
         g.attempt
             .as_ref()
@@ -1062,7 +1027,7 @@ fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
         let mut g = game(mode);
         enemy(&mut g, 5, DEFENSE_LINE, false);
         enemy(&mut g, 5, DEFENSE_LINE + 0.65, false);
-        ticks(&mut g, 1);
+        advance(&mut g, 1);
         let a = g.attempt.as_mut().unwrap();
         assert_eq!(a.enemies[0].attack_phase, EnemyPhase::Windup);
         assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Queued);
@@ -1070,7 +1035,7 @@ fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
         for e in &mut a.enemies {
             e.statuses.refresh(StatusId::HitStop, 6);
         }
-        ticks(&mut g, 6);
+        advance(&mut g, 6);
         let a = g.attempt.as_ref().unwrap();
         assert!(a.enemies.iter().all(|e| e.hit_stop_remaining() == 0));
         assert_eq!(a.enemies[0].attack_left, windup - 6);
@@ -1087,14 +1052,14 @@ fn hit_stop_survives_pause_and_save_resume_and_rejects_unbounded_saved_duration(
         aim: [10.0, 5.5],
         ..Input::default()
     });
-    ticks(&mut g, 2);
+    advance(&mut g, 2);
     assert_eq!(
         g.attempt.as_ref().unwrap().enemies[0].hit_stop_remaining(),
         3
     );
     g.set_paused(true);
     let frozen = serde_json::to_string(&g).unwrap();
-    ticks(&mut g, 120);
+    advance(&mut g, 120);
     assert_eq!(serde_json::to_string(&g).unwrap(), frozen);
     let path = std::env::temp_dir().join(format!("horde-hit-stop-{}.json", std::process::id()));
     g.save(&path).unwrap();
@@ -1109,11 +1074,11 @@ fn hit_stop_survives_pause_and_save_resume_and_rejects_unbounded_saved_duration(
     restored.refresh(StatusId::HitStop, 3);
     g.set_paused(false);
     resumed.set_paused(false);
-    ticks(&mut g, 3);
-    ticks(&mut resumed, 3);
+    advance(&mut g, 3);
+    advance(&mut resumed, 3);
     assert_eq!(resumed.attempt.as_ref().unwrap().enemies[0].x, 10.0);
-    ticks(&mut g, 1);
-    ticks(&mut resumed, 1);
+    advance(&mut g, 1);
+    advance(&mut resumed, 1);
     assert!(resumed.attempt.as_ref().unwrap().enemies[0].x < 10.0);
     assert_eq!(
         serde_json::to_string(&g).unwrap(),
@@ -1246,7 +1211,7 @@ fn cautious_contact_defense_is_a_whole_maneuver_with_a_real_dodge_bonus() {
     a.profile.npc.skill_bonus = 0;
     a.profile.npc.accuracy = 0;
     a.rng = Rng::new(seed);
-    ticks(&mut g, 120);
+    advance(&mut g, 120);
     let a = g.attempt.as_ref().unwrap();
     assert_eq!(a.maneuver, NpcManeuver::AllOutDefense);
     assert_eq!(a.defense_bonus, 2);
@@ -1262,7 +1227,7 @@ fn cautious_contact_defense_is_a_whole_maneuver_with_a_real_dodge_bonus() {
             .any(|line| line.contains("defense roll 10 vs 11"))
     );
     g.campaign.npc.allow_risk = true;
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     assert_eq!(
         g.attempt.as_ref().unwrap().defense_bonus,
         0,
@@ -1299,7 +1264,7 @@ fn siege_brute_recovers_then_telegraphs_before_another_attack() {
             .attack_phase,
         EnemyPhase::Recovery
     );
-    ticks(&mut g, recovery);
+    advance(&mut g, recovery);
     let a = g.attempt.as_ref().unwrap();
     assert_eq!(a.telemetry.contact_attacks, 1);
     assert_eq!(
@@ -1340,7 +1305,7 @@ fn fully_absorbed_personal_hits_and_invalid_aim_do_not_create_hidden_damage() {
             .any(|e| e.kind == EventKind::Armor && e.value == 0)
     );
     let ammo = a.ammo;
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     g.tick(Input {
         fire: true,
         aim: [f32::NAN, 5.5],
@@ -1396,7 +1361,7 @@ fn paused_peak_review_fixture_uses_the_real_cap_and_an_affordable_defense_plan()
             .max(0) as u32
     );
     let frozen = serde_json::to_string(&g).unwrap();
-    ticks(&mut g, 240);
+    advance(&mut g, 240);
     assert_eq!(serde_json::to_string(&g).unwrap(), frozen);
 }
 
@@ -1415,7 +1380,7 @@ fn parallel_loot_cursors_and_reports_do_not_duplicate_an_unused_shared_stash() {
     // A legacy save has no append cursor. Its first settlement must scan once
     // without paying for the original equipment snapshot again.
     g.battles[0].synced_item_index = 0;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert_eq!(g.campaign.items.len(), original_items);
     let battle = &mut g.battles[0];
     enemy(&mut battle.game, 5, 20.0, true);
@@ -1427,7 +1392,7 @@ fn parallel_loot_cursors_and_reports_do_not_duplicate_an_unused_shared_stash() {
         .unwrap()
         .injury
         .unconscious = true;
-    ticks(&mut g, 1);
+    advance(&mut g, 1);
     assert!(g.battles[0].settled);
     assert!(g.battles[0].game.campaign.items.len() <= 8);
     assert_eq!(g.campaign.items.len(), original_items + 1);
@@ -1446,7 +1411,7 @@ fn npc_turret_uses_its_authored_skill_and_a_critical_failure_requires_ready() {
         .find(|seed| Rng::new(*seed).roll3d6() == 17)
         .unwrap();
     g.attempt.as_mut().unwrap().rng = Rng::new(seed);
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     let a = g.attempt.as_ref().unwrap();
     let turret = &a.structures[0];
     let id = turret.id;
@@ -1467,7 +1432,7 @@ fn npc_turret_uses_its_authored_skill_and_a_critical_failure_requires_ready() {
         .filter(|e| e.kind == EventKind::Shot && e.actor_id == Some(id))
         .count();
     assert_eq!(shots_before, 1);
-    ticks(&mut g, 60);
+    advance(&mut g, 60);
     let a = g.attempt.as_ref().unwrap();
     assert_eq!(a.structures[0].ready_turns, 0);
     assert!(
@@ -1480,7 +1445,7 @@ fn npc_turret_uses_its_authored_skill_and_a_critical_failure_requires_ready() {
 #[test]
 fn a_single_generation_decoder_uses_the_same_schema_and_full_state_validation() {
     let mut g = game(Mode::Npc);
-    ticks(&mut g, 121);
+    advance(&mut g, 121);
     let path = std::env::temp_dir().join(format!("horde-decode-save-{}.json", std::process::id()));
     g.save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
@@ -1503,13 +1468,13 @@ fn a_single_generation_decoder_uses_the_same_schema_and_full_state_validation() 
 fn npc_and_personal_attacks_cannot_target_unseen_entry_queue_positions() {
     let mut npc = game(Mode::Npc);
     enemy(&mut npc, 5, 40.0, false);
-    ticks(&mut npc, 60);
+    advance(&mut npc, 60);
     let a = npc.attempt.as_ref().unwrap();
     assert_eq!(a.decision_target, None);
     assert_eq!(a.shots, 0);
     assert!(a.decision.starts_with("Do Nothing"));
     npc.attempt.as_mut().unwrap().enemies[0].x = 29.5;
-    ticks(&mut npc, 60);
+    advance(&mut npc, 60);
     assert!(npc.attempt.as_ref().unwrap().decision_target.is_some());
     let mut personal = game(Mode::Personal);
     enemy(&mut personal, 5, 40.0, false);

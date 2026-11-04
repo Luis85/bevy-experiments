@@ -5,7 +5,7 @@ use horde_core::{
     sim::{ENEMY_HIT_STOP_TICKS, EventKind, Game, Input, Outcome},
 };
 use std::sync::atomic::{AtomicU64, Ordering};
-use support::legacy_game;
+use support::{advance, legacy_game};
 
 fn game(mode: Mode, unlock: bool) -> Game {
     let mut game = legacy_game();
@@ -20,11 +20,6 @@ fn game(mode: Mode, unlock: bool) -> Game {
     game.deploy(0, mode).unwrap();
     game.set_paused(false);
     game
-}
-fn advance(game: &mut Game, count: u32) {
-    for _ in 0..count {
-        game.tick(Input::default());
-    }
 }
 fn throw(game: &mut Game, kind: OrdnanceKind, cell: [u8; 2]) {
     game.tick(Input {

@@ -363,7 +363,7 @@ pub struct Attempt {
     #[serde(default)]
     pub kill_xp: u64,
     #[serde(default)]
-    pub loot_quality_counts: [u32; 6],
+    pub loot_quality_counts: crate::kind_map::KindMap<crate::quality::Quality, u32>,
     #[serde(default = "legacy_lane_count")]
     pub lane_count: u8,
     #[serde(default)]
@@ -936,7 +936,7 @@ impl Game {
             dps: crate::stats::DpsTracker::new(),
             gear_snapshot,
             kill_xp: 0,
-            loot_quality_counts: [0; 6],
+            loot_quality_counts: Default::default(),
             lane_count,
             loot_events: Vec::new(),
             progression,
@@ -2989,7 +2989,7 @@ impl Game {
                         Some(quality),
                     ) {
                         a.loot += 1;
-                        a.loot_quality_counts[quality as usize] += 1;
+                        a.loot_quality_counts[quality] += 1;
                         if a.loot_events.len() == crate::quality::MAX_LOOT_EVENTS {
                             a.loot_events.remove(0);
                         }
@@ -3108,7 +3108,7 @@ impl Game {
             coins: a.coins,
             kill_xp: a.kill_xp,
             completion_xp,
-            loot_by_quality: a.loot_quality_counts,
+            loot_by_quality: a.loot_quality_counts.clone(),
             end_hp: a.hp,
             max_hp: a.max_hp,
             legacy: a.gear_snapshot.is_empty(),
