@@ -176,9 +176,7 @@ struct SaveEnvelope {
     payload: String,
 }
 fn checksum(bytes: &[u8]) -> u64 {
-    bytes.iter().fold(0xcbf29ce484222325, |hash, byte| {
-        (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
-    })
+    crate::hash::fnv1a(bytes)
 }
 fn read_save(path: &Path) -> Result<Game, SaveError> {
     ensure_generation_size(std::fs::metadata(path)?.len(), MAX_GENERATION_BYTES)?;

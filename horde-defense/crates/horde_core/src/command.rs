@@ -172,8 +172,12 @@ impl From<String> for CommandError {
 }
 
 impl Game {
-    /// The mutation path for frontends: validates `command` against every
-    /// domain rule and applies it atomically or not at all.
+    /// The single frontend mutation path: validates `command` against every
+    /// domain rule before changing state. Frontend widgets only see `&Game`, so
+    /// this is enforced by types there; `Game` fields stay public in core
+    /// (narrowing them is a tracked follow-up). Only the staged arms
+    /// (`ChooseStart`, `EnterCountry`) apply to a clone and commit on success;
+    /// every other arm relies on the atomicity of the domain method it calls.
     pub fn apply(&mut self, command: &Command) -> Result<CommandOutcome, CommandError> {
         use CommandOutcome::{Amount, Applied, Id};
         Ok(match command {

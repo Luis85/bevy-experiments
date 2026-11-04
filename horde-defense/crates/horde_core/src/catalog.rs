@@ -265,16 +265,16 @@ pub fn content_fingerprint() -> u64 {
 }
 
 fn fingerprint_sections(sections: &[(&str, Vec<&str>)]) -> u64 {
-    let mut hash = 0xcbf29ce484222325_u64;
+    let mut hash = crate::hash::fnv1a_start();
     for (section, ids) in sections {
         // Separators keep ("ab", "c") distinct from ("a", "bc").
         for byte in std::iter::once(*section)
             .chain(ids.iter().copied())
             .flat_map(|id| id.bytes().chain([0xff]))
         {
-            hash = (hash ^ u64::from(byte)).wrapping_mul(0x100000001b3);
+            hash = crate::hash::fnv1a_step(hash, byte);
         }
-        hash = (hash ^ 0xfe).wrapping_mul(0x100000001b3);
+        hash = crate::hash::fnv1a_step(hash, 0xfe);
     }
     hash
 }

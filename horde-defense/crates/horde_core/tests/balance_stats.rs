@@ -309,9 +309,7 @@ fn older_checkpoint_geometry_is_eleven_by_thirty_with_empty_history_and_unknown_
         value["attempt"].as_object_mut().unwrap().remove(key);
     }
     let payload = serde_json::to_string(&value).unwrap();
-    let checksum = payload.bytes().fold(0xcbf29ce484222325u64, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
-    });
+    let checksum = support::fnv1a(payload.as_bytes());
     let loaded = Game::decode_save_generation(
         &serde_json::to_vec(
             &serde_json::json!({"version":1,"checksum":checksum,"payload":payload}),

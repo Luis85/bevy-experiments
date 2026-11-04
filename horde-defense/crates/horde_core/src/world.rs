@@ -142,9 +142,7 @@ fn default_stage_themes() -> Vec<StageThemeDefinition> {
     .collect()
 }
 fn stable_hash(text: &str) -> u64 {
-    text.bytes().fold(0xcbf29ce484222325, |h, b| {
-        (h ^ u64::from(b)).wrapping_mul(0x100000001b3)
-    })
+    crate::hash::fnv1a(text.as_bytes())
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Country {

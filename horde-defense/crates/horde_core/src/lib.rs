@@ -4,6 +4,7 @@ pub mod catalog;
 pub mod command;
 pub mod content;
 pub mod enemy_catalog;
+mod hash;
 pub mod kind_map;
 pub mod ordnance;
 pub mod progression;

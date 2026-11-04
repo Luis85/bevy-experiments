@@ -73,7 +73,7 @@ fn run_observed(seed: u64, mode: Mode, mut observe: impl FnMut(&Game)) -> Game {
 #[test]
 fn seeded_headless_runs_keep_their_pinned_gameplay_traces() {
     for (seed, mode, expected) in GAMEPLAY_TRACE {
-        let mut hash = 0xcbf2_9ce4_8422_2325_u64;
+        let mut hash = support::fnv1a(b"");
         run_observed(seed, mode, |g| {
             let a = g.attempt.as_ref().unwrap();
             let line = format!(
@@ -87,9 +87,7 @@ fn seeded_headless_runs_keep_their_pinned_gameplay_traces() {
                     .collect::<Vec<_>>(),
                 a.events
             );
-            hash = line.bytes().fold(hash, |h, b| {
-                (h ^ u64::from(b)).wrapping_mul(0x0100_0000_01b3)
-            });
+            hash = support::fnv1a_extend(hash, line.as_bytes());
         });
         assert_eq!(hash, expected, "seed {seed:#x} {mode:?} gameplay moved");
     }

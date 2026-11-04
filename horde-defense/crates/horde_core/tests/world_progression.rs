@@ -126,9 +126,7 @@ fn older_checkpoint_fields_default_without_resetting_actions_or_creating_levelle
         .unwrap()
         .remove("appearance");
     let payload = serde_json::to_string(&value).unwrap();
-    let checksum = payload.bytes().fold(0xcbf29ce484222325u64, |hash, b| {
-        (hash ^ u64::from(b)).wrapping_mul(0x100000001b3)
-    });
+    let checksum = support::fnv1a(payload.as_bytes());
     let bytes =
         serde_json::to_vec(&serde_json::json!({"version":1,"checksum":checksum,"payload":payload}))
             .unwrap();
