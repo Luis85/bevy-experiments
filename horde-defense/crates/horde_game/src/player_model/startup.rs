@@ -229,11 +229,16 @@ fn decode_png(bytes: &[u8], size: [u32; 2]) -> Result<bevy::prelude::Image, Stri
     .map_err(|e| e.to_string())
 }
 /// Where the bundled catalogue's source images live: the startup asset root,
-/// or the development `assets/` folder when startup has not run (tests).
-pub(super) fn bundled_asset_root() -> PathBuf {
+/// or the development `assets/` folder only when startup has not run (tests).
+/// A failed startup is an error, never a silent switch to another root.
+pub(super) fn bundled_asset_root() -> Result<PathBuf, String> {
     match ACTIVE.get() {
-        Some(Ok(value)) => value.asset_root.clone(),
-        _ => PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets")),
+        Some(Ok(value)) => Ok(value.asset_root.clone()),
+        Some(Err(error)) => Err(error.clone()),
+        None => Ok(PathBuf::from(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../assets"
+        ))),
     }
 }
 pub(super) fn compile_bundled(asset_root: &Path) -> Result<CompiledCatalogue, String> {
@@ -273,6 +278,14 @@ fn compile_from_root(
 mod tests {
     use super::*;
 
+    /// Removes the scratch asset root even when an assertion fails first.
+    struct TempRoot(PathBuf);
+    impl Drop for TempRoot {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
     fn summary(catalogue: &CompiledCatalogue) -> Vec<(String, String, String)> {
         catalogue
             .sources
@@ -283,7 +296,7 @@ mod tests {
 
     #[test]
     fn bundled_catalogue_matches_the_manifest_and_reads_sources_from_the_asset_root() {
-        let root = bundled_asset_root();
+        let root = bundled_asset_root().unwrap();
         let manifest = load_from_asset_root(&root).unwrap();
         let bundled = super::super::builtin().unwrap();
         assert_eq!(summary(&manifest.catalogue), summary(bundled));
@@ -296,26 +309,30 @@ mod tests {
             bundled.attachments.keys().collect::<Vec<_>>()
         );
         assert_eq!(
+            format!("{:?}", manifest.catalogue.definition.skins),
+            format!("{:?}", bundled.definition.skins)
+        );
+        assert_eq!(
             manifest.manifest.default_model_map,
             bundled_manifest().default_model_map
         );
 
         // Without a manifest the bundled documents still read their PNGs from
         // the asset root; with no source images there is nothing embedded to use.
-        let temp = std::env::temp_dir().join(format!(
+        let guard = TempRoot(std::env::temp_dir().join(format!(
             "lastlight-player-model-root-{}",
             std::process::id()
-        ));
-        let _ = std::fs::remove_dir_all(&temp);
+        )));
+        let temp = guard.0.as_path();
+        let _ = std::fs::remove_dir_all(temp);
         std::fs::create_dir_all(temp.join("art/pixel")).unwrap();
-        let missing = load_from_asset_root(&temp).unwrap_err();
+        let missing = load_from_asset_root(temp).unwrap_err();
         assert!(missing.contains("Missing player model asset"), "{missing}");
         for (_, path, _) in summary(bundled) {
             std::fs::copy(root.join(&path), temp.join(&path)).unwrap();
         }
-        let fallback = load_from_asset_root(&temp).unwrap();
+        let fallback = load_from_asset_root(temp).unwrap();
         assert!(fallback.provenance.contains("manifest absent"));
         assert_eq!(summary(&fallback.catalogue), summary(bundled));
-        std::fs::remove_dir_all(&temp).unwrap();
     }
 }
