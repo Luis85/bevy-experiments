@@ -204,7 +204,7 @@ pub fn npc_decision(ui: &mut egui::Ui, attempt: &Attempt) {
     if let Some(id) = attempt.decision_target {
         ui.label(format!("Committed target #{id}"));
     }
-    if let Some(line) = attempt.log.iter().rev().find(|line| line.contains("3d6")) {
+    if let Some(line) = attempt.latest_resolution.as_deref() {
         egui::CollapsingHeader::new("Latest resolution")
             .default_open(
                 crate::environment::string("LASTLIGHT_REVIEW_SCREEN").as_deref()

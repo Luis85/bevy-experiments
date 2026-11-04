@@ -15,27 +15,6 @@ enum Kind {
     Miss,
 }
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-struct Key {
-    tick: u64,
-    kind: u8,
-    actor: Option<u64>,
-    target: Option<u64>,
-    value: i32,
-    from: [u32; 2],
-    to: [u32; 2],
-}
-fn key(event: &Event) -> Key {
-    Key {
-        tick: event.tick,
-        kind: event.kind as u8,
-        actor: event.actor_id,
-        target: event.target_id,
-        value: event.value,
-        from: event.from.map(f32::to_bits),
-        to: event.to.map(f32::to_bits),
-    }
-}
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Target {
     Actor(u64),
     Defender,
@@ -89,7 +68,8 @@ fn positive(kind: Kind) -> bool {
 #[derive(Default)]
 struct Stream {
     attempt: Option<u64>,
-    seen: BTreeSet<Key>,
+    /// Event sequence numbers already presented; unique within an attempt.
+    seen: BTreeSet<u64>,
     active: Vec<Bubble>,
     last_seen: f64,
 }
@@ -106,10 +86,10 @@ impl Stream {
         }
         self.last_seen = now;
         self.active.retain(|b| now - b.started < LIFE);
-        let current: BTreeSet<_> = a.events.iter().map(key).collect();
-        self.seen.retain(|k| current.contains(k));
+        let current: BTreeSet<_> = a.events.iter().map(|event| event.seq).collect();
+        self.seen.retain(|seq| current.contains(seq));
         for event in &a.events {
-            if !self.seen.insert(key(event))
+            if !self.seen.insert(event.seq)
                 || !enabled
                 || (!replay && a.tick.saturating_sub(event.tick) > 120)
             {
@@ -305,8 +285,9 @@ mod tests {
         game.deploy_country_stage(0, Mode::Personal).unwrap();
         game
     }
-    fn hit(a: &Attempt, value: i32, kind: EventKind) -> Event {
+    fn hit(a: &Attempt, value: i32, kind: EventKind, seq: u64) -> Event {
         Event {
+            seq,
             kind,
             from: a.defender_position(),
             to: [12.0, 5.5],
@@ -323,8 +304,8 @@ mod tests {
         let mut game = fixture();
         let a = game.attempt.as_mut().unwrap();
         a.events.clear();
-        a.events.push(hit(a, 20, EventKind::Hit));
-        a.events.push(hit(a, 10, EventKind::WeakPoint));
+        a.events.push_back(hit(a, 20, EventKind::Hit, 1));
+        a.events.push_back(hit(a, 10, EventKind::WeakPoint, 2));
         let before = serde_json::to_value(&game).unwrap();
         let a = game.attempt.as_ref().unwrap();
         let mut stream = Stream::default();
@@ -337,6 +318,22 @@ mod tests {
         stream.observe(a, 11.0, true, false);
         assert!(stream.active.is_empty());
         assert_eq!(serde_json::to_value(&game).unwrap(), before);
+    }
+    #[test]
+    fn identical_results_are_distinct_by_sequence_and_each_presents_once() {
+        let mut game = fixture();
+        let a = game.attempt.as_mut().unwrap();
+        a.events.clear();
+        // Two pellets with identical tick, target, value and geometry.
+        a.events.push_back(hit(a, 20, EventKind::Hit, 1));
+        a.events.push_back(hit(a, 20, EventKind::Hit, 2));
+        let a = game.attempt.as_ref().unwrap();
+        let mut stream = Stream::default();
+        stream.observe(a, 10.0, true, false);
+        assert_eq!(stream.active.len(), 1);
+        assert_eq!(stream.active[0].value, 40);
+        stream.observe(a, 10.05, true, false);
+        assert_eq!(stream.active[0].value, 40);
     }
     #[test]
     fn punch_is_large_then_settles_while_reduced_feedback_has_no_punch_or_drift() {

@@ -11,6 +11,7 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | `campaign`, `strategy` | Currency, unique gear, advancement, recruits, duties and outbreaks | Hit detection or cosmetic effects |
 | `rules` | Saved RNG and supported dice, defense, protection and injury procedures | NPC target policy or animation |
 | `sim` | One-field schedules, actors, collision/contact, maneuvers and reward events | UI, audio, filesystem calls |
+| `sim/events` | Typed `SimEvent` stream: saved per-`Game` sequence numbers, the transient `drain_events` outbox and expedition forwarding | Presentation decisions or persistence of the outbox |
 | `sim/parallel` | Worker battle ownership, reservations, idempotent settlement and reported `SettlementIssue`s | A second combat implementation |
 | `sim/persistence` | Versioned coherent generations, checksums, validation and atomic writes | New combat decisions during load |
 | `runner` | `AppCommand` queue (gameplay `Command`s plus durable reset/save intents), fixed-step execution, input edges, save coordination and sound consumption | Drawing, domain rule checks or alternative combat rules |
@@ -26,7 +27,7 @@ flowchart LR
     Runtime -->|PreUpdate: Game::apply once| Game[Engine-free Game aggregate]
     Fixed[FixedUpdate: 60 Hz] --> Runtime
     Runtime -->|whole ticks, 1x / 2x / 4x| Game
-    Game -->|authoritative events and reports| Runtime
+    Game -->|drain_events: typed SimEvent records and reports| Runtime
     Runtime -->|Update| Save[Atomic save adapter]
     Runtime -->|Update| Audio[Native audio players]
     Game -->|read-only state| UI
@@ -36,6 +37,10 @@ flowchart LR
 Egui may repeat layout passes. A repeated render pass cannot buy an item twice, advance combat or write a file: `Runtime` deduplicates same-frame semantic commands and holds pressed actions until a real fixed step consumes them. Held input and pressed edges are separate. Observation speed executes complete authoritative ticks, never scaled damage or extra actions per simulated second. Tactical pause covers the main battlefield, parallel workers, recovery, spawns, rewards and plague pressure.
 
 `RuntimeNotice` acknowledges command outcomes, durable saves, completed attempts and expedition settlement failures. The runner holds no domain rules: it forwards each gameplay `Command` to `Game::apply` and reports the typed `CommandError` text unchanged. Menus and close handling react to those results; they do not assume that an operation succeeded. Failed writes keep the game open. Startup loading and isolated practice construction are application setup, outside widget layout. Unreadable generations are preserved before replacement.
+
+## Simulation event stream
+
+Every event the simulation emits receives a monotonic `seq` from the emitting `Game` (saved, so it never repeats after load; a live attempt owns the cursor and hands it back on finish) and is queued as a `SimEventRecord { seq, tick, battle, event }` in a transient outbox. `Game::drain_events` returns them in emission order, including the events of the tick on which an attempt finishes and a closing `AttemptFinished`. Expedition records are forwarded with `BattleId::Expedition(id)`; `(battle, seq)` is unique. Variants carry the data consumers need (resolved `Actor` with structure kind, defender mode and weapon class, ordnance kind, rules summary), so the runner selects sounds without inspecting a possibly ended attempt. Undrained records are capped. `Attempt.events` remains a bounded `VecDeque` window for scene replay; each window event shares its record's `seq`, which damage numbers use for deduplication. Legacy windows are renumbered on load. `Attempt.latest_resolution` gives the inspector the latest rules resolution without parsing log prose. Settlement failures stay on the separate `take_settlement_issues` channel because recalls produce them outside ticks.
 
 ## Domain interfaces
 
@@ -61,7 +66,7 @@ The UI overhaul adds presentation-only `navigation`, `chrome` and `briefing` mod
 
 The frontend publishes `SceneAudioTarget` before `AmbienceUpdate`. `AtmosphereAudioPlugin` owns six persistent loop players and a bounded 1.2-second normalized crossfade. `runner` selects at most two authoritative effect cues per native update and caps effects at six voices. Pending playback settings and active sinks both obey current mute/gain settings. An observed parallel field supplies ordinary cues only while its observation is visible; other workers supply critical alerts.
 
-The `logging` module configures Bevy's `LogPlugin` once (default filter, `RUST_LOG` override) with a plain-text file layer under `<save dir>/logs/` and a panic hook that writes `crash-<timestamp>.txt`; `horde_core` only emits `tracing` events (currently save/load) and never installs a subscriber. Non-test code uses `info!`/`warn!`/`error!`; plain stdout is reserved for the `--smoke` report and startup messages emitted before the subscriber exists.
+The `logging` module configures Bevy's `LogPlugin` once (default filter, `RUST_LOG` override) with a plain-text file layer under `<save dir>/logs/` and a panic hook that writes `crash-<timestamp>.txt`; `horde_core` only emits `tracing` events and never installs a subscriber: save/load, a `battle` span (`attempt`, `mode`, `seed`) with attempt start/finish at `info` (finish carries the outcome), NPC decisions and rules resolutions at `debug` with structured fields, and one `trace` per tick. Non-test code uses `info!`/`warn!`/`error!`; plain stdout is reserved for the `--smoke` report and startup messages emitted before the subscriber exists.
 
 The opt-in `capture_sequence` adapter exclusively creates a fresh output directory, captures actual native frames and records authoritative ticks. Its explicit fixed-step capture clock requires an isolated named review, rejects persistent practice and performance-report combinations, and never applies to ordinary gameplay. See [REVIEW_ANIMATION.md](REVIEW_ANIMATION.md), [REVIEW_ATMOSPHERE.md](REVIEW_ATMOSPHERE.md) and [REVIEW_UX.md](REVIEW_UX.md).
 

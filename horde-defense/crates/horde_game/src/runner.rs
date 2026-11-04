@@ -6,7 +6,8 @@ use bevy::{app::AppExit, prelude::*};
 use horde_core::{
     command::{Command, CommandOutcome},
     content::{Mode, StructureKind},
-    sim::{Attempt, Event, EventKind, Game, Input, SettlementIssue},
+    ordnance::OrdnanceKind,
+    sim::{Actor, BattleId, Game, Input, SettlementIssue, SimEvent},
 };
 use std::collections::VecDeque;
 use std::path::PathBuf;
@@ -290,34 +291,42 @@ impl Runtime {
             self.sounds.push(cue);
         }
     }
-    fn event_sound(&mut self, event: &Event, attempt: &Attempt) {
-        let source = event
-            .actor_id
-            .and_then(|id| attempt.structures.iter().find(|s| s.id == id));
-        if source.is_some_and(|s| s.kind == StructureKind::Trap)
+    fn event_sound(&mut self, event: &SimEvent) {
+        if let SimEvent::Hit(strike)
+        | SimEvent::Armor(strike)
+        | SimEvent::Miss(strike)
+        | SimEvent::Defended(strike) = event
             && matches!(
-                event.kind,
-                EventKind::Hit | EventKind::Armor | EventKind::Miss | EventKind::Defended
+                strike.attacker,
+                Actor::Structure {
+                    kind: StructureKind::Trap,
+                    ..
+                }
             )
         {
             self.sound(SoundCue::Trap);
         }
-        let cue = match event.kind {
-            EventKind::Boss => Some(SoundCue::Boss),
-            EventKind::BossWarning | EventKind::Reinforcements => Some(SoundCue::Wave),
-            EventKind::BossExposure => Some(SoundCue::Ready),
-            EventKind::StructureLost => Some(SoundCue::Structure),
-            EventKind::Damage => Some(SoundCue::Damage),
-            EventKind::Melee => Some(SoundCue::Melee),
-            EventKind::Reload => Some(SoundCue::Reload),
-            EventKind::Shot => match source.map(|s| s.kind) {
-                Some(StructureKind::Trap) => Some(SoundCue::Trap),
-                Some(StructureKind::Turret) => Some(SoundCue::TurretShot),
-                // A source destroyed this tick has no reliable timbre. Do not
-                // guess a gunshot from a trap's former world position.
-                _ if (3.0..=15.0).contains(&event.from[0]) => None,
-                _ if attempt.mode == Mode::Npc => Some(SoundCue::NpcShot),
-                _ => Some(match attempt.profile.weapon.class {
+        let cue = match event {
+            SimEvent::Boss { .. } => Some(SoundCue::Boss),
+            SimEvent::BossWarning { .. } | SimEvent::Reinforcements { .. } => Some(SoundCue::Wave),
+            SimEvent::BossExposure { .. } | SimEvent::CooldownReady => Some(SoundCue::Ready),
+            SimEvent::StructureLost { .. } => Some(SoundCue::Structure),
+            SimEvent::Damage(_) => Some(SoundCue::Damage),
+            SimEvent::Melee(_) => Some(SoundCue::Melee),
+            SimEvent::Reload => Some(SoundCue::Reload),
+            SimEvent::Shot { shooter, .. } => match *shooter {
+                Actor::Structure {
+                    kind: StructureKind::Trap,
+                    ..
+                } => Some(SoundCue::Trap),
+                Actor::Structure {
+                    kind: StructureKind::Turret,
+                    ..
+                } => Some(SoundCue::TurretShot),
+                Actor::Defender {
+                    mode: Mode::Npc, ..
+                } => Some(SoundCue::NpcShot),
+                Actor::Defender { weapon, .. } => Some(match weapon {
                     horde_core::weapons::WeaponClass::Pistol => SoundCue::Pistol,
                     horde_core::weapons::WeaponClass::Smg => SoundCue::Smg,
                     horde_core::weapons::WeaponClass::Shotgun => SoundCue::Shotgun,
@@ -325,28 +334,63 @@ impl Runtime {
                     horde_core::weapons::WeaponClass::Marksman => SoundCue::Marksman,
                     horde_core::weapons::WeaponClass::MachineGun => SoundCue::MachineGun,
                 }),
+                // A source that no longer exists has no reliable timbre.
+                _ => None,
             },
-            EventKind::Throw => Some(SoundCue::Throw),
-            EventKind::Explosion => Some(
-                if attempt
-                    .ordnance
-                    .fire_zones
-                    .iter()
-                    .any(|zone| Some(zone.id) == event.actor_id)
-                {
-                    SoundCue::Molotov
-                } else {
-                    SoundCue::Explosion
-                },
-            ),
-            EventKind::Burn => Some(SoundCue::Fire),
-            EventKind::Hit | EventKind::WeakPoint => Some(SoundCue::Impact),
-            EventKind::Armor => Some(SoundCue::Armor),
-            EventKind::Spawn => Some(SoundCue::Incoming),
+            SimEvent::Throw { .. } => Some(SoundCue::Throw),
+            SimEvent::Explosion {
+                ordnance: OrdnanceKind::Molotov,
+                ..
+            } => Some(SoundCue::Molotov),
+            SimEvent::Explosion { .. } => Some(SoundCue::Explosion),
+            SimEvent::Burn { .. } => Some(SoundCue::Fire),
+            SimEvent::Hit(_) | SimEvent::WeakPoint(_) => Some(SoundCue::Impact),
+            SimEvent::Armor(_) => Some(SoundCue::Armor),
+            SimEvent::Spawn { .. } => Some(SoundCue::Incoming),
             _ => None,
         };
         if let Some(cue) = cue {
             self.sound(cue);
+        }
+    }
+    /// Sounds for one tick's drained events. The main deployment is always
+    /// audible; camp observation hears the observed expedition in full and only
+    /// important cues from the others, without multiplying ordinary shots.
+    fn tick_sounds(&mut self, game: &mut Game) {
+        let observed = self.observed_battle;
+        let camp = game.attempt.is_none();
+        for record in game.drain_events() {
+            let audible = match record.battle {
+                BattleId::Root => true,
+                BattleId::Expedition(id) => {
+                    camp && (observed == Some(id)
+                        || matches!(
+                            record.event,
+                            SimEvent::Boss { .. }
+                                | SimEvent::BossWarning { .. }
+                                | SimEvent::Reinforcements { .. }
+                                | SimEvent::StructureLost { .. }
+                        ))
+                }
+            };
+            if audible {
+                self.event_sound(&record.event);
+            }
+        }
+        let fire = match &game.attempt {
+            Some(a) => !a.ordnance.fire_zones.is_empty(),
+            None => game.battles.iter().any(|battle| {
+                !battle.settled
+                    && observed == Some(battle.id)
+                    && battle
+                        .game
+                        .attempt
+                        .as_ref()
+                        .is_some_and(|a| !a.ordnance.fire_zones.is_empty())
+            }),
+        };
+        if fire {
+            self.sound(SoundCue::Fire);
         }
     }
     fn advance(&mut self, game: &mut Game) -> bool {
@@ -363,45 +407,10 @@ impl Runtime {
         for _ in 0..self.controls.speed {
             let input = self.input();
             let had_attempt = game.attempt.is_some();
-            let previous_melee = game.attempt.as_ref().map_or(0, |a| a.melee_cooldown);
             game.tick(input);
             self.simulated_ticks += 1;
             self.save_ticks += 1;
-            if let Some(a) = &game.attempt {
-                if previous_melee > 0 && a.melee_cooldown == 0 {
-                    self.sound(SoundCue::Ready);
-                }
-                for event in a.events.iter().filter(|event| event.tick == a.tick) {
-                    self.event_sound(event, a);
-                }
-                if !a.ordnance.fire_zones.is_empty() {
-                    self.sound(SoundCue::Fire);
-                }
-            } else {
-                // Camp observation can receive important cues from actual worker
-                // battles, without multiplying ordinary shot sounds by roster size.
-                let observed = self.observed_battle;
-                for battle in game.battles.iter().filter(|battle| !battle.settled) {
-                    if let Some(a) = &battle.game.attempt {
-                        if observed == Some(battle.id) && !a.ordnance.fire_zones.is_empty() {
-                            self.sound(SoundCue::Fire);
-                        }
-                        for event in a.events.iter().filter(|event| {
-                            event.tick == a.tick
-                                && (observed == Some(battle.id)
-                                    || matches!(
-                                        event.kind,
-                                        EventKind::Boss
-                                            | EventKind::BossWarning
-                                            | EventKind::Reinforcements
-                                            | EventKind::StructureLost
-                                    ))
-                        }) {
-                            self.event_sound(event, a);
-                        }
-                    }
-                }
-            }
+            self.tick_sounds(game);
             if self.save_ticks >= 600 {
                 self.dirty = true;
             }
@@ -1046,32 +1055,83 @@ mod tests {
     }
     #[test]
     fn authoritative_events_select_weapon_and_ordnance_sounds_without_mutating_the_game() {
+        use horde_core::sim::{Actor, SimEvent};
         let mut host = Host::new();
         host.deploy();
         let before = serde_json::to_value(&host.game).unwrap();
         let a = host.game.attempt.as_ref().unwrap();
-        let mut event = Event {
-            kind: EventKind::Shot,
-            from: horde_core::sim::DEFENDER,
-            to: [15.0, 5.5],
-            value: 0,
-            tick: a.tick,
-            actor_id: None,
+        let shot = SimEvent::Shot {
+            shooter: Actor::Defender {
+                mode: a.mode,
+                weapon: a.profile.weapon.class,
+            },
             target_id: None,
             lane: None,
-            duration_ticks: 0,
+            from: horde_core::sim::DEFENDER,
+            to: [15.0, 5.5],
         };
-        host.runtime.event_sound(&event, a);
+        host.runtime.event_sound(&shot);
         assert_eq!(host.runtime.sounds, vec![SoundCue::Pistol]);
         host.runtime.sounds.clear();
-        event.kind = EventKind::Throw;
-        host.runtime.event_sound(&event, a);
+        let throw = SimEvent::Throw {
+            projectile_id: 7,
+            ordnance: OrdnanceKind::Grenade,
+            lane: Some(5),
+            from: horde_core::sim::DEFENDER,
+            to: [15.0, 5.5],
+            flight_ticks: 30,
+        };
+        host.runtime.event_sound(&throw);
         assert_eq!(host.runtime.sounds, vec![SoundCue::Throw]);
         host.runtime.sounds.clear();
-        event.kind = EventKind::Explosion;
-        host.runtime.event_sound(&event, a);
-        assert_eq!(host.runtime.sounds, vec![SoundCue::Explosion]);
+        for (ordnance, cue) in [
+            (OrdnanceKind::Grenade, SoundCue::Explosion),
+            (OrdnanceKind::Molotov, SoundCue::Molotov),
+        ] {
+            host.runtime.event_sound(&SimEvent::Explosion {
+                projectile_id: 7,
+                ordnance,
+                lane: Some(5),
+                at: [15.0, 5.5],
+                radius: 1.5,
+            });
+            assert_eq!(host.runtime.sounds, vec![cue]);
+            host.runtime.sounds.clear();
+        }
         assert_eq!(serde_json::to_value(&host.game).unwrap(), before);
+    }
+    #[test]
+    fn a_sound_emitted_on_the_finishing_tick_is_played() {
+        let mut host = Host::new();
+        host.deploy();
+        let a = host.game.attempt.as_mut().unwrap();
+        // The reload completes on the same tick the overrun defender retreats.
+        a.hp = 0;
+        a.reload_left = 1;
+        host.runtime.publish(ControlFrame {
+            enabled: true,
+            ..ControlFrame::default()
+        });
+        step(&mut host);
+        assert!(host.game.attempt.is_none());
+        assert!(host.runtime.sounds.contains(&SoundCue::Reload));
+        assert!(
+            host.notices
+                .iter()
+                .any(|n| matches!(n, RuntimeNotice::SimulationFinished))
+        );
+    }
+    #[test]
+    fn melee_readiness_event_plays_the_ready_cue() {
+        let mut host = Host::new();
+        host.deploy();
+        host.game.attempt.as_mut().unwrap().melee_cooldown = 1;
+        host.runtime.publish(ControlFrame {
+            enabled: true,
+            ..ControlFrame::default()
+        });
+        step(&mut host);
+        assert!(host.runtime.sounds.contains(&SoundCue::Ready));
     }
     #[test]
     fn authored_node_purchase_command_charges_once_and_preserves_id_ownership() {
@@ -1118,44 +1178,39 @@ mod tests {
     }
     #[test]
     fn trap_shots_never_fabricate_a_turret_and_missing_sources_stay_silent() {
-        let mut host = Host::new();
-        host.deploy();
-        let a = host.game.attempt.as_mut().unwrap();
-        a.structures.push(horde_core::sim::Structure {
+        use horde_core::sim::{Actor, SimEvent, Strike};
+        let mut runtime = Runtime::default();
+        let shot = |shooter| SimEvent::Shot {
+            shooter,
+            target_id: None,
+            lane: Some(0),
+            from: [4.2, 0.5],
+            to: [5.0, 0.5],
+        };
+        let trap = Actor::Structure {
             id: 9000,
             kind: StructureKind::Trap,
-            lane: 0,
-            column: 0,
-            hp: 10,
-            max_hp: 10,
-            cooldown: 0,
-            charges: 0,
-            cost: 0,
-            ready_turns: 0,
-            position_x: None,
-            build_width: None,
-        });
-        let event = Event {
-            kind: EventKind::Shot,
+        };
+        runtime.event_sound(&shot(trap));
+        assert_eq!(runtime.sounds, vec![SoundCue::Trap]);
+        runtime.sounds.clear();
+        runtime.event_sound(&shot(Actor::Structure {
+            id: 9000,
+            kind: StructureKind::Turret,
+        }));
+        assert_eq!(runtime.sounds, vec![SoundCue::TurretShot]);
+        runtime.sounds.clear();
+        runtime.event_sound(&shot(Actor::Unknown { id: 9000 }));
+        assert!(runtime.sounds.is_empty());
+        runtime.event_sound(&SimEvent::Miss(Strike {
+            attacker: trap,
+            target_id: Some(1),
+            lane: Some(0),
             from: [4.2, 0.5],
             to: [5.0, 0.5],
             value: 0,
-            tick: a.tick,
-            actor_id: Some(9000),
-            target_id: None,
-            lane: Some(0),
-            duration_ticks: 0,
-        };
-        host.runtime.event_sound(&event, a);
-        assert_eq!(host.runtime.sounds, vec![SoundCue::Trap]);
-        host.runtime.sounds.clear();
-        a.structures.last_mut().unwrap().kind = StructureKind::Turret;
-        host.runtime.event_sound(&event, a);
-        assert_eq!(host.runtime.sounds, vec![SoundCue::TurretShot]);
-        host.runtime.sounds.clear();
-        a.structures.pop();
-        host.runtime.event_sound(&event, a);
-        assert!(host.runtime.sounds.is_empty());
+        }));
+        assert_eq!(runtime.sounds, vec![SoundCue::Trap]);
     }
 
     #[test]

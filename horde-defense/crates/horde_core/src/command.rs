@@ -150,7 +150,7 @@ impl fmt::Display for CommandError {
                 f.write_str("Choose your survivor before selecting a starting country")
             }
             Self::NoSelectedCountry => f.write_str("No selected country"),
-            Self::UnknownExpedition => f.write_str("No active expedition with that ID"),
+            Self::UnknownExpedition => f.write_str(crate::sim::UNKNOWN_EXPEDITION),
             Self::ExpeditionEnded => f.write_str("Expedition has ended"),
             Self::RecallThresholdOutOfRange(_) => write!(
                 f,

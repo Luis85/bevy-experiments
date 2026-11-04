@@ -757,7 +757,9 @@ mod tests {
             lane: Some(0),
             value: 0,
             duration_ticks: 0,
-        }];
+            seq: 0,
+        }]
+        .into();
         for tick in 100..108 {
             a.tick = tick;
             for reduced in [false, true] {
@@ -815,6 +817,7 @@ mod tests {
                 target_id: Some(a.enemies[0].id),
                 lane: Some(4),
                 duration_ticks: 0,
+                seq: 0,
             })
             .collect();
         let before = serde_json::to_string(a).unwrap();
@@ -882,6 +885,7 @@ mod tests {
                 target_id: Some(id),
                 lane: Some(4),
                 duration_ticks: 0,
+                seq: 0,
             },
             Event {
                 kind: EventKind::Damage,
@@ -893,8 +897,10 @@ mod tests {
                 target_id: None,
                 lane: Some(4),
                 duration_ticks: 0,
+                seq: 0,
             },
-        ];
+        ]
+        .into();
         let before = serde_json::to_string(a).unwrap();
         let frame = SceneAnimation::sample(a, false);
         assert_eq!(frame.enemies[&id].offset, [0.; 2]);
@@ -981,14 +987,16 @@ mod tests {
             target_id: Some(a.enemies[0].id),
             lane: Some(4),
             duration_ticks: 0,
-        }];
+            seq: 0,
+        }]
+        .into();
         let before: Vec<_> = SceneAnimation::sample(a, false)
             .particles
             .into_iter()
             .filter(|p| p.kind == ParticleKind::Casing)
             .collect();
         assert_eq!(before.len(), 2);
-        a.events.push(Event {
+        a.events.push_back(Event {
             kind: EventKind::Damage,
             from: [1.5, 0.5],
             to: [0.5, 5.5],
@@ -998,6 +1006,7 @@ mod tests {
             target_id: None,
             lane: Some(0),
             duration_ticks: 0,
+            seq: 0,
         });
         let after: Vec<_> = SceneAnimation::sample(a, false)
             .particles

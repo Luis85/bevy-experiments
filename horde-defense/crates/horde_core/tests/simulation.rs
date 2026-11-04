@@ -343,6 +343,7 @@ fn parallel_rewards_and_unique_loot_settle_exactly_once() {
     assert_eq!(g.campaign.coins, paid);
     assert!(g.campaign.reserved_items.is_empty());
     assert!(g.battles.iter().all(|b| b.settled));
+    assert!(g.take_settlement_issues().is_empty());
     assert!(g.recall_survivor(b1).is_err());
 }
 #[test]
@@ -465,6 +466,7 @@ fn grand_strategy_country_operation_advances_until_country_is_free() {
         a.enemies[0].injury.unconscious = true;
         ticks(&mut g, 1);
         assert_eq!(g.campaign.world.completed(&country.id), stage + 1);
+        assert!(g.take_settlement_issues().is_empty());
     }
     assert!(
         g.battles
