@@ -69,6 +69,13 @@ foreach ($name in $projects) {
                 Invoke-Cargo @('fmt', '--all', '--', '--check')
                 Invoke-Cargo (@('clippy', '--locked') + $workspaceArgs + @('--all-targets', '--', '-D', 'warnings'))
                 Invoke-Cargo $testArgs
+                if ($name -eq 'horde-defense') {
+                    # Lastlight's optional feature sets compile different code:
+                    # lint both extremes and test the dev (hot-reload) build.
+                    Invoke-Cargo @('clippy', '--locked', '-p', 'horde-defense', '--all-targets', '--no-default-features', '--', '-D', 'warnings')
+                    Invoke-Cargo @('clippy', '--locked', '-p', 'horde-defense', '--all-targets', '--features', 'dev', '--', '-D', 'warnings')
+                    Invoke-Cargo @('test', '--locked', '-p', 'horde-defense', '--features', 'dev')
+                }
             }
         }
     }

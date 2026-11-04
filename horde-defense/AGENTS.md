@@ -6,4 +6,5 @@ stable IDs, serializable random state; no renderer-driven authoritative outcomes
 Do not bundle proprietary rule tables or rulebook files. Preserve assets/CREDITS.md,
 the font OFL notice and geographic source attribution. See docs/GDD.md.
 Use cargo fmt --all, cargo clippy --locked --workspace --all-targets -- -D warnings,
-and cargo test --locked --workspace inside this directory. Each workspace owns target/.
+the same clippy with -p horde-defense --no-default-features and with --features dev,
+and cargo test --locked --workspace (plus -p horde-defense --features dev) inside this directory. Each workspace owns target/.
