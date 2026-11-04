@@ -1996,7 +1996,7 @@ mod loot_capture_tests {
         }
     }
     fn prepared_frontend() -> Frontend {
-        let mut f = Frontend::load();
+        let mut f = crate::ui::test_support::test_frontend();
         f.game = Game::default();
         f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
         f.game.campaign.choose_start_country("DEU").unwrap();
@@ -2142,7 +2142,7 @@ mod loot_capture_tests {
     #[test]
     fn new_journey_victory_and_liberation_fixtures_use_one_real_settlement_each() {
         for liberated in [false, true] {
-            let mut f = Frontend::load();
+            let mut f = crate::ui::test_support::test_frontend();
             f.game = Game::default();
             f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
             f.game.campaign.choose_start_country("DEU").unwrap();

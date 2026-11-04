@@ -1,7 +1,7 @@
 use crate::{
     art::{self, AMBER, GREEN, INK, MUTED, PANEL, RED, TEXT},
     runner::{
-        self, AppCommand, AppOutcome, AttackAims, ControlFrame, Runtime, RuntimeHost,
+        AppCommand, AppOutcome, AttackAims, ControlFrame, LoadedProfile, Runtime, RuntimeHost,
         RuntimeNotice, SaveIntent,
     },
     settings::{self, Action, Settings},
@@ -25,8 +25,12 @@ use horde_core::{
 };
 use std::path::PathBuf;
 
+mod startup;
+#[cfg(test)]
+mod test_support;
 #[cfg(test)]
 mod tests;
+pub use startup::{ProfilePaths, StartupConfig};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -114,22 +118,47 @@ pub struct Frontend {
     last_toggle_frame: u64,
 }
 impl Frontend {
+    /// Production startup: reads the environment and the save, then applies review scenarios.
     pub fn load() -> Self {
-        let practice = crate::environment::flag("LASTLIGHT_PRACTICE");
-        let scenario = crate::environment::string("LASTLIGHT_REVIEW_SCREEN");
-        let directory =
-            runner::profile_directory(settings::save_directory(), scenario.as_deref(), practice);
-        let loaded = runner::load_profile(directory);
-        let profile_exists = loaded.game.campaign.selected_survivor.is_some()
-            || loaded.game.campaign.attempts > 0
-            || loaded.game.campaign.world.start.is_some();
-        let runner::LoadedProfile {
+        let config = StartupConfig::from_env();
+        let paths = ProfilePaths::from_env(&config);
+        let profile = LoadedProfile::load(&paths);
+        let resumed_practice = config.practice
+            && (profile.game.campaign.selected_survivor.is_some()
+                || profile.game.campaign.attempts > 0
+                || profile.game.campaign.world.start.is_some());
+        let mut f = Self::new(profile, &config, &paths);
+        if !resumed_practice {
+            review::prepare(&mut f);
+        } else {
+            f.message = "Practice scenario - saved progress is isolated from your campaign".into();
+        }
+        review::apply_reduced_override(
+            &mut f,
+            config.scenario.is_some(),
+            config.practice,
+            config.review_reduced,
+        );
+        // Explicit automated-motion fixtures use a separate temporary profile.
+        // This changes startup state only; fixed systems still own every tick.
+        if config.scenario.is_some() && !config.practice && config.review_motion {
+            f.game.set_paused(false);
+            f.construction = false;
+            f.message = "Live motion review · progress is isolated from your campaign".into();
+        }
+        f
+    }
+    /// Pure construction: touches no files and no environment variables.
+    pub fn new(profile: LoadedProfile, config: &StartupConfig, paths: &ProfilePaths) -> Self {
+        let profile_exists = profile.game.campaign.selected_survivor.is_some()
+            || profile.game.campaign.attempts > 0
+            || profile.game.campaign.world.start.is_some();
+        let LoadedProfile {
             game,
             settings,
-            campaign_path: save_path,
-            settings_path,
             warning: message,
-        } = loaded;
+            ..
+        } = profile;
         let selected_country = game
             .campaign
             .world
@@ -147,7 +176,7 @@ impl Frontend {
             ),
         ];
         let preview_survivor = game.campaign.selected_survivor.unwrap_or(SurvivorId::Rook);
-        let mut f = Self {
+        Self {
             game,
             runtime: Runtime::default(),
             textures: crate::visual_assets::ArtTextures::default(),
@@ -173,7 +202,7 @@ impl Frontend {
             recovery_notice: String::new(),
             feedback: feedback::FeedbackState::default(),
             feedback_revision: 0,
-            practice_profile: practice || scenario.is_some(),
+            practice_profile: config.practice || config.scenario.is_some(),
             save_pending: false,
             profile_exists,
             selected_item: None,
@@ -182,8 +211,8 @@ impl Frontend {
             armory_quality: None,
             armory_sort: armory::ArmorySort::Newest,
             pending_sale: None,
-            save_path,
-            settings_path,
+            save_path: paths.campaign(),
+            settings_path: paths.settings(),
             initialized: false,
             construction: false,
             build_kind: StructureKind::Trap,
@@ -208,26 +237,7 @@ impl Frontend {
             custom_cursor_requested: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,
-        };
-        if !(practice && profile_exists) {
-            review::prepare(&mut f);
-        } else {
-            f.message = "Practice scenario - saved progress is isolated from your campaign".into();
         }
-        review::apply_reduced_override(
-            &mut f,
-            scenario.is_some(),
-            practice,
-            crate::environment::flag("LASTLIGHT_REVIEW_REDUCED"),
-        );
-        // Explicit automated-motion fixtures use a separate temporary profile.
-        // This changes startup state only; fixed systems still own every tick.
-        if scenario.is_some() && !practice && crate::environment::flag("LASTLIGHT_REVIEW_MOTION") {
-            f.game.set_paused(false);
-            f.construction = false;
-            f.message = "Live motion review · progress is isolated from your campaign".into();
-        }
-        f
     }
     pub fn ambience_target(&self) -> crate::atmosphere_audio::SceneAudioTarget {
         use crate::atmosphere_audio::{AudioContext, SceneAudioTarget};

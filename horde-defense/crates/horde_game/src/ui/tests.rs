@@ -1,7 +1,7 @@
 //! Event-driven tests of the shipped egui widgets. No OS window or user saves.
 use super::*;
+use crate::runner;
 use bevy_egui::egui::{Event, FullOutput, Key, Modifiers, PointerButton, Pos2, RawInput, Vec2};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 struct IsolatedFrontend {
     frontend: Frontend,
@@ -9,16 +9,8 @@ struct IsolatedFrontend {
 }
 impl IsolatedFrontend {
     fn new() -> Self {
-        static NEXT: AtomicU64 = AtomicU64::new(0);
-        let directory = std::env::temp_dir().join(format!(
-            "lastlight-ui-{}-{}",
-            std::process::id(),
-            NEXT.fetch_add(1, Ordering::Relaxed)
-        ));
-        // load() only reads; replace every persisted path before invoking widgets.
-        let mut frontend = Frontend::load();
-        frontend.save_path = directory.join("campaign.json");
-        frontend.settings_path = directory.join("settings.json");
+        let mut frontend = test_support::test_frontend();
+        let directory = frontend.save_path.parent().unwrap().to_path_buf();
         frontend.game = Game::default();
         // Existing control/layout cases exercise compatibility campaigns.
         frontend.game.campaign.legacy_features = true;
