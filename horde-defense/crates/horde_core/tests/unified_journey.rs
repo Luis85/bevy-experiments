@@ -1,6 +1,7 @@
 use horde_core::{
     campaign::{BodyAttribute, Campaign, NodePayment},
-    content::{EnemyKind, Mode, Slot, StructureKind, content},
+    content::{EnemyKind, ItemDefId, Mode, Slot, StructureKind, content},
+    kind_map::KindMap,
     sim::{Game, Input, JourneyContinuation, Outcome},
     skill_catalog::{CampaignFeature, SkillCatalog, skills},
     survivors::SurvivorId,
@@ -84,7 +85,7 @@ fn fresh_body_training_is_coin_graph_progression_and_never_double_applies_legacy
     };
     legacy.player.level = 4;
     legacy.player.points = 0;
-    legacy.player.body[0] = 3;
+    legacy.player.body[BodyAttribute::Vitality] = 3;
     legacy.coins = 500;
     assert!(legacy.has_node("body_vitality_3"));
     let hp = legacy.profile(Mode::Personal).personal.health;
@@ -113,7 +114,7 @@ fn retained_legacy_points_pay_inside_the_same_graph_with_an_exact_nonrefundable_
     c.purchase_node("body_vitality_1").unwrap();
     assert_eq!(c.player.points, 0);
     assert_eq!(c.player.legacy_graph_points, 1);
-    assert_eq!(c.player.body[0], 0);
+    assert_eq!(c.player.body[BodyAttribute::Vitality], 0);
     assert_eq!(c.profile(Mode::Personal).personal.health, 105);
     c.validate().unwrap();
     c.respec_player().unwrap();
@@ -140,7 +141,7 @@ fn legacy_refund_cannot_orphan_coin_or_point_purchased_graph_nodes() {
         let c = &mut g.campaign;
         c.legacy_features = true;
         c.player.level = if use_legacy_point { 5 } else { 4 };
-        c.player.body[0] = 3;
+        c.player.body[BodyAttribute::Vitality] = 3;
         c.player.points = u32::from(use_legacy_point);
         c.coins = 500;
         let price = skills().node("body_vitality_4").unwrap().price;
@@ -182,10 +183,10 @@ fn legacy_refund_cannot_orphan_coin_or_point_purchased_graph_nodes() {
         ..Campaign::default()
     };
     c.player.level = 4;
-    c.player.body[0] = 3;
+    c.player.body[BodyAttribute::Vitality] = 3;
     c.respec_player().unwrap();
     assert_eq!(c.player.points, 3);
-    assert_eq!(c.player.body, [0; 5]);
+    assert_eq!(c.player.body, KindMap::default());
     c.respec_player().unwrap();
     assert_eq!(
         c.player.points, 3,
@@ -208,7 +209,7 @@ fn fortification_nodes_have_real_effects_and_existing_blueprints_and_ranks_canno
     g.campaign.purchase_blueprint(StructureKind::Trap).unwrap();
     assert!(g.campaign.has_node("trap_blueprint"));
     g.campaign.upgrade_structure(StructureKind::Trap).unwrap();
-    assert_eq!(g.campaign.structure_upgrades[0], 1);
+    assert_eq!(g.campaign.structure_upgrades[StructureKind::Trap], 1);
     g.campaign.validate().unwrap();
     let before = g.campaign.clone();
     assert!(g.campaign.purchase_node("trap_rank_1").is_err());
@@ -219,14 +220,14 @@ fn fortification_nodes_have_real_effects_and_existing_blueprints_and_ranks_canno
     let mut old = legacy_game().campaign;
     old.coins = 1000;
     old.first_clear(0, Mode::Personal);
-    old.blueprints[0] = true;
-    old.structure_upgrades[0] = 3;
+    old.blueprints[StructureKind::Trap] = true;
+    old.structure_upgrades[StructureKind::Trap] = 3;
     let coins = old.coins;
     assert!(old.has_node("trap_rank_3"));
     assert!(old.purchase_node("trap_rank_2").is_err());
     assert_eq!(old.coins, coins);
     old.purchase_node("trap_rank_4").unwrap();
-    assert_eq!(old.structure_upgrades[0], 4);
+    assert_eq!(old.structure_upgrades[StructureKind::Trap], 4);
     old.validate().unwrap();
 }
 
@@ -329,7 +330,7 @@ fn equipped_visuals_are_authored_actual_instances_and_frozen_for_the_attempt() {
     g.campaign.equip(Mode::Personal, id).unwrap();
     let profile = g.campaign.profile(Mode::Personal);
     let visual = profile.equipment_visual.outfit.as_ref().unwrap();
-    assert_eq!(visual.definition, outfit);
+    assert_eq!(visual.definition, ItemDefId::at(outfit));
     assert_eq!(visual.level, g.campaign.item(id).unwrap().level);
     assert_eq!(visual.style, "armor.leather");
     assert_eq!(visual.quality, g.campaign.item_quality(id).unwrap());

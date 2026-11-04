@@ -187,7 +187,11 @@ pub(super) fn draw_for(
         armory::paint_item_icon(
             &painter,
             textures,
-            entry.receipt.definition,
+            entry
+                .receipt
+                .definition
+                .index()
+                .expect("validated loot receipt"),
             icon.shrink(3.0),
             Color32::WHITE.gamma_multiply(fade),
         );
@@ -233,7 +237,7 @@ mod tests {
     fn receipt(id: u64, quality: Quality) -> LootEvent {
         LootEvent {
             item_id: id,
-            definition: 4,
+            definition: horde_core::content::ItemDefId::at(4),
             level: 1,
             quality,
             name: "Rifle".into(),

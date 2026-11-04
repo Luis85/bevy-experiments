@@ -55,6 +55,13 @@ from its components, while a Demolisher-tagged archetype does not gain those
 traits merely from its legacy kind. Timed boss-specific mechanics remain
 separate from these ordinary profiles.
 
+An archetype may also author `"target_urgency"`: yards added to an NPC
+defender's target score, so negative values are engaged sooner (finite,
+−100–100). When omitted it defaults from `base_enemy_kind` (Runner −3,
+otherwise 0), so older catalogues keep their targeting; the shipped Runner-tagged
+archetypes author −3 explicitly. It is a resolved, saved snapshot field like the
+others.
+
 Component IDs are local to their table. Archetype IDs are persistent identities;
 keep them stable when rebalancing. Components contain values, not references to
 other components: inheritance and reference cycles are unsupported. Every record
@@ -64,6 +71,46 @@ rejects unknown fields, including attempted inheritance fields.
 `Breacher`, `Caller`, and `SiegeBrute`, reusing the existing sprite assets. Selecting
 a boss sprite does not grant boss behavior. Boss-derived packlings, prowlers and
 husks have their own lower health, rewards, combat profiles and presentation size.
+
+## Adding a new enemy
+
+**Data-only variant** (new numbers, mix of existing behaviours) — no Rust edit:
+
+1. Reuse or add records in `bodies`, `movements`, `attacks`, `defenses`,
+   `rewards` and `visuals` (each validates on its own).
+2. Add an `archetypes` record: a new stable `id`, `name`, the nearest legacy
+   `base_enemy_kind` (category, visual fallback and kill-tally key only), the six
+   component IDs, optional `target_urgency`, and `unlocked_by` (`null` or a boss
+   kind for boss-derived ordinaries).
+3. Give it a positive `weight` in each `waves` template it should appear in.
+4. Pick a `visual.sprite` from the existing `VisualSprite` set; until per-archetype
+   art is data-driven, the frontend draws the sprite with the authored tint/scale.
+5. Run `cargo test --locked -p horde_core` — catalogue validation, snapshot
+   validation and the save round-trip tests cover the new record.
+
+Every per-kind number the simulation uses (speed, damage, windup, armor, contact
+armor fraction, structure damage multiplier, NPC stats, rewards, targeting
+priority) comes from the resolved profile; `sim.rs` has no per-`EnemyKind`
+numeric branches.
+
+**New behaviour** (something the profile cannot express, e.g. a ranged attack or
+an aura):
+
+1. Add the parameter to the relevant component (or the archetype) with a serde
+   default that reproduces current behaviour, copy it into `ResolvedEnemy`, and
+   bound it in both `AuthoredCatalog::resolve` and `ResolvedEnemy::validate`.
+2. Read it through `enemy_profile(e)` in the simulation; branch on the value,
+   not on `EnemyKind`.
+3. If old saves' snapshots need a value other than the serde default, bump
+   `SAVE_VERSION` with a step in `sim/migrations.rs` and a fixture test.
+4. Only add an `EnemyKind` variant for a new legacy category with its own
+   fallback art; the compiler then lists every frontend `match` to update
+   (`KindMap` keys, kill tallies, sprite choice). See ARCHITECTURE.md on why these
+   enums stay exhaustive.
+
+`EnemyKind` still selects behaviour in two places on purpose: the timed boss
+spawns through the Brute default profile, and the Caller boss summons the Runner
+default. Both resolve their numbers from the catalogue's `defaults`.
 
 ## Waves and boss unlocks
 
@@ -104,6 +151,7 @@ before play. Exactly one unrestricted default must match each legacy kind.
 | NPC HP / HT / skill / dodge / armor | 1–1000 / 3–30 / 3–30 / 0–20 / 0–100 |
 | NPC damage dice / add | 1–20 / −30–100 |
 | Structure damage multiplier / contact armor fraction | integer 1–8 / finite 0–1 |
+| Target urgency | finite −100–100 |
 | Speed / windup | 0.01–10 / 0.5–60 |
 | Coins / XP | 1–1000000 / 0–1000000 |
 | Tint channels / visual scale | 0–1 / 0.25–3 |
@@ -133,11 +181,13 @@ unlock persistence, or random selection. Those remain simulation/presentation
 responsibilities; a catalogue unlock marker alone cannot record a boss kill.
 
 
-`ResolvedEnemy` includes `structure_damage_multiplier` and
-`contact_armor_fraction`; save validation checks their bounds along with the
-other snapshot fields. A changed component affects future spawns, not an actor
-already saved with a resolved profile. Legacy records without these fields use
-their documented neutral defaults during deserialization.
+`ResolvedEnemy` includes `structure_damage_multiplier`,
+`contact_armor_fraction` and `target_urgency`; save validation checks their
+bounds along with the other snapshot fields. A changed component affects future
+spawns, not an actor already saved with a resolved profile. Legacy records
+without the first two use their documented neutral defaults during
+deserialization; save format v3 migration adds `target_urgency` to older
+snapshots from their saved `kind`.
 
 Fallen actors move into persistent per-attempt corpse records with their
 resolved appearance and stable identity. They remain through save/resume and

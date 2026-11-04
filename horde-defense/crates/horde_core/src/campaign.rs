@@ -1,6 +1,10 @@
-use crate::content::{Mode, NpcProfile, PersonalProfile, Policy, Slot, StructureKind, content};
+use crate::content::{
+    ItemDefId, ItemDefinition, Mode, NpcProfile, PersonalProfile, Policy, Slot, StructureKind,
+    content,
+};
+use crate::kind_map::{KindMap, StableKind};
 use crate::rules::Stats;
-use crate::skill_catalog::{SkillModifiers, skills};
+use crate::skill_catalog::{SkillModifiers, skills, unlocks};
 use crate::weapons::{WeaponClass, WeaponSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -9,7 +13,7 @@ fn legacy_training_default() -> bool {
     true
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum BodyAttribute {
     Vitality,
     Strength,
@@ -28,6 +32,9 @@ impl BodyAttribute {
     pub fn index(self) -> usize {
         self as usize
     }
+}
+impl StableKind for BodyAttribute {
+    const ALL: &'static [Self] = &Self::ALL;
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Skill {
@@ -76,7 +83,7 @@ impl Skill {
             .price
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum NpcTraining {
     Strength,
     Dexterity,
@@ -98,6 +105,11 @@ impl NpcTraining {
         Self::HitPoints,
         Self::Fatigue,
     ];
+}
+impl StableKind for NpcTraining {
+    const ALL: &'static [Self] = &Self::ALL;
+}
+impl NpcTraining {
     pub fn cost(self) -> u32 {
         match self {
             Self::Strength | Self::Health => 10,
@@ -127,7 +139,7 @@ pub struct Player {
     pub level: u32,
     pub xp: u64,
     pub points: u32,
-    pub body: [u32; 5],
+    pub body: KindMap<BodyAttribute, u32>,
     pub loadout: [u64; 4],
 }
 impl Player {
@@ -253,7 +265,7 @@ pub struct Npc {
     pub extra_fp: i32,
     pub awarded: u32,
     pub unspent: u32,
-    pub investments: [u32; 8],
+    pub investments: KindMap<NpcTraining, u32>,
     pub successful_hits: u64,
     pub combat_ticks: u64,
     pub objectives_claimed: [bool; 2],
@@ -324,10 +336,24 @@ pub struct Item {
     #[serde(default = "crate::progression::level_one")]
     pub level: u32,
     pub id: u64,
-    pub definition: usize,
+    pub definition: ItemDefId,
     pub locked: bool,
     pub favorite: bool,
     pub protected: bool,
+}
+impl Item {
+    /// Authored definition; saved IDs are validated against the catalogue on load.
+    pub fn definition(&self) -> &'static ItemDefinition {
+        self.definition
+            .definition()
+            .expect("validated item definition ID")
+    }
+    /// Position of this item's definition in the loaded catalogue.
+    pub fn definition_index(&self) -> usize {
+        self.definition
+            .index()
+            .expect("validated item definition ID")
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Placement {
@@ -463,8 +489,8 @@ pub struct Campaign {
     /// armory. Fresh campaigns require authored class proficiency and ownership.
     #[serde(default = "legacy_training_default")]
     pub legacy_weapon_training: bool,
-    pub blueprints: [bool; 3],
-    pub structure_upgrades: [u32; 3],
+    pub blueprints: KindMap<StructureKind, bool>,
+    pub structure_upgrades: KindMap<StructureKind, u32>,
     pub layout: Vec<Placement>,
     #[serde(default)]
     pub country_layouts: BTreeMap<String, Vec<Placement>>,
@@ -542,7 +568,7 @@ impl Default for Campaign {
                 level: 1,
                 xp: 0,
                 points: 0,
-                body: [0; 5],
+                body: KindMap::default(),
                 loadout: personal_loadout,
             },
             npc: Npc {
@@ -558,7 +584,7 @@ impl Default for Campaign {
                 extra_fp: 0,
                 awarded: 0,
                 unspent: 0,
-                investments: [0; 8],
+                investments: KindMap::default(),
                 successful_hits: 0,
                 combat_ticks: 0,
                 objectives_claimed: [false; 2],
@@ -578,7 +604,7 @@ impl Default for Campaign {
                     quality: None,
                     level: 1,
                     id: n + 1,
-                    definition: n as usize,
+                    definition: ItemDefId::at(n as usize),
                     locked: true,
                     favorite: false,
                     protected: true,
@@ -587,7 +613,7 @@ impl Default for Campaign {
                     quality: None,
                     level: 1,
                     id: 5,
-                    definition,
+                    definition: ItemDefId::at(definition),
                     locked: true,
                     favorite: false,
                     protected: true,
@@ -596,8 +622,8 @@ impl Default for Campaign {
             skills: vec![],
             skill_nodes: BTreeSet::from(["pistol_training".into()]),
             legacy_weapon_training: starter_pistol.is_none(),
-            blueprints: [false; 3],
-            structure_upgrades: [0; 3],
+            blueprints: KindMap::default(),
+            structure_upgrades: KindMap::default(),
             layout: vec![],
             country_layouts: BTreeMap::new(),
             presets: vec![Preset {
@@ -645,17 +671,21 @@ impl Campaign {
     fn owns_node_definition(&self, node: &crate::skill_catalog::SkillNode) -> bool {
         self.owns_node_with_body(node, &self.player.body)
     }
-    fn owns_node_with_body(&self, node: &crate::skill_catalog::SkillNode, body: &[u32; 5]) -> bool {
+    fn owns_node_with_body(
+        &self,
+        node: &crate::skill_catalog::SkillNode,
+        body: &KindMap<BodyAttribute, u32>,
+    ) -> bool {
         self.skill_nodes.contains(&node.id)
             || self.skills.iter().any(|s| s.id() == node.id)
             || (node.id == "pistol_training" && self.legacy_weapon_training)
             || node.effects.iter().any(|effect| match effect {
                 crate::skill_catalog::SkillEffect::BodyDevelopment { attribute, rank } => {
-                    body[attribute.index()] >= *rank
+                    body[*attribute] >= *rank
                 }
-                crate::skill_catalog::SkillEffect::Blueprint(kind) => self.blueprints[kind.index()],
+                crate::skill_catalog::SkillEffect::Blueprint(kind) => self.blueprints[*kind],
                 crate::skill_catalog::SkillEffect::StructureRank { kind, rank } => {
-                    self.structure_upgrades[kind.index()] >= *rank
+                    self.structure_upgrades[*kind] >= *rank
                 }
                 _ => false,
             })
@@ -690,8 +720,7 @@ impl Campaign {
         self.skill_nodes.iter().map(String::as_str).chain(self.skills.iter().map(|skill|skill.id())).filter_map(|id|skills().node(id)).any(|node|node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::FeatureUnlock(value) if *value==feature)))
     }
     pub fn body_rank(&self, attribute: BodyAttribute) -> u32 {
-        self.player.body[attribute.index()]
-            .max(self.modifiers().body_development[attribute.index()])
+        self.player.body[attribute].max(self.modifiers().body_development[attribute])
     }
     pub fn modifiers(&self) -> SkillModifiers {
         let mut result = SkillModifiers::default();
@@ -747,8 +776,8 @@ impl Campaign {
             skills: self.skills.clone(),
             skill_nodes: self.skill_nodes.clone(),
             legacy_weapon_training: self.legacy_weapon_training,
-            blueprints: self.blueprints,
-            structure_upgrades: self.structure_upgrades,
+            blueprints: self.blueprints.clone(),
+            structure_upgrades: self.structure_upgrades.clone(),
             layout: self.layout.clone(),
             country_layouts: self.country_layouts.clone(),
             presets: self.presets.clone(),
@@ -899,25 +928,19 @@ impl Campaign {
     pub fn item_sale_value(&self, id: u64) -> Result<u64, String> {
         let item = self.item(id).ok_or("Unknown item")?;
         Ok(
-            (crate::progression::price(content().items[item.definition].sell_value, item.level)
-                as f64
-                * crate::quality::value_ratio(
-                    content().items[item.definition].base_quality,
-                    item.quality,
-                ))
+            (crate::progression::price(item.definition().sell_value, item.level) as f64
+                * crate::quality::value_ratio(item.definition().base_quality, item.quality))
             .round() as u64,
         )
     }
     pub fn item_quality(&self, id: u64) -> Result<crate::quality::Quality, String> {
         let item = self.item(id).ok_or("Unknown item")?;
-        Ok(item
-            .quality
-            .unwrap_or(content().items[item.definition].base_quality))
+        Ok(item.quality.unwrap_or(item.definition().base_quality))
     }
     pub fn effective_item(&self, id: u64) -> Result<crate::content::ItemDefinition, String> {
         let item = self.item(id).ok_or("Unknown item")?;
         Ok(crate::quality::apply(
-            crate::progression::scale_item(content().items[item.definition].clone(), item.level),
+            crate::progression::scale_item(item.definition().clone(), item.level),
             item.quality,
         ))
     }
@@ -961,12 +984,9 @@ impl Campaign {
         self.skill_nodes.insert(id.to_owned());
         for effect in &node.effects {
             match effect {
-                crate::skill_catalog::SkillEffect::Blueprint(kind) => {
-                    self.blueprints[kind.index()] = true
-                }
+                crate::skill_catalog::SkillEffect::Blueprint(kind) => self.blueprints[*kind] = true,
                 crate::skill_catalog::SkillEffect::StructureRank { kind, rank } => {
-                    self.structure_upgrades[kind.index()] =
-                        self.structure_upgrades[kind.index()].max(*rank)
+                    self.structure_upgrades[*kind] = self.structure_upgrades[*kind].max(*rank)
                 }
                 _ => {}
             }
@@ -1020,11 +1040,8 @@ impl Campaign {
             Mode::Personal => self.player.loadout,
             Mode::Npc => self.npc.loadout,
         };
-        let index = self
-            .item(loadout[slot.index()])
-            .map(|x| x.definition)
-            .unwrap_or(slot.index());
-        &content().items[index]
+        self.item(loadout[slot.index()])
+            .map_or(&content().items[slot.index()], Item::definition)
     }
     fn equipment_visual_for(
         &self,
@@ -1033,9 +1050,9 @@ impl Campaign {
     ) -> crate::survivors::EquipmentVisual {
         let item = |slot: Slot| {
             self.item(loadout[slot.index()]).map(|item| {
-                let definition = &content().items[item.definition];
+                let definition = item.definition();
                 crate::survivors::EquipmentVisualItem {
-                    definition: item.definition,
+                    definition: item.definition.clone(),
                     level: item.level,
                     quality: item.quality.unwrap_or(definition.base_quality),
                     style: definition.visual_style.clone(),
@@ -1064,15 +1081,14 @@ impl Campaign {
         character: &Npc,
     ) -> DefenderProfile {
         let equipment = |slot: Slot| {
-            let index = self
+            let definition = self
                 .item(loadout[slot.index()])
-                .map(|i| i.definition)
-                .unwrap_or(slot.index());
+                .map_or(&content().items[slot.index()], Item::definition);
             let level = self
                 .item(loadout[slot.index()])
                 .map_or(1, |item| item.level);
             crate::quality::apply(
-                crate::progression::scale_item(content().items[index].clone(), level),
+                crate::progression::scale_item(definition.clone(), level),
                 self.item(loadout[slot.index()])
                     .and_then(|item| item.quality),
             )
@@ -1102,8 +1118,8 @@ impl Campaign {
             npc.accuracy += i.npc.accuracy;
             npc.skill_bonus += i.npc.skill_bonus;
         }
-        let b = std::array::from_fn::<_, 5, _>(|index| {
-            self.player.body[index].max(modifiers.body_development[index])
+        let b = BodyAttribute::ALL.map(|attribute| {
+            self.player.body[attribute].max(modifiers.body_development[attribute])
         });
         if mode == Mode::Personal {
             personal.health += b[0] as i32 * 5;
@@ -1156,10 +1172,10 @@ impl Campaign {
             npc_melee_damage_dice: npc_melee.dice,
             npc_melee_damage_add: npc_melee.adds,
             npc_melee_kind: melee.npc.damage_kind,
-            pierce: is_personal && modifiers.piercing,
-            sweep: is_personal && modifiers.sweep,
-            heal: is_personal && modifiers.heal,
-            brace: is_personal && modifiers.brace,
+            pierce: is_personal && modifiers.unlocked(unlocks::PIERCING),
+            sweep: is_personal && modifiers.unlocked(unlocks::SWEEP),
+            heal: is_personal && modifiers.unlocked(unlocks::HEAL),
+            brace: is_personal && modifiers.unlocked(unlocks::BRACE),
             engineering: modifiers.engineering,
             strength: if is_personal { b[1] } else { 0 },
             endurance: if is_personal { b[3] } else { 0 },
@@ -1168,9 +1184,9 @@ impl Campaign {
     }
     pub fn compare_item(&self, mode: Mode, id: u64) -> Result<ItemComparison, String> {
         let candidate = self.item(id).ok_or("Item is no longer owned")?;
-        let slot = content()
-            .items
-            .get(candidate.definition)
+        let slot = candidate
+            .definition
+            .definition()
             .ok_or("Unknown item profile")?
             .slot;
         let before = if mode == Mode::Personal {
@@ -1328,7 +1344,9 @@ impl Campaign {
         let owned = self
             .items
             .iter()
-            .filter(|i| !self.item_reserved(i.id) && self.can_use_weapon(mode, i.definition))
+            .filter(|i| {
+                !self.item_reserved(i.id) && self.can_use_weapon(mode, i.definition_index())
+            })
             .filter_map(|item| self.compare_item(mode, item.id).ok())
             .filter(|c| score(&c.after, c.slot) > score(&c.before, c.slot) + 1.0)
             .max_by(|a, b| {
@@ -1340,10 +1358,9 @@ impl Campaign {
                 "Equip an improvement already in your armory".into(),
                 format!(
                     "{} improves your selected {:?} loadout. Compare the complete profile before equipping.",
-                    content().items[self
-                        .item(item.item_id)
+                    self.item(item.item_id)
                         .expect("owned comparison")
-                        .definition]
+                        .definition()
                         .name,
                     mode
                 ),
@@ -1364,7 +1381,7 @@ impl Campaign {
             );
         }
         for kind in StructureKind::ALL {
-            if self.blueprint_available(kind) && !self.blueprints[kind.index()] {
+            if self.blueprint_available(kind) && !self.blueprints[kind] {
                 let def = content().structure(kind);
                 return make(
                     format!("Unlock {}", def.name),
@@ -1400,15 +1417,15 @@ impl Campaign {
         }
         if mode == Mode::Personal {
             for item in &self.items {
-                if self.can_use_weapon(mode, item.definition)
-                    || content().items[item.definition].slot != Slot::Ranged
-                    || (content().items[item.definition].npc_only && !self.legacy_weapon_training)
+                if self.can_use_weapon(mode, item.definition_index())
+                    || item.definition().slot != Slot::Ranged
+                    || (item.definition().npc_only && !self.legacy_weapon_training)
                 {
                     continue;
                 }
-                let class = WeaponSpec::from_item(&content().items[item.definition]).class;
+                let class = WeaponSpec::from_item(item.definition()).class;
                 if let Some(node) = skills().nodes.iter().find(|n| !self.has_node(&n.id) && n.prerequisites.iter().all(|p| self.has_node(p)) && n.effects.iter().any(|e| matches!(e, crate::skill_catalog::SkillEffect::WeaponTraining(c) if *c == class))) {
-                    return make(format!("Train for your owned {}", content().items[item.definition].name), format!("{} Unlocking proficiency permits equipping the weapon already in your armory.", node.description), RecommendationAction::LearnNode(node.id.clone()), node.price);
+                    return make(format!("Train for your owned {}", item.definition().name), format!("{} Unlocking proficiency permits equipping the weapon already in your armory.", node.description), RecommendationAction::LearnNode(node.id.clone()), node.price);
                 }
             }
         }
@@ -1477,15 +1494,14 @@ impl Campaign {
         if !self.legacy_features {
             return Err("Purchase body-development nodes in the skill tree".into());
         }
-        let n = attribute.index();
         if self.player.points == 0 {
             return Err("Earn a character point by leveling up".into());
         }
-        if self.player.body[n] >= self.body_cap() {
+        if self.player.body[attribute] >= self.body_cap() {
             return Err("Attribute at campaign tier cap".into());
         }
         self.player.points -= 1;
-        self.player.body[n] += 1;
+        self.player.body[attribute] += 1;
         Ok(())
     }
     pub fn respec_player(&mut self) -> Result<(), String> {
@@ -1502,15 +1518,15 @@ impl Campaign {
             if node.prerequisites.iter().any(|prerequisite| {
                 !skills()
                     .node(prerequisite)
-                    .is_some_and(|required| self.owns_node_with_body(required, &[0; 5]))
+                    .is_some_and(|required| self.owns_node_with_body(required, &KindMap::default()))
             }) {
                 return Err(format!(
                     "Cannot refund legacy body points: learned skill {id} requires those ranks"
                 ));
             }
         }
-        self.player.points += self.player.body.iter().sum::<u32>();
-        self.player.body = [0; 5];
+        self.player.points += self.player.body.values().sum::<u32>();
+        self.player.body = KindMap::default();
         Ok(())
     }
     pub fn reward(&mut self, coins: u64, xp: u64, mode: Mode) -> u64 {
@@ -1573,7 +1589,7 @@ impl Campaign {
             quality,
             level,
             id,
-            definition,
+            definition: ItemDefId::at(definition),
             locked: false,
             favorite: false,
             protected: false,
@@ -1604,8 +1620,8 @@ impl Campaign {
             return Err("This equipment is reserved by another survivor".into());
         }
         let item = self.item(id).ok_or("Item is no longer owned")?;
-        let slot = content().items[item.definition].slot.index();
-        self.weapon_access(mode, item.definition)
+        let slot = item.definition().slot.index();
+        self.weapon_access(mode, item.definition_index())
             .map_err(str::to_owned)?;
         match mode {
             Mode::Personal => self.player.loadout[slot] = id,
@@ -1736,7 +1752,7 @@ impl Campaign {
         self.validate_loadout(loadout)?;
         for id in loadout {
             let item = self.item(id).ok_or("Missing equipment")?;
-            self.weapon_access(mode, item.definition)
+            self.weapon_access(mode, item.definition_index())
                 .map_err(str::to_owned)?;
         }
         if loadout.iter().any(|id| self.reserved_items.contains(id)) {
@@ -1753,8 +1769,7 @@ impl Campaign {
             && self.items.iter().any(|i| {
                 i.id == 5
                     && i.protected
-                    && WeaponSpec::from_item(&content().items[i.definition]).class
-                        == WeaponClass::Pistol
+                    && WeaponSpec::from_item(i.definition()).class == WeaponClass::Pistol
             })
         {
             5
@@ -1765,9 +1780,9 @@ impl Campaign {
     pub fn validate_loadout(&self, loadout: [u64; 4]) -> Result<(), String> {
         for (slot, id) in loadout.into_iter().enumerate() {
             let item = self.item(id).ok_or("Preset references sold equipment")?;
-            if content()
-                .items
-                .get(item.definition)
+            if item
+                .definition
+                .definition()
                 .ok_or("Unsupported equipment")?
                 .slot
                 .index()
@@ -1802,7 +1817,7 @@ impl Campaign {
         }
         for id in loadout {
             let item = self.item(id).ok_or("Missing equipment")?;
-            self.weapon_access(mode, item.definition)
+            self.weapon_access(mode, item.definition_index())
                 .map_err(str::to_owned)?;
         }
         self.reserved = Some(mode);
@@ -1905,7 +1920,7 @@ impl Campaign {
             return self.purchase_node(&id);
         }
         self.preparation()?;
-        if self.blueprints[kind.index()] {
+        if self.blueprints[kind] {
             return Err("Blueprint already owned".into());
         }
         if !self.blueprint_available(kind) {
@@ -1915,12 +1930,12 @@ impl Campaign {
             ));
         }
         self.spend(content().structure(kind).blueprint_price)?;
-        self.blueprints[kind.index()] = true;
+        self.blueprints[kind] = true;
         Ok(())
     }
     pub fn upgrade_structure(&mut self, kind: StructureKind) -> Result<(), String> {
         if !self.legacy_features {
-            let rank = self.structure_upgrades[kind.index()]
+            let rank = self.structure_upgrades[kind]
                 .checked_add(1)
                 .filter(|rank| *rank <= 10)
                 .ok_or("Structure rank complete")?;
@@ -1928,15 +1943,15 @@ impl Campaign {
             return self.purchase_node(&id);
         }
         self.preparation()?;
-        if !self.blueprints[kind.index()] {
+        if !self.blueprints[kind] {
             return Err("Purchase the blueprint first".into());
         }
-        let rank = self.structure_upgrades[kind.index()];
+        let rank = self.structure_upgrades[kind];
         if rank >= 3 {
             return Err("Structure upgrade complete".into());
         }
         self.spend(40 + 40 * rank as u64)?;
-        self.structure_upgrades[kind.index()] += 1;
+        self.structure_upgrades[kind] += 1;
         Ok(())
     }
     pub fn layout_cost(&self) -> u32 {
@@ -1975,7 +1990,7 @@ impl Campaign {
             || layout.iter().any(|p| {
                 p.lane >= usize::from(crate::sim::MAX_LANES)
                     || p.column >= 5
-                    || !self.blueprints[p.kind.index()]
+                    || !self.blueprints[p.kind]
                     || !cells.insert((p.lane, p.column))
             })
         {
@@ -1992,7 +2007,7 @@ impl Campaign {
             if p.lane >= usize::from(self.lane_count()) || p.column >= 5 {
                 return Err("Build only in the eleven-row, five-column left-half grid".into());
             }
-            if !self.blueprints[p.kind.index()] {
+            if !self.blueprints[p.kind] {
                 return Err("Blueprint not owned".into());
             }
             if !cells.insert((p.lane, p.column)) {
@@ -2067,9 +2082,8 @@ impl Campaign {
         if self.npc.unspent < cost {
             return Err(format!("Requires {cost} NPC character points"));
         }
-        let n = training as usize;
         self.npc.unspent -= cost;
-        self.npc.investments[n] += 1;
+        self.npc.investments[training] += 1;
         match training {
             NpcTraining::Strength => self.npc.st += 1,
             NpcTraining::Dexterity => {
@@ -2097,28 +2111,29 @@ impl Campaign {
         self.npc.extra_hp = 0;
         self.npc.extra_fp = 0;
         self.npc.unspent = self.npc.awarded;
-        self.npc.investments = [0; 8];
+        self.npc.investments = KindMap::default();
         Ok(())
     }
     pub fn validate_npc(&self, npc: &Npc) -> Result<(), String> {
-        let i = npc.investments;
+        use NpcTraining::*;
+        let i = |training: NpcTraining| npc.investments[training];
         if !npc.creation.valid()
-            || i.iter().any(|n| *n > self.allowance())
-            || i[2] != 0
-            || i[6] != 0
-            || i[7] != 0
+            || npc.investments.values().any(|n| *n > self.allowance())
+            || i(Intelligence) != 0
+            || i(HitPoints) != 0
+            || i(Fatigue) != 0
         {
             return Err("Invalid NPC creation or supported advancement traits".into());
         }
         let base = &npc.creation;
         if !npc.stats().valid()
             || npc.st > 20
-            || npc.st != base.st + i[0] as i32
-            || npc.dx != base.dx + i[1] as i32
+            || npc.st != base.st + i(Strength) as i32
+            || npc.dx != base.dx + i(Dexterity) as i32
             || npc.iq != base.iq
-            || npc.ht != base.ht + i[3] as i32
-            || npc.guns != base.guns + i[1] as i32 + i[4] as i32
-            || npc.melee != base.melee + i[1] as i32 + i[5] as i32
+            || npc.ht != base.ht + i(Health) as i32
+            || npc.guns != base.guns + i(Dexterity) as i32 + i(Guns) as i32
+            || npc.melee != base.melee + i(Dexterity) as i32 + i(Melee) as i32
             || npc.extra_hp != 0
             || npc.extra_fp != 0
         {
@@ -2145,13 +2160,12 @@ impl Campaign {
         {
             return Err("NPC achievement precedes its campaign milestone".into());
         }
-        let costs = [10, 20, 20, 10, 4, 4, 2, 3];
         let spent = npc
             .investments
-            .iter()
-            .zip(costs)
-            .try_fold(0u32, |total, (n, c)| {
-                n.checked_mul(c).and_then(|cost| total.checked_add(cost))
+            .entries()
+            .try_fold(0u32, |total, (training, n)| {
+                n.checked_mul(training.cost())
+                    .and_then(|cost| total.checked_add(cost))
             })
             .ok_or("Invalid advancement investment total")?;
         if npc.awarded > self.allowance() || npc.unspent.checked_add(spent) != Some(npc.awarded) {
@@ -2206,26 +2220,23 @@ impl Campaign {
                 || !(1..=64).contains(&item.level)
                 || (item.protected && (item.level != 1 || item.quality.is_some()))
                 || item.id >= self.next_item_id
-                || item.definition >= content().items.len()
+                || item.definition.index().is_none()
                 || !ids.insert(item.id)
                 || (item.protected
                     && (!item.locked
-                        || (item.definition >= 4
-                            && !(content().items[item.definition].tier == 0
-                                && content().items[item.definition].slot == Slot::Ranged
-                                && WeaponSpec::from_item(&content().items[item.definition])
-                                    .class
+                        || (item.definition_index() >= 4
+                            && !(item.definition().tier == 0
+                                && item.definition().slot == Slot::Ranged
+                                && WeaponSpec::from_item(item.definition()).class
                                     == WeaponClass::Pistol))))
             {
                 return Err("Invalid or duplicate owned item".into());
             }
         }
         for n in 0..4 {
-            if !self
-                .items
-                .iter()
-                .any(|i| i.id == n + 1 && i.definition == n as usize && i.protected && i.locked)
-            {
+            if !self.items.iter().any(|i| {
+                i.id == n + 1 && i.definition_index() == n as usize && i.protected && i.locked
+            }) {
                 return Err("Protected starter set is missing".into());
             }
         }
@@ -2238,7 +2249,7 @@ impl Campaign {
             }
         }
         if self.player.level == 0
-            || self.player.body.iter().try_fold(
+            || self.player.body.values().try_fold(
                 self.player
                     .points
                     .checked_add(self.player.legacy_graph_points)
@@ -2255,7 +2266,7 @@ impl Campaign {
         if self
             .player
             .body
-            .iter()
+            .values()
             .any(|points| *points > self.body_cap())
             || self.player.xp >= self.player.next_level_xp()
         {
@@ -2278,10 +2289,10 @@ impl Campaign {
             }
         }
         for kind in StructureKind::ALL {
-            let rank = self.structure_upgrades[kind.index()];
+            let rank = self.structure_upgrades[kind];
             if rank > 10
-                || (rank > 0 && !self.blueprints[kind.index()])
-                || (self.blueprints[kind.index()] && !self.blueprint_available(kind))
+                || (rank > 0 && !self.blueprints[kind])
+                || (self.blueprints[kind] && !self.blueprint_available(kind))
             {
                 return Err("Invalid blueprint milestone or structure upgrade".into());
             }
@@ -2306,7 +2317,7 @@ impl Campaign {
                     || id >= self.next_item_id
                     || self
                         .item(id)
-                        .is_some_and(|i| content().items[i.definition].slot.index() != slot)
+                        .is_some_and(|i| i.definition().slot.index() != slot)
                 {
                     return Err("Invalid loadout preset reference".into());
                 }
@@ -2508,7 +2519,7 @@ mod tests {
     #[test]
     fn invalid_layout_spends_nothing() {
         let mut c = Campaign {
-            blueprints: [true; 3],
+            blueprints: KindMap::filled(true),
             ..Campaign::default()
         };
         let coins = c.coins;
@@ -2651,7 +2662,7 @@ mod tests {
     fn personal_upgrades_never_transfer_to_npc() {
         let mut c = Campaign::default();
         let before = c.profile(Mode::Npc);
-        c.player.body = [5; 5];
+        c.player.body = KindMap::filled(5);
         c.skills = Skill::ALL.to_vec();
         assert_eq!(c.profile(Mode::Npc).npc, before.npc);
         assert_eq!(c.profile(Mode::Npc).ranged_skill, before.ranged_skill);
@@ -2729,14 +2740,14 @@ mod tests {
             player: Player {
                 level: 7,
                 points: 0,
-                body: [6, 0, 0, 0, 0],
+                body: KindMap::from_fn(|a| if a == BodyAttribute::Vitality { 6 } else { 0 }),
                 ..Campaign::default().player
             },
             ..Campaign::default()
         };
         assert!(c.validate().is_err());
         let mut npc = Campaign::default().npc;
-        npc.investments[0] = u32::MAX;
+        npc.investments[NpcTraining::Strength] = u32::MAX;
         let c = Campaign {
             npc,
             ..Campaign::default()

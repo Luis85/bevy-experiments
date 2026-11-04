@@ -1,5 +1,6 @@
 //! Validated, extensible skill DAG. Ownership stores stable string IDs, never node indices.
 use crate::catalog::{self, ContentError};
+use crate::kind_map::KindMap;
 use crate::weapons::WeaponClass;
 use crate::{campaign::BodyAttribute, content::StructureKind};
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,42 @@ pub struct SkillNode {
     pub icon: String,
     pub effects: Vec<SkillEffect>,
 }
+/// A data-keyed capability a skill grants (`Unlock("grenade")`). Unlocks carry
+/// no value; the simulation asks `SkillModifiers::unlocked` for the IDs it
+/// implements, so new nodes can grant existing unlocks without a new variant.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct UnlockId(pub String);
+impl UnlockId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+impl From<&str> for UnlockId {
+    fn from(id: &str) -> Self {
+        Self(id.to_owned())
+    }
+}
+impl std::fmt::Display for UnlockId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+/// Unlock IDs the simulation implements. Catalogues may only grant these, so a
+/// typo is a load error rather than a silently dead skill.
+pub mod unlocks {
+    pub const PIERCING: &str = "piercing";
+    pub const SWEEP: &str = "sweep";
+    pub const HEAL: &str = "heal";
+    pub const BRACE: &str = "brace";
+    pub const GRENADE: &str = "grenade";
+    pub const MOLOTOV: &str = "molotov";
+    pub const ALL: [&str; 6] = [PIERCING, SWEEP, HEAL, BRACE, GRENADE, MOLOTOV];
+}
+
+/// Typed unlocks with campaign-side rules (blueprints, ranks, features,
+/// weapon classes) keep their variants; numeric variants are stat modifiers;
+/// plain capability unlocks are `Unlock(UnlockId)` data.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value")]
 pub enum SkillEffect {
@@ -39,14 +76,9 @@ pub enum SkillEffect {
     StaminaAdd(i32),
     ArmorAdd(i32),
     MeleeAdd(i32),
-    Piercing,
-    Sweep,
-    Heal,
-    Brace,
     EngineeringMultiplier(f32),
     WeaponTraining(WeaponClass),
-    GrenadeUnlock,
-    MolotovUnlock,
+    Unlock(UnlockId),
     GrenadeCharges(u32),
     MolotovCharges(u32),
     OrdnanceDamageMultiplier(f32),
@@ -65,9 +97,9 @@ pub enum CampaignFeature {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct SkillModifiers {
-    pub body_development: [u32; 5],
-    pub blueprints: [bool; 3],
-    pub structure_ranks: [u32; 3],
+    pub body_development: KindMap<BodyAttribute, u32>,
+    pub blueprints: KindMap<StructureKind, bool>,
+    pub structure_ranks: KindMap<StructureKind, u32>,
     pub features: BTreeSet<CampaignFeature>,
     pub damage_add: i32,
     pub damage_multiplier: f32,
@@ -77,15 +109,10 @@ pub struct SkillModifiers {
     pub stamina_add: i32,
     pub armor_add: i32,
     pub melee_add: i32,
-    pub piercing: bool,
-    pub sweep: bool,
-    pub heal: bool,
-    pub brace: bool,
     pub engineering: bool,
     pub engineering_multiplier: f32,
     pub weapon_classes: BTreeSet<WeaponClass>,
-    pub grenade_unlocked: bool,
-    pub molotov_unlocked: bool,
+    pub unlocks: BTreeSet<UnlockId>,
     pub grenade_charges: u32,
     pub molotov_charges: u32,
     pub ordnance_damage_multiplier: f32,
@@ -96,9 +123,9 @@ pub struct SkillModifiers {
 impl Default for SkillModifiers {
     fn default() -> Self {
         Self {
-            body_development: [0; 5],
-            blueprints: [false; 3],
-            structure_ranks: [0; 3],
+            body_development: KindMap::default(),
+            blueprints: KindMap::default(),
+            structure_ranks: KindMap::default(),
             features: BTreeSet::new(),
             damage_add: 0,
             damage_multiplier: 1.0,
@@ -108,15 +135,10 @@ impl Default for SkillModifiers {
             stamina_add: 0,
             armor_add: 0,
             melee_add: 0,
-            piercing: false,
-            sweep: false,
-            heal: false,
-            brace: false,
             engineering: false,
             engineering_multiplier: 1.0,
             weapon_classes: BTreeSet::new(),
-            grenade_unlocked: false,
-            molotov_unlocked: false,
+            unlocks: BTreeSet::new(),
             grenade_charges: 2,
             molotov_charges: 2,
             ordnance_damage_multiplier: 1.0,
@@ -127,10 +149,14 @@ impl Default for SkillModifiers {
     }
 }
 impl SkillModifiers {
+    /// Whether a skill granted the capability `id` (see [`unlocks`]).
+    pub fn unlocked(&self, id: &str) -> bool {
+        self.unlocks.iter().any(|unlock| unlock.as_str() == id)
+    }
     /// Validate frozen save snapshots independently of the current catalogue.
     pub fn validate(&self) -> Result<(), String> {
-        if self.body_development.iter().any(|rank| *rank > 1000)
-            || self.structure_ranks.iter().any(|rank| *rank > 10)
+        if self.body_development.values().any(|rank| *rank > 1000)
+            || self.structure_ranks.values().any(|rank| *rank > 10)
             || [
                 self.damage_add,
                 self.health_add,
@@ -140,6 +166,7 @@ impl SkillModifiers {
             ]
             .into_iter()
             .any(|v| !(0..=1_000_000).contains(&v))
+            || self.unlocks.iter().any(|id| !valid_unlock(id))
             || self.grenade_charges > 32768
             || self.molotov_charges > 32768
             || [
@@ -162,12 +189,11 @@ impl SkillModifiers {
     pub fn apply(&mut self, effect: &SkillEffect) {
         match *effect {
             SkillEffect::BodyDevelopment { attribute, rank } => {
-                self.body_development[attribute.index()] =
-                    self.body_development[attribute.index()].max(rank)
+                self.body_development[attribute] = self.body_development[attribute].max(rank)
             }
-            SkillEffect::Blueprint(kind) => self.blueprints[kind.index()] = true,
+            SkillEffect::Blueprint(kind) => self.blueprints[kind] = true,
             SkillEffect::StructureRank { kind, rank } => {
-                self.structure_ranks[kind.index()] = self.structure_ranks[kind.index()].max(rank)
+                self.structure_ranks[kind] = self.structure_ranks[kind].max(rank)
             }
             SkillEffect::FeatureUnlock(feature) => {
                 self.features.insert(feature);
@@ -180,10 +206,6 @@ impl SkillModifiers {
             SkillEffect::StaminaAdd(n) => self.stamina_add += n,
             SkillEffect::ArmorAdd(n) => self.armor_add += n,
             SkillEffect::MeleeAdd(n) => self.melee_add += n,
-            SkillEffect::Piercing => self.piercing = true,
-            SkillEffect::Sweep => self.sweep = true,
-            SkillEffect::Heal => self.heal = true,
-            SkillEffect::Brace => self.brace = true,
             SkillEffect::EngineeringMultiplier(n) => {
                 self.engineering = true;
                 self.engineering_multiplier *= n;
@@ -191,8 +213,9 @@ impl SkillModifiers {
             SkillEffect::WeaponTraining(class) => {
                 self.weapon_classes.insert(class);
             }
-            SkillEffect::GrenadeUnlock => self.grenade_unlocked = true,
-            SkillEffect::MolotovUnlock => self.molotov_unlocked = true,
+            SkillEffect::Unlock(ref id) => {
+                self.unlocks.insert(id.clone());
+            }
             SkillEffect::GrenadeCharges(n) => self.grenade_charges += n,
             SkillEffect::MolotovCharges(n) => self.molotov_charges += n,
             SkillEffect::OrdnanceDamageMultiplier(n) => self.ordnance_damage_multiplier *= n,
@@ -286,6 +309,7 @@ impl SkillCatalog {
                     SkillEffect::GrenadeCharges(v) | SkillEffect::MolotovCharges(v) => {
                         (1..=5).contains(v)
                     }
+                    SkillEffect::Unlock(id) => valid_unlock(id),
                     _ => true,
                 };
                 if !valid {
@@ -381,6 +405,10 @@ impl SkillCatalog {
         Ok(())
     }
 }
+/// Saved and authored unlocks must name an implemented capability.
+fn valid_unlock(id: &UnlockId) -> bool {
+    unlocks::ALL.contains(&id.as_str())
+}
 static SKILLS: OnceLock<SkillCatalog> = OnceLock::new();
 pub(crate) fn install() -> Result<&'static SkillCatalog, ContentError> {
     catalog::install(&SKILLS, SkillCatalog::try_load)
@@ -415,5 +443,40 @@ mod tests {
         node.position[0] += 200.0;
         extended.nodes.push(node);
         extended.validate().unwrap();
+    }
+
+    #[test]
+    fn unlocks_are_data_keyed_and_unknown_ids_are_rejected() {
+        let catalog = skills().clone();
+        let granted: BTreeSet<_> = catalog
+            .nodes
+            .iter()
+            .flat_map(|n| &n.effects)
+            .filter_map(|e| match e {
+                SkillEffect::Unlock(id) => Some(id.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(granted, BTreeSet::from(unlocks::ALL));
+        let grenade = catalog.node("grenade_training").unwrap();
+        assert_eq!(grenade.effects, [SkillEffect::Unlock("grenade".into())]);
+        let mut modifiers = SkillModifiers::default();
+        modifiers.apply(&grenade.effects[0]);
+        assert!(modifiers.unlocked(unlocks::GRENADE));
+        assert!(!modifiers.unlocked(unlocks::MOLOTOV));
+        modifiers.validate().unwrap();
+        // A second node may grant an existing unlock with no new code.
+        let mut extended = catalog.clone();
+        let mut node = grenade.clone();
+        node.id = "ordnance_drill".into();
+        node.position[0] += 300.0;
+        extended.nodes.push(node);
+        extended.validate().unwrap();
+        let mut bad = catalog;
+        let index = bad.nodes.iter().position(|n| n.id == "grenade_training");
+        bad.nodes[index.unwrap()].effects = vec![SkillEffect::Unlock("granade".into())];
+        assert!(bad.validate().is_err());
+        modifiers.unlocks.insert("granade".into());
+        assert!(modifiers.validate().is_err());
     }
 }

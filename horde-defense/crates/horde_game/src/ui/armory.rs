@@ -101,7 +101,7 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
     let Some(item) = f.game.campaign.item(id) else {
         return;
     };
-    let definition = &content().items[item.definition];
+    let definition = item.definition();
     let quality = f.game.campaign.item_quality(id).expect("owned equipment");
     let Ok(comparison) = f.game.campaign.compare_item(f.campaign.mode, id) else {
         return;
@@ -109,7 +109,7 @@ fn inventory_comparison(ui: &mut egui::Ui, f: &UiCtx, id: u64) {
     let before = &comparison.before;
     let after = &comparison.after;
     ui.horizontal(|ui| {
-        slot_art(ui, f, item.definition, quality);
+        slot_art(ui, f, item.definition_index(), quality);
         ui.vertical(|ui| {
             ui.label(
                 RichText::new(format!("{} #{} · Lv {}", definition.name, id, item.level))
@@ -458,10 +458,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         .iter()
         .enumerate()
         .filter(|(_, item)| {
-            matches[item.definition]
+            matches[item.definition_index()]
                 && f.armory
                     .slot
-                    .is_none_or(|slot| content().items[item.definition].slot == slot)
+                    .is_none_or(|slot| item.definition().slot == slot)
                 && f.armory.quality.is_none_or(|quality| {
                     f.game.campaign.item_quality(item.id).ok() == Some(quality)
                 })
@@ -473,9 +473,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
         let b = &f.game.campaign.items[b];
         match f.armory.sort {
             ArmorySort::Newest => b.id.cmp(&a.id),
-            ArmorySort::Name => content().items[a.definition]
+            ArmorySort::Name => a
+                .definition()
                 .name
-                .cmp(&content().items[b.definition].name)
+                .cmp(&b.definition().name)
                 .then(a.id.cmp(&b.id)),
             ArmorySort::Level => b.level.cmp(&a.level).then(b.id.cmp(&a.id)),
             ArmorySort::Quality => f
@@ -486,9 +487,10 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                 .cmp(&f.game.campaign.item_quality(a.id).expect("owned item"))
                 .then(b.level.cmp(&a.level))
                 .then(b.id.cmp(&a.id)),
-            ArmorySort::Tier => content().items[b.definition]
+            ArmorySort::Tier => b
+                .definition()
                 .tier
-                .cmp(&content().items[a.definition].tier)
+                .cmp(&a.definition().tier)
                 .then(a.id.cmp(&b.id)),
         }
     });
@@ -541,7 +543,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
                 .game
                 .campaign
                 .item(id)
-                .map(|item| content().items[item.definition].name.as_str())
+                .map(|item| item.definition().name.as_str())
                 .unwrap_or("Item");
             let quality = f.game.campaign.item_quality(id).expect("owned item");
             ui.label(
@@ -611,7 +613,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
         .show_rows(ui, 72.0, indices.len(), |ui, range| {
             for index in range {
                 let item = f.game.campaign.items[indices[index]].clone();
-                let definition = &content().items[item.definition];
+                let definition = item.definition();
                 let quality = f
                     .game
                     .campaign
@@ -626,7 +628,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
                 let reserved = f.game.campaign.item_reserved(item.id);
                 ui.push_id(item.id, |ui| {
                     ui.horizontal_top(|ui| {
-                        slot_art(ui, f, item.definition, quality);
+                        slot_art(ui, f, item.definition_index(), quality);
                         let name_width = (ui.available_width() - 100.0).max(150.0);
                         ui.allocate_ui_with_layout(
                             vec2(name_width, 62.0),
@@ -679,7 +681,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
                                 !reserved
                                     && f.game
                                         .campaign
-                                        .can_use_weapon(f.campaign.mode, item.definition),
+                                        .can_use_weapon(f.campaign.mode, item.definition_index()),
                                 egui::Button::new("Equip"),
                             )
                             .on_disabled_hover_text(if reserved {
@@ -687,7 +689,7 @@ fn inventory_list(ui: &mut egui::Ui, f: &mut UiCtx, indices: &[usize]) {
                             } else {
                                 f.game
                                     .campaign
-                                    .weapon_access(f.campaign.mode, item.definition)
+                                    .weapon_access(f.campaign.mode, item.definition_index())
                                     .err()
                                     .unwrap_or_default()
                             })
@@ -736,7 +738,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                     && !loadout.contains(&item.id)
                     && f.game
                         .campaign
-                        .can_use_weapon(f.campaign.mode, item.definition),
+                        .can_use_weapon(f.campaign.mode, item.definition_index()),
                 egui::Button::new("Equip selected"),
             )
             .on_disabled_hover_text(if reserved {
@@ -744,7 +746,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             } else {
                 f.game
                     .campaign
-                    .weapon_access(f.campaign.mode, item.definition)
+                    .weapon_access(f.campaign.mode, item.definition_index())
                     .err()
                     .unwrap_or_default()
             })
@@ -799,7 +801,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             f.armory.pending_sale = Some(item.id);
         }
     });
-    let definition = &content().items[item.definition];
+    let definition = item.definition();
     let npc_restricted = definition.npc_only
         && f.campaign.mode == Mode::Personal
         && !f.game.campaign.legacy_weapon_training;
@@ -820,7 +822,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             ui,
             f.game
                 .campaign
-                .weapon_access(f.campaign.mode, item.definition)
+                .weapon_access(f.campaign.mode, item.definition_index())
                 .err()
                 .unwrap_or_default(),
         );
@@ -830,7 +832,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
         let trained = f
             .game
             .campaign
-            .can_use_weapon(f.campaign.mode, item.definition);
+            .can_use_weapon(f.campaign.mode, item.definition_index());
         muted(
             ui,
             format!(
@@ -904,7 +906,7 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .game
                     .campaign
                     .item(id)
-                    .map(|item| content().items[item.definition].name.as_str())
+                    .map(|item| item.definition().name.as_str())
                     .unwrap_or("Equipment");
                 ui.colored_label(
                     AMBER,

@@ -97,10 +97,10 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
     .into_iter()
     .enumerate()
     {
-        ui.label(format!(
-            "{name} · rank {}",
-            p.body[index].max(development[index])
-        ));
+        ui.label(format!("{name} · rank {}", {
+            let attribute = horde_core::campaign::BodyAttribute::ALL[index];
+            p.body[attribute].max(development[attribute])
+        }));
     }
     chrome::section(ui, "Ready for the field");
     ui.label(format!(

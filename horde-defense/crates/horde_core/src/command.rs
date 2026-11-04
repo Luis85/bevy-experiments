@@ -523,7 +523,7 @@ mod tests {
             panic!("purchase returns an item id, got {outcome:?}");
         };
         let item = game.campaign.items.iter().find(|item| item.id == id);
-        assert_eq!(item.unwrap().definition, index);
+        assert_eq!(item.unwrap().definition_index(), index);
         assert_eq!(game.campaign.coins, 7);
         game.campaign.coins = 0;
         let before = snapshot(&game);
@@ -541,7 +541,7 @@ mod tests {
             panic!("recruit should succeed");
         };
         let kind = StructureKind::Wall;
-        game.campaign.blueprints[kind.index()] = true;
+        game.campaign.blueprints[kind] = true;
         let Ok(CommandOutcome::Id(battle)) = game.apply(&Command::DeploySurvivor {
             id: recruit,
             country: country.clone(),

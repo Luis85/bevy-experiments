@@ -2,7 +2,7 @@
 //! records without the newer visual snapshot; never inspect today's inventory.
 use horde_core::{
     campaign::DefenderProfile,
-    content::{Slot, content},
+    content::Slot,
     stats::GearRecord,
     survivors::{EquipmentVisual, EquipmentVisualItem},
 };
@@ -22,12 +22,12 @@ pub fn from_frozen_gear<'a>(
         if candidates.next().is_some() || !(1..=64).contains(&record.level) {
             return None;
         }
-        let definition = content().items.get(record.definition)?;
+        let definition = record.definition.definition()?;
         if definition.slot != slot {
             return None;
         }
         Some(EquipmentVisualItem {
-            definition: record.definition,
+            definition: record.definition.clone(),
             level: record.level,
             quality: record.quality,
             style: definition.visual_style.clone(),
@@ -75,7 +75,7 @@ mod tests {
         legacy.equipment_visual = EquipmentVisual::default();
         let invalid = GearRecord {
             slot: Slot::Accessory,
-            definition: 0,
+            definition: horde_core::content::ItemDefId::at(0),
             name: "A name must never select the model".into(),
             level: 1,
             quality: horde_core::quality::Quality::Common,

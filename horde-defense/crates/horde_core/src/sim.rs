@@ -1,21 +1,28 @@
 mod events;
 mod journey;
+mod migrations;
 mod parallel;
 mod persistence;
 pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
 pub use journey::JourneyContinuation;
+pub use migrations::SAVE_VERSION;
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;
 use persistence::validate_game;
+pub use persistence::{RULESET_VERSION, SaveError};
 
 use crate::campaign::{Campaign, DefenderProfile};
-use crate::content::{BossKind, BossTiming, EnemyKind, Mode, Policy, StructureKind, content};
+use crate::content::{
+    BossKind, BossTiming, EnemyKind, ItemDefId, Mode, Policy, StructureKind, content,
+};
+use crate::kind_map::KindMap;
 use crate::ordnance::{self, FireZone, OrdnanceKind, OrdnanceState, ThrowRequest, ThrownOrdnance};
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
+use crate::status::{StatusId, Statuses};
 use crate::world::Modifiers;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, VecDeque};
-use tracing::{debug, info, info_span, trace};
+use tracing::{debug, debug_span, info, info_span, trace};
 
 pub const TICKS_PER_SECOND: u32 = 60;
 pub const ENEMY_HIT_STOP_TICKS: u32 = 6;
@@ -95,9 +102,10 @@ pub struct Enemy {
     pub attack_phase: EnemyPhase,
     #[serde(default)]
     pub windup_total: u32,
-    /// Remaining movement steps held after positive injury; attacks keep their cadence.
-    #[serde(default)]
-    pub hit_stop_left: u32,
+    /// Timed effects; `StatusId::HitStop` holds movement steps after positive
+    /// injury while attacks keep their cadence.
+    #[serde(default, skip_serializing_if = "Statuses::is_empty")]
+    pub statuses: Statuses,
     #[serde(default)]
     pub resolved: Option<crate::enemy_catalog::ResolvedEnemy>,
 }
@@ -147,8 +155,13 @@ impl Enemy {
             self.hp = self.injury.hp;
         }
         if damage > 0 {
-            self.hit_stop_left = self.hit_stop_left.max(ENEMY_HIT_STOP_TICKS);
+            self.statuses
+                .refresh(StatusId::HitStop, ENEMY_HIT_STOP_TICKS);
         }
+    }
+    /// Movement steps still held by hit-stop; 0 when the enemy may move.
+    pub fn hit_stop_remaining(&self) -> u32 {
+        self.statuses.remaining(StatusId::HitStop)
     }
     pub fn y(&self) -> f32 {
         self.lane as f32 + 0.5 + self.pass_offset
@@ -262,7 +275,9 @@ struct EventMetadata {
     duration_ticks: u32,
     ordnance: Option<OrdnanceKind>,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 pub enum NpcManeuver {
     #[default]
     DoNothing,
@@ -273,6 +288,18 @@ pub enum NpcManeuver {
     Recover,
     Posture,
     AllOutDefense,
+}
+impl crate::kind_map::StableKind for NpcManeuver {
+    const ALL: &'static [Self] = &[
+        Self::DoNothing,
+        Self::Aim,
+        Self::Attack,
+        Self::Ready,
+        Self::Reload,
+        Self::Recover,
+        Self::Posture,
+        Self::AllOutDefense,
+    ];
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CombatTelemetry {
@@ -286,10 +313,10 @@ pub struct CombatTelemetry {
     pub contact_attacks: u32,
     #[serde(default = "legacy_damage_lanes")]
     pub damage_by_lane: Vec<u64>,
-    pub kills_by_kind: [u32; 5],
+    pub kills_by_kind: KindMap<EnemyKind, u32>,
     pub structure_losses: u32,
     pub structure_damage_taken: u64,
-    pub npc_decisions: [u32; 8],
+    pub npc_decisions: KindMap<NpcManeuver, u32>,
     pub boss_arrival_tick: Option<u64>,
     pub boss_defeat_tick: Option<u64>,
     pub defender_damage: u64,
@@ -413,7 +440,8 @@ pub struct Attempt {
     #[serde(default)]
     npc_holding_melee: bool,
     heal_used: bool,
-    brace_left: u32,
+    #[serde(default, skip_serializing_if = "Statuses::is_empty")]
+    statuses: Statuses,
     caller_tick: u64,
     #[serde(default)]
     boss_warning_sent: bool,
@@ -439,7 +467,11 @@ impl Attempt {
     }
     /// Saved authoritative clock; transient presentation events may expire first.
     pub fn brace_remaining_ticks(&self) -> u32 {
-        self.brace_left
+        self.statuses.remaining(StatusId::Brace)
+    }
+    /// The defender's timed status effects (saved, authoritative).
+    pub fn statuses(&self) -> &Statuses {
+        &self.statuses
     }
     pub fn live_dps(&self) -> f32 {
         self.dps.live(self.tick)
@@ -886,10 +918,10 @@ impl Game {
                     .campaign
                     .item(loadout[slot.index()])
                     .expect("validated loadout");
-                let definition = &content().items[item.definition];
+                let definition = item.definition();
                 crate::stats::GearRecord {
                     slot,
-                    definition: item.definition,
+                    definition: item.definition.clone(),
                     name: definition.name.clone(),
                     level: item.level,
                     quality: self.campaign.item_quality(item.id).expect("owned"),
@@ -968,7 +1000,7 @@ impl Game {
             ready_turns: 0,
             npc_holding_melee: false,
             heal_used: false,
-            brace_left: 0,
+            statuses: Statuses::default(),
             caller_tick: 0,
             boss_warning_sent: false,
             caller_lanes: None,
@@ -1047,7 +1079,7 @@ impl Game {
         if lane >= a.lane_count || column >= 5 {
             return Err("Footprint must remain wholly in the left-half build zone".into());
         }
-        if !self.campaign.blueprints[kind.index()] {
+        if !self.campaign.blueprints[kind] {
             return Err("Purchase the unlocked blueprint in camp".into());
         }
         if a.supply < content().structure(kind).supply {
@@ -1076,7 +1108,7 @@ impl Game {
         let id = a.next_id;
         a.next_id += 1;
         let durability = (d.health as f32
-            * structure_bonus(a, self.campaign.structure_upgrades[kind.index()]))
+            * structure_bonus(a, self.campaign.structure_upgrades[kind]))
         .round() as i32;
         a.structures.push(Structure {
             position_x: Some(a.build_cell_center(lane, column).expect("valid cell")[0]),
@@ -1160,8 +1192,10 @@ impl Game {
             self.attempt = Some(a);
             return;
         }
+        // Per-tick span stays below the shipped `info` filter; attempt start
+        // and finish keep their info-level spans.
         let _battle =
-            info_span!("battle", attempt = a.id, mode = ?a.mode, seed = self.seed).entered();
+            debug_span!("battle", attempt = a.id, mode = ?a.mode, seed = self.seed).entered();
         a.event_seq = a.event_seq.max(self.next_event_seq);
         a.tick += 1;
         trace!(tick = a.tick, enemies = a.enemies.len(), hp = a.hp, "tick");
@@ -1173,7 +1207,7 @@ impl Game {
         }
         a.melee_cooldown = a.melee_cooldown.saturating_sub(1);
         a.melee_commit = a.melee_commit.saturating_sub(1);
-        a.brace_left = a.brace_left.saturating_sub(1);
+        a.statuses.tick();
         if a.mode == Mode::Personal {
             self.advance_ordnance(&mut a);
             self.reap(&mut a);
@@ -1232,7 +1266,7 @@ impl Game {
                 decision = %a.decision,
                 "npc decision"
             );
-            a.telemetry.npc_decisions[a.maneuver as usize] += 1;
+            a.telemetry.npc_decisions[a.maneuver] += 1;
             self.reap(&mut a);
         }
         if a.boss_spawned && !a.enemies.iter().any(|e| e.boss) {
@@ -1286,9 +1320,13 @@ impl Game {
         if input.aim.iter().any(|value| !value.is_finite()) {
             return;
         }
-        if input.brace && a.profile.brace && a.brace_left == 0 && a.stamina >= 30.0 {
+        if input.brace
+            && a.profile.brace
+            && !a.statuses.active(StatusId::Brace)
+            && a.stamina >= 30.0
+        {
             a.stamina -= 30.0;
-            a.brace_left = BRACE_DURATION_TICKS;
+            a.statuses.refresh(StatusId::Brace, BRACE_DURATION_TICKS);
             a.event(
                 EventKind::Ability,
                 a.defender_position(),
@@ -1502,10 +1540,7 @@ impl Game {
             || a.melee_commit > 0
             || a.ordnance.projectiles.len() + a.ordnance.fire_zones.len()
                 >= ordnance::MAX_ACTIVE_ORDNANCE
-            || !match request.kind {
-                OrdnanceKind::Grenade => a.profile.modifiers.grenade_unlocked,
-                OrdnanceKind::Molotov => a.profile.modifiers.molotov_unlocked,
-            }
+            || !a.profile.modifiers.unlocked(request.kind.unlock())
         {
             return;
         }
@@ -1542,7 +1577,7 @@ impl Game {
             burn_interval: definition.burn_interval,
             release_cues: Some(ordnance::ReleaseCues {
                 tick: a.tick,
-                brace: a.brace_left > 0,
+                brace: a.statuses.active(StatusId::Brace),
                 last_shot_tick: a
                     .events
                     .iter()
@@ -1931,7 +1966,7 @@ impl Game {
             boss_timing: level.boss_timing.clone(),
             attack_phase: EnemyPhase::Advance,
             windup_total: 0,
-            hit_stop_left: 0,
+            statuses: Statuses::default(),
             resolved: (!boss).then_some(resolved),
         });
         a.telemetry.spawned += 1;
@@ -2037,7 +2072,7 @@ impl Game {
                 }
                 let speed = if e.boss { 0.6 } else { enemy_profile(e).speed };
                 let injury = &a.enemies[n].injury;
-                let slow = if a.enemies[n].hit_stop_left > 0
+                let slow = if a.enemies[n].statuses.active(StatusId::HitStop)
                     || (a.mode == Mode::Npc && (injury.prone || injury.stunned))
                 {
                     0.0
@@ -2058,7 +2093,7 @@ impl Game {
                 };
                 a.enemies[n].x = (a.enemies[n].x - speed * DT * slow * a.modifiers.enemy_speed)
                     .max(stop.min(a.enemies[n].x));
-                a.enemies[n].hit_stop_left = a.enemies[n].hit_stop_left.saturating_sub(1);
+                a.enemies[n].statuses.tick();
                 let blocked = a.enemies[n].x <= stop + 0.01;
                 a.enemies[n].target_structure = if blocked { blocker } else { None };
                 if blocked && (stop <= DEFENSE_LINE + 0.01 || blocker.is_some()) {
@@ -2166,7 +2201,7 @@ impl Game {
                 ..Default::default()
             };
             a.event_with(EventKind::Shot, origin, point, 0, meta);
-            let bonus = structure_bonus(a, self.campaign.structure_upgrades[d.kind.index()]);
+            let bonus = structure_bonus(a, self.campaign.structure_upgrades[d.kind]);
             let damage = if a.mode == Mode::Personal {
                 let damage = ((d.damage as f32 * bonus).round() as i32
                     - enemy_armor(a, &a.enemies[target]))
@@ -2820,7 +2855,7 @@ impl Game {
                 a.structures[s].hp -= damage;
             } else {
                 damage = (damage - a.profile.personal.armor).max(0);
-                if a.brace_left > 0 {
+                if a.statuses.active(StatusId::Brace) {
                     damage /= 2;
                 }
                 a.hp -= damage;
@@ -2918,7 +2953,7 @@ impl Game {
             a.kill_xp = a
                 .kill_xp
                 .saturating_add(self.campaign.reward(coins, xp, a.mode));
-            a.telemetry.kills_by_kind[e.kind as usize] += 1;
+            a.telemetry.kills_by_kind[e.kind] += 1;
             if e.boss {
                 a.telemetry.boss_defeat_tick = Some(a.tick);
             }
@@ -2961,7 +2996,7 @@ impl Game {
                         a.loot_events.push(crate::quality::LootEvent {
                             at: [e.x, e.y()],
                             item_id,
-                            definition,
+                            definition: ItemDefId::at(definition),
                             level: a.progression.item_level,
                             quality,
                             name: content().items[definition].name.clone(),
@@ -3191,7 +3226,9 @@ fn enemy_profile(e: &Enemy) -> &crate::enemy_catalog::ResolvedEnemy {
         .unwrap_or_else(|| crate::enemy_catalog::enemy_catalog().default_profile(e.kind))
 }
 fn enemy_step_speed(a: &Attempt, e: &Enemy) -> f32 {
-    if e.hit_stop_left > 0 || (a.mode == Mode::Npc && (e.injury.prone || e.injury.stunned)) {
+    if e.statuses.active(StatusId::HitStop)
+        || (a.mode == Mode::Npc && (e.injury.prone || e.injury.stunned))
+    {
         return 0.0;
     }
     let mut multiplier = a.modifiers.enemy_speed;
@@ -3255,8 +3292,10 @@ fn select_npc_target(a: &Attempt, policy: Policy) -> Option<usize> {
             if e.injury.hp <= 0 {
                 urgency += 8.0;
             }
-            if e.kind == EnemyKind::Runner {
-                urgency -= 3.0;
+            // Skip a zero bias so the score keeps its exact float value.
+            let bias = enemy_profile(e).target_urgency;
+            if bias != 0.0 {
+                urgency += bias;
             }
             if e.boss {
                 urgency -= if policy == Policy::BossFocus && a.hp * 2 > a.max_hp {
@@ -3326,7 +3365,7 @@ pub fn smoke_seed(seed: u64) -> Result<String, String> {
             for retry in 0..6 {
                 smoke_prepare(&mut g, mode)?;
                 g.deploy(level, mode)?;
-                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap.index()] {
+                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap] {
                     for lane in
                         construction_lane_order(g.attempt.as_ref().expect("deployed").lane_count)
                     {
@@ -3377,7 +3416,7 @@ pub fn smoke_seed(seed: u64) -> Result<String, String> {
 pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
     if mode == Mode::Npc
         && g.campaign.blueprint_available(StructureKind::Trap)
-        && !g.campaign.blueprints[StructureKind::Trap.index()]
+        && !g.campaign.blueprints[StructureKind::Trap]
         && g.campaign.coins >= content().structure(StructureKind::Trap).blueprint_price
     {
         g.campaign.purchase_blueprint(StructureKind::Trap)?;
@@ -3483,7 +3522,10 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
             g.campaign.npc.allow_risk = true;
         }
     } else {
-        while g.campaign.player.points > 0 && g.campaign.player.body[0] < g.campaign.body_cap() {
+        while g.campaign.player.points > 0
+            && g.campaign.player.body[crate::campaign::BodyAttribute::Vitality]
+                < g.campaign.body_cap()
+        {
             g.campaign
                 .allocate_body(crate::campaign::BodyAttribute::Vitality)?;
         }
@@ -3615,7 +3657,7 @@ pub fn maximum_progression_render_fixture() -> Result<Game, String> {
     }
     g.campaign.player.level = g.campaign.player_level_cap();
     g.campaign.player.xp = 0;
-    g.campaign.player.body = [0; 5];
+    g.campaign.player.body = KindMap::default();
     g.campaign.player.points = g.campaign.player.level - 1;
     g.campaign.first_clear(4, Mode::Npc);
     g.campaign.victories = u64::from(crate::progression::catalog().max_rank);

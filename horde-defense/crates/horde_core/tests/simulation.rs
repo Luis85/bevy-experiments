@@ -2,6 +2,7 @@
 mod support;
 use horde_core::content::{EnemyKind, Mode, StructureKind, content};
 use horde_core::sim::{DEFENSE_LINE, Game, Input, Outcome};
+use horde_core::status::StatusId;
 use support::legacy_game;
 
 fn game(mode: Mode) -> Game {
@@ -165,7 +166,7 @@ fn boss_timer_is_not_victory_and_boss_transaction_is_atomic() {
 #[test]
 fn construction_bounds_invalid_spend_salvage_and_blocking() {
     let mut g = game(Mode::Personal);
-    g.campaign.blueprints = [true; 3];
+    g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
     g.set_paused(true);
     let supply = g.attempt.as_ref().unwrap().supply;
     assert!(g.place(StructureKind::Wall, 11, 0).is_err());
@@ -368,7 +369,7 @@ fn failed_parallel_loot_insert_is_reported_once_instead_of_silently_lost() {
         issues,
         vec![SettlementIssue::LootLost {
             battle,
-            definition: 4,
+            definition: horde_core::content::ItemDefId::at(4),
             level: 9,
             error: "Persistent item identity space exhausted".into(),
         }]
@@ -838,10 +839,10 @@ fn npc_impacts_distinguish_misses_defenses_protection_and_injury() {
                 && event.lane == Some(5)),
             "Missing {kind:?} authoritative impact"
         );
-        assert_eq!(a.telemetry.npc_decisions.iter().sum::<u32>(), 1);
+        assert_eq!(a.telemetry.npc_decisions.values().sum::<u32>(), 1);
         if let Some(enemy) = a.enemies.iter().find(|enemy| enemy.id == target) {
             assert_eq!(
-                enemy.hit_stop_left,
+                enemy.hit_stop_remaining(),
                 if kind == EventKind::Hit { 6 } else { 0 }
             );
         }
@@ -873,7 +874,7 @@ fn positive_personal_injury_holds_six_movement_steps_then_resumes_for_enemies_an
         ticks(&mut g, ENEMY_HIT_STOP_TICKS - 1);
         let a = g.attempt.as_ref().unwrap();
         assert_eq!(a.enemies[0].x, 10.0);
-        assert_eq!(a.enemies[0].hit_stop_left, 0);
+        assert_eq!(a.enemies[0].hit_stop_remaining(), 0);
         assert_eq!(a.shots, 1);
         assert_eq!(a.enemies[0].hp, hp - 1);
         ticks(&mut g, 1);
@@ -895,7 +896,10 @@ fn repeated_injury_refreshes_without_accumulating_and_misses_or_armor_do_not_hol
             aim: [10.0, 5.5],
             ..Input::default()
         });
-        assert_eq!(g.attempt.as_ref().unwrap().enemies[0].hit_stop_left, 5);
+        assert_eq!(
+            g.attempt.as_ref().unwrap().enemies[0].hit_stop_remaining(),
+            5
+        );
         assert_eq!(g.attempt.as_ref().unwrap().enemies[0].x, 10.0);
     }
     ticks(&mut g, 5);
@@ -912,7 +916,7 @@ fn repeated_injury_refreshes_without_accumulating_and_misses_or_armor_do_not_hol
         });
         let a = g.attempt.as_ref().unwrap();
         assert_eq!(a.active_damage, 0);
-        assert_eq!(a.enemies[0].hit_stop_left, 0);
+        assert_eq!(a.enemies[0].hit_stop_remaining(), 0);
         assert!(a.enemies[0].x < 10.0);
     }
 }
@@ -936,7 +940,7 @@ fn melee_and_sweep_hold_each_injured_enemy_without_extending_attack_windup() {
     let a = g.attempt.as_mut().unwrap();
     assert_eq!(a.melee_commit, 30);
     for e in &mut a.enemies {
-        assert_eq!(e.hit_stop_left, 5);
+        assert_eq!(e.hit_stop_remaining(), 5);
         assert_eq!(e.attack_left, windup - 1);
         e.x = 10.0;
     }
@@ -970,7 +974,7 @@ fn traps_and_turrets_hold_only_positive_injuries_in_both_modes() {
         for kind in [StructureKind::Trap, StructureKind::Turret] {
             for armor in [0, 1000] {
                 let mut g = game(mode);
-                g.campaign.blueprints = [true; 3];
+                g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
                 g.set_paused(true);
                 g.place(kind, 5, 0).unwrap();
                 g.set_paused(false);
@@ -994,7 +998,10 @@ fn traps_and_turrets_hold_only_positive_injuries_in_both_modes() {
                 let a = g.attempt.as_ref().unwrap();
                 let damage = 1000 - a.enemies[0].hp;
                 assert_eq!(damage > 0, armor == 0, "{mode:?} {kind:?}");
-                assert_eq!(a.enemies[0].hit_stop_left, if damage > 0 { 6 } else { 0 });
+                assert_eq!(
+                    a.enemies[0].hit_stop_remaining(),
+                    if damage > 0 { 6 } else { 0 }
+                );
                 assert!(
                     a.events
                         .iter()
@@ -1022,7 +1029,7 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
     }
     ticks(&mut g, 60);
     let a = g.attempt.as_ref().unwrap();
-    assert_eq!(a.enemies[0].hit_stop_left, 6);
+    assert_eq!(a.enemies[0].hit_stop_remaining(), 6);
     let x = a.enemies[0].x;
     let hp = a.enemies[0].hp;
     let rng = serde_json::to_string(&a.rng).unwrap();
@@ -1032,7 +1039,7 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
     assert_eq!(a.enemies[0].hp, hp);
     assert_eq!(serde_json::to_string(&a.rng).unwrap(), rng);
     assert_eq!(a.shots, 1);
-    assert_eq!(a.telemetry.npc_decisions.iter().sum::<u32>(), 1);
+    assert_eq!(a.telemetry.npc_decisions.values().sum::<u32>(), 1);
     ticks(&mut g, 1);
     assert!(g.attempt.as_ref().unwrap().enemies[0].x < x);
     ticks(&mut g, 53);
@@ -1042,7 +1049,7 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
             .unwrap()
             .telemetry
             .npc_decisions
-            .iter()
+            .values()
             .sum::<u32>(),
         2
     );
@@ -1061,11 +1068,11 @@ fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
         assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Queued);
         let windup = a.enemies[0].attack_left;
         for e in &mut a.enemies {
-            e.hit_stop_left = 6;
+            e.statuses.refresh(StatusId::HitStop, 6);
         }
         ticks(&mut g, 6);
         let a = g.attempt.as_ref().unwrap();
-        assert!(a.enemies.iter().all(|e| e.hit_stop_left == 0));
+        assert!(a.enemies.iter().all(|e| e.hit_stop_remaining() == 0));
         assert_eq!(a.enemies[0].attack_left, windup - 6);
         assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Queued);
     }
@@ -1081,7 +1088,10 @@ fn hit_stop_survives_pause_and_save_resume_and_rejects_unbounded_saved_duration(
         ..Input::default()
     });
     ticks(&mut g, 2);
-    assert_eq!(g.attempt.as_ref().unwrap().enemies[0].hit_stop_left, 3);
+    assert_eq!(
+        g.attempt.as_ref().unwrap().enemies[0].hit_stop_remaining(),
+        3
+    );
     g.set_paused(true);
     let frozen = serde_json::to_string(&g).unwrap();
     ticks(&mut g, 120);
@@ -1090,9 +1100,13 @@ fn hit_stop_survives_pause_and_save_resume_and_rejects_unbounded_saved_duration(
     g.save(&path).unwrap();
     let mut resumed = Game::load(&path).unwrap();
     assert_eq!(serde_json::to_string(&resumed).unwrap(), frozen);
-    g.attempt.as_mut().unwrap().enemies[0].hit_stop_left = 7;
+    g.attempt.as_mut().unwrap().enemies[0]
+        .statuses
+        .refresh(StatusId::HitStop, 7);
     assert!(g.save(&path).is_err());
-    g.attempt.as_mut().unwrap().enemies[0].hit_stop_left = 3;
+    let restored = &mut g.attempt.as_mut().unwrap().enemies[0].statuses;
+    restored.remove(StatusId::HitStop);
+    restored.refresh(StatusId::HitStop, 3);
     g.set_paused(false);
     resumed.set_paused(false);
     ticks(&mut g, 3);
@@ -1109,9 +1123,12 @@ fn hit_stop_survives_pause_and_save_resume_and_rejects_unbounded_saved_duration(
     legacy["attempt"]["enemies"][0]
         .as_object_mut()
         .unwrap()
-        .remove("hit_stop_left");
+        .remove("statuses");
     let legacy: Game = serde_json::from_value(legacy).unwrap();
-    assert_eq!(legacy.attempt.as_ref().unwrap().enemies[0].hit_stop_left, 0);
+    assert_eq!(
+        legacy.attempt.as_ref().unwrap().enemies[0].hit_stop_remaining(),
+        0
+    );
     for path in [
         path.clone(),
         path.with_extension("bak"),
@@ -1136,7 +1153,7 @@ fn a_boss_defeat_stops_piercing_followups_and_later_turrets() {
         g.deploy(0, Mode::Personal).unwrap();
         g.set_paused(false);
         if use_turrets {
-            g.campaign.blueprints = [true; 3];
+            g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
             g.set_paused(true);
             g.place(StructureKind::Turret, 5, 0).unwrap();
             g.place(StructureKind::Turret, 5, 1).unwrap();
@@ -1420,7 +1437,7 @@ fn parallel_loot_cursors_and_reports_do_not_duplicate_an_unused_shared_stash() {
 fn npc_turret_uses_its_authored_skill_and_a_critical_failure_requires_ready() {
     use horde_core::{rules::Rng, sim::EventKind};
     let mut g = game(Mode::Npc);
-    g.campaign.blueprints = [true; 3];
+    g.campaign.blueprints = horde_core::kind_map::KindMap::filled(true);
     g.set_paused(true);
     g.place(StructureKind::Turret, 5, 4).unwrap();
     g.set_paused(false);

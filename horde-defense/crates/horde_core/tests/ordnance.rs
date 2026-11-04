@@ -158,7 +158,9 @@ fn molotov_burns_over_time_and_paused_flight_and_fire_are_immutable() {
     let a = game.attempt.as_ref().unwrap();
     let hostile = a.enemies.iter().find(|e| e.id == target).unwrap();
     assert!(hostile.hp < 25 && hostile.hp > 0);
-    assert!(hostile.hit_stop_left > 0 && hostile.hit_stop_left <= ENEMY_HIT_STOP_TICKS);
+    assert!(
+        hostile.hit_stop_remaining() > 0 && hostile.hit_stop_remaining() <= ENEMY_HIT_STOP_TICKS
+    );
     assert_eq!(a.ordnance.fire_zones.len(), 1);
     game.set_paused(true);
     let paused = serde_json::to_string(&game).unwrap();

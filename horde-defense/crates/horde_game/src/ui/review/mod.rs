@@ -497,7 +497,7 @@ pub(super) fn prepare(f: &mut FrontendParts) {
             a.loot += 1;
             a.loot_events.push(horde_core::quality::LootEvent {
                 item_id,
-                definition,
+                definition: horde_core::content::ItemDefId::at(definition),
                 level: 3,
                 quality,
                 name: content().items[definition].name.clone(),

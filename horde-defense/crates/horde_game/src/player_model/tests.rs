@@ -469,7 +469,7 @@ fn every_authored_item_style_can_resolve_on_both_survivors_without_losing_the_bo
         )
         .unwrap();
         let item = Some(EquipmentVisualItem {
-            definition,
+            definition: horde_core::content::ItemDefId::at(definition),
             level: 1,
             quality: recipe.base_quality,
             style: recipe.visual_style.clone(),
@@ -1323,7 +1323,7 @@ fn active_fist_aliases_and_all_melee_grips_match_actual_painted_source_surfaces(
                 .find(|(_, recipe)| recipe.visual_style == style)
                 .unwrap();
             equipment.melee = Some(EquipmentVisualItem {
-                definition,
+                definition: horde_core::content::ItemDefId::at(definition),
                 level: 1,
                 quality: recipe.base_quality,
                 style: style.into(),

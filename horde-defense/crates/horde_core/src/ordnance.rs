@@ -26,6 +26,13 @@ impl OrdnanceKind {
             Self::Molotov => "Molotov",
         }
     }
+    /// The skill unlock ID that grants this throw.
+    pub fn unlock(self) -> &'static str {
+        match self {
+            Self::Grenade => crate::skill_catalog::unlocks::GRENADE,
+            Self::Molotov => crate::skill_catalog::unlocks::MOLOTOV,
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ThrowRequest {
@@ -196,12 +203,12 @@ pub fn allowance(mode: Mode, modifiers: &SkillModifiers) -> [u32; 2] {
         return [0; 2];
     }
     [
-        if modifiers.grenade_unlocked {
+        if modifiers.unlocked(OrdnanceKind::Grenade.unlock()) {
             modifiers.grenade_charges.min(MAX_CHARGES)
         } else {
             0
         },
-        if modifiers.molotov_unlocked {
+        if modifiers.unlocked(OrdnanceKind::Molotov.unlock()) {
             modifiers.molotov_charges.min(MAX_CHARGES)
         } else {
             0

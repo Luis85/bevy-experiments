@@ -133,7 +133,7 @@ impl DpsTracker {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GearRecord {
     pub slot: Slot,
-    pub definition: usize,
+    pub definition: crate::content::ItemDefId,
     pub name: String,
     pub level: u32,
     pub quality: Quality,
@@ -195,9 +195,7 @@ impl RunRecord {
             || self.cause.len() > 1000
             || self.gear.len() > 4
             || self.gear.iter().any(|g| {
-                g.definition >= crate::content::content().items.len()
-                    || g.name.len() > 120
-                    || !(1..=64).contains(&g.level)
+                g.definition.index().is_none() || g.name.len() > 120 || !(1..=64).contains(&g.level)
             })
             || [self.average_dps, self.peak_dps]
                 .into_iter()

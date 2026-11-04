@@ -57,8 +57,14 @@ Effects use tagged JSON. Numerical additions are `DamageAdd`, `HealthAdd`,
 `OrdnanceRadiusMultiplier`, `BurnDurationMultiplier` (1–2), plus
 `ReloadMultiplier`, `CadenceMultiplier`, `OrdnanceCooldownMultiplier` (0.5–1).
 `GrenadeCharges` and `MolotovCharges` add 1–5. `WeaponTraining` names a class.
-Flag effects `Piercing`, `Sweep`, `Heal`, `Brace`, `GrenadeUnlock` and
-`MolotovUnlock` omit `value`. The combined multiplier kernel is also bounded
+Capability unlocks are data-keyed: `{"kind":"Unlock","value":"grenade"}`.
+The implemented unlock IDs are `piercing`, `sweep`, `heal`, `brace`, `grenade`
+and `molotov` (`skill_catalog::unlocks`); any node may grant any of them, and an
+unknown ID is rejected at load. Learned unlocks are saved as the
+`SkillModifiers::unlocks` ID set (save v3 migrated the former boolean flags). A
+genuinely new capability needs its ID added to `unlocks::ALL` plus the code that
+reads `SkillModifiers::unlocked(id)`; it never needs a new `SkillEffect`
+variant. The combined multiplier kernel is also bounded
 to 0.01–100. Additive/multiplier effects stack in catalog order, so preserve that order when a
 numerically identical replay matters.
 

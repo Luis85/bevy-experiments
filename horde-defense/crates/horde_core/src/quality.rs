@@ -192,7 +192,7 @@ pub struct LootEvent {
     #[serde(default = "legacy_loot_origin")]
     pub at: [f32; 2],
     pub item_id: u64,
-    pub definition: usize,
+    pub definition: crate::content::ItemDefId,
     pub level: u32,
     pub quality: Quality,
     pub name: String,
@@ -214,7 +214,7 @@ pub fn validate_loot_events(
             event.item_id == 0
                 || event.item_id >= next_item_id
                 || !ids.insert(event.item_id)
-                || event.definition >= crate::content::content().items.len()
+                || event.definition.index().is_none()
                 || !(1..=64).contains(&event.level)
                 || event.name.trim().is_empty()
                 || event.name.len() > 120

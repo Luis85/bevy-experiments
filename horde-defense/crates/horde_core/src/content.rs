@@ -1,5 +1,7 @@
 use crate::catalog::{self, ContentError};
+use crate::kind_map::StableKind;
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -20,7 +22,7 @@ impl Slot {
         self as usize
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum EnemyKind {
     Shambler,
     Runner,
@@ -37,13 +39,16 @@ impl EnemyKind {
         Self::Demolisher,
     ];
 }
+impl StableKind for EnemyKind {
+    const ALL: &'static [Self] = &Self::ALL;
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BossKind {
     Breacher,
     Caller,
     SiegeBrute,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum StructureKind {
     Trap,
     Wall,
@@ -54,6 +59,49 @@ impl StructureKind {
     pub fn index(self) -> usize {
         self as usize
     }
+}
+impl StableKind for StructureKind {
+    const ALL: &'static [Self] = &Self::ALL;
+}
+
+/// Stable authored identity of an item definition. Saves reference items by
+/// this ID, never by catalogue position; [`Content::item_index`] resolves it.
+#[derive(Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct ItemDefId(pub String);
+impl ItemDefId {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+    /// ID of the definition at `index` in the loaded catalogue.
+    pub fn at(index: usize) -> Self {
+        content().items[index].id.clone()
+    }
+    /// Position in the loaded catalogue, if this ID is authored there.
+    pub fn index(&self) -> Option<usize> {
+        content().item_index(self)
+    }
+    pub fn definition(&self) -> Option<&'static ItemDefinition> {
+        content().item(self)
+    }
+}
+impl From<&str> for ItemDefId {
+    fn from(id: &str) -> Self {
+        Self(id.to_owned())
+    }
+}
+impl std::fmt::Display for ItemDefId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+/// Authored content IDs are short lowercase ASCII slugs.
+fn valid_content_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .bytes()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == b'_')
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Policy {
@@ -96,6 +144,7 @@ pub struct NpcProfile {
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct ItemDefinition {
+    pub id: ItemDefId,
     #[serde(default)]
     pub visual_style: String,
     #[serde(default)]
@@ -184,6 +233,7 @@ impl BossTiming {
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct LevelDefinition {
+    pub id: String,
     pub name: String,
     pub subtitle: String,
     pub boss: BossKind,
@@ -212,6 +262,7 @@ pub struct LevelDefinition {
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct StructureDefinition {
+    pub id: String,
     pub kind: StructureKind,
     pub name: String,
     pub supply: u32,
@@ -235,11 +286,34 @@ pub struct Content {
     pub enemies: Vec<EnemyDefinition>,
     pub items: Vec<ItemDefinition>,
     pub structures: Vec<StructureDefinition>,
+    /// Item ID -> catalogue position, rebuilt whenever a catalogue is parsed.
+    #[serde(skip)]
+    item_index: HashMap<ItemDefId, usize>,
 }
 impl Content {
     /// Pure parse + validate, so tests can build alternative catalogues in-process.
     pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
-        catalog::parse_validated("content", text, 32 * catalog::MIB, Self::validate)
+        let mut content: Self =
+            catalog::parse_validated("content", text, 32 * catalog::MIB, Self::validate)?;
+        content.item_index = content
+            .items
+            .iter()
+            .enumerate()
+            .map(|(index, item)| (item.id.clone(), index))
+            .collect();
+        Ok(content)
+    }
+    /// Catalogue position of an item ID. The prebuilt index is verified so an
+    /// in-process edited clone still resolves correctly.
+    pub fn item_index(&self, id: &ItemDefId) -> Option<usize> {
+        self.item_index
+            .get(id)
+            .copied()
+            .filter(|&index| self.items.get(index).is_some_and(|item| item.id == *id))
+            .or_else(|| self.items.iter().position(|item| item.id == *id))
+    }
+    pub fn item(&self, id: &ItemDefId) -> Option<&ItemDefinition> {
+        self.item_index(id).map(|index| &self.items[index])
     }
     pub fn from_json(text: &str) -> Result<Self, String> {
         Self::from_json_str(text).map_err(ContentError::into_message)
@@ -254,13 +328,38 @@ impl Content {
         )
     }
     pub fn validate(&self) -> Result<(), String> {
-        if self.levels.len() != 5
-            || self.enemies.len() != EnemyKind::ALL.len()
-            || self.structures.len() != StructureKind::ALL.len()
-            || self.items.len() < 4
-            || self.items.len() > 4096
+        if self.levels.len() != 5 || self.items.len() < 4 || self.items.len() > 4096 {
+            return Err("Expected five encounter templates and four protected starters".into());
+        }
+        let enemy_kinds: BTreeSet<_> = self.enemies.iter().map(|e| e.kind).collect();
+        let structure_kinds: BTreeSet<_> = self.structures.iter().map(|s| s.kind).collect();
+        if enemy_kinds.len() != self.enemies.len()
+            || enemy_kinds.len() != EnemyKind::ALL.len()
+            || structure_kinds.len() != self.structures.len()
+            || structure_kinds.len() != StructureKind::ALL.len()
         {
-            return Err("Expected five encounter templates, canonical enemy/structure tables, and four protected starters".into());
+            return Err("Every enemy and structure kind needs exactly one profile".into());
+        }
+        for (catalog, ids) in [
+            ("level", self.levels.iter().map(|l| l.id.as_str()).collect()),
+            ("item", self.items.iter().map(|i| i.id.as_str()).collect()),
+            (
+                "structure",
+                self.structures
+                    .iter()
+                    .map(|s| s.id.as_str())
+                    .collect::<Vec<_>>(),
+            ),
+        ] {
+            let mut seen = BTreeSet::new();
+            if let Some(id) = ids
+                .into_iter()
+                .find(|id| !valid_content_id(id) || !seen.insert(*id))
+            {
+                return Err(format!(
+                    "Missing, malformed or duplicate {catalog} ID: {id:?}"
+                ));
+            }
         }
         let safe_float =
             |value: f32, min: f32, max: f32| value.is_finite() && (min..=max).contains(&value);
@@ -308,9 +407,8 @@ impl Content {
                 return Err(format!("Invalid or unsupported level profile: {}", l.name));
             }
         }
-        for (index, e) in self.enemies.iter().enumerate() {
-            if e.kind != EnemyKind::ALL[index]
-                || e.name.trim().is_empty()
+        for e in &self.enemies {
+            if e.name.trim().is_empty()
                 || !(1..=100_000).contains(&e.health)
                 || !safe_float(e.speed, 0.01, 10.0)
                 || !safe_float(e.windup, 0.5, 60.0)
@@ -326,20 +424,16 @@ impl Content {
                 || e.reward > 1_000_000
                 || e.xp > 1_000_000
             {
-                return Err(format!(
-                    "Invalid enemy profile or canonical order: {}",
-                    e.name
-                ));
+                return Err(format!("Invalid enemy profile: {}", e.name));
             }
         }
-        for (index, d) in self.structures.iter().enumerate() {
+        for d in &self.structures {
             if (d.kind == StructureKind::Wall && !(0..=30).contains(&d.npc_skill))
                 || (d.kind != StructureKind::Wall && !(3..=30).contains(&d.npc_skill))
             {
                 return Err(format!("Invalid explicit NPC structure skill: {}", d.name));
             }
-            if d.kind != StructureKind::ALL[index]
-                || d.name.trim().is_empty()
+            if d.name.trim().is_empty()
                 || !(1..=100_000).contains(&d.health)
                 || !(1..=1000).contains(&d.supply)
                 || !safe_float(d.cooldown, 0.1, 60.0)
@@ -353,10 +447,7 @@ impl Content {
                     && (d.charges == 0 || d.charges > 1000 || d.damage == 0))
                 || (d.kind == StructureKind::Turret && (d.range <= 0.0 || d.damage == 0))
             {
-                return Err(format!(
-                    "Invalid structure profile or canonical order: {}",
-                    d.name
-                ));
+                return Err(format!("Invalid structure profile: {}", d.name));
             }
         }
         for (index, i) in self.items.iter().enumerate() {
@@ -446,10 +537,16 @@ impl Content {
         Ok(())
     }
     pub fn enemy(&self, kind: EnemyKind) -> &EnemyDefinition {
-        &self.enemies[kind as usize]
+        self.enemies
+            .iter()
+            .find(|e| e.kind == kind)
+            .expect("validated: every enemy kind has a profile")
     }
     pub fn structure(&self, kind: StructureKind) -> &StructureDefinition {
-        &self.structures[kind as usize]
+        self.structures
+            .iter()
+            .find(|s| s.kind == kind)
+            .expect("validated: every structure kind has a profile")
     }
 }
 static CONTENT: OnceLock<Content> = OnceLock::new();
@@ -484,8 +581,24 @@ mod tests {
         let mut data = content().clone();
         data.items.clear();
         assert!(data.validate().is_err());
+        // Profiles are keyed by kind, so order is free but every kind is required once.
         let mut data = content().clone();
         data.enemies.swap(0, 1);
+        assert!(data.validate().is_ok());
+        assert_eq!(
+            data.enemy(EnemyKind::Runner),
+            content().enemy(EnemyKind::Runner)
+        );
+        data.enemies[1] = data.enemies[0].clone();
+        assert!(data.validate().is_err());
+        let mut data = content().clone();
+        data.structures.pop();
+        assert!(data.validate().is_err());
+        let mut data = content().clone();
+        data.items[5].id = data.items[4].id.clone();
+        assert!(data.validate().is_err());
+        let mut data = content().clone();
+        data.levels[0].id = "Old Road".into();
         assert!(data.validate().is_err());
         let mut data = content().clone();
         data.levels[0].enemies = vec![u32::MAX; 5];
@@ -504,6 +617,17 @@ mod tests {
             assert!(end > l.start_rate);
             assert!(end <= l.rate_cap);
         }
+    }
+    #[test]
+    fn item_ids_resolve_through_the_index_and_survive_edited_clones() {
+        let content = content();
+        for (index, item) in content.items.iter().enumerate() {
+            assert_eq!(content.item_index(&item.id), Some(index));
+        }
+        assert_eq!(content.item_index(&"no_such_item".into()), None);
+        let mut edited = content.clone();
+        edited.items.swap(4, 5);
+        assert_eq!(edited.item_index(&content.items[4].id), Some(5));
     }
     #[test]
     fn every_slot_has_protected_starter_profile() {
