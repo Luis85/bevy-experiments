@@ -127,7 +127,7 @@ Save and return to the menu, quit, and continue the same deployment. Reload prog
 
 ## Logs and crash reports
 
-Each run writes `%LOCALAPPDATA%\LastlightHordeDefense\logs\lastlight-<unix-timestamp>.log` (or `<LASTLIGHT_SAVE_DIR>\logs\`); the newest 10 are kept. If the game crashes it also writes `crash-<unix-timestamp>.txt` in that folder with the version, OS, panic message and backtrace. Send the newest crash file and log with your feedback. Set `RUST_LOG` to change verbosity; the default is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`.
+Each run writes `%LOCALAPPDATA%\LastlightHordeDefense\logs\lastlight-<unix-timestamp>.log` (or `<LASTLIGHT_SAVE_DIR>\logs\`); the newest 10 are kept. If the game crashes it also writes `crash-<unix-timestamp>.txt` in that folder with the version, OS, panic message, backtrace and the last 200 log lines. Send the newest crash file and log with your feedback. Set `RUST_LOG` to change verbosity; the default is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`.
 
 ## Atmosphere and feedback pass
 
