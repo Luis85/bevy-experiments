@@ -45,11 +45,14 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                         f.dispatch(Command::SetPaused(true), "");
                         f.request_save(SaveIntent::Menu);
                     }
-                    ui.colored_label(AMBER, format!("{} coins", f.game.campaign.coins));
-                    if ui.available_width() > 230.0 && !f.game.campaign.world.cleared.is_empty() {
-                        muted(ui, format!("{} freed", f.game.campaign.world.cleared.len()));
+                    ui.colored_label(AMBER, format!("{} coins", f.game.campaign().coins));
+                    if ui.available_width() > 230.0 && !f.game.campaign().world.cleared.is_empty() {
+                        muted(
+                            ui,
+                            format!("{} freed", f.game.campaign().world.cleared.len()),
+                        );
                     }
-                    let alerts = f.game.strategy.active_outbreaks();
+                    let alerts = f.game.strategy().active_outbreaks();
                     if alerts > 0
                         && ui
                             .add(egui::Button::new(
@@ -73,7 +76,7 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
 }
 
 pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
-    if f.game.campaign.world.start.is_none() {
+    if f.game.campaign().world.start.is_none() {
         return;
     }
     egui::Panel::top("camp_navigation")
@@ -84,7 +87,7 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
         )
         .show(root, |ui| {
             ui.horizontal_wrapped(|ui| {
-                if f.game.attempt.is_none() && ui.button("Back to journey upgrades").clicked() {
+                if f.game.attempt().is_none() && ui.button("Back to journey upgrades").clicked() {
                     f.open_upgrades();
                 }
                 let response = ui.selectable_label(f.tab == Tab::World, "Campaign");
@@ -138,13 +141,13 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
                         if tab == Tab::Survivor
                             && !f
                                 .game
-                                .campaign
+                                .campaign()
                                 .has_feature(horde_core::skill_catalog::CampaignFeature::Companion)
                         {
                             continue;
                         }
                         if tab == Tab::Engineering
-                            && !f.game.campaign.has_feature(
+                            && !f.game.campaign().has_feature(
                                 horde_core::skill_catalog::CampaignFeature::Construction,
                             )
                         {
@@ -164,9 +167,9 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
     if !matches!(f.screen, Screen::Camp | Screen::Results) {
         return;
     }
-    let fields = f.game.battles.iter().filter(|b| !b.settled).count();
-    let alerts = f.game.strategy.active_outbreaks();
-    if f.game.attempt.is_none() && fields == 0 && alerts == 0 {
+    let fields = f.game.battles().iter().filter(|b| !b.settled).count();
+    let alerts = f.game.strategy().active_outbreaks();
+    if f.game.attempt().is_none() && fields == 0 && alerts == 0 {
         return;
     }
     egui::Panel::top("active_fields")
@@ -177,7 +180,7 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
         )
         .show(root, |ui| {
             ui.horizontal_wrapped(|ui| {
-                if let Some(a) = &f.game.attempt {
+                if let Some(a) = f.game.attempt() {
                     ui.strong(format!(
                         "Active defense · {}",
                         if a.mode == Mode::Personal {
@@ -201,7 +204,7 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
                         f.go_tab(Tab::Operations);
                         if f.campaign.observed.is_none() {
                             f.campaign.observed =
-                                f.game.battles.iter().find(|b| !b.settled).map(|b| b.id);
+                                f.game.battles().iter().find(|b| !b.settled).map(|b| b.id);
                         }
                     }
                 }
@@ -212,7 +215,7 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
                     ui,
                     if f.screen == Screen::Results {
                         "Fields paused during upgrades"
-                    } else if f.game.global_paused {
+                    } else if f.game.global_paused() {
                         "All fields paused"
                     } else {
                         "World clock running"

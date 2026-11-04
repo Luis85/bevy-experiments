@@ -129,11 +129,11 @@ pub(crate) fn ambience_target(
         campaign
             .observed
             .and_then(|id| game.active_battle(id))
-            .and_then(|battle| battle.game.attempt.as_ref())
+            .and_then(|battle| battle.game().attempt())
     } else {
         None
     };
-    let attempt = game.attempt.as_ref().or(observed);
+    let attempt = game.attempt().or(observed);
     let theme = attempt
         .and_then(|attempt| {
             world()
@@ -143,14 +143,14 @@ pub(crate) fn ambience_target(
         .or_else(|| {
             world()
                 .country(&campaign.selected_country)
-                .or_else(|| game.campaign.world.active_country())
+                .or_else(|| game.campaign().world.active_country())
                 .map(|country| country.stage_theme(campaign.stage))
         });
     let context = match screen.ambience() {
         ScreenAmbience::Menu => AudioContext::Menu,
         ScreenAmbience::Paused => AudioContext::Paused,
         ScreenAmbience::Live
-            if game.global_paused || attempt.is_some_and(|attempt| attempt.paused) =>
+            if game.global_paused() || attempt.is_some_and(|attempt| attempt.paused) =>
         {
             AudioContext::Paused
         }
@@ -239,9 +239,9 @@ impl UiCtx<'_> {
             CampaignFeature::Operations,
         ]
         .into_iter()
-        .any(|feature| self.game.campaign.has_feature(feature))
-            || !self.game.strategy.roster.is_empty()
-            || !self.game.battles.is_empty()
+        .any(|feature| self.game.campaign().has_feature(feature))
+            || !self.game.strategy().roster.is_empty()
+            || !self.game.battles().is_empty()
     }
 
     // ----- commands -----
@@ -265,8 +265,8 @@ impl UiCtx<'_> {
         }
         if self.status.profile_exists
             || self.paths.campaign().try_exists().unwrap_or(true)
-            || self.game.campaign.selected_survivor.is_some()
-            || self.game.campaign.world.start.is_some()
+            || self.game.campaign().selected_survivor.is_some()
+            || self.game.campaign().world.start.is_some()
         {
             self.menu.new_journey_confirm = true;
         } else {
@@ -292,7 +292,7 @@ impl UiCtx<'_> {
     pub(super) fn focus_next_upgrade(&mut self) {
         self.campaign.improvement_focus = self
             .game
-            .campaign
+            .campaign()
             .recommendation_fallback(UpgradeFocus::Next(self.campaign.mode))
             .map(|r| r.action);
     }
@@ -301,7 +301,7 @@ impl UiCtx<'_> {
 
     pub(super) fn open_history(&mut self) {
         self.nav.history_return = self.screen;
-        self.nav.history_world_paused = self.game.global_paused;
+        self.nav.history_world_paused = self.game.global_paused();
         self.battle.fire_latched = false;
         self.dispatch(Command::SetPaused(true), "");
         self.go(Screen::History);
@@ -311,9 +311,9 @@ impl UiCtx<'_> {
         self.dispatch(Command::SetPaused(self.nav.history_world_paused), "");
     }
     pub(super) fn open_settings(&mut self) {
-        self.prefs.balance_draft = Some(self.game.campaign.balance_settings.clone());
+        self.prefs.balance_draft = Some(self.game.campaign().balance_settings.clone());
         self.nav.return_screen = self.screen;
-        self.nav.return_world_paused = self.game.global_paused;
+        self.nav.return_world_paused = self.game.global_paused();
         self.go(Screen::Settings);
         self.dispatch(Command::SetPaused(true), "");
         self.battle.fire_latched = false;
@@ -328,7 +328,7 @@ impl UiCtx<'_> {
         self.request_save(SaveIntent::Menu);
     }
     pub(super) fn open_upgrades(&mut self) {
-        if self.game.attempt.is_some() {
+        if self.game.attempt().is_some() {
             self.open_preparation(Tab::Skills);
             return;
         }
@@ -339,15 +339,15 @@ impl UiCtx<'_> {
     }
     pub(super) fn open_preparation(&mut self, tab: Tab) {
         if matches!(tab, Tab::Skills | Tab::Engineering)
-            && self.game.attempt.is_none()
-            && self.game.campaign.world.start.is_some()
+            && self.game.attempt().is_none()
+            && self.game.campaign().world.start.is_some()
         {
             self.open_upgrades();
             return;
         }
 
         self.preserve_debrief_pause();
-        if let Some(active) = self.game.campaign.world.active.clone() {
+        if let Some(active) = self.game.campaign().world.active.clone() {
             self.campaign.selected_country = active;
         }
         self.go_tab(tab);
@@ -357,7 +357,7 @@ impl UiCtx<'_> {
         self.runtime.clear_input();
     }
     fn preserve_debrief_pause(&mut self) {
-        if self.screen == Screen::Results && !self.game.global_paused {
+        if self.screen == Screen::Results && !self.game.global_paused() {
             self.dispatch(Command::SetPaused(true), "");
         }
     }
@@ -369,9 +369,9 @@ impl UiCtx<'_> {
         self.runtime.clear_input();
     }
     pub(super) fn open_briefing(&mut self) {
-        if let Some(country) = self.game.campaign.world.active.clone() {
+        if let Some(country) = self.game.campaign().world.active.clone() {
             self.campaign.selected_country = country;
-            self.campaign.stage = self.game.campaign.world.next_stage();
+            self.campaign.stage = self.game.campaign().world.next_stage();
         }
         self.open_preparation(Tab::Briefing);
     }
@@ -379,22 +379,23 @@ impl UiCtx<'_> {
         self.go(Screen::SurvivorSelection);
         self.campaign.preview_survivor = self
             .game
-            .campaign
+            .campaign()
             .selected_survivor
             .unwrap_or(self.campaign.preview_survivor);
         self.battle.fire_latched = false;
         self.runtime.clear_input();
     }
     pub(super) fn resume(&mut self) {
-        if self.game.campaign.world.start.is_none()
-            && self.game.campaign.selected_survivor.is_none()
+        if self.game.campaign().world.start.is_none()
+            && self.game.campaign().selected_survivor.is_none()
         {
             self.open_survivor_selection();
             return;
         }
-        if self.game.attempt.is_some() {
+        if self.game.attempt().is_some() {
             self.go(Screen::Battle);
-        } else if self.game.campaign.world.start.is_some() && self.game.campaign.journey_active {
+        } else if self.game.campaign().world.start.is_some() && self.game.campaign().journey_active
+        {
             self.focus_next_upgrade();
             self.go(Screen::Results);
         } else {
@@ -403,7 +404,7 @@ impl UiCtx<'_> {
         }
         self.battle.fire_latched = false;
         self.runtime.clear_input();
-        if self.game.attempt.is_some() {
+        if self.game.attempt().is_some() {
             self.dispatch(Command::SetPaused(true), "");
         }
     }

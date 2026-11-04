@@ -8,14 +8,14 @@ use support::legacy_game;
 fn fixture(lane: u8) -> (Game, u64, u64) {
     let mut g = legacy_game();
     g.deploy(0, Mode::Personal).unwrap();
-    let mut a = g.attempt.take().unwrap();
+    let mut a = g.attempt_slot_mut().take().unwrap();
     g.spawn_enemy(&mut a, EnemyKind::Shambler, lane, false);
     a.enemies.last_mut().unwrap().x = 14.0;
     let slow = a.enemies.last().unwrap().id;
     g.spawn_enemy(&mut a, EnemyKind::Runner, lane, false);
     a.enemies.last_mut().unwrap().x = 14.8;
     let fast = a.enemies.last().unwrap().id;
-    g.attempt = Some(a);
+    *g.attempt_slot_mut() = Some(a);
     (g, slow, fast)
 }
 fn step(g: &mut Game, count: u32, batch: u32) {
@@ -36,10 +36,10 @@ fn faster_enemy_smoothly_passes_without_stopping_the_slow_one_or_changing_lanes(
         let mut crossed = false;
         let mut previous_offset = 0.0;
         for _ in 0..150 {
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             let before = a.enemies.iter().find(|e| e.id == slow).unwrap().x;
             g.tick(Input::default());
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             let slow = a.enemies.iter().find(|e| e.id == slow).unwrap();
             let fast = a.enemies.iter().find(|e| e.id == fast).unwrap();
             assert!(
@@ -62,7 +62,7 @@ fn faster_enemy_smoothly_passes_without_stopping_the_slow_one_or_changing_lanes(
                 crossed = true;
             }
         }
-        let a = g.attempt.as_ref().unwrap();
+        let a = g.attempt().unwrap();
         assert!(crossed);
         assert!(
             a.enemies.iter().find(|e| e.id == fast).unwrap().x
@@ -74,21 +74,23 @@ fn faster_enemy_smoothly_passes_without_stopping_the_slow_one_or_changing_lanes(
 #[test]
 fn wall_and_contact_queues_still_block_fast_runners_and_traps_cover_the_passing_width() {
     let mut g = legacy_game();
-    g.campaign.first_clear(0, Mode::Personal);
-    g.campaign.first_clear(1, Mode::Personal);
-    g.campaign.reward(1000, 0, Mode::Personal);
-    g.campaign.purchase_blueprint(StructureKind::Wall).unwrap();
+    g.campaign_mut().first_clear(0, Mode::Personal);
+    g.campaign_mut().first_clear(1, Mode::Personal);
+    g.campaign_mut().reward(1000, 0, Mode::Personal);
+    g.campaign_mut()
+        .purchase_blueprint(StructureKind::Wall)
+        .unwrap();
     g.deploy(0, Mode::Personal).unwrap();
     g.place(StructureKind::Wall, 5, 0).unwrap();
-    let wall = g.attempt.as_ref().unwrap().structures[0].x() + 0.7;
-    let mut a = g.attempt.take().unwrap();
+    let wall = g.attempt().unwrap().structures[0].x() + 0.7;
+    let mut a = g.attempt_slot_mut().take().unwrap();
     for (kind, x) in [(EnemyKind::Shambler, 6.3), (EnemyKind::Runner, 7.1)] {
         g.spawn_enemy(&mut a, kind, 5, false);
         a.enemies.last_mut().unwrap().x = x;
     }
-    g.attempt = Some(a);
+    *g.attempt_slot_mut() = Some(a);
     step(&mut g, 240, 4);
-    let a = g.attempt.as_ref().unwrap();
+    let a = g.attempt().unwrap();
     assert!(a.structures[0].hp > 0);
     assert!(
         a.enemies
@@ -110,19 +112,21 @@ fn wall_and_contact_queues_still_block_fast_runners_and_traps_cover_the_passing_
     );
 
     let mut g = legacy_game();
-    g.campaign.first_clear(0, Mode::Personal);
-    g.campaign.reward(25, 0, Mode::Personal);
-    g.campaign.purchase_blueprint(StructureKind::Trap).unwrap();
+    g.campaign_mut().first_clear(0, Mode::Personal);
+    g.campaign_mut().reward(25, 0, Mode::Personal);
+    g.campaign_mut()
+        .purchase_blueprint(StructureKind::Trap)
+        .unwrap();
     g.deploy(0, Mode::Personal).unwrap();
     g.place(StructureKind::Trap, 5, 0).unwrap();
-    let mut a = g.attempt.take().unwrap();
+    let mut a = g.attempt_slot_mut().take().unwrap();
     for (kind, x) in [(EnemyKind::Shambler, 5.5), (EnemyKind::Runner, 6.2)] {
         g.spawn_enemy(&mut a, kind, 5, false);
         a.enemies.last_mut().unwrap().x = x;
     }
-    g.attempt = Some(a);
+    *g.attempt_slot_mut() = Some(a);
     step(&mut g, 180, 4);
-    let a = g.attempt.as_ref().unwrap();
+    let a = g.attempt().unwrap();
     assert_eq!(a.kills, 2);
     assert_eq!(a.structures[0].charges, 1);
     assert!(a.corpses.iter().all(|e| e.at[0] >= DEFENSE_LINE));
@@ -151,10 +155,9 @@ fn passing_state_roundtrips_and_produces_identical_fixed_ticks_at_1_2_4x() {
         }
     }
     let mut invalid = original.clone();
-    invalid.attempt.as_mut().unwrap().enemies[0].pass_offset = 1.0;
+    invalid.attempt_mut().unwrap().enemies[0].pass_offset = 1.0;
     assert!(invalid.save(&path).is_err());
-    let mut old =
-        serde_json::to_value(original.attempt.as_ref().unwrap().enemies[0].clone()).unwrap();
+    let mut old = serde_json::to_value(original.attempt().unwrap().enemies[0].clone()).unwrap();
     old.as_object_mut().unwrap().remove("pass_offset");
     assert_eq!(
         serde_json::from_value::<horde_core::sim::Enemy>(old)

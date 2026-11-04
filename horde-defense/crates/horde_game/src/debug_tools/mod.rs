@@ -201,12 +201,15 @@ fn draw_overlays(
 /// The F3 panel text, separate from egui so it is testable.
 fn sim_panel_lines(game: &Game, runtime: &Runtime, record_flag: bool) -> Vec<String> {
     let debug = runtime.debug_snapshot();
-    let mut lines = vec![format!("seed          {}", game.seed)];
-    match &game.attempt {
+    let mut lines = vec![format!("seed          {}", game.seed())];
+    match game.attempt() {
         Some(a) => {
             lines.push(format!("attempt       {} ({:?})", a.id, a.mode));
             lines.push(format!("tick          {}", a.tick));
-            lines.push(format!("paused        {}", a.paused || game.global_paused));
+            lines.push(format!(
+                "paused        {}",
+                a.paused || game.global_paused()
+            ));
             lines.push(format!(
                 "enemies       {}/{}",
                 a.enemies.len(),
@@ -216,7 +219,7 @@ fn sim_panel_lines(game: &Game, runtime: &Runtime, record_flag: bool) -> Vec<Str
         }
         None => lines.push(format!(
             "attempt       none (next id {})",
-            game.next_attempt_id
+            game.next_attempt_id()
         )),
     }
     lines.push(format!(

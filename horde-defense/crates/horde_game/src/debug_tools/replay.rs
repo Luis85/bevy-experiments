@@ -72,10 +72,11 @@ fn compatibility_warnings(header: &Header, game: &Game) -> Vec<String> {
             header.content_fingerprint
         ));
     }
-    if header.seed != game.seed {
+    if header.seed != game.seed() {
         warnings.push(format!(
             "header seed {} differs from the embedded game's seed {}",
-            header.seed, game.seed
+            header.seed,
+            game.seed()
         ));
     }
     warnings
@@ -130,11 +131,11 @@ pub fn replay(lines: Vec<Line>) -> Result<ReplayReport, String> {
             break;
         }
         // Mirrors `Runtime::run_tick`: finishing the attempt pauses the game.
-        let had_attempt = game.attempt.is_some();
+        let had_attempt = game.attempt().is_some();
         game.tick(input.clone());
         for _ in game.drain_events() {}
         let _ = game.take_settlement_issues();
-        if had_attempt && game.attempt.is_none() {
+        if had_attempt && game.attempt().is_none() {
             game.set_paused(true);
         }
         tick += 1;

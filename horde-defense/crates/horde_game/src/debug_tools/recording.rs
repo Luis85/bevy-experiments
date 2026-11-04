@@ -89,7 +89,7 @@ impl Recorder {
         let initial = serde_json::to_value(game).map_err(|e| e.to_string())?;
         recorder.write(&Line::Header(Header {
             format: FORMAT,
-            seed: game.seed,
+            seed: game.seed(),
             version: SAVE_VERSION,
             ruleset: RULESET_VERSION,
             content_fingerprint: hex(horde_core::catalog::content_fingerprint()),

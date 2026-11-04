@@ -129,12 +129,12 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             ui.label("Orders for");
             egui::ComboBox::from_id_salt("operations_country").selected_text(country_name(&f.campaign.selected_country)).show_ui(ui, |ui| {
                 for country in &world().countries {
-                    if f.game.campaign.world.can_enter(&country.id) { ui.selectable_value(&mut f.campaign.selected_country, country.id.clone(), &country.name); }
+                    if f.game.campaign().world.can_enter(&country.id) { ui.selectable_value(&mut f.campaign.selected_country, country.id.clone(), &country.name); }
                 }
             });
-            let liberated = f.game.campaign.world.cleared.contains(&f.campaign.selected_country);
-            let space = f.game.strategy.roster.len() < config.max_roster;
-            let can_recruit = liberated && space && f.game.campaign.coins >= config.recruit_cost && f.game.campaign.reserved.is_none();
+            let liberated = f.game.campaign().world.cleared.contains(&f.campaign.selected_country);
+            let space = f.game.strategy().roster.len() < config.max_roster;
+            let can_recruit = liberated && space && f.game.campaign().coins >= config.recruit_cost && f.game.campaign().reserved.is_none();
             if ui.add_enabled(can_recruit, egui::Button::new(format!("Recruit survivor · {} coins", config.recruit_cost))).on_disabled_hover_text("Choose a liberated country, keep space in the roster and enough coins, and return the active defender to camp.").clicked() { f.dispatch(Command::Recruit(f.campaign.selected_country.clone()), "Survivor recruited with independent protected equipment."); }
         });
         muted(
@@ -160,18 +160,18 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             );
         }
     }
-    for recruit in f.game.strategy.roster.clone() {
+    for recruit in f.game.strategy().roster.clone() {
         ui.push_id(recruit.id, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.strong(&recruit.name);
                 ui.label(format!("{:?} · from {}", recruit.status, country_name(&recruit.origin)));
-                if let Some(guard) = f.game.strategy.guards.iter().find(|g| g.recruit_id == recruit.id) { ui.colored_label(AMBER, format!("Guarding {}", country_name(&guard.country_id))); }
+                if let Some(guard) = f.game.strategy().guards.iter().find(|g| g.recruit_id == recruit.id) { ui.colored_label(AMBER, format!("Guarding {}", country_name(&guard.country_id))); }
                 if recruit.status == RecruitStatus::Guarding && ui.button("Release guard").clicked() { f.dispatch(Command::ReleaseGuard(recruit.id), "Guard recalled and recovered."); }
             });
-            if let Ok(readiness) = f.game.strategy.readiness(&f.game.campaign, recruit.id) { muted(ui, &readiness.summary); }
+            if let Ok(readiness) = f.game.strategy().readiness(f.game.campaign(), recruit.id) { muted(ui, &readiness.summary); }
             if recruit.status == RecruitStatus::Ready {
                 ui.horizontal_wrapped(|ui| {
-                    let stage = f.game.campaign.world.completed(&f.campaign.selected_country).min(world().country(&f.campaign.selected_country).map(|c| c.level_count().saturating_sub(1)).unwrap_or(0));
+                    let stage = f.game.campaign().world.completed(&f.campaign.selected_country).min(world().country(&f.campaign.selected_country).map(|c| c.level_count().saturating_sub(1)).unwrap_or(0));
                     if parallel && ui.button("Deploy single defense").clicked() { f.dispatch(Command::DeploySurvivor { id: recruit.id, country: f.campaign.selected_country.clone(), stage }, "Expedition deployed. Its actual battle runs live."); }
                     if strategy {
                         if ui.button("Liberate country").on_hover_text("Chain real defenses until liberation, defeat, recall or invalid equipment. No automatic purchases or training.").clicked() { f.dispatch(Command::CountryOperation { id: recruit.id, country: f.campaign.selected_country.clone() }, "Country operation started; stops on liberation, defeat or recall."); }
@@ -179,17 +179,17 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     }
                 });
                 egui::CollapsingHeader::new(format!("Equipment, training & policy · {} CP available", recruit.npc.unspent)).show(ui, |ui| {
-                    ui.label(format!("{} / {} advancement awarded · Guns {} · Melee {} · HT {}", recruit.npc.awarded, f.game.campaign.allowance(), recruit.npc.guns, recruit.npc.melee, recruit.npc.ht));
+                    ui.label(format!("{} / {} advancement awarded · Guns {} · Melee {} · HT {}", recruit.npc.awarded, f.game.campaign().allowance(), recruit.npc.guns, recruit.npc.melee, recruit.npc.ht));
                     ui.horizontal_wrapped(|ui| {
-                        if ui.add_enabled(f.game.campaign.coins >= 25 && recruit.npc.awarded < f.game.campaign.allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).clicked() { f.dispatch(Command::BuyRecruitPoint(recruit.id), "Training point awarded to the selected survivor."); }
+                        if ui.add_enabled(f.game.campaign().coins >= 25 && recruit.npc.awarded < f.game.campaign().allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).clicked() { f.dispatch(Command::BuyRecruitPoint(recruit.id), "Training point awarded to the selected survivor."); }
                         for training in [NpcTraining::Guns, NpcTraining::Melee, NpcTraining::Health, NpcTraining::Strength, NpcTraining::Dexterity] {
                             if ui.add_enabled(recruit.npc.unspent >= training.cost() && (training != NpcTraining::Strength || recruit.npc.st < 20), egui::Button::new(format!("{} · {} CP", training.name(), training.cost()))).clicked() { f.dispatch(Command::TrainRecruit { id: recruit.id, training }, "Selected survivor trained."); }
                         }
                     });
                     for slot in Slot::ALL {
-                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{:?}: {}", slot, f.game.campaign.item(recruit.npc.loadout[slot.index()]).map(|i| i.definition().name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
-                            for item in f.game.campaign.items.clone().iter().filter(|i| i.definition().slot == slot) {
-                                let reserved = f.game.campaign.item_reserved(item.id);
+                        egui::ComboBox::from_id_salt(("recruit_equipment", recruit.id, slot.index())).selected_text(format!("{:?}: {}", slot, f.game.campaign().item(recruit.npc.loadout[slot.index()]).map(|i| i.definition().name.as_str()).unwrap_or("Missing"))).show_ui(ui, |ui| {
+                            for item in f.game.campaign().items.clone().iter().filter(|i| i.definition().slot == slot) {
+                                let reserved = f.game.campaign().item_reserved(item.id);
                                 if ui.add_enabled(!reserved, egui::Button::selectable(recruit.npc.loadout.contains(&item.id), format!("{} #{} · Lv {}{}", item.definition().name, item.id, item.level, if reserved { " · reserved" } else { "" }))).clicked() { f.dispatch(Command::EquipRecruit { id: recruit.id, item: item.id }, "Survivor equipment updated."); }
                             }
                         });
@@ -215,14 +215,14 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             .show(ui.ctx(), |ui| {
                 ui.horizontal_wrapped(|ui| {
                     if ui
-                        .button(if f.game.global_paused {
+                        .button(if f.game.global_paused() {
                             "Resume all"
                         } else {
                             "Pause all"
                         })
                         .clicked()
                     {
-                        f.dispatch(Command::SetPaused(!f.game.global_paused), "");
+                        f.dispatch(Command::SetPaused(!f.game.global_paused()), "");
                     }
                     if ui.button("Save country plan").clicked() { f.dispatch(Command::SaveExpeditionLayout(id), "Country plan saved for future deployments."); }
                     if ui.button("Clear country plan").clicked() { f.dispatch(Command::ClearExpeditionLayout(id), "Country plan cleared; deployed structures remain."); }
@@ -231,8 +231,8 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         ui.selectable_value(&mut f.battle.build_kind, kind, format!("{kind:?}"));
                     }
                 });
-                if let Some(b) = f.game.battles.iter().find(|b| b.id == id)
-                    && let Some(a) = b.game.attempt.as_ref()
+                if let Some(b) = f.game.battles().iter().find(|b| b.id == id)
+                    && let Some(a) = b.game().attempt()
                 {
                     muted(
                         ui,
@@ -332,7 +332,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     }
     egui::CollapsingHeader::new("Strategic event log").show(ui, |ui| {
-        for line in f.game.strategy.log.iter().rev() {
+        for line in f.game.strategy().log.iter().rev() {
             muted(ui, line);
         }
     });

@@ -225,9 +225,9 @@ mod tests {
     #[test]
     fn inspecting_actual_objects_does_not_change_state_or_randomness() {
         let mut game = Game::default();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let mut attempt = game.attempt.take().unwrap();
+        let mut attempt = game.attempt_slot_mut().take().unwrap();
         game.spawn_enemy(&mut attempt, EnemyKind::Runner, 0, false);
         attempt.enemies[0].x = 7.0;
         let before = serde_json::to_value(&attempt).unwrap();

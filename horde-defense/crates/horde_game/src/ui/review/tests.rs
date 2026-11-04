@@ -28,8 +28,11 @@ fn loot_replay_is_exclusive_to_explicit_isolated_capture_modes() {
 fn prepared_frontend() -> FrontendParts {
     let mut f = crate::ui::test_support::test_frontend();
     f.game = Game::default();
-    f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-    f.game.campaign.choose_start_country("DEU").unwrap();
+    f.game
+        .campaign_mut()
+        .choose_survivor(SurvivorId::Rook)
+        .unwrap();
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
     prepare_progression(&mut f.game);
     f
 }
@@ -57,17 +60,14 @@ fn scheduled_gesture_inputs_create_real_post_warmup_events_and_recover() {
         let mut f = prepared_frontend();
         prepare_gesture_battle(&mut f, kind == GestureFixture::Melee);
         f.game.set_paused(false);
-        let start = f.game.attempt.as_ref().unwrap().tick;
+        let start = f.game.attempt().unwrap().tick;
         let mut observed_throws = std::collections::BTreeMap::new();
         let mut observed_melee = std::collections::BTreeMap::new();
         for frame in 1..=152 {
             let input = scheduled_gesture_input(
                 kind,
                 frame,
-                f.game
-                    .attempt
-                    .as_ref()
-                    .expect("live isolated gesture battle"),
+                f.game.attempt().expect("live isolated gesture battle"),
             )
             .unwrap_or_default();
             if frame <= 60 {
@@ -76,7 +76,7 @@ fn scheduled_gesture_inputs_create_real_post_warmup_events_and_recover() {
             f.game.tick(input);
             // Combat VFX events legitimately expire. Observe real events
             // while live; never change production TTL to make a fixture pass.
-            for event in &f.game.attempt.as_ref().expect("live gesture battle").events {
+            for event in &f.game.attempt().expect("live gesture battle").events {
                 let key = (event.tick, event.actor_id, event.target_id);
                 match event.kind {
                     EventKind::Throw => {
@@ -91,8 +91,7 @@ fn scheduled_gesture_inputs_create_real_post_warmup_events_and_recover() {
         }
         let a = f
             .game
-            .attempt
-            .as_ref()
+            .attempt()
             .expect("gesture evidence keeps the real battle active");
         let throws: Vec<_> = observed_throws.values().collect();
         let melee: Vec<_> = observed_melee.values().collect();
@@ -129,12 +128,12 @@ fn scheduled_gesture_inputs_create_real_post_warmup_events_and_recover() {
 fn short_normal_review_fixtures_keep_live_battles_and_real_throw_cells_valid() {
     for scene in ["battle", "npc", "ordnance", "boss", "results"] {
         let mut f = prepared_frontend();
-        let expected = f.game.campaign.arena_geometry();
+        let expected = f.game.campaign().arena_geometry();
         prepare_battle(&mut f, scene);
         if scene == "results" {
-            assert!(f.game.last_result.is_some());
+            assert!(f.game.last_result().is_some());
         } else {
-            let a = f.game.attempt.as_ref().unwrap();
+            let a = f.game.attempt().unwrap();
             assert_eq!((a.lane_count, a.width_yards), expected);
             for s in &a.structures {
                 assert!(s.lane < a.lane_count && s.x() < a.width_yards * 0.5);
@@ -160,27 +159,30 @@ fn short_normal_review_fixtures_keep_live_battles_and_real_throw_cells_valid() {
 fn history_review_uses_real_settlements_and_damage_instead_of_authored_plot_points() {
     let mut f = prepared_frontend();
     prepare_history(&mut f);
-    assert_eq!(f.game.campaign.run_history.len(), 3);
+    assert_eq!(f.game.campaign().run_history.len(), 3);
     assert!(
         f.game
-            .campaign
+            .campaign()
             .run_history
             .iter()
             .any(|r| r.damage_by_source.total() > 0 && r.average_dps > 0.0)
     );
     assert!(f.screen == Screen::History);
-    assert!(f.game.attempt.is_none());
+    assert!(f.game.attempt().is_none());
 }
 #[test]
 fn new_journey_victory_and_liberation_fixtures_use_one_real_settlement_each() {
     for liberated in [false, true] {
         let mut f = crate::ui::test_support::test_frontend();
         f.game = Game::default();
-        f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-        f.game.campaign.choose_start_country("DEU").unwrap();
+        f.game
+            .campaign_mut()
+            .choose_survivor(SurvivorId::Rook)
+            .unwrap();
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
         prepare_journey_victory(&mut f, liberated);
-        assert_eq!(f.game.campaign.run_history.len(), 1);
-        let coins = f.game.campaign.coins;
+        assert_eq!(f.game.campaign().run_history.len(), 1);
+        let coins = f.game.campaign().coins;
         let next = f.game.continue_journey().unwrap();
         assert_eq!(
             next,
@@ -190,7 +192,7 @@ fn new_journey_victory_and_liberation_fixtures_use_one_real_settlement_each() {
                 horde_core::sim::JourneyContinuation::Deployed
             }
         );
-        assert_eq!(f.game.campaign.coins, coins);
-        assert_eq!(f.game.campaign.run_history.len(), 1);
+        assert_eq!(f.game.campaign().coins, coins);
+        assert_eq!(f.game.campaign().run_history.len(), 1);
     }
 }

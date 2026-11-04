@@ -198,9 +198,9 @@ impl FrontendParts {
         let paths = ProfilePaths::from_config(config);
         let profile = LoadedProfile::load(&paths);
         let resumed_practice = config.practice
-            && (profile.game.campaign.selected_survivor.is_some()
-                || profile.game.campaign.attempts > 0
-                || profile.game.campaign.world.start.is_some());
+            && (profile.game.campaign().selected_survivor.is_some()
+                || profile.game.campaign().attempts > 0
+                || profile.game.campaign().world.start.is_some());
         let mut f = Self::new(profile, config, &paths);
         if !resumed_practice {
             super::review::prepare(&mut f);
@@ -226,9 +226,9 @@ impl FrontendParts {
     }
     /// Pure construction: touches no files and no environment variables.
     pub fn new(profile: LoadedProfile, config: &LaunchConfig, paths: &ProfilePaths) -> Self {
-        let profile_exists = profile.game.campaign.selected_survivor.is_some()
-            || profile.game.campaign.attempts > 0
-            || profile.game.campaign.world.start.is_some();
+        let profile_exists = profile.game.campaign().selected_survivor.is_some()
+            || profile.game.campaign().attempts > 0
+            || profile.game.campaign().world.start.is_some();
         let LoadedProfile {
             game,
             settings,
@@ -236,22 +236,25 @@ impl FrontendParts {
             ..
         } = profile;
         let selected_country = game
-            .campaign
+            .campaign()
             .world
             .active
             .clone()
             .unwrap_or_else(|| "DEU".into());
         let initial_aim = [
-            game.attempt.as_ref().map_or_else(
-                || game.campaign.arena_geometry().1 * 0.5,
+            game.attempt().map_or_else(
+                || game.campaign().arena_geometry().1 * 0.5,
                 |a| a.width_yards * 0.5,
             ),
-            game.attempt.as_ref().map_or_else(
-                || f32::from(game.campaign.lane_count()) * 0.5,
+            game.attempt().map_or_else(
+                || f32::from(game.campaign().lane_count()) * 0.5,
                 |a| a.defender_position()[1],
             ),
         ];
-        let preview_survivor = game.campaign.selected_survivor.unwrap_or(SurvivorId::Rook);
+        let preview_survivor = game
+            .campaign()
+            .selected_survivor
+            .unwrap_or(SurvivorId::Rook);
         Self {
             game,
             runtime: Runtime::default(),

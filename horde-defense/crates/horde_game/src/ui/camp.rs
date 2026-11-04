@@ -19,7 +19,7 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
     }
     navigation::camp_navigation(root, f);
     egui::Panel::bottom("camp_status")
-        .min_size(if f.game.campaign.world.start.is_none() {
+        .min_size(if f.game.campaign().world.start.is_none() {
             98.0
         } else {
             118.0
@@ -36,7 +36,7 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
                 briefing::mission_actions(ui, f);
             }
             ui.add_space(5.0);
-            if f.game.campaign.world.start.is_some() {
+            if f.game.campaign().world.start.is_some() {
                 ui.horizontal_wrapped(|ui| {
                     if ui.small_button("Save campaign").clicked() {
                         f.request_save(SaveIntent::Manual);
@@ -116,7 +116,7 @@ fn upgrade_surface(root: &mut egui::Ui, f: &mut UiCtx) {
                     }
                     muted(
                         ui,
-                        if f.game.global_paused {
+                        if f.game.global_paused() {
                             "World paused"
                         } else {
                             "World running"
@@ -153,7 +153,7 @@ fn world_ui(ui: &mut egui::Ui, f: &mut UiCtx) {
     let compact = ui.available_width() < 900.0;
     if compact {
         ui.label(
-            RichText::new(if f.game.campaign.world.start.is_none() {
+            RichText::new(if f.game.campaign().world.start.is_none() {
                 "Choose your starting country"
             } else {
                 "Campaign map"
@@ -164,7 +164,7 @@ fn world_ui(ui: &mut egui::Ui, f: &mut UiCtx) {
     } else {
         chrome::page_title(
             ui,
-            if f.game.campaign.world.start.is_none() {
+            if f.game.campaign().world.start.is_none() {
                 "Choose your starting country"
             } else {
                 "Campaign map"
@@ -245,8 +245,8 @@ fn country_results_with_height(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
                     }
                     if query.is_empty()
                         && country.id != f.campaign.selected_country
-                        && f.game.campaign.world.start.is_some()
-                        && !f.game.campaign.world.can_enter(&country.id)
+                        && f.game.campaign().world.start.is_some()
+                        && !f.game.campaign().world.can_enter(&country.id)
                     {
                         continue;
                     }
@@ -266,12 +266,12 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
     };
     ui.label(RichText::new(&country.name).size(23.0).strong());
     let levels = country.level_count();
-    let cleared = f.game.campaign.world.completed(&country.id);
+    let cleared = f.game.campaign().world.completed(&country.id);
     ui.label(format!(
         "{} defenses · {:.2}× difficulty",
         levels, country.difficulty
     ));
-    if f.game.campaign.world.start.is_some() {
+    if f.game.campaign().world.start.is_some() {
         progress(
             ui,
             cleared as f32 / levels as f32,
@@ -300,27 +300,27 @@ fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(country) = world().country(&f.campaign.selected_country) else {
         return;
     };
-    if f.game.attempt.is_some() {
+    if f.game.attempt().is_some() {
         if primary(ui, "Return to active defense") {
             f.go(Screen::Battle);
             f.battle.fire_latched = false;
         }
         return;
     }
-    let choosing = f.game.campaign.world.start.is_none();
-    if choosing && f.game.campaign.selected_survivor.is_none() {
+    let choosing = f.game.campaign().world.start.is_none();
+    if choosing && f.game.campaign().selected_survivor.is_none() {
         if primary(ui, "Choose survivor first") {
             f.open_survivor_selection();
         }
         return;
     }
     ui.horizontal_wrapped(|ui| {
-        let allowed = choosing || f.game.campaign.world.can_enter(&country.id);
+        let allowed = choosing || f.game.campaign().world.can_enter(&country.id);
         ui.add_enabled_ui(allowed, |ui| {
             if primary(
                 ui,
                 if !choosing
-                    && f.game.campaign.world.completed(&country.id) >= country.level_count()
+                    && f.game.campaign().world.completed(&country.id) >= country.level_count()
                 {
                     "Manage country"
                 } else {
@@ -372,12 +372,8 @@ fn camp_controls(ctx: &egui::Context, f: &mut UiCtx) {
     }
 }
 fn toggle_time(f: &mut UiCtx) {
-    let paused = f.game.global_paused
-        || f.game
-            .attempt
-            .as_ref()
-            .is_some_and(|attempt| attempt.paused);
-    if paused && f.game.attempt.is_some() {
+    let paused = f.game.global_paused() || f.game.attempt().is_some_and(|attempt| attempt.paused);
+    if paused && f.game.attempt().is_some() {
         f.go(Screen::Battle);
         f.battle.construction = false;
     }
@@ -386,12 +382,8 @@ fn toggle_time(f: &mut UiCtx) {
     f.runtime.clear_input();
 }
 fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let paused = f.game.global_paused
-        || f.game
-            .attempt
-            .as_ref()
-            .is_some_and(|attempt| attempt.paused);
-    let label = if paused && f.game.attempt.is_some() {
+    let paused = f.game.global_paused() || f.game.attempt().is_some_and(|attempt| attempt.paused);
+    let label = if paused && f.game.attempt().is_some() {
         "Return and resume defense"
     } else if paused {
         "Resume world clock"
@@ -410,7 +402,7 @@ fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     let fields = f
         .game
-        .battles
+        .battles()
         .iter()
         .filter(|battle| !battle.settled)
         .count();
@@ -422,19 +414,18 @@ fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
             "World running"
         },
     );
-    if fields > 0 || f.game.strategy.active_outbreaks() > 0 {
+    if fields > 0 || f.game.strategy().active_outbreaks() > 0 {
         muted(
             ui,
             format!(
                 "{fields} expeditions · {} alerts",
-                f.game.strategy.active_outbreaks()
+                f.game.strategy().active_outbreaks()
             ),
         );
     }
-    if fields > 0 || f.game.strategy.grand_strategy_unlocked(&f.game.campaign) {
+    if fields > 0 || f.game.strategy().grand_strategy_unlocked(f.game.campaign()) {
         if f.game
-            .attempt
-            .as_ref()
+            .attempt()
             .is_some_and(|attempt| attempt.mode == Mode::Personal)
         {
             muted(ui, "Personal defense · 1×");

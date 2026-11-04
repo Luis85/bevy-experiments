@@ -65,7 +65,7 @@ fn main() -> AppExit {
         return AppExit::error();
     }
     if config.action == launch::LaunchAction::Smoke {
-        match smoke() {
+        match horde_core::sim::desktop_smoke() {
             Ok(report) => println!("{report}"),
             Err(e) => {
                 eprintln!("Smoke failed: {e}");
@@ -168,67 +168,4 @@ fn asset_directory(config: &launch::LaunchConfig) -> std::path::PathBuf {
         }
     }
     std::path::PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets"))
-}
-fn smoke() -> Result<String, String> {
-    use horde_core::{
-        content::{Mode, content},
-        sim::{Game, Input},
-        world::world,
-    };
-    content().validate()?;
-    world().validate()?;
-    let mut game = Game::default();
-    game.campaign
-        .choose_survivor(horde_core::survivors::SurvivorId::Rook)?;
-    game.campaign.choose_start_country("DEU")?;
-    game.deploy_country_stage(0, Mode::Personal)?;
-    game.attempt.as_mut().unwrap().paused = false;
-    for _ in 0..180 {
-        game.tick(Input::default());
-    }
-    let path = std::env::temp_dir().join(format!("lastlight-smoke-{}.json", std::process::id()));
-    game.save(&path)?;
-    let resumed = Game::load(&path)?;
-    if serde_json::to_value(&game).map_err(|e| e.to_string())?
-        != serde_json::to_value(&resumed).map_err(|e| e.to_string())?
-    {
-        return Err("Save changed simulation state".into());
-    }
-    std::fs::remove_file(&path).map_err(|e| e.to_string())?;
-    game.withdraw();
-    if game.campaign.npc_available() {
-        return Err("Fresh campaign unlocked the companion before its tree requirements".into());
-    }
-    let fresh = serde_json::to_value(&game).map_err(|e| e.to_string())?;
-    if game.deploy_country_stage(0, Mode::Npc).is_ok()
-        || serde_json::to_value(&game).map_err(|e| e.to_string())? != fresh
-    {
-        return Err("Locked companion deployment succeeded or mutated fresh state".into());
-    }
-    // Separately retain the old-save autonomous compatibility exercise. Fresh
-    // progression above must not bypass the new authored companion unlock.
-    game.campaign.legacy_features = true;
-    game.deploy_country_stage(0, Mode::Npc)?;
-    game.attempt.as_mut().unwrap().paused = false;
-    for _ in 0..60 * 420 {
-        game.tick(Input::default());
-        if game.attempt.is_none() {
-            break;
-        }
-    }
-    let report = game
-        .last_result
-        .as_ref()
-        .ok_or("NPC attempt did not terminate in seven simulated minutes")?;
-    let baseline = format!(
-        "PASS: {} country profiles; {} encounters; atomic resume identical; fresh companion gate is atomic; legacy autonomous {:?}: {} kills, {} coins in {:.1}s.\n{}",
-        world().countries.len(),
-        content().levels.len(),
-        report.outcome,
-        report.kills,
-        report.coins,
-        report.elapsed,
-        report.cause
-    );
-    Ok(format!("{baseline}\n{}", horde_core::sim::smoke()?))
 }

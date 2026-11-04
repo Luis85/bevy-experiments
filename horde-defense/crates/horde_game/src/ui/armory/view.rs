@@ -38,7 +38,7 @@ pub(super) fn view_model(
     mode: Mode,
     focus: Option<&RecommendationAction>,
 ) -> ArmoryView {
-    let campaign = &game.campaign;
+    let campaign = game.campaign();
     let recommended = match focus {
         Some(RecommendationAction::BuyEquipment(index)) => campaign.shop_offer(*index).ok(),
         _ => None,
@@ -82,11 +82,11 @@ mod tests {
     fn game() -> Game {
         let mut game = Game::default();
         // Three clears open the first four levels (and item tiers).
-        game.campaign.first_clears = horde_core::content::content().levels[..3]
+        game.campaign_mut().first_clears = horde_core::content::content().levels[..3]
             .iter()
             .map(|level| level.id.clone())
             .collect();
-        game.campaign.coins = 500;
+        game.campaign_mut().coins = 500;
         game
     }
 
@@ -94,12 +94,12 @@ mod tests {
     fn view_model_reports_gear_level_and_quartermaster_offers() {
         let game = game();
         let view = view_model(&game, Mode::Personal, None);
-        assert_eq!(view.rank, game.campaign.progression_rank());
-        assert_eq!(view.shop_level, game.campaign.shop_item_level());
-        assert_eq!(view.next_gear_rank, game.campaign.next_gear_level_rank());
+        assert_eq!(view.rank, game.campaign().progression_rank());
+        assert_eq!(view.shop_level, game.campaign().shop_item_level());
+        assert_eq!(view.next_gear_rank, game.campaign().next_gear_level_rank());
         assert_eq!(view.recommended, None);
         assert_eq!(view.equip_focus, None);
-        assert_eq!(view.offers.len(), game.campaign.shop_offers().len());
+        assert_eq!(view.offers.len(), game.campaign().shop_offers().len());
         for offer in &view.offers {
             let authored = &content().items[offer.preview.definition];
             assert_eq!(offer.weapon.is_some(), authored.slot == Slot::Ranged);
@@ -108,7 +108,7 @@ mod tests {
                     training == OfferTraining::Trained,
                     !authored.npc_only
                         && game
-                            .campaign
+                            .campaign()
                             .can_use_weapon(Mode::Personal, offer.preview.definition)
                 );
             }
@@ -118,14 +118,14 @@ mod tests {
     #[test]
     fn view_model_resolves_buy_and_equip_focus() {
         let game = game();
-        let index = game.campaign.shop_offers()[0].definition;
+        let index = game.campaign().shop_offers()[0].definition;
         let view = view_model(
             &game,
             Mode::Personal,
             Some(&RecommendationAction::BuyEquipment(index)),
         );
-        assert_eq!(view.recommended, game.campaign.shop_offer(index).ok());
-        let owned = game.campaign.items[0].id;
+        assert_eq!(view.recommended, game.campaign().shop_offer(index).ok());
+        let owned = game.campaign().items[0].id;
         let view = view_model(
             &game,
             Mode::Personal,

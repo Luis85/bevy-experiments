@@ -157,3 +157,50 @@ pub fn maximum_progression_render_fixture() -> Result<Game, String> {
     validate_game(&g, 0)?;
     Ok(g)
 }
+
+/// Synthetic-scene staging seam: direct mutable access to a [`Game`] for
+/// building review fixtures and the shipped practice scenes (deliberately
+/// staged funds, cleared stages, placed crowds, rewound attempts).
+///
+/// This is not a command because staging is not play: it bypasses every rule
+/// [`Game::apply`] enforces, on purpose, to reach states no legal command
+/// sequence reaches quickly. Frontends must use it only while constructing a
+/// synthetic scene, never on a live player campaign. It is un-gated because
+/// practice scenes ship in every build. Each method consumes the handle so a
+/// call such as `game.staging().campaign().coins = 10` borrows `game` directly.
+pub struct Staging<'a> {
+    game: &'a mut Game,
+}
+impl Game {
+    /// Opens the [`Staging`] seam. See its documentation before using it.
+    pub fn staging(&mut self) -> Staging<'_> {
+        Staging { game: self }
+    }
+}
+impl<'a> Staging<'a> {
+    pub fn campaign(self) -> &'a mut Campaign {
+        &mut self.game.campaign
+    }
+    pub fn attempt(self) -> Option<&'a mut Attempt> {
+        self.game.attempt.as_mut()
+    }
+    /// The attempt slot itself, to take an attempt out, edit it and put it back.
+    pub fn attempt_slot(self) -> &'a mut Option<Attempt> {
+        &mut self.game.attempt
+    }
+    pub fn strategy(self) -> &'a mut crate::strategy::StrategyState {
+        &mut self.game.strategy
+    }
+    /// Strategy and campaign together, for strategy calls that take the campaign.
+    pub fn strategy_and_campaign(
+        self,
+    ) -> (&'a mut crate::strategy::StrategyState, &'a mut Campaign) {
+        (&mut self.game.strategy, &mut self.game.campaign)
+    }
+    pub fn last_result(self) -> &'a mut Option<Report> {
+        &mut self.game.last_result
+    }
+    pub fn battles(self) -> &'a mut Vec<ParallelBattle> {
+        &mut self.game.battles
+    }
+}

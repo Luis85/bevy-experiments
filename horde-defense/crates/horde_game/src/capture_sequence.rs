@@ -80,7 +80,7 @@ pub fn capture_frames(
         commands
             .spawn(Screenshot::primary_window())
             .observe(save_to_disk(directory.join(&file)));
-        let attempt = session.game.attempt.as_ref();
+        let attempt = session.game.attempt();
         use horde_core::sim::EventKind;
         let latest = |kind| {
             attempt.and_then(|attempt| attempt.events.iter().rev().find(|event| event.kind == kind))

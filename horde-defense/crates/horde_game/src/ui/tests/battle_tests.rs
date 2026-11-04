@@ -8,20 +8,20 @@ fn pointer_pause_and_resume_freeze_and_restart_authoritative_ticks() {
     let h = Harness::new();
     let f = &mut fixture.frontend;
     h.click(f, View::Battle, "Pause");
-    assert!(f.game.global_paused);
-    assert!(f.game.attempt.as_ref().unwrap().paused);
+    assert!(f.game.global_paused());
+    assert!(f.game.attempt().unwrap().paused);
     let frozen = serde_json::to_string(&f.game).unwrap();
     for _ in 0..30 {
         f.game.tick(Input::default());
     }
     assert_eq!(serde_json::to_string(&f.game).unwrap(), frozen);
     h.click(f, View::Battle, "Begin defense");
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
     assert!(!f.battle.construction);
     for _ in 0..30 {
         f.game.tick(Input::default());
     }
-    assert_eq!(f.game.attempt.as_ref().unwrap().tick, 30);
+    assert_eq!(f.game.attempt().unwrap().tick, 30);
 }
 
 #[test]
@@ -31,8 +31,8 @@ fn npc_controls_do_not_take_a_permanent_column_from_the_fullscreen_arena() {
         let h = Harness::new();
         settings::configure(&h.ctx, scale);
         let f = &mut fixture.frontend;
-        f.game.campaign.choose_start_country("DEU").unwrap();
-        f.game.campaign.attempts = 1;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.game.campaign_mut().attempts = 1;
         f.game.deploy_country_stage(0, Mode::Npc).unwrap();
         f.screen = Screen::Battle;
         h.frame_size(f, View::Battle, vec![], size);
@@ -58,11 +58,11 @@ fn owned_defense_blueprints_allow_live_building_without_an_automatic_pause() {
     let f = &mut fixture.frontend;
     h.click(f, View::Dossier, "Start journey");
     assert!(!f.battle.construction);
-    assert!(!f.game.attempt.as_ref().unwrap().paused);
+    assert!(!f.game.attempt().unwrap().paused);
     h.click(f, View::Battle, "Build defenses");
     assert!(f.battle.construction);
-    assert!(!f.game.global_paused);
-    assert!(!f.game.attempt.as_ref().unwrap().paused);
+    assert!(!f.game.global_paused());
+    assert!(!f.game.attempt().unwrap().paused);
     assert!(Game::load(&f.paths.campaign()).is_ok());
 }
 
@@ -75,18 +75,18 @@ fn keyboard_pause_and_construction_stop_toggle_firing() {
     let f = &mut fixture.frontend;
     f.battle.fire_latched = true;
     h.key(f, View::Battle, Key::Escape);
-    assert!(f.game.global_paused);
+    assert!(f.game.global_paused());
     assert!(!f.battle.fire_latched);
     h.key(f, View::Battle, Key::Escape);
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
     f.battle.fire_latched = true;
     h.key(f, View::Battle, Key::B);
     assert!(f.battle.construction);
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
     assert!(!f.battle.fire_latched);
     h.key(f, View::Battle, Key::B);
     assert!(!f.battle.construction);
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
 }
 
 #[test]
@@ -95,11 +95,11 @@ fn mouse_reload_button_queues_a_legal_reload_without_firing() {
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.attempt.as_mut().unwrap().ammo = 3;
+    f.game.attempt_mut().unwrap().ammo = 3;
     h.click(f, View::Battle, "Reload");
     assert!(f.battle.pending.reload);
     f.game.tick(f.battle.pending.clone());
-    let a = f.game.attempt.as_ref().unwrap();
+    let a = f.game.attempt().unwrap();
     assert!(a.reload_left > 0);
     assert_eq!(a.ammo, 3);
     assert_eq!(a.shots, 0);
@@ -206,9 +206,9 @@ fn quick_fire_tap_survives_release_and_reaim_before_a_fixed_opportunity() {
             Event::PointerMoved(released),
         ],
     );
-    assert_eq!(f.game.attempt.as_ref().unwrap().shots, 0);
+    assert_eq!(f.game.attempt().unwrap().shots, 0);
     f.step();
-    let attempt = f.game.attempt.as_ref().unwrap();
+    let attempt = f.game.attempt().unwrap();
     assert_eq!(attempt.shots, 1);
     assert_eq!(
         attempt.hits, 1,
@@ -217,7 +217,7 @@ fn quick_fire_tap_survives_release_and_reaim_before_a_fixed_opportunity() {
     for _ in 0..60 {
         f.step();
     }
-    assert_eq!(f.game.attempt.as_ref().unwrap().shots, 1);
+    assert_eq!(f.game.attempt().unwrap().shots, 1);
 }
 
 #[test]
@@ -243,7 +243,7 @@ fn one_render_frame_click_and_motion_uses_the_mouse_press_event_position() {
         ],
     );
     f.step();
-    let attempt = f.game.attempt.as_ref().unwrap();
+    let attempt = f.game.attempt().unwrap();
     assert_eq!(attempt.shots, 1);
     assert_eq!(attempt.hits, 1);
 }
@@ -279,7 +279,7 @@ fn quick_outer_lane_melee_tap_keeps_its_selected_lane_after_release_and_motion()
     let mut strikes = 0;
     for tick in 0..150 {
         f.step();
-        let attempt = f.game.attempt.as_ref().unwrap();
+        let attempt = f.game.attempt().unwrap();
         for event in attempt.events.iter().filter(|event| {
             event.tick == attempt.tick && event.kind == horde_core::sim::EventKind::Melee
         }) {
@@ -311,7 +311,7 @@ fn sidebar_strike_button_uses_the_actual_selected_outer_contact_lane() {
     assert!(f.battle.pending.melee);
     h.publish_combat(f, vec![]);
     f.step();
-    let attempt = f.game.attempt.as_ref().unwrap();
+    let attempt = f.game.attempt().unwrap();
     let event = attempt
         .events
         .iter()
@@ -334,18 +334,18 @@ fn rapid_remapped_fire_taps_coalesce_without_bypassing_the_weapon_cadence() {
         h.publish_combat(f, vec![key_event(Key::Space, false)]);
     }
     f.step();
-    assert_eq!(f.game.attempt.as_ref().unwrap().shots, 1);
+    assert_eq!(f.game.attempt().unwrap().shots, 1);
     for _ in 0..4 {
         h.publish_combat(f, vec![key_event(Key::Space, true)]);
         h.publish_combat(f, vec![key_event(Key::Space, false)]);
         f.step();
     }
-    assert_eq!(f.game.attempt.as_ref().unwrap().shots, 1);
+    assert_eq!(f.game.attempt().unwrap().shots, 1);
     for _ in 0..60 {
         f.step();
     }
     assert_eq!(
-        f.game.attempt.as_ref().unwrap().shots,
+        f.game.attempt().unwrap().shots,
         1,
         "Unready taps cannot become a deferred firing burst"
     );
@@ -364,11 +364,11 @@ fn locked_construction_stays_out_of_the_first_battle_and_explains_the_gate() {
             .iter()
             .all(|shape| text_position(&shape.shape, "Build defenses").is_none())
     );
-    let supply = f.game.attempt.as_ref().unwrap().supply;
+    let supply = f.game.attempt().unwrap().supply;
     h.key(f, View::Battle, Key::B);
-    assert!(!f.game.global_paused);
+    assert!(!f.game.global_paused());
     assert!(!f.battle.construction);
-    assert_eq!(f.game.attempt.as_ref().unwrap().supply, supply);
+    assert_eq!(f.game.attempt().unwrap().supply, supply);
     assert!(f.status.message.contains("first boss clear"));
 }
 
@@ -378,7 +378,7 @@ fn hud_reports_actual_reload_and_outer_lane_damage_without_advancing_them() {
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.attempt.as_mut().unwrap().ammo = 3;
+    f.game.attempt_mut().unwrap().ammo = 3;
     f.game.tick(Input {
         reload: true,
         ..Input::default()
@@ -395,7 +395,7 @@ fn hud_reports_actual_reload_and_outer_lane_damage_without_advancing_them() {
     input_enemy(f, 10, horde_core::sim::DEFENSE_LINE);
     for _ in 0..180 {
         f.game.tick(Input::default());
-        if f.game.attempt.as_ref().unwrap().hp < f.game.attempt.as_ref().unwrap().max_hp {
+        if f.game.attempt().unwrap().hp < f.game.attempt().unwrap().max_hp {
             break;
         }
     }
@@ -436,11 +436,11 @@ fn long_npc_action_is_one_elided_hud_line_without_changing_height_or_authority()
         settings::configure(&h.ctx, scale);
         let f = &mut fixture.frontend;
         f.settings.scale = scale;
-        f.game.campaign.choose_start_country("DEU").unwrap();
-        f.game.campaign.attempts = 1;
+        f.game.campaign_mut().choose_start_country("DEU").unwrap();
+        f.game.campaign_mut().attempts = 1;
         f.game.deploy_country_stage(0, Mode::Npc).unwrap();
         f.screen = Screen::Battle;
-        f.game.attempt.as_mut().unwrap().decision = "Aim at Runner in lane 5".into();
+        f.game.attempt_mut().unwrap().decision = "Aim at Runner in lane 5".into();
         // Egui's first complete panel/legend pass settles its cached sizing
         // (the initial arena differs by one 15-point legend row even without
         // an action change). Compare two established layouts, as native
@@ -449,7 +449,7 @@ fn long_npc_action_is_one_elided_hud_line_without_changing_height_or_authority()
         h.frame_size(f, View::Battle, vec![], size);
         let short_arena = f.battle.arena_rect.unwrap();
         let long = "Attack: shoot Armored survivor in lane 11 — close engagement; preparing a fully aimed follow-up when the shared defense line is safe";
-        f.game.attempt.as_mut().unwrap().decision = long.into();
+        f.game.attempt_mut().unwrap().decision = long.into();
         let before = serde_json::to_value(&f.game).unwrap();
         let output = h.frame_size(f, View::Battle, vec![], size);
         let arena = f.battle.arena_rect.unwrap();
@@ -476,7 +476,7 @@ fn long_npc_action_is_one_elided_hud_line_without_changing_height_or_authority()
             arena
         );
         assert_eq!(
-            f.game.attempt.as_ref().unwrap().decision,
+            f.game.attempt().unwrap().decision,
             long,
             "The complete sidebar/tooltip text must remain available"
         );
@@ -490,12 +490,12 @@ fn battle_management_popup_cannot_leak_reload_or_fire_input() {
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.attempt.as_mut().unwrap().ammo = 4;
+    f.game.attempt_mut().unwrap().ammo = 4;
     h.click(f, View::Battle, "Management");
     h.key(f, View::Battle, Key::R);
     assert!(!f.battle.pending.reload && !f.battle.pending.fire);
-    assert_eq!(f.game.attempt.as_ref().unwrap().ammo, 4);
-    assert_eq!(f.game.attempt.as_ref().unwrap().shots, 0);
+    assert_eq!(f.game.attempt().unwrap().ammo, 4);
+    assert_eq!(f.game.attempt().unwrap().shots, 0);
 }
 
 #[test]
@@ -507,7 +507,7 @@ fn locked_throwables_are_disabled_buttons_that_explain_where_to_learn_them() {
         .all_styles_mut(|style| style.interaction.tooltip_delay = 0.0);
     let f = &mut fixture.frontend;
     let slot = crate::battle_view::OrdnanceSlotView::of(
-        f.game.attempt.as_ref().unwrap(),
+        f.game.attempt().unwrap(),
         horde_core::ordnance::OrdnanceKind::Grenade,
     );
     assert!(!slot.unlocked);
@@ -540,11 +540,11 @@ fn locked_throwables_are_disabled_buttons_that_explain_where_to_learn_them() {
 #[test]
 fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_toggle() {
     let mut fixture = IsolatedFrontend::new();
-    fixture.frontend.game.campaign.coins = 100;
+    fixture.frontend.game.campaign_mut().coins = 100;
     fixture
         .frontend
         .game
-        .campaign
+        .campaign_mut()
         .purchase_node("grenade_training")
         .unwrap();
     fixture.deploy();
@@ -567,7 +567,7 @@ fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_togg
     f.battle.aim = [28.0, 9.0];
     h.publish_combat(f, vec![Event::PointerMoved(art::world(arena, 28.0, 9.0))]);
     f.step();
-    let a = f.game.attempt.as_ref().unwrap();
+    let a = f.game.attempt().unwrap();
     assert_eq!(
         a.ordnance
             .spent(horde_core::ordnance::OrdnanceKind::Grenade),
@@ -580,8 +580,7 @@ fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_togg
     }
     assert_eq!(
         f.game
-            .attempt
-            .as_ref()
+            .attempt()
             .unwrap()
             .ordnance
             .spent(horde_core::ordnance::OrdnanceKind::Grenade),
@@ -596,15 +595,18 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
     fixture.unlock_trap();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.player.level = f.game.campaign.player_level_cap();
-    f.game.campaign.player.points = f.game.campaign.player.level - 1;
-    f.game.campaign.player.xp = 0;
-    f.game.campaign.coins = 100;
-    f.game.campaign.purchase_node("grenade_training").unwrap();
-    f.game.campaign.choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().player.level = f.game.campaign_mut().player_level_cap();
+    f.game.campaign_mut().player.points = f.game.campaign_mut().player.level - 1;
+    f.game.campaign_mut().player.xp = 0;
+    f.game.campaign_mut().coins = 100;
+    f.game
+        .campaign_mut()
+        .purchase_node("grenade_training")
+        .unwrap();
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
     f.game.deploy_country_stage(0, Mode::Personal).unwrap();
     f.screen = Screen::Battle;
-    assert_eq!(f.game.attempt.as_ref().unwrap().lane_count, 17);
+    assert_eq!(f.game.attempt().unwrap().lane_count, 17);
     h.key(f, View::Battle, Key::B);
     assert!(f.battle.construction);
     h.frame(f, View::Battle, vec![]);
@@ -629,8 +631,7 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
     );
     assert!(
         f.game
-            .attempt
-            .as_ref()
+            .attempt()
             .unwrap()
             .structures
             .iter()
@@ -650,13 +651,10 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
     );
     f.step();
     assert_eq!(
-        f.game.attempt.as_ref().unwrap().ordnance.projectiles[0].cell,
+        f.game.attempt().unwrap().ordnance.projectiles[0].cell,
         [20, 16]
     );
-    assert_eq!(
-        f.game.attempt.as_ref().unwrap().defender_position(),
-        [0.5, 8.5]
-    );
+    assert_eq!(f.game.attempt().unwrap().defender_position(), [0.5, 8.5]);
 }
 
 #[test]
@@ -666,7 +664,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
     fixture
         .frontend
         .game
-        .campaign
+        .campaign_mut()
         .set_balance_settings(BalanceSettings::default())
         .unwrap();
     fixture.deploy();
@@ -674,7 +672,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
     let f = &mut fixture.frontend;
     h.frame_size(f, View::Battle, vec![], vec2(1050.0 / 1.35, 700.0 / 1.35));
     let rect = f.battle.arena_rect.unwrap();
-    let a = f.game.attempt.as_ref().unwrap();
+    let a = f.game.attempt().unwrap();
     assert_eq!((a.lane_count, a.width_yards), (3, 12.0));
     assert!(rect.width() < 400.0 && rect.height() < 150.0);
     assert!(rect.height() >= 86.0);

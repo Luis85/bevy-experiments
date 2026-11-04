@@ -41,14 +41,13 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
             let all = ui.max_rect();
             let identity = f
                 .game
-                .campaign
+                .campaign()
                 .selected_survivor
                 .unwrap_or(f.campaign.preview_survivor);
             let lanes = f
                 .game
-                .attempt
-                .as_ref()
-                .map_or_else(|| f.game.campaign.lane_count(), |a| a.lane_count);
+                .attempt()
+                .map_or_else(|| f.game.campaign().lane_count(), |a| a.lane_count);
             checkpoint_scene(
                 ui.painter(),
                 all,
@@ -109,8 +108,8 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                         );
                         ui.add_space(if compact { 16.0 } else { 30.0 });
                         let has_journey = f.status.profile_exists
-                            || f.game.campaign.selected_survivor.is_some()
-                            || f.game.campaign.world.start.is_some();
+                            || f.game.campaign().selected_survivor.is_some()
+                            || f.game.campaign().world.start.is_some();
                         if primary(
                             ui,
                             if has_journey {
@@ -128,12 +127,12 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                         if has_journey && ui.button("New game").clicked() {
                             f.request_new_game();
                         }
-                        if let Some(identity) = f.game.campaign.selected_survivor {
+                        if let Some(identity) = f.game.campaign().selected_survivor {
                             muted(
                                 ui,
                                 format!("{} · checkpoint · {} lanes", identity.name(), lanes),
                             );
-                            if f.game.campaign.world.start.is_none()
+                            if f.game.campaign().world.start.is_none()
                                 && ui.small_button("Change survivor").clicked()
                             {
                                 f.open_survivor_selection();
@@ -148,13 +147,13 @@ pub(super) fn menu(root: &mut egui::Ui, f: &mut UiCtx, time: f32) {
                                 .truncate(),
                             )
                             .on_hover_text("Progress and saves stay separate from your campaign.");
-                        } else if let Some(country) = f.game.campaign.world.active_country() {
+                        } else if let Some(country) = f.game.campaign().world.active_country() {
                             muted(
                                 ui,
                                 format!(
                                     "{} · {} / {} defenses secured",
                                     country.name,
-                                    f.game.campaign.world.completed(&country.id),
+                                    f.game.campaign().world.completed(&country.id),
                                     country.level_count()
                                 ),
                             );
@@ -512,10 +511,13 @@ mod tests {
             f.status.message.clear();
             f.status.save_pending = false;
             if chosen {
-                f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
+                f.game
+                    .campaign_mut()
+                    .choose_survivor(SurvivorId::Rook)
+                    .unwrap();
             }
             if campaign {
-                f.game.campaign.choose_start_country("DEU").unwrap();
+                f.game.campaign_mut().choose_start_country("DEU").unwrap();
             }
             if active {
                 f.game.deploy_country_stage(0, Mode::Personal).unwrap();
@@ -531,8 +533,8 @@ mod tests {
                 );
                 output.textures_delta.clear();
                 let launch = if f.status.profile_exists
-                    || f.game.campaign.selected_survivor.is_some()
-                    || f.game.campaign.world.start.is_some()
+                    || f.game.campaign().selected_survivor.is_some()
+                    || f.game.campaign().world.start.is_some()
                 {
                     "Resume journey"
                 } else {

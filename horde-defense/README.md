@@ -123,7 +123,10 @@ cargo clippy --locked -p horde-defense --all-targets --no-default-features -- -D
 cargo clippy --locked -p horde-defense --all-targets --features dev -- -D warnings
 cargo test --locked --workspace
 cargo test --locked -p horde-defense --features dev
+cargo run --locked -p horde-defense -- --smoke
 ```
+
+Tests stage state through `horde_core`'s `test-support` feature (`campaign_mut()` and friends); it is a dev-dependency only, so the game itself mutates core state through `Game::apply` and the seams in [ARCHITECTURE.md](docs/ARCHITECTURE.md#mutation-path).
 
 ### Launch options and features
 

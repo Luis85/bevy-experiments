@@ -177,15 +177,15 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
         AMBER,
         "Applies to the NEXT RUN. Current fields keep their saved settings.",
     );
-    let (lanes, width) = f.game.campaign.arena_geometry();
+    let (lanes, width) = f.game.campaign().arena_geometry();
     muted(
         ui,
         format!(
             "Saved next deployment: {} · {lanes} lanes · {width:.0} yd path",
-            f.game.campaign.balance_settings.preset.name()
+            f.game.campaign().balance_settings.preset.name()
         ),
     );
-    if let Some(a) = f.game.attempt.as_ref() {
+    if let Some(a) = f.game.attempt() {
         muted(
             ui,
             format!(
@@ -197,7 +197,7 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
         );
     }
     let apply = {
-        let committed = &f.game.campaign.balance_settings;
+        let committed = &f.game.campaign().balance_settings;
         let draft = f
             .prefs
             .balance_draft
@@ -261,7 +261,7 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
         if let Err(error) = &valid {
             ui.colored_label(RED, error);
         }
-        let (draft_lanes, draft_width) = draft.geometry(f.game.campaign.player.level);
+        let (draft_lanes, draft_width) = draft.geometry(f.game.campaign().player.level);
         muted(
             ui,
             format!(

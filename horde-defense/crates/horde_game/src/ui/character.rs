@@ -14,8 +14,8 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
         "Character",
         "Personal combat develops through the journey upgrade tree.",
     );
-    let p = f.game.campaign.player.clone();
-    let profile = f.game.campaign.profile(Mode::Personal);
+    let p = f.game.campaign().player.clone();
+    let profile = f.game.campaign().profile(Mode::Personal);
     let (preview, _) =
         ui.allocate_exact_size(vec2(ui.available_width().min(260.0), 110.0), Sense::hover());
     crate::visual_assets::defender_preview(
@@ -27,19 +27,19 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
         preview.right_center(),
     );
     ui.horizontal_wrapped(|ui| {
-        if f.game.campaign.legacy_features {
+        if f.game.campaign().legacy_features {
             ui.strong(format!("{} legacy CP available in the tree", p.points));
         }
         ui.label(format!(
             "Level {} · body development in the upgrade tree",
             p.level
         ));
-        if f.game.campaign.legacy_features {
+        if f.game.campaign().legacy_features {
             muted(
                 ui,
                 format!(
                     "Legacy CP payment rank limit {}",
-                    f.game.campaign.body_cap()
+                    f.game.campaign().body_cap()
                 ),
             );
         }
@@ -48,7 +48,7 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
         progress(
             ui,
             1.0,
-            format!("MAX · level {}", f.game.campaign.player_level_cap()),
+            format!("MAX · level {}", f.game.campaign().player_level_cap()),
             AMBER,
         );
         muted(
@@ -66,10 +66,10 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     ui.label(format!(
         "Next deployment: {} lanes · {:.0} yd path",
-        f.game.campaign.arena_geometry().0,
-        f.game.campaign.arena_geometry().1
+        f.game.campaign().arena_geometry().0,
+        f.game.campaign().arena_geometry().1
     ));
-    if let Some(level) = f.game.campaign.next_lane_unlock_level() {
+    if let Some(level) = f.game.campaign().next_lane_unlock_level() {
         muted(
             ui,
             format!(
@@ -86,7 +86,7 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
     if ui.button("Open journey upgrades").clicked() {
         f.open_upgrades();
     }
-    let development = f.game.campaign.modifiers().body_development;
+    let development = f.game.campaign().modifiers().body_development;
     for (index, name) in [
         "Vitality",
         "Strength",
@@ -118,12 +118,12 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     });
     egui::CollapsingHeader::new("Current equipment & advancement rules").show(ui, |ui| {
-        for slot in Slot::ALL { ui.label(format!("{:?}: {}", slot, f.game.campaign.equipped(Mode::Personal, slot).name)); }
+        for slot in Slot::ALL { ui.label(format!("{:?}: {}", slot, f.game.campaign().equipped(Mode::Personal, slot).name)); }
         muted(ui, "Body-development nodes share one journey tree. Legacy point payments and refunds remain in that tree; Mara retains separate training.");
     });
 }
 pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let npc = &f.game.campaign.npc;
+    let npc = &f.game.campaign().npc;
     let mut proposed = NpcTactics {
         policy: npc.policy,
         prefer_aim: npc.prefer_aim,
@@ -164,16 +164,16 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
         "Mara Vale",
         "Train and equip your autonomous defender, then review her tactical policy.",
     );
-    if !f.game.campaign.npc_available() {
+    if !f.game.campaign().npc_available() {
         ui.colored_label(AMBER, "Mara joins after your introductory attempt.");
     }
-    let n = f.game.campaign.npc.clone();
+    let n = f.game.campaign().npc.clone();
     ui.horizontal_wrapped(|ui| {
         ui.strong(format!("{} CP available", n.unspent));
         ui.label(format!(
             "{} / {} advancement awarded",
             n.awarded,
-            f.game.campaign.allowance()
+            f.game.campaign().allowance()
         ));
         ui.label(format!(
             "Guns {} · Melee {} · HP {} · FP {} · Dodge {}",
@@ -186,7 +186,7 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
     chrome::section(ui, "Training");
     ui.horizontal_wrapped(|ui| {
-        if ui.add_enabled(f.game.campaign.coins >= 25 && n.awarded < f.game.campaign.allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(Command::BuyNpcPoint, "Training point awarded."); }
+        if ui.add_enabled(f.game.campaign().coins >= 25 && n.awarded < f.game.campaign().allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(Command::BuyNpcPoint, "Training point awarded."); }
         if ui.button("Change Mara's equipment").clicked() { f.campaign.mode = Mode::Npc; f.open_preparation(Tab::Armory); }
     });
     muted(

@@ -202,16 +202,19 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
     }
 }
 pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
-    if f.tab != Tab::Briefing && f.game.attempt.is_none() && f.game.campaign.world.start.is_some() {
+    if f.tab != Tab::Briefing
+        && f.game.attempt().is_none()
+        && f.game.campaign().world.start.is_some()
+    {
         if primary(
             ui,
-            if f.game.campaign.journey_active {
+            if f.game.campaign().journey_active {
                 "Back to journey upgrades"
             } else {
                 "Back to world map"
             },
         ) {
-            if f.game.campaign.journey_active {
+            if f.game.campaign().journey_active {
                 f.open_upgrades();
             } else {
                 f.open_campaign();
@@ -219,13 +222,13 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
         return;
     }
-    if f.game.attempt.is_some() {
+    if f.game.attempt().is_some() {
         if primary(ui, "Return to active defense") {
             f.go(Screen::Battle);
         }
         return;
     }
-    let Some(country) = f.game.campaign.world.active_country() else {
+    let Some(country) = f.game.campaign().world.active_country() else {
         if primary(ui, "Choose a country") {
             f.go_tab(Tab::World);
         }
@@ -234,7 +237,7 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
     let name = country.name.clone();
     f.campaign.stage = f.campaign.stage.min(
         f.game
-            .campaign
+            .campaign()
             .world
             .completed(&country.id)
             .min(country.level_count() - 1),

@@ -131,13 +131,13 @@ fn older_checkpoint_fields_default_without_resetting_actions_or_creating_levelle
         serde_json::to_vec(&serde_json::json!({"version":1,"checksum":checksum,"payload":payload}))
             .unwrap();
     let resumed = Game::decode_save_generation(&bytes).unwrap();
-    assert_eq!(resumed.campaign.selected_survivor, Some(SurvivorId::Rook));
-    assert!(resumed.campaign.items.iter().all(|item| item.level == 1));
-    let a = resumed.attempt.unwrap();
+    assert_eq!(resumed.campaign().selected_survivor, Some(SurvivorId::Rook));
+    assert!(resumed.campaign().items.iter().all(|item| item.level == 1));
+    let a = resumed.attempt().unwrap();
     assert_eq!(a.progression, ProgressionSnapshot::default());
     assert_eq!(a.profile.appearance, Appearance::Male);
-    assert_eq!(a.ammo, g.attempt.as_ref().unwrap().ammo);
-    assert_eq!(a.shot_cooldown, g.attempt.as_ref().unwrap().shot_cooldown);
+    assert_eq!(a.ammo, g.attempt().unwrap().ammo);
+    assert_eq!(a.shot_cooldown, g.attempt().unwrap().shot_cooldown);
 }
 
 #[test]
@@ -204,24 +204,24 @@ fn item_levels_change_both_profiles_without_transferring_personal_skills_or_brea
 #[test]
 fn grouped_spawns_and_frozen_scaling_survive_pause_and_checkpoint_without_catch_up() {
     let mut g = legacy_game();
-    g.campaign.choose_start_country("USA").unwrap();
+    g.campaign_mut().choose_start_country("USA").unwrap();
     for stage in 0..6 {
-        g.campaign.world.record_clear(stage).unwrap();
-        g.campaign.first_clear(stage % 5, Mode::Personal);
+        g.campaign_mut().world.record_clear(stage).unwrap();
+        g.campaign_mut().first_clear(stage % 5, Mode::Personal);
     }
     g.deploy_country_stage(6, Mode::Personal).unwrap();
     g.set_paused(false);
-    let snapshot = g.attempt.as_ref().unwrap().progression.clone();
+    let snapshot = g.attempt().unwrap().progression.clone();
     assert_eq!(snapshot.rank, 6);
     assert_eq!(snapshot.batch_size, 3);
     assert_eq!(snapshot.item_level, 4);
     for _ in 0..1200 {
         g.tick(Input::default());
-        if !g.attempt.as_ref().unwrap().enemies.is_empty() {
+        if !g.attempt().unwrap().enemies.is_empty() {
             break;
         }
     }
-    let a = g.attempt.as_ref().unwrap();
+    let a = g.attempt().unwrap();
     assert_eq!(a.enemies.len(), 3);
     assert!(
         a.enemies
@@ -251,9 +251,9 @@ fn grouped_spawns_and_frozen_scaling_survive_pause_and_checkpoint_without_catch_
         serde_json::to_string(&g).unwrap(),
         serde_json::to_string(&resumed).unwrap()
     );
-    assert_eq!(g.attempt.as_ref().unwrap().progression, snapshot);
+    assert_eq!(g.attempt().unwrap().progression, snapshot);
     let mut invalid = g;
-    invalid.attempt.as_mut().unwrap().progression.batch_size = 0;
+    invalid.attempt_mut().unwrap().progression.batch_size = 0;
     assert!(invalid.save(&path).is_err());
     std::fs::remove_file(&path).unwrap();
     if path.with_extension("bak").exists() {
@@ -264,10 +264,10 @@ fn grouped_spawns_and_frozen_scaling_survive_pause_and_checkpoint_without_catch_
 #[test]
 fn staged_maximum_crowd_uses_the_frozen_population_cap_and_all_enemies_are_visible() {
     let mut g = horde_core::sim::maximum_progression_render_fixture().unwrap();
-    let a = g.attempt.as_ref().unwrap();
+    let a = g.attempt().unwrap();
     assert_eq!(a.progression.rank, catalog().max_rank);
     assert_eq!(a.lane_count, catalog().max_lanes);
-    assert!(g.campaign.player.is_max_level());
+    assert!(g.campaign().player.is_max_level());
     assert_eq!(a.enemy_cap(), catalog().population_global_cap);
     assert_eq!(a.enemies.len(), a.enemy_cap() + 1);
     assert!(a.enemies.iter().all(|e| e.in_view()));
@@ -283,12 +283,12 @@ fn staged_maximum_crowd_uses_the_frozen_population_cap_and_all_enemies_are_visib
 fn eight_real_country_defenses_are_achievable_with_earned_levelled_shop_gear_in_both_modes() {
     for mode in [Mode::Personal, Mode::Npc] {
         let mut g = Game::default();
-        g.seed = 2026;
-        g.campaign.attempts = 1;
-        g.campaign.choose_start_country("USA").unwrap();
+        g.set_seed(2026);
+        g.campaign_mut().attempts = 1;
+        g.campaign_mut().choose_start_country("USA").unwrap();
         if mode == Mode::Npc {
-            g.campaign.legacy_features = true;
-            g.campaign.npc.policy = Policy::BossFocus;
+            g.campaign_mut().legacy_features = true;
+            g.campaign_mut().npc.policy = Policy::BossFocus;
         }
         let mut last_rate = 0.0;
         let mut last_boss = 0;
@@ -297,18 +297,18 @@ fn eight_real_country_defenses_are_achievable_with_earned_levelled_shop_gear_in_
             for retry in 0..6 {
                 smoke_prepare(&mut g, mode).unwrap();
                 g.deploy_country_stage(stage, mode).unwrap();
-                let a = g.attempt.as_ref().unwrap();
+                let a = g.attempt().unwrap();
                 assert_eq!(a.progression.rank, stage as u32);
                 assert!(a.arrival_rate() >= last_rate);
                 last_rate = a.arrival_rate();
                 let boss_floor = a.progression.boss_health_floor;
                 assert!(boss_floor >= last_boss);
                 last_boss = boss_floor;
-                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap] {
-                    for lane in horde_core::sim::construction_lane_order(
-                        g.attempt.as_ref().unwrap().lane_count,
-                    ) {
-                        if g.attempt.as_ref().unwrap().supply
+                if mode == Mode::Npc && g.campaign().blueprints[StructureKind::Trap] {
+                    for lane in
+                        horde_core::sim::construction_lane_order(g.attempt().unwrap().lane_count)
+                    {
+                        if g.attempt().unwrap().supply
                             >= content().structure(StructureKind::Trap).supply
                         {
                             g.place(StructureKind::Trap, lane, 0).unwrap();
@@ -317,13 +317,13 @@ fn eight_real_country_defenses_are_achievable_with_earned_levelled_shop_gear_in_
                 }
                 g.set_paused(false);
                 for _ in 0..60 * 600 {
-                    if g.attempt.is_none() {
+                    if g.attempt().is_none() {
                         break;
                     }
                     let input = smoke_input(&g);
                     g.tick(input);
                 }
-                let report = g.last_result.as_ref().expect("bounded earned encounter");
+                let report = g.last_result().expect("bounded earned encounter");
                 eprintln!(
                     "{mode:?} country stage{} retry{} {:?} {:.1}s {} coins",
                     stage + 1,
@@ -343,15 +343,15 @@ fn eight_real_country_defenses_are_achievable_with_earned_levelled_shop_gear_in_
                 stage + 1
             );
         }
-        assert_eq!(g.campaign.world.completed("USA"), 8);
-        assert_eq!(g.campaign.progression_rank(), 8);
-        assert!(g.campaign.items.iter().any(|item| item.level >= 4));
+        assert_eq!(g.campaign().world.completed("USA"), 8);
+        assert_eq!(g.campaign().progression_rank(), 8);
+        assert!(g.campaign().items.iter().any(|item| item.level >= 4));
         let equipped = g
-            .campaign
+            .campaign()
             .item(if mode == Mode::Personal {
-                g.campaign.player.loadout[Slot::Ranged.index()]
+                g.campaign().player.loadout[Slot::Ranged.index()]
             } else {
-                g.campaign.npc.loadout[Slot::Ranged.index()]
+                g.campaign().npc.loadout[Slot::Ranged.index()]
             })
             .unwrap();
         assert!(equipped.level >= 4);

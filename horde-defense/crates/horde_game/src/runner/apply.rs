@@ -138,8 +138,10 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
     let old = ctx.game.clone();
     let mut fresh = Game::default();
     fresh
-        .campaign
-        .set_balance_settings(old.campaign.balance_settings.clone())?;
+        .apply(&horde_core::command::Command::SetBalance(
+            old.campaign().balance_settings.clone(),
+        ))
+        .map_err(|e| e.to_string())?;
     let cancelled = {
         let runtime = &mut *ctx.runtime;
         let mut cancelled = runtime.storage.reset(old, fresh, path)?;

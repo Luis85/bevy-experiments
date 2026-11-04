@@ -65,7 +65,7 @@ pub(super) fn reset_new_battle(
     if !std::mem::take(&mut nav.battle_reset) {
         return;
     }
-    if let Some(a) = game.attempt.as_ref() {
+    if let Some(a) = game.attempt() {
         battle.aim = [a.width_yards * 0.5, a.defender_position()[1]];
         campaign.mode = a.mode;
     }
@@ -175,8 +175,7 @@ impl UiCtx<'_> {
             RuntimeNotice::SimulationFinished => {
                 self.campaign.mode = self
                     .game
-                    .last_result
-                    .as_ref()
+                    .last_result()
                     .map_or(self.campaign.mode, |r| r.mode);
                 self.focus_next_upgrade();
                 self.go(Screen::Results);
@@ -273,8 +272,7 @@ impl UiCtx<'_> {
             AppCommand::Game(Command::Withdraw) => {
                 self.campaign.mode = self
                     .game
-                    .last_result
-                    .as_ref()
+                    .last_result()
                     .map_or(self.campaign.mode, |r| r.mode);
                 self.go(Screen::Results);
                 self.focus_next_upgrade();
@@ -291,9 +289,9 @@ impl UiCtx<'_> {
             }
             AppCommand::Game(Command::EnterCountry(id)) => {
                 self.campaign.selected_country = id;
-                self.campaign.stage = self.game.campaign.world.next_stage();
+                self.campaign.stage = self.game.campaign().world.next_stage();
                 self.status.profile_exists = true;
-                if self.game.attempt.is_some() {
+                if self.game.attempt().is_some() {
                     self.start_battle();
                 } else {
                     self.open_preparation(Tab::Briefing);

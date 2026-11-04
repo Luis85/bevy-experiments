@@ -6,19 +6,19 @@ fn item_sale_requires_review_and_confirmation_before_changing_the_wallet() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    let id = f.game.campaign.add_item(4).unwrap();
+    let id = f.game.campaign_mut().add_item(4).unwrap();
     let price = content().items[4].sell_value;
     h.click(f, View::Armory, &format!("Review sale · {price}"));
     assert_eq!(f.armory.pending_sale, Some(id));
-    assert!(f.game.campaign.item(id).is_some());
-    assert_eq!(f.game.campaign.coins, 0);
+    assert!(f.game.campaign().item(id).is_some());
+    assert_eq!(f.game.campaign().coins, 0);
     h.click(f, View::Armory, "Keep item");
     assert!(f.armory.pending_sale.is_none());
-    assert!(f.game.campaign.item(id).is_some());
+    assert!(f.game.campaign().item(id).is_some());
     h.click(f, View::Armory, &format!("Review sale · {price}"));
     h.click(f, View::Armory, "Confirm item sale");
-    assert!(f.game.campaign.item(id).is_none());
-    assert_eq!(f.game.campaign.coins, price);
+    assert!(f.game.campaign().item(id).is_none());
+    assert_eq!(f.game.campaign().coins, price);
     assert!(f.armory.pending_sale.is_none());
 }
 
@@ -27,13 +27,16 @@ fn preset_sale_warning_names_the_actual_reference_before_confirmation() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.coins = 65;
-    f.game.campaign.purchase_node("quick_reload").unwrap();
-    f.game.campaign.purchase_node("rifle_training").unwrap();
-    let id = f.game.campaign.add_item(4).unwrap();
-    f.game.campaign.equip(Mode::Personal, id).unwrap();
+    f.game.campaign_mut().coins = 65;
+    f.game.campaign_mut().purchase_node("quick_reload").unwrap();
     f.game
-        .campaign
+        .campaign_mut()
+        .purchase_node("rifle_training")
+        .unwrap();
+    let id = f.game.campaign_mut().add_item(4).unwrap();
+    f.game.campaign_mut().equip(Mode::Personal, id).unwrap();
+    f.game
+        .campaign_mut()
         .save_preset("Patrol rifle".into(), Mode::Personal)
         .unwrap();
     let price = content().items[4].sell_value;
@@ -43,10 +46,15 @@ fn preset_sale_warning_names_the_actual_reference_before_confirmation() {
         &shape.shape,
         "These presets will be incomplete: Patrol rifle"
     )));
-    assert!(f.game.campaign.item(id).is_some());
+    assert!(f.game.campaign().item(id).is_some());
     h.click(f, View::Armory, "Confirm item sale");
-    assert_eq!(f.game.campaign.player.loadout[0], 5);
-    assert!(f.game.campaign.apply_preset(1, Mode::Personal).is_err());
+    assert_eq!(f.game.campaign().player.loadout[0], 5);
+    assert!(
+        f.game
+            .campaign_mut()
+            .apply_preset(1, Mode::Personal)
+            .is_err()
+    );
 }
 
 #[test]
@@ -55,7 +63,7 @@ fn large_armory_renders_only_visible_rows_and_filters_without_discarding_items()
     let h = Harness::new();
     let f = &mut fixture.frontend;
     for _ in 0..1000 {
-        f.game.campaign.add_item(4).unwrap();
+        f.game.campaign_mut().add_item(4).unwrap();
     }
     let output = h.frame(f, View::Armory, vec![]);
     let rows = output
@@ -81,7 +89,7 @@ fn large_armory_renders_only_visible_rows_and_filters_without_discarding_items()
             .iter()
             .any(|shape| shape_has_text(&shape.shape, "Showing 0 of 1005 items"))
     );
-    assert_eq!(f.game.campaign.items.len(), 1005);
+    assert_eq!(f.game.campaign().items.len(), 1005);
 }
 
 #[test]
@@ -89,8 +97,8 @@ fn recommended_market_item_is_visible_and_purchased_only_after_explicit_input() 
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.first_clear(0, Mode::Personal);
-    f.game.campaign.coins = 200;
+    f.game.campaign_mut().first_clear(0, Mode::Personal);
+    f.game.campaign_mut().coins = 200;
     let index = content()
         .items
         .iter()
@@ -106,16 +114,16 @@ fn recommended_market_item_is_visible_and_purchased_only_after_explicit_input() 
         &format!("Recommended: {}", content().items[index].name)
     )));
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
-    let count = f.game.campaign.items.len();
-    let coins = f.game.campaign.coins;
+    let count = f.game.campaign().items.len();
+    let coins = f.game.campaign().coins;
     h.click(
         f,
         View::Armory,
         &format!("Buy · {} coins", content().items[index].buy_value),
     );
-    assert_eq!(f.game.campaign.items.len(), count + 1);
+    assert_eq!(f.game.campaign().items.len(), count + 1);
     assert_eq!(
-        f.game.campaign.coins,
+        f.game.campaign().coins,
         coins - content().items[index].buy_value
     );
     assert!(f.campaign.improvement_focus.is_none());
@@ -126,17 +134,20 @@ fn leveled_equipment_ui_uses_the_same_price_and_comparison_as_the_transaction() 
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.choose_start_country("DEU").unwrap();
-    f.game.campaign.coins = 1000;
-    f.game.campaign.purchase_node("quick_reload").unwrap();
-    f.game.campaign.purchase_node("rifle_training").unwrap();
-    let rifle = f.game.campaign.buy_item(4).unwrap();
-    f.game.campaign.equip(Mode::Personal, rifle).unwrap();
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().coins = 1000;
+    f.game.campaign_mut().purchase_node("quick_reload").unwrap();
+    f.game
+        .campaign_mut()
+        .purchase_node("rifle_training")
+        .unwrap();
+    let rifle = f.game.campaign_mut().buy_item(4).unwrap();
+    f.game.campaign_mut().equip(Mode::Personal, rifle).unwrap();
     // Real replay victories raise threat; merely marking country clears no
     // longer stands in for completed runs under the current progression rule.
     for _ in 0..6 {
         f.game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let mut attempt = f.game.attempt.take().unwrap();
+        let mut attempt = f.game.attempt_slot_mut().take().unwrap();
         attempt.boss_spawned = true;
         let lane = attempt.lane_count / 2;
         f.game.spawn_enemy(
@@ -149,31 +160,28 @@ fn leveled_equipment_ui_uses_the_same_price_and_comparison_as_the_transaction() 
         let boss = attempt.enemies.last_mut().unwrap();
         boss.x = target[0];
         boss.hp = 1;
-        f.game.attempt = Some(attempt);
+        *f.game.attempt_slot_mut() = Some(attempt);
         f.game.tick(Input {
             aim: target,
             fire: true,
             ..Input::default()
         });
-        assert!(f.game.attempt.is_none());
-        assert_eq!(
-            f.game.last_result.as_ref().unwrap().outcome,
-            Outcome::Victory
-        );
+        assert!(f.game.attempt().is_none());
+        assert_eq!(f.game.last_result().unwrap().outcome, Outcome::Victory);
     }
-    assert_eq!(f.game.campaign.victories, 6);
-    f.game.campaign.coins = 1000;
+    assert_eq!(f.game.campaign().victories, 6);
+    f.game.campaign_mut().coins = 1000;
     let definition = content()
         .items
         .iter()
         .position(|i| i.slot == Slot::Ranged && i.tier == 1)
         .unwrap();
-    let price = f.game.campaign.buy_price(definition).unwrap();
-    let id = f.game.campaign.buy_item(definition).unwrap();
-    let item_level = f.game.campaign.item(id).unwrap().level;
+    let price = f.game.campaign().buy_price(definition).unwrap();
+    let id = f.game.campaign_mut().buy_item(definition).unwrap();
+    let item_level = f.game.campaign().item(id).unwrap().level;
     assert!(item_level > 1);
-    assert_eq!(f.game.campaign.coins, 1000 - price);
-    let effective = f.game.campaign.effective_item(id).unwrap();
+    assert_eq!(f.game.campaign().coins, 1000 - price);
+    let effective = f.game.campaign().effective_item(id).unwrap();
     assert!(effective.personal.damage > content().items[definition].personal.damage);
     f.armory.selected_item = Some(id);
     let output = h.frame(f, View::Armory, vec![]);
@@ -185,7 +193,7 @@ fn leveled_equipment_ui_uses_the_same_price_and_comparison_as_the_transaction() 
     );
     assert_eq!(
         f.game
-            .campaign
+            .campaign()
             .compare_item(Mode::Personal, id)
             .unwrap()
             .after
@@ -207,23 +215,23 @@ fn quality_names_and_filter_sort_use_owned_quality_without_awarding_anything() {
         .unwrap();
     let poor = f
         .game
-        .campaign
+        .campaign_mut()
         .add_item_with_quality(definition, 2, Some(Quality::Poor))
         .unwrap();
     let legendary = f
         .game
-        .campaign
+        .campaign_mut()
         .add_item_with_quality(definition, 2, Some(Quality::Legendary))
         .unwrap();
     assert!(
         f.game
-            .campaign
+            .campaign()
             .effective_item(legendary)
             .unwrap()
             .personal
             .damage
             > f.game
-                .campaign
+                .campaign()
                 .effective_item(poor)
                 .unwrap()
                 .personal
@@ -263,10 +271,10 @@ fn visible_quality_drop_receipts_never_grant_the_item_or_coins_twice() {
     let quality = horde_core::quality::Quality::Rare;
     let id = f
         .game
-        .campaign
+        .campaign_mut()
         .add_item_with_quality(4, 2, Some(quality))
         .unwrap();
-    let a = f.game.attempt.as_mut().unwrap();
+    let a = f.game.attempt_mut().unwrap();
     a.loot_events.push(horde_core::quality::LootEvent {
         item_id: id,
         definition: horde_core::content::ItemDefId::at(4),
@@ -295,7 +303,7 @@ fn visible_quality_drop_receipts_never_grant_the_item_or_coins_twice() {
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
     assert_eq!(
         f.game
-            .campaign
+            .campaign()
             .items
             .iter()
             .filter(|item| item.id == id)
@@ -328,16 +336,19 @@ fn equip_buttons_and_equipped_labels_share_one_status_column() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.coins = 65;
-    f.game.campaign.purchase_node("quick_reload").unwrap();
-    f.game.campaign.purchase_node("rifle_training").unwrap();
+    f.game.campaign_mut().coins = 65;
+    f.game.campaign_mut().purchase_node("quick_reload").unwrap();
+    f.game
+        .campaign_mut()
+        .purchase_node("rifle_training")
+        .unwrap();
     // Names of different lengths must not move the status column.
     for definition in 0..content().items.len().min(4) {
-        f.game.campaign.add_item(definition).unwrap();
+        f.game.campaign_mut().add_item(definition).unwrap();
     }
     // Newest first: the equipped rifle is the top visible row.
-    let rifle = f.game.campaign.add_item(4).unwrap();
-    f.game.campaign.equip(Mode::Personal, rifle).unwrap();
+    let rifle = f.game.campaign_mut().add_item(4).unwrap();
+    f.game.campaign_mut().equip(Mode::Personal, rifle).unwrap();
     // An equipped selection keeps the comparison header out of this check.
     f.armory.selected_item = Some(rifle);
     let output = h.frame(f, View::Armory, vec![]);
@@ -361,12 +372,15 @@ fn equipped_selection_says_so_instead_of_repeating_identical_columns() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.coins = 65;
-    f.game.campaign.purchase_node("quick_reload").unwrap();
-    f.game.campaign.purchase_node("rifle_training").unwrap();
-    let rifle = f.game.campaign.add_item(4).unwrap();
-    let spare = f.game.campaign.add_item(4).unwrap();
-    f.game.campaign.equip(Mode::Personal, rifle).unwrap();
+    f.game.campaign_mut().coins = 65;
+    f.game.campaign_mut().purchase_node("quick_reload").unwrap();
+    f.game
+        .campaign_mut()
+        .purchase_node("rifle_training")
+        .unwrap();
+    let rifle = f.game.campaign_mut().add_item(4).unwrap();
+    let spare = f.game.campaign_mut().add_item(4).unwrap();
+    f.game.campaign_mut().equip(Mode::Personal, rifle).unwrap();
     let has = |output: &FullOutput, text: &str| {
         output.shapes.iter().any(|s| shape_has_text(&s.shape, text))
     };
@@ -375,9 +389,9 @@ fn equipped_selection_says_so_instead_of_repeating_identical_columns() {
     assert!(has(&output, crate::ui::armory::CURRENTLY_EQUIPPED));
     assert!(has(&output, "Current loadout"));
     assert!(!has(&output, "With this item"));
-    let before = f.game.campaign.player.loadout;
+    let before = f.game.campaign().player.loadout;
     h.click(f, View::Armory, "Equip selected");
-    assert_eq!(f.game.campaign.player.loadout, before);
+    assert_eq!(f.game.campaign().player.loadout, before);
     f.armory.selected_item = Some(spare);
     let output = h.frame(f, View::Armory, vec![]);
     assert!(!has(&output, crate::ui::armory::CURRENTLY_EQUIPPED));

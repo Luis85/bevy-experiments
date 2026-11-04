@@ -5,14 +5,14 @@ use super::*;
 fn continuing_from_the_menu_preserves_a_saved_world_pause() {
     let mut fixture = IsolatedFrontend::new();
     let f = &mut fixture.frontend;
-    f.game.campaign.choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
     f.game.set_paused(true);
     f.screen = Screen::Menu;
     let before = serde_json::to_value(&f.game).unwrap();
     f.act(|c| c.resume());
     f.flush_for_test();
     assert!(f.screen == Screen::Camp);
-    assert!(f.game.global_paused);
+    assert!(f.game.global_paused());
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }
 
@@ -23,7 +23,7 @@ fn new_game_requires_confirmation_archives_previous_progress_and_restarts_surviv
     let h = Harness::new();
     let f = &mut fixture.frontend;
     f.game.set_paused(true);
-    f.game.campaign.coins = 91;
+    f.game.campaign_mut().coins = 91;
     f.screen = Screen::Menu;
     f.settings.scale = 1.1;
     f.game.save(&f.paths.campaign()).unwrap();
@@ -37,10 +37,10 @@ fn new_game_requires_confirmation_archives_previous_progress_and_restarts_surviv
     h.click(f, View::Menu, "New game");
     h.click(f, View::Menu, "Start new journey");
     assert!(f.screen == Screen::SurvivorSelection);
-    assert!(f.game.campaign.selected_survivor.is_none());
-    assert!(f.game.campaign.world.start.is_none());
-    assert_eq!(f.game.campaign.coins, 0);
-    assert!(!f.game.campaign.journey_active);
+    assert!(f.game.campaign().selected_survivor.is_none());
+    assert!(f.game.campaign().world.start.is_none());
+    assert_eq!(f.game.campaign().coins, 0);
+    assert!(!f.game.campaign().journey_active);
     assert_eq!(f.settings.scale, 1.1);
     let archive = std::fs::read_dir(
         f.paths

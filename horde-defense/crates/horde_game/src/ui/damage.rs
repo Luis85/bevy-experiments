@@ -167,7 +167,7 @@ fn motion(age: f64, reduced: bool) -> (f32, f32, f32) {
     (scale, rise, fade)
 }
 pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
-    if let Some(a) = f.game.attempt.as_ref() {
+    if let Some(a) = f.game.attempt() {
         draw_for(
             ui,
             a,
@@ -288,7 +288,7 @@ mod tests {
     use horde_core::sim::Game;
     fn fixture() -> Game {
         let mut game = Game::default();
-        game.campaign.choose_start_country("DEU").unwrap();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
         game.deploy_country_stage(0, Mode::Personal).unwrap();
         game
     }
@@ -309,12 +309,12 @@ mod tests {
     #[test]
     fn resolved_damage_merges_once_and_survives_accelerated_simulation_ticks_for_real_time() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.events.clear();
         a.events.push_back(hit(a, 20, EventKind::Hit, 1));
         a.events.push_back(hit(a, 10, EventKind::WeakPoint, 2));
         let before = serde_json::to_value(&game).unwrap();
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let mut stream = Stream::default();
         stream.observe(a, 10.0, true, false);
         assert_eq!(stream.active.len(), 1);
@@ -329,12 +329,12 @@ mod tests {
     #[test]
     fn identical_results_are_distinct_by_sequence_and_each_presents_once() {
         let mut game = fixture();
-        let a = game.attempt.as_mut().unwrap();
+        let a = game.attempt_mut().unwrap();
         a.events.clear();
         // Two pellets with identical tick, target, value and geometry.
         a.events.push_back(hit(a, 20, EventKind::Hit, 1));
         a.events.push_back(hit(a, 20, EventKind::Hit, 2));
-        let a = game.attempt.as_ref().unwrap();
+        let a = game.attempt().unwrap();
         let mut stream = Stream::default();
         stream.observe(a, 10.0, true, false);
         assert_eq!(stream.active.len(), 1);

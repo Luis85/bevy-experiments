@@ -11,7 +11,7 @@ fn history_is_reachable_from_menu_camp_and_results_without_repaying_settled_runs
         f.game.tick(Input::default());
     }
     f.game.withdraw();
-    assert_eq!(f.game.campaign.run_history.len(), 1);
+    assert_eq!(f.game.campaign().run_history.len(), 1);
     f.game.set_paused(true);
     let before = serde_json::to_value(&f.game).unwrap();
     f.screen = Screen::Menu;
@@ -69,7 +69,7 @@ fn empty_history_aligns_its_filters_and_offers_a_next_step() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    assert!(f.game.campaign.run_history.is_empty());
+    assert!(f.game.campaign().run_history.is_empty());
     f.screen = Screen::History;
     let output = h.frame(f, View::History, vec![]);
     assert!(

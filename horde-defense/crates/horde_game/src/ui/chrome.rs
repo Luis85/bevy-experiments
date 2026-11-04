@@ -21,17 +21,17 @@ pub(super) fn section(ui: &mut egui::Ui, title: &str) {
 pub(super) fn defender_name<'a>(f: &UiCtx<'a>) -> &'a str {
     if f.campaign.mode == Mode::Personal {
         f.game
-            .campaign
+            .campaign()
             .selected_survivor
             .map_or("You", SurvivorId::name)
     } else {
-        &f.game.campaign.npc.name
+        &f.game.campaign().npc.name
     }
 }
 pub(super) fn mode_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
     if !f
         .game
-        .campaign
+        .campaign()
         .has_feature(horde_core::skill_catalog::CampaignFeature::Companion)
     {
         f.campaign.mode = Mode::Personal;
@@ -41,12 +41,12 @@ pub(super) fn mode_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
     ui.horizontal_wrapped(|ui| {
         ui.label("Defender");
         ui.selectable_value(&mut f.campaign.mode, Mode::Personal, "You");
-        let available = f.game.campaign.npc_available();
+        let available = f.game.campaign().npc_available();
         ui.add_enabled_ui(available, |ui| {
             ui.selectable_value(
                 &mut f.campaign.mode,
                 Mode::Npc,
-                f.game.campaign.npc.name.clone(),
+                f.game.campaign().npc.name.clone(),
             );
         })
         .response

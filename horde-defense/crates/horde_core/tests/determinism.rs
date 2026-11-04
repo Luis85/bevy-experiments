@@ -61,11 +61,11 @@ fn run(seed: u64, mode: Mode) -> Game {
 /// `observe` sees the game after every tick.
 fn run_observed(seed: u64, mode: Mode, mut observe: impl FnMut(&Game)) -> Game {
     let mut g = Game::default();
-    g.seed = seed;
-    g.campaign.attempts = 1;
+    g.set_seed(seed);
+    g.campaign_mut().attempts = 1;
     if mode == Mode::Npc {
-        g.campaign.legacy_features = true;
-        g.campaign.npc.policy = Policy::BossFocus;
+        g.campaign_mut().legacy_features = true;
+        g.campaign_mut().npc.policy = Policy::BossFocus;
     }
     g.deploy(0, mode).unwrap();
     g.set_paused(false);
@@ -82,7 +82,7 @@ fn seeded_headless_runs_keep_their_pinned_gameplay_traces() {
     for (seed, mode, expected) in GAMEPLAY_TRACE {
         let mut hash = support::fnv1a(b"");
         run_observed(seed, mode, |g| {
-            let a = g.attempt.as_ref().unwrap();
+            let a = g.attempt().unwrap();
             let line = format!(
                 "t{} hp{} coins{} e{:?} ev{:?}\n",
                 a.tick,
@@ -128,7 +128,7 @@ fn golden_runs_exercise_a_live_battle_and_depend_on_the_seed() {
     for seed in SEEDS {
         for mode in [Mode::Personal, Mode::Npc] {
             let g = run(seed, mode);
-            let a = g.attempt.as_ref().expect("battle is still running");
+            let a = g.attempt().expect("battle is still running");
             assert_eq!(a.tick, u64::from(TICKS));
             assert!(a.telemetry.spawned > 0);
             digests.insert(g.state_digest());

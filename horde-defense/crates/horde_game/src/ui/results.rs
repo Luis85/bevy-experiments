@@ -9,17 +9,17 @@ use horde_core::campaign::UpgradeFocus;
 use horde_core::skill_catalog::CampaignFeature;
 use horde_core::{command::Command, content::Mode, sim::Outcome, world::world};
 fn continue_label(f: &UiCtx) -> &'static str {
-    if !f.game.campaign.journey_active || f.game.last_result.is_none() {
+    if !f.game.campaign().journey_active || f.game.last_result().is_none() {
         return "Choose a country";
     }
-    match f.game.last_result.as_ref() {
+    match f.game.last_result() {
         Some(report) if report.outcome == Outcome::Victory => {
             if report
                 .country_id
                 .as_deref()
                 .and_then(|id| world().country(id))
                 .is_some_and(|country| {
-                    f.game.campaign.world.completed(&country.id) >= country.level_count()
+                    f.game.campaign().world.completed(&country.id) >= country.level_count()
                 })
             {
                 "Choose next country"
@@ -47,14 +47,14 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
         .show(root, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(RichText::new("Journey upgrades").size(26.0).strong());
-                ui.colored_label(AMBER, format!("{} coins", f.game.campaign.coins));
+                ui.colored_label(AMBER, format!("{} coins", f.game.campaign().coins));
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if ui.button("Settings").clicked() {
                         f.open_settings();
                     }
                 });
             });
-            if let Some(report) = &f.game.last_result {
+            if let Some(report) = f.game.last_result() {
                 let label = match report.outcome {
                     Outcome::Victory => "Victory",
                     Outcome::Defeat => "Retreated to camp",
@@ -75,8 +75,7 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
             }
             if let Some(report) = f
                 .game
-                .last_result
-                .as_ref()
+                .last_result()
                 .filter(|r| r.outcome != Outcome::Victory)
             {
                 ui.add(
@@ -99,7 +98,7 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
                     )
                     .clicked()
                 {
-                    if f.game.campaign.journey_active && f.game.last_result.is_some() {
+                    if f.game.campaign().journey_active && f.game.last_result().is_some() {
                         f.dispatch(Command::ContinueJourney, "Journey continued.");
                     } else {
                         f.open_campaign();
@@ -110,13 +109,9 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
                     f.status.save_pending = true;
                 }
                 if ui.button("Equipment").clicked() {
-                    f.campaign.mode = f
-                        .game
-                        .last_result
-                        .as_ref()
-                        .map_or(Mode::Personal, |r| r.mode);
+                    f.campaign.mode = f.game.last_result().map_or(Mode::Personal, |r| r.mode);
                     f.armory.sort = armory::ArmorySort::Newest;
-                    f.armory.selected_item = f.game.campaign.items.last().map(|i| i.id);
+                    f.armory.selected_item = f.game.campaign().items.last().map(|i| i.id);
                     f.open_preparation(Tab::Armory);
                 }
                 if ui.button("Run analysis").clicked() {
@@ -127,7 +122,7 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
                         f.open_campaign();
                         ui.close();
                     }
-                    if (f.game.campaign.legacy_features || f.game.campaign.victories > 0)
+                    if (f.game.campaign().legacy_features || f.game.campaign().victories > 0)
                         && ui.button("Plan or replay a defense").clicked()
                     {
                         f.open_preparation(Tab::Briefing);
@@ -149,13 +144,13 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
                         if (if feature == CampaignFeature::Operations {
                             f.operations_available()
                         } else {
-                            f.game.campaign.has_feature(feature)
+                            f.game.campaign().has_feature(feature)
                         }) && ui.button(label).clicked()
                         {
                             if feature == CampaignFeature::Construction {
                                 f.campaign.improvement_focus = f
                                     .game
-                                    .campaign
+                                    .campaign()
                                     .recommendation_fallback(UpgradeFocus::Fortification)
                                     .map(|r| r.action);
                             }

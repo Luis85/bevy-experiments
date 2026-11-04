@@ -20,13 +20,13 @@ fn doomed_run(seed: u64) -> Game {
         Mode::Npc
     };
     let mut g = game(mode);
-    g.seed = seed;
+    g.set_seed(seed);
     for n in 0..(seed % 4) {
         enemy(&mut g, (n % 11) as u8, 9.0 + n as f32, false);
-        g.attempt.as_mut().unwrap().enemies.last_mut().unwrap().hp = 0;
+        g.attempt_mut().unwrap().enemies.last_mut().unwrap().hp = 0;
     }
     enemy(&mut g, 5, 20.0, true);
-    let a = g.attempt.as_mut().unwrap();
+    let a = g.attempt_mut().unwrap();
     a.boss_spawned = true;
     let boss = a.enemies.iter_mut().find(|e| e.boss).unwrap();
     boss.injury.unconscious = true;
@@ -38,28 +38,28 @@ fn doomed_run(seed: u64) -> Game {
 fn run_rewards_are_granted_exactly_once() {
     for seed in SEEDS {
         let mut g = doomed_run(seed);
-        let coins = g.campaign.coins;
-        let history = g.campaign.run_history.len();
+        let coins = g.campaign().coins;
+        let history = g.campaign().run_history.len();
         for _ in 0..10 {
             g.tick(Input::default());
-            if g.attempt.is_none() {
+            if g.attempt().is_none() {
                 break;
             }
         }
-        assert!(g.attempt.is_none(), "seed {seed}: run did not finish");
-        let paid = g.campaign.coins;
+        assert!(g.attempt().is_none(), "seed {seed}: run did not finish");
+        let paid = g.campaign().coins;
         assert!(paid > coins, "seed {seed}: boss kill pays");
-        assert_eq!(g.campaign.run_history.len(), history + 1, "seed {seed}");
-        let items = g.campaign.items.clone();
-        let attempts = g.campaign.attempts;
+        assert_eq!(g.campaign().run_history.len(), history + 1, "seed {seed}");
+        let items = g.campaign().items.clone();
+        let attempts = g.campaign().attempts;
         // Neither time, nor recalling an already-finished run, pays again.
         advance(&mut g, 30);
         g.withdraw();
         advance(&mut g, 30);
-        assert_eq!(g.campaign.coins, paid, "seed {seed}");
-        assert_eq!(g.campaign.items, items, "seed {seed}");
-        assert_eq!(g.campaign.attempts, attempts, "seed {seed}");
-        assert_eq!(g.campaign.run_history.len(), history + 1, "seed {seed}");
+        assert_eq!(g.campaign().coins, paid, "seed {seed}");
+        assert_eq!(g.campaign().items, items, "seed {seed}");
+        assert_eq!(g.campaign().attempts, attempts, "seed {seed}");
+        assert_eq!(g.campaign().run_history.len(), history + 1, "seed {seed}");
     }
 }
 
@@ -68,33 +68,36 @@ fn coins_never_go_negative_overflow_or_drop_without_a_purchase() {
     let mut rng = Rng::new(0xC0FFEE);
     for seed in SEEDS {
         let mut g = game(Mode::Personal);
-        g.seed = seed;
-        let mut last = g.campaign.coins;
+        g.set_seed(seed);
+        let mut last = g.campaign().coins;
         let mut last_attempt = 0;
         for _ in 0..(120 + seed % 120) {
             let input = smoke_input(&g);
             g.tick(input);
-            if let Some(a) = &g.attempt {
+            if let Some(a) = g.attempt() {
                 assert!(a.coins >= last_attempt, "seed {seed}: attempt coins fell");
                 last_attempt = a.coins;
             }
-            assert!(g.campaign.coins >= last, "seed {seed}: coins fell by play");
-            last = g.campaign.coins;
+            assert!(
+                g.campaign().coins >= last,
+                "seed {seed}: coins fell by play"
+            );
+            last = g.campaign().coins;
         }
         // Saturating rewards: a near-max balance cannot wrap.
-        g.campaign.coins = u64::MAX - rng.below(50);
-        g.campaign.reward(1_000_000, 0, Mode::Personal);
-        assert_eq!(g.campaign.coins, u64::MAX, "seed {seed}");
+        g.campaign_mut().coins = u64::MAX - rng.below(50);
+        g.campaign_mut().reward(1_000_000, 0, Mode::Personal);
+        assert_eq!(g.campaign().coins, u64::MAX, "seed {seed}");
         // A purchase either fails and changes nothing, or costs exactly its price.
         let mut buyer = Game::default();
-        buyer.campaign.coins = rng.below(400);
-        let before = buyer.campaign.coins;
-        match buyer.campaign.buy_item(4) {
+        buyer.campaign_mut().coins = rng.below(400);
+        let before = buyer.campaign().coins;
+        match buyer.campaign_mut().buy_item(4) {
             Ok(_) => {
                 let price = horde_core::content::content().items[4].buy_value;
-                assert_eq!(buyer.campaign.coins, before - price, "seed {seed}");
+                assert_eq!(buyer.campaign().coins, before - price, "seed {seed}");
             }
-            Err(_) => assert_eq!(buyer.campaign.coins, before, "seed {seed}"),
+            Err(_) => assert_eq!(buyer.campaign().coins, before, "seed {seed}"),
         }
     }
 }
@@ -110,7 +113,7 @@ fn save_load_save_is_byte_equal() {
             Mode::Npc
         };
         let mut g = game(mode);
-        g.seed = seed;
+        g.set_seed(seed);
         for _ in 0..(seed % 150) {
             let input = smoke_input(&g);
             g.tick(input);
@@ -149,15 +152,17 @@ fn save_load_save_is_byte_equal() {
 fn settling_twice_changes_nothing() {
     for seed in SEEDS {
         let mut g = strategic_game();
-        g.seed = seed;
-        let country = g.campaign.world.cleared[0].clone();
+        g.set_seed(seed);
+        let country = g.campaign().world.cleared[0].clone();
         for _ in 0..=(seed % 2) {
-            let recruit = g.strategy.recruit(&mut g.campaign, &country).unwrap();
+            let recruit = g
+                .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+                .unwrap();
             g.deploy_survivor(recruit, &country, 0).unwrap();
         }
-        for b in &mut g.battles {
-            enemy(&mut b.game, 5, 20.0, true);
-            let a = b.game.attempt.as_mut().unwrap();
+        for b in g.battles_mut() {
+            enemy(b.game_mut(), 5, 20.0, true);
+            let a = b.game_mut().attempt_mut().unwrap();
             a.boss_spawned = true;
             a.enemies
                 .iter_mut()
@@ -167,19 +172,19 @@ fn settling_twice_changes_nothing() {
                 .unconscious = true;
         }
         advance(&mut g, 1);
-        assert!(g.battles.iter().all(|b| b.settled), "seed {seed}");
+        assert!(g.battles().iter().all(|b| b.settled), "seed {seed}");
         let settled = (
-            g.campaign.coins,
-            g.campaign.items.clone(),
-            g.campaign.run_history.len(),
-            g.campaign.reserved_items.clone(),
+            g.campaign().coins,
+            g.campaign().items.clone(),
+            g.campaign().run_history.len(),
+            g.campaign().reserved_items.clone(),
         );
         advance(&mut g, 5);
         let again = (
-            g.campaign.coins,
-            g.campaign.items.clone(),
-            g.campaign.run_history.len(),
-            g.campaign.reserved_items.clone(),
+            g.campaign().coins,
+            g.campaign().items.clone(),
+            g.campaign().run_history.len(),
+            g.campaign().reserved_items.clone(),
         );
         assert_eq!(settled, again, "seed {seed}: second settlement pass paid");
         assert!(g.take_settlement_issues().is_empty(), "seed {seed}");
@@ -190,10 +195,12 @@ fn settling_twice_changes_nothing() {
 fn event_sequence_numbers_strictly_increase_per_battle() {
     for seed in SEEDS {
         let mut g = strategic_game();
-        g.seed = seed;
-        let country = g.campaign.world.cleared[0].clone();
+        g.set_seed(seed);
+        let country = g.campaign().world.cleared[0].clone();
         for _ in 0..=(seed % 2) {
-            let recruit = g.strategy.recruit(&mut g.campaign, &country).unwrap();
+            let recruit = g
+                .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+                .unwrap();
             g.deploy_survivor(recruit, &country, 0).unwrap();
         }
         g.set_paused(false);
@@ -201,9 +208,9 @@ fn event_sequence_numbers_strictly_increase_per_battle() {
         let mut seen = 0;
         for tick in 0..200 {
             if tick == 3 {
-                for b in &mut g.battles {
-                    enemy(&mut b.game, 5, 20.0, true);
-                    let a = b.game.attempt.as_mut().unwrap();
+                for b in g.battles_mut() {
+                    enemy(b.game_mut(), 5, 20.0, true);
+                    let a = b.game_mut().attempt_mut().unwrap();
                     a.boss_spawned = true;
                     a.enemies
                         .iter_mut()
@@ -231,7 +238,7 @@ fn event_sequence_numbers_strictly_increase_per_battle() {
         assert!(!last.is_empty(), "seed {seed}");
         // A root (non-expedition) battle numbers its own stream the same way.
         let mut root = game(Mode::Npc);
-        root.seed = seed;
+        root.set_seed(seed);
         enemy(&mut root, 5, 8.0, false);
         let mut previous = None;
         for _ in 0..200 {
