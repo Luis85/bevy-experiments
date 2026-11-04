@@ -315,7 +315,10 @@ impl<'a> Graph<'a> {
             let tip = *points.last().expect("nonempty route");
             let direction = (tip - points[points.len() - 2]).normalized();
             let start = points[0];
-            let lead = (points[1] - start).normalized();
+            // The label sits beyond the stub's far end, along its overall
+            // direction, so a stub with a short bend never puts the label
+            // over the child's icon.
+            let lead = (tip - start).normalized();
             painter.add(egui::Shape::line(points, stroke));
             let wing = egui::vec2(-direction.y, direction.x) * 4.0;
             painter.line_segment([tip, tip - direction * 8.0 + wing], stroke);
@@ -519,7 +522,14 @@ impl<'a> Graph<'a> {
             ui.ctx().request_repaint();
         }
         let painter = ui.painter().with_clip_rect(mini.intersect(ui.clip_rect()));
-        painter.rect_filled(mini, 0.0, Color32::from_rgb(7, 11, 11));
+        // Translucent at rest so nodes under the corner stay readable; opaque
+        // while the pointer is on it, when the overview is what you read.
+        let backdrop = if response.hovered() || response.dragged() {
+            Color32::from_rgb(7, 11, 11)
+        } else {
+            Color32::from_rgba_unmultiplied(7, 11, 11, 150)
+        };
+        painter.rect_filled(mini, 0.0, backdrop);
         painter.rect_stroke(
             mini,
             0.0,
@@ -566,10 +576,11 @@ impl<'a> Graph<'a> {
     }
 }
 
-/// Bottom-right overview rectangle, sized to the layout's aspect ratio.
+/// Bottom-right overview rectangle, sized to the layout's aspect ratio and
+/// kept small so it covers only a few percent of the canvas.
 fn minimap_rect(canvas: Rect, bounds: egui::Vec2) -> Option<Rect> {
-    let width = (canvas.width() * 0.24).min(190.0);
-    let height = (width * bounds.y / bounds.x).min(canvas.height() * 0.38);
+    let width = (canvas.width() * 0.16).min(150.0);
+    let height = (width * bounds.y / bounds.x).min(canvas.height() * 0.25);
     let width = width.min(height * bounds.x / bounds.y);
     (width >= 60.0 && height >= 40.0).then(|| {
         Rect::from_min_size(
@@ -1286,5 +1297,52 @@ mod tests {
         )
         .unwrap();
         assert!(mini.width() <= 190.0 && mini.right() < 1000.0 && mini.bottom() < 600.0);
+    }
+
+    #[test]
+    fn the_minimap_keeps_most_of_the_canvas_corner_free() {
+        let bounds = vec2(6640.0, 4730.0);
+        // Desktop canvas and the compact canvas at 1050x700 @ 1.35.
+        for canvas in [vec2(1040.0, 600.0), vec2(740.0, 300.0)] {
+            let canvas = Rect::from_min_size(pos2(0.0, 0.0), canvas);
+            let mini = minimap_rect(canvas, bounds).unwrap();
+            let share = mini.area() / canvas.area();
+            assert!(share <= 0.04, "{canvas:?}: minimap covers {share:.3}");
+            assert!(canvas.contains_rect(mini));
+        }
+    }
+
+    #[test]
+    fn every_body_attribute_draws_its_own_pictogram() {
+        use std::collections::BTreeMap;
+        let catalog = horde_core::skill_catalog::skills();
+        let mut by_attribute: BTreeMap<String, std::collections::BTreeSet<String>> =
+            BTreeMap::new();
+        for node in catalog
+            .nodes
+            .iter()
+            .filter(|n| n.branch == "Body development")
+        {
+            let attribute = node.name.rsplit_once(' ').map_or("", |(name, _)| name);
+            by_attribute
+                .entry(attribute.to_owned())
+                .or_default()
+                .insert(node.icon.clone());
+        }
+        assert_eq!(by_attribute.len(), 5, "{by_attribute:?}");
+        let mut seen = std::collections::BTreeSet::new();
+        for (attribute, icons) in &by_attribute {
+            assert_eq!(
+                icons.len(),
+                1,
+                "{attribute} ranks share one icon: {icons:?}"
+            );
+            let icon = icons.first().unwrap();
+            assert!(
+                !matches!(skill_icon(icon), Icon::Firearm),
+                "{attribute} draws the default pistol ({icon})"
+            );
+            assert!(seen.insert(icon.clone()), "{attribute} repeats {icon}");
+        }
     }
 }
