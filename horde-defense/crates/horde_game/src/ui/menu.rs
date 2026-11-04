@@ -298,10 +298,15 @@ fn checkpoint_scene(
             },
             ..Default::default()
         };
+        let Some(shambler) =
+            crate::visual_assets::Actor::enemy(horde_core::enemy_catalog::VisualSprite::Shambler)
+        else {
+            continue;
+        };
         crate::visual_assets::actor_animated(
             &p,
             textures,
-            crate::visual_assets::Actor::Shambler,
+            shambler,
             point,
             vec2(r.height() * 0.026, r.height() * 0.043),
             Color32::from_rgba_unmultiplied(99, 113, 101, 110),

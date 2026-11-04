@@ -85,7 +85,9 @@ pub fn project_player_socket(
 pub fn prepare_player_models(context: &bevy_egui::egui::Context) -> Result<(), String> {
     crate::player_model::backend_egui::textures(context).map(|_| ())
 }
+pub mod enemy_visuals;
 mod ground_material;
+use enemy_visuals::{EnemySprite, SpriteArt, WalkArt};
 
 static FLASH_MASKS: OnceLock<FlashMasks> = OnceLock::new();
 static RIG_ATLAS: OnceLock<RigAtlas> = OnceLock::new();
@@ -93,15 +95,37 @@ static RIG_ATLAS: OnceLock<RigAtlas> = OnceLock::new();
 /// Cached geometry derived from the unchanged source alpha, never a new raster.
 #[derive(Debug)]
 pub struct FlashMasks {
-    walkers: Vec<FlashMask>,
-    actors: Vec<FlashMask>,
+    /// Per enemy sprite (catalogue order): one mask per gait frame or standing pose.
+    enemies: Vec<Vec<FlashMask>>,
+    /// Player and companion standing poses.
+    survivors: Vec<FlashMask>,
 }
 #[derive(Debug)]
 struct FlashMask {
     runs: Vec<[f32; 4]>,
 }
 impl FlashMask {
+    /// Bounds are clipped to the real image, so a mismatched replacement sheet
+    /// yields a smaller (or empty) mask rather than an out-of-range read.
     fn from_rgba(width: u32, pixels: &[u8], bounds: [f32; 4]) -> Self {
+        let height = if width == 0 {
+            0
+        } else {
+            (pixels.len() / 4 / width as usize) as u32
+        };
+        let clip = |value: f32, limit: u32| {
+            if value.is_finite() {
+                (value.max(0.0) as u32).min(limit) as f32
+            } else {
+                0.0
+            }
+        };
+        let bounds = [
+            clip(bounds[0], width),
+            clip(bounds[1], height),
+            clip(bounds[2], width),
+            clip(bounds[3], height),
+        ];
         let mut runs = Vec::new();
         // A conservative 2x2 block is lit only when every source pixel is solid.
         // Transparent RGB noise cannot become a rectangular additive glow.
@@ -145,18 +169,84 @@ impl FlashMasks {
             .data
             .as_deref()
             .expect("RGBA actor pixels remain available");
+        let catalog = enemy_visuals::active();
+        let enemy_art_fits = enemy_art_problem(Some(walkers), Some(actors)).is_none();
         Self {
-            walkers: WALK_SPECS
+            enemies: catalog
+                .sprites()
                 .iter()
-                .flat_map(|spec| spec.frames.iter())
-                .map(|frame| FlashMask::from_rgba(walkers.width(), walk_pixels, frame.bounds))
+                .map(|sprite| match &sprite.art {
+                    // Rejected art keeps per-sprite slots but has no masks.
+                    _ if !enemy_art_fits => Vec::new(),
+                    SpriteArt::Walk(walk) => walk
+                        .frames
+                        .iter()
+                        .map(|frame| {
+                            FlashMask::from_rgba(walkers.width(), walk_pixels, frame.bounds)
+                        })
+                        .collect(),
+                    SpriteArt::Standing(art) => {
+                        vec![FlashMask::from_rgba(
+                            actors.width(),
+                            actor_pixels,
+                            art.bounds,
+                        )]
+                    }
+                })
                 .collect(),
-            actors: ACTOR_RECTS[..5]
+            survivors: SURVIVOR_RECTS
                 .iter()
                 .map(|bounds| FlashMask::from_rgba(actors.width(), actor_pixels, *bounds))
                 .collect(),
         }
     }
+}
+
+/// Why the loaded sheets cannot back the enemy mapping, if they cannot: each
+/// sheet a sprite is measured on must have exactly the declared pixel size and
+/// contain every rectangle. Checks only the sheets that have loaded.
+fn enemy_art_problem(walkers: Option<&Image>, actors: Option<&Image>) -> Option<String> {
+    for sprite in enemy_visuals::active().sprites() {
+        let (image, name, rects): (_, _, Vec<[f32; 4]>) = match &sprite.art {
+            SpriteArt::Walk(walk) => (
+                walkers,
+                "walkers-v1.png",
+                walk.frames.iter().map(|frame| frame.bounds).collect(),
+            ),
+            SpriteArt::Standing(art) => (actors, "actors-v1.png", vec![art.bounds]),
+        };
+        let Some(image) = image else {
+            continue;
+        };
+        let size = [image.width() as f32, image.height() as f32];
+        if size != sprite.source_size {
+            return Some(format!(
+                "{name} is {}x{} but enemy visuals declare {:?} for {:?}",
+                image.width(),
+                image.height(),
+                sprite.source_size,
+                sprite.sprite
+            ));
+        }
+        if rects
+            .iter()
+            .any(|r| r[2] > size[0] || r[3] > size[1] || r[0] < 0.0 || r[1] < 0.0)
+        {
+            return Some(format!("{:?} art leaves {name}", sprite.sprite));
+        }
+    }
+    None
+}
+/// Logs a rejected enemy mapping once; the battlefield then uses fallback figures.
+fn enemy_art_rejected(walkers: Option<&Image>, actors: Option<&Image>) -> bool {
+    static REPORTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+    let Some(problem) = enemy_art_problem(walkers, actors) else {
+        return false;
+    };
+    if !REPORTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+        error!("Enemy sprite art disabled: {problem}");
+    }
+    true
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -223,8 +313,10 @@ pub struct ArtTextures {
     pub props: Option<TextureId>,
     pub keyart: Option<TextureId>,
     pub ground: Option<TextureId>,
-    pub walkers: [Option<WalkSheet>; 5],
+    pub walkers: Option<WalkSheet>,
     pub flash_masks: Option<&'static FlashMasks>,
+    /// The loaded sheets do not match `enemy_visuals.json`: draw fallback figures.
+    pub enemy_art_rejected: bool,
     /// Weapon and ordnance icon atlas (legacy defender rig sheet; no bodies are drawn from it).
     pub rig: Option<RigSheet>,
     pub menu_idle: Option<TextureId>,
@@ -386,24 +478,34 @@ pub fn register(
         props: texture(1, &visuals.props),
         keyart: texture(2, &visuals.keyart),
         ground: texture(3, &visuals.ground),
-        walkers: [sheet; 5],
+        walkers: sheet,
         flash_masks,
+        enemy_art_rejected: enemy_art_rejected(
+            images.get(&visuals.walkers),
+            images.get(&visuals.actors),
+        ),
         rig,
         menu_idle: texture(6, &visuals.menu_idle),
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Actor {
-    Shambler,
-    Runner,
-    Brute,
-    Armored,
-    Demolisher,
-    Breacher,
     Player,
     Mara,
-    Caller,
-    SiegeBrute,
+    /// Data-driven enemy art from `assets/art/enemy_visuals.json`.
+    Enemy(&'static EnemySprite),
+}
+impl Actor {
+    pub fn enemy(sprite: horde_core::enemy_catalog::VisualSprite) -> Option<Self> {
+        enemy_visuals::active().get(sprite).map(Actor::Enemy)
+    }
+    fn survivor_index(self) -> Option<usize> {
+        match self {
+            Actor::Player => Some(0),
+            Actor::Mara => Some(1),
+            Actor::Enemy(_) => None,
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Prop {
@@ -430,29 +532,17 @@ pub enum Prop {
 // all more-opaque hands, boots and equipment are enclosed with 3-4px padding.
 // Hips are the median solid pixels in the 51-64% torso band. Each gait keeps
 // its row's deepest boot baseline; passing feet are never pulled to the floor.
-const ACTOR_SIZE: [f32; 2] = [1774., 887.];
+/// Survivor sheet size; startup requires `enemy_visuals.json` to declare the same.
+pub(crate) const ACTOR_SIZE: [f32; 2] = [1774., 887.];
 const PROP_SIZE: [f32; 2] = [1261., 1247.];
-const WALK_SIZE: [f32; 2] = [1122., 1402.];
 const GROUND_SIZE: [f32; 2] = [2172., 724.];
 const KEYART_RATIO: f32 = 1672. / 941.;
-const ACTOR_RECTS: [[f32; 4]; 8] = [
-    [72., 47., 396., 430.],
-    [506., 58., 826., 432.],
-    [917., 10., 1293., 435.],
-    [1371., 10., 1700., 432.],
-    [10., 447., 428., 877.],
-    [496., 513., 816., 837.],
-    [925., 517., 1257., 835.],
-    [1342., 619., 1768., 758.],
-];
-// Solid torso median, deepest boot and occupied height for each standing actor.
-const ACTOR_ANCHORS: [[f32; 3]; 5] = [
-    [195., 427., 377.],
-    [622., 429., 368.],
-    [1109., 432., 419.],
-    [1577., 429., 416.],
-    [204., 874., 424.],
-];
+// Enemy cells, anchors and gaits live in `assets/art/enemy_visuals.json`.
+const SURVIVOR_RECTS: [[f32; 4]; 2] = [[72., 47., 396., 430.], [506., 58., 826., 432.]];
+// Solid torso median, deepest boot and occupied height for each standing survivor.
+const SURVIVOR_ANCHORS: [[f32; 3]; 2] = [[195., 427., 377.], [622., 429., 368.]];
+const PORTRAIT_RECTS: [[f32; 4]; 2] = [[496., 513., 816., 837.], [925., 517., 1257., 835.]];
+const CORPSE_RECT: [f32; 4] = [1342., 619., 1768., 758.];
 const PROP_RECTS: [[f32; 4]; 16] = [
     [25., 54., 295., 287.],
     [325., 89., 613., 277.],
@@ -471,138 +561,6 @@ const PROP_RECTS: [[f32; 4]; 16] = [
     [644., 984., 935., 1197.],
     [1006., 925., 1205., 1233.],
 ];
-#[derive(Clone, Copy)]
-struct WalkFrame {
-    bounds: [f32; 4],
-    hip_x: f32,
-}
-#[derive(Clone, Copy)]
-struct WalkSpec {
-    frames: [WalkFrame; 4],
-    feet_y: f32,
-    height: f32,
-    source_size: [f32; 2],
-}
-const WALK_SPECS: [WalkSpec; 5] = [
-    WalkSpec {
-        frames: [
-            WalkFrame {
-                bounds: [74., 18., 250., 275.],
-                hip_x: 173.0,
-            },
-            WalkFrame {
-                bounds: [357., 18., 499., 275.],
-                hip_x: 440.0,
-            },
-            WalkFrame {
-                bounds: [609., 18., 782., 275.],
-                hip_x: 714.0,
-            },
-            WalkFrame {
-                bounds: [897., 18., 1041., 275.],
-                hip_x: 977.0,
-            },
-        ],
-        feet_y: 271.,
-        height: 249.,
-        source_size: WALK_SIZE,
-    },
-    WalkSpec {
-        frames: [
-            WalkFrame {
-                bounds: [69., 302., 257., 544.],
-                hip_x: 172.0,
-            },
-            WalkFrame {
-                bounds: [358., 302., 511., 544.],
-                hip_x: 439.0,
-            },
-            WalkFrame {
-                bounds: [608., 302., 795., 544.],
-                hip_x: 707.0,
-            },
-            WalkFrame {
-                bounds: [892., 301., 1041., 544.],
-                hip_x: 975.0,
-            },
-        ],
-        feet_y: 540.,
-        height: 235.,
-        source_size: WALK_SIZE,
-    },
-    WalkSpec {
-        frames: [
-            WalkFrame {
-                bounds: [38., 567., 271., 837.],
-                hip_x: 162.0,
-            },
-            WalkFrame {
-                bounds: [331., 562., 531., 837.],
-                hip_x: 432.0,
-            },
-            WalkFrame {
-                bounds: [575., 569., 814., 837.],
-                hip_x: 710.0,
-            },
-            WalkFrame {
-                bounds: [871., 569., 1074., 837.],
-                hip_x: 980.0,
-            },
-        ],
-        feet_y: 833.,
-        height: 267.,
-        source_size: WALK_SIZE,
-    },
-    WalkSpec {
-        frames: [
-            WalkFrame {
-                bounds: [68., 852., 251., 1116.],
-                hip_x: 171.0,
-            },
-            WalkFrame {
-                bounds: [345., 851., 504., 1116.],
-                hip_x: 439.0,
-            },
-            WalkFrame {
-                bounds: [605., 855., 791., 1116.],
-                hip_x: 716.0,
-            },
-            WalkFrame {
-                bounds: [887., 851., 1050., 1116.],
-                hip_x: 981.0,
-            },
-        ],
-        feet_y: 1112.,
-        height: 257.,
-        source_size: WALK_SIZE,
-    },
-    WalkSpec {
-        frames: [
-            WalkFrame {
-                bounds: [64., 1130., 249., 1391.],
-                hip_x: 163.0,
-            },
-            WalkFrame {
-                bounds: [344., 1135., 520., 1391.],
-                hip_x: 433.0,
-            },
-            WalkFrame {
-                bounds: [601., 1135., 789., 1391.],
-                hip_x: 706.0,
-            },
-            WalkFrame {
-                bounds: [877., 1136., 1059., 1391.],
-                hip_x: 976.0,
-            },
-        ],
-        feet_y: 1387.,
-        height: 253.,
-        source_size: WALK_SIZE,
-    },
-];
-fn walk_spec(actor: Actor) -> Option<WalkSpec> {
-    WALK_SPECS.get(actor as usize).copied()
-}
 fn region_for(px: [f32; 4], size: [f32; 2]) -> Rect {
     Rect::from_min_max(
         pos2(px[0] / size[0], px[1] / size[1]),
@@ -773,28 +731,45 @@ pub fn actor_animated(
     tint: Color32,
     pose: &ActorPose,
 ) -> bool {
-    let sheet = if (kind as usize) < textures.walkers.len() {
-        textures.walkers[kind as usize]
-    } else {
-        None
-    };
-    let (texture, rect, uv, pivot) = if let Some(sheet) = sheet
-        && let Some((rect, uv, pivot)) =
-            walk_frame_layout(kind, sheet.size, pose.frame, center, size)
-    {
-        (Some(sheet.texture), rect, uv, pivot)
-    } else {
-        let index = match kind {
-            Actor::Player => 0,
-            Actor::Mara => 1,
-            Actor::Breacher => 2,
-            Actor::Caller => 3,
-            Actor::SiegeBrute => 4,
-            _ => return false,
-        };
-        let source = ACTOR_RECTS[index];
-        let (rect, pivot) = standing_actor_layout(index, center, size);
-        (textures.actors, rect, region_for(source, ACTOR_SIZE), pivot)
+    let (texture, rect, uv, pivot) = match kind {
+        Actor::Enemy(_) if textures.enemy_art_rejected => return false,
+        Actor::Enemy(sprite) => match &sprite.art {
+            SpriteArt::Walk(walk) => {
+                let Some(sheet) = textures.walkers else {
+                    return false;
+                };
+                let (rect, uv, pivot) = walk_frame_layout(
+                    walk,
+                    sprite.source_size,
+                    sheet.size,
+                    pose.frame,
+                    center,
+                    size,
+                );
+                (Some(sheet.texture), rect, uv, pivot)
+            }
+            SpriteArt::Standing(art) => {
+                let (rect, pivot) = standing_actor_layout(
+                    art.bounds,
+                    [art.hip_x, art.feet_y, art.height],
+                    center,
+                    size,
+                );
+                (
+                    textures.actors,
+                    rect,
+                    region_for(art.bounds, sprite.source_size),
+                    pivot,
+                )
+            }
+        },
+        Actor::Player | Actor::Mara => {
+            let index = kind.survivor_index().unwrap_or_default();
+            let source = SURVIVOR_RECTS[index];
+            let (rect, pivot) =
+                standing_actor_layout(source, SURVIVOR_ANCHORS[index], center, size);
+            (textures.actors, rect, region_for(source, ACTOR_SIZE), pivot)
+        }
     };
     let Some(texture) = texture else {
         return false;
@@ -837,35 +812,58 @@ pub fn actor_hit_flash(
     let Some(masks) = textures.flash_masks else {
         return;
     };
-    let (mask, source, rect, pivot) = if let Some(spec) = walk_spec(kind) {
-        let frame = (pose.frame % 4) as usize;
-        let Some(sheet) = textures.walkers[kind as usize] else {
-            return;
-        };
-        let Some((rect, _, pivot)) = walk_frame_layout(kind, sheet.size, pose.frame, center, size)
-        else {
-            return;
-        };
-        (
-            &masks.walkers[kind as usize * 4 + frame],
-            spec.frames[frame].bounds,
-            rect,
-            pivot,
-        )
-    } else {
-        let index = match kind {
-            Actor::Player => 0,
-            Actor::Mara => 1,
-            Actor::Breacher => 2,
-            Actor::Caller => 3,
-            Actor::SiegeBrute => 4,
-            _ => return,
-        };
-        if textures.actors.is_none() {
-            return;
+    let (mask, source, rect, pivot) = match kind {
+        Actor::Enemy(_) if textures.enemy_art_rejected => return,
+        Actor::Enemy(sprite) => {
+            let Some(frames) = masks.enemies.get(sprite.index) else {
+                return;
+            };
+            match &sprite.art {
+                SpriteArt::Walk(walk) => {
+                    let frame = pose.frame as usize % walk.frames.len();
+                    let Some(sheet) = textures.walkers else {
+                        return;
+                    };
+                    let (rect, _, pivot) = walk_frame_layout(
+                        walk,
+                        sprite.source_size,
+                        sheet.size,
+                        pose.frame,
+                        center,
+                        size,
+                    );
+                    let Some(mask) = frames.get(frame) else {
+                        return;
+                    };
+                    (mask, walk.frames[frame].bounds, rect, pivot)
+                }
+                SpriteArt::Standing(art) => {
+                    if textures.actors.is_none() {
+                        return;
+                    }
+                    let (rect, pivot) = standing_actor_layout(
+                        art.bounds,
+                        [art.hip_x, art.feet_y, art.height],
+                        center,
+                        size,
+                    );
+                    let Some(mask) = frames.first() else {
+                        return;
+                    };
+                    (mask, art.bounds, rect, pivot)
+                }
+            }
         }
-        let (rect, pivot) = standing_actor_layout(index, center, size);
-        (&masks.actors[index], ACTOR_RECTS[index], rect, pivot)
+        Actor::Player | Actor::Mara => {
+            let index = kind.survivor_index().unwrap_or_default();
+            if textures.actors.is_none() {
+                return;
+            }
+            let source = SURVIVOR_RECTS[index];
+            let (rect, pivot) =
+                standing_actor_layout(source, SURVIVOR_ANCHORS[index], center, size);
+            (&masks.survivors[index], source, rect, pivot)
+        }
     };
     let color = hit_flash_color(flash);
     let mut mesh = bevy_egui::egui::epaint::Mesh::default();
@@ -898,9 +896,12 @@ fn hit_flash_color(flash: HitFlash) -> Color32 {
         )
     }
 }
-fn standing_actor_layout(index: usize, center: Pos2, available: Vec2) -> (Rect, Pos2) {
-    let source = ACTOR_RECTS[index];
-    let [hip, feet, height] = ACTOR_ANCHORS[index];
+fn standing_actor_layout(
+    source: [f32; 4],
+    [hip, feet, height]: [f32; 3],
+    center: Pos2,
+    available: Vec2,
+) -> (Rect, Pos2) {
     let scale = (available.y / height).min(available.x / (source[2] - source[0]));
     let foot = center + vec2(0., available.y * 0.5);
     let rect = Rect::from_min_max(
@@ -910,29 +911,29 @@ fn standing_actor_layout(index: usize, center: Pos2, available: Vec2) -> (Rect, 
     (rect, foot)
 }
 fn walk_frame_layout(
-    actor: Actor,
+    walk: &WalkArt,
+    source_size: [f32; 2],
     size: [u32; 2],
     frame: u8,
     center: Pos2,
     available: Vec2,
-) -> Option<(Rect, Rect, Pos2)> {
-    let spec = walk_spec(actor)?;
-    let frame = spec.frames[(frame % 4) as usize];
-    let max_width = spec
+) -> (Rect, Rect, Pos2) {
+    let frame = walk.frames[frame as usize % walk.frames.len()];
+    let max_width = walk
         .frames
         .iter()
         .map(|frame| frame.bounds[2] - frame.bounds[0])
         .fold(0., f32::max);
-    let scale = (available.y / spec.height).min(available.x / max_width);
+    let scale = (available.y / walk.height).min(available.x / max_width);
     let foot = center + vec2(0., available.y * 0.5);
     let rect = Rect::from_min_max(
         foot + vec2(
             (frame.bounds[0] - frame.hip_x) * scale,
-            (frame.bounds[1] - spec.feet_y) * scale,
+            (frame.bounds[1] - walk.feet_y) * scale,
         ),
         foot + vec2(
             (frame.bounds[2] - frame.hip_x) * scale,
-            (frame.bounds[3] - spec.feet_y) * scale,
+            (frame.bounds[3] - walk.feet_y) * scale,
         ),
     );
     // Pixel-space metadata remains valid for a uniformly rescaled copy of the
@@ -940,15 +941,15 @@ fn walk_frame_layout(
     let gutter = vec2(0.5 / size[0].max(1) as f32, 0.5 / size[1].max(1) as f32);
     let uv = Rect::from_min_max(
         pos2(
-            frame.bounds[0] / spec.source_size[0],
-            frame.bounds[1] / spec.source_size[1],
+            frame.bounds[0] / source_size[0],
+            frame.bounds[1] / source_size[1],
         ) + gutter,
         pos2(
-            frame.bounds[2] / spec.source_size[0],
-            frame.bounds[3] / spec.source_size[1],
+            frame.bounds[2] / source_size[0],
+            frame.bounds[3] / source_size[1],
         ) - gutter,
     );
-    Some((rect, uv, foot))
+    (rect, uv, foot)
 }
 /// Every settled body shares one draw mesh. Count and lifetime come from the
 /// saved attempt; only the short collapse animation is rendered separately.
@@ -960,7 +961,7 @@ pub fn corpse_batch(
     let Some(texture) = textures.actors else {
         return false;
     };
-    let source = ACTOR_RECTS[7];
+    let source = CORPSE_RECT;
     let uv = region_for(source, ACTOR_SIZE);
     let mut mesh = bevy_egui::egui::epaint::Mesh::with_texture(texture);
     for (center, size, tint) in bodies {
@@ -976,7 +977,7 @@ pub fn portrait(p: &Painter, textures: ArtTextures, npc: bool, center: Pos2, siz
     actor_region(
         p,
         textures,
-        if npc { 6 } else { 5 },
+        PORTRAIT_RECTS[usize::from(npc)],
         center,
         size,
         Color32::WHITE,
@@ -985,7 +986,7 @@ pub fn portrait(p: &Painter, textures: ArtTextures, npc: bool, center: Pos2, siz
 fn actor_region(
     p: &Painter,
     textures: ArtTextures,
-    index: usize,
+    source: [f32; 4],
     center: Pos2,
     size: Vec2,
     tint: Color32,
@@ -993,7 +994,6 @@ fn actor_region(
     let Some(texture) = textures.actors else {
         return false;
     };
-    let source = ACTOR_RECTS[index];
     p.image(
         texture,
         fit(center, size, source),
@@ -1221,6 +1221,7 @@ pub fn panorama(p: &Painter, r: Rect, textures: ArtTextures, _biome: &str) -> bo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use horde_core::enemy_catalog::VisualSprite;
     #[test]
     fn cohesive_menu_poses_keep_both_boots_and_lower_body_fixed_while_upper_body_breathes() {
         let foot = pos2(320.0, 410.0);
@@ -1526,11 +1527,20 @@ mod tests {
         let walkers = decode(include_bytes!("../../../assets/art/pixel/walkers-v1.png"));
         let actors = decode(include_bytes!("../../../assets/art/pixel/actors-v1.png"));
         let masks = FlashMasks::from_images(&walkers, &actors);
-        assert_eq!(masks.walkers.len(), 5 * 4);
-        assert_eq!(masks.actors.len(), 5);
-        for (masks, image) in [(&masks.walkers, &walkers), (&masks.actors, &actors)] {
+        // Five four-frame gaits and three standing bosses, plus both survivors.
+        let catalog = enemy_visuals::active();
+        assert_eq!(masks.enemies.len(), catalog.sprites().len());
+        assert_eq!(masks.enemies.iter().map(Vec::len).sum::<usize>(), 5 * 4 + 3);
+        assert_eq!(masks.survivors.len(), 2);
+        let enemy_masks = catalog.sprites().iter().flat_map(|sprite| {
+            let image = if sprite.is_walk() { &walkers } else { &actors };
+            masks.enemies[sprite.index]
+                .iter()
+                .map(move |mask| (mask, image))
+        });
+        for (mask, image) in enemy_masks.chain(masks.survivors.iter().map(|mask| (mask, &actors))) {
             let pixels = image.data.as_ref().unwrap();
-            for mask in masks {
+            {
                 assert!(!mask.runs.is_empty() && mask.runs.len() < 2048);
                 for [left, top, right, bottom] in mask.runs.iter().copied() {
                     for y in top as u32..bottom as u32 {
@@ -1584,7 +1594,10 @@ mod tests {
             (
                 "walkers",
                 include_bytes!("../../../assets/art/pixel/walkers-v1.png").as_slice(),
-                WALK_SIZE,
+                enemy_visuals::active()
+                    .get(VisualSprite::Shambler)
+                    .unwrap()
+                    .source_size,
                 0x5540_6952_c6b3_c223,
             ),
             (
@@ -1616,11 +1629,24 @@ mod tests {
     }
     #[test]
     fn survivor_and_boss_torso_pivots_stay_on_the_fixed_foot_anchor() {
-        for (index, [hip, feet, _]) in ACTOR_ANCHORS.into_iter().enumerate() {
+        let bosses = enemy_visuals::active()
+            .sprites()
+            .iter()
+            .filter_map(|sprite| match &sprite.art {
+                SpriteArt::Standing(art) => Some((art.bounds, [art.hip_x, art.feet_y, art.height])),
+                SpriteArt::Walk(_) => None,
+            });
+        let standing: Vec<_> = SURVIVOR_RECTS
+            .into_iter()
+            .zip(SURVIVOR_ANCHORS)
+            .chain(bosses)
+            .collect();
+        assert_eq!(standing.len(), 5);
+        for (source, anchor) in standing {
+            let [hip, feet, _] = anchor;
             let center = pos2(200., 150.);
             let available = vec2(70., 60.);
-            let (rect, foot) = standing_actor_layout(index, center, available);
-            let source = ACTOR_RECTS[index];
+            let (rect, foot) = standing_actor_layout(source, anchor, center, available);
             let scale = rect.width() / (source[2] - source[0]);
             let reconstructed =
                 rect.min + vec2((hip - source[0]) * scale, (feet - source[1]) * scale);
@@ -1714,9 +1740,20 @@ mod tests {
     }
     #[test]
     fn pixel_atlas_regions_fit_their_own_source_and_preserve_aspect() {
-        for (rect, size) in ACTOR_RECTS
+        let boss_rects =
+            enemy_visuals::active()
+                .sprites()
+                .iter()
+                .filter_map(|sprite| match &sprite.art {
+                    SpriteArt::Standing(art) => Some((art.bounds, sprite.source_size)),
+                    SpriteArt::Walk(_) => None,
+                });
+        for (rect, size) in SURVIVOR_RECTS
             .into_iter()
+            .chain(PORTRAIT_RECTS)
+            .chain([CORPSE_RECT])
             .map(|r| (r, ACTOR_SIZE))
+            .chain(boss_rects)
             .chain(PROP_RECTS.into_iter().map(|r| (r, PROP_SIZE)))
         {
             assert!(rect[0] >= 0. && rect[1] >= 0. && rect[2] <= size[0] && rect[3] <= size[1]);
@@ -1764,36 +1801,44 @@ mod tests {
     ];
     #[test]
     fn pixel_gaits_keep_common_scale_hips_and_foot_baselines() {
-        for actor in [
-            Actor::Shambler,
-            Actor::Runner,
-            Actor::Brute,
-            Actor::Armored,
-            Actor::Demolisher,
-        ] {
-            let spec = walk_spec(actor).unwrap();
+        for (row, sprite) in [
+            VisualSprite::Shambler,
+            VisualSprite::Runner,
+            VisualSprite::Brute,
+            VisualSprite::Armored,
+            VisualSprite::Demolisher,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let art = enemy_visuals::active().get(sprite).unwrap();
+            let SpriteArt::Walk(spec) = &art.art else {
+                panic!("{sprite:?} walks");
+            };
+            let source_size = art.source_size;
+            assert_eq!(spec.frames.len(), 4);
             let mut previous = 0.;
             let mut pixel_scale: Option<f32> = None;
             for frame in 0..4 {
                 let source = spec.frames[frame as usize];
                 let (rect, uv, foot) = walk_frame_layout(
-                    actor,
-                    [spec.source_size[0] as u32, spec.source_size[1] as u32],
+                    spec,
+                    source_size,
+                    [source_size[0] as u32, source_size[1] as u32],
                     frame,
                     pos2(100., 100.),
                     vec2(72., 60.),
-                )
-                .unwrap();
+                );
                 assert!(uv.min.x >= previous && uv.max.x <= 1. && uv.min.y > 0. && uv.max.y < 1.);
                 previous = uv.max.x;
-                let occupied = OCCUPIED_WALKS[actor as usize][frame as usize];
+                let occupied = OCCUPIED_WALKS[row][frame as usize];
                 assert!(
-                    uv.min.x * spec.source_size[0] < occupied[0]
-                        && uv.min.y * spec.source_size[1] < occupied[1]
+                    uv.min.x * source_size[0] < occupied[0]
+                        && uv.min.y * source_size[1] < occupied[1]
                 );
                 assert!(
-                    uv.max.x * spec.source_size[0] > occupied[2]
-                        && uv.max.y * spec.source_size[1] > occupied[3],
+                    uv.max.x * source_size[0] > occupied[2]
+                        && uv.max.y * source_size[1] > occupied[3],
                     "Every opaque boot, hand and tool retains a transparent gutter"
                 );
                 assert!(
@@ -1816,5 +1861,88 @@ mod tests {
                 assert!(source.bounds[1] < spec.feet_y && spec.feet_y <= source.bounds[3]);
             }
         }
+    }
+    fn blank_sheet(width: u32, height: u32) -> Image {
+        Image::new_fill(
+            bevy::render::render_resource::Extent3d {
+                width,
+                height,
+                depth_or_array_layers: 1,
+            },
+            bevy::render::render_resource::TextureDimension::D2,
+            &[255, 255, 255, 255],
+            bevy::render::render_resource::TextureFormat::Rgba8UnormSrgb,
+            bevy::asset::RenderAssetUsages::default(),
+        )
+    }
+    #[test]
+    fn mismatched_sheets_disable_enemy_art_without_reading_outside_the_image() {
+        let decode = |bytes| {
+            Image::from_buffer(
+                bytes,
+                bevy::image::ImageType::Extension("png"),
+                bevy::image::CompressedImageFormats::NONE,
+                true,
+                ImageSampler::nearest(),
+                bevy::asset::RenderAssetUsages::default(),
+            )
+            .unwrap()
+        };
+        let walkers = decode(include_bytes!("../../../assets/art/pixel/walkers-v1.png"));
+        let actors = decode(include_bytes!("../../../assets/art/pixel/actors-v1.png"));
+        assert_eq!(enemy_art_problem(Some(&walkers), Some(&actors)), None);
+        assert_eq!(enemy_art_problem(None, None), None);
+        // A replacement smaller than the declared sheet is rejected per sheet.
+        let small = blank_sheet(64, 64);
+        assert!(enemy_art_problem(Some(&small), Some(&actors)).is_some());
+        assert!(enemy_art_problem(Some(&walkers), Some(&small)).is_some());
+        assert!(enemy_art_problem(Some(&small), None).is_some());
+        // Building masks from it neither panics nor lights anything outside it.
+        let masks = FlashMasks::from_images(&small, &small);
+        assert_eq!(masks.enemies.len(), enemy_visuals::active().sprites().len());
+        assert!(masks.enemies.iter().all(Vec::is_empty));
+        for mask in &masks.survivors {
+            for run in &mask.runs {
+                assert!(run[2] <= 64. && run[3] <= 64.);
+            }
+        }
+        let clipped = FlashMask::from_rgba(4, &[255; 4 * 4 * 4], [-8., 2., 900., f32::NAN]);
+        assert!(clipped.runs.is_empty());
+        let inside = FlashMask::from_rgba(4, &[255; 4 * 4 * 4], [0., 0., 900., 900.]);
+        assert_eq!(inside.runs, vec![[0., 0., 4., 2.], [0., 2., 4., 4.]]);
+        // Rejected art draws nothing for enemies, so the caller uses its fallback
+        // figure; survivors are unaffected.
+        let ctx = bevy_egui::egui::Context::default();
+        let shambler = Actor::enemy(VisualSprite::Shambler).unwrap();
+        let boss = Actor::enemy(VisualSprite::Caller).unwrap();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            let textures = ArtTextures {
+                actors: Some(TextureId::User(1)),
+                walkers: Some(WalkSheet {
+                    texture: TextureId::User(2),
+                    size: [1122, 1402],
+                }),
+                ..Default::default()
+            };
+            let rejected = ArtTextures {
+                enemy_art_rejected: true,
+                ..textures
+            };
+            let draw = |textures, actor| {
+                actor_animated(
+                    ui.painter(),
+                    textures,
+                    actor,
+                    pos2(50., 50.),
+                    vec2(40., 40.),
+                    Color32::WHITE,
+                    &ActorPose::default(),
+                )
+            };
+            assert!(draw(textures, shambler) && draw(textures, boss));
+            assert!(!draw(rejected, shambler) && !draw(rejected, boss));
+            assert!(draw(rejected, Actor::Player));
+        });
+        output.textures_delta.clear();
     }
 }

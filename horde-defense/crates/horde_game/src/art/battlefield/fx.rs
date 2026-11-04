@@ -1,0 +1,350 @@
+//! Weather, impact particles and short-lived event effects: explosions,
+//! callouts, tracers, contact damage and hit sparks.
+use super::super::{AMBER, ArenaProjection, MUTED, PANEL, RED, TEXT, box_at, line};
+use crate::{
+    animation::{Particle, ParticleKind},
+    battle_view::BattleViewModel,
+    visual_assets::{self, ArtTextures, PropMotion},
+};
+use bevy_egui::egui::{self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, vec2};
+use horde_core::{content::StructureKind, sim::EventKind};
+
+pub(super) struct FxOptions {
+    pub numbers: bool,
+    pub reduced: bool,
+    pub blood: bool,
+    pub textures: ArtTextures,
+}
+
+pub(super) fn ambient(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
+    let sy = arena.lane_height();
+    for particle in particles {
+        let at = arena.world(particle.at[0], particle.at[1]);
+        let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;
+        match particle.kind {
+            ParticleKind::Rain => {
+                let direction = vec2(particle.angle.cos(), particle.angle.sin());
+                line(
+                    p,
+                    at - direction * sy * particle.size,
+                    at,
+                    0.8,
+                    C::from_rgba_unmultiplied(153, 176, 181, alpha),
+                );
+            }
+            ParticleKind::Snow => {
+                p.circle_filled(
+                    at,
+                    (sy * particle.size).clamp(0.7, 1.7),
+                    C::from_rgba_unmultiplied(211, 219, 211, alpha),
+                );
+            }
+            ParticleKind::Mist => {
+                p.add(egui::Shape::ellipse_filled(
+                    at,
+                    vec2(sy * particle.size * 3.5, sy * particle.size * 0.35),
+                    C::from_rgba_unmultiplied(155, 171, 156, alpha),
+                ));
+            }
+            ParticleKind::Ash => {
+                p.circle_filled(
+                    at,
+                    (sy * particle.size).max(0.5),
+                    C::from_rgba_unmultiplied(175, 171, 154, alpha),
+                );
+            }
+            // Ambient motes share the dust material, while impact dust is drawn
+            // above actors only when its stronger opacity marks a resolved hit.
+            ParticleKind::Dust if particle.alpha <= 0.15 => {
+                p.circle_filled(
+                    at,
+                    (sy * particle.size).max(0.5),
+                    C::from_rgba_unmultiplied(169, 151, 109, alpha),
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
+    let sy = arena.lane_height();
+    for particle in particles {
+        let at = arena.world(particle.at[0], particle.at[1]);
+        let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;
+        match particle.kind {
+            ParticleKind::Casing => {
+                let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size;
+                line(
+                    p,
+                    at - d,
+                    at + d,
+                    1.1,
+                    C::from_rgba_unmultiplied(180, 143, 67, alpha),
+                );
+            }
+            ParticleKind::Spark => {
+                let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size * 1.8;
+                line(
+                    p,
+                    at - d,
+                    at + d,
+                    1.,
+                    C::from_rgba_unmultiplied(234, 212, 158, alpha),
+                );
+            }
+            ParticleKind::Debris => {
+                let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size;
+                line(
+                    p,
+                    at - d,
+                    at + d,
+                    (sy * particle.size * 0.65).max(1.),
+                    C::from_rgba_unmultiplied(136, 125, 91, alpha),
+                );
+            }
+            ParticleKind::Dust if particle.alpha > 0.15 => {
+                p.circle_filled(
+                    at,
+                    sy * particle.size,
+                    C::from_rgba_unmultiplied(156, 144, 109, alpha),
+                );
+            }
+            _ => {}
+        }
+    }
+}
+
+/// `muzzle` is the drawn survivor's muzzle socket, when the rig resolved.
+pub(super) fn events(
+    p: &Painter,
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    muzzle: Option<Pos2>,
+    options: &FxOptions,
+) {
+    let FxOptions {
+        numbers,
+        reduced,
+        blood,
+        textures,
+    } = *options;
+    let r = arena.rect;
+    let sy = arena.lane_height();
+    let origin = arena.world(view.defender.position[0], view.defender.position[1]);
+    for e in &view.fx {
+        let age = e.age;
+        let alpha = (1.0 - age / 0.45).clamp(0.0, 1.0);
+        match e.kind {
+            EventKind::Explosion if age < 0.5 => {
+                let at = arena.world(e.to[0], e.to[1]);
+                let progress = (age / 0.5).clamp(0., 1.);
+                let radius = (e.value as f32 / 100.).max(0.1);
+                let range = vec2(arena.yard_width(), sy) * radius;
+                let alpha = ((1. - progress) * if reduced { 105. } else { 190. }) as u8;
+                p.add(egui::Shape::ellipse_stroke(
+                    at,
+                    range * if reduced { 1. } else { 0.25 + progress * 0.75 },
+                    Stroke::new(
+                        if reduced { 1. } else { 2. },
+                        C::from_rgba_unmultiplied(239, 181, 82, alpha),
+                    ),
+                ));
+                let sprite = !reduced
+                    && visual_assets::ordnance_effect(
+                        p,
+                        textures,
+                        false,
+                        at,
+                        range * (0.9 + progress * 0.8),
+                        C::from_white_alpha(alpha),
+                    );
+                if !reduced && !sprite {
+                    for n in 0..15 {
+                        let theta = n as f32 * 2.399_963;
+                        let spread = ((n + 1) as f32 / 16.).sqrt() * (0.15 + progress * 0.85);
+                        let point =
+                            at + vec2(theta.cos() * range.x, theta.sin() * range.y) * spread;
+                        let size = sy * (0.10 + (1. - progress) * 0.14);
+                        box_at(
+                            p,
+                            point,
+                            vec2(size, size),
+                            C::from_rgba_unmultiplied(230, 152 + (n % 3) as u8 * 20, 65, alpha),
+                        );
+                    }
+                }
+            }
+            EventKind::BossWarning if age < 1.0 => {
+                p.rect_filled(
+                    Rect::from_center_size(
+                        arena.world(view.width * 0.8, view.defender.position[1]),
+                        vec2((r.width() * 0.34).min(290.), 36.),
+                    ),
+                    2.,
+                    PANEL,
+                );
+                p.text(
+                    arena.world(view.width * 0.8, view.defender.position[1]),
+                    Align2::CENTER_CENTER,
+                    "BOSS APPROACHING",
+                    FontId::proportional(14.),
+                    AMBER,
+                );
+            }
+            EventKind::Reinforcements if age < 0.45 => {
+                let lane = e.lane.unwrap_or(view.lanes / 2) as f32 + 0.5;
+                p.text(
+                    arena.world(view.width - 1.0, lane),
+                    Align2::RIGHT_CENTER,
+                    "REINFORCEMENTS",
+                    FontId::proportional(10.),
+                    AMBER,
+                );
+            }
+            EventKind::Spawn | EventKind::Boss if age < 0.45 => {
+                let at = arena.world(view.width - 0.5, e.to[1]);
+                p.add(egui::Shape::convex_polygon(
+                    vec![
+                        at + vec2(0.0, -6.0),
+                        at + vec2(-8.0, 0.0),
+                        at + vec2(0.0, 6.0),
+                    ],
+                    AMBER,
+                    Stroke::NONE,
+                ));
+                p.text(
+                    at + vec2(-12.0, 0.0),
+                    Align2::RIGHT_CENTER,
+                    if e.kind == EventKind::Boss {
+                        "BOSS"
+                    } else {
+                        "INCOMING"
+                    },
+                    FontId::proportional(10.0),
+                    AMBER,
+                );
+            }
+            EventKind::Shot
+                if age < 0.12
+                    && !e.actor_id.is_some_and(|id| {
+                        view.structure(id)
+                            .is_some_and(|s| s.kind == StructureKind::Trap)
+                    }) =>
+            {
+                let from = if e.actor_id.is_none() {
+                    muzzle.unwrap_or_else(|| arena.world(e.from[0], e.from[1]))
+                } else {
+                    e.actor_id
+                        .and_then(|id| view.structure(id))
+                        .filter(|s| s.kind == StructureKind::Turret)
+                        .filter(|_| textures.props.is_some())
+                        .map_or_else(
+                            || arena.world(e.from[0], e.from[1]),
+                            |s| {
+                                let pose = &s.pose;
+                                visual_assets::turret_muzzle(
+                                    arena.world(s.position[0], s.position[1]),
+                                    vec2(arena.yard_width() * s.footprint_width, sy * 0.88),
+                                    PropMotion {
+                                        target: Some(arena.world(pose.target[0], pose.target[1])),
+                                        recoil: pose.recoil,
+                                        ..Default::default()
+                                    },
+                                )
+                            },
+                        )
+                };
+                if !reduced && age < 0.065 {
+                    let direction = (arena.world(e.to[0], e.to[1]) - from).normalized();
+                    let side = vec2(-direction.y, direction.x);
+                    let length = sy * (0.12 + (1. - age / 0.065) * 0.12);
+                    p.add(egui::Shape::convex_polygon(
+                        vec![
+                            from - direction * 1.,
+                            from + side * length * 0.3,
+                            from + direction * length,
+                            from - side * length * 0.3,
+                        ],
+                        C::from_rgba_unmultiplied(248, 207, 117, ((1. - age / 0.065) * 230.) as u8),
+                        Stroke::NONE,
+                    ));
+                }
+                line(
+                    p,
+                    from,
+                    arena.world(e.to[0], e.to[1]),
+                    if reduced { 1.0 } else { 1.25 },
+                    AMBER.gamma_multiply(1.0 - age / 0.12),
+                );
+            }
+            EventKind::Damage if age < 0.3 && e.target_id.is_none() => {
+                line(
+                    p,
+                    arena.world(1.5, e.from[1]),
+                    arena.world(1.5, e.from[1] + 0.5),
+                    4.0,
+                    RED.gamma_multiply(alpha),
+                );
+                p.circle_stroke(
+                    origin,
+                    sy * 0.7,
+                    Stroke::new(2.0, RED.gamma_multiply(alpha)),
+                );
+            }
+            EventKind::Hit
+            | EventKind::WeakPoint
+            | EventKind::Kill
+            | EventKind::Armor
+            | EventKind::Melee
+                if alpha > 0.0 =>
+            {
+                let at = arena.world(e.to[0], e.to[1]);
+                if blood && !reduced && e.kind == EventKind::Kill {
+                    for n in 0..4 {
+                        p.circle_filled(
+                            at + vec2((n as f32 * 2.3).sin() * 9.0, (n as f32 * 4.2).cos() * 6.0),
+                            2.0,
+                            C::from_rgb(102, 52, 42).gamma_multiply(alpha),
+                        );
+                    }
+                }
+                let color = if e.kind == EventKind::Armor {
+                    MUTED
+                } else if e.kind == EventKind::WeakPoint {
+                    AMBER
+                } else {
+                    TEXT
+                };
+                if !reduced {
+                    for d in [
+                        vec2(-1.0, -1.0),
+                        vec2(1.0, -1.0),
+                        vec2(-1.0, 1.0),
+                        vec2(1.0, 1.0),
+                    ] {
+                        line(
+                            p,
+                            at + d * 4.0,
+                            at + d * 8.0,
+                            1.5,
+                            color.gamma_multiply(alpha),
+                        );
+                    }
+                }
+                // Currency feedback stays separate from the real-time resolved
+                // damage-number cache used by battlefield presentation.
+                if numbers && e.kind == EventKind::Kill && e.value > 0 {
+                    p.text(
+                        at + vec2(0.0, -10.0 - if reduced { 0. } else { age * 24.0 }),
+                        Align2::CENTER_CENTER,
+                        format!("+{}c", e.value),
+                        FontId::proportional(13.0),
+                        color.gamma_multiply(alpha),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+}

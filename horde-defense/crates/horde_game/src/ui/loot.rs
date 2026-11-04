@@ -163,7 +163,7 @@ pub(super) fn draw_for(
         && textures.props.is_some()
         && textures.keyart.is_some()
         && textures.ground.is_some()
-        && textures.walkers[0].is_some()
+        && textures.walkers.is_some()
         && textures.rig.is_some()
         && textures.menu_idle.is_some();
     let (rare, now) = state.observe_for_capture(

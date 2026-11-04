@@ -284,6 +284,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                     blood: f.settings.blood,
                     theme,
                     textures: f.textures,
+                    blend: f.battle.interpolation.scene(None, a),
                 },
             );
             art::world_atmosphere(ui.painter(), canvas);

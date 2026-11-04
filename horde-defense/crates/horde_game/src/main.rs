@@ -2,6 +2,7 @@ mod animation;
 mod art;
 mod atmosphere_audio;
 mod audio;
+mod battle_view;
 #[cfg(feature = "review")]
 mod capture_sequence;
 mod cursor;
@@ -30,6 +31,8 @@ fn validate_startup_catalogs(config: &launch::LaunchConfig) -> Result<(), String
     // Loads, validates and installs every catalogue; a bad override is a clean error.
     horde_core::catalog::init_catalogs().map_err(|error| error.to_string())?;
     player_model::startup::initialize_player_models(&asset_directory(config))?;
+    // After the enemy catalogue: every sprite it names must have atlas data.
+    visual_assets::enemy_visuals::initialize(&asset_directory(config))?;
     for (name, source) in config.catalog_sources() {
         // Runs before LogPlugin installs the subscriber, so stderr is the only channel.
         #[allow(clippy::print_stderr)]
@@ -129,6 +132,7 @@ fn main() -> AppExit {
     let review = config.review().is_some();
     app.add_systems(Startup, log_launch_warnings).add_plugins((
         runner::SimRuntimePlugin,
+        battle_view::BattleViewPlugin,
         sfx::SfxPlugin,
         ui::UiPlugin,
         atmosphere_audio::AtmosphereAudioPlugin,
