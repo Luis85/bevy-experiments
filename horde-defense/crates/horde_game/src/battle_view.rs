@@ -3,6 +3,10 @@
 //! cosmetic caches; it is built headlessly and never written back to the core.
 //! Actor positions blend between the last two fixed ticks by the fixed clock's
 //! overstep, so motion stays smooth at any display rate.
+//!
+//! `BattleScreen` is the same seam for the battle screen's controls and
+//! readouts around the painter: built from `&Game`, it carries every attempt
+//! value the screen lays out, so egui code never reads the attempt itself.
 use crate::{
     animation::{ActorPose, DefenderPose, Particle, SceneAnimation, StructurePose},
     launch::LaunchConfig,
@@ -12,10 +16,14 @@ use crate::{
 };
 use bevy::prelude::*;
 use horde_core::{
-    content::{EnemyKind, StructureKind, content},
+    content::{EnemyKind, Mode, StructureKind, content},
     enemy_catalog::EnemyVisual,
+    kind_map::KindMap,
     ordnance::{self, OrdnanceKind},
-    sim::{Attempt, Enemy, EnemyCondition, EnemyPhase, EventKind},
+    quality::LootEvent,
+    sim::{Attempt, Enemy, EnemyCondition, EnemyPhase, EventKind, Game},
+    skill_catalog::unlocks,
+    world::{StageTheme, world},
 };
 use std::collections::BTreeMap;
 
@@ -409,6 +417,316 @@ impl BattleViewModel {
     }
 }
 
+/// The arena the battle screen projects onto: the attempt's, else the
+/// campaign's next deployment (lanes, width in yards).
+pub fn arena_geometry(game: &Game) -> (u8, f32) {
+    game.attempt.as_ref().map_or_else(
+        || (game.campaign.lane_count(), game.campaign.arena_geometry().1),
+        |a| (a.lane_count, a.width_yards),
+    )
+}
+
+/// The defender's magazine and reload clock.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct WeaponView {
+    pub ammo: u32,
+    pub magazine: u32,
+    pub reload_left: u32,
+    pub reload_total: u32,
+}
+impl WeaponView {
+    pub fn of(a: &Attempt) -> Self {
+        Self {
+            ammo: a.ammo,
+            magazine: a.magazine,
+            reload_left: a.reload_left,
+            reload_total: a.reload_duration_ticks(),
+        }
+    }
+    /// Reload completion in 0..=1 while reloading.
+    pub fn reload_progress(&self) -> Option<f32> {
+        (self.reload_left > 0).then(|| {
+            (1.0 - self.reload_left as f32 / self.reload_total.max(1) as f32).clamp(0.0, 1.0)
+        })
+    }
+}
+
+/// One throwable's unlock, stock and cooldown for the attack selector, the
+/// target cursor and the reticle.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct OrdnanceSlotView {
+    pub unlocked: bool,
+    pub charges: u32,
+    pub issued: u32,
+    pub cooldown: u32,
+    /// Full cooldown in ticks after the profile multiplier, at least 1.
+    pub cooldown_total: f32,
+    pub ready: bool,
+    /// Blast radius in yards after the profile multiplier.
+    pub radius: f32,
+}
+impl OrdnanceSlotView {
+    pub fn of(a: &Attempt, kind: OrdnanceKind) -> Self {
+        let definition = ordnance::catalog().definition(kind);
+        let modifiers = &a.profile.modifiers;
+        Self {
+            unlocked: modifiers.unlocked(match kind {
+                OrdnanceKind::Grenade => unlocks::GRENADE,
+                OrdnanceKind::Molotov => unlocks::MOLOTOV,
+            }),
+            charges: a.ordnance.charges(kind),
+            issued: a.ordnance.issued(kind),
+            cooldown: a.ordnance.cooldown(kind),
+            cooldown_total: (definition.cooldown_ticks as f32
+                * modifiers.ordnance_cooldown_multiplier)
+                .round()
+                .clamp(1.0, 3600.0),
+            ready: a.ordnance.ready(kind),
+            radius: definition.radius * modifiers.ordnance_radius_multiplier,
+        }
+    }
+}
+
+/// The cursor badge: rounds or charges left, a reload or cooldown arc and a
+/// short label.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ReticleReadout {
+    pub remaining: u32,
+    pub capacity: u32,
+    pub progress: Option<f32>,
+    pub label: String,
+    /// Observed (NPC) battles draw the neutral reticle colour.
+    pub observed: bool,
+}
+impl ReticleReadout {
+    /// The readout for `a`; a selected throwable applies to personal battles only.
+    pub fn build(a: &Attempt, selected: Option<OrdnanceKind>) -> Self {
+        let slot = selected.map(|kind| OrdnanceSlotView::of(a, kind));
+        Self::from_parts(a.mode, &WeaponView::of(a), slot.as_ref())
+    }
+    fn from_parts(mode: Mode, weapon: &WeaponView, slot: Option<&OrdnanceSlotView>) -> Self {
+        let reload = weapon.reload_progress();
+        let observed = mode == Mode::Npc;
+        match slot.filter(|_| mode == Mode::Personal) {
+            Some(slot) => Self {
+                remaining: slot.charges,
+                capacity: slot.issued.max(1),
+                progress: reload.or((slot.cooldown > 0)
+                    .then(|| (1.0 - slot.cooldown as f32 / slot.cooldown_total).clamp(0.0, 1.0))),
+                label: if reload.is_some() {
+                    "RELOAD".into()
+                } else {
+                    format!("{} left", slot.charges)
+                },
+                observed,
+            },
+            None => Self {
+                remaining: weapon.ammo,
+                capacity: weapon.magazine.max(1),
+                progress: reload,
+                label: if reload.is_some() {
+                    format!("R {:.1}s", weapon.reload_left as f32 / 60.0)
+                } else {
+                    format!("{}/{}", weapon.ammo, weapon.magazine)
+                },
+                observed,
+            },
+        }
+    }
+}
+
+/// Which first-deployment field hint applies.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FieldHint {
+    /// Nothing has happened yet.
+    Opening,
+    /// No shot fired.
+    Shoot,
+    /// Never reloaded and the magazine is not full.
+    Reload,
+    /// No enemy has reached the line.
+    Contact,
+    Banked,
+}
+
+/// Deployment facts for the field-details menu.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FieldReadout {
+    pub threat_rank: u32,
+    pub hostiles: usize,
+    pub enemy_cap: usize,
+    pub arrival_rate: f32,
+    pub difficulty: &'static str,
+    pub batch_size: u32,
+    pub gear_level: u32,
+    pub level_name: &'static str,
+    pub hint: FieldHint,
+    /// The country stage's local setting, when deployed to a country.
+    pub setting: Option<StageTheme>,
+}
+
+/// Lines of the resolution log the field-details menu shows.
+pub const LOG_TAIL: usize = 18;
+
+/// Every attempt value the battle screen lays out around the painter.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BattleScreen {
+    pub mode: Mode,
+    pub tick: u64,
+    pub paused: bool,
+    pub lanes: u8,
+    pub width_yards: f32,
+    /// Backdrop and terrain theme index.
+    pub theme: usize,
+    pub last_loot: Option<LootEvent>,
+    pub weapon_class: &'static str,
+    pub weapon: WeaponView,
+    pub ordnance: KindMap<OrdnanceKind, OrdnanceSlotView>,
+    pub heal: bool,
+    pub brace: bool,
+    pub melee_cooldown: u32,
+    pub supply: u32,
+    pub field: FieldReadout,
+    /// Newest first, at most `LOG_TAIL` lines.
+    pub log_tail: Vec<String>,
+    /// Every enemy's position, in attempt order, for aim assist.
+    pub targets: Vec<[f32; 2]>,
+    pub blueprints: KindMap<StructureKind, bool>,
+    pub global_paused: bool,
+    /// The campaign has not finished a deployment yet.
+    pub first_deployment: bool,
+}
+impl BattleScreen {
+    /// The active battle's screen, or `None` outside a battle.
+    pub fn build(game: &Game) -> Option<Self> {
+        let a = game.attempt.as_ref()?;
+        let country = world().country(a.country_id.as_deref().unwrap_or(""));
+        let theme = country
+            .map(|country| match country.biome.to_lowercase().as_str() {
+                "desert" | "arid" => 2,
+                "tundra" | "polar" | "boreal" => 3,
+                "tropical" | "rainforest" => 4,
+                "mediterranean" => 1,
+                _ => 0,
+            })
+            .unwrap_or(a.level);
+        let hint = if a.tick == 0 {
+            FieldHint::Opening
+        } else if a.shots == 0 {
+            FieldHint::Shoot
+        } else if a.reload_ticks == 0 && a.ammo < a.magazine {
+            FieldHint::Reload
+        } else if a.first_contact.is_none() {
+            FieldHint::Contact
+        } else {
+            FieldHint::Banked
+        };
+        Some(Self {
+            mode: a.mode,
+            tick: a.tick,
+            paused: a.paused,
+            lanes: a.lane_count,
+            width_yards: a.width_yards,
+            theme,
+            last_loot: a.loot_events.last().cloned(),
+            weapon_class: a.profile.weapon.class.name(),
+            weapon: WeaponView::of(a),
+            ordnance: KindMap::from_fn(|kind| OrdnanceSlotView::of(a, kind)),
+            heal: a.profile.heal,
+            brace: a.profile.brace,
+            melee_cooldown: a.melee_cooldown,
+            supply: a.supply,
+            field: FieldReadout {
+                threat_rank: a.progression.rank,
+                hostiles: a.enemies.len(),
+                enemy_cap: a.enemy_cap(),
+                arrival_rate: a.arrival_rate(),
+                difficulty: a.balance.preset.name(),
+                batch_size: a.progression.batch_size,
+                gear_level: a.progression.item_level,
+                level_name: &content().levels[a.level].name,
+                hint,
+                setting: country.map(|country| country.stage_theme(a.stage)),
+            },
+            log_tail: a.log.iter().rev().take(LOG_TAIL).cloned().collect(),
+            targets: a.enemies.iter().map(|e| [e.x, e.y()]).collect(),
+            blueprints: game.campaign.blueprints.clone(),
+            global_paused: game.global_paused,
+            first_deployment: game.campaign.attempts == 0,
+        })
+    }
+    pub fn personal(&self) -> bool {
+        self.mode == Mode::Personal
+    }
+    pub fn any_blueprint(&self) -> bool {
+        self.blueprints.iter().any(|owned| *owned)
+    }
+    pub fn slot(&self, kind: OrdnanceKind) -> &OrdnanceSlotView {
+        &self.ordnance[kind]
+    }
+    /// The reticle readout with `selected` throwable, if any.
+    pub fn reticle(&self, selected: Option<OrdnanceKind>) -> ReticleReadout {
+        ReticleReadout::from_parts(
+            self.mode,
+            &self.weapon,
+            selected.map(|kind| self.slot(kind)),
+        )
+    }
+    /// The 1-based lane the aim selects, clamped onto the arena.
+    pub fn selected_lane(&self, aim: [f32; 2]) -> u8 {
+        aim[1]
+            .floor()
+            .clamp(0.0, f32::from(self.lanes.saturating_sub(1))) as u8
+            + 1
+    }
+    /// The nearest enemy within `radius` yards of `aim`, else `aim` itself.
+    pub fn assist(&self, aim: [f32; 2], radius: f32) -> [f32; 2] {
+        if radius <= 0.0 {
+            return aim;
+        }
+        let distance = |p: &[f32; 2]| ((p[0] - aim[0]).powi(2) + (p[1] - aim[1]).powi(2)).sqrt();
+        self.targets
+            .iter()
+            .filter(|p| distance(p) < radius)
+            .min_by(|a, b| distance(a).total_cmp(&distance(b)))
+            .copied()
+            .unwrap_or(aim)
+    }
+}
+
+/// The construction cell under the aim and whether a structure may go there.
+#[derive(Clone, Debug, PartialEq)]
+pub struct PlacementPreview {
+    pub lane: u8,
+    pub column: u8,
+    pub center: [f32; 2],
+    pub half_width: f32,
+    pub valid: Result<(), String>,
+    /// The structure already standing in the cell, which salvage removes.
+    pub occupant: Option<u64>,
+}
+/// `None` outside a battle or when the aim is off the construction grid.
+pub fn placement_preview(
+    game: &Game,
+    kind: StructureKind,
+    aim: [f32; 2],
+) -> Option<PlacementPreview> {
+    let a = game.attempt.as_ref()?;
+    let [lane, column] = a.build_cell_at(aim)?;
+    Some(PlacementPreview {
+        lane,
+        column,
+        center: a.build_cell_center(lane, column).expect("validated cell"),
+        half_width: a.construction_cell_width() * 0.5,
+        valid: game.preview_placement(kind, lane, column),
+        occupant: a
+            .structures
+            .iter()
+            .find(|s| s.lane == lane && s.column == column)
+            .map(|s| s.id),
+    })
+}
+
 fn enemy_view(
     a: &Attempt,
     e: &Enemy,
@@ -700,6 +1018,233 @@ mod tests {
         assert_eq!(
             drawn_at(a, cache.scene(None, a), moved.id),
             before[&moved.id]
+        );
+    }
+
+    #[test]
+    fn battle_screen_is_absent_outside_battle_and_geometry_falls_back_to_the_campaign() {
+        let game = Game::default();
+        assert_eq!(BattleScreen::build(&game), None);
+        assert_eq!(
+            placement_preview(&game, StructureKind::ALL[0], [3.0, 0.5]),
+            None
+        );
+        assert_eq!(
+            arena_geometry(&game),
+            (game.campaign.lane_count(), game.campaign.arena_geometry().1)
+        );
+        let game = fixture();
+        let a = game.attempt.as_ref().unwrap();
+        assert_eq!(arena_geometry(&game), (a.lane_count, a.width_yards));
+    }
+
+    #[test]
+    fn battle_screen_mirrors_the_attempt_headlessly_without_mutating_it() {
+        let mut game = fixture();
+        for _ in 0..30 {
+            game.tick(Input::default());
+        }
+        let a = game.attempt.as_mut().unwrap();
+        a.log = (0..25).map(|n| format!("line {n}")).collect();
+        let a = game.attempt.as_ref().unwrap();
+        let before = serde_json::to_string(a).unwrap();
+        let view = BattleScreen::build(&game).unwrap();
+        assert_eq!(before, serde_json::to_string(a).unwrap());
+        assert_eq!(
+            (
+                view.mode,
+                view.tick,
+                view.paused,
+                view.lanes,
+                view.width_yards
+            ),
+            (a.mode, a.tick, a.paused, a.lane_count, a.width_yards)
+        );
+        assert!(view.personal());
+        assert_eq!(view.last_loot.as_ref(), a.loot_events.last());
+        assert_eq!(view.weapon_class, a.profile.weapon.class.name());
+        assert_eq!(
+            view.weapon,
+            WeaponView {
+                ammo: a.ammo,
+                magazine: a.magazine,
+                reload_left: a.reload_left,
+                reload_total: a.reload_duration_ticks(),
+            }
+        );
+        for kind in [OrdnanceKind::Grenade, OrdnanceKind::Molotov] {
+            let slot = view.slot(kind);
+            assert_eq!(slot.charges, a.ordnance.charges(kind));
+            assert_eq!(slot.issued, a.ordnance.issued(kind));
+            assert_eq!(slot.cooldown, a.ordnance.cooldown(kind));
+            assert_eq!(slot.ready, a.ordnance.ready(kind));
+            assert_eq!(
+                slot.radius,
+                ordnance::catalog().definition(kind).radius
+                    * a.profile.modifiers.ordnance_radius_multiplier
+            );
+            assert!(slot.cooldown_total >= 1.0);
+        }
+        assert_eq!((view.heal, view.brace), (a.profile.heal, a.profile.brace));
+        assert_eq!(
+            (view.melee_cooldown, view.supply),
+            (a.melee_cooldown, a.supply)
+        );
+        assert_eq!(view.field.threat_rank, a.progression.rank);
+        assert_eq!(view.field.hostiles, a.enemies.len());
+        assert_eq!(view.field.enemy_cap, a.enemy_cap());
+        assert_eq!(view.field.arrival_rate, a.arrival_rate());
+        assert_eq!(view.field.difficulty, a.balance.preset.name());
+        assert_eq!(view.field.batch_size, a.progression.batch_size);
+        assert_eq!(view.field.gear_level, a.progression.item_level);
+        assert_eq!(view.field.level_name, content().levels[a.level].name);
+        assert_eq!(view.log_tail.len(), LOG_TAIL);
+        assert_eq!(view.log_tail[0], "line 24");
+        assert_eq!(view.log_tail[LOG_TAIL - 1], "line 7");
+        assert_eq!(view.targets.len(), a.enemies.len());
+        assert_eq!(view.blueprints, game.campaign.blueprints);
+        assert_eq!(
+            view.any_blueprint(),
+            game.campaign.blueprints.iter().any(|b| *b)
+        );
+        assert_eq!(view.global_paused, game.global_paused);
+        assert!(!view.first_deployment);
+    }
+
+    #[test]
+    fn country_stages_carry_their_biome_theme_and_local_setting() {
+        let mut game = Game::default();
+        game.campaign.choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let a = game.attempt.as_ref().unwrap();
+        let country = world().country(a.country_id.as_deref().unwrap()).unwrap();
+        let view = BattleScreen::build(&game).unwrap();
+        assert_eq!(view.field.setting, Some(country.stage_theme(a.stage)));
+        assert!(view.theme <= 4);
+        // Without a country the backdrop follows the level and no setting shows.
+        let mut legacy = fixture();
+        legacy.attempt.as_mut().unwrap().country_id = None;
+        let view = BattleScreen::build(&legacy).unwrap();
+        assert_eq!(view.theme, legacy.attempt.as_ref().unwrap().level);
+        assert_eq!(view.field.setting, None);
+    }
+
+    #[test]
+    fn reticle_uses_exact_ammo_and_frozen_reload_ticks_without_a_presentation_clock() {
+        let mut game = Game::default();
+        game.campaign.choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let a = game.attempt.as_mut().unwrap();
+        a.ammo = 3;
+        a.reload_left = 63;
+        a.profile.personal.reload = 2.1;
+        let state = ReticleReadout::build(a, None);
+        assert_eq!((state.remaining, state.capacity), (3, a.magazine));
+        assert_eq!(state.progress, Some(0.5));
+        assert_eq!(state.label, "R 1.0s");
+        assert!(!state.observed);
+        assert_eq!(ReticleReadout::build(a, None), state);
+        assert_eq!(BattleScreen::build(&game).unwrap().reticle(None), state);
+        let a = game.attempt.as_mut().unwrap();
+        a.mode = Mode::Npc;
+        a.profile.npc.reload_turns = 3;
+        a.reload_left = 90;
+        let observed = ReticleReadout::build(a, Some(OrdnanceKind::Grenade));
+        assert_eq!(observed.progress, Some(0.5));
+        // Observed battles never show a throwable readout.
+        assert_eq!(observed.label, "R 1.5s");
+        assert!(observed.observed);
+    }
+
+    #[test]
+    fn selected_throwables_report_charges_and_cooldown_on_the_reticle() {
+        let mut game = fixture();
+        let a = game.attempt.as_mut().unwrap();
+        a.reload_left = 0;
+        let kind = OrdnanceKind::Grenade;
+        let total = OrdnanceSlotView::of(a, kind).cooldown_total;
+        let charges = a.ordnance.charges(kind);
+        let issued = a.ordnance.issued(kind);
+        let view = BattleScreen::build(&game).unwrap();
+        let readout = view.reticle(Some(kind));
+        assert_eq!(
+            readout,
+            ReticleReadout::build(game.attempt.as_ref().unwrap(), Some(kind))
+        );
+        assert_eq!(
+            (readout.remaining, readout.capacity),
+            (charges, issued.max(1))
+        );
+        assert_eq!(readout.label, format!("{charges} left"));
+        assert_eq!(readout.progress, None);
+        let mut cooling = view.clone();
+        cooling.ordnance = KindMap::from_fn(|k| OrdnanceSlotView {
+            cooldown: (total / 2.0) as u32,
+            ..*view.slot(k)
+        });
+        let progress = cooling.reticle(Some(kind)).progress.unwrap();
+        assert!((progress - (1.0 - (total / 2.0).floor() / total)).abs() < 1e-6);
+        let mut reloading = view;
+        reloading.weapon.reload_left = 1;
+        assert_eq!(reloading.reticle(Some(kind)).label, "RELOAD");
+    }
+
+    #[test]
+    fn aim_assist_snaps_to_the_nearest_enemy_inside_the_radius_only() {
+        let mut view = BattleScreen::build(&fixture()).unwrap();
+        view.targets = vec![[5.0, 1.5], [4.0, 1.5], [4.0, 1.5], [20.0, 0.5]];
+        assert_eq!(view.assist([3.5, 1.5], 0.0), [3.5, 1.5]);
+        assert_eq!(view.assist([3.5, 1.5], 2.0), [4.0, 1.5]);
+        assert_eq!(view.assist([3.5, 1.5], 0.4), [3.5, 1.5]);
+        assert_eq!(view.assist([19.0, 0.5], 1.5), [20.0, 0.5]);
+        view.lanes = 3;
+        assert_eq!(view.selected_lane([0.0, -2.0]), 1);
+        assert_eq!(view.selected_lane([0.0, 1.7]), 2);
+        assert_eq!(view.selected_lane([0.0, 9.0]), 3);
+    }
+
+    #[test]
+    fn first_deployment_hints_follow_the_attempt_milestones() {
+        let mut game = Game::default();
+        game.deploy(0, Mode::Personal).unwrap();
+        let hint = |game: &Game| BattleScreen::build(game).unwrap().field.hint;
+        assert!(BattleScreen::build(&game).unwrap().first_deployment);
+        assert_eq!(hint(&game), FieldHint::Opening);
+        let a = game.attempt.as_mut().unwrap();
+        a.tick = 10;
+        a.shots = 0;
+        assert_eq!(hint(&game), FieldHint::Shoot);
+        let a = game.attempt.as_mut().unwrap();
+        a.shots = 2;
+        a.reload_ticks = 0;
+        a.ammo = a.magazine.saturating_sub(1);
+        assert_eq!(hint(&game), FieldHint::Reload);
+        let a = game.attempt.as_mut().unwrap();
+        a.ammo = a.magazine;
+        a.first_contact = None;
+        assert_eq!(hint(&game), FieldHint::Contact);
+        game.attempt.as_mut().unwrap().first_contact = Some(3.0);
+        assert_eq!(hint(&game), FieldHint::Banked);
+    }
+
+    #[test]
+    fn placement_preview_reports_the_aimed_cell_validity_and_occupant() {
+        let game = fixture();
+        let a = game.attempt.as_ref().unwrap();
+        let kind = StructureKind::ALL[0];
+        assert_eq!(placement_preview(&game, kind, [-1.0, 0.5]), None);
+        let center = a.build_cell_center(1, 2).unwrap();
+        let preview = placement_preview(&game, kind, center).unwrap();
+        assert_eq!((preview.lane, preview.column), (1, 2));
+        assert_eq!(preview.center, center);
+        assert_eq!(preview.half_width, a.construction_cell_width() * 0.5);
+        assert_eq!(preview.valid, game.preview_placement(kind, 1, 2));
+        assert_eq!(
+            preview.occupant,
+            a.structures
+                .iter()
+                .find(|s| s.lane == 1 && s.column == 2)
+                .map(|s| s.id)
         );
     }
 
