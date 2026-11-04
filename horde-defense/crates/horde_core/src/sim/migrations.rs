@@ -5,7 +5,7 @@ use super::persistence::SaveError;
 use serde_json::{Map, Value};
 
 /// Envelope version written by this build.
-pub const SAVE_VERSION: u32 = 3;
+pub const SAVE_VERSION: u32 = 4;
 
 /// Upgrade a payload saved at envelope `from` to [`SAVE_VERSION`].
 pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
@@ -16,6 +16,7 @@ pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
         value = match version {
             1 => v1_to_v2(value)?,
             2 => v2_to_v3(value),
+            3 => v3_to_v4(value)?,
             _ => unreachable!("every version below SAVE_VERSION has a step"),
         };
     }
@@ -240,6 +241,55 @@ fn migrate_unlock_flags(object: &mut Map<String, Value>) {
     }
 }
 
+/// v3 quality order (`Quality` declaration order at save format v3). A v3
+/// `loot_by_quality` / `loot_quality_counts` slot `n` meant `V3_QUALITIES[n]`.
+const V3_QUALITIES: &[&str] = &["Poor", "Common", "Uncommon", "Rare", "Epic", "Legendary"];
+/// v3 positional quality arrays, by field name (unique across the save tree).
+const V3_QUALITY_ARRAYS: &[&str] = &["loot_by_quality", "loot_quality_counts"];
+
+/// v3 -> v4: the quality-indexed loot counters (attempts, reports, run
+/// history, nested expedition games) become quality-keyed maps. Values already
+/// in v4 shape are left untouched, so the step is idempotent.
+fn v3_to_v4(mut value: Value) -> Result<Value, SaveError> {
+    rewrite_v3(&mut value)?;
+    Ok(value)
+}
+
+fn rewrite_v3(value: &mut Value) -> Result<(), SaveError> {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object.iter_mut() {
+                if V3_QUALITY_ARRAYS.contains(&key.as_str())
+                    && let Value::Array(slots) = child
+                {
+                    if slots.len() != V3_QUALITIES.len() {
+                        return Err(SaveError::Migration(format!(
+                            "v3 field {key} has {} entries; expected {}",
+                            slots.len(),
+                            V3_QUALITIES.len()
+                        )));
+                    }
+                    let map: Map<String, Value> = V3_QUALITIES
+                        .iter()
+                        .map(|quality| (*quality).to_owned())
+                        .zip(std::mem::take(slots))
+                        .collect();
+                    *child = Value::Object(map);
+                    continue;
+                }
+                rewrite_v3(child)?;
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                rewrite_v3(item)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,5 +472,38 @@ mod tests {
         );
         assert_eq!(v3["battles"][0]["game"]["attempt"], json!({"enemies": []}));
         assert_eq!(v2_to_v3(v3.clone()), v3);
+    }
+
+    #[test]
+    fn frozen_v3_quality_order_matches_the_kind_that_replaced_it() {
+        use crate::quality::Quality;
+        assert_eq!(serde_names(&Quality::ALL), V3_QUALITIES);
+    }
+
+    #[test]
+    fn v3_quality_arrays_become_maps_everywhere_and_the_step_is_idempotent() {
+        let v3 = json!({
+            "attempt": {"loot_quality_counts": [0, 2, 1, 0, 1, 3]},
+            "campaign": {"run_history": [{"loot_by_quality": [1, 0, 0, 0, 0, 5]}]},
+            "battles": [{"game": {"attempt": {"loot_quality_counts": [0, 0, 0, 9, 0, 0]}}}]
+        });
+        let v4 = migrate(v3, 3).unwrap();
+        assert_eq!(
+            v4["attempt"]["loot_quality_counts"],
+            json!({"Poor": 0, "Common": 2, "Uncommon": 1, "Rare": 0, "Epic": 1, "Legendary": 3})
+        );
+        assert_eq!(
+            v4["campaign"]["run_history"][0]["loot_by_quality"]["Legendary"],
+            5
+        );
+        assert_eq!(
+            v4["battles"][0]["game"]["attempt"]["loot_quality_counts"]["Rare"],
+            9
+        );
+        assert_eq!(v3_to_v4(v4.clone()).unwrap(), v4);
+        assert!(matches!(
+            migrate(json!({"loot_by_quality": [1, 2]}), 3),
+            Err(SaveError::Migration(_))
+        ));
     }
 }

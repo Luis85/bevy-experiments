@@ -1,11 +1,13 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)] // CLI example / test diagnostics
 //! Earned-reward progression proof. The controller reads only current enemies;
 //! it receives no free purchases, loadout drops or authoritatively altered hits.
+mod support;
 use horde_core::{
     content::{EnemyKind, Mode, Slot, content},
     sim::{Game, Input, Outcome},
     weapons::WeaponClass,
 };
+use support::country_game;
 
 fn fight(game: &mut Game) -> bool {
     game.deploy_country_stage(0, Mode::Personal).unwrap();
@@ -46,9 +48,8 @@ fn buy_weapon(game: &mut Game, name: &str) {
 fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loot() {
     for seed in [1, 2026, 0x1A571167] {
         for country in ["DEU", "BRA", "EGY", "USA", "ISL"] {
-            let mut game = Game::default();
+            let mut game = country_game(country);
             game.seed = seed;
-            game.campaign.choose_start_country(country).unwrap();
             assert_eq!(game.campaign.coins, 0);
             assert_eq!(
                 game.campaign.profile(Mode::Personal).weapon.class,
@@ -142,8 +143,7 @@ fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loo
 #[test]
 fn fresh_country_pistols_can_injure_the_boss_during_authored_exposure() {
     for country in ["DEU", "BRA", "EGY", "USA", "ISL"] {
-        let mut game = Game::default();
-        game.campaign.choose_start_country(country).unwrap();
+        let mut game = country_game(country);
         game.deploy_country_stage(0, Mode::Personal).unwrap();
         let mut attempt = game.attempt.take().unwrap();
         let lane = attempt.lane_count / 2;

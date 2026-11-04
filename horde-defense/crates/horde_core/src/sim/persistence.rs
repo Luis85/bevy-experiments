@@ -88,6 +88,14 @@ impl Game {
     pub fn decode_save_generation(bytes: &[u8]) -> Result<Self, SaveError> {
         decode_generation(bytes)
     }
+    /// Determinism/replay digest: the stable FNV-1a hash (the save checksum
+    /// function) of the canonical serialized save payload. Two games with equal
+    /// digests have identical authoritative state, including RNG streams, so
+    /// golden tests and replay tooling compare one `u64` per tick or run.
+    pub fn state_digest(&self) -> u64 {
+        let payload = serde_json::to_string(self).expect("game state serializes");
+        checksum(payload.as_bytes())
+    }
     pub fn save(&self, path: &Path) -> Result<(), SaveError> {
         tracing::info!(path = %path.display(), "save started");
         let result = self.save_inner(path);
