@@ -866,7 +866,14 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen, hud_view
         egui::CollapsingHeader::new("Local setting").show(ui, |ui| {
             ui.strong(&theme.title);
             ui.label(&theme.setting);
-            muted(ui, format!("{} · {}", theme.weather, theme.lighting));
+            muted(
+                ui,
+                format!(
+                    "{} · {}",
+                    chrome::display_label(&theme.weather),
+                    chrome::display_label(&theme.lighting)
+                ),
+            );
             muted(ui, format!("Field props: {}", theme.props.join(", ")));
         });
     }
