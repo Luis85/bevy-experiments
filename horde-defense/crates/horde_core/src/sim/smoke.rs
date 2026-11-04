@@ -1,0 +1,213 @@
+//! Seeded headless exercises. Un-gated: the shipped `--smoke` command runs them.
+
+use super::*;
+/// Seeded, renderer-free full encounter exercise used by the desktop --smoke
+/// command. The manual bot supplies ordinary geometric aiming inputs only.
+pub fn smoke() -> Result<String, String> {
+    smoke_seed(0x1A571167)
+}
+pub fn smoke_seed(seed: u64) -> Result<String, String> {
+    let mut lines = Vec::new();
+    for mode in [Mode::Personal, Mode::Npc] {
+        let mut g = Game {
+            seed,
+            ..Game::default()
+        };
+        g.campaign.attempts = 1;
+        if mode == Mode::Npc {
+            g.campaign.legacy_features = true;
+            g.campaign.npc.policy = Policy::BossFocus;
+        }
+        for level in 0..5 {
+            let mut cleared = false;
+            for retry in 0..6 {
+                smoke_prepare(&mut g, mode)?;
+                g.deploy(level, mode)?;
+                if mode == Mode::Npc && g.campaign.blueprints[StructureKind::Trap] {
+                    for lane in
+                        construction_lane_order(g.attempt.as_ref().expect("deployed").lane_count)
+                    {
+                        if g.attempt.as_ref().is_some_and(|a| {
+                            a.supply >= content().structure(StructureKind::Trap).supply
+                        }) {
+                            g.place(StructureKind::Trap, lane, 0)?;
+                        }
+                    }
+                }
+                g.set_paused(false);
+                for _ in 0..60 * 600 {
+                    if g.attempt.is_none() {
+                        break;
+                    }
+                    let input = smoke_input(&g);
+                    g.tick(input);
+                }
+                let r = g
+                    .last_result
+                    .as_ref()
+                    .ok_or("Smoke encounter exceeded ten simulated minutes")?;
+                lines.push(format!(
+                    "{mode:?} stage{} attempt{} {:?} {:.1}s · {} kills · {} coins retained",
+                    level + 1,
+                    retry + 1,
+                    r.outcome,
+                    r.elapsed,
+                    r.kills,
+                    r.coins
+                ));
+                if r.outcome == Outcome::Victory {
+                    cleared = true;
+                    break;
+                }
+            }
+            if !cleared {
+                return Err(format!(
+                    "No campaign clear within six earned-reward retries:\n{}",
+                    lines.join("\n")
+                ));
+            }
+        }
+    }
+    Ok(lines.join("\n"))
+}
+/// Legal earned-reward preparation used by deterministic campaign proofs.
+pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
+    if mode == Mode::Npc
+        && g.campaign.blueprint_available(StructureKind::Trap)
+        && !g.campaign.blueprints[StructureKind::Trap]
+        && g.campaign.coins >= content().structure(StructureKind::Trap).blueprint_price
+    {
+        g.campaign.purchase_blueprint(StructureKind::Trap)?;
+    }
+    if mode == Mode::Personal {
+        for id in [
+            "quick_reload",
+            "rifle_training",
+            "steady_hands",
+            "rapid_cycle",
+            "stopping_power",
+            "piercing",
+            "field_fitness",
+            "second_wind",
+            "brace",
+        ] {
+            let node = crate::skill_catalog::skills()
+                .node(id)
+                .expect("shipped smoke purchase route");
+            if !g.campaign.has_node(id)
+                && node.price <= g.campaign.coins
+                && node.prerequisites.iter().all(|p| g.campaign.has_node(p))
+            {
+                g.campaign.purchase_node(id)?;
+            }
+        }
+    }
+    let mut market: Vec<usize> = content()
+        .items
+        .iter()
+        .enumerate()
+        .filter(|(definition, item)| {
+            item.tier > 0
+                && item.tier <= g.campaign.unlocked
+                && g.campaign
+                    .buy_price(*definition)
+                    .is_ok_and(|price| price <= g.campaign.coins)
+                && (mode == Mode::Npc || g.campaign.can_use_weapon(mode, *definition))
+        })
+        .map(|(n, _)| n)
+        .collect();
+    market.sort_by_key(|n| {
+        (
+            match content().items[*n].slot {
+                crate::content::Slot::Ranged => 0,
+                crate::content::Slot::Outfit => 1,
+                crate::content::Slot::Accessory => 2,
+                crate::content::Slot::Melee => 3,
+            },
+            std::cmp::Reverse(content().items[*n].tier),
+            std::cmp::Reverse(
+                if mode == Mode::Npc && content().items[*n].slot == crate::content::Slot::Ranged {
+                    // Compare guaranteed catalogue profiles within a
+                    // tier, including sustained magazine capacity.
+                    let profile = &content().items[*n].npc;
+                    i64::from(profile.damage_dice) * 28
+                        + i64::from(profile.damage_add) * 8
+                        + i64::from(profile.accuracy) * 3
+                        + i64::from(profile.magazine)
+                } else {
+                    0
+                },
+            ),
+        )
+    });
+    let mut bought = [false; 4];
+    for n in market {
+        let def = &content().items[n];
+        let slot = def.slot.index();
+        if !bought[slot]
+            && (g.campaign.equipped(mode, def.slot).tier < def.tier
+                || (g.campaign.equipped(mode, def.slot).tier == def.tier
+                    && g.campaign
+                        .item(if mode == Mode::Personal {
+                            g.campaign.player.loadout[slot]
+                        } else {
+                            g.campaign.npc.loadout[slot]
+                        })
+                        .is_some_and(|item| item.level < g.campaign.shop_item_level())))
+            && g.campaign
+                .buy_price(n)
+                .is_ok_and(|price| price <= g.campaign.coins)
+        {
+            let id = g.campaign.buy_item(n)?;
+            g.campaign.equip(mode, id)?;
+            bought[slot] = true;
+        }
+    }
+    if mode == Mode::Npc {
+        while g.campaign.npc.unspent < 4
+            && g.campaign.coins >= 25
+            && g.campaign.npc.awarded < g.campaign.allowance()
+        {
+            g.campaign.buy_training_point()?;
+        }
+        if g.campaign.npc.unspent >= 4 {
+            g.campaign.train_npc(crate::campaign::NpcTraining::Guns)?;
+        }
+        if g.campaign.npc.guns >= 17 {
+            // A trained defender facing a dense horde trades
+            // optional Aim turns for more legal attack attempts.
+            g.campaign.npc.prefer_aim = false;
+            g.campaign.npc.allow_risk = true;
+        }
+    } else {
+        while g.campaign.player.points > 0
+            && g.campaign.player.body[crate::campaign::BodyAttribute::Vitality]
+                < g.campaign.body_cap()
+        {
+            g.campaign
+                .allocate_body(crate::campaign::BodyAttribute::Vitality)?;
+        }
+    }
+    Ok(())
+}
+pub fn smoke_input(g: &Game) -> Input {
+    let Some(a) = &g.attempt else {
+        return Input::default();
+    };
+    let target = a
+        .enemies
+        .iter()
+        .filter(|e| e.in_view())
+        .min_by(|e, f| e.x.total_cmp(&f.x).then(e.id.cmp(&f.id)));
+    let Some(e) = target else {
+        return Input::default();
+    };
+    Input {
+        aim: [e.x, e.y()],
+        fire: true,
+        melee: e.contact() && a.stamina >= 25.0,
+        heal: a.hp < a.max_hp / 2,
+        brace: a.hp < a.max_hp / 2,
+        ..Input::default()
+    }
+}

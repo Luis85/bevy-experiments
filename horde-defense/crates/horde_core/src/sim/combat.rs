@@ -1,0 +1,426 @@
+//! Enemy attack resolution, damage application and corpse reaping.
+
+use super::*;
+
+impl Game {
+    pub(super) fn enemy_attacks(&mut self, a: &mut Attempt) {
+        for n in 0..a.enemies.len() {
+            let e = &a.enemies[n];
+            if (a.mode == Mode::Personal && e.hp <= 0)
+                || (a.mode == Mode::Npc && e.injury.terminal())
+            {
+                continue;
+            }
+            if a.enemies[n].contact_since.is_some_and(|tick| a.tick > tick) {
+                a.enemies[n].attack_left = a.enemies[n].attack_left.saturating_sub(1);
+                if a.enemies[n].attack_phase == EnemyPhase::Recovery
+                    && a.enemies[n].attack_left == 0
+                {
+                    let duration = seconds(enemy_profile(&a.enemies[n]).windup);
+                    a.enemies[n].attack_phase = EnemyPhase::Windup;
+                    a.enemies[n].attack_left = duration;
+                    a.enemies[n].windup_total = duration;
+                    let e = &a.enemies[n];
+                    let point = [e.x, e.y()];
+                    let meta = EventMetadata {
+                        actor_id: Some(e.id),
+                        target_id: e.target_structure,
+                        lane: Some(e.lane),
+                        duration_ticks: duration,
+                        ..Default::default()
+                    };
+                    a.event_with(
+                        EventKind::Windup,
+                        point,
+                        if meta.target_id.is_none() {
+                            a.defender_position()
+                        } else {
+                            point
+                        },
+                        0,
+                        meta,
+                    );
+                }
+            }
+            let mut turn_shock = 0;
+            if a.mode == Mode::Npc && a.tick.is_multiple_of(60) {
+                turn_shock = a.enemies[n].injury.shock;
+                a.enemies[n].injury.clear_shock();
+                let ht = enemy_ht(a, &a.enemies[n]);
+                if !a.enemies[n].injury.start_turn(&mut a.rng, ht) {
+                    if a.enemies[n].boss {
+                        break;
+                    }
+                    continue;
+                }
+                if a.enemies[n].injury.stunned {
+                    a.enemies[n].injury.recover_stun(&mut a.rng, ht);
+                    continue;
+                }
+                if a.enemies[n].injury.prone {
+                    a.enemies[n].injury.prone = false;
+                    continue;
+                }
+                // Hostiles use natural strikes; knockdown cannot drop a claw.
+                a.enemies[n].injury.weapon_dropped = false;
+                if a.enemies[n].ready_turns > 0 {
+                    a.enemies[n].ready_turns -= 1;
+                    continue;
+                }
+            }
+            let e = &a.enemies[n];
+            let Some(contact_tick) = e.contact_since else {
+                if a.mode == Mode::Npc && a.tick.is_multiple_of(60) {
+                    a.enemies[n].injury.clear_shock();
+                }
+                continue;
+            };
+            if a.tick <= contact_tick {
+                continue;
+            }
+            if a.enemies[n].attack_left > 0 {
+                continue;
+            }
+            if a.mode == Mode::Npc && !a.tick.is_multiple_of(60) {
+                continue;
+            }
+            let e = &a.enemies[n];
+            let d = enemy_profile(e).clone();
+            let origin = [e.x, e.y()];
+            let lane = e.lane;
+            let structure = e
+                .target_structure
+                .and_then(|id| a.structures.iter().position(|s| s.id == id));
+            let actor_id = e.id;
+            let target_id = e.target_structure;
+            let meta = EventMetadata {
+                actor_id: Some(actor_id),
+                target_id,
+                lane: Some(lane),
+                ..Default::default()
+            };
+            let mut damage = if e.boss {
+                content().levels[a.level].boss_damage
+            } else {
+                d.damage
+            };
+            damage = (damage as f32 * a.progression.enemy_damage * a.balance.enemy_damage).round()
+                as i32;
+            if structure.is_some() {
+                damage *= if e.boss && content().levels[a.level].boss == BossKind::SiegeBrute {
+                    2
+                } else {
+                    i32::from(d.structure_damage_multiplier)
+                };
+            }
+            let siege = e.boss && content().levels[a.level].boss == BossKind::SiegeBrute;
+            a.enemies[n].attack_phase = if siege {
+                EnemyPhase::Recovery
+            } else {
+                EnemyPhase::Windup
+            };
+            a.enemies[n].attack_left = if siege {
+                seconds(content().levels[a.level].boss_timing.siege_recovery)
+            } else if a.mode == Mode::Personal {
+                seconds(d.windup)
+            } else {
+                60
+            };
+            a.enemies[n].windup_total = a.enemies[n].attack_left;
+            if !siege {
+                a.event_with(
+                    EventKind::Windup,
+                    origin,
+                    if target_id.is_none() {
+                        a.defender_position()
+                    } else {
+                        origin
+                    },
+                    0,
+                    EventMetadata {
+                        duration_ticks: a.enemies[n].attack_left,
+                        ..meta
+                    },
+                );
+            }
+            if structure.is_none() {
+                a.telemetry.contact_attacks += 1;
+            }
+            if a.mode == Mode::Npc {
+                let l = &content().levels[a.level];
+                let boss = a.enemies[n].boss;
+                let demolition = if structure.is_some() {
+                    if boss && l.boss == BossKind::SiegeBrute {
+                        2
+                    } else {
+                        d.structure_damage_multiplier
+                    }
+                } else {
+                    1
+                };
+                let mut attack = Attack {
+                    skill: if boss { l.boss_npc_skill } else { d.npc_skill } - turn_shock,
+                    damage: Damage {
+                        dice: (if boss {
+                            l.boss_npc_damage_dice
+                        } else {
+                            d.npc_damage_dice
+                        })
+                        .saturating_mul(demolition),
+                        adds: (if boss {
+                            l.boss_npc_damage_add
+                        } else {
+                            d.npc_damage_add
+                        }) * i32::from(demolition)
+                            + ((a.progression.enemy_damage - 1.0) * 6.0).floor() as i32,
+                        kind: DamageKind::Crushing,
+                    },
+                    armor_divisor: 1,
+                };
+                let expected = crate::campaign::mean_basic_damage(attack.damage);
+                attack.damage.adds = (attack.damage.adds as f32
+                    + expected * (a.balance.enemy_damage - 1.0))
+                    .round()
+                    .clamp(-30.0, 1_000_000.0) as i32;
+                if let Some(s) = structure {
+                    let protection = content().structure(a.structures[s].kind).npc.armor;
+                    let result = rules::resolve_object_attack(&mut a.rng, attack, protection);
+                    if result.requires_ready {
+                        a.enemies[n].ready_turns = 1;
+                    }
+                    damage = result.injury * 5;
+                    a.structures[s].hp -= damage;
+                    let mut feedback = result.clone();
+                    feedback.injury = damage;
+                    a.resolution_event(
+                        &feedback,
+                        origin,
+                        [a.structures[s].x(), a.structures[s].y()],
+                        meta,
+                        false,
+                    );
+                    a.resolved(
+                        Some(actor_id),
+                        target_id,
+                        &result,
+                        format!(
+                            "{} → structure in lane {}: {}",
+                            d.name,
+                            lane + 1,
+                            result.explanation()
+                        ),
+                    );
+                } else {
+                    let dodge = a
+                        .injury
+                        .dodge((a.profile.stats.dx + a.profile.stats.ht) / 4 + 3)
+                        + a.defense_bonus;
+                    let result = rules::resolve_attack(
+                        &mut a.rng,
+                        attack,
+                        Some(dodge),
+                        a.profile.npc.armor,
+                        &mut a.injury,
+                        a.profile.stats.ht,
+                    );
+                    if result.requires_ready {
+                        a.enemies[n].ready_turns = 1;
+                    }
+                    if result.defense_roll.is_some() || result.injury > 0 {
+                        a.aim_target = None;
+                        a.aim_seconds = 0;
+                    }
+                    damage = result.injury;
+                    a.hp = a.injury.hp;
+                    a.resolution_event(&result, origin, a.defender_position(), meta, false);
+                    a.resolved(
+                        Some(actor_id),
+                        None,
+                        &result,
+                        format!(
+                            "{} → survivor from lane {}: {}",
+                            d.name,
+                            lane + 1,
+                            result.explanation()
+                        ),
+                    );
+                }
+                a.enemies[n].injury.clear_shock();
+            } else if let Some(s) = structure {
+                a.structures[s].hp -= damage;
+            } else {
+                damage = (damage - a.profile.personal.armor).max(0);
+                if a.statuses.active(StatusId::Brace) {
+                    damage /= 2;
+                }
+                a.hp -= damage;
+            }
+            let point = structure.map_or(a.defender_position(), |s| {
+                [a.structures[s].x(), a.structures[s].y()]
+            });
+            if a.mode == Mode::Personal {
+                a.event_with(
+                    if damage > 0 {
+                        EventKind::Damage
+                    } else {
+                        EventKind::Armor
+                    },
+                    origin,
+                    point,
+                    damage,
+                    meta,
+                );
+            }
+            if structure.is_none() && damage > 0 {
+                a.last_damage_lane = Some(lane);
+                a.telemetry.damage_by_lane[lane as usize] += damage as u64;
+            }
+            if structure.is_some() {
+                a.telemetry.structure_damage_taken += damage.max(0) as u64;
+            }
+            if a.mode == Mode::Npc && a.injury.terminal() {
+                break;
+            }
+        }
+        let destroyed: Vec<_> = a
+            .structures
+            .iter()
+            .filter(|s| s.hp <= 0)
+            .map(|s| [s.x(), s.y()])
+            .collect();
+        for point in destroyed {
+            a.telemetry.structure_losses += 1;
+            a.event(EventKind::StructureLost, point, point, 0);
+        }
+        a.structures.retain(|s| s.hp > 0);
+        for e in &mut a.enemies {
+            if e.target_structure
+                .is_some_and(|id| !a.structures.iter().any(|s| s.id == id))
+            {
+                e.target_structure = None;
+                e.contact_since = None;
+                e.attack_left = 0;
+                e.attack_phase = EnemyPhase::Advance;
+                e.windup_total = 0;
+            }
+        }
+    }
+    pub(super) fn reap(&mut self, a: &mut Attempt) {
+        let defeated: Vec<usize> = a
+            .enemies
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                if a.mode == Mode::Personal {
+                    e.hp <= 0
+                } else {
+                    e.injury.terminal()
+                }
+            })
+            .map(|(n, _)| n)
+            .collect();
+        for n in defeated.into_iter().rev() {
+            let e = a.enemies.remove(n);
+            if !a.reward_ledger.insert(e.id) {
+                continue;
+            }
+            a.corpses.push(CorpseRecord {
+                id: e.id,
+                kind: e.kind,
+                boss_kind: e.boss_kind,
+                at: [e.x, e.y()],
+                visual: e.resolved.as_ref().map(|profile| profile.visual.clone()),
+                tick: a.tick,
+            });
+            let d = enemy_profile(&e);
+            let level = &content().levels[a.level];
+            let base_coins = if e.boss {
+                level.boss_reward + level.completion_bonus
+            } else {
+                d.reward
+            };
+            let coins = (base_coins as f32 * a.modifiers.reward).round().max(1.0) as u64;
+            let xp = if e.boss {
+                40 + a.level as u64 * 15
+            } else {
+                d.xp
+            };
+            a.kill_xp = a
+                .kill_xp
+                .saturating_add(self.campaign.reward(coins, xp, a.mode));
+            a.telemetry.kills_by_kind[e.kind] += 1;
+            if e.boss {
+                a.telemetry.boss_defeat_tick = Some(a.tick);
+            }
+            a.coins += coins;
+            a.kills += 1;
+            a.event_with(
+                EventKind::Kill,
+                [e.x, e.y()],
+                [e.x, e.y()],
+                coins as i32,
+                EventMetadata {
+                    actor_id: Some(e.id),
+                    lane: Some(e.lane),
+                    ..Default::default()
+                },
+            );
+            let drop = e.boss || a.rng.below(100) < 3 || a.kills.is_multiple_of(20);
+            if drop {
+                let available: Vec<usize> = content()
+                    .items
+                    .iter()
+                    .enumerate()
+                    .filter(|(n, i)| *n >= 4 && i.tier > 0 && i.tier <= a.level + 1)
+                    .map(|(n, _)| n)
+                    .collect();
+                if !available.is_empty() {
+                    let definition = available[a.rng.below(available.len() as u64) as usize];
+                    let quality =
+                        crate::quality::catalog().roll(self.seed, a.id, e.id, a.progression.rank);
+                    if let Ok(item_id) = self.campaign.add_item_with_quality(
+                        definition,
+                        a.progression.item_level,
+                        Some(quality),
+                    ) {
+                        a.loot += 1;
+                        a.loot_quality_counts[quality] += 1;
+                        if a.loot_events.len() == crate::quality::MAX_LOOT_EVENTS {
+                            a.loot_events.remove(0);
+                        }
+                        a.loot_events.push(crate::quality::LootEvent {
+                            at: [e.x, e.y()],
+                            item_id,
+                            definition: ItemDefId::at(definition),
+                            level: a.progression.item_level,
+                            quality,
+                            name: content().items[definition].name.clone(),
+                            tick: a.tick,
+                        });
+                        a.note(format!(
+                            "Recovered {} {} · level {} · banked in the shared armory",
+                            quality.name(),
+                            content().items[definition].name,
+                            a.progression.item_level
+                        ));
+                    }
+                }
+            }
+            if a.mode == Mode::Npc {
+                a.note(format!(
+                    "{} in lane {} {} · +{} coins",
+                    enemy_name(a, &e),
+                    e.lane + 1,
+                    if e.injury.dead {
+                        "dead"
+                    } else if e.injury.unconscious {
+                        "unconscious; removed from the encounter"
+                    } else {
+                        "incapacitated"
+                    },
+                    coins
+                ));
+            }
+        }
+    }
+}

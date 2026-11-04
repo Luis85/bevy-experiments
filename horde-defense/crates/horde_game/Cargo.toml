@@ -20,7 +20,7 @@ default = ["review"]
 # Isolated review tooling: model workshop, review fixtures and screens, capture
 # sequence, automated screenshots and performance reports. Playtest packages
 # build without it (`--no-default-features`).
-review = []
+review = ["horde_core/test-support"]
 # Developer conveniences: asset hot reload, change-location tracking and system
 # information diagnostics. (`bevy_dev_tools` is left out: no release matches the
 # locked `bevy_internal` 0.20.1.)
