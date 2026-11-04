@@ -14,6 +14,9 @@ pub enum Quality {
     Epic,
     Legendary,
 }
+impl crate::kind_map::StableKind for Quality {
+    const ALL: &'static [Self] = &Self::ALL;
+}
 impl Quality {
     pub const ALL: [Self; 6] = [
         Self::Poor,

@@ -8,6 +8,8 @@ use crate::skill_catalog::{SkillModifiers, skills, unlocks};
 use crate::weapons::{WeaponClass, WeaponSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+mod view;
+pub use view::{NodeStatus, OfferPreview, UpgradeFocus};
 
 fn legacy_training_default() -> bool {
     true
@@ -997,6 +999,30 @@ impl Campaign {
         let node = skills().node(id).ok_or("Unknown skill node")?;
         if self.legacy_features && self.player.points>0 && node.effects.len()==1 && node.effects.iter().any(|effect|matches!(effect,crate::skill_catalog::SkillEffect::BodyDevelopment{rank,..} if *rank<=self.body_cap())) {{self.player.legacy_graph_points.checked_add(1).ok_or("Legacy graph point ledger exhausted")?;Ok(NodePayment::LegacyBodyPoints(1))}}else{Ok(NodePayment::Coins(node.price))}
     }
+    /// The first unmet catalogue gate (prerequisites, liberation, victories);
+    /// shared by the purchase preflight and `node_status`.
+    pub(crate) fn node_requirement_error(
+        &self,
+        node: &crate::skill_catalog::SkillNode,
+    ) -> Option<String> {
+        if node
+            .prerequisites
+            .iter()
+            .any(|parent| !self.has_node(parent))
+        {
+            return Some("Learn the required prerequisite skills first".into());
+        }
+        if self.liberated_count() < node.minimum_liberated {
+            return Some(format!(
+                "Liberate {} countries first",
+                node.minimum_liberated
+            ));
+        }
+        if self.victories < node.minimum_victories {
+            return Some(format!("Win {} defenses first", node.minimum_victories));
+        }
+        None
+    }
     pub fn can_purchase_node(&self, id: &str) -> Result<(), String> {
         self.preparation()?;
         let node = skills().node(id).ok_or("Unknown skill node")?;
@@ -1006,21 +1032,8 @@ impl Campaign {
         if node.price == 0 {
             return Err("Starter proficiency is granted only at campaign creation".into());
         }
-        if node
-            .prerequisites
-            .iter()
-            .any(|parent| !self.has_node(parent))
-        {
-            return Err("Learn the required prerequisite skills first".into());
-        }
-        if self.liberated_count() < node.minimum_liberated {
-            return Err(format!(
-                "Liberate {} countries first",
-                node.minimum_liberated
-            ));
-        }
-        if self.victories < node.minimum_victories {
-            return Err(format!("Win {} defenses first", node.minimum_victories));
+        if let Some(reason) = self.node_requirement_error(node) {
+            return Err(reason);
         }
         if let NodePayment::Coins(price) = self.node_payment(id)?
             && self.coins < price

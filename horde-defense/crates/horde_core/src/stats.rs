@@ -171,7 +171,7 @@ pub struct RunRecord {
     pub coins: u64,
     pub kill_xp: u64,
     pub completion_xp: u64,
-    pub loot_by_quality: [u32; 6],
+    pub loot_by_quality: crate::kind_map::KindMap<crate::quality::Quality, u32>,
     pub end_hp: i32,
     pub max_hp: i32,
     pub legacy: bool,

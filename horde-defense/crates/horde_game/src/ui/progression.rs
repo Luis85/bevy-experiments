@@ -2,6 +2,7 @@
 use super::{UiCtx, muted};
 use crate::art::{AMBER, MUTED};
 use bevy_egui::egui::{self, Align, Layout, RichText, Sense, vec2};
+use horde_core::campaign::{NodePayment, NodeStatus};
 use horde_core::command::Command;
 mod upgrade_graph;
 use upgrade_graph::{Graph, Node, View};
@@ -30,23 +31,14 @@ fn catalogue_nodes_for(campaign: &horde_core::campaign::Campaign) -> Vec<Node> {
         .nodes
         .iter()
         .map(|node| {
-            let learned = campaign.has_node(&node.id);
-            let requirements = node.prerequisites.iter().all(|id| campaign.has_node(id))
-                && campaign.liberated_count() >= node.minimum_liberated
-                && campaign.victories >= node.minimum_victories;
+            let status = campaign.node_status(&node.id);
             Node {
                 position: vec2(node.position[0], node.position[1]),
                 title: node.name.clone(),
-                state: if learned {
-                    "OWNED".into()
-                } else if !requirements {
-                    "LOCKED".into()
-                } else {
-                    payment_label(campaign, &node.id)
-                },
+                state: status_label(&status),
+                acquired: status == NodeStatus::Owned,
+                available: matches!(status, NodeStatus::Available(_)),
                 icon: upgrade_graph::skill_icon(&node.icon),
-                acquired: learned,
-                available: !learned && campaign.can_purchase_node(&node.id).is_ok(),
                 prerequisites: node
                     .prerequisites
                     .iter()
@@ -119,14 +111,28 @@ pub(super) fn skill_tree(ui: &mut egui::Ui, f: &mut UiCtx, height: f32) {
     });
     ui.ctx().data_mut(|d| d.insert_temp(id, view));
 }
-fn payment_label(campaign: &horde_core::campaign::Campaign, id: &str) -> String {
-    match campaign.node_payment(id) {
-        Ok(horde_core::campaign::NodePayment::LegacyBodyPoints(points)) => {
-            format!("{points} legacy CP")
-        }
-        Ok(horde_core::campaign::NodePayment::Coins(price)) => format!("{price} coins"),
-        Err(_) => "Unavailable".into(),
+fn status_label(status: &NodeStatus) -> String {
+    match status {
+        NodeStatus::Owned => "OWNED".into(),
+        NodeStatus::Locked { .. } => "LOCKED".into(),
+        NodeStatus::Available(payment)
+        | NodeStatus::Blocked {
+            payment: Some(payment),
+            ..
+        } => price_label(*payment),
+        NodeStatus::Blocked { payment: None, .. } => "Unavailable".into(),
     }
+}
+fn price_label(payment: NodePayment) -> String {
+    match payment {
+        NodePayment::LegacyBodyPoints(points) => format!("{points} legacy CP"),
+        NodePayment::Coins(price) => format!("{price} coins"),
+    }
+}
+fn payment_label(campaign: &horde_core::campaign::Campaign, id: &str) -> String {
+    campaign
+        .node_payment(id)
+        .map_or_else(|_| "Unavailable".into(), price_label)
 }
 fn skill_detail(
     ui: &mut egui::Ui,
@@ -203,9 +209,6 @@ mod tests {
     use super::*;
     use horde_core::content::StructureKind;
     use horde_core::content::content;
-    use horde_core::sim::Game;
-    use horde_core::survivors::SurvivorId;
-    use horde_core::world::world;
     fn structure_node(
         kind: StructureKind,
         rank: u32,
@@ -314,33 +317,31 @@ mod tests {
         }
     }
     #[test]
-    fn reopened_country_uses_the_same_ever_liberated_gate_as_the_purchase_preflight() {
-        let mut f = crate::ui::test_support::test_frontend();
-        f.game = Game::default();
-        f.game.campaign.choose_survivor(SurvivorId::Rook).unwrap();
-        f.game.campaign.choose_start_country("DEU").unwrap();
-        let count = world().country("DEU").unwrap().level_count();
-        for stage in 0..count {
-            f.game.campaign.record_country_stage_clear(stage).unwrap();
-        }
-        f.game.campaign.world.cleared.retain(|id| id != "DEU");
-        f.game.campaign.coins = 1000;
-        f.game.campaign.purchase_node("field_fitness").unwrap();
-        assert_eq!(f.game.campaign.liberated_count(), 1);
-        assert!(f.game.campaign.world.cleared.is_empty());
-        assert!(
-            f.game
-                .campaign
-                .can_purchase_node("companion_contact")
-                .is_ok()
+    fn node_status_maps_to_catalogue_labels() {
+        assert_eq!(status_label(&NodeStatus::Owned), "OWNED");
+        assert_eq!(
+            status_label(&NodeStatus::Locked {
+                reason: "Win 3 defenses first".into()
+            }),
+            "LOCKED"
         );
-        let index = horde_core::skill_catalog::skills()
-            .nodes
-            .iter()
-            .position(|n| n.id == "companion_contact")
-            .unwrap();
-        let nodes = catalogue_nodes(&f.ctx());
-        assert!(nodes[index].available);
-        assert_ne!(nodes[index].state, "LOCKED");
+        assert_eq!(
+            status_label(&NodeStatus::Available(NodePayment::Coins(40))),
+            "40 coins"
+        );
+        assert_eq!(
+            status_label(&NodeStatus::Blocked {
+                payment: Some(NodePayment::LegacyBodyPoints(1)),
+                reason: "Need coins".into()
+            }),
+            "1 legacy CP"
+        );
+        assert_eq!(
+            status_label(&NodeStatus::Blocked {
+                payment: None,
+                reason: "Ledger exhausted".into()
+            }),
+            "Unavailable"
+        );
     }
 }

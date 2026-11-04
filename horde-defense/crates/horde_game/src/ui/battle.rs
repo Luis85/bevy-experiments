@@ -14,7 +14,6 @@ use horde_core::{
     content::{Mode, StructureKind, content},
     ordnance::{OrdnanceKind, ThrowRequest},
     sim::Input,
-    survivors::{Appearance, SurvivorId},
     world::world,
 };
 
@@ -537,7 +536,7 @@ fn battle_arena(canvas: Rect, construction: bool) -> Rect {
     )
 }
 fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
-    let a = f.game.attempt.as_ref().unwrap();
+    let view = hud::view_model(f.game).expect("battle HUD needs an attempt");
     let left = Rect::from_min_size(canvas.min + vec2(14., 12.), vec2(322., 108.));
     ui.scope_builder(egui::UiBuilder::new().max_rect(left), |ui| {
         egui::Frame::new()
@@ -550,7 +549,7 @@ fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
                     crate::visual_assets::portrait(
                         ui.painter(),
                         f.textures,
-                        a.mode == Mode::Npc || a.profile.appearance == Appearance::Female,
+                        view.female_portrait,
                         portrait.center(),
                         portrait.size(),
                     );
@@ -558,38 +557,24 @@ fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
                         ui.set_width(250.);
                         progress(
                             ui,
-                            a.hp.max(0) as f32 / a.max_hp as f32,
-                            format!(
-                                "{} · HP {} / {}",
-                                if a.mode == Mode::Personal {
-                                    f.game
-                                        .campaign
-                                        .selected_survivor
-                                        .map_or("YOU", SurvivorId::name)
-                                } else {
-                                    "MARA"
-                                },
-                                a.hp.max(0),
-                                a.max_hp
-                            ),
+                            view.hp as f32 / view.max_hp as f32,
+                            format!("{} · HP {} / {}", view.defender, view.hp, view.max_hp),
                             RED,
                         );
                         ui.horizontal(|ui| {
-                            ui.strong(format!("{} / {} ammo", a.ammo, a.magazine));
+                            ui.strong(format!("{} / {} ammo", view.ammo, view.magazine));
                             ui.label(
                                 RichText::new(format!(
                                     "{} {:.0}/{:.0}",
-                                    if a.mode == Mode::Npc { "FP" } else { "Stamina" },
-                                    a.stamina,
-                                    a.max_stamina
+                                    view.stamina_label, view.stamina, view.max_stamina
                                 ))
                                 .size(12.0),
                             );
                         });
-                        hud::action(ui, a);
+                        hud::action(ui, &view.action);
                         ui.horizontal(|ui| {
-                            hud::danger(ui, a);
-                            hud::dps(ui, a);
+                            hud::danger(ui, &view.danger);
+                            hud::dps(ui, &view.dps);
                         });
                     });
                 });
@@ -606,48 +591,47 @@ fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
             .inner_margin(6)
             .show(ui, |ui| {
                 ui.set_width(176.);
-                if let Some(boss) = a.enemies.iter().find(|e| e.boss) {
-                    progress(
+                match view.boss {
+                    hud::BossReadout::Present {
+                        health,
+                        critical,
+                        hp,
+                    } => progress(
                         ui,
-                        boss.hp.max(0) as f32 / boss.max_hp as f32,
-                        if boss.critically_wounded(a.mode) {
-                            format!("CRITICAL · {} HP", boss.injury.hp)
+                        health,
+                        if critical {
+                            format!("CRITICAL · {hp} HP")
                         } else {
-                            format!("BOSS · {} HP", boss.hp.max(0))
+                            format!("BOSS · {hp} HP")
                         },
                         RED,
-                    );
-                } else {
-                    ui.strong(format!(
-                        "BOSS IN {:02}:{:02}",
-                        a.boss_countdown() as u32 / 60,
-                        a.boss_countdown() as u32 % 60
-                    ));
+                    ),
+                    hud::BossReadout::Incoming { seconds } => {
+                        ui.strong(format!("BOSS IN {:02}:{:02}", seconds / 60, seconds % 60));
+                    }
                 }
                 ui.label(
                     RichText::new(format!(
                         "{:.0}s · {} kills · +{} coins",
-                        a.elapsed(),
-                        a.kills,
-                        a.coins
+                        view.elapsed, view.kills, view.coins
                     ))
                     .size(12.),
                 );
                 ui.label(
                     RichText::new(format!(
                         "{} lanes · {:.0} yd · threat {}",
-                        a.lane_count, a.width_yards, a.progression.rank
+                        view.lanes, view.width_yards, view.threat_rank
                     ))
                     .size(10.0),
                 )
                 .on_hover_text(format!(
                     "{} difficulty, frozen at deployment",
-                    a.balance.preset.name()
+                    view.difficulty
                 ));
                 ui.label(
                     RichText::new(format!(
                         "{}-enemy groups · gear Lv{}",
-                        a.progression.batch_size, a.progression.item_level
+                        view.batch_size, view.gear_level
                     ))
                     .size(10.0),
                 );
@@ -671,8 +655,7 @@ fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx) {
         .profile
         .modifiers
         .unlocked(horde_core::skill_catalog::unlocks::MOLOTOV);
-    let charges = a.ordnance.charges;
-    let cooldowns = a.ordnance.cooldowns;
+    let ordnance = &a.ordnance;
     let spacing = 4.0;
     let button_width = ((ui.available_width() - 2.0 * spacing) / 3.0).max(1.0);
     ui.spacing_mut().item_spacing.x = spacing;
@@ -686,7 +669,7 @@ fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx) {
             let hint = if selection == AttackSelection::Gun {
                 format!("{class}: hold {} to fire.", f.settings.bindings[Action::Fire as usize])
             } else if unlocked {
-                format!("{label}: {} charges. Select, then click a ground cell to throw.", charges[selection.ordnance().expect("throwable").index()])
+                format!("{label}: {} charges. Select, then click a ground cell to throw.", ordnance.charges(selection.ordnance().expect("throwable")))
             } else {
                 format!("Learn {label} handling in the Ordnance branch of Survival skills after this attempt.")
             };
@@ -702,17 +685,13 @@ fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     });
     let helper = if let Some(kind) = f.battle.attack_selection.ordnance() {
-        let index = kind.index();
-        if charges[index] == 0 {
+        let (charges, cooldown) = (ordnance.charges(kind), ordnance.cooldown(kind));
+        if charges == 0 {
             "Empty · renewed next attempt".to_owned()
-        } else if cooldowns[index] > 0 {
-            format!(
-                "{} left · ready {:.1}s",
-                charges[index],
-                cooldowns[index] as f32 / 60.0
-            )
+        } else if cooldown > 0 {
+            format!("{} left · ready {:.1}s", charges, cooldown as f32 / 60.0)
         } else {
-            format!("{} left · click ground cell", charges[index])
+            format!("{} left · click ground cell", charges)
         }
     } else {
         "Hold fire to shoot".to_owned()
@@ -729,7 +708,7 @@ fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx) {
         return;
     };
     let a = f.game.attempt.as_ref().expect("active battle");
-    let ready = a.ordnance.charges[kind.index()] > 0 && a.ordnance.cooldowns[kind.index()] == 0;
+    let ready = a.ordnance.ready(kind);
     let color = if ready { AMBER } else { RED };
     let painter = ui.painter_at(r);
     for column in 0..=arena.width.ceil() as u8 {
@@ -829,7 +808,7 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx) {
             a.progression.item_level
         ),
     );
-    hud::dps(ui, a);
+    hud::dps(ui, &hud::dps_readout(a));
     muted(ui, &content().levels[a.level].name);
     if a.mode == Mode::Personal {
         muted(

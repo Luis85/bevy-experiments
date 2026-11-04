@@ -363,7 +363,7 @@ pub struct Attempt {
     #[serde(default)]
     pub kill_xp: u64,
     #[serde(default)]
-    pub loot_quality_counts: [u32; 6],
+    pub loot_quality_counts: crate::kind_map::KindMap<crate::quality::Quality, u32>,
     #[serde(default = "legacy_lane_count")]
     pub lane_count: u8,
     #[serde(default)]
@@ -468,6 +468,32 @@ impl Attempt {
     /// Saved authoritative clock; transient presentation events may expire first.
     pub fn brace_remaining_ticks(&self) -> u32 {
         self.statuses.remaining(StatusId::Brace)
+    }
+    /// Whether the brace stance covers `tick` (at or before the current tick).
+    /// The saved status clock is authoritative; past ticks after the status
+    /// ended fall back to retained brace ability events (`value == 0`).
+    pub fn brace_active_at(&self, tick: u64) -> bool {
+        if tick > self.tick {
+            return false;
+        }
+        let duration = u64::from(BRACE_DURATION_TICKS);
+        let remaining = self.statuses.remaining(StatusId::Brace);
+        if remaining > 0 {
+            let end = self.tick.saturating_add(u64::from(remaining));
+            let start = end.saturating_sub(duration);
+            if tick >= start && tick < end {
+                return true;
+            }
+        }
+        if tick == self.tick {
+            return false;
+        }
+        self.events.iter().rev().any(|event| {
+            event.kind == EventKind::Ability
+                && event.value == 0
+                && event.tick <= tick
+                && tick - event.tick < duration
+        })
     }
     /// The defender's timed status effects (saved, authoritative).
     pub fn statuses(&self) -> &Statuses {
@@ -936,7 +962,7 @@ impl Game {
             dps: crate::stats::DpsTracker::new(),
             gear_snapshot,
             kill_xp: 0,
-            loot_quality_counts: [0; 6],
+            loot_quality_counts: Default::default(),
             lane_count,
             loot_events: Vec::new(),
             progression,
@@ -1531,11 +1557,10 @@ impl Game {
     }
 
     fn throw_ordnance(&mut self, a: &mut Attempt, request: ThrowRequest) {
-        let index = request.kind.index();
+        let kind = request.kind;
         if a.mode != Mode::Personal
             || !ordnance::valid_cell_for_arena(request.cell, a.lane_count, a.width_yards)
-            || a.ordnance.charges[index] == 0
-            || a.ordnance.cooldowns[index] > 0
+            || !a.ordnance.ready(kind)
             || a.reload_left > 0
             || a.melee_commit > 0
             || a.ordnance.projectiles.len() + a.ordnance.fire_zones.len()
@@ -1603,9 +1628,9 @@ impl Game {
         };
         a.next_id += 1;
         a.ordnance.next_id += 1;
-        a.ordnance.charges[index] -= 1;
-        a.ordnance.spent[index] += 1;
-        a.ordnance.cooldowns[index] = (definition.cooldown_ticks as f32
+        a.ordnance.charges[kind] -= 1;
+        a.ordnance.spent[kind] += 1;
+        a.ordnance.cooldowns[kind] = (definition.cooldown_ticks as f32
             * modifiers.ordnance_cooldown_multiplier)
             .round()
             .clamp(1.0, 3600.0) as u32;
@@ -1613,7 +1638,7 @@ impl Game {
             EventKind::Throw,
             a.defender_position(),
             ordnance::cell_center(request.cell),
-            index as i32,
+            kind.event_value(),
             EventMetadata {
                 actor_id: Some(projectile.id),
                 lane: Some(request.cell[1]),
@@ -1625,7 +1650,7 @@ impl Game {
         a.ordnance.projectiles.push(projectile);
     }
     fn advance_ordnance(&mut self, a: &mut Attempt) {
-        for cooldown in &mut a.ordnance.cooldowns {
+        for cooldown in a.ordnance.cooldowns.values_mut() {
             *cooldown = cooldown.saturating_sub(1);
         }
         let mut pulses = Vec::new();
@@ -2989,7 +3014,7 @@ impl Game {
                         Some(quality),
                     ) {
                         a.loot += 1;
-                        a.loot_quality_counts[quality as usize] += 1;
+                        a.loot_quality_counts[quality] += 1;
                         if a.loot_events.len() == crate::quality::MAX_LOOT_EVENTS {
                             a.loot_events.remove(0);
                         }
@@ -3108,7 +3133,7 @@ impl Game {
             coins: a.coins,
             kill_xp: a.kill_xp,
             completion_xp,
-            loot_by_quality: a.loot_quality_counts,
+            loot_by_quality: a.loot_quality_counts.clone(),
             end_hp: a.hp,
             max_hp: a.max_hp,
             legacy: a.gear_snapshot.is_empty(),
@@ -3707,4 +3732,41 @@ pub fn maximum_progression_render_fixture() -> Result<Game, String> {
     g.set_paused(true);
     validate_game(&g, 0)?;
     Ok(g)
+}
+
+#[cfg(test)]
+mod brace_tests {
+    use super::*;
+
+    #[test]
+    fn brace_active_at_reads_the_status_clock_then_retained_ability_events() {
+        let mut game = Game::default();
+        game.deploy(0, Mode::Personal).unwrap();
+        game.attempt.as_mut().unwrap().profile.brace = true;
+        game.tick(Input {
+            brace: true,
+            ..Default::default()
+        });
+        let born = game.attempt.as_ref().unwrap().tick;
+        for _ in 0..3 {
+            game.tick(Input::default());
+        }
+        let a = game.attempt.as_mut().unwrap();
+        assert!(a.brace_remaining_ticks() > 0);
+        assert!(a.brace_active_at(a.tick));
+        assert!(a.brace_active_at(born));
+        assert!(!a.brace_active_at(born.saturating_sub(1)));
+        assert!(!a.brace_active_at(a.tick + 1));
+        // Without the status clock only past ticks covered by the event qualify.
+        a.statuses.remove(StatusId::Brace);
+        assert!(!a.brace_active_at(a.tick));
+        let event_tick = a
+            .events
+            .iter()
+            .find(|e| e.kind == EventKind::Ability && e.value == 0)
+            .expect("brace event retained")
+            .tick;
+        assert!(a.brace_active_at(event_tick));
+        assert!(!a.brace_active_at(event_tick.saturating_sub(1)));
+    }
 }

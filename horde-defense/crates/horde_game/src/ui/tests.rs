@@ -1729,13 +1729,25 @@ fn selected_grenade_uses_one_press_cell_and_never_repeats_from_hold_or_fire_togg
     h.publish_combat(f, vec![Event::PointerMoved(art::world(arena, 28.0, 9.0))]);
     f.step();
     let a = f.game.attempt.as_ref().unwrap();
-    assert_eq!(a.ordnance.spent[0], 1);
+    assert_eq!(
+        a.ordnance
+            .spent(horde_core::ordnance::OrdnanceKind::Grenade),
+        1
+    );
     assert_eq!(a.ordnance.projectiles[0].cell, [19, 3]);
     assert_eq!(a.shots, 0);
     for _ in 0..180 {
         f.step();
     }
-    assert_eq!(f.game.attempt.as_ref().unwrap().ordnance.spent[0], 1);
+    assert_eq!(
+        f.game
+            .attempt
+            .as_ref()
+            .unwrap()
+            .ordnance
+            .spent(horde_core::ordnance::OrdnanceKind::Grenade),
+        1
+    );
     assert!(!f.battle.fire_latched);
 }
 #[test]

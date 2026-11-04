@@ -2,7 +2,7 @@ mod support;
 use horde_core::campaign::Placement;
 use horde_core::content::{EnemyKind, Mode, StructureKind, content};
 use horde_core::sim::{Game, Input};
-use support::legacy_game;
+use support::{decode_value, legacy_game};
 
 fn prepared_game() -> Game {
     let mut game = legacy_game();
@@ -14,22 +14,6 @@ fn prepared_game() -> Game {
         game.campaign.purchase_blueprint(kind).unwrap();
     }
     game
-}
-
-fn decode_value(value: serde_json::Value) -> Result<Game, String> {
-    let payload = serde_json::to_string(&value).unwrap();
-    let checksum = payload
-        .as_bytes()
-        .iter()
-        .fold(0xcbf29ce484222325_u64, |hash, byte| {
-            (hash ^ u64::from(*byte)).wrapping_mul(0x100000001b3)
-        });
-    Ok(Game::decode_save_generation(
-        &serde_json::to_vec(&serde_json::json!({
-            "version": 1, "checksum": checksum, "payload": payload,
-        }))
-        .unwrap(),
-    )?)
 }
 
 #[test]

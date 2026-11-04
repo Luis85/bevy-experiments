@@ -5,7 +5,7 @@ use super::persistence::SaveError;
 use serde_json::{Map, Value};
 
 /// Envelope version written by this build.
-pub const SAVE_VERSION: u32 = 3;
+pub const SAVE_VERSION: u32 = 5;
 
 /// Upgrade a payload saved at envelope `from` to [`SAVE_VERSION`].
 pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
@@ -16,6 +16,8 @@ pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
         value = match version {
             1 => v1_to_v2(value)?,
             2 => v2_to_v3(value),
+            3 => v3_to_v4(value)?,
+            4 => v4_to_v5(value)?,
             _ => unreachable!("every version below SAVE_VERSION has a step"),
         };
     }
@@ -240,6 +242,110 @@ fn migrate_unlock_flags(object: &mut Map<String, Value>) {
     }
 }
 
+/// v3 quality order (`Quality` declaration order at save format v3). A v3
+/// `loot_by_quality` / `loot_quality_counts` slot `n` meant `V3_QUALITIES[n]`.
+const V3_QUALITIES: &[&str] = &["Poor", "Common", "Uncommon", "Rare", "Epic", "Legendary"];
+/// v3 positional quality arrays, by field name (unique across the save tree).
+const V3_QUALITY_ARRAYS: &[&str] = &["loot_by_quality", "loot_quality_counts"];
+
+/// v3 -> v4: the quality-indexed loot counters (attempts, reports, run
+/// history, nested expedition games) become quality-keyed maps. Values already
+/// in v4 shape are left untouched, so the step is idempotent.
+fn v3_to_v4(mut value: Value) -> Result<Value, SaveError> {
+    rewrite_v3(&mut value)?;
+    Ok(value)
+}
+
+fn rewrite_v3(value: &mut Value) -> Result<(), SaveError> {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object.iter_mut() {
+                if V3_QUALITY_ARRAYS.contains(&key.as_str())
+                    && let Value::Array(slots) = child
+                {
+                    if slots.len() != V3_QUALITIES.len() {
+                        return Err(SaveError::Migration(format!(
+                            "v3 field {key} has {} entries; expected {}",
+                            slots.len(),
+                            V3_QUALITIES.len()
+                        )));
+                    }
+                    let map: Map<String, Value> = V3_QUALITIES
+                        .iter()
+                        .map(|quality| (*quality).to_owned())
+                        .zip(std::mem::take(slots))
+                        .collect();
+                    *child = Value::Object(map);
+                    continue;
+                }
+                rewrite_v3(child)?;
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                rewrite_v3(item)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// v4 `OrdnanceKind` order (declaration order at save format v4). A v4
+/// ordnance counter slot `n` meant `V4_ORDNANCE_KINDS[n]`.
+const V4_ORDNANCE_KINDS: &[&str] = &["Grenade", "Molotov"];
+/// v4 positional per-kind counters of an attempt's `ordnance` state.
+const V4_ORDNANCE_ARRAYS: &[&str] = &["cooldowns", "charges", "issued", "spent"];
+
+/// v4 -> v5: the per-kind ordnance counters of every attempt's `ordnance`
+/// state (including nested expedition games) become kind-keyed maps. Values
+/// already in v5 shape are left untouched, so the step is idempotent.
+fn v4_to_v5(mut value: Value) -> Result<Value, SaveError> {
+    rewrite_v4(&mut value)?;
+    Ok(value)
+}
+
+fn rewrite_v4(value: &mut Value) -> Result<(), SaveError> {
+    match value {
+        Value::Object(object) => {
+            for (key, child) in object.iter_mut() {
+                if key == "ordnance"
+                    && let Value::Object(state) = child
+                {
+                    for field in V4_ORDNANCE_ARRAYS {
+                        if let Some(slots) = state.get_mut(*field)
+                            && let Value::Array(entries) = slots
+                        {
+                            if entries.len() != V4_ORDNANCE_KINDS.len() {
+                                return Err(SaveError::Migration(format!(
+                                    "v4 ordnance {field} has {} entries; expected {}",
+                                    entries.len(),
+                                    V4_ORDNANCE_KINDS.len()
+                                )));
+                            }
+                            let map: Map<String, Value> = V4_ORDNANCE_KINDS
+                                .iter()
+                                .map(|kind| (*kind).to_owned())
+                                .zip(std::mem::take(entries))
+                                .collect();
+                            *slots = Value::Object(map);
+                        }
+                    }
+                    continue;
+                }
+                rewrite_v4(child)?;
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                rewrite_v4(item)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -422,5 +528,75 @@ mod tests {
         );
         assert_eq!(v3["battles"][0]["game"]["attempt"], json!({"enemies": []}));
         assert_eq!(v2_to_v3(v3.clone()), v3);
+    }
+
+    #[test]
+    fn frozen_v3_quality_order_matches_the_kind_that_replaced_it() {
+        use crate::quality::Quality;
+        assert_eq!(serde_names(&Quality::ALL), V3_QUALITIES);
+    }
+
+    #[test]
+    fn v3_quality_arrays_become_maps_everywhere_and_the_step_is_idempotent() {
+        let v3 = json!({
+            "attempt": {"loot_quality_counts": [0, 2, 1, 0, 1, 3]},
+            "campaign": {"run_history": [{"loot_by_quality": [1, 0, 0, 0, 0, 5]}]},
+            "battles": [{"game": {"attempt": {"loot_quality_counts": [0, 0, 0, 9, 0, 0]}}}]
+        });
+        let v4 = migrate(v3, 3).unwrap();
+        assert_eq!(
+            v4["attempt"]["loot_quality_counts"],
+            json!({"Poor": 0, "Common": 2, "Uncommon": 1, "Rare": 0, "Epic": 1, "Legendary": 3})
+        );
+        assert_eq!(
+            v4["campaign"]["run_history"][0]["loot_by_quality"]["Legendary"],
+            5
+        );
+        assert_eq!(
+            v4["battles"][0]["game"]["attempt"]["loot_quality_counts"]["Rare"],
+            9
+        );
+        assert_eq!(v3_to_v4(v4.clone()).unwrap(), v4);
+        assert!(matches!(
+            migrate(json!({"loot_by_quality": [1, 2]}), 3),
+            Err(SaveError::Migration(_))
+        ));
+    }
+
+    #[test]
+    fn frozen_v4_ordnance_order_matches_the_kind_that_replaced_it() {
+        use crate::kind_map::StableKind;
+        use crate::ordnance::OrdnanceKind;
+        assert_eq!(serde_names(OrdnanceKind::ALL), V4_ORDNANCE_KINDS);
+    }
+
+    #[test]
+    fn v4_ordnance_arrays_become_maps_everywhere_and_the_step_is_idempotent() {
+        let v4 = json!({
+            "attempt": {"ordnance": {
+                "projectiles": [], "next_id": 3,
+                "cooldowns": [10, 61], "charges": [1, 4], "issued": [2, 5], "spent": [1, 1]
+            }},
+            "battles": [{"game": {"attempt": {"ordnance": {"charges": [0, 7]}}}}]
+        });
+        let v5 = migrate(v4, 4).unwrap();
+        let o = &v5["attempt"]["ordnance"];
+        assert_eq!(o["cooldowns"], json!({"Grenade": 10, "Molotov": 61}));
+        assert_eq!(o["charges"], json!({"Grenade": 1, "Molotov": 4}));
+        assert_eq!(o["issued"], json!({"Grenade": 2, "Molotov": 5}));
+        assert_eq!(o["spent"], json!({"Grenade": 1, "Molotov": 1}));
+        assert_eq!(o["next_id"], 3);
+        assert_eq!(
+            v5["battles"][0]["game"]["attempt"]["ordnance"]["charges"]["Molotov"],
+            7
+        );
+        assert_eq!(v4_to_v5(v5.clone()).unwrap(), v5);
+        assert!(matches!(
+            migrate(json!({"ordnance": {"charges": [1]}}), 4),
+            Err(SaveError::Migration(_))
+        ));
+        // Arrays with these names outside an ordnance state are not ordnance.
+        let other = json!({"npc": {"spent": [1, 2, 3]}});
+        assert_eq!(v4_to_v5(other.clone()).unwrap(), other);
     }
 }

@@ -1,19 +1,17 @@
+mod support;
 use horde_core::{
     campaign::{Campaign, RecommendationAction},
     content::{ItemDefinition, Mode, content},
 };
+use support::trained_campaign;
 
-fn trained_campaign() -> Campaign {
-    let mut campaign = Campaign::default();
-    campaign.reward(130, 0, Mode::Personal);
-    campaign.purchase_node("quick_reload").unwrap();
-    campaign.purchase_node("rifle_training").unwrap();
-    campaign
+fn rifle_trained_campaign() -> Campaign {
+    trained_campaign(130, &["quick_reload", "rifle_training"])
 }
 
 #[test]
 fn npc_issued_rifle_stays_unavailable_to_fresh_personal_loadouts_after_training() {
-    let mut campaign = trained_campaign();
+    let mut campaign = rifle_trained_campaign();
     assert!(content().items[0].npc_only);
     assert!(campaign.can_use_weapon(Mode::Npc, 0));
     assert!(!campaign.can_use_weapon(Mode::Personal, 0));
@@ -44,7 +42,7 @@ fn npc_issued_rifle_stays_unavailable_to_fresh_personal_loadouts_after_training(
 #[test]
 fn personal_rifles_require_a_real_purchase_or_loot_instance_as_well_as_training() {
     for purchased in [false, true] {
-        let mut campaign = trained_campaign();
+        let mut campaign = rifle_trained_campaign();
         let before = campaign.coins;
         let id = if purchased {
             campaign.buy_item(4).unwrap()
@@ -71,9 +69,7 @@ fn personal_rifles_require_a_real_purchase_or_loot_instance_as_well_as_training(
 
 #[test]
 fn recommendations_do_not_offer_training_to_unlock_npc_issued_equipment() {
-    let mut campaign = Campaign::default();
-    campaign.reward(200, 0, Mode::Personal);
-    campaign.purchase_node("quick_reload").unwrap();
+    let campaign = trained_campaign(200, &["quick_reload"]);
     let recommendation = campaign.recommendation(Mode::Personal);
     assert!(
         !matches!(recommendation.action, RecommendationAction::LearnNode(ref id) if id == "rifle_training")
