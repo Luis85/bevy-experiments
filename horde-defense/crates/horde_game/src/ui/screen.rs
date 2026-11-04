@@ -35,12 +35,12 @@ impl Screen {
         Screen::History,
         Screen::Settings,
     ];
-    /// Whether the persistent header (tabs and field status) is drawn.
-    pub fn shows_header(self, tab: Tab) -> bool {
+    /// Whether the persistent LASTLIGHT header (wallet, Menu, History,
+    /// Settings) is drawn. Camp and the Journey upgrades home share it.
+    pub fn shows_header(self) -> bool {
         match self {
-            Screen::Menu | Screen::SurvivorSelection | Screen::Battle | Screen::Results => false,
-            Screen::Camp => !matches!(tab, Tab::Skills | Tab::Engineering),
-            Screen::History | Screen::Settings => true,
+            Screen::Menu | Screen::SurvivorSelection | Screen::Battle => false,
+            Screen::Camp | Screen::Results | Screen::History | Screen::Settings => true,
         }
     }
     /// Label of the settings screen's save-and-return action.
@@ -101,8 +101,9 @@ mod tests {
                     .starts_with("Save and return to")
             );
         }
-        assert!(Screen::History.shows_header(Tab::World));
-        assert!(!Screen::Camp.shows_header(Tab::Skills));
-        assert!(Screen::Camp.shows_header(Tab::Armory));
+        assert!(Screen::History.shows_header());
+        assert!(Screen::Camp.shows_header());
+        assert!(Screen::Results.shows_header());
+        assert!(!Screen::Battle.shows_header());
     }
 }

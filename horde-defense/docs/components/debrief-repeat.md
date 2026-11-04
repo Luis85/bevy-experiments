@@ -4,7 +4,7 @@ id: debrief-repeat
 title: "Continue or leave the journey"
 parent: journey-upgrades
 status: Implemented
-source: "crates/horde_game/src/ui/results.rs::results; crates/horde_core/src/sim/journey.rs::continue_journey, leave_journey"
+source: "crates/horde_game/src/ui/results.rs::results, actions; crates/horde_core/src/sim/journey.rs::continue_journey, leave_journey"
 ---
 
 # Continue or leave the journey

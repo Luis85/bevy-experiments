@@ -1,7 +1,7 @@
 //! Campaign selection and the persistent preparation shell.
 use super::{
-    Screen, Tab, UiCtx, armory, briefing, character, chrome, engineering, feedback, muted,
-    navigation, operations, primary, progress, skills, status, survivor,
+    Screen, Tab, UiCtx, armory, briefing, character, chrome, feedback, muted, navigation,
+    operations, primary, progress, status, survivor,
 };
 use crate::{
     art::{AMBER, GREEN, INK, PANEL, RED},
@@ -14,7 +14,9 @@ use horde_core::{command::Command, content::Mode, world::world};
 pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
     camp_controls(root.ctx(), f);
     if matches!(f.tab, Tab::Skills | Tab::Engineering) {
-        upgrade_surface(root, f);
+        // The complete tree has one home. Old tab routes (remembered tabs,
+        // saved navigation) land there instead of rendering a second copy.
+        f.open_preparation(f.tab);
         return;
     }
     navigation::camp_navigation(root, f);
@@ -32,7 +34,7 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
         .show(root, |ui| {
             if f.tab == Tab::World {
                 country_action(ui, f);
-            } else if f.tab != Tab::Operations {
+            } else if f.tab != Tab::Operations || f.game.attempt().is_some() {
                 briefing::mission_actions(ui, f);
             }
             ui.add_space(5.0);
@@ -68,84 +70,9 @@ pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
                     Tab::Character => character(ui, f),
                     Tab::Survivor => survivor(ui, f),
                     Tab::Armory => armory(ui, f),
-                    Tab::Skills => skills(ui, f),
-                    Tab::Engineering => engineering(ui, f),
+                    // Redirected to the upgrade home above.
+                    Tab::Skills | Tab::Engineering => {}
                     Tab::Operations => operations(ui, f),
-                });
-        });
-}
-fn upgrade_surface(root: &mut egui::Ui, f: &mut UiCtx) {
-    egui::Panel::top("upgrade_navigation")
-        .frame(
-            egui::Frame::new()
-                .fill(INK)
-                .inner_margin(egui::Margin::symmetric(12, 6)),
-        )
-        .show(root, |ui| {
-            ui.horizontal(|ui| {
-                ui.menu_button("Camp", |ui| {
-                    if ui.button("Back to briefing").clicked() {
-                        f.open_preparation(Tab::Briefing);
-                    }
-                    if ui.button("Campaign map").clicked() {
-                        f.open_campaign();
-                    }
-                    if ui.button("Equipment").clicked() {
-                        f.open_preparation(Tab::Armory);
-                    }
-                    if ui.button("Save campaign").clicked() {
-                        f.request_save(SaveIntent::Manual);
-                    }
-                    time_controls(ui, f);
-                });
-                if ui
-                    .selectable_label(f.tab == Tab::Skills, "Skills")
-                    .clicked()
-                {
-                    f.open_preparation(Tab::Skills);
-                }
-                if ui
-                    .selectable_label(f.tab == Tab::Engineering, "Fortifications")
-                    .clicked()
-                {
-                    f.open_preparation(Tab::Engineering);
-                }
-                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                    if ui.button("Settings").clicked() {
-                        f.open_settings();
-                    }
-                    muted(
-                        ui,
-                        if f.game.global_paused() {
-                            "World paused"
-                        } else {
-                            "World running"
-                        },
-                    );
-                });
-            });
-        });
-    egui::Panel::bottom("upgrade_mission")
-        .min_size(76.0)
-        .frame(egui::Frame::new().fill(INK).inner_margin(10))
-        .show(root, |ui| {
-            briefing::mission_actions(ui, f);
-            if f.status.message_error || f.status.save_pending || f.status.practice_profile {
-                status(ui, f);
-            }
-        });
-    egui::CentralPanel::default()
-        .frame(egui::Frame::new().fill(INK).inner_margin(14))
-        .show(root, |ui| {
-            egui::ScrollArea::vertical()
-                .id_salt(("upgrade_page", f.tab as u8))
-                .auto_shrink([false, false])
-                .show(ui, |ui| {
-                    if f.tab == Tab::Skills {
-                        skills(ui, f);
-                    } else {
-                        engineering(ui, f);
-                    }
                 });
         });
 }
@@ -383,17 +310,23 @@ fn toggle_time(f: &mut UiCtx) {
 }
 fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
     let paused = f.game.global_paused() || f.game.attempt().is_some_and(|attempt| attempt.paused);
-    let label = if paused && f.game.attempt().is_some() {
-        "Return and resume defense"
-    } else if paused {
+    // One clock control with one name. The footer's primary "Return to
+    // active defense" stays the one visible return route on the page; the
+    // hover says that resuming also brings a live main defense back.
+    let label = if paused {
         "Resume world clock"
     } else {
         "Pause world clock"
     };
+    let returns = if f.game.attempt().is_some() {
+        " Resuming returns you to your active defense."
+    } else {
+        ""
+    };
     if ui
         .button(label)
         .on_hover_text(format!(
-            "{} pauses every battle and strategic deadline. Personal combat runs at 1×.",
+            "{} pauses every battle and strategic deadline. Personal combat runs at 1×.{returns}",
             f.settings.bindings[Action::Pause as usize]
         ))
         .clicked()

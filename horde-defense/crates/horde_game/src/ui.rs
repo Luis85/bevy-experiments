@@ -123,7 +123,7 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
     if f.screen == Screen::Battle {
         controls(ctx, f);
     }
-    if f.screen.shows_header(f.tab) {
+    if f.screen.shows_header() {
         navigation::header(root, f, view_accent);
     }
     navigation::field_status(root, f);
@@ -194,11 +194,10 @@ mod character;
 use self::character::{character, mode_selector, policy, survivor};
 mod armory;
 use self::armory::armory;
-mod progression;
-use self::progression::{engineering, skills};
 mod battle;
 mod damage;
 mod loot;
+mod progression;
 mod reticle;
 use self::battle::{battle, controls, gather_combat_input};
 mod results;

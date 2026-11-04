@@ -184,3 +184,68 @@ fn liberated_country_continue_opens_map_and_does_not_autoselect_or_pay_again() {
     assert_eq!(f.game.campaign().coins, coins);
     assert_eq!(f.game.campaign().run_history.len(), records);
 }
+
+#[test]
+fn the_upgrade_home_shares_the_camp_header_and_orders_its_actions() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game.withdraw();
+    f.game.campaign_mut().coins = 42;
+    f.screen = Screen::Results;
+    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    for label in [
+        "LASTLIGHT",
+        "Menu",
+        "History",
+        "Settings",
+        "Journey upgrades",
+    ] {
+        assert_eq!(text_count(&output, label), 1, "{label} once");
+    }
+    assert_eq!(text_count(&output, "42 coins"), 1, "one wallet on screen");
+    let x = |label: &str| {
+        output
+            .shapes
+            .iter()
+            .find_map(|s| labeled_bounds(&s.shape, label))
+            .unwrap_or_else(|| panic!("{label} painted"))
+            .left()
+    };
+    let order = ["Try again", "Run analysis", "More", "Leave journey"];
+    for pair in order.windows(2) {
+        assert!(x(pair[0]) < x(pair[1]), "{} before {}", pair[0], pair[1]);
+    }
+    // The camp row is drawn here too, so its destinations are not repeated
+    // as action buttons; "Journey upgrades" is the selected tab, not a title.
+    for label in ["Briefing", "Equipment", "Character", "World map"] {
+        assert_eq!(text_count(&output, label), 1, "{label} only in the row");
+    }
+    // "More" keeps only what the row does not list.
+    h.click(f, View::ResultsWithChrome, "More");
+    let output = h.frame(f, View::ResultsWithChrome, vec![]);
+    for label in ["Plan or replay a defense", "Save journey"] {
+        assert_eq!(text_count(&output, label), 1, "{label} in More");
+    }
+    for label in [
+        "World map",
+        "Character",
+        "Mara",
+        "Operations",
+        "Fortifications",
+    ] {
+        assert!(
+            text_count(&output, label) <= 1,
+            "{label} not repeated in More"
+        );
+    }
+    h.frame(
+        f,
+        View::ResultsWithChrome,
+        vec![key_event(Key::Escape, true)],
+    );
+    h.click(f, View::ResultsWithChrome, "Menu");
+    f.flush_for_test();
+    assert!(f.screen == Screen::Menu);
+}

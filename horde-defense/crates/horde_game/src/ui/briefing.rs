@@ -201,39 +201,35 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
         );
     }
 }
+/// The camp footer's primary action. A live main defense always offers the
+/// one return to it; other Prepare pages lead to the briefing, and only the
+/// briefing deploys.
 pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
-    if f.tab != Tab::Briefing
-        && f.game.attempt().is_none()
-        && f.game.campaign().world.start.is_some()
-    {
-        if primary(
-            ui,
-            if f.game.campaign().journey_active {
-                "Back to journey upgrades"
-            } else {
-                "Back to world map"
-            },
-        ) {
-            if f.game.campaign().journey_active {
-                f.open_upgrades();
-            } else {
-                f.open_campaign();
-            }
-        }
-        return;
-    }
     if f.game.attempt().is_some() {
         if primary(ui, "Return to active defense") {
             f.go(Screen::Battle);
+            f.battle.fire_latched = false;
         }
         return;
     }
     let Some(country) = f.game.campaign().world.active_country() else {
         if primary(ui, "Choose a country") {
-            f.go_tab(Tab::World);
+            f.open_campaign();
         }
         return;
     };
+    if f.tab != Tab::Briefing {
+        ui.horizontal_wrapped(|ui| {
+            if primary(ui, "Go to briefing") {
+                f.open_preparation(Tab::Briefing);
+            }
+            muted(
+                ui,
+                format!("{} · {}", country.name, chrome::defender_name(f)),
+            );
+        });
+        return;
+    }
     let name = country.name.clone();
     f.campaign.stage = f.campaign.stage.min(
         f.game
@@ -258,8 +254,5 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             f.campaign.stage + 1,
             chrome::defender_name(f)
         ));
-        if f.tab != Tab::Briefing && ui.small_button("Back to briefing").clicked() {
-            f.open_preparation(Tab::Briefing);
-        }
     });
 }

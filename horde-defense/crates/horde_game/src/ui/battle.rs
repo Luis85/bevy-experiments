@@ -419,7 +419,9 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         } else {
                             "Retreat & train"
                         })
-                        .on_hover_text("Return to skills with every earned coin and item retained.")
+                        .on_hover_text(
+                            "Withdraw to Journey upgrades. Every earned coin and item is retained.",
+                        )
                         .clicked()
                     {
                         f.battle.fire_latched = false;
@@ -441,20 +443,6 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                             f.dispatch(Command::SetPaused(true), "");
                             f.battle.fire_latched = false;
                             f.request_save(SaveIntent::Menu);
-                        }
-                        if ui
-                            .button(if observed {
-                                "Recall survivor"
-                            } else {
-                                "Withdraw"
-                            })
-                            .clicked()
-                        {
-                            f.battle.fire_latched = false;
-                            f.dispatch(
-                                Command::Withdraw,
-                                "Deployment recalled; earned rewards retained.",
-                            );
                         }
                         ui.separator();
                         ui.checkbox(&mut f.battle.inspect_log, "Combat log");

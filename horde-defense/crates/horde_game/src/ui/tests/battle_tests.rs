@@ -721,3 +721,29 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
     battle::gather_combat_input(&h.ctx, &mut f.ctx());
     assert_eq!(f.battle.pending.throw.unwrap().cell, [11, 2]);
 }
+
+#[test]
+fn retreat_is_the_one_visible_withdraw_and_management_keeps_its_tools() {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.deploy();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    h.click(f, View::Battle, "Management");
+    let output = h.frame(f, View::Battle, vec![]);
+    for kept in [
+        "Settings",
+        "Save deployment",
+        "Save and return to menu",
+        "Combat log",
+    ] {
+        assert_eq!(text_count(&output, kept), 1, "Management keeps {kept}");
+    }
+    assert_eq!(text_count(&output, "Retreat & train"), 1);
+    for gone in ["Withdraw", "Recall survivor"] {
+        assert_eq!(
+            text_count(&output, gone),
+            0,
+            "{gone} duplicates the retreat"
+        );
+    }
+}

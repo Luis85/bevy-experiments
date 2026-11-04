@@ -1,5 +1,5 @@
 //! Operations presentation. Game changes are queued typed intents.
-use super::{Screen, UiCtx, battle, chrome, damage, loot, muted, reticle};
+use super::{UiCtx, battle, chrome, damage, loot, muted, reticle};
 use crate::art::{self, AMBER, RED};
 use bevy_egui::egui::{self, Sense, vec2};
 use view::country_name;
@@ -29,12 +29,8 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         },
     );
     if view.field_active {
-        ui.horizontal_wrapped(|ui| {
-            ui.strong("Your active field");
-            if ui.button("Return to active defense").clicked() {
-                f.go(Screen::Battle);
-            }
-        });
+        // The footer's primary action is the one return to that field.
+        muted(ui, "Your active field waits while you manage operations.");
     }
     if !view.outbreaks.is_empty() {
         chrome::section(ui, "Urgent outbreaks");

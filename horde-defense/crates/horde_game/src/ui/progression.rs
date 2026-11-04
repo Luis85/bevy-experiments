@@ -7,21 +7,6 @@ use horde_core::command::Command;
 mod upgrade_graph;
 use upgrade_graph::{Graph, Node, View};
 
-pub(super) fn skills(ui: &mut egui::Ui, f: &mut UiCtx) {
-    ui.horizontal_wrapped(|ui| {
-        ui.heading("Journey upgrades");
-        ui.colored_label(AMBER, format!("{} coins", f.game.campaign().coins));
-    });
-    skill_tree(ui, f, visible_height(ui));
-}
-pub(super) fn engineering(ui: &mut egui::Ui, f: &mut UiCtx) {
-    skills(ui, f);
-}
-fn visible_height(ui: &egui::Ui) -> f32 {
-    (ui.clip_rect().bottom() - ui.cursor().top())
-        .min(ui.available_height())
-        .max(0.0)
-}
 fn catalogue_nodes(f: &UiCtx) -> Vec<Node> {
     catalogue_nodes_for(f.game.campaign())
 }

@@ -135,6 +135,8 @@ enum View {
     WorldWithChrome,
     Armory,
     Results,
+    /// The upgrade home with the global header and field strip, as drawn.
+    ResultsWithChrome,
     History,
     Feedback,
 }
@@ -196,6 +198,11 @@ impl Harness {
                         egui::CentralPanel::default().show(ui, |ui| armory(ui, f));
                     }
                     View::Results => results(ui, f),
+                    View::ResultsWithChrome => {
+                        navigation::header(ui, f, 1.0);
+                        navigation::field_status(ui, f);
+                        results(ui, f);
+                    }
                     View::History => history::show(ui, f),
                     View::Feedback => {
                         egui::CentralPanel::default().show(ui, |ui| status(ui, f));
@@ -319,6 +326,17 @@ fn shape_has_text(shape: &egui::epaint::Shape, label: &str) -> bool {
         _ => false,
     }
 }
+/// How many painted text runs read exactly `label`.
+fn text_count(output: &FullOutput, label: &str) -> usize {
+    fn count(shape: &egui::epaint::Shape, label: &str) -> usize {
+        match shape {
+            egui::epaint::Shape::Text(text) => usize::from(text.galley.text() == label),
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().map(|s| count(s, label)).sum(),
+            _ => 0,
+        }
+    }
+    output.shapes.iter().map(|c| count(&c.shape, label)).sum()
+}
 fn pointer_event(pressed: bool) -> Event {
     Event::PointerButton {
         pos: pos2(200.0, 200.0),
@@ -397,6 +415,7 @@ mod character_tests;
 mod feedback_tests;
 mod history_tests;
 mod menu_tests;
+mod navigation_tests;
 mod operations_tests;
 mod results_tests;
 mod settings_tests;

@@ -5,7 +5,7 @@ use crate::{
     runner::SaveIntent,
 };
 use bevy_egui::egui::{self, Align, Color32, FontId, Layout, RichText, Stroke, pos2};
-use horde_core::{command::Command, content::Mode};
+use horde_core::{command::Command, content::Mode, skill_catalog::CampaignFeature};
 
 pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
     let header = egui::Panel::top("header")
@@ -27,7 +27,6 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                         ui,
                         match f.screen {
                             Screen::Battle => "Hold the line",
-                            Screen::Results => "Journey upgrades",
                             Screen::Settings => "Settings",
                             Screen::History => "Run analysis",
                             _ => "Field command",
@@ -38,10 +37,12 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
                     if f.screen != Screen::Settings && ui.button("Settings").clicked() {
                         f.open_settings();
                     }
-                    if f.screen == Screen::Camp && ui.small_button("History").clicked() {
+                    // Camp and the upgrade home share one header grammar.
+                    let between_runs = matches!(f.screen, Screen::Camp | Screen::Results);
+                    if between_runs && ui.small_button("History").clicked() {
                         f.open_history();
                     }
-                    if f.screen == Screen::Camp && ui.small_button("Menu").clicked() {
+                    if between_runs && ui.small_button("Menu").clicked() {
                         f.dispatch(Command::SetPaused(true), "");
                         f.request_save(SaveIntent::Menu);
                     }
@@ -75,6 +76,50 @@ pub(super) fn header(root: &mut egui::Ui, f: &mut UiCtx, accent: f32) {
     );
 }
 
+/// One destination in the camp navigation row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum NavEntry {
+    /// The Journey upgrades home (`Screen::Results`).
+    Upgrades,
+    Tab(Tab),
+}
+impl NavEntry {
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            NavEntry::Upgrades => "Journey upgrades",
+            NavEntry::Tab(Tab::Briefing) => "Briefing",
+            NavEntry::Tab(Tab::Armory) => "Equipment",
+            NavEntry::Tab(Tab::Character) => "Character",
+            NavEntry::Tab(Tab::Survivor) => "Mara",
+            NavEntry::Tab(Tab::World) => "World map",
+            NavEntry::Tab(Tab::Operations) => "Operations",
+            // Redirected to the upgrade home; never listed.
+            NavEntry::Tab(Tab::Skills | Tab::Engineering) => "Journey upgrades",
+        }
+    }
+}
+
+/// The single camp navigation row, in order. The upgrade home is listed while
+/// no main attempt is live (and on the home itself); Mara and Operations
+/// follow their unlocks.
+/// The complete upgrade tree has exactly one route: the home.
+pub(super) fn camp_entries(f: &UiCtx) -> Vec<NavEntry> {
+    let mut entries = Vec::with_capacity(7);
+    // On the home itself the tab stays listed so the row shows where you are.
+    if f.game.attempt().is_none() || f.screen == Screen::Results {
+        entries.push(NavEntry::Upgrades);
+    }
+    entries.extend([Tab::Briefing, Tab::Armory, Tab::Character].map(NavEntry::Tab));
+    if f.game.campaign().has_feature(CampaignFeature::Companion) {
+        entries.push(NavEntry::Tab(Tab::Survivor));
+    }
+    entries.push(NavEntry::Tab(Tab::World));
+    if f.operations_available() {
+        entries.push(NavEntry::Tab(Tab::Operations));
+    }
+    entries
+}
+
 pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
     if f.game.campaign().world.start.is_none() {
         return;
@@ -83,83 +128,43 @@ pub(super) fn camp_navigation(root: &mut egui::Ui, f: &mut UiCtx) {
         .frame(
             egui::Frame::new()
                 .fill(PANEL)
-                .inner_margin(egui::Margin::symmetric(18, 7)),
+                .inner_margin(egui::Margin::symmetric(18, 6)),
         )
         .show(root, |ui| {
             ui.horizontal_wrapped(|ui| {
-                if f.game.attempt().is_none() && ui.button("Back to journey upgrades").clicked() {
-                    f.open_upgrades();
-                }
-                let response = ui.selectable_label(f.tab == Tab::World, "Campaign");
-                if response.clicked() {
-                    f.go_tab(Tab::World);
-                }
-                feedback::tab_marker(
-                    ui,
-                    &response,
-                    "Campaign",
-                    f.tab == Tab::World,
-                    f.settings.reduced_effects,
-                );
-                let prep = !matches!(f.tab, Tab::World | Tab::Operations);
-                let response = ui.selectable_label(prep, "Prepare");
-                if response.clicked() {
-                    f.open_preparation(f.nav.last_prepare_tab);
-                }
-                feedback::tab_marker(
-                    ui,
-                    &response,
-                    "Prepare",
-                    !matches!(f.tab, Tab::World | Tab::Operations),
-                    f.settings.reduced_effects,
-                );
-                if f.operations_available() {
-                    let response = ui.selectable_label(f.tab == Tab::Operations, "Operations");
-                    if response.clicked() {
-                        f.go_tab(Tab::Operations);
+                for entry in camp_entries(f) {
+                    let selected = match entry {
+                        NavEntry::Upgrades => f.screen == Screen::Results,
+                        NavEntry::Tab(tab) => f.screen == Screen::Camp && f.tab == tab,
+                    };
+                    let label = entry.label();
+                    let response = ui.selectable_label(selected, label);
+                    if response.clicked() && !selected {
+                        match entry {
+                            NavEntry::Upgrades => f.open_upgrades(),
+                            // After a round, Equipment opens on the newest find.
+                            NavEntry::Tab(Tab::Armory) if f.screen == Screen::Results => {
+                                f.campaign.mode =
+                                    f.game.last_result().map_or(Mode::Personal, |r| r.mode);
+                                f.armory.sort = super::armory::ArmorySort::Newest;
+                                f.armory.selected_item =
+                                    f.game.campaign().items.last().map(|i| i.id);
+                                f.open_preparation(Tab::Armory);
+                            }
+                            NavEntry::Tab(Tab::World) => f.open_campaign(),
+                            NavEntry::Tab(Tab::Operations) => f.go_tab(Tab::Operations),
+                            NavEntry::Tab(tab) => f.open_preparation(tab),
+                        }
                     }
                     feedback::tab_marker(
                         ui,
                         &response,
-                        "Operations",
-                        f.tab == Tab::Operations,
+                        label,
+                        selected,
                         f.settings.reduced_effects,
                     );
                 }
             });
-            if !matches!(f.tab, Tab::World | Tab::Operations) {
-                ui.add_space(4.0);
-                ui.horizontal_wrapped(|ui| {
-                    for (tab, label) in [
-                        (Tab::Briefing, "Briefing"),
-                        (Tab::Armory, "Equipment"),
-                        (Tab::Character, "Your character"),
-                        (Tab::Survivor, "Mara"),
-                        (Tab::Skills, "Skills"),
-                        (Tab::Engineering, "Fortifications"),
-                    ] {
-                        if tab == Tab::Survivor
-                            && !f
-                                .game
-                                .campaign()
-                                .has_feature(horde_core::skill_catalog::CampaignFeature::Companion)
-                        {
-                            continue;
-                        }
-                        if tab == Tab::Engineering
-                            && !f.game.campaign().has_feature(
-                                horde_core::skill_catalog::CampaignFeature::Construction,
-                            )
-                        {
-                            continue;
-                        }
-                        if ui.selectable_label(f.tab == tab, label).clicked() {
-                            f.go_tab(tab);
-                            f.nav.last_prepare_tab = tab;
-                        }
-                    }
-                });
-            }
         });
 }
 
@@ -189,10 +194,6 @@ pub(super) fn field_status(root: &mut egui::Ui, f: &mut UiCtx) {
                             "Mara"
                         }
                     ));
-                    if ui.button("Return to active defense").clicked() {
-                        f.go(Screen::Battle);
-                        f.battle.fire_latched = false;
-                    }
                 }
                 if fields > 0 {
                     ui.label(format!("{fields} live expeditions"));

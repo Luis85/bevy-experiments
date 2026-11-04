@@ -327,21 +327,25 @@ impl UiCtx<'_> {
         self.runtime.clear_input();
         self.request_save(SaveIntent::Menu);
     }
+    /// The Journey upgrades home: the one route to the complete tree. A live
+    /// main defense stays paused there and is reached from its primary action.
     pub(super) fn open_upgrades(&mut self) {
-        if self.game.attempt().is_some() {
-            self.open_preparation(Tab::Skills);
-            return;
-        }
         self.dispatch(Command::SetPaused(true), "");
         self.go(Screen::Results);
         self.battle.fire_latched = false;
         self.runtime.clear_input();
     }
     pub(super) fn open_preparation(&mut self, tab: Tab) {
-        if matches!(tab, Tab::Skills | Tab::Engineering)
-            && self.game.attempt().is_none()
-            && self.game.campaign().world.start.is_some()
-        {
+        // The old Skills and Fortifications tabs redirect to the one home;
+        // Fortifications frames the Fortification branch there.
+        if matches!(tab, Tab::Skills | Tab::Engineering) {
+            if tab == Tab::Engineering {
+                self.campaign.improvement_focus = self
+                    .game
+                    .campaign()
+                    .recommendation_fallback(UpgradeFocus::Fortification)
+                    .map(|r| r.action);
+            }
             self.open_upgrades();
             return;
         }
