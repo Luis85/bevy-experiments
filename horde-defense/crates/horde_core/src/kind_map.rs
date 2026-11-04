@@ -27,11 +27,12 @@ impl<K: StableKind, V> KindMap<K, V> {
         self.0.iter().map(|(kind, value)| (*kind, value))
     }
     /// Values in kind order, like iterating the array this map replaced.
-    pub fn iter(&self) -> impl Iterator<Item = &V> {
-        self.0.values()
-    }
     pub fn values(&self) -> impl Iterator<Item = &V> {
         self.0.values()
+    }
+    /// Alias of [`Self::values`], kept for call sites that read as array iteration.
+    pub fn iter(&self) -> impl Iterator<Item = &V> {
+        self.values()
     }
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> {
         self.0.values_mut()

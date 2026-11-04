@@ -43,8 +43,8 @@ and renderer frame time need their separate native playtest evidence.
 
 ## Separation of responsibilities
 
-`sim.rs` contains the serializable battle model, fixed-step local simulation and
-authoritative events. It performs no filesystem IO. `sim/parallel.rs` owns
+`sim.rs` contains the serializable battle model and `tick` orchestration; its
+phases live in `sim/{director,movement,structures,npc,manual,combat,lifecycle}.rs`. It performs no filesystem IO. `sim/parallel.rs` owns
 multi-expedition dispatch, equipment reservations and shared reward settlement.
 `sim/persistence.rs` is the storage adapter: versioned envelopes, atomic commit,
 generation recovery and full-state validation. Child modules share private model

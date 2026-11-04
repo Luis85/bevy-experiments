@@ -577,7 +577,7 @@ mod tests {
         assert!(content().validate().is_ok());
     }
     #[test]
-    fn authoring_rejects_missing_starters_reordered_profiles_and_overflow_weights() {
+    fn authoring_accepts_reordered_profiles_but_rejects_bad_starters_and_weights() {
         let mut data = content().clone();
         data.items.clear();
         assert!(data.validate().is_err());

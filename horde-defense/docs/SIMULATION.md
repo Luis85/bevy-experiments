@@ -1,6 +1,6 @@
 # Simulation and persistence
 
-The authoritative model lives in horde_core::sim without Bevy types/filesystem IO. sim/parallel owns worker coordination and sim/persistence validates/commits generations. Each unpaused Game::tick advances 1/60 simulated second. Attempt.lane_count, width_yards and copied balance freeze at deployment: Normal begins3/12 and grows to 17/30, while legacy missing geometry preserves11/30 and old multipliers. The defender is(0.5,lane_count/2), contact x=1.5; presentation cannot change those coordinates.
+The authoritative model lives in horde_core::sim without Bevy types/filesystem IO. phase logic lives in sim/{director,movement,structures,npc,manual,combat,lifecycle}; sim/parallel owns worker coordination and sim/persistence validates/commits generations. Each unpaused Game::tick advances 1/60 simulated second. Attempt.lane_count, width_yards and copied balance freeze at deployment: Normal begins3/12 and grows to 17/30, while legacy missing geometry preserves11/30 and old multipliers. The defender is(0.5,lane_count/2), contact x=1.5; presentation cannot change those coordinates.
 
 Personal shots intersect enemy circles along the actual aim ray, sorted by distance; the first circle receives the hit unless the owned penetration skill enables the second. There is no attack roll in personal mode. Melee selects only the front contact enemy in the cursor's lane. A legal strike cancels reload and commits thirty ticks of exclusive recovery; the seventy-two-tick strike cooldown and stamina are separate restrictions.
 

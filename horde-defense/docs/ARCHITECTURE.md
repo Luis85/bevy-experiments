@@ -12,7 +12,13 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | `campaign`, `strategy` | Currency, unique gear, advancement, recruits, duties and outbreaks | Hit detection or cosmetic effects |
 | `status` | Generic timed `StatusEffect`s (`StatusId`, ticks, stacks, magnitude) kept as a sorted per-actor `Statuses` list with apply/refresh/tick/expire/validate helpers | Deciding what a status does to combat (the simulation reads it) |
 | `rules` | Saved RNG and supported dice, defense, protection and injury procedures | NPC target policy or animation |
-| `sim` | One-field schedules, actors, collision/contact, maneuvers and reward events | UI, audio, filesystem calls |
+| `sim` (`sim.rs`) | `Game`/`Attempt` model types, deployment wrappers, `tick` orchestration and re-exports; one-field schedules, actors, collision/contact, maneuvers and reward events (phase logic lives in the child modules below) | UI, audio, filesystem calls |
+| `sim/director`, `sim/movement`, `sim/structures` | Spawn director and enemy materialisation; enemy movement and blocking; turret and trap behaviour | Rule resolution |
+| `sim/npc`, `sim/manual` | NPC maneuver decisions and target policy; personal-mode manual actions including ordnance | Enemy movement |
+| `sim/combat` | Enemy attack resolution, damage application and corpse reaping | Spawn pacing |
+| `sim/lifecycle`, `sim/telemetry` | Deploy/retry/withdraw/settle/repeat runs; `CombatTelemetry` counters | Per-tick combat |
+| `sim/smoke`, `sim/fixtures` | Seeded headless exercises used by `--smoke` (un-gated); render/review fixtures behind the `test-support` feature (enabled by core tests and the `review` feature of `horde_game`) | Anything the shipped game needs outside `--smoke` |
+| `campaign/*` | `campaign.rs` keeps `Campaign`, `Default` and `validate`; children: `armory` (items, presets, reservations), `progression` (skills, body, survivors, levels), `ledger` (coin/XP transactions, run records), `world` (blueprints, layouts, country progress), `loadout` (profiles, comparison, recommendations), `view` | Hit detection or cosmetic effects |
 | `sim/events` | Typed `SimEvent` stream: saved per-`Game` sequence numbers, the transient `drain_events` outbox and expedition forwarding | Presentation decisions or persistence of the outbox |
 | `sim/parallel` | Worker battle ownership, reservations, idempotent settlement and reported `SettlementIssue`s | A second combat implementation |
 | `sim/persistence` | Versioned coherent generations (envelope v5 with `ruleset_version` and a content-ID fingerprint; drift only warns), checksums, typed `SaveError`, validation and atomic writes | New combat decisions during load |
