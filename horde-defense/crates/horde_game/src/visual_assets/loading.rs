@@ -73,7 +73,6 @@ impl ArtCheck {
 pub struct VisualAssets {
     handles: [Handle<Image>; 7],
     slots: [ArtSlot; 7],
-    flash_masks: Option<Arc<FlashMasks>>,
     rig_atlas: Option<RigAtlas>,
     enemy_check: ArtCheck,
     survivor_check: ArtCheck,
@@ -88,7 +87,6 @@ impl VisualAssets {
         Self {
             handles,
             slots: Default::default(),
-            flash_masks: None,
             rig_atlas: None,
             enemy_check: ArtCheck::default(),
             survivor_check: ArtCheck::default(),
@@ -145,11 +143,12 @@ impl VisualAssets {
             self.enemy_art_rejected = self
                 .enemy_check
                 .rejected("Enemy sprite art", enemy_art_problem(walkers, actors));
-            self.flash_masks = walkers
-                .zip(actors)
-                .map(|(walkers, actors)| Arc::new(FlashMasks::from_images(walkers, actors)));
-            let masks = self.flash_masks.clone();
-            context.data_mut(|data| data.insert_temp(flash_masks_id(), masks));
+            publish_flash_masks(
+                context,
+                walkers
+                    .zip(actors)
+                    .map(|(walkers, actors)| Arc::new(FlashMasks::from_images(walkers, actors))),
+            );
         }
         if changed[ACTORS] {
             let problem = rgba(ACTORS).and_then(survivor_art_problem);
@@ -191,9 +190,13 @@ impl VisualAssets {
 fn flash_masks_id() -> egui::Id {
     egui::Id::new("lastlight.art.flash_masks.v1")
 }
-/// The current hit-flash masks. Like the art textures they describe, they are
-/// published into the egui context (keeping `ArtTextures` a plain `Copy`
-/// value), and replaced or removed whenever their sheets reload.
+/// Replaces (or, with `None`, removes) the hit-flash masks. They live only in
+/// the egui context, like the art textures they describe, which keeps
+/// `ArtTextures` a plain `Copy` value and leaves one source of truth.
+pub(super) fn publish_flash_masks(context: &egui::Context, masks: Option<Arc<FlashMasks>>) {
+    context.data_mut(|data| data.insert_temp(flash_masks_id(), masks));
+}
+/// The current hit-flash masks, as last published by `refresh`.
 pub(super) fn flash_masks(context: &egui::Context) -> Option<Arc<FlashMasks>> {
     context
         .data(|data| data.get_temp::<Option<Arc<FlashMasks>>>(flash_masks_id()))
