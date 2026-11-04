@@ -60,4 +60,21 @@ After it passes, update `REVIEW_FOUNDATION.md`.
 
 ## Playtest findings
 
-(filled in during Wave 3)
+Source: native 1440×900 review captures (`menu`, `world`, `briefing`, `intro`, `battle`, `damage`, `construction`, `results`, `armory`, `history-empty`, …) from a `--features dev` build, plus a code read of the cue mapping.
+
+**Battle readability and feedback** (`ui/battle.rs`, `ui/hud.rs`, `runner/runtime.rs`, `audio.rs`/`sfx.rs`)
+1. The opening HUD shows `DPS -0.0`. Negative zero leaks through `{:.1}`; clamp it to zero.
+2. The `Grenade` and `Molotov` selectors look like plain text and give no locked reason. Show them as disabled buttons with a hover reason (for example "Learn in the Ordnance branch").
+3. The intel box reads "1-enemy groups" / "2-enemy groups". Reword it to "groups of 2".
+4. The coin pop-up (`+18c`) is small, grey and low contrast against the ground. Give it the amber coin colour with an outline, matching the damage numbers.
+5. Sound gaps. A `Kill` has no cue; the closest available is reusing an impact variant at a lower gain. There is no stinger for victory, defeat or boss kill on `AttemptFinished`. A purchase or upgrade in the tree has no confirmation cue. Enemy `Windup` has no tell (optional). Reuse existing banks where possible; any new WAV must come from `scripts/generate_audio.py` with provenance.
+
+**Camp, armory and flow** (`ui/armory.rs`, `ui/briefing.rs`, `ui/history.rs`, `ui/progression.rs`, construction panel)
+6. In the armory item list, the `Equipped` status labels sit at ragged x positions. Use a right-aligned status column.
+7. When the selected item is already equipped, the armory comparison repeats identical columns, and `Equip selected` is disabled without a reason. Say "Currently equipped" and hide the redundant column.
+8. The briefing shows the raw id `ground_fog` ("Reclaimed farm track · ground_fog · dawn"). Humanise the weather and lighting ids. The battle pause panel does the same (`ui/battle.rs:860`).
+9. At 1440×900 the construction side panel clips its last button ("Clear country plan"). The structure rows wrap their supply cost onto a second line. Fit the panel or let it scroll visibly, and keep each cost on one line.
+10. Empty history: the `All modes` combo box sits 8 px higher than its siblings, and the empty state has no next step. Align the filter row and add "Finish or retreat from a defense to record a run".
+11. The Journey tree truncates node labels ("Survivor foundatio…"). Wrap them to two lines instead of eliding.
+
+**Pacing of the first 15 minutes.** The first defense is 180 s to the boss with a cap of 20 and three lanes. Starter-node prices are 20–40 c and a defense banks about 100 c, so 3–5 runs per tier matches the documented target. No rebalance is made without human evidence.
