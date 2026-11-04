@@ -220,7 +220,7 @@ Evidence is the foundation-hardening branch (merge `51b31ac` plus the final-revi
 | Item | Status | Evidence |
 |---|---|---|
 | P0.1 Version control and CI | Done | `horde-defense` is tracked; `ci.yml` matrix and `scripts/dev.ps1 verify` cover it, now including the `--no-default-features` and `--features dev` clippy/test runs. |
-| P0.2 Core command API | Partially | `Game::apply` and typed `CommandError` live in `horde_core/src/command.rs`; widgets only see `&Game`. Core fields are still `pub` (deferred by ruling). |
+| P0.2 Core command API | Done | `Game::apply` and typed `CommandError` live in `horde_core/src/command.rs`; widgets only see `&Game`. `Game` fields are crate-private behind accessors; frontends mutate through `apply`, runtime plumbing, `Game::staging()` for synthetic scenes, and tests through the dev-only `test-support` feature. Other core aggregates (`Campaign`, `Attempt`, …) still have `pub` fields. |
 | P0.3 Typed sim event stream | Done | `sim/events.rs` `SimEvent` stream; final-tick events delivered; settlement failures surface as `SettlementIssue`. |
 | P0.4 Stable IDs in saves | Partially | Items, unlocks, statuses and enum-keyed `KindMap`s use IDs (saves v2-v5 with migrations and fixtures). Level-positional progress remains. |
 | P0.5 Logging and crash reports | Partially | `LogPlugin` file logs, crash file, `playtest` profile. The crash report does not include the last log lines. |
@@ -244,7 +244,7 @@ Evidence is the foundation-hardening branch (merge `51b31ac` plus the final-revi
 
 ### Tracked follow-ups
 
-- Core field visibility: make `Game` fields private behind accessors (the P0.2 remainder).
+- Core field visibility below `Game`: `Campaign`, `Attempt`, `StrategyState` and `ParallelBattle`'s bookkeeping keep `pub` fields (reachable only through `&` accessors, staging or `test-support`).
 - Level-positional progress (`first_clears`, `unlocked`, `Command::BuyItem(usize)`) must move to stable IDs before levels are reordered.
 - The crash report lacks the last log lines.
 - The battle screen still reads the attempt directly in places (the view model is partial).
