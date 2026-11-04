@@ -1,7 +1,6 @@
 mod combat;
 mod director;
 mod events;
-#[cfg(feature = "test-support")]
 mod fixtures;
 mod journey;
 mod lifecycle;
@@ -15,7 +14,6 @@ mod smoke;
 mod structures;
 mod telemetry;
 pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
-#[cfg(feature = "test-support")]
 pub use fixtures::{maximum_progression_render_fixture, peak_render_fixture};
 pub use journey::JourneyContinuation;
 pub use migrations::SAVE_VERSION;

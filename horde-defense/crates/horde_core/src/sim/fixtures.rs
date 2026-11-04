@@ -1,4 +1,5 @@
-//! Deterministic render/review fixtures, behind the `test-support` feature.
+//! Deterministic render/review fixtures. Un-gated: the shipped practice scenes
+//! (peak, progressed-peak, max-lanes) build their games with them.
 
 use super::persistence::validate_game;
 use super::*;

@@ -12,13 +12,3 @@ workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tracing = { version = "0.1", default-features = false, features = ["std", "attributes"] }
-
-[features]
-# Deterministic render/review fixtures (`peak_render_fixture`,
-# `maximum_progression_render_fixture`). The `smoke*` exercises stay un-gated
-# because the shipped `--smoke` command runs them.
-test-support = []
-
-[dev-dependencies]
-# Self dev-dependency: enables `test-support` for this crate's own tests and examples.
-horde_core = { path = ".", features = ["test-support"] }

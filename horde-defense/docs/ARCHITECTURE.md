@@ -17,7 +17,7 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | `sim/npc`, `sim/manual` | NPC maneuver decisions and target policy; personal-mode manual actions including ordnance | Enemy movement |
 | `sim/combat` | Enemy attack resolution, damage application and corpse reaping | Spawn pacing |
 | `sim/lifecycle`, `sim/telemetry` | Deploy/retry/withdraw/settle/repeat runs; `CombatTelemetry` counters | Per-tick combat |
-| `sim/smoke`, `sim/fixtures` | Seeded headless exercises used by `--smoke` (un-gated); render/review fixtures behind the `test-support` feature (enabled by core tests and the `review` feature of `horde_game`) | Anything the shipped game needs outside `--smoke` |
+| `sim/smoke`, `sim/fixtures` | Seeded headless exercises used by `--smoke` (un-gated); render/review fixtures (`peak_render_fixture`, `maximum_progression_render_fixture`), also un-gated because shipped practice scenes build on them | Anything else test-only |
 | `campaign/*` | `campaign.rs` keeps `Campaign`, `Default` and `validate`; children: `armory` (items, presets, reservations), `progression` (skills, body, survivors, levels), `ledger` (coin/XP transactions, run records), `world` (blueprints, layouts, country progress), `loadout` (profiles, comparison, recommendations), `view` | Hit detection or cosmetic effects |
 | `sim/events` | Typed `SimEvent` stream: saved per-`Game` sequence numbers, the transient `drain_events` outbox and expedition forwarding | Presentation decisions or persistence of the outbox |
 | `sim/parallel` | Worker battle ownership, reservations, idempotent settlement and reported `SettlementIssue`s | A second combat implementation |
