@@ -1,60 +1,9 @@
 //! A cursor readout of frozen authoritative ammunition and action timers.
-use super::battle;
-use crate::art::{self, AMBER, GREEN, MUTED, RED, TEXT};
+use crate::{
+    art::{self, AMBER, GREEN, MUTED, RED, TEXT},
+    battle_view::ReticleReadout,
+};
 use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
-use horde_core::content::Mode;
-use horde_core::sim::Attempt;
-#[derive(Clone, Debug, PartialEq)]
-struct Resources {
-    remaining: u32,
-    capacity: u32,
-    progress: Option<f32>,
-    label: String,
-}
-fn resources(a: &Attempt, selection: battle::AttackSelection) -> Resources {
-    let reload = if a.reload_left > 0 {
-        let total = if a.mode == Mode::Npc {
-            a.profile.npc.reload_turns.max(1) * 60
-        } else {
-            (a.profile.personal.reload.max(0.5) * 60.0).ceil() as u32
-        };
-        Some((1.0 - a.reload_left as f32 / total.max(1) as f32).clamp(0.0, 1.0))
-    } else {
-        None
-    };
-    if a.mode == Mode::Personal
-        && let Some(kind) = selection.ordnance()
-    {
-        let left = a.ordnance.cooldown(kind);
-        let total = (horde_core::ordnance::catalog()
-            .definition(kind)
-            .cooldown_ticks as f32
-            * a.profile.modifiers.ordnance_cooldown_multiplier)
-            .round()
-            .clamp(1.0, 3600.0);
-        Resources {
-            remaining: a.ordnance.charges(kind),
-            capacity: a.ordnance.issued(kind).max(1),
-            progress: reload.or((left > 0).then(|| (1.0 - left as f32 / total).clamp(0.0, 1.0))),
-            label: if reload.is_some() {
-                "RELOAD".into()
-            } else {
-                format!("{} left", a.ordnance.charges(kind))
-            },
-        }
-    } else {
-        Resources {
-            remaining: a.ammo,
-            capacity: a.magazine.max(1),
-            progress: reload,
-            label: if reload.is_some() {
-                format!("R {:.1}s", a.reload_left as f32 / 60.0)
-            } else {
-                format!("{}/{}", a.ammo, a.magazine)
-            },
-        }
-    }
-}
 fn arc(p: &egui::Painter, at: egui::Pos2, radius: f32, progress: f32, color: Color32) {
     let count = (48.0 * progress).ceil().max(1.0) as usize;
     let points = (0..=count)
@@ -80,19 +29,17 @@ fn readout_origin(rect: Rect, center: egui::Pos2, text: egui::Vec2) -> egui::Pos
 }
 pub(super) fn paint(
     ui: &egui::Ui,
-    a: &Attempt,
+    state: &ReticleReadout,
     arena: art::ArenaProjection,
     aim: [f32; 2],
-    selection: battle::AttackSelection,
     building: bool,
     reduced: bool,
 ) {
     let at = arena.world(aim[0], aim[1]);
     let p = ui.painter_at(arena.effects_clip);
-    let state = resources(a, selection);
     let color = if state.remaining == 0 {
         RED
-    } else if a.mode == Mode::Npc {
+    } else if state.observed {
         TEXT
     } else {
         AMBER
@@ -141,7 +88,7 @@ pub(super) fn paint(
     if let Some(progress) = state.progress {
         arc(&p, center, 23.0, progress, GREEN);
     }
-    let galley = p.layout_no_wrap(state.label, FontId::proportional(11.0), color);
+    let galley = p.layout_no_wrap(state.label.clone(), FontId::proportional(11.0), color);
     let pos = readout_origin(arena.effects_clip, center, galley.size());
     p.rect_filled(
         Rect::from_min_size(pos - vec2(3.0, 1.0), galley.size() + vec2(6.0, 2.0)),
@@ -153,29 +100,6 @@ pub(super) fn paint(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use horde_core::sim::Game;
-    #[test]
-    fn reticle_uses_exact_ammo_and_frozen_reload_ticks_without_a_presentation_clock() {
-        let mut game = Game::default();
-        game.campaign.choose_start_country("DEU").unwrap();
-        game.deploy_country_stage(0, Mode::Personal).unwrap();
-        let a = game.attempt.as_mut().unwrap();
-        a.ammo = 3;
-        a.reload_left = 63;
-        a.profile.personal.reload = 2.1;
-        let state = resources(a, battle::AttackSelection::Gun);
-        assert_eq!((state.remaining, state.capacity), (3, a.magazine));
-        assert_eq!(state.progress, Some(0.5));
-        assert_eq!(state.label, "R 1.0s");
-        assert_eq!(resources(a, battle::AttackSelection::Gun), state);
-        a.mode = Mode::Npc;
-        a.profile.npc.reload_turns = 3;
-        a.reload_left = 90;
-        assert_eq!(
-            resources(a, battle::AttackSelection::Gun).progress,
-            Some(0.5)
-        );
-    }
     #[test]
     fn resources_stay_readable_at_every_clearing_edge_without_moving_true_aim() {
         for size in [vec2(160.0, 86.0), vec2(292.0, 86.0), vec2(729.0, 310.0)] {

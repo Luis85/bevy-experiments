@@ -281,7 +281,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                     if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode()) { f.notify_rare_loot(); }
                     if response.hover_pos().is_some_and(|p| r.contains(p)) && ui.input(|i|i.raw.focused) && !ui.ctx().any_popup_open() {
                         f.battle.custom_cursor_requested=true;ui.ctx().set_cursor_icon(egui::CursorIcon::None);
-                        reticle::paint(ui,a,projection,aim,battle::AttackSelection::Gun,false,f.settings.reduced_effects);
+                        reticle::paint(ui,&crate::battle_view::ReticleReadout::build(a,None),projection,aim,false,f.settings.reduced_effects);
                     }
                     crate::inspector::hover(&response, a, aim);
                     let build_cell = a.build_cell_at(aim);

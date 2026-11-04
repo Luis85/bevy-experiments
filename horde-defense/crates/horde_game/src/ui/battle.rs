@@ -1,10 +1,14 @@
-//! Battle presentation. Game changes are queued typed intents.
+//! Battle presentation. Game changes are queued typed intents. Every attempt
+//! value laid out here comes from `battle_view::BattleScreen` (or the HUD view
+//! model); the attempt itself is only handed to the battlefield painter and
+//! the inspector tools.
 use super::{
     Screen, UiCtx, armory, chrome, damage, feedback, hud, loot, muted, policy, progress, reticle,
     status,
 };
 use crate::{
     art::{self, AMBER, GREEN, INK, MUTED, RED, TEXT},
+    battle_view::{self, BattleScreen, FieldHint},
     runner::SaveIntent,
     settings::Action,
 };
@@ -14,7 +18,6 @@ use horde_core::{
     content::{Mode, StructureKind, content},
     ordnance::{OrdnanceKind, ThrowRequest},
     sim::Input,
-    world::world,
 };
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -42,19 +45,9 @@ fn target_cell(aim: [f32; 2], lanes: u8, width: f32) -> Option<[u8; 2]> {
     .filter(|cell| horde_core::ordnance::valid_cell_for_arena(*cell, lanes, width))
 }
 
-fn active_lanes(f: &UiCtx) -> u8 {
-    f.game
-        .attempt
-        .as_ref()
-        .map_or_else(|| f.game.campaign.lane_count(), |a| a.lane_count)
-}
 fn projection(f: &UiCtx, r: Rect) -> art::ArenaProjection {
-    let width = f
-        .game
-        .attempt
-        .as_ref()
-        .map_or_else(|| f.game.campaign.arena_geometry().1, |a| a.width_yards);
-    art::ArenaProjection::with_geometry(r, active_lanes(f), width).with_effects_clip(
+    let (lanes, width) = battle_view::arena_geometry(f.game);
+    art::ArenaProjection::with_geometry(r, lanes, width).with_effects_clip(
         f.battle
             .effects_rect
             .filter(|clip| clip.contains_rect(r))
@@ -72,7 +65,7 @@ pub(super) fn controls(ctx: &egui::Context, f: &mut UiCtx) {
         return;
     }
     if f.settings.pressed(ctx, Action::Pause, false) {
-        let pause = !f.game.attempt.as_ref().is_some_and(|a| a.paused);
+        let pause = !BattleScreen::build(f.game).is_some_and(|view| view.paused);
         f.dispatch(Command::SetPaused(pause), "");
         f.battle.construction = false;
         f.battle.fire_latched = false;
@@ -106,8 +99,10 @@ pub(super) fn gather_combat_input(ctx: &egui::Context, f: &mut UiCtx) -> Input {
             ..Input::default()
         };
     }
+    let view = BattleScreen::build(f.game);
+    let view = view.as_ref();
     let mut input = Input {
-        aim: assisted_aim(f),
+        aim: assisted_aim(f, view),
         auto_reload: f.settings.auto_reload,
         ..Input::default()
     };
@@ -116,23 +111,17 @@ pub(super) fn gather_combat_input(ctx: &egui::Context, f: &mut UiCtx) -> Input {
     if let Some(kind) = f.battle.attack_selection.ordnance() {
         // Throwing consumes a press edge, never a held button or firing latch.
         f.battle.fire_latched = false;
-        if let Some(cell) = raw_press_aim(ctx, f, Action::Fire).and_then(|aim| {
-            target_cell(
-                aim,
-                active_lanes(f),
-                f.game
-                    .attempt
-                    .as_ref()
-                    .map_or_else(|| f.game.campaign.arena_geometry().1, |a| a.width_yards),
-            )
-        }) {
+        let (lanes, width) = battle_view::arena_geometry(f.game);
+        if let Some(cell) =
+            raw_press_aim(ctx, f, Action::Fire).and_then(|aim| target_cell(aim, lanes, width))
+        {
             f.battle
                 .pending
                 .throw
                 .get_or_insert(ThrowRequest { kind, cell });
         }
     } else {
-        let fire_press = press_aim(ctx, f, Action::Fire);
+        let fire_press = press_aim(ctx, f, view, Action::Fire);
         if f.settings.toggle_fire && fire_press.is_some() {
             f.toggle_fire(ctx);
         }
@@ -147,7 +136,7 @@ pub(super) fn gather_combat_input(ctx: &egui::Context, f: &mut UiCtx) -> Input {
             f.battle.pending_attack_aims.fire.get_or_insert(aim);
         }
     }
-    if let Some(aim) = press_aim(ctx, f, Action::Melee) {
+    if let Some(aim) = press_aim(ctx, f, view, Action::Melee) {
         f.battle.pending.melee = true;
         f.battle.pending_attack_aims.melee.get_or_insert(aim);
     }
@@ -159,11 +148,16 @@ pub(super) fn gather_combat_input(ctx: &egui::Context, f: &mut UiCtx) -> Input {
     input.brace |= f.settings.pressed(ctx, Action::Brace, false);
     input
 }
-fn assisted_aim(f: &UiCtx) -> [f32; 2] {
-    assist_at(f, f.battle.aim)
+fn assisted_aim(f: &UiCtx, view: Option<&BattleScreen>) -> [f32; 2] {
+    assist_at(f, view, f.battle.aim)
 }
-fn press_aim(ctx: &egui::Context, f: &UiCtx, action: Action) -> Option<[f32; 2]> {
-    raw_press_aim(ctx, f, action).map(|aim| assist_at(f, aim))
+fn press_aim(
+    ctx: &egui::Context,
+    f: &UiCtx,
+    view: Option<&BattleScreen>,
+    action: Action,
+) -> Option<[f32; 2]> {
+    raw_press_aim(ctx, f, action).map(|aim| assist_at(f, view, aim))
 }
 fn raw_press_aim(ctx: &egui::Context, f: &UiCtx, action: Action) -> Option<[f32; 2]> {
     let binding = &f.settings.bindings[action as usize];
@@ -199,25 +193,8 @@ fn raw_press_aim(ctx: &egui::Context, f: &UiCtx, action: Action) -> Option<[f32;
         .pressed(ctx, action, false)
         .then_some(f.battle.aim)
 }
-fn assist_at(f: &UiCtx, aim: [f32; 2]) -> [f32; 2] {
-    if f.settings.aim_assist <= 0.0 {
-        return aim;
-    }
-    if let Some(a) = &f.game.attempt
-        && let Some(e) = a
-            .enemies
-            .iter()
-            .filter(|e| {
-                ((e.x - aim[0]).powi(2) + (e.y() - aim[1]).powi(2)).sqrt() < f.settings.aim_assist
-            })
-            .min_by(|a, b| {
-                ((a.x - aim[0]).powi(2) + (a.y() - aim[1]).powi(2))
-                    .total_cmp(&((b.x - aim[0]).powi(2) + (b.y() - aim[1]).powi(2)))
-            })
-    {
-        return [e.x, e.y()];
-    }
-    aim
+fn assist_at(f: &UiCtx, view: Option<&BattleScreen>, aim: [f32; 2]) -> [f32; 2] {
+    view.map_or(aim, |view| view.assist(aim, f.settings.aim_assist))
 }
 fn reticle_ownership(preview: bool, hovered: bool, focused: bool, covered: bool) -> Option<bool> {
     if preview {
@@ -232,18 +209,22 @@ fn preview_aim(arena: art::ArenaProjection) -> [f32; 2] {
     [(arena.width * 0.6).min(18.0), f32::from(arena.lanes) * 0.5]
 }
 pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
-    if f.game.attempt.is_none() {
+    let game = f.game;
+    let (Some(view), Some(hud_view), Some(a)) = (
+        BattleScreen::build(game),
+        hud::view_model(game),
+        game.attempt.as_ref(),
+    ) else {
         f.go(Screen::Results);
         return;
-    }
+    };
     let ctx = root.ctx().clone();
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK))
         .show(root, |ui| {
             let canvas = ui.max_rect();
             let maximum = battle_arena(canvas, f.battle.construction);
-            let a = f.game.attempt.as_ref().unwrap();
-            let r = clearing_rect(maximum, a.lane_count, a.width_yards);
+            let r = clearing_rect(maximum, view.lanes, view.width_yards);
             f.battle.effects_rect = Some(maximum);
             let arena = projection(f, r);
             let response = ui.interact(
@@ -259,18 +240,8 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
             } else if let Some(pointer) = response.hover_pos() {
                 f.battle.aim = arena.inverse(pointer);
             }
-            let a = f.game.attempt.as_ref().unwrap();
-            let theme = world()
-                .country(a.country_id.as_deref().unwrap_or(""))
-                .map(|country| match country.biome.to_lowercase().as_str() {
-                    "desert" | "arid" => 2,
-                    "tundra" | "polar" | "boreal" => 3,
-                    "tropical" | "rainforest" => 4,
-                    "mediterranean" => 1,
-                    _ => 0,
-                })
-                .unwrap_or(a.level);
-            art::world_backdrop(ui.painter(), canvas, arena, theme, f.textures);
+            art::world_backdrop(ui.painter(), canvas, arena, view.theme, f.textures);
+            // The painter builds its own `BattleViewModel` from the attempt.
             art::battlefield(
                 &ui.painter_at(maximum),
                 r,
@@ -282,7 +253,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                     numbers: f.settings.numbers,
                     reduced: f.settings.reduced_effects,
                     blood: f.settings.blood,
-                    theme,
+                    theme: view.theme,
                     textures: f.textures,
                     blend: f.battle.interpolation.scene(None, a),
                 },
@@ -292,9 +263,8 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
             if response.hovered() {
                 if f.battle.construction {
                     placement_cursor(ui, r, f);
-                } else if f.battle.attack_selection.ordnance().is_some() && a.mode == Mode::Personal
-                {
-                    ordnance_cursor(ui, r, f);
+                } else if f.battle.attack_selection.ordnance().is_some() && view.personal() {
+                    ordnance_cursor(ui, r, f, &view);
                 }
             }
             if let Some(owns_cursor) = reticle_ownership(
@@ -309,18 +279,17 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                 }
                 reticle::paint(
                     ui,
-                    f.game.attempt.as_ref().unwrap(),
+                    &view.reticle(f.battle.attack_selection.ordnance()),
                     arena,
                     f.battle.aim,
-                    f.battle.attack_selection,
                     f.battle.construction,
                     f.settings.reduced_effects,
                 );
             }
             damage::draw(ui, r, f);
             loot::draw(ui, r, f);
-            corner_hud(ui, canvas, f);
-            if let Some(receipt) = f.game.attempt.as_ref().and_then(|a| a.loot_events.last()) {
+            corner_hud(ui, canvas, f, &hud_view);
+            if let Some(receipt) = &view.last_loot {
                 let area = Rect::from_min_max(
                     pos2(canvas.left() + 350.0, canvas.top() + 72.0),
                     pos2(canvas.right() - 222.0, r.top() - 8.0),
@@ -335,16 +304,11 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                     armory::loot_receipt(ui, receipt);
                 });
             }
-            if f.game
-                .attempt
-                .as_ref()
-                .is_some_and(|a| a.mode == Mode::Personal)
-                && !f.battle.construction
-            {
+            if view.personal() && !f.battle.construction {
                 let selector = attack_selector_rect(canvas, r);
                 ui.scope_builder(egui::UiBuilder::new().max_rect(selector), |ui| {
                     ui.set_clip_rect(selector.intersect(ui.clip_rect()));
-                    attack_selector(ui, f)
+                    attack_selector(ui, f, &view)
                 });
             }
             if f.battle.construction {
@@ -361,7 +325,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                             ui.set_width(214.0);
                             egui::ScrollArea::vertical()
                                 .max_height(panel.height() - 24.0)
-                                .show(ui, |ui| construction_controls(ui, f));
+                                .show(ui, |ui| construction_controls(ui, f, &view));
                         });
                 });
             }
@@ -390,13 +354,13 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                 pos2(canvas.left() + 12., canvas.bottom() - 76.),
                 pos2(canvas.right() - 12., canvas.bottom() - 5.),
             );
+            let observed = view.mode == Mode::Npc;
             ui.scope_builder(egui::UiBuilder::new().max_rect(bar), |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    let a = f.game.attempt.as_ref().unwrap();
-                    let paused = a.paused;
+                    let paused = view.paused;
                     let label = if !paused {
                         "Pause"
-                    } else if a.tick == 0 {
+                    } else if view.tick == 0 {
                         "Begin defense"
                     } else {
                         "Resume defense"
@@ -406,12 +370,10 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         f.battle.construction = false;
                         f.battle.fire_latched = false;
                     }
-                    if f.game.attempt.as_ref().unwrap().mode == Mode::Personal
-                        && !f.battle.construction
-                    {
-                        personal_controls(ui, f, &ctx);
+                    if view.personal() && !f.battle.construction {
+                        personal_controls(ui, f, &ctx, &view);
                     }
-                    if f.game.campaign.blueprints.iter().any(|b| *b)
+                    if view.any_blueprint()
                         && ui
                             .button(if f.battle.construction {
                                 "Close construction"
@@ -423,7 +385,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         f.battle.construction = !f.battle.construction;
                         f.battle.fire_latched = false;
                     }
-                    if f.game.attempt.as_ref().unwrap().mode == Mode::Npc {
+                    if observed {
                         ui.label("Observe");
                         for speed in [1, 2, 4] {
                             ui.selectable_value(&mut f.battle.speed, speed, format!("{speed}×"));
@@ -444,7 +406,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                                 .show(ui, |ui| {
                                     crate::inspector::npc_decision(
                                         ui,
-                                        f.game.attempt.as_ref().unwrap(),
+                                        a,
                                         f.launch.reviewing("npc-expanded"),
                                     );
                                     policy(ui, f);
@@ -452,13 +414,11 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         });
                     }
                     if ui
-                        .button(
-                            if f.game.attempt.as_ref().is_some_and(|a| a.mode == Mode::Npc) {
-                                "Recall & train"
-                            } else {
-                                "Retreat & train"
-                            },
-                        )
+                        .button(if observed {
+                            "Recall & train"
+                        } else {
+                            "Retreat & train"
+                        })
                         .on_hover_text("Return to skills with every earned coin and item retained.")
                         .clicked()
                     {
@@ -483,7 +443,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                             f.request_save(SaveIntent::Menu);
                         }
                         if ui
-                            .button(if f.game.attempt.as_ref().unwrap().mode == Mode::Npc {
+                            .button(if observed {
                                 "Recall survivor"
                             } else {
                                 "Withdraw"
@@ -500,7 +460,7 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         ui.checkbox(&mut f.battle.inspect_log, "Combat log");
                         egui::ScrollArea::vertical()
                             .max_height(280.)
-                            .show(ui, |ui| field_details(ui, f));
+                            .show(ui, |ui| field_details(ui, f, &view, &hud_view));
                     });
                 });
                 if !f.status.message.is_empty() {
@@ -535,8 +495,7 @@ fn battle_arena(canvas: Rect, construction: bool) -> Rect {
         ),
     )
 }
-fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx) {
-    let view = hud::view_model(f.game).expect("battle HUD needs an attempt");
+fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx, view: &hud::HudView) {
     let left = Rect::from_min_size(canvas.min + vec2(14., 12.), vec2(322., 108.));
     ui.scope_builder(egui::UiBuilder::new().max_rect(left), |ui| {
         egui::Frame::new()
@@ -644,32 +603,24 @@ fn attack_selector_rect(canvas: Rect, arena: Rect) -> Rect {
         pos2(canvas.right() - 222.0, arena.top() - 12.0),
     )
 }
-fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let a = f.game.attempt.as_ref().expect("active battle");
-    let class = a.profile.weapon.class.name();
-    let grenade = a
-        .profile
-        .modifiers
-        .unlocked(horde_core::skill_catalog::unlocks::GRENADE);
-    let molotov = a
-        .profile
-        .modifiers
-        .unlocked(horde_core::skill_catalog::unlocks::MOLOTOV);
-    let ordnance = &a.ordnance;
+fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
+    let class = view.weapon_class;
     let spacing = 4.0;
     let button_width = ((ui.available_width() - 2.0 * spacing) / 3.0).max(1.0);
     ui.spacing_mut().item_spacing.x = spacing;
     ui.spacing_mut().button_padding = vec2(3.0, 4.0);
     ui.horizontal(|ui| {
-        for (selection, label, unlocked) in [
-            (AttackSelection::Gun, "Gun", true),
-            (AttackSelection::Grenade, "Grenade", grenade),
-            (AttackSelection::Molotov, "Molotov", molotov),
+        for (selection, label) in [
+            (AttackSelection::Gun, "Gun"),
+            (AttackSelection::Grenade, "Grenade"),
+            (AttackSelection::Molotov, "Molotov"),
         ] {
-            let hint = if selection == AttackSelection::Gun {
+            let slot = selection.ordnance().map(|kind| view.slot(kind));
+            let unlocked = slot.is_none_or(|slot| slot.unlocked);
+            let hint = if let Some(slot) = slot.filter(|_| unlocked) {
+                format!("{label}: {} charges. Select, then click a ground cell to throw.", slot.charges)
+            } else if slot.is_none() {
                 format!("{class}: hold {} to fire.", f.settings.bindings[Action::Fire as usize])
-            } else if unlocked {
-                format!("{label}: {} charges. Select, then click a ground cell to throw.", ordnance.charges(selection.ordnance().expect("throwable")))
             } else {
                 format!("Learn {label} handling in the Ordnance branch of Survival skills after this attempt.")
             };
@@ -685,13 +636,17 @@ fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     });
     let helper = if let Some(kind) = f.battle.attack_selection.ordnance() {
-        let (charges, cooldown) = (ordnance.charges(kind), ordnance.cooldown(kind));
-        if charges == 0 {
+        let slot = view.slot(kind);
+        if slot.charges == 0 {
             "Empty · renewed next attempt".to_owned()
-        } else if cooldown > 0 {
-            format!("{} left · ready {:.1}s", charges, cooldown as f32 / 60.0)
+        } else if slot.cooldown > 0 {
+            format!(
+                "{} left · ready {:.1}s",
+                slot.charges,
+                slot.cooldown as f32 / 60.0
+            )
         } else {
-            format!("{} left · click ground cell", charges)
+            format!("{} left · click ground cell", slot.charges)
         }
     } else {
         "Hold fire to shoot".to_owned()
@@ -699,7 +654,7 @@ fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx) {
     ui.add(egui::Label::new(RichText::new(&helper).size(11.0).color(MUTED)).truncate())
         .on_hover_text(helper);
 }
-fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx) {
+fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx, view: &BattleScreen) {
     let arena = projection(f, r);
     let Some(kind) = f.battle.attack_selection.ordnance() else {
         return;
@@ -707,9 +662,8 @@ fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx) {
     let Some(cell) = target_cell(f.battle.aim, arena.lanes, arena.width) else {
         return;
     };
-    let a = f.game.attempt.as_ref().expect("active battle");
-    let ready = a.ordnance.ready(kind);
-    let color = if ready { AMBER } else { RED };
+    let slot = view.slot(kind);
+    let color = if slot.ready { AMBER } else { RED };
     let painter = ui.painter_at(r);
     for column in 0..=arena.width.ceil() as u8 {
         painter.line_segment(
@@ -733,11 +687,9 @@ fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx) {
     let rect = Rect::from_min_max(arena.world(x, y), arena.world(x + 1.0, y + 1.0));
     painter.rect_filled(rect, 0.0, color.gamma_multiply(0.25));
     painter.rect_stroke(rect, 0.0, Stroke::new(1.5, color), egui::StrokeKind::Inside);
-    let radius = horde_core::ordnance::catalog().definition(kind).radius
-        * a.profile.modifiers.ordnance_radius_multiplier;
     painter.add(egui::Shape::ellipse_stroke(
         rect.center(),
-        arena.radius(radius),
+        arena.radius(slot.radius),
         Stroke::new(1.2, color),
     ));
     painter.text(
@@ -749,14 +701,14 @@ fn ordnance_cursor(ui: &mut egui::Ui, r: Rect, f: &UiCtx) {
     );
 }
 
-fn personal_controls(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
+fn personal_controls(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context, view: &BattleScreen) {
     f.battle.pending.reload |= ui.button("Reload").clicked();
     if ui
         .button("Strike contact lane")
         .on_hover_text("Strike the selected contact lane. Melee cancels an unfinished reload.")
         .clicked()
     {
-        let aim = assisted_aim(f);
+        let aim = assisted_aim(f, Some(view));
         f.battle.pending.melee = true;
         f.battle.pending.aim = aim;
         f.battle.pending_attack_aims.melee.get_or_insert(aim);
@@ -772,69 +724,63 @@ fn personal_controls(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
     {
         f.toggle_fire(ctx);
     }
-    if f.game.attempt.as_ref().unwrap().profile.heal {
+    if view.heal {
         f.battle.pending.heal |= ui
             .button("Emergency aid")
             .on_hover_text(&f.settings.bindings[Action::Heal as usize])
             .clicked();
     }
-    if f.game.attempt.as_ref().unwrap().profile.brace {
+    if view.brace {
         f.battle.pending.brace |= ui
             .button("Brace the line")
             .on_hover_text(&f.settings.bindings[Action::Brace as usize])
             .clicked();
     }
 }
-fn field_details(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let a = f.game.attempt.as_ref().unwrap();
+fn field_details(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen, hud_view: &hud::HudView) {
+    let field = &view.field;
     muted(
         ui,
         format!(
             "{} lanes · threat {} · {} hostiles · ordinary cap {} (+ boss) · {:.2} enemies/s",
-            a.lane_count,
-            a.progression.rank,
-            a.enemies.len(),
-            a.enemy_cap(),
-            a.arrival_rate()
+            view.lanes, field.threat_rank, field.hostiles, field.enemy_cap, field.arrival_rate
         ),
     );
     muted(
         ui,
         format!(
             "{:.0} yd path · {} difficulty · groups {} · new gear Lv{}",
-            a.width_yards,
-            a.balance.preset.name(),
-            a.progression.batch_size,
-            a.progression.item_level
+            view.width_yards, field.difficulty, field.batch_size, field.gear_level
         ),
     );
-    hud::dps(ui, &hud::dps_readout(a));
-    muted(ui, &content().levels[a.level].name);
-    if a.mode == Mode::Personal {
+    hud::dps(ui, &hud_view.dps);
+    muted(ui, field.level_name);
+    if view.personal() {
         muted(
             ui,
             format!(
                 "Selected lane {} · melee {:.1}s",
-                f.battle.aim[1]
-                    .floor()
-                    .clamp(0.0, f32::from(a.lane_count.saturating_sub(1))) as u8
-                    + 1,
-                a.melee_cooldown as f32 / 60.0
+                view.selected_lane(f.battle.aim),
+                view.melee_cooldown as f32 / 60.0
             ),
         );
     }
-    if f.settings.show_guidance && f.game.campaign.attempts == 0 {
+    if f.settings.show_guidance && view.first_deployment {
         chrome::section(ui, "Your first defense");
-        let hint = if a.tick == 0 {
-            "You stay at the center of the defense. Combat is live: aim across every lane. Retreat banks your rewards for training."
-        } else if a.shots == 0 {
-            "Aim at a visible enemy and hold fire. Reload during a safe gap."
-        } else if a.reload_ticks == 0 && a.ammo < a.magazine {
-            "Reload renews the magazine without spending coins. Melee cancels an unfinished reload."
-        } else if a.first_contact.is_none() {
-            "An enemy reaching any part of the left line can hurt you. Aim at that lane and strike back."
-        } else {
-            "Coins and equipment are already banked. Defeat the boss, or return to camp to improve."
+        let hint = match field.hint {
+            FieldHint::Opening => {
+                "You stay at the center of the defense. Combat is live: aim across every lane. Retreat banks your rewards for training."
+            }
+            FieldHint::Shoot => "Aim at a visible enemy and hold fire. Reload during a safe gap.",
+            FieldHint::Reload => {
+                "Reload renews the magazine without spending coins. Melee cancels an unfinished reload."
+            }
+            FieldHint::Contact => {
+                "An enemy reaching any part of the left line can hurt you. Aim at that lane and strike back."
+            }
+            FieldHint::Banked => {
+                "Coins and equipment are already banked. Defeat the boss, or return to camp to improve."
+            }
         };
         ui.label(hint);
         if ui.small_button("Hide field hints").clicked() {
@@ -842,18 +788,11 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx) {
         }
     }
     egui::CollapsingHeader::new("Shared line rule")
-        .default_open(f.settings.show_guidance && f.game.campaign.attempts == 0)
+        .default_open(f.settings.show_guidance && view.first_deployment)
         .show(ui, |ui| {
             ui.label("Enemies at any part of the line can attack you. Aim at a contact lane to strike back.");
         });
-    if let Some(country) = f
-        .game
-        .attempt
-        .as_ref()
-        .and_then(|a| world().country(a.country_id.as_deref().unwrap_or("")))
-    {
-        let a = f.game.attempt.as_ref().unwrap();
-        let theme = country.stage_theme(a.stage);
+    if let Some(theme) = &field.setting {
         egui::CollapsingHeader::new("Local setting").show(ui, |ui| {
             ui.strong(&theme.title);
             ui.label(&theme.setting);
@@ -863,19 +802,16 @@ fn field_details(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     if f.battle.inspect_log {
         chrome::section(ui, "Resolution log");
-        for line in f.game.attempt.as_ref().unwrap().log.iter().rev().take(18) {
+        for line in &view.log_tail {
             ui.label(RichText::new(line).size(11.0).color(MUTED));
         }
     }
 }
-fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
-    ui.strong(format!(
-        "{} supply remaining",
-        f.game.attempt.as_ref().unwrap().supply
-    ));
+fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
+    ui.strong(format!("{} supply remaining", view.supply));
     for kind in StructureKind::ALL {
         let def = content().structure(kind);
-        ui.add_enabled_ui(f.game.campaign.blueprints[kind], |ui| {
+        ui.add_enabled_ui(view.blueprints[kind], |ui| {
             ui.selectable_value(
                 &mut f.battle.build_kind,
                 kind,
@@ -898,7 +834,7 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
     );
     muted(
         ui,
-        if f.game.global_paused {
+        if view.global_paused {
             "Paused explicitly"
         } else {
             "Combat continues while building"
@@ -916,7 +852,7 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
             "Country plan cleared; deployed defenses remain.",
         );
     }
-    if f.game.campaign.blueprints.iter().all(|b| !*b) {
+    if !view.any_blueprint() {
         muted(
             ui,
             "Unlock traps after 1 boss clear, walls after 2, turrets after 3. Purchase blueprints in camp.",
@@ -925,19 +861,15 @@ fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
 }
 fn placement_cursor(ui: &mut egui::Ui, r: Rect, f: &mut UiCtx) {
     let arena = projection(f, r);
-    let attempt = f.game.attempt.as_ref().unwrap();
-    let Some([lane, column]) = attempt.build_cell_at(f.battle.aim) else {
+    let Some(preview) = battle_view::placement_preview(f.game, f.battle.build_kind, f.battle.aim)
+    else {
         return;
     };
-    let center = attempt
-        .build_cell_center(lane, column)
-        .expect("validated cell");
-    let half_width = attempt.construction_cell_width() * 0.5;
-    let valid = f.game.preview_placement(f.battle.build_kind, lane, column);
-    let color = if valid.is_ok() { GREEN } else { RED };
+    let (lane, column, center) = (preview.lane, preview.column, preview.center);
+    let color = if preview.valid.is_ok() { GREEN } else { RED };
     let cell = Rect::from_min_max(
-        arena.world(center[0] - half_width, f32::from(lane)),
-        arena.world(center[0] + half_width, f32::from(lane) + 1.0),
+        arena.world(center[0] - preview.half_width, f32::from(lane)),
+        arena.world(center[0] + preview.half_width, f32::from(lane) + 1.0),
     );
     ui.painter()
         .rect_filled(cell, 0.0, color.gamma_multiply(0.22));
@@ -951,7 +883,7 @@ fn placement_cursor(ui: &mut egui::Ui, r: Rect, f: &mut UiCtx) {
             Stroke::new(1.0, color.gamma_multiply(0.45)),
         ));
     }
-    if let Err(reason) = &valid {
+    if let Err(reason) = &preview.valid {
         ui.painter().text(
             cell.left_top() + vec2(3.0, -5.0),
             Align2::LEFT_BOTTOM,
@@ -970,19 +902,10 @@ fn placement_cursor(ui: &mut egui::Ui, r: Rect, f: &mut UiCtx) {
             "Defense placed.",
         );
     }
-    if ui.input(|i| i.pointer.secondary_clicked()) {
-        let id = f
-            .game
-            .attempt
-            .as_ref()
-            .unwrap()
-            .structures
-            .iter()
-            .find(|s| s.lane == lane && s.column == column)
-            .map(|s| s.id);
-        if let Some(id) = id {
-            f.dispatch(Command::Salvage(id), "Structure salvaged.");
-        }
+    if ui.input(|i| i.pointer.secondary_clicked())
+        && let Some(id) = preview.occupant
+    {
+        f.dispatch(Command::Salvage(id), "Structure salvaged.");
     }
 }
 

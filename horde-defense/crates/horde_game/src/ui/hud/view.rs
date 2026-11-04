@@ -134,11 +134,7 @@ fn boss(a: &Attempt) -> BossReadout {
 
 pub(in crate::ui) fn action(attempt: &Attempt) -> ActionReadout {
     let (label, progress) = if attempt.reload_left > 0 {
-        let total = if attempt.mode == Mode::Personal {
-            (attempt.profile.personal.reload.max(0.5) * 60.0).ceil()
-        } else {
-            attempt.profile.npc.reload_turns.max(1) as f32 * 60.0
-        };
+        let total = attempt.reload_duration_ticks() as f32;
         (
             format!("Reload · {:.1}s", attempt.reload_left as f32 / 60.0),
             Some(1.0 - attempt.reload_left as f32 / total),
@@ -312,6 +308,7 @@ mod tests {
         let a = game.attempt.as_mut().unwrap();
         a.reload_left = 30;
         let total = (a.profile.personal.reload.max(0.5) * 60.0).ceil();
+        assert_eq!(a.reload_duration_ticks() as f32, total);
         let readout = action(a);
         assert_eq!(readout.label, "Reload · 0.5s");
         assert_eq!(readout.progress, Some(1.0 - 30.0 / total));

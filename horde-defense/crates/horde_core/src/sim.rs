@@ -562,6 +562,16 @@ impl Attempt {
             "Ready · hold primary to fire".into()
         }
     }
+    /// Full length of one reload in ticks, for progress readouts. Personal
+    /// reloads last the profile's reload time; observed reloads span whole
+    /// decision turns.
+    pub fn reload_duration_ticks(&self) -> u32 {
+        if self.mode == Mode::Npc {
+            self.profile.npc.reload_turns.max(1).saturating_mul(60)
+        } else {
+            seconds(self.profile.personal.reload.max(0.5))
+        }
+    }
     fn event(&mut self, kind: EventKind, from: [f32; 2], to: [f32; 2], value: i32) {
         self.event_with(kind, from, to, value, EventMetadata::default());
     }
@@ -1102,6 +1112,27 @@ fn enemy_dodge(a: &Attempt, e: &Enemy) -> i32 {
         content().levels[a.level].boss_npc_dodge
     } else {
         enemy_profile(e).npc_dodge
+    }
+}
+
+#[cfg(test)]
+mod reload_duration_tests {
+    use super::*;
+
+    #[test]
+    fn reload_duration_matches_the_personal_reload_and_whole_observed_turns() {
+        let mut game = Game::default();
+        game.deploy(0, Mode::Personal).unwrap();
+        let a = game.attempt.as_mut().unwrap();
+        a.profile.personal.reload = 2.1;
+        assert_eq!(a.reload_duration_ticks(), 126);
+        a.profile.personal.reload = 0.1;
+        assert_eq!(a.reload_duration_ticks(), 30);
+        a.mode = Mode::Npc;
+        a.profile.npc.reload_turns = 3;
+        assert_eq!(a.reload_duration_ticks(), 180);
+        a.profile.npc.reload_turns = 0;
+        assert_eq!(a.reload_duration_ticks(), 60);
     }
 }
 

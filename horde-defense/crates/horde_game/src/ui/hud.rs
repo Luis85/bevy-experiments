@@ -4,7 +4,7 @@ use crate::art::{AMBER, GREEN, MUTED, RED};
 use bevy_egui::egui::{self, FontId, RichText, Sense, Stroke, pos2, vec2};
 mod view;
 use view::{ActionReadout, Danger, DangerReadout, DpsReadout};
-pub(super) use view::{BossReadout, dps as dps_readout, view_model};
+pub(super) use view::{BossReadout, HudView, view_model};
 
 pub(super) fn action(ui: &mut egui::Ui, readout: &ActionReadout) {
     let ActionReadout {
