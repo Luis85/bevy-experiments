@@ -1,13 +1,8 @@
 //! Presentation assets. Asset handles and atlas coordinates never enter simulation state.
 use crate::animation::ActorPose;
-use bevy::image::{ImageLoaderSettings, ImageSampler};
 use bevy::prelude::*;
-use bevy_egui::{
-    EguiContexts,
-    egui::{Color32, Painter, Pos2, Rect, TextureId, Vec2, pos2, vec2},
-};
+use bevy_egui::egui::{Color32, Painter, Pos2, Rect, TextureId, Vec2, pos2, vec2};
 use horde_core::{ordnance::OrdnanceKind, weapons::WeaponClass};
-use std::sync::OnceLock;
 // Characters and equipment previews share the source-owned model resolver.
 mod player_preview;
 pub use player_preview::defender_preview;
@@ -87,12 +82,15 @@ pub fn prepare_player_models(context: &bevy_egui::egui::Context) -> Result<(), S
 }
 pub mod enemy_visuals;
 mod ground_material;
+mod loading;
 use enemy_visuals::{EnemySprite, SpriteArt, WalkArt};
+#[cfg(feature = "review")]
+pub use loading::VisualAssets;
+pub use loading::{load_assets, refresh_art};
 
-static FLASH_MASKS: OnceLock<FlashMasks> = OnceLock::new();
-static RIG_ATLAS: OnceLock<RigAtlas> = OnceLock::new();
-
-/// Cached geometry derived from the unchanged source alpha, never a new raster.
+/// Geometry derived from the unchanged source alpha, never a new raster.
+/// Rebuilt by `loading` whenever the walker or actor sheet (re)loads and kept
+/// beside the egui textures it describes (see `loading::flash_masks`).
 #[derive(Debug)]
 pub struct FlashMasks {
     /// Per enemy sprite (catalogue order): one mask per gait frame or standing pose.
@@ -202,9 +200,30 @@ impl FlashMasks {
     }
 }
 
+/// Why `image` cannot back the rectangles measured on it, if it cannot: it must
+/// have exactly the declared pixel size and contain every rectangle.
+fn sheet_problem(
+    image: &Image,
+    name: &str,
+    declared: [f32; 2],
+    rects: &[[f32; 4]],
+) -> Option<String> {
+    let size = [image.width() as f32, image.height() as f32];
+    if size != declared {
+        return Some(format!(
+            "{name} is {}x{} but its art metadata declares {declared:?}",
+            image.width(),
+            image.height()
+        ));
+    }
+    rects
+        .iter()
+        .find(|r| r[2] > size[0] || r[3] > size[1] || r[0] < 0.0 || r[1] < 0.0)
+        .map(|r| format!("{r:?} leaves {name}"))
+}
 /// Why the loaded sheets cannot back the enemy mapping, if they cannot: each
-/// sheet a sprite is measured on must have exactly the declared pixel size and
-/// contain every rectangle. Checks only the sheets that have loaded.
+/// sheet a sprite is measured on must fit as `sheet_problem` requires. Checks
+/// only the sheets that have loaded.
 fn enemy_art_problem(walkers: Option<&Image>, actors: Option<&Image>) -> Option<String> {
     for sprite in enemy_visuals::active().sprites() {
         let (image, name, rects): (_, _, Vec<[f32; 4]>) = match &sprite.art {
@@ -218,35 +237,26 @@ fn enemy_art_problem(walkers: Option<&Image>, actors: Option<&Image>) -> Option<
         let Some(image) = image else {
             continue;
         };
-        let size = [image.width() as f32, image.height() as f32];
-        if size != sprite.source_size {
-            return Some(format!(
-                "{name} is {}x{} but enemy visuals declare {:?} for {:?}",
-                image.width(),
-                image.height(),
-                sprite.source_size,
-                sprite.sprite
-            ));
-        }
-        if rects
-            .iter()
-            .any(|r| r[2] > size[0] || r[3] > size[1] || r[0] < 0.0 || r[1] < 0.0)
-        {
-            return Some(format!("{:?} art leaves {name}", sprite.sprite));
+        if let Some(problem) = sheet_problem(image, name, sprite.source_size, &rects) {
+            return Some(format!("{problem} ({:?})", sprite.sprite));
         }
     }
     None
 }
-/// Logs a rejected enemy mapping once; the battlefield then uses fallback figures.
-fn enemy_art_rejected(walkers: Option<&Image>, actors: Option<&Image>) -> bool {
-    static REPORTED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-    let Some(problem) = enemy_art_problem(walkers, actors) else {
-        return false;
-    };
-    if !REPORTED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-        error!("Enemy sprite art disabled: {problem}");
-    }
-    true
+/// Player, companion, portrait and corpse cells share the actor sheet; a
+/// mismatch draws the procedural survivor figures instead.
+fn survivor_art_problem(actors: &Image) -> Option<String> {
+    let rects: Vec<[f32; 4]> = SURVIVOR_RECTS
+        .iter()
+        .chain(&PORTRAIT_RECTS)
+        .chain([&CORPSE_RECT])
+        .copied()
+        .collect();
+    sheet_problem(actors, "actors-v1.png", ACTOR_SIZE, &rects)
+}
+/// A mismatched prop sheet draws procedural props instead.
+fn prop_art_problem(props: &Image) -> Option<String> {
+    sheet_problem(props, "props-v1.png", PROP_SIZE, &PROP_RECTS)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -255,58 +265,8 @@ pub struct HitFlash {
     pub reduced: bool,
 }
 
-#[derive(Resource)]
-pub struct VisualAssets {
-    actors: Handle<Image>,
-    props: Handle<Image>,
-    keyart: Handle<Image>,
-    ground: Handle<Image>,
-    walkers: Handle<Image>,
-    /// Legacy `defender-rig-v1.png`: now only the firearm/ordnance icon source.
-    rig: Handle<Image>,
-    menu_idle: Handle<Image>,
-    egui_textures: [OnceLock<Result<bevy_egui::egui::TextureHandle, String>>; 7],
-}
-impl VisualAssets {
-    #[cfg(feature = "review")]
-    pub fn all_loaded(&self, images: &Assets<Image>) -> bool {
-        [
-            &self.actors,
-            &self.props,
-            &self.keyart,
-            &self.ground,
-            &self.walkers,
-            &self.rig,
-            &self.menu_idle,
-        ]
-        .into_iter()
-        .all(|handle| images.get(handle).is_some())
-    }
-}
-pub fn load_assets(mut commands: Commands, server: Res<AssetServer>) {
-    let pixel = |path: &'static str| {
-        server
-            .load_builder()
-            .with_settings(|settings: &mut ImageLoaderSettings| {
-                settings.sampler = ImageSampler::nearest();
-                // Egui owns the only GPU copy; retain untouched source pixels
-                // for atlas calibration and alpha masks in the main world.
-                settings.asset_usage = bevy::asset::RenderAssetUsages::MAIN_WORLD;
-            })
-            .load(path)
-    };
-    commands.insert_resource(VisualAssets {
-        actors: pixel("art/pixel/actors-v1.png"),
-        props: pixel("art/pixel/props-v1.png"),
-        keyart: pixel("art/pixel/keyart-v2.png"),
-        ground: pixel("art/pixel/terrain-v1.png"),
-        walkers: pixel("art/pixel/walkers-v1.png"),
-        rig: pixel("art/pixel/defender-rig-v1.png"),
-        menu_idle: pixel("art/pixel/menu-survivors-v1.png"),
-        egui_textures: std::array::from_fn(|_| OnceLock::new()),
-    });
-}
-/// Egui texture ids for the loaded art, re-registered each frame.
+/// Egui texture ids and derived data for the loaded art, republished each
+/// frame by `loading::refresh_art`.
 #[derive(Resource, Clone, Copy, Default, Debug)]
 pub struct ArtTextures {
     pub actors: Option<TextureId>,
@@ -314,9 +274,10 @@ pub struct ArtTextures {
     pub keyart: Option<TextureId>,
     pub ground: Option<TextureId>,
     pub walkers: Option<WalkSheet>,
-    pub flash_masks: Option<&'static FlashMasks>,
     /// The loaded sheets do not match `enemy_visuals.json`: draw fallback figures.
     pub enemy_art_rejected: bool,
+    /// The actor sheet does not match the survivor/portrait/corpse cells.
+    pub survivor_art_rejected: bool,
     /// Weapon and ordnance icon atlas (legacy defender rig sheet; no bodies are drawn from it).
     pub rig: Option<RigSheet>,
     pub menu_idle: Option<TextureId>,
@@ -324,11 +285,11 @@ pub struct ArtTextures {
 #[derive(Clone, Copy, Debug)]
 pub struct RigSheet {
     pub texture: TextureId,
-    pub atlas: &'static RigAtlas,
+    pub atlas: RigAtlas,
 }
 /// Icon cells cut from the legacy defender rig sheet: 4..=9 firearms, 10..=13 ordnance.
 /// The body cells (0..=3) are retained only because the grid is cut uniformly.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct RigAtlas {
     size: [f32; 2],
     cells: [[f32; 4]; 16],
@@ -389,104 +350,6 @@ pub struct PropMotion {
     pub recoil: f32,
     pub trigger: f32,
     pub hit: f32,
-}
-/// bevy_egui 0.43.1 uses premultiplied blending and its fragment shader does
-/// not premultiply external textures. Convert straight PNG RGBA through egui's
-/// supported managed-image path once, preserving nearest sampling and originals.
-fn image_for_egui(image: &Image) -> bevy_egui::egui::ColorImage {
-    bevy_egui::egui::ColorImage::from_rgba_unmultiplied(
-        [image.width() as usize, image.height() as usize],
-        image
-            .data
-            .as_deref()
-            .expect("Original RGBA pixels remain in main world"),
-    )
-}
-
-fn managed_texture(
-    context: &bevy_egui::egui::Context,
-    name: String,
-    image: &Image,
-    max_side: usize,
-) -> Result<bevy_egui::egui::TextureHandle, String> {
-    // Egui's backend-independent default is 2048. The active render device,
-    // rather than that default or an assumed adapter maximum, owns this budget.
-    context.input_mut(|input| {
-        input.max_texture_side = max_side;
-        input.raw.max_texture_side = Some(max_side);
-    });
-    if image.width() as usize > max_side || image.height() as usize > max_side {
-        return Err(format!(
-            "Art texture {name} is {}x{}, exceeding the active render device limit {max_side}; using procedural fallback",
-            image.width(),
-            image.height()
-        ));
-    }
-    Ok(context.load_texture(
-        name,
-        image_for_egui(image),
-        bevy_egui::egui::TextureOptions::NEAREST,
-    ))
-}
-
-pub fn register(
-    contexts: &mut EguiContexts,
-    visuals: &VisualAssets,
-    images: &Assets<Image>,
-    max_texture_side: usize,
-) -> ArtTextures {
-    let Ok(context) = contexts.ctx_mut() else {
-        return ArtTextures::default();
-    };
-    let context = context.clone();
-    let texture = |slot: usize, handle: &Handle<Image>| {
-        let image = images.get(handle)?;
-        let cached = visuals.egui_textures[slot].get_or_init(|| {
-            let uploaded = managed_texture(
-                &context,
-                format!("lastlight-art-{slot}"),
-                image,
-                max_texture_side,
-            );
-            if let Err(error) = &uploaded {
-                warn!("{error}");
-            }
-            uploaded
-        });
-        cached.as_ref().ok().map(bevy_egui::egui::TextureHandle::id)
-    };
-    let sheet = images.get(&visuals.walkers).and_then(|image| {
-        texture(4, &visuals.walkers).map(|texture| WalkSheet {
-            texture,
-            size: [image.width(), image.height()],
-        })
-    });
-    let flash_masks = images
-        .get(&visuals.walkers)
-        .zip(images.get(&visuals.actors))
-        .map(|(walkers, actors)| {
-            FLASH_MASKS.get_or_init(|| FlashMasks::from_images(walkers, actors))
-        });
-    let rig = images.get(&visuals.rig).and_then(|image| {
-        texture(5, &visuals.rig).map(|texture| RigSheet {
-            texture,
-            atlas: RIG_ATLAS.get_or_init(|| RigAtlas::from_image(image)),
-        })
-    });
-    ArtTextures {
-        actors: texture(0, &visuals.actors),
-        props: texture(1, &visuals.props),
-        keyart: texture(2, &visuals.keyart),
-        ground: texture(3, &visuals.ground),
-        walkers: sheet,
-        flash_masks,
-        enemy_art_rejected: enemy_art_rejected(
-            images.get(&visuals.walkers),
-            images.get(&visuals.actors),
-        ),
-        rig,
-        menu_idle: texture(6, &visuals.menu_idle),
-    }
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Actor {
@@ -763,6 +626,7 @@ pub fn actor_animated(
                 )
             }
         },
+        Actor::Player | Actor::Mara if textures.survivor_art_rejected => return false,
         Actor::Player | Actor::Mara => {
             let index = kind.survivor_index().unwrap_or_default();
             let source = SURVIVOR_RECTS[index];
@@ -809,7 +673,7 @@ pub fn actor_hit_flash(
     if flash.strength <= 0. {
         return;
     }
-    let Some(masks) = textures.flash_masks else {
+    let Some(masks) = loading::flash_masks(p.ctx()) else {
         return;
     };
     let (mask, source, rect, pivot) = match kind {
@@ -856,7 +720,7 @@ pub fn actor_hit_flash(
         }
         Actor::Player | Actor::Mara => {
             let index = kind.survivor_index().unwrap_or_default();
-            if textures.actors.is_none() {
+            if textures.actors.is_none() || textures.survivor_art_rejected {
                 return;
             }
             let source = SURVIVOR_RECTS[index];
@@ -958,7 +822,7 @@ pub fn corpse_batch(
     textures: ArtTextures,
     bodies: impl IntoIterator<Item = (Pos2, Vec2, Color32)>,
 ) -> bool {
-    let Some(texture) = textures.actors else {
+    let Some(texture) = textures.actors.filter(|_| !textures.survivor_art_rejected) else {
         return false;
     };
     let source = CORPSE_RECT;
@@ -991,7 +855,7 @@ fn actor_region(
     size: Vec2,
     tint: Color32,
 ) -> bool {
-    let Some(texture) = textures.actors else {
+    let Some(texture) = textures.actors.filter(|_| !textures.survivor_art_rejected) else {
         return false;
     };
     p.image(
@@ -1220,7 +1084,9 @@ pub fn panorama(p: &Painter, r: Rect, textures: ArtTextures, _biome: &str) -> bo
 
 #[cfg(test)]
 mod tests {
+    use super::loading::{image_for_egui, managed_texture};
     use super::*;
+    use bevy::image::ImageSampler;
     use horde_core::enemy_catalog::VisualSprite;
     #[test]
     fn cohesive_menu_poses_keep_both_boots_and_lower_body_fixed_while_upper_body_breathes() {
@@ -1352,7 +1218,7 @@ mod tests {
             )
             .unwrap();
             let original = image.data.clone().unwrap();
-            let converted = image_for_egui(&image);
+            let converted = image_for_egui(&image).unwrap();
             let mut transparent = 0;
             for (source, pixel) in original.as_chunks::<4>().0.iter().zip(&converted.pixels) {
                 let rgba = pixel.to_array();
@@ -1942,6 +1808,63 @@ mod tests {
             assert!(draw(textures, shambler) && draw(textures, boss));
             assert!(!draw(rejected, shambler) && !draw(rejected, boss));
             assert!(draw(rejected, Actor::Player));
+        });
+        output.textures_delta.clear();
+    }
+    #[test]
+    fn mismatched_survivor_and_prop_sheets_are_rejected_and_draw_fallbacks() {
+        let decode = |bytes| {
+            Image::from_buffer(
+                bytes,
+                bevy::image::ImageType::Extension("png"),
+                bevy::image::CompressedImageFormats::NONE,
+                true,
+                ImageSampler::nearest(),
+                bevy::asset::RenderAssetUsages::default(),
+            )
+            .unwrap()
+        };
+        let actors = decode(include_bytes!("../../../assets/art/pixel/actors-v1.png"));
+        let props = decode(include_bytes!("../../../assets/art/pixel/props-v1.png"));
+        assert_eq!(survivor_art_problem(&actors), None);
+        assert_eq!(prop_art_problem(&props), None);
+        // Wrong size, or the right size with a cell outside it, is rejected.
+        assert!(survivor_art_problem(&blank_sheet(64, 64)).is_some());
+        assert!(prop_art_problem(&blank_sheet(64, 64)).is_some());
+        assert!(prop_art_problem(&actors).is_some());
+        assert!(
+            sheet_problem(&blank_sheet(10, 10), "x", [10., 10.], &[[0., 0., 11., 5.]]).is_some()
+        );
+        assert!(
+            sheet_problem(&blank_sheet(10, 10), "x", [10., 10.], &[[0., 0., 10., 10.]]).is_none()
+        );
+        // A rejected actor sheet draws no survivor, portrait or corpse art (the
+        // callers paint procedural figures) while enemies are unaffected.
+        let ctx = bevy_egui::egui::Context::default();
+        let shambler = Actor::enemy(VisualSprite::Shambler).unwrap();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            let textures = ArtTextures {
+                actors: Some(TextureId::User(1)),
+                walkers: Some(WalkSheet {
+                    texture: TextureId::User(2),
+                    size: [1122, 1402],
+                }),
+                ..Default::default()
+            };
+            let rejected = ArtTextures {
+                survivor_art_rejected: true,
+                ..textures
+            };
+            let p = ui.painter();
+            let (at, size) = (pos2(50., 50.), vec2(40., 40.));
+            assert!(actor(p, textures, Actor::Player, at, size, Color32::WHITE));
+            assert!(portrait(p, textures, true, at, size));
+            assert!(corpse_batch(p, textures, [(at, size, Color32::WHITE)]));
+            assert!(!actor(p, rejected, Actor::Player, at, size, Color32::WHITE));
+            assert!(!actor(p, rejected, Actor::Mara, at, size, Color32::WHITE));
+            assert!(!portrait(p, rejected, true, at, size));
+            assert!(!corpse_batch(p, rejected, [(at, size, Color32::WHITE)]));
+            assert!(actor(p, rejected, shambler, at, size, Color32::WHITE));
         });
         output.textures_delta.clear();
     }

@@ -32,26 +32,12 @@ pub use source_masks::{
     SourceImageView, compile_catalogue,
 };
 
-#[cfg(any(test, feature = "review"))]
+/// The bundled player-model documents, matching `player_models/manifest.json`.
+/// This is the one embedded catalogue: it backs the manifest-absent startup
+/// fallback and tests/review tools. The JSON is embedded because startup
+/// validates it before the app (and its AssetServer) exists; the source PNGs it
+/// names are never embedded and are always read from the asset root.
 pub fn bundled_catalogue() -> Result<PlayerModelCatalogue, String> {
-    PlayerModelCatalogue::from_json(
-        &[
-            include_str!("../../../../assets/player_models/rook.json"),
-            include_str!("../../../../assets/player_models/june.json"),
-        ],
-        include_str!("../../../../assets/player_models/skins.json"),
-    )
-}
-#[cfg(any(test, feature = "review"))]
-pub fn builtin() -> Result<&'static CompiledCatalogue, String> {
-    static CACHE: std::sync::OnceLock<Result<CompiledCatalogue, String>> =
-        std::sync::OnceLock::new();
-    match CACHE.get_or_init(|| bundled_catalogue().and_then(backend_egui::decode_bundled)) {
-        Ok(value) => Ok(value),
-        Err(error) => Err(error.clone()),
-    }
-}
-pub fn bundled_equipment_catalogue() -> Result<PlayerModelCatalogue, String> {
     PlayerModelCatalogue::from_documents(
         &[
             include_str!("../../../../assets/player_models/rook.json"),
@@ -63,10 +49,12 @@ pub fn bundled_equipment_catalogue() -> Result<PlayerModelCatalogue, String> {
         ],
     )
 }
-pub fn equipped_builtin() -> Result<&'static CompiledCatalogue, String> {
+/// The bundled catalogue compiled once from the startup asset root (or, before
+/// startup ran, the development `assets/` folder).
+pub fn builtin() -> Result<&'static CompiledCatalogue, String> {
     static CACHE: std::sync::OnceLock<Result<CompiledCatalogue, String>> =
         std::sync::OnceLock::new();
-    match CACHE.get_or_init(|| bundled_equipment_catalogue().and_then(startup::decode_embedded)) {
+    match CACHE.get_or_init(|| startup::compile_bundled(&startup::bundled_asset_root())) {
         Ok(value) => Ok(value),
         Err(e) => Err(e.clone()),
     }

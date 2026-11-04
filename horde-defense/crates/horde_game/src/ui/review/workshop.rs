@@ -137,9 +137,10 @@ fn paint_model_parity(
     pixels_per_point: f32,
 ) -> Result<NativeParityLayout, String> {
     use crate::player_model::{
-        ModelPlacement, builtin, draw_egui, resolve_model, verification::audit_bind,
+        ModelPlacement, draw_egui, resolve_model, startup::active_or_bundled,
+        verification::audit_bind,
     };
-    let catalogue = builtin()?;
+    let catalogue = active_or_bundled()?;
     let model = catalogue
         .model(id)
         .ok_or_else(|| format!("Unknown model {id}"))?;
@@ -311,8 +312,10 @@ fn paint_model_parts(
     id: &str,
     viewport: egui::Rect,
 ) -> Result<(), String> {
-    use crate::player_model::{ModelPlacement, builtin, draw_egui, resolve_model};
-    let catalogue = builtin()?;
+    use crate::player_model::{
+        ModelPlacement, draw_egui, resolve_model, startup::active_or_bundled,
+    };
+    let catalogue = active_or_bundled()?;
     let model = catalogue
         .model(id)
         .ok_or_else(|| format!("Unknown model {id}"))?;

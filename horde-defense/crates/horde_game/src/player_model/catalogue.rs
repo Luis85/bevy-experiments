@@ -124,10 +124,6 @@ pub struct PlayerModelCatalogue {
 }
 
 impl PlayerModelCatalogue {
-    #[cfg(any(test, feature = "review"))]
-    pub fn from_json(models: &[&str], skins: &str) -> Result<Self, String> {
-        Self::from_documents(models, &[skins])
-    }
     pub fn from_documents(models: &[&str], skin_documents: &[&str]) -> Result<Self, String> {
         if models.is_empty()
             || models.len() > 32

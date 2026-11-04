@@ -24,7 +24,7 @@ impl Plugin for UiPlugin {
             .add_systems(Startup, (spawn_camera, visual_assets::load_assets))
             .add_systems(
                 EguiPrimaryContextPass,
-                (super::register_textures, super::draw).chain(),
+                (visual_assets::refresh_art, super::draw).chain(),
             )
             .add_systems(
                 PostUpdate,

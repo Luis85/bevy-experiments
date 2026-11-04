@@ -371,7 +371,7 @@ fn egui_adapter_submits_only_selected_cached_parts_with_white_tint_and_shared_tr
 #[test]
 fn selected_real_starter_equipment_keeps_the_original_bind_exact_with_no_generated_visible_fill() {
     use horde_core::weapons::WeaponClass;
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let equipment = verification::review_equipment(
         Some(WeaponClass::Pistol),
         Some("armor.cloth"),
@@ -415,7 +415,7 @@ fn selected_real_starter_equipment_keeps_the_original_bind_exact_with_no_generat
 
 #[test]
 fn actual_campaign_starter_snapshot_including_stowed_melee_keeps_source_bind_exact() {
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let campaign = horde_core::campaign::Campaign::default();
     let frozen = campaign
         .profile(horde_core::content::Mode::Personal)
@@ -460,7 +460,7 @@ fn every_authored_item_style_can_resolve_on_both_survivors_without_losing_the_bo
         survivors::EquipmentVisualItem,
         weapons::{WeaponClass, WeaponSpec},
     };
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     for (definition, recipe) in content().items.iter().enumerate() {
         let mut frozen = verification::review_equipment(
             Some(WeaponClass::Pistol),
@@ -522,7 +522,7 @@ fn every_authored_item_style_can_resolve_on_both_survivors_without_losing_the_bo
 #[test]
 fn all_six_firearms_and_three_outfits_select_distinct_actual_cached_geometry() {
     use horde_core::weapons::WeaponClass;
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let placement = ModelPlacement {
         source_origin: [900., 700.],
         scale: 0.25,
@@ -587,7 +587,7 @@ fn all_six_firearms_and_three_outfits_select_distinct_actual_cached_geometry() {
 
 #[test]
 fn absent_frozen_slots_remove_original_gear_without_borrowing_a_default_loadout() {
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     for id in ["rook", "june"] {
         let empty = verification::review_equipment(None, None, None).unwrap();
         let pose = resolve_equipped_model(
@@ -625,7 +625,7 @@ fn absent_frozen_slots_remove_original_gear_without_borrowing_a_default_loadout(
 #[test]
 fn repeated_paused_and_reduced_samples_resolve_identical_actual_pixels_and_sockets() {
     use horde_core::weapons::WeaponClass;
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let equipment = verification::review_equipment(
         Some(WeaponClass::Rifle),
         Some("armor.cloth"),
@@ -728,7 +728,7 @@ fn actual_published_hand_socket<'c, 'p>(
 #[test]
 fn held_contacts_bone_lengths_and_muzzle_follow_actual_drawn_geometry_for_every_gun_and_facing() {
     use horde_core::weapons::WeaponClass;
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let mut unsupported = Vec::new();
     let placement = ModelPlacement {
         source_origin: [900., 700.],
@@ -870,7 +870,7 @@ fn held_contacts_bone_lengths_and_muzzle_follow_actual_drawn_geometry_for_every_
 #[test]
 fn throw_and_melee_effect_origins_are_on_the_actual_drawn_hand_and_weapon() {
     use horde_core::weapons::WeaponClass;
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let equipment = verification::review_equipment(
         Some(WeaponClass::Pistol),
         Some("armor.cloth"),
@@ -1046,7 +1046,7 @@ fn action_boundary_geometry_errors(
 #[test]
 fn action_boundaries_preserve_actual_aimed_gun_and_recover_held_arm_geometry() {
     use horde_core::weapons::WeaponClass;
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let placement = ModelPlacement {
         source_origin: [900., 700.],
         scale: 0.25,
@@ -1135,7 +1135,7 @@ fn action_boundaries_preserve_actual_aimed_gun_and_recover_held_arm_geometry() {
 #[test]
 fn active_hand_cel_suppresses_only_the_original_palm_and_retains_source_wrist_and_cuff() {
     use horde_core::weapons::WeaponClass;
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let equipment = verification::review_equipment(
         Some(WeaponClass::Pistol),
         Some("armor.cloth"),
@@ -1301,7 +1301,7 @@ fn active_hand_cel_suppresses_only_the_original_palm_and_retains_source_wrist_an
 #[test]
 fn active_fist_aliases_and_all_melee_grips_match_actual_painted_source_surfaces() {
     use horde_core::{content::content, survivors::EquipmentVisualItem, weapons::WeaponClass};
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     for id in ["rook", "june"] {
         for style in [
             "melee.crowbar",
@@ -1409,7 +1409,7 @@ fn active_fist_aliases_and_all_melee_grips_match_actual_painted_source_surfaces(
 fn recompile_review_definition(
     definition: PlayerModelCatalogue,
 ) -> Result<CompiledCatalogue, String> {
-    let source = equipped_builtin()?;
+    let source = builtin()?;
     let views: Vec<_> = source
         .sources
         .values()
@@ -1425,7 +1425,7 @@ fn recompile_review_definition(
 
 #[test]
 fn action_cel_schema_rejects_protected_owners_missing_activation_and_illegal_aliases() {
-    let catalogue = equipped_builtin().unwrap();
+    let catalogue = builtin().unwrap();
     let index = catalogue
         .definition
         .attachments
@@ -1456,7 +1456,7 @@ fn action_cel_schema_rejects_protected_owners_missing_activation_and_illegal_ali
 #[test]
 fn conflicting_active_hand_and_tool_aliases_fail_instead_of_publishing_a_fake_contact() {
     use horde_core::weapons::WeaponClass;
-    let source = equipped_builtin().unwrap();
+    let source = builtin().unwrap();
     for id in ["rook", "june"] {
         let mut definition = source.definition.clone();
         let cel = definition
@@ -1507,7 +1507,7 @@ fn conflicting_active_hand_and_tool_aliases_fail_instead_of_publishing_a_fake_co
 #[test]
 fn missing_gear_cannot_activate_an_action_local_hand_replacement_in_bind() {
     use horde_core::weapons::WeaponClass;
-    let source = equipped_builtin().unwrap();
+    let source = builtin().unwrap();
     for id in ["rook", "june"] {
         let mut definition = source.definition.clone();
         let missing = definition

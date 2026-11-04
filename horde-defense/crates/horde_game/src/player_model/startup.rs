@@ -55,7 +55,7 @@ pub fn active_or_bundled() -> Result<&'static CompiledCatalogue, String> {
     if ACTIVE.get().is_some() {
         active_catalogue()
     } else {
-        super::equipped_builtin()
+        super::builtin()
     }
 }
 pub fn model_for_appearance_key(key: &str) -> Result<String, String> {
@@ -102,7 +102,7 @@ pub fn load_from_asset_root(asset_root: &Path) -> Result<StartupPlayerModels, St
         .map_err(|e| format!("Cannot inspect model manifest: {e}"))?
     {
         return Ok(StartupPlayerModels {
-            catalogue: decode_embedded(super::bundled_equipment_catalogue()?)?,
+            catalogue: compile_from_root(&root, super::bundled_catalogue()?)?,
             manifest: bundled_manifest(),
             provenance: "bundled fallback (manifest absent)".into(),
             asset_root: root,
@@ -146,24 +146,7 @@ pub fn load_from_asset_root(asset_root: &Path) -> Result<StartupPlayerModels, St
             return Err("Unknown player model manifest mapping".into());
         }
     }
-    let specs = source_specs(&definition);
-    let mut images = Vec::with_capacity(specs.len());
-    for source in &specs {
-        let path = checked_path(&root, &root, &source.path)?;
-        let bytes = read_bounded(&path, 64 * 1024 * 1024)?;
-        images.push(decode_png(&bytes, source.size)?);
-    }
-    let views = specs
-        .iter()
-        .zip(&images)
-        .map(|(spec, image)| SourceImageView {
-            id: &spec.id,
-            width: image.width(),
-            height: image.height(),
-            rgba: image.data.as_deref().unwrap_or_default(),
-        })
-        .collect::<Vec<_>>();
-    let catalogue = compile_catalogue(definition, &views)?;
+    let catalogue = compile_from_root(&root, definition)?;
     Ok(StartupPlayerModels {
         catalogue,
         manifest,
@@ -245,49 +228,94 @@ fn decode_png(bytes: &[u8], size: [u32; 2]) -> Result<bevy::prelude::Image, Stri
     )
     .map_err(|e| e.to_string())
 }
-pub(super) fn decode_embedded(
+/// Where the bundled catalogue's source images live: the startup asset root,
+/// or the development `assets/` folder when startup has not run (tests).
+pub(super) fn bundled_asset_root() -> PathBuf {
+    match ACTIVE.get() {
+        Some(Ok(value)) => value.asset_root.clone(),
+        _ => PathBuf::from(concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets")),
+    }
+}
+pub(super) fn compile_bundled(asset_root: &Path) -> Result<CompiledCatalogue, String> {
+    let root = asset_root
+        .canonicalize()
+        .map_err(|e| format!("Invalid player asset root: {e}"))?;
+    compile_from_root(&root, super::bundled_catalogue()?)
+}
+/// Reads, bounds and decodes every source PNG a definition names from the
+/// canonical asset root: the same files the AssetServer serves, never an
+/// embedded copy.
+fn compile_from_root(
+    root: &Path,
     definition: PlayerModelCatalogue,
 ) -> Result<CompiledCatalogue, String> {
     let specs = source_specs(&definition);
-    let mut images = Vec::new();
+    let mut images = Vec::with_capacity(specs.len());
     for source in &specs {
-        let bytes: &[u8] = match source.path.as_str() {
-            "art/pixel/menu-survivors-v1.png" => {
-                include_bytes!("../../../../assets/art/pixel/menu-survivors-v1.png")
-            }
-            "art/pixel/defender-rig-v1.png" => {
-                include_bytes!("../../../../assets/art/pixel/defender-rig-v1.png")
-            }
-            "art/pixel/canonical-parts-v1.png" => {
-                include_bytes!("../../../../assets/art/pixel/canonical-parts-v1.png")
-            }
-            "art/pixel/player-underlayers-v1.png" => {
-                include_bytes!("../../../../assets/art/pixel/player-underlayers-v1.png")
-            }
-            "art/pixel/player-equipment-v1.png" => {
-                include_bytes!("../../../../assets/art/pixel/player-equipment-v1.png")
-            }
-            "art/pixel/player-hidden-torsos-v1.png" => {
-                include_bytes!("../../../../assets/art/pixel/player-hidden-torsos-v1.png")
-            }
-            _ => {
-                return Err(format!(
-                    "Unbundled source {}; provide a model manifest",
-                    source.path
-                ));
-            }
-        };
-        images.push(decode_png(bytes, source.size)?);
+        let path = checked_path(root, root, &source.path)?;
+        let bytes = read_bounded(&path, 64 * 1024 * 1024)?;
+        images.push(decode_png(&bytes, source.size)?);
     }
     let views = specs
         .iter()
         .zip(&images)
-        .map(|(source, image)| SourceImageView {
-            id: &source.id,
+        .map(|(spec, image)| SourceImageView {
+            id: &spec.id,
             width: image.width(),
             height: image.height(),
             rgba: image.data.as_deref().unwrap_or_default(),
         })
         .collect::<Vec<_>>();
     compile_catalogue(definition, &views)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn summary(catalogue: &CompiledCatalogue) -> Vec<(String, String, String)> {
+        catalogue
+            .sources
+            .values()
+            .map(|s| (s.id.clone(), s.path.clone(), s.rgba_fnv1a64.clone()))
+            .collect()
+    }
+
+    #[test]
+    fn bundled_catalogue_matches_the_manifest_and_reads_sources_from_the_asset_root() {
+        let root = bundled_asset_root();
+        let manifest = load_from_asset_root(&root).unwrap();
+        let bundled = super::super::builtin().unwrap();
+        assert_eq!(summary(&manifest.catalogue), summary(bundled));
+        assert_eq!(
+            manifest.catalogue.models.keys().collect::<Vec<_>>(),
+            bundled.models.keys().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            manifest.catalogue.attachments.keys().collect::<Vec<_>>(),
+            bundled.attachments.keys().collect::<Vec<_>>()
+        );
+        assert_eq!(
+            manifest.manifest.default_model_map,
+            bundled_manifest().default_model_map
+        );
+
+        // Without a manifest the bundled documents still read their PNGs from
+        // the asset root; with no source images there is nothing embedded to use.
+        let temp = std::env::temp_dir().join(format!(
+            "lastlight-player-model-root-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&temp);
+        std::fs::create_dir_all(temp.join("art/pixel")).unwrap();
+        let missing = load_from_asset_root(&temp).unwrap_err();
+        assert!(missing.contains("Missing player model asset"), "{missing}");
+        for (_, path, _) in summary(bundled) {
+            std::fs::copy(root.join(&path), temp.join(&path)).unwrap();
+        }
+        let fallback = load_from_asset_root(&temp).unwrap();
+        assert!(fallback.provenance.contains("manifest absent"));
+        assert_eq!(summary(&fallback.catalogue), summary(bundled));
+        std::fs::remove_dir_all(&temp).unwrap();
+    }
 }

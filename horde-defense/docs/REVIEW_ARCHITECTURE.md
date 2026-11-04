@@ -50,7 +50,7 @@ Production systems are named and scheduled explicitly:
 | `FixedUpdate` at 60 Hz (`RuntimeSet::Advance`) | `runner::advance` | Advance authoritative whole ticks and consume one-shot controls once. |
 | `Update` (`RuntimeSet::Persist`) | `runner::persist` | Commit due autosaves outside rendering and fixed combat procedures. |
 | `Update`, after `Persist` | `sfx::play_sounds` | Consume bounded `SoundCue` messages and spawn native audio players. |
-| egui context pass | `ui::register_textures`, `ui::draw` | Read state, render controls, publish input snapshots and queue commands. |
+| egui context pass | `visual_assets::refresh_art`, `ui::draw` | Read state, render controls, publish input snapshots and queue commands. |
 
 `flush(&mut ctx)` and `step(&mut ctx)` are the same services used by production
 systems and headless widget/schedule tests. They require no OS window or GPU.
