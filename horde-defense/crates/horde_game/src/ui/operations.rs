@@ -231,7 +231,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         ui.selectable_value(&mut f.battle.build_kind, kind, format!("{kind:?}"));
                     }
                 });
-                if let Some(b) = f.game.active_battle(id)
+                if let Some(b) = f.game.battles.iter().find(|b| b.id == id)
                     && let Some(a) = b.game.attempt.as_ref()
                 {
                     muted(
