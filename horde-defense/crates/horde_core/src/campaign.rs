@@ -4,7 +4,7 @@ use crate::content::{
 };
 use crate::kind_map::{KindMap, StableKind};
 use crate::rules::Stats;
-use crate::skill_catalog::{SkillModifiers, skills};
+use crate::skill_catalog::{SkillModifiers, skills, unlocks};
 use crate::weapons::{WeaponClass, WeaponSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -1172,10 +1172,10 @@ impl Campaign {
             npc_melee_damage_dice: npc_melee.dice,
             npc_melee_damage_add: npc_melee.adds,
             npc_melee_kind: melee.npc.damage_kind,
-            pierce: is_personal && modifiers.piercing,
-            sweep: is_personal && modifiers.sweep,
-            heal: is_personal && modifiers.heal,
-            brace: is_personal && modifiers.brace,
+            pierce: is_personal && modifiers.unlocked(unlocks::PIERCING),
+            sweep: is_personal && modifiers.unlocked(unlocks::SWEEP),
+            heal: is_personal && modifiers.unlocked(unlocks::HEAL),
+            brace: is_personal && modifiers.unlocked(unlocks::BRACE),
             engineering: modifiers.engineering,
             strength: if is_personal { b[1] } else { 0 },
             endurance: if is_personal { b[3] } else { 0 },

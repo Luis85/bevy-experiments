@@ -856,7 +856,7 @@ pub fn battlefield(p: &Painter, r: Rect, a: &Attempt, aim: [f32; 2], options: Re
         ) {
             figure(p, painted_at, sy * scale, e.kind, e.boss, phase, false);
         }
-        if e.hit_stop_left > 0 {
+        if e.hit_stop_remaining() > 0 {
             visual_assets::actor_hit_flash(
                 p,
                 textures,
@@ -864,7 +864,7 @@ pub fn battlefield(p: &Painter, r: Rect, a: &Attempt, aim: [f32; 2], options: Re
                 painted_at,
                 vec2(figure_height * 1.2, figure_height),
                 HitFlash {
-                    strength: (e.hit_stop_left as f32
+                    strength: (e.hit_stop_remaining() as f32
                         / horde_core::sim::ENEMY_HIT_STOP_TICKS as f32)
                         .sqrt(),
                     reduced,

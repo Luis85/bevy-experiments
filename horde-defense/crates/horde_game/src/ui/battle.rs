@@ -632,8 +632,14 @@ fn attack_selector_rect(canvas: Rect, arena: Rect) -> Rect {
 fn attack_selector(ui: &mut egui::Ui, f: &mut Frontend) {
     let a = f.game.attempt.as_ref().expect("active battle");
     let class = a.profile.weapon.class.name();
-    let grenade = a.profile.modifiers.grenade_unlocked;
-    let molotov = a.profile.modifiers.molotov_unlocked;
+    let grenade = a
+        .profile
+        .modifiers
+        .unlocked(horde_core::skill_catalog::unlocks::GRENADE);
+    let molotov = a
+        .profile
+        .modifiers
+        .unlocked(horde_core::skill_catalog::unlocks::MOLOTOV);
     let charges = a.ordnance.charges;
     let cooldowns = a.ordnance.cooldowns;
     let spacing = 4.0;

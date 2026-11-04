@@ -18,6 +18,7 @@ use crate::content::{
 use crate::kind_map::KindMap;
 use crate::ordnance::{self, FireZone, OrdnanceKind, OrdnanceState, ThrowRequest, ThrownOrdnance};
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
+use crate::status::{StatusId, Statuses};
 use crate::world::Modifiers;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, VecDeque};
@@ -101,9 +102,10 @@ pub struct Enemy {
     pub attack_phase: EnemyPhase,
     #[serde(default)]
     pub windup_total: u32,
-    /// Remaining movement steps held after positive injury; attacks keep their cadence.
-    #[serde(default)]
-    pub hit_stop_left: u32,
+    /// Timed effects; `StatusId::HitStop` holds movement steps after positive
+    /// injury while attacks keep their cadence.
+    #[serde(default, skip_serializing_if = "Statuses::is_empty")]
+    pub statuses: Statuses,
     #[serde(default)]
     pub resolved: Option<crate::enemy_catalog::ResolvedEnemy>,
 }
@@ -153,8 +155,13 @@ impl Enemy {
             self.hp = self.injury.hp;
         }
         if damage > 0 {
-            self.hit_stop_left = self.hit_stop_left.max(ENEMY_HIT_STOP_TICKS);
+            self.statuses
+                .refresh(StatusId::HitStop, ENEMY_HIT_STOP_TICKS);
         }
+    }
+    /// Movement steps still held by hit-stop; 0 when the enemy may move.
+    pub fn hit_stop_remaining(&self) -> u32 {
+        self.statuses.remaining(StatusId::HitStop)
     }
     pub fn y(&self) -> f32 {
         self.lane as f32 + 0.5 + self.pass_offset
@@ -433,7 +440,8 @@ pub struct Attempt {
     #[serde(default)]
     npc_holding_melee: bool,
     heal_used: bool,
-    brace_left: u32,
+    #[serde(default, skip_serializing_if = "Statuses::is_empty")]
+    statuses: Statuses,
     caller_tick: u64,
     #[serde(default)]
     boss_warning_sent: bool,
@@ -459,7 +467,11 @@ impl Attempt {
     }
     /// Saved authoritative clock; transient presentation events may expire first.
     pub fn brace_remaining_ticks(&self) -> u32 {
-        self.brace_left
+        self.statuses.remaining(StatusId::Brace)
+    }
+    /// The defender's timed status effects (saved, authoritative).
+    pub fn statuses(&self) -> &Statuses {
+        &self.statuses
     }
     pub fn live_dps(&self) -> f32 {
         self.dps.live(self.tick)
@@ -988,7 +1000,7 @@ impl Game {
             ready_turns: 0,
             npc_holding_melee: false,
             heal_used: false,
-            brace_left: 0,
+            statuses: Statuses::default(),
             caller_tick: 0,
             boss_warning_sent: false,
             caller_lanes: None,
@@ -1195,7 +1207,7 @@ impl Game {
         }
         a.melee_cooldown = a.melee_cooldown.saturating_sub(1);
         a.melee_commit = a.melee_commit.saturating_sub(1);
-        a.brace_left = a.brace_left.saturating_sub(1);
+        a.statuses.tick();
         if a.mode == Mode::Personal {
             self.advance_ordnance(&mut a);
             self.reap(&mut a);
@@ -1308,9 +1320,13 @@ impl Game {
         if input.aim.iter().any(|value| !value.is_finite()) {
             return;
         }
-        if input.brace && a.profile.brace && a.brace_left == 0 && a.stamina >= 30.0 {
+        if input.brace
+            && a.profile.brace
+            && !a.statuses.active(StatusId::Brace)
+            && a.stamina >= 30.0
+        {
             a.stamina -= 30.0;
-            a.brace_left = BRACE_DURATION_TICKS;
+            a.statuses.refresh(StatusId::Brace, BRACE_DURATION_TICKS);
             a.event(
                 EventKind::Ability,
                 a.defender_position(),
@@ -1524,10 +1540,7 @@ impl Game {
             || a.melee_commit > 0
             || a.ordnance.projectiles.len() + a.ordnance.fire_zones.len()
                 >= ordnance::MAX_ACTIVE_ORDNANCE
-            || !match request.kind {
-                OrdnanceKind::Grenade => a.profile.modifiers.grenade_unlocked,
-                OrdnanceKind::Molotov => a.profile.modifiers.molotov_unlocked,
-            }
+            || !a.profile.modifiers.unlocked(request.kind.unlock())
         {
             return;
         }
@@ -1564,7 +1577,7 @@ impl Game {
             burn_interval: definition.burn_interval,
             release_cues: Some(ordnance::ReleaseCues {
                 tick: a.tick,
-                brace: a.brace_left > 0,
+                brace: a.statuses.active(StatusId::Brace),
                 last_shot_tick: a
                     .events
                     .iter()
@@ -1953,7 +1966,7 @@ impl Game {
             boss_timing: level.boss_timing.clone(),
             attack_phase: EnemyPhase::Advance,
             windup_total: 0,
-            hit_stop_left: 0,
+            statuses: Statuses::default(),
             resolved: (!boss).then_some(resolved),
         });
         a.telemetry.spawned += 1;
@@ -2059,7 +2072,7 @@ impl Game {
                 }
                 let speed = if e.boss { 0.6 } else { enemy_profile(e).speed };
                 let injury = &a.enemies[n].injury;
-                let slow = if a.enemies[n].hit_stop_left > 0
+                let slow = if a.enemies[n].statuses.active(StatusId::HitStop)
                     || (a.mode == Mode::Npc && (injury.prone || injury.stunned))
                 {
                     0.0
@@ -2080,7 +2093,7 @@ impl Game {
                 };
                 a.enemies[n].x = (a.enemies[n].x - speed * DT * slow * a.modifiers.enemy_speed)
                     .max(stop.min(a.enemies[n].x));
-                a.enemies[n].hit_stop_left = a.enemies[n].hit_stop_left.saturating_sub(1);
+                a.enemies[n].statuses.tick();
                 let blocked = a.enemies[n].x <= stop + 0.01;
                 a.enemies[n].target_structure = if blocked { blocker } else { None };
                 if blocked && (stop <= DEFENSE_LINE + 0.01 || blocker.is_some()) {
@@ -2842,7 +2855,7 @@ impl Game {
                 a.structures[s].hp -= damage;
             } else {
                 damage = (damage - a.profile.personal.armor).max(0);
-                if a.brace_left > 0 {
+                if a.statuses.active(StatusId::Brace) {
                     damage /= 2;
                 }
                 a.hp -= damage;
@@ -3213,7 +3226,9 @@ fn enemy_profile(e: &Enemy) -> &crate::enemy_catalog::ResolvedEnemy {
         .unwrap_or_else(|| crate::enemy_catalog::enemy_catalog().default_profile(e.kind))
 }
 fn enemy_step_speed(a: &Attempt, e: &Enemy) -> f32 {
-    if e.hit_stop_left > 0 || (a.mode == Mode::Npc && (e.injury.prone || e.injury.stunned)) {
+    if e.statuses.active(StatusId::HitStop)
+        || (a.mode == Mode::Npc && (e.injury.prone || e.injury.stunned))
+    {
         return 0.0;
     }
     let mut multiplier = a.modifiers.enemy_speed;
@@ -3277,8 +3292,10 @@ fn select_npc_target(a: &Attempt, policy: Policy) -> Option<usize> {
             if e.injury.hp <= 0 {
                 urgency += 8.0;
             }
-            if e.kind == EnemyKind::Runner {
-                urgency -= 3.0;
+            // Skip a zero bias so the score keeps its exact float value.
+            let bias = enemy_profile(e).target_urgency;
+            if bias != 0.0 {
+                urgency += bias;
             }
             if e.boss {
                 urgency -= if policy == Policy::BossFocus && a.hp * 2 > a.max_hp {

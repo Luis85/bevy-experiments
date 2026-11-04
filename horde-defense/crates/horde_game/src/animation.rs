@@ -299,9 +299,9 @@ fn enemy_pose(a: &Attempt, e: &Enemy, reduced: bool) -> ActorPose {
     .round() as u64)
         .max(3);
     let cycle = frame_ticks * 4;
-    let pose_tick = if e.hit_stop_left > 0 {
+    let pose_tick = if e.hit_stop_remaining() > 0 {
         a.tick.saturating_sub(u64::from(
-            horde_core::sim::ENEMY_HIT_STOP_TICKS.saturating_sub(e.hit_stop_left),
+            horde_core::sim::ENEMY_HIT_STOP_TICKS.saturating_sub(e.hit_stop_remaining()),
         ))
     } else {
         a.tick
