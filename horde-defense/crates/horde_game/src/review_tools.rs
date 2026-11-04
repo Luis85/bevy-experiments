@@ -33,20 +33,22 @@ struct StaticCapture {
 fn automated_capture(
     mut commands: Commands,
     mut state: Local<StaticCapture>,
-    (assets, images): (Res<visual_assets::VisualAssets>, Res<Assets<Image>>),
+    assets: Res<visual_assets::VisualAssets>,
     mut contexts: bevy_egui::EguiContexts,
     config: Res<LaunchConfig>,
     mut exit: MessageWriter<AppExit>,
 ) {
     state.frames += 1;
-    if assets.all_loaded(&images) {
+    if assets.ready() {
         state.ready_frames += 1;
     } else {
         state.ready_frames = 0;
     }
     // Warm up after real asset readiness, rather than waiting 120 frames in an
     // unfocused window. Extra completed frames allow GPU uploads/fonts to settle.
-    let automated = if state.requested.is_none() && state.frames >= 12 && state.ready_frames >= 8 {
+    // Readiness is published after the upload pass, one frame after the images
+    // appear, so 7 ready frames keep the capture on the same frame as before.
+    let automated = if state.requested.is_none() && state.frames >= 12 && state.ready_frames >= 7 {
         config.capture_path().cloned()
     } else {
         None

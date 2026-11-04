@@ -25,8 +25,14 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | `debug_tools` (`DebugPlugin`, `dev` feature) | F2/F3 overlays, F5 single tick (runner `step_once`), F6 dump, F7 recorder (`Runtime` hooks write JSONL); `--replay` rebuilds the `Game` headless | Default and `--no-default-features` builds |
 | `review_tools` (`ReviewToolsPlugin`, `review` feature) | Automated captures, capture sequences, frame reports; scheduled only for review launches | Ordinary play or practice |
 | `battle_view` (`BattleViewPlugin`) | `BattleViewModel`: a pure per-frame snapshot of one attempt (actors with id/kind/interpolated position/pose/health, structures, ordnance, fx, particles, defender) built from the attempt and cosmetic caches; pre-tick actor positions and the fixed-overstep blend fraction (1 in capture sequences and automated screenshots) | Writing to the attempt or deciding outcomes |
-| `art` (`art/battlefield/{terrain,structures,enemies,ordnance,fx}`), `visual_assets`, `animation` | Asset handles, padded atlas poses, the egui renderer of the view model, read-only tick/event animation and bounded scene histories. Enemy sprite cells, anchors, gaits and heights are data (`assets/art/enemy_visuals.json`, keyed by the catalogue's visual sprite id, validated at startup by `visual_assets::enemy_visuals`) | Accuracy rolls, health, range or rewards |
+| `art` (`art/battlefield/{terrain,structures,enemies,ordnance,fx}`), `visual_assets`, `animation` | Asset handles, padded atlas poses, the egui renderer of the view model, read-only tick/event animation and bounded scene histories. Enemy sprite cells, anchors, gaits and heights are data (`assets/art/enemy_visuals.json`, keyed by the catalogue's visual sprite id, validated at startup by `visual_assets::enemy_visuals`). `visual_assets::loading` owns the art handles and everything derived from them (see "Asset pipeline") | Accuracy rolls, health, range or rewards |
 | `atmosphere_audio` | Scene classification, six persistent environment channels, normalized crossfades and audio-bus gain | Combat clocks, weather damage or new hit resolution |
+
+## Asset pipeline
+
+Scene art (`actors`, `props`, `keyart-v2`, `terrain`, `walkers`, the `defender-rig` weapon-icon sheet and `menu-survivors`) loads only through the AssetServer, with pixels retained in the main world. `visual_assets::refresh_art` reads `AssetEvent<Image>` and, for a sheet that first appears or reports `LoadedWithDependencies`/`Modified`, re-uploads its egui texture and rebuilds what derives from it: hit-flash masks (published into the egui context beside the textures), the weapon-icon atlas and the sheet checks. A sheet whose size or cells do not match its metadata (enemy cells from `enemy_visuals.json`, survivor/portrait/corpse cells, prop cells) or is not 8-bit RGBA is logged and drawn with procedural fallbacks; a later valid reload clears the rejection, and a later bad one logs again. With the `dev` feature's `file_watcher` this makes art hot-reload. `VisualAssets::ready` (every sheet processed) is the readiness signal review captures wait for.
+
+Only catalogues that startup must validate before the app exists are embedded with `include_str!`: the `horde_core` catalogues, `assets/art/enemy_visuals.json` and the bundled player-model documents (`player_model::bundled_catalogue`, the single copy matching `player_models/manifest.json` and used when the manifest is absent). The UI font is embedded so egui never renders without it. No PNG is embedded: player-model source images are read from the asset root by the bounded startup loader, the same files the AssetServer serves.
 
 ## Closed enums inside the workspace
 
@@ -59,7 +65,7 @@ flowchart LR
         Blend[battle_view: overstep blend fraction]
     end
     subgraph PostUpdate
-        Draw[EguiPrimaryContextPass: register_textures then draw]
+        Draw[EguiPrimaryContextPass: visual_assets::refresh_art then draw]
     end
     Draw -->|AppCommand / ControlFrame on Runtime| Apply
     Draw -->|NextState| Next

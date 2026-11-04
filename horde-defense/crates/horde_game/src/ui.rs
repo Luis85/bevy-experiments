@@ -65,23 +65,6 @@ pub(crate) fn player_model_review_report(ctx: &egui::Context) -> Option<review::
     review::model_report(ctx)
 }
 
-/// Registers this frame's egui textures into their own resource, so drawing
-/// never needs mutable access to the game.
-pub(super) fn register_textures(
-    mut contexts: EguiContexts,
-    visual_assets: Res<crate::visual_assets::VisualAssets>,
-    images: Res<Assets<Image>>,
-    render_device: Res<bevy::render::renderer::RenderDevice>,
-    mut textures: ResMut<crate::visual_assets::ArtTextures>,
-) {
-    *textures = crate::visual_assets::register(
-        &mut contexts,
-        &visual_assets,
-        &images,
-        render_device.limits().max_texture_dimension_2d as usize,
-    );
-}
-
 #[allow(clippy::too_many_arguments)]
 pub(super) fn draw(
     mut contexts: EguiContexts,
