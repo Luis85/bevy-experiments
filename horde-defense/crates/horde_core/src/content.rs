@@ -1,3 +1,4 @@
+use crate::catalog::{self, ContentError};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
@@ -236,15 +237,21 @@ pub struct Content {
     pub structures: Vec<StructureDefinition>,
 }
 impl Content {
+    /// Pure parse + validate, so tests can build alternative catalogues in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
+        catalog::parse_validated("content", text, 32 * catalog::MIB, Self::validate)
+    }
     pub fn from_json(text: &str) -> Result<Self, String> {
-        if text.len() > 32 * 1024 * 1024 {
-            return Err(
-                "Encounter/equipment JSON exceeds the supported 32 MiB authoring limit".into(),
-            );
-        }
-        let data: Self = serde_json::from_str(text).map_err(|e| format!("Content JSON: {e}"))?;
-        data.validate()?;
-        Ok(data)
+        Self::from_json_str(text).map_err(ContentError::into_message)
+    }
+    /// Bundled default, or the `LASTLIGHT_CONTENT` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        catalog::load(
+            "content",
+            32 * catalog::MIB,
+            include_str!("../content.json"),
+            Self::from_json_str,
+        )
     }
     pub fn validate(&self) -> Result<(), String> {
         if self.levels.len() != 5
@@ -445,28 +452,13 @@ impl Content {
         &self.structures[kind as usize]
     }
 }
+static CONTENT: OnceLock<Content> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static Content, ContentError> {
+    catalog::install(&CONTENT, Content::try_load)
+}
 pub fn content() -> &'static Content {
-    static CONTENT: OnceLock<Content> = OnceLock::new();
-    CONTENT.get_or_init(|| {
-        let (text, source) = match std::env::var_os("LASTLIGHT_CONTENT") {
-            Some(path) => (
-                {if std::fs::metadata(&path).is_ok_and(|m|m.len()>32*1024*1024){panic!("LASTLIGHT_CONTENT {path:?} exceeds the supported 32 MiB authoring limit");}std::fs::read_to_string(&path).unwrap_or_else(|error| {
-                    panic!("Could not read LASTLIGHT_CONTENT {path:?}: {error}")
-                })},
-                format!("{path:?}"),
-            ),
-            None => (
-                include_str!("../content.json").to_owned(),
-                "bundled content.json".to_owned(),
-            ),
-        };
-        let data: Content = serde_json::from_str(&text).unwrap_or_else(|error| {
-            panic!("Invalid encounter/equipment JSON from {source}: {error}")
-        });
-        data.validate().unwrap_or_else(|error| {
-            panic!("Invalid encounter/equipment content from {source}: {error}")
-        });
-        data
+    catalog::lazy(&CONTENT, "content", Content::try_load, || {
+        Content::from_json_str(include_str!("../content.json"))
     })
 }
 

@@ -1,4 +1,5 @@
 //! Validated, engine-free enemy composition. Resolved profiles are save snapshots.
+use crate::catalog::{self, ContentError};
 use crate::content::{BossKind, EnemyKind};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -128,13 +129,36 @@ impl EnemyCatalog {
             .max()
             .unwrap_or(1)
     }
-    pub fn from_json(text: &str) -> Result<Self, String> {
+    /// Pure parse + validate, so tests can build alternative catalogues in-process.
+    pub fn from_json_str(text: &str) -> Result<Self, ContentError> {
         if text.len() > MAX_JSON_BYTES {
-            return Err("Enemy JSON exceeds the supported 4 MiB authoring limit".into());
+            return Err(ContentError::TooLarge {
+                catalog: "enemies",
+                limit: MAX_JSON_BYTES as u64,
+                actual: text.len() as u64,
+            });
         }
         let authored: AuthoredCatalog =
-            serde_json::from_str(text).map_err(|e| format!("Enemy JSON: {e}"))?;
-        authored.resolve()
+            serde_json::from_str(text).map_err(|e| ContentError::Parse {
+                catalog: "enemies",
+                message: e.to_string(),
+            })?;
+        authored.resolve().map_err(|message| ContentError::Invalid {
+            catalog: "enemies",
+            message,
+        })
+    }
+    pub fn from_json(text: &str) -> Result<Self, String> {
+        Self::from_json_str(text).map_err(ContentError::into_message)
+    }
+    /// Bundled default, or the `LASTLIGHT_ENEMIES` override.
+    pub fn try_load() -> Result<Self, ContentError> {
+        catalog::load(
+            "enemies",
+            MAX_JSON_BYTES as u64,
+            include_str!("../enemy_catalog.json"),
+            Self::from_json_str,
+        )
     }
 
     pub fn resolve(&self, id: &str) -> Result<ResolvedEnemy, String> {
@@ -168,30 +192,13 @@ impl EnemyCatalog {
     }
 }
 
+static CATALOG: OnceLock<EnemyCatalog> = OnceLock::new();
+pub(crate) fn install() -> Result<&'static EnemyCatalog, ContentError> {
+    catalog::install(&CATALOG, EnemyCatalog::try_load)
+}
 pub fn enemy_catalog() -> &'static EnemyCatalog {
-    static CATALOG: OnceLock<EnemyCatalog> = OnceLock::new();
-    CATALOG.get_or_init(|| {
-        let (text, source) = match std::env::var_os("LASTLIGHT_ENEMIES") {
-            Some(path) => {
-                let metadata = std::fs::metadata(&path).unwrap_or_else(|e| {
-                    panic!("Could not inspect LASTLIGHT_ENEMIES {path:?}: {e}")
-                });
-                if metadata.len() > MAX_JSON_BYTES as u64 {
-                    panic!(
-                        "LASTLIGHT_ENEMIES {path:?} exceeds the supported 4 MiB authoring limit"
-                    );
-                }
-                let text = std::fs::read_to_string(&path)
-                    .unwrap_or_else(|e| panic!("Could not read LASTLIGHT_ENEMIES {path:?}: {e}"));
-                (text, format!("{path:?}"))
-            }
-            None => (
-                include_str!("../enemy_catalog.json").to_owned(),
-                "bundled enemy_catalog.json".to_owned(),
-            ),
-        };
-        EnemyCatalog::from_json(&text)
-            .unwrap_or_else(|error| panic!("Invalid enemy catalogue from {source}: {error}"))
+    catalog::lazy(&CATALOG, "enemies", EnemyCatalog::try_load, || {
+        EnemyCatalog::from_json_str(include_str!("../enemy_catalog.json"))
     })
 }
 
