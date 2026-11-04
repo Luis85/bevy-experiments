@@ -45,13 +45,25 @@ fn matching<'a>(records: &'a [RunRecord], state: &HistoryUi) -> Vec<&'a RunRecor
 pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
     let mut close = false;
     egui::CentralPanel::default().frame(egui::Frame::new().fill(INK).inner_margin(20)).show(root, |ui| {
-        ui.horizontal_wrapped(|ui| {
-            chrome::page_title(ui, "Run history", "Analysis");
-            if ui.button("Back").clicked() { close = true; }
+        // The page title and its one way back share a row; the global header
+        // already names the screen ("Run analysis").
+        ui.horizontal(|ui| {
+            ui.label(RichText::new("Run history").font(FontId::new(28.0, egui::FontFamily::Name("display".into()))));
+            ui.add_space(16.0);
+            if ui.button("Back").on_hover_text("Return to the page you opened history from").clicked() { close = true; }
         });
-        muted(ui, "All fields are paused while you review. History records each settled run once; loot and coins are already banked.");
+        muted(ui, "Each settled run is recorded once; its rewards are already banked. Fields stay paused.");
+        ui.add_space(6.0);
         let records = &f.game.campaign().run_history;
         let state = &mut f.history;
+        if records.is_empty() {
+            chrome::section(ui, "Your first report starts here");
+            ui.label("Completed defenses, defeats and withdrawals are recorded automatically. Older saves begin with an empty ledger; past results are not invented.");
+            ui.add_space(6.0);
+            ui.colored_label(AMBER, EMPTY_NEXT_STEP);
+            return;
+        }
+        let shown = matching(records, state).len();
         ui.horizontal_wrapped(|ui| {
             let row = chrome::begin_filter_row(ui);
             egui::ComboBox::from_id_salt("history-mode").selected_text(state.mode.map_or("All modes", mode_name)).show_ui(ui, |ui| {
@@ -64,17 +76,11 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
             });
             ui.add(egui::TextEdit::singleline(&mut state.front).hint_text("Filter front / country").desired_width(180.0).min_size(vec2(180.0, row)).vertical_align(egui::Align::Center));
             if ui.small_button("Clear filters").clicked() { state.mode = None; state.outcome = None; state.front.clear(); }
+            muted(ui, format!("{shown} of {} runs · newest first", records.len()));
         });
+        // A filter changed this frame applies before the list renders.
         let rows = matching(records, state);
-        muted(ui, format!("{} matching / {} recorded runs · newest first", rows.len(), records.len()));
         if !rows.iter().any(|r| Some(r.id) == state.selected) { state.selected = rows.last().map(|r| r.id); }
-        if records.is_empty() {
-            chrome::section(ui, "Your first report starts here");
-            ui.label("Completed defenses, defeats and withdrawals are recorded automatically. Older saves begin with an empty ledger; past results are not invented.");
-            ui.add_space(6.0);
-            ui.colored_label(AMBER, EMPTY_NEXT_STEP);
-            return;
-        }
         if rows.is_empty() { ui.label("No runs match these filters."); return; }
         egui::ScrollArea::vertical().id_salt("history-page").show(ui, |ui| {
             if ui.available_width() >= 760.0 {
@@ -132,11 +138,12 @@ fn run_list(ui: &mut egui::Ui, rows: &[&RunRecord], selected: &mut Option<u64>) 
                     run.duration_seconds(),
                     dps
                 );
+                // Left-aligned like the detail column it selects.
                 if ui
-                    .add_sized(
-                        [ui.available_width(), 56.0],
+                    .add(
                         egui::Button::new(RichText::new(label).color(color))
-                            .selected(*selected == Some(run.id)),
+                            .selected(*selected == Some(run.id))
+                            .min_size(vec2(ui.available_width(), 56.0)),
                     )
                     .clicked()
                 {
