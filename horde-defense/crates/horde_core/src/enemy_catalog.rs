@@ -14,6 +14,12 @@ fn one_multiplier() -> f32 {
 fn one_structure_multiplier() -> u8 {
     1
 }
+const MAX_TARGET_URGENCY: f32 = 100.0;
+/// Target urgency a legacy category implies when an archetype authors none,
+/// so catalogues written before the field keep their targeting behaviour.
+fn legacy_target_urgency(kind: EnemyKind) -> f32 {
+    if kind == EnemyKind::Runner { -3.0 } else { 0.0 }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum VisualSprite {
@@ -63,6 +69,9 @@ pub struct ResolvedEnemy {
     pub structure_damage_multiplier: u8,
     #[serde(default = "one_multiplier")]
     pub contact_armor_fraction: f32,
+    /// Added to an NPC defender's target urgency (yards of distance); negative
+    /// values are engaged first. Saves before v3 derive it from `kind`.
+    pub target_urgency: f32,
     pub visual: EnemyVisual,
     pub unlocked_by: Option<BossKind>,
 }
@@ -84,6 +93,7 @@ impl ResolvedEnemy {
             || !(-30..=100).contains(&self.npc_damage_add)
             || !(1..=8).contains(&self.structure_damage_multiplier)
             || !finite_range(self.contact_armor_fraction, 0.0, 1.0)
+            || !finite_range(self.target_urgency, -MAX_TARGET_URGENCY, MAX_TARGET_URGENCY)
             || !(0..=1000).contains(&self.armor)
             || !(0..=100).contains(&self.npc_armor)
             || !(0..=20).contains(&self.npc_dodge)
@@ -280,6 +290,9 @@ struct Archetype {
     reward: String,
     visual: String,
     unlocked_by: Option<BossKind>,
+    /// See [`ResolvedEnemy::target_urgency`]; defaults from `base_enemy_kind`.
+    #[serde(default)]
+    target_urgency: Option<f32>,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -418,6 +431,9 @@ impl AuthoredCatalog {
                 npc_damage_add: attack.npc_damage_add,
                 structure_damage_multiplier: attack.structure_damage_multiplier,
                 contact_armor_fraction: d.contact_armor_fraction,
+                target_urgency: a
+                    .target_urgency
+                    .unwrap_or_else(|| legacy_target_urgency(a.base_enemy_kind)),
                 armor: d.armor,
                 npc_armor: d.npc_armor,
                 npc_dodge: d.npc_dodge,
@@ -551,6 +567,42 @@ mod tests {
                 .iter()
                 .any(|w| w.archetype_id == custom.archetype_id)
         );
+    }
+
+    #[test]
+    fn target_urgency_is_authored_data_with_a_legacy_category_default() {
+        let catalog = parse(&authored()).unwrap();
+        for id in catalog.archetype_ids() {
+            let enemy = catalog.resolve(id).unwrap();
+            let expected = if enemy.kind == EnemyKind::Runner {
+                -3.0
+            } else {
+                0.0
+            };
+            assert_eq!(enemy.target_urgency, expected, "{id}");
+        }
+        // Catalogues authored before the field keep the category's behaviour.
+        let mut legacy = authored();
+        for archetype in legacy["archetypes"].as_array_mut().unwrap() {
+            archetype.as_object_mut().unwrap().remove("target_urgency");
+        }
+        let legacy = parse(&legacy).unwrap();
+        for id in catalog.archetype_ids() {
+            assert_eq!(legacy.resolve(id), catalog.resolve(id));
+        }
+        // A data-only variant can reprioritise without a code change.
+        let mut data = authored();
+        data["archetypes"][0]["target_urgency"] = (-7.5).into();
+        assert_eq!(
+            parse(&data)
+                .unwrap()
+                .resolve("shambler")
+                .unwrap()
+                .target_urgency,
+            -7.5
+        );
+        data["archetypes"][0]["target_urgency"] = 101.0.into();
+        assert!(parse(&data).is_err());
     }
 
     #[test]

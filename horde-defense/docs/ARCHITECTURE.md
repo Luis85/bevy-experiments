@@ -10,16 +10,29 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 | `kind_map` | `KindMap<K, V>`: complete enum-keyed maps saved as objects keyed by variant name, replacing positional per-kind arrays | Catalogue lookups |
 | `command` | Typed `Command` data and `Game::apply`, the single frontend mutation path, with every player-intent rule and typed `CommandError` | Queueing, saves or presentation |
 | `campaign`, `strategy` | Currency, unique gear, advancement, recruits, duties and outbreaks | Hit detection or cosmetic effects |
+| `status` | Generic timed `StatusEffect`s (`StatusId`, ticks, stacks, magnitude) kept as a sorted per-actor `Statuses` list with apply/refresh/tick/expire/validate helpers | Deciding what a status does to combat (the simulation reads it) |
 | `rules` | Saved RNG and supported dice, defense, protection and injury procedures | NPC target policy or animation |
 | `sim` | One-field schedules, actors, collision/contact, maneuvers and reward events | UI, audio, filesystem calls |
 | `sim/events` | Typed `SimEvent` stream: saved per-`Game` sequence numbers, the transient `drain_events` outbox and expedition forwarding | Presentation decisions or persistence of the outbox |
 | `sim/parallel` | Worker battle ownership, reservations, idempotent settlement and reported `SettlementIssue`s | A second combat implementation |
-| `sim/persistence` | Versioned coherent generations (envelope v2 with `ruleset_version` and a content-ID fingerprint; drift only warns), checksums, typed `SaveError`, validation and atomic writes | New combat decisions during load |
-| `sim/migrations` | Ordered raw-JSON migration chain run before typed decoding; each step freezes its source version's meaning (v1→v2: item indices to IDs, per-kind arrays to maps) | Reading the current catalogues to interpret old data |
+| `sim/persistence` | Versioned coherent generations (envelope v3 with `ruleset_version` and a content-ID fingerprint; drift only warns), checksums, typed `SaveError`, validation and atomic writes | New combat decisions during load |
+| `sim/migrations` | Ordered raw-JSON migration chain run before typed decoding; each step freezes its source version's meaning (v1→v2: item indices to IDs, per-kind arrays to maps; v2→v3: hit-stop/brace counters to `statuses`, skill unlock flags to `unlocks` IDs, Runner-category snapshots gain `target_urgency`) | Reading the current catalogues to interpret old data |
 | `runner` | `AppCommand` queue (gameplay `Command`s plus durable reset/save intents), fixed-step execution, input edges, save coordination and sound consumption | Drawing, domain rule checks or alternative combat rules |
 | `ui/*`, `worldmap`, `inspector` | Read state, display decisions, collect intent and manage presentation-only selections | Ticking the game or paying rewards |
 | `art`, `visual_assets`, `animation` | Asset handles, padded atlas poses, read-only tick/event animation and bounded scene histories | Accuracy rolls, health, range or rewards |
 | `atmosphere_audio` | Scene classification, six persistent environment channels, normalized crossfades and audio-bus gain | Combat clocks, weather damage or new hit resolution |
+
+## Closed enums inside the workspace
+
+Core enums that frontends match on and that may grow (`EnemyKind`, `StatusId`,
+`SkillEffect`, `SimEvent`, `StructureKind`, `OrdnanceKind`, …) are deliberately
+**not** `#[non_exhaustive]`. Both crates live in this workspace, so an
+exhaustive `match` in `horde-defense` is a compile-time checklist: adding a
+variant breaks every site that must decide how to present it. `#[non_exhaustive]`
+would turn that into a silent `_ =>` fallback. Prefer moving per-variant numbers
+into data (enemy profiles, skill `Unlock` IDs) so that a new variant is needed
+only for genuinely new behaviour. Revisit only if `horde_core` is published for
+out-of-workspace consumers.
 
 ## Native scheduling
 
@@ -81,9 +94,11 @@ produce an additive rectangle. Dressing stays outside the authoritative arena.
 Normal combat has floating status/actions; skills and fortifications have a
 dedicated immersive shell and presentation-only graph selection/pan/zoom.
 
-Enemy hit stop is authoritative `Enemy::hit_stop_left`, defaulting to zero in old
-saves and validated against a six-tick cap. Positive injury refreshes the bounded
-movement pause; attack/NPC clocks continue. Rendering reads the counter for flash
+Enemy hit stop is the authoritative `StatusId::HitStop` entry in `Enemy::statuses`
+(read through `Enemy::hit_stop_remaining`), absent in old saves and validated
+against a six-tick cap; the defender's brace is `StatusId::Brace` on the attempt.
+Positive injury refreshes the bounded movement pause; attack/NPC clocks
+continue. Rendering reads the clock for flash
 and gait freeze; it cannot apply a second hit or change timing. Per-attempt corpse records are
 persistent; settled drawing is batched. Settings navigation uses the shared
 origin capture and durable save notices, with explicit main-menu choice and

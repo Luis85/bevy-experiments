@@ -446,6 +446,8 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         if deployed_supply + u64::from(a.supply) > starting_supply {
             return Err("Saved construction budget exceeds the authored allowance".into());
         }
+        a.statuses
+            .validate(&[(StatusId::Brace, BRACE_DURATION_TICKS)])?;
         for e in &a.enemies {
             if let Some(snapshot) = &e.resolved {
                 snapshot.validate()?;
@@ -464,7 +466,9 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
                 || e.injury.max_hp != e.max_hp
                 || !e.injury.valid()
                 || e.born_tick > a.tick
-                || e.hit_stop_left > ENEMY_HIT_STOP_TICKS
+                || e.statuses
+                    .validate(&[(StatusId::HitStop, ENEMY_HIT_STOP_TICKS)])
+                    .is_err()
                 || !e.boss_timing.validate()
                 || enemy_defeated(a, e)
                 || (a.mode == Mode::Npc && e.hp != e.injury.hp)

@@ -5,7 +5,7 @@ use super::persistence::SaveError;
 use serde_json::{Map, Value};
 
 /// Envelope version written by this build.
-pub const SAVE_VERSION: u32 = 2;
+pub const SAVE_VERSION: u32 = 3;
 
 /// Upgrade a payload saved at envelope `from` to [`SAVE_VERSION`].
 pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
@@ -15,6 +15,7 @@ pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
     for version in from..SAVE_VERSION {
         value = match version {
             1 => v1_to_v2(value)?,
+            2 => v2_to_v3(value),
             _ => unreachable!("every version below SAVE_VERSION has a step"),
         };
     }
@@ -153,6 +154,92 @@ fn rewrite_v1(value: &mut Value) -> Result<(), SaveError> {
     Ok(())
 }
 
+/// v2 boolean skill unlock flags and the unlock IDs that replaced them.
+const V2_UNLOCK_FLAGS: &[(&str, &str)] = &[
+    ("piercing", "piercing"),
+    ("sweep", "sweep"),
+    ("heal", "heal"),
+    ("brace", "brace"),
+    ("grenade_unlocked", "grenade"),
+    ("molotov_unlocked", "molotov"),
+];
+/// v2 per-actor tick counters and the status IDs that replaced them.
+const V2_STATUS_COUNTERS: &[(&str, &str)] =
+    &[("hit_stop_left", "HitStop"), ("brace_left", "Brace")];
+/// NPC target urgency every v2 hostile category implied (only Runners were
+/// prioritised, by 3 yards).
+const V2_RUNNER_TARGET_URGENCY: f64 = -3.0;
+
+/// v2 -> v3, wherever the shapes occur (attempts, nested expedition games):
+/// - enemy `hit_stop_left` / attempt `brace_left` counters become a sorted
+///   `statuses` list (a zero counter is an absent status);
+/// - skill-modifier unlock booleans become the sorted `unlocks` ID set;
+/// - resolved enemy snapshots gain the `target_urgency` their category implied.
+///
+/// Values already in v3 shape are left untouched, so the step is idempotent.
+fn v2_to_v3(mut value: Value) -> Value {
+    rewrite_v2(&mut value);
+    value
+}
+
+fn rewrite_v2(value: &mut Value) {
+    match value {
+        Value::Object(object) => {
+            migrate_status_counters(object);
+            if object.contains_key("cadence_multiplier") {
+                migrate_unlock_flags(object);
+            }
+            if object.contains_key("archetype_id")
+                && object.contains_key("npc_damage_dice")
+                && !object.contains_key("target_urgency")
+            {
+                let runner = object.get("kind").and_then(Value::as_str) == Some("Runner");
+                let urgency = if runner {
+                    V2_RUNNER_TARGET_URGENCY
+                } else {
+                    0.0
+                };
+                object.insert("target_urgency".into(), urgency.into());
+            }
+            for child in object.values_mut() {
+                rewrite_v2(child);
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(rewrite_v2),
+        _ => {}
+    }
+}
+
+fn migrate_status_counters(object: &mut Map<String, Value>) {
+    let mut statuses = Vec::new();
+    // V2_STATUS_COUNTERS is in StatusId order, so the list stays sorted.
+    for (field, id) in V2_STATUS_COUNTERS {
+        if let Some(left) = object.remove(*field)
+            && let Some(left) = left.as_u64().filter(|left| *left > 0)
+        {
+            statuses.push(serde_json::json!({
+                "id": id, "remaining_ticks": left, "stacks": 1, "magnitude": 0
+            }));
+        }
+    }
+    if !statuses.is_empty() {
+        object.insert("statuses".into(), Value::Array(statuses));
+    }
+}
+
+fn migrate_unlock_flags(object: &mut Map<String, Value>) {
+    let mut unlocks: Vec<&str> = Vec::new();
+    for (flag, id) in V2_UNLOCK_FLAGS {
+        if object.remove(*flag).and_then(|v| v.as_bool()) == Some(true) {
+            unlocks.push(id);
+        }
+    }
+    unlocks.sort_unstable();
+    if !unlocks.is_empty() || !object.contains_key("unlocks") {
+        object.insert("unlocks".into(), unlocks.into());
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -270,5 +357,70 @@ mod tests {
             migrate(json!({"x": 1}), SAVE_VERSION).unwrap(),
             json!({"x": 1})
         );
+    }
+
+    #[test]
+    fn frozen_v2_names_match_the_ids_that_replaced_them() {
+        use crate::skill_catalog::unlocks;
+        use crate::status::StatusId;
+        let ids: Vec<_> = V2_UNLOCK_FLAGS.iter().map(|(_, id)| *id).collect();
+        assert_eq!(ids, unlocks::ALL);
+        assert_eq!(
+            V2_STATUS_COUNTERS
+                .iter()
+                .map(|(_, id)| *id)
+                .collect::<Vec<_>>(),
+            serde_names(&[StatusId::HitStop, StatusId::Brace])
+        );
+    }
+
+    #[test]
+    fn v2_counters_flags_and_snapshots_become_v3_and_the_step_is_idempotent() {
+        let snapshot =
+            |kind: &str| json!({"archetype_id": "x", "kind": kind, "npc_damage_dice": 1});
+        let v2 = json!({
+            "attempt": {
+                "brace_left": 12,
+                "profile": {
+                    "brace": true,
+                    "modifiers": {
+                        "cadence_multiplier": 1.0, "piercing": true, "sweep": false,
+                        "heal": false, "brace": true, "grenade_unlocked": true,
+                        "molotov_unlocked": false
+                    }
+                },
+                "enemies": [
+                    {"hit_stop_left": 4, "resolved": snapshot("Runner")},
+                    {"hit_stop_left": 0, "resolved": snapshot("Brute")},
+                    {"hit_stop_left": 0, "resolved": null}
+                ]
+            },
+            "battles": [{"game": {"attempt": {"brace_left": 0, "enemies": []}}}]
+        });
+        let v3 = migrate(v2, 2).unwrap();
+        let a = &v3["attempt"];
+        assert_eq!(
+            a["statuses"],
+            json!([{"id": "Brace", "remaining_ticks": 12, "stacks": 1, "magnitude": 0}])
+        );
+        assert!(a.get("brace_left").is_none());
+        // Only skill modifiers lose their flags; the profile's own `brace` stays.
+        assert_eq!(a["profile"]["brace"], true);
+        assert_eq!(
+            a["profile"]["modifiers"],
+            json!({"cadence_multiplier": 1.0, "unlocks": ["brace", "grenade", "piercing"]})
+        );
+        assert_eq!(
+            a["enemies"][0]["statuses"][0],
+            json!({"id": "HitStop", "remaining_ticks": 4, "stacks": 1, "magnitude": 0})
+        );
+        assert_eq!(a["enemies"][0]["resolved"]["target_urgency"], -3.0);
+        assert_eq!(a["enemies"][1]["resolved"]["target_urgency"], 0.0);
+        assert_eq!(
+            a["enemies"][1],
+            json!({"resolved": {"archetype_id": "x", "kind": "Brute", "npc_damage_dice": 1, "target_urgency": 0.0}})
+        );
+        assert_eq!(v3["battles"][0]["game"]["attempt"], json!({"enemies": []}));
+        assert_eq!(v2_to_v3(v3.clone()), v3);
     }
 }

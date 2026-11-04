@@ -12,6 +12,7 @@ pub mod rules;
 pub mod sim;
 pub mod skill_catalog;
 pub mod stats;
+pub mod status;
 pub mod strategy;
 pub mod survivors;
 pub mod weapons;
