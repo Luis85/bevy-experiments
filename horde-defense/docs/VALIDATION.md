@@ -214,7 +214,7 @@ All six painted PNGs have exact prompt provenance embedded and recorded in `asse
 
 Country records retain source years (mainly 2019), attribution, symmetric travel links, actual boundaries and validated connectivity. Content validation rejects unsupported/missing profiles, bad ordering, nonfinite/overflow values and unsafe geometry. Culture/architecture is original regional dressing, not bespoke research or art for every country.
 
-Save generations retain RNG, actions, equipment reservations, pending boss mechanics, workers and settlement cursors coherently. Corrupt primary/backup bytes are preserved before replacement; failed writes never acknowledge quit. The save format (envelope v5; the limit is version-independent) has an inclusive **64 MiB encoded-generation ceiling**. Oversized saves fail before touching any existing generation or temporary file. Inventory has no gameplay capacity limit and collected items are never discarded, but a future storage format is needed for persistence beyond that technical ceiling.
+Save generations retain RNG, actions, equipment reservations, pending boss mechanics, workers and settlement cursors coherently. Corrupt primary/backup bytes are preserved before replacement; failed writes never acknowledge quit. The save format (envelope v6; the limit is version-independent) has an inclusive **64 MiB encoded-generation ceiling**. Oversized saves fail before touching any existing generation or temporary file. Inventory has no gameplay capacity limit and collected items are never discarded, but a future storage format is needed for persistence beyond that technical ceiling.
 
 ## Remaining playtest questions
 

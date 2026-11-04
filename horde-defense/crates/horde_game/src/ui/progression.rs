@@ -298,7 +298,9 @@ mod tests {
             let clears = content().structure(kind).unlock_clear;
             assert!(!campaign.blueprint_available(kind));
             assert!(campaign.purchase_blueprint(kind).is_err());
-            campaign.first_clears[..clears].fill(true);
+            campaign
+                .first_clears
+                .extend(content().levels[..clears].iter().map(|l| l.id.clone()));
             assert!(campaign.blueprint_available(kind));
             let before = campaign.coins;
             campaign.purchase_blueprint(kind).unwrap();

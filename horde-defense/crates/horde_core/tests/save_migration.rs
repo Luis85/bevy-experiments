@@ -18,6 +18,13 @@
 //! (commit c6f518d): a live personal attempt at tick 481 with both throws
 //! unlocked, one grenade and one Molotov thrown (positional ordnance counters:
 //! charges `[1,1]`, cooldowns `[10,61]`) and the Molotov's fire zone burning.
+//!
+//! `fixtures/save_v5.json` was written by `Game::save` at save format v5
+//! (commit b9d1fd4): a modern campaign whose level progress is positional —
+//! campaign first clears `[true,true,false,false,false]`, `unlocked: 3`, NPC
+//! first clears `[true,false,..]` with `first_clear_claimed: [2,0,0,0,0]`, one
+//! withdrawn run on level 1 (`template: 1`) and a live personal attempt on
+//! level 2 (`level: 2`) at tick 420.
 mod support;
 
 use horde_core::campaign::{BodyAttribute, NpcTraining};
@@ -32,6 +39,7 @@ const FIXTURE: &str = include_str!("fixtures/save_v1.json");
 const FIXTURE_V2: &str = include_str!("fixtures/save_v2.json");
 const FIXTURE_V3: &str = include_str!("fixtures/save_v3.json");
 const FIXTURE_V4: &str = include_str!("fixtures/save_v4.json");
+const FIXTURE_V5: &str = include_str!("fixtures/save_v5.json");
 
 fn fixture() -> Game {
     Game::decode_save_generation(FIXTURE.as_bytes()).expect("v1 fixture migrates and validates")
@@ -482,4 +490,142 @@ fn migrated_attempt_gear_snapshots_carry_stable_item_ids() {
             .item_index(&id.as_str().into())
             .is_some()
     }));
+}
+
+fn fixture_v5() -> Game {
+    Game::decode_save_generation(FIXTURE_V5.as_bytes()).expect("v5 fixture migrates and validates")
+}
+
+#[test]
+fn v5_fixture_is_a_real_v5_generation() {
+    let envelope: serde_json::Value = serde_json::from_str(FIXTURE_V5).unwrap();
+    assert_eq!(envelope["version"], 5);
+    let payload: serde_json::Value =
+        serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+    let campaign = &payload["campaign"];
+    assert_eq!(campaign["unlocked"], 3);
+    assert_eq!(
+        campaign["first_clears"],
+        serde_json::json!([true, true, false, false, false])
+    );
+    assert_eq!(
+        campaign["npc"]["first_clears"],
+        serde_json::json!([true, false, false, false, false])
+    );
+    assert_eq!(
+        campaign["npc"]["first_clear_claimed"],
+        serde_json::json!([2, 0, 0, 0, 0])
+    );
+    assert_eq!(campaign["run_history"][0]["template"], 1);
+    assert_eq!(payload["attempt"]["level"], 2);
+}
+
+#[test]
+fn migrated_v5_fixture_resaves_as_current_version_and_resumes_byte_identically() {
+    resave_and_resume_byte_identically(fixture_v5(), "v5");
+}
+
+/// Trace of the v5 fixture continued for 600 idle ticks, recorded on the v5
+/// build (commit b9d1fd4) before level progress was keyed by level id.
+const V5_CONTINUATION_FNV: u64 = 0xbc2a_f76c_324f_6287;
+
+#[test]
+fn v5_fixture_continues_exactly_as_the_v5_build_did() {
+    let mut g = fixture_v5();
+    let mut trace = String::new();
+    for t in 0..600u32 {
+        g.tick(Input::default());
+        if t % 50 == 49 {
+            let a = g.attempt.as_ref().unwrap();
+            trace.push_str(&format!(
+                "t{} hp{} loot{} coins{} rng{} level{} enemies{:?}
+",
+                a.tick,
+                a.hp,
+                a.loot,
+                a.coins,
+                a.rng.state,
+                a.level,
+                a.enemies
+                    .iter()
+                    .map(|e| (e.id, e.hp, e.x.to_bits()))
+                    .collect::<Vec<_>>()
+            ));
+        }
+    }
+    let fnv = support::fnv1a(trace.as_bytes());
+    assert_eq!(trace.lines().count(), 12);
+    assert_eq!(fnv, V5_CONTINUATION_FNV, "{trace}");
+}
+
+/// Level progress of a decoded game: campaign clears, frontier, NPC clears and
+/// claimed first-clear points, keyed by stable level id.
+type LevelProgress<'a> = (Vec<&'a str>, usize, Vec<&'a str>, Vec<(&'a str, u32)>);
+
+fn level_progress(game: &Game) -> LevelProgress<'_> {
+    let c = &game.campaign;
+    (
+        c.first_clears.iter().map(String::as_str).collect(),
+        c.unlocked(),
+        c.npc.first_clears.iter().map(String::as_str).collect(),
+        c.npc
+            .first_clear_claimed
+            .iter()
+            .map(|(id, n)| (id.as_str(), *n))
+            .collect(),
+    )
+}
+
+#[test]
+fn v5_fixture_level_progress_becomes_level_ids_with_the_same_frontier() {
+    let game = fixture_v5();
+    assert_eq!(
+        level_progress(&game),
+        (
+            vec!["ashwood_crossing", "the_old_road"],
+            3,
+            vec!["the_old_road"],
+            vec![("the_old_road", 2)]
+        )
+    );
+    // In-memory level positions are unchanged; on disk they are level ids.
+    assert_eq!(game.attempt.as_ref().unwrap().level, 2);
+    assert_eq!(game.campaign.run_history[0].template, 1);
+    let saved = serde_json::to_value(&game).unwrap();
+    assert_eq!(saved["attempt"]["level"], "depot_nine");
+    assert_eq!(
+        saved["campaign"]["run_history"][0]["template"],
+        "ashwood_crossing"
+    );
+    assert!(saved["campaign"].get("unlocked").is_none());
+    assert_eq!(
+        saved["campaign"]["first_clears"],
+        serde_json::json!(["ashwood_crossing", "the_old_road"])
+    );
+    assert_eq!(
+        saved["campaign"]["npc"]["first_clear_claimed"],
+        serde_json::json!({"the_old_road": 2})
+    );
+}
+
+#[test]
+fn every_legacy_fixture_keeps_its_clears_frontier_and_claims() {
+    let none = || (vec![], 1, vec![], vec![]);
+    assert_eq!(
+        level_progress(&fixture()),
+        (
+            vec!["ashwood_crossing", "depot_nine", "the_old_road"],
+            4,
+            vec!["the_old_road"],
+            vec![("the_old_road", 2)]
+        )
+    );
+    assert_eq!(level_progress(&fixture_v2()), none());
+    assert_eq!(level_progress(&fixture_v3()), none());
+    assert_eq!(level_progress(&fixture_v4()), none());
+    for game in [fixture(), fixture_v2(), fixture_v3(), fixture_v4()] {
+        assert_eq!(game.attempt.as_ref().unwrap().level, 0);
+    }
+    assert_eq!(fixture().campaign.run_history[0].template, 0);
+    assert_eq!(fixture_v3().campaign.run_history[0].template, 0);
 }

@@ -5,7 +5,7 @@ use super::persistence::SaveError;
 use serde_json::{Map, Value};
 
 /// Envelope version written by this build.
-pub const SAVE_VERSION: u32 = 5;
+pub const SAVE_VERSION: u32 = 6;
 
 /// Upgrade a payload saved at envelope `from` to [`SAVE_VERSION`].
 pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
@@ -18,6 +18,7 @@ pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
             2 => v2_to_v3(value),
             3 => v3_to_v4(value)?,
             4 => v4_to_v5(value)?,
+            5 => v5_to_v6(value)?,
             _ => unreachable!("every version below SAVE_VERSION has a step"),
         };
     }
@@ -346,6 +347,109 @@ fn rewrite_v4(value: &mut Value) -> Result<(), SaveError> {
     Ok(())
 }
 
+/// v5 level order (`content.json` levels at save format v5). A v5 level
+/// position `n` (clear flag slot, claim slot, attempt/report `level`, run
+/// `template`) meant `V5_LEVEL_IDS[n]`.
+const V5_LEVEL_IDS: [&str; 5] = [
+    "the_old_road",
+    "ashwood_crossing",
+    "depot_nine",
+    "the_iron_yard",
+    "lastlight_checkpoint",
+];
+
+/// v5 -> v6: level-positional progress becomes level-ID keyed, wherever it
+/// occurs (campaign, its NPC, recruits, attempts, reports, run history and
+/// nested expedition games):
+/// - `first_clears: [bool; 5]` becomes the sorted set of cleared level IDs;
+/// - `first_clear_claimed: [u32; 5]` becomes a level-ID map of non-zero claims;
+/// - the campaign's numeric `unlocked` frontier is dropped (v6 derives it from
+///   the clears; v5 validation already required exactly that value);
+/// - an attempt's or report's `level` and a run's `template` become level IDs.
+///
+/// Values already in v6 shape are left untouched, so the step is idempotent.
+fn v5_to_v6(mut value: Value) -> Result<Value, SaveError> {
+    rewrite_v5(&mut value)?;
+    Ok(value)
+}
+
+fn v5_level(key: &str, slot: &Value) -> Result<Value, SaveError> {
+    slot.as_u64()
+        .and_then(|n| V5_LEVEL_IDS.get(usize::try_from(n).ok()?))
+        .map(|id| Value::String((*id).to_owned()))
+        .ok_or_else(|| SaveError::Migration(format!("Unknown v5 level {key} {slot}")))
+}
+
+fn v5_slots<'a>(key: &str, slots: &'a [Value]) -> Result<&'a [Value], SaveError> {
+    if slots.len() == V5_LEVEL_IDS.len() {
+        Ok(slots)
+    } else {
+        Err(SaveError::Migration(format!(
+            "v5 field {key} has {} entries; expected {}",
+            slots.len(),
+            V5_LEVEL_IDS.len()
+        )))
+    }
+}
+
+fn rewrite_v5(value: &mut Value) -> Result<(), SaveError> {
+    match value {
+        Value::Object(object) => {
+            if let Some(Value::Array(slots)) = object.get("first_clears")
+                && slots.iter().any(Value::is_boolean)
+            {
+                let mut cleared: Vec<&str> = V5_LEVEL_IDS
+                    .iter()
+                    .zip(v5_slots("first_clears", slots)?)
+                    .filter(|(_, clear)| clear.as_bool() == Some(true))
+                    .map(|(id, _)| *id)
+                    .collect();
+                // V5_LEVEL_IDS is not alphabetical; ID sets serialize sorted.
+                cleared.sort_unstable();
+                object.insert("first_clears".into(), cleared.into());
+                if object.get("unlocked").is_some_and(Value::is_number) {
+                    object.remove("unlocked");
+                }
+            }
+            if let Some(Value::Array(slots)) = object.get("first_clear_claimed") {
+                let mut claims = Map::new();
+                for (id, claimed) in V5_LEVEL_IDS
+                    .iter()
+                    .zip(v5_slots("first_clear_claimed", slots)?)
+                {
+                    if claimed.as_u64().is_none_or(|n| n > 0) {
+                        claims.insert((*id).to_owned(), claimed.clone());
+                    }
+                }
+                object.insert("first_clear_claimed".into(), Value::Object(claims));
+            }
+            if object.contains_key("country_name") {
+                if object.contains_key("stage")
+                    && let Some(level) = object.get_mut("level")
+                    && level.is_number()
+                {
+                    *level = v5_level("level", level)?;
+                }
+                if let Some(template) = object.get_mut("template")
+                    && template.is_number()
+                {
+                    *template = v5_level("template", template)?;
+                }
+            }
+            for child in object.values_mut() {
+                rewrite_v5(child)?;
+            }
+        }
+        Value::Array(items) => {
+            for item in items {
+                rewrite_v5(item)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -598,5 +702,81 @@ mod tests {
         // Arrays with these names outside an ordnance state are not ordnance.
         let other = json!({"npc": {"spent": [1, 2, 3]}});
         assert_eq!(v4_to_v5(other.clone()).unwrap(), other);
+    }
+
+    #[test]
+    fn frozen_v5_level_order_matches_the_bundled_catalogue_it_replaced() {
+        let ids: Vec<_> = content().levels.iter().map(|l| l.id.as_str()).collect();
+        assert_eq!(ids, V5_LEVEL_IDS);
+    }
+
+    #[test]
+    fn v5_level_positions_become_ids_everywhere_and_the_step_is_idempotent() {
+        let npc = json!({
+            "first_clears": [true, false, false, false, false],
+            "first_clear_claimed": [2, 0, 0, 0, 0]
+        });
+        let v5 = json!({
+            "campaign": {
+                "unlocked": 4,
+                "first_clears": [true, true, true, false, false],
+                "npc": npc,
+                "run_history": [{"country_name": "", "stage": 0, "template": 2}],
+                "world": {"unlocked": ["FRA"]},
+                "items": [{"id": 1, "level": 3, "definition": "crowbar"}]
+            },
+            "attempt": {"country_name": "", "stage": 3, "level": 4},
+            "last_result": {"country_name": "", "stage": 0, "level": 1},
+            "strategy": {"roster": [{"npc": {
+                "first_clears": [false, true, false, false, false],
+                "first_clear_claimed": [0, 1, 0, 0, 0]
+            }}]},
+            "battles": [{"stage": 2, "game": {"campaign": {
+                "unlocked": 1,
+                "first_clears": [false, false, false, false, false]
+            }}}]
+        });
+        let v6 = migrate(v5, 5).unwrap();
+        let c = &v6["campaign"];
+        assert!(c.get("unlocked").is_none());
+        assert_eq!(
+            c["first_clears"],
+            json!(["ashwood_crossing", "depot_nine", "the_old_road"])
+        );
+        assert_eq!(c["npc"]["first_clears"], json!(["the_old_road"]));
+        assert_eq!(c["npc"]["first_clear_claimed"], json!({"the_old_road": 2}));
+        assert_eq!(c["run_history"][0]["template"], "depot_nine");
+        // Country unlocks, item levels and expedition stages are not levels.
+        assert_eq!(c["world"]["unlocked"], json!(["FRA"]));
+        assert_eq!(c["items"][0]["level"], 3);
+        assert_eq!(v6["battles"][0]["stage"], 2);
+        assert_eq!(v6["attempt"]["level"], "lastlight_checkpoint");
+        assert_eq!(v6["attempt"]["stage"], 3);
+        assert_eq!(v6["last_result"]["level"], "ashwood_crossing");
+        let recruit = &v6["strategy"]["roster"][0]["npc"];
+        assert_eq!(recruit["first_clears"], json!(["ashwood_crossing"]));
+        assert_eq!(
+            recruit["first_clear_claimed"],
+            json!({"ashwood_crossing": 1})
+        );
+        let nested = &v6["battles"][0]["game"]["campaign"];
+        assert_eq!(nested["first_clears"], json!([]));
+        assert!(nested.get("unlocked").is_none());
+        assert_eq!(v5_to_v6(v6.clone()).unwrap(), v6);
+    }
+
+    #[test]
+    fn malformed_v5_level_shapes_are_typed_errors() {
+        for bad in [
+            json!({"first_clears": [true, false]}),
+            json!({"first_clear_claimed": [0, 0, 0]}),
+            json!({"country_name": "", "stage": 0, "level": 5}),
+            json!({"country_name": "", "template": 9}),
+        ] {
+            assert!(
+                matches!(migrate(bad.clone(), 5), Err(SaveError::Migration(_))),
+                "{bad}"
+            );
+        }
     }
 }

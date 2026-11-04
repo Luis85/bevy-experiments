@@ -28,8 +28,11 @@ fn camp_escape_and_footer_control_pause_and_resume_all_parallel_work() {
     f.game.campaign.choose_start_country("DEU").unwrap();
     f.game.campaign.attempts = 1;
     f.game.campaign.coins = 500;
-    f.game.campaign.first_clears = [true; 5];
-    f.game.campaign.unlocked = 5;
+    f.game.campaign.first_clears = horde_core::content::content()
+        .levels
+        .iter()
+        .map(|level| level.id.clone())
+        .collect();
     for id in ["DEU", "FRA"] {
         f.game.campaign.world.cleared.push(id.into());
         f.game

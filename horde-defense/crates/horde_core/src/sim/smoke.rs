@@ -108,7 +108,7 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
         .enumerate()
         .filter(|(definition, item)| {
             item.tier > 0
-                && item.tier <= g.campaign.unlocked
+                && item.tier <= g.campaign.unlocked()
                 && g.campaign
                     .buy_price(*definition)
                     .is_ok_and(|price| price <= g.campaign.coins)

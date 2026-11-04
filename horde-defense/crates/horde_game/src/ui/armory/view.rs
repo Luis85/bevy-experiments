@@ -81,7 +81,11 @@ mod tests {
 
     fn game() -> Game {
         let mut game = Game::default();
-        game.campaign.unlocked = 4;
+        // Three clears open the first four levels (and item tiers).
+        game.campaign.first_clears = horde_core::content::content().levels[..3]
+            .iter()
+            .map(|level| level.id.clone())
+            .collect();
         game.campaign.coins = 500;
         game
     }

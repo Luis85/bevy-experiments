@@ -152,6 +152,8 @@ pub struct RunRecord {
     pub defender_name: String,
     pub cause: String,
     pub stage: usize,
+    /// Catalogue level position of the encounter; saved as the level's stable ID.
+    #[serde(with = "crate::content::level_ref")]
     pub template: usize,
     pub survivor: Option<SurvivorId>,
     pub lane_count: u8,

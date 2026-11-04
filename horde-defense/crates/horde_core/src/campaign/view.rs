@@ -1,7 +1,7 @@
 //! Read-only campaign queries for presentation. Screens map these answers to
 //! labels; the rules themselves (gates, prices, focus targets) live here.
 use super::{Campaign, NodePayment, Recommendation, RecommendationAction};
-use crate::content::{ItemDefinition, Mode, content};
+use crate::content::{ItemDefId, ItemDefinition, Mode, content};
 use crate::skill_catalog::{SkillEffect, SkillNode, skills};
 use crate::weapons::WeaponClass;
 
@@ -38,7 +38,10 @@ pub enum UpgradeFocus {
 /// One quartermaster offer at the current shop item level.
 #[derive(Clone, Debug, PartialEq)]
 pub struct OfferPreview {
+    /// Catalogue position of the offered definition.
     pub definition: usize,
+    /// Stable ID of the offered definition; what `Command::BuyItem` takes.
+    pub id: ItemDefId,
     pub level: u32,
     pub price: u64,
     /// The authored item scaled to the offered level.
@@ -135,10 +138,11 @@ impl Campaign {
         let level = self.shop_item_level();
         Ok(OfferPreview {
             definition,
+            id: authored.id.clone(),
             level,
             price,
             item: crate::progression::scale_item(authored.clone(), level),
-            tier_unlocked: authored.tier <= self.unlocked,
+            tier_unlocked: authored.tier <= self.unlocked(),
             affordable: self.coins >= price,
         })
     }
@@ -149,7 +153,7 @@ impl Campaign {
             .items
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.tier > 0 && item.tier <= self.unlocked)
+            .filter(|(_, item)| item.tier > 0 && item.tier <= self.unlocked())
             .map(|(index, _)| self.shop_offer(index).expect("catalogue definition exists"))
             .collect()
     }
@@ -403,13 +407,14 @@ mod tests {
     #[test]
     fn shop_offers_quote_the_buy_preflight_price_and_scaled_item() {
         let mut c = started();
-        c.unlocked = 4;
+        c.first_clears = content().levels[..3].iter().map(|l| l.id.clone()).collect();
+        assert_eq!(c.unlocked(), 4);
         c.coins = 0;
         let offers = c.shop_offers();
         assert!(!offers.is_empty());
         for offer in &offers {
             let authored = &content().items[offer.definition];
-            assert!(authored.tier > 0 && authored.tier <= c.unlocked);
+            assert!(authored.tier > 0 && authored.tier <= c.unlocked());
             assert_eq!(Ok(offer.price), c.buy_price(offer.definition));
             assert_eq!(offer.level, c.shop_item_level());
             assert_eq!(
@@ -422,9 +427,15 @@ mod tests {
         let first = offers[0].definition;
         c.coins = offers[0].price;
         assert!(c.shop_offer(first).unwrap().affordable);
+        assert_eq!(offers[0].id, content().items[first].id);
         assert!(c.buy_item(first).is_ok());
-        c.unlocked = 0;
-        assert!(!c.shop_offer(first).unwrap().tier_unlocked);
+        let later = offers
+            .iter()
+            .find(|offer| content().items[offer.definition].tier > 1)
+            .expect("a tier-2+ offer at frontier 4")
+            .definition;
+        c.first_clears.clear();
+        assert!(!c.shop_offer(later).unwrap().tier_unlocked);
         assert!(c.shop_offer(usize::MAX).is_err());
     }
 }
