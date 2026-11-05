@@ -1,17 +1,11 @@
 //! Persistent late-campaign recruitment, garrisons and seeded plague pressure.
 //! The caller advances this clock only while the global simulation is running.
-use crate::campaign::{Campaign, Npc, NpcCreation, NpcTraining};
+use crate::campaign::{Campaign, Npc, NpcCreation, NpcTraining, SaleRefs};
 use crate::content::{Mode, Slot, content};
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
 use crate::world::world;
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StrategySaleQuote {
-    pub coins: u64,
-    pub affected_presets: Vec<String>,
-    pub affected_survivors: Vec<String>,
-}
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RecruitReadiness {
     pub role: String,
@@ -175,19 +169,6 @@ impl StrategyState {
         recruit.npc = std::mem::replace(&mut campaign.npc, main);
         result
     }
-    pub fn sale_preview(&self, campaign: &Campaign, id: u64) -> Result<StrategySaleQuote, String> {
-        let quote = campaign.sale_preview(id)?;
-        Ok(StrategySaleQuote {
-            coins: quote.coins,
-            affected_presets: quote.affected_presets,
-            affected_survivors: self
-                .roster
-                .iter()
-                .filter(|r| r.npc.loadout.contains(&id))
-                .map(|r| r.name.clone())
-                .collect(),
-        })
-    }
     /// Selling an idle survivor's optional item restores the real protected set
     /// issued at recruitment. Deployed equipment is never eligible for sale.
     pub fn reconcile_loadouts(&mut self, campaign: &Campaign) -> usize {
@@ -224,61 +205,28 @@ impl StrategyState {
         }
         changed
     }
-    pub fn sell_extras_quote(&self, campaign: &Campaign) -> u64 {
-        if campaign.reserved.is_some() {
-            return 0;
-        }
-        let excluded = self.excluded_equipment(campaign);
-        campaign
-            .items
-            .iter()
-            .filter(|item| {
-                !item.protected && !item.locked && !item.favorite && !excluded.contains(&item.id)
-            })
-            .map(|item| campaign.item_sale_value(item.id).expect("known owned item"))
-            .sum()
-    }
-    pub fn sell_extras(&mut self, campaign: &mut Campaign) -> Result<u64, String> {
-        campaign
-            .coins
-            .checked_add(self.sell_extras_quote(campaign))
-            .ok_or("Batch sale would exceed the wallet limit")?;
-        let ids = self.extra_ids(campaign);
-        let mut total = 0u64;
-        for id in ids {
-            total = total
-                .checked_add(campaign.sell(id)?)
-                .ok_or("Sale proceeds exceed the wallet limit")?;
-        }
-        Ok(total)
-    }
-    fn extra_ids(&self, campaign: &Campaign) -> Vec<u64> {
-        if campaign.reserved.is_some() {
-            return vec![];
-        }
-        let excluded = self.excluded_equipment(campaign);
-        campaign
-            .items
-            .iter()
-            .filter(|i| !i.protected && !i.locked && !i.favorite && !excluded.contains(&i.id))
-            .map(|i| i.id)
-            .collect()
-    }
-    fn excluded_equipment(&self, campaign: &Campaign) -> std::collections::BTreeSet<u64> {
-        let mut ids: std::collections::BTreeSet<u64> = campaign
-            .player
-            .loadout
-            .into_iter()
-            .chain(campaign.npc.loadout)
-            .chain(campaign.reserved_items.iter().copied())
-            .collect();
-        for preset in &campaign.presets {
-            ids.extend(preset.loadout);
-        }
+    /// The idle recruits' loadouts, the only sale references `Campaign`
+    /// cannot see. Built once per sale (`Game::plan_sale`).
+    pub fn sale_refs(&self) -> SaleRefs {
+        let mut equipped = std::collections::BTreeMap::new();
         for recruit in &self.roster {
-            ids.extend(recruit.npc.loadout);
+            for id in recruit.npc.loadout {
+                equipped.entry(id).or_insert_with(|| recruit.name.clone());
+            }
         }
-        ids
+        SaleRefs::new(equipped)
+    }
+    /// The batch quote over every owned item (0 while a defender is deployed).
+    pub fn sell_extras_quote(&self, campaign: &Campaign) -> u64 {
+        campaign.sell_quote(&self.sale_refs())
+    }
+    /// Sells every eligible item. While a defender is deployed nothing is
+    /// eligible and this returns `Ok(0)`, as it always has.
+    pub fn sell_extras(&mut self, campaign: &mut Campaign) -> Result<u64, String> {
+        if campaign.reserved.is_some() {
+            return Ok(0);
+        }
+        campaign.sell_unprotected(&self.sale_refs())
     }
     fn note(&mut self, text: String) {
         self.log.push(text);
@@ -1214,12 +1162,16 @@ mod tests {
         let starter = s.roster[0].npc.loadout[0];
         let rifle = c.add_item(4).unwrap();
         s.equip_recruit(&c, id, rifle).unwrap();
+        let refs = s.sale_refs();
         assert_eq!(
-            s.sale_preview(&c, rifle).unwrap().affected_survivors,
-            vec![s.roster[0].name.clone()]
+            c.sale_eligibility_for(rifle, crate::campaign::SaleOrigin::Player, &refs),
+            Err(crate::campaign::SaleBlock::RecruitEquipped {
+                name: s.roster[0].name.clone()
+            })
         );
         assert_eq!(s.sell_extras_quote(&c), 0);
-        c.sell(rifle).unwrap();
+        // SellItem still sells through the recruit block until W1-20.
+        c.sell(rifle, &refs).unwrap();
         assert_eq!(s.reconcile_loadouts(&c), 1);
         assert_eq!(s.roster[0].npc.loadout[0], starter);
         assert_ne!(starter, 1);
@@ -1230,7 +1182,9 @@ mod tests {
     /// (`Campaign::sell_quote` / `Campaign::sell_unprotected`) cannot see
     /// recruit loadouts, so it quotes and sells a rifle a recruit has equipped,
     /// leaving the strategic state invalid. W1-20 replaces this test with
-    /// `strict_sell_rejects_recruit_equipped_item`.
+    /// `strict_sell_rejects_recruit_equipped_item`. Since W1-19 the wrappers
+    /// take `SaleRefs`; the empty refs are exactly the old Campaign-only view,
+    /// while every Game path passes `StrategyState::sale_refs`.
     #[test]
     fn old_campaign_filter_sells_recruit_equipped_item() {
         let mut c = liberated(1);
@@ -1242,8 +1196,9 @@ mod tests {
         assert_eq!(s.roster[0].npc.loadout[0], rifle);
         assert!(s.validate(&c).is_ok());
         // The old filter counts the recruit-equipped rifle as an extra.
-        assert_eq!(c.sell_quote(), 22);
-        assert_eq!(c.sell_unprotected().unwrap(), 22);
+        let campaign_only = crate::campaign::SaleRefs::empty();
+        assert_eq!(c.sell_quote(&campaign_only), 22);
+        assert_eq!(c.sell_unprotected(&campaign_only).unwrap(), 22);
         assert!(c.item(rifle).is_none());
         // The recruit still references the sold rifle.
         assert_eq!(s.roster[0].npc.loadout[0], rifle);

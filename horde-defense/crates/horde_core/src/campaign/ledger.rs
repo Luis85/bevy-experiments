@@ -2,12 +2,6 @@
 
 use super::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SaleQuote {
-    pub coins: u64,
-    pub affected_presets: Vec<String>,
-}
-
 impl Campaign {
     pub(super) fn spend(&mut self, price: u64) -> Result<(), String> {
         if self.coins < price {
@@ -49,30 +43,19 @@ impl Campaign {
         self.coins -= price;
         Ok(id)
     }
-    pub fn sale_preview(&self, id: u64) -> Result<SaleQuote, String> {
-        self.preparation()?;
-        let item = self.item(id).ok_or("Item is no longer owned")?;
-        if self.reserved_items.contains(&id) {
-            return Err("This item is deployed or assigned to a country guard".into());
+    /// `Command::SellItem` before W1-20: one item through [`Self::sale_block`],
+    /// overriding only the blocks [`SaleBlock::sell_item_overrides`] lists;
+    /// the loadouts that held it fall back to protected starter equipment.
+    pub(crate) fn sell(&mut self, id: u64, refs: &SaleRefs) -> Result<u64, String> {
+        if let Some(block) = self.sale_block(id, refs, SaleOrigin::Player)
+            && !block.sell_item_overrides()
+        {
+            return Err(block.label());
         }
-        if item.protected || item.locked || item.favorite {
-            return Err("Remove item protection before selling".into());
-        }
-        Ok(SaleQuote {
-            coins: self.item_sale_value(item.id)?,
-            affected_presets: self
-                .presets
-                .iter()
-                .filter(|p| p.loadout.contains(&id))
-                .map(|p| p.name.clone())
-                .collect(),
-        })
-    }
-    pub fn sell(&mut self, id: u64) -> Result<u64, String> {
-        let quote = self.sale_preview(id)?;
+        let coins = self.item_sale_value(id)?;
         let wallet = self
             .coins
-            .checked_add(quote.coins)
+            .checked_add(coins)
             .ok_or("Sale would exceed the wallet limit")?;
         self.items.retain(|x| x.id != id);
         for slot in 0..4 {
@@ -84,47 +67,18 @@ impl Campaign {
             }
         }
         self.coins = wallet;
-        Ok(quote.coins)
+        Ok(coins)
     }
-    pub fn sell_quote(&self) -> u64 {
-        self.items
-            .iter()
-            .filter(|x| {
-                !x.protected
-                    && !x.locked
-                    && !x.favorite
-                    && !self.reserved_items.contains(&x.id)
-                    && !self.player.loadout.contains(&x.id)
-                    && !self.npc.loadout.contains(&x.id)
-                    && !self.presets.iter().any(|p| p.loadout.contains(&x.id))
-            })
-            .map(|x| self.item_sale_value(x.id).expect("known owned item"))
-            .sum()
+    /// What selling every eligible item pays; 0 while a defender is deployed.
+    pub(crate) fn sell_quote(&self, refs: &SaleRefs) -> u64 {
+        self.plan_batch(refs, SaleOrigin::Player, self.owned_item_ids())
+            .coins
     }
-    pub fn sell_unprotected(&mut self) -> Result<u64, String> {
+    /// Sells every eligible item, or nothing when the wallet would overflow.
+    pub(crate) fn sell_unprotected(&mut self, refs: &SaleRefs) -> Result<u64, String> {
         self.preparation()?;
-        self.coins
-            .checked_add(self.sell_quote())
-            .ok_or("Batch sale would exceed the wallet limit")?;
-        let ids: Vec<_> = self
-            .items
-            .iter()
-            .filter(|x| {
-                !x.protected
-                    && !x.locked
-                    && !x.favorite
-                    && !self.reserved_items.contains(&x.id)
-                    && !self.player.loadout.contains(&x.id)
-                    && !self.npc.loadout.contains(&x.id)
-                    && !self.presets.iter().any(|p| p.loadout.contains(&x.id))
-            })
-            .map(|x| x.id)
-            .collect();
-        let mut total = 0;
-        for id in ids {
-            total += self.sell(id)?;
-        }
-        Ok(total)
+        let plan = self.plan_batch(refs, SaleOrigin::Player, self.owned_item_ids());
+        self.execute_plan(&plan)
     }
     pub fn finish_attempt(&mut self) {
         if self.reserved == Some(Mode::Npc) {

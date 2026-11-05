@@ -3,7 +3,7 @@ use super::{Tab, UiCtx, chrome, mode_selector, muted};
 use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, Color32, Layout, Rect, RichText, Sense, Stroke, vec2};
 use horde_core::{
-    campaign::UpgradeFocus,
+    campaign::{SaleBlock, UpgradeFocus},
     command::Command,
     content::{Mode, Slot, content},
 };
@@ -872,10 +872,14 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                 "Favorite updated.",
             );
         }
-        let sale = f.game.sale_preview(item.id);
+        // Until W1-20 SellItem still sells through the blocks it overrides.
+        let sale = f.game.sale_eligibility(item.id);
+        let reviewable = sale
+            .as_ref()
+            .map_or_else(SaleBlock::sell_item_overrides, |_| true);
         if ui
             .add_enabled(
-                sale.is_ok(),
+                reviewable,
                 egui::Button::new(format!(
                     "Review sale · {}",
                     f.game
@@ -884,7 +888,7 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                         .expect("owned equipment")
                 )),
             )
-            .on_disabled_hover_text(sale.err().unwrap_or_default())
+            .on_disabled_hover_text(sale.err().map(|b| b.label()).unwrap_or_default())
             .clicked()
         {
             f.armory.pending_sale = Some(item.id);
@@ -994,29 +998,57 @@ fn sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
 fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
     if let Some(id) = f.armory.pending_sale {
         ui.add_space(8.0);
-        match f.game.sale_preview(id) {
-            Ok(quote) => {
+        match f.game.sale_eligibility(id) {
+            Err(block) if !block.sell_item_overrides() => {
+                ui.colored_label(RED, block.label());
+                if ui.button("Dismiss sale").clicked() {
+                    f.armory.pending_sale = None;
+                }
+            }
+            sale => {
+                let coins = match &sale {
+                    Ok(quote) => quote.coins,
+                    Err(_) => f.game.campaign().item_sale_value(id).unwrap_or_default(),
+                };
                 let name = f
                     .game
                     .campaign()
                     .item(id)
                     .map(|item| item.definition().name.as_str())
                     .unwrap_or("Equipment");
-                ui.colored_label(
-                    AMBER,
-                    format!("Sell {name} #{id} for {} coins?", quote.coins),
-                );
-                if !quote.affected_presets.is_empty() {
-                    ui.label(format!(
-                        "These presets will be incomplete: {}",
-                        quote.affected_presets.join(", ")
-                    ));
-                }
-                if !quote.affected_survivors.is_empty() {
-                    ui.label(format!(
-                        "These survivors will use protected starter equipment: {}",
-                        quote.affected_survivors.join(", ")
-                    ));
+                ui.colored_label(AMBER, format!("Sell {name} #{id} for {coins} coins?"));
+                // An overriding SellItem (until W1-20) breaks every preset and
+                // idle recruit loadout that references the item, not only the
+                // first block reported.
+                if sale.is_err() {
+                    let presets: Vec<&str> = f
+                        .game
+                        .campaign()
+                        .presets
+                        .iter()
+                        .filter(|p| p.loadout.contains(&id))
+                        .map(|p| p.name.as_str())
+                        .collect();
+                    if !presets.is_empty() {
+                        ui.label(format!(
+                            "These presets will be incomplete: {}",
+                            presets.join(", ")
+                        ));
+                    }
+                    let survivors: Vec<&str> = f
+                        .game
+                        .strategy()
+                        .roster
+                        .iter()
+                        .filter(|r| r.npc.loadout.contains(&id))
+                        .map(|r| r.name.as_str())
+                        .collect();
+                    if !survivors.is_empty() {
+                        ui.label(format!(
+                            "These survivors will use protected starter equipment: {}",
+                            survivors.join(", ")
+                        ));
+                    }
                 }
                 ui.horizontal(|ui| {
                     if ui.button("Confirm item sale").clicked() {
@@ -1029,12 +1061,6 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
                         f.armory.pending_sale = None;
                     }
                 });
-            }
-            Err(reason) => {
-                ui.colored_label(RED, reason);
-                if ui.button("Dismiss sale").clicked() {
-                    f.armory.pending_sale = None;
-                }
             }
         }
     }

@@ -12,17 +12,19 @@ mod armory;
 mod ledger;
 mod loadout;
 mod progression;
+mod sale;
 mod tree_view;
 mod view;
 mod world;
 pub use armory::{Item, Preset};
-pub use ledger::SaleQuote;
 pub(crate) use loadout::mean_basic_damage;
 pub use loadout::{
     DefenderProfile, ItemComparison, LoadoutMetrics, Recommendation, RecommendationAction,
 };
 use progression::legacy_training_default;
 pub use progression::{BodyAttribute, NodePayment, Npc, NpcCreation, NpcTraining, Player, Skill};
+pub(crate) use sale::SalePlan;
+pub use sale::{SaleBlock, SaleOrigin, SaleQuote, SaleRefs, SaleResolution};
 pub use tree_view::{NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta};
 pub use view::{NodeStatus, OfferPreview, UpgradeFocus};
 pub use world::Placement;
@@ -599,20 +601,20 @@ mod tests {
         let id = c.add_item(4).unwrap();
         c.equip(Mode::Personal, id).unwrap();
         c.reserve(Mode::Personal).unwrap();
-        assert!(c.sell(id).is_err());
+        assert!(c.sell(id, &SaleRefs::empty()).is_err());
         assert!(c.equip(Mode::Personal, 1).is_err());
         c.finish_attempt();
-        assert_eq!(c.sell(id).unwrap(), 22);
+        assert_eq!(c.sell(id, &SaleRefs::empty()).unwrap(), 22);
         assert_eq!(c.player.loadout[0], 5);
     }
     #[test]
     fn starter_set_survives_every_sale() {
         let mut c = Campaign::default();
         c.add_item(4).unwrap();
-        assert_eq!(c.sell_unprotected().unwrap(), 22);
+        assert_eq!(c.sell_unprotected(&SaleRefs::empty()).unwrap(), 22);
         assert_eq!(c.items.len(), 5);
         for id in 1..=5 {
-            assert!(c.sell(id).is_err());
+            assert!(c.sell(id, &SaleRefs::empty()).is_err());
         }
         assert!(c.validate().is_ok());
     }
@@ -631,8 +633,13 @@ mod tests {
         c.save_preset("Rifle".into(), Mode::Personal).unwrap();
         c.apply_preset(1, Mode::Npc).unwrap();
         assert_eq!(c.items.len(), 6);
-        assert_eq!(c.sale_preview(id).unwrap().affected_presets, vec!["Rifle"]);
-        c.sell(id).unwrap();
+        // The first matching guard wins: the rifle is equipped and in "Rifle".
+        assert_eq!(
+            c.sale_eligibility_for(id, SaleOrigin::Player, &SaleRefs::empty()),
+            Err(SaleBlock::EquippedPersonal)
+        );
+        // SellItem still sells through it until W1-20; the preset breaks.
+        c.sell(id, &SaleRefs::empty()).unwrap();
         assert!(c.apply_preset(1, Mode::Personal).is_err());
     }
     #[test]
@@ -769,7 +776,7 @@ mod tests {
         let loadout = c.grant_recruit_starters().unwrap();
         c.reserve_external(loadout).unwrap();
         assert!(c.reserve_external(loadout).is_err());
-        assert!(c.sell(loadout[0]).is_err());
+        assert!(c.sell(loadout[0], &SaleRefs::empty()).is_err());
         assert!(c.equip(Mode::Personal, loadout[0]).is_err());
         c.reserve(Mode::Personal).unwrap();
         assert!(c.reserve_external(c.player.loadout).is_err());
@@ -900,7 +907,7 @@ mod tests {
         let id = c.add_item(4).unwrap();
         c.coins = u64::MAX;
         let before = c.clone();
-        assert!(c.sell(id).is_err());
+        assert!(c.sell(id, &SaleRefs::empty()).is_err());
         assert_eq!(c, before);
     }
     #[test]
@@ -963,7 +970,7 @@ mod tests {
         c.add_item(4).unwrap();
         c.add_item(4).unwrap();
         let before = c.clone();
-        assert!(c.sell_unprotected().is_err());
+        assert!(c.sell_unprotected(&SaleRefs::empty()).is_err());
         assert_eq!(c, before);
         let mut strategy = crate::strategy::StrategyState::default();
         assert!(strategy.sell_extras(&mut c).is_err());

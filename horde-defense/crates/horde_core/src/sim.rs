@@ -29,7 +29,9 @@ pub use persistence::{RULESET_VERSION, SaveError};
 pub use smoke::{desktop_smoke, smoke, smoke_input, smoke_prepare, smoke_seed};
 pub use telemetry::CombatTelemetry;
 
-use crate::campaign::{Campaign, DefenderProfile};
+use crate::campaign::{
+    Campaign, DefenderProfile, SaleBlock, SaleOrigin, SalePlan, SaleQuote, SaleRefs,
+};
 use crate::content::{
     BossKind, BossTiming, EnemyKind, ItemDefId, Mode, Policy, StructureKind, content,
 };
@@ -927,20 +929,48 @@ impl Game {
     pub fn take_settlement_issues(&mut self) -> Vec<SettlementIssue> {
         std::mem::take(&mut self.settlement_issues)
     }
-    pub fn sale_preview(&self, id: u64) -> Result<crate::strategy::StrategySaleQuote, String> {
-        self.strategy.sale_preview(&self.campaign, id)
+    /// The single public sale-eligibility read (LE-1): what selling `id` pays
+    /// now, or the first guard that blocks it. Pure: no mutation, no RNG.
+    /// Replaces `sale_preview` / `StrategySaleQuote`.
+    pub fn sale_eligibility(&self, id: u64) -> Result<SaleQuote, SaleBlock> {
+        self.sale_eligibility_for(id, SaleOrigin::Player, &self.strategy.sale_refs())
     }
+    /// The one eligibility implementation behind every sell path.
+    pub(crate) fn sale_eligibility_for(
+        &self,
+        id: u64,
+        origin: SaleOrigin,
+        refs: &SaleRefs,
+    ) -> Result<SaleQuote, SaleBlock> {
+        self.campaign.sale_eligibility_for(id, origin, refs)
+    }
+    /// The eligible subset of `ids`, with the sale references built once.
+    pub(crate) fn plan_sale(
+        &self,
+        origin: SaleOrigin,
+        ids: impl IntoIterator<Item = u64>,
+    ) -> SalePlan {
+        self.campaign
+            .plan_batch(&self.strategy.sale_refs(), origin, ids)
+    }
+    /// `Command::SellItem`. Until W1-20 it keeps its pre-strict behaviour: it
+    /// sells through the blocks [`SaleBlock::sell_item_overrides`] lists and
+    /// the affected loadouts fall back to protected starter equipment.
     pub fn sell_item(&mut self, id: u64) -> Result<u64, String> {
-        self.sale_preview(id)?;
-        let coins = self.campaign.sell(id)?;
+        let coins = self.campaign.sell(id, &self.strategy.sale_refs())?;
         self.strategy.reconcile_loadouts(&self.campaign);
         Ok(coins)
     }
+    /// What `SellUnprotected` pays: the summed `sale_eligibility` Ok set.
     pub fn sell_extras_quote(&self) -> u64 {
-        self.strategy.sell_extras_quote(&self.campaign)
+        self.plan_sale(SaleOrigin::Player, self.campaign.owned_item_ids())
+            .coins
     }
+    /// Sells exactly the `sale_eligibility` Ok set; `Ok(0)` while a defender
+    /// is deployed, and nothing when the wallet would overflow.
     pub fn sell_extras(&mut self) -> Result<u64, String> {
-        self.strategy.sell_extras(&mut self.campaign)
+        let plan = self.plan_sale(SaleOrigin::Player, self.campaign.owned_item_ids());
+        self.campaign.execute_plan(&plan)
     }
     pub fn sell_unprotected(&mut self) -> Result<u64, String> {
         self.sell_extras()
