@@ -3,6 +3,7 @@ pub mod campaign;
 pub mod catalog;
 pub mod command;
 pub mod content;
+pub mod defenders;
 pub mod enemy_catalog;
 mod hash;
 pub mod kind_map;

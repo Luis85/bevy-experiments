@@ -32,6 +32,17 @@ pub enum RecruitStatus {
     Guarding,
     Deployed,
 }
+impl RecruitStatus {
+    pub const ALL: [Self; 3] = [Self::Ready, Self::Guarding, Self::Deployed];
+    /// Player-facing status text. `Deployed` means away on an expedition.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Ready => "Ready",
+            Self::Guarding => "Guarding",
+            Self::Deployed => "On expedition",
+        }
+    }
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Recruit {
     pub id: u64,
@@ -126,9 +137,9 @@ impl StrategyState {
             magazine: profile.npc.magazine,
             status: recruit.status,
             summary: format!(
-                "{} · {:?} · HP {hp}/{} · FP {fp}/{} · DR {} · Guns {} · {} rounds",
+                "{} · {} · HP {hp}/{} · FP {fp}/{} · DR {} · Guns {} · {} rounds",
                 recruit.npc.creation.archetype,
-                recruit.status,
+                recruit.status.label(),
                 profile.max_hp,
                 profile.max_fp,
                 profile.npc.armor,
@@ -306,22 +317,8 @@ impl StrategyState {
         campaign.coins -= price;
         let id = self.next_recruit_id;
         self.next_recruit_id = next_id;
-        let names = [
-            "Alex Rowan",
-            "Sam Okoro",
-            "Noor Aziz",
-            "Ren Mori",
-            "Lena Fischer",
-            "Ari Silva",
-            "Mika Chen",
-            "Imani Cole",
-            "Sasha Volk",
-            "Kai Morgan",
-            "Dara Nouri",
-            "Morgan Reyes",
-        ];
-        let base_name = names[((id - 1) % names.len() as u64) as usize];
-        let name = if id <= names.len() as u64 {
+        let (base_name, _) = crate::defenders::recruit_identity(id);
+        let name = if id <= crate::defenders::RECRUIT_IDENTITIES.len() as u64 {
             base_name.to_string()
         } else {
             format!("{base_name} {id}")
@@ -1200,6 +1197,17 @@ mod tests {
         assert_eq!(s.roster[1].npc.awarded, 4);
         assert!(s.readiness(&c, a).unwrap().summary.contains("Marksman"));
         assert!(s.validate(&c).is_ok());
+    }
+    #[test]
+    fn readiness_summary_has_no_debug_names() {
+        let mut c = liberated(1);
+        let mut s = StrategyState::default();
+        let country = c.world.cleared[0].clone();
+        let id = s.recruit(&mut c, &country).unwrap();
+        s.roster[0].status = RecruitStatus::Deployed;
+        let summary = s.readiness(&c, id).unwrap().summary;
+        assert!(summary.contains("On expedition"), "{summary}");
+        assert!(!summary.contains("Deployed"), "{summary}");
     }
     #[test]
     fn strategic_validation_rejects_duplicate_alerts_and_invalid_guard_injury() {

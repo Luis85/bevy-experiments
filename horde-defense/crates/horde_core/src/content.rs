@@ -146,6 +146,15 @@ impl Policy {
         Self::Guardian,
         Self::BossFocus,
     ];
+    /// Player-facing policy name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Balanced => "Balanced",
+            Self::Marksman => "Marksman",
+            Self::Guardian => "Guardian",
+            Self::BossFocus => "Boss focus",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
