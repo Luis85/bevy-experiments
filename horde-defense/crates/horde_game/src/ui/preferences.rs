@@ -156,16 +156,7 @@ fn remap_settings(ui: &mut egui::Ui, f: &mut UiCtx, ctx: &egui::Context) {
                 // from this prompt.
                 f.prefs.rebind = None;
             } else if let Some(key) = pressed {
-                if let Some(other) = f
-                    .settings
-                    .bindings
-                    .iter()
-                    .position(|binding| *binding == key)
-                {
-                    f.settings.bindings.swap(other, action as usize);
-                } else {
-                    f.settings.bindings[action as usize] = key;
-                }
+                f.settings.bind(action, key);
                 f.prefs.rebind = None;
             }
         } else if !clicked {

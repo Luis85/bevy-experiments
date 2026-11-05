@@ -1,6 +1,31 @@
 use bevy_egui::egui::{self, Context, PointerButton};
 use serde::{Deserialize, Serialize};
-use std::path::Path;
+use std::{collections::BTreeSet, path::Path};
+
+/// The `version` every settings file is written with. A file without the key
+/// predates it and reads as 0. Wave 6 raises it to 2 for the mix migration.
+pub const SETTINGS_VERSION: u32 = 1;
+
+/// Default preference values. Audio owns the volume values; `WAVE1_*` keep
+/// the wave-1 defaults so a later default change can tell an untouched
+/// slider from a chosen one.
+pub mod defaults {
+    pub const MASTER: f32 = 0.6;
+    pub const EFFECTS: f32 = 0.7;
+    pub const AMBIENCE: f32 = 0.15;
+    pub const MUSIC: f32 = 0.7;
+    pub const UI: f32 = 0.7;
+    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
+    pub const WAVE1_MASTER: f32 = 0.6;
+    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
+    pub const WAVE1_EFFECTS: f32 = 0.7;
+    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
+    pub const WAVE1_AMBIENCE: f32 = 0.15;
+    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
+    pub const WAVE1_MUSIC: f32 = 0.7;
+    #[allow(dead_code, reason = "the wave-6 mix migration compares against these")]
+    pub const WAVE1_UI: f32 = 0.7;
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Action {
@@ -38,10 +63,62 @@ impl Action {
     }
 }
 
+/// Keys for actions outside the eight core bindings. `""` is Unbound and never
+/// fires. A new action is a new field, so older files keep their keys.
+#[derive(Clone, PartialEq, Eq, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ExtraBindings {
+    pub world_clock: String,
+    pub cycle_attack: String,
+}
+impl Default for ExtraBindings {
+    fn default() -> Self {
+        Self {
+            world_clock: "P".into(),
+            cycle_attack: "Q".into(),
+        }
+    }
+}
+impl ExtraBindings {
+    fn slots_mut(&mut self) -> [&mut String; 2] {
+        [&mut self.world_clock, &mut self.cycle_attack]
+    }
+}
+
+/// Variants are append-only: an unknown variant falls back alone.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub enum WindowModeSetting {
+    #[default]
+    Windowed,
+    BorderlessFullscreen,
+}
+
+/// How item quality is shown besides colour. Variants are append-only.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub enum QualityMarkers {
+    #[default]
+    ColorOnly,
+    Text,
+    Shape,
+    TextAndShape,
+}
+
+/// Variants are append-only.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default, Serialize, Deserialize)]
+pub enum Palette {
+    #[default]
+    Standard,
+    ColorBlind,
+}
+
 /// The user settings resource: display, audio, controls and accessibility.
-#[derive(bevy::prelude::Resource, Clone, Debug, Serialize, Deserialize)]
+#[derive(bevy::prelude::Resource, Clone, PartialEq, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
+    /// Field-level default: a file without the key reads as 0, never as the
+    /// current version, so the load migrations can tell old files apart.
+    #[serde(default)]
+    pub version: u32,
     pub scale: f32,
     pub aim_assist: f32,
     pub auto_reload: bool,
@@ -55,10 +132,24 @@ pub struct Settings {
     pub effects: f32,
     pub ambience: f32,
     pub bindings: [String; 8],
+    pub extra_bindings: ExtraBindings,
+    pub window_mode: WindowModeSetting,
+    pub vsync: bool,
+    pub low_latency: bool,
+    /// "Music & stingers".
+    pub music: f32,
+    /// "Interface sounds".
+    pub ui: f32,
+    pub mono_audio: bool,
+    pub quality_markers: QualityMarkers,
+    pub palette: Palette,
+    /// Onboarding callouts already shown; None is a file from before them.
+    pub seen_callouts: Option<BTreeSet<String>>,
 }
 impl Default for Settings {
     fn default() -> Self {
         Self {
+            version: SETTINGS_VERSION,
             scale: 1.0,
             aim_assist: 0.0,
             auto_reload: true,
@@ -68,19 +159,148 @@ impl Default for Settings {
             reduced_effects: false,
             show_guidance: true,
             blood: false,
-            master: 0.6,
-            effects: 0.7,
-            ambience: 0.15,
+            master: defaults::MASTER,
+            effects: defaults::EFFECTS,
+            ambience: defaults::AMBIENCE,
             bindings: ["Mouse1", "Mouse2", "R", "1", "2", "B", "Escape", "F"].map(String::from),
+            extra_bindings: ExtraBindings::default(),
+            window_mode: WindowModeSetting::Windowed,
+            vsync: true,
+            low_latency: false,
+            music: defaults::MUSIC,
+            ui: defaults::UI,
+            mono_audio: false,
+            quality_markers: QualityMarkers::ColorOnly,
+            palette: Palette::Standard,
+            seen_callouts: None,
         }
     }
 }
+
+/// The pure result of reading settings bytes.
+#[derive(Clone, PartialEq, Debug)]
+pub struct SettingsDecode {
+    pub settings: Settings,
+    /// Keys whose values could not be read; each took its default alone.
+    pub dropped_keys: Vec<String>,
+    /// The bytes were not a JSON object, so every value is a default.
+    pub not_json: bool,
+}
+
 impl Settings {
+    /// Reads settings without preserving an unreadable file. The startup read
+    /// is `profile::read_settings`.
     pub fn load(path: &Path) -> Self {
         std::fs::read(path)
-            .ok()
-            .and_then(|b| serde_json::from_slice(&b).ok())
+            .map(|bytes| Self::decode(&bytes).settings)
             .unwrap_or_default()
+    }
+    /// Reads settings bytes, in order: per-key salvage; before version 1,
+    /// Interface sounds take the effects volume they rode on; volumes are
+    /// clamped and a non-finite one takes its default; `normalise`; the
+    /// version becomes `SETTINGS_VERSION`. Pure: preserving the original is
+    /// `profile::read_settings`.
+    pub fn decode(bytes: &[u8]) -> SettingsDecode {
+        let (mut settings, dropped_keys, not_json) =
+            match serde_json::from_slice::<serde_json::Value>(bytes) {
+                Ok(serde_json::Value::Object(object)) => {
+                    let (settings, dropped_keys) = Self::salvage(object);
+                    (settings, dropped_keys, false)
+                }
+                _ => (Self::default(), Vec::new(), true),
+            };
+        if settings.version < 1 {
+            settings.ui = settings.effects;
+        }
+        settings.clamp_volumes();
+        settings.normalise();
+        settings.version = SETTINGS_VERSION;
+        SettingsDecode {
+            settings,
+            dropped_keys,
+            not_json,
+        }
+    }
+    /// Keeps every key that still deserializes; each other key takes its
+    /// default alone, so one bad value never resets the bindings.
+    fn salvage(mut object: serde_json::Map<String, serde_json::Value>) -> (Self, Vec<String>) {
+        // serde_json writes a non-finite f32 as null: that reads as the
+        // default, not as an unreadable key.
+        const FLOATS: [&str; 7] = [
+            "scale",
+            "aim_assist",
+            "master",
+            "effects",
+            "ambience",
+            "music",
+            "ui",
+        ];
+        object.retain(|key, value| !(value.is_null() && FLOATS.contains(&key.as_str())));
+        let parse = |object: &serde_json::Map<String, serde_json::Value>| {
+            serde_json::from_value::<Self>(serde_json::Value::Object(object.clone()))
+        };
+        if let Ok(settings) = parse(&object) {
+            return (settings, Vec::new());
+        }
+        let mut kept = serde_json::Map::new();
+        let mut dropped = Vec::new();
+        for (key, value) in object {
+            kept.insert(key.clone(), value);
+            if parse(&kept).is_err() {
+                kept.remove(&key);
+                dropped.push(key);
+            }
+        }
+        // Every kept key parsed alongside the others, so this cannot fail.
+        (parse(&kept).unwrap_or_default(), dropped)
+    }
+    fn clamp_volumes(&mut self) {
+        for (volume, default) in [
+            (&mut self.master, defaults::MASTER),
+            (&mut self.effects, defaults::EFFECTS),
+            (&mut self.ambience, defaults::AMBIENCE),
+            (&mut self.music, defaults::MUSIC),
+            (&mut self.ui, defaults::UI),
+        ] {
+            *volume = if volume.is_finite() {
+                volume.clamp(0.0, 1.0)
+            } else {
+                default
+            };
+        }
+    }
+    /// Unbinds any extra key that a core action, or an earlier extra action,
+    /// already holds, so one key never drives two actions.
+    pub fn normalise(&mut self) {
+        let mut taken: Vec<String> = self.bindings.to_vec();
+        for slot in self.extra_bindings.slots_mut() {
+            if slot.is_empty() {
+                continue;
+            }
+            if taken.contains(slot) {
+                slot.clear();
+            } else {
+                taken.push(slot.clone());
+            }
+        }
+    }
+    /// Binds `action` to `key`. A key another core or extra action holds
+    /// swaps over: that action takes `action`'s previous key.
+    pub fn bind(&mut self, action: Action, key: String) {
+        let index = action as usize;
+        let previous = std::mem::replace(&mut self.bindings[index], key.clone());
+        if let Some(other) =
+            (0..self.bindings.len()).find(|&other| other != index && self.bindings[other] == key)
+        {
+            self.bindings[other] = previous;
+        } else if let Some(slot) = self
+            .extra_bindings
+            .slots_mut()
+            .into_iter()
+            .find(|slot| **slot == key)
+        {
+            *slot = previous;
+        }
     }
     pub fn save(&self, path: &Path) -> Result<(), String> {
         if let Some(parent) = path.parent() {
@@ -223,7 +443,220 @@ mod tests {
             effects: 0.45,
             ambience: 0.3,
             bindings: ["Mouse1", "Mouse3", "T", "Q", "E", "C", "P", "G"].map(String::from),
+            ..Settings::default()
         }
+    }
+
+    fn decode(json: &str) -> SettingsDecode {
+        Settings::decode(json.as_bytes())
+    }
+
+    #[test]
+    fn absent_version_key_reads_zero_not_current() {
+        let absent: Settings = serde_json::from_str("{}").unwrap();
+        assert_eq!(absent.version, 0);
+        assert_eq!(Settings::default().version, SETTINGS_VERSION);
+        let written: Settings =
+            serde_json::from_slice(&serde_json::to_vec(&Settings::default()).unwrap()).unwrap();
+        assert_eq!(written.version, SETTINGS_VERSION);
+    }
+
+    #[test]
+    fn old_13_key_settings_file_loads_with_new_defaults() {
+        let raw: Settings = serde_json::from_str(SETTINGS_V0).unwrap();
+        assert_eq!(raw.version, 0);
+        let decoded = decode(SETTINGS_V0);
+        assert!(decoded.dropped_keys.is_empty() && !decoded.not_json);
+        let settings = decoded.settings;
+        let old = customised();
+        assert_eq!(settings.bindings, old.bindings);
+        assert_eq!(
+            (settings.scale, settings.aim_assist, settings.master),
+            (old.scale, old.aim_assist, old.master)
+        );
+        assert_eq!((settings.effects, settings.ambience), (0.45, 0.3));
+        assert!(!settings.auto_reload && settings.toggle_fire && settings.outlines);
+        assert!(!settings.numbers && settings.reduced_effects && !settings.show_guidance);
+        assert!(settings.blood);
+        // Interface sounds rode the effects bus before version 1.
+        assert_eq!(settings.ui, 0.45);
+        assert_eq!(settings.version, SETTINGS_VERSION);
+        // This file binds Heal to Q and Pause to P, so both default extra
+        // keys are taken and stay unbound.
+        assert_eq!(settings.extra_bindings.world_clock, "");
+        assert_eq!(settings.extra_bindings.cycle_attack, "");
+        assert_eq!(settings.window_mode, WindowModeSetting::Windowed);
+        assert_eq!(
+            (settings.vsync, settings.low_latency, settings.mono_audio),
+            (true, false, false)
+        );
+        assert_eq!(settings.music, defaults::MUSIC);
+        assert_eq!(settings.quality_markers, QualityMarkers::ColorOnly);
+        assert_eq!(settings.palette, Palette::Standard);
+        assert_eq!(settings.seen_callouts, None);
+    }
+
+    #[test]
+    fn one_bad_key_falls_back_alone() {
+        let decoded = decode(
+            r#"{"master": 0.3, "effects": "loud", "blood": true,
+                "bindings": ["Mouse1", "Mouse3", "T", "Q", "E", "C", "P", "G"]}"#,
+        );
+        assert_eq!(decoded.dropped_keys, ["effects"]);
+        assert!(!decoded.not_json);
+        let settings = decoded.settings;
+        assert_eq!(settings.master, 0.3);
+        assert!(settings.blood);
+        assert_eq!(settings.bindings, customised().bindings);
+        assert_eq!(settings.effects, defaults::EFFECTS);
+    }
+
+    #[test]
+    fn not_json_or_not_an_object_takes_every_default() {
+        for bytes in [&b"master = 0.3"[..], b"[1, 2]", b"", b"\xff\xfe"] {
+            let decoded = Settings::decode(bytes);
+            assert!(decoded.not_json, "{bytes:?}");
+            assert!(decoded.dropped_keys.is_empty());
+            assert_eq!(decoded.settings, Settings::default());
+        }
+    }
+
+    #[test]
+    fn unknown_window_mode_variant_is_salvaged_alone() {
+        let decoded = decode(
+            r#"{"version": 1, "window_mode": "ExclusiveFullscreen", "palette": "ColorBlind",
+                "quality_markers": "Shape", "vsync": false,
+                "bindings": ["Mouse1", "Mouse3", "T", "Q", "E", "C", "P", "G"]}"#,
+        );
+        assert_eq!(decoded.dropped_keys, ["window_mode"]);
+        let settings = decoded.settings;
+        assert_eq!(settings.window_mode, WindowModeSetting::Windowed);
+        assert_eq!(settings.palette, Palette::ColorBlind);
+        assert_eq!(settings.quality_markers, QualityMarkers::Shape);
+        assert!(!settings.vsync);
+        assert_eq!(settings.bindings, customised().bindings);
+    }
+
+    #[test]
+    fn out_of_range_and_null_volumes_take_clamp_or_default() {
+        let decoded = decode(
+            r#"{"version": 1, "master": 1.7, "effects": -0.2, "ambience": null,
+                "music": null, "ui": 0.4}"#,
+        );
+        // serde_json writes a non-finite f32 as null: that is a default, not
+        // an unreadable key.
+        assert!(
+            decoded.dropped_keys.is_empty(),
+            "{:?}",
+            decoded.dropped_keys
+        );
+        let settings = decoded.settings;
+        assert_eq!(settings.master, 1.0);
+        assert_eq!(settings.effects, 0.0);
+        assert_eq!(settings.ambience, defaults::AMBIENCE);
+        assert_eq!(settings.music, defaults::MUSIC);
+        assert_eq!(settings.ui, 0.4);
+        let mut written = Settings {
+            master: f32::NAN,
+            ui: f32::INFINITY,
+            ..Settings::default()
+        };
+        let reread = Settings::decode(&serde_json::to_vec(&written).unwrap());
+        assert!(reread.dropped_keys.is_empty());
+        written.master = defaults::MASTER;
+        written.ui = defaults::UI;
+        assert_eq!(reread.settings, written);
+    }
+
+    #[test]
+    fn extra_binding_equal_to_core_binding_is_unbound() {
+        let decoded = decode(
+            r#"{"version": 1, "extra_bindings": {"world_clock": "B", "cycle_attack": "Q"}}"#,
+        );
+        assert_eq!(decoded.settings.extra_bindings.world_clock, "");
+        assert_eq!(decoded.settings.extra_bindings.cycle_attack, "Q");
+        let mut settings = Settings::default();
+        settings.extra_bindings.world_clock = "Escape".into();
+        settings.normalise();
+        assert_eq!(settings.extra_bindings.world_clock, "");
+        // Two extra actions never share a key either.
+        settings.extra_bindings.world_clock = "K".into();
+        settings.extra_bindings.cycle_attack = "K".into();
+        settings.normalise();
+        assert_eq!(settings.extra_bindings.world_clock, "K");
+        assert_eq!(settings.extra_bindings.cycle_attack, "");
+    }
+
+    #[test]
+    fn core_rebind_to_an_extra_key_swaps_across_the_tables() {
+        let mut settings = Settings::default();
+        settings.bind(Action::Reload, "P".into());
+        assert_eq!(settings.bindings[Action::Reload as usize], "P");
+        assert_eq!(settings.extra_bindings.world_clock, "R");
+        settings.bind(Action::Reload, "B".into());
+        assert_eq!(settings.bindings[Action::Reload as usize], "B");
+        assert_eq!(settings.bindings[Action::Build as usize], "P");
+        assert_eq!(settings.extra_bindings.world_clock, "R");
+        settings.bind(Action::Build, "K".into());
+        assert_eq!(settings.bindings[Action::Build as usize], "K");
+        assert_eq!(settings.extra_bindings.world_clock, "R");
+    }
+
+    #[test]
+    fn every_new_field_round_trips_at_a_non_default_value() {
+        let fresh = Settings::default();
+        let changed = Settings {
+            extra_bindings: ExtraBindings {
+                world_clock: "K".into(),
+                cycle_attack: "".into(),
+            },
+            window_mode: WindowModeSetting::BorderlessFullscreen,
+            vsync: false,
+            low_latency: true,
+            music: 0.25,
+            ui: 0.35,
+            mono_audio: true,
+            quality_markers: QualityMarkers::TextAndShape,
+            palette: Palette::ColorBlind,
+            seen_callouts: Some(BTreeSet::from(["feature:companion".to_string()])),
+            ..customised()
+        };
+        assert_ne!(changed.extra_bindings, fresh.extra_bindings);
+        assert_ne!(changed.window_mode, fresh.window_mode);
+        assert_ne!(changed.vsync, fresh.vsync);
+        assert_ne!(changed.low_latency, fresh.low_latency);
+        assert_ne!(changed.music, fresh.music);
+        assert_ne!(changed.ui, fresh.ui);
+        assert_ne!(changed.mono_audio, fresh.mono_audio);
+        assert_ne!(changed.quality_markers, fresh.quality_markers);
+        assert_ne!(changed.palette, fresh.palette);
+        assert_ne!(changed.seen_callouts, fresh.seen_callouts);
+        let bytes = serde_json::to_vec_pretty(&changed).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["version"], SETTINGS_VERSION);
+        let decoded = Settings::decode(&bytes);
+        assert!(decoded.dropped_keys.is_empty() && !decoded.not_json);
+        assert_eq!(decoded.settings, changed);
+        for markers in [
+            QualityMarkers::ColorOnly,
+            QualityMarkers::Text,
+            QualityMarkers::Shape,
+            QualityMarkers::TextAndShape,
+        ] {
+            let settings = Settings {
+                quality_markers: markers,
+                ..Settings::default()
+            };
+            let bytes = serde_json::to_vec(&settings).unwrap();
+            assert_eq!(Settings::decode(&bytes).settings, settings);
+        }
+    }
+
+    #[test]
+    fn bindings_stay_eight_core_actions() {
+        assert_eq!(Action::ALL.len(), 8);
+        let bindings: [String; 8] = Settings::default().bindings;
+        assert_eq!(bindings.len(), Action::ALL.len());
     }
 
     #[test]
