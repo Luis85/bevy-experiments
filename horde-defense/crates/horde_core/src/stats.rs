@@ -181,6 +181,11 @@ pub struct RunRecord {
     pub end_hp: i32,
     pub max_hp: i32,
     pub legacy: bool,
+    /// How many of this run's drops settlement auto-sold, and for how much.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub auto_sold_count: u32,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub auto_sold_coins: u64,
 }
 impl RunRecord {
     pub fn duration_seconds(&self) -> f32 {
@@ -213,6 +218,8 @@ impl RunRecord {
                 .map(|v| u64::from(*v))
                 .sum::<u64>()
                 > u64::from(self.loot)
+            || self.auto_sold_count > self.loot
+            || (self.auto_sold_count == 0 && self.auto_sold_coins != 0)
         {
             return Err("Invalid persistent run record".into());
         }

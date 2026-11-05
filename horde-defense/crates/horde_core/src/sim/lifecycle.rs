@@ -184,6 +184,8 @@ impl Game {
             kills: 0,
             coins: 0,
             loot: 0,
+            drop_ids: Vec::new(),
+            drop_tier: None,
             decision: "Ready to deploy".into(),
             events: VecDeque::new(),
             log: vec![],
@@ -357,6 +359,8 @@ impl Game {
             end_hp: a.hp,
             max_hp: a.max_hp,
             legacy: a.gear_snapshot.is_empty(),
+            auto_sold_count: 0,
+            auto_sold_coins: 0,
         };
         if self.worker {
             self.pending_runs.push(record);
@@ -381,6 +385,9 @@ impl Game {
             country_freed,
             coins: a.coins,
             loot: a.loot,
+            drop_ids: Vec::new(),
+            loot_by_quality: Default::default(),
+            auto_sold: Default::default(),
             cause,
             tip: if outcome == Outcome::Victory {
                 "Spend retained rewards, review your loadout, then secure the next sector.".into()

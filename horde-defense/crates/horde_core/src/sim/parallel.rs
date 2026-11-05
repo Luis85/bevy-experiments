@@ -153,6 +153,7 @@ impl Game {
             loadout: npc.loadout,
             country_operation: false,
             summary: None,
+            pending_auto_sell: Vec::new(),
         });
         while self.battles.len() > 32 {
             if let Some(n) = self.battles.iter().position(|b| b.settled) {

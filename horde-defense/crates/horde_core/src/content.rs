@@ -191,6 +191,10 @@ pub struct ItemDefinition {
     /// their own alternative. Pre-proficiency saves retain grandfathered access.
     #[serde(default)]
     pub npc_only: bool,
+    /// Recovered only as loot: never offered in the shop or bought. Requires
+    /// a droppable tier (1..=4).
+    #[serde(default, skip_serializing_if = "crate::schema::is_false")]
+    pub loot_only: bool,
     #[serde(default)]
     pub weapon: Option<crate::weapons::WeaponSpec>,
     pub name: String,
@@ -201,6 +205,12 @@ pub struct ItemDefinition {
     pub buy_value: u64,
     pub personal: PersonalProfile,
     pub npc: NpcProfile,
+}
+impl ItemDefinition {
+    /// Sold in the shop: a non-starter tier that is not loot-only.
+    pub fn purchasable(&self) -> bool {
+        self.tier > 0 && !self.loot_only
+    }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct EnemyDefinition {
@@ -352,6 +362,17 @@ impl Content {
     }
     pub fn item(&self, id: &ItemDefId) -> Option<&ItemDefinition> {
         self.item_index(id).map(|index| &self.items[index])
+    }
+    /// The highest tier the drop pool holds (non-starter, not NPC issue): a
+    /// saved `Attempt::drop_tier` lies in `1..=max_drop_tier()`.
+    pub fn max_drop_tier(&self) -> u8 {
+        self.items
+            .iter()
+            .skip(4)
+            .filter(|item| !item.npc_only)
+            .map(|item| u8::try_from(item.tier).unwrap_or(u8::MAX))
+            .max()
+            .unwrap_or(0)
     }
     /// Catalogue position of a level ID (five levels; a scan is cheapest).
     pub fn level_index(&self, id: &str) -> Option<usize> {
@@ -562,6 +583,9 @@ impl Content {
                     i.name
                 ));
             }
+            if i.loot_only && (index < 4 || !(1..=4).contains(&i.tier)) {
+                return Err(format!("Loot-only item needs a drop tier: {}", i.name));
+            }
         }
         for slot in Slot::ALL {
             if !self
@@ -670,6 +694,30 @@ mod tests {
         let mut edited = content.clone();
         edited.items.swap(4, 5);
         assert_eq!(edited.item_index(&content.items[4].id), Some(5));
+    }
+    #[test]
+    fn loot_only_items_need_a_drop_tier_and_are_never_purchasable() {
+        // No authored item is loot-only yet: purchasable is today's tier gate.
+        for item in &content().items {
+            assert!(!item.loot_only, "{}", item.id);
+            assert_eq!(item.purchasable(), item.tier > 0, "{}", item.id);
+        }
+        assert_eq!(content().max_drop_tier(), 4);
+        let text = serde_json::to_string(content()).unwrap();
+        assert!(!text.contains("loot_only"), "skipped while false");
+        let mut data = content().clone();
+        data.items[5].loot_only = true;
+        assert!(!data.items[5].purchasable());
+        assert!(data.validate().is_ok());
+        let text = serde_json::to_string(&data).unwrap();
+        assert_eq!(Content::from_json(&text).unwrap().items[5], data.items[5]);
+        // Loot-only gear must be droppable: tier 1..=4, never a starter.
+        for (index, tier) in [(0, 0), (5, 0), (5, 5)] {
+            let mut data = content().clone();
+            data.items[index].loot_only = true;
+            data.items[index].tier = tier;
+            assert!(data.validate().is_err(), "item {index} at tier {tier}");
+        }
     }
     #[test]
     fn every_slot_has_protected_starter_profile() {

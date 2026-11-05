@@ -457,7 +457,7 @@ fn rewrite_v5(value: &mut Value) -> Result<(), SaveError> {
 fn v6_to_v7(mut value: Value) -> Result<Value, SaveError> {
     v7_worker_seats(&mut value)?; // (a) defender seats
     v7_npc_appearance(&mut value); // (e) defensive appearance back-fill
-    // (b) report drop tracking (loot-economy) goes here.
+    v7_report_drops(&mut value)?; // (b) report drop tracking
     // (c) level-grant ledger, then (d) milestones (progression-tree) go here.
     Ok(value)
 }
@@ -528,6 +528,102 @@ fn v7_npc_appearance(value: &mut Value) {
                 .or_insert_with(|| Value::from("Female"));
         }
     }
+}
+
+/// (b) The root report and every worker report gain `drop_ids`, the sorted
+/// item ids of their loot receipts, and `loot_by_quality`. The root report
+/// takes the counts of its own run record (`attempt_id` equal, `worker_id`
+/// null), which saw every drop; otherwise the receipts are counted. Keys
+/// are inserted only when absent and only with a drop, so a report without
+/// receipts stays as it was. Every other v7 loot field (the auto-sell rule,
+/// attempt drop tracking, receipts, pending sales) relies on its serde
+/// default: off and empty. Runs after (a), which rejects malformed battles.
+fn v7_report_drops(value: &mut Value) -> Result<(), SaveError> {
+    let Some(root) = value.as_object_mut() else {
+        return Ok(());
+    };
+    let history = root
+        .get("campaign")
+        .and_then(|campaign| campaign.get("run_history"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    if let Some(report) = root.get_mut("last_result") {
+        let attempt = report.get("attempt_id").and_then(Value::as_u64);
+        let recorded = history
+            .iter()
+            .find(|record| {
+                attempt.is_some()
+                    && record.get("attempt_id").and_then(Value::as_u64) == attempt
+                    && record.get("worker_id").is_none_or(Value::is_null)
+            })
+            .and_then(|record| record.get("loot_by_quality"));
+        v7_report_drop_keys(report, recorded)?;
+    }
+    if let Some(battles) = root.get_mut("battles") {
+        for battle in v6_battles(Some(battles))? {
+            if let Some(report) = battle
+                .get_mut("game")
+                .and_then(|game| game.get_mut("last_result"))
+            {
+                v7_report_drop_keys(report, None)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn v7_report_drop_keys(report: &mut Value, recorded: Option<&Value>) -> Result<(), SaveError> {
+    let Some(report) = report.as_object_mut() else {
+        return Ok(());
+    };
+    let malformed = || SaveError::Migration("v6 report has a malformed loot receipt".into());
+    let events = match report.get("loot_events") {
+        None | Some(Value::Null) => &Vec::new(),
+        Some(Value::Array(events)) => events,
+        Some(_) => return Err(malformed()),
+    };
+    let mut ids = Vec::with_capacity(events.len());
+    let mut counted = [0u64; V3_QUALITIES.len()];
+    for event in events {
+        ids.push(
+            event
+                .get("item_id")
+                .and_then(Value::as_u64)
+                .ok_or_else(malformed)?,
+        );
+        let quality = event.get("quality").and_then(Value::as_str);
+        let slot = V3_QUALITIES
+            .iter()
+            .position(|name| Some(*name) == quality)
+            .ok_or_else(malformed)?;
+        counted[slot] += 1;
+    }
+    ids.sort_unstable();
+    ids.dedup();
+    if !ids.is_empty() && !report.contains_key("drop_ids") {
+        report.insert("drop_ids".into(), Value::from(ids));
+    }
+    if !report.contains_key("loot_by_quality") {
+        let counts = match recorded {
+            Some(recorded) => recorded.clone(),
+            // v6 quality names are the v3 ones (Quality was never reordered).
+            None => Value::Object(
+                V3_QUALITIES
+                    .iter()
+                    .zip(counted)
+                    .map(|(name, n)| ((*name).to_owned(), Value::from(n)))
+                    .collect(),
+            ),
+        };
+        let any = counts
+            .as_object()
+            .is_some_and(|map| map.values().any(|n| n.as_u64() != Some(0)));
+        if any {
+            report.insert("loot_by_quality".into(), counts);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -955,5 +1051,94 @@ mod tests {
         assert_eq!(appearance(1), Some(json!("Male")));
         assert_eq!(appearance(2), None);
         assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+    }
+
+    fn loot_event(item_id: u64, quality: &str) -> Value {
+        json!({"item_id": item_id, "quality": quality, "definition": "fire_axe"})
+    }
+
+    fn counts(
+        poor: u32,
+        common: u32,
+        uncommon: u32,
+        rare: u32,
+        epic: u32,
+        legendary: u32,
+    ) -> Value {
+        json!({"Poor": poor, "Common": common, "Uncommon": uncommon,
+               "Rare": rare, "Epic": epic, "Legendary": legendary})
+    }
+
+    #[test]
+    fn v6_report_drop_ids_and_quality_counts_come_from_loot_events() {
+        let v6 = json!({
+            "campaign": {"run_history": [
+                // Same attempt id, but an expedition's record: never matched.
+                {"attempt_id": 7, "worker_id": 2, "loot_by_quality": counts(0, 0, 0, 0, 0, 9)},
+                // The root report's own record: its counts are complete.
+                {"attempt_id": 7, "worker_id": null, "loot_by_quality": counts(1, 4, 2, 0, 1, 0)},
+                {"attempt_id": 8, "worker_id": null, "loot_by_quality": counts(0, 0, 0, 0, 0, 0)}
+            ]},
+            "last_result": {"attempt_id": 7, "loot_events": [
+                loot_event(41, "Rare"), loot_event(12, "Common"), loot_event(30, "Common")
+            ]},
+            "battles": [
+                // No root record applies inside a worker: count its receipts.
+                {"recruit_id": 1, "game": {"last_result": {"attempt_id": 7, "loot_events": [
+                    loot_event(9, "Epic"), loot_event(3, "Poor"), loot_event(6, "Epic")
+                ]}}},
+                // A report without drops gains no key.
+                {"recruit_id": 2, "game": {"last_result": {"attempt_id": 1, "loot_events": []}}},
+                {"recruit_id": 3, "game": {"attempt": null, "last_result": null}}
+            ]
+        });
+        let v7 = migrate(v6.clone(), 6).unwrap();
+        let root = &v7["last_result"];
+        assert_eq!(root["drop_ids"], json!([12, 30, 41]), "sorted item ids");
+        assert_eq!(root["loot_by_quality"], counts(1, 4, 2, 0, 1, 0));
+        let worker = &v7["battles"][0]["game"]["last_result"];
+        assert_eq!(worker["drop_ids"], json!([3, 6, 9]));
+        assert_eq!(worker["loot_by_quality"], counts(1, 0, 0, 0, 2, 0));
+        let empty = v7["battles"][1]["game"]["last_result"].as_object().unwrap();
+        assert!(!empty.contains_key("drop_ids") && !empty.contains_key("loot_by_quality"));
+        assert!(v7["battles"][2]["game"]["last_result"].is_null());
+        // A root report without a matching record counts its receipts, and
+        // an all-zero record adds no key; saved values are kept (or_insert).
+        let mut unmatched = v6.clone();
+        unmatched["last_result"]["attempt_id"] = json!(5);
+        let v7 = migrate(unmatched, 6).unwrap();
+        assert_eq!(
+            v7["last_result"]["loot_by_quality"],
+            counts(0, 2, 0, 1, 0, 0)
+        );
+        let mut zero = v6.clone();
+        zero["last_result"] = json!({"attempt_id": 8, "loot_events": []});
+        let v7 = migrate(zero, 6).unwrap();
+        assert!(v7["last_result"].get("loot_by_quality").is_none());
+        let mut kept = v6.clone();
+        kept["last_result"]["drop_ids"] = json!([41]);
+        kept["last_result"]["loot_by_quality"] = counts(0, 0, 0, 1, 0, 0);
+        let v7 = migrate(kept.clone(), 6).unwrap();
+        assert_eq!(
+            v7["last_result"]["drop_ids"],
+            kept["last_result"]["drop_ids"]
+        );
+        assert_eq!(
+            v7["last_result"]["loot_by_quality"],
+            kept["last_result"]["loot_by_quality"]
+        );
+        let v7 = migrate(v6, 6).unwrap();
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+        // Malformed receipts are typed errors, not panics.
+        for bad in [
+            json!({"last_result": {"loot_events": [{"item_id": "3", "quality": "Rare"}]}}),
+            json!({"last_result": {"loot_events": [{"item_id": 3, "quality": "Shiny"}]}}),
+            json!({"last_result": {"loot_events": {"item_id": 3}}}),
+        ] {
+            assert!(
+                matches!(migrate(bad.clone(), 6), Err(SaveError::Migration(_))),
+                "{bad}"
+            );
+        }
     }
 }

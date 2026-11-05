@@ -66,6 +66,8 @@ pub const DEFENSE_LINE: f32 = 1.5;
 const DT: f32 = 1.0 / 60.0;
 const MAX_LOG: usize = 80;
 pub const MAX_EVENTS: usize = 512;
+/// The most drops one run tracks in `Attempt::drop_ids` (save bound).
+pub const MAX_RUN_DROPS: usize = 4096;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Input {
@@ -383,6 +385,16 @@ pub struct Attempt {
     pub kills: u32,
     pub coins: u64,
     pub loot: u32,
+    /// Every item this run dropped, ascending (the receipts in `loot_events`
+    /// are capped; this list is not, up to [`MAX_RUN_DROPS`]). Written only
+    /// at depth 0 on the `drop_tier` Some path.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drop_ids: Vec<u64>,
+    /// The highest item tier this run drops, frozen at deploy, in
+    /// `1..=Content::max_drop_tier()`. None marks an attempt deployed before
+    /// v7, which keeps the legacy drop path.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drop_tier: Option<u8>,
     pub decision: String,
     /// Bounded presentation window for scene replay; the typed stream is
     /// `Game::drain_events`.
@@ -719,6 +731,18 @@ pub struct Report {
     pub country_freed: bool,
     pub coins: u64,
     pub loot: u32,
+    /// The finished run's dropped item ids (the owning game's ids: worker-local
+    /// in an expedition report).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub drop_ids: Vec<u64>,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub loot_by_quality: crate::kind_map::KindMap<crate::quality::Quality, u32>,
+    /// What settlement auto-sold from this run's drops.
+    #[serde(
+        default,
+        skip_serializing_if = "crate::campaign::AutoSoldReceipt::is_empty"
+    )]
+    pub auto_sold: crate::campaign::AutoSoldReceipt,
     pub cause: String,
     pub tip: String,
     pub first_clear: bool,
@@ -792,6 +816,10 @@ pub struct ParallelBattle {
     /// battles settled before save version 7 (they are never announced).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub summary: Option<ExpeditionSummary>,
+    /// Parent-side ids of this expedition's drops awaiting its auto-sale.
+    /// Empty once the battle is settled.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pending_auto_sell: Vec<u64>,
 }
 /// What a settled expedition achieved, kept until the player acknowledges
 /// it. `outcome` and `acknowledged` imply the battle is settled; it lists at

@@ -383,9 +383,51 @@ fn validate_defender_seats(game: &Game, depth: usize) -> Result<Option<u64>, Str
         }
     }
 }
+/// A report's drop ids (unique, at most its loot and [`MAX_RUN_DROPS`], each
+/// an id the owning game issued), quality counts and auto-sold receipt
+/// (schema v7 §3.4).
+fn validate_report_loot(report: &Report, next_item_id: u64) -> Result<(), String> {
+    let mut ids = BTreeSet::new();
+    if report.drop_ids.len() > MAX_RUN_DROPS
+        || report.drop_ids.len() > report.loot as usize
+        || report
+            .drop_ids
+            .iter()
+            .any(|id| *id == 0 || *id >= next_item_id || !ids.insert(*id))
+        || report
+            .loot_by_quality
+            .values()
+            .map(|n| u64::from(*n))
+            .sum::<u64>()
+            > u64::from(report.loot)
+    {
+        return Err("Invalid saved report drop tracking".into());
+    }
+    report.auto_sold.validate(report.loot)
+}
+/// An attempt's drop ids (strictly ascending, at most its loot and
+/// [`MAX_RUN_DROPS`], each an issued id) and frozen drop tier (schema v7 §3.3).
+fn validate_attempt_loot(a: &Attempt, next_item_id: u64) -> Result<(), String> {
+    if a.drop_ids.len() > MAX_RUN_DROPS
+        || a.drop_ids.len() > a.loot as usize
+        || a.drop_ids.first().is_some_and(|id| *id == 0)
+        || a.drop_ids.last().is_some_and(|id| *id >= next_item_id)
+        || a.drop_ids.windows(2).any(|pair| pair[0] >= pair[1])
+        || a.drop_tier
+            .is_some_and(|tier| !(1..=content().max_drop_tier()).contains(&tier))
+    {
+        return Err("Invalid saved attempt drop tracking".into());
+    }
+    Ok(())
+}
 pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     game.campaign.validate()?;
+    if depth > 0 && !game.campaign.auto_sell.is_default() {
+        // The parent pays an expedition's sales; a worker rule would pay twice.
+        return Err("An expedition carries an auto-sell rule".into());
+    }
     if let Some(report) = &game.last_result {
+        validate_report_loot(report, game.campaign.next_item_id)?;
         if !(MIN_LANES..=MAX_LANES).contains(&report.lane_count)
             || report.lane_count.is_multiple_of(2)
             || report.telemetry.damage_by_lane.len() != usize::from(report.lane_count)
@@ -422,6 +464,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     }
     let takeover = validate_defender_seats(game, depth)?;
     if let Some(a) = &game.attempt {
+        validate_attempt_loot(a, game.campaign.next_item_id)?;
         crate::quality::validate_loot_events(
             &a.loot_events,
             game.campaign.next_item_id,
@@ -655,6 +698,8 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         return Err("Duplicate global equipment reservation".into());
     }
     let mut expected_reservations = BTreeSet::new();
+    let root_drops: &[u64] = game.attempt.as_ref().map_or(&[], |a| &a.drop_ids);
+    let mut pending_sales = BTreeSet::new();
     for guard in &game.strategy.guards {
         let recruit = game
             .strategy
@@ -671,6 +716,19 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
             || b.synced_item_index > b.game.campaign.items.len()
         {
             return Err("Invalid expedition settlement cursor".into());
+        }
+        // Parent-side ids awaiting this expedition's auto-sale: issued, owned
+        // by no other pending sale, reserved by no duty, not a main-run drop.
+        if (b.settled && !b.pending_auto_sell.is_empty())
+            || b.pending_auto_sell.iter().any(|id| {
+                *id == 0
+                    || *id >= game.campaign.next_item_id
+                    || !pending_sales.insert(*id)
+                    || actual_reservations.contains(id)
+                    || root_drops.contains(id)
+            })
+        {
+            return Err("Invalid expedition pending auto-sale".into());
         }
         if b.summary.as_ref().is_some_and(|s| {
             ((s.acknowledged || s.outcome.is_some()) && !b.settled)

@@ -9,6 +9,7 @@ use crate::weapons::{WeaponClass, WeaponSpec};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 mod armory;
+mod auto_sell;
 mod ledger;
 mod loadout;
 mod progression;
@@ -17,6 +18,7 @@ mod tree_view;
 mod view;
 mod world;
 pub use armory::{Item, Preset};
+pub use auto_sell::{AutoSellRule, AutoSoldLine, AutoSoldReceipt, MAX_AUTO_SOLD_LINES};
 pub(crate) use loadout::mean_basic_damage;
 pub use loadout::{
     DefenderProfile, ItemComparison, LoadoutMetrics, Recommendation, RecommendationAction,
@@ -92,6 +94,11 @@ pub struct Campaign {
     /// a worker game.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reserved_recruit: Option<u64>,
+    /// Which of a run's drops settlement sells; off by default. Always the
+    /// default in a worker game, so an expedition's sales are paid once, by
+    /// the parent.
+    #[serde(default, skip_serializing_if = "AutoSellRule::is_default")]
+    pub auto_sell: AutoSellRule,
 }
 impl Default for Campaign {
     fn default() -> Self {
@@ -197,6 +204,7 @@ impl Default for Campaign {
             world: crate::world::WorldProgress::default(),
             next_defender: None,
             reserved_recruit: None,
+            auto_sell: AutoSellRule::default(),
         }
     }
 }
@@ -258,6 +266,7 @@ impl Campaign {
             world: self.world.clone(),
             next_defender: None,
             reserved_recruit: None,
+            auto_sell: AutoSellRule::default(),
         }
     }
     pub fn choose_survivor(&mut self, id: crate::survivors::SurvivorId) -> Result<(), String> {
@@ -270,6 +279,7 @@ impl Campaign {
     }
     pub fn validate(&self) -> Result<(), String> {
         self.balance_settings.validate()?;
+        self.auto_sell.validate()?;
         if self.next_run_id == 0 || self.run_history.windows(2).any(|p| p[0].id >= p[1].id) {
             return Err("Invalid run history sequence".into());
         }
@@ -436,6 +446,27 @@ mod tests {
         let worker = c.clone_for_worker();
         assert_eq!(worker.next_defender, None);
         assert_eq!(worker.reserved_recruit, None);
+    }
+    #[test]
+    fn clone_for_worker_resets_the_auto_sell_rule() {
+        let c = Campaign {
+            auto_sell: AutoSellRule {
+                enabled: true,
+                sell_below: crate::quality::Quality::Rare,
+                ..AutoSellRule::default()
+            },
+            ..Campaign::default()
+        };
+        c.validate().unwrap();
+        assert!(c.clone_for_worker().auto_sell.is_default());
+        let poor = Campaign {
+            auto_sell: AutoSellRule {
+                sell_below: crate::quality::Quality::Poor,
+                ..AutoSellRule::default()
+            },
+            ..Campaign::default()
+        };
+        assert!(poor.validate().is_err());
     }
     #[test]
     fn authored_purchases_stack_and_reject_unmet_prerequisites_without_spending() {

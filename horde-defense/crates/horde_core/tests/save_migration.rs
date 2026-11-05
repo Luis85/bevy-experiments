@@ -944,6 +944,87 @@ const V6_STASH_TABLE_FNV: u64 = 0x7868_6fdb_47d0_2c09;
 #[test]
 fn v6_stash_item_stats_and_values_are_pinned() {
     let game = fixture_v6();
+    let table = v6_stash_table(&game);
+    assert_eq!(table.lines().count(), game.campaign().items.len());
+    assert_eq!(
+        support::fnv1a(table.as_bytes()),
+        V6_STASH_TABLE_FNV,
+        "{table}"
+    );
+}
+
+/// The v7 loot schema (W1-21) leaves every v6 stash item's stats and value
+/// as the v6 build computed them: `loot_only` defaults to false, so each
+/// definition stays purchasable exactly when it has a shop tier.
+#[test]
+fn v6_items_keep_stats_and_value() {
+    let game = fixture_v6();
+    let table = v6_stash_table(&game);
+    assert_eq!(table.lines().count(), game.campaign().items.len());
+    assert_eq!(
+        support::fnv1a(table.as_bytes()),
+        V6_STASH_TABLE_FNV,
+        "{table}"
+    );
+    for item in &game.campaign().items {
+        let definition = item.definition();
+        assert!(!definition.loot_only, "{}", item.definition);
+        assert_eq!(definition.purchasable(), definition.tier > 0);
+    }
+}
+
+/// The v6 fixture through the SAVE_VERSION 7 migration: the auto-sell rule
+/// is off (the serde default), no attempt tracks drops or has a drop tier
+/// (a pre-v7 legacy loot path), no expedition has a pending sale, nothing
+/// was auto-sold, and each report's drop ids and quality counts come from
+/// its loot receipts (sub-step (b)); the root report's counts come from its
+/// own run record.
+#[test]
+fn v6_save_loads_with_auto_sell_off_and_empty_drop_tracking() {
+    let game = fixture_v6();
+    let c = game.campaign();
+    assert!(c.auto_sell.is_default() && !c.auto_sell.enabled);
+    assert!(
+        c.run_history
+            .iter()
+            .all(|r| (r.auto_sold_count, r.auto_sold_coins) == (0, 0))
+    );
+    let mut attempts = vec![game.attempt().unwrap()];
+    let mut reports = vec![(game.last_result().unwrap(), true)];
+    for battle in game.battles() {
+        assert!(battle.pending_auto_sell.is_empty(), "{}", battle.id);
+        attempts.extend(battle.game().attempt());
+        reports.extend(battle.game().last_result().map(|r| (r, false)));
+    }
+    assert!(attempts.len() >= 2 && reports.len() >= 2);
+    for a in attempts {
+        assert!(a.drop_ids.is_empty() && a.drop_tier.is_none(), "{}", a.id);
+    }
+    for (r, root) in reports {
+        assert!(r.auto_sold.is_empty());
+        let mut ids: Vec<u64> = r.loot_events.iter().map(|e| e.item_id).collect();
+        ids.sort_unstable();
+        assert!(!ids.is_empty(), "every v6 report here has drops");
+        assert_eq!(r.drop_ids, ids, "report {}", r.attempt_id);
+        let expected = if root {
+            c.run_history
+                .iter()
+                .find(|record| record.attempt_id == r.attempt_id && record.worker_id.is_none())
+                .expect("the root report has its run record")
+                .loot_by_quality
+                .clone()
+        } else {
+            let mut counted = horde_core::kind_map::KindMap::default();
+            for event in &r.loot_events {
+                counted[event.quality] += 1;
+            }
+            counted
+        };
+        assert_eq!(r.loot_by_quality, expected, "report {}", r.attempt_id);
+    }
+}
+
+fn v6_stash_table(game: &Game) -> String {
     let c = game.campaign();
     let mut table = String::new();
     for item in &c.items {
@@ -964,12 +1045,7 @@ fn v6_stash_item_stats_and_values_are_pinned() {
             c.item_sale_value(item.id).unwrap()
         ));
     }
-    assert_eq!(table.lines().count(), c.items.len());
-    assert_eq!(
-        support::fnv1a(table.as_bytes()),
-        V6_STASH_TABLE_FNV,
-        "{table}"
-    );
+    table
 }
 
 /// The v6 fixture through the SAVE_VERSION 7 migration: the root report is

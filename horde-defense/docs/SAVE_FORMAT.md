@@ -39,7 +39,7 @@ resave is byte-identical to the first.
 | v3 to v4 | Quality-indexed loot counters become quality-keyed maps. |
 | v4 to v5 | Ordnance counters become kind-keyed maps. |
 | v5 to v6 | Positional level progress becomes level IDs. |
-| v6 to v7 | Defender seats on expedition games and the Npc appearance back-fill (below). |
+| v6 to v7 | Defender seats on expedition games, the Npc appearance back-fill and report drop tracking (below). |
 
 ## v7
 
@@ -80,6 +80,29 @@ loadout; only the recruit's items in `reserved_items` are reserved.
 An expedition `summary` may carry an `outcome` or `acknowledged: true` only
 once its battle has settled, and lists at most 32 `fronts`.
 
+### Loot tracking and auto-sell
+
+Every key below is optional and absent at its default, so a save that never
+uses them is unchanged. Loading rejects any of these as invalid:
+
+- `campaign.auto_sell` (the rule; off by default) with `sell_below: "Poor"`,
+  or any non-default rule in an expedition game;
+- `attempt.drop_ids` that are not strictly ascending, hold more ids than the
+  attempt's `loot` or than 4096, or name id 0 or an id at or above
+  `next_item_id`; an `attempt.drop_tier` outside 1 to the highest droppable
+  item tier (absent means an attempt deployed before v7);
+- `last_result.drop_ids` with a repeated id or the bounds above (any order);
+  `last_result.loot_by_quality` summing above `loot`;
+- a `last_result.auto_sold` receipt whose `count` plus `kept_on_overflow`
+  exceeds `loot`, with more than `min(count, 12)` lines, a `by_quality` sum
+  other than `count`, line coins above `coins`, coins without a sale, or a
+  line definition that does not resolve;
+- a run record whose `auto_sold_count` exceeds its `loot`, or that has
+  `auto_sold_coins` without a count;
+- a `battles[*].pending_auto_sell` on a settled battle, or one naming id 0,
+  an id at or above the parent's `next_item_id`, an id pending for another
+  expedition, a `reserved_items` id or a root `attempt.drop_ids` id.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add
@@ -96,8 +119,16 @@ theirs at the marked slots.
    `Npc` mode whose profile has no `appearance` gain `"Female"`. This is what
    every v6 Npc deploy stamped. The serde default is `Male`. A saved
    appearance is kept.
-3. (b) Report drop tracking, then (c) the level-grant ledger and (d) rank
-   milestones, are added by their owners' commits.
+3. **(b) Report drop tracking.** The root report and every expedition report
+   with loot receipts gain `drop_ids`, the sorted, de-duplicated receipt item
+   ids, and `loot_by_quality`. The root report takes the counts of its own
+   run record (same `attempt_id`, `worker_id` null), which saw every drop;
+   otherwise the receipts are counted. A count of all zeros adds no key, and
+   saved keys are kept. A receipt without a u64 `item_id` or a known quality
+   is a migration error. The auto-sell rule, attempt drop tracking, receipts
+   and pending sales keep their defaults: off and empty.
+4. (c) The level-grant ledger and (d) rank milestones are added by their
+   owners' commits.
 
 The step adds no `acknowledged` flag, so v6 expeditions that had already
 settled never raise a notice.
