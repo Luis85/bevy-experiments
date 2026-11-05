@@ -46,6 +46,11 @@ pub enum RuntimeNotice {
         intent: SaveIntent,
         result: Result<(), String>,
     },
+    /// A user intent finished without a save (`Runtime::forbid_saves`): its
+    /// navigation still runs, but nothing was written.
+    SaveSkipped {
+        intent: SaveIntent,
+    },
     SimulationFinished,
     RecoveryCopies(Vec<PathBuf>),
     /// Expedition transfers that could not be applied to the shared campaign.

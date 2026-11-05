@@ -216,14 +216,7 @@ impl FrontendParts {
             config.practice,
             config.review().is_some_and(|r| r.reduced),
         );
-        // Explicit automated-motion fixtures use a separate temporary profile.
-        // This changes startup state only; fixed systems still own every tick.
-        if config.scenario.is_some() && !config.practice && config.motion_review() {
-            f.game.set_paused(false);
-            f.battle.construction = false;
-            f.status.message =
-                "Live motion review · progress is isolated from your campaign".into();
-        }
+        super::review::apply_motion_override(&mut f, config);
         f
     }
     /// Pure construction: touches no files and no environment variables.

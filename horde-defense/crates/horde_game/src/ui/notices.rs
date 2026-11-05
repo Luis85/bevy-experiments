@@ -77,6 +77,29 @@ pub(super) fn reset_new_battle(
 }
 
 impl UiCtx<'_> {
+    /// The navigation a finished save intent runs: after its save, or after
+    /// `RuntimeNotice::SaveSkipped` on an unsaveable review.
+    fn finish_save_intent(&mut self, intent: SaveIntent) {
+        match intent {
+            SaveIntent::Menu => {
+                self.go(Screen::Menu);
+                self.prefs.rebind = None;
+                self.battle.fire_latched = false;
+                self.runtime.clear_input();
+            }
+            SaveIntent::SettingsBack => {
+                self.go(match self.nav.return_screen {
+                    Screen::Settings => Screen::Menu,
+                    screen => screen,
+                });
+                self.prefs.rebind = None;
+                if self.nav.return_screen == Screen::Camp {
+                    self.dispatch(Command::SetPaused(self.nav.return_world_paused), "");
+                }
+            }
+            _ => {}
+        }
+    }
     pub(super) fn apply_notice(&mut self, notice: RuntimeNotice) {
         if matches!(
             &notice,
@@ -118,28 +141,7 @@ impl UiCtx<'_> {
                             };
                             self.status.message_error = false;
                         }
-                        match intent {
-                            SaveIntent::Menu => {
-                                self.go(Screen::Menu);
-                                self.prefs.rebind = None;
-                                self.battle.fire_latched = false;
-                                self.runtime.clear_input();
-                            }
-                            SaveIntent::SettingsBack => {
-                                self.go(match self.nav.return_screen {
-                                    Screen::Settings => Screen::Menu,
-                                    screen => screen,
-                                });
-                                self.prefs.rebind = None;
-                                if self.nav.return_screen == Screen::Camp {
-                                    self.dispatch(
-                                        Command::SetPaused(self.nav.return_world_paused),
-                                        "",
-                                    );
-                                }
-                            }
-                            _ => {}
-                        }
+                        self.finish_save_intent(intent);
                     }
                     Err(error) => {
                         self.status.feedback_revision =
@@ -149,6 +151,13 @@ impl UiCtx<'_> {
                         self.status.message_error = true;
                     }
                 }
+            }
+            RuntimeNotice::SaveSkipped { intent } => {
+                self.status.save_pending = self.runtime.user_save_pending();
+                self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
+                self.status.message = "Stress review: nothing is saved".into();
+                self.status.message_error = false;
+                self.finish_save_intent(intent);
             }
             RuntimeNotice::RecoveryCopies(paths) => {
                 self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);

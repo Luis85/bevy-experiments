@@ -519,6 +519,71 @@ fn stress_screen_never_requests_a_save_and_shows_no_save_error() {
     );
     assert!(!f.paths.campaign().exists());
 }
+/// No intent on the stress screen is dropped: each one finishes without a
+/// save, so the working indicator clears, Back from Settings returns to the
+/// battle and "Save and return to menu" reaches the menu.
+#[cfg(feature = "review")]
+#[test]
+fn stress_screen_finishes_every_intent_without_a_save() {
+    use crate::runner::SaveIntent;
+    let mut f = launched(&[
+        ("LASTLIGHT_REVIEW_SCREEN", "stress"),
+        ("LASTLIGHT_REVIEW_MOTION", "1"),
+    ]);
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    f.runtime.begin_frame(1);
+    f.act(|c| c.open_settings());
+    assert!(f.screen == Screen::Settings, "{:?}", f.screen);
+    f.runtime.begin_frame(2);
+    f.act(|c| c.request_save(SaveIntent::SettingsBack));
+    assert!(!f.flush_for_test(), "Back does not close the review");
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    assert!(!f.status.save_pending, "{}", f.status.message);
+    assert_eq!(f.status.message, "Stress review: nothing is saved");
+    f.runtime.begin_frame(3);
+    f.act(|c| c.request_save(SaveIntent::Manual));
+    assert!(!f.flush_for_test());
+    assert!(!f.status.save_pending, "{}", f.status.message);
+    f.runtime.begin_frame(4);
+    f.act(|c| c.request_save(SaveIntent::Menu));
+    assert!(!f.flush_for_test());
+    assert!(f.screen == Screen::Menu, "{:?}", f.screen);
+    assert!(!f.status.save_pending, "{}", f.status.message);
+    assert!(!f.status.message_error && !f.status.profile_exists);
+    let metrics = f.runtime.persistence_metrics();
+    assert_eq!(
+        (
+            metrics.completed_background_saves,
+            metrics.failed_background_saves,
+            metrics.pending
+        ),
+        (0, 0, false)
+    );
+    assert!(!f.paths.campaign().exists() && !f.paths.settings().exists());
+}
+/// The real startup (`FrontendParts::load`) of a motion stress review keeps
+/// the fixture's disclaimer rather than the generic live-motion note.
+#[cfg(feature = "review")]
+#[test]
+fn stress_disclaimer_survives_the_motion_launch() {
+    let vars = [
+        ("LASTLIGHT_REVIEW_SCREEN", "stress"),
+        ("LASTLIGHT_REVIEW_MOTION", "1"),
+    ];
+    let config = LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
+        vars.iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| (*value).into())
+    })
+    .expect("valid launch");
+    let f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    assert!(!f.game.global_paused(), "motion review runs live");
+    assert_eq!(
+        f.status.message,
+        "Synthetic stress fixture · 400 drawn + 3 expeditions · perf headroom, not a gameplay claim"
+    );
+}
 #[test]
 fn workshop_names_still_reach_the_workshop() {
     for scene in ["model-parity-x", "model-workshop"] {

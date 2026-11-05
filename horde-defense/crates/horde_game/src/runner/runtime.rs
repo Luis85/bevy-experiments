@@ -69,8 +69,9 @@ impl Runtime {
     /// Review-only, for a staged game production validation rejects (the
     /// stress scene): the periodic autosave never fires and no intent reaches
     /// storage, so no save can fail. A Quit still closes (a perf report ends
-    /// with one); other intents are dropped and the review stays on its
-    /// battle. The isolated review profile has nothing to keep.
+    /// with one); every other user intent finishes with
+    /// `RuntimeNotice::SaveSkipped`, so its navigation runs without a save.
+    /// The isolated review profile has nothing to keep.
     #[cfg(feature = "review")]
     pub fn forbid_saves(&mut self) {
         self.unsaveable = true;

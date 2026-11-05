@@ -294,9 +294,16 @@ pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
         }
         if runtime.unsaveable {
             // `Runtime::forbid_saves`: nothing reaches storage, no autosave.
+            // Every user intent still finishes, so its navigation runs.
             runtime.dirty = false;
             let intents = std::mem::take(&mut runtime.save_requests);
-            return quit || intents.contains(&SaveIntent::Quit);
+            let quit = quit || intents.contains(&SaveIntent::Quit);
+            for intent in intents {
+                if intent != SaveIntent::Autosave {
+                    ctx.notice(RuntimeNotice::SaveSkipped { intent });
+                }
+            }
+            return quit;
         }
         if runtime.dirty && runtime.simulated_ticks >= runtime.retry_save_at {
             runtime.request_save(SaveIntent::Autosave);

@@ -180,6 +180,21 @@ pub(super) fn apply_reduced_override(
     }
 }
 
+/// Explicit automated-motion fixtures use a separate temporary profile.
+/// This changes startup state only; fixed systems still own every tick. The
+/// stress fixture keeps its staged disclaimer (no gameplay claim) instead of
+/// the generic live-motion note.
+pub(super) fn apply_motion_override(f: &mut FrontendParts, config: &crate::launch::LaunchConfig) {
+    if config.scenario.is_some() && !config.practice && config.motion_review() {
+        f.game.set_paused(false);
+        f.battle.construction = false;
+        if config.scenario.as_deref() != Some("stress") {
+            f.status.message =
+                "Live motion review · progress is isolated from your campaign".into();
+        }
+    }
+}
+
 mod fixtures;
 mod matrix;
 pub(super) use matrix::prepare;
