@@ -1,6 +1,7 @@
 //! Item quality is independent of level and definition unlock tier. Quality
 //! generation uses its own counter key and never consumes the combat RNG.
 use crate::catalog::{self as shared, ContentError};
+use crate::hash;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeSet, sync::OnceLock};
 
@@ -109,13 +110,6 @@ impl QualityCatalog {
         Ok(())
     }
     pub fn roll(&self, seed: u64, attempt: u64, enemy: u64, rank: u32) -> Quality {
-        // Counter-based SplitMix avalanche with an explicit quality-purpose tag.
-        fn mix(mut value: u64) -> u64 {
-            value = value.wrapping_add(0x9E3779B97F4A7C15);
-            value = (value ^ (value >> 30)).wrapping_mul(0xBF58476D1CE4E5B9);
-            value = (value ^ (value >> 27)).wrapping_mul(0x94D049BB133111EB);
-            value ^ (value >> 31)
-        }
         let weight = |q: &QualityDefinition| {
             if rank >= q.min_rank {
                 u64::from(q.weight) + u64::from(q.weight_per_rank) * u64::from(rank.min(1000))
@@ -124,7 +118,8 @@ impl QualityCatalog {
             }
         };
         let total = self.tiers.iter().map(weight).sum::<u64>();
-        let mut roll = mix(seed ^ mix(attempt) ^ mix(enemy) ^ 0x5155_414C_4954_5901) % total;
+        // Counter-based keyed roll with an explicit quality-purpose tag.
+        let mut roll = hash::keyed(seed, attempt, enemy, hash::tags::QUALITY) % total;
         for tier in &self.tiers {
             let n = weight(tier);
             if roll < n {

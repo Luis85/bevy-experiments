@@ -10,6 +10,7 @@ pub mod ordnance;
 pub mod progression;
 pub mod quality;
 pub mod rules;
+mod schema;
 pub mod sim;
 pub mod skill_catalog;
 pub mod stats;
