@@ -8,7 +8,7 @@ use bevy_egui::egui::{self, Color32, FontId, Rect, pos2, vec2};
 use horde_core::sim::{Attempt, Event, EventKind};
 use std::collections::{BTreeMap, BTreeSet};
 const LIFE: f64 = 0.9;
-const LIMIT: usize = 24;
+pub(crate) const LIMIT: usize = 24;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Kind {
     Hit,

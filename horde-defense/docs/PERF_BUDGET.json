@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "hardware": {
+    "gpu": "NVIDIA RTX 1000 Ada Laptop",
+    "cpu": "Intel Core Ultra 9 185H",
+    "backend": "Vulkan",
+    "integrated_gpu": {
+      "status": "pending",
+      "adapter": "Intel(R) Arc(TM) Graphics",
+      "report": null
+    }
+  },
+  "sizes": {
+    "normal": { "size": "1440x900", "scale": 1.0 },
+    "small": { "size": "1050x700", "scale": 1.35 }
+  },
+  "definitions": {
+    "interface_draw_ms": "ui::draw wall time (v2 WorkPhase::Interface)",
+    "interface_total_ms": "egui pass loop + tessellation",
+    "cpu_frame_ms": "main First..Last + (extract + Render schedule - present wait) of latest completed render sample; per-sample sum; VsyncOff runs only"
+  },
+  "profiles": {
+    "dev": { "dir": "debug", "features": ["review"] },
+    "playtest": { "dir": "playtest", "features": ["review"] },
+    "shipped": { "features": [], "measured": "--smoke wall time only" }
+  },
+  "run": {
+    "warmup_frames": 180,
+    "frames": { "peak": 600, "progressed-peak": 600, "stress": 1800 },
+    "repeat_acceptance": 3
+  },
+  "baseline": {
+    "wave0": {
+      "commit": "7bd5de8",
+      "profile": "dev",
+      "vsync": true,
+      "frame_report": 2,
+      "interface_mean_ms": {
+        "peak": { "normal": 1.1904, "small": 1.0752 },
+        "progressed-peak": { "normal": 1.6128, "small": 1.4719 }
+      }
+    },
+    "v3": null
+  },
+  "scenes": {
+    "peak": {
+      "frames_over_50ms_max": 0,
+      "interface_draw_mean_ms_max": { "normal": 1.1904, "small": 1.0752 }
+    },
+    "progressed-peak": {
+      "frames_over_50ms_max": 0,
+      "interface_draw_mean_ms_max": { "normal": 1.129, "small": 1.030 },
+      "interface_total_not_above_baseline_v3": true,
+      "cpu_frame_p99_ms_max": 10.0
+    },
+    "stress": {
+      "frames_over_50ms_max": 0,
+      "cpu_frame_p99_ms_max": 10.0
+    }
+  },
+  "caps": {
+    "enemies_ceiling": 225,
+    "enemies_stress": 400,
+    "corpses_settled_drawn": 2048,
+    "corpses_collapsing_drawn": 64,
+    "particles": 128,
+    "particle_events": 64,
+    "scenes": 8,
+    "damage_popups": 24,
+    "loot_flyups": 12,
+    "fx_lifetime_max_seconds": 2.0
+  },
+  "egui": {
+    "battlefield_primitives_max": 48,
+    "primitive_growth_52_to_400_max": 2,
+    "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 72000 }
+  },
+  "save_clone": {
+    "items_min": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": ["dev", "playtest"]
+  },
+  "decisions": {
+    "pipelined_rendering": null
+  }
+}

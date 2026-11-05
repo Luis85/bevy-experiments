@@ -6,7 +6,7 @@ use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
 use horde_core::quality::{LootEvent, Quality};
 use std::collections::{BTreeMap, BTreeSet};
 const LIFETIME: f64 = 1.5;
-const LIMIT: usize = 12;
+pub(crate) const LIMIT: usize = 12;
 #[derive(Clone)]
 struct Flyup {
     receipt: LootEvent,

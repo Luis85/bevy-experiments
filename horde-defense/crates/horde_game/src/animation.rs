@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, VecDeque};
 
 pub const MAX_SCENES: usize = 8;
 pub const MAX_PARTICLES: usize = 128;
-const EVENT_BUDGET: usize = 64;
+pub(crate) const EVENT_BUDGET: usize = 64;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ActorPose {

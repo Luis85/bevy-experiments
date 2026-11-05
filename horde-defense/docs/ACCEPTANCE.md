@@ -45,6 +45,14 @@ The later user requests extend the GDD. World validation covers country IDs, pop
 
 Strategic tests cover independent recruited equipment, exclusive survivor roles and equipment reservations, seeded continuation, containment idempotency, and failure reopening a country without free coins. Guard combat is a documented scenario adapter using the shared rules resolver; each guard and each active hostile group receive one action at their own legal one-second boundary. Parallel battle ownership and live reward merging belong to the simulation suite. No offline rewards or pressure are implemented.
 
+## Pending human checks
+
+These have no automated substitute and do not block a wave. The performance gates themselves live in `docs/PERF_BUDGET.json`.
+
+| Check | Protocol | Status |
+|---|---|---|
+| Integrated-GPU run | `measure_performance.ps1 -Adapter "Intel(R) Arc(TM) Graphics" -VsyncOff` on progressed-peak and stress at both sizes (informational, not a gate). Then set `hardware.integrated_gpu` in `docs/PERF_BUDGET.json` to `status` `measured` with the report path in `report`. | pending human check |
+
 ## Explicit limits
 
 The game does not claim implementation of all GURPS rules or supplements. The supported reference is Fourth Edition Lite August 2004 with original fixed-lane, shared-contact, renewable-reserve, campaign-recovery and strategic-garrison adapters. Unified melee skill remains an explicit adapter; supported muscle-powered profiles now scale from the NPC's actual Strength through the verified swing procedure. Independent HP/FP buying and informational IQ training are disabled rather than sold without useful supported effects. A digital-game distribution license is not established by the reference PDF's availability.

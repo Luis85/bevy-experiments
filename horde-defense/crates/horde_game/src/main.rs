@@ -15,6 +15,7 @@ mod gear_appearance;
 mod inspector;
 mod launch;
 mod logging;
+mod perf_budget;
 mod player_model;
 mod profile;
 #[cfg(test)]
