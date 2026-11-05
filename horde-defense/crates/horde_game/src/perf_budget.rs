@@ -281,6 +281,64 @@ mod tests {
         }
     }
 
+    /// The `-Scene` values of the `ValidateSet` on the `$Scene` parameter of
+    /// `scripts/measure_performance.ps1`, without `all`.
+    fn script_scenes(script: &str) -> BTreeSet<String> {
+        let line = script
+            .lines()
+            .find(|line| line.contains("ValidateSet(") && line.contains("$Scene"))
+            .expect("measure_performance.ps1 declares -Scene with a ValidateSet");
+        let set = line
+            .split("ValidateSet(")
+            .nth(1)
+            .and_then(|rest| rest.split(')').next())
+            .expect("a closed ValidateSet");
+        set.split(',')
+            .map(|value| value.trim().trim_matches(['\'', '"']).to_owned())
+            .filter(|value| !value.is_empty() && value != "all")
+            .collect()
+    }
+
+    /// The script's `-Scene` set, the budget's gated scenes and the review
+    /// registry's perf fixtures that run live (motion, no input save) are one
+    /// set, so a scene can never be measured without a budget or gated
+    /// without a staged fixture.
+    #[test]
+    fn perf_scenes_agree_across_script_budget_and_review_matrix() {
+        use crate::review_scenes::{REVIEW_SCENES, SceneKind, accepts};
+        const SCRIPT: &str = include_str!("../../../scripts/measure_performance.ps1");
+        let script = script_scenes(SCRIPT);
+        let json = budget();
+        let budget_scenes: BTreeSet<String> = keys(object(&json, "/scenes"))
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        let matrix: BTreeSet<String> = REVIEW_SCENES
+            .iter()
+            .filter(|scene| scene.perf && scene.kind != SceneKind::NeedsInputSave)
+            .map(|scene| scene.name.to_owned())
+            .collect();
+        assert_eq!(
+            script, budget_scenes,
+            "script -Scene vs PERF_BUDGET.json scenes"
+        );
+        assert_eq!(
+            matrix, budget_scenes,
+            "review perf scenes vs PERF_BUDGET.json scenes"
+        );
+        for name in &matrix {
+            let scene = REVIEW_SCENES
+                .iter()
+                .find(|scene| scene.name == name)
+                .unwrap();
+            assert!(
+                scene.motion,
+                "{name}: the script runs it live (LASTLIGHT_REVIEW_MOTION)"
+            );
+            assert!(accepts(name, true), "{name}: a review build stages it");
+        }
+    }
+
     /// 12.0 ms is only the pipelined-rendering decision threshold (ruling
     /// W-12): no gate outside `decisions` may carry it.
     #[test]

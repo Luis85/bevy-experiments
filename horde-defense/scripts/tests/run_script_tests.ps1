@@ -1,5 +1,5 @@
 #requires -Version 5.1
-# Self-tests for scripts/lib/Native.ps1 under Windows PowerShell 5.1.
+# Self-tests for scripts/lib/Native.ps1 and scripts/measure_performance.ps1 (with a fake game exe) under Windows PowerShell 5.1.
 # Run: powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/tests/run_script_tests.ps1
 # The runner is expected to pass with its own output redirected. Prints PASS or FAIL and exits 0 or 1.
 [CmdletBinding()]
@@ -76,6 +76,33 @@ public static class LastLightNativeHelper {
             Process child = Process.Start(info);
             File.WriteAllText(args[1], Process.GetCurrentProcess().Id + " " + child.Id);
             Thread.Sleep(int.Parse(args[2]) * 1000);
+            return 0;
+        }
+        // Copied to <target>\debug\horde-defense.exe it stands in for the game in measure_performance.ps1 runs.
+        if (args.Length == 1 && args[0] == "--version") { Console.WriteLine("horde-defense fake"); return 0; }
+        if (args.Length == 1 && args[0] == "--list-scenes") {
+            Console.WriteLine("name\tkind\tmotion\tperf\tpractice\tprimary\tbefore_proxy\tsince_wave");
+            Console.WriteLine("menu\tStill\ttrue\tfalse\tfalse\t\t\t0");
+            Console.WriteLine("progressed-peak\tStill\ttrue\ttrue\tfalse\t\t\t0");
+            Console.WriteLine("peak\tStill\ttrue\ttrue\tfalse\t\t\t0");
+            Console.WriteLine("stress\tMotionOnly\ttrue\ttrue\tfalse\t\tmax-lanes\t1");
+            return 0;
+        }
+        string report = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_REPORT");
+        if (args.Length == 0 && !String.IsNullOrEmpty(report)) {
+            int unfocused = 0;
+            string once = Environment.GetEnvironmentVariable("HORDE_FAKE_UNFOCUSED_ONCE");
+            if (!String.IsNullOrEmpty(once) && File.Exists(once)) { File.Delete(once); unfocused = 3; }
+            if (Environment.GetEnvironmentVariable("HORDE_FAKE_UNFOCUSED_ALWAYS") == "1") { unfocused = 2; }
+            string mode = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PRESENT_MODE") == "autonovsync" ? "AutoNoVsync" : "Fifo";
+            string pipelined = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PIPELINED") == "0" ? "false" : "true";
+            File.WriteAllText(report, "{\"version\":3,\"scene\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN")
+                + "\",\"sample_frames\":" + Environment.GetEnvironmentVariable("LASTLIGHT_PERF_FRAMES")
+                + ",\"completed_sample_target\":true,\"paused\":false,\"unfocused_sample_frames\":" + unfocused
+                + ",\"frames_over_50ms\":0,\"work_mean_ms\":[0.4,0.0,1.0]"
+                + ",\"phases\":{\"cpu_frame_ms\":{\"mean\":4.0,\"p50\":4.0,\"p95\":4.5,\"p99\":5.0,\"max\":6.0},\"interface_total_ms\":{\"mean\":1.0,\"p50\":1.0,\"p95\":1.2,\"p99\":1.3,\"max\":1.5}}"
+                + ",\"present\":{\"requested_mode\":\"" + mode + "\",\"pipelined_rendering\":" + pipelined + "}"
+                + ",\"build\":{\"profile_label\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PROFILE") + "\"}}");
             return 0;
         }
         return 2;
@@ -231,6 +258,79 @@ try {
         $threw = $false
         try { Invoke-Cargo -Arguments @('no-such-subcommand-lastlight') -LogStem (Join-Path $temporary 'logs\cargo-bad') -TimeoutSeconds 60 | Out-Null } catch { $threw = $true }
         Assert-True $threw 'failing cargo did not throw'
+    }
+
+    $measure = Join-Path $scriptsDirectory 'measure_performance.ps1'
+    function Invoke-Measure([string[]]$Arguments, [string]$Stem) {
+        $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $measure) + $Arguments
+        return Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\$Stem") -TimeoutSeconds 300
+    }
+    function New-FakeTarget([string]$Target) {
+        New-Item -ItemType Directory -Force -Path (Join-Path $Target 'debug') | Out-Null
+        Copy-Item -LiteralPath $helper -Destination (Join-Path $Target 'debug\horde-defense.exe')
+    }
+
+    Test-Case 'measure_performance -SelfTest gives 0/1/1/2 on the fixtures under redirect' {
+        $r = Invoke-Measure @('-SelfTest') 'measure-selftest'
+        $out = Read-Log $r.Out
+        Assert-Equal 0 $r.ExitCode ("self-test exit code; out: $out err: " + (Read-Log $r.Err))
+        foreach ($line in @('within-budget -> 0', 'over-budget-cpu -> 1', 'over-50ms -> 1', 'unfocused -> 2', 'SELFTEST PASS')) {
+            Assert-True ($out.Contains($line)) "self-test output lacks '$line'"
+        }
+        Assert-Equal '' (Read-Log $r.Err).Trim() 'self-test stderr'
+    }
+
+    Test-Case 'measure_performance uses a relative CARGO_TARGET_DIR and reruns an unfocused run once' {
+        $relative = "target\script-tests-$PID-relative"
+        $full = [IO.Path]::GetFullPath((Join-Path $workspace $relative))
+        try {
+            New-FakeTarget $full
+            $once = Join-Path $temporary 'unfocused-once'
+            Write-Utf8NoBom -Path $once -Text 'x'
+            $env:HORDE_FAKE_UNFOCUSED_ONCE = $once
+            $env:CARGO_TARGET_DIR = $relative
+            $out = Join-Path $temporary 'perf-relative'
+            $r = Invoke-Measure @('-Scene', 'all', '-Profile', 'dev', '-NoBuild', '-NoBudget', '-OutputDirectory', $out) 'measure-relative'
+            Assert-Equal 0 $r.ExitCode ("exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
+            $reports = @(Get-ChildItem -LiteralPath $out -Filter '*.json' -File | Where-Object { $_.Name -ne 'summary.json' -and $_.Name -notlike '*.invalid.json' } | ForEach-Object { $_.Name } | Sort-Object)
+            Assert-Equal 'peak-normal.json,peak-small.json,progressed-peak-normal.json,progressed-peak-small.json,stress-normal.json,stress-small.json' ($reports -join ',') 'v3 reports'
+            Assert-True (Test-Path -LiteralPath (Join-Path $out 'peak-normal.invalid.json')) 'the rejected attempt was not kept'
+            Assert-True (Test-Path -LiteralPath (Join-Path $out 'summary.md')) 'summary.md'
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            Assert-Equal 0 $summary.exit_code 'summary exit code'
+            Assert-Equal $full $summary.cargo_target_dir 'resolved target'
+            Assert-Equal 2 $summary.runs[0].attempts 'first run attempts'
+            Assert-Equal 1 $summary.runs[1].attempts 'second run attempts'
+            Assert-Equal 'Fifo' $summary.runs[0].present_mode 'present mode echo'
+            Assert-True (-not (Test-Path -LiteralPath $once)) 'the fake never saw the first launch'
+        }
+        finally {
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_UNFOCUSED_ONCE', $null, 'Process')
+            if (Test-Path -LiteralPath $full) { Remove-Item -LiteralPath $full -Recurse -Force }
+        }
+    }
+
+    Test-Case 'measure_performance uses a rooted CARGO_TARGET_DIR and exits 2 when the rerun is invalid too' {
+        $rooted = Join-Path $temporary 'perf-rooted-target'
+        try {
+            New-FakeTarget $rooted
+            $env:HORDE_FAKE_UNFOCUSED_ALWAYS = '1'
+            $env:CARGO_TARGET_DIR = $rooted
+            $out = Join-Path $temporary 'perf-rooted'
+            $r = Invoke-Measure @('-Scene', 'peak', '-VsyncOff', '-Pipelined', 'off', '-NoBuild', '-OutputDirectory', $out) 'measure-rooted'
+            Assert-Equal 2 $r.ExitCode ("exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            Assert-Equal $rooted $summary.cargo_target_dir 'resolved target'
+            Assert-Equal 'AutoNoVsync' $summary.present_mode 'requested present mode'
+            Assert-Equal 2 @($summary.runs).Count 'one run per size'
+            foreach ($run in @($summary.runs)) {
+                Assert-Equal 2 $run.attempts "$($run.file) attempts"
+                Assert-Equal 'AutoNoVsync' $run.present_mode "$($run.file) present mode echo"
+                Assert-Equal $false $run.pipelined_rendering "$($run.file) pipelined echo"
+                Assert-Equal 'unfocused_sample_frames 2, expected 0' (@($run.problems) -join '; ') "$($run.file) problems"
+            }
+        }
+        finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_UNFOCUSED_ALWAYS', $null, 'Process') }
     }
 }
 finally {

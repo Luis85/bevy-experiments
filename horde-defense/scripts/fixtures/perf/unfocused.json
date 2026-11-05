@@ -1,0 +1,101 @@
+{
+  "fixture": "unfocused",
+  "description": "VSync-on dev run where progressed-peak normal lost focus for 4 sample frames: invalid evidence (exit 2) wins over the over-budget interface_draw of progressed-peak small.",
+  "run": {
+    "profile": "dev",
+    "vsync_off": false,
+    "pipelined": "default"
+  },
+  "reports": [
+    {
+      "scene": "progressed-peak",
+      "size": "normal",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": false,
+        "unfocused_sample_frames": 4,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.05
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 11.48,
+            "p50": 11.15,
+            "p95": 14.76,
+            "p99": 16.4,
+            "max": 19.68
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "Fifo",
+          "source": "settings",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    },
+    {
+      "scene": "progressed-peak",
+      "size": "small",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.5
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 11.34,
+            "p50": 11.02,
+            "p95": 14.58,
+            "p99": 16.2,
+            "max": 19.44
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "Fifo",
+          "source": "settings",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    }
+  ]
+}

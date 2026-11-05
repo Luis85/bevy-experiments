@@ -1,0 +1,146 @@
+{
+  "fixture": "over-50ms",
+  "description": "VsyncOff dev run with cpu_frame p99 inside the gate, but one progressed-peak repeat has a frame over 50 ms; the worst repeat counts.",
+  "run": {
+    "profile": "dev",
+    "vsync_off": true,
+    "pipelined": "default"
+  },
+  "reports": [
+    {
+      "scene": "progressed-peak",
+      "size": "normal",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.0
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 6.23,
+            "p50": 6.05,
+            "p95": 8.01,
+            "p99": 8.9,
+            "max": 10.68
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "AutoNoVsync",
+          "source": "launch-override",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    },
+    {
+      "scene": "progressed-peak",
+      "size": "normal",
+      "repeat": 2,
+      "report": {
+        "version": 3,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 1,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.0
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 6.37,
+            "p50": 6.19,
+            "p95": 8.19,
+            "p99": 9.1,
+            "max": 10.92
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "AutoNoVsync",
+          "source": "launch-override",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    },
+    {
+      "scene": "progressed-peak",
+      "size": "normal",
+      "repeat": 3,
+      "report": {
+        "version": 3,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.0
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 6.3,
+            "p50": 6.12,
+            "p95": 8.1,
+            "p99": 9.0,
+            "max": 10.8
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "AutoNoVsync",
+          "source": "launch-override",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    }
+  ]
+}

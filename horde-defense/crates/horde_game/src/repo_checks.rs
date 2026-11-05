@@ -16,7 +16,6 @@ const PS7_ALLOWLIST: &[&str] = &[
 
 /// Not yet ported, with the commit that ports each and removes it from here.
 const PENDING: &[(&str, &str)] = &[
-    ("measure_performance.ps1", "W1-36"),
     ("package_playtest.ps1", "W7-02"),
     ("verify_playtest.ps1", "W7-02"),
 ];
