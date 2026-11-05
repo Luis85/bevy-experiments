@@ -105,6 +105,15 @@ pub struct Campaign {
     /// the operation-chain sync; v6 saves claim the milestones they reached.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub milestones_claimed: BTreeSet<u32>,
+    /// The named preset whose catalogue extras a Custom `balance_settings`
+    /// keeps (a Hard player who edits lanes keeps the Hard rules). Normal
+    /// whenever the preset is named, never Custom; copied into workers and
+    /// on the operation-chain sync. v6 saves load as Normal.
+    #[serde(
+        default = "crate::balance::normal_preset",
+        skip_serializing_if = "crate::balance::is_normal_preset"
+    )]
+    pub balance_extras_basis: crate::balance::BalancePreset,
 }
 impl Default for Campaign {
     fn default() -> Self {
@@ -213,6 +222,7 @@ impl Default for Campaign {
             reserved_recruit: None,
             auto_sell: AutoSellRule::default(),
             milestones_claimed: BTreeSet::new(),
+            balance_extras_basis: crate::balance::BalancePreset::Normal,
         }
     }
 }
@@ -228,14 +238,38 @@ impl Campaign {
         &mut self,
         mut settings: crate::balance::BalanceSettings,
     ) -> Result<(), String> {
+        use crate::balance::{BalancePreset, BalanceSettings};
         settings.validate()?;
-        if settings.preset != crate::balance::BalancePreset::Custom
-            && settings != crate::balance::BalanceSettings::for_preset(settings.preset)
+        let requested = settings.preset;
+        if requested != BalancePreset::Custom && settings != BalanceSettings::for_preset(requested)
         {
-            settings.preset = crate::balance::BalancePreset::Custom;
+            settings.preset = BalancePreset::Custom;
         }
+        let previous = self.balance_settings.preset;
+        self.balance_extras_basis = if settings.preset != BalancePreset::Custom {
+            BalancePreset::Normal
+        } else if requested != BalancePreset::Custom {
+            requested
+        } else if previous != BalancePreset::Custom {
+            previous
+        } else {
+            self.balance_extras_basis
+        };
         self.balance_settings = settings;
         Ok(())
+    }
+    /// The named preset whose catalogue extras apply: the preset itself, or
+    /// for Custom the preset the edit came from.
+    pub fn balance_extras_preset(&self) -> crate::balance::BalancePreset {
+        if self.balance_settings.preset == crate::balance::BalancePreset::Custom {
+            self.balance_extras_basis
+        } else {
+            self.balance_settings.preset
+        }
+    }
+    /// The catalogue extras the next deployment uses.
+    pub fn balance_extras(&self) -> crate::balance::PresetExtras {
+        crate::balance::PresetExtras::for_preset(self.balance_extras_preset())
     }
     pub fn arena_geometry(&self) -> (u8, f32) {
         self.balance_settings.geometry(self.player.level)
@@ -276,6 +310,7 @@ impl Campaign {
             reserved_recruit: None,
             auto_sell: AutoSellRule::default(),
             milestones_claimed: self.milestones_claimed.clone(),
+            balance_extras_basis: self.balance_extras_basis,
         }
     }
     pub fn choose_survivor(&mut self, id: crate::survivors::SurvivorId) -> Result<(), String> {
@@ -288,6 +323,12 @@ impl Campaign {
     }
     pub fn validate(&self) -> Result<(), String> {
         self.balance_settings.validate()?;
+        if self.balance_extras_basis == crate::balance::BalancePreset::Custom
+            || (self.balance_settings.preset != crate::balance::BalancePreset::Custom
+                && self.balance_extras_basis != crate::balance::BalancePreset::Normal)
+        {
+            return Err("Invalid balance extras basis".into());
+        }
         self.auto_sell.validate()?;
         if self.next_run_id == 0 || self.run_history.windows(2).any(|p| p[0].id >= p[1].id) {
             return Err("Invalid run history sequence".into());

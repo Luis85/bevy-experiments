@@ -313,6 +313,7 @@ impl Game {
                 }
                 if battle.country_operation && !report.country_freed {
                     battle.game.campaign.balance_settings = self.campaign.balance_settings.clone();
+                    battle.game.campaign.balance_extras_basis = self.campaign.balance_extras_basis;
                     battle.game.campaign.victories = self.campaign.victories;
                     battle.game.campaign.threat_revision = 1;
                     battle.game.campaign.player.level = self.campaign.player.level;
