@@ -1,10 +1,12 @@
 //! Defender identity (W1-10): the public `DefenderId`, the saved
 //! `DefenderSeat`, `resolve`, the recruit identity table and the plain labels
 //! that replace Rust `Debug` names in player text; and (W1-11) the appended
-//! `RecruitStatus::Defending` with `reserve_defender` / `release_defender`.
+//! `RecruitStatus::Defending` with `reserve_defender` / `release_defender`;
+//! and (W1-12) the typed `DefenseInProgress` / `DefenderUnavailable` errors
+//! with the Defending pre-checks in `Game::apply`.
 use horde_core::{
     campaign::{Campaign, NpcTraining},
-    command::Command,
+    command::{Command, CommandError},
     content::{Mode, Policy},
     defenders::{
         DefenderBlocker, DefenderId, DefenderSeat, OriginTrait, RECRUIT_IDENTITIES,
@@ -380,4 +382,128 @@ fn world_tick_does_not_claim_for_defending_or_deployed_recruits() {
     assert_eq!(npc(ready).awarded, was(ready).awarded + 1, "Ready claims");
     assert_eq!(npc(defending), was(defending), "Defending must not claim");
     assert_eq!(npc(away), was(away), "Deployed must not claim");
+}
+
+fn every_blocker() -> Vec<DefenderBlocker> {
+    vec![
+        DefenderBlocker::Locked {
+            node_id: skills().nodes[0].id.clone(),
+        },
+        DefenderBlocker::Guarding {
+            country_id: world().countries[0].id.clone(),
+        },
+        DefenderBlocker::OnExpedition { battle: 3 },
+        DefenderBlocker::Defending,
+        DefenderBlocker::InvalidLoadout {
+            reason: "Missing ranged weapon".into(),
+        },
+    ]
+}
+
+#[test]
+fn defender_blockers_have_plain_display() {
+    let mut texts = vec![CommandError::DefenseInProgress.to_string()];
+    for blocker in every_blocker() {
+        assert_eq!(blocker.to_string(), blocker.label());
+        for defender in [DefenderId::Player, DefenderId::Mara, DefenderId::Recruit(2)] {
+            let error = CommandError::DefenderUnavailable {
+                defender,
+                blocker: blocker.clone(),
+            };
+            let text = error.to_string();
+            assert!(text.contains(&blocker.label()), "{text}");
+            texts.push(text);
+        }
+    }
+    for text in &texts {
+        assert!(is_human(text), "not a player-facing message: {text:?}");
+    }
+    assert_eq!(
+        CommandError::DefenseInProgress.to_string(),
+        "Only possible between defenses"
+    );
+}
+
+#[test]
+fn defending_recruit_commands_return_typed_defender_unavailable() {
+    let mut ready = liberated_game(4);
+    // Expeditions need the introductory attempt behind the player.
+    ready.staging().campaign().attempts = 1;
+    let origin = ready.campaign().world.cleared[1].clone();
+    let id = recruit(&mut ready, &origin);
+    for _ in 0..4 {
+        ready.apply(&Command::BuyRecruitPoint(id)).unwrap();
+    }
+    let item = ready.strategy().roster[0].npc.loadout[0];
+    let frontier = world()
+        .countries
+        .iter()
+        .find(|c| {
+            ready.campaign().world.can_enter(&c.id)
+                && !ready.campaign().world.cleared.contains(&c.id)
+                && c.level_count() > 1
+        })
+        .expect("an enterable front")
+        .id
+        .clone();
+    let commands = [
+        Command::AssignGuard {
+            id,
+            country: origin.clone(),
+        },
+        Command::DeploySurvivor {
+            id,
+            country: origin.clone(),
+            stage: 0,
+        },
+        Command::CountryOperation {
+            id,
+            country: frontier,
+        },
+        Command::TrainRecruit {
+            id,
+            training: NpcTraining::Guns,
+        },
+        Command::EquipRecruit { id, item },
+        Command::BuyRecruitPoint(id),
+        Command::SetRecruitPolicy {
+            id,
+            policy: Policy::Guardian,
+        },
+    ];
+    // Control: each command is accepted for the same recruit while Ready.
+    for command in &commands {
+        let mut game = ready.clone();
+        game.apply(command)
+            .unwrap_or_else(|e| panic!("{command:?} on a Ready recruit: {e}"));
+    }
+
+    let mut defending = ready.clone();
+    defending.staging().strategy().reserve_defender(id).unwrap();
+    let before = serde_json::to_value(&defending).unwrap();
+    for command in &commands {
+        assert_eq!(
+            defending.apply(command),
+            Err(CommandError::DefenderUnavailable {
+                defender: DefenderId::Recruit(id),
+                blocker: DefenderBlocker::Defending,
+            }),
+            "{command:?}"
+        );
+        assert_eq!(
+            serde_json::to_value(&defending).unwrap(),
+            before,
+            "{command:?}"
+        );
+    }
+    // Other recruits keep their existing errors: an unknown id is still
+    // UnknownSurvivor, not a defender error.
+    assert_eq!(
+        defending.apply(&Command::SetRecruitPolicy {
+            id: id + 100,
+            policy: Policy::Guardian,
+        }),
+        Err(CommandError::UnknownSurvivor)
+    );
+    assert_eq!(serde_json::to_value(&defending).unwrap(), before);
 }

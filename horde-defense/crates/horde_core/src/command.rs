@@ -4,6 +4,7 @@
 use crate::balance::BalanceSettings;
 use crate::campaign::NpcTraining;
 use crate::content::{ItemDefId, Mode, Policy, StructureKind};
+use crate::defenders::{DefenderBlocker, DefenderId};
 use crate::sim::{Game, JourneyContinuation};
 use crate::strategy::RecruitStatus;
 use crate::survivors::SurvivorId;
@@ -120,6 +121,23 @@ pub enum Command {
     },
 }
 
+impl Command {
+    /// The roster recruit this command acts on, for the commands a recruit
+    /// defending the main run must refuse (see [`Game::apply`]).
+    fn defender_gated_recruit(&self) -> Option<u64> {
+        match self {
+            Self::AssignGuard { id, .. }
+            | Self::DeploySurvivor { id, .. }
+            | Self::CountryOperation { id, .. }
+            | Self::TrainRecruit { id, .. }
+            | Self::EquipRecruit { id, .. }
+            | Self::BuyRecruitPoint(id)
+            | Self::SetRecruitPolicy { id, .. } => Some(*id),
+            _ => None,
+        }
+    }
+}
+
 /// What an applied command produced.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CommandOutcome {
@@ -143,6 +161,13 @@ pub enum CommandError {
     RecruitNotReady,
     /// A campaign, strategy or simulation rule rejected the command.
     Rejected(String),
+    /// The command is only allowed between defenses, with no live attempt.
+    DefenseInProgress,
+    /// The named defender cannot take this command right now.
+    DefenderUnavailable {
+        defender: DefenderId,
+        blocker: DefenderBlocker,
+    },
 }
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -162,6 +187,8 @@ impl fmt::Display for CommandError {
                 f.write_str("Recall the survivor before changing their preparation policy")
             }
             Self::Rejected(message) => f.write_str(message),
+            Self::DefenseInProgress => f.write_str("Only possible between defenses"),
+            Self::DefenderUnavailable { blocker, .. } => write!(f, "{blocker}"),
         }
     }
 }
@@ -181,6 +208,9 @@ impl Game {
     /// every other arm relies on the atomicity of the domain method it calls.
     pub fn apply(&mut self, command: &Command) -> Result<CommandOutcome, CommandError> {
         use CommandOutcome::{Amount, Applied, Id};
+        if let Some(id) = command.defender_gated_recruit() {
+            self.reject_defending_recruit(id)?;
+        }
         Ok(match command {
             Command::ContinueJourney => match self.continue_journey()? {
                 JourneyContinuation::Deployed => Applied,
@@ -408,6 +438,26 @@ impl Game {
                 Amount(u64::from(worker.salvage(*structure)?))
             }
         })
+    }
+}
+
+impl Game {
+    /// The typed pre-check for recruit commands: a recruit defending the main
+    /// run cannot be guarded, dispatched, trained, re-equipped or re-tasked.
+    /// Unknown ids fall through to each command's own `UnknownSurvivor` path.
+    fn reject_defending_recruit(&self, id: u64) -> Result<(), CommandError> {
+        let defending = self
+            .strategy
+            .roster
+            .iter()
+            .any(|r| r.id == id && r.status == RecruitStatus::Defending);
+        if defending {
+            return Err(CommandError::DefenderUnavailable {
+                defender: DefenderId::Recruit(id),
+                blocker: DefenderBlocker::Defending,
+            });
+        }
+        Ok(())
     }
 }
 
