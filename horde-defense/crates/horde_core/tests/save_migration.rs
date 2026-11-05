@@ -45,12 +45,14 @@ mod support;
 
 use horde_core::campaign::{BodyAttribute, NpcTraining};
 use horde_core::content::{EnemyKind, ItemDefId, Mode, StructureKind};
+use horde_core::defenders::DefenderId;
 use horde_core::ordnance::OrdnanceKind;
 use horde_core::quality::Quality;
-use horde_core::sim::{Game, Input, NpcManeuver, Outcome, SAVE_VERSION, smoke_input};
+use horde_core::sim::{Game, Input, NpcManeuver, Outcome, SAVE_VERSION, SaveError, smoke_input};
 use horde_core::skill_catalog::unlocks;
 use horde_core::status::StatusId;
 use horde_core::strategy::RecruitStatus;
+use horde_core::survivors::Appearance;
 
 const FIXTURE: &str = include_str!("fixtures/save_v1.json");
 const FIXTURE_V2: &str = include_str!("fixtures/save_v2.json");
@@ -968,4 +970,113 @@ fn v6_stash_item_stats_and_values_are_pinned() {
         V6_STASH_TABLE_FNV,
         "{table}"
     );
+}
+
+/// The v6 fixture through the SAVE_VERSION 7 migration: the root report is
+/// Mara's (Npc, keyless), the root attempt is the player's, and every worker
+/// attempt and report sits in its expedition's recruit seat.
+#[test]
+fn v6_fixture_defenders_resolve() {
+    let game = fixture_v6();
+    assert_eq!(game.attempt().unwrap().defender(), DefenderId::Player);
+    assert_eq!(game.last_result().unwrap().defender(), DefenderId::Mara);
+    let (mut attempts, mut reports) = (0, 0);
+    for battle in game.battles() {
+        let seat = DefenderId::Recruit(battle.recruit_id);
+        if let Some(a) = battle.game().attempt() {
+            assert_eq!(a.defender(), seat, "expedition {}", battle.id);
+            attempts += 1;
+        }
+        if let Some(r) = battle.game().last_result() {
+            assert_eq!(r.defender(), seat, "expedition {}", battle.id);
+            reports += 1;
+        }
+    }
+    assert!(attempts >= 1 && reports >= 1, "{attempts} {reports}");
+    // The seat keys are written for workers only, and load-save-load-save is
+    // byte-identical.
+    let dir = std::env::temp_dir();
+    let path = |n: u8| {
+        dir.join(format!(
+            "lastlight-v6-seats-{n}-{}.json",
+            std::process::id()
+        ))
+    };
+    game.save(&path(1)).unwrap();
+    let first = std::fs::read(path(1)).unwrap();
+    Game::load(&path(1)).unwrap().save(&path(2)).unwrap();
+    let second = std::fs::read(path(2)).unwrap();
+    for n in [1, 2] {
+        for extension in ["json", "bak"] {
+            let _ = std::fs::remove_file(path(n).with_extension(extension));
+        }
+    }
+    assert!(first == second, "the second resave is byte-identical");
+    let envelope: serde_json::Value = serde_json::from_slice(&first).unwrap();
+    let payload: serde_json::Value =
+        serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+    assert!(payload["attempt"].get("defender").is_none());
+    assert!(payload["last_result"].get("defender").is_none());
+    for battle in payload["battles"].as_array().unwrap() {
+        let seat = serde_json::json!({"Recruit": battle["recruit_id"]});
+        for key in ["attempt", "last_result"] {
+            if battle["game"][key].is_object() {
+                assert_eq!(battle["game"][key]["defender"], seat, "{key}");
+            }
+        }
+    }
+}
+
+/// A v6 Npc attempt saved without an appearance loads as Female through
+/// `Game::from_payload`; a current-version payload keeps the serde default.
+#[test]
+fn v6_npc_attempt_without_appearance_loads_female_through_from_payload() {
+    let mut value = serde_json::to_value(support::game(Mode::Npc)).unwrap();
+    value["attempt"]["profile"]
+        .as_object_mut()
+        .unwrap()
+        .remove("appearance");
+    let migrated = Game::from_payload(value.clone(), 6).unwrap();
+    assert_eq!(
+        migrated.attempt().unwrap().profile.appearance,
+        Appearance::Female
+    );
+    let current = Game::from_payload(value, SAVE_VERSION).unwrap();
+    assert_eq!(
+        current.attempt().unwrap().profile.appearance,
+        Appearance::Male
+    );
+}
+
+#[test]
+fn decode_rejects_version_8() {
+    assert_eq!(SAVE_VERSION, 7);
+    let payload = serde_json::to_string(&Game::default()).unwrap();
+    let envelope = |version: u32| {
+        serde_json::to_vec(&serde_json::json!({
+            "version": version,
+            "checksum": support::fnv1a(payload.as_bytes()),
+            "payload": payload,
+        }))
+        .unwrap()
+    };
+    assert!(Game::decode_save_generation(&envelope(7)).is_ok());
+    assert!(matches!(
+        Game::decode_save_generation(&envelope(8)),
+        Err(SaveError::UnsupportedVersion(8))
+    ));
+    let value: serde_json::Value = serde_json::from_str(&payload).unwrap();
+    for version in [0, 8] {
+        assert!(
+            matches!(
+                Game::from_payload(value.clone(), version),
+                Err(SaveError::UnsupportedVersion(v)) if v == version
+            ),
+            "{version}"
+        );
+    }
+    // Every supported version decodes through the same seam.
+    for version in 1..=SAVE_VERSION {
+        Game::from_payload(value.clone(), version).unwrap();
+    }
 }

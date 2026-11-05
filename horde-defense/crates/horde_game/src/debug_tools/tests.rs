@@ -404,8 +404,45 @@ fn write_equipped_sale_recording() {
     runtime.finish_storage_for_test();
 }
 
+/// A recording made by an older build loads its initial state the way that
+/// build's save would load here: migrated, reconciled and validated through
+/// `Game::from_payload`. A current-version initial state is taken as recorded.
 #[test]
-fn v6_equipped_sale_recording_replays_to_its_recorded_digest() {
+fn v6_recording_initial_state_goes_through_from_payload() {
+    use horde_core::sim::{RULESET_VERSION, SAVE_VERSION};
+    horde_core::catalog::init_catalogs().unwrap();
+    let game = Game::default();
+    let header = |version: u32, initial: serde_json::Value| {
+        Line::Header(Header {
+            format: FORMAT,
+            seed: game.seed(),
+            version,
+            ruleset: RULESET_VERSION,
+            content_fingerprint: hex(horde_core::catalog::content_fingerprint()),
+            start_tick: 0,
+            initial,
+        })
+    };
+    // A pre-journey save: reconciling it on load derives the journey flags,
+    // so the loaded and the raw state differ.
+    let mut initial = serde_json::to_value(&game).unwrap();
+    initial["campaign"]["journey_revision"] = 0.into();
+    let loaded = Game::from_payload(initial.clone(), 6).unwrap();
+    let raw: Game = serde_json::from_value(initial.clone()).unwrap();
+    assert_ne!(loaded.state_digest(), raw.state_digest());
+    let old = replay(vec![header(6, initial.clone())]).unwrap();
+    assert_eq!((old.ticks, old.digest), (0, loaded.state_digest()));
+    let current = replay(vec![header(SAVE_VERSION, initial)]).unwrap();
+    assert_eq!(current.digest, raw.state_digest());
+    // An old initial state that cannot be migrated is an error.
+    let mut broken = serde_json::to_value(&game).unwrap();
+    broken["battles"] = serde_json::json!([{"game": {}}]);
+    let error = replay(vec![header(6, broken)]).unwrap_err();
+    assert!(error.contains("recorded initial state"), "{error}");
+}
+
+#[test]
+fn v6_fresh_recording_reproduces_before_strict_sale() {
     horde_core::catalog::init_catalogs().unwrap();
     let lines = read_lines(Path::new(EQUIPPED_SALE)).unwrap();
     let Some(Line::Header(header)) = lines.first() else {
@@ -431,7 +468,15 @@ fn v6_equipped_sale_recording_replays_to_its_recorded_digest() {
     assert_eq!(equipped, sold, "the sold item is the equipped one");
     assert!(matches!(lines.last(), Some(Line::End { .. })));
     let report = replay(lines).unwrap();
-    assert!(report.warnings.is_empty(), "{:?}", report.warnings);
+    // The fresh v6 initial state migrates unchanged, so only the save version
+    // is reported and ruleset 1 still reproduces the recorded digest.
+    assert_eq!(
+        report.warnings,
+        [format!(
+            "recorded with save version 6, this build uses {}",
+            horde_core::sim::SAVE_VERSION
+        )]
+    );
     assert!(
         report.matches_recording(),
         "ruleset 1 reproduces the recording"

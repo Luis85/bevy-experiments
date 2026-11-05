@@ -5,7 +5,7 @@ use super::persistence::SaveError;
 use serde_json::{Map, Value};
 
 /// Envelope version written by this build.
-pub const SAVE_VERSION: u32 = 6;
+pub const SAVE_VERSION: u32 = 7;
 
 /// Upgrade a payload saved at envelope `from` to [`SAVE_VERSION`].
 pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
@@ -19,6 +19,7 @@ pub(super) fn migrate(mut value: Value, from: u32) -> Result<Value, SaveError> {
             3 => v3_to_v4(value)?,
             4 => v4_to_v5(value)?,
             5 => v5_to_v6(value)?,
+            6 => v6_to_v7(value)?,
             _ => unreachable!("every version below SAVE_VERSION has a step"),
         };
     }
@@ -450,6 +451,85 @@ fn rewrite_v5(value: &mut Value) -> Result<(), SaveError> {
     Ok(())
 }
 
+/// v6 -> v7: path-based, idempotent (`or_insert` only) and catalogue-free.
+/// The sub-steps run in this fixed order; later steps land in their owners'
+/// commits at the marked slots and never reorder the earlier ones.
+fn v6_to_v7(mut value: Value) -> Result<Value, SaveError> {
+    v7_worker_seats(&mut value)?; // (a) defender seats
+    v7_npc_appearance(&mut value); // (e) defensive appearance back-fill
+    // (b) report drop tracking (loot-economy) goes here.
+    // (c) level-grant ledger, then (d) milestones (progression-tree) go here.
+    Ok(value)
+}
+
+/// The expedition records; a missing array means there are none.
+fn v6_battles(battles: Option<&mut Value>) -> Result<&mut [Value], SaveError> {
+    match battles {
+        None | Some(Value::Null) => Ok(&mut []),
+        Some(Value::Array(battles)) => Ok(battles),
+        Some(_) => Err(SaveError::Migration("v6 battles is not an array".into())),
+    }
+}
+
+/// (a) Every worker game's attempt and report gain `"defender": {"Recruit":
+/// recruit_id}`. The root attempt and report stay keyless: absent means the
+/// mode owner (the player for Personal, Mara for Npc), which is what a v6 root
+/// meant.
+fn v7_worker_seats(value: &mut Value) -> Result<(), SaveError> {
+    for battle in v6_battles(value.get_mut("battles"))? {
+        let recruit = battle
+            .get("recruit_id")
+            .and_then(Value::as_u64)
+            .ok_or_else(|| SaveError::Migration("v6 battle without a u64 recruit_id".into()))?;
+        let Some(game) = battle.get_mut("game").and_then(Value::as_object_mut) else {
+            continue;
+        };
+        for key in ["attempt", "last_result"] {
+            if let Some(Value::Object(record)) = game.get_mut(key) {
+                record
+                    .entry("defender")
+                    .or_insert_with(|| serde_json::json!({ "Recruit": recruit }));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// (e) An Npc attempt profile without an appearance reads as Female, the
+/// appearance every v6 Npc deploy stamped (the serde default is Male). Saved
+/// appearances are kept, and v6 expeditions are not re-stamped with their
+/// recruit's identity. Runs after (a), which rejects malformed battles.
+fn v7_npc_appearance(value: &mut Value) {
+    let Some(root) = value.as_object_mut() else {
+        return;
+    };
+    let mut attempts = Vec::new();
+    for (key, child) in root.iter_mut() {
+        match key.as_str() {
+            "attempt" => attempts.push(child),
+            "battles" => {
+                if let Ok(battles) = v6_battles(Some(child)) {
+                    attempts.extend(
+                        battles
+                            .iter_mut()
+                            .filter_map(|battle| battle.get_mut("game")?.get_mut("attempt")),
+                    );
+                }
+            }
+            _ => {}
+        }
+    }
+    for attempt in attempts {
+        if attempt.get("mode").and_then(Value::as_str) == Some("Npc")
+            && let Some(Value::Object(profile)) = attempt.get_mut("profile")
+        {
+            profile
+                .entry("appearance")
+                .or_insert_with(|| Value::from("Female"));
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -502,7 +582,7 @@ mod tests {
                     "equipment_visual": {"outfit": {"definition": 2}}
                 }
             },
-            "battles": [{"game": {"campaign": {"items": [{"definition": 3}]}}}]
+            "battles": [{"recruit_id": 1, "game": {"campaign": {"items": [{"definition": 3}]}}}]
         });
         let v2 = migrate(v1, 1).unwrap();
         assert_eq!(
@@ -605,7 +685,7 @@ mod tests {
                     {"hit_stop_left": 0, "resolved": null}
                 ]
             },
-            "battles": [{"game": {"attempt": {"brace_left": 0, "enemies": []}}}]
+            "battles": [{"recruit_id": 1, "game": {"attempt": {"brace_left": 0, "enemies": []}}}]
         });
         let v3 = migrate(v2, 2).unwrap();
         let a = &v3["attempt"];
@@ -630,7 +710,10 @@ mod tests {
             a["enemies"][1],
             json!({"resolved": {"archetype_id": "x", "kind": "Brute", "npc_damage_dice": 1, "target_urgency": 0.0}})
         );
-        assert_eq!(v3["battles"][0]["game"]["attempt"], json!({"enemies": []}));
+        assert_eq!(
+            v3["battles"][0]["game"]["attempt"],
+            json!({"enemies": [], "defender": {"Recruit": 1}})
+        );
         assert_eq!(v2_to_v3(v3.clone()), v3);
     }
 
@@ -645,7 +728,7 @@ mod tests {
         let v3 = json!({
             "attempt": {"loot_quality_counts": [0, 2, 1, 0, 1, 3]},
             "campaign": {"run_history": [{"loot_by_quality": [1, 0, 0, 0, 0, 5]}]},
-            "battles": [{"game": {"attempt": {"loot_quality_counts": [0, 0, 0, 9, 0, 0]}}}]
+            "battles": [{"recruit_id": 1, "game": {"attempt": {"loot_quality_counts": [0, 0, 0, 9, 0, 0]}}}]
         });
         let v4 = migrate(v3, 3).unwrap();
         assert_eq!(
@@ -681,7 +764,7 @@ mod tests {
                 "projectiles": [], "next_id": 3,
                 "cooldowns": [10, 61], "charges": [1, 4], "issued": [2, 5], "spent": [1, 1]
             }},
-            "battles": [{"game": {"attempt": {"ordnance": {"charges": [0, 7]}}}}]
+            "battles": [{"recruit_id": 1, "game": {"attempt": {"ordnance": {"charges": [0, 7]}}}}]
         });
         let v5 = migrate(v4, 4).unwrap();
         let o = &v5["attempt"]["ordnance"];
@@ -731,7 +814,7 @@ mod tests {
                 "first_clears": [false, true, false, false, false],
                 "first_clear_claimed": [0, 1, 0, 0, 0]
             }}]},
-            "battles": [{"stage": 2, "game": {"campaign": {
+            "battles": [{"recruit_id": 1, "stage": 2, "game": {"campaign": {
                 "unlocked": 1,
                 "first_clears": [false, false, false, false, false]
             }}}]
@@ -778,5 +861,99 @@ mod tests {
                 "{bad}"
             );
         }
+    }
+
+    #[test]
+    fn v6_worker_games_gain_their_recruit_seat_root_records_stay_keyless() {
+        let v6 = json!({
+            "attempt": {"mode": "Npc", "profile": {"appearance": "Female"}},
+            "last_result": {"mode": "Npc", "outcome": "Victory"},
+            "battles": [
+                {"recruit_id": 3, "settled": false, "game": {
+                    "attempt": {"mode": "Npc", "profile": {"appearance": "Female"}},
+                    "last_result": {"mode": "Npc", "outcome": "Victory"}
+                }},
+                {"recruit_id": 2, "settled": true, "game": {
+                    "attempt": null,
+                    "last_result": {"mode": "Npc", "outcome": "Defeat"}
+                }},
+                {"recruit_id": 5, "settled": false, "game": {
+                    "attempt": {"mode": "Npc", "profile": {"appearance": "Male"}, "defender": {"Recruit": 9}}
+                }}
+            ]
+        });
+        let v7 = migrate(v6.clone(), 6).unwrap();
+        // The root attempt and report are never touched: absent = mode owner.
+        assert_eq!(v7["attempt"], v6["attempt"]);
+        assert_eq!(v7["last_result"], v6["last_result"]);
+        let seat =
+            |battle: usize, key: &str| v7["battles"][battle]["game"][key]["defender"].clone();
+        assert_eq!(seat(0, "attempt"), json!({"Recruit": 3}));
+        assert_eq!(seat(0, "last_result"), json!({"Recruit": 3}));
+        assert!(v7["battles"][1]["game"]["attempt"].is_null());
+        assert_eq!(seat(1, "last_result"), json!({"Recruit": 2}));
+        // An existing key is kept (or_insert), and a missing report stays missing.
+        assert_eq!(seat(2, "attempt"), json!({"Recruit": 9}));
+        assert!(v7["battles"][2]["game"].get("last_result").is_none());
+        // No acknowledged flag and nothing else on the battle records.
+        for (old, new) in v6["battles"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(v7["battles"].as_array().unwrap())
+        {
+            let keys = |b: &Value| b.as_object().unwrap().keys().cloned().collect::<Vec<_>>();
+            assert_eq!(keys(old), keys(new));
+        }
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+        // A save without expeditions has nothing to migrate.
+        let idle = json!({"attempt": null, "last_result": null});
+        assert_eq!(migrate(idle.clone(), 6).unwrap(), idle);
+    }
+
+    #[test]
+    fn malformed_v6_battle_without_recruit_id_is_a_typed_migration_error() {
+        for bad in [
+            json!({"battles": [{"game": {"attempt": null}}]}),
+            json!({"battles": [{"recruit_id": "3", "game": {}}]}),
+            json!({"battles": [{"recruit_id": -1, "game": {}}]}),
+            json!({"battles": [{"recruit_id": 1.5, "game": {}}]}),
+            json!({"battles": [7]}),
+            json!({"battles": {"recruit_id": 3}}),
+        ] {
+            assert!(
+                matches!(migrate(bad.clone(), 6), Err(SaveError::Migration(_))),
+                "{bad}"
+            );
+        }
+    }
+
+    #[test]
+    fn v6_npc_attempt_without_appearance_loads_female() {
+        let v6 = json!({
+            "attempt": {"mode": "Npc", "profile": {"weapon": {}}},
+            "last_result": {"mode": "Npc"},
+            "battles": [
+                {"recruit_id": 1, "game": {"attempt": {"mode": "Npc", "profile": {}}}},
+                {"recruit_id": 2, "game": {"attempt": {"mode": "Npc", "profile": {"appearance": "Male"}}}},
+                {"recruit_id": 3, "game": {"attempt": {"mode": "Personal", "profile": {}}}}
+            ]
+        });
+        let v7 = migrate(v6, 6).unwrap();
+        assert_eq!(
+            v7["attempt"]["profile"],
+            json!({"weapon": {}, "appearance": "Female"})
+        );
+        assert!(v7["last_result"].get("profile").is_none());
+        let appearance = |battle: usize| {
+            v7["battles"][battle]["game"]["attempt"]["profile"]
+                .get("appearance")
+                .cloned()
+        };
+        assert_eq!(appearance(0), Some(json!("Female")));
+        // or_insert: a saved appearance is kept, and Personal profiles are untouched.
+        assert_eq!(appearance(1), Some(json!("Male")));
+        assert_eq!(appearance(2), None);
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
     }
 }

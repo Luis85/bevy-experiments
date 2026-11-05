@@ -88,6 +88,21 @@ impl Game {
     pub fn decode_save_generation(bytes: &[u8]) -> Result<Self, SaveError> {
         decode_generation(bytes)
     }
+    /// Decode a save payload written at envelope `version`, exactly as a save
+    /// generation would load: an older payload is migrated on raw JSON, then
+    /// every game is reconciled and validated. Debug replay uses this for
+    /// recordings made by an older build. Versions 0 and above
+    /// [`SAVE_VERSION`] are [`SaveError::UnsupportedVersion`].
+    pub fn from_payload(value: serde_json::Value, version: u32) -> Result<Self, SaveError> {
+        let value = if version == SAVE_VERSION {
+            value
+        } else {
+            // Legacy formats are upgraded on raw JSON before any typed decode;
+            // `migrate` rejects version 0 and anything newer than this build.
+            migrate(value, version)?
+        };
+        settle_decoded(serde_json::from_value(value)?)
+    }
     /// Determinism/replay digest: the stable FNV-1a hash (the save checksum
     /// function) of the canonical serialized save payload. Two games with equal
     /// digests have identical authoritative state, including RNG streams, so
@@ -193,13 +208,15 @@ fn decode_generation(bytes: &[u8]) -> Result<Game, SaveError> {
         return Err(SaveError::ChecksumMismatch);
     }
     warn_on_catalog_drift(&envelope);
-    let mut game: Game = if envelope.version == SAVE_VERSION {
-        serde_json::from_str(&envelope.payload)?
+    if envelope.version == SAVE_VERSION {
+        // The current format skips the intermediate JSON tree.
+        settle_decoded(serde_json::from_str(&envelope.payload)?)
     } else {
-        // Legacy formats are upgraded on raw JSON before any typed decode.
-        let value = serde_json::from_str(&envelope.payload)?;
-        serde_json::from_value(migrate(value, envelope.version)?)?
-    };
+        Game::from_payload(serde_json::from_str(&envelope.payload)?, envelope.version)
+    }
+}
+/// Catalogue-aware fills, then the invariants every loaded game must hold.
+fn settle_decoded(mut game: Game) -> Result<Game, SaveError> {
     reconcile_saved_game(&mut game);
     validate_game(&game, 0).map_err(SaveError::Invalid)?;
     Ok(game)

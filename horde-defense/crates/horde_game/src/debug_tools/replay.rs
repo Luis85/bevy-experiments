@@ -88,8 +88,14 @@ pub fn replay(lines: Vec<Line>) -> Result<ReplayReport, String> {
     let Some(Line::Header(header)) = iter.next() else {
         return Err("recording does not start with a header line".into());
     };
-    let mut game: Game = serde_json::from_value(header.initial.clone())
-        .map_err(|e| format!("recorded initial state is unreadable: {e}"))?;
+    // An older build's initial state loads as its save would: migrated,
+    // reconciled and validated. The current version is taken as recorded.
+    let mut game: Game = if header.version < SAVE_VERSION {
+        Game::from_payload(header.initial.clone(), header.version).map_err(|e| e.to_string())
+    } else {
+        serde_json::from_value(header.initial.clone()).map_err(|e| e.to_string())
+    }
+    .map_err(|e| format!("recorded initial state is unreadable: {e}"))?;
     let mut warnings = compatibility_warnings(&header, &game);
     let body: Vec<Line> = iter.collect();
     let (end_tick, recorded_digest) = match body.last() {
