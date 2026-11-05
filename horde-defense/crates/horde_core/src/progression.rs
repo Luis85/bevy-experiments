@@ -52,6 +52,112 @@ pub struct ProgressionCatalog {
     pub max_supply_bonus: u32,
     pub pressure_floors: Vec<PressureFloor>,
     pub gear: GearScaling,
+    /// Level-up grant, rank milestones and camp prices. Absent means the
+    /// neutral block: no grant, no milestones, flat camp prices.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub rewards: ProgressionRewardCatalog,
+}
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct ProgressionRewardCatalog {
+    /// Level-up coin grant as a fraction (0..=1) of the XP needed to reach
+    /// the new level. 0 pays nothing.
+    pub level_grant_xp_fraction: f32,
+    /// Rank milestones, ranks strictly increasing; at most
+    /// [`MAX_RECEIPT_MILESTONES`](crate::sim::MAX_RECEIPT_MILESTONES), so one
+    /// settlement receipt can hold them all.
+    pub milestones: Vec<MilestoneDefinition>,
+    pub camp_prices: CampPrices,
+}
+impl Default for ProgressionRewardCatalog {
+    fn default() -> Self {
+        Self {
+            level_grant_xp_fraction: 0.0,
+            milestones: Vec::new(),
+            camp_prices: CampPrices::default(),
+        }
+    }
+}
+/// One rank milestone: coins and an item of a fixed authored quality, paid
+/// once when the campaign's progression rank reaches `rank`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MilestoneDefinition {
+    pub rank: u32,
+    pub coins: u64,
+    pub item_quality: crate::quality::Quality,
+}
+/// Threat-scaled camp prices: `base × min(1 + per_rank × rank, max_multiplier)`
+/// rounded to 5 (see [`camp_price`]).
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct CampPrices {
+    /// Base price of one NPC training point (the legacy flat 25).
+    pub npc_training_base: u64,
+    /// Price growth per threat rank (0..=1). 0 keeps prices flat.
+    pub per_rank: f32,
+    /// Cap on the price multiplier (1..=10).
+    pub max_multiplier: f32,
+}
+impl Default for CampPrices {
+    fn default() -> Self {
+        Self {
+            npc_training_base: 25,
+            per_rank: 0.0,
+            max_multiplier: 1.0,
+        }
+    }
+}
+impl ProgressionRewardCatalog {
+    pub fn validate(&self) -> Result<(), String> {
+        let prices = &self.camp_prices;
+        if !finite(self.level_grant_xp_fraction, 0.0, 1.0)
+            || self.milestones.len() > crate::sim::MAX_RECEIPT_MILESTONES
+            || self
+                .milestones
+                .iter()
+                .any(|m| !(1..=10_000).contains(&m.rank) || m.coins > 1_000_000)
+            || self.milestones.windows(2).any(|m| m[1].rank <= m[0].rank)
+            || !(1..=1_000_000).contains(&prices.npc_training_base)
+            || !finite(prices.per_rank, 0.0, 1.0)
+            || !finite(prices.max_multiplier, 1.0, 10.0)
+        {
+            return Err("Invalid progression rewards".into());
+        }
+        Ok(())
+    }
+    /// Coins granted for reaching `level` (0 at level 1 and below):
+    /// `round(level_grant_xp_fraction × xp_to_advance_from(level - 1))`.
+    pub fn level_grant(&self, level: u32) -> u64 {
+        if level < 2 {
+            return 0;
+        }
+        (f64::from(self.level_grant_xp_fraction) * xp_to_advance_from(level - 1) as f64).round()
+            as u64
+    }
+    /// `base` scaled by threat `rank`, rounded to the nearest 5. A multiplier
+    /// of 1 (the neutral block, or rank 0) returns `base` unchanged.
+    pub fn camp_price(&self, base: u64, rank: u32) -> u64 {
+        let prices = &self.camp_prices;
+        let multiplier = (1.0 + f64::from(prices.per_rank) * f64::from(rank))
+            .min(f64::from(prices.max_multiplier));
+        if multiplier <= 1.0 {
+            return base;
+        }
+        ((base as f64 * multiplier / 5.0).round() as u64).saturating_mul(5)
+    }
+}
+/// XP needed to advance from `level` to the next level (the player's curve).
+pub fn xp_to_advance_from(level: u32) -> u64 {
+    (20.0 + 15.0 * (level.saturating_sub(1) as f64).powf(1.3)).round() as u64
+}
+/// [`ProgressionRewardCatalog::level_grant`] over the installed catalogue.
+pub fn level_grant(level: u32) -> u64 {
+    catalog().rewards.level_grant(level)
+}
+/// [`ProgressionRewardCatalog::camp_price`] over the installed catalogue.
+pub fn camp_price(base: u64, rank: u32) -> u64 {
+    catalog().rewards.camp_price(base, rank)
 }
 fn finite(v: f32, min: f32, max: f32) -> bool {
     v.is_finite() && (min..=max).contains(&v)
@@ -147,7 +253,7 @@ impl ProgressionCatalog {
         }) {
             return Err("Progression pressure floors must be monotone".into());
         }
-        Ok(())
+        self.rewards.validate()
     }
     pub fn lanes_for_level(&self, level: u32) -> u8 {
         (u32::from(self.base_lanes)
@@ -306,4 +412,133 @@ pub fn price(base: u64, level: u32) -> u64 {
             + f64::from(level.saturating_sub(1).min(63))
                 * f64::from(catalog().gear.price_per_level)))
     .round() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::quality::Quality;
+
+    fn milestone(rank: u32, coins: u64, item_quality: Quality) -> MilestoneDefinition {
+        MilestoneDefinition {
+            rank,
+            coins,
+            item_quality,
+        }
+    }
+
+    /// The design's authored values (wave 2 ships them in progression.json).
+    fn authored() -> ProgressionRewardCatalog {
+        ProgressionRewardCatalog {
+            level_grant_xp_fraction: 0.25,
+            milestones: vec![
+                milestone(5, 500, Quality::Uncommon),
+                milestone(10, 1000, Quality::Uncommon),
+                milestone(15, 1500, Quality::Rare),
+                milestone(20, 2000, Quality::Rare),
+            ],
+            camp_prices: CampPrices {
+                npc_training_base: 25,
+                per_rank: 0.10,
+                max_multiplier: 6.0,
+            },
+        }
+    }
+
+    fn with_rewards(rewards: ProgressionRewardCatalog) -> ProgressionCatalog {
+        ProgressionCatalog {
+            rewards,
+            ..catalog().clone()
+        }
+    }
+
+    #[test]
+    fn progression_rewards_reject_unsorted_milestones() {
+        // The shipped catalogue has no rewards block: every reward is neutral
+        // and nothing new is written back.
+        assert_eq!(catalog().rewards, ProgressionRewardCatalog::default());
+        let shipped = serde_json::to_string(catalog()).unwrap();
+        assert!(!shipped.contains("rewards"), "skipped at default");
+        // The authored block validates and round-trips.
+        let catalog = with_rewards(authored());
+        catalog.validate().unwrap();
+        let text = serde_json::to_string(&catalog).unwrap();
+        assert!(
+            text.contains(r#""milestones":[{"rank":5,"coins":500,"item_quality":"Uncommon"},"#)
+        );
+        assert_eq!(ProgressionCatalog::from_json(&text).unwrap(), catalog);
+        let edit = |change: &dyn Fn(&mut ProgressionRewardCatalog)| {
+            let mut rewards = authored();
+            change(&mut rewards);
+            with_rewards(rewards).validate()
+        };
+        type Edit<'a> = &'a dyn Fn(&mut ProgressionRewardCatalog);
+        let rows: [(&str, Edit); 13] = [
+            ("unsorted", &|r| r.milestones.swap(1, 2)),
+            ("duplicate rank", &|r| r.milestones[1].rank = 5),
+            ("five milestones", &|r| {
+                r.milestones.push(milestone(25, 1, Quality::Rare))
+            }),
+            ("rank 0", &|r| r.milestones[0].rank = 0),
+            ("rank above 10000", &|r| r.milestones[3].rank = 10_001),
+            ("coins above 1000000", &|r| {
+                r.milestones[0].coins = 1_000_001
+            }),
+            ("negative fraction", &|r| r.level_grant_xp_fraction = -0.25),
+            ("fraction above 1", &|r| r.level_grant_xp_fraction = 1.5),
+            ("fraction NaN", &|r| r.level_grant_xp_fraction = f32::NAN),
+            ("training base 0", &|r| r.camp_prices.npc_training_base = 0),
+            ("per rank above 1", &|r| r.camp_prices.per_rank = 1.5),
+            ("max below 1", &|r| r.camp_prices.max_multiplier = 0.9),
+            ("max infinite", &|r| {
+                r.camp_prices.max_multiplier = f32::INFINITY
+            }),
+        ];
+        let passed: Vec<String> = rows
+            .into_iter()
+            .filter_map(|(row, change)| match edit(change) {
+                Err(error) if error == "Invalid progression rewards" => None,
+                Err(error) => Some(format!("{row}: {error}")),
+                Ok(()) => Some(format!("{row}: validated")),
+            })
+            .collect();
+        assert_eq!(passed, Vec::<String>::new(), "rows that did not fail");
+    }
+
+    #[test]
+    fn level_grant_and_camp_price_read_neutral_values_today() {
+        // Shipped (neutral) values: no grant, flat legacy prices.
+        for level in [0, 1, 2, 6, 12, 50] {
+            assert_eq!(level_grant(level), 0, "level {level}");
+        }
+        for rank in [0, 1, 10, 20, 50, 1000] {
+            assert_eq!(camp_price(25, rank), 25, "rank {rank}");
+            assert_eq!(camp_price(100, rank), 100, "rank {rank}");
+            assert_eq!(camp_price(27, rank), 27, "rank {rank}: neutral is exact");
+        }
+        // The authored values give the design tables.
+        let rewards = authored();
+        let grants: Vec<u64> = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30, 40, 50]
+            .into_iter()
+            .map(|level| rewards.level_grant(level))
+            .collect();
+        assert_eq!(
+            grants,
+            [0, 5, 9, 14, 21, 28, 44, 61, 80, 110, 166, 290, 430, 580]
+        );
+        assert_eq!((2..=6).map(|l| rewards.level_grant(l)).sum::<u64>(), 77);
+        let prices = |base| [0, 1, 10, 20, 50, 80].map(|rank| rewards.camp_price(base, rank));
+        assert_eq!(
+            prices(rewards.camp_prices.npc_training_base),
+            [25, 30, 50, 75, 150, 150]
+        );
+        assert_eq!(prices(100), [100, 110, 200, 300, 600, 600]);
+        // xp_to_advance_from is the player's level curve.
+        let mut player = crate::campaign::Campaign::default().player;
+        for level in 1..=60 {
+            player.level = level;
+            assert_eq!(xp_to_advance_from(level), player.next_level_xp(), "{level}");
+        }
+        assert_eq!([1, 2, 3].map(xp_to_advance_from), [20, 35, 57]);
+    }
 }

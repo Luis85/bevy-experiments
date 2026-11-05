@@ -6,7 +6,10 @@
 use super::loadout::coordination_reload_factor;
 use super::{BodyAttribute, Campaign, NodePayment, RecommendationAction};
 use crate::content::{Mode, StructureKind};
-use crate::skill_catalog::{CampaignFeature, SkillEffect, SkillNode, skills, unlock_label};
+use crate::skill_catalog::{
+    CampaignFeature, ClassStat, SkillEffect, SkillNode, skills, unlock_label,
+};
+use crate::weapons::WeaponClass;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// Purchase state of one node for the tree canvas and detail panel.
@@ -113,6 +116,13 @@ pub enum PreviewStat {
     ReloadTime,
     /// Personal shot-interval multiplier (lower fires faster).
     ShotInterval,
+    /// One weapon class's perk: a damage, reload or shot-interval
+    /// multiplier, or an added weak-spot bonus fraction.
+    ClassStat(WeaponClass, ClassStat),
+    /// Enemy armor ignored by personal shots.
+    ArmorPenetration,
+    /// Multiplier on hazard (blast and spit) damage taken.
+    HazardDamage,
     GrenadeCharges,
     MolotovCharges,
     OrdnanceDamage,
@@ -142,6 +152,18 @@ impl PreviewStat {
             Self::DamageMultiplier => "Firearm damage".into(),
             Self::ReloadTime => "Reload time".into(),
             Self::ShotInterval => "Time between shots".into(),
+            Self::ClassStat(class, stat) => format!(
+                "{} {}",
+                class.name(),
+                match stat {
+                    ClassStat::Damage => "damage",
+                    ClassStat::Reload => "reload time",
+                    ClassStat::Cadence => "time between shots",
+                    ClassStat::WeakBonus => "weak-spot damage",
+                }
+            ),
+            Self::ArmorPenetration => "Armor penetration".into(),
+            Self::HazardDamage => "Blast and spit damage taken".into(),
             Self::GrenadeCharges => "Grenade charges".into(),
             Self::MolotovCharges => "Molotov charges".into(),
             Self::OrdnanceDamage => "Ordnance damage".into(),
@@ -160,10 +182,14 @@ impl PreviewStat {
     pub fn format(&self, value: f32) -> String {
         match self {
             Self::DamageBonus => format!("+{}", value.round() as i64),
-            Self::WeakSpotBonus => format!("+{}%", (value * 100.0).round() as i64),
+            Self::WeakSpotBonus | Self::ClassStat(_, ClassStat::WeakBonus) => {
+                format!("+{}%", (value * 100.0).round() as i64)
+            }
             Self::DamageMultiplier
             | Self::ReloadTime
             | Self::ShotInterval
+            | Self::ClassStat(..)
+            | Self::HazardDamage
             | Self::OrdnanceDamage
             | Self::OrdnanceRadius
             | Self::BurnDuration
@@ -174,6 +200,7 @@ impl PreviewStat {
             | Self::Stamina
             | Self::Armor
             | Self::MeleeDamage
+            | Self::ArmorPenetration
             | Self::GrenadeCharges
             | Self::MolotovCharges
             | Self::StructureRank(_)
@@ -248,6 +275,26 @@ fn stat_snapshot(c: &Campaign) -> (Vec<(PreviewStat, f32)>, BTreeSet<String>) {
                 * coordination_reload_factor(rank(BodyAttribute::Coordination)),
         ),
         (PreviewStat::ShotInterval, modifiers.cadence_multiplier),
+    ];
+    for class in WeaponClass::ALL {
+        let perk = modifiers
+            .class_modifiers
+            .get(&class)
+            .copied()
+            .unwrap_or_default();
+        stats.extend(
+            ClassStat::ALL.map(|stat| (PreviewStat::ClassStat(class, stat), perk.get(stat))),
+        );
+    }
+    stats.extend([
+        (
+            PreviewStat::ArmorPenetration,
+            modifiers.armor_penetration as f32,
+        ),
+        (
+            PreviewStat::HazardDamage,
+            modifiers.hazard_damage_multiplier,
+        ),
         (
             PreviewStat::GrenadeCharges,
             modifiers.grenade_charges as f32,
@@ -276,7 +323,7 @@ fn stat_snapshot(c: &Campaign) -> (Vec<(PreviewStat, f32)>, BTreeSet<String>) {
             PreviewStat::StructurePower,
             modifiers.engineering_multiplier,
         ),
-    ];
+    ]);
     stats.extend(StructureKind::ALL.map(|kind| {
         (
             PreviewStat::StructureRank(kind),
@@ -755,6 +802,39 @@ impl Campaign {
 mod tests {
     use super::*;
     use crate::survivors::SurvivorId;
+
+    #[test]
+    fn perk_preview_stats_have_labels_formats_and_neutral_snapshot_values() {
+        let shotgun = |stat| PreviewStat::ClassStat(WeaponClass::Shotgun, stat);
+        assert_eq!(
+            shotgun(ClassStat::Cadence).label(),
+            "Shotgun time between shots"
+        );
+        assert_eq!(shotgun(ClassStat::Cadence).format(0.8), "×0.80");
+        assert_eq!(shotgun(ClassStat::Damage).label(), "Shotgun damage");
+        assert_eq!(shotgun(ClassStat::Reload).label(), "Shotgun reload time");
+        assert_eq!(shotgun(ClassStat::WeakBonus).format(0.15), "+15%");
+        assert_eq!(PreviewStat::ArmorPenetration.format(4.0), "4");
+        assert_eq!(PreviewStat::HazardDamage.format(0.6), "×0.60");
+        // Every perk stat is in the snapshot at its neutral value, so no
+        // shipped node previews a change to it.
+        let (stats, _) = stat_snapshot(&Campaign::default());
+        let value = |stat: PreviewStat| stats.iter().find(|(s, _)| *s == stat).unwrap().1;
+        for class in WeaponClass::ALL {
+            for stat in ClassStat::ALL {
+                let neutral = if stat == ClassStat::WeakBonus {
+                    0.0
+                } else {
+                    1.0
+                };
+                assert_eq!(value(PreviewStat::ClassStat(class, stat)), neutral);
+            }
+        }
+        assert_eq!(value(PreviewStat::ArmorPenetration), 0.0);
+        assert_eq!(value(PreviewStat::HazardDamage), 1.0);
+        let order: Vec<_> = stats.iter().map(|(s, _)| s.clone()).collect();
+        assert!(order.windows(2).all(|w| w[0] < w[1]), "PreviewStat order");
+    }
 
     #[test]
     fn a_milestone_just_met_names_the_nodes_it_opened() {

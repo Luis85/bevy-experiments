@@ -169,7 +169,7 @@ impl Player {
         self.level >= Self::level_cap()
     }
     pub fn next_level_xp(&self) -> u64 {
-        (20.0 + 15.0 * ((self.level.saturating_sub(1)) as f64).powf(1.3)).round() as u64
+        crate::progression::xp_to_advance_from(self.level)
     }
 }
 

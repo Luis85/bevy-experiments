@@ -71,6 +71,26 @@ variant. The combined multiplier kernel is also bounded
 to 0.01–100. Additive/multiplier effects stack in catalog order, so preserve that order when a
 numerically identical replay matters.
 
+Three effect kinds carry the per-class perks and counters (schema only: no
+shipped node grants them yet, and the combat code reads them from wave 2):
+
+```json
+[
+  {"kind":"ClassModifier","value":{"class":"Shotgun","stat":"Cadence","value":0.8}},
+  {"kind":"ArmorPenetration","value":4},
+  {"kind":"HazardDamageMultiplier","value":0.6}
+]
+```
+
+`ClassModifier` names a weapon class and a `stat`: `Damage` (multiplier 1–2),
+`Reload` and `Cadence` (multipliers 0.5–1) or `WeakBonus` (added to the
+weak-spot bonus, 0.01–1). Perks fold per class into
+`SkillModifiers::class_modifiers`; classes without a perk have no entry.
+`ArmorPenetration` (1–20) adds enemy armor ignored by personal shots, and
+`HazardDamageMultiplier` (0.5–1) scales hazard damage taken. A node may also
+list `counters`, the enemy archetype ids it is authored to answer (at most 8
+distinct ids of lowercase letters, digits, `-` or `_`); no rule reads them.
+
 Additional tagged effects encode target ownership/rank, not repeated additive rank bonuses:
 
 ```json

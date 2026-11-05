@@ -127,6 +127,18 @@ or `level_to` above the player level cap. A milestone item that could not be
 stored is reported to the frontend once (`MilestoneItemLost`) and is never
 saved.
 
+### Skill modifier perks
+
+The frozen `attempt.profile.modifiers` (root and expedition attempts) may
+carry three optional keys, each absent at its neutral value:
+`class_modifiers` (a map from weapon class to `{damage_multiplier,
+reload_multiplier, cadence_multiplier, weak_bonus_add}`, every inner key
+written), `armor_penetration` (absent at 0) and `hazard_damage_multiplier`
+(absent at exactly 1.0). Loading rejects a class multiplier outside 0.01–100,
+a `weak_bonus_add` outside 0–1, non-finite values, an `armor_penetration`
+outside 0–1000 or a `hazard_damage_multiplier` outside 0.01–1. v6 attempts
+load with neutral values and need no migration step.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add

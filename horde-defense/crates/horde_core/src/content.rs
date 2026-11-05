@@ -319,6 +319,10 @@ pub struct StructureDefinition {
     pub range: f32,
     pub cooldown: f32,
     pub charges: u32,
+    /// Extra trap charges per structure mastery rank (traps only; 0 elsewhere).
+    /// Absent means 0. Not yet read by placement (W2).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub charges_per_rank: u32,
     pub blueprint_price: u64,
     pub unlock_clear: usize,
     pub npc: NpcProfile,
@@ -508,6 +512,12 @@ impl Content {
                 || d.blueprint_price > 1_000_000
                 || (d.kind == StructureKind::Trap
                     && (d.charges == 0 || d.charges > 1000 || d.damage == 0))
+                // Rank 10 (the StructureRank bound) stays within the trap limit.
+                || (d.kind != StructureKind::Trap && d.charges_per_rank != 0)
+                || (d.kind == StructureKind::Trap
+                    && d.charges
+                        .saturating_add(d.charges_per_rank.saturating_mul(10))
+                        > 1000)
                 || (d.kind == StructureKind::Turret && (d.range <= 0.0 || d.damage == 0))
             {
                 return Err(format!("Invalid structure profile: {}", d.name));
@@ -731,6 +741,60 @@ mod tests {
                 ),
                 Ok(()) => panic!("{row}: validated"),
             }
+        }
+    }
+    #[test]
+    fn rejects_charges_per_rank_on_a_wall() {
+        // Neutral today: no authored structure gains charges per rank, and
+        // the key is skipped at 0 so the shipped catalogue is unchanged.
+        for d in &content().structures {
+            assert_eq!(d.charges_per_rank, 0, "{}", d.id);
+        }
+        let text = serde_json::to_string(content()).unwrap();
+        assert!(!text.contains("charges_per_rank"), "skipped at 0");
+        let index = |kind| {
+            content()
+                .structures
+                .iter()
+                .position(|d| d.kind == kind)
+                .unwrap()
+        };
+        // A trap may gain charges per rank, bounded so rank 10 stays at or
+        // below the 1000-charge trap limit; the value round-trips.
+        let trap = index(StructureKind::Trap);
+        let mut data = content().clone();
+        data.structures[trap].charges_per_rank = 1;
+        assert!(data.validate().is_ok());
+        let text = serde_json::to_string(&data).unwrap();
+        assert!(text.contains(r#""charges_per_rank":1"#));
+        assert_eq!(
+            Content::from_json(&text).unwrap().structures[trap],
+            data.structures[trap]
+        );
+        let charges = data.structures[trap].charges;
+        data.structures[trap].charges_per_rank = (1000 - charges) / 10;
+        assert!(data.validate().is_ok());
+        data.structures[trap].charges_per_rank += 1;
+        assert_eq!(
+            data.validate(),
+            Err(format!(
+                "Invalid structure profile: {}",
+                data.structures[trap].name
+            ))
+        );
+        // Walls and turrets have no charges to scale.
+        for kind in [StructureKind::Wall, StructureKind::Turret] {
+            let mut data = content().clone();
+            let n = index(kind);
+            data.structures[n].charges_per_rank = 1;
+            assert_eq!(
+                data.validate(),
+                Err(format!(
+                    "Invalid structure profile: {}",
+                    data.structures[n].name
+                )),
+                "{kind:?}"
+            );
         }
     }
     #[test]
