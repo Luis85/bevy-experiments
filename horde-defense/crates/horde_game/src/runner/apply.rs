@@ -302,6 +302,7 @@ pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
         settings: ctx.settings.clone(),
         campaign_path: ctx.paths.campaign(),
         settings_path: ctx.paths.settings(),
+        preserve_settings: ctx.runtime.settings_at_risk,
     };
     let result = {
         let runtime = &mut *ctx.runtime;

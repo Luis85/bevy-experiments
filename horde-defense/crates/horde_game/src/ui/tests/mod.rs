@@ -124,6 +124,8 @@ impl Drop for IsolatedFrontend {
             "campaign.bak",
             "campaign.tmp",
             "settings.json",
+            "settings.tmp",
+            crate::profile::UNREADABLE_SETTINGS,
         ] {
             let _ = std::fs::remove_file(self.directory.join(file));
         }

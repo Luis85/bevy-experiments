@@ -229,8 +229,12 @@ impl FrontendParts {
             game,
             settings,
             warning: message,
-            ..
+            settings_at_risk,
         } = profile;
+        let mut runtime = Runtime::default();
+        if settings_at_risk {
+            runtime.guard_settings_original();
+        }
         let selected_country = game
             .campaign()
             .world
@@ -253,7 +257,7 @@ impl FrontendParts {
             .unwrap_or(SurvivorId::Rook);
         Self {
             game,
-            runtime: Runtime::default(),
+            runtime,
             settings,
             paths: paths.clone(),
             launch: config.clone(),

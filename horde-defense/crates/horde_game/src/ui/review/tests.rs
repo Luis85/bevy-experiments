@@ -414,6 +414,7 @@ fn launched(vars: &[(&str, &str)]) -> FrontendParts {
         game: Game::default(),
         settings: crate::settings::Settings::default(),
         warning: String::new(),
+        settings_at_risk: false,
     };
     let mut f = FrontendParts::new(profile, &config, &paths);
     prepare(&mut f);

@@ -57,6 +57,9 @@ pub struct LoadedProfile {
     pub game: Game,
     pub settings: Settings,
     pub warning: String,
+    /// The startup read could neither use nor copy `settings.json`, so the
+    /// first save must copy it before replacing it (`SettingsLoad::original_at_risk`).
+    pub settings_at_risk: bool,
 }
 /// Keep resumable practice profiles separate; screenshot fixtures are ephemeral.
 pub fn profile_directory(base: PathBuf, scenario: Option<&str>, practice: bool) -> PathBuf {
@@ -96,9 +99,11 @@ pub fn load_profile(directory: PathBuf) -> LoadedProfile {
     } else {
         (Game::default(), String::new())
     };
+    let settings = read_settings(&settings_path);
     LoadedProfile {
         game,
-        settings: read_settings(&settings_path).settings,
+        settings_at_risk: settings.original_at_risk(),
+        settings: settings.settings,
         warning,
     }
 }
@@ -109,11 +114,17 @@ pub fn load_profile(directory: PathBuf) -> LoadedProfile {
 pub struct SettingsLoad {
     pub settings: Settings,
     /// Set when any value fell back to its default.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub warning: Option<String>,
     /// Where the original bytes were copied before anything could replace them.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub preserved: Option<PathBuf>,
+}
+impl SettingsLoad {
+    /// Something fell back but no copy was made: the file could not be read,
+    /// or the copy could not be written. Its first replacement must then
+    /// copy it first (`preserve_settings_original`).
+    pub fn original_at_risk(&self) -> bool {
+        self.warning.is_some() && self.preserved.is_none()
+    }
 }
 
 /// The copy of an unreadable settings file, beside it.
@@ -176,6 +187,33 @@ pub fn read_settings(path: &Path) -> SettingsLoad {
         warning: Some(warning),
         preserved,
     }
+}
+/// Copies the `settings.json` about to be replaced to `settings.unreadable.json`
+/// (synced), unless that copy already holds the same bytes. Called before the
+/// first save of a session whose startup read left the original at risk; an
+/// error blocks that save, so the original is never replaced uncopied. A
+/// missing file needs no copy.
+pub fn preserve_settings_original(path: &Path) -> Result<(), String> {
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => {
+            return Err(format!(
+                "Cannot preserve {} before replacement: {error}",
+                path.display()
+            ));
+        }
+    };
+    let copy = path.with_file_name(UNREADABLE_SETTINGS);
+    if std::fs::read(&copy).is_ok_and(|kept| kept == bytes) {
+        return Ok(());
+    }
+    write_synced(&copy, &bytes).map_err(|error| {
+        format!(
+            "Cannot preserve {} as {UNREADABLE_SETTINGS} before replacement: {error}",
+            path.display()
+        )
+    })
 }
 fn write_synced(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
     use std::io::Write;
@@ -245,6 +283,31 @@ mod tests {
         assert!(warning.contains(UNREADABLE_SETTINGS), "{warning}");
         load.settings.save(&path).unwrap();
         assert_eq!(std::fs::read(&copy).unwrap(), original);
+        std::fs::remove_dir_all(directory).unwrap();
+    }
+
+    #[test]
+    fn unreadable_or_uncopied_settings_stay_at_risk_until_preserved() {
+        let directory = directory("at-risk");
+        let path = directory.join("settings.json");
+        // A directory cannot be read as a file: an error other than NotFound.
+        std::fs::create_dir(&path).unwrap();
+        let load = read_settings(&path);
+        assert_eq!(load.settings, Settings::default());
+        assert!(load.warning.is_some() && load.preserved.is_none());
+        assert!(load.original_at_risk());
+        assert!(preserve_settings_original(&path).is_err());
+        std::fs::remove_dir(&path).unwrap();
+        // Nothing to preserve once the file is gone.
+        assert_eq!(preserve_settings_original(&path), Ok(()));
+        let copy = directory.join(UNREADABLE_SETTINGS);
+        assert!(!copy.exists());
+        // A copy made at startup leaves nothing at risk; a repeat is a no-op.
+        std::fs::write(&path, b"not json").unwrap();
+        let load = read_settings(&path);
+        assert!(load.preserved.is_some() && !load.original_at_risk());
+        assert_eq!(preserve_settings_original(&path), Ok(()));
+        assert_eq!(std::fs::read(&copy).unwrap(), b"not json");
         std::fs::remove_dir_all(directory).unwrap();
     }
 

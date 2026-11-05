@@ -40,6 +40,9 @@ pub struct Runtime {
     pub(super) retry_save_at: u64,
     pub(super) storage: persistence::Service,
     pub(super) reset_success: Option<String>,
+    /// The startup read left `settings.json` uncopied: every save copies it
+    /// first, until the worker has done so once.
+    pub(super) settings_at_risk: bool,
     pub fixed_calls: u64,
     pub simulated_ticks: u64,
     /// `dev`: command/input recording in progress.
@@ -56,6 +59,10 @@ pub struct Runtime {
 }
 
 impl Runtime {
+    /// Startup could not preserve `settings.json` (`LoadedProfile::settings_at_risk`).
+    pub fn guard_settings_original(&mut self) {
+        self.settings_at_risk = true;
+    }
     /// Called on each egui pass with the native FrameCount. Repeated layout
     /// passes share a command identity set, preventing duplicate purchases.
     pub fn durable_transition_pending(&self) -> bool {

@@ -24,6 +24,9 @@ pub(super) struct Snapshot {
     pub settings: Settings,
     pub campaign_path: PathBuf,
     pub settings_path: PathBuf,
+    /// Copy the settings file aside before its first replacement
+    /// (`profile::preserve_settings_original`).
+    pub preserve_settings: bool,
 }
 #[derive(Debug)]
 enum Payload {
@@ -83,6 +86,9 @@ trait Backend: Send + 'static {
 #[derive(Default)]
 struct FileStore {
     preserved: Vec<(PathBuf, u64)>,
+    /// Settings files already copied aside this session; later saves replace
+    /// only this session's own writes and must not copy them over the original.
+    settings_preserved: Vec<PathBuf>,
 }
 impl Backend for FileStore {
     fn execute(&mut self, job: Job) -> Completion {
@@ -92,6 +98,12 @@ impl Backend for FileStore {
             Payload::Save(snapshot) => {
                 recovered =
                     apply::preserve_unreadable(&snapshot.campaign_path, &mut self.preserved)?;
+                if snapshot.preserve_settings
+                    && !self.settings_preserved.contains(&snapshot.settings_path)
+                {
+                    crate::profile::preserve_settings_original(&snapshot.settings_path)?;
+                    self.settings_preserved.push(snapshot.settings_path.clone());
+                }
                 snapshot.game.save(&snapshot.campaign_path)?;
                 apply::write_settings(&snapshot.settings, &snapshot.settings_path)?;
                 Ok(Commit::Saved)
@@ -523,6 +535,7 @@ mod tests {
                 settings: Settings::default(),
                 campaign_path: self.0.join("campaign.json"),
                 settings_path: self.0.join("settings.json"),
+                preserve_settings: false,
             }
         }
     }

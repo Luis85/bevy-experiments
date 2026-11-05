@@ -173,6 +173,99 @@ fn binding_capture_ignores_its_activation_click_and_swaps_duplicates() {
 }
 
 #[test]
+fn binding_capture_swaps_a_core_key_with_an_extra_key() {
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    assert_eq!(f.settings.extra_bindings.world_clock, "P");
+    h.click(f, View::Settings, "R");
+    assert!(f.prefs.rebind == Some(Action::Reload));
+    h.frame(f, View::Settings, vec![]);
+    h.key(f, View::Settings, Key::P);
+    assert!(f.prefs.rebind.is_none());
+    assert_eq!(f.settings.bindings[Action::Reload as usize], "P");
+    assert_eq!(f.settings.extra_bindings.world_clock, "R");
+}
+
+/// The frontend as startup builds it from the files already in `directory`.
+fn frontend_loaded_from(directory: &std::path::Path) -> FrontendParts {
+    let paths = ProfilePaths::in_directory(directory.to_path_buf());
+    let profile = crate::profile::LoadedProfile::load(&paths);
+    FrontendParts::new(profile, &crate::launch::LaunchConfig::default(), &paths)
+}
+
+/// A manual save in its own frame (a frame enqueues one save of an intent),
+/// waited for.
+fn save_in_frame(f: &mut FrontendParts, frame: u32) {
+    f.runtime.begin_frame(frame);
+    f.act(|c| c.request_save(SaveIntent::Manual));
+    f.flush_for_test();
+}
+
+#[test]
+fn settings_copy_failure_at_startup_keeps_the_original_until_a_save_can_copy_it() {
+    let mut fixture = IsolatedFrontend::new();
+    let directory = fixture.directory.clone();
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("settings.json");
+    let original = b"{\"master\": 0.3, truncated by a crash";
+    std::fs::write(&path, original).unwrap();
+    // A directory where the copy belongs: creating the copy fails.
+    let copy = directory.join(crate::profile::UNREADABLE_SETTINGS);
+    std::fs::create_dir(&copy).unwrap();
+    fixture.frontend = frontend_loaded_from(&directory);
+    let f = &mut fixture.frontend;
+    assert_eq!(f.settings, Settings::default());
+    save_in_frame(f, 1);
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    assert!(
+        f.status.message.starts_with("Save failed:"),
+        "{}",
+        f.status.message
+    );
+    // Once the copy can be made, the next save makes it before replacing.
+    std::fs::remove_dir(&copy).unwrap();
+    save_in_frame(f, 2);
+    assert_eq!(std::fs::read(&copy).unwrap(), original);
+    assert_eq!(Settings::load(&path), Settings::default());
+    // Later saves replace only settings.json; the copy keeps the original.
+    f.settings.master = 0.4;
+    save_in_frame(f, 3);
+    assert_eq!(std::fs::read(&copy).unwrap(), original);
+    assert_eq!(Settings::load(&path).master, 0.4);
+}
+
+#[test]
+fn settings_read_failure_at_startup_copies_the_original_before_the_first_save() {
+    let mut fixture = IsolatedFrontend::new();
+    let directory = fixture.directory.clone();
+    let path = directory.join("settings.json");
+    // A directory cannot be read as a file: the startup read fails with an
+    // error other than NotFound, as a sharing violation or a denied read does.
+    std::fs::create_dir_all(&path).unwrap();
+    fixture.frontend = frontend_loaded_from(&directory);
+    // The file becomes readable again, holding the player's real settings.
+    std::fs::remove_dir(&path).unwrap();
+    let real = Settings {
+        master: 0.25,
+        ..Settings::default()
+    };
+    real.save(&path).unwrap();
+    let original = std::fs::read(&path).unwrap();
+    let f = &mut fixture.frontend;
+    assert_eq!(f.settings, Settings::default());
+    save_in_frame(f, 1);
+    let copy = directory.join(crate::profile::UNREADABLE_SETTINGS);
+    assert_eq!(std::fs::read(&copy).ok(), Some(original.clone()));
+    // Later saves never copy this session's own writes over the original.
+    f.settings.master = 0.4;
+    save_in_frame(f, 2);
+    assert_eq!(std::fs::read(&copy).unwrap(), original);
+    assert_eq!(Settings::load(&path).master, 0.4);
+}
+
+#[test]
 fn field_guidance_defaults_on_for_old_settings_and_is_saved_when_changed() {
     let settings: Settings = serde_json::from_str("{}").unwrap();
     assert!(settings.show_guidance);
