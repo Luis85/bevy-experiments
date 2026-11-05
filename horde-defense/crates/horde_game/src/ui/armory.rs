@@ -575,6 +575,7 @@ pub(super) fn armory(ui: &mut egui::Ui, f: &mut UiCtx) {
             if ui.button("Save loadout preset").clicked() { f.dispatch(Command::SavePreset { name: f.armory.preset_name.clone(), mode: f.campaign.mode }, "Loadout saved by reference."); }
             for (index, preset) in f.game.campaign().presets.clone().iter().enumerate() {
                 if ui.button(format!("Use {}", preset.name)).clicked() { f.dispatch(Command::ApplyPreset { index, mode: f.campaign.mode }, "Loadout equipped."); }
+                if ui.button(format!("Delete {}", preset.name)).on_hover_text("Removes this preset only; its items stay in the armory.").clicked() { f.dispatch(Command::DeletePreset { index }, "Preset deleted."); }
             }
         });
     });
@@ -872,14 +873,12 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                 "Favorite updated.",
             );
         }
-        // Until W1-20 SellItem still sells through the blocks it overrides.
+        // Strict SellItem (ruleset 2): a blocked item cannot be reviewed for
+        // sale, and the disabled button says why in the core's words.
         let sale = f.game.sale_eligibility(item.id);
-        let reviewable = sale
-            .as_ref()
-            .map_or_else(SaleBlock::sell_item_overrides, |_| true);
         if ui
             .add_enabled(
-                reviewable,
+                sale.is_ok(),
                 egui::Button::new(format!(
                     "Review sale · {}",
                     f.game
@@ -888,7 +887,12 @@ fn selected_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
                         .expect("owned equipment")
                 )),
             )
-            .on_disabled_hover_text(sale.err().map(|b| b.label()).unwrap_or_default())
+            .on_disabled_hover_text(
+                sale.err()
+                    .as_ref()
+                    .map(SaleBlock::label)
+                    .unwrap_or_default(),
+            )
             .clicked()
         {
             f.armory.pending_sale = Some(item.id);
@@ -999,63 +1003,26 @@ fn item_sale_confirmation(ui: &mut egui::Ui, f: &mut UiCtx) {
     if let Some(id) = f.armory.pending_sale {
         ui.add_space(8.0);
         match f.game.sale_eligibility(id) {
-            Err(block) if !block.sell_item_overrides() => {
+            Err(block) => {
                 ui.colored_label(RED, block.label());
                 if ui.button("Dismiss sale").clicked() {
                     f.armory.pending_sale = None;
                 }
             }
-            sale => {
-                let coins = match &sale {
-                    Ok(quote) => quote.coins,
-                    Err(_) => f.game.campaign().item_sale_value(id).unwrap_or_default(),
-                };
+            Ok(quote) => {
                 let name = f
                     .game
                     .campaign()
                     .item(id)
                     .map(|item| item.definition().name.as_str())
                     .unwrap_or("Equipment");
-                ui.colored_label(AMBER, format!("Sell {name} #{id} for {coins} coins?"));
-                // An overriding SellItem (until W1-20) breaks every preset and
-                // idle recruit loadout that references the item, not only the
-                // first block reported.
-                if sale.is_err() {
-                    let presets: Vec<&str> = f
-                        .game
-                        .campaign()
-                        .presets
-                        .iter()
-                        .filter(|p| p.loadout.contains(&id))
-                        .map(|p| p.name.as_str())
-                        .collect();
-                    if !presets.is_empty() {
-                        ui.label(format!(
-                            "These presets will be incomplete: {}",
-                            presets.join(", ")
-                        ));
-                    }
-                    let survivors: Vec<&str> = f
-                        .game
-                        .strategy()
-                        .roster
-                        .iter()
-                        .filter(|r| r.npc.loadout.contains(&id))
-                        .map(|r| r.name.as_str())
-                        .collect();
-                    if !survivors.is_empty() {
-                        ui.label(format!(
-                            "These survivors will use protected starter equipment: {}",
-                            survivors.join(", ")
-                        ));
-                    }
-                }
+                ui.colored_label(
+                    AMBER,
+                    format!("Sell {name} #{id} for {} coins?", quote.coins),
+                );
                 ui.horizontal(|ui| {
                     if ui.button("Confirm item sale").clicked() {
-                        f.dispatch(
-                            Command::SellItem(id),
-                            "Item sold. Affected loadouts use protected equipment.",
-                        );
+                        f.dispatch(Command::SellItem(id), "Item sold.");
                     }
                     if ui.button("Keep item").clicked() {
                         f.armory.pending_sale = None;

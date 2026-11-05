@@ -201,6 +201,17 @@ impl Campaign {
         }
         Ok(())
     }
+    /// Removes the preset at `index` (`Command::DeletePreset`). Presets hold
+    /// references only, so no item or loadout changes; the items it held
+    /// stop reporting `SaleBlock::Preset`.
+    pub fn delete_preset(&mut self, index: usize) -> Result<(), String> {
+        self.preparation()?;
+        if index >= self.presets.len() {
+            return Err("Unknown preset".into());
+        }
+        self.presets.remove(index);
+        Ok(())
+    }
     pub fn apply_preset(&mut self, index: usize, mode: Mode) -> Result<(), String> {
         self.preparation()?;
         let loadout = self.presets.get(index).ok_or("Unknown preset")?.loadout;
@@ -218,19 +229,6 @@ impl Campaign {
             Mode::Npc => self.npc.loadout = loadout,
         };
         Ok(())
-    }
-    pub(super) fn personal_starter_id(&self, slot: usize) -> u64 {
-        if slot == 0
-            && self.items.iter().any(|i| {
-                i.id == 5
-                    && i.protected
-                    && WeaponSpec::from_item(i.definition()).class == WeaponClass::Pistol
-            })
-        {
-            5
-        } else {
-            slot as u64 + 1
-        }
     }
     pub fn validate_loadout(&self, loadout: [u64; 4]) -> Result<(), String> {
         for (slot, id) in loadout.into_iter().enumerate() {

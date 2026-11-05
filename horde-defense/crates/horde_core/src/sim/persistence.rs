@@ -8,7 +8,13 @@ const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
 
 /// Revision of the gameplay rules. Bump when the same saved state and inputs
 /// would produce different outcomes; a mismatch on load is logged, not fatal.
-pub const RULESET_VERSION: u32 = 1;
+///
+/// - 2 (W1-20): `SellItem` is strict. An equipped, preset, recruit-equipped
+///   or NPC-issue item is refused with `SaleBlocked` instead of being sold
+///   with its loadout slots replaced by starter equipment, so ruleset 1
+///   recordings that sold such an item diverge. No seeded run sells, so
+///   `GAMEPLAY_TRACE` and `GOLDEN` are unchanged.
+pub const RULESET_VERSION: u32 = 2;
 
 /// A save or load failure. `Display` keeps the player-facing wording.
 #[derive(Debug)]
@@ -918,6 +924,14 @@ mod tests {
             std::fs::remove_file(path).unwrap();
         }
         std::fs::remove_dir(root).unwrap();
+    }
+
+    /// Ruleset 2 (W1-20): `SellItem` is strict. The same saved state and
+    /// commands that sold an equipped, preset, recruit-equipped or NPC-issue
+    /// item under ruleset 1 now reject it with `SaleBlocked`.
+    #[test]
+    fn ruleset_version_is_2() {
+        assert_eq!(RULESET_VERSION, 2);
     }
 
     #[test]

@@ -588,8 +588,13 @@ mod tests {
         assert_eq!(c.npc.objectives_claimed, [true, true]);
         assert_eq!(c.npc.awarded, 14);
     }
+    /// Rewritten in W1-20 (was `reserved_equipment_cannot_be_sold_or_changed`,
+    /// whose second half sold the equipped rifle and checked that the starter
+    /// pistol replaced it): strict SellItem refuses equipped items with a
+    /// typed block and never rewrites a loadout. Unequipping is the way out.
     #[test]
-    fn reserved_equipment_cannot_be_sold_or_changed() {
+    fn sell_item_rejects_equipped_personal_item_with_typed_block_and_no_replacement() {
+        use crate::command::CommandError::SaleBlocked;
         let mut c = Campaign::default();
         c.reward(
             price(&["quick_reload", "rifle_training"]),
@@ -598,14 +603,30 @@ mod tests {
         );
         c.purchase_node("quick_reload").unwrap();
         c.purchase_node("rifle_training").unwrap();
+        let refs = SaleRefs::empty();
         let id = c.add_item(4).unwrap();
         c.equip(Mode::Personal, id).unwrap();
+        let mara = c.add_item(4).unwrap();
+        c.equip(Mode::Npc, mara).unwrap();
         c.reserve(Mode::Personal).unwrap();
-        assert!(c.sell(id, &SaleRefs::empty()).is_err());
+        assert_eq!(c.sell(id, &refs), Err(SaleBlocked(SaleBlock::InBattle)));
         assert!(c.equip(Mode::Personal, 1).is_err());
         c.finish_attempt();
-        assert_eq!(c.sell(id, &SaleRefs::empty()).unwrap(), 22);
+        let before = c.clone();
+        assert_eq!(
+            c.sell(id, &refs),
+            Err(SaleBlocked(SaleBlock::EquippedPersonal))
+        );
+        assert_eq!(
+            c.sell(mara, &refs),
+            Err(SaleBlocked(SaleBlock::EquippedMara))
+        );
+        assert_eq!(c, before, "a refused sale changes nothing");
+        assert_eq!(c.player.loadout[0], id);
+        c.equip(Mode::Personal, 5).unwrap();
+        assert_eq!(c.sell(id, &refs), Ok(22));
         assert_eq!(c.player.loadout[0], 5);
+        assert_eq!(c.npc.loadout[0], mara);
     }
     #[test]
     fn starter_set_survives_every_sale() {
@@ -638,9 +659,25 @@ mod tests {
             c.sale_eligibility_for(id, SaleOrigin::Player, &SaleRefs::empty()),
             Err(SaleBlock::EquippedPersonal)
         );
-        // SellItem still sells through it until W1-20; the preset breaks.
-        c.sell(id, &SaleRefs::empty()).unwrap();
+        // Rewritten in W1-20 (SellItem used to sell through both blocks and
+        // leave "Rifle" incomplete): the sale is refused while the rifle is
+        // equipped, then while "Rifle" holds it, and deleting the preset is
+        // the way out. No preset is ever left pointing at a sold item.
+        c.equip(Mode::Personal, 5).unwrap();
+        c.equip(Mode::Npc, 1).unwrap();
+        assert_eq!(
+            c.sell(id, &SaleRefs::empty()),
+            Err(crate::command::CommandError::SaleBlocked(
+                SaleBlock::Preset {
+                    names: vec!["Rifle".into()]
+                }
+            ))
+        );
+        assert!(c.delete_preset(2).is_err(), "unknown preset index");
+        c.delete_preset(1).unwrap();
+        assert_eq!(c.sell(id, &SaleRefs::empty()), Ok(22));
         assert!(c.apply_preset(1, Mode::Personal).is_err());
+        assert!(c.validate().is_ok());
     }
     #[test]
     fn invalid_layout_spends_nothing() {

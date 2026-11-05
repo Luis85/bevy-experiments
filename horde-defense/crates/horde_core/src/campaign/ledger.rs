@@ -1,6 +1,7 @@
 //! Coin and XP transactions: rewards, purchases, sales and run bookkeeping.
 
 use super::*;
+use crate::command::CommandError;
 
 impl Campaign {
     pub(super) fn spend(&mut self, price: u64) -> Result<(), String> {
@@ -43,31 +44,17 @@ impl Campaign {
         self.coins -= price;
         Ok(id)
     }
-    /// `Command::SellItem` before W1-20: one item through [`Self::sale_block`],
-    /// overriding only the blocks [`SaleBlock::sell_item_overrides`] lists;
-    /// the loadouts that held it fall back to protected starter equipment.
-    pub(crate) fn sell(&mut self, id: u64, refs: &SaleRefs) -> Result<u64, String> {
-        if let Some(block) = self.sale_block(id, refs, SaleOrigin::Player)
-            && !block.sell_item_overrides()
-        {
-            return Err(block.label());
-        }
-        let coins = self.item_sale_value(id)?;
-        let wallet = self
-            .coins
-            .checked_add(coins)
-            .ok_or("Sale would exceed the wallet limit")?;
-        self.items.retain(|x| x.id != id);
-        for slot in 0..4 {
-            if self.player.loadout[slot] == id {
-                self.player.loadout[slot] = self.personal_starter_id(slot);
-            }
-            if self.npc.loadout[slot] == id {
-                self.npc.loadout[slot] = slot as u64 + 1;
-            }
-        }
-        self.coins = wallet;
-        Ok(coins)
+    /// `Command::SellItem`, strict since ruleset 2: one item sells only when
+    /// [`Self::sale_block`] allows it, otherwise the typed block is returned
+    /// and nothing changes. No loadout, preset or recruit slot is rewritten.
+    pub(crate) fn sell(&mut self, id: u64, refs: &SaleRefs) -> Result<u64, CommandError> {
+        let quote = self
+            .sale_eligibility_for(id, SaleOrigin::Player, refs)
+            .map_err(CommandError::SaleBlocked)?;
+        self.execute_plan(&SalePlan {
+            ids: vec![id],
+            coins: quote.coins,
+        })
     }
     /// What selling every eligible item pays; 0 while a defender is deployed.
     pub(crate) fn sell_quote(&self, refs: &SaleRefs) -> u64 {
@@ -75,7 +62,7 @@ impl Campaign {
             .coins
     }
     /// Sells every eligible item, or nothing when the wallet would overflow.
-    pub(crate) fn sell_unprotected(&mut self, refs: &SaleRefs) -> Result<u64, String> {
+    pub(crate) fn sell_unprotected(&mut self, refs: &SaleRefs) -> Result<u64, CommandError> {
         self.preparation()?;
         let plan = self.plan_batch(refs, SaleOrigin::Player, self.owned_item_ids());
         self.execute_plan(&plan)

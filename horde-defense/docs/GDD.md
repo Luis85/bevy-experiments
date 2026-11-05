@@ -392,7 +392,7 @@ Drop probability must follow kill volume. For example, a 3% chance across 200 el
 
 ## Selling and loadout safety
 
-Sell items in preparation. Show total proceeds before a batch sale. Locked items and actively deployed equipment cannot be sold. Favorited items are excluded from batch sales; deliberately selling one requires removing its protection first. Saved loadout references produce a warning if selling would leave a preset incomplete.
+Sell items in preparation. Show total proceeds before a batch sale. One sale rule decides every sale, single or batch: an item sells only when nothing holds it. Locked, favorited, protected starter and NPC-issue items, equipment worn by you, Mara or an idle survivor, items a saved preset references and items reserved by a deployment or a country guard cannot be sold. The armory disables the sale and states the first reason in plain text; unlock, unfavorite, unequip or delete the preset first. A sale never rewrites a loadout and never leaves a preset incomplete (ruleset 2).
 
 Multiple presets may reference the same owned rifle because only one defender deploys at a time. Deployment reserves the actual item; a preset never creates a duplicate. A protected starter equipment set always remains available.
 

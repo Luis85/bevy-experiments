@@ -95,7 +95,10 @@ const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
 
 /// The ruleset `GAMEPLAY_TRACE` was recorded under. It follows
 /// `RULESET_VERSION` in the commits that bump it (ruling P4).
-const TRACE_RULESET: u32 = 1;
+///
+/// - 2 (W1-20, strict `SellItem`): the traced runs never sell, so every
+///   `GAMEPLAY_TRACE` digest is unchanged; only the label moves.
+const TRACE_RULESET: u32 = 2;
 
 /// Provisional `(GOLDEN, GAMEPLAY_TRACE)` digests, in `GOLDEN` order, set by
 /// a digest-moving commit until the wave's re-bless folds them (ruling P3).

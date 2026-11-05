@@ -953,13 +953,13 @@ impl Game {
         self.campaign
             .plan_batch(&self.strategy.sale_refs(), origin, ids)
     }
-    /// `Command::SellItem`. Until W1-20 it keeps its pre-strict behaviour: it
-    /// sells through the blocks [`SaleBlock::sell_item_overrides`] lists and
-    /// the affected loadouts fall back to protected starter equipment.
-    pub fn sell_item(&mut self, id: u64) -> Result<u64, String> {
-        let coins = self.campaign.sell(id, &self.strategy.sale_refs())?;
-        self.strategy.reconcile_loadouts(&self.campaign);
-        Ok(coins)
+    /// `Command::SellItem`, strict since ruleset 2 (W1-20): sells `id` for
+    /// its `sale_eligibility` quote, or answers `SaleBlocked` with the first
+    /// guard and changes nothing. A sale never rewrites a loadout, so no
+    /// recruit reconciliation follows (`reconcile_loadouts` stays for save
+    /// repair only).
+    pub fn sell_item(&mut self, id: u64) -> Result<u64, crate::command::CommandError> {
+        self.campaign.sell(id, &self.strategy.sale_refs())
     }
     /// What `SellUnprotected` pays: the summed `sale_eligibility` Ok set.
     pub fn sell_extras_quote(&self) -> u64 {
@@ -968,11 +968,11 @@ impl Game {
     }
     /// Sells exactly the `sale_eligibility` Ok set; `Ok(0)` while a defender
     /// is deployed, and nothing when the wallet would overflow.
-    pub fn sell_extras(&mut self) -> Result<u64, String> {
+    pub fn sell_extras(&mut self) -> Result<u64, crate::command::CommandError> {
         let plan = self.plan_sale(SaleOrigin::Player, self.campaign.owned_item_ids());
         self.campaign.execute_plan(&plan)
     }
-    pub fn sell_unprotected(&mut self) -> Result<u64, String> {
+    pub fn sell_unprotected(&mut self) -> Result<u64, crate::command::CommandError> {
         self.sell_extras()
     }
     pub fn deploy(&mut self, level: usize, mode: Mode) -> Result<(), String> {

@@ -169,8 +169,10 @@ impl StrategyState {
         recruit.npc = std::mem::replace(&mut campaign.npc, main);
         result
     }
-    /// Selling an idle survivor's optional item restores the real protected set
-    /// issued at recruitment. Deployed equipment is never eligible for sale.
+    /// Save repair: an idle survivor slot whose item is no longer owned falls
+    /// back to the real protected set issued at recruitment. Sales never need
+    /// it since ruleset 2 (strict `SellItem` refuses recruit-equipped items);
+    /// loading a save still runs it.
     pub fn reconcile_loadouts(&mut self, campaign: &Campaign) -> usize {
         let mut bundles: Vec<u64> = campaign
             .items
@@ -222,7 +224,10 @@ impl StrategyState {
     }
     /// Sells every eligible item. While a defender is deployed nothing is
     /// eligible and this returns `Ok(0)`, as it always has.
-    pub fn sell_extras(&mut self, campaign: &mut Campaign) -> Result<u64, String> {
+    pub fn sell_extras(
+        &mut self,
+        campaign: &mut Campaign,
+    ) -> Result<u64, crate::command::CommandError> {
         if campaign.reserved.is_some() {
             return Ok(0);
         }
@@ -1153,8 +1158,13 @@ mod tests {
         assert!(!s.resolve_outbreak(&id));
         assert_eq!(c.coins, coins);
     }
+    /// Rewritten in W1-20 (was `idle_recruit_sales_warn_and_restore_the_
+    /// original_owned_starter_set`): SellItem is strict, so a recruit-equipped
+    /// item is no longer sold with a warning and replaced by the recruit's
+    /// starter set. The way out is to re-equip the recruit's own starter item;
+    /// then the rifle sells and no loadout needs repair.
     #[test]
-    fn idle_recruit_sales_warn_and_restore_the_original_owned_starter_set() {
+    fn idle_recruit_equipment_sells_only_after_the_recruit_switches_back() {
         let mut c = liberated(1);
         let mut s = StrategyState::default();
         let country = c.world.cleared[0].clone();
@@ -1162,31 +1172,31 @@ mod tests {
         let starter = s.roster[0].npc.loadout[0];
         let rifle = c.add_item(4).unwrap();
         s.equip_recruit(&c, id, rifle).unwrap();
-        let refs = s.sale_refs();
+        let blocked = crate::campaign::SaleBlock::RecruitEquipped {
+            name: s.roster[0].name.clone(),
+        };
         assert_eq!(
-            c.sale_eligibility_for(rifle, crate::campaign::SaleOrigin::Player, &refs),
-            Err(crate::campaign::SaleBlock::RecruitEquipped {
-                name: s.roster[0].name.clone()
-            })
+            c.sale_eligibility_for(rifle, crate::campaign::SaleOrigin::Player, &s.sale_refs()),
+            Err(blocked.clone())
         );
         assert_eq!(s.sell_extras_quote(&c), 0);
-        // SellItem still sells through the recruit block until W1-20.
-        c.sell(rifle, &refs).unwrap();
-        assert_eq!(s.reconcile_loadouts(&c), 1);
-        assert_eq!(s.roster[0].npc.loadout[0], starter);
-        assert_ne!(starter, 1);
+        assert_eq!(
+            c.sell(rifle, &s.sale_refs()),
+            Err(crate::command::CommandError::SaleBlocked(blocked))
+        );
+        s.equip_recruit(&c, id, starter).unwrap();
+        assert_eq!(c.sell(rifle, &s.sale_refs()), Ok(22));
+        assert_eq!(s.reconcile_loadouts(&c), 0, "no loadout needs repair");
         assert!(s.validate(&c).is_ok());
     }
-    /// CHARACTERISATION TEST (LE-1, W1-18): it pins today's defect and passes
-    /// on the old code by construction. The Campaign-level batch filter
-    /// (`Campaign::sell_quote` / `Campaign::sell_unprotected`) cannot see
-    /// recruit loadouts, so it quotes and sells a rifle a recruit has equipped,
-    /// leaving the strategic state invalid. W1-20 replaces this test with
-    /// `strict_sell_rejects_recruit_equipped_item`. Since W1-19 the wrappers
-    /// take `SaleRefs`; the empty refs are exactly the old Campaign-only view,
-    /// while every Game path passes `StrategyState::sale_refs`.
+    /// Replaces the W1-18 characterisation test
+    /// `old_campaign_filter_sells_recruit_equipped_item` (LE-1, acceptance
+    /// G4.2), inverted: every sell path reads the recruit loadouts through
+    /// `StrategyState::sale_refs`, so a rifle an idle recruit has equipped is
+    /// neither quoted nor sold, by the batch or by the strict single sale, and
+    /// the strategic state stays valid.
     #[test]
-    fn old_campaign_filter_sells_recruit_equipped_item() {
+    fn strict_sell_rejects_recruit_equipped_item() {
         let mut c = liberated(1);
         let mut s = StrategyState::default();
         let country = c.world.cleared[0].clone();
@@ -1194,15 +1204,20 @@ mod tests {
         let rifle = c.add_item(4).unwrap();
         s.equip_recruit(&c, id, rifle).unwrap();
         assert_eq!(s.roster[0].npc.loadout[0], rifle);
-        assert!(s.validate(&c).is_ok());
-        // The old filter counts the recruit-equipped rifle as an extra.
-        let campaign_only = crate::campaign::SaleRefs::empty();
-        assert_eq!(c.sell_quote(&campaign_only), 22);
-        assert_eq!(c.sell_unprotected(&campaign_only).unwrap(), 22);
-        assert!(c.item(rifle).is_none());
-        // The recruit still references the sold rifle.
+        let before = c.clone();
+        assert_eq!(s.sell_extras_quote(&c), 0);
+        assert_eq!(s.sell_extras(&mut c), Ok(0));
+        assert_eq!(
+            c.sell(rifle, &s.sale_refs()),
+            Err(crate::command::CommandError::SaleBlocked(
+                crate::campaign::SaleBlock::RecruitEquipped {
+                    name: s.roster[0].name.clone()
+                }
+            ))
+        );
+        assert_eq!(c, before);
         assert_eq!(s.roster[0].npc.loadout[0], rifle);
-        assert!(s.validate(&c).is_err());
+        assert!(s.validate(&c).is_ok());
     }
     #[test]
     fn recruited_backgrounds_and_policies_are_individual_and_training_preserves_creation() {

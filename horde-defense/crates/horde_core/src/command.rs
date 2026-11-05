@@ -2,7 +2,7 @@
 //! frontends: every domain rule a player intent must satisfy lives here or in
 //! the campaign/strategy/sim methods it calls, never in a frontend.
 use crate::balance::BalanceSettings;
-use crate::campaign::NpcTraining;
+use crate::campaign::{NpcTraining, SaleBlock};
 use crate::content::{ItemDefId, Mode, Policy, StructureKind};
 use crate::defenders::{DefenderBlocker, DefenderId};
 use crate::sim::{Game, JourneyContinuation};
@@ -119,6 +119,10 @@ pub enum Command {
         battle: u64,
         structure: u64,
     },
+    /// Removes the saved preset at `index`; its items stop blocking sales.
+    DeletePreset {
+        index: usize,
+    },
 }
 
 impl Command {
@@ -168,6 +172,10 @@ pub enum CommandError {
         defender: DefenderId,
         blocker: DefenderBlocker,
     },
+    /// The item cannot be sold; the block says why (strict `SellItem`).
+    SaleBlocked(SaleBlock),
+    /// The sale would overflow the wallet; nothing was sold.
+    WalletLimit,
 }
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -189,6 +197,8 @@ impl fmt::Display for CommandError {
             Self::Rejected(message) => f.write_str(message),
             Self::DefenseInProgress => f.write_str("Only possible between defenses"),
             Self::DefenderUnavailable { blocker, .. } => write!(f, "{blocker}"),
+            Self::SaleBlocked(block) => f.write_str(&block.label()),
+            Self::WalletLimit => f.write_str("Sale would exceed the wallet limit"),
         }
     }
 }
@@ -344,6 +354,10 @@ impl Game {
             }
             Command::ApplyPreset { index, mode } => {
                 self.campaign.apply_preset(*index, *mode)?;
+                Applied
+            }
+            Command::DeletePreset { index } => {
+                self.campaign.delete_preset(*index)?;
                 Applied
             }
             Command::BuyNpcPoint => {
@@ -675,6 +689,7 @@ mod tests {
                 column: 1,
             },
             Command::ChooseSurvivor(SurvivorId::June),
+            Command::DeletePreset { index: 2 },
         ];
         for command in commands {
             let json = serde_json::to_string(&command).unwrap();

@@ -2,12 +2,13 @@
 //! only place that decides whether an owned item may be sold; the quote
 //! ([`Campaign::sale_eligibility_for`]), the batch plan
 //! ([`Campaign::plan_batch`]) and the batch sale ([`Campaign::execute_plan`])
-//! all read it, and `Game::sale_eligibility` is the public facade.
-//! `Command::SellItem` still sells through the equipped, preset, recruit and
-//! NPC-issue blocks until W1-20 makes it strict
-//! ([`SaleBlock::sell_item_overrides`]).
+//! all read it, and `Game::sale_eligibility` is the public facade. Since
+//! ruleset 2 (W1-20) `Command::SellItem` is strict: it sells exactly when the
+//! rule allows and otherwise answers `CommandError::SaleBlocked(block)`; no
+//! sale ever rewrites a loadout.
 
 use super::*;
+use crate::command::CommandError;
 
 /// Who is selling. Pure reads never consume RNG either way.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,23 +65,10 @@ impl SaleBlock {
             Self::RecruitEquipped { name } => format!("Equipped by {name}"),
         }
     }
-    /// Until W1-20 `Command::SellItem` keeps its pre-strict behaviour: it
-    /// sells through these blocks and the affected loadouts fall back to
-    /// protected starter equipment. Batch sales and quotes never do.
-    pub fn sell_item_overrides(&self) -> bool {
-        matches!(
-            self,
-            Self::NpcOnly
-                | Self::EquippedPersonal
-                | Self::EquippedMara
-                | Self::Preset { .. }
-                | Self::RecruitEquipped { .. }
-        )
-    }
 }
 
-/// The shortcut a blocked sale offers. Wired to [`SaleBlock`] with the strict
-/// `SellItem` (W1-20) and the armory resolution buttons.
+/// The shortcut a blocked sale offers. Wired to [`SaleBlock`] with the armory
+/// resolution buttons (wave 3); W1-20 shows only `SaleBlock::label()`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SaleResolution {
     Unlock,
@@ -207,11 +195,11 @@ impl Campaign {
         self.items.iter().map(|i| i.id).collect()
     }
     /// Sells a whole plan or nothing: the wallet limit rejects the batch.
-    pub(crate) fn execute_plan(&mut self, plan: &SalePlan) -> Result<u64, String> {
+    pub(crate) fn execute_plan(&mut self, plan: &SalePlan) -> Result<u64, CommandError> {
         let wallet = self
             .coins
             .checked_add(plan.coins)
-            .ok_or("Batch sale would exceed the wallet limit")?;
+            .ok_or(CommandError::WalletLimit)?;
         let sold: BTreeSet<u64> = plan.ids.iter().copied().collect();
         self.items.retain(|x| !sold.contains(&x.id));
         self.coins = wallet;
@@ -268,7 +256,7 @@ mod tests {
         let plan = c.plan_batch(&refs, SaleOrigin::Player, c.owned_item_ids());
         assert_eq!(plan.ids.len(), 1);
         let before = c.clone();
-        assert!(c.execute_plan(&plan).is_err());
+        assert_eq!(c.execute_plan(&plan), Err(CommandError::WalletLimit));
         assert_eq!(c, before);
     }
 }

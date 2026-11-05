@@ -441,8 +441,14 @@ fn v6_recording_initial_state_goes_through_from_payload() {
     assert!(error.contains("recorded initial state"), "{error}");
 }
 
+/// Replaces `v6_fresh_recording_reproduces_before_strict_sale` (W1-20): a
+/// ruleset 1 recording that sells an equipped item is not expected to
+/// reproduce under ruleset 2 (strict `SellItem`). Replay still loads the v6
+/// initial state, applies every command and reaches the end line; the
+/// recorded sale is now a typed rejection, so the digest differs, and the
+/// warnings name both the older ruleset and the older save version.
 #[test]
-fn v6_fresh_recording_reproduces_before_strict_sale() {
+fn pre_strict_recording_diverges_with_ruleset_warning() {
     horde_core::catalog::init_catalogs().unwrap();
     let lines = read_lines(Path::new(EQUIPPED_SALE)).unwrap();
     let Some(Line::Header(header)) = lines.first() else {
@@ -466,19 +472,35 @@ fn v6_fresh_recording_reproduces_before_strict_sale() {
         panic!("the recording ends buy, equip, sell: {commands:?}");
     };
     assert_eq!(equipped, sold, "the sold item is the equipped one");
-    assert!(matches!(lines.last(), Some(Line::End { .. })));
+    let Some(Line::End { digest, .. }) = lines.last() else {
+        panic!("the recording ends with its digest");
+    };
+    let recorded = digest.clone();
     let report = replay(lines).unwrap();
-    // The fresh v6 initial state migrates unchanged, so only the save version
-    // is reported and ruleset 1 still reproduces the recorded digest.
     assert_eq!(
-        report.warnings,
-        [format!(
-            "recorded with save version 6, this build uses {}",
-            horde_core::sim::SAVE_VERSION
-        )]
+        report.commands,
+        commands.len(),
+        "replay applies every command"
+    );
+    assert_eq!(report.recorded_digest.as_ref(), Some(&recorded));
+    assert_ne!(
+        hex(report.digest),
+        recorded,
+        "ruleset 2 refuses the equipped sale"
+    );
+    assert!(!report.matches_recording());
+    assert_eq!(report.warnings.len(), 2, "{:?}", report.warnings);
+    assert!(
+        report
+            .warnings
+            .iter()
+            .any(|w| w.contains("ruleset 1") && w.contains("may diverge")),
+        "{:?}",
+        report.warnings
     );
     assert!(
-        report.matches_recording(),
-        "ruleset 1 reproduces the recording"
+        report.warnings.iter().any(|w| w.contains("save version 6")),
+        "{:?}",
+        report.warnings
     );
 }
