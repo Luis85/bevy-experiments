@@ -56,6 +56,30 @@ identity appearance. Loading checks that each expedition game's `attempt` and
 `last_result`, when present, have the seat `{"Recruit": recruit_id}` of their
 `battles[*]` record; any other seat, including a missing key, is invalid.
 
+### Recruit takeover and next defender
+
+A recruit seat on the root `attempt` is a main-run takeover. Loading rejects
+any of these as invalid:
+
+- a `Personal` attempt or report with a recruit seat;
+- a root takeover unless exactly one roster recruit is `Defending`, it is the
+  seated one, `campaign.reserved` is `"Npc"`, `campaign.reserved_recruit`
+  names it, its loadout is in `reserved_items`, and it has no guard and no
+  running expedition;
+- a `Defending` recruit or a `reserved_recruit` without a root takeover;
+- a root report whose recruit seat is not on the roster (any status);
+- an expedition game with `reserved_recruit`, `next_defender` or a
+  `Defending` recruit;
+- a `campaign.next_defender` of `{"Recruit": id}` that is not on the roster;
+- a run record with no `worker_id` and a `recruit_id` (a main-run takeover)
+  whose mode is not `Npc`.
+
+While a recruit holds the seat, `reserved: "Npc"` no longer covers Mara's
+loadout; only the recruit's items in `reserved_items` are reserved.
+
+An expedition `summary` may carry an `outcome` or `acknowledged: true` only
+once its battle has settled, and lists at most 32 `fronts`.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add

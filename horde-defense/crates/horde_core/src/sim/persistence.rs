@@ -315,6 +315,68 @@ fn reconcile_saved_game(game: &mut Game) {
         reconcile_saved_game(&mut battle.game);
     }
 }
+/// D7 seat and takeover rules (schema-v7 §5, rules 1-4, 6 and 7; rule 5 is
+/// in the parent battle loop and rule 8 in `RunRecord::validate`). Returns
+/// the recruit holding the live depth-0 seat, whose duties and loadout
+/// `validate_game` checks with the other reservations.
+fn validate_defender_seats(game: &Game, depth: usize) -> Result<Option<u64>, String> {
+    use crate::strategy::RecruitStatus;
+    let on_roster = |id: u64| game.strategy.roster.iter().any(|r| r.id == id);
+    let defending: Vec<u64> = game
+        .strategy
+        .roster
+        .iter()
+        .filter(|r| r.status == RecruitStatus::Defending)
+        .map(|r| r.id)
+        .collect();
+    let attempt_seat = game.attempt.as_ref().map(|a| (a.mode, a.seat));
+    let report_seat = game.last_result.as_ref().map(|r| (r.mode, r.seat));
+    if [attempt_seat, report_seat]
+        .into_iter()
+        .flatten()
+        .any(|(mode, seat)| mode == Mode::Personal && !seat.is_mode_owner())
+    {
+        return Err("A personal defense names a recruit defender".into());
+    }
+    if let Some(DefenderId::Recruit(id)) = game.campaign.next_defender
+        && !on_roster(id)
+    {
+        return Err("The next defender is not on the roster".into());
+    }
+    if depth > 0 {
+        // A worker game is one expedition; main-run defender state stays
+        // with the parent.
+        if game.campaign.reserved_recruit.is_some()
+            || game.campaign.next_defender.is_some()
+            || !defending.is_empty()
+        {
+            return Err("An expedition holds main-run defender state".into());
+        }
+        return Ok(None);
+    }
+    if let Some((_, DefenderSeat::Recruit(id))) = report_seat
+        && !on_roster(id)
+    {
+        return Err("Saved report names a survivor missing from the roster".into());
+    }
+    match attempt_seat {
+        Some((_, DefenderSeat::Recruit(id))) => {
+            if defending != [id]
+                || game.campaign.reserved != Some(Mode::Npc)
+                || game.campaign.reserved_recruit != Some(id)
+            {
+                return Err("Recruit takeover does not match its Defending survivor".into());
+            }
+            Ok(Some(id))
+        }
+        _ => {
+            if !defending.is_empty() || game.campaign.reserved_recruit.is_some() {
+                return Err("A survivor is Defending without a recruit takeover".into());
+            }
+            Ok(None)
+        }
+    }
+}
 pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     game.campaign.validate()?;
     if let Some(report) = &game.last_result {
@@ -352,6 +414,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     {
         return Err("Invalid expedition tree".into());
     }
+    let takeover = validate_defender_seats(game, depth)?;
     if let Some(a) = &game.attempt {
         crate::quality::validate_loot_events(
             &a.loot_events,
@@ -603,6 +666,12 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         {
             return Err("Invalid expedition settlement cursor".into());
         }
+        if b.summary.as_ref().is_some_and(|s| {
+            ((s.acknowledged || s.outcome.is_some()) && !b.settled)
+                || s.fronts.len() > ExpeditionSummary::MAX_FRONTS
+        }) {
+            return Err("Invalid expedition outcome notice".into());
+        }
         validate_game(&b.game, depth + 1)?;
         // A worker game carries exactly one recruit: its attempt and report
         // seats name that recruit (v7 stamping, v6_to_v7 (a) for old saves).
@@ -629,6 +698,28 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
             {
                 return Err("Expedition reservation is inconsistent".into());
             }
+        }
+    }
+    if let Some(id) = takeover {
+        // D7 rule 2: the takeover recruit holds no other duty and its
+        // loadout is reserved for the main run alone.
+        let r = game
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == id)
+            .ok_or("Defending survivor missing from roster")?;
+        if game.strategy.guards.iter().any(|g| g.recruit_id == id)
+            || game
+                .battles
+                .iter()
+                .any(|b| !b.settled && b.recruit_id == id)
+            || r.npc
+                .loadout
+                .iter()
+                .any(|item| !expected_reservations.insert(*item))
+        {
+            return Err("Defending survivor has another duty or shares equipment".into());
         }
     }
     if actual_reservations != expected_reservations {

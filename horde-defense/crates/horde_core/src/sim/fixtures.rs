@@ -203,4 +203,42 @@ impl<'a> Staging<'a> {
     pub fn battles(self) -> &'a mut Vec<ParallelBattle> {
         &mut self.game.battles
     }
+    /// Test-support: hands the live depth-0 Npc defense Mara holds to the
+    /// Ready roster recruit `recruit_id`, the saved shape of a recruit
+    /// takeover: the recruit becomes Defending, its loadout joins
+    /// `reserved_items`, `reserved_recruit` names it, and the attempt takes
+    /// the recruit seat and identity appearance. The frozen combat profile
+    /// stays the one the Npc deploy built; wave 2's takeover deploy builds it
+    /// from the recruit. Fails without a change when there is no such
+    /// attempt or the recruit is unknown, not Ready, or holds reserved items.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn stage_takeover(self, recruit_id: u64) -> Result<(), String> {
+        let game = self.game;
+        let held_by_mara = game
+            .attempt
+            .as_ref()
+            .is_some_and(|a| a.mode == Mode::Npc && a.seat == DefenderSeat::ModeOwner);
+        if game.worker || !held_by_mara {
+            return Err("A takeover needs Mara's live main-run defense".into());
+        }
+        let loadout = game
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == recruit_id)
+            .ok_or("Unknown survivor")?
+            .npc
+            .loadout;
+        game.strategy.reserve_defender(recruit_id)?;
+        if let Err(error) = game.campaign.reserve_external(loadout) {
+            game.strategy
+                .release_defender(recruit_id)
+                .expect("just reserved");
+            return Err(error);
+        }
+        game.campaign.reserved_recruit = Some(recruit_id);
+        let attempt = game.attempt.as_mut().expect("checked above");
+        super::parallel::stamp_recruit_defender(attempt, recruit_id);
+        Ok(())
+    }
 }

@@ -143,7 +143,11 @@ pub struct GearRecord {
 pub struct RunRecord {
     pub id: u64,
     pub attempt_id: u64,
+    /// The expedition that ran this attempt; None for a main-run record.
     pub worker_id: Option<u64>,
+    /// The recruit who defended. With `worker_id` Some it is the expedition's
+    /// survivor; with `worker_id` None it marks a main-run recruit takeover,
+    /// which is always an Npc run.
     pub recruit_id: Option<u64>,
     pub outcome: Outcome,
     pub mode: Mode,
@@ -192,6 +196,7 @@ impl RunRecord {
             || !(8.0..=30.0).contains(&self.width_yards)
             || self.max_hp <= 0
             || self.end_hp > self.max_hp
+            || (self.worker_id.is_none() && self.recruit_id.is_some() && self.mode != Mode::Npc)
             || self.country_name.len() > 120
             || self.defender_name.len() > 120
             || self.cause.len() > 1000

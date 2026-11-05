@@ -9,7 +9,9 @@
 //! attempts at both deploy sites, with the worker-seat save validation; and
 //! (W1-16) the saved defender schema fields `Campaign.next_defender` and
 //! `reserved_recruit`, `ParallelBattle.summary`, `StrategyState.folded_outcomes`
-//! and `Recruit.containments`, all skipped at their defaults.
+//! and `Recruit.containments`, all skipped at their defaults; and (W1-17)
+//! the D7 seat, Defending and reservation validation, the expedition summary
+//! bounds and the test-support `stage_takeover` seam.
 mod support;
 use horde_core::{
     campaign::{Campaign, NpcTraining},
@@ -854,4 +856,411 @@ fn takeover_does_not_reserve_maras_idle_loadout() {
         assert!(campaign.item_reserved(item), "Mara's item {item}");
     }
     assert!(campaign.clone().reserve_external(mara_loadout).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// W1-17: D7 seat, Defending and reservation validation, the D10 summary
+// bounds and the `stage_takeover` test-support seam.
+// ---------------------------------------------------------------------------
+
+/// The same main-run state saved before and after `stage_takeover`, with
+/// four recruits on the roster: `defender` (who takes the main run),
+/// `ready`, `expedition` (on the live battle 0) and `guard` (garrisoned).
+struct TakeoverSaves {
+    mara: serde_json::Value,
+    takeover: serde_json::Value,
+    defender: u64,
+    ready: u64,
+    expedition: u64,
+    guard: u64,
+}
+
+fn takeover_saves() -> TakeoverSaves {
+    let mut g = strategic_game();
+    let country = g.campaign().world.cleared[0].clone();
+    let [defender, ready, expedition, guard] = [(); 4].map(|()| {
+        g.with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+            .unwrap()
+    });
+    g.apply(&Command::AssignGuard {
+        id: guard,
+        country: country.clone(),
+    })
+    .unwrap();
+    g.deploy_survivor(expedition, &country, 0).unwrap();
+    g.deploy(0, Mode::Npc).unwrap();
+    let mara = serde_json::to_value(&g).unwrap();
+    g.staging().stage_takeover(defender).unwrap();
+    TakeoverSaves {
+        mara,
+        takeover: serde_json::to_value(&g).unwrap(),
+        defender,
+        ready,
+        expedition,
+        guard,
+    }
+}
+
+fn roster_entry(value: &mut serde_json::Value, id: u64) -> &mut serde_json::Value {
+    value["strategy"]["roster"]
+        .as_array_mut()
+        .unwrap()
+        .iter_mut()
+        .find(|r| r["id"] == json!(id))
+        .unwrap_or_else(|| panic!("recruit {id} on the roster"))
+}
+
+fn set_status(value: &mut serde_json::Value, id: u64, status: &str) {
+    roster_entry(value, id)["status"] = json!(status);
+}
+
+fn saved_loadout(value: &mut serde_json::Value, id: u64) -> serde_json::Value {
+    roster_entry(value, id)["npc"]["loadout"].clone()
+}
+
+/// Drops `loadout`'s items from the root `reserved_items`.
+fn unreserve(value: &mut serde_json::Value, loadout: &serde_json::Value) {
+    let items = loadout.as_array().unwrap().clone();
+    value["campaign"]["reserved_items"]
+        .as_array_mut()
+        .unwrap()
+        .retain(|id| !items.contains(id));
+}
+
+/// Loads every row and fails with the names of the rows that loaded or
+/// failed with anything but `SaveError::Invalid`.
+fn assert_each_invalid(rows: Vec<(&str, serde_json::Value)>) {
+    let loaded: Vec<String> = rows
+        .into_iter()
+        .filter_map(
+            |(name, value)| match Game::from_payload(value, SAVE_VERSION) {
+                Err(SaveError::Invalid(_)) => None,
+                Ok(_) => Some(format!("{name}: loaded")),
+                Err(error) => Some(format!("{name}: {error}")),
+            },
+        )
+        .collect();
+    assert_eq!(
+        loaded,
+        Vec::<String>::new(),
+        "rows that did not fail validation"
+    );
+}
+
+#[test]
+fn staged_recruit_defending_main_run_validates() {
+    let mut saves = takeover_saves();
+    let id = saves.defender;
+    Game::from_payload(saves.mara.clone(), SAVE_VERSION).expect("Mara's defense loads");
+    let value = saves.takeover.clone();
+    assert_eq!(value["attempt"]["defender"], json!({"Recruit": id}));
+    assert_eq!(value["campaign"]["reserved"], json!("Npc"));
+    assert_eq!(value["campaign"]["reserved_recruit"], json!(id));
+    let loadout = saved_loadout(&mut saves.takeover, id);
+    for item in loadout.as_array().unwrap() {
+        assert!(
+            value["campaign"]["reserved_items"]
+                .as_array()
+                .unwrap()
+                .contains(item),
+            "recruit item {item} is reserved"
+        );
+    }
+    let loaded = Game::from_payload(value.clone(), SAVE_VERSION)
+        .unwrap_or_else(|e| panic!("staged takeover: {e}"));
+    assert_eq!(status(&loaded, id), RecruitStatus::Defending);
+    let a = loaded.attempt().unwrap();
+    assert_eq!(a.defender(), DefenderId::Recruit(id));
+    assert_eq!(a.profile.appearance, recruit_identity(id).1);
+    assert_eq!(serde_json::to_value(&loaded).unwrap(), value);
+
+    // The seam refuses without a change: no Mara defense, or a recruit that
+    // is unknown or not Ready.
+    let mut idle = strategic_game();
+    let country = idle.campaign().world.cleared[0].clone();
+    let recruit = idle
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    let mut personal = idle.clone();
+    personal.deploy(0, Mode::Personal).unwrap();
+    let mut taken = loaded.clone();
+    let busy = Game::from_payload(saves.mara, SAVE_VERSION).unwrap();
+    for (name, game, recruit) in [
+        ("no attempt", &mut idle, recruit),
+        ("personal attempt", &mut personal, recruit),
+        ("already taken over", &mut taken, saves.ready),
+        ("guarding recruit", &mut busy.clone(), saves.guard),
+        ("expedition recruit", &mut busy.clone(), saves.expedition),
+        ("unknown recruit", &mut busy.clone(), 99),
+    ] {
+        let before = serde_json::to_value(&*game).unwrap();
+        assert!(
+            game.staging().stage_takeover(recruit).is_err(),
+            "{name} was staged"
+        );
+        assert_eq!(serde_json::to_value(&*game).unwrap(), before, "{name}");
+    }
+}
+
+#[test]
+fn seat_validation_rejects_each_inconsistency() {
+    let mut saves = takeover_saves();
+    let (a, b, c, d) = (saves.defender, saves.ready, saves.expedition, saves.guard);
+    let mara = saves.mara.clone();
+    let takeover = saves.takeover.clone();
+    let loadout_a = saved_loadout(&mut saves.takeover, a);
+    let loadout_c = saved_loadout(&mut saves.takeover, c);
+    let loadout_d = saved_loadout(&mut saves.takeover, d);
+
+    // Personal defenses with a recruit on the roster, live and reported.
+    let mut personal = strategic_game();
+    let country = personal.campaign().world.cleared[0].clone();
+    let recruit = personal
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    personal.deploy(0, Mode::Personal).unwrap();
+    let live_personal = serde_json::to_value(&personal).unwrap();
+    personal.apply(&Command::Withdraw).unwrap();
+    let personal_report = serde_json::to_value(&personal).unwrap();
+    // Mara's finished defense, with no attempt and an Npc report.
+    let mut mara_game = Game::from_payload(mara.clone(), SAVE_VERSION).unwrap();
+    mara_game.apply(&Command::Withdraw).unwrap();
+    let mara_report = serde_json::to_value(&mara_game).unwrap();
+    for (name, base) in [
+        ("mara", &mara),
+        ("takeover", &takeover),
+        ("personal", &live_personal),
+        ("personal report", &personal_report),
+        ("mara report", &mara_report),
+    ] {
+        Game::from_payload(base.clone(), SAVE_VERSION)
+            .unwrap_or_else(|e| panic!("{name} baseline: {e}"));
+    }
+    // An Npc report may name any roster recruit, whatever its status.
+    let mut known_report = mara_report.clone();
+    known_report["last_result"]["defender"] = json!({"Recruit": a});
+    Game::from_payload(known_report, SAVE_VERSION).expect("a report naming a roster recruit");
+
+    let row = |base: &serde_json::Value, edit: &dyn Fn(&mut serde_json::Value)| {
+        let mut value = base.clone();
+        edit(&mut value);
+        value
+    };
+    assert_each_invalid(vec![
+        (
+            "personal attempt with a recruit seat",
+            row(&live_personal, &|v| {
+                v["attempt"]["defender"] = json!({"Recruit": recruit});
+            }),
+        ),
+        (
+            "personal report with a recruit seat",
+            row(&personal_report, &|v| {
+                v["last_result"]["defender"] = json!({"Recruit": recruit});
+            }),
+        ),
+        (
+            "report seat names no roster recruit",
+            row(&mara_report, &|v| {
+                v["last_result"]["defender"] = json!({"Recruit": 99});
+            }),
+        ),
+        (
+            "Defending without a seat",
+            row(&mara, &|v| set_status(v, b, "Defending")),
+        ),
+        (
+            "Defending without an attempt",
+            row(&mara_report, &|v| set_status(v, b, "Defending")),
+        ),
+        (
+            "reserved_recruit without a takeover",
+            row(&mara, &|v| v["campaign"]["reserved_recruit"] = json!(b)),
+        ),
+        (
+            "seat with a Ready recruit",
+            row(&takeover, &|v| set_status(v, a, "Ready")),
+        ),
+        (
+            "two Defending",
+            row(&takeover, &|v| set_status(v, b, "Defending")),
+        ),
+        (
+            "seat names no roster recruit",
+            row(&takeover, &|v| {
+                v["attempt"]["defender"] = json!({"Recruit": 99});
+            }),
+        ),
+        (
+            "Defending plus guard",
+            row(&takeover, &|v| {
+                v["strategy"]["guards"][0]["recruit_id"] = json!(a);
+                set_status(v, d, "Ready");
+                unreserve(v, &loadout_d);
+            }),
+        ),
+        (
+            "Defending plus unsettled battle",
+            row(&takeover, &|v| {
+                let battle = &mut v["battles"][0];
+                battle["recruit_id"] = json!(a);
+                battle["loadout"] = loadout_a.clone();
+                battle["game"]["attempt"]["defender"] = json!({"Recruit": a});
+                set_status(v, c, "Ready");
+                unreserve(v, &loadout_c);
+            }),
+        ),
+        (
+            "reserved_recruit names another recruit",
+            row(&takeover, &|v| v["campaign"]["reserved_recruit"] = json!(b)),
+        ),
+        (
+            "reserved_recruit missing",
+            row(&takeover, &|v| {
+                v["campaign"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("reserved_recruit");
+            }),
+        ),
+        (
+            "loadout not reserved",
+            row(&takeover, &|v| unreserve(v, &loadout_a)),
+        ),
+        (
+            "worker seat != recruit_id",
+            row(&takeover, &|v| {
+                v["battles"][0]["game"]["attempt"]["defender"] = json!({"Recruit": b});
+            }),
+        ),
+        (
+            "worker with next_defender",
+            row(&takeover, &|v| {
+                v["battles"][0]["game"]["campaign"]["next_defender"] = json!("Mara");
+            }),
+        ),
+        (
+            "worker with reserved_recruit",
+            row(&takeover, &|v| {
+                v["battles"][0]["game"]["campaign"]["reserved_recruit"] = json!(c);
+            }),
+        ),
+    ]);
+}
+
+#[test]
+fn next_defender_must_name_a_roster_recruit() {
+    let saves = takeover_saves();
+    for (name, base) in [("mara", &saves.mara), ("takeover", &saves.takeover)] {
+        for defender in [
+            json!("Player"),
+            json!("Mara"),
+            json!({"Recruit": saves.ready}),
+            json!({"Recruit": saves.guard}),
+            json!({"Recruit": saves.defender}),
+        ] {
+            let mut value = base.clone();
+            value["campaign"]["next_defender"] = defender.clone();
+            let loaded = Game::from_payload(value, SAVE_VERSION)
+                .unwrap_or_else(|e| panic!("{name} next_defender {defender}: {e}"));
+            assert_eq!(
+                serde_json::to_value(loaded.campaign().next_defender).unwrap(),
+                defender
+            );
+        }
+        let mut value = base.clone();
+        value["campaign"]["next_defender"] = json!({"Recruit": 99});
+        match Game::from_payload(value, SAVE_VERSION) {
+            Err(SaveError::Invalid(_)) => {}
+            other => panic!("{name} unknown next_defender loaded: {:?}", other.err()),
+        }
+    }
+}
+
+#[test]
+fn summary_bounds_are_validated() {
+    let (mut g, country, id) = game_with_alex();
+    let live = g.deploy_survivor(id, &country, 0).unwrap();
+    let running = serde_json::to_value(&g).unwrap();
+    g.recall_survivor(live).unwrap();
+    let settled = serde_json::to_value(&g).unwrap();
+    let fronts = |n: usize| -> Vec<String> { (0..n).map(|n| format!("front-{n}")).collect() };
+    let with = |base: &serde_json::Value, summary: serde_json::Value| {
+        let mut value = base.clone();
+        value["battles"][0]["summary"] = summary;
+        value
+    };
+    for (name, value) in [
+        (
+            "running, partial",
+            with(&running, json!({"coins": 5, "loot_count": 1})),
+        ),
+        (
+            "settled, full",
+            with(
+                &settled,
+                json!({"outcome": "Withdrawal", "acknowledged": true, "fronts": fronts(32)}),
+            ),
+        ),
+        (
+            "settled, unacknowledged",
+            with(&settled, json!({"outcome": "Victory"})),
+        ),
+    ] {
+        Game::from_payload(value, SAVE_VERSION).unwrap_or_else(|e| panic!("{name}: {e}"));
+    }
+    assert_each_invalid(vec![
+        (
+            "acknowledged while running",
+            with(&running, json!({"acknowledged": true})),
+        ),
+        (
+            "outcome while running",
+            with(&running, json!({"outcome": "Defeat"})),
+        ),
+        (
+            "33 fronts while running",
+            with(&running, json!({"fronts": fronts(33)})),
+        ),
+        (
+            "33 fronts when settled",
+            with(
+                &settled,
+                json!({"outcome": "Victory", "fronts": fronts(33)}),
+            ),
+        ),
+    ]);
+}
+
+#[test]
+fn run_record_takeover_requires_npc_mode() {
+    let mut personal = deployed(Mode::Personal);
+    personal.apply(&Command::Withdraw).unwrap();
+    let mut mara = deployed(Mode::Npc);
+    mara.apply(&Command::Withdraw).unwrap();
+    // The last main-run record, rewritten as a recruit's main-run takeover.
+    let takeover_record = |game: &Game, mode: &str| {
+        let mut value = serde_json::to_value(game).unwrap();
+        let record = value["campaign"]["run_history"]
+            .as_array_mut()
+            .unwrap()
+            .last_mut()
+            .expect("a main-run record");
+        assert_eq!(record["worker_id"], json!(null));
+        record["recruit_id"] = json!(1);
+        record["mode"] = json!(mode);
+        value
+    };
+    Game::from_payload(takeover_record(&mara, "Npc"), SAVE_VERSION)
+        .unwrap_or_else(|e| panic!("Npc takeover record: {e}"));
+    assert_each_invalid(vec![
+        (
+            "Personal takeover record",
+            takeover_record(&personal, "Personal"),
+        ),
+        (
+            "Personal-mode takeover record of an Npc run",
+            takeover_record(&mara, "Personal"),
+        ),
+    ]);
 }

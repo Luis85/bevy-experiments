@@ -805,6 +805,10 @@ pub struct ExpeditionSummary {
     pub loot_count: u32,
     pub acknowledged: bool,
 }
+impl ExpeditionSummary {
+    /// The most newly opened fronts one notice lists (save validation bound).
+    pub const MAX_FRONTS: usize = 32;
+}
 impl Default for Game {
     fn default() -> Self {
         Self {
