@@ -207,6 +207,9 @@ mod tests {
         );
         g.campaign.reserved = None;
         assert_eq!(stash_apply(&mut g, 0, 0), Err(CommandError::NothingToSell));
+        // NothingToSell comes before the quote check: a non-zero quote on an
+        // empty stash is not reported as a changed quote.
+        assert_eq!(stash_apply(&mut g, 1, 7), Err(CommandError::NothingToSell));
         let id = found(&mut g, 5, Quality::Poor);
         let coins = g.campaign.item_sale_value(id).unwrap();
         // In battle the matching drop is still refused with InBattle, even
@@ -240,6 +243,19 @@ mod tests {
         );
         assert!(g.campaign.item(id).is_none());
         assert_eq!(g.campaign.coins, coins);
+        // The realistic stale case: the player quotes one drop, then locks
+        // it, so nothing matches. The old quote gets NothingToSell, not
+        // SaleQuoteChanged { count: 0, coins: 0 }.
+        let late = found(&mut g, 5, Quality::Poor);
+        let quote = stash_preview(&g);
+        assert_eq!(quote.ids, vec![late]);
+        g.campaign.set_lock(late, true).unwrap();
+        let before = g.state_digest();
+        assert_eq!(
+            stash_apply(&mut g, quote.count, quote.coins),
+            Err(CommandError::NothingToSell)
+        );
+        assert_eq!(g.state_digest(), before, "NothingToSell changes nothing");
     }
 
     #[test]
@@ -341,8 +357,9 @@ mod tests {
         assert_eq!(preview.by_slot, [0, 1, 0, 0]);
         assert_eq!(preview.by_quality[Quality::Common], 1);
         assert!(![rare, accessory].iter().any(|id| preview.ids.contains(id)));
-        // keep_upgrades consults every defender: tier-3 riot armor beats the
-        // starter work jacket, so it is kept and counted.
+        // keep_upgrades consults every defender: the fire axe beats the
+        // player's crowbar and tier-3 riot armor the starter work jacket, so
+        // both are kept and each is counted once.
         let armor = found(&mut g, 14, Quality::Common);
         assert!(g.campaign.is_upgrade_for(
             armor,
@@ -354,15 +371,39 @@ mod tests {
             ..rule
         };
         let preview = g.auto_sell_preview(&keep, AutoSellScope::Stash);
-        assert!(!preview.ids.contains(&armor));
-        assert!(preview.kept_upgrades >= 1);
+        assert_eq!(preview.ids, Vec::<u64>::new());
+        assert_eq!(preview.kept_upgrades, 2, "the axe and the armor");
+        assert_eq!(preview.blocked, 2);
         let preview = g.auto_sell_preview(&rule, AutoSellScope::Stash);
         assert_eq!(preview.ids, vec![sold, armor]);
+        // Not only the player: a marksman rifle is no upgrade for the
+        // untrained player, but it is one for Mara once she is available.
+        let rifle = found(&mut g, 4, Quality::Common);
+        let strategy = &g.strategy;
+        let player = UpgradeJudge::Defender(DefenderId::Player);
+        let mara = UpgradeJudge::Defender(DefenderId::Mara);
+        assert!(!g.campaign.is_upgrade_for(rifle, &player, strategy));
+        assert!(g.campaign.is_upgrade_for(rifle, &mara, strategy));
+        // Without the companion Mara is not judged, so the rifle is sold.
+        assert!(!g.campaign.npc_available());
+        let preview = g.auto_sell_preview(&keep, AutoSellScope::Stash);
+        assert_eq!(preview.ids, vec![rifle]);
+        assert_eq!(preview.kept_upgrades, 2);
+        g.campaign.legacy_features = true;
+        g.campaign.attempts = 1;
+        assert!(g.campaign.npc_available());
+        let preview = g.auto_sell_preview(&keep, AutoSellScope::Stash);
+        assert_eq!(preview.ids, Vec::<u64>::new());
+        assert_eq!(
+            preview.kept_upgrades, 3,
+            "the axe, the armor and Mara's rifle"
+        );
+        assert_eq!(preview.blocked, 2);
         // In battle the player origin blocks every candidate.
         g.campaign.reserve(Mode::Personal).unwrap();
         let preview = g.auto_sell_preview(&rule, AutoSellScope::Stash);
         assert_eq!(preview.count, 0);
-        assert_eq!(preview.blocked, 4);
+        assert_eq!(preview.blocked, 5);
     }
 
     #[test]
