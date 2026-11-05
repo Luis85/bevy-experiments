@@ -509,7 +509,8 @@ pub fn capture_performance(
         ResMut<crate::runner::Runtime>,
         ResMut<crate::ui::StatusUi>,
     ),
-    window: Single<&Window>,
+    // The plan says whether a launch override set the present mode.
+    (window, plan): (Single<&Window>, Option<Res<crate::render_plan::RenderPlan>>),
     RendererInfo {
         adapter,
         device,
@@ -632,7 +633,7 @@ pub fn capture_performance(
         },
         present: Present {
             requested_mode: format!("{:?}", window.present_mode),
-            source: "settings",
+            source: plan.map_or("settings", |plan| plan.source.label()),
             pipelined_rendering: probe.pipelined(),
             desired_maximum_frame_latency: window.desired_maximum_frame_latency.map(|n| n.get()),
             low_latency: settings.as_ref().is_some_and(|s| s.low_latency),

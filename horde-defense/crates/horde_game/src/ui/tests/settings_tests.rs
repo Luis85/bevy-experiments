@@ -191,8 +191,43 @@ fn binding_capture_swaps_a_core_key_with_an_extra_key() {
 /// The frontend as startup builds it from the files already in `directory`.
 fn frontend_loaded_from(directory: &std::path::Path) -> FrontendParts {
     let paths = ProfilePaths::in_directory(directory.to_path_buf());
-    let profile = crate::profile::LoadedProfile::load(&paths);
+    let startup = crate::profile::read_settings(&paths.settings());
+    let profile = crate::profile::LoadedProfile::load(&paths, startup);
     FrontendParts::new(profile, &crate::launch::LaunchConfig::default(), &paths)
+}
+
+#[test]
+fn startup_settings_are_read_once_and_reused() {
+    let fixture = IsolatedFrontend::new();
+    let directory = fixture.directory.clone();
+    std::fs::create_dir_all(&directory).unwrap();
+    let config = crate::launch::LaunchConfig {
+        save_directory: directory.clone(),
+        ..crate::launch::LaunchConfig::default()
+    };
+    let path = ProfilePaths::from_config(&config).settings();
+    let startup_value = Settings {
+        master: 0.3,
+        low_latency: true,
+        ..Settings::default()
+    };
+    startup_value.save(&path).unwrap();
+    // `main`: the one read, before the App, which the render plan also uses.
+    let startup = crate::profile::read_settings(&path);
+    let plan = crate::render_plan::render_plan(&startup.settings, config.perf());
+    assert!(!plan.pipelined);
+    // The file changes after that read; startup never reads it again.
+    Settings {
+        master: 0.9,
+        ..Settings::default()
+    }
+    .save(&path)
+    .unwrap();
+    let f = FrontendParts::load(&config, startup);
+    assert_eq!(f.settings, startup_value);
+    // Later saves still go to the same profile file.
+    assert_eq!(f.paths.settings(), path);
+    std::fs::remove_file(&path).unwrap();
 }
 
 /// A manual save in its own frame (a frame enqueues one save of an intent),

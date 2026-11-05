@@ -7,7 +7,7 @@ use super::{
 use crate::{
     audio::Cue as SoundCue,
     launch::LaunchConfig,
-    profile::{LoadedProfile, ProfilePaths},
+    profile::{LoadedProfile, ProfilePaths, SettingsLoad},
     runner::{AttackAims, GameSession, Runtime, RuntimeNotice},
     settings::{Action, Settings},
     visual_assets::ArtTextures,
@@ -189,10 +189,16 @@ pub(crate) struct FrontendParts {
     pub(super) notices: Vec<RuntimeNotice>,
 }
 impl FrontendParts {
-    /// Production startup: reads the save, then applies review or practice scenarios.
-    pub fn load(config: &LaunchConfig) -> Self {
+    /// Production startup: reads the save beside the one startup settings
+    /// read `main` made before the App (never `settings.json` again), then
+    /// applies review or practice scenarios.
+    pub fn load(config: &LaunchConfig, startup_settings: SettingsLoad) -> Self {
         let paths = ProfilePaths::from_config(config);
-        let profile = LoadedProfile::load(&paths);
+        // The read ran before logging existed; report its warning now.
+        if let Some(warning) = &startup_settings.warning {
+            warn!("{warning}");
+        }
+        let profile = LoadedProfile::load(&paths, startup_settings);
         let resumed_practice = config.practice
             && (profile.game.campaign().selected_survivor.is_some()
                 || profile.game.campaign().attempts > 0

@@ -18,6 +18,7 @@ mod logging;
 mod perf_budget;
 mod player_model;
 mod profile;
+mod render_plan;
 #[cfg(test)]
 mod repo_checks;
 mod review_scenes;
@@ -30,7 +31,7 @@ mod ui;
 mod visual_assets;
 mod worldmap;
 
-use bevy::{app::AppExit, prelude::*, window::WindowResolution};
+use bevy::{app::AppExit, prelude::*};
 
 fn validate_startup_catalogs(config: &launch::LaunchConfig) -> Result<(), String> {
     // Loads, validates and installs every catalogue; a bad override is a clean error.
@@ -96,55 +97,31 @@ fn main() -> AppExit {
             code => AppExit::from_code(code as u8),
         };
     }
-    let (width, height) = config.window;
+    // The one read of settings.json for this process, before the App: the
+    // present mode and pipelined rendering are fixed from it (or a perf
+    // override), and the frontend reuses it instead of reading again.
+    let startup_settings =
+        profile::read_settings(&profile::ProfilePaths::from_config(&config).settings());
+    let plan = render_plan::render_plan(&startup_settings.settings, config.perf());
     let mut app = App::new();
     if config.sequence_path().is_some() {
         // LaunchConfig already rejected exports outside an isolated motion review.
         app.insert_resource(bevy::time::TimeUpdateStrategy::FixedTimesteps(1));
         app.insert_resource(bevy::winit::WinitSettings::continuous());
     }
-    let asset_directory = asset_directory(&config);
+    let plugins = render_plan::default_plugins(&config, &asset_directory(&config), &plan);
     // Inserted before LogPlugin so the file layer can find the save directory.
     app.insert_resource(config);
     // Performance sampling keeps ordinary window scheduling. Only deterministic
     // visual export above overrides time and redraw cadence.
     app.insert_resource(ClearColor(Color::srgb(0.067, 0.09, 0.094)))
-        .add_plugins(
-            DefaultPlugins
-                // `RUST_LOG`, when set, overrides this filter entirely.
-                .set(bevy::log::LogPlugin {
-                    filter: logging::DEFAULT_FILTER.into(),
-                    custom_layer: logging::file_layer,
-                    ..default()
-                })
-                .set(AssetPlugin {
-                    file_path: asset_directory.to_string_lossy().into_owned(),
-                    ..default()
-                })
-                .set(WindowPlugin {
-                    primary_window: Some(Window {
-                        title: "Lastlight · Horde Defense".into(),
-                        visible: false,
-                        resolution: WindowResolution::new(width, height),
-                        // One queued frame instead of Bevy's two: the arena
-                        // aims at the pointer, so presentation latency is felt.
-                        desired_maximum_frame_latency: std::num::NonZero::new(1),
-                        resize_constraints: bevy::window::WindowResizeConstraints {
-                            min_width: 1050.0,
-                            min_height: 700.0,
-                            ..default()
-                        },
-                        ..default()
-                    }),
-                    close_when_requested: false,
-                    ..default()
-                }),
-        );
+        .add_plugins(plugins)
+        .add_plugins(render_plan::DisplayPlugin(plan));
     let config = app.world().resource::<launch::LaunchConfig>().clone();
     // Perf launches only: the probe, its span systems and the GPU span.
     diagnostics::install(&mut app, &config);
     // After LogPlugin so Game::load startup events reach the console and log file.
-    ui::FrontendParts::load(&config).insert_into(&mut app);
+    ui::FrontendParts::load(&config, startup_settings).insert_into(&mut app);
     let review = config.review().is_some();
     app.add_systems(Startup, log_launch_warnings).add_plugins((
         runner::SimRuntimePlugin,

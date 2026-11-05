@@ -667,7 +667,7 @@ fn corrupt_primary_and_backup_are_uniquely_preserved_before_new_campaign_autosav
     let backup = b"unreadable backup bytes";
     std::fs::write(host.directory.join("campaign.json"), original).unwrap();
     std::fs::write(host.directory.join("campaign.bak"), backup).unwrap();
-    let loaded = load_profile(host.directory.clone());
+    let loaded = load_profile(host.directory.clone(), Default::default());
     assert!(loaded.warning.contains("Original files remain unchanged"));
     host.game = loaded.game;
     host.runtime.begin_frame(1);
@@ -721,7 +721,7 @@ fn practice_profiles_save_and_resume_without_changing_the_ordinary_campaign() {
         practice.game.campaign_mut().coins = 300;
         practice.runtime.request_save(SaveIntent::Manual);
         flush_for_test(&mut practice.ctx());
-        let loaded = load_profile(directory);
+        let loaded = load_profile(directory, Default::default());
         assert_eq!(loaded.game.campaign().coins, 300);
         assert_eq!(loaded.game.campaign().world.start.as_deref(), Some("DEU"));
         assert_eq!(

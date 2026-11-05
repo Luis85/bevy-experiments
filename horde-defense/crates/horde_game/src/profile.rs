@@ -1,5 +1,7 @@
 //! The active profile: where its campaign and settings live, and the startup
-//! read that loads them. Construction of the frontend itself stays pure.
+//! reads that load them. `settings.json` is read once, in `main` before the
+//! App exists (`read_settings`); the campaign is read by `load_profile`, which
+//! takes that settings read. Construction of the frontend itself stays pure.
 use crate::{launch::LaunchConfig, settings::Settings};
 use bevy::prelude::Resource;
 use horde_core::sim::Game;
@@ -41,15 +43,16 @@ impl ProfilePaths {
 }
 
 impl LoadedProfile {
-    /// Reads the campaign and settings. Unreadable saves degrade to a fresh
-    /// in-memory game plus a warning, so loading itself cannot fail.
-    pub fn load(paths: &ProfilePaths) -> Self {
+    /// Reads the campaign beside the startup settings read. Unreadable saves
+    /// degrade to a fresh in-memory game plus a warning, so loading itself
+    /// cannot fail.
+    pub fn load(paths: &ProfilePaths, settings: SettingsLoad) -> Self {
         let directory = paths
             .campaign
             .parent()
             .map(PathBuf::from)
             .unwrap_or_default();
-        load_profile(directory)
+        load_profile(directory, settings)
     }
 }
 
@@ -79,9 +82,9 @@ pub fn profile_directory(base: PathBuf, scenario: Option<&str>, practice: bool) 
     }
 }
 /// Startup read service, separate from widget layout and the command runner.
-pub fn load_profile(directory: PathBuf) -> LoadedProfile {
+/// Reads only `campaign.json`; `settings` is the one startup settings read.
+pub fn load_profile(directory: PathBuf, settings: SettingsLoad) -> LoadedProfile {
     let campaign_path = directory.join("campaign.json");
-    let settings_path = directory.join("settings.json");
     let (game, warning) = if campaign_path.exists() || campaign_path.with_extension("bak").exists()
     {
         match Game::load(&campaign_path) {
@@ -99,7 +102,6 @@ pub fn load_profile(directory: PathBuf) -> LoadedProfile {
     } else {
         (Game::default(), String::new())
     };
-    let settings = read_settings(&settings_path);
     LoadedProfile {
         game,
         settings_at_risk: settings.original_at_risk(),
@@ -108,9 +110,10 @@ pub fn load_profile(directory: PathBuf) -> LoadedProfile {
     }
 }
 
-/// The startup read of one `settings.json`. The warning is logged here; the
-/// settings-unreadable modal (wave 3) is what shows it on screen.
-#[derive(Clone, Debug)]
+/// The startup read of one `settings.json`. `FrontendParts::load` logs the
+/// warning once logging is up; the settings-unreadable modal (wave 3) is what
+/// shows it on screen. The default is a fresh profile's read.
+#[derive(Clone, Debug, Default)]
 pub struct SettingsLoad {
     pub settings: Settings,
     /// Set when any value fell back to its default.
@@ -130,9 +133,10 @@ impl SettingsLoad {
 /// The copy of an unreadable settings file, beside it.
 pub const UNREADABLE_SETTINGS: &str = "settings.unreadable.json";
 
-/// Reads `settings.json`. When any value falls back to its default, the
-/// original bytes are first copied to `settings.unreadable.json` beside it,
-/// before this returns and so before any save can replace them. A missing
+/// Reads `settings.json`, once per process, before the App and its logging
+/// exist (so this logs nothing). When any value falls back to its default,
+/// the original bytes are first copied to `settings.unreadable.json` beside
+/// it, before this returns and so before any save can replace them. A missing
 /// file is a fresh profile: defaults, no warning.
 pub fn read_settings(path: &Path) -> SettingsLoad {
     let bytes = match std::fs::read(path) {
@@ -146,7 +150,6 @@ pub fn read_settings(path: &Path) -> SettingsLoad {
         }
         Err(error) => {
             let warning = format!("Settings could not be read ({error}); defaults are in use.");
-            bevy::log::warn!("{warning}");
             return SettingsLoad {
                 settings: Settings::default(),
                 warning: Some(warning),
@@ -181,7 +184,6 @@ pub fn read_settings(path: &Path) -> SettingsLoad {
             decoded.dropped_keys.join(", ")
         )
     };
-    bevy::log::warn!("{warning}");
     SettingsLoad {
         settings: decoded.settings,
         warning: Some(warning),

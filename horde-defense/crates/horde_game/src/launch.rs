@@ -60,6 +60,10 @@ pub struct PerfOptions {
     pub profile_label: Option<String>,
     pub audio: bool,
     pub npc_speed: Option<u32>,
+    /// `LASTLIGHT_PERF_PRESENT_MODE`: wins over the VSync and Low latency settings.
+    pub present_mode: Option<PresentModeOverride>,
+    /// `LASTLIGHT_PERF_PIPELINED` (0|1): wins over Low latency and the default.
+    pub pipelined: Option<bool>,
 }
 impl Default for PerfOptions {
     fn default() -> Self {
@@ -72,6 +76,40 @@ impl Default for PerfOptions {
             profile_label: None,
             audio: false,
             npc_speed: None,
+            present_mode: None,
+            pipelined: None,
+        }
+    }
+}
+
+/// `LASTLIGHT_PERF_PRESENT_MODE` values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PresentModeOverride {
+    Fifo,
+    Mailbox,
+    Immediate,
+    AutoNoVsync,
+}
+impl PresentModeOverride {
+    fn parse(raw: &str) -> Result<Self, String> {
+        match raw.trim().to_ascii_lowercase().as_str() {
+            "fifo" => Ok(Self::Fifo),
+            "mailbox" => Ok(Self::Mailbox),
+            "immediate" => Ok(Self::Immediate),
+            "autonovsync" => Ok(Self::AutoNoVsync),
+            _ => Err(
+                "LASTLIGHT_PERF_PRESENT_MODE must be fifo, mailbox, immediate or autonovsync"
+                    .into(),
+            ),
+        }
+    }
+    pub fn present_mode(self) -> bevy::window::PresentMode {
+        use bevy::window::PresentMode;
+        match self {
+            Self::Fifo => PresentMode::Fifo,
+            Self::Mailbox => PresentMode::Mailbox,
+            Self::Immediate => PresentMode::Immediate,
+            Self::AutoNoVsync => PresentMode::AutoNoVsync,
         }
     }
 }
@@ -176,6 +214,9 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_PERF_PROFILE        Build profile label recorded in the report
     LASTLIGHT_PERF_AUDIO          Flag: keep audio in the perf-audio fixture
     LASTLIGHT_PERF_NPC_SPEED      Observation speed 1, 2 or 4 for perf fixtures
+    LASTLIGHT_PERF_PRESENT_MODE   fifo, mailbox, immediate or autonovsync; wins over
+                                  the VSync and Low latency settings
+    LASTLIGHT_PERF_PIPELINED      0 or 1: pipelined rendering, wins over Low latency
   Developer tools (builds with the `dev` feature; otherwise rejected or ignored)
     LASTLIGHT_RECORD              Same as --record
   Logging
@@ -201,6 +242,8 @@ const REVIEW_VARIABLES: &[&str] = &[
     "LASTLIGHT_PERF_PROFILE",
     "LASTLIGHT_PERF_AUDIO",
     "LASTLIGHT_PERF_NPC_SPEED",
+    "LASTLIGHT_PERF_PRESENT_MODE",
+    "LASTLIGHT_PERF_PIPELINED",
 ];
 
 /// Typed reads over one variable source. Empty Windows values are unset.
@@ -374,12 +417,25 @@ impl LaunchConfig {
                 profile_label: env.string("LASTLIGHT_PERF_PROFILE"),
                 audio: env.flag("LASTLIGHT_PERF_AUDIO"),
                 npc_speed: None,
+                present_mode: None,
+                pipelined: None,
             },
         });
         if let (Some(review), Some(raw)) = (&mut review, env.string("LASTLIGHT_PERF_NPC_SPEED")) {
             review.perf.npc_speed = Some(match raw.trim().parse() {
                 Ok(speed @ (1 | 2 | 4)) => speed,
                 _ => return Err("LASTLIGHT_PERF_NPC_SPEED must be 1, 2 or 4".into()),
+            });
+        }
+        if let (Some(review), Some(raw)) = (&mut review, env.string("LASTLIGHT_PERF_PRESENT_MODE"))
+        {
+            review.perf.present_mode = Some(PresentModeOverride::parse(&raw)?);
+        }
+        if let (Some(review), Some(raw)) = (&mut review, env.string("LASTLIGHT_PERF_PIPELINED")) {
+            review.perf.pipelined = Some(match raw.trim() {
+                "0" => false,
+                "1" => true,
+                _ => return Err("LASTLIGHT_PERF_PIPELINED must be 0 or 1".into()),
             });
         }
         // An isolated review stages a throwaway profile; without an explicit save
@@ -830,6 +886,69 @@ mod tests {
         }
         assert!(parse(&[], &base[..2]).is_err(), "motion flag required");
         assert!(parse(&[], &[base[0], base[2]]).is_err(), "scene required");
+    }
+    #[test]
+    fn perf_present_mode_and_pipelined_parse_and_are_review_variables() {
+        for name in [
+            "LASTLIGHT_PERF_PRESENT_MODE",
+            "LASTLIGHT_PERF_PIPELINED",
+            "LASTLIGHT_PERF_PROFILE",
+        ] {
+            assert!(REVIEW_VARIABLES.contains(&name), "{name}");
+            assert!(HELP.contains(name), "{name}");
+        }
+        let perf = |vars: &[(&str, &str)]| {
+            let mut vars = vars.to_vec();
+            vars.push(("LASTLIGHT_PERF_REPORT", "perf.json"));
+            parse(&[], &vars).map(|c| c.perf().cloned())
+        };
+        if !cfg!(feature = "review") {
+            // Without review tooling every perf variable is ignored with a warning.
+            let c = parse(&[], &[("LASTLIGHT_PERF_PRESENT_MODE", "bogus")]).unwrap();
+            assert!(c.review.is_none());
+            assert_eq!(c.warnings.len(), 1);
+            return;
+        }
+        let defaults = perf(&[]).unwrap().unwrap();
+        assert_eq!((defaults.present_mode, defaults.pipelined), (None, None));
+        for (raw, expected) in [
+            ("fifo", PresentModeOverride::Fifo),
+            ("Mailbox", PresentModeOverride::Mailbox),
+            (" immediate ", PresentModeOverride::Immediate),
+            ("autonovsync", PresentModeOverride::AutoNoVsync),
+        ] {
+            let options = perf(&[("LASTLIGHT_PERF_PRESENT_MODE", raw)])
+                .unwrap()
+                .unwrap();
+            assert_eq!(options.present_mode, Some(expected), "{raw}");
+        }
+        for (raw, expected) in [("0", false), ("1", true)] {
+            let options = perf(&[("LASTLIGHT_PERF_PIPELINED", raw)]).unwrap().unwrap();
+            assert_eq!(options.pipelined, Some(expected), "{raw}");
+        }
+        let options = perf(&[("LASTLIGHT_PERF_PROFILE", "playtest")])
+            .unwrap()
+            .unwrap();
+        assert_eq!(options.profile_label.as_deref(), Some("playtest"));
+        // Invalid values are typed launch errors.
+        assert_eq!(
+            perf(&[("LASTLIGHT_PERF_PRESENT_MODE", "vsync")]).unwrap_err(),
+            "LASTLIGHT_PERF_PRESENT_MODE must be fifo, mailbox, immediate or autonovsync"
+        );
+        for raw in ["2", "on", "true"] {
+            assert_eq!(
+                perf(&[("LASTLIGHT_PERF_PIPELINED", raw)]).unwrap_err(),
+                "LASTLIGHT_PERF_PIPELINED must be 0 or 1",
+                "{raw}"
+            );
+        }
+        // Each is a review variable on its own: it activates review options.
+        let c = parse(&[], &[("LASTLIGHT_PERF_PIPELINED", "0")]).unwrap();
+        assert_eq!(c.review().map(|r| r.perf.pipelined), Some(Some(false)));
+        assert_eq!(
+            PresentModeOverride::AutoNoVsync.present_mode(),
+            bevy::window::PresentMode::AutoNoVsync
+        );
     }
     #[cfg(not(feature = "review"))]
     #[test]
