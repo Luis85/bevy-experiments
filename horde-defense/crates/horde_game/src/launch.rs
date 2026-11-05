@@ -85,6 +85,10 @@ pub struct LaunchConfig {
     pub asset_dir: Option<PathBuf>,
     /// `LASTLIGHT_SAVE_DIR`, else `%LOCALAPPDATA%/LastlightHordeDefense`, else `saves`.
     pub save_directory: PathBuf,
+    /// Where an isolated review logs when `LASTLIGHT_SAVE_DIR` is absent: the
+    /// per-process temp review profile, so review launches never write or prune
+    /// logs in the player's profile. `None` for play, practice and explicit saves.
+    pub log_directory_override: Option<PathBuf>,
     /// `LASTLIGHT_CAPTURE_DIR`: F12 screenshot folder.
     pub capture_dir: Option<PathBuf>,
     /// Catalogue name and override file, as `horde_core::catalog` resolves them.
@@ -110,6 +114,7 @@ impl Default for LaunchConfig {
             window: DEFAULT_WINDOW,
             asset_dir: None,
             save_directory: PathBuf::from("saves"),
+            log_directory_override: None,
             capture_dir: None,
             catalogs: Vec::new(),
             warnings: Vec::new(),
@@ -297,7 +302,8 @@ impl LaunchConfig {
             }),
             None => DEFAULT_WINDOW,
         };
-        let save_directory = env.path("LASTLIGHT_SAVE_DIR").unwrap_or_else(|| {
+        let explicit_save_directory = env.path("LASTLIGHT_SAVE_DIR");
+        let save_directory = explicit_save_directory.clone().unwrap_or_else(|| {
             env.path("LOCALAPPDATA")
                 .map(|p| p.join("LastlightHordeDefense"))
                 .unwrap_or_else(|| PathBuf::from("saves"))
@@ -360,6 +366,16 @@ impl LaunchConfig {
                 _ => return Err("LASTLIGHT_PERF_NPC_SPEED must be 1, 2 or 4".into()),
             });
         }
+        // An isolated review stages a throwaway profile; without an explicit save
+        // directory its logs go there too, never into the player's profile.
+        let log_directory_override = (review.is_some()
+            && !practice
+            && scenario.is_some()
+            && explicit_save_directory.is_none())
+        .then(|| {
+            crate::profile::profile_directory(save_directory.clone(), scenario.as_deref(), false)
+                .join("logs")
+        });
         #[cfg(feature = "dev")]
         let record = record.or_else(|| env.path("LASTLIGHT_RECORD"));
         #[cfg(not(feature = "dev"))]
@@ -374,6 +390,7 @@ impl LaunchConfig {
             window,
             asset_dir: env.path("LASTLIGHT_ASSET_DIR"),
             save_directory,
+            log_directory_override,
             capture_dir: env.path("LASTLIGHT_CAPTURE_DIR"),
             catalogs: horde_core::catalog::CATALOG_OVERRIDES
                 .iter()
@@ -438,8 +455,11 @@ impl LaunchConfig {
             .map(|r| &r.perf)
             .filter(|perf| perf.report.is_some())
     }
+    /// The review override when one is set, otherwise `<save directory>/logs`.
     pub fn log_directory(&self) -> PathBuf {
-        self.save_directory.join("logs")
+        self.log_directory_override
+            .clone()
+            .unwrap_or_else(|| self.save_directory.join("logs"))
     }
     /// Every catalogue's source, for the startup diagnostic console.
     pub fn catalog_sources(&self) -> Vec<(&'static str, String)> {
@@ -615,6 +635,71 @@ mod tests {
     }
     #[cfg(feature = "review")]
     #[test]
+    fn review_without_save_dir_never_logs_into_the_player_profile() {
+        let c = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "menu"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        let player_profile = PathBuf::from("C:/x").join("LastlightHordeDefense");
+        assert_eq!(c.save_directory, player_profile);
+        assert!(
+            !c.log_directory().starts_with(&player_profile),
+            "review logs landed in the player profile: {}",
+            c.log_directory().display()
+        );
+        assert_eq!(
+            c.log_directory(),
+            crate::profile::profile_directory(player_profile, Some("menu"), false).join("logs"),
+            "review logs live in the per-process temp review profile"
+        );
+    }
+    #[cfg(feature = "review")]
+    #[test]
+    fn explicit_save_dir_keeps_review_logs_beside_the_evidence() {
+        let c = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "menu"),
+                ("LASTLIGHT_SAVE_DIR", "D:/evidence/saves/normal-menu"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            c.log_directory(),
+            PathBuf::from("D:/evidence/saves/normal-menu").join("logs")
+        );
+    }
+    #[test]
+    fn practice_and_ordinary_play_log_into_the_profile() {
+        let profile = PathBuf::from("C:/x").join("LastlightHordeDefense");
+        let ordinary = parse(&[], &[("LOCALAPPDATA", "C:/x")]).unwrap();
+        assert_eq!(ordinary.log_directory(), profile.join("logs"));
+        let practice = parse(
+            &[],
+            &[
+                ("LASTLIGHT_PRACTICE", "1"),
+                ("LASTLIGHT_REVIEW_SCREEN", "construction"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(practice.log_directory(), profile.join("logs"));
+        // A review without a staged scenario plays the real profile, so its
+        // logs stay there too.
+        let unstaged = parse(
+            &[],
+            &[("LASTLIGHT_PERF_CPU", "test"), ("LOCALAPPDATA", "C:/x")],
+        )
+        .unwrap();
+        assert_eq!(unstaged.log_directory(), profile.join("logs"));
+    }
+    #[cfg(feature = "review")]
+    #[test]
     fn animation_export_requires_isolated_motion_review() {
         let base = [
             ("LASTLIGHT_CAPTURE_SEQUENCE", "frames"),
@@ -659,5 +744,15 @@ mod tests {
         .unwrap();
         assert_eq!(c.scenario.as_deref(), Some("construction"));
         assert!(c.practice && c.review.is_none());
+        // An ignored review scene is ordinary play, which logs into the profile.
+        let c = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "menu"),
+                ("LOCALAPPDATA", "C:/x"),
+            ],
+        )
+        .unwrap();
+        assert_eq!(c.log_directory(), c.save_directory.join("logs"));
     }
 }
