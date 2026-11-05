@@ -15,6 +15,8 @@ mod launch;
 mod logging;
 mod player_model;
 mod profile;
+#[cfg(test)]
+mod repo_checks;
 #[cfg(feature = "review")]
 mod review_tools;
 mod runner;
