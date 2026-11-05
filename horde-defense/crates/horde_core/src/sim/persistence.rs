@@ -109,6 +109,16 @@ impl Game {
         };
         settle_decoded(serde_json::from_value(value)?)
     }
+    /// Test-support: the raw JSON the migrations make of a payload saved at
+    /// envelope `version`, before any typed decode, reconcile or validation
+    /// (the schema guards compare it with what the current types keep).
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn migrate_payload(
+        value: serde_json::Value,
+        version: u32,
+    ) -> Result<serde_json::Value, SaveError> {
+        migrate(value, version)
+    }
     /// Determinism/replay digest: the stable FNV-1a hash (the save checksum
     /// function) of the canonical serialized save payload. Two games with equal
     /// digests have identical authoritative state, including RNG streams, so

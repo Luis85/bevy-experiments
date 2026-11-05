@@ -262,6 +262,220 @@ pub fn json_key_paths(value: &Value) -> BTreeSet<String> {
     paths
 }
 
+/// Where an expedition's worker game sits in a save: `ParallelBattle.game`
+/// inside the root `battles` array. [`game_key_paths`] folds it onto the root.
+pub const WORKER_GAME_PREFIX: &str = "/battles/game";
+
+/// [`json_key_paths`] of a saved game with every worker game path folded
+/// onto the root path of the same field (`/battles/game/attempt/drop_ids`
+/// becomes `/attempt/drop_ids`), since a worker game is a `Game` too.
+pub fn game_key_paths(value: &Value) -> BTreeSet<String> {
+    json_key_paths(value)
+        .into_iter()
+        .map(|path| match path.strip_prefix(WORKER_GAME_PREFIX) {
+            Some(rest) if rest.starts_with('/') => rest.to_owned(),
+            _ => path,
+        })
+        .collect()
+}
+
+/// Every value at the key `path` (as [`json_key_paths`] spells it: no array
+/// indices), walking into every element of each array on the way. Empty when
+/// no object along the way holds the key.
+pub fn values_at_key_path<'a>(value: &'a Value, path: &str) -> Vec<&'a Value> {
+    fn walk<'a>(value: &'a Value, keys: &[&str], found: &mut Vec<&'a Value>) {
+        let Some((key, rest)) = keys.split_first() else {
+            found.push(value);
+            return;
+        };
+        match value {
+            Value::Array(items) => items.iter().for_each(|item| walk(item, keys, found)),
+            Value::Object(map) => {
+                if let Some(child) = map.get(*key) {
+                    walk(child, rest, found);
+                }
+            }
+            _ => {}
+        }
+    }
+    let keys: Vec<&str> = path.split('/').skip(1).collect();
+    let mut found = Vec::new();
+    walk(value, &keys, &mut found);
+    found
+}
+
+/// Every field save format 7 added (schema-v7.md section 3), as
+/// `(section, key path)`. Paths are [`game_key_paths`]: no array indices, and
+/// a worker game's field shares its root path. A type saved at several places
+/// (telemetry on the attempt and the report, run records in the history and
+/// the pending list) has one row per place. Each field is serde-defaulted and
+/// skipped at its default, so a v6 save and the GOLDEN runs write none of
+/// them. `tests/schema_v7.rs` proves the list complete against the types.
+pub const V7_SAVED_KEYS: &[(&str, &str)] = &[
+    // 3.1 Campaign
+    ("3.1 Campaign", "/campaign/auto_sell"),
+    ("3.1 Campaign", "/campaign/next_defender"),
+    ("3.1 Campaign", "/campaign/reserved_recruit"),
+    ("3.1 Campaign", "/campaign/milestones_claimed"),
+    ("3.1 Campaign", "/campaign/balance_extras_basis"),
+    // 3.2 Player
+    ("3.2 Player", "/campaign/player/level_grant_paid"),
+    // 3.3 Attempt (the seat is saved as "defender")
+    ("3.3 Attempt", "/attempt/defender"),
+    ("3.3 Attempt", "/attempt/drop_ids"),
+    ("3.3 Attempt", "/attempt/drop_tier"),
+    // 3.4 Report
+    ("3.4 Report", "/last_result/defender"),
+    ("3.4 Report", "/last_result/drop_ids"),
+    ("3.4 Report", "/last_result/loot_by_quality"),
+    ("3.4 Report", "/last_result/auto_sold"),
+    ("3.4 Report", "/last_result/progression_rewards"),
+    ("3.4 Report", "/last_result/boss_rank"),
+    // 3.5 RunRecord, in the run history and the pending list
+    ("3.5 RunRecord", "/campaign/run_history/auto_sold_count"),
+    ("3.5 RunRecord", "/campaign/run_history/auto_sold_coins"),
+    ("3.5 RunRecord", "/campaign/run_history/level_grant_coins"),
+    ("3.5 RunRecord", "/campaign/run_history/milestone_coins"),
+    ("3.5 RunRecord", "/campaign/run_history/elite_kills"),
+    ("3.5 RunRecord", "/campaign/run_history/boss_ttk_ticks"),
+    ("3.5 RunRecord", "/campaign/run_history/boss_rank"),
+    ("3.5 RunRecord", "/pending_runs/auto_sold_count"),
+    ("3.5 RunRecord", "/pending_runs/auto_sold_coins"),
+    ("3.5 RunRecord", "/pending_runs/level_grant_coins"),
+    ("3.5 RunRecord", "/pending_runs/milestone_coins"),
+    ("3.5 RunRecord", "/pending_runs/elite_kills"),
+    ("3.5 RunRecord", "/pending_runs/boss_ttk_ticks"),
+    ("3.5 RunRecord", "/pending_runs/boss_rank"),
+    // 3.6 ParallelBattle
+    ("3.6 ParallelBattle", "/battles/summary"),
+    ("3.6 ParallelBattle", "/battles/pending_auto_sell"),
+    // 3.7 StrategyState and Recruit
+    ("3.7 StrategyState", "/strategy/folded_outcomes"),
+    ("3.7 Recruit", "/strategy/roster/containments"),
+    // 3.8 Enemy
+    ("3.8 Enemy", "/attempt/enemies/split_child"),
+    ("3.8 Enemy", "/attempt/enemies/boss_state"),
+    // 3.9 ResolvedEnemy
+    ("3.9 ResolvedEnemy", "/attempt/enemies/resolved/reach"),
+    (
+        "3.9 ResolvedEnemy",
+        "/attempt/enemies/resolved/ranged_armor",
+    ),
+    (
+        "3.9 ResolvedEnemy",
+        "/attempt/enemies/resolved/npc_ranged_armor",
+    ),
+    (
+        "3.9 ResolvedEnemy",
+        "/attempt/enemies/resolved/stagger_immune",
+    ),
+    ("3.9 ResolvedEnemy", "/attempt/enemies/resolved/group_size"),
+    (
+        "3.9 ResolvedEnemy",
+        "/attempt/enemies/resolved/death_effect",
+    ),
+    ("3.9 ResolvedEnemy", "/attempt/enemies/resolved/tags"),
+    ("3.9 ResolvedEnemy", "/attempt/enemies/resolved/elite"),
+    // 3.10 ProgressionSnapshot
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/elite_rate_bp",
+    ),
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/front_ramp",
+    ),
+    ("3.10 ProgressionSnapshot", "/attempt/progression/boss_rank"),
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/boss_phases",
+    ),
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/boss_armor_multiplier",
+    ),
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/npc_boss_armor_add",
+    ),
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/boss_health_multiplier",
+    ),
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/boss_reward_multiplier",
+    ),
+    (
+        "3.10 ProgressionSnapshot",
+        "/attempt/progression/boss_damage_multiplier",
+    ),
+    // 3.11 SkillModifiers (saved inside the attempt's defender profile)
+    (
+        "3.11 SkillModifiers",
+        "/attempt/profile/modifiers/class_modifiers",
+    ),
+    (
+        "3.11 SkillModifiers",
+        "/attempt/profile/modifiers/armor_penetration",
+    ),
+    (
+        "3.11 SkillModifiers",
+        "/attempt/profile/modifiers/hazard_damage_multiplier",
+    ),
+    // 3.12 CombatTelemetry, on the live attempt and on the report
+    (
+        "3.12 CombatTelemetry",
+        "/attempt/telemetry/spawned_by_archetype",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/attempt/telemetry/kills_by_archetype",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/attempt/telemetry/damage_taken_by_archetype",
+    ),
+    ("3.12 CombatTelemetry", "/attempt/telemetry/elites_spawned"),
+    ("3.12 CombatTelemetry", "/attempt/telemetry/elites_killed"),
+    (
+        "3.12 CombatTelemetry",
+        "/attempt/telemetry/hazard_damage_taken",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/attempt/telemetry/boss_phase_ticks",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/last_result/telemetry/spawned_by_archetype",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/last_result/telemetry/kills_by_archetype",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/last_result/telemetry/damage_taken_by_archetype",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/last_result/telemetry/elites_spawned",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/last_result/telemetry/elites_killed",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/last_result/telemetry/hazard_damage_taken",
+    ),
+    (
+        "3.12 CombatTelemetry",
+        "/last_result/telemetry/boss_phase_ticks",
+    ),
+];
+
 /// FNV-1a of the sorted [`json_key_paths`], one per line: moves only when
 /// the serialized shape gains, loses or renames a field key (entries of
 /// arrays and [`DATA_KEYED_MAPS`] maps are data, not shape).
