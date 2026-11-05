@@ -31,15 +31,19 @@ pub enum RecruitStatus {
     Ready,
     Guarding,
     Deployed,
+    /// Appended (D5): the depth-0 main-run defender. Never on an expedition.
+    Defending,
 }
 impl RecruitStatus {
-    pub const ALL: [Self; 3] = [Self::Ready, Self::Guarding, Self::Deployed];
-    /// Player-facing status text. `Deployed` means away on an expedition.
+    pub const ALL: [Self; 4] = [Self::Ready, Self::Guarding, Self::Deployed, Self::Defending];
+    /// Player-facing status text. `Deployed` means away on an expedition;
+    /// `Defending` means holding the main defense.
     pub fn label(self) -> &'static str {
         match self {
             Self::Ready => "Ready",
             Self::Guarding => "Guarding",
             Self::Deployed => "On expedition",
+            Self::Defending => "Defending",
         }
     }
 }
@@ -379,6 +383,34 @@ impl StrategyState {
         r.status = RecruitStatus::Ready;
         Ok(())
     }
+    /// Seats a Ready recruit as the main-run defender (Ready to Defending).
+    /// `reserve_recruit` / `release_recruit` stay expedition-only (Deployed).
+    pub fn reserve_defender(&mut self, id: u64) -> Result<(), String> {
+        let r = self
+            .roster
+            .iter_mut()
+            .find(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        if r.status != RecruitStatus::Ready {
+            return Err("Survivor is already on duty".into());
+        }
+        r.status = RecruitStatus::Defending;
+        Ok(())
+    }
+    /// Returns the main-run defender to the roster (Defending to Ready). The
+    /// roster entry is the battle's npc, so there is nothing to copy back.
+    pub fn release_defender(&mut self, id: u64) -> Result<(), String> {
+        let r = self
+            .roster
+            .iter_mut()
+            .find(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        if r.status != RecruitStatus::Defending {
+            return Err("Survivor is not defending the main run".into());
+        }
+        r.status = RecruitStatus::Ready;
+        Ok(())
+    }
     pub fn equip_recruit(
         &mut self,
         campaign: &Campaign,
@@ -588,7 +620,12 @@ impl StrategyState {
     pub fn tick_world(&mut self, campaign: &mut Campaign) {
         let allowance = campaign.allowance();
         for recruit in &mut self.roster {
-            if recruit.status != RecruitStatus::Deployed {
+            // Deployed recruits fight on with a worker copy and Defending ones
+            // claim through the main run; neither claims from the world clock.
+            if !matches!(
+                recruit.status,
+                RecruitStatus::Deployed | RecruitStatus::Defending
+            ) {
                 recruit.npc.claim_objectives(allowance);
             }
         }

@@ -1,12 +1,16 @@
 //! Defender identity (W1-10): the public `DefenderId`, the saved
 //! `DefenderSeat`, `resolve`, the recruit identity table and the plain labels
-//! that replace Rust `Debug` names in player text.
+//! that replace Rust `Debug` names in player text; and (W1-11) the appended
+//! `RecruitStatus::Defending` with `reserve_defender` / `release_defender`.
 use horde_core::{
+    campaign::{Campaign, NpcTraining},
+    command::Command,
     content::{Mode, Policy},
     defenders::{
         DefenderBlocker, DefenderId, DefenderSeat, OriginTrait, RECRUIT_IDENTITIES,
         recruit_identity, resolve,
     },
+    sim::Game,
     skill_catalog::skills,
     strategy::RecruitStatus,
     survivors::Appearance,
@@ -121,7 +125,7 @@ fn is_human(label: &str) -> bool {
 #[test]
 fn recruit_status_labels_cover_all_variants() {
     let labels: Vec<_> = RecruitStatus::ALL.iter().map(|s| s.label()).collect();
-    assert_eq!(labels, ["Ready", "Guarding", "On expedition"]);
+    assert_eq!(labels, ["Ready", "Guarding", "On expedition", "Defending"]);
 }
 
 #[test]
@@ -195,4 +199,185 @@ fn origin_traits_cover_every_world_biome_without_fallback() {
         OriginTrait::HedgerowForager,
         "unknown biomes fall back to Temperate"
     );
+}
+
+/// A legacy game with `count` liberated countries, recruitment and garrisons
+/// unlocked, plenty of coins and no live attempt (so preparation is open).
+fn liberated_game(count: usize) -> Game {
+    let mut c = Campaign {
+        legacy_features: true,
+        ..Campaign::default()
+    };
+    let ids: Vec<_> = world()
+        .countries
+        .iter()
+        .take(count)
+        .map(|c| c.id.clone())
+        .collect();
+    c.choose_start_country(&ids[0]).unwrap();
+    for id in ids {
+        let levels = world().country(&id).unwrap().level_count();
+        c.world.country_levels.insert(id.clone(), levels);
+        c.world.cleared.push(id);
+    }
+    c.coins = 10_000;
+    let mut game = Game::default();
+    *game.staging().campaign() = c;
+    game
+}
+
+fn recruit(game: &mut Game, country: &str) -> u64 {
+    match game.apply(&Command::Recruit(country.into())) {
+        Ok(horde_core::command::CommandOutcome::Id(id)) => id,
+        other => panic!("recruiting failed: {other:?}"),
+    }
+}
+
+fn status(game: &Game, id: u64) -> RecruitStatus {
+    game.strategy()
+        .roster
+        .iter()
+        .find(|r| r.id == id)
+        .unwrap()
+        .status
+}
+
+#[test]
+fn reserve_and_release_defender_round_trip() {
+    let mut game = liberated_game(4);
+    let country = game.campaign().world.cleared[0].clone();
+    let defender = recruit(&mut game, &country);
+    let guard = recruit(&mut game, &country);
+    let away = recruit(&mut game, &country);
+    game.apply(&Command::AssignGuard {
+        id: guard,
+        country: country.clone(),
+    })
+    .unwrap();
+    game.staging().strategy().reserve_recruit(away).unwrap();
+    let before = serde_json::to_value(game.strategy()).unwrap();
+
+    let s = game.staging().strategy();
+    assert!(s.reserve_defender(99).is_err(), "unknown survivor");
+    assert!(s.reserve_defender(guard).is_err(), "Guarding is not Ready");
+    assert!(s.reserve_defender(away).is_err(), "Deployed is not Ready");
+    assert!(
+        s.release_defender(defender).is_err(),
+        "Ready is not Defending"
+    );
+    assert!(
+        s.release_defender(away).is_err(),
+        "Deployed is not Defending"
+    );
+    assert_eq!(serde_json::to_value(&*s).unwrap(), before);
+
+    s.reserve_defender(defender).unwrap();
+    assert_eq!(status(&game, defender), RecruitStatus::Defending);
+    let s = game.staging().strategy();
+    assert!(s.reserve_defender(defender).is_err(), "already defending");
+    let npc = s
+        .roster
+        .iter()
+        .find(|r| r.id == defender)
+        .unwrap()
+        .npc
+        .clone();
+    assert!(
+        s.release_recruit(defender, npc).is_err(),
+        "release_recruit stays Deployed-only"
+    );
+    s.release_defender(defender).unwrap();
+    assert_eq!(status(&game, defender), RecruitStatus::Ready);
+    assert!(
+        game.staging()
+            .strategy()
+            .release_defender(defender)
+            .is_err()
+    );
+    assert_eq!(serde_json::to_value(game.strategy()).unwrap(), before);
+}
+
+#[test]
+fn defending_recruit_rejects_every_ready_gated_mutation() {
+    let mut ready = liberated_game(4);
+    let country = ready.campaign().world.cleared[1].clone();
+    let id = recruit(&mut ready, &country);
+    for _ in 0..4 {
+        ready.apply(&Command::BuyRecruitPoint(id)).unwrap();
+    }
+    let item = ready.strategy().roster[0].npc.loadout[0];
+    let commands = [
+        Command::EquipRecruit { id, item },
+        Command::TrainRecruit {
+            id,
+            training: NpcTraining::Guns,
+        },
+        Command::BuyRecruitPoint(id),
+        Command::AssignGuard {
+            id,
+            country: country.clone(),
+        },
+        Command::SetRecruitPolicy {
+            id,
+            policy: Policy::Guardian,
+        },
+    ];
+    // Control: every command is accepted while the recruit is Ready, so the
+    // rejections below come from the status gate and nothing else.
+    for command in &commands {
+        let mut game = ready.clone();
+        game.apply(command)
+            .unwrap_or_else(|e| panic!("{command:?} on a Ready recruit: {e}"));
+    }
+    {
+        let mut game = ready.clone();
+        let (s, c) = game.staging().strategy_and_campaign();
+        s.respec_recruit(c, id).unwrap();
+        s.reserve_recruit(id).unwrap();
+    }
+
+    let mut defending = ready.clone();
+    defending.staging().strategy().reserve_defender(id).unwrap();
+    let before = serde_json::to_value(&defending).unwrap();
+    for command in &commands {
+        assert!(
+            defending.apply(command).is_err(),
+            "{command:?} accepted for a Defending recruit"
+        );
+        assert_eq!(
+            serde_json::to_value(&defending).unwrap(),
+            before,
+            "{command:?}"
+        );
+    }
+    let (s, c) = defending.staging().strategy_and_campaign();
+    assert!(s.respec_recruit(c, id).is_err());
+    assert!(s.reserve_recruit(id).is_err());
+    assert_eq!(serde_json::to_value(&defending).unwrap(), before);
+    assert_eq!(status(&defending, id), RecruitStatus::Defending);
+}
+
+#[test]
+fn world_tick_does_not_claim_for_defending_or_deployed_recruits() {
+    let mut game = liberated_game(4);
+    let country = game.campaign().world.cleared[0].clone();
+    let ready = recruit(&mut game, &country);
+    let defending = recruit(&mut game, &country);
+    let away = recruit(&mut game, &country);
+    let (s, c) = game.staging().strategy_and_campaign();
+    s.reserve_defender(defending).unwrap();
+    s.reserve_recruit(away).unwrap();
+    // Every recruit has an unclaimed hit objective and allowance to spare.
+    for r in &mut s.roster {
+        r.npc.successful_hits = 20;
+        assert!(!r.npc.objectives_claimed[0]);
+        assert!(r.npc.awarded < c.allowance());
+    }
+    let before: Vec<_> = s.roster.iter().map(|r| r.npc.clone()).collect();
+    s.tick_world(c);
+    let npc = |id: u64| &s.roster.iter().find(|r| r.id == id).unwrap().npc;
+    let was = |id: u64| &before[s.roster.iter().position(|r| r.id == id).unwrap()];
+    assert_eq!(npc(ready).awarded, was(ready).awarded + 1, "Ready claims");
+    assert_eq!(npc(defending), was(defending), "Defending must not claim");
+    assert_eq!(npc(away), was(away), "Deployed must not claim");
 }
