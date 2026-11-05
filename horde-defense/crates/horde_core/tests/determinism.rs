@@ -280,6 +280,7 @@ fn planted_payload() -> serde_json::Value {
                 {"id": 2, "definition": "bat", "quality": "Rare", "level": 2, "locked": true},
             ],
             "run_history": [{"id": 1, "kills": 3}],
+            "first_clear_claimed": {"level-1": 1},
         },
         "attempt": {
             "hp": 30,
@@ -308,6 +309,16 @@ fn anatomy_classifier_labels_planted_changes() {
         classify(&|p| p["campaign"]["new_counter"] = 0.into()),
         Some(MoveClass::F),
         "an extra key is a format move"
+    );
+    assert_eq!(
+        classify(&|p| p["campaign"]["coins"] = 11.into()),
+        Some(MoveClass::G),
+        "a value-only state move is never format; it is conservatively gameplay"
+    );
+    assert_eq!(
+        classify(&|p| p["campaign"]["first_clear_claimed"]["level-2"] = 1.into()),
+        Some(MoveClass::G),
+        "a new entry in a data-keyed map is a state move, not a format move"
     );
     assert_eq!(
         classify(&|p| p["campaign"]["items"][0]["definition"] = "rifle".into()),
@@ -360,6 +371,16 @@ fn anatomy_classifier_labels_planted_changes() {
         support::json_key_paths_fnv(&more)
     );
     assert_ne!(support::items_fnv(&base), support::items_fnv(&more));
+
+    // Data-keyed map entries are data, not shape: a newly claimed level ID
+    // does not move the key paths.
+    let mut claimed = base.clone();
+    claimed["campaign"]["first_clear_claimed"]["level-2"] = 2.into();
+    assert_eq!(
+        support::json_key_paths_fnv(&base),
+        support::json_key_paths_fnv(&claimed)
+    );
+    assert!(support::json_key_paths(&base).contains("/campaign/first_clear_claimed/*"));
 }
 
 #[test]
@@ -378,6 +399,15 @@ fn anatomy_reads_the_real_payload_shape() {
         "/attempt/loot_events",
     ] {
         assert!(paths.contains(path), "the save payload has no {path}");
+    }
+    // Every data-keyed map the key paths collapse is a real payload field, so
+    // a rename cannot silently turn its entries back into shape.
+    for name in support::DATA_KEYED_MAPS {
+        let suffix = format!("/{name}");
+        assert!(
+            paths.iter().any(|p| p.ends_with(&suffix)),
+            "the save payload has no data-keyed map {name}"
+        );
     }
     let core = support::json_key_paths(&support::without_telemetry(&payload));
     assert!(!core.iter().any(|p| p.contains("/telemetry")));

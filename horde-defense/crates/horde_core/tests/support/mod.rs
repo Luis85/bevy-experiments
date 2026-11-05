@@ -216,35 +216,55 @@ pub fn outcome_summary(seed: u64, mode: Mode) -> OutcomeSummary {
     summary
 }
 
+/// Object keys whose value is a map keyed by data (level and country IDs),
+/// not by field names: `Campaign::country_layouts`,
+/// `first_clear_claimed`, `WorldProgress::country_levels` and
+/// `clear_high_water`. Their entries are state, so [`json_key_paths`] reports
+/// their children as one `*` segment.
+pub const DATA_KEYED_MAPS: [&str; 4] = [
+    "country_layouts",
+    "first_clear_claimed",
+    "country_levels",
+    "clear_high_water",
+];
+
 /// Every JSON-pointer path of an object key in `value` (no leaf values),
 /// with array indices stripped: array elements add their keys under the
-/// array's own path, so element count and order never change the set.
+/// array's own path, so element count and order never change the set. The
+/// entries of a [`DATA_KEYED_MAPS`] map collapse to one `*` segment, so
+/// adding or removing an entry never changes the set either.
 pub fn json_key_paths(value: &Value) -> BTreeSet<String> {
-    fn walk(value: &Value, path: &str, paths: &mut BTreeSet<String>) {
+    fn walk(value: &Value, path: &str, data_keyed: bool, paths: &mut BTreeSet<String>) {
         match value {
             Value::Object(map) => {
                 for (key, child) in map {
-                    let escaped = key.replace('~', "~0").replace('/', "~1");
-                    let child_path = format!("{path}/{escaped}");
-                    walk(child, &child_path, paths);
+                    let child_path = if data_keyed {
+                        format!("{path}/*")
+                    } else {
+                        let escaped = key.replace('~', "~0").replace('/', "~1");
+                        format!("{path}/{escaped}")
+                    };
+                    let child_keyed = !data_keyed && DATA_KEYED_MAPS.contains(&key.as_str());
+                    walk(child, &child_path, child_keyed, paths);
                     paths.insert(child_path);
                 }
             }
             Value::Array(items) => {
                 for item in items {
-                    walk(item, path, paths);
+                    walk(item, path, data_keyed, paths);
                 }
             }
             _ => {}
         }
     }
     let mut paths = BTreeSet::new();
-    walk(value, "", &mut paths);
+    walk(value, "", false, &mut paths);
     paths
 }
 
 /// FNV-1a of the sorted [`json_key_paths`], one per line: moves only when
-/// the serialized shape gains, loses or renames a key.
+/// the serialized shape gains, loses or renames a field key (entries of
+/// arrays and [`DATA_KEYED_MAPS`] maps are data, not shape).
 pub fn json_key_paths_fnv(value: &Value) -> u64 {
     json_key_paths(value).iter().fold(fnv1a(b""), |hash, path| {
         fnv1a_extend(fnv1a_extend(hash, path.as_bytes()), b"\n")
@@ -341,23 +361,26 @@ impl fmt::Display for Anatomy {
 /// design-save-determinism section 9; ledger ruling P3).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MoveClass {
-    /// Format: the serialized shape or encoding moved (typically keys) with
-    /// no gameplay, content or telemetry-only explanation.
+    /// Format: the serialized key paths moved (a key gained, lost or
+    /// renamed) with no gameplay, content or telemetry-only explanation.
     F,
     /// Content: campaign items moved, the outcome did not.
     C,
     /// Telemetry: only telemetry and receipt subtrees moved.
     T,
-    /// Gameplay: the outcome summary or the gameplay trace moved.
+    /// Gameplay: the outcome summary or the gameplay trace moved, or core
+    /// state moved with nothing else to explain it (the conservative class).
     G,
 }
 
 /// Classify the move from `before` to `after`; None when nothing moved.
 ///
 /// In precedence order: G when the outcome or the trace moved; T when the
-/// payload without telemetry is unchanged; C when the items moved; F for any
-/// other payload move (a key move, or a value re-encoding with no outcome,
-/// trace or item move).
+/// payload without telemetry is unchanged; C when the items moved; F when the
+/// key paths moved; otherwise G, because a value-only core move (a campaign
+/// counter, recruit XP, a field the trace does not cover) is a state move,
+/// never format. The digests cannot tell whether values also moved beside a
+/// key move, so an F still needs its written reason checked by hand.
 pub fn classify(before: &Anatomy, after: &Anatomy) -> Option<MoveClass> {
     if before == after {
         None
@@ -367,7 +390,9 @@ pub fn classify(before: &Anatomy, after: &Anatomy) -> Option<MoveClass> {
         Some(MoveClass::T)
     } else if before.items != after.items {
         Some(MoveClass::C)
-    } else {
+    } else if before.keys != after.keys {
         Some(MoveClass::F)
+    } else {
+        Some(MoveClass::G)
     }
 }
