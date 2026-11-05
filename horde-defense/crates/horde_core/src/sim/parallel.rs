@@ -34,6 +34,13 @@ pub enum SettlementIssue {
         recruit: u64,
         error: String,
     },
+    /// A rank milestone's item could not be stored; its coins and the claim
+    /// still apply.
+    MilestoneItemLost {
+        rank: u32,
+        definition: ItemDefId,
+        error: String,
+    },
 }
 impl std::fmt::Display for SettlementIssue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -64,6 +71,14 @@ impl std::fmt::Display for SettlementIssue {
             } => write!(
                 f,
                 "Expedition {battle} survivor {recruit} could not return to the roster: {error}"
+            ),
+            Self::MilestoneItemLost {
+                rank,
+                definition,
+                error,
+            } => write!(
+                f,
+                "Rank {rank} milestone item {definition} was not stored: {error}"
             ),
         }
     }

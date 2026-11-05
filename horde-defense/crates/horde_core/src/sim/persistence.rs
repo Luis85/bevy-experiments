@@ -423,6 +423,27 @@ fn validate_attempt_loot(a: &Attempt, next_item_id: u64, depth: usize) -> Result
     }
     Ok(())
 }
+/// A report's progression receipt (schema v7 §3.4): at most
+/// [`MAX_RECEIPT_MILESTONES`] milestones at strictly increasing ranks, each
+/// granted definition resolving, and `level_from <= level_to <= cap`.
+fn validate_progression_rewards(rewards: &ProgressionRewards) -> Result<(), String> {
+    if rewards.milestones.len() > MAX_RECEIPT_MILESTONES
+        || rewards
+            .milestones
+            .windows(2)
+            .any(|pair| pair[0].rank >= pair[1].rank)
+        || rewards.milestones.iter().any(|m| {
+            m.item_definition
+                .as_ref()
+                .is_some_and(|definition| definition.index().is_none())
+        })
+        || rewards.level_from > rewards.level_to
+        || rewards.level_to > crate::campaign::Player::level_cap()
+    {
+        return Err("Invalid saved progression receipt".into());
+    }
+    Ok(())
+}
 /// The most milestone claims a campaign may hold (schema v7 §3.1).
 const MAX_MILESTONES_CLAIMED: usize = 64;
 
@@ -452,6 +473,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     }
     if let Some(report) = &game.last_result {
         validate_report_loot(report, game.campaign.next_item_id)?;
+        validate_progression_rewards(&report.progression_rewards)?;
         if !(MIN_LANES..=MAX_LANES).contains(&report.lane_count)
             || report.lane_count.is_multiple_of(2)
             || report.telemetry.damage_by_lane.len() != usize::from(report.lane_count)

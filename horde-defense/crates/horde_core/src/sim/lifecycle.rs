@@ -361,6 +361,8 @@ impl Game {
             legacy: a.gear_snapshot.is_empty(),
             auto_sold_count: 0,
             auto_sold_coins: 0,
+            level_grant_coins: 0,
+            milestone_coins: 0,
         };
         if self.worker {
             self.pending_runs.push(record);
@@ -388,6 +390,7 @@ impl Game {
             drop_ids: Vec::new(),
             loot_by_quality: Default::default(),
             auto_sold: Default::default(),
+            progression_rewards: Default::default(),
             cause,
             tip: if outcome == Outcome::Victory {
                 "Spend retained rewards, review your loadout, then secure the next sector.".into()

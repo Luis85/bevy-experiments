@@ -186,6 +186,12 @@ pub struct RunRecord {
     pub auto_sold_count: u32,
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub auto_sold_coins: u64,
+    /// The level-up grant and milestone coins settlement paid with this run
+    /// (receipts; no bound of their own).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub level_grant_coins: u64,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub milestone_coins: u64,
 }
 impl RunRecord {
     pub fn duration_seconds(&self) -> f32 {

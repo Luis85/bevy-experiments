@@ -745,6 +745,10 @@ pub struct Report {
         skip_serializing_if = "crate::campaign::AutoSoldReceipt::is_empty"
     )]
     pub auto_sold: crate::campaign::AutoSoldReceipt,
+    /// The level-up grants and rank milestones settlement paid with this
+    /// report (a receipt, never read back by the simulation).
+    #[serde(default, skip_serializing_if = "ProgressionRewards::is_empty")]
+    pub progression_rewards: ProgressionRewards,
     pub cause: String,
     pub tip: String,
     pub first_clear: bool,
@@ -756,6 +760,39 @@ pub struct Report {
     pub log: Vec<String>,
     #[serde(default)]
     pub telemetry: CombatTelemetry,
+}
+/// The most milestone rewards one receipt may list: the catalogue authors
+/// four milestone ranks (schema v7 §3.4).
+pub const MAX_RECEIPT_MILESTONES: usize = 4;
+/// What progression settlement paid with one report: the level-up grants
+/// for the levels from `level_from` (exclusive) to `level_to`, and each
+/// newly claimed rank milestone in ascending rank order.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ProgressionRewards {
+    pub level_from: u32,
+    pub level_to: u32,
+    pub level_coins: u64,
+    pub milestones: Vec<MilestoneReward>,
+}
+impl ProgressionRewards {
+    /// Nothing was paid; the serde skip predicate.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+/// One paid rank milestone: its coins and the item granted with it. The
+/// item fields are None when no item was stored (see
+/// [`SettlementIssue::MilestoneItemLost`]).
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MilestoneReward {
+    pub rank: u32,
+    pub coins: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_id: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item_definition: Option<ItemDefId>,
 }
 impl Report {
     /// The defender who fought the reported attempt.

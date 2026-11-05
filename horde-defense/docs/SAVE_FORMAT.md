@@ -115,6 +115,18 @@ the operation-chain sync. Loading rejects, in any game, a `level_grant_paid`
 above the player's `level`, more than 64 claims, or a claim above the
 campaign's progression rank.
 
+The receipts of what settlement paid are optional and absent at their
+default. `last_result.progression_rewards` (root or expedition report) holds
+`level_from`, `level_to`, `level_coins` and up to four `milestones`, each
+`{rank, coins, item_id?, item_definition?}` (the item keys are absent when no
+item was stored). A run record may carry `level_grant_coins` and
+`milestone_coins`, with no bound of their own. Loading rejects a receipt with
+more than four milestones, milestone ranks that are not strictly increasing,
+an `item_definition` that does not resolve, or `level_from` above `level_to`
+or `level_to` above the player level cap. A milestone item that could not be
+stored is reported to the frontend once (`MilestoneItemLost`) and is never
+saved.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add
