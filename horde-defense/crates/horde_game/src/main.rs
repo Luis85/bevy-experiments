@@ -1,4 +1,6 @@
 mod animation;
+#[cfg(test)]
+mod architecture_tests;
 mod art;
 mod atmosphere_audio;
 mod audio;
