@@ -403,7 +403,6 @@ fn drop_tracking_bounds_reject_out_of_range_saves() {
             "worker drop tier above the pool",
             edited(|s| s.value["battles"][s.live]["game"]["attempt"]["drop_tier"] = json!(9)),
         ),
-        ("report drops above loot", report("loot", json!(1))),
         ("report drop duplicate", report("drop_ids", json!([a, a]))),
         ("report drop at next id", report("drop_ids", json!([next]))),
         (
@@ -427,6 +426,68 @@ fn drop_tracking_bounds_reject_out_of_range_saves() {
             }),
         ),
     ]);
+    // Rows that only one drop-tracking bound rejects, checked by message so
+    // a row cannot pass on another rule.
+    let worker_drops = |s: &mut Staged| {
+        let worker = &mut s.value["battles"][s.live]["game"];
+        worker["attempt"]["loot"] = json!(1);
+        worker["attempt"]["drop_ids"] = json!([1]);
+    };
+    let only_drop_bound = vec![
+        (
+            // Quality counts and the receipt fit loot 1; the two ids do not.
+            "report drops above loot",
+            "Invalid saved report drop tracking",
+            edited(|s| {
+                let report = s.value["last_result"].as_object_mut().unwrap();
+                report.insert("loot".into(), json!(1));
+                report.insert("loot_by_quality".into(), counts(&[("Common", 1)]));
+                report.remove("auto_sold");
+            }),
+        ),
+        (
+            "report drop id zero",
+            "Invalid saved report drop tracking",
+            report("drop_ids", json!([0, a])),
+        ),
+        (
+            // Only the drop_tier Some path records drops (ruling E11).
+            "legacy attempt with drops",
+            "Invalid saved attempt drop tracking",
+            edited(|s| {
+                s.value["attempt"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("drop_tier");
+            }),
+        ),
+        (
+            // Drops are tracked at depth 0 only (ruling E5).
+            "worker attempt with drops",
+            "Invalid saved attempt drop tracking",
+            edited(worker_drops),
+        ),
+    ];
+    let wrong: Vec<String> = only_drop_bound
+        .into_iter()
+        .filter_map(|(name, expected, value)| match load(value) {
+            Err(SaveError::Invalid(error)) if error == expected => None,
+            Ok(_) => Some(format!("{name}: loaded")),
+            Err(error) => Some(format!("{name}: {error}")),
+        })
+        .collect();
+    assert_eq!(
+        wrong,
+        Vec::<String>::new(),
+        "rows not rejected by their bound"
+    );
+    // The worker rows are valid without their drop ids.
+    let mut worker = staged();
+    worker_drops(&mut worker);
+    worker.value["battles"][worker.live]["game"]["attempt"]["drop_ids"] = json!([]);
+    if let Err(error) = load(worker.value) {
+        panic!("worker loot 1 without drops: {error}");
+    }
     // A drop list of exactly MAX_RUN_DROPS ids is not rejected for its length.
     let mut many = staged();
     let ids: Vec<u64> = (1..=MAX_RUN_DROPS as u64).collect();

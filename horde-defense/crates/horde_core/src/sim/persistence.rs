@@ -407,8 +407,11 @@ fn validate_report_loot(report: &Report, next_item_id: u64) -> Result<(), String
 }
 /// An attempt's drop ids (strictly ascending, at most its loot and
 /// [`MAX_RUN_DROPS`], each an issued id) and frozen drop tier (schema v7 §3.3).
-fn validate_attempt_loot(a: &Attempt, next_item_id: u64) -> Result<(), String> {
-    if a.drop_ids.len() > MAX_RUN_DROPS
+/// Drops are recorded only at depth 0 on the `drop_tier` Some path (rulings
+/// E5 and E11): a legacy or worker attempt never holds any.
+fn validate_attempt_loot(a: &Attempt, next_item_id: u64, depth: usize) -> Result<(), String> {
+    if (!a.drop_ids.is_empty() && (a.drop_tier.is_none() || depth > 0))
+        || a.drop_ids.len() > MAX_RUN_DROPS
         || a.drop_ids.len() > a.loot as usize
         || a.drop_ids.first().is_some_and(|id| *id == 0)
         || a.drop_ids.last().is_some_and(|id| *id >= next_item_id)
@@ -464,7 +467,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     }
     let takeover = validate_defender_seats(game, depth)?;
     if let Some(a) = &game.attempt {
-        validate_attempt_loot(a, game.campaign.next_item_id)?;
+        validate_attempt_loot(a, game.campaign.next_item_id, depth)?;
         crate::quality::validate_loot_events(
             &a.loot_events,
             game.campaign.next_item_id,

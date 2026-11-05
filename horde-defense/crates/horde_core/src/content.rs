@@ -192,7 +192,7 @@ pub struct ItemDefinition {
     #[serde(default)]
     pub npc_only: bool,
     /// Recovered only as loot: never offered in the shop or bought. Requires
-    /// a droppable tier (1..=4).
+    /// a droppable tier (1..=4) on a non-starter that is not NPC-only.
     #[serde(default, skip_serializing_if = "crate::schema::is_false")]
     pub loot_only: bool,
     #[serde(default)]
@@ -583,7 +583,7 @@ impl Content {
                     i.name
                 ));
             }
-            if i.loot_only && (index < 4 || !(1..=4).contains(&i.tier)) {
+            if i.loot_only && (index < 4 || i.npc_only || !(1..=4).contains(&i.tier)) {
                 return Err(format!("Loot-only item needs a drop tier: {}", i.name));
             }
         }
@@ -711,12 +711,26 @@ mod tests {
         assert!(data.validate().is_ok());
         let text = serde_json::to_string(&data).unwrap();
         assert_eq!(Content::from_json(&text).unwrap().items[5], data.items[5]);
-        // Loot-only gear must be droppable: tier 1..=4, never a starter.
-        for (index, tier) in [(0, 0), (5, 0), (5, 5)] {
+        // Loot-only gear must be droppable: tier 1..=4, never a starter and
+        // never NPC-only (the drop pool skips both). Each row keeps the
+        // per-slot tier-1 guarantee, so only the loot-only rule can fire:
+        // a starter, a tier-0 non-starter (worn_service_pistol), a tier-5
+        // item (checkpoint_rifle) and an NPC-only drop-tier item.
+        for (index, tier, npc_only) in
+            [(0, 0, false), (20, 0, false), (16, 5, false), (16, 4, true)]
+        {
             let mut data = content().clone();
             data.items[index].loot_only = true;
             data.items[index].tier = tier;
-            assert!(data.validate().is_err(), "item {index} at tier {tier}");
+            data.items[index].npc_only = npc_only;
+            let row = format!("item {index} at tier {tier}, npc_only {npc_only}");
+            match data.validate() {
+                Err(error) => assert!(
+                    error.contains("Loot-only item needs a drop tier"),
+                    "{row}: {error}"
+                ),
+                Ok(()) => panic!("{row}: validated"),
+            }
         }
     }
     #[test]

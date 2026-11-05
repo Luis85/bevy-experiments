@@ -89,8 +89,10 @@ uses them is unchanged. Loading rejects any of these as invalid:
   or any non-default rule in an expedition game;
 - `attempt.drop_ids` that are not strictly ascending, hold more ids than the
   attempt's `loot` or than 4096, or name id 0 or an id at or above
-  `next_item_id`; an `attempt.drop_tier` outside 1 to the highest droppable
-  item tier (absent means an attempt deployed before v7);
+  `next_item_id`, or that are present on an attempt without `drop_tier` or
+  on an expedition's attempt (only a root attempt with a drop tier records
+  drops); an `attempt.drop_tier` outside 1 to the highest droppable item tier
+  (absent means an attempt deployed before v7);
 - `last_result.drop_ids` with a repeated id or the bounds above (any order);
   `last_result.loot_by_quality` summing above `loot`;
 - a `last_result.auto_sold` receipt whose `count` plus `kept_on_overflow`
