@@ -398,6 +398,55 @@ fn non_practice_review_has_no_practice_status() {
         "Practice scenario - progress is isolated from your campaign"
     );
 }
+/// Startup as `FrontendParts::load` builds it from these launch variables:
+/// the real constructor and the real prepare, with a private temp profile.
+fn launched(vars: &[(&str, &str)]) -> FrontendParts {
+    let config = LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
+        vars.iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| (*value).into())
+    })
+    .expect("valid launch");
+    let paths = crate::profile::ProfilePaths::in_directory(
+        std::env::temp_dir().join(format!("lastlight-launched-{}", std::process::id())),
+    );
+    let profile = crate::profile::LoadedProfile {
+        game: Game::default(),
+        settings: crate::settings::Settings::default(),
+        warning: String::new(),
+    };
+    let mut f = FrontendParts::new(profile, &config, &paths);
+    prepare(&mut f);
+    f
+}
+#[test]
+fn isolated_reviews_are_not_practice_profiles() {
+    if cfg!(feature = "review") {
+        for scene in ["menu", "armory"] {
+            let mut f = launched(&[("LASTLIGHT_REVIEW_SCREEN", scene)]);
+            assert_eq!(f.launch.scenario.as_deref(), Some(scene));
+            assert!(!f.status.practice_profile, "{scene}");
+            let output = one_frame(&mut f);
+            for label in [
+                "Practice profile",
+                "Separate practice saves",
+                "Practice · separate campaign",
+            ] {
+                assert_eq!(
+                    crate::ui::tests::text_count(&output, label),
+                    0,
+                    "{scene}: {label:?}"
+                );
+            }
+        }
+    }
+    let practice = launched(&[
+        ("LASTLIGHT_PRACTICE", "1"),
+        ("LASTLIGHT_REVIEW_SCREEN", "construction"),
+    ]);
+    assert!(practice.launch.practice);
+    assert!(practice.status.practice_profile);
+}
 #[test]
 fn workshop_names_still_reach_the_workshop() {
     for scene in ["model-parity-x", "model-workshop"] {

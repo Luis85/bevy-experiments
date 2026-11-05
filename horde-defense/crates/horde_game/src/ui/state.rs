@@ -264,7 +264,8 @@ impl FrontendParts {
             nav: Navigation::default(),
             status: StatusUi {
                 message,
-                practice_profile: config.practice || config.scenario.is_some(),
+                // An isolated review stages a throwaway profile, not a practice save.
+                practice_profile: config.practice,
                 profile_exists,
                 ..StatusUi::default()
             },
