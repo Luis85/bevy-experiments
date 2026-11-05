@@ -201,16 +201,26 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
         );
     }
     let apply = {
-        let committed = &f.game.campaign().balance_settings;
+        let campaign = f.game.campaign();
+        let committed = &campaign.balance_settings;
         let draft = f
             .prefs
             .balance_draft
             .get_or_insert_with(|| committed.clone());
         chrome::row(ui, |ui| {
+            // An edited named draft keeps its preset, so the core keeps that
+            // preset's extras when it normalises the edit to Custom; it is
+            // shown as Custom.
+            let shown = if *draft == BalanceSettings::for_preset(draft.preset) {
+                draft.preset
+            } else {
+                BalancePreset::Custom
+            };
             for preset in BalancePreset::ALL {
                 if ui
-                    .selectable_label(draft.preset == preset, preset.name())
+                    .selectable_label(shown == preset, preset.name())
                     .clicked()
+                    && shown != preset
                 {
                     if preset == BalancePreset::Custom {
                         draft.preset = preset;
@@ -220,7 +230,6 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
                 }
             }
         });
-        let mut changed = false;
         for (label, value) in [
             ("Zombie speed", &mut draft.enemy_speed),
             ("Zombie health", &mut draft.enemy_health),
@@ -228,22 +237,20 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
             ("Spawn pressure", &mut draft.spawn_rate),
             ("Coin rewards", &mut draft.reward),
         ] {
-            changed |= ui
-                .add(egui::Slider::new(value, 0.25..=3.0).suffix("×").text(label))
-                .changed();
+            ui.add(egui::Slider::new(value, 0.25..=3.0).suffix("×").text(label));
         }
         egui::CollapsingHeader::new("Arena size & growth").show(ui, |ui| {
             muted(ui, "The actual path and clearing grow with player level. A short opening is a smaller clearing, with the same world units.");
             for (label, value) in [("Opening lanes", &mut draft.start_lanes), ("Maximum lanes", &mut draft.max_lanes)] {
-                changed |= ui.add(egui::Slider::new(value, 3..=17).step_by(2.0).text(label)).changed();
+                ui.add(egui::Slider::new(value, 3..=17).step_by(2.0).text(label));
             }
-            changed |= ui.add(egui::Slider::new(&mut draft.lanes_per_step, 0..=6).step_by(2.0).text("Lanes per growth step")).changed();
-            changed |= ui.add(egui::Slider::new(&mut draft.lane_level_step, 1..=100).text("Player levels per lane step")).changed();
+            ui.add(egui::Slider::new(&mut draft.lanes_per_step, 0..=6).step_by(2.0).text("Lanes per growth step"));
+            ui.add(egui::Slider::new(&mut draft.lane_level_step, 1..=100).text("Player levels per lane step"));
             for (label, value) in [("Opening path (yd)", &mut draft.start_width), ("Maximum path (yd)", &mut draft.max_width)] {
-                changed |= ui.add(egui::Slider::new(value, 8..=30).text(label)).changed();
+                ui.add(egui::Slider::new(value, 8..=30).text(label));
             }
-            changed |= ui.add(egui::Slider::new(&mut draft.width_per_step, 0..=8).text("Yards per growth step")).changed();
-            changed |= ui.add(egui::Slider::new(&mut draft.width_level_step, 1..=100).text("Player levels per path step")).changed();
+            ui.add(egui::Slider::new(&mut draft.width_per_step, 0..=8).text("Yards per growth step"));
+            ui.add(egui::Slider::new(&mut draft.width_level_step, 1..=100).text("Player levels per path step"));
         });
         egui::CollapsingHeader::new("Advanced combat tuning").show(ui, |ui| {
             for (label, value) in [
@@ -253,14 +260,11 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
                 ("Boss arrival time", &mut draft.boss_time),
                 ("Threat growth per victory", &mut draft.threat_growth),
             ] {
-                changed |= ui.add(egui::Slider::new(value, 0.25..=3.0).suffix("×").text(label)).changed();
+                ui.add(egui::Slider::new(value, 0.25..=3.0).suffix("×").text(label));
             }
-            changed |= ui.add(egui::Slider::new(&mut draft.supply, -30..=100).text("Starting supply adjustment")).changed();
+            ui.add(egui::Slider::new(&mut draft.supply, -30..=100).text("Starting supply adjustment"));
             muted(ui, "NPC attacks still use the documented injury and turn rules. Threat increases after victories; losses add no threat.");
         });
-        if changed {
-            draft.preset = BalancePreset::Custom;
-        }
         let valid = draft.validate();
         if let Err(error) = &valid {
             ui.colored_label(RED, error);
@@ -272,7 +276,10 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
                 "Draft next deployment at your level: {draft_lanes} lanes · {draft_width:.0} yd path"
             ),
         );
-        let changed = *draft != *committed;
+        // Pending when applying would change the saved settings or the
+        // extras basis (the same values edited from another preset).
+        let changed = campaign.balance_outcome(draft.clone())
+            != Ok((committed.clone(), campaign.balance_extras_basis));
         let apply = ui
             .add_enabled(
                 valid.is_ok() && changed,

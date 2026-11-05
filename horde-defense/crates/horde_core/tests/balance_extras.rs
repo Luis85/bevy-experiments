@@ -63,22 +63,39 @@ fn preset_extras_catalogue_values_default_and_bounds() {
             .iter()
             .all(|p| p.extras == PresetExtras::default())
     );
+    // Each row starts from complete Hard extras, so it parses and only
+    // `PresetExtras::validate` can reject it.
+    let with_hard_extras = |field: &str, value: Value| {
+        let mut catalogue = bundled.clone();
+        catalogue["presets"][2]["extras"] =
+            json!({"elite_rate_pct": 150, "front_ramp_pct": 150, "boss_phase_bonus": 1});
+        catalogue["presets"][2]["extras"][field] = value;
+        BalanceCatalog::from_json_str(&catalogue.to_string())
+    };
+    let ceiling = with_hard_extras("elite_rate_pct", json!(300)).unwrap();
+    assert_eq!(ceiling.presets[2].extras, extras(300, 150, 1));
+    let ceiling = with_hard_extras("front_ramp_pct", json!(300)).unwrap();
+    assert_eq!(ceiling.presets[2].extras, extras(150, 300, 1));
+    let ceiling = with_hard_extras("boss_phase_bonus", json!(2)).unwrap();
+    assert_eq!(ceiling.presets[2].extras, extras(150, 150, 2));
     for (field, value) in [
         ("elite_rate_pct", 301),
         ("front_ramp_pct", 301),
         ("boss_phase_bonus", 3),
     ] {
-        let mut bad = bundled.clone();
-        bad["presets"][2]["extras"] = json!({"elite_rate_pct": 150, "front_ramp_pct": 150});
-        bad["presets"][2]["extras"][field] = json!(value);
+        let error = with_hard_extras(field, json!(value))
+            .err()
+            .unwrap_or_else(|| panic!("{field} = {value} accepted"))
+            .to_string();
         assert!(
-            BalanceCatalog::from_json_str(&bad.to_string()).is_err(),
-            "{field} = {value} accepted"
+            error.contains("extras exceed supported ranges"),
+            "{field} = {value}: {error}"
         );
     }
-    let mut unknown = bundled.clone();
-    unknown["presets"][2]["extras"] = json!({"elite_rate": 150});
-    assert!(BalanceCatalog::from_json_str(&unknown.to_string()).is_err());
+    let error = with_hard_extras("elite_rate", json!(1))
+        .expect_err("unknown extras key accepted")
+        .to_string();
+    assert!(error.contains("unknown field `elite_rate`"), "{error}");
 }
 
 #[test]
@@ -101,6 +118,47 @@ fn custom_edit_from_hard_keeps_hard_extras() {
     let loaded: Campaign = serde_json::from_value(saved).unwrap();
     assert_eq!(loaded, c);
     loaded.validate().unwrap();
+}
+
+/// `balance_outcome` is the pure preview of `set_balance_settings`: the
+/// settings screen uses it to tell whether a draft would change anything.
+#[test]
+fn balance_outcome_previews_the_normalised_settings_and_basis_without_writing() {
+    let c = on(BalancePreset::Normal);
+    let before = c.clone();
+    let (settings, basis) = c.balance_outcome(hard_edit()).unwrap();
+    assert_eq!(c, before);
+    let mut expected = hard_edit();
+    expected.preset = BalancePreset::Custom;
+    assert_eq!((settings, basis), (expected, BalancePreset::Hard));
+    let mut applied = c.clone();
+    applied.set_balance_settings(hard_edit()).unwrap();
+    // The same edit previewed after it was applied is a no-op.
+    assert_eq!(
+        applied.balance_outcome(hard_edit()).unwrap(),
+        (
+            applied.balance_settings.clone(),
+            applied.balance_extras_basis
+        )
+    );
+    // The same values from another named preset move the basis.
+    let mut from_easy = hard_edit();
+    from_easy.preset = BalancePreset::Easy;
+    assert_eq!(
+        applied.balance_outcome(from_easy).unwrap().1,
+        BalancePreset::Easy
+    );
+    assert_eq!(
+        c.balance_outcome(BalanceSettings::for_preset(BalancePreset::Hard))
+            .unwrap(),
+        (
+            BalanceSettings::for_preset(BalancePreset::Hard),
+            BalancePreset::Normal
+        )
+    );
+    let mut bad = hard_edit();
+    bad.enemy_speed = f32::NAN;
+    assert!(c.balance_outcome(bad).is_err());
 }
 
 #[test]

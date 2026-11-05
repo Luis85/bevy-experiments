@@ -2,9 +2,12 @@
 use crate::catalog::{self as shared, ContentError};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BalancePreset {
     Easy,
+    /// The default is only the neutral serde value of saved fields such as
+    /// `Campaign.balance_extras_basis`; `BalanceSettings::default()` is separate.
+    #[default]
     Normal,
     Hard,
     Custom,
@@ -136,14 +139,6 @@ impl BalanceSettings {
             .min(u32::from(self.max_width)) as f32,
         )
     }
-}
-/// Serde default of `Campaign.balance_extras_basis`.
-pub(crate) fn normal_preset() -> BalancePreset {
-    BalancePreset::Normal
-}
-/// The skip predicate paired with [`normal_preset`].
-pub(crate) fn is_normal_preset(preset: &BalancePreset) -> bool {
-    *preset == BalancePreset::Normal
 }
 /// Catalogue-only rules a preset adds beyond its `BalanceSettings` (never
 /// saved, never in the digest). Integer percents and a phase count, so the

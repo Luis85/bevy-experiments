@@ -137,11 +137,21 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
     let path = ctx.paths.campaign();
     let old = ctx.game.clone();
     let mut fresh = Game::default();
-    fresh
-        .apply(&horde_core::command::Command::SetBalance(
-            old.campaign().balance_settings.clone(),
-        ))
-        .map_err(|e| e.to_string())?;
+    // A Custom balance keeps the named preset its extras came from: apply that
+    // preset first, so the Custom settings record it as the previous preset.
+    let balance = &old.campaign().balance_settings;
+    let mut carried = Vec::with_capacity(2);
+    if balance.preset == horde_core::balance::BalancePreset::Custom {
+        carried.push(horde_core::balance::BalanceSettings::for_preset(
+            old.campaign().balance_extras_preset(),
+        ));
+    }
+    carried.push(balance.clone());
+    for settings in carried {
+        fresh
+            .apply(&horde_core::command::Command::SetBalance(settings))
+            .map_err(|e| e.to_string())?;
+    }
     let cancelled = {
         let runtime = &mut *ctx.runtime;
         let mut cancelled = runtime.storage.reset(old, fresh, path)?;

@@ -266,6 +266,112 @@ fn difficulty_apply_is_a_validated_saved_command_and_keeps_active_geometry_froze
     assert_eq!((a.lane_count, a.width_yards), (3, 12.0));
 }
 
+/// Every painted text run with its screen rect.
+fn text_rects(output: &FullOutput) -> Vec<(String, Rect)> {
+    fn walk(shape: &egui::epaint::Shape, out: &mut Vec<(String, Rect)>) {
+        match shape {
+            egui::epaint::Shape::Text(text) => out.push((
+                text.galley.text().to_owned(),
+                text.galley.rect.translate(text.pos.to_vec2()),
+            )),
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| walk(s, out)),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    output.shapes.iter().for_each(|c| walk(&c.shape, &mut out));
+    out
+}
+
+/// Presses and releases the rail of the slider labelled `label`, 30 px left
+/// of its value field, as a player clicking the rail would.
+fn press_slider_rail(h: &Harness, f: &mut FrontendParts, label: &str) {
+    let texts = text_rects(&h.frame(f, View::Settings, vec![]));
+    let (_, label_rect) = texts
+        .iter()
+        .find(|(text, _)| text == label)
+        .unwrap_or_else(|| panic!("Slider not found: {label}"));
+    // The value field's text runs ("1.45", "×") sit between rail and label.
+    let value_left = texts
+        .iter()
+        .filter(|(_, r)| {
+            (r.center().y - label_rect.center().y).abs() < 2.0 && r.max.x < label_rect.min.x
+        })
+        .map(|(_, r)| r.min.x)
+        .min_by(f32::total_cmp)
+        .expect("slider value field");
+    let position = pos2(value_left - 30.0, label_rect.center().y);
+    for pressed in [true, false] {
+        h.frame(
+            f,
+            View::Settings,
+            vec![
+                Event::PointerMoved(position),
+                Event::PointerButton {
+                    pos: position,
+                    button: PointerButton::Primary,
+                    pressed,
+                    modifiers: Modifiers::NONE,
+                },
+            ],
+        );
+    }
+}
+
+/// W1-29 review: a named preset edited on the settings screen keeps that
+/// preset's extras. The draft keeps the named preset it came from, and the
+/// core normalises it to Custom with that preset as the extras basis.
+#[test]
+fn editing_a_named_preset_on_the_settings_screen_keeps_its_extras() {
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    // Committed Normal; pick Hard, drag a slider, apply.
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game
+        .apply(&Command::SetBalance(BalanceSettings::for_preset(
+            BalancePreset::Normal,
+        )))
+        .unwrap();
+    f.act(|c| c.open_settings());
+    f.flush_for_test();
+    h.click(f, View::Settings, "Hard");
+    press_slider_rail(&h, f, "Zombie speed");
+    let draft = f.prefs.balance_draft.clone().unwrap();
+    assert_ne!(
+        draft.enemy_speed,
+        BalanceSettings::for_preset(BalancePreset::Hard).enemy_speed,
+        "the slider did not move"
+    );
+    h.click(f, View::Settings, "Apply to next run");
+    let campaign = f.game.campaign();
+    assert_eq!(campaign.balance_settings.enemy_speed, draft.enemy_speed);
+    assert_eq!(campaign.balance_settings.preset, BalancePreset::Custom);
+    assert_eq!(campaign.balance_extras_preset(), BalancePreset::Hard);
+    // Once applied, the same draft is nothing new to apply.
+    let output = h.frame(f, View::Settings, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Unapplied draft. Apply before saving and returning."
+        ),
+        0
+    );
+
+    // Committed Custom from Hard; pick Easy, drag a slider, apply.
+    h.click(f, View::Settings, "Easy");
+    press_slider_rail(&h, f, "Zombie speed");
+    assert_ne!(
+        f.prefs.balance_draft.as_ref().unwrap().enemy_speed,
+        BalanceSettings::for_preset(BalancePreset::Easy).enemy_speed,
+        "the slider did not move"
+    );
+    h.click(f, View::Settings, "Apply to next run");
+    let campaign = f.game.campaign();
+    assert_eq!(campaign.balance_settings.preset, BalancePreset::Custom);
+    assert_eq!(campaign.balance_extras_preset(), BalancePreset::Easy);
+}
+
 #[test]
 fn older_autosave_ack_keeps_navigation_busy_and_freezes_raw_settings_binding_capture() {
     let mut fixture = IsolatedFrontend::new();

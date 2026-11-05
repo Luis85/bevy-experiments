@@ -109,10 +109,7 @@ pub struct Campaign {
     /// keeps (a Hard player who edits lanes keeps the Hard rules). Normal
     /// whenever the preset is named, never Custom; copied into workers and
     /// on the operation-chain sync. v6 saves load as Normal.
-    #[serde(
-        default = "crate::balance::normal_preset",
-        skip_serializing_if = "crate::balance::is_normal_preset"
-    )]
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub balance_extras_basis: crate::balance::BalancePreset,
 }
 impl Default for Campaign {
@@ -236,8 +233,27 @@ impl Campaign {
     }
     pub fn set_balance_settings(
         &mut self,
-        mut settings: crate::balance::BalanceSettings,
+        settings: crate::balance::BalanceSettings,
     ) -> Result<(), String> {
+        let (settings, basis) = self.balance_outcome(settings)?;
+        self.balance_settings = settings;
+        self.balance_extras_basis = basis;
+        Ok(())
+    }
+    /// What [`Self::set_balance_settings`] would store, without storing it:
+    /// the settings normalised to Custom when a named preset was edited, and
+    /// the extras basis (Normal under a named preset; on Custom the requested
+    /// named preset, else the previous named preset, else the old basis).
+    pub fn balance_outcome(
+        &self,
+        mut settings: crate::balance::BalanceSettings,
+    ) -> Result<
+        (
+            crate::balance::BalanceSettings,
+            crate::balance::BalancePreset,
+        ),
+        String,
+    > {
         use crate::balance::{BalancePreset, BalanceSettings};
         settings.validate()?;
         let requested = settings.preset;
@@ -246,7 +262,7 @@ impl Campaign {
             settings.preset = BalancePreset::Custom;
         }
         let previous = self.balance_settings.preset;
-        self.balance_extras_basis = if settings.preset != BalancePreset::Custom {
+        let basis = if settings.preset != BalancePreset::Custom {
             BalancePreset::Normal
         } else if requested != BalancePreset::Custom {
             requested
@@ -255,8 +271,7 @@ impl Campaign {
         } else {
             self.balance_extras_basis
         };
-        self.balance_settings = settings;
-        Ok(())
+        Ok((settings, basis))
     }
     /// The named preset whose catalogue extras apply: the preset itself, or
     /// for Custom the preset the edit came from.

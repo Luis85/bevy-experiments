@@ -788,6 +788,16 @@ fn confirmed_new_journey_archives_the_exact_current_game_and_preserves_preferenc
     host.game.save(&path).unwrap();
     write_settings(&host.settings, &host.directory.join("settings.json")).unwrap();
     let settings = std::fs::read(host.directory.join("settings.json")).unwrap();
+    // A Custom balance edited from Hard keeps the Hard extras (W1-29 review).
+    let mut hard_edit =
+        horde_core::balance::BalanceSettings::for_preset(horde_core::balance::BalancePreset::Hard);
+    hard_edit.supply = 7;
+    host.game.apply(&Command::SetBalance(hard_edit)).unwrap();
+    assert_eq!(
+        host.game.campaign().balance_extras_preset(),
+        horde_core::balance::BalancePreset::Hard
+    );
+    host.game.save(&path).unwrap();
     let before = state(&host.game);
     let balance = host.game.campaign().balance_settings.clone();
     host.runtime.enqueue(AppCommand::NewJourney, "");
@@ -814,7 +824,16 @@ fn confirmed_new_journey_archives_the_exact_current_game_and_preserves_preferenc
     assert!(!host.game.campaign().journey_active);
     assert!(!host.game.campaign().legacy_features);
     assert_eq!(host.game.campaign().balance_settings, balance);
-    assert_eq!(state(&Game::load(&path).unwrap()), state(&host.game));
+    assert_eq!(
+        host.game.campaign().balance_extras_preset(),
+        horde_core::balance::BalancePreset::Hard
+    );
+    let reloaded = Game::load(&path).unwrap();
+    assert_eq!(
+        reloaded.campaign().balance_extras_basis,
+        horde_core::balance::BalancePreset::Hard
+    );
+    assert_eq!(state(&reloaded), state(&host.game));
     assert_eq!(
         std::fs::read(host.directory.join("settings.json")).unwrap(),
         settings
