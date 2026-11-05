@@ -2,9 +2,10 @@
 //! frontends: every domain rule a player intent must satisfy lives here or in
 //! the campaign/strategy/sim methods it calls, never in a frontend.
 use crate::balance::BalanceSettings;
-use crate::campaign::{NpcTraining, SaleBlock};
+use crate::campaign::{AutoSellRule, NpcTraining, SaleBlock};
 use crate::content::{ItemDefId, Mode, Policy, StructureKind};
 use crate::defenders::{DefenderBlocker, DefenderId};
+use crate::quality::Quality;
 use crate::sim::{Game, JourneyContinuation};
 use crate::strategy::RecruitStatus;
 use crate::survivors::SurvivorId;
@@ -123,6 +124,16 @@ pub enum Command {
     DeletePreset {
         index: usize,
     },
+    /// Stores the auto-sell rule; allowed in or out of battle, it acts at
+    /// the next settlement.
+    SetAutoSell(AutoSellRule),
+    /// Sells the stash items the stored rule matches now (ignoring
+    /// `enabled`), but only if that is still `expect_count` items for
+    /// `expect_coins`: the quote the player confirmed.
+    ApplyAutoSellToStash {
+        expect_count: u32,
+        expect_coins: u64,
+    },
 }
 
 impl Command {
@@ -151,6 +162,11 @@ pub enum CommandOutcome {
     Id(u64),
     /// Coins or supply returned by the command.
     Amount(u64),
+    /// One batch sale: how many items sold and what they paid together.
+    Sold {
+        count: u32,
+        coins: u64,
+    },
 }
 
 /// Why a command was rejected. `Display` is the user-facing message.
@@ -176,6 +192,16 @@ pub enum CommandError {
     SaleBlocked(SaleBlock),
     /// The sale would overflow the wallet; nothing was sold.
     WalletLimit,
+    /// An auto-sell rule must sell below a quality above Poor.
+    AutoSellRuleInvalid(Quality),
+    /// The auto-sell rule matches no sellable stash item.
+    NothingToSell,
+    /// The stash changed since the quote; this is the current quote and
+    /// nothing was sold.
+    SaleQuoteChanged {
+        count: u32,
+        coins: u64,
+    },
 }
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -199,6 +225,12 @@ impl fmt::Display for CommandError {
             Self::DefenderUnavailable { blocker, .. } => write!(f, "{blocker}"),
             Self::SaleBlocked(block) => f.write_str(&block.label()),
             Self::WalletLimit => f.write_str("Sale would exceed the wallet limit"),
+            Self::AutoSellRuleInvalid(_) => f.write_str("Auto-sell threshold must be above Poor"),
+            Self::NothingToSell => f.write_str("Nothing in the stash matches the auto-sell rule"),
+            Self::SaleQuoteChanged { count, coins } => write!(
+                f,
+                "The stash changed: auto-sell would now sell {count} items for {coins} coins"
+            ),
         }
     }
 }
@@ -359,6 +391,17 @@ impl Game {
             Command::DeletePreset { index } => {
                 self.campaign.delete_preset(*index)?;
                 Applied
+            }
+            Command::SetAutoSell(rule) => {
+                self.set_auto_sell(*rule)?;
+                Applied
+            }
+            Command::ApplyAutoSellToStash {
+                expect_count,
+                expect_coins,
+            } => {
+                let (count, coins) = self.apply_auto_sell_to_stash(*expect_count, *expect_coins)?;
+                CommandOutcome::Sold { count, coins }
             }
             Command::BuyNpcPoint => {
                 self.campaign.buy_training_point()?;
@@ -694,6 +737,46 @@ mod tests {
         for command in commands {
             let json = serde_json::to_string(&command).unwrap();
             assert_eq!(serde_json::from_str::<Command>(&json).unwrap(), command);
+        }
+    }
+    #[test]
+    fn command_serde_round_trip_covers_appended_economy_variants() {
+        let rule = crate::campaign::AutoSellRule {
+            enabled: true,
+            sell_below: crate::quality::Quality::Rare,
+            slots: [true, false, true, false],
+            keep_upgrades: false,
+            apply_to_npc_runs: false,
+        };
+        let commands = [
+            Command::DeletePreset { index: 2 },
+            Command::SetAutoSell(rule),
+            Command::ApplyAutoSellToStash {
+                expect_count: 50,
+                expect_coins: 1_234,
+            },
+        ];
+        for command in commands {
+            let json = serde_json::to_string(&command).unwrap();
+            assert_eq!(serde_json::from_str::<Command>(&json).unwrap(), command);
+        }
+        let sold = CommandOutcome::Sold {
+            count: 50,
+            coins: 1_234,
+        };
+        let json = serde_json::to_string(&sold).unwrap();
+        assert_eq!(serde_json::from_str::<CommandOutcome>(&json).unwrap(), sold);
+        // The appended errors read as plain sentences.
+        for error in [
+            CommandError::AutoSellRuleInvalid(crate::quality::Quality::Poor),
+            CommandError::NothingToSell,
+            CommandError::SaleQuoteChanged {
+                count: 3,
+                coins: 40,
+            },
+        ] {
+            let text = error.to_string();
+            assert!(!text.is_empty() && !text.contains("::"), "{text}");
         }
     }
 }

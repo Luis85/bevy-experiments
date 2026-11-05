@@ -1,3 +1,4 @@
+mod auto_sell;
 mod combat;
 mod director;
 mod events;
@@ -14,6 +15,7 @@ mod persistence;
 mod smoke;
 mod structures;
 mod telemetry;
+pub use auto_sell::{AutoSellPreview, AutoSellScope};
 pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
 pub use fixtures::{Staging, maximum_progression_render_fixture, peak_render_fixture};
 pub use journey::JourneyContinuation;
