@@ -139,6 +139,20 @@ a `weak_bonus_add` outside 0–1, non-finite values, an `armor_penetration`
 outside 0–1000 or a `hazard_damage_multiplier` outside 0.01–1. v6 attempts
 load with neutral values and need no migration step.
 
+### Combat telemetry
+
+`telemetry` (on the attempt and the report, root or expedition) may carry
+seven optional keys, each absent when empty or zero: `spawned_by_archetype`
+and `kills_by_archetype` (maps from archetype id to a u32 count),
+`damage_taken_by_archetype` (archetype id to u64 damage), `elites_spawned`,
+`elites_killed`, `hazard_damage_taken` and `boss_phase_ticks` (a list of
+ticks). Bosses and unresolved legacy enemies are never counted in the maps.
+Loading rejects more than 256 keys in a map, a key that is not a catalogue
+id (1-64 bytes of `[a-z0-9_.-]`), archetype kills summing above the owner's
+`kills`, an archetype with more kills than spawns, or more than two boss
+phase ticks. Nothing writes these keys yet; v6 telemetry loads with them
+empty.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add

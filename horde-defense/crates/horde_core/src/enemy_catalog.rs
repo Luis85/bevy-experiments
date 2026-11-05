@@ -320,7 +320,9 @@ struct AuthoredCatalog {
     waves: Vec<Wave>,
 }
 
-fn valid_id(id: &str) -> bool {
+/// A catalogue id: 1-64 bytes of `[a-z0-9_.-]`. Saved per-archetype
+/// telemetry keys use the same rule.
+pub(crate) fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
         && id

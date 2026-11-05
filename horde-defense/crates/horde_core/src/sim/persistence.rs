@@ -464,6 +464,37 @@ fn validate_progression_ledgers(campaign: &crate::campaign::Campaign) -> Result<
     }
     Ok(())
 }
+/// Combat telemetry bounds (schema v7 §3.12) for an attempt or report with
+/// `kills` kills: each per-archetype map holds at most 256 catalogue-id keys,
+/// the archetype kills sum to at most `kills`, no archetype has more kills
+/// than spawns, and at most two boss phase ticks are recorded.
+fn validate_telemetry(telemetry: &CombatTelemetry, kills: u32) -> Result<(), String> {
+    use super::telemetry::{MAX_BOSS_PHASE_TICKS, MAX_TELEMETRY_ARCHETYPES};
+    fn keys_valid<V>(map: &std::collections::BTreeMap<String, V>) -> bool {
+        map.len() <= MAX_TELEMETRY_ARCHETYPES
+            && map.keys().all(|key| crate::enemy_catalog::valid_id(key))
+    }
+    if !keys_valid(&telemetry.spawned_by_archetype)
+        || !keys_valid(&telemetry.kills_by_archetype)
+        || !keys_valid(&telemetry.damage_taken_by_archetype)
+        || telemetry.boss_phase_ticks.len() > MAX_BOSS_PHASE_TICKS
+    {
+        return Err("Invalid saved combat telemetry archetype keys or boss phases".into());
+    }
+    let archetype_kills: u64 = telemetry
+        .kills_by_archetype
+        .values()
+        .map(|k| u64::from(*k))
+        .sum();
+    if archetype_kills > u64::from(kills)
+        || telemetry.kills_by_archetype.iter().any(|(id, killed)| {
+            *killed > telemetry.spawned_by_archetype.get(id).copied().unwrap_or(0)
+        })
+    {
+        return Err("Saved combat telemetry kills exceed kills or spawns".into());
+    }
+    Ok(())
+}
 pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     game.campaign.validate()?;
     validate_progression_ledgers(&game.campaign)?;
@@ -474,6 +505,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     if let Some(report) = &game.last_result {
         validate_report_loot(report, game.campaign.next_item_id)?;
         validate_progression_rewards(&report.progression_rewards)?;
+        validate_telemetry(&report.telemetry, report.kills)?;
         if !(MIN_LANES..=MAX_LANES).contains(&report.lane_count)
             || report.lane_count.is_multiple_of(2)
             || report.telemetry.damage_by_lane.len() != usize::from(report.lane_count)
@@ -511,6 +543,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     let takeover = validate_defender_seats(game, depth)?;
     if let Some(a) = &game.attempt {
         validate_attempt_loot(a, game.campaign.next_item_id, depth)?;
+        validate_telemetry(&a.telemetry, a.kills)?;
         crate::quality::validate_loot_events(
             &a.loot_events,
             game.campaign.next_item_id,

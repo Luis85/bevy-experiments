@@ -1,6 +1,13 @@
 //! Per-attempt combat telemetry counters.
 
 use super::*;
+use std::collections::BTreeMap;
+
+/// The most keys each per-archetype telemetry map may hold (schema v7 §3.12).
+pub(crate) const MAX_TELEMETRY_ARCHETYPES: usize = 256;
+/// The most boss phase transitions one attempt records (schema v7 §3.12).
+pub(crate) const MAX_BOSS_PHASE_TICKS: usize = 2;
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CombatTelemetry {
     pub spawned: u32,
@@ -23,6 +30,27 @@ pub struct CombatTelemetry {
     pub trap_damage: u64,
     pub turret_damage: u64,
     pub canceled_reload_ticks: u64,
+    /// Non-boss spawns per resolved archetype id. Bosses and unresolved
+    /// legacy enemies are not counted. Absent when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub spawned_by_archetype: BTreeMap<String, u32>,
+    /// Non-boss kills per resolved archetype id; the sum is at most the
+    /// attempt's `kills` and each entry at most its spawns. Absent when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub kills_by_archetype: BTreeMap<String, u32>,
+    /// Damage the defenders took per resolved archetype id. Absent when empty.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub damage_taken_by_archetype: BTreeMap<String, u64>,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub elites_spawned: u32,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub elites_killed: u32,
+    /// Damage the defenders took from hazards (spit pools, detonations).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub hazard_damage_taken: u64,
+    /// The tick of each boss phase transition, at most two.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub boss_phase_ticks: Vec<u64>,
 }
 impl Default for CombatTelemetry {
     fn default() -> Self {
@@ -46,6 +74,13 @@ impl Default for CombatTelemetry {
             trap_damage: Default::default(),
             turret_damage: Default::default(),
             canceled_reload_ticks: Default::default(),
+            spawned_by_archetype: BTreeMap::new(),
+            kills_by_archetype: BTreeMap::new(),
+            damage_taken_by_archetype: BTreeMap::new(),
+            elites_spawned: 0,
+            elites_killed: 0,
+            hazard_damage_taken: 0,
+            boss_phase_ticks: Vec::new(),
         }
     }
 }
