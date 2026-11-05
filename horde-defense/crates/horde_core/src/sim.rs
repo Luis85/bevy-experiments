@@ -133,6 +133,53 @@ pub struct Enemy {
     pub statuses: Statuses,
     #[serde(default)]
     pub resolved: Option<crate::enemy_catalog::ResolvedEnemy>,
+    /// Spawned by a splitter's death: never elite, never splits, never drops.
+    #[serde(default, skip_serializing_if = "crate::schema::is_false")]
+    pub split_child: bool,
+    /// A phased boss's profile and progress, snapshotted at spawn; None is a
+    /// boss without phases (every legacy boss).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boss_state: Option<BossState>,
+}
+/// How a boss changes when it enters a phase, one profile per [`BossKind`].
+/// Transition `n` applies each multiplier to the power `n`, clamped at the
+/// profile bounds.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BossPhaseProfile {
+    pub name: String,
+    pub speed_mult: f32,
+    pub armor_mult: f32,
+    pub call_interval_mult: f32,
+    pub siege_recovery_mult: f32,
+    /// Ticks the boss neither moves nor counts down its attack after entering
+    /// a phase.
+    pub hold_ticks: u32,
+}
+impl BossPhaseProfile {
+    pub fn valid(&self) -> bool {
+        let within = |v: f32, min: f32, max: f32| v.is_finite() && (min..=max).contains(&v);
+        !self.name.trim().is_empty()
+            && self.name.len() <= 40
+            && within(self.speed_mult, 1.0, 2.0)
+            && within(self.armor_mult, 0.25, 1.0)
+            && within(self.call_interval_mult, 0.3, 1.0)
+            && within(self.siege_recovery_mult, 0.3, 1.0)
+            && self.hold_ticks <= 180
+    }
+}
+/// A phased boss: its profile, how many transitions it may enter, how many it
+/// has entered, and the tick its current hold ends.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BossState {
+    pub profile: BossPhaseProfile,
+    pub transitions: u8,
+    pub entered: u8,
+    pub hold_until: u64,
+}
+impl BossState {
+    pub fn valid(&self) -> bool {
+        self.profile.valid() && self.transitions <= 2 && self.entered <= self.transitions
+    }
 }
 /// Permanent battlefield remains for this attempt, independent of transient effects.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -271,6 +318,14 @@ pub enum EventKind {
     Throw,
     Explosion,
     Burn,
+    /// A ranged enemy strike (actor = spitter, target = structure or None).
+    Spit,
+    /// A blast from a dying or fused enemy; value = radius in hundredths.
+    Detonation,
+    /// A splitter's death spawned children; value = child count.
+    Split,
+    /// A boss entered a phase; value = the transition number.
+    BossPhase,
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Event {
@@ -749,6 +804,9 @@ pub struct Report {
     /// report (a receipt, never read back by the simulation).
     #[serde(default, skip_serializing_if = "ProgressionRewards::is_empty")]
     pub progression_rewards: ProgressionRewards,
+    /// The rank of the stage's boss (no writer before wave 2).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub boss_rank: crate::progression::BossRank,
     pub cause: String,
     pub tip: String,
     pub first_clear: bool,

@@ -363,6 +363,9 @@ impl Game {
             auto_sold_coins: 0,
             level_grant_coins: 0,
             milestone_coins: 0,
+            elite_kills: 0,
+            boss_ttk_ticks: None,
+            boss_rank: Default::default(),
         };
         if self.worker {
             self.pending_runs.push(record);
@@ -391,6 +394,7 @@ impl Game {
             loot_by_quality: Default::default(),
             auto_sold: Default::default(),
             progression_rewards: Default::default(),
+            boss_rank: Default::default(),
             cause,
             tip: if outcome == Outcome::Victory {
                 "Spend retained rewards, review your loadout, then secure the next sector.".into()

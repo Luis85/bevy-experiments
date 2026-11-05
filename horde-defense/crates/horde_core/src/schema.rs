@@ -30,6 +30,11 @@ pub(crate) fn one_u8() -> u8 {
     1
 }
 
+/// The skip predicate paired with [`one_u8`].
+pub(crate) fn is_one_u8(value: &u8) -> bool {
+    *value == 1
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -192,6 +192,14 @@ pub struct RunRecord {
     pub level_grant_coins: u64,
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub milestone_coins: u64,
+    /// Elites killed in this run (at most `kills`).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub elite_kills: u32,
+    /// Ticks from the boss's arrival to its defeat (at most `duration_ticks`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boss_ttk_ticks: Option<u64>,
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub boss_rank: crate::progression::BossRank,
 }
 impl RunRecord {
     pub fn duration_seconds(&self) -> f32 {
@@ -226,6 +234,10 @@ impl RunRecord {
                 > u64::from(self.loot)
             || self.auto_sold_count > self.loot
             || (self.auto_sold_count == 0 && self.auto_sold_coins != 0)
+            || self.elite_kills > self.kills
+            || self
+                .boss_ttk_ticks
+                .is_some_and(|ticks| ticks > self.duration_ticks)
         {
             return Err("Invalid persistent run record".into());
         }

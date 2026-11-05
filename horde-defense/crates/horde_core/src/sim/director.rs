@@ -214,6 +214,8 @@ impl Game {
             windup_total: 0,
             statuses: Statuses::default(),
             resolved: (!boss).then_some(resolved),
+            split_child: false,
+            boss_state: None,
         });
         a.telemetry.spawned += 1;
         a.telemetry.peak_enemies = a.telemetry.peak_enemies.max(a.enemies.len());

@@ -156,6 +156,44 @@ spawns were never counted, the writer counts a kill in `kills_by_archetype`
 only while that archetype's kills are below its `spawned_by_archetype` count.
 Otherwise the save could not load again.
 
+### Enemy schema
+
+Every key below is optional and absent at its neutral value; v6 saves load
+with the neutral values and need no migration step. Nothing writes a
+non-neutral value yet (enemy-balance, wave 2).
+
+- A spawn snapshot `attempt.enemies[*].resolved` may carry `reach` (yards,
+  0–12, absent at 0), `ranged_armor` (0–1000), `npc_ranged_armor` (0–100),
+  `stagger_immune` (absent when false), `group_size` (1–6, absent at 1),
+  `death_effect` (`{"Burst": {radius, damage, structure_damage, npc_dice,
+  npc_add, fuse}}` with radius in (0, 3], damage 1–10000, structure damage
+  0–10000, dice 1–20 and add −30–100, or `{"Split": {archetype_id, count}}`
+  with count 1–4), `tags` (at most 8 unique catalogue ids) and `elite`
+  (`{affix_id, name}`, a non-blank name of at most 60 bytes). An unknown key
+  is still refused. A split target or affix id need not exist in the current
+  catalogue, but must be a catalogue id.
+- An enemy may carry `split_child` (absent when false) and `boss_state`
+  (`{profile: {name, speed_mult, armor_mult, call_interval_mult,
+  siege_recovery_mult, hold_ticks}, transitions, entered, hold_until}`).
+  Loading rejects a split child that is a boss, an elite or a splitter, a
+  `boss_state` on a regular enemy, more than two transitions, `entered`
+  above `transitions`, or a profile outside its bounds (name 1–40 bytes,
+  speed 1–2, armor 0.25–1, call interval and siege recovery 0.3–1, hold at
+  most 180 ticks).
+- `attempt.progression` may carry `elite_rate_bp` (0–10000), `front_ramp`
+  (1–2, absent at exactly 1.0), `boss_rank` (`Sector`, `Regional` or
+  `Capstone`; absent at `Sector`), `boss_phases` (0–2),
+  `boss_armor_multiplier` (1–4), `npc_boss_armor_add` (0–20),
+  `boss_health_multiplier` and `boss_reward_multiplier` (1–2) and
+  `boss_damage_multiplier` (1–4); the multipliers are absent at exactly 1.0.
+  `wave_tier` may be at most 15 (`MAX_WAVE_TIER`) and `enemy_cap` at most
+  224 (`GAMEPLAY_ENEMY_CAP`, one boss may come on top).
+- A run record may carry `elite_kills` (at most `kills`), `boss_ttk_ticks`
+  (at most `duration_ticks`) and `boss_rank`; a report may carry
+  `boss_rank`.
+- The saved presentation events (`attempt.events[*].kind`) gain `Spit`,
+  `Detonation`, `Split` and `BossPhase`.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add

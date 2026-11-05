@@ -74,7 +74,92 @@ pub struct ResolvedEnemy {
     pub target_urgency: f32,
     pub visual: EnemyVisual,
     pub unlocked_by: Option<BossKind>,
+    /// Ranged attack reach in yards beyond the defense line; 0 is melee.
+    #[serde(default, skip_serializing_if = "crate::schema::is_zero_f32")]
+    pub reach: f32,
+    /// Personal armor added against shots and turret fire while not in contact.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub ranged_armor: i32,
+    /// NPC damage resistance added against ranged fire while not in contact.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub npc_ranged_armor: i32,
+    /// Hits never interrupt movement or attacks (no hit-stop, prone or stun).
+    #[serde(default, skip_serializing_if = "crate::schema::is_false")]
+    pub stagger_immune: bool,
+    /// Members spawned by one weighted pick.
+    #[serde(
+        default = "crate::schema::one_u8",
+        skip_serializing_if = "crate::schema::is_one_u8"
+    )]
+    pub group_size: u8,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub death_effect: Option<DeathEffect>,
+    /// Authored labels for perk targeting; never used for numbers.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    /// Set on an elite spawn; its affix stats are already baked into the
+    /// other fields.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elite: Option<EliteMark>,
 }
+
+/// What an archetype does when it dies (schema v7 §3.9). Saved inside the
+/// spawn snapshot, so a split target need not exist in the current catalogue.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub enum DeathEffect {
+    /// A blast around the body; with `fuse` it also detonates on contact.
+    Burst {
+        /// Yards, in (0, 3].
+        radius: f32,
+        damage: i32,
+        structure_damage: i32,
+        npc_dice: u8,
+        npc_add: i32,
+        fuse: bool,
+    },
+    /// Spawns `count` children of `archetype_id`.
+    Split { archetype_id: String, count: u8 },
+}
+
+impl DeathEffect {
+    fn valid(&self) -> bool {
+        match self {
+            Self::Burst {
+                radius,
+                damage,
+                structure_damage,
+                npc_dice,
+                npc_add,
+                fuse: _,
+            } => {
+                radius.is_finite()
+                    && *radius > 0.0
+                    && *radius <= 3.0
+                    && (1..=10_000).contains(damage)
+                    && (0..=10_000).contains(structure_damage)
+                    && (1..=20).contains(npc_dice)
+                    && (-30..=100).contains(npc_add)
+            }
+            Self::Split {
+                archetype_id,
+                count,
+            } => valid_id(archetype_id) && (1..=4).contains(count),
+        }
+    }
+}
+
+/// Marks an elite spawn: the affix it rolled and its display name.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EliteMark {
+    pub affix_id: String,
+    pub name: String,
+}
+
+/// The most authored tags one archetype may carry.
+pub const MAX_ENEMY_TAGS: usize = 8;
+const MAX_ELITE_NAME_BYTES: usize = 60;
 
 impl ResolvedEnemy {
     /// Validate saved snapshots without consulting the current catalogue.
@@ -101,6 +186,19 @@ impl ResolvedEnemy {
             || self.xp > 1_000_000
             || !finite_range(self.visual.scale, 0.25, 3.0)
             || self.visual.tint.iter().any(|v| !finite_range(*v, 0.0, 1.0))
+            || !finite_range(self.reach, 0.0, 12.0)
+            || !(0..=1000).contains(&self.ranged_armor)
+            || !(0..=100).contains(&self.npc_ranged_armor)
+            || !(1..=6).contains(&self.group_size)
+            || self.death_effect.as_ref().is_some_and(|e| !e.valid())
+            || self.tags.len() > MAX_ENEMY_TAGS
+            || self.tags.iter().any(|tag| !valid_id(tag))
+            || self.tags.iter().collect::<BTreeSet<_>>().len() != self.tags.len()
+            || self.elite.as_ref().is_some_and(|elite| {
+                !valid_id(&elite.affix_id)
+                    || elite.name.trim().is_empty()
+                    || elite.name.len() > MAX_ELITE_NAME_BYTES
+            })
         {
             return Err(format!(
                 "Invalid resolved enemy profile: {}",
@@ -447,6 +545,15 @@ impl AuthoredCatalog {
                     scale: v.scale,
                 },
                 unlocked_by: a.unlocked_by,
+                // Authored keys for these land with the content (wave 2).
+                reach: 0.0,
+                ranged_armor: 0,
+                npc_ranged_armor: 0,
+                stagger_immune: false,
+                group_size: 1,
+                death_effect: None,
+                tags: Vec::new(),
+                elite: None,
             };
             enemy.validate()?;
             resolved.insert(id.to_owned(), enemy);

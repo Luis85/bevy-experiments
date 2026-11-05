@@ -694,6 +694,23 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
                     return Err("Saved hostile profile category is inconsistent".into());
                 }
             }
+            let splits = |profile: &crate::enemy_catalog::ResolvedEnemy| {
+                matches!(
+                    profile.death_effect,
+                    Some(crate::enemy_catalog::DeathEffect::Split { .. })
+                )
+            };
+            if (e.split_child
+                && (e.boss
+                    || e.resolved
+                        .as_ref()
+                        .is_some_and(|r| r.elite.is_some() || splits(r))))
+                || e.boss_state
+                    .as_ref()
+                    .is_some_and(|state| !e.boss || !state.valid())
+            {
+                return Err("Saved split child or boss phase state is invalid".into());
+            }
             if !e.arena_width.is_finite()
                 || e.arena_width != a.width_yards
                 || e.max_hp <= 0

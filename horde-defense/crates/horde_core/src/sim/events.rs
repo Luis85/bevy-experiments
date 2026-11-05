@@ -161,6 +161,34 @@ pub enum SimEvent {
         mode: Mode,
         cause: String,
     },
+    /// A ranged enemy strike; `target_id` is a structure, or `None` when the
+    /// defender was struck.
+    Spit(Strike),
+    /// A dying or fused enemy's blast. `target_id` names the fuse target (a
+    /// structure, or `None` for the defender) and is `None` for a death burst.
+    Detonation {
+        enemy_id: u64,
+        target_id: Option<u64>,
+        lane: Option<u8>,
+        at: [f32; 2],
+        /// Blast radius in yards.
+        radius: f32,
+    },
+    /// A splitter died and spawned `count` children.
+    Split {
+        enemy_id: u64,
+        lane: Option<u8>,
+        at: [f32; 2],
+        count: u8,
+    },
+    /// A boss entered phase `phase` (1-based transition number).
+    BossPhase {
+        boss_id: u64,
+        kind: BossKind,
+        phase: u8,
+        lane: Option<u8>,
+        at: [f32; 2],
+    },
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -345,6 +373,35 @@ impl Attempt {
                 radius: value as f32 / 100.0,
                 duration_ticks: meta.duration_ticks,
             },
+            EventKind::Spit => SimEvent::Spit(strike()),
+            EventKind::Detonation => SimEvent::Detonation {
+                enemy_id: id,
+                target_id: meta.target_id,
+                lane,
+                at: from,
+                radius: value as f32 / 100.0,
+            },
+            EventKind::Split => SimEvent::Split {
+                enemy_id: id,
+                lane,
+                at: from,
+                count: value.clamp(0, i32::from(u8::MAX)) as u8,
+            },
+            EventKind::BossPhase => {
+                let kind = self
+                    .enemies
+                    .iter()
+                    .find(|e| e.id == id)
+                    .and_then(|e| e.boss_kind);
+                debug_assert!(kind.is_some(), "boss phase events name a live boss");
+                SimEvent::BossPhase {
+                    boss_id: id,
+                    kind: kind.unwrap_or(BossKind::Breacher),
+                    phase: value.clamp(0, i32::from(u8::MAX)) as u8,
+                    lane,
+                    at: from,
+                }
+            }
         }
     }
 }
@@ -406,5 +463,92 @@ impl Game {
             let excess = self.event_outbox.len() - MAX_UNDRAINED_EVENTS / 2;
             self.event_outbox.drain(..excess);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn appended_event_kinds_map_to_their_typed_events() {
+        let mut game = Game::default();
+        game.deploy(0, Mode::Personal).unwrap();
+        let mut a = game.attempt.take().unwrap();
+        game.spawn_enemy(&mut a, EnemyKind::Runner, 2, false);
+        a.boss_spawned = true;
+        game.spawn_enemy(&mut a, EnemyKind::Brute, 4, true);
+        let runner = a.enemies[0].id;
+        let boss = a.enemies[1].id;
+        let boss_kind = a.enemies[1].boss_kind.unwrap();
+        a.emitted.clear();
+        let meta = |actor: u64, target: Option<u64>, lane: u8| EventMetadata {
+            actor_id: Some(actor),
+            target_id: target,
+            lane: Some(lane),
+            ..EventMetadata::default()
+        };
+        let (from, to) = ([6.0, 2.5], [1.5, 2.5]);
+        a.event_with(EventKind::Spit, from, to, 7, meta(runner, None, 2));
+        a.event_with(
+            EventKind::Detonation,
+            from,
+            to,
+            160,
+            meta(runner, Some(9), 2),
+        );
+        a.event_with(EventKind::Split, from, to, 3, meta(runner, None, 2));
+        a.event_with(EventKind::BossPhase, from, to, 2, meta(boss, None, 4));
+        let events: Vec<SimEvent> = a.emitted.iter().map(|r| r.event.clone()).collect();
+        assert_eq!(
+            events,
+            [
+                SimEvent::Spit(Strike {
+                    attacker: Actor::Enemy { id: runner },
+                    target_id: None,
+                    lane: Some(2),
+                    from,
+                    to,
+                    value: 7,
+                }),
+                SimEvent::Detonation {
+                    enemy_id: runner,
+                    target_id: Some(9),
+                    lane: Some(2),
+                    at: from,
+                    radius: 1.6,
+                },
+                SimEvent::Split {
+                    enemy_id: runner,
+                    lane: Some(2),
+                    at: from,
+                    count: 3,
+                },
+                SimEvent::BossPhase {
+                    boss_id: boss,
+                    kind: boss_kind,
+                    phase: 2,
+                    lane: Some(4),
+                    at: from,
+                },
+            ]
+        );
+        // The presentation window saves the appended kinds by name.
+        let saved: Vec<String> = a
+            .events
+            .iter()
+            .rev()
+            .take(4)
+            .map(|e| serde_json::to_string(&e.kind).unwrap())
+            .collect();
+        assert_eq!(
+            saved,
+            [
+                r#""BossPhase""#,
+                r#""Split""#,
+                r#""Detonation""#,
+                r#""Spit""#
+            ]
+        );
     }
 }

@@ -417,6 +417,11 @@ pub(super) fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
             Outcome::Defeat => SoundCue::Defeat,
             Outcome::Withdrawal => SoundCue::Retreat,
         }),
+        // Enemy-side events have no cues yet (audio adds them in wave 2).
+        SimEvent::Spit(_)
+        | SimEvent::Detonation { .. }
+        | SimEvent::Split { .. }
+        | SimEvent::BossPhase { .. } => None,
         _ => None,
     };
     if let Some(cue) = cue {

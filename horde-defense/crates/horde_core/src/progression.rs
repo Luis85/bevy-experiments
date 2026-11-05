@@ -2,6 +2,24 @@
 use crate::catalog::{self as shared, ContentError};
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
+/// The highest composition wave tier a pressure floor or a saved snapshot may
+/// name (inclusive). The authored maximum is 11; the headroom is validation
+/// only, so widening it never touches a save.
+pub const MAX_WAVE_TIER: usize = 15;
+/// The most regular enemies a production encounter keeps alive (one boss may
+/// come on top). Saves and catalogues above it are rejected.
+pub const GAMEPLAY_ENEMY_CAP: usize = 224;
+/// Which boss a stage fields, derived from its place on the country's front
+/// (schema v7 §3.10). Append-only.
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+pub enum BossRank {
+    #[default]
+    Sector,
+    Regional,
+    Capstone,
+}
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GearScaling {
@@ -191,14 +209,14 @@ impl ProgressionCatalog {
             || self.lanes_per_step > 6
             || self.lane_level_step == 0
             || self.lane_level_step > 1000
-            || self.population_global_cap > 224
+            || self.population_global_cap > GAMEPLAY_ENEMY_CAP
             || self.population_global_cap < self.population_cap
             || self.victory_player_xp > 1_000_000
             || self.health_per_rank <= 0.0
             || self.damage_per_rank <= 0.0
-            || !(1..=224).contains(&self.population_base)
+            || !(1..=GAMEPLAY_ENEMY_CAP).contains(&self.population_base)
             || self.population_per_rank > 16
-            || !(self.population_base..=224).contains(&self.population_cap)
+            || !(self.population_base..=GAMEPLAY_ENEMY_CAP).contains(&self.population_cap)
             || !finite(self.npc_arrival_factor, 0.5, 2.0)
             || !(1..=1000).contains(&self.max_rank)
             || !(1..=1000).contains(&self.batch_rank_step)
@@ -237,7 +255,7 @@ impl ProgressionCatalog {
                 || !finite(f.rate_cap, f.start_rate, 20.0)
                 || !(0..=100_000).contains(&f.boss_health)
                 || !(0..=1000).contains(&f.npc_boss_health)
-                || f.wave_tier > 4
+                || f.wave_tier > MAX_WAVE_TIER
                 || !finite(f.boss_time, 0.0, 600.0)
             {
                 return Err("Invalid progression pressure floor".into());
@@ -292,6 +310,8 @@ impl ProgressionCatalog {
             npc_boss_health_floor: floor.npc_boss_health,
             wave_tier: floor.wave_tier,
             boss_time_floor: floor.boss_time,
+            // The enemy-side fields stay neutral until their wave-2 writers.
+            ..ProgressionSnapshot::default()
         }
     }
 }
@@ -315,6 +335,28 @@ pub struct ProgressionSnapshot {
     pub boss_health_floor: i32,
     pub npc_boss_health_floor: i32,
     pub wave_tier: usize,
+    /// Elite spawn chance in basis points (0..=10000).
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub elite_rate_bp: u32,
+    /// The front-depth ramp, already folded into `enemy_health` and
+    /// `arrival_multiplier`; kept for display and audit.
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub front_ramp: f32,
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub boss_rank: BossRank,
+    /// Boss phase transitions this encounter's boss may enter (0..=2).
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub boss_phases: u8,
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub boss_armor_multiplier: f32,
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub npc_boss_armor_add: i32,
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub boss_health_multiplier: f32,
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub boss_reward_multiplier: f32,
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub boss_damage_multiplier: f32,
 }
 impl Default for ProgressionSnapshot {
     fn default() -> Self {
@@ -336,12 +378,21 @@ impl Default for ProgressionSnapshot {
             boss_health_floor: 0,
             npc_boss_health_floor: 0,
             wave_tier: 0,
+            elite_rate_bp: 0,
+            front_ramp: 1.0,
+            boss_rank: BossRank::Sector,
+            boss_phases: 0,
+            boss_armor_multiplier: 1.0,
+            npc_boss_armor_add: 0,
+            boss_health_multiplier: 1.0,
+            boss_reward_multiplier: 1.0,
+            boss_damage_multiplier: 1.0,
         }
     }
 }
 impl ProgressionSnapshot {
     pub fn validate(&self) -> Result<(), String> {
-        if self.enemy_cap > 224
+        if self.enemy_cap > GAMEPLAY_ENEMY_CAP
             || (self.enemy_cap == 0 && self.rank != 0)
             || self.rank > 10_000
             || !finite(self.boss_time_floor, 0.0, 600.0)
@@ -350,7 +401,7 @@ impl ProgressionSnapshot {
             || !(1..=8).contains(&self.batch_size)
             || !(1..=64).contains(&self.item_level)
             || self.supply_bonus > 100
-            || self.wave_tier > 4
+            || self.wave_tier > MAX_WAVE_TIER
             || !(0..=100_000).contains(&self.boss_health_floor)
             || !(0..=1000).contains(&self.npc_boss_health_floor)
             || !finite(self.start_rate_floor, 0.0, 10.0)
@@ -365,6 +416,14 @@ impl ProgressionSnapshot {
             ]
             .into_iter()
             .any(|v| !finite(v, 1.0, 8.0))
+            || self.elite_rate_bp > 10_000
+            || !finite(self.front_ramp, 1.0, 2.0)
+            || self.boss_phases > 2
+            || !finite(self.boss_armor_multiplier, 1.0, 4.0)
+            || !(0..=20).contains(&self.npc_boss_armor_add)
+            || !finite(self.boss_health_multiplier, 1.0, 2.0)
+            || !finite(self.boss_reward_multiplier, 1.0, 2.0)
+            || !finite(self.boss_damage_multiplier, 1.0, 4.0)
         {
             return Err("Invalid saved progression snapshot".into());
         }
