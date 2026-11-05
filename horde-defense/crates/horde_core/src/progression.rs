@@ -392,8 +392,13 @@ impl Default for ProgressionSnapshot {
 }
 impl ProgressionSnapshot {
     pub fn validate(&self) -> Result<(), String> {
-        if self.enemy_cap > GAMEPLAY_ENEMY_CAP
-            || (self.enemy_cap == 0 && self.rank != 0)
+        if self.enemy_cap > GAMEPLAY_ENEMY_CAP {
+            return Err(format!(
+                "Saved enemy cap {} exceeds the gameplay enemy cap {GAMEPLAY_ENEMY_CAP}",
+                self.enemy_cap
+            ));
+        }
+        if (self.enemy_cap == 0 && self.rank != 0)
             || self.rank > 10_000
             || !finite(self.boss_time_floor, 0.0, 600.0)
             || self.batch_size > self.rank.saturating_add(1)

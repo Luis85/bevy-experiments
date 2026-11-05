@@ -449,6 +449,77 @@ fn isolated_reviews_are_not_practice_profiles() {
     assert!(practice.status.practice_profile);
 }
 #[test]
+fn review_matrix_lists_stress_screen() {
+    let row = review_scenes::REVIEW_SCENES
+        .iter()
+        .find(|scene| scene.name == "stress")
+        .expect("stress registry row");
+    assert_eq!(row.kind, review_scenes::SceneKind::MotionOnly);
+    assert!(row.motion && row.perf && !row.practice);
+    assert_eq!((row.owner, row.since_wave), ("perf-architecture", 1));
+    assert!(crate::perf_budget::CPU_GATED_SCENES.contains(&row.name));
+    assert!(review_scenes::accepts("stress", true));
+    assert!(!review_scenes::accepts("stress", false));
+    #[cfg(feature = "review")]
+    {
+        let mut f = staged("stress");
+        assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+        assert_eq!(f.campaign.mode, horde_core::content::Mode::Npc);
+        let a = f.game.attempt().expect("stress field");
+        assert_eq!(a.enemies.len(), crate::perf_budget::ENEMIES_STRESS);
+        assert!(a.paused);
+        assert_eq!(f.game.battles().len(), 3);
+        assert_eq!(
+            f.status.message,
+            "Synthetic stress fixture · 400 drawn + 3 expeditions · perf headroom, not a gameplay claim"
+        );
+        one_frame(&mut f);
+    }
+}
+/// An autosave of the stress fixture would fail validation, so the scene never
+/// submits one; an explicit quit (how a perf report ends) closes unsaved.
+#[cfg(feature = "review")]
+#[test]
+fn stress_screen_never_requests_a_save_and_shows_no_save_error() {
+    use crate::runner::{ControlFrame, SaveIntent};
+    let mut f = launched(&[
+        ("LASTLIGHT_REVIEW_SCREEN", "stress"),
+        ("LASTLIGHT_REVIEW_MOTION", "1"),
+    ]);
+    f.game.set_paused(false);
+    f.runtime.publish(ControlFrame {
+        enabled: true,
+        ..ControlFrame::default()
+    });
+    // Past two autosave periods (600 ticks each).
+    for _ in 0..1300 {
+        f.step();
+        f.flush();
+    }
+    assert!(f.runtime.simulated_ticks >= 1300);
+    assert!(
+        f.game.attempt().is_some(),
+        "the stress battle is still live"
+    );
+    crate::ui::request_save(&mut f.runtime, &mut f.status, SaveIntent::Quit);
+    assert!(f.flush_for_test(), "the quit completes without a save");
+    let metrics = f.runtime.persistence_metrics();
+    assert_eq!(
+        (
+            metrics.completed_background_saves,
+            metrics.failed_background_saves,
+            metrics.pending
+        ),
+        (0, 0, false)
+    );
+    assert!(
+        !f.status.message_error && !f.status.message.contains("Save failed"),
+        "{}",
+        f.status.message
+    );
+    assert!(!f.paths.campaign().exists());
+}
+#[test]
 fn workshop_names_still_reach_the_workshop() {
     for scene in ["model-parity-x", "model-workshop"] {
         let f = staged(scene);

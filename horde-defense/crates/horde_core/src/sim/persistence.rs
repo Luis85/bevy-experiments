@@ -136,9 +136,15 @@ impl Game {
         }
         result
     }
-    fn save_inner(&self, path: &Path) -> Result<(), SaveError> {
+    /// The validated save payload [`Game::save`] writes, without touching
+    /// disk. Fails with [`SaveError::Invalid`] when the game breaks a save
+    /// rule, as every review-staged stress game does.
+    pub fn to_save_json(&self) -> Result<String, SaveError> {
         validate_game(self, usize::from(self.worker)).map_err(SaveError::Invalid)?;
-        let payload = serde_json::to_string(self)?;
+        Ok(serde_json::to_string(self)?)
+    }
+    fn save_inner(&self, path: &Path) -> Result<(), SaveError> {
+        let payload = self.to_save_json()?;
         let envelope = SaveEnvelope {
             version: SAVE_VERSION,
             checksum: checksum(payload.as_bytes()),

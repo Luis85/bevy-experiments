@@ -292,6 +292,12 @@ pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
         if runtime.storage.reset_pending() {
             return quit;
         }
+        if runtime.unsaveable {
+            // `Runtime::forbid_saves`: nothing reaches storage, no autosave.
+            runtime.dirty = false;
+            let intents = std::mem::take(&mut runtime.save_requests);
+            return quit || intents.contains(&SaveIntent::Quit);
+        }
         if runtime.dirty && runtime.simulated_ticks >= runtime.retry_save_at {
             runtime.request_save(SaveIntent::Autosave);
         }

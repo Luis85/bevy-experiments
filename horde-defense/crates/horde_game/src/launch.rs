@@ -496,6 +496,12 @@ impl LaunchConfig {
                 "Unknown review scene \"{scene}\"; run --list-scenes"
             ));
         }
+        // A practice campaign saves; the staged stress game never can.
+        if self.practice && self.scenario.as_deref() == Some("stress") {
+            return Err(
+                "The stress scene is an unsaveable review fixture; it cannot run with LASTLIGHT_PRACTICE".into(),
+            );
+        }
         if let Some(review) = &self.review
             && review.sequence.is_some()
             && (review.perf.report.is_some()
@@ -702,6 +708,27 @@ mod tests {
             practice("camp-hmoe").unwrap_err(),
             "Unknown review scene \"camp-hmoe\"; run --list-scenes"
         );
+    }
+    /// The stress fixture cannot be saved, so it is never a practice campaign.
+    #[test]
+    fn practice_flag_with_stress_screen_is_rejected() {
+        let stress = |practice: bool| {
+            let mut vars = vec![("LASTLIGHT_REVIEW_SCREEN", "stress")];
+            if practice {
+                vars.push(("LASTLIGHT_PRACTICE", "1"));
+            }
+            parse(&[], &vars)
+        };
+        let error = stress(true).unwrap_err();
+        if cfg!(feature = "review") {
+            assert_eq!(
+                error,
+                "The stress scene is an unsaveable review fixture; it cannot run with LASTLIGHT_PRACTICE"
+            );
+            assert!(stress(false).is_ok());
+        } else {
+            assert_eq!(error, "Unknown review scene \"stress\"; run --list-scenes");
+        }
     }
     /// A build without `review` accepts exactly the scenes `--list-scenes`
     /// lists there: the practice scenes.

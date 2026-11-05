@@ -18,6 +18,10 @@ tracing = { version = "0.1", default-features = false, features = ["std", "attri
 # production build: this crate's own integration tests turn it on through the
 # self dev-dependency below, and `horde-defense` only as a dev-dependency.
 test-support = []
+# The review/test-only stress seam: `STRESS_ENEMY_CAP`, the stress fixtures and
+# `Attempt::stage_review_enemy_cap`. Enabled only through `horde-defense`'s
+# `review` feature; playtest builds (`--no-default-features`) compile without it.
+review = []
 
 [dev-dependencies]
 horde_core = { path = ".", features = ["test-support"] }

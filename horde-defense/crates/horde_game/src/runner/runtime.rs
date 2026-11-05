@@ -43,6 +43,9 @@ pub struct Runtime {
     /// The startup read left `settings.json` uncopied: every save copies it
     /// first, until the worker has done so once.
     pub(super) settings_at_risk: bool,
+    /// Review-only: the staged game can never be saved (the stress fixture),
+    /// so no save is ever submitted. See [`Runtime::forbid_saves`].
+    pub(super) unsaveable: bool,
     pub fixed_calls: u64,
     pub simulated_ticks: u64,
     /// `dev`: command/input recording in progress.
@@ -62,6 +65,15 @@ impl Runtime {
     /// Startup could not preserve `settings.json` (`LoadedProfile::settings_at_risk`).
     pub fn guard_settings_original(&mut self) {
         self.settings_at_risk = true;
+    }
+    /// Review-only, for a staged game production validation rejects (the
+    /// stress scene): the periodic autosave never fires and no intent reaches
+    /// storage, so no save can fail. A Quit still closes (a perf report ends
+    /// with one); other intents are dropped and the review stays on its
+    /// battle. The isolated review profile has nothing to keep.
+    #[cfg(feature = "review")]
+    pub fn forbid_saves(&mut self) {
+        self.unsaveable = true;
     }
     /// Called on each egui pass with the native FrameCount. Repeated layout
     /// passes share a command identity set, preventing duplicate purchases.

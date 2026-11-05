@@ -134,6 +134,14 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     scene("npc-stutter", NeedsInputSave, false, true, false),
     scene("model-workshop", Workshop, false, false, false),
     scene("model-comparison", Workshop, false, false, false),
+    // Wave 1.
+    ReviewScene {
+        before_proxy: Some("max-lanes"),
+        owner: "perf-architecture",
+        since_wave: 1,
+        // The unsaveable 400-enemy perf fixture; never a practice campaign.
+        ..scene("stress", MotionOnly, true, true, false)
+    },
 ];
 
 /// Workshop scenes named `<prefix><model id>`.

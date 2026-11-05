@@ -17,6 +17,10 @@ mod structures;
 mod telemetry;
 pub use auto_sell::{AutoSellPreview, AutoSellScope};
 pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
+#[cfg(any(test, feature = "test-support", feature = "review"))]
+pub use fixtures::{
+    STRESS_ENEMY_CAP, save_clone_fixture, stress_authored_fixture, stress_render_fixture,
+};
 pub use fixtures::{Staging, maximum_progression_render_fixture, peak_render_fixture};
 pub use journey::JourneyContinuation;
 pub use migrations::SAVE_VERSION;
@@ -610,6 +614,23 @@ impl Attempt {
         } else {
             self.progression.enemy_cap
         }
+    }
+    /// Review/test-only seam (ruling W-11): raises this attempt's regular
+    /// enemy cap to `cap`, at most [`STRESS_ENEMY_CAP`], so the director refills
+    /// the field past the gameplay cap. Production validation still rejects
+    /// any cap above [`crate::progression::GAMEPLAY_ENEMY_CAP`], so a staged
+    /// attempt is unsaveable by construction. Fails without a change when
+    /// `cap` would lower the cap or exceed the stress cap.
+    #[cfg(any(test, feature = "test-support", feature = "review"))]
+    pub fn stage_review_enemy_cap(&mut self, cap: usize) -> Result<(), String> {
+        if !(self.enemy_cap()..=STRESS_ENEMY_CAP).contains(&cap) {
+            return Err(format!(
+                "A review enemy cap must lie between {} and {STRESS_ENEMY_CAP}",
+                self.enemy_cap()
+            ));
+        }
+        self.progression.enemy_cap = cap;
+        Ok(())
     }
     pub fn enemy_protection(&self, enemy: &Enemy) -> i32 {
         enemy_armor(self, enemy)

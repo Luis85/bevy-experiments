@@ -52,6 +52,22 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         f.screen = Screen::Menu;
         return;
     }
+    // The unsaveable 400-enemy perf fixture (launch refuses it as practice):
+    // it never submits a save, so no autosave can fail on it.
+    #[cfg(feature = "review")]
+    if screen == "stress" {
+        f.game = horde_core::sim::stress_render_fixture().expect("stress render fixture");
+        f.runtime.forbid_saves();
+        f.screen = Screen::Battle;
+        f.campaign.mode = Mode::Npc;
+        f.campaign.selected_country = f
+            .game
+            .attempt()
+            .and_then(|a| a.country_id.clone())
+            .expect("stress country stage");
+        f.status.message = "Synthetic stress fixture · 400 drawn + 3 expeditions · perf headroom, not a gameplay claim".into();
+        return;
+    }
     if matches!(screen.as_str(), "peak" | "progressed-peak" | "max-lanes") {
         f.game = if matches!(screen.as_str(), "progressed-peak" | "max-lanes") {
             horde_core::sim::maximum_progression_render_fixture()
