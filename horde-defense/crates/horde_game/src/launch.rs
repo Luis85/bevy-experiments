@@ -426,8 +426,9 @@ impl LaunchConfig {
     /// Rejects unknown scenes and combinations that would silently produce
     /// misleading evidence.
     fn validate(&self) -> Result<(), String> {
+        // A build accepts exactly the scenes its --list-scenes lists.
         if let Some(scene) = &self.scenario
-            && crate::review_scenes::lookup(scene).is_none()
+            && !crate::review_scenes::accepts(scene, cfg!(feature = "review"))
         {
             return Err(format!(
                 "Unknown review scene \"{scene}\"; run --list-scenes"
@@ -639,6 +640,35 @@ mod tests {
             practice("camp-hmoe").unwrap_err(),
             "Unknown review scene \"camp-hmoe\"; run --list-scenes"
         );
+    }
+    /// A build without `review` accepts exactly the scenes `--list-scenes`
+    /// lists there: the practice scenes.
+    #[cfg(not(feature = "review"))]
+    #[test]
+    fn plain_builds_accept_only_listed_practice_scenes() {
+        let practice = |scene| {
+            parse(
+                &[],
+                &[
+                    ("LASTLIGHT_PRACTICE", "1"),
+                    ("LASTLIGHT_REVIEW_SCREEN", scene),
+                ],
+            )
+        };
+        for scene in ["construction", "operations"] {
+            assert!(practice(scene).is_ok(), "{scene}");
+        }
+        for scene in [
+            "model-parity-rook",
+            "model-workshop",
+            "npc-stutter",
+            "battle",
+        ] {
+            assert_eq!(
+                practice(scene).unwrap_err(),
+                format!("Unknown review scene \"{scene}\"; run --list-scenes"),
+            );
+        }
     }
     #[cfg(feature = "dev")]
     #[test]

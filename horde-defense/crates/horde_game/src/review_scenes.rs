@@ -162,6 +162,18 @@ pub fn is_workshop(name: &str) -> bool {
     lookup(name) == Some(SceneKind::Workshop)
 }
 
+/// Whether a build can stage `name`: exactly the scenes `list_lines` lists for
+/// it. Without `review` that is only the practice rows (no workshop names).
+pub fn accepts(name: &str, review_build: bool) -> bool {
+    if review_build {
+        lookup(name).is_some()
+    } else {
+        REVIEW_SCENES
+            .iter()
+            .any(|scene| scene.practice && scene.name == name)
+    }
+}
+
 #[cfg_attr(not(test), allow(dead_code))]
 pub fn stills() -> impl Iterator<Item = &'static ReviewScene> {
     REVIEW_SCENES
@@ -245,6 +257,21 @@ mod tests {
         assert_eq!(lookup("camp-hmoe"), None);
         assert!(!is_workshop("battle"));
         assert_eq!(lookup("npc-stutter"), Some(SceneKind::NeedsInputSave));
+    }
+    #[test]
+    fn a_build_accepts_exactly_the_scenes_it_lists() {
+        for review_build in [true, false] {
+            let listed = list_lines(review_build);
+            for scene in REVIEW_SCENES {
+                let row = listed
+                    .iter()
+                    .any(|line| line.split('\t').next() == Some(scene.name));
+                assert_eq!(accepts(scene.name, review_build), row, "{}", scene.name);
+            }
+        }
+        assert!(accepts("model-parity-rook", true));
+        assert!(!accepts("model-parity-rook", false));
+        assert!(!accepts("camp-hmoe", true) && !accepts("camp-hmoe", false));
     }
     #[test]
     fn list_lines_are_tsv_and_a_plain_build_lists_only_practice() {
