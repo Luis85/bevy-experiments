@@ -22,6 +22,7 @@ pub use auto_sell::{AutoSellRule, AutoSoldLine, AutoSoldReceipt, MAX_AUTO_SOLD_L
 pub(crate) use loadout::mean_basic_damage;
 pub use loadout::{
     DefenderProfile, ItemComparison, LoadoutMetrics, Recommendation, RecommendationAction,
+    UPGRADE_MARGIN, UpgradeJudge,
 };
 use progression::legacy_training_default;
 pub use progression::{BodyAttribute, NodePayment, Npc, NpcCreation, NpcTraining, Player, Skill};
