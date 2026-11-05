@@ -107,6 +107,18 @@ Source: `target/production-before/perf/*.json` (frame report v2; 90 warm-up and 
 - `target/production-before/{normal,reduced}/`: **156 of 164** stills (41 scenes × 2 sizes × 2 modes).
 - The 8 failures are `progressed-battle` and `leveled-armory` at both sizes in both modes: a panic at `crates/horde_game/src/ui/review/fixtures.rs:138:14`. Fixed in W1-05; their before evidence is captured by W1-06 on the fixed build (logged as CF-0-01).
 - None of the brief's 11 new review scenes exist yet; they are registered in W1-54, W3-27 and W5-09/10, with `before_proxy` pairs.
+- **Supplemental before set (W1-06):** `target/production-before/supplement/{normal,reduced}/`, **28 of 28** stills (7 scenes × 2 sizes × 2 modes), with `captures.json` (version 1) and `scenes.tsv`. Captured by `scripts/capture_review.ps1 -Modes normal,reduced -ContinueOnError` on the build at efd9c29 (after the W1-05 fixture fix and its review follow-ups, before any presentation change; W1-38 is the first). Executable sha256 `1157bfb124ed…`, `windows_scale` 2, `player_logs_unchanged` true, 0 failures. compare_captures merges this folder into the before set, so the full before set is 184 stills (156 wave-0 plus 28).
+- The 7 scenes are the 2 that crashed in wave 0 (`progressed-battle`, `leveled-armory`) and the 5 that wave 0 did not list (`journey-victory`, `journey-liberated`, `journey-upgrades`, `skills-search`, `max-lanes`). Normal-mode sha256 prefixes:
+
+| Scene | 1440x900 | 1050x700@1.35 | Reduced identical to normal (large / small) |
+|---|---|---|---|
+| progressed-battle | 1505dd69e6ab | 1a8b6bdc6567 | no / no |
+| leveled-armory | b6163c62d2a9 | 961eb0db88bb | no / yes |
+| journey-victory | e0c97fd928e9 | 0cf2e3c41209 | yes / no |
+| journey-liberated | 743c11773db0 | 6ab5e301ebcd | yes / yes |
+| journey-upgrades | bf2c07d86718 | 22742667212c | yes / yes |
+| skills-search | 579f35076d5b | 4abe2acf7db4 | yes / no |
+| max-lanes | f53dea21fffe | 4cad1a8572b9 | no / no |
 
 ---
 
