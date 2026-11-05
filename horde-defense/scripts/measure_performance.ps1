@@ -30,18 +30,21 @@
 # Budget compare: repeats by median, frames_over_50ms by the worst repeat. frames_over_50ms always; cpu_frame p99 only
 # with -VsyncOff; interface_draw (v2 work_mean_ms[2], ui::draw) only when profile and VSync match baseline.wave0;
 # interface_total only against baseline.v3.interface_total_mean_ms.<scene>.<size> when baseline.v3 is recorded and its
-# profile and vsync match the run.
+# profile and vsync match the run. A gated metric missing from any repeat, or a recorded baseline.v3 without that layout
+# (perf_budget.rs pins it), is invalid evidence (exit 2), never a pass or a skip.
 # Exit codes: 0 pass, 1 over budget, 2 invalid evidence, 3 build or run failure. summary.json and summary.md are
 # always written to the output directory once it exists.
-[CmdletBinding()]
+# Arguments are plain strings validated in the body: a binding failure (ValidateSet, ValidateRange, an [int] that does not
+# parse, an unknown or positional argument) would exit 1 under -File before the trap exists, and 1 means over budget.
+[CmdletBinding(PositionalBinding = $false)]
 param(
-    [ValidateSet('peak', 'progressed-peak', 'stress', 'all')][string]$Scene = 'all',
-    [ValidateSet('dev', 'playtest')][string]$Profile = 'dev',
+    [string]$Scene = 'all',
+    [string]$Profile = 'dev',
     [switch]$VsyncOff,
-    [ValidateSet('default', 'on', 'off')][string]$Pipelined = 'default',
-    [ValidateRange(0, 3600)][int]$Frames = 0,
-    [ValidateRange(-1, 600)][int]$Warmup = -1,
-    [ValidateRange(1, 20)][int]$Repeat = 1,
+    [string]$Pipelined = 'default',
+    [string]$Frames = '0',
+    [string]$Warmup = '-1',
+    [string]$Repeat = '1',
     [string]$Adapter,
     [string]$OutputDirectory,
     [switch]$NoBuild,
@@ -49,11 +52,39 @@ param(
     [switch]$SaveClone,
     [switch]$ShippedSmoke,
     [switch]$SelfTest,
-    [int]$TimeoutSeconds = 900
+    [string]$TimeoutSeconds = '900',
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Unexpected
 )
 $ErrorActionPreference = 'Stop'
 # Any error outside the measured runs (arguments, output directory, summary) is a run failure, never exit 1.
 trap { Write-Output "FAIL $($_.Exception.Message)"; exit 3 }
+# perf_budget.rs reads this list: the -Scene values minus all are the PERF_BUDGET.json scenes.
+$sceneChoices = @('peak', 'progressed-peak', 'stress', 'all')
+$profileChoices = @('dev', 'playtest')
+$pipelinedChoices = @('default', 'on', 'off')
+
+function Assert-Choice([string]$Name, [string]$Value, [string[]]$Choices) {
+    if ($Choices -notcontains $Value) { throw "-$Name '$Value' is not one of $($Choices -join ', ')" }
+}
+
+function ConvertTo-BoundedInt([string]$Name, [string]$Text, [int]$Minimum, [int]$Maximum) {
+    $value = 0
+    $styles = [Globalization.NumberStyles]::AllowLeadingSign
+    if (-not [int]::TryParse($Text, $styles, [Globalization.CultureInfo]::InvariantCulture, [ref]$value) -or $value -lt $Minimum -or $value -gt $Maximum) {
+        throw "-$Name '$Text' is not a whole number in $Minimum..$Maximum"
+    }
+    return $value
+}
+
+if ($null -ne $Unexpected -and $Unexpected.Count -gt 0) { throw "Unexpected argument(s): $($Unexpected -join ' ')" }
+Assert-Choice 'Scene' $Scene $sceneChoices
+Assert-Choice 'Profile' $Profile $profileChoices
+Assert-Choice 'Pipelined' $Pipelined $pipelinedChoices
+[int]$Frames = ConvertTo-BoundedInt 'Frames' $Frames 0 3600
+if ($Frames -ne 0 -and $Frames -lt 300) { throw '-Frames is 0 (budget default) or 300..3600' }
+[int]$Warmup = ConvertTo-BoundedInt 'Warmup' $Warmup -1 600
+[int]$Repeat = ConvertTo-BoundedInt 'Repeat' $Repeat 1 20
+[int]$TimeoutSeconds = ConvertTo-BoundedInt 'TimeoutSeconds' $TimeoutSeconds 1 86400
 . (Join-Path $PSScriptRoot 'lib\Native.ps1')
 $workspace = Split-Path -Parent $PSScriptRoot
 $budgetPath = Join-Path $workspace 'docs\PERF_BUDGET.json'
@@ -130,6 +161,19 @@ function Invoke-WithRerun([scriptblock]$Attempt) {
     return [pscustomobject]@{ Result = $second; Attempts = 2; Rejected = @($first) }
 }
 
+function Get-GatedValues($Reports, [scriptblock]$Read) {
+    # The metric of every repeat as numbers, or $null when any repeat lacks it. A missing gated metric is invalid
+    # evidence, never a zero that passes ([int]$null and [double[]]@($null) are both 0).
+    $values = New-Object System.Collections.Generic.List[double]
+    foreach ($report in @($Reports)) {
+        $raw = & $Read $report
+        if ($null -eq $raw -or $raw -is [bool] -or $raw -isnot [ValueType]) { return $null }
+        $values.Add([double]$raw)
+    }
+    if ($values.Count -eq 0) { return $null }
+    return , $values.ToArray()
+}
+
 function Measure-PerfBudget($Runs, $Context, $Budget) {
     # Runs: objects with Scene, Size, Repeat, Report, Problems. Context: Profile, VsyncOff, NoBudget, Informational.
     $checks = New-Object System.Collections.Generic.List[object]
@@ -154,23 +198,27 @@ function Measure-PerfBudget($Runs, $Context, $Budget) {
             continue
         }
         $reports = @($group.Group | ForEach-Object { $_.Report })
-        $judge = {
-            param($Value, $Limit)
-            if ([double]$Value -gt [double]$Limit) { return 'over' }
-            return 'pass'
+        $measure = {
+            # worst = the highest repeat, median = the median of the repeats.
+            param([string]$Metric, [string]$Aggregate, $Limit, [scriptblock]$Read, [string]$Field)
+            $values = Get-GatedValues $reports $Read
+            if ($null -eq $values) { & $check $Metric $Aggregate $null $Limit 'invalid' "a repeat has no $Field"; return }
+            if ($Aggregate -eq 'worst') { $value = ($values | Measure-Object -Maximum).Maximum }
+            else { $value = Get-Median $values }
+            $status = 'pass'
+            if ([double]$value -gt [double]$Limit) { $status = 'over' }
+            & $check $Metric $Aggregate $value $Limit $status ''
         }
 
         $limit = Get-Field $sceneBudget @('frames_over_50ms_max')
         if ($null -ne $limit) {
-            $worst = ($reports | ForEach-Object { [int](Get-Field $_ @('frames_over_50ms')) } | Measure-Object -Maximum).Maximum
-            & $check 'frames_over_50ms' 'worst' $worst $limit (& $judge $worst $limit) ''
+            & $measure 'frames_over_50ms' 'worst' $limit { param($r) Get-Field $r @('frames_over_50ms') } 'frames_over_50ms'
         }
 
         $limit = Get-Field $sceneBudget @('cpu_frame_p99_ms_max')
         if ($null -ne $limit) {
             if ($Context.VsyncOff) {
-                $value = Get-Median ([double[]]@($reports | ForEach-Object { Get-Field $_ @('phases', 'cpu_frame_ms', 'p99') }))
-                & $check 'cpu_frame_p99_ms' 'median' $value $limit (& $judge $value $limit) ''
+                & $measure 'cpu_frame_p99_ms' 'median' $limit { param($r) Get-Field $r @('phases', 'cpu_frame_ms', 'p99') } 'phases.cpu_frame_ms.p99'
             }
             else { & $check 'cpu_frame_p99_ms' 'median' $null $limit 'skipped' 'gated only with -VsyncOff' }
         }
@@ -178,22 +226,33 @@ function Measure-PerfBudget($Runs, $Context, $Budget) {
         $limit = Get-Field $sceneBudget @('interface_draw_mean_ms_max', $first.Size)
         if ($null -ne $limit) {
             if ($Context.Profile -eq (Get-Field $wave0 @('profile')) -and $vsyncOn -eq (Get-Field $wave0 @('vsync'))) {
-                $value = Get-Median ([double[]]@($reports | ForEach-Object { @(Get-Field $_ @('work_mean_ms'))[2] }))
-                & $check 'interface_draw_mean_ms' 'median' $value $limit (& $judge $value $limit) ''
+                $readDraw = {
+                    param($r)
+                    $work = @(Get-Field $r @('work_mean_ms'))
+                    if ($work.Count -gt 2) { $work[2] }
+                }
+                & $measure 'interface_draw_mean_ms' 'median' $limit $readDraw 'work_mean_ms[2] (ui::draw)'
             }
             else { & $check 'interface_draw_mean_ms' 'median' $null $limit 'skipped' 'gated only in the baseline profile with VSync on' }
         }
 
         if ((Get-Field $sceneBudget @('interface_total_not_above_baseline_v3')) -eq $true) {
+            # Once baseline.v3 is recorded, any other layout than perf_budget.rs pins is invalid evidence, never a skip.
+            $v3Profile = Get-Field $v3 @('profile')
+            $v3Vsync = Get-Field $v3 @('vsync')
             $limit = Get-Field $v3 @('interface_total_mean_ms', $first.Scene, $first.Size)
             if ($null -eq $v3) { & $check 'interface_total_mean_ms' 'median' $null $null 'skipped' 'baseline.v3 is not recorded yet' }
-            elseif ($Context.Profile -ne (Get-Field $v3 @('profile')) -or $vsyncOn -ne (Get-Field $v3 @('vsync'))) {
+            elseif ($v3Profile -isnot [string] -or $v3Vsync -isnot [bool]) {
+                & $check 'interface_total_mean_ms' 'median' $null $null 'invalid' 'baseline.v3 has no profile and vsync'
+            }
+            elseif ($Context.Profile -ne $v3Profile -or $vsyncOn -ne $v3Vsync) {
                 & $check 'interface_total_mean_ms' 'median' $null $limit 'skipped' 'gated only in the baseline.v3 profile and VSync state'
             }
-            elseif ($null -eq $limit) { & $check 'interface_total_mean_ms' 'median' $null $null 'skipped' 'baseline.v3 has no value for this scene and size' }
+            elseif ($null -eq $limit -or $limit -is [bool] -or $limit -isnot [ValueType]) {
+                & $check 'interface_total_mean_ms' 'median' $null $null 'invalid' 'baseline.v3 has no interface_total_mean_ms for this scene and size'
+            }
             else {
-                $value = Get-Median ([double[]]@($reports | ForEach-Object { Get-Field $_ @('phases', 'interface_total_ms', 'mean') }))
-                & $check 'interface_total_mean_ms' 'median' $value $limit (& $judge $value $limit) ''
+                & $measure 'interface_total_mean_ms' 'median' $limit { param($r) Get-Field $r @('phases', 'interface_total_ms', 'mean') } 'phases.interface_total_ms.mean'
             }
         }
     }
@@ -214,34 +273,84 @@ function Get-ExitLabel([int]$Code) {
     }
 }
 
+function Get-FixtureRuns($Fixture) {
+    $run = $Fixture.run
+    $expect = Get-PerfExpectation $run.profile ([bool]$run.vsync_off) $run.pipelined
+    return , @($Fixture.reports | ForEach-Object {
+            [pscustomobject]@{
+                Scene = $_.scene; Size = $_.size; Repeat = $_.repeat; Report = $_.report
+                Problems = (Test-PerfReport $_.report $_.scene $expect)
+            }
+        })
+}
+
+function Test-BudgetCase([string]$Name, $Runs, $Context, $Budget, [int]$Expected, [string[]]$Checks) {
+    # One self-test case: the exit code and every named "<scene>/<size> <metric> <status>" check line.
+    $result = Measure-PerfBudget $Runs $Context $Budget
+    $lines = @($result.Checks | ForEach-Object { "$($_.scene)/$($_.size) $($_.metric) $($_.status)" })
+    $detail = @($result.Checks | Where-Object { $_.status -ne 'pass' } | ForEach-Object { "$($_.scene)/$($_.size) $($_.metric) $($_.status)" }) -join '; '
+    $absent = @($Checks | Where-Object { $_ -and $lines -notcontains $_ })
+    if ($result.ExitCode -eq $Expected -and $absent.Count -eq 0) { Write-Output "ok   $Name -> $($result.ExitCode) ($detail)"; return }
+    $script:selfTestFailed += 1
+    Write-Output "FAIL $Name -> $($result.ExitCode), expected $Expected ($detail)$(if ($absent.Count -gt 0) { '; missing check ' + ($absent -join ', ') })"
+}
+
+function New-V3Baseline([string]$RunProfile, [bool]$Vsync, $Normal, $Small) {
+    $means = [ordered]@{}
+    if ($null -ne $Normal) { $means['normal'] = $Normal }
+    if ($null -ne $Small) { $means['small'] = $Small }
+    return [pscustomobject]@{
+        profile = $RunProfile; vsync = $Vsync
+        interface_total_mean_ms = [pscustomobject]@{ 'progressed-peak' = [pscustomobject]$means }
+    }
+}
+
 function Invoke-SelfTest {
     $budget = Read-JsonFile $budgetPath
     $fixtureDirectory = Join-Path $PSScriptRoot 'fixtures\perf'
-    $expected = [ordered]@{ 'within-budget' = 0; 'over-budget-cpu' = 1; 'over-50ms' = 1; 'unfocused' = 2 }
-    $failed = 0
+    $expected = [ordered]@{
+        'within-budget' = 0; 'over-budget-cpu' = 1; 'over-50ms' = 1; 'unfocused' = 2
+        'vsync-on-within-budget' = 0; 'over-interface-draw' = 1; 'playtest-vsync-on' = 0
+        'missing-metric' = 2; 'missing-cpu-frame' = 2
+    }
+    $script:selfTestFailed = 0
     foreach ($file in @(Get-ChildItem -LiteralPath $fixtureDirectory -Filter '*.json' -File)) {
         $stem = [IO.Path]::GetFileNameWithoutExtension($file.Name)
-        if (-not $expected.Contains($stem)) { $failed += 1; Write-Output "FAIL fixture $($file.Name) has no expected exit code" }
+        if (-not $expected.Contains($stem)) { $script:selfTestFailed += 1; Write-Output "FAIL fixture $($file.Name) has no expected exit code" }
     }
     foreach ($name in $expected.Keys) {
         $fixture = Read-JsonFile (Join-Path $fixtureDirectory "$name.json")
         $run = $fixture.run
-        $expect = Get-PerfExpectation $run.profile ([bool]$run.vsync_off) $run.pipelined
-        $runs = @($fixture.reports | ForEach-Object {
-                [pscustomobject]@{
-                    Scene = $_.scene; Size = $_.size; Repeat = $_.repeat; Report = $_.report
-                    Problems = (Test-PerfReport $_.report $_.scene $expect)
-                }
-            })
         $context = [pscustomobject]@{ Profile = $run.profile; VsyncOff = [bool]$run.vsync_off; NoBudget = $false; Informational = $false }
-        $result = Measure-PerfBudget $runs $context $budget
-        $detail = @($result.Checks | Where-Object { $_.status -ne 'pass' } | ForEach-Object { "$($_.scene)/$($_.size) $($_.metric) $($_.status)" }) -join '; '
-        if ($result.ExitCode -eq $expected[$name]) { Write-Output "ok   $name -> $($result.ExitCode) ($detail)" }
-        else {
-            $failed += 1
-            Write-Output "FAIL $name -> $($result.ExitCode), expected $($expected[$name]) ($detail)"
-        }
+        Test-BudgetCase $name (Get-FixtureRuns $fixture) $context $budget $expected[$name] @($fixture.expected_checks)
     }
+
+    # baseline.v3 is null in the real budget, so the interface_total gate runs against copies that record it.
+    $vsyncOn = Read-JsonFile (Join-Path $fixtureDirectory 'vsync-on-within-budget.json')
+    $onContext = [pscustomobject]@{ Profile = 'dev'; VsyncOff = $false; NoBudget = $false; Informational = $false }
+    $total = 'progressed-peak/normal interface_total_mean_ms'
+    $v3Cases = @(
+        @{ Name = 'v3 interface_total within the baseline'; V3 = (New-V3Baseline 'dev' $true 2.5 2.5); Expected = 0; Checks = @("$total pass", 'progressed-peak/small interface_total_mean_ms pass') },
+        @{ Name = 'v3 interface_total above the baseline'; V3 = (New-V3Baseline 'dev' $true 1.9 2.5); Expected = 1; Checks = @("$total over") },
+        @{ Name = 'v3 recorded in another profile'; V3 = (New-V3Baseline 'playtest' $true 1.9 1.9); Expected = 0; Checks = @("$total skipped") },
+        @{ Name = 'v3 recorded with VSync off'; V3 = (New-V3Baseline 'dev' $false 1.9 1.9); Expected = 0; Checks = @("$total skipped") },
+        @{ Name = 'v3 without a small value'; V3 = (New-V3Baseline 'dev' $true 2.5 $null); Expected = 2; Checks = @("$total pass", 'progressed-peak/small interface_total_mean_ms invalid') },
+        @{ Name = 'v3 in a per-profile layout'; V3 = [pscustomobject]@{ dev = (New-V3Baseline 'dev' $true 2.5 2.5) }; Expected = 2; Checks = @("$total invalid") },
+        @{ Name = 'v3 recorded, a report without interface_total'; V3 = (New-V3Baseline 'dev' $true 2.5 2.5); Strip = $true; Expected = 2; Checks = @("$total invalid") }
+    )
+    foreach ($case in $v3Cases) {
+        $copy = $budget | ConvertTo-Json -Depth 20 | ConvertFrom-Json
+        $copy.baseline.v3 = $case.V3
+        $runs = Get-FixtureRuns $vsyncOn
+        if ($case.Strip) {
+            $target = @($runs | Where-Object { $_.Scene -eq 'progressed-peak' -and $_.Size -eq 'normal' })[0]
+            $report = $target.Report | ConvertTo-Json -Depth 20 | ConvertFrom-Json
+            $report.phases.PSObject.Properties.Remove('interface_total_ms')
+            $target.Report = $report
+        }
+        Test-BudgetCase "v3: $($case.Name)" $runs $onContext $copy $case.Expected $case.Checks
+    }
+    $failed = $script:selfTestFailed
     $rerunCases = @(
         @{ Name = 'valid first attempt is not rerun'; Valid = @(1); Attempts = 1; Final = $true },
         @{ Name = 'invalid then valid is rerun once'; Valid = @(2); Attempts = 2; Final = $true },
@@ -277,7 +386,6 @@ if ($SelfTest) {
     exit $script:selfTestExit
 }
 
-if ($Frames -ne 0 -and $Frames -lt 300) { throw '-Frames is 0 (budget default) or 300..3600' }
 $budget = Read-JsonFile $budgetPath
 if ($Scene -eq 'all') { $sceneNames = @($budget.run.frames.PSObject.Properties | ForEach-Object { $_.Name }) }
 else { $sceneNames = @($Scene) }

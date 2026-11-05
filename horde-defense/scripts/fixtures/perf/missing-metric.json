@@ -1,0 +1,105 @@
+{
+  "fixture": "missing-metric",
+  "description": "VSync-on dev run whose progressed-peak normal report has no frames_over_50ms and whose small report has no ui::draw entry in work_mean_ms: a missing gated metric is invalid evidence (exit 2), never a zero that passes.",
+  "run": {
+    "profile": "dev",
+    "vsync_off": false,
+    "pipelined": "default"
+  },
+  "expected_checks": [
+    "progressed-peak/normal frames_over_50ms invalid",
+    "progressed-peak/small interface_draw_mean_ms invalid",
+    "progressed-peak/normal interface_draw_mean_ms pass",
+    "progressed-peak/small frames_over_50ms pass"
+  ],
+  "reports": [
+    {
+      "scene": "progressed-peak",
+      "size": "normal",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.1
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 11.48,
+            "p50": 11.14,
+            "p95": 14.76,
+            "p99": 16.4,
+            "max": 19.68
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "Fifo",
+          "source": "settings",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    },
+    {
+      "scene": "progressed-peak",
+      "size": "small",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 11.34,
+            "p50": 11.0,
+            "p95": 14.58,
+            "p99": 16.2,
+            "max": 19.44
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "Fifo",
+          "source": "settings",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    }
+  ]
+}

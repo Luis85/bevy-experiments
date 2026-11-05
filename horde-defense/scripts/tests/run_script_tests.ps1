@@ -274,10 +274,32 @@ try {
         $r = Invoke-Measure @('-SelfTest') 'measure-selftest'
         $out = Read-Log $r.Out
         Assert-Equal 0 $r.ExitCode ("self-test exit code; out: $out err: " + (Read-Log $r.Err))
-        foreach ($line in @('within-budget -> 0', 'over-budget-cpu -> 1', 'over-50ms -> 1', 'unfocused -> 2', 'SELFTEST PASS')) {
+        $lines = @(
+            'ok   within-budget -> 0', 'ok   over-budget-cpu -> 1', 'ok   over-50ms -> 1', 'ok   unfocused -> 2',
+            'ok   vsync-on-within-budget -> 0', 'ok   over-interface-draw -> 1', 'ok   playtest-vsync-on -> 0',
+            'ok   missing-metric -> 2', 'ok   missing-cpu-frame -> 2', 'ok   v3: v3 interface_total above the baseline -> 1',
+            'ok   v3: v3 without a small value -> 2', 'SELFTEST PASS'
+        )
+        foreach ($line in $lines) {
             Assert-True ($out.Contains($line)) "self-test output lacks '$line'"
         }
         Assert-Equal '' (Read-Log $r.Err).Trim() 'self-test stderr'
+    }
+
+    Test-Case 'measure_performance exits 3, never 1, on bad arguments' {
+        $cases = @(
+            @('-Scene', 'bogus'), @('-Scene', 'stres'), @('-Profile', 'release'), @('-Pipelined', 'maybe'),
+            @('-Repeat', '0'), @('-Repeat', 'x'), @('-Frames', '4000'), @('-Frames', '100'), @('-Warmup', '900'),
+            @('-TimeoutSeconds', '0'), @('-Bogus'), @('peak')
+        )
+        $index = 0
+        foreach ($arguments in $cases) {
+            $index += 1
+            $r = Invoke-Measure ($arguments + @('-NoBuild', '-OutputDirectory', (Join-Path $temporary "perf-bad-$index"))) "measure-bad-$index"
+            Assert-Equal 3 $r.ExitCode ("$($arguments -join ' '): exit code; out: " + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+            Assert-True ((Read-Log $r.Out) -match 'FAIL ') "$($arguments -join ' '): no FAIL line"
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $temporary "perf-bad-$index"))) "$($arguments -join ' '): created its output directory"
+        }
     }
 
     Test-Case 'measure_performance uses a relative CARGO_TARGET_DIR and reruns an unfocused run once' {

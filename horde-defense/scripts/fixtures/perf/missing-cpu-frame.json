@@ -1,0 +1,144 @@
+{
+  "fixture": "missing-cpu-frame",
+  "description": "VsyncOff dev run whose second stress normal repeat has no phases.cpu_frame_ms: the gate is invalid evidence (exit 2), not a median over a zero.",
+  "run": {
+    "profile": "dev",
+    "vsync_off": true,
+    "pipelined": "default"
+  },
+  "expected_checks": [
+    "stress/normal cpu_frame_p99_ms invalid",
+    "stress/small cpu_frame_p99_ms pass",
+    "stress/normal frames_over_50ms pass"
+  ],
+  "reports": [
+    {
+      "scene": "stress",
+      "size": "normal",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "scene": "stress",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          2.0
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 6.44,
+            "p50": 6.25,
+            "p95": 8.28,
+            "p99": 9.2,
+            "max": 11.04
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "AutoNoVsync",
+          "source": "launch-override",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    },
+    {
+      "scene": "stress",
+      "size": "normal",
+      "repeat": 2,
+      "report": {
+        "version": 3,
+        "scene": "stress",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          2.0
+        ],
+        "phases": {
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "AutoNoVsync",
+          "source": "launch-override",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    },
+    {
+      "scene": "stress",
+      "size": "small",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "scene": "stress",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.9
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 6.37,
+            "p50": 6.18,
+            "p95": 8.19,
+            "p99": 9.1,
+            "max": 10.92
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "present": {
+          "requested_mode": "AutoNoVsync",
+          "source": "launch-override",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    }
+  ]
+}

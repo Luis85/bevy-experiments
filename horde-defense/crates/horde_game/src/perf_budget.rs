@@ -281,18 +281,21 @@ mod tests {
         }
     }
 
-    /// The `-Scene` values of the `ValidateSet` on the `$Scene` parameter of
-    /// `scripts/measure_performance.ps1`, without `all`.
+    const SCRIPT: &str = include_str!("../../../scripts/measure_performance.ps1");
+
+    /// The `-Scene` values of `$sceneChoices` in
+    /// `scripts/measure_performance.ps1` (the list its body validates
+    /// `-Scene` against, so a bad value exits 3, not 1), without `all`.
     fn script_scenes(script: &str) -> BTreeSet<String> {
         let line = script
             .lines()
-            .find(|line| line.contains("ValidateSet(") && line.contains("$Scene"))
-            .expect("measure_performance.ps1 declares -Scene with a ValidateSet");
+            .find(|line| line.trim_start().starts_with("$sceneChoices = @("))
+            .expect("measure_performance.ps1 lists the -Scene values in $sceneChoices");
         let set = line
-            .split("ValidateSet(")
+            .split("@(")
             .nth(1)
             .and_then(|rest| rest.split(')').next())
-            .expect("a closed ValidateSet");
+            .expect("a closed $sceneChoices list");
         set.split(',')
             .map(|value| value.trim().trim_matches(['\'', '"']).to_owned())
             .filter(|value| !value.is_empty() && value != "all")
@@ -305,8 +308,7 @@ mod tests {
     /// without a staged fixture.
     #[test]
     fn perf_scenes_agree_across_script_budget_and_review_matrix() {
-        use crate::review_scenes::{REVIEW_SCENES, SceneKind, accepts};
-        const SCRIPT: &str = include_str!("../../../scripts/measure_performance.ps1");
+        use crate::review_scenes::{LIST_HEADER, REVIEW_SCENES, SceneKind, list_lines};
         let script = script_scenes(SCRIPT);
         let json = budget();
         let budget_scenes: BTreeSet<String> = keys(object(&json, "/scenes"))
@@ -326,6 +328,9 @@ mod tests {
             matrix, budget_scenes,
             "review perf scenes vs PERF_BUDGET.json scenes"
         );
+        // The script keeps the --list-scenes rows whose fourth column is "true".
+        assert_eq!(LIST_HEADER.split('\t').nth(3), Some("perf"));
+        let listed = list_lines(true);
         for name in &matrix {
             let scene = REVIEW_SCENES
                 .iter()
@@ -335,8 +340,105 @@ mod tests {
                 scene.motion,
                 "{name}: the script runs it live (LASTLIGHT_REVIEW_MOTION)"
             );
-            assert!(accepts(name, true), "{name}: a review build stages it");
+            let row = listed
+                .iter()
+                .find(|row| row.split('\t').next() == Some(name.as_str()))
+                .unwrap_or_else(|| panic!("{name}: a review build lists it (--list-scenes)"));
+            assert_eq!(
+                row.split('\t').nth(3),
+                Some("true"),
+                "{name}: the --list-scenes perf column the script filters on: {row}"
+            );
         }
+    }
+
+    /// Every way `baseline.v3` breaks the layout `measure_performance.ps1`
+    /// reads for the interface_total gate: `{profile, vsync,
+    /// interface_total_mean_ms.<scene>.<size>}` for every scene with
+    /// `interface_total_not_above_baseline_v3` and every size. Null (not yet
+    /// recorded by W1-37) has no problems.
+    fn v3_layout_problems(json: &Value) -> Vec<String> {
+        let mut problems = Vec::new();
+        let Some(v3) = json.pointer("/baseline/v3") else {
+            return vec!["baseline.v3 is missing (null until W1-37 records it)".into()];
+        };
+        if v3.is_null() {
+            return problems;
+        }
+        let profiles = object(json, "/profiles");
+        match v3.get("profile").and_then(Value::as_str) {
+            Some(profile) if profiles.contains_key(profile) => {}
+            other => problems.push(format!("baseline.v3.profile {other:?} is not a profile")),
+        }
+        if !v3.get("vsync").is_some_and(Value::is_boolean) {
+            problems.push("baseline.v3.vsync is not a bool".into());
+        }
+        for (scene, gates) in object(json, "/scenes") {
+            if gates.get("interface_total_not_above_baseline_v3") != Some(&Value::Bool(true)) {
+                continue;
+            }
+            for size in object(json, "/sizes").keys() {
+                let path = format!("/interface_total_mean_ms/{scene}/{size}");
+                if !v3
+                    .pointer(&path)
+                    .and_then(Value::as_f64)
+                    .is_some_and(|mean| mean > 0.0)
+                {
+                    problems.push(format!("baseline.v3{path} is not a positive number"));
+                }
+            }
+        }
+        problems
+    }
+
+    /// The interface_total gate never becomes a silent skip: the script and
+    /// `PERF_BUDGET.json` agree on the `baseline.v3` layout, so W1-37 has to
+    /// record it in this shape (the script reports any other shape as invalid
+    /// evidence, exit 2).
+    #[test]
+    fn perf_budget_v3_baseline_has_the_layout_the_script_reads() {
+        for read in [
+            "Get-Field $Budget @('baseline', 'v3')",
+            "Get-Field $v3 @('profile')",
+            "Get-Field $v3 @('vsync')",
+            "Get-Field $v3 @('interface_total_mean_ms', $first.Scene, $first.Size)",
+        ] {
+            assert!(
+                SCRIPT.contains(read),
+                "measure_performance.ps1 reads {read}"
+            );
+        }
+        let json = budget();
+        assert_eq!(v3_layout_problems(&json), Vec::<String>::new());
+
+        let with_v3 = |v3: Value| {
+            let mut json = budget();
+            json["baseline"]["v3"] = v3;
+            v3_layout_problems(&json)
+        };
+        let complete = serde_json::json!({
+            "profile": "dev", "vsync": true,
+            "interface_total_mean_ms": { "progressed-peak": { "normal": 2.1, "small": 1.9 } }
+        });
+        assert_eq!(with_v3(complete.clone()), Vec::<String>::new());
+        let mut missing_size = complete.clone();
+        missing_size["interface_total_mean_ms"]["progressed-peak"]
+            .as_object_mut()
+            .unwrap()
+            .remove("small");
+        assert_eq!(
+            with_v3(missing_size),
+            ["baseline.v3/interface_total_mean_ms/progressed-peak/small is not a positive number"]
+        );
+        let per_profile = serde_json::json!({ "dev": complete.clone() });
+        assert_eq!(
+            with_v3(per_profile).len(),
+            4,
+            "a per-profile layout is not read"
+        );
+        let mut no_vsync = complete;
+        no_vsync.as_object_mut().unwrap().remove("vsync");
+        assert_eq!(with_v3(no_vsync), ["baseline.v3.vsync is not a bool"]);
     }
 
     /// 12.0 ms is only the pipelined-rendering decision threshold (ruling
