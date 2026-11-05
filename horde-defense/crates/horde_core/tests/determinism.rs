@@ -57,6 +57,7 @@
 //! | pre-pass | 8103a97 | 0xdeadbeef2026 Personal | 0x9900ad25467328e2->0x5aaf1f080eb1da92 | unchanged | F | save v6 level IDs |
 //! | pre-pass | 8103a97 | 0xdeadbeef2026 Npc | 0x72f7f039a9dd7280->0xc1bb9ef207925afc | unchanged | F | save v6 level IDs |
 mod support;
+use horde_core::command::Command;
 use horde_core::content::Mode;
 use horde_core::sim::{Game, RULESET_VERSION};
 use support::{Anatomy, MoveClass, OutcomeSummary, advance, smoke_run};
@@ -181,6 +182,32 @@ fn observed_run(seed: u64, mode: Mode) -> (Game, u64, OutcomeSummary) {
         summary.observe(g);
     });
     (g, hash, summary)
+}
+
+/// Pin (W1-13, R2): the mode owner's seat is never written, so the default
+/// game and every GOLDEN run (live, then finished by a withdrawal) carry no
+/// `"defender"` key on the attempt or the report and GOLDEN cannot move for it.
+#[test]
+fn golden_and_default_games_serialize_no_defender_key() {
+    fn keyless(g: &Game, slot: &str, what: &str) {
+        let value = serde_json::to_value(g).unwrap();
+        let object = value[slot]
+            .as_object()
+            .unwrap_or_else(|| panic!("{what}: {slot} is an object"));
+        assert!(
+            !object.contains_key("defender"),
+            "{what}: {slot} wrote a mode-owner defender key"
+        );
+    }
+    let default = serde_json::to_value(Game::default()).unwrap();
+    assert!(default["attempt"].is_null() && default["last_result"].is_null());
+    for (seed, mode, _) in GOLDEN {
+        let mut g = run(seed, mode);
+        let what = format!("seed {seed:#x} {mode:?}");
+        keyless(&g, "attempt", &what);
+        g.apply(&Command::Withdraw).unwrap();
+        keyless(&g, "last_result", &what);
+    }
 }
 
 #[test]

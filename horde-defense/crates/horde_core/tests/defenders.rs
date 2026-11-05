@@ -3,7 +3,9 @@
 //! that replace Rust `Debug` names in player text; and (W1-11) the appended
 //! `RecruitStatus::Defending` with `reserve_defender` / `release_defender`;
 //! and (W1-12) the typed `DefenseInProgress` / `DefenderUnavailable` errors
-//! with the Defending pre-checks in `Game::apply`.
+//! with the Defending pre-checks in `Game::apply`; and (W1-13) the saved
+//! `"defender"` seat on `Attempt` and `Report` with their `defender()`
+//! accessors.
 use horde_core::{
     campaign::{Campaign, NpcTraining},
     command::{Command, CommandError},
@@ -506,4 +508,80 @@ fn defending_recruit_commands_return_typed_defender_unavailable() {
         Err(CommandError::UnknownSurvivor)
     );
     assert_eq!(serde_json::to_value(&defending).unwrap(), before);
+}
+
+/// A fresh game with a live stage-0 attempt in `mode`.
+fn deployed(mode: Mode) -> Game {
+    let mut game = Game::default();
+    let campaign = game.staging().campaign();
+    campaign.legacy_features = true;
+    campaign.attempts = 1; // past the introduction, so Mara can deploy
+    game.deploy(0, mode).unwrap();
+    game
+}
+
+/// Rewrites the live attempt's saved `"defender"` key through serde: the seat
+/// is crate-private and has no setter, so tests stage it as a save would.
+fn with_attempt_seat(game: &Game, seat: serde_json::Value) -> Game {
+    let mut value = serde_json::to_value(game).unwrap();
+    value["attempt"]
+        .as_object_mut()
+        .expect("live attempt")
+        .insert("defender".into(), seat);
+    serde_json::from_value(value).unwrap()
+}
+
+fn has_defender_key(value: &serde_json::Value, slot: &str) -> bool {
+    value[slot]
+        .as_object()
+        .unwrap_or_else(|| panic!("{slot} is an object"))
+        .contains_key("defender")
+}
+
+#[test]
+fn npc_report_without_key_reads_mara_personal_reads_player() {
+    for (mode, owner) in [
+        (Mode::Personal, DefenderId::Player),
+        (Mode::Npc, DefenderId::Mara),
+    ] {
+        let mut game = deployed(mode);
+        let saved = serde_json::to_value(&game).unwrap();
+        assert!(!has_defender_key(&saved, "attempt"), "{mode:?}");
+        let loaded: Game = serde_json::from_value(saved).unwrap();
+        assert_eq!(loaded.attempt().unwrap().defender(), owner, "{mode:?}");
+        assert_eq!(game.attempt().unwrap().defender(), owner, "{mode:?}");
+
+        game.apply(&Command::Withdraw).unwrap();
+        let saved = serde_json::to_value(&game).unwrap();
+        assert!(!has_defender_key(&saved, "last_result"), "{mode:?}");
+        let loaded: Game = serde_json::from_value(saved).unwrap();
+        assert_eq!(loaded.last_result().unwrap().defender(), owner, "{mode:?}");
+        assert_eq!(game.last_result().unwrap().defender(), owner, "{mode:?}");
+    }
+    // A keyed Npc attempt names the recruit; Personal always names the
+    // player (a Personal recruit seat is invalid state, never a recruit).
+    let npc = with_attempt_seat(&deployed(Mode::Npc), json!({"Recruit": 5}));
+    assert_eq!(npc.attempt().unwrap().defender(), DefenderId::Recruit(5));
+    let personal = with_attempt_seat(&deployed(Mode::Personal), json!({"Recruit": 5}));
+    assert_eq!(personal.attempt().unwrap().defender(), DefenderId::Player);
+}
+
+#[test]
+fn report_copies_attempt_seat_at_finish() {
+    let mut game = with_attempt_seat(&deployed(Mode::Npc), json!({"Recruit": 3}));
+    let saved = serde_json::to_value(&game).unwrap();
+    assert_eq!(saved["attempt"]["defender"], json!({"Recruit": 3}));
+    game.apply(&Command::Withdraw).unwrap();
+    assert!(game.attempt().is_none());
+    assert_eq!(
+        game.last_result().unwrap().defender(),
+        DefenderId::Recruit(3)
+    );
+    let saved = serde_json::to_value(&game).unwrap();
+    assert_eq!(saved["last_result"]["defender"], json!({"Recruit": 3}));
+    let loaded: Game = serde_json::from_value(saved).unwrap();
+    assert_eq!(
+        loaded.last_result().unwrap().defender(),
+        DefenderId::Recruit(3)
+    );
 }

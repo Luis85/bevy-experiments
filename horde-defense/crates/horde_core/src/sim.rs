@@ -33,6 +33,7 @@ use crate::campaign::{Campaign, DefenderProfile};
 use crate::content::{
     BossKind, BossTiming, EnemyKind, ItemDefId, Mode, Policy, StructureKind, content,
 };
+use crate::defenders::{DefenderId, DefenderSeat, resolve};
 use crate::kind_map::KindMap;
 use crate::ordnance::{self, FireZone, OrdnanceKind, OrdnanceState, ThrowRequest, ThrownOrdnance};
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
@@ -344,6 +345,14 @@ pub struct Attempt {
     #[serde(with = "crate::content::level_ref")]
     pub level: usize,
     pub mode: Mode,
+    /// Who holds the line, saved as `"defender"`; absent means the mode
+    /// owner. Read through [`Attempt::defender`].
+    #[serde(
+        rename = "defender",
+        default,
+        skip_serializing_if = "DefenderSeat::is_mode_owner"
+    )]
+    pub(crate) seat: DefenderSeat,
     pub tick: u64,
     pub paused: bool,
     pub country_id: Option<String>,
@@ -425,6 +434,11 @@ pub struct Attempt {
     emitted: Vec<SimEventRecord>,
 }
 impl Attempt {
+    /// The defender holding this attempt's line: the mode owner unless a
+    /// recruit holds the seat.
+    pub fn defender(&self) -> DefenderId {
+        resolve(self.mode, self.seat)
+    }
     /// The surviving structures as a reusable country layout plan.
     pub fn structure_layout(&self) -> Vec<crate::campaign::Placement> {
         self.structures
@@ -687,6 +701,14 @@ pub struct Report {
     #[serde(with = "crate::content::level_ref")]
     pub level: usize,
     pub mode: Mode,
+    /// The finished attempt's seat, saved as `"defender"`; absent means the
+    /// mode owner. Read through [`Report::defender`].
+    #[serde(
+        rename = "defender",
+        default,
+        skip_serializing_if = "DefenderSeat::is_mode_owner"
+    )]
+    pub(crate) seat: DefenderSeat,
     pub elapsed: f32,
     pub kills: u32,
     pub country_id: Option<String>,
@@ -706,6 +728,12 @@ pub struct Report {
     pub log: Vec<String>,
     #[serde(default)]
     pub telemetry: CombatTelemetry,
+}
+impl Report {
+    /// The defender who fought the reported attempt.
+    pub fn defender(&self) -> DefenderId {
+        resolve(self.mode, self.seat)
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 ///
