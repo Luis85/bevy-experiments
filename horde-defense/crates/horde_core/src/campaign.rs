@@ -100,6 +100,11 @@ pub struct Campaign {
     /// the parent.
     #[serde(default, skip_serializing_if = "AutoSellRule::is_default")]
     pub auto_sell: AutoSellRule,
+    /// Progression ranks whose milestone reward has been paid; each at most
+    /// [`Campaign::progression_rank`], at most 64. Copied into workers and on
+    /// the operation-chain sync; v6 saves claim the milestones they reached.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub milestones_claimed: BTreeSet<u32>,
 }
 impl Default for Campaign {
     fn default() -> Self {
@@ -135,6 +140,7 @@ impl Default for Campaign {
                 points: 0,
                 body: KindMap::default(),
                 loadout: personal_loadout,
+                level_grant_paid: 0,
             },
             npc: Npc {
                 name: "Mara Vale".into(),
@@ -206,6 +212,7 @@ impl Default for Campaign {
             next_defender: None,
             reserved_recruit: None,
             auto_sell: AutoSellRule::default(),
+            milestones_claimed: BTreeSet::new(),
         }
     }
 }
@@ -268,6 +275,7 @@ impl Campaign {
             next_defender: None,
             reserved_recruit: None,
             auto_sell: AutoSellRule::default(),
+            milestones_claimed: self.milestones_claimed.clone(),
         }
     }
     pub fn choose_survivor(&mut self, id: crate::survivors::SurvivorId) -> Result<(), String> {
@@ -447,6 +455,19 @@ mod tests {
         let worker = c.clone_for_worker();
         assert_eq!(worker.next_defender, None);
         assert_eq!(worker.reserved_recruit, None);
+    }
+    #[test]
+    fn clone_for_worker_copies_the_progression_ledgers() {
+        let mut c = Campaign {
+            victories: 12,
+            milestones_claimed: BTreeSet::from([5, 10]),
+            ..Campaign::default()
+        };
+        c.player.level = 9;
+        c.player.level_grant_paid = 9;
+        let worker = c.clone_for_worker();
+        assert_eq!(worker.milestones_claimed, c.milestones_claimed);
+        assert_eq!(worker.player.level_grant_paid, 9);
     }
     #[test]
     fn clone_for_worker_resets_the_auto_sell_rule() {

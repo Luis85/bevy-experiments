@@ -306,6 +306,10 @@ impl Game {
                     battle.game.campaign.player.body = self.campaign.player.body.clone();
                     battle.game.campaign.player.legacy_graph_points =
                         self.campaign.player.legacy_graph_points;
+                    battle.game.campaign.player.level_grant_paid =
+                        self.campaign.player.level_grant_paid;
+                    battle.game.campaign.milestones_claimed =
+                        self.campaign.milestones_claimed.clone();
                     battle.game.campaign.skill_nodes = self.campaign.skill_nodes.clone();
                     battle.game.campaign.skills = self.campaign.skills.clone();
                     battle.game.campaign.blueprints = self.campaign.blueprints.clone();

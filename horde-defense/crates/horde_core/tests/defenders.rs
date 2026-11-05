@@ -666,6 +666,43 @@ fn country_operation_next_stage_attempt_keeps_recruit_seat_and_appearance() {
     }
 }
 
+/// W1-24: the operation-chain sync that re-arms a country operation's next
+/// stage copies the parent's progression ledgers with the level it copies,
+/// so the worker's claims never exceed its synced rank.
+#[test]
+fn country_operation_sync_copies_the_progression_ledgers() {
+    let (mut g, _, id) = game_with_alex();
+    let country = world()
+        .countries
+        .iter()
+        .find(|c| {
+            g.campaign().world.can_enter(&c.id)
+                && !g.campaign().world.cleared.contains(&c.id)
+                && c.level_count() > 1
+        })
+        .unwrap()
+        .clone();
+    let operation = g.deploy_country_operation(id, &country.id).unwrap();
+    let c = g.campaign_mut();
+    c.victories = c.victories.max(10);
+    c.milestones_claimed = [5, 10].into();
+    c.player.level_grant_paid = c.player.level;
+    let worker = battle(&g, operation).game().campaign();
+    assert!(worker.milestones_claimed.is_empty());
+    win_stage(&mut g, operation);
+    assert!(g.take_settlement_issues().is_empty());
+    let b = battle(&g, operation);
+    assert!(!b.settled && b.stage == 1);
+    let (parent, worker) = (g.campaign(), b.game().campaign());
+    assert_eq!(worker.milestones_claimed, parent.milestones_claimed);
+    assert_eq!(worker.player.level, parent.player.level);
+    assert_eq!(
+        worker.player.level_grant_paid,
+        parent.player.level_grant_paid
+    );
+    Game::from_payload(serde_json::to_value(&g).unwrap(), SAVE_VERSION).unwrap();
+}
+
 #[test]
 fn worker_battle_seat_mismatch_is_invalid() {
     let (mut g, country, id) = game_with_alex();

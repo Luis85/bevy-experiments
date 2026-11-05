@@ -1156,3 +1156,150 @@ fn decode_rejects_version_8() {
         Game::from_payload(value.clone(), version).unwrap();
     }
 }
+
+/// Sub-steps (c) and (d) (W1-24) on the v6 fixture: every player, the root's
+/// and each expedition's, has its level-up grant marked paid up to its level,
+/// and every campaign claims the milestones its rank 14 had reached (5 and
+/// 10, not 15), so a v6 save is owed nothing retroactively. The same payload
+/// at level 12 is marked paid to 12. Loading and 600 idle ticks pay no coins.
+#[test]
+fn v6_save_migrates_level_grant_paid_to_level_and_claims_reached_milestones() {
+    let reached = std::collections::BTreeSet::from([5, 10]);
+    let mut game = fixture_v6();
+    let c = game.campaign();
+    assert_eq!((c.progression_rank(), c.player.level), (14, 33));
+    assert_eq!(c.player.level_grant_paid, 33);
+    assert_eq!(c.milestones_claimed, reached);
+    assert_eq!(game.battles().len(), 2);
+    for battle in game.battles() {
+        let worker = battle.game().campaign();
+        assert!(worker.player.level >= 2, "expedition {}", battle.id);
+        assert_eq!(
+            worker.player.level_grant_paid, worker.player.level,
+            "expedition {}",
+            battle.id
+        );
+        assert_eq!(
+            worker.milestones_claimed, reached,
+            "expedition {}",
+            battle.id
+        );
+    }
+    // The live expedition earns coins that settlement syncs to the parent;
+    // apart from them the parent's coins are unchanged.
+    let coins = |g: &Game| {
+        let workers: u64 = g.battles().iter().map(|b| b.game().campaign().coins).sum();
+        (g.campaign().coins, workers)
+    };
+    let (parent, workers) = coins(&game);
+    for _ in 0..600 {
+        game.tick(Input::default());
+    }
+    let (parent_after, workers_after) = coins(&game);
+    assert_eq!(
+        parent_after - parent,
+        workers_after - workers,
+        "no retroactive grant"
+    );
+
+    let mut payload = payload_v6();
+    payload["campaign"]["player"]["level"] = 12.into();
+    payload["campaign"]["player"]["xp"] = 0.into();
+    let game = Game::from_payload(payload, 6).expect("a level 12 v6 save loads");
+    let c = game.campaign();
+    assert_eq!((c.player.level, c.player.level_grant_paid), (12, 12));
+    assert_eq!(c.milestones_claimed, reached);
+}
+
+/// A level 1 player writes no `level_grant_paid` key and a campaign below
+/// rank 5 no `milestones_claimed` key, through the migration and a resave.
+#[test]
+fn level_one_saves_gain_no_level_grant_key() {
+    let synthetic = serde_json::to_value(support::game(Mode::Personal)).unwrap();
+    let v2 = Game::decode_save_generation(FIXTURE_V2.as_bytes()).unwrap();
+    let synthetic = Game::from_payload(synthetic, 6).unwrap();
+    for (label, game) in [
+        ("v2", v2),
+        ("v3", fixture_v3()),
+        ("v4", fixture_v4()),
+        ("v6 synthetic", synthetic),
+    ] {
+        let c = game.campaign();
+        assert_eq!(c.player.level, 1, "{label}");
+        assert_eq!(c.player.level_grant_paid, 0, "{label}");
+        assert!(c.milestones_claimed.is_empty(), "{label}");
+        let mut keys = std::collections::BTreeSet::new();
+        all_keys(&serde_json::to_value(&game).unwrap(), &mut keys);
+        assert!(!keys.contains("level_grant_paid"), "{label}");
+        assert!(!keys.contains("milestones_claimed"), "{label}");
+    }
+    // Below rank 5 a levelled player is marked paid, but nothing is claimed.
+    for (label, game, level) in [("v1", fixture(), 18), ("v5", fixture_v5(), 5)] {
+        let c = game.campaign();
+        assert!(c.progression_rank() < 5, "{label}");
+        assert_eq!(c.player.level_grant_paid, level, "{label}");
+        assert!(c.milestones_claimed.is_empty(), "{label}");
+    }
+}
+
+/// The current-format v6 fixture with `edit` applied to its saved JSON.
+fn edited_v6(edit: impl FnOnce(&mut serde_json::Value)) -> Result<Game, SaveError> {
+    let mut value = serde_json::to_value(fixture_v6()).unwrap();
+    edit(&mut value);
+    Game::from_payload(value, SAVE_VERSION)
+}
+
+fn assert_invalid(result: Result<Game, SaveError>, label: &str) {
+    match result {
+        Err(SaveError::Invalid(_)) => {}
+        other => panic!("{label} loaded: {:?}", other.err()),
+    }
+}
+
+#[test]
+fn rejects_level_grant_paid_above_level() {
+    edited_v6(|v| v["campaign"]["player"]["level_grant_paid"] = 33.into()).unwrap();
+    assert_invalid(
+        edited_v6(|v| v["campaign"]["player"]["level_grant_paid"] = 34.into()),
+        "root paid above level",
+    );
+    edited_v6(|v| v["battles"][0]["game"]["campaign"]["player"]["level_grant_paid"] = 31.into())
+        .unwrap();
+    assert_invalid(
+        edited_v6(|v| {
+            v["battles"][0]["game"]["campaign"]["player"]["level_grant_paid"] = 32.into();
+        }),
+        "worker paid above level",
+    );
+}
+
+#[test]
+fn rejects_milestone_claimed_above_rank() {
+    let claim = |set: &[u32]| serde_json::json!(set);
+    edited_v6(|v| v["campaign"]["milestones_claimed"] = claim(&[5, 10, 14])).unwrap();
+    assert_invalid(
+        edited_v6(|v| v["campaign"]["milestones_claimed"] = claim(&[5, 10, 15])),
+        "root claim above rank 14",
+    );
+    // Expedition 13 was cloned at rank 12.
+    edited_v6(|v| v["battles"][0]["game"]["campaign"]["milestones_claimed"] = claim(&[12]))
+        .unwrap();
+    assert_invalid(
+        edited_v6(|v| v["battles"][0]["game"]["campaign"]["milestones_claimed"] = claim(&[13])),
+        "worker claim above its rank 12",
+    );
+    // At most 64 claims, whatever the rank.
+    let many: Vec<u32> = (1..=65).collect();
+    edited_v6(|v| {
+        v["campaign"]["victories"] = 100.into();
+        v["campaign"]["milestones_claimed"] = claim(&many[..64]);
+    })
+    .unwrap();
+    assert_invalid(
+        edited_v6(|v| {
+            v["campaign"]["victories"] = 100.into();
+            v["campaign"]["milestones_claimed"] = claim(&many);
+        }),
+        "65 claims",
+    );
+}

@@ -39,7 +39,7 @@ resave is byte-identical to the first.
 | v3 to v4 | Quality-indexed loot counters become quality-keyed maps. |
 | v4 to v5 | Ordnance counters become kind-keyed maps. |
 | v5 to v6 | Positional level progress becomes level IDs. |
-| v6 to v7 | Defender seats on expedition games, the Npc appearance back-fill and report drop tracking (below). |
+| v6 to v7 | Defender seats on expedition games, the Npc appearance back-fill, report drop tracking and the progression ledgers (below). |
 
 ## v7
 
@@ -105,6 +105,16 @@ uses them is unchanged. Loading rejects any of these as invalid:
   an id at or above the parent's `next_item_id`, an id pending for another
   expedition, a `reserved_items` id or a root `attempt.drop_ids` id.
 
+### Progression ledgers
+
+`campaign.player.level_grant_paid` is the highest level whose level-up coin
+grant has been paid (absent means 0; 0 and 1 both mean none).
+`campaign.milestones_claimed` is the set of ranks whose milestone reward has
+been paid (absent means empty). Both are copied into expedition games and on
+the operation-chain sync. Loading rejects, in any game, a `level_grant_paid`
+above the player's `level`, more than 64 claims, or a claim above the
+campaign's progression rank.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add
@@ -129,8 +139,17 @@ theirs at the marked slots.
    saved keys are kept. A receipt without a u64 `item_id` or a known quality
    is a migration error. The auto-sell rule, attempt drop tracking, receipts
    and pending sales keep their defaults: off and empty.
-4. (c) The level-grant ledger and (d) rank milestones are added by their
-   owners' commits.
+4. **(c) Level-grant ledger.** The root player and every expedition game's
+   player at level 2 or above gain `level_grant_paid` equal to their
+   `level`, unless they already have one, so a v6 save is owed no
+   retroactive level-up grant. Level 1 writes nothing.
+5. **(d) Rank milestones.** The root campaign gains `milestones_claimed`,
+   every rank of the frozen list 5, 10, 15, 20 at or below its v6 rank,
+   unless it already has one. The v6 rank is a frozen copy of
+   `progression_rank`: the victories, or for a pre-threat campaign
+   (`threat_revision` 0 or absent) the larger of the victories and the legacy
+   clear count. Every expedition campaign gains the parent's claims, limited
+   to those its own rank reached. Below rank 5 nothing is written.
 
 The step adds no `acknowledged` flag, so v6 expeditions that had already
 settled never raise a notice.

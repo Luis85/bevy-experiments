@@ -153,6 +153,12 @@ pub struct Player {
     pub points: u32,
     pub body: KindMap<BodyAttribute, u32>,
     pub loadout: [u64; 4],
+    /// The highest level whose level-up coin grant has been paid (0 and 1
+    /// both mean none). A ledger, at most `level`: settlement pays the levels
+    /// above it, at the root only and never in a worker. v6 saves are marked
+    /// paid up to their level, so nothing is owed retroactively.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub level_grant_paid: u32,
 }
 
 impl Player {

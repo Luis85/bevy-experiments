@@ -423,8 +423,29 @@ fn validate_attempt_loot(a: &Attempt, next_item_id: u64, depth: usize) -> Result
     }
     Ok(())
 }
+/// The most milestone claims a campaign may hold (schema v7 §3.1).
+const MAX_MILESTONES_CLAIMED: usize = 64;
+
+/// Progression ledger bounds (schema v7 §3.1-3.2), in every game: the grant
+/// is paid at most to the player's level, and a milestone is claimed only at
+/// or below the campaign's rank.
+fn validate_progression_ledgers(campaign: &crate::campaign::Campaign) -> Result<(), String> {
+    if campaign.player.level_grant_paid > campaign.player.level {
+        return Err("Level-up grant ledger exceeds the player level".into());
+    }
+    if campaign.milestones_claimed.len() > MAX_MILESTONES_CLAIMED
+        || campaign
+            .milestones_claimed
+            .last()
+            .is_some_and(|rank| *rank > campaign.progression_rank())
+    {
+        return Err("Milestone claims exceed the progression rank".into());
+    }
+    Ok(())
+}
 pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     game.campaign.validate()?;
+    validate_progression_ledgers(&game.campaign)?;
     if depth > 0 && !game.campaign.auto_sell.is_default() {
         // The parent pays an expedition's sales; a worker rule would pay twice.
         return Err("An expedition carries an auto-sell rule".into());

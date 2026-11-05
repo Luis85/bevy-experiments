@@ -458,8 +458,133 @@ fn v6_to_v7(mut value: Value) -> Result<Value, SaveError> {
     v7_worker_seats(&mut value)?; // (a) defender seats
     v7_npc_appearance(&mut value); // (e) defensive appearance back-fill
     v7_report_drops(&mut value)?; // (b) report drop tracking
-    // (c) level-grant ledger, then (d) milestones (progression-tree) go here.
+    v7_level_grant_paid(&mut value)?; // (c) level-grant ledger
+    v7_milestones_claimed(&mut value)?; // (d) milestones
     Ok(value)
+}
+
+/// The root campaign and every expedition game's campaign.
+type V6Campaigns<'a> = (Option<&'a mut Value>, Vec<&'a mut Value>);
+
+fn v6_campaigns(value: &mut Value) -> Result<V6Campaigns<'_>, SaveError> {
+    let Some(root) = value.as_object_mut() else {
+        return Ok((None, Vec::new()));
+    };
+    let (mut campaign, mut battles) = (None, None);
+    for (key, child) in root.iter_mut() {
+        match key.as_str() {
+            "campaign" => campaign = Some(child),
+            "battles" => battles = Some(child),
+            _ => {}
+        }
+    }
+    let mut workers = Vec::new();
+    for battle in v6_battles(battles)? {
+        if let Some(worker) = battle
+            .get_mut("game")
+            .and_then(|game| game.get_mut("campaign"))
+        {
+            workers.push(worker);
+        }
+    }
+    Ok((campaign, workers))
+}
+
+/// (c) Every player at level 2 or above, the root's and each expedition's,
+/// is marked as already paid the level-up grant for its level: a v6 save is
+/// owed no retroactive grant. Level 1 writes nothing (0 and 1 both mean
+/// none paid).
+fn v7_level_grant_paid(value: &mut Value) -> Result<(), SaveError> {
+    let (root, workers) = v6_campaigns(value)?;
+    for campaign in root.into_iter().chain(workers) {
+        if let Some(Value::Object(player)) = campaign.get_mut("player")
+            && let Some(level) = player.get("level").and_then(Value::as_u64)
+            && level >= 2
+        {
+            player
+                .entry("level_grant_paid")
+                .or_insert_with(|| Value::from(level));
+        }
+    }
+    Ok(())
+}
+
+/// The milestone ranks at save format v7, frozen for sub-step (d): the
+/// milestones a v6 campaign had reached are claimed, whatever the current
+/// catalogue authors.
+const V7_MILESTONE_RANKS: [u32; 4] = [5, 10, 15, 20];
+
+/// A frozen copy of `Campaign::progression_rank` on a v6 campaign as it will
+/// load: a pre-threat campaign (revision 0) counts the larger of its
+/// victories and its legacy clear rank, which `migrate_threat_history` folds
+/// into victories at load; otherwise its victories.
+fn v6_rank(campaign: &Value) -> u32 {
+    let victories = campaign
+        .get("victories")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let threat_revision = campaign
+        .get("threat_revision")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let rank = if threat_revision == 0 {
+        victories.max(u64::from(v6_legacy_clear_rank(campaign)))
+    } else {
+        victories
+    };
+    u32::try_from(rank).unwrap_or(u32::MAX)
+}
+
+/// The frozen `Campaign::legacy_clear_rank`: per country the larger of its
+/// clear high-water and completed levels, summed, and at least the number of
+/// first clears.
+fn v6_legacy_clear_rank(campaign: &Value) -> u32 {
+    let mut cleared: std::collections::BTreeMap<&str, u64> = std::collections::BTreeMap::new();
+    let world = campaign.get("world");
+    for key in ["clear_high_water", "country_levels"] {
+        if let Some(Value::Object(counts)) = world.and_then(|world| world.get(key)) {
+            for (id, count) in counts {
+                let count = count.as_u64().unwrap_or(0);
+                let slot = cleared.entry(id.as_str()).or_insert(count);
+                *slot = (*slot).max(count);
+            }
+        }
+    }
+    let first_clears = campaign
+        .get("first_clears")
+        .and_then(Value::as_array)
+        .map_or(0, Vec::len) as u64;
+    cleared
+        .values()
+        .fold(0u64, |sum, count| sum.saturating_add(*count))
+        .max(first_clears) as u32
+}
+
+/// (d) The root campaign claims every frozen milestone its v6 rank reached,
+/// so none is paid retroactively, and every expedition campaign gets the
+/// parent's claims. An expedition cloned at a lower rank keeps only the
+/// claims its own rank reached, so the claims never exceed the rank they are
+/// validated against. Nothing is written below rank 5.
+fn v7_milestones_claimed(value: &mut Value) -> Result<(), SaveError> {
+    let (Some(root), workers) = v6_campaigns(value)? else {
+        return Ok(());
+    };
+    let parent = v6_rank(root);
+    for campaign in std::iter::once(root).chain(workers) {
+        let rank = parent.min(v6_rank(campaign));
+        let claimed: Vec<u32> = V7_MILESTONE_RANKS
+            .into_iter()
+            .filter(|milestone| *milestone <= rank)
+            .collect();
+        if let Value::Object(campaign) = campaign
+            && !claimed.is_empty()
+        {
+            campaign
+                .entry("milestones_claimed")
+                .or_insert_with(|| Value::from(claimed));
+        }
+    }
+    Ok(())
 }
 
 /// The expedition records; a missing array means there are none.
@@ -1140,5 +1265,111 @@ mod tests {
                 "{bad}"
             );
         }
+    }
+
+    #[test]
+    fn v7_ledgers_mark_levels_paid_and_claim_reached_milestones_idempotently() {
+        let campaign = |victories: u64, level: u32| json!({"victories": victories, "threat_revision": 1, "first_clears": [], "player": {"level": level}});
+        let v6 = json!({
+            "campaign": campaign(15, 7),
+            "battles": [
+                {"recruit_id": 1, "game": {"campaign": campaign(15, 1)}},
+                {"recruit_id": 2, "game": {"campaign": campaign(9, 4)}},
+                {"recruit_id": 3}
+            ]
+        });
+        let v7 = migrate(v6, 6).unwrap();
+        assert_eq!(v7["campaign"]["player"]["level_grant_paid"], 7);
+        assert_eq!(v7["campaign"]["milestones_claimed"], json!([5, 10, 15]));
+        let worker = |n: usize| &v7["battles"][n]["game"]["campaign"];
+        // Level 1 writes nothing; the parent's claims are copied.
+        assert!(worker(0)["player"].get("level_grant_paid").is_none());
+        assert_eq!(worker(0)["milestones_claimed"], json!([5, 10, 15]));
+        // An expedition cloned below the parent's rank keeps only the claims
+        // its own rank reached, so it still validates.
+        assert_eq!(worker(1)["player"]["level_grant_paid"], 4);
+        assert_eq!(worker(1)["milestones_claimed"], json!([5]));
+        assert!(v7["battles"][2].get("game").is_none());
+        assert_eq!(v6_to_v7(v7.clone()).unwrap(), v7, "idempotent");
+        // Saved values are kept (or_insert).
+        let mut kept = v7.clone();
+        kept["campaign"]["player"]["level_grant_paid"] = json!(3);
+        kept["campaign"]["milestones_claimed"] = json!([5]);
+        assert_eq!(v6_to_v7(kept.clone()).unwrap(), kept);
+        // Below rank 5 at level 1, and with no campaign, nothing is written;
+        // rank 20 and above claims all four.
+        for unchanged in [json!({"campaign": campaign(4, 1)}), json!({})] {
+            assert_eq!(migrate(unchanged.clone(), 6).unwrap(), unchanged);
+        }
+        let v7 = migrate(json!({"campaign": campaign(40, 50)}), 6).unwrap();
+        assert_eq!(
+            v7["campaign"]["milestones_claimed"],
+            json!(V7_MILESTONE_RANKS)
+        );
+    }
+
+    /// Each checked-in fixture as saved, and as a pre-threat (revision 0)
+    /// save with no victories, so the legacy clear rank decides. The v1 root
+    /// keeps its 4 victories: its live attempt is at rank 4, above its three
+    /// clears, and would not validate.
+    fn rank_fixtures() -> Vec<(String, u32, Value)> {
+        let fixtures = [
+            include_str!("../../tests/fixtures/save_v1.json"),
+            include_str!("../../tests/fixtures/save_v2.json"),
+            include_str!("../../tests/fixtures/save_v3.json"),
+            include_str!("../../tests/fixtures/save_v4.json"),
+            include_str!("../../tests/fixtures/save_v5.json"),
+            include_str!("../../tests/fixtures/save_v6.json"),
+        ];
+        let mut out = Vec::new();
+        for (n, text) in fixtures.into_iter().enumerate() {
+            let version = n as u32 + 1;
+            let envelope: Value = serde_json::from_str(text).unwrap();
+            assert_eq!(envelope["version"], version);
+            let payload: Value =
+                serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap();
+            let pre_threat = |campaign: &mut Value, victories: u64| {
+                let campaign = campaign.as_object_mut().unwrap();
+                campaign.remove("threat_revision");
+                campaign.insert("victories".into(), json!(victories));
+            };
+            let mut legacy = payload.clone();
+            pre_threat(&mut legacy["campaign"], if version == 1 { 4 } else { 0 });
+            if let Some(Value::Array(battles)) = legacy.get_mut("battles") {
+                for battle in battles {
+                    pre_threat(&mut battle["game"]["campaign"], 0);
+                }
+            }
+            out.push((format!("v{version}"), version, payload));
+            out.push((format!("v{version} pre-threat"), version, legacy));
+        }
+        out
+    }
+
+    /// Parity pin: the frozen `v6_rank` equals the rank the loaded game
+    /// reports (after `migrate_threat_history`), for every fixture's root and
+    /// expedition campaigns.
+    #[test]
+    fn v6_rank_migration_matches_runtime_progression_rank_on_every_fixture() {
+        let mut legacy_ranks = Vec::new();
+        for (label, version, payload) in rank_fixtures() {
+            let migrated = migrate(payload.clone(), version).unwrap();
+            let game = crate::sim::Game::from_payload(payload, version)
+                .unwrap_or_else(|e| panic!("{label}: {e}"));
+            let rank = v6_rank(&migrated["campaign"]);
+            assert_eq!(rank, game.campaign().progression_rank(), "{label}");
+            if label.ends_with("pre-threat") {
+                legacy_ranks.push(rank);
+            }
+            for (n, battle) in game.battles().iter().enumerate() {
+                assert_eq!(
+                    v6_rank(&migrated["battles"][n]["game"]["campaign"]),
+                    battle.game().campaign().progression_rank(),
+                    "{label} expedition {n}"
+                );
+            }
+        }
+        // The pre-threat v5 and v6 ranks come from their clears alone.
+        assert_eq!(legacy_ranks, [4, 0, 0, 0, 2, 14]);
     }
 }
