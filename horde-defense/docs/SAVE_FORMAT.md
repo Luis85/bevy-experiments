@@ -50,6 +50,12 @@ defender who fights the run. When the key is absent, the run belongs to the
 mode owner: the player for `Personal`, Mara for `Npc`. A recruit seat is
 written as `{"Recruit": id}`.
 
+Every expedition deploy, and every later stage of a country operation, seats
+its recruit on the worker attempt and gives the attempt profile that recruit's
+identity appearance. Loading checks that each expedition game's `attempt` and
+`last_result`, when present, have the seat `{"Recruit": recruit_id}` of their
+`battles[*]` record; any other seat, including a missing key, is invalid.
+
 ### v6 to v7
 
 The step runs its sub-steps in a fixed order. Later production-pass commits add

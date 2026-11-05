@@ -4,6 +4,15 @@ use super::*;
 /// Single source for the unknown-expedition message shared with `command`.
 pub(crate) const UNKNOWN_EXPEDITION: &str = "No active expedition with that ID";
 
+/// Seats recruit `recruit_id` on a freshly deployed attempt: the saved seat
+/// names the recruit and the profile takes the recruit's identity-table
+/// appearance instead of the Npc deploy's Female default. Presentation only
+/// reads the appearance; no rule or RNG draw depends on either field.
+pub(crate) fn stamp_recruit_defender(attempt: &mut Attempt, recruit_id: u64) {
+    attempt.seat = DefenderSeat::Recruit(recruit_id);
+    attempt.profile.appearance = crate::defenders::recruit_identity(recruit_id).1;
+}
+
 /// A shared-campaign transfer that settlement could not complete. Settlement
 /// still advances its cursors, so each issue is reported exactly once.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,6 +127,9 @@ impl Game {
         if let Err(error) = operation {
             self.campaign.release_external(npc.loadout);
             return Err(error);
+        }
+        if let Some(attempt) = worker.attempt.as_mut() {
+            stamp_recruit_defender(attempt, recruit_id);
         }
         if let Err(error) = self.strategy.reserve_recruit(recruit_id) {
             self.campaign.release_external(npc.loadout);
@@ -315,6 +327,11 @@ impl Game {
                     }
                     let next = battle.game.campaign.world.completed(&battle.country_id);
                     if battle.game.deploy_country_stage(next, Mode::Npc).is_ok() {
+                        // The worker game has no roster and does not know who
+                        // it carries; the parent re-seats the recruit.
+                        if let Some(attempt) = battle.game.attempt.as_mut() {
+                            stamp_recruit_defender(attempt, battle.recruit_id);
+                        }
                         battle.stage = next;
                         battle.game.set_paused(false);
                         continue;

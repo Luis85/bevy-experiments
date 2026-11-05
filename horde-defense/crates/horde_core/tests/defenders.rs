@@ -5,7 +5,9 @@
 //! and (W1-12) the typed `DefenseInProgress` / `DefenderUnavailable` errors
 //! with the Defending pre-checks in `Game::apply`; and (W1-13) the saved
 //! `"defender"` seat on `Attempt` and `Report` with their `defender()`
-//! accessors.
+//! accessors; and (W1-15) the recruit seat and appearance stamped on worker
+//! attempts at both deploy sites, with the worker-seat save validation.
+mod support;
 use horde_core::{
     campaign::{Campaign, NpcTraining},
     command::{Command, CommandError},
@@ -14,13 +16,14 @@ use horde_core::{
         DefenderBlocker, DefenderId, DefenderSeat, OriginTrait, RECRUIT_IDENTITIES,
         recruit_identity, resolve,
     },
-    sim::Game,
+    sim::{Game, ParallelBattle, SAVE_VERSION, SaveError},
     skill_catalog::skills,
     strategy::RecruitStatus,
     survivors::Appearance,
     world::world,
 };
 use serde_json::json;
+use support::{advance, enemy, strategic_game};
 
 #[test]
 fn defender_id_serde_shape() {
@@ -584,4 +587,129 @@ fn report_copies_attempt_seat_at_finish() {
         loaded.last_result().unwrap().defender(),
         DefenderId::Recruit(3)
     );
+}
+
+/// A strategic game with recruit 1 (Alex Rowan, a Male identity) on the
+/// roster, so the stamped appearance differs from the Female Npc default.
+fn game_with_alex() -> (Game, String, u64) {
+    let mut g = strategic_game();
+    let country = g.campaign().world.cleared[0].clone();
+    let id = g
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    assert_eq!(id, 1);
+    assert_eq!(recruit_identity(id), ("Alex Rowan", Appearance::Male));
+    (g, country, id)
+}
+
+fn battle(g: &Game, id: u64) -> &ParallelBattle {
+    g.battles().iter().find(|b| b.id == id).unwrap()
+}
+
+/// Ends the battle's current stage in victory on the next tick.
+fn win_stage(g: &mut Game, id: u64) {
+    let b = g.battles_mut().iter_mut().find(|b| b.id == id).unwrap();
+    enemy(b.game_mut(), 5, 20.0, true);
+    let a = b.game_mut().attempt_mut().unwrap();
+    a.boss_spawned = true;
+    a.enemies[0].injury.unconscious = true;
+    advance(g, 1);
+}
+
+#[test]
+fn expedition_attempt_carries_recruit_seat_and_appearance() {
+    let (mut g, country, id) = game_with_alex();
+    let b = g.deploy_survivor(id, &country, 0).unwrap();
+    let a = battle(&g, b).game().attempt().unwrap();
+    assert_eq!(a.defender(), DefenderId::Recruit(id));
+    assert_eq!(a.profile.appearance, Appearance::Male);
+    let saved = serde_json::to_value(&g).unwrap();
+    let attempt = &saved["battles"][0]["game"]["attempt"];
+    assert_eq!(attempt["defender"], json!({"Recruit": id}));
+    assert_eq!(attempt["profile"]["appearance"], json!("Male"));
+    let loaded = Game::from_payload(saved, SAVE_VERSION).unwrap();
+    let a = battle(&loaded, b).game().attempt().unwrap();
+    assert_eq!(a.defender(), DefenderId::Recruit(id));
+    assert_eq!(a.profile.appearance, Appearance::Male);
+}
+
+#[test]
+fn country_operation_next_stage_attempt_keeps_recruit_seat_and_appearance() {
+    let (mut g, _, id) = game_with_alex();
+    let country = world()
+        .countries
+        .iter()
+        .find(|c| {
+            g.campaign().world.can_enter(&c.id)
+                && !g.campaign().world.cleared.contains(&c.id)
+                && c.level_count() > 1
+        })
+        .unwrap()
+        .clone();
+    let operation = g.deploy_country_operation(id, &country.id).unwrap();
+    for stage in 0..2 {
+        let b = battle(&g, operation);
+        assert_eq!(b.stage, stage);
+        assert!(!b.settled);
+        let a = b.game().attempt().unwrap();
+        assert_eq!(a.defender(), DefenderId::Recruit(id), "stage {stage}");
+        assert_eq!(a.profile.appearance, Appearance::Male, "stage {stage}");
+        Game::from_payload(serde_json::to_value(&g).unwrap(), SAVE_VERSION)
+            .unwrap_or_else(|e| panic!("stage {stage} save: {e}"));
+        win_stage(&mut g, operation);
+        assert!(g.take_settlement_issues().is_empty());
+    }
+}
+
+#[test]
+fn worker_battle_seat_mismatch_is_invalid() {
+    let (mut g, country, id) = game_with_alex();
+    let b = g.deploy_survivor(id, &country, 0).unwrap();
+    let live = serde_json::to_value(&g).unwrap();
+    g.recall_survivor(b).unwrap();
+    assert!(battle(&g, b).settled);
+    let settled = serde_json::to_value(&g).unwrap();
+    for (base, slot) in [(&live, "attempt"), (&settled, "last_result")] {
+        Game::from_payload(base.clone(), SAVE_VERSION)
+            .unwrap_or_else(|e| panic!("{slot} baseline: {e}"));
+        for seat in [None, Some(json!({"Recruit": id + 1}))] {
+            let mut value = base.clone();
+            let target = value["battles"][0]["game"][slot]
+                .as_object_mut()
+                .unwrap_or_else(|| panic!("worker {slot}"));
+            match &seat {
+                None => target.remove("defender"),
+                Some(seat) => target.insert("defender".into(), seat.clone()),
+            };
+            match Game::from_payload(value, SAVE_VERSION) {
+                Err(SaveError::Invalid(_)) => {}
+                other => panic!("{slot} seat {seat:?} loaded: {:?}", other.err()),
+            }
+        }
+    }
+}
+
+/// Pin: inside a worker the victory credit lands on the worker's own
+/// `campaign.npc` copy, which settlement hands back to the roster entry.
+#[test]
+fn worker_victory_still_credits_the_worker_npc_copy() {
+    let (mut g, country, id) = game_with_alex();
+    let roster_victories = |g: &Game| {
+        g.strategy()
+            .roster
+            .iter()
+            .find(|r| r.id == id)
+            .unwrap()
+            .npc
+            .victories
+    };
+    let before = roster_victories(&g);
+    let b = g.deploy_survivor(id, &country, 0).unwrap();
+    assert_eq!(battle(&g, b).game().campaign().npc.victories, before);
+    win_stage(&mut g, b);
+    let settled = battle(&g, b);
+    assert!(settled.settled);
+    assert_eq!(settled.game().campaign().npc.victories, before + 1);
+    assert_eq!(roster_victories(&g), before + 1);
+    assert_eq!(status(&g, id), RecruitStatus::Ready);
 }

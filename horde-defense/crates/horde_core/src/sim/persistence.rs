@@ -604,6 +604,14 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
             return Err("Invalid expedition settlement cursor".into());
         }
         validate_game(&b.game, depth + 1)?;
+        // A worker game carries exactly one recruit: its attempt and report
+        // seats name that recruit (v7 stamping, v6_to_v7 (a) for old saves).
+        let seat = DefenderSeat::Recruit(b.recruit_id);
+        if b.game.attempt.as_ref().is_some_and(|a| a.seat != seat)
+            || b.game.last_result.as_ref().is_some_and(|r| r.seat != seat)
+        {
+            return Err("Expedition defender seat does not name its survivor".into());
+        }
         if !b.settled {
             expected_reservations.extend(b.loadout);
             let r = game
