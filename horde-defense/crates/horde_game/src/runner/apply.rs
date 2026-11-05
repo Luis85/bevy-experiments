@@ -16,6 +16,8 @@ pub struct RuntimeCtx<'a> {
     pub cues: &'a mut Vec<SoundCue>,
     /// Set when the pass mutated `game`, so `GameSession` change ticks stay honest.
     pub game_changed: bool,
+    /// Perf launches only; tests and normal play pass `None`.
+    pub perf: Option<&'a crate::diagnostics::PerfProbe>,
 }
 impl RuntimeCtx<'_> {
     pub(super) fn notice(&mut self, notice: RuntimeNotice) {
@@ -175,7 +177,7 @@ pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result
 /// authoritative ticks; one-shot controls are consumed only by the first tick.
 pub fn step(ctx: &mut RuntimeCtx) {
     let before = ctx.runtime.simulated_ticks;
-    let finished = ctx.runtime.advance(ctx.game, ctx.cues);
+    let finished = ctx.runtime.advance(ctx.game, ctx.cues, ctx.perf);
     ctx.game_changed |= ctx.runtime.simulated_ticks != before;
     report_settlement_issues(ctx);
     if finished {
@@ -282,7 +284,8 @@ pub(super) fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
 }
 pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
     // This main-thread phase measures only polling, snapshot capture and enqueue.
-    let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Persistence);
+    let _work =
+        crate::diagnostics::work_timer(ctx.perf, crate::diagnostics::WorkPhase::Persistence);
     let quit = poll_storage(ctx);
     let intents = {
         let runtime = &mut *ctx.runtime;

@@ -54,6 +54,7 @@ fn scripted_session(game: &mut Game, runtime: &mut Runtime, scratch: &Scratch) -
             notices: &mut notices,
             cues: &mut cues,
             game_changed: false,
+            perf: None,
         };
         flush(&mut ctx);
         step(&mut ctx);
@@ -251,6 +252,7 @@ fn an_unusable_step_request_is_dropped_and_the_ordinary_tick_still_runs() {
         notices: &mut notices,
         cues: &mut cues,
         game_changed: false,
+        perf: None,
     };
     step(&mut ctx);
     assert_eq!(
@@ -355,6 +357,7 @@ fn write_equipped_sale_recording() {
             notices: &mut notices,
             cues: &mut cues,
             game_changed: false,
+            perf: None,
         };
         flush(&mut ctx);
         step(&mut ctx);

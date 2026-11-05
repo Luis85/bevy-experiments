@@ -97,7 +97,6 @@ fn main() -> AppExit {
         };
     }
     let (width, height) = config.window;
-    diagnostics::enable_work_timing(config.perf().is_some());
     let mut app = App::new();
     if config.sequence_path().is_some() {
         // LaunchConfig already rejected exports outside an isolated motion review.
@@ -142,6 +141,8 @@ fn main() -> AppExit {
                 }),
         );
     let config = app.world().resource::<launch::LaunchConfig>().clone();
+    // Perf launches only: the probe, its span systems and the GPU span.
+    diagnostics::install(&mut app, &config);
     // After LogPlugin so Game::load startup events reach the console and log file.
     ui::FrontendParts::load(&config).insert_into(&mut app);
     let review = config.review().is_some();

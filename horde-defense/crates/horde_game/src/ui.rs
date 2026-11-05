@@ -72,11 +72,17 @@ pub(super) fn draw(
     time: Res<Time>,
     frames: Res<bevy::diagnostic::FrameCount>,
     render_device: Res<bevy::render::renderer::RenderDevice>,
+    perf: Option<Res<crate::diagnostics::PerfProbe>>,
     mut initialized: Local<bool>,
 ) -> Result {
-    let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Interface);
+    let perf = perf.as_deref();
+    let _work = crate::diagnostics::work_timer(perf, crate::diagnostics::WorkPhase::Interface);
+    if let Some(perf) = perf {
+        perf.count_egui_pass();
+    }
     let mut cues = Vec::new();
     let mut f = params.ctx(&mut cues);
+    f.perf = perf;
     f.runtime.begin_frame(frames.0);
     let ctx = contexts.ctx_mut()?;
     if !*initialized {

@@ -56,6 +56,8 @@ pub struct PerfOptions {
     pub frames: u32,
     pub active_only: bool,
     pub cpu: Option<String>,
+    /// `LASTLIGHT_PERF_PROFILE`: build profile label recorded in the report.
+    pub profile_label: Option<String>,
     pub audio: bool,
     pub npc_speed: Option<u32>,
 }
@@ -67,6 +69,7 @@ impl Default for PerfOptions {
             frames: 300,
             active_only: false,
             cpu: None,
+            profile_label: None,
             audio: false,
             npc_speed: None,
         }
@@ -170,6 +173,7 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_PERF_FRAMES         300..=3600 (default 300)
     LASTLIGHT_PERF_ACTIVE_ONLY    Flag: sample only unpaused battle frames
     LASTLIGHT_PERF_CPU            CPU label recorded in the report
+    LASTLIGHT_PERF_PROFILE        Build profile label recorded in the report
     LASTLIGHT_PERF_AUDIO          Flag: keep audio in the perf-audio fixture
     LASTLIGHT_PERF_NPC_SPEED      Observation speed 1, 2 or 4 for perf fixtures
   Developer tools (builds with the `dev` feature; otherwise rejected or ignored)
@@ -194,6 +198,7 @@ const REVIEW_VARIABLES: &[&str] = &[
     "LASTLIGHT_PERF_FRAMES",
     "LASTLIGHT_PERF_ACTIVE_ONLY",
     "LASTLIGHT_PERF_CPU",
+    "LASTLIGHT_PERF_PROFILE",
     "LASTLIGHT_PERF_AUDIO",
     "LASTLIGHT_PERF_NPC_SPEED",
 ];
@@ -366,6 +371,7 @@ impl LaunchConfig {
                 ),
                 active_only: env.flag("LASTLIGHT_PERF_ACTIVE_ONLY"),
                 cpu: env.string("LASTLIGHT_PERF_CPU"),
+                profile_label: env.string("LASTLIGHT_PERF_PROFILE"),
                 audio: env.flag("LASTLIGHT_PERF_AUDIO"),
                 npc_speed: None,
             },

@@ -352,6 +352,7 @@ impl Host {
             notices: &mut self.notices,
             cues: &mut self.cues,
             game_changed: false,
+            perf: None,
         }
     }
     fn deploy(&mut self) {

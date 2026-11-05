@@ -315,6 +315,7 @@ impl FrontendParts {
             prefs: &mut self.prefs,
             menu: &mut self.menu,
             cues: &mut self.cues,
+            perf: None,
         }
     }
     /// Lends the runner's view of the parts; notices collect in `self.notices`.
@@ -328,6 +329,7 @@ impl FrontendParts {
             notices: &mut self.notices,
             cues: &mut self.cues,
             game_changed: false,
+            perf: None,
         }
     }
     /// Startup only: everything becomes resources, `screen` the initial state.

@@ -193,8 +193,13 @@ impl Runtime {
         self.pending_aims = AttackAims::default();
         input
     }
-    pub(super) fn advance(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) -> bool {
-        let _work = crate::diagnostics::work_timer(crate::diagnostics::WorkPhase::Simulation);
+    pub(super) fn advance(
+        &mut self,
+        game: &mut Game,
+        cues: &mut Vec<SoundCue>,
+        perf: Option<&crate::diagnostics::PerfProbe>,
+    ) -> bool {
+        let _work = crate::diagnostics::work_timer(perf, crate::diagnostics::WorkPhase::Simulation);
         self.fixed_calls += 1;
         #[cfg(feature = "dev")]
         if self.step_requests > 0 {

@@ -9,6 +9,7 @@ use super::{
 use crate::{
     art::{self, AMBER, GREEN, INK, MUTED, RED, TEXT},
     battle_view::{self, BattleScreen, FieldHint},
+    diagnostics::{self, InterfaceSpan},
     runner::SaveIntent,
     settings::Action,
 };
@@ -213,11 +214,16 @@ fn preview_aim(arena: art::ArenaProjection) -> [f32; 2] {
 }
 pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
     let game = f.game;
-    let (Some(view), Some(hud_view), Some(a)) = (
-        BattleScreen::build(game),
-        hud::view_model(game),
-        game.attempt(),
-    ) else {
+    let perf = f.perf;
+    let built = {
+        let _span = diagnostics::interface_span(perf, InterfaceSpan::BattleFrameBuild);
+        (
+            BattleScreen::build(game),
+            hud::view_model(game),
+            game.attempt(),
+        )
+    };
+    let (Some(view), Some(hud_view), Some(a)) = built else {
         f.go(Screen::Results);
         return;
     };
@@ -243,9 +249,13 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
             } else if let Some(pointer) = response.hover_pos() {
                 f.battle.aim = arena.inverse(pointer);
             }
-            art::world_backdrop(ui.painter(), canvas, arena, view.theme, f.textures);
+            {
+                let _span = diagnostics::interface_span(perf, InterfaceSpan::Backdrop);
+                art::world_backdrop(ui.painter(), canvas, arena, view.theme, f.textures);
+            }
+            let paint = diagnostics::interface_span(perf, InterfaceSpan::BattlefieldPaint);
             // The painter builds its own `BattleViewModel` from the attempt.
-            art::battlefield(
+            let drawn = art::battlefield(
                 &ui.painter_at(maximum),
                 r,
                 a,
@@ -261,6 +271,10 @@ pub(super) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                     blend: f.battle.interpolation.scene(None, a),
                 },
             );
+            drop(paint);
+            if let Some(perf) = perf {
+                perf.record_scene(drawn);
+            }
             art::world_atmosphere(ui.painter(), canvas);
             crate::inspector::hover(&response, a, f.battle.aim);
             if response.hovered() {

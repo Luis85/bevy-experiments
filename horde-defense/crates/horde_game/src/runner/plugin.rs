@@ -42,6 +42,7 @@ pub struct RuntimeParams<'w> {
     paths: Res<'w, ProfilePaths>,
     notices: MessageWriter<'w, RuntimeNotice>,
     cues: MessageWriter<'w, SoundCue>,
+    perf: Option<Res<'w, crate::diagnostics::PerfProbe>>,
 }
 impl RuntimeParams<'_> {
     fn run<R>(&mut self, pass: impl FnOnce(&mut RuntimeCtx) -> R) -> R {
@@ -57,6 +58,7 @@ impl RuntimeParams<'_> {
                 notices: &mut notices,
                 cues: &mut cues,
                 game_changed: false,
+                perf: self.perf.as_deref(),
             };
             let result = pass(&mut ctx);
             (result, ctx.game_changed)

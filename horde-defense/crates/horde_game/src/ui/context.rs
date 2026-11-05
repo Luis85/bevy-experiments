@@ -44,6 +44,8 @@ pub(crate) struct UiCtx<'a> {
     pub(super) menu: &'a mut MenuUi,
     /// UI-originated sound cues, forwarded as `SoundCue` messages.
     pub(super) cues: &'a mut Vec<SoundCue>,
+    /// Perf launches only: sub-spans and scene counts inside `ui::draw`.
+    pub(super) perf: Option<&'a crate::diagnostics::PerfProbe>,
 }
 
 /// Per-screen UI state resources, grouped to keep `UiParams` within Bevy's
@@ -98,6 +100,7 @@ impl UiParams<'_> {
             prefs: &mut state.prefs,
             menu: &mut state.menu,
             cues,
+            perf: None,
         }
     }
 }

@@ -11,6 +11,7 @@ use super::{ArenaProjection, RED, soft_shadow};
 use crate::{
     animation::{self, SceneCache},
     battle_view::{BattleViewModel, SceneBlend},
+    diagnostics::SceneDraw,
     visual_assets::{self, ArtTextures},
 };
 use bevy::log::warn;
@@ -29,7 +30,15 @@ pub struct RenderOptions<'a> {
     pub blend: SceneBlend<'a>,
 }
 
-pub fn battlefield(p: &Painter, r: Rect, a: &Attempt, aim: [f32; 2], options: RenderOptions) {
+/// Paints the field and returns what it drew, for the perf report's
+/// `scene_load` (settled bodies are those past 0.9 collapse).
+pub fn battlefield(
+    p: &Painter,
+    r: Rect,
+    a: &Attempt,
+    aim: [f32; 2],
+    options: RenderOptions,
+) -> SceneDraw {
     let arena = ArenaProjection::for_attempt(r, a);
     let motion = p.ctx().data_mut(|data| {
         let cache =
@@ -42,6 +51,13 @@ pub fn battlefield(p: &Painter, r: Rect, a: &Attempt, aim: [f32; 2], options: Re
     });
     let view = BattleViewModel::build(a, &motion, options.blend, options.reduced);
     render(p, arena, &view, a, aim, &options);
+    let settled_corpses = view.corpses.iter().filter(|c| c.collapse > 0.9).count();
+    SceneDraw {
+        settled_corpses,
+        collapsing_corpses: view.corpses.len() - settled_corpses,
+        particles: view.particles.len(),
+        fx_views: view.fx.len(),
+    }
 }
 
 /// `a` is read only where the survivor rig resolves poses from the attempt:

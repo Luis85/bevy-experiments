@@ -13,12 +13,16 @@ impl Plugin for ReviewToolsPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(
             Update,
-            (
-                automated_capture,
-                diagnostics::capture_performance,
-                capture_sequence::capture_frames,
-            ),
+            (automated_capture, capture_sequence::capture_frames),
         );
+        // The report reads the frame `PerfPlugin` closes at the end of `Last`,
+        // so each phase is attributed to the frame that did the work.
+        if app.world().resource::<LaunchConfig>().perf().is_some() {
+            app.add_systems(
+                Last,
+                diagnostics::capture_performance.after(diagnostics::PerfSet::CloseFrame),
+            );
+        }
     }
 }
 
