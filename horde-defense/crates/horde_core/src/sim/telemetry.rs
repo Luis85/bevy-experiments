@@ -36,6 +36,13 @@ pub struct CombatTelemetry {
     pub spawned_by_archetype: BTreeMap<String, u32>,
     /// Non-boss kills per resolved archetype id; the sum is at most the
     /// attempt's `kills` and each entry at most its spawns. Absent when empty.
+    ///
+    /// Writer obligation (schema v7 §3.12 keeps the per-archetype rule that
+    /// design-progression-tree §10 dropped): an attempt resumed from a save
+    /// made before the maps were written has living enemies whose spawns were
+    /// never counted, so the writer counts a kill only while that archetype's
+    /// kills are below its `spawned_by_archetype` count. Without that rule,
+    /// the next load fails with `SaveError::Invalid`.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub kills_by_archetype: BTreeMap<String, u32>,
     /// Damage the defenders took per resolved archetype id. Absent when empty.

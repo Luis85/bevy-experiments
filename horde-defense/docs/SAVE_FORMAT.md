@@ -151,7 +151,10 @@ Loading rejects more than 256 keys in a map, a key that is not a catalogue
 id (1-64 bytes of `[a-z0-9_.-]`), archetype kills summing above the owner's
 `kills`, an archetype with more kills than spawns, or more than two boss
 phase ticks. Nothing writes these keys yet; v6 telemetry loads with them
-empty.
+empty. Because an attempt resumed from an older save has living enemies whose
+spawns were never counted, the writer counts a kill in `kills_by_archetype`
+only while that archetype's kills are below its `spawned_by_archetype` count.
+Otherwise the save could not load again.
 
 ### v6 to v7
 

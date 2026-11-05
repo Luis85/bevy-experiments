@@ -75,13 +75,31 @@ fn with(owner: &str, field: &str, v: Value) -> Value {
     value
 }
 
+/// `staged()` with the `extra` entries added to the `field` map of `owner`'s
+/// telemetry. The staged entries stay, so spawns still cover kills and the
+/// row breaks only the key rule; returns the map's new length too.
+fn with_added(owner: &str, field: &str, extra: &serde_json::Map<String, Value>) -> (Value, usize) {
+    let mut value = staged();
+    let map = value[owner]["telemetry"][field].as_object_mut().unwrap();
+    map.extend(extra.clone());
+    let len = map.len();
+    (value, len)
+}
+
+/// The message for a bad archetype key, too many keys or too many boss
+/// phase ticks.
+const KEYS_MESSAGE: &str = "Invalid saved combat telemetry archetype keys or boss phases";
+/// The message for archetype kills above the owner's kills or above spawns.
+const KILLS_MESSAGE: &str = "Saved combat telemetry kills exceed kills or spawns";
+
 /// Loads every row and fails with the names of the rows that loaded or
-/// failed with anything but the telemetry's own `SaveError::Invalid`.
-fn assert_each_invalid(rows: Vec<(String, Value)>) {
+/// failed with anything but `SaveError::Invalid(expected)`, so a row that
+/// also breaks the other telemetry rule cannot pass on that rule's message.
+fn assert_each_invalid(rows: Vec<(String, Value)>, expected: &str) {
     let loaded: Vec<String> = rows
         .into_iter()
         .filter_map(|(name, value)| match load(value) {
-            Err(SaveError::Invalid(message)) if message.contains("combat telemetry") => None,
+            Err(SaveError::Invalid(message)) if message == expected => None,
             Ok(_) => Some(format!("{name}: loaded")),
             Err(error) => Some(format!("{name}: {error}")),
         })
@@ -153,7 +171,7 @@ fn telemetry_maps_round_trip_and_skip_when_empty() {
 
 #[test]
 fn rejects_invalid_archetype_keys_and_three_boss_phase_ticks() {
-    let too_many: serde_json::Map<String, Value> = (0..257)
+    let too_many: serde_json::Map<String, Value> = (0..255)
         .map(|i| (format!("archetype-{i}"), json!(0)))
         .collect();
     let mut rows = Vec::new();
@@ -163,14 +181,15 @@ fn rejects_invalid_archetype_keys_and_three_boss_phase_ticks() {
             "kills_by_archetype",
             "damage_taken_by_archetype",
         ] {
-            rows.push((
-                format!("{owner} {field} 257 keys"),
-                with(owner, field, Value::Object(too_many.clone())),
-            ));
+            // The staged two keys plus 255 more.
+            let (value, len) = with_added(owner, field, &too_many);
+            assert_eq!(len, 257, "{owner} {field}");
+            rows.push((format!("{owner} {field} 257 keys"), value));
             for key in ["", "Shambler", "boss:horde", &"a".repeat(65)] {
+                let bad = serde_json::Map::from_iter([(key.to_owned(), json!(0))]);
                 rows.push((
                     format!("{owner} {field} key {key:?}"),
-                    with(owner, field, json!({ key: 0 })),
+                    with_added(owner, field, &bad).0,
                 ));
             }
         }
@@ -179,7 +198,7 @@ fn rejects_invalid_archetype_keys_and_three_boss_phase_ticks() {
             with(owner, "boss_phase_ticks", json!([100, 200, 300])),
         ));
     }
-    assert_each_invalid(rows);
+    assert_each_invalid(rows, KEYS_MESSAGE);
 }
 
 #[test]
@@ -200,7 +219,7 @@ fn rejects_kills_by_archetype_sum_exceeding_kills() {
         value[owner]["kills"] = json!(4);
         rows.push((format!("{owner} kills 4 under sum 5"), value));
     }
-    assert_each_invalid(rows);
+    assert_each_invalid(rows, KILLS_MESSAGE);
 }
 
 #[test]
@@ -220,5 +239,5 @@ fn rejects_archetype_kills_above_spawned() {
             with(owner, "spawned_by_archetype", json!({"shambler": 4})),
         ));
     }
-    assert_each_invalid(rows);
+    assert_each_invalid(rows, KILLS_MESSAGE);
 }
