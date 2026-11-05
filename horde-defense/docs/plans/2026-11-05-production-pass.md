@@ -723,10 +723,10 @@ Format owned by qa-captures and checked by `scripts/check_capture_findings.py` (
 <!-- capture-findings:begin -->
 | ID | Wave | Scene | Size | Mode | Finding | Severity | Owner | Status | Fix commit | After evidence | Deferral |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| CF-0-01 | 0 | progressed-battle, leveled-armory | both | both | Capture panics at ui/review/fixtures.rs:138:14; no before still (8 of 164 failed) | blocker | qa-captures | open | | | |
+| CF-0-01 | 0 | progressed-battle, leveled-armory | both | both | Capture panics at ui/review/fixtures.rs:138:14; no before still (8 of 164 failed) | blocker | qa-captures | fixed | 299470a | target/production-after/w1-05/normal/progressed-battle-small.png#6bc210e3bed4 | |
 | CF-0-02 | 0 | battle | both | both | 3x12 field uses about 40% x 27% of the arena (fixed-scale clearing) | blocker | vfx-lighting | open | | | |
 | CF-0-03 | 0 | construction | both | both | Construction mode shrinks the arena by 252 pt | blocker | vfx-lighting | open | | | |
-| CF-0-04 | 0 | battle | both | both | Non-practice review captures show "Practice scenario - progress is isolated from your campaign" | minor | qa-captures | open | | | |
+| CF-0-04 | 0 | battle | both | both | Non-practice review captures show "Practice scenario - progress is isolated from your campaign" | minor | qa-captures | fixed | 299470a | target/production-after/w1-05/normal/battle.png#d44738e6cb6a | |
 <!-- capture-findings:end -->
 
 ---
