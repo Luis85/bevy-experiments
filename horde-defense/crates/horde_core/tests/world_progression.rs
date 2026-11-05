@@ -361,3 +361,25 @@ fn eight_real_country_defenses_are_achievable_with_earned_levelled_shop_gear_in_
         assert!(equipped.level >= 4);
     }
 }
+
+/// FNV-1a of every country's stage count (`id count` lines in catalogue
+/// order), recorded at parent commit 3d492cd. A world regeneration (user
+/// decision 12) must not silently drift saved stage indices or the
+/// liberation frontier of existing campaigns.
+const COUNTRY_LEVEL_COUNTS_FNV: u64 = 0x6202_d526_f76c_2828;
+
+#[test]
+fn country_level_counts_are_pinned() {
+    let countries = &horde_core::world::world().countries;
+    let table: String = countries
+        .iter()
+        .map(|c| format!("{} {}\n", c.id, c.level_count()))
+        .collect();
+    let total: usize = countries.iter().map(|c| c.level_count()).sum();
+    assert_eq!((countries.len(), total), (242, 1026), "{table}");
+    assert_eq!(
+        support::fnv1a(table.as_bytes()),
+        COUNTRY_LEVEL_COUNTS_FNV,
+        "{table}"
+    );
+}

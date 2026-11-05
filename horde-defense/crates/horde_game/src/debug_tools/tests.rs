@@ -293,3 +293,147 @@ fn dump_writes_the_save_payload() {
     let bytes = std::fs::read(path).unwrap();
     assert_eq!(bytes, serde_json::to_vec(&game).unwrap());
 }
+
+/// `tests/fixtures/recording_v6_equipped_sale.jsonl`: a fresh new game
+/// recorded through the runner on the v6 build (parent commit 3d492cd). Rook
+/// starts in Germany and fights with aim quantised to whole yards until the
+/// banked coins buy the cheapest outfit, retreats, buys it, equips it and
+/// sells the equipped item (accepted under ruleset 1), then the recording
+/// ends with its digest.
+const EQUIPPED_SALE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/tests/fixtures/recording_v6_equipped_sale.jsonl"
+);
+
+/// The cheapest tier-1 outfit a fresh campaign may buy.
+fn cheapest_outfit(game: &Game) -> (horde_core::content::ItemDefId, u64) {
+    horde_core::content::content()
+        .items
+        .iter()
+        .enumerate()
+        .filter(|(_, item)| item.tier == 1 && item.slot == horde_core::content::Slot::Outfit)
+        .map(|(n, item)| (item.id.clone(), game.campaign().buy_price(n).unwrap()))
+        .min_by_key(|(id, price)| (*price, id.as_str().to_owned()))
+        .unwrap()
+}
+
+#[test]
+#[ignore = "writes tests/fixtures/recording_v6_equipped_sale.jsonl; set LASTLIGHT_WRITE_RECORDING_FIXTURE"]
+fn write_equipped_sale_recording() {
+    let Some(path) = std::env::var_os("LASTLIGHT_WRITE_RECORDING_FIXTURE").map(PathBuf::from)
+    else {
+        return;
+    };
+    assert!(!path.exists(), "refusing to overwrite {}", path.display());
+    assert_eq!(
+        horde_core::sim::SAVE_VERSION,
+        6,
+        "this recording is cut on v6"
+    );
+    horde_core::catalog::init_catalogs().unwrap();
+    let scratch = Scratch::new("record-equipped-sale");
+    let mut game = Game::default();
+    let mut runtime = Runtime::default();
+    runtime.start_recording(Recorder::create(&path, &game, 0).unwrap());
+    let settings = Settings::default();
+    let paths = ProfilePaths::in_directory(scratch.0.clone());
+    let (mut notices, mut cues) = (Vec::new(), Vec::new());
+    let mut frame = 0;
+    let mut pass = |game: &mut Game, runtime: &mut Runtime, held: Input| {
+        frame += 1;
+        runtime.begin_frame(frame);
+        runtime.publish(ControlFrame {
+            enabled: true,
+            held,
+            ..ControlFrame::default()
+        });
+        let mut ctx = RuntimeCtx {
+            game,
+            runtime,
+            settings: &settings,
+            paths: &paths,
+            notices: &mut notices,
+            cues: &mut cues,
+            game_changed: false,
+        };
+        flush(&mut ctx);
+        step(&mut ctx);
+    };
+    let (outfit, price) = cheapest_outfit(&game);
+    for command in [
+        Command::ChooseSurvivor(horde_core::survivors::SurvivorId::Rook),
+        Command::ChooseStart("DEU".into()),
+        Command::SetPaused(false),
+    ] {
+        runtime.enqueue(command, "");
+    }
+    pass(&mut game, &mut runtime, Input::default());
+    while game.campaign().coins < price {
+        assert!(
+            game.attempt().is_some(),
+            "the defense ended before the outfit was affordable"
+        );
+        let mut held = horde_core::sim::smoke_input(&game);
+        held.aim = [held.aim[0].round(), held.aim[1].floor() + 0.5];
+        pass(&mut game, &mut runtime, held);
+    }
+    runtime.enqueue(Command::Withdraw, "");
+    runtime.enqueue(Command::BuyItem(outfit), "");
+    pass(&mut game, &mut runtime, Input::default());
+    let item = game.campaign().items.last().unwrap().id;
+    runtime.enqueue(
+        Command::Equip {
+            mode: Mode::Personal,
+            id: item,
+        },
+        "",
+    );
+    pass(&mut game, &mut runtime, Input::default());
+    assert_eq!(
+        game.campaign().player.loadout[2],
+        item,
+        "the outfit is equipped"
+    );
+    runtime.enqueue(Command::SellItem(item), "");
+    pass(&mut game, &mut runtime, Input::default());
+    assert!(
+        game.campaign().item(item).is_none(),
+        "ruleset 1 sells the equipped outfit"
+    );
+    assert!(runtime.stop_recording(&game, "fixture"));
+    runtime.finish_storage_for_test();
+}
+
+#[test]
+fn v6_equipped_sale_recording_replays_to_its_recorded_digest() {
+    horde_core::catalog::init_catalogs().unwrap();
+    let lines = read_lines(Path::new(EQUIPPED_SALE)).unwrap();
+    let Some(Line::Header(header)) = lines.first() else {
+        panic!("header first");
+    };
+    assert_eq!((header.format, header.version, header.ruleset), (1, 6, 1));
+    let commands: Vec<_> = lines
+        .iter()
+        .filter_map(|line| match line {
+            Line::Command { command, .. } => Some(command.clone()),
+            _ => None,
+        })
+        .collect();
+    let [
+        ..,
+        Command::BuyItem(_),
+        Command::Equip { id: equipped, .. },
+        Command::SellItem(sold),
+    ] = commands.as_slice()
+    else {
+        panic!("the recording ends buy, equip, sell: {commands:?}");
+    };
+    assert_eq!(equipped, sold, "the sold item is the equipped one");
+    assert!(matches!(lines.last(), Some(Line::End { .. })));
+    let report = replay(lines).unwrap();
+    assert!(report.warnings.is_empty(), "{:?}", report.warnings);
+    assert!(
+        report.matches_recording(),
+        "ruleset 1 reproduces the recording"
+    );
+}

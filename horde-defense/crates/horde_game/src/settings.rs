@@ -197,3 +197,56 @@ pub fn install_font(ctx: &Context) {
         .insert(0, "atkinson".into());
     ctx.set_fonts(fonts);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `tests/fixtures/settings_v0.json`: a settings file as the pre-v2 build
+    /// writes it (`Settings::save`, 13 keys, no version), with custom
+    /// bindings and every preference away from its default. Cut on the v6
+    /// build (parent commit 3d492cd) by `write_settings_v0_fixture`.
+    const SETTINGS_V0: &str = include_str!("../tests/fixtures/settings_v0.json");
+
+    fn customised() -> Settings {
+        Settings {
+            scale: 1.15,
+            aim_assist: 0.25,
+            auto_reload: false,
+            toggle_fire: true,
+            outlines: true,
+            numbers: false,
+            reduced_effects: true,
+            show_guidance: false,
+            blood: true,
+            master: 0.8,
+            effects: 0.45,
+            ambience: 0.3,
+            bindings: ["Mouse1", "Mouse3", "T", "Q", "E", "C", "P", "G"].map(String::from),
+        }
+    }
+
+    #[test]
+    fn settings_v0_fixture_is_a_13_key_file_with_custom_bindings() {
+        let value: serde_json::Value = serde_json::from_str(SETTINGS_V0).unwrap();
+        let keys: Vec<_> = value.as_object().unwrap().keys().cloned().collect();
+        assert_eq!(keys.len(), 13, "{keys:?}");
+        assert!(value.get("version").is_none());
+        assert_eq!(value["effects"], 0.45);
+        let settings: Settings = serde_json::from_str(SETTINGS_V0).unwrap();
+        assert_eq!(settings.bindings, customised().bindings);
+        assert_eq!(settings.effects, 0.45);
+        assert_ne!(settings.bindings, Settings::default().bindings);
+    }
+
+    #[test]
+    #[ignore = "writes tests/fixtures/settings_v0.json; set LASTLIGHT_WRITE_SETTINGS_FIXTURE"]
+    fn write_settings_v0_fixture() {
+        let Some(path) = std::env::var_os("LASTLIGHT_WRITE_SETTINGS_FIXTURE") else {
+            return;
+        };
+        let path = std::path::PathBuf::from(path);
+        assert!(!path.exists(), "refusing to overwrite {}", path.display());
+        customised().save(&path).unwrap();
+    }
+}

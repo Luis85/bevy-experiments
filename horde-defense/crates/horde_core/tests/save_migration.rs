@@ -25,21 +25,39 @@
 //! first clears `[true,false,..]` with `first_clear_claimed: [2,0,0,0,0]`, one
 //! withdrawn run on level 1 (`template: 1`) and a live personal attempt on
 //! level 2 (`level: 2`) at tick 420.
+//!
+//! `fixtures/save_v6.json` was written by `Game::save` at save format v6 on
+//! untouched v6 code (parent commit 3d492cd), by the `#[ignore]`d writer in
+//! `save_fixtures.rs` (seed 0x5AFE_0006). Its state was reached through
+//! `Game::apply` with the `--smoke` bot inputs; the staging seam set only the
+//! game and strategy seeds and coins, and restored the root report that the
+//! final deployment clears. It holds a Hard campaign with one earlier Custom
+//! round, 14 victories, every catalogue level cleared (Mara's allowance of 52
+//! fully awarded), four liberated countries, three recruits (Guarding in
+//! Moldova; Ready after a won Hungarian expedition, in bought gear; Deployed
+//! on a live Polish expedition with one synced drop), a stash with a locked
+//! Epic, a favourite Rare and a second preset, a settled Mara victory as the
+//! root report, and a live Personal attempt in Belarus at tick 423 (rank 14)
+//! with enemies, a corpse and a drop. Rook's natural level is 33 (Moldova
+//! alone reaches 14), and the file is 120,842 bytes: the 14 run records, two
+//! 80-line Npc logs and two worker games are most of it.
 mod support;
 
 use horde_core::campaign::{BodyAttribute, NpcTraining};
-use horde_core::content::{EnemyKind, ItemDefId, StructureKind};
+use horde_core::content::{EnemyKind, ItemDefId, Mode, StructureKind};
 use horde_core::ordnance::OrdnanceKind;
 use horde_core::quality::Quality;
-use horde_core::sim::{Game, Input, NpcManeuver, SAVE_VERSION};
+use horde_core::sim::{Game, Input, NpcManeuver, Outcome, SAVE_VERSION, smoke_input};
 use horde_core::skill_catalog::unlocks;
 use horde_core::status::StatusId;
+use horde_core::strategy::RecruitStatus;
 
 const FIXTURE: &str = include_str!("fixtures/save_v1.json");
 const FIXTURE_V2: &str = include_str!("fixtures/save_v2.json");
 const FIXTURE_V3: &str = include_str!("fixtures/save_v3.json");
 const FIXTURE_V4: &str = include_str!("fixtures/save_v4.json");
 const FIXTURE_V5: &str = include_str!("fixtures/save_v5.json");
+const FIXTURE_V6: &str = include_str!("fixtures/save_v6.json");
 
 fn fixture() -> Game {
     Game::decode_save_generation(FIXTURE.as_bytes()).expect("v1 fixture migrates and validates")
@@ -622,9 +640,332 @@ fn every_legacy_fixture_keeps_its_clears_frontier_and_claims() {
     assert_eq!(level_progress(&fixture_v2()), none());
     assert_eq!(level_progress(&fixture_v3()), none());
     assert_eq!(level_progress(&fixture_v4()), none());
-    for game in [fixture(), fixture_v2(), fixture_v3(), fixture_v4()] {
+    assert_eq!(
+        level_progress(&fixture_v6()),
+        (
+            vec![
+                "ashwood_crossing",
+                "depot_nine",
+                "lastlight_checkpoint",
+                "the_iron_yard",
+                "the_old_road"
+            ],
+            5,
+            vec!["depot_nine"],
+            vec![]
+        )
+    );
+    for game in [
+        fixture(),
+        fixture_v2(),
+        fixture_v3(),
+        fixture_v4(),
+        fixture_v6(),
+    ] {
         assert_eq!(game.attempt().unwrap().level, 0);
     }
     assert_eq!(fixture().campaign().run_history[0].template, 0);
     assert_eq!(fixture_v3().campaign().run_history[0].template, 0);
+    let templates: Vec<_> = fixture_v6()
+        .campaign()
+        .run_history
+        .iter()
+        .map(|r| r.template)
+        .collect();
+    assert_eq!(templates, [0, 1, 2, 0, 1, 2, 0, 1, 2, 3, 4, 0, 1, 2]);
+}
+
+fn fixture_v6() -> Game {
+    Game::decode_save_generation(FIXTURE_V6.as_bytes()).expect("v6 fixture validates")
+}
+
+/// The saved JSON of the v6 fixture's game.
+fn payload_v6() -> serde_json::Value {
+    let envelope: serde_json::Value = serde_json::from_str(FIXTURE_V6).unwrap();
+    assert_eq!(envelope["version"], 6);
+    serde_json::from_str(envelope["payload"].as_str().unwrap()).unwrap()
+}
+
+/// Every object key anywhere in `value`.
+fn all_keys(value: &serde_json::Value, keys: &mut std::collections::BTreeSet<String>) {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, child) in map {
+                keys.insert(key.clone());
+                all_keys(child, keys);
+            }
+        }
+        serde_json::Value::Array(items) => items.iter().for_each(|item| all_keys(item, keys)),
+        _ => {}
+    }
+}
+
+#[test]
+fn v6_fixture_is_a_real_v6_generation() {
+    let payload = payload_v6();
+    let campaign = &payload["campaign"];
+    assert_eq!(campaign["balance_settings"]["preset"], "Hard");
+    let history = campaign["run_history"].as_array().unwrap();
+    assert_eq!(history[0]["balance"]["preset"], "Custom");
+    assert!(history.iter().any(|r| r["worker_id"].is_null()));
+    assert!(history.iter().any(|r| r["worker_id"].is_u64()));
+    assert_eq!(campaign["victories"], 14);
+    assert_eq!(campaign["npc"]["awarded"], 52);
+    assert_eq!(campaign["first_clears"].as_array().unwrap().len(), 5);
+    let statuses: Vec<_> = payload["strategy"]["roster"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|r| r["status"].as_str().unwrap())
+        .collect();
+    assert_eq!(statuses, ["Guarding", "Ready", "Deployed"]);
+    let battles = payload["battles"].as_array().unwrap();
+    let settled: Vec<_> = battles.iter().map(|b| b["settled"] == true).collect();
+    assert_eq!(
+        settled,
+        [true, false],
+        "one settled and one live expedition"
+    );
+    assert_eq!(battles[0]["game"]["last_result"]["outcome"], "Victory");
+    assert_eq!(payload["attempt"]["mode"], "Personal");
+    assert_eq!(payload["last_result"]["mode"], "Npc");
+    // No v7 key exists yet: no defender seat on any attempt or report, and
+    // no auto-sell rule or tracked drop anywhere.
+    let mut sites = vec![&payload["attempt"], &payload["last_result"]];
+    for battle in battles {
+        sites.extend([&battle["game"]["attempt"], &battle["game"]["last_result"]]);
+    }
+    for site in sites.into_iter().filter(|site| !site.is_null()) {
+        assert!(site.get("defender").is_none(), "{site}");
+    }
+    let mut keys = std::collections::BTreeSet::new();
+    all_keys(&payload, &mut keys);
+    assert!(!keys.contains("auto_sell") && !keys.contains("drop_ids"));
+}
+
+#[test]
+fn v6_fixture_decodes_with_the_recorded_campaign_state() {
+    let game = fixture_v6();
+    let c = game.campaign();
+    assert_eq!(c.progression_rank(), 14);
+    assert_eq!((c.player.level, c.allowance()), (33, 52));
+    assert_eq!(c.world.cleared, ["MDA", "ROU", "UKR", "HUN"]);
+    let roster: Vec<_> = game
+        .strategy()
+        .roster
+        .iter()
+        .map(|r| (r.id, r.status, r.npc.awarded))
+        .collect();
+    assert_eq!(
+        roster,
+        [
+            (1, RecruitStatus::Guarding, 0),
+            (2, RecruitStatus::Ready, 52),
+            (3, RecruitStatus::Deployed, 52)
+        ]
+    );
+    // The Ready veteran still carries bought gear from the shared stash.
+    let veteran = &game.strategy().roster[1];
+    assert!(veteran.npc.loadout.iter().all(|id| *id > 79));
+    let quality = |id: u64| c.item(id).and_then(|i| i.quality);
+    let locked: Vec<_> = c
+        .items
+        .iter()
+        .filter(|i| i.locked && !i.protected)
+        .collect();
+    let favourites: Vec<_> = c.items.iter().filter(|i| i.favorite).collect();
+    assert_eq!(locked.len(), 1);
+    assert_eq!(quality(locked[0].id), Some(Quality::Epic));
+    assert_eq!(favourites.len(), 1);
+    assert_eq!(quality(favourites[0].id), Some(Quality::Rare));
+    assert_eq!(c.presets.len(), 2);
+    let live = &game.battles()[1];
+    assert!(!live.settled && live.synced_item_index > 8);
+    assert_eq!(live.game().attempt().unwrap().loot, 1);
+    let a = game.attempt().unwrap();
+    assert_eq!(
+        (a.tick, a.progression.rank, a.mode),
+        (423, 14, Mode::Personal)
+    );
+    assert!(!a.enemies.is_empty() && !a.corpses.is_empty() && a.loot_events.len() == 1);
+    let mara = game.last_result().unwrap();
+    assert_eq!((mara.mode, mara.outcome), (Mode::Npc, Outcome::Victory));
+    assert!(!mara.loot_events.is_empty());
+}
+
+#[test]
+fn migrated_v6_fixture_resaves_as_current_version_and_resumes_byte_identically() {
+    resave_and_resume_byte_identically(fixture_v6(), "v6");
+}
+
+/// FNV-1a of the v6 fixture continued for 600 idle ticks (sampled every 50),
+/// recorded on the v6 build at parent commit 3d492cd. Each line is the v5
+/// line for the root attempt plus, per expedition, its settled flag, tick,
+/// hp, RNG state and enemy count. Campaign coins, items and the strategy RNG
+/// are left out: reward and strategy policy may move in waves 2 and 4.
+const V6_CONTINUATION_FNV: u64 = 0x90a0_13c2_877b_6b59;
+
+#[test]
+fn v6_fixture_continues_exactly_as_the_v6_build_did() {
+    let mut g = fixture_v6();
+    let mut trace = String::new();
+    for t in 0..600u32 {
+        g.tick(Input::default());
+        if t % 50 == 49 {
+            let a = g.attempt().unwrap();
+            trace.push_str(&format!(
+                "t{} hp{} loot{} coins{} rng{} level{} enemies{:?}",
+                a.tick,
+                a.hp,
+                a.loot,
+                a.coins,
+                a.rng.state,
+                a.level,
+                a.enemies
+                    .iter()
+                    .map(|e| (e.id, e.hp, e.x.to_bits()))
+                    .collect::<Vec<_>>()
+            ));
+            for battle in g.battles() {
+                let worker = battle.game().attempt();
+                trace.push_str(&format!(
+                    " | b{} settled{} {:?}",
+                    battle.id,
+                    battle.settled,
+                    worker.map(|a| (a.tick, a.hp, a.rng.state, a.enemies.len()))
+                ));
+            }
+            trace.push('\n');
+        }
+    }
+    assert!(
+        !g.battles()[1].settled,
+        "the live expedition outlasts 600 ticks"
+    );
+    let fnv = support::fnv1a(trace.as_bytes());
+    assert_eq!(trace.lines().count(), 12);
+    assert_eq!(fnv, V6_CONTINUATION_FNV, "{trace}");
+}
+
+/// FNV-1a of the first drops after the v6 fixture resumes under the smoke bot
+/// (definition, quality, level and the attempt RNG state after each), recorded
+/// on the v6 build at parent commit 3d492cd. Attempts deployed before v7 keep
+/// this legacy drop path byte-identical (ruling E11); asserted from W2-06.
+const V6_DROP_TRACE_FNV: u64 = 0x2016_774b_b9f6_3c67;
+
+/// The v6 fixture's root attempt and live expedition, resumed under the smoke
+/// bot until the root attempt has dropped three more items.
+fn v6_drop_trace() -> String {
+    let mut g = fixture_v6();
+    let mut seen = [
+        g.attempt().unwrap().loot_events.last().unwrap().item_id,
+        g.battles()[1]
+            .game()
+            .attempt()
+            .unwrap()
+            .loot_events
+            .last()
+            .unwrap()
+            .item_id,
+    ];
+    let mut trace = String::new();
+    let mut root_drops = 0;
+    while root_drops < 3 {
+        let input = smoke_input(&g);
+        g.tick(input);
+        let attempts = [g.attempt(), g.battles()[1].game().attempt()];
+        assert!(
+            attempts[0].is_some(),
+            "the root attempt ended first:\n{trace}"
+        );
+        for (source, attempt) in attempts.into_iter().enumerate() {
+            let Some(a) = attempt else { continue };
+            for event in a.loot_events.iter().filter(|e| e.item_id > seen[source]) {
+                trace.push_str(&format!(
+                    "{source} t{} {} {:?} L{} rng{}\n",
+                    a.tick, event.definition, event.quality, event.level, a.rng.state
+                ));
+                root_drops += usize::from(source == 0);
+            }
+            if let Some(last) = a.loot_events.last() {
+                seen[source] = seen[source].max(last.item_id);
+            }
+        }
+    }
+    trace
+}
+
+#[test]
+fn v6_drop_trace_is_pinned() {
+    let trace = v6_drop_trace();
+    assert!(trace.lines().count() >= 3);
+    assert_eq!(
+        support::fnv1a(trace.as_bytes()),
+        V6_DROP_TRACE_FNV,
+        "{trace}"
+    );
+}
+
+/// FNV-1a of 10,000 quality rolls over seeded (seed, attempt, enemy, rank)
+/// tuples, recorded on the v6 build at parent commit 3d492cd. Pins the keyed
+/// quality roll before its mixer moves to `crate::hash` (W1-09).
+const QUALITY_ROLL_TABLE_FNV: u64 = 0x1f6b_c282_6f97_e583;
+
+#[test]
+fn quality_roll_table_is_pinned() {
+    let catalog = horde_core::quality::catalog();
+    let mut tuples = horde_core::rules::Rng::new(0x5155_414C_5441_424C);
+    let mut counts = [0u32; Quality::ALL.len()];
+    let mut table = String::new();
+    for n in 0..10_000u32 {
+        let seed = tuples.next_u64();
+        let attempt = tuples.next_u64() % 4096;
+        let enemy = tuples.next_u64() % 4096;
+        let rank = if n % 100 == 99 { 1000 + n % 7 } else { n % 41 };
+        let quality = catalog.roll(seed, attempt, enemy, rank);
+        counts[Quality::ALL.iter().position(|q| *q == quality).unwrap()] += 1;
+        table.push_str(quality.name());
+        table.push('\n');
+    }
+    assert_eq!(
+        support::fnv1a(table.as_bytes()),
+        QUALITY_ROLL_TABLE_FNV,
+        "counts {counts:?}"
+    );
+}
+
+/// FNV-1a of the v6 fixture stash: per item, the effective stats the quality
+/// and level scaling produce and the sale value, recorded on the v6 build at
+/// parent commit 3d492cd.
+const V6_STASH_TABLE_FNV: u64 = 0x7868_6fdb_47d0_2c09;
+
+#[test]
+fn v6_stash_item_stats_and_values_are_pinned() {
+    let game = fixture_v6();
+    let c = game.campaign();
+    let mut table = String::new();
+    for item in &c.items {
+        let e = c.effective_item(item.id).unwrap();
+        table.push_str(&format!(
+            "{} {} L{} {:?} dmg{} melee{} armor{} hp{} stamina{} npc_armor{} npc_add{} value{}\n",
+            item.id,
+            item.definition,
+            item.level,
+            item.quality,
+            e.personal.damage,
+            e.personal.melee_damage,
+            e.personal.armor,
+            e.personal.health,
+            e.personal.stamina,
+            e.npc.armor,
+            e.npc.damage_add,
+            c.item_sale_value(item.id).unwrap()
+        ));
+    }
+    assert_eq!(table.lines().count(), c.items.len());
+    assert_eq!(
+        support::fnv1a(table.as_bytes()),
+        V6_STASH_TABLE_FNV,
+        "{table}"
+    );
 }
