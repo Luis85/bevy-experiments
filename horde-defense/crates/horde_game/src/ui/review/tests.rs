@@ -1,5 +1,8 @@
 use super::{fixtures::*, *};
-use crate::ui::Screen;
+use crate::launch::{LaunchConfig, ReviewOptions};
+use crate::review_scenes;
+use crate::ui::{Screen, Tab};
+use bevy_egui::egui;
 use horde_core::survivors::SurvivorId;
 #[test]
 fn loot_replay_is_exclusive_to_explicit_isolated_capture_modes() {
@@ -194,5 +197,212 @@ fn new_journey_victory_and_liberation_fixtures_use_one_real_settlement_each() {
         );
         assert_eq!(f.game.campaign().coins, coins);
         assert_eq!(f.game.campaign().run_history.len(), 1);
+    }
+}
+
+/// The screen (and camp tab, where one is shown) every registered still stages.
+/// Kept here so the UI-free registry never names UI types.
+const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
+    ("menu", Screen::Menu, None),
+    ("menu-female", Screen::Menu, None),
+    ("survivor-select", Screen::SurvivorSelection, None),
+    ("battle-female", Screen::Battle, None),
+    ("progressed-battle", Screen::Battle, None),
+    ("leveled-armory", Screen::Camp, Some(Tab::Armory)),
+    ("quality-armory", Screen::Camp, Some(Tab::Armory)),
+    ("quality-loot", Screen::Battle, None),
+    ("reticle-reload", Screen::Battle, None),
+    ("damage", Screen::Battle, None),
+    ("damage-4x", Screen::Battle, None),
+    ("critical-npc", Screen::Battle, None),
+    ("progressed-peak", Screen::Battle, None),
+    ("world", Screen::Camp, Some(Tab::World)),
+    ("campaign", Screen::Camp, Some(Tab::World)),
+    ("briefing", Screen::Camp, Some(Tab::Briefing)),
+    ("briefing-npc", Screen::Camp, Some(Tab::Briefing)),
+    ("intro", Screen::Battle, None),
+    ("battle", Screen::Battle, None),
+    ("npc", Screen::Battle, None),
+    ("npc-expanded", Screen::Battle, None),
+    ("boss", Screen::Battle, None),
+    ("construction", Screen::Battle, None),
+    ("character", Screen::Camp, Some(Tab::Character)),
+    ("character-max", Screen::Camp, Some(Tab::Character)),
+    ("survivor", Screen::Camp, Some(Tab::Survivor)),
+    ("armory", Screen::Camp, Some(Tab::Armory)),
+    ("skills", Screen::Results, Some(Tab::Skills)),
+    ("skills-survival", Screen::Results, Some(Tab::Skills)),
+    ("skills-ordnance", Screen::Results, Some(Tab::Skills)),
+    ("ordnance", Screen::Battle, None),
+    ("engineering", Screen::Results, None),
+    ("results", Screen::Results, None),
+    ("operations", Screen::Camp, Some(Tab::Operations)),
+    ("settings", Screen::Settings, None),
+    ("history", Screen::History, None),
+    ("history-empty", Screen::History, None),
+    ("arid", Screen::Battle, None),
+    ("tropical", Screen::Battle, None),
+    ("peak", Screen::Battle, None),
+    ("active-camp", Screen::Camp, Some(Tab::World)),
+    ("max-lanes", Screen::Battle, None),
+    ("journey-victory", Screen::Results, None),
+    ("journey-liberated", Screen::Results, None),
+    ("journey-upgrades", Screen::Results, None),
+    ("skills-search", Screen::Results, None),
+];
+
+/// An isolated still review of `scene`, staged exactly as startup stages it.
+fn staged(scene: &str) -> FrontendParts {
+    let mut f = crate::ui::test_support::test_frontend();
+    f.launch = LaunchConfig {
+        scenario: Some(scene.into()),
+        review: Some(ReviewOptions {
+            capture: Some("headless-review-capture.png".into()),
+            exit: true,
+            ..ReviewOptions::default()
+        }),
+        ..LaunchConfig::default()
+    };
+    prepare(&mut f);
+    f
+}
+
+/// One headless 1440x900 frame of the staged screen, drawn as the App draws it.
+fn one_frame(f: &mut FrontendParts) -> egui::FullOutput {
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+    let mut output = ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1440.0, 900.0),
+            )),
+            ..egui::RawInput::default()
+        },
+        |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+    );
+    output.textures_delta.clear();
+    output
+}
+
+/// Every still on `screens` prepares to its EXPECTED screen and tab, draws one
+/// headless frame, and shows its registered primary exactly once in amber.
+fn stills_prepare_headless(screens: &[Screen]) {
+    let mut checked = 0;
+    for &(name, screen, tab) in EXPECTED.iter().filter(|(_, s, _)| screens.contains(s)) {
+        let scene = review_scenes::REVIEW_SCENES
+            .iter()
+            .find(|scene| scene.name == name)
+            .unwrap_or_else(|| panic!("{name} has an expectation row but no registry row"));
+        let mut f = staged(name);
+        assert!(f.screen == screen, "{name} staged {:?}", f.screen);
+        if let Some(tab) = tab {
+            assert_eq!(f.nav.tab, tab, "{name}");
+        }
+        let output = one_frame(&mut f);
+        if let Some(primary) = scene.primary {
+            assert_eq!(
+                crate::ui::tests::text_count(&output, primary),
+                1,
+                "{name}: one {primary:?}"
+            );
+            let color = output
+                .shapes
+                .iter()
+                .find_map(|clipped| crate::ui::tests::text_color(&clipped.shape, primary));
+            assert_eq!(
+                color,
+                Some(crate::art::AMBER),
+                "{name}: {primary:?} is amber"
+            );
+        }
+        checked += 1;
+    }
+    assert!(checked > 0);
+}
+#[test]
+fn stills_menus_and_camp_prepare_headless() {
+    stills_prepare_headless(&[
+        Screen::Menu,
+        Screen::SurvivorSelection,
+        Screen::Camp,
+        Screen::Settings,
+    ]);
+}
+#[test]
+fn stills_battles_prepare_headless() {
+    stills_prepare_headless(&[Screen::Battle]);
+}
+#[test]
+fn stills_results_and_history_prepare_headless() {
+    stills_prepare_headless(&[Screen::Results, Screen::History]);
+}
+#[test]
+fn every_still_has_an_expectation_row() {
+    let rows: Vec<_> = EXPECTED.iter().map(|(name, _, _)| *name).collect();
+    for still in review_scenes::stills() {
+        assert_eq!(
+            rows.iter().filter(|row| **row == still.name).count(),
+            1,
+            "{} needs exactly one EXPECTED row",
+            still.name
+        );
+    }
+    for name in rows {
+        assert_eq!(
+            review_scenes::lookup(name),
+            Some(review_scenes::SceneKind::Still),
+            "{name} is not a registered still"
+        );
+    }
+}
+#[test]
+fn progressed_fixtures_have_a_genuinely_leveled_survivor() {
+    for scene in ["progressed-battle", "leveled-armory"] {
+        let f = staged(scene);
+        let player = &f.game.campaign().player;
+        assert!(player.level >= 10, "{scene}: level {}", player.level);
+        assert_eq!(player.body.values().sum::<u32>(), 3, "{scene}");
+        assert_eq!(player.points, 8, "{scene}: points left after 3 allocations");
+    }
+}
+#[test]
+fn non_practice_review_has_no_practice_status() {
+    for scene in ["menu", "world", "battle", "armory", "results"] {
+        let f = staged(scene);
+        assert!(
+            !f.status.message.contains("Practice"),
+            "{scene}: {:?}",
+            f.status.message
+        );
+    }
+    // Synthetic fixtures keep their own disclaimer.
+    assert!(
+        staged("peak")
+            .status
+            .message
+            .contains("peak-render fixture")
+    );
+    let mut f = crate::ui::test_support::test_frontend();
+    f.launch = LaunchConfig {
+        scenario: Some("construction".into()),
+        practice: true,
+        ..LaunchConfig::default()
+    };
+    prepare(&mut f);
+    assert_eq!(
+        f.status.message,
+        "Practice scenario - progress is isolated from your campaign"
+    );
+}
+#[test]
+fn workshop_names_still_reach_the_workshop() {
+    for scene in ["model-parity-x", "model-workshop"] {
+        let f = staged(scene);
+        assert!(f.screen == Screen::Camp, "{scene}");
+        assert_eq!(f.nav.tab, Tab::World, "{scene}");
     }
 }

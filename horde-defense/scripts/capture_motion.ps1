@@ -5,7 +5,8 @@
 # process logs, cargo log and the isolated LASTLIGHT_SAVE_DIR go to the sibling folder <OutputDirectory>.logs.
 [CmdletBinding()]
 param(
-    [ValidateSet('peak', 'npc', 'battle', 'battle-female', 'intro', 'boss', 'arid', 'tropical', 'ordnance', 'menu', 'menu-female', 'survivor-select', 'progressed-peak', 'max-lanes', 'quality-loot', 'reticle-reload', 'damage', 'damage-4x', 'critical-npc', 'gesture-throws', 'gesture-melee')][string]$Scene = 'peak',
+    # Any scene the binary's --list-scenes marks motion=true.
+    [string]$Scene = 'peak',
     [string]$OutputDirectory = 'target/animation-playtest-review/motion',
     [switch]$ReducedEffects,
     [switch]$NoBuild,
@@ -30,6 +31,13 @@ try {
         if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "No executable at $exe" }
     }
     else { $exe = Get-HordeExecutable -Profile dev }
+    $listing = Invoke-Native -FilePath $exe -Arguments @('--list-scenes') -LogStem (Join-Path $logs 'list-scenes') -TimeoutSeconds 30 -WorkingDirectory $workspace
+    if ($listing.ExitCode -ne 0) { throw "This build has no --list-scenes (exit $($listing.ExitCode)); see $($listing.Err)" }
+    $motionScenes = @(Get-Content -LiteralPath $listing.Out | Where-Object { $_.Trim() -and -not $_.StartsWith('#') } | ForEach-Object {
+            $columns = $_ -split "`t"
+            if ($columns.Count -ge 3 -and $columns[0] -ne 'name' -and $columns[2] -eq 'true') { $columns[0] }
+        })
+    if ($motionScenes -cnotcontains $Scene) { throw "Unknown motion scene `"$Scene`"; run --list-scenes (motion scenes: $($motionScenes -join ', '))" }
     $env:LASTLIGHT_REVIEW_SCREEN = $Scene
     $env:LASTLIGHT_REVIEW_SIZE = '1440x900'
     $env:LASTLIGHT_REVIEW_SCALE = '1.0'

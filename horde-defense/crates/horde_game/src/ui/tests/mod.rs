@@ -334,7 +334,7 @@ fn shape_has_text(shape: &egui::epaint::Shape, label: &str) -> bool {
     }
 }
 /// How many painted text runs read exactly `label`.
-fn text_count(output: &FullOutput, label: &str) -> usize {
+pub(super) fn text_count(output: &FullOutput, label: &str) -> usize {
     fn count(shape: &egui::epaint::Shape, label: &str) -> usize {
         match shape {
             egui::epaint::Shape::Text(text) => usize::from(text.galley.text() == label),
@@ -371,7 +371,7 @@ fn attack_pointer(pos: Pos2, button: PointerButton, pressed: bool) -> Event {
         modifiers: Modifiers::NONE,
     }
 }
-fn text_color(shape: &egui::epaint::Shape, label: &str) -> Option<Color32> {
+pub(super) fn text_color(shape: &egui::epaint::Shape, label: &str) -> Option<Color32> {
     match shape {
         egui::epaint::Shape::Text(text) if text.galley.text() == label => text
             .galley

@@ -18,6 +18,8 @@ pub enum LaunchAction {
     Smoke,
     /// `--help`: print `HELP` and exit.
     Help,
+    /// `--list-scenes`: print the review scene registry as TSV and exit.
+    ListScenes,
     /// `--replay <path>` (`dev` feature): headless replay of a recording.
     #[cfg(feature = "dev")]
     Replay,
@@ -130,13 +132,15 @@ pub const HELP: &str = "\
 Lastlight: Horde Defense
 
 USAGE:
-    horde-defense [--smoke | --help]
+    horde-defense [--smoke | --help | --list-scenes]
     horde-defense [--record <file>]        (`dev` feature)
     horde-defense --replay <file>          (`dev` feature)
 
 OPTIONS:
     --smoke    Validate catalogues, run a headless campaign self-check and exit
     -h, --help Print this help and exit
+    --list-scenes  Print every LASTLIGHT_REVIEW_SCREEN name as TSV and exit
+                   (a build without `review` lists only practice scenes)
     --record <file>  Record commands and per-tick input to a JSONL file (F7 toggles in game)
     --replay <file>  Replay a recording headless, print the final state digest and exit
 
@@ -266,6 +270,12 @@ impl LaunchConfig {
             match arg.to_str() {
                 Some("--smoke") => action = LaunchAction::Smoke,
                 Some("--help" | "-h") => return Ok(Self::help()),
+                Some("--list-scenes") => {
+                    return Ok(Self {
+                        action: LaunchAction::ListScenes,
+                        ..Self::default()
+                    });
+                }
                 Some(flag @ ("--record" | "--replay")) => {
                     #[cfg(feature = "dev")]
                     {
@@ -413,8 +423,16 @@ impl LaunchConfig {
         }
     }
 
-    /// Rejects combinations that would silently produce misleading evidence.
+    /// Rejects unknown scenes and combinations that would silently produce
+    /// misleading evidence.
     fn validate(&self) -> Result<(), String> {
+        if let Some(scene) = &self.scenario
+            && crate::review_scenes::lookup(scene).is_none()
+        {
+            return Err(format!(
+                "Unknown review scene \"{scene}\"; run --list-scenes"
+            ));
+        }
         if let Some(review) = &self.review
             && review.sequence.is_some()
             && (review.perf.report.is_some()
@@ -587,6 +605,41 @@ mod tests {
         assert!(parse(&["--bogus"], &[]).is_err());
         assert!(HELP.contains("LASTLIGHT_REVIEW_SCREEN"));
     }
+    #[test]
+    fn list_scenes_is_a_launch_action() {
+        assert_eq!(
+            parse(&["--list-scenes"], &[]).unwrap().action,
+            LaunchAction::ListScenes
+        );
+        // Listing never depends on (or validates) the scene being launched.
+        assert_eq!(
+            parse(
+                &["--list-scenes"],
+                &[("LASTLIGHT_REVIEW_SCREEN", "camp-hmoe")]
+            )
+            .unwrap()
+            .action,
+            LaunchAction::ListScenes
+        );
+        assert!(HELP.contains("--list-scenes"));
+    }
+    #[test]
+    fn unknown_practice_scene_is_rejected() {
+        let practice = |scene| {
+            parse(
+                &[],
+                &[
+                    ("LASTLIGHT_PRACTICE", "1"),
+                    ("LASTLIGHT_REVIEW_SCREEN", scene),
+                ],
+            )
+        };
+        assert!(practice("construction").is_ok());
+        assert_eq!(
+            practice("camp-hmoe").unwrap_err(),
+            "Unknown review scene \"camp-hmoe\"; run --list-scenes"
+        );
+    }
     #[cfg(feature = "dev")]
     #[test]
     fn record_and_replay_flags_take_a_path() {
@@ -632,6 +685,28 @@ mod tests {
         assert_eq!(review.perf.frames, 1800);
         assert!(c.reviewing("damage") && !c.reviewing("battle"));
         assert!(c.perf().is_none(), "no report path, no measurement");
+    }
+    #[cfg(feature = "review")]
+    #[test]
+    fn unknown_review_scene_is_rejected() {
+        let review = |scene| parse(&[], &[("LASTLIGHT_REVIEW_SCREEN", scene)]);
+        assert_eq!(
+            review("camp-hmoe").unwrap_err(),
+            "Unknown review scene \"camp-hmoe\"; run --list-scenes"
+        );
+        assert!(
+            review("model-parity-").is_err(),
+            "a workshop prefix needs an id"
+        );
+        assert!(review("camp").is_err(), "a screen name is not a scene");
+        for known in [
+            "battle",
+            "npc-stutter",
+            "gesture-melee",
+            "model-parity-rook",
+        ] {
+            assert!(review(known).is_ok(), "{known}");
+        }
     }
     #[cfg(feature = "review")]
     #[test]

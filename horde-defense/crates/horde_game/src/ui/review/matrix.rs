@@ -23,7 +23,9 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
     if let Some(scale) = launch.review().and_then(|r| r.scale) {
         f.settings.scale = scale;
     }
-    f.status.message = "Practice scenario - progress is isolated from your campaign".into();
+    if launch.practice {
+        f.status.message = "Practice scenario - progress is isolated from your campaign".into();
+    }
     if screen == "menu" {
         return;
     }
@@ -130,6 +132,9 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         return;
     }
     if matches!(screen.as_str(), "progressed-battle" | "leveled-armory") {
+        // Before the clears: their levels grant the character points that
+        // prepare_progression invests (without the flag the third allocation fails).
+        enable_legacy_ledgers(&mut f.game);
         let count = f
             .game
             .campaign()
@@ -355,7 +360,15 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         }
         "battle" | "battle-female" | "progressed-battle" | "construction" | "ordnance" | "npc"
         | "boss" | "results" | "arid" | "tropical" => prepare_battle(f, &screen),
-        _ => f.nav.tab = Tab::World,
+        // Launch validation admits only registered names, so only the
+        // workshop scenes reach this arm; workshop.rs draws them.
+        _ => {
+            debug_assert!(
+                crate::review_scenes::is_workshop(&screen),
+                "registry admitted {screen}"
+            );
+            f.nav.tab = Tab::World;
+        }
     }
     f.game.set_paused(true);
 }

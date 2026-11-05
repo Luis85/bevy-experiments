@@ -116,12 +116,18 @@ pub(super) fn prepare_journey_victory(f: &mut FrontendParts, liberated: bool) {
     f.screen = Screen::Results;
 }
 
+/// These pre-existing advanced view fixtures explicitly retain legacy ledgers
+/// (character points, body ranks). Idempotent; it must run before any staged
+/// clear whose levels should grant those points.
+pub(super) fn enable_legacy_ledgers(game: &mut Game) {
+    game.staging().campaign().legacy_features = true;
+}
+
 pub(super) fn prepare_progression(game: &mut Game) {
     // Explicit screenshot entitlements; use model methods for every owned item,
     // skill and point investment. This does not represent earned campaign income.
+    enable_legacy_ledgers(game);
     let campaign = game.staging().campaign();
-    // These pre-existing advanced view fixtures explicitly retain legacy ledgers.
-    campaign.legacy_features = true;
     campaign.coins = 1800;
     for stage in 0..5 {
         campaign.first_clear(stage, Mode::Personal);

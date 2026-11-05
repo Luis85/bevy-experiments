@@ -17,6 +17,7 @@ mod player_model;
 mod profile;
 #[cfg(test)]
 mod repo_checks;
+mod review_scenes;
 #[cfg(feature = "review")]
 mod review_tools;
 mod runner;
@@ -58,6 +59,13 @@ fn main() -> AppExit {
     };
     if config.action == launch::LaunchAction::Help {
         print!("{}", launch::HELP);
+        return AppExit::Success;
+    }
+    if config.action == launch::LaunchAction::ListScenes {
+        // The capture scripts read scene names only from this listing.
+        for line in review_scenes::list_lines(cfg!(feature = "review")) {
+            println!("{line}");
+        }
         return AppExit::Success;
     }
     logging::install_panic_hook(config.log_directory());
