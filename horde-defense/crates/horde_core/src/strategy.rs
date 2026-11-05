@@ -1225,6 +1225,30 @@ mod tests {
         assert_ne!(starter, 1);
         assert!(s.validate(&c).is_ok());
     }
+    /// CHARACTERISATION TEST (LE-1, W1-18): it pins today's defect and passes
+    /// on the old code by construction. The Campaign-level batch filter
+    /// (`Campaign::sell_quote` / `Campaign::sell_unprotected`) cannot see
+    /// recruit loadouts, so it quotes and sells a rifle a recruit has equipped,
+    /// leaving the strategic state invalid. W1-20 replaces this test with
+    /// `strict_sell_rejects_recruit_equipped_item`.
+    #[test]
+    fn old_campaign_filter_sells_recruit_equipped_item() {
+        let mut c = liberated(1);
+        let mut s = StrategyState::default();
+        let country = c.world.cleared[0].clone();
+        let id = s.recruit(&mut c, &country).unwrap();
+        let rifle = c.add_item(4).unwrap();
+        s.equip_recruit(&c, id, rifle).unwrap();
+        assert_eq!(s.roster[0].npc.loadout[0], rifle);
+        assert!(s.validate(&c).is_ok());
+        // The old filter counts the recruit-equipped rifle as an extra.
+        assert_eq!(c.sell_quote(), 22);
+        assert_eq!(c.sell_unprotected().unwrap(), 22);
+        assert!(c.item(rifle).is_none());
+        // The recruit still references the sold rifle.
+        assert_eq!(s.roster[0].npc.loadout[0], rifle);
+        assert!(s.validate(&c).is_err());
+    }
     #[test]
     fn recruited_backgrounds_and_policies_are_individual_and_training_preserves_creation() {
         let mut c = liberated(1);
