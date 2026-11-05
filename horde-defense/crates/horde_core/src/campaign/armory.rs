@@ -292,21 +292,25 @@ impl Campaign {
         }
         Ok(loadout)
     }
+    /// The mode owner's loadout the main run holds. A recruit takeover
+    /// (`reserved_recruit` Some) reserves the recruit's items through
+    /// `reserved_items` instead, so Mara's idle loadout stays free.
+    fn main_run_loadout(&self) -> Option<[u64; 4]> {
+        match self.reserved {
+            Some(Mode::Personal) => Some(self.player.loadout),
+            Some(Mode::Npc) if self.reserved_recruit.is_none() => Some(self.npc.loadout),
+            Some(Mode::Npc) | None => None,
+        }
+    }
     pub fn item_reserved(&self, id: u64) -> bool {
         self.reserved_items.contains(&id)
-            || match self.reserved {
-                Some(Mode::Personal) => self.player.loadout.contains(&id),
-                Some(Mode::Npc) => self.npc.loadout.contains(&id),
-                None => false,
-            }
+            || self
+                .main_run_loadout()
+                .is_some_and(|loadout| loadout.contains(&id))
     }
     pub fn reserve_external(&mut self, loadout: [u64; 4]) -> Result<(), String> {
         self.validate_loadout(loadout)?;
-        let main = match self.reserved {
-            Some(Mode::Personal) => Some(self.player.loadout),
-            Some(Mode::Npc) => Some(self.npc.loadout),
-            None => None,
-        };
+        let main = self.main_run_loadout();
         if loadout.iter().any(|id| {
             self.reserved_items.contains(id) || main.is_some_and(|items| items.contains(id))
         }) {

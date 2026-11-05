@@ -79,6 +79,17 @@ pub struct Campaign {
     pub kills_since_loot: u32,
     #[serde(default)]
     pub world: crate::world::WorldProgress,
+    /// The defender chosen for the next defense. None means the defender of
+    /// the last report. A recruit must be on the roster; always None in a
+    /// worker game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_defender: Option<crate::defenders::DefenderId>,
+    /// The recruit defending the main run, only while `reserved` is
+    /// `Some(Npc)` for that takeover. While it is Some, Mara's loadout is not
+    /// reserved (the recruit's items are in `reserved_items`). Always None in
+    /// a worker game.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reserved_recruit: Option<u64>,
 }
 impl Default for Campaign {
     fn default() -> Self {
@@ -182,6 +193,8 @@ impl Default for Campaign {
             reserved_items: vec![],
             kills_since_loot: 0,
             world: crate::world::WorldProgress::default(),
+            next_defender: None,
+            reserved_recruit: None,
         }
     }
 }
@@ -241,6 +254,8 @@ impl Campaign {
             reserved_items: self.reserved_items.clone(),
             kills_since_loot: self.kills_since_loot,
             world: self.world.clone(),
+            next_defender: None,
+            reserved_recruit: None,
         }
     }
     pub fn choose_survivor(&mut self, id: crate::survivors::SurvivorId) -> Result<(), String> {
@@ -408,6 +423,17 @@ mod tests {
     /// The summed catalogue price of the named skill nodes.
     fn price(ids: &[&str]) -> u64 {
         ids.iter().map(|id| skills().node(id).unwrap().price).sum()
+    }
+    #[test]
+    fn clone_for_worker_clears_next_defender_and_reserved_recruit() {
+        let c = Campaign {
+            next_defender: Some(crate::defenders::DefenderId::Recruit(2)),
+            reserved_recruit: Some(2),
+            ..Campaign::default()
+        };
+        let worker = c.clone_for_worker();
+        assert_eq!(worker.next_defender, None);
+        assert_eq!(worker.reserved_recruit, None);
     }
     #[test]
     fn authored_purchases_stack_and_reject_unmet_prerequisites_without_spending() {

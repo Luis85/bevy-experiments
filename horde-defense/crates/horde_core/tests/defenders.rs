@@ -6,7 +6,10 @@
 //! with the Defending pre-checks in `Game::apply`; and (W1-13) the saved
 //! `"defender"` seat on `Attempt` and `Report` with their `defender()`
 //! accessors; and (W1-15) the recruit seat and appearance stamped on worker
-//! attempts at both deploy sites, with the worker-seat save validation.
+//! attempts at both deploy sites, with the worker-seat save validation; and
+//! (W1-16) the saved defender schema fields `Campaign.next_defender` and
+//! `reserved_recruit`, `ParallelBattle.summary`, `StrategyState.folded_outcomes`
+//! and `Recruit.containments`, all skipped at their defaults.
 mod support;
 use horde_core::{
     campaign::{Campaign, NpcTraining},
@@ -16,7 +19,7 @@ use horde_core::{
         DefenderBlocker, DefenderId, DefenderSeat, OriginTrait, RECRUIT_IDENTITIES,
         recruit_identity, resolve,
     },
-    sim::{Game, ParallelBattle, SAVE_VERSION, SaveError},
+    sim::{ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError},
     skill_catalog::skills,
     strategy::RecruitStatus,
     survivors::Appearance,
@@ -712,4 +715,143 @@ fn worker_victory_still_credits_the_worker_npc_copy() {
     assert_eq!(settled.game().campaign().npc.victories, before + 1);
     assert_eq!(roster_victories(&g), before + 1);
     assert_eq!(status(&g, id), RecruitStatus::Ready);
+}
+
+/// Every saved location of a W1-16 field in `value` that is present, as
+/// `path.key`, over the root game and each worker game.
+fn defender_schema_keys(value: &serde_json::Value) -> Vec<String> {
+    fn check(object: &serde_json::Value, path: String, key: &str, found: &mut Vec<String>) {
+        if object.as_object().is_some_and(|o| o.contains_key(key)) {
+            found.push(format!("{path}.{key}"));
+        }
+    }
+    fn game(value: &serde_json::Value, at: &str, found: &mut Vec<String>) {
+        for key in ["next_defender", "reserved_recruit"] {
+            check(&value["campaign"], format!("{at}campaign"), key, found);
+        }
+        let strategy = &value["strategy"];
+        check(strategy, format!("{at}strategy"), "folded_outcomes", found);
+        let roster = strategy["roster"].as_array().into_iter().flatten();
+        for (n, recruit) in roster.enumerate() {
+            let path = format!("{at}strategy.roster[{n}]");
+            check(recruit, path, "containments", found);
+        }
+        let battles = value["battles"].as_array().into_iter().flatten();
+        for (n, battle) in battles.enumerate() {
+            check(battle, format!("{at}battles[{n}]"), "summary", found);
+            game(&battle["game"], &format!("{at}battles[{n}].game."), found);
+        }
+    }
+    let mut found = Vec::new();
+    game(value, "", &mut found);
+    found
+}
+
+#[test]
+fn defender_fields_serialize_only_when_set() {
+    let mut personal = deployed(Mode::Personal);
+    personal.apply(&Command::Withdraw).unwrap();
+    let mut mara = deployed(Mode::Npc);
+    mara.apply(&Command::Withdraw).unwrap();
+    let (mut expedition, country, id) = game_with_alex();
+    let live = expedition.deploy_survivor(id, &country, 0).unwrap();
+    let mut settled = expedition.clone();
+    settled.recall_survivor(live).unwrap();
+    assert!(battle(&settled, live).settled);
+    for (name, game) in [
+        ("fresh", &Game::default()),
+        ("personal report", &personal),
+        ("mara report", &mara),
+        ("live expedition", &expedition),
+        ("settled expedition", &settled),
+    ] {
+        let saved = serde_json::to_value(game).unwrap();
+        assert_eq!(defender_schema_keys(&saved), Vec::<String>::new(), "{name}");
+    }
+
+    let summary = ExpeditionSummary {
+        outcome: Some(Outcome::Withdrawal),
+        stages_cleared: 1,
+        liberated: true,
+        fronts: vec!["front-a".into(), "front-b".into()],
+        coins: 40,
+        loot_count: 2,
+        acknowledged: false,
+    };
+    let campaign = settled.staging().campaign();
+    campaign.next_defender = Some(DefenderId::Recruit(id));
+    campaign.reserved_recruit = Some(id);
+    settled.staging().strategy().folded_outcomes = 3;
+    settled.staging().strategy().roster[0].containments = 2;
+    settled.staging().battles()[0].summary = Some(summary.clone());
+    let saved = serde_json::to_value(&settled).unwrap();
+    assert_eq!(
+        defender_schema_keys(&saved),
+        [
+            "campaign.next_defender",
+            "campaign.reserved_recruit",
+            "strategy.folded_outcomes",
+            "strategy.roster[0].containments",
+            "battles[0].summary",
+        ]
+    );
+    assert_eq!(saved["campaign"]["next_defender"], json!({"Recruit": id}));
+    assert_eq!(saved["campaign"]["reserved_recruit"], json!(id));
+    assert_eq!(saved["strategy"]["folded_outcomes"], json!(3));
+    assert_eq!(saved["strategy"]["roster"][0]["containments"], json!(2));
+    let loaded: Game = serde_json::from_value(saved.clone()).unwrap();
+    assert_eq!(
+        loaded.campaign().next_defender,
+        Some(DefenderId::Recruit(id))
+    );
+    assert_eq!(loaded.campaign().reserved_recruit, Some(id));
+    assert_eq!(loaded.strategy().folded_outcomes, 3);
+    assert_eq!(loaded.strategy().roster[0].containments, 2);
+    assert_eq!(battle(&loaded, live).summary, Some(summary));
+    assert_eq!(serde_json::to_value(&loaded).unwrap(), saved);
+
+    // The summary has a container default: missing keys read as neutral.
+    let mut sparse = saved;
+    sparse["battles"][0]["summary"] = json!({"coins": 7});
+    let loaded: Game = serde_json::from_value(sparse).unwrap();
+    assert_eq!(
+        battle(&loaded, live).summary,
+        Some(ExpeditionSummary {
+            coins: 7,
+            ..ExpeditionSummary::default()
+        })
+    );
+}
+
+/// During a takeover `reserved == Some(Npc)` names the recruit's run, so
+/// only the recruit's items (in `reserved_items`) are reserved: Mara's idle
+/// loadout stays free for sale checks and other deployments.
+#[test]
+fn takeover_does_not_reserve_maras_idle_loadout() {
+    let mut game = liberated_game(1);
+    let country = game.campaign().world.cleared[0].clone();
+    let id = recruit(&mut game, &country);
+    let recruit_loadout = game.strategy().roster[0].npc.loadout;
+    let mara_loadout = game.campaign().npc.loadout;
+    let campaign = game.staging().campaign();
+    campaign.reserve_external(recruit_loadout).unwrap();
+    campaign.reserved = Some(Mode::Npc);
+    campaign.reserved_recruit = Some(id);
+    for item in mara_loadout {
+        assert!(!campaign.item_reserved(item), "Mara's item {item}");
+    }
+    for item in recruit_loadout {
+        assert!(campaign.item_reserved(item), "recruit item {item}");
+    }
+    // Another deployment may take Mara's idle loadout during the takeover.
+    let mut other = campaign.clone();
+    other.reserve_external(mara_loadout).unwrap();
+    assert!(mara_loadout.iter().all(|item| other.item_reserved(*item)));
+
+    // Without a recruit in the seat, Some(Npc) is Mara's own run.
+    campaign.reserved_recruit = None;
+    for item in mara_loadout {
+        assert!(campaign.item_reserved(item), "Mara's item {item}");
+    }
+    assert!(campaign.clone().reserve_external(mara_loadout).is_err());
 }

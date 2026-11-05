@@ -786,6 +786,24 @@ pub struct ParallelBattle {
     pub loadout: [u64; 4],
     #[serde(default)]
     pub country_operation: bool,
+    /// The settled expedition's outcome notice. None while it runs, and for
+    /// battles settled before save version 7 (they are never announced).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<ExpeditionSummary>,
+}
+/// What a settled expedition achieved, kept until the player acknowledges
+/// it. `outcome` and `acknowledged` imply the battle is settled; it lists at
+/// most 32 newly opened `fronts`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ExpeditionSummary {
+    pub outcome: Option<Outcome>,
+    pub stages_cleared: u32,
+    pub liberated: bool,
+    pub fronts: Vec<String>,
+    pub coins: u64,
+    pub loot_count: u32,
+    pub acknowledged: bool,
 }
 impl Default for Game {
     fn default() -> Self {

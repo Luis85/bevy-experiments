@@ -54,6 +54,10 @@ pub struct Recruit {
     pub origin: String,
     pub npc: Npc,
     pub status: RecruitStatus,
+    /// Outbreaks this recruit contained while guarding. Saved because the
+    /// guard assignment that saw them is removed.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub containments: u32,
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct GuardAssignment {
@@ -98,6 +102,10 @@ pub struct StrategyState {
     pub next_outbreak_id: u64,
     pub peak_freed: usize,
     pub log: Vec<String>,
+    /// Settled expedition outcomes dropped unacknowledged when the battle
+    /// list was pruned (saturating).
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub folded_outcomes: u32,
 }
 impl Default for StrategyState {
     fn default() -> Self {
@@ -111,6 +119,7 @@ impl Default for StrategyState {
             next_outbreak_id: 1,
             peak_freed: 0,
             log: vec![],
+            folded_outcomes: 0,
         }
     }
 }
@@ -349,6 +358,7 @@ impl StrategyState {
             origin: country_id.into(),
             npc,
             status: RecruitStatus::Ready,
+            containments: 0,
         });
         self.peak_freed = self.peak_freed.max(campaign.liberated_count() as usize);
         self.note(format!(

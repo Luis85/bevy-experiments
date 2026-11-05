@@ -152,6 +152,7 @@ impl Game {
             settled: false,
             loadout: npc.loadout,
             country_operation: false,
+            summary: None,
         });
         while self.battles.len() > 32 {
             if let Some(n) = self.battles.iter().position(|b| b.settled) {
