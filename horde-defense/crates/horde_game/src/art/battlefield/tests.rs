@@ -50,11 +50,19 @@ fn options(textures: ArtTextures) -> RenderOptions {
 /// Paints the battlefield of `game` and tessellates it: the primitives whose
 /// clip is the arena (the battlefield painter's own).
 fn battlefield_primitives(game: &Game, textures: ArtTextures) -> Vec<ClippedPrimitive> {
+    battlefield_primitives_in(game, textures, arena())
+}
+
+/// [`battlefield_primitives`] in any arena `rect`.
+fn battlefield_primitives_in(
+    game: &Game,
+    textures: ArtTextures,
+    rect: Rect,
+) -> Vec<ClippedPrimitive> {
     let a = game.attempt().expect("fixture battle");
     let motion = SceneAnimation::sample(a, false);
     let view = BattleViewModel::build(a, motion, SceneBlend::NONE, false);
     let ctx = egui::Context::default();
-    let rect = arena();
     let mut output = ctx.run_ui(Default::default(), |ui| {
         let painter = ui.painter().with_clip_rect(rect);
         battlefield(&painter, rect, &view, a, [10.0, 5.0], options(textures));
@@ -64,6 +72,104 @@ fn battlefield_primitives(game: &Game, textures: ArtTextures) -> Vec<ClippedPrim
         .into_iter()
         .filter(|primitive| primitive.clip_rect == rect)
         .collect()
+}
+
+/// Mesh vertices over `primitives` (callbacks have none).
+fn vertices(primitives: &[ClippedPrimitive]) -> usize {
+    primitives
+        .iter()
+        .map(|clipped| match &clipped.primitive {
+            egui::epaint::Primitive::Mesh(mesh) => mesh.vertices.len(),
+            egui::epaint::Primitive::Callback(_) => 0,
+        })
+        .sum()
+}
+
+/// The `PERF_BUDGET.json` vertex gate of `scene`.
+fn vertex_gate(scene: &str) -> usize {
+    crate::perf_budget::BATTLEFIELD_VERTICES_MAX
+        .iter()
+        .find(|(name, _)| *name == scene)
+        .map(|(_, max)| *max)
+        .unwrap_or_else(|| panic!("{scene} has a vertex gate"))
+}
+
+/// The battlefield stays within its measured vertex gates (W1-51): the
+/// progressed-peak fixture, and the stress fixture as staged and with both
+/// corpse draw caps full (5000 records, 64 of them collapsing).
+#[test]
+fn battlefield_vertices_stay_within_the_measured_gates() {
+    let progressed = horde_core::sim::maximum_progression_render_fixture().expect("fixture");
+    let painted = vertices(&battlefield_primitives(&progressed, textures()));
+    let gate = vertex_gate("progressed-peak");
+    assert!(
+        painted <= gate,
+        "progressed-peak paints {painted} vertices, gate {gate}"
+    );
+    let mut stress = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    let staged = vertices(&battlefield_primitives(&stress, textures()));
+    stage_bodies(
+        &mut stress,
+        5_000,
+        crate::perf_budget::CORPSES_COLLAPSING_DRAWN,
+    );
+    let full = vertices(&battlefield_primitives(&stress, textures()));
+    let gate = vertex_gate("stress");
+    assert!(full > staged, "the full corpse caps add vertices");
+    for (case, painted) in [("staged", staged), ("full corpse caps", full)] {
+        assert!(
+            painted <= gate,
+            "stress {case} paints {painted} vertices, gate {gate}"
+        );
+    }
+}
+
+/// The measurement behind `PERF_BUDGET.json` `evidence.egui_measured`: the
+/// battlefield's largest primitive and vertex counts over every 2nd tick of a
+/// sim run from each perf fixture (warmup_frames + run.frames ticks), at the
+/// normal and small arenas. Several minutes in a debug build; prints only.
+#[test]
+#[ignore = "W1-51 measurement, run with --ignored --nocapture"]
+#[allow(clippy::print_stdout, reason = "prints the measurement it exists for")]
+fn measure_battlefield_egui_load() {
+    let small = Rect::from_min_size(pos2(24.0, 124.0), vec2(729.8, 310.5));
+    for (scene, ticks) in [
+        ("peak", 780),
+        ("progressed-peak", 780),
+        ("stress", 1980),
+        ("stress-5000-corpses", 1980),
+    ] {
+        for (size, rect) in [("normal", arena()), ("small", small)] {
+            let mut game = match scene {
+                "peak" => horde_core::sim::peak_render_fixture(),
+                "progressed-peak" => horde_core::sim::maximum_progression_render_fixture(),
+                _ => horde_core::sim::stress_render_fixture(),
+            }
+            .expect("perf fixture");
+            if scene == "stress-5000-corpses" {
+                stage_bodies(
+                    &mut game,
+                    5_000,
+                    crate::perf_budget::CORPSES_COLLAPSING_DRAWN,
+                );
+            }
+            game.set_paused(false);
+            game.attempt_mut().expect("fixture battle").paused = false;
+            let (mut primitives_max, mut vertices_max) = (0, 0);
+            for tick in 0..=ticks {
+                if tick % 2 == 0 {
+                    let primitives = battlefield_primitives_in(&game, textures(), rect);
+                    primitives_max = primitives_max.max(primitives.len());
+                    vertices_max = vertices_max.max(vertices(&primitives));
+                }
+                game.tick(horde_core::sim::Input::default());
+                if game.attempt().is_none() {
+                    break;
+                }
+            }
+            println!("W1-51 {scene} {size}: primitives {primitives_max} vertices {vertices_max}");
+        }
+    }
 }
 
 /// Pin of the batched layers: the battlefield costs at most

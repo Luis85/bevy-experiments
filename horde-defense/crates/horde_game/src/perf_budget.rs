@@ -31,14 +31,18 @@ pub const CORPSES_COLLAPSING_DRAWN: usize = 64;
 /// Longest any battlefield effect stays on screen.
 pub const FX_LIFETIME_MAX_SECONDS: f64 = 2.0;
 
-/// Hard egui ceilings for the battlefield painter, tightened to measured x 1.25
-/// once the batched meshes land, never above these.
+/// egui gates for the battlefield painter: the measured maximum x 1.25
+/// (W1-51, `PERF_BUDGET.json` `evidence.egui_measured`), never above the
+/// W1-32 hard ceilings (48 primitives; 40,000 / 72,000 vertices). Live runs
+/// reach 47 primitives (stress), so 47 x 1.25 keeps the 48 ceiling.
 pub const BATTLEFIELD_PRIMITIVES_MAX: usize = 48;
 /// Most extra primitives 400 enemies may cost over 52.
 pub const PRIMITIVE_GROWTH_52_TO_400_MAX: usize = 2;
-/// Battlefield vertex ceilings per measured scene.
+/// Battlefield vertex gates per measured scene: progressed-peak measured
+/// 37,940 (x 1.25 is above its 40,000 ceiling), stress 48,878 with the corpse
+/// caps full (x 1.25 = 61,097.5).
 pub const BATTLEFIELD_VERTICES_MAX: &[(&str, usize)] =
-    &[("progressed-peak", 40_000), ("stress", 72_000)];
+    &[("progressed-peak", 40_000), ("stress", 61_098)];
 
 /// Whole-number presentation caps, keyed as in `PERF_BUDGET.json` `caps`
 /// (whose one float, `fx_lifetime_max_seconds`, is `FX_LIFETIME_MAX_SECONDS`).
@@ -201,6 +205,75 @@ mod tests {
         }
         assert_eq!(CPU_FRAME_P99_MS_MAX, 10.0);
         assert_eq!(FRAMES_OVER_50MS_MAX, 0);
+    }
+
+    /// W1-51: every egui gate is its measured maximum x 1.25, rounded up, and
+    /// never above the W1-32 hard ceiling, so a re-measurement moves the
+    /// recorded evidence and the gate together.
+    #[test]
+    fn egui_gates_are_measured_x_1_25_capped_at_the_w1_32_ceilings() {
+        const CEILING_PRIMITIVES: usize = 48;
+        const CEILING_VERTICES: &[(&str, usize)] =
+            &[("progressed-peak", 40_000), ("stress", 72_000)];
+        let json = budget();
+        let measured = "/evidence/egui_measured";
+        let factor = number(&json, &format!("{measured}/factor"));
+        assert_eq!(factor, 1.25);
+        let gate = |measured: usize, ceiling: usize| {
+            ((measured as f64 * factor).ceil() as usize).min(ceiling)
+        };
+        assert_eq!(
+            whole(
+                &json,
+                &format!("{measured}/ceilings/battlefield_primitives_max")
+            ),
+            CEILING_PRIMITIVES
+        );
+        assert_table_matches(
+            CEILING_VERTICES,
+            object(
+                &json,
+                &format!("{measured}/ceilings/battlefield_vertices_max"),
+            ),
+            "ceilings/battlefield_vertices_max",
+        );
+
+        let primitives = whole(&json, &format!("{measured}/battlefield_primitives_max"));
+        let by_scene = object(
+            &json,
+            &format!("{measured}/battlefield_primitives_by_scene"),
+        );
+        assert_eq!(
+            by_scene.values().filter_map(Value::as_u64).max(),
+            Some(primitives as u64),
+            "the primitive maximum is the largest scene"
+        );
+        assert_eq!(
+            BATTLEFIELD_PRIMITIVES_MAX,
+            gate(primitives, CEILING_PRIMITIVES)
+        );
+
+        let vertices = object(&json, &format!("{measured}/battlefield_vertices_max"));
+        assert_eq!(
+            keys(vertices),
+            BATTLEFIELD_VERTICES_MAX
+                .iter()
+                .map(|(scene, _)| *scene)
+                .collect()
+        );
+        for (scene, max) in BATTLEFIELD_VERTICES_MAX {
+            let ceiling = CEILING_VERTICES
+                .iter()
+                .find(|(name, _)| name == scene)
+                .map(|(_, ceiling)| *ceiling)
+                .unwrap_or_else(|| panic!("{scene}: no W1-32 vertex ceiling"));
+            let scene_max = whole(
+                &json,
+                &format!("{measured}/battlefield_vertices_max/{scene}"),
+            );
+            assert_eq!(*max, gate(scene_max, ceiling), "{scene}: vertex gate");
+            assert!(*max <= ceiling, "{scene}: above the W1-32 ceiling");
+        }
     }
 
     #[test]

@@ -148,7 +148,7 @@
   "egui": {
     "battlefield_primitives_max": 48,
     "primitive_growth_52_to_400_max": 2,
-    "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 72000 }
+    "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 61098 }
   },
   "save_clone": {
     "items_min": 1000,
@@ -175,6 +175,19 @@
         "peak": { "normal": { "before": 2.5215, "after": 2.6351 }, "small": { "before": 2.3551, "after": 2.4706 } },
         "progressed-peak": { "normal": { "before": 4.7029, "after": 4.6447 }, "small": { "before": 4.4162, "after": 4.4801 } }
       }
+    },
+    "egui_measured": {
+      "note": "W1-51: the egui gates are min(W1-32 ceiling, ceil(measured max x factor)); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn). Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
+      "commit": "a93e340",
+      "factor": 1.25,
+      "ceilings": {
+        "battlefield_primitives_max": 48,
+        "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 72000 }
+      },
+      "battlefield_primitives_max": 47,
+      "battlefield_primitives_by_scene": { "peak": 29, "progressed-peak": 45, "stress": 47 },
+      "battlefield_vertices_max": { "progressed-peak": 37940, "stress": 48878 },
+      "battlefield_vertices_by_scene": { "peak": 32667, "progressed-peak": 37940, "stress": 46801, "stress-5000-corpses": 48878 }
     }
   },
   "decisions": {
