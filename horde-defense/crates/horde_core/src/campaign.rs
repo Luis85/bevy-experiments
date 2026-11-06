@@ -1124,4 +1124,23 @@ mod tests {
         assert!(strategy.sell_extras(&mut c).is_err());
         assert_eq!(c, before);
     }
+    /// LE section 1: the Campaign-level bulk sale keeps its in-battle `Err`,
+    /// typed `SaleBlocked(InBattle)`; the strategy wrapper keeps `Ok(0)`.
+    #[test]
+    fn sell_unprotected_in_battle_is_typed_sale_blocked_in_battle() {
+        let mut c = Campaign::default();
+        c.add_item(4).unwrap();
+        c.reserve(Mode::Personal).unwrap();
+        let before = c.clone();
+        assert_eq!(
+            c.sell_unprotected(&SaleRefs::empty()),
+            Err(crate::command::CommandError::SaleBlocked(
+                SaleBlock::InBattle
+            ))
+        );
+        assert_eq!(c, before, "a refused bulk sale changes nothing");
+        let mut strategy = crate::strategy::StrategyState::default();
+        assert_eq!(strategy.sell_extras(&mut c), Ok(0));
+        assert_eq!(c, before);
+    }
 }

@@ -66,8 +66,12 @@ impl Campaign {
             .coins
     }
     /// Sells every eligible item, or nothing when the wallet would overflow.
+    /// While a defender is deployed it answers `SaleBlocked(InBattle)`
+    /// (`StrategyState::sell_extras` keeps its `Ok(0)` in front of this).
     pub(crate) fn sell_unprotected(&mut self, refs: &SaleRefs) -> Result<u64, CommandError> {
-        self.preparation()?;
+        if self.reserved.is_some() {
+            return Err(CommandError::SaleBlocked(SaleBlock::InBattle));
+        }
         let plan = self.plan_batch(refs, SaleOrigin::Player, self.owned_item_ids());
         self.execute_plan(&plan)
     }
