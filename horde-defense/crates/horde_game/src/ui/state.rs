@@ -121,6 +121,10 @@ pub(crate) struct BattleUi {
     pub(super) pending_attack_aims: AttackAims,
     pub(super) arena_rect: Option<Rect>,
     pub(super) effects_rect: Option<Rect>,
+    /// The worker observer window's fitted field, written each frame the
+    /// window draws a live attempt and cleared when it closes (presentation
+    /// only; review captures read it).
+    pub(super) observer_arena_rect: Option<Rect>,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
@@ -143,6 +147,7 @@ impl BattleUi {
             pending_attack_aims: AttackAims::default(),
             arena_rect: None,
             effects_rect: None,
+            observer_arena_rect: None,
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,

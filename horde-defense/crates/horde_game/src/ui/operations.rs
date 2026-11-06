@@ -1,7 +1,7 @@
 //! Operations presentation. Game changes are queued typed intents.
 use super::{UiCtx, chrome, damage, loot, muted, reticle};
 use crate::art::{self, AMBER, RED};
-use bevy_egui::egui::{self, Rect, Sense, vec2};
+use bevy_egui::egui::{self, Sense, vec2};
 use view::country_name;
 mod view;
 use horde_core::{
@@ -273,8 +273,11 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         ),
                         Sense::click(),
                     );
+                    // Uniform zoom-to-fit in the observer box: no hint band or
+                    // headroom, the effects clip is the box itself.
                     let effects_clip=r;
-                    let r=observer_clearing(r,a.lane_count,a.width_yards);
+                    let r=art::fit_field(r,r,a.lane_count,a.width_yards).rect;
+                    f.battle.observer_arena_rect=Some(r);
                     let projection=art::ArenaProjection::for_attempt(r,a).with_effects_clip(effects_clip);
                     let response=ui.interact(r,ui.id().with(("observer-arena",id)),Sense::click());
                     let aim = response
@@ -282,7 +285,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         .filter(|p| r.contains(*p))
                         .map(|p| projection.inverse(p))
                         .unwrap_or([a.width_yards*0.5,a.defender_position()[1]]);
-                    art::world_backdrop(ui.painter(),effects_clip,projection,a.level,f.textures,f32::INFINITY);
+                    art::world_backdrop(ui.painter(),effects_clip,projection,a.level,f.textures,effects_clip.height()/art::camera::REFERENCE_LANES);
                     art::battlefield_for_attempt(
                         &ui.painter_at(effects_clip),
                         r,
@@ -343,6 +346,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         }
                     }
                 } else {
+                    f.battle.observer_arena_rect = None;
                     muted(
                         ui,
                         "Deployment complete. Its report remains in the expedition list.",
@@ -351,6 +355,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             });
         if !open {
             f.campaign.observed = None;
+            f.battle.observer_arena_rect = None;
         }
     }
     egui::CollapsingHeader::new("Strategic event log").show(ui, |ui| {
@@ -358,15 +363,4 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             muted(ui, line);
         }
     });
-}
-/// The observer window's unzoomed clearing in its box, exactly as the main
-/// battle drew it before the camera; C3 (W1-45) replaces it with
-/// `art::fit_field`.
-fn observer_clearing(r: Rect, lanes: u8, width: f32) -> Rect {
-    let size = art::clearing_size(r, lanes, width);
-    if size == r.size() {
-        r
-    } else {
-        Rect::from_center_size(r.center(), size).intersect(r)
-    }
 }

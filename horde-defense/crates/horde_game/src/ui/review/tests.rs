@@ -592,3 +592,91 @@ fn workshop_names_still_reach_the_workshop() {
         assert_eq!(f.nav.tab, Tab::World, "{scene}");
     }
 }
+
+/// The staged operations review with its live expedition observed, drawn as
+/// the App draws it at 1050x700 pixels and scale 1.35 (777.8x518.5 points;
+/// egui's raw screen rect is in points) with the
+/// attempt set to `geometry` (lanes, width). Returns the window's recorded
+/// field and the observer box: the clip of the battlefield painter, whose
+/// height is the window's `(content height - 200).clamp(180, 360)` allocation.
+fn observed_operations(f: &mut FrontendParts, geometry: (u8, f32)) -> (egui::Rect, egui::Rect) {
+    let id = f
+        .game
+        .battles()
+        .iter()
+        .find(|b| !b.settled && b.game().attempt().is_some())
+        .map(|b| b.id)
+        .expect("the operations review keeps a live expedition");
+    // Presentation only: the window reads the geometry, nothing is ticked.
+    let battle = f
+        .game
+        .battles_mut()
+        .iter_mut()
+        .find(|b| b.id == id)
+        .unwrap();
+    let a = battle.game_mut().attempt_mut().unwrap();
+    (a.lane_count, a.width_yards) = geometry;
+    f.campaign.observed = Some(id);
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    crate::settings::configure(&ctx, 1.35);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    let mut last = None;
+    // Windows settle their size over the first passes; read a settled frame.
+    for _ in 0..3 {
+        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(egui::Rect::from_min_size(
+                    egui::Pos2::ZERO,
+                    egui::vec2(1050.0, 700.0) / 1.35,
+                )),
+                ..egui::RawInput::default()
+            },
+            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+        );
+        output.textures_delta.clear();
+        last = Some(output);
+    }
+    let output = last.unwrap();
+    let content = ctx.content_rect();
+    let field = f
+        .battle
+        .observer_arena_rect
+        .unwrap_or_else(|| panic!("no observer field at {content:?}"));
+    let box_height = (content.height() - 200.0).clamp(180.0, 360.0);
+    let mut boxes: Vec<egui::Rect> = output
+        .shapes
+        .iter()
+        .map(|s| s.clip_rect)
+        .filter(|clip| clip.height() == box_height && clip.contains_rect(field))
+        .collect();
+    boxes.dedup();
+    assert_eq!(boxes.len(), 1, "observer boxes {boxes:?} for {field:?}");
+    (field, boxes[0])
+}
+
+#[test]
+fn observer_uses_fit_field() {
+    let mut f = staged("operations");
+    // The review's live expedition at a fresh 3x12 opening.
+    let (lanes, width) = (3, 12.0);
+    let (field, observer_box) = observed_operations(&mut f, (lanes, width));
+    let fit = crate::art::fit_field(observer_box, observer_box, lanes, width);
+    assert_eq!(
+        field,
+        fit.rect,
+        "{lanes}x{width} in {observer_box:?}: field width is {:.2}x the box",
+        field.width() / observer_box.width()
+    );
+    assert_eq!(field.width(), observer_box.width());
+    assert!(fit.zoom > 1.0, "the 3x12 field zooms in: {}", fit.zoom);
+}
+
+#[test]
+fn observer_filling_field_is_unchanged() {
+    let mut f = staged("operations");
+    let (field, observer_box) = observed_operations(&mut f, (11, 30.0));
+    assert_eq!(field, observer_box, "an 11x30 field fills its box");
+}
