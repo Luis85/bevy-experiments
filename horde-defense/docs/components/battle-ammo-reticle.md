@@ -4,7 +4,7 @@ id: battle-ammo-reticle
 title: "Battlefield ammunition and reload reticle"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/reticle.rs::paint, resources; crates/horde_game/src/cursor.rs::sync_native_cursor"
+source: "crates/horde_game/src/ui/reticle.rs::paint; crates/horde_game/src/ui/battle/field.rs::set_cursor_icon"
 ---
 
 # Battlefield ammunition and reload reticle

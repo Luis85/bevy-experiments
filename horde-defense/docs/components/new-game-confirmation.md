@@ -4,7 +4,7 @@ id: new-game-confirmation
 title: "Protect the current journey"
 parent: main-menu
 status: Implemented
-source: "crates/horde_game/src/ui/menu.rs::menu; crates/horde_game/src/runner.rs::begin_new_journey"
+source: "crates/horde_game/src/ui/menu.rs::menu; crates/horde_game/src/runner/apply.rs::begin_new_journey"
 ---
 
 # Protect the current journey
