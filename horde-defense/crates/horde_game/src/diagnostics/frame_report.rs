@@ -3,7 +3,10 @@
 //! `PerfSet::CloseFrame`, so every phase of frame i lands in sample i. Every v2
 //! key keeps its name and meaning; v3 adds `phases`, the interface breakdown,
 //! egui and scene counts, the present and build context and GPU time, and
-//! (W1-64) `egui.texture_uploads`.
+//! (W1-64) `egui.texture_uploads`. W1-68 adds the between-frames gap and its
+//! hand-off and channel wait, render-thread idle, per-frame `events`,
+//! wall-clock instants and a window `attribution` in `longest_frames`, and
+//! `slow_frames`.
 use super::{
     EguiCount, FrameSample, PerfFrame, PerfProbe,
     gpu_span::{EGUI_GPU_PATH, gpu_timing_support},
@@ -60,6 +63,10 @@ pub(super) struct RecordedFrame {
     /// A GPU egui-pass measurement that arrived this frame (it lags the
     /// frame it timed by the readback latency).
     pub gpu_egui_ms: Option<f64>,
+    /// Wall clock (ms since the probe epoch) of the instant `Time<Real>`
+    /// closed `frame_ms` at: the frame interval is `time_ms - frame_ms ..
+    /// time_ms`. `None` when the time had no update (W1-68).
+    pub time_ms: Option<f64>,
 }
 /// The final-frame context of the v2 report.
 #[derive(Clone, Debug, Default)]
@@ -140,6 +147,15 @@ pub(super) struct Phases<T> {
     render_world_cpu_ms: T,
     cpu_frame_ms: T,
     critical_path_ms: T,
+    /// W1-68: the main thread between the previous end of `Last` and this
+    /// First, its render hand-off, the pipelined channel wait inside that,
+    /// the rest of the gap (winit and the OS), and the render-thread idle
+    /// before the latest render sample.
+    gap_ms: T,
+    handoff_ms: T,
+    channel_wait_ms: T,
+    outside_update_ms: T,
+    render_idle_ms: T,
 }
 #[derive(Serialize)]
 struct InterfaceBreakdown {
@@ -178,6 +194,55 @@ struct SceneLoad {
     /// Hostiles drawn with a hit flash, and the quads those flashes drew (W1-66).
     flashing_enemies: CountStats,
     flash_quads: CountStats,
+}
+/// Per-frame window, image-asset and audio-asset events and audio voices
+/// spawned (W1-68).
+#[derive(Serialize)]
+struct EventReport {
+    window: CountStats,
+    image_assets: CountStats,
+    audio_assets: CountStats,
+    audio_voices: CountStats,
+}
+/// One slow frame's events, with the egui texture bytes it uploaded.
+#[derive(Serialize)]
+struct SlowFrameEvents {
+    window: u64,
+    image_assets: u64,
+    audio_assets: u64,
+    audio_voices: u64,
+    texture_upload_bytes: u64,
+}
+/// Where one frame's wall-clock window `window_begin_ms .. time_ms` went
+/// (W1-68). Main thread: the main schedules, the pipelined channel waits,
+/// the rest of the render hand-offs, and the time outside App::update, as
+/// overlaps with the window; `unattributed_ms` is the window no main-thread
+/// span covers and `coverage` the covered share. Render thread: present
+/// waits, the rest of the render frames, and the window outside any recorded
+/// render frame (idle, or a frame no sample kept).
+#[derive(Serialize)]
+struct Attribution {
+    window_begin_ms: f64,
+    main_cpu_ms: f64,
+    channel_wait_ms: f64,
+    handoff_other_ms: f64,
+    outside_update_ms: f64,
+    unattributed_ms: f64,
+    coverage: f64,
+    render_present_ms: f64,
+    render_other_ms: f64,
+    render_unbusy_ms: f64,
+}
+/// Every sampled frame over 50 ms (W1-68): how many had a wall-clock window,
+/// how many of those main-thread spans cover to at least 95%, the lowest
+/// coverage and the most unattributed time.
+#[derive(Serialize)]
+struct SlowFrameSummary {
+    over_50ms: usize,
+    timed: usize,
+    covered_95: usize,
+    min_coverage: Option<f64>,
+    max_unattributed_ms: f64,
 }
 #[derive(Serialize)]
 struct BuildInfo {
@@ -246,6 +311,9 @@ pub(super) struct FrameReport {
     interface_breakdown_mean_ms: InterfaceBreakdown,
     egui: EguiReport,
     scene_load: SceneLoad,
+    events: EventReport,
+    attribution_scope: &'static str,
+    slow_frames: SlowFrameSummary,
     present: Present,
     build: BuildInfo,
     gpu: GpuReport,
@@ -256,6 +324,18 @@ struct SlowFrame {
     frame_ms: f64,
     work_ms: [f64; 3],
     phases: Phases<f64>,
+    /// Wall clock, ms since the probe epoch (W1-68): the frame interval's
+    /// end, this frame's First begin and end of `Last`, and the latest render
+    /// sample's sequence number, begin, present begin and end.
+    time_ms: Option<f64>,
+    main_begin_ms: f64,
+    main_end_ms: f64,
+    render_seq: u64,
+    render_begin_ms: Option<f64>,
+    render_present_begin_ms: Option<f64>,
+    render_end_ms: Option<f64>,
+    events: SlowFrameEvents,
+    attribution: Option<Attribution>,
 }
 
 fn quantile(sorted: &[f64], percent: f64) -> f64 {
@@ -316,6 +396,11 @@ fn frame_phases(sample: &FrameSample, pipelined: bool) -> Phases<f64> {
         } else {
             sample.main_cpu_ms + render_world
         },
+        gap_ms: sample.gap_ms,
+        handoff_ms: sample.handoff_ms,
+        channel_wait_ms: sample.channel_wait_ms,
+        outside_update_ms: (sample.gap_ms - sample.handoff_ms).max(0.),
+        render_idle_ms: render.idle_ms,
     }
 }
 fn phase_stats(frames: &[Phases<f64>]) -> Phases<Stats> {
@@ -333,6 +418,95 @@ fn phase_stats(frames: &[Phases<f64>]) -> Phases<Stats> {
         render_world_cpu_ms: stats(&render_world),
         cpu_frame_ms: stats(&cpu_frames(&main, &render_world)),
         critical_path_ms: stats(&column(|p| p.critical_path_ms)),
+        gap_ms: stats(&column(|p| p.gap_ms)),
+        handoff_ms: stats(&column(|p| p.handoff_ms)),
+        channel_wait_ms: stats(&column(|p| p.channel_wait_ms)),
+        outside_update_ms: stats(&column(|p| p.outside_update_ms)),
+        render_idle_ms: stats(&column(|p| p.render_idle_ms)),
+    }
+}
+
+/// Frames at or above this are slow for `slow_frames` and are attributed.
+const SLOW_FRAME_MS: f64 = 50.;
+/// The coverage `slow_frames.covered_95` counts.
+const COVERED_SHARE: f64 = 0.95;
+
+fn overlap(begin: f64, end: f64, window: (f64, f64)) -> f64 {
+    (end.min(window.1) - begin.max(window.0)).max(0.)
+}
+/// Attributes the wall-clock window of `frames[index]` to every recorded
+/// main-thread and render-thread span it overlaps. Each sample's main thread
+/// is, in order: the hand-off right after the previous `Last` (channel wait
+/// first, it is the receive), the rest of the gap, then First..Last. Render
+/// frames are counted once per sequence number.
+fn attribute(frames: &[RecordedFrame], index: usize) -> Option<Attribution> {
+    let frame = &frames[index];
+    let end = frame.time_ms?;
+    let window = (end - frame.frame_ms, end);
+    let (mut main_cpu, mut wait, mut handoff_other, mut outside) = (0., 0., 0., 0.);
+    for sample in frames.iter().map(|f| &f.probe) {
+        if sample.main_begin_ms <= 0. {
+            continue;
+        }
+        main_cpu += overlap(sample.main_begin_ms, sample.main_end_ms, window);
+        let gap_begin = sample.main_begin_ms - sample.gap_ms;
+        let handoff_end = gap_begin + sample.handoff_ms.min(sample.gap_ms);
+        let wait_end = gap_begin + sample.channel_wait_ms.min(handoff_end - gap_begin);
+        wait += overlap(gap_begin, wait_end, window);
+        handoff_other += overlap(wait_end, handoff_end, window);
+        outside += overlap(handoff_end, sample.main_begin_ms, window);
+    }
+    let (mut busy, mut present, mut last_seq) = (0., 0., None);
+    for frame in frames {
+        let Some(render) = frame.probe.render else {
+            continue;
+        };
+        if last_seq == Some(frame.probe.render_seq) || render.end_ms <= 0. {
+            continue;
+        }
+        last_seq = Some(frame.probe.render_seq);
+        busy += overlap(render.begin_ms, render.end_ms, window);
+        present += overlap(
+            render.present_begin_ms,
+            render.present_begin_ms + render.present_wait_ms,
+            window,
+        );
+    }
+    let covered = main_cpu + wait + handoff_other + outside;
+    Some(Attribution {
+        window_begin_ms: window.0,
+        main_cpu_ms: main_cpu,
+        channel_wait_ms: wait,
+        handoff_other_ms: handoff_other,
+        outside_update_ms: outside,
+        unattributed_ms: (frame.frame_ms - covered).max(0.),
+        coverage: if frame.frame_ms > 0. {
+            (covered / frame.frame_ms).min(1.)
+        } else {
+            1.
+        },
+        render_present_ms: present,
+        render_other_ms: (busy - present).max(0.),
+        render_unbusy_ms: (frame.frame_ms - busy).max(0.),
+    })
+}
+fn slow_frame_summary(frames: &[RecordedFrame]) -> SlowFrameSummary {
+    let slow: Vec<usize> = (0..frames.len())
+        .filter(|&i| frames[i].frame_ms > SLOW_FRAME_MS)
+        .collect();
+    let attributed: Vec<Attribution> = slow.iter().filter_map(|&i| attribute(frames, i)).collect();
+    SlowFrameSummary {
+        over_50ms: slow.len(),
+        timed: attributed.len(),
+        covered_95: attributed
+            .iter()
+            .filter(|a| a.coverage >= COVERED_SHARE)
+            .count(),
+        min_coverage: attributed.iter().map(|a| a.coverage).reduce(f64::min),
+        max_unattributed_ms: attributed
+            .iter()
+            .map(|a| a.unattributed_ms)
+            .fold(0., f64::max),
     }
 }
 fn build_info(profile_label: Option<&str>) -> BuildInfo {
@@ -480,11 +654,31 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
         work_max_ms,
         longest_frames: longest
             .into_iter()
-            .map(|(sample_index, frame_ms)| SlowFrame {
-                sample_index,
-                frame_ms,
-                work_ms: frames[sample_index].probe.work_ms,
-                phases: phases[sample_index],
+            .map(|(sample_index, frame_ms)| {
+                let frame = &frames[sample_index];
+                let sample = &frame.probe;
+                let events = sample.events;
+                SlowFrame {
+                    sample_index,
+                    frame_ms,
+                    work_ms: sample.work_ms,
+                    phases: phases[sample_index],
+                    time_ms: frame.time_ms,
+                    main_begin_ms: sample.main_begin_ms,
+                    main_end_ms: sample.main_end_ms,
+                    render_seq: sample.render_seq,
+                    render_begin_ms: sample.render.map(|r| r.begin_ms),
+                    render_present_begin_ms: sample.render.map(|r| r.present_begin_ms),
+                    render_end_ms: sample.render.map(|r| r.end_ms),
+                    events: SlowFrameEvents {
+                        window: events.window,
+                        image_assets: events.image_assets,
+                        audio_assets: events.audio_assets,
+                        audio_voices: events.audio_voices,
+                        texture_upload_bytes: sample.egui[EguiCount::TextureUploadBytes as usize],
+                    },
+                    attribution: attribute(frames, sample_index),
+                }
             })
             .collect(),
         phase_scope: "Wall-clock spans per sampled frame, as {mean, p50, p95, p99, max} in milliseconds. main_cpu: First begin to the end of Last. egui_pass: EguiPostUpdateSet::EndPass (every multipass draw plus end_pass); egui_tessellate: ProcessOutput; interface_total = egui_pass + egui_tessellate. extract: the RenderApp extract function only (never the pipelined channel wait); render_schedule: the Render schedule; present_wait: prepare_windows (swap-chain acquire); render_world_cpu = extract + render_schedule - present_wait of the latest completed render sample (frame i-1 under pipelining). cpu_frame = main_cpu + render_world_cpu summed per sample before taking quantiles, never a sum of means or quantiles. critical_path = max(main_cpu, render_world_cpu) when pipelined, else their sum; informational only.",
@@ -515,6 +709,14 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
             flashing_enemies: scene(|f| f.probe.scene.flashing_enemies),
             flash_quads: scene(|f| f.probe.scene.flash_quads),
         },
+        events: EventReport {
+            window: count_stats(frames.iter().map(|f| f.probe.events.window)),
+            image_assets: count_stats(frames.iter().map(|f| f.probe.events.image_assets)),
+            audio_assets: count_stats(frames.iter().map(|f| f.probe.events.audio_assets)),
+            audio_voices: count_stats(frames.iter().map(|f| f.probe.events.audio_voices)),
+        },
+        attribution_scope: "W1-68. Instants are wall clock in ms since the probe epoch. A frame's window is time_ms - frame_ms .. time_ms, where time_ms is the instant Time<Real> used (the render world's send_time when it arrived, else First). gap = previous end of Last to First on the main thread; handoff = its first part, the render hand-off (pipelined: RenderExtractApp extract = channel receive + RenderApp extract + send, channel_wait = that minus the extract; not pipelined: RenderApp extract + Render schedule); outside_update = gap - handoff (winit event loop, OS). render_idle = previous render end to this render begin. attribution overlaps the window with every sample's main-thread spans and every distinct render sample; slow_frames counts frames over 50 ms.",
+        slow_frames: slow_frame_summary(frames),
         present: input.present.clone(),
         build: build_info(input.profile_label.as_deref()),
         gpu: gpu_report(input),
@@ -613,6 +815,7 @@ pub fn capture_performance(
                 visible_enemies: attempt.map_or(0, |a| a.enemies.len()),
                 corpses: attempt.map_or(0, |a| a.corpses.len()),
                 gpu_egui_ms,
+                time_ms: time.last_update().and_then(|at| probe.epoch_ms(at)),
             });
             state.unfocused_samples += usize::from(!window.focused);
         }

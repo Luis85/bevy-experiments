@@ -500,6 +500,70 @@ Proofs recorded at the cut: removing one key (`pending_runs[0].boss_rank`, check
 
 From now on a new saved field must be serde-defaulted, skipped at its default and load `save_v7.json` unchanged; otherwise the work stops and the user is asked (the only pre-approved exception is R5, `SkillModifiers.heavy_target_damage_multiplier`). Later cases use inline JSON or new `save_v7_w2_*.json` / `save_v7_w4_*.json` files. Over the whole of wave 1, `GOLDEN` and `GAMEPLAY_TRACE` moved 0/6 each and `PROVISIONAL` is None.
 
+## The isolated 0.5 s frames (gate 3) — 6 November 2026 (W1-68)
+
+**Finding: the 0.5 s and 1.0 s frames are a swap-chain acquire stall in the graphics driver or compositor of this hybrid-graphics laptop. They come and go with the machine's state, not with the code.** Nothing in process was found to cause them. Gate 3 (`frames_over_50ms` 0) is unchanged and needs a user ruling.
+
+**What the frame report now records (W1-68).** These fields are still report version 3; every earlier key keeps its meaning.
+- `phases.gap_ms`: the main thread from the previous frame's end of `Last` to this frame's First.
+- `phases.handoff_ms`: the first part of the gap, the render hand-off. With pipelining this is the `RenderExtractApp` extract: channel receive, `RenderApp` extract, send. Without pipelining it is the `RenderApp` extract plus the Render schedule.
+- `phases.channel_wait_ms`: the hand-off minus the extract, that is, the pipelined wait for the render thread. The extract wrapper of today's report excludes it.
+- `phases.outside_update_ms`: the rest of the gap (winit event loop, OS).
+- `phases.render_idle_ms`: the render thread from one render frame's end to the next frame's begin.
+- `events`: per-frame counts of winit window messages, `Image` and `AudioSource` asset events, and spawned `AudioPlayer` voices.
+- `longest_frames`:
+  - Wall-clock instants, in ms since the probe epoch: the `Time<Real>` instant that closed the frame, First begin, end of `Last`, and the render sample's begin, present begin and end.
+  - The frame's events and egui texture-upload bytes.
+  - An `attribution` that overlaps the frame's window (`time_ms - frame_ms .. time_ms`) with every sample's main-thread spans: main schedule, channel wait, the rest of the hand-off, and outside update. It does the same with every distinct render sample: present wait, the rest of the render frame, and time with no render frame. `coverage` is the covered share of the window.
+- `slow_frames`: how many frames were over 50 ms, how many were timed, and how many of those are covered to at least 95%.
+
+Pins: `slow_frame_reports_unattributed_time` and `perf_launch_records_the_between_frames_gap_and_events`.
+
+**Fresh probes.** Same hardware and power state as before (mains, Balanced). The machine was shared, and a 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (up to 100% load in two passes). Each pass is `measure_performance.ps1 -Repeat 3` at both sizes. Every run was valid, and every pass exited 0.
+
+| Pass (target/perf/w1-68/) | Build | Scene, frames | Present, pipelined, adapter, backend | Runs | Frames > 50 ms | cpu_frame p99 (median, normal / small) | gap p50 / p99 (normal) | channel_wait mean (normal) |
+|---|---|---|---|---|---|---|---|---|
+| playtest-novsync-pipelined-default | W1-68 | progressed-peak, 600 | AutoNoVsync, on, RTX, Vulkan | 6 | 0 | 6.89 / 6.17 | 0.66 / 1.42 | 0.08 |
+| playtest-novsync-pipelined-off | W1-68 | progressed-peak, 600 | AutoNoVsync, off, RTX, Vulkan | 6 | 0 | 7.83 / 6.23 | 2.86 / 5.81 | 0 |
+| playtest-novsync-arc | W1-68 | progressed-peak, 600 | AutoNoVsync, on, Intel Arc (integrated), Vulkan | 6 | 0 | 6.84 / 6.26 | 0.81 / 3.12 | 0.33 |
+| playtest-novsync-dx12 | W1-68 | progressed-peak, 600 | AutoNoVsync, on, RTX, Dx12 (`WGPU_BACKEND=dx12`) | 6 | 0 | 6.57 / 6.31 | 2.81 / 4.92 | 2.17 |
+| playtest-novsync-stress | W1-68 | stress, 1800 | AutoNoVsync, on, RTX, Vulkan | 6 | 0 | 6.72 / 6.55 | 0.60 / 1.16 | 0.04 |
+| playtest-novsync-progressed-peak-3600 | W1-68 | progressed-peak, 3600 | AutoNoVsync, on, RTX, Vulkan | 6 | 0 | 7.75 / 6.55 | 0.64 / 1.34 | 0.05 |
+| dev-vsync-progressed-peak | W1-68 | progressed-peak, 600 | Fifo, on, RTX, Vulkan | 6 | 0 | 9.33 / 7.50 | 13.32 / 14.39 | 12.43 |
+| dev-vsync-stress | W1-68 | stress, 1800 | Fifo, on, RTX, Vulkan | 6 | 0 | 8.27 / 8.63 | 13.05 / 14.19 | 12.33 |
+| playtest-vsync-stress | W1-68 | stress, 1800 | Fifo, on, RTX, Vulkan | 6 | 0 | 7.75 / 7.84 | 13.64 / 14.67 | 12.93 |
+| head-control-dev-vsync-stress | HEAD 99850aa | stress, 1800 | Fifo, on, RTX, Vulkan | 6 | 0 | 8.42 / 8.60 | - | - |
+| dev-vsync-stress-3600 | HEAD 99850aa | stress, 3600 | Fifo, on, RTX, Vulkan | 6 | 0 | 8.38 / 7.96 | - | - |
+
+The last two passes ran the W1-67 binary itself. In the first, the W1-68 files were set aside so the build was HEAD. The second ran an unrebuilt HEAD dev build, because restoring the files with their older timestamps did not trigger a rebuild. Its report has no W1-68 fields, which confirms it was the HEAD build.
+
+**Evidence for the cause.**
+1. **The same code stalls or not depending on the hour.**
+   - At 18:09 the W1-67 binary (this HEAD) had 4-14 frames over 50 ms in every dev VSync-on stress run (`target/perf/w1-67/after-dev-vsync-stress`).
+   - From 18:50 to 19:04 the same binary had 0 in 12 runs (6 x 1,800 and 6 x 3,600 frames).
+   - The W1-68 build had 0 in 54 runs from 18:31 to 19:06.
+   - Scene, window sizes and script were the same throughout. Nothing in the session changed the power plan (mains and Balanced when checked at 18:49).
+2. **The stalls sat in the driver's acquire call.** In the stalled W1-67 frames:
+   - In 47 of the 56 stalled W1-67 frames, the frame's own render sample shows it: present_wait was 497-547 ms or 995-998 ms (two tail frames had 99 and 348 ms). present_wait times `prepare_windows`, where `get_current_texture` blocks on the swap chain.
+   - Main CPU was 5.6-12.9 ms, and render-world CPU was a normal 2.3-3.5 ms.
+   - In the other 9, the frame's render sample was a normal one (Render schedule 2.7-10 ms). The v3 report keeps only the latest render sample per frame, and the stall had landed in a render frame it did not keep. The W1-68 per-sample instants and the attribution now place such a frame.
+   - The 1.0 s frames equal wgpu-core's surface acquire timeout (`FRAME_TIMEOUT_MS = 1000`, wgpu-core 30.0.1 present.rs:32, :178). The render thread waited out that whole timeout in the driver's image acquire, sometimes five frames in a row (stress-small-r3, samples 1024-1028).
+3. **No in-process work lines up with them.**
+   - egui texture uploads were 0 in every sampled frame of every pass, so the W1-64 churn is gone.
+   - `Image` and `AudioSource` asset events were 0 in every frame.
+   - Window messages were 0, except 2 in one stress run.
+   - No audio voice was ever spawned. The review scenes run with master volume 0 (`ui/review/matrix.rs:21`), so `play_sounds` returns before spawning. Audio voice creation therefore cannot have caused the stalls measured in these scenes. Ordinary play with sound is not covered by this.
+   - OS descheduling cannot be excluded in general. But it would not land, time after time, inside the one swap-chain call, in multiples of about 0.5 s and at the 1.0 s timeout.
+4. **The new fields close on real frames.** The attribution was taken over the 20 longest frames of each instrumented run (1,080 frames, the longest 23.4 ms). It covered 1,077 of them to 100%. The other 3 are a run's first samples, whose windows begin before the first kept sample. With VSync on, the gap of about 13.3 ms is the channel wait (about 12.4 ms) plus 0.8 ms outside the update: the main thread waits on a render thread that is held by the present. If the stall returns, a frame over 50 ms will show whether it was:
+   - the channel wait, with the render thread's present wait;
+   - time outside App::update (winit or OS);
+   - the main schedule.
+
+   The VSync-off 0.5 s frames of the W1-61 probes had present_wait of about 0.1 ms and fell outside every span. They did not recur here.
+5. **The A/B probes cannot tell the arms apart today.** Pipelined off, the integrated Intel Arc adapter and the DX12 backend all had 0 frames over 50 ms. So did the default arm in the same hour. Without pipelining the gap holds the render work (2.9 ms) and the median frame rises from 3.2 to 5.5 ms. DX12 has a longer channel wait (2.2 ms against 0.1 ms on Vulkan) at a similar cpu_frame p99.
+
+**Status.** Every fresh probe meets the done_when coverage (every frame over 50 ms covered to at least 95%) only trivially, because there were 0 such frames. The cause is environmental, so no in-process fix follows. The intermittent stall makes gate 3 unreachable on demand on this machine. This needs a user ruling; the gate was not moved. In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms at progressed-peak and 6.6-6.7 ms in stress, against ≤ 10.0. That is informational for W1-61, which re-runs the gates.
+
 ## Full verify
 
 From `horde-defense/`, before every production-pass commit:

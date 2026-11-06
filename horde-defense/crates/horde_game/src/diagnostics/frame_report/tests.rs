@@ -80,6 +80,7 @@ fn render(extract: f64, schedule: f64, present_wait: f64) -> Option<RenderSample
         extract_ms: extract,
         render_schedule_ms: schedule,
         present_wait_ms: present_wait,
+        ..default()
     })
 }
 fn report_json(input: &ReportInput) -> Value {
@@ -279,4 +280,116 @@ fn scene_load_reports_hit_flash_quads() {
     assert_eq!(scene["flashing_enemies"]["mean"], 2.0);
     assert_eq!(scene["flash_quads"]["max"], 300);
     assert_eq!(scene["flash_quads"]["mean"], 440.0 / 3.0);
+}
+
+/// A frame on the probe's wall clock (ms since its epoch): Time<Real> closed
+/// its interval at `time`, the main schedule ran `begin..begin + main`, and
+/// the main thread spent `gap` before `begin` outside it, `handoff` of that
+/// in the render hand-off (of which `wait` on the pipelined channel).
+fn timed(time: f64, frame_ms: f64, begin: f64, main: f64, gap: [f64; 3]) -> RecordedFrame {
+    let [gap, handoff, wait] = gap;
+    let mut recorded = frame(frame_ms, main, None);
+    recorded.time_ms = Some(time);
+    recorded.probe.main_begin_ms = begin;
+    recorded.probe.main_end_ms = begin + main;
+    recorded.probe.gap_ms = gap;
+    recorded.probe.handoff_ms = handoff;
+    recorded.probe.channel_wait_ms = wait;
+    recorded
+}
+fn close(actual: &Value, expected: f64) -> bool {
+    actual
+        .as_f64()
+        .is_some_and(|actual| (actual - expected).abs() < 1e-9)
+}
+
+/// W1-68: a 500 ms frame whose spans hold 9 ms says where the rest went.
+/// With the between-frames gap recorded, the frame's wall-clock window is
+/// covered by main-thread spans: the previous frame's main schedule, the
+/// pipelined channel wait and the rest of the hand-off, and the time outside
+/// App::update. Without it, the report says how much no span covers.
+#[test]
+fn slow_frame_reports_unattributed_time() {
+    let quick = timed(990., 16.7, 990., 8., [8., 7., 6.5]);
+    // 998..1489 between frames: 487.5 ms channel wait, 0.5 ms extract and
+    // send, 3 ms outside App::update; the frame interval is 990..1489.
+    let mut slow = timed(1489., 499., 1489., 9., [491., 488., 487.5]);
+    slow.probe.render = Some(RenderSample {
+        extract_ms: 0.3,
+        render_schedule_ms: 485.,
+        present_wait_ms: 480.,
+        begin_ms: 1000.,
+        present_begin_ms: 1002.,
+        end_ms: 1485.,
+        idle_ms: 12.,
+    });
+    slow.probe.events = crate::diagnostics::FrameEvents {
+        window: 3,
+        image_assets: 1,
+        audio_assets: 0,
+        audio_voices: 2,
+    };
+    slow.probe.egui[EguiCount::TextureUploadBytes as usize] = 4096;
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), slow.clone()],
+        ..default()
+    });
+    let longest = &report["longest_frames"][0];
+    assert_eq!(longest["sample_index"], 1);
+    assert!(close(&longest["time_ms"], 1489.));
+    assert!(close(&longest["main_begin_ms"], 1489.));
+    assert!(close(&longest["main_end_ms"], 1498.));
+    let phases = &longest["phases"];
+    assert!(close(&phases["gap_ms"], 491.));
+    assert!(close(&phases["handoff_ms"], 488.));
+    assert!(close(&phases["channel_wait_ms"], 487.5));
+    assert!(close(&phases["outside_update_ms"], 3.));
+    assert!(close(&phases["render_idle_ms"], 12.));
+    let window = &longest["attribution"];
+    assert!(close(&window["window_begin_ms"], 990.));
+    assert!(close(&window["main_cpu_ms"], 8.));
+    assert!(close(&window["channel_wait_ms"], 487.5));
+    assert!(close(&window["handoff_other_ms"], 0.5));
+    assert!(close(&window["outside_update_ms"], 3.));
+    assert!(close(&window["unattributed_ms"], 0.));
+    assert!(close(&window["coverage"], 1.));
+    assert!(close(&window["render_present_ms"], 480.));
+    assert!(close(&window["render_other_ms"], 5.));
+    assert!(close(&window["render_unbusy_ms"], 14.));
+    let events = &longest["events"];
+    assert_eq!(events["window"], 3);
+    assert_eq!(events["image_assets"], 1);
+    assert_eq!(events["audio_voices"], 2);
+    assert_eq!(events["texture_upload_bytes"], 4096);
+    let summary = &report["slow_frames"];
+    assert_eq!(summary["over_50ms"], 1);
+    assert_eq!(summary["timed"], 1);
+    assert_eq!(summary["covered_95"], 1);
+    assert!(close(&summary["min_coverage"], 1.));
+    assert_eq!(report["events"]["audio_voices"]["max"], 2);
+    assert!(close(&report["phases"]["gap_ms"]["max"], 491.));
+
+    // Today's report: the same frame with no gap or earlier frame recorded.
+    // 499 ms of its window lie outside every span.
+    let mut bare = slow;
+    bare.probe.gap_ms = 0.;
+    bare.probe.handoff_ms = 0.;
+    bare.probe.channel_wait_ms = 0.;
+    let report = report_json(&ReportInput {
+        frames: vec![bare],
+        ..default()
+    });
+    let window = &report["longest_frames"][0]["attribution"];
+    assert!(close(&window["unattributed_ms"], 499.));
+    assert!(close(&window["coverage"], 0.));
+    assert_eq!(report["slow_frames"]["covered_95"], 0);
+    // A frame without a wall-clock end is counted, never attributed.
+    let report = report_json(&ReportInput {
+        frames: vec![frame(500., 9., None)],
+        ..default()
+    });
+    assert!(report["longest_frames"][0]["attribution"].is_null());
+    assert_eq!(report["slow_frames"]["over_50ms"], 1);
+    assert_eq!(report["slow_frames"]["timed"], 0);
+    assert!(report["slow_frames"]["min_coverage"].is_null());
 }

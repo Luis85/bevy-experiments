@@ -67,8 +67,10 @@ enum Mark {
     Tessellate,
     Render,
     PresentWait,
+    /// Start of the `RenderApp` extract (the non-pipelined hand-off begins here).
+    Extract,
 }
-const MARKS: usize = 5;
+const MARKS: usize = 6;
 /// Per-frame egui counts (`egui`), in report order.
 #[derive(Clone, Copy)]
 enum EguiCount {
@@ -85,14 +87,36 @@ enum EguiCount {
 const EGUI_COUNTS: usize = 8;
 /// The [`SceneDraw`] fields, in `record_scene` order.
 const SCENE_COUNTS: usize = 6;
+/// The [`FrameEvents`] fields, in `record_events` order.
+const EVENT_COUNTS: usize = 4;
+
+/// What arrived or started in one main-world frame (`events`, W1-68): winit
+/// window messages, `Image` and `AudioSource` asset events, and audio voices
+/// (`AudioPlayer` entities) spawned.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct FrameEvents {
+    pub window: u64,
+    pub image_assets: u64,
+    pub audio_assets: u64,
+    pub audio_voices: u64,
+}
 
 /// One completed render-world frame: extraction, the Render schedule and the
-/// swap-chain wait inside it (`prepare_windows`), in milliseconds.
+/// swap-chain wait inside it (`prepare_windows`), in milliseconds. The
+/// instants (W1-68) are wall clock, milliseconds since the probe epoch.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct RenderSample {
     pub extract_ms: f64,
     pub render_schedule_ms: f64,
     pub present_wait_ms: f64,
+    /// Render schedule begin, `prepare_windows` begin and Render schedule end.
+    pub begin_ms: f64,
+    pub present_begin_ms: f64,
+    pub end_ms: f64,
+    /// From the previous render frame's end to this one's begin: the render
+    /// thread waiting for the next extraction when pipelined, main-thread work
+    /// otherwise. 0 for the first render frame.
+    pub idle_ms: f64,
 }
 impl RenderSample {
     /// Render-world CPU: extract + Render schedule − present wait.
@@ -121,6 +145,22 @@ pub struct FrameSample {
     /// texture_uploads, texture_upload_bytes]`.
     pub egui: [u64; EGUI_COUNTS],
     pub scene: SceneDraw,
+    /// First begin and the end of `Last`, wall clock in ms since the probe
+    /// epoch (W1-68).
+    pub main_begin_ms: f64,
+    pub main_end_ms: f64,
+    /// The main thread between the previous frame's end of `Last` and this
+    /// frame's First: the render hand-off, then winit and the OS. 0 for the
+    /// first frame.
+    pub gap_ms: f64,
+    /// Of `gap_ms`, the render hand-off right after the previous `Last`:
+    /// pipelined, the `RenderExtractApp` extract (channel receive, extract,
+    /// send); otherwise the `RenderApp` extract and Render schedule.
+    pub handoff_ms: f64,
+    /// Of `handoff_ms`, the pipelined wait for the render thread to return
+    /// the render app (and the send back); 0 when not pipelined.
+    pub channel_wait_ms: f64,
+    pub events: FrameEvents,
 }
 
 /// The atomics one perf launch shares between the main and render worlds.
@@ -135,6 +175,13 @@ pub struct PerfCounters {
     scene: [AtomicU64; SCENE_COUNTS],
     extract_ns: AtomicU64,
     present_wait_ns: AtomicU64,
+    /// W1-68: the previous end of `Last` and render end (ns since `epoch`),
+    /// the hand-off and channel wait since the last close, and the events.
+    last_main_end_ns: AtomicU64,
+    last_render_end_ns: AtomicU64,
+    handoff_ns: AtomicU64,
+    channel_wait_ns: AtomicU64,
+    events: [AtomicU64; EVENT_COUNTS],
     /// The latest completed render-world sample and its sequence number.
     render: Mutex<(u64, Option<RenderSample>)>,
     pipelined: AtomicBool,
@@ -152,6 +199,11 @@ impl Default for PerfCounters {
             scene: Default::default(),
             extract_ns: AtomicU64::new(0),
             present_wait_ns: AtomicU64::new(0),
+            last_main_end_ns: AtomicU64::new(0),
+            last_render_end_ns: AtomicU64::new(0),
+            handoff_ns: AtomicU64::new(0),
+            channel_wait_ns: AtomicU64::new(0),
+            events: Default::default(),
             render: Mutex::new((0, None)),
             pipelined: AtomicBool::new(false),
         }
@@ -172,6 +224,16 @@ fn elapsed_ns(start: Instant) -> u64 {
 impl PerfProbe {
     fn now_ns(&self) -> u64 {
         elapsed_ns(self.0.epoch)
+    }
+    /// `instant` as wall-clock ms since the probe epoch; `None` before it.
+    pub fn epoch_ms(&self, instant: Instant) -> Option<f64> {
+        instant
+            .checked_duration_since(self.0.epoch)
+            .map(|since| since.as_secs_f64() * 1000.)
+    }
+    /// The begin mark of `mark` (ns since `epoch`), 0 when never set.
+    fn mark_ns(&self, mark: Mark) -> u64 {
+        self.0.marks_ns[mark as usize].load(Ordering::Relaxed)
     }
     fn mark(&self, mark: Mark) {
         self.0.marks_ns[mark as usize].store(self.now_ns(), Ordering::Relaxed);
@@ -203,11 +265,36 @@ impl PerfProbe {
             slot.store(count as u64, Ordering::Relaxed);
         }
     }
+    /// This frame's window, image and audio events and new voices (W1-68).
+    fn record_events(&self, events: FrameEvents) {
+        let counts = [
+            events.window,
+            events.image_assets,
+            events.audio_assets,
+            events.audio_voices,
+        ];
+        for (slot, count) in self.0.events.iter().zip(counts) {
+            slot.fetch_add(count, Ordering::Relaxed);
+        }
+    }
     /// Takes this frame's counters and the latest completed render sample.
     fn close_frame(&self) -> FrameSample {
         let take = |slot: &AtomicU64| slot.swap(0, Ordering::Relaxed);
-        let main_cpu_ms = ms(self.since(Mark::Main));
+        let end = self.now_ns();
+        let begin = self.mark_ns(Mark::Main);
+        let main_cpu_ms = if begin == 0 {
+            0.
+        } else {
+            ms(end.saturating_sub(begin))
+        };
         self.0.marks_ns[Mark::Main as usize].store(0, Ordering::Relaxed);
+        let previous_end = self.0.last_main_end_ns.swap(end, Ordering::Relaxed);
+        let gap_ms = if begin == 0 || previous_end == 0 {
+            0.
+        } else {
+            ms(begin.saturating_sub(previous_end))
+        };
+        let events: [u64; EVENT_COUNTS] = std::array::from_fn(|i| take(&self.0.events[i]));
         let scene: [u64; SCENE_COUNTS] = std::array::from_fn(|i| take(&self.0.scene[i]));
         let (render_seq, render) = self.0.render.lock().map_or((0, None), |latest| *latest);
         FrameSample {
@@ -226,6 +313,17 @@ impl PerfProbe {
                 fx_views: scene[3] as usize,
                 flashing_enemies: scene[4] as usize,
                 flash_quads: scene[5] as usize,
+            },
+            main_begin_ms: ms(begin),
+            main_end_ms: ms(end),
+            gap_ms,
+            handoff_ms: ms(take(&self.0.handoff_ns)),
+            channel_wait_ms: ms(take(&self.0.channel_wait_ns)),
+            events: FrameEvents {
+                window: events[0],
+                image_assets: events[1],
+                audio_assets: events[2],
+                audio_voices: events[3],
             },
         }
     }
@@ -296,7 +394,13 @@ impl Plugin for PerfPlugin {
         app.insert_resource(probe.clone())
             .init_resource::<PerfFrame>()
             .add_systems(First, mark_main_begin)
-            .add_systems(Last, close_frame.in_set(PerfSet::CloseFrame));
+            .add_systems(
+                Last,
+                (
+                    count_events.before(PerfSet::CloseFrame),
+                    close_frame.in_set(PerfSet::CloseFrame),
+                ),
+            );
         egui_probe::add(app);
         if let Some(render_app) = app.get_sub_app_mut(bevy::render::RenderApp) {
             render_app.insert_resource(probe);
@@ -317,6 +421,36 @@ impl Plugin for PerfPlugin {
 #[cfg(feature = "review")]
 fn mark_main_begin(probe: Res<PerfProbe>) {
     probe.mark(Mark::Main);
+}
+/// Message cursors of [`count_events`]. Every message type is optional, so a
+/// MinimalPlugins app without windows, assets or audio counts zero.
+#[cfg(feature = "review")]
+#[derive(Default)]
+struct EventCursors {
+    window: bevy::ecs::message::MessageCursor<bevy::window::WindowEvent>,
+    images: bevy::ecs::message::MessageCursor<AssetEvent<Image>>,
+    audio: bevy::ecs::message::MessageCursor<AssetEvent<AudioSource>>,
+}
+#[cfg(feature = "review")]
+fn count_events(
+    probe: Res<PerfProbe>,
+    mut cursors: Local<EventCursors>,
+    window: Option<Res<Messages<bevy::window::WindowEvent>>>,
+    images: Option<Res<Messages<AssetEvent<Image>>>>,
+    audio: Option<Res<Messages<AssetEvent<AudioSource>>>>,
+    voices: Query<(), Added<AudioPlayer>>,
+) {
+    let EventCursors {
+        window: window_cursor,
+        images: image_cursor,
+        audio: audio_cursor,
+    } = &mut *cursors;
+    probe.record_events(FrameEvents {
+        window: window.map_or(0, |m| window_cursor.read(&m).count() as u64),
+        image_assets: images.map_or(0, |m| image_cursor.read(&m).count() as u64),
+        audio_assets: audio.map_or(0, |m| audio_cursor.read(&m).count() as u64),
+        audio_voices: voices.iter().count() as u64,
+    });
 }
 #[cfg(feature = "review")]
 fn close_frame(probe: Res<PerfProbe>, mut frame: ResMut<PerfFrame>) {

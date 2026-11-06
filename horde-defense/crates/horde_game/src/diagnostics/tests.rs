@@ -117,3 +117,43 @@ fn interface_work_is_attributed_to_the_same_frame() {
     assert_eq!(interface[2], 0.);
     assert_eq!(passes, [0, 1, 0]);
 }
+
+/// W1-68: the probe records the main thread between frames (the gap from the
+/// previous end of `Last` to First), wall-clock instants, and the frame's
+/// window messages and spawned audio voices.
+#[cfg(feature = "review")]
+#[test]
+fn perf_launch_records_the_between_frames_gap_and_events() {
+    use bevy::window::{AppLifecycle, WindowEvent};
+    let mut app = perf_app();
+    app.add_message::<WindowEvent>();
+    app.update();
+    let first = app.world().resource::<PerfFrame>().0.clone().unwrap();
+    assert_eq!(first.gap_ms, 0., "no earlier frame: {first:?}");
+    assert!(first.main_end_ms > first.main_begin_ms, "{first:?}");
+    std::thread::sleep(std::time::Duration::from_millis(5));
+    app.world_mut()
+        .write_message(WindowEvent::AppLifecycle(AppLifecycle::Running));
+    app.world_mut()
+        .write_message(WindowEvent::AppLifecycle(AppLifecycle::Running));
+    app.world_mut()
+        .spawn(AudioPlayer::<AudioSource>(Handle::default()));
+    app.update();
+    let second = app.world().resource::<PerfFrame>().0.clone().unwrap();
+    assert!(second.gap_ms >= 5.0, "{second:?}");
+    let between = second.main_begin_ms - first.main_end_ms;
+    assert!((second.gap_ms - between).abs() < 1e-6, "{second:?}");
+    // No RenderApp: no hand-off ran in the gap.
+    assert_eq!((second.handoff_ms, second.channel_wait_ms), (0., 0.));
+    assert_eq!(
+        second.events,
+        FrameEvents {
+            window: 2,
+            audio_voices: 1,
+            ..default()
+        }
+    );
+    app.update();
+    let third = app.world().resource::<PerfFrame>().0.clone().unwrap();
+    assert_eq!(third.events, FrameEvents::default());
+}
