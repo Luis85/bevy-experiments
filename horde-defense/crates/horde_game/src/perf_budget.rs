@@ -220,7 +220,6 @@ mod tests {
             json.pointer(&format!("{wave0}/frame_report")),
             Some(&2.into())
         );
-        assert_eq!(json.pointer("/baseline/v3"), Some(&Value::Null));
         let mean = |scene: &str, size: &str| {
             number(&json, &format!("{wave0}/interface_mean_ms/{scene}/{size}"))
         };
@@ -439,6 +438,120 @@ mod tests {
         let mut no_vsync = complete;
         no_vsync.as_object_mut().unwrap().remove("vsync");
         assert_eq!(with_v3(no_vsync), ["baseline.v3.vsync is not a bool"]);
+    }
+
+    const PLAN: &str = include_str!("../../../docs/plans/2026-11-05-production-pass.md");
+    const V3_SECTION: &str = "### 9.4 Frame report v3 baseline (W1-37)";
+
+    /// W1-37 records frame report v3 on the unchanged renderer, in the wave-0
+    /// profile and VSync state, for every budget scene and size: the
+    /// interface_total anti-shift guard reads it, and the v2-compatible
+    /// interface_draw beside it is compared with wave 0. A difference of more
+    /// than 5% is investigated and written up in the plan's v3 section; the
+    /// interface_draw gate itself never moves off wave 0.
+    #[test]
+    fn perf_budget_records_a_v3_baseline_for_every_scene_and_size() {
+        let json = budget();
+        let v3 = json
+            .pointer("/baseline/v3")
+            .filter(|v3| !v3.is_null())
+            .expect("baseline.v3 is recorded (W1-37)");
+        assert_eq!(v3_layout_problems(&json), Vec::<String>::new());
+        assert_eq!(v3.get("profile"), json.pointer("/baseline/wave0/profile"));
+        assert_eq!(v3.get("vsync"), json.pointer("/baseline/wave0/vsync"));
+        assert_eq!(v3.get("frame_report"), Some(&3.into()));
+        let commit = v3.get("commit").and_then(Value::as_str).unwrap_or("");
+        assert!(
+            commit.len() >= 7 && commit.chars().all(|c| c.is_ascii_hexdigit()),
+            "baseline.v3.commit names the measured commit: {commit:?}"
+        );
+        assert!(
+            whole(&json, "/baseline/v3/repeat") >= whole(&json, "/run/repeat_acceptance"),
+            "baseline.v3 is a median of the acceptance repeat count"
+        );
+
+        // Every other measured profile and VSync state is recorded beside the
+        // gate run, informational only (the script never reads `runs`).
+        let measured: BTreeSet<&str> = object(&json, "/profiles")
+            .iter()
+            .filter(|(_, profile)| profile.get("dir").is_some())
+            .map(|(name, _)| name.as_str())
+            .collect();
+        let mut recorded = BTreeSet::from([("dev".to_owned(), true)]);
+        for (name, run) in object(&json, "/baseline/v3/runs") {
+            let profile = run.get("profile").and_then(Value::as_str).unwrap_or("");
+            let vsync = run.get("vsync").and_then(Value::as_bool);
+            assert!(
+                measured.contains(profile),
+                "runs/{name}: profile {profile:?}"
+            );
+            let vsync = vsync.unwrap_or_else(|| panic!("runs/{name}: vsync is not a bool"));
+            assert!(
+                recorded.insert((profile.to_owned(), vsync)),
+                "runs/{name}: {profile} VSync {vsync} is recorded twice"
+            );
+            let mut metrics = vec!["interface_total_mean_ms", "interface_draw_mean_ms"];
+            if !vsync {
+                metrics.push("cpu_frame_p99_ms");
+            }
+            for scene in keys(object(&json, "/scenes")) {
+                for size in keys(object(&json, "/sizes")) {
+                    for metric in &metrics {
+                        let path = format!("/baseline/v3/runs/{name}/{metric}/{scene}/{size}");
+                        assert!(number(&json, &path) > 0.0, "{path} is not positive");
+                    }
+                }
+            }
+        }
+        let every: BTreeSet<(String, bool)> = measured
+            .iter()
+            .flat_map(|profile| {
+                [
+                    ((*profile).to_owned(), true),
+                    ((*profile).to_owned(), false),
+                ]
+            })
+            .collect();
+        assert_eq!(
+            recorded, every,
+            "v3 covers every measured profile with VSync on and off"
+        );
+
+        let section = PLAN
+            .split(V3_SECTION)
+            .nth(1)
+            .map(|rest| rest.split("\n## ").next().unwrap_or(rest))
+            .expect("the plan records the v3 baseline in its own section");
+        let wave0 = object(&json, "/baseline/wave0/interface_mean_ms");
+        for scene in keys(object(&json, "/scenes")) {
+            for size in keys(object(&json, "/sizes")) {
+                for metric in ["interface_total_mean_ms", "interface_draw_mean_ms"] {
+                    let path = format!("/baseline/v3/{metric}/{scene}/{size}");
+                    assert!(number(&json, &path) > 0.0, "{path} is not positive");
+                }
+                let Some(before) = wave0
+                    .get(scene)
+                    .and_then(|sizes| sizes.get(size))
+                    .and_then(Value::as_f64)
+                else {
+                    continue;
+                };
+                let draw = number(
+                    &json,
+                    &format!("/baseline/v3/interface_draw_mean_ms/{scene}/{size}"),
+                );
+                let drift = (draw / before - 1.0).abs();
+                if drift > 0.05 {
+                    let note = format!("- Drift {scene} {size}:");
+                    assert!(
+                        section.lines().any(|line| line.starts_with(&note)),
+                        "{scene} {size}: v3 interface_draw {draw} is {:.1}% off wave 0 {before}; \
+                         the plan's v3 section needs a \"{note}\" investigation line",
+                        drift * 100.0
+                    );
+                }
+            }
+        }
     }
 
     /// 12.0 ms is only the pipelined-rendering decision threshold (ruling

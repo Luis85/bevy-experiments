@@ -307,6 +307,10 @@ function New-V3Baseline([string]$RunProfile, [bool]$Vsync, $Normal, $Small) {
 
 function Invoke-SelfTest {
     $budget = Read-JsonFile $budgetPath
+    # The fixtures' interface_total values are synthetic, so they run against a copy without the measured baseline.v3;
+    # the v3 cases below gate interface_total against copies that record one.
+    $fixtureBudget = $budget | ConvertTo-Json -Depth 20 | ConvertFrom-Json
+    $fixtureBudget.baseline.v3 = $null
     $fixtureDirectory = Join-Path $PSScriptRoot 'fixtures\perf'
     $expected = [ordered]@{
         'within-budget' = 0; 'over-budget-cpu' = 1; 'over-50ms' = 1; 'unfocused' = 2
@@ -322,10 +326,10 @@ function Invoke-SelfTest {
         $fixture = Read-JsonFile (Join-Path $fixtureDirectory "$name.json")
         $run = $fixture.run
         $context = [pscustomobject]@{ Profile = $run.profile; VsyncOff = [bool]$run.vsync_off; NoBudget = $false; Informational = $false }
-        Test-BudgetCase $name (Get-FixtureRuns $fixture) $context $budget $expected[$name] @($fixture.expected_checks)
+        Test-BudgetCase $name (Get-FixtureRuns $fixture) $context $fixtureBudget $expected[$name] @($fixture.expected_checks)
     }
 
-    # baseline.v3 is null in the real budget, so the interface_total gate runs against copies that record it.
+    # The interface_total gate runs against copies of the budget that record their own baseline.v3.
     $vsyncOn = Read-JsonFile (Join-Path $fixtureDirectory 'vsync-on-within-budget.json')
     $onContext = [pscustomobject]@{ Profile = 'dev'; VsyncOff = $false; NoBudget = $false; Informational = $false }
     $total = 'progressed-peak/normal interface_total_mean_ms'

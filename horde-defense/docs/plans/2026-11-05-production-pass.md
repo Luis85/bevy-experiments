@@ -694,9 +694,9 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 |---|---|---|---|---|---|---|---|---|
 | progressed-peak | 1440x900 | interface mean (ms, VSync on) | 1.613 | ≤ 1.129 | | | | |
 | progressed-peak | 1050x700@1.35 | interface mean (ms, VSync on) | 1.472 | ≤ 1.030 | | | | |
-| progressed-peak | both | CPU p99 (ms, -VsyncOff) | n/a | ≤ 10.0 | | | | |
-| stress (400) | both | CPU p99 (ms, -VsyncOff) | n/a | ≤ 10.0 | | | | |
-| progressed-peak, stress | both | frames > 50 ms | 0 (VSync on) | 0 | | | | |
+| progressed-peak | both | CPU p99 (ms, -VsyncOff) | n/a (v3 dev: 20.7 / 19.1, see 9.4) | ≤ 10.0 | | | | |
+| stress (400) | both | CPU p99 (ms, -VsyncOff) | n/a (v3 dev: 31.8 / 38.1, see 9.4) | ≤ 10.0 | | | | |
+| progressed-peak, stress | both | frames > 50 ms | 0 (VSync on, 300 frames; v3 600/1800 frames: 6-64, see 9.4) | 0 | | | | |
 | peak | 1440x900 / 1050x700@1.35 | interface mean (ms) | 1.190 / 1.075 | informational | | | | |
 | camera zoom delta (W1-47) | both | peak and progressed-peak, commit before C2 vs C2 | n/a | recorded | | | | |
 | pipelined decision (W1-61) | both | on vs off, Repeat 3 | n/a | recorded | | | | |
@@ -725,6 +725,80 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 | 60 s reference mix, integrated LUFS (both themes) | about -38..-42 | | -23 ±2 |
 | 60 s dense battle true peak (FS) | | | ≤ 0.95 |
 | Runtime master limiter needed (R3) | n/a | yes / no | only if TP > 0.95 |
+
+### 9.4 Frame report v3 baseline (W1-37)
+
+Recorded 2026-11-05/06 on `2339a3d`, before any BattleFrame, camera, batching or corpse commit: the wave-0 painters plus the W1-33 probe and the W1-34 render plan at its defaults (Fifo, pipelined, frame latency 1). Hardware as `PERF_BUDGET.json` (RTX 1000 Ada Laptop, Vulkan, 2880x1800 at OS scale 2.0); mains power, Windows power plan Balanced (not changed for the run). `measure_performance.ps1 -Scene all -Repeat 3` per profile and VSync state, the budget window (warmup 180, 600 / 600 / 1800 frames), every recorded report valid (version 3, sample target met, focused, requested present mode and profile echoed; one attempt, `dev-vsync-b` peak normal repeat 3, ended with the battle before its sample target and was rerun by the script's one-rerun rule). Values are medians of 3 repeats; frames > 50 ms is the worst repeat. Evidence: `target/perf/w1-37/<dir>` (not committed), each with summary.json and summary.md.
+
+`PERF_BUDGET.json baseline.v3` holds the dev, VSync-on run (`dev-vsync-b`): `interface_total_mean_ms` is the anti-shift guard `measure_performance.ps1` gates progressed-peak on, `interface_draw_mean_ms` is the v2-compatible ui::draw mean. `baseline.v3.runs` records the other three profile and VSync states, informational. The interface_draw gate stays 0.70x wave 0 (≤ 1.129 / ≤ 1.030); nothing here moves it.
+
+The machine was shared with other sessions during the runs, so the script's runs were wrapped in a 5 s `Win32_Processor.LoadPercentage` sampler (scratch only). A scene whose repeats overlapped a ≥ 90% load sample was re-measured as a whole group and the rerun recorded: dev VSync off progressed-peak (`dev-novsync` ran it under 100% load for 2 minutes; recorded from `dev-novsync-progressed-peak-b`) and playtest stress, VSync on and off (`playtest-vsync-stress-b`, `playtest-novsync-stress-b`). The first dev VSync-on pass (`dev-vsync`) ran before the sampler existed, so the baseline is the second pass `dev-vsync-b`; both are compared below.
+
+| Config | Scene | Size | interface_draw | vs wave 0 | interface_total | egui_pass | tessellate | main_cpu | extract | render_schedule | present_wait | cpu_frame p99 | primitives | vertices | textured quads | GPU egui | frames > 50 ms (worst) |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| dev-vsync-on | peak | normal | 1.215 | +2.1% | 2.548 | 1.489 | 1.059 | 4.169 | 1.055 | 22.983 | 19.677 | 20.3 | 149 | 49847 | 11804 | 1.774 | 12 |
+| dev-vsync-on | peak | small | 1.084 | +0.8% | 2.383 | 1.382 | 1.005 | 4.150 | 1.319 | 20.081 | 16.272 | 31.9 | 149 | 41759 | 7524 | 1.182 | 10 |
+| dev-vsync-on | progressed-peak | normal | 1.655 | +2.6% | 4.645 | 1.957 | 2.688 | 6.435 | 1.116 | 16.866 | 12.938 | 23.4 | 514 | 94402 | 14399 | 1.973 | 6 |
+| dev-vsync-on | progressed-peak | small | 1.518 | +3.1% | 4.589 | 1.849 | 2.740 | 6.548 | 1.352 | 19.149 | 14.127 | 36.7 | 516 | 83419 | 8410 | 1.448 | 12 |
+| dev-vsync-on | stress | normal | 2.171 | - | 6.969 | 2.506 | 4.424 | 9.006 | 1.420 | 14.648 | 9.815 | 31.6 | 859 | 132687 | 16140 | 2.739 | 16 |
+| dev-vsync-on | stress | small | 1.904 | - | 6.525 | 2.261 | 4.264 | 8.878 | 1.690 | 19.018 | 12.827 | 63.4 | 857 | 121083 | 10153 | 1.720 | 64 |
+| dev-vsync-off | peak | normal | 1.210 | - | 2.634 | 1.498 | 1.135 | 4.076 | 0.719 | 3.135 | 0.130 | 17.3 | 150 | 50148 | 11803 | 0.938 | 7 |
+| dev-vsync-off | peak | small | 1.017 | - | 2.324 | 1.267 | 1.057 | 3.663 | 0.814 | 2.934 | 0.126 | 16.9 | 149 | 41918 | 7523 | 0.440 | 16 |
+| dev-vsync-off | progressed-peak | normal | 1.663 | - | 4.739 | 1.957 | 2.783 | 6.179 | 0.690 | 3.804 | 0.132 | 20.7 | 515 | 94363 | 14395 | 1.322 | 0 |
+| dev-vsync-off | progressed-peak | small | 1.350 | - | 4.270 | 1.619 | 2.645 | 5.662 | 0.687 | 3.249 | 0.118 | 19.1 | 517 | 83232 | 8406 | 0.724 | 1 |
+| dev-vsync-off | stress | normal | 2.047 | - | 6.608 | 2.348 | 4.259 | 8.420 | 1.170 | 4.554 | 0.137 | 31.8 | 861 | 132688 | 16139 | 1.420 | 39 |
+| dev-vsync-off | stress | small | 1.827 | - | 6.237 | 2.137 | 4.104 | 8.091 | 1.149 | 4.919 | 0.371 | 38.1 | 863 | 122048 | 10151 | 1.104 | 40 |
+| playtest-vsync-on | peak | normal | 0.966 | - | 2.051 | 1.229 | 0.822 | 3.575 | 1.041 | 20.304 | 17.192 | 18.2 | 148 | 49858 | 11804 | 1.679 | 7 |
+| playtest-vsync-on | peak | small | 0.881 | - | 1.943 | 1.154 | 0.789 | 3.578 | 1.166 | 19.420 | 15.844 | 21.5 | 149 | 41896 | 7524 | 1.086 | 7 |
+| playtest-vsync-on | progressed-peak | normal | 1.303 | - | 3.601 | 1.596 | 2.005 | 5.322 | 1.130 | 18.534 | 14.681 | 23.7 | 514 | 94411 | 14399 | 1.996 | 7 |
+| playtest-vsync-on | progressed-peak | small | 1.223 | - | 3.493 | 1.526 | 1.967 | 5.282 | 1.375 | 19.467 | 15.167 | 34.9 | 516 | 83262 | 8411 | 1.400 | 14 |
+| playtest-vsync-on | stress | normal | 1.669 | - | 5.157 | 1.988 | 3.169 | 7.143 | 1.392 | 17.677 | 12.537 | 37.8 | 856 | 132086 | 16141 | 3.260 | 27 |
+| playtest-vsync-on | stress | small | 1.530 | - | 4.931 | 1.844 | 3.087 | 6.964 | 1.644 | 19.658 | 13.894 | 58.7 | 858 | 121150 | 10153 | 1.688 | 54 |
+| playtest-vsync-off | peak | normal | 0.886 | - | 1.927 | 1.124 | 0.804 | 3.163 | 0.605 | 2.651 | 0.115 | 14.5 | 149 | 50003 | 11802 | 0.931 | 5 |
+| playtest-vsync-off | peak | small | 0.760 | - | 1.744 | 0.989 | 0.755 | 2.928 | 0.553 | 2.515 | 0.109 | 15.2 | 149 | 41966 | 7522 | 0.400 | 5 |
+| playtest-vsync-off | progressed-peak | normal | 1.214 | - | 3.524 | 1.478 | 2.023 | 4.845 | 0.749 | 3.462 | 0.118 | 18.4 | 515 | 93771 | 14395 | 1.207 | 7 |
+| playtest-vsync-off | progressed-peak | small | 1.078 | - | 3.213 | 1.324 | 1.890 | 4.424 | 0.603 | 3.029 | 0.118 | 17.0 | 517 | 82915 | 8406 | 0.552 | 8 |
+| playtest-vsync-off | stress | normal | 1.592 | - | 5.023 | 1.869 | 3.153 | 6.482 | 1.005 | 4.062 | 0.134 | 27.3 | 864 | 133408 | 16138 | 1.457 | 31 |
+| playtest-vsync-off | stress | small | 1.461 | - | 4.695 | 1.734 | 2.961 | 6.212 | 1.037 | 4.864 | 0.471 | 33.7 | 866 | 122340 | 10150 | 1.045 | 35 |
+
+All times are means in ms except cpu_frame p99; primitives, vertices and textured quads are per-frame means over the whole egui output (not the battlefield painter alone); GPU egui is the `lastlight/egui` timestamp span (supported on this adapter). The cpu_frame p99 column is only gated with VSync off.
+
+**interface_draw against wave 0 (the 5% check).** Wave 0 measured 300 frames after a 90-frame warmup; v3 uses the budget's 600 after 180.
+
+| Scene | Size | wave 0 (300 frames) | v3 pass 1 (600) | v3 pass 2 = baseline (600) | v3 at the wave-0 window (300, warmup 90) |
+|---|---|---|---|---|---|
+| peak | normal | 1.1904 | 1.3221 (+11.1%) | 1.2152 (+2.1%) | 1.2195 (+2.4%) |
+| peak | small | 1.0752 | 1.1002 (+2.3%) | 1.0841 (+0.8%) | 1.0783 (+0.3%) |
+| progressed-peak | normal | 1.6128 | 1.6502 (+2.3%) | 1.6550 (+2.6%) | 1.6542 (+2.6%) |
+| progressed-peak | small | 1.4719 | 1.5123 (+2.7%) | 1.5180 (+3.1%) | 1.4990 (+1.8%) |
+
+- Drift peak normal: pass 1 was 11.1% above wave 0 (repeats 1.296 / 1.340 / 1.322). Investigated: it is not instrumentation and not content. The W1-33 probe inside ui::draw is three `Instant` pairs (battle_frame_build, battlefield_paint, backdrop), one atomic egui-pass count and one scene-load record per pass; the other eleven cells of this table bound it together with noise at 0.3-3.1%, at most 0.05 ms. The same binary, scene and window measured 1.2152 (+2.1%) in pass 2 with the same scene load (52 enemies; 5-6 structures and 9-10 corpses at the end of the window, as in pass 1), and 1.2195 (+2.4%) at the wave-0 window, so the 600-frame window does not explain it either. Pass 1 ran without a load trace while other sessions were building; the machine sampled 93% load minutes after it ended. It is recorded as unreproduced pass-to-pass noise of up to about 9% on this shared machine, and the baseline uses pass 2. No cell of the baseline pass is more than 5% off wave 0.
+
+**What the baseline shows before any wave-1 optimisation.**
+- interface_draw is 47% over the progressed-peak gate at both sizes (1.655 vs ≤ 1.129, 1.518 vs ≤ 1.030); peak is at +2.1% / +0.8% over its not-above-wave-0 gate.
+- interface_total is 2.8-3.0x interface_draw at progressed-peak (tessellation 2.7 ms is the largest share, 515 clipped primitives and 94k vertices per frame), so the anti-shift guard has a real margin to watch.
+- cpu_frame p99 with VSync off is 16.9-38.1 ms in dev and 14.5-33.7 ms in playtest, against 10.0 ms; from the means, main_cpu is the larger share at progressed-peak and stress (4.4-8.4 ms against 3.5-5.7 ms of extract + render_schedule - present_wait), and the two are about equal at peak.
+- Frames over 50 ms are 0 in only one cell, dev VSync-off progressed-peak normal (wave 0 had 0 in 300 frames). The long frames are about 0.5 s each: with VSync on and pipelined rendering they sit in present_wait (swap-chain acquire, 514-530 ms), with VSync off they fall outside every span (main_cpu ≤ 17 ms, present_wait 0), and with VSync on and pipelining off they nearly vanish (pipelined A/B below). This is the isolated 0.5 s frame class in VALIDATION.md, not caused by the probe; the budget's frames_over_50ms 0 is unreachable on this machine until it is understood.
+- Two launches hung instead of reporting, both peak normal repeat 1 with VSync on: `dev-vsync-pipelined-off` ended in a Vulkan DeviceLost after 5 minutes, `dev-vsync-peak-wave0-window` (pipelined default) hit the 900 s script timeout. Both logged the boss victory at tick 15420 and wrote no report; the rejected `dev-vsync-b` attempt above is the same battle ending first but with a report. The reruns (`-b`) completed. Logged for W1-61, not reproduced.
+
+**Pipelined A/B (informational; W1-61 decides with both profiles).** dev, median of 3; on = the recorded runs above (`dev-novsync` + `dev-novsync-progressed-peak-b`, `dev-vsync-b`), off = `-Pipelined off` (`dev-novsync-pipelined-off`, `dev-vsync-pipelined-off-b`). Every cpu_frame p99 on both sides is above the 12.0 ms decision threshold. In `dev-vsync-pipelined-off-b`, progressed-peak small repeat 3 and both stress sizes overlapped ≥ 90% load samples, so those rows are the weakest.
+
+| VSync | Scene | Size | cpu_frame p99 on / off | critical_path p99 on / off | median frame on / off | mean FPS on / off | frames > 50 ms on / off |
+|---|---|---|---|---|---|---|---|
+| off | peak | normal | 17.3 / 15.4 | 12.4 / 15.4 | 4.59 / 6.82 | 103.4 / 62.6 | 7 / 13 |
+| off | peak | small | 16.9 / 18.9 | 11.9 / 18.9 | 4.10 / 6.29 | 100.1 / 68.2 | 16 / 10 |
+| off | progressed-peak | normal | 20.7 / 18.9 | 13.3 / 18.9 | 6.72 / 9.74 | 134.8 / 49.2 | 0 / 14 |
+| off | progressed-peak | small | 19.1 / 23.8 | 11.5 / 23.8 | 6.09 / 9.49 | 146.4 / 54.7 | 1 / 11 |
+| off | stress | normal | 31.8 / 31.7 | 21.5 / 31.7 | 8.75 / 12.69 | 54.7 / 38.1 | 39 / 53 |
+| off | stress | small | 38.1 / 37.4 | 28.0 / 37.4 | 8.21 / 12.34 | 55.7 / 38.1 | 40 / 57 |
+| on | peak | normal | 20.3 / 17.3 | 15.2 / 17.3 | 16.68 / 16.69 | 41.3 / 60.0 | 12 / 0 |
+| on | peak | small | 31.9 / 20.6 | 26.7 / 20.6 | 16.69 / 16.71 | 44.1 / 59.4 | 10 / 1 |
+| on | progressed-peak | normal | 23.4 / 21.1 | 16.0 / 21.1 | 16.67 / 16.73 | 48.1 / 59.6 | 6 / 1 |
+| on | progressed-peak | small | 36.7 / 32.8 | 27.9 / 32.8 | 16.70 / 16.75 | 43.7 / 58.3 | 12 / 3 |
+| on | stress | normal | 31.6 / 31.0 | 20.8 / 31.0 | 16.68 / 16.68 | 59.7 / 46.4 | 16 / 19 |
+| on | stress | small | 63.4 / 49.9 | 52.2 / 49.9 | 16.72 / 16.86 | 37.7 / 38.0 | 64 / 254 |
+
+Reading: with VSync off, pipelining raises throughput (median frame 4.1-8.8 ms against 6.3-12.7 ms) at a similar cpu_frame p99. With VSync on, both hold a 16.7 ms median, but pipelining carries the 0.5 s present_wait stalls (mean FPS 41-48 against 58-60 at peak and progressed-peak). Mean FPS includes those stalls; it is not a smoothness measure on its own.
 
 ---
 
