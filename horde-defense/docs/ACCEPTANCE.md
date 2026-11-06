@@ -52,6 +52,8 @@ These have no automated substitute and do not block a wave. The performance gate
 | Check | Protocol | Status |
 |---|---|---|
 | Integrated-GPU run | `measure_performance.ps1 -Adapter "Intel(R) Arc(TM) Graphics" -VsyncOff` on progressed-peak and stress at both sizes (informational, not a gate). Then set `hardware.integrated_gpu` in `docs/PERF_BUDGET.json` to `status` `measured` with the report path in `report`. | pending human check |
+| Camera feel: a 3x12 field at 2.5x zoom | Play the first defense (3 lanes x 12 yards, zoom 2.5, so on-screen enemy speed rises 2.5x) at 1440x900 and 1050x700@1.35, and judge whether the zoomed field reads and plays well. | pending human check |
+| Sheet upscale on 3-lane sprites at 2.5x | Inspect the intro and intro-small stills of a `capture_review.ps1` run and the 3x12 `weapon-classes` stills for blur, shimmer or uneven texels in the 2.5x sprites. | pending human check |
 
 ## Explicit limits
 
