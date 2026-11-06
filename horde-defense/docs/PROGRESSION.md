@@ -50,7 +50,7 @@ Fortifications now have ten authored rank nodes per type, with their actual node
 
 ## Overtaking, critical injury and loot
 
-[OVERTAKING_AND_CRITICAL.md](OVERTAKING_AND_CRITICAL.md) records the user’s explicit passing and retained GURPS injury semantics. Enemy.y() includes saved lateral displacement for hit tests, range, corpses and loot; intact blockers/contact still queue. A conscious NPC enemy at zero/negative HP is Critical, not a paid defeat. Actual terminals stop/reap/pay in the same fixed tick. Loot receipts are bounded informational history for already-owned items, never a second reward path.
+[OVERTAKING_AND_CRITICAL.md](OVERTAKING_AND_CRITICAL.md) records the user’s explicit passing and retained GURPS injury semantics. Enemy.y() includes saved lateral displacement for hit tests, range, corpses and loot. Since W1-69 enemies never queue: they overlap, and that displacement only eases back to 0. A conscious NPC enemy at zero/negative HP is Critical, not a paid defeat. Actual terminals stop/reap/pay in the same fixed tick. Loot receipts are bounded informational history for already-owned items, never a second reward path.
 
 ## Validation boundary
 

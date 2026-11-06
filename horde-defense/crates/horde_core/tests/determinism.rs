@@ -56,6 +56,15 @@
 //! | pre-pass | 8103a97 | 0x1a571167 Npc | 0xa0d031d13edd1996->0x6a2ba00f7e4018d8 | unchanged | F | save v6 level IDs |
 //! | pre-pass | 8103a97 | 0xdeadbeef2026 Personal | 0x9900ad25467328e2->0x5aaf1f080eb1da92 | unchanged | F | save v6 level IDs |
 //! | pre-pass | 8103a97 | 0xdeadbeef2026 Npc | 0x72f7f039a9dd7280->0xc1bb9ef207925afc | unchanged | F | save v6 level IDs |
+//! | 1 | W1-69 | 0x1a571167 Personal | 0x3be131386490e3b2->0x2902d75f0238e1a3 | 0x8beb3e2e0553347a->0x5cc8bde4faf09763 | G | W1-69 user decision: enemies no longer queue behind each other (a body that waited 0.65 yd behind another now walks on; outcome at t1800 kills 11, coins 37, loot 1) |
+//! | 1 | W1-69 | 0x1a571167 Npc | unchanged | 0x85ec9e5263ea48af->0x20c2f0bd540515c4 | G | W1-69 user decision: enemies no longer queue behind each other (no passing offset, so traced y and event order move; end state unchanged) |
+//! | 1 | W1-69 | 0xdeadbeef2026 Npc | unchanged | 0x1fda7a0649d44756->0x9d7678e43c2f560f | G | W1-69 user decision: enemies no longer queue behind each other (no passing offset, so traced y and event order move; end state unchanged) |
+//!
+//! W1-69 is the wave-1 re-bless (ruling R7, folded directly: the user's
+//! 2026-11-06 decision that enemies overlap is the only cause, so no
+//! `PROVISIONAL` step). The other three GOLDEN and three TRACE digests, the
+//! V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins
+//! did not move.
 mod support;
 use horde_core::command::Command;
 use horde_core::content::Mode;
@@ -70,10 +79,12 @@ const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
 /// serialized as level-ID sets/maps, the redundant `unlocked` frontier is no
 /// longer saved and attempt/report levels serialize as level IDs. The payload
 /// of every run changed, no gameplay did: `GAMEPLAY_TRACE` is unchanged.
+/// W1-69 (user decision, enemies no longer queue behind each other) moved
+/// 0x1A57_1167 Personal; see the re-bless log.
 const GOLDEN: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0x303e_a36f_ac6a_070b),
     (1, Mode::Npc, 0xeede_2391_290b_b381),
-    (0x1A57_1167, Mode::Personal, 0x3be1_3138_6490_e3b2),
+    (0x1A57_1167, Mode::Personal, 0x2902_d75f_0238_e1a3),
     (0x1A57_1167, Mode::Npc, 0x6a2b_a00f_7e40_18d8),
     (0xDEAD_BEEF_2026, Mode::Personal, 0x5aaf_1f08_0eb1_da92),
     (0xDEAD_BEEF_2026, Mode::Npc, 0xc1bb_9ef2_0792_5afc),
@@ -83,14 +94,16 @@ const GOLDEN: [(u64, Mode, u64); 6] = [
 /// enemy ids/hp/positions and the event queue; no serialized format) recorded
 /// on the v4 build (commit c6f518d) before the ordnance arrays became kind
 /// maps. The save-v5 and save-v6 re-blesses of `GOLDEN` are format-only: this trace proves
-/// the gameplay outcomes of the same six runs did not move.
+/// the gameplay outcomes of the same six runs did not move. W1-69 (user
+/// decision, enemies no longer queue behind each other) re-blessed three of
+/// them; see the re-bless log.
 const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xa6ca_a6de_7fd9_2b1a),
     (1, Mode::Npc, 0x2966_10f8_ded8_a91f),
-    (0x1A57_1167, Mode::Personal, 0x8beb_3e2e_0553_347a),
-    (0x1A57_1167, Mode::Npc, 0x85ec_9e52_63ea_48af),
+    (0x1A57_1167, Mode::Personal, 0x5cc8_bde4_faf0_9763),
+    (0x1A57_1167, Mode::Npc, 0x20c2_f0bd_5405_15c4),
     (0xDEAD_BEEF_2026, Mode::Personal, 0x46a2_adc6_720f_8678),
-    (0xDEAD_BEEF_2026, Mode::Npc, 0x1fda_7a06_49d4_4756),
+    (0xDEAD_BEEF_2026, Mode::Npc, 0x9d76_78e4_3c2f_560f),
 ];
 
 /// The ruleset `GAMEPLAY_TRACE` was recorded under. It follows

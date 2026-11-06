@@ -15,8 +15,15 @@ pub(super) fn paint(
 ) {
     let sy = arena.lane_height();
     // Three passes (every shadow, every prop, every readout) keep the
-    // battlefield's primitive count independent of how many structures stand:
-    // shapes sharing a texture merge in tessellation, alternating ones do not.
+    // battlefield's primitive count independent of how many structures stand
+    // or are struck: shapes sharing a texture merge in tessellation,
+    // alternating ones do not.
+    let prop = |kind| match kind {
+        StructureKind::Trap => Prop::Trap,
+        StructureKind::Wall => Prop::Wall,
+        StructureKind::Turret => Prop::Turret,
+    };
+    let prop_size = |footprint: f32| vec2(arena.yard_width() * footprint, sy * 0.88);
     for s in &view.structures {
         let at = arena.world(s.position[0], s.position[1]);
         soft_shadow(p, at + vec2(2., sy * 0.29), vec2(sy * 0.48, sy * 0.14), 0.7);
@@ -25,11 +32,6 @@ pub(super) fn paint(
         let at = arena.world(s.position[0], s.position[1]);
         let pose = &s.pose;
         let direction = arena.world(pose.target[0], pose.target[1]) - at;
-        let prop = match s.kind {
-            StructureKind::Trap => Prop::Trap,
-            StructureKind::Wall => Prop::Wall,
-            StructureKind::Turret => Prop::Turret,
-        };
         let tint = if s.kind == StructureKind::Trap && s.charges == 0 {
             C::from_rgb(132, 126, 109)
         } else {
@@ -38,16 +40,15 @@ pub(super) fn paint(
         if !visual_assets::prop_animated(
             p,
             textures,
-            prop,
+            prop(s.kind),
             at,
-            vec2(arena.yard_width() * s.footprint_width, sy * 0.88),
+            prop_size(s.footprint_width),
             tint,
             PropMotion {
                 angle: direction.y.atan2(direction.x),
                 target: Some(arena.world(pose.target[0], pose.target[1])),
                 recoil: pose.recoil,
                 trigger: pose.trigger,
-                hit: pose.hit,
             },
         ) {
             structure_fallback(
@@ -62,6 +63,14 @@ pub(super) fn paint(
     }
     for s in &view.structures {
         let at = arena.world(s.position[0], s.position[1]);
+        visual_assets::prop_hit_outline(
+            p,
+            textures,
+            prop(s.kind),
+            at,
+            prop_size(s.footprint_width),
+            s.pose.hit,
+        );
         if s.hp < s.max_hp {
             let damage = 1. - s.hp.max(0) as f32 / s.max_hp as f32;
             for n in 0..3 {

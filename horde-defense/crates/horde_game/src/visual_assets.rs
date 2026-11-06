@@ -261,7 +261,6 @@ pub struct PropMotion {
     pub target: Option<Pos2>,
     pub recoil: f32,
     pub trigger: f32,
-    pub hit: f32,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Actor {
@@ -809,18 +808,32 @@ pub fn prop_animated(
             p.image(texture, rect, region(source), tint);
         }
     }
-    if motion.hit > 0. {
-        p.rect_stroke(
-            rect,
-            1.,
-            bevy_egui::egui::Stroke::new(
-                1.,
-                Color32::from_rgba_unmultiplied(227, 164, 108, (motion.hit * 180.) as u8),
-            ),
-            bevy_egui::egui::StrokeKind::Outside,
-        );
-    }
     true
+}
+/// The struck outline of a prop drawn by [`prop_animated`] at the same
+/// `center` and `size`, `hit` in 0..=1. Drawn by the caller after every prop
+/// (W1-69), so struck props never split the props pass into alternating
+/// texture runs. Draws nothing without the props sheet, like the prop.
+pub fn prop_hit_outline(
+    p: &Painter,
+    textures: ArtTextures,
+    kind: Prop,
+    center: Pos2,
+    size: Vec2,
+    hit: f32,
+) {
+    if hit <= 0. || textures.props.is_none() {
+        return;
+    }
+    p.rect_stroke(
+        fit(center, size, PROP_RECTS[kind as usize]),
+        1.,
+        bevy_egui::egui::Stroke::new(
+            1.,
+            Color32::from_rgba_unmultiplied(227, 164, 108, (hit * 180.) as u8),
+        ),
+        bevy_egui::egui::StrokeKind::Outside,
+    );
 }
 // Source-space spindle, breech and barrel end from the pixel turret. These
 // presentation-only calibration points share the head's rigid transform.

@@ -360,9 +360,10 @@ fn legacy_actor_meshes(view: &BattleViewModel, textures: ArtTextures) -> Vec<egu
         for e in &view.enemies {
             let pose = &e.pose;
             let has_walk = e.sprite.is_some_and(|s| s.is_walk()) && textures.walkers.is_some();
+            let [x, y] = e.drawn();
             let painted_at = arena.world(
-                e.position[0] + pose.offset[0],
-                e.position[1] + if has_walk { 0. } else { pose.offset[1] },
+                x + pose.offset[0],
+                y + if has_walk { 0. } else { pose.offset[1] },
             );
             let height = e.height.pixels(sy);
             let actor = visual_assets::Actor::Enemy(e.sprite.unwrap());
@@ -408,11 +409,13 @@ fn batched_actor_layer_keeps_feet_then_id_order_across_sheets() {
     let a = game.attempt().unwrap();
     let textures = textures();
     let atlas = textures.battle_atlas.unwrap();
+    let a_enemy = |id: u64| a.enemies.iter().find(|e| e.id == id).unwrap();
     assert!(
-        view.enemies
-            .windows(2)
-            .all(|pair| (pair[0].position[1], pair[0].id) <= (pair[1].position[1], pair[1].id)),
-        "the view is in feet-then-id order"
+        view.enemies.windows(2).all(|pair| {
+            let (p, q) = (a_enemy(pair[0].id), a_enemy(pair[1].id));
+            (p.y(), -p.x, p.id) <= (q.y(), -q.x, q.id)
+        }),
+        "the view is in lane-feet, x-descending, id order"
     );
     let arena_projection = ArenaProjection::for_attempt(arena(), a);
     let shapes = painted(|p| {
@@ -1128,4 +1131,101 @@ fn hit_flash_is_one_quad_per_sprite() {
             .count();
         assert_eq!(flash_vertices, 4 * flashing, "reduced {reduced}");
     }
+}
+
+/// Struck structures cost no primitives (W1-69): since enemies stop queueing,
+/// every wall in a 17-lane field can be struck in one frame. Each hit outline
+/// used to split the props pass (props texture, outline, props texture...),
+/// so the field passed the 48-primitive gate at the progressed peak.
+#[test]
+fn struck_structures_add_no_primitives() {
+    let game = horde_core::sim::maximum_progression_render_fixture().unwrap();
+    let a = game.attempt().unwrap();
+    let primitives = |hit: f32| {
+        let mut view =
+            BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
+        for s in &mut view.structures {
+            s.pose.hit = hit;
+        }
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            let painter = ui.painter().with_clip_rect(arena());
+            battlefield(
+                &painter,
+                arena(),
+                &view,
+                a,
+                [10.0, 5.0],
+                options(textures()),
+            );
+        });
+        output.textures_delta.clear();
+        ctx.tessellate(output.shapes, output.pixels_per_point)
+            .into_iter()
+            .filter(|primitive| primitive.clip_rect == arena())
+            .count()
+    };
+    assert!(a.structures.len() >= 10, "a field of structures");
+    assert_eq!(primitives(1.0), primitives(0.0));
+}
+
+/// A stack on the line (W1-69, enemies overlap) draws one contact band and
+/// one windup ring for its lane, and every body keeps its own windup bar.
+#[test]
+fn a_stack_on_the_line_draws_one_band_and_one_windup_ring() {
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(horde_core::balance::BalanceSettings::legacy())
+        .unwrap();
+    game.campaign_mut().attempts = 1;
+    game.deploy(0, horde_core::content::Mode::Personal).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.paused = false;
+    for (lane, x) in [
+        (1, 1.5),
+        (1, 1.5),
+        (1, 1.5),
+        (1, 1.5),
+        (1, 1.5),
+        (1, 1.5),
+        (0, 1.5),
+        (1, 3.0),
+    ] {
+        game.spawn_enemy(
+            &mut a,
+            horde_core::content::EnemyKind::Shambler,
+            lane,
+            false,
+        );
+        a.enemies.last_mut().unwrap().x = x;
+    }
+    *game.attempt_slot_mut() = Some(a);
+    game.set_paused(false);
+    game.tick(horde_core::sim::Input::default());
+    let a = game.attempt().unwrap();
+    let view = BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
+    let winding = view.enemies.iter().filter(|e| e.windup.is_some()).count();
+    assert_eq!(
+        winding,
+        7,
+        "the six stacked bodies and the lane-0 body wind up: {:?}",
+        a.enemies
+            .iter()
+            .map(|e| (e.id, e.lane, e.x, e.attack_phase, e.in_view()))
+            .collect::<Vec<_>>()
+    );
+    let lanes: Vec<u8> = enemies::lane_contacts(&view)
+        .into_iter()
+        .map(|(lane, _)| lane)
+        .collect();
+    assert_eq!(lanes, [0, 1], "one band per contact lane");
+    let rings = enemies::windup_rings(&view);
+    let ringed: Vec<(u8, f32)> = view
+        .enemies
+        .iter()
+        .zip(&rings)
+        .filter(|(_, ring)| **ring)
+        .map(|(e, _)| (e.lane, e.position[0]))
+        .collect();
+    assert_eq!(ringed, [(0, 1.5), (1, 1.5)], "one ring per stack");
 }

@@ -1,9 +1,19 @@
+//! Enemies never block each other (user decision, 2026-11-06, W1-69).
+//!
+//! Until W1-69 a lane was traffic: an enemy stopped 0.65 yd behind the one in
+//! front (`EnemyPhase::Queued`) and a faster one swung out by
+//! `pass_offset` to overtake. The user ruled that enemies overlap instead:
+//! there is no lane queue, every enemy walks until it reaches the defense
+//! line or a live non-trap structure in its lane, and every enemy there
+//! attacks. These tests pin that rule; they replace the queueing and passing
+//! assertions on purpose, they are not weakened versions of them.
 mod support;
 use horde_core::{
     content::{EnemyKind, Mode, StructureKind},
-    sim::{DEFENSE_LINE, EnemyPhase, Game, Input, MAX_PASS_OFFSET},
+    kind_map::KindMap,
+    sim::{DEFENSE_LINE, EnemyPhase, Game, Input},
 };
-use support::legacy_game;
+use support::{game, legacy_game};
 
 fn fixture(lane: u8) -> (Game, u64, u64) {
     let mut g = legacy_game();
@@ -29,12 +39,172 @@ fn step(g: &mut Game, count: u32, batch: u32) {
     }
 }
 
+/// Six hostiles of mixed speeds, slowest in front, all in `lane`, with a
+/// defender that cannot fall. Returns the game and `(id, start x, speed)`.
+fn crowd(lane: u8) -> (Game, Vec<(u64, f32, f32)>) {
+    let mut g = game(Mode::Personal);
+    let mut a = g.attempt_slot_mut().take().unwrap();
+    a.max_hp = 1_000_000;
+    a.hp = a.max_hp;
+    let mut crowd = Vec::new();
+    for (kind, x) in [
+        (EnemyKind::Brute, 3.0),
+        (EnemyKind::Demolisher, 3.4),
+        (EnemyKind::Armored, 3.8),
+        (EnemyKind::Shambler, 4.2),
+        (EnemyKind::Runner, 4.6),
+        (EnemyKind::Runner, 5.0),
+    ] {
+        g.spawn_enemy(&mut a, kind, lane, false);
+        let e = a.enemies.last_mut().unwrap();
+        e.x = x;
+        let speed = e.resolved.as_ref().unwrap().speed * a.modifiers.enemy_speed;
+        crowd.push((e.id, x, speed));
+    }
+    *g.attempt_slot_mut() = Some(a);
+    (g, crowd)
+}
+
 #[test]
-fn faster_enemy_smoothly_passes_without_stopping_the_slow_one_or_changing_lanes() {
+fn enemies_in_one_lane_never_block_each_other() {
+    let (mut g, crowd) = crowd(5);
+    let (brute, runner) = (crowd[0].0, crowd[4].0);
+    // Ticks each hostile needs to walk from its start to the line, plus one
+    // for the contact step.
+    let due: Vec<u64> = crowd
+        .iter()
+        .map(|(_, x, speed)| ((x - DEFENSE_LINE) / speed * 60.0).ceil() as u64 + 1)
+        .collect();
+    let start = g.attempt().unwrap().tick;
+    let mut swapped = false;
+    let mut contact_at = vec![None; crowd.len()];
+    for _ in 0..=*due.iter().max().unwrap() {
+        g.tick(Input::default());
+        let a = g.attempt().expect("the defender cannot fall");
+        let find = |id: u64| a.enemies.iter().find(|e| e.id == id).unwrap();
+        for (n, (id, _, _)) in crowd.iter().enumerate() {
+            let e = find(*id);
+            assert_ne!(
+                e.attack_phase,
+                EnemyPhase::Queued,
+                "hostile {id} queued behind another"
+            );
+            assert_eq!(e.pass_offset, 0.0, "hostile {id} swung out to pass");
+            if contact_at[n].is_none() && e.contact_since.is_some() {
+                assert!((e.x - DEFENSE_LINE).abs() <= 0.01, "contact off the line");
+                assert_eq!(e.attack_phase, EnemyPhase::Windup);
+                assert_eq!(e.target_structure, None);
+                contact_at[n] = Some(a.tick - start);
+            }
+        }
+        swapped |= find(runner).x < find(brute).x;
+    }
+    assert!(
+        swapped,
+        "the runner walked through the brute in front of it"
+    );
+    let a = g.attempt().unwrap();
+    for (n, (id, _, _)) in crowd.iter().enumerate() {
+        let e = a.enemies.iter().find(|e| e.id == *id).unwrap();
+        assert!(
+            (e.x - DEFENSE_LINE).abs() <= 0.01,
+            "hostile {id} stopped at {} short of the line",
+            e.x
+        );
+        let reached = contact_at[n].unwrap_or_else(|| panic!("hostile {id} never made contact"));
+        assert!(
+            reached <= due[n],
+            "hostile {id}: contact at {reached} > {}",
+            due[n]
+        );
+    }
+}
+
+#[test]
+fn enemies_still_stop_at_structures() {
+    let mut g = game(Mode::Personal);
+    g.campaign_mut().blueprints = KindMap::filled(true);
+    g.set_paused(true);
+    g.place(StructureKind::Wall, 5, 0).unwrap();
+    let (wall_id, stop) = {
+        let s = &g.attempt().unwrap().structures[0];
+        (s.id, s.x() + s.blocking_radius())
+    };
+    g.attempt_mut().unwrap().structures[0].hp = 1_000_000;
+    g.attempt_mut().unwrap().structures[0].max_hp = 1_000_000;
+    let mut a = g.attempt_slot_mut().take().unwrap();
+    let mut ids = Vec::new();
+    for (kind, x) in [
+        (EnemyKind::Brute, stop + 0.4),
+        (EnemyKind::Shambler, stop + 0.8),
+        (EnemyKind::Runner, stop + 1.2),
+        (EnemyKind::Runner, stop + 1.6),
+    ] {
+        g.spawn_enemy(&mut a, kind, 5, false);
+        a.enemies.last_mut().unwrap().x = x;
+        ids.push(a.enemies.last().unwrap().id);
+    }
+    *g.attempt_slot_mut() = Some(a);
+    g.set_paused(false);
+    step(&mut g, 300, 4);
+    let a = g.attempt().unwrap();
+    assert!(a.structures[0].hp > 0);
+    for id in ids {
+        let e = a.enemies.iter().find(|e| e.id == id).unwrap();
+        assert!(
+            (e.x - stop).abs() <= 0.01,
+            "hostile {id} at {} instead of the wall face {stop}",
+            e.x
+        );
+        assert_eq!(e.target_structure, Some(wall_id), "hostile {id}");
+        assert!(e.contact_since.is_some(), "hostile {id} is not attacking");
+        assert_ne!(e.attack_phase, EnemyPhase::Queued);
+    }
+}
+
+#[test]
+fn a_saved_queued_enemy_resolves_on_the_next_tick() {
+    // Saves written before W1-69 can hold `"attack_phase": "Queued"`. The
+    // variant stays for them; the next movement step resolves it.
+    for (x, contact) in [(6.0, false), (DEFENSE_LINE, true)] {
+        let mut g = game(Mode::Personal);
+        let mut a = g.attempt_slot_mut().take().unwrap();
+        g.spawn_enemy(&mut a, EnemyKind::Shambler, 3, false);
+        let e = a.enemies.last_mut().unwrap();
+        e.x = x;
+        e.attack_phase = EnemyPhase::Queued;
+        *g.attempt_slot_mut() = Some(a);
+        let json = serde_json::to_string(&g).unwrap();
+        assert!(json.contains("\"Queued\""));
+        let path = std::env::temp_dir().join(format!(
+            "lastlight-queued-{}-{contact}.json",
+            std::process::id()
+        ));
+        g.save(&path).unwrap();
+        let mut g = Game::load(&path).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(
+            g.attempt().unwrap().enemies[0].attack_phase,
+            EnemyPhase::Queued
+        );
+        g.set_paused(false);
+        g.tick(Input::default());
+        let e = &g.attempt().unwrap().enemies[0];
+        if contact {
+            assert_eq!(e.attack_phase, EnemyPhase::Windup);
+            assert!(e.contact_since.is_some());
+        } else {
+            assert_eq!(e.attack_phase, EnemyPhase::Advance);
+            assert!(e.x < x);
+        }
+    }
+}
+
+#[test]
+fn faster_enemy_walks_through_the_slow_one_without_stopping_it_or_leaving_the_lane() {
     for lane in [0, 5, 10] {
         let (mut g, slow, fast) = fixture(lane);
         let mut crossed = false;
-        let mut previous_offset = 0.0;
         for _ in 0..150 {
             let a = g.attempt().unwrap();
             let before = a.enemies.iter().find(|e| e.id == slow).unwrap().x;
@@ -48,31 +218,41 @@ fn faster_enemy_smoothly_passes_without_stopping_the_slow_one_or_changing_lanes(
             );
             assert_eq!(slow.lane, lane);
             assert_eq!(fast.lane, lane);
-            assert_ne!(slow.id, fast.id);
-            assert!((fast.pass_offset - previous_offset).abs() <= 2.0 / 60.0 + 0.00001);
-            previous_offset = fast.pass_offset;
-            assert!(fast.pass_offset.abs() <= MAX_PASS_OFFSET);
-            assert!((0.5..=10.5).contains(&fast.y()));
-            assert_eq!(fast.y().floor() as u8, lane);
-            if (fast.x - slow.x).abs() < 0.025 {
-                assert!(
-                    (fast.y() - slow.y()).abs() >= if lane == 5 { 0.5 } else { 0.25 },
-                    "passing must have real lateral separation"
-                );
-                crossed = true;
-            }
+            // No lateral passing: both stay on the lane centre and overlap.
+            assert_eq!(fast.pass_offset, 0.0);
+            assert_eq!(fast.y(), lane as f32 + 0.5);
+            assert_eq!(slow.y(), fast.y());
+            crossed |= fast.x < slow.x;
         }
-        let a = g.attempt().unwrap();
         assert!(crossed);
-        assert!(
-            a.enemies.iter().find(|e| e.id == fast).unwrap().x
-                < a.enemies.iter().find(|e| e.id == slow).unwrap().x
-        );
     }
 }
 
 #[test]
-fn wall_and_contact_queues_still_block_fast_runners_and_traps_cover_the_passing_width() {
+fn a_saved_passing_offset_eases_back_to_the_lane_centre() {
+    let (mut g, _, fast) = fixture(5);
+    let a = g.attempt_mut().unwrap();
+    let e = a.enemies.iter_mut().find(|e| e.id == fast).unwrap();
+    e.pass_offset = 0.32;
+    let mut previous = 0.32f32;
+    for _ in 0..30 {
+        g.tick(Input::default());
+        let e = g
+            .attempt()
+            .unwrap()
+            .enemies
+            .iter()
+            .find(|e| e.id == fast)
+            .unwrap()
+            .pass_offset;
+        assert!(e <= previous && previous - e <= 2.0 / 60.0 + 0.00001);
+        previous = e;
+    }
+    assert_eq!(previous, 0.0);
+}
+
+#[test]
+fn walls_hold_every_enemy_and_traps_still_trigger() {
     let mut g = legacy_game();
     g.campaign_mut().first_clear(0, Mode::Personal);
     g.campaign_mut().first_clear(1, Mode::Personal);
@@ -98,17 +278,18 @@ fn wall_and_contact_queues_still_block_fast_runners_and_traps_cover_the_passing_
             .filter(|e| e.lane == 5)
             .all(|e| e.x >= wall - 0.001)
     );
+    // Both bodies reach the wall and attack it; neither waits behind the other.
     assert_eq!(
         a.enemies
             .iter()
             .filter(|e| e.target_structure == Some(a.structures[0].id))
             .count(),
-        1
+        2
     );
     assert!(
         a.enemies
             .iter()
-            .any(|e| e.attack_phase == EnemyPhase::Queued)
+            .all(|e| e.attack_phase != EnemyPhase::Queued)
     );
 
     let mut g = legacy_game();

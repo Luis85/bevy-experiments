@@ -156,6 +156,7 @@ Source: `target/production-before/perf/*.json` (frame report v2; 90 warm-up and 
 | Loudness gate | A 60 s mix at **default sliders** reads **-23 ±2 LUFS integrated** with **true peak ≤ 0.95 FS**. This replaces the brief's "-16 to -14 LUFS". Recorded in ACCEPTANCE.md, AUDIO_SURVIVAL.md and this plan. | G8.5: `reference_mixed_60s_meets_loudness_gate` (both themes), `dense_battle_60s_true_peak_at_most_0_95` (A6-17) |
 | Mastering (R3) | The exporter may apply an offline per-clip true-peak ceiling. A runtime master limiter is added only if the measured 60 s mix exceeds 0.95 FS true peak; the outcome is recorded here. | G8.6 |
 | Music | MusicPlugin = music director + Music bus + stingers built from existing banks. Every track slot is `Track::Deferred`. The slider is labelled "Music & stingers". | G8.7 (A6-15) |
+| Enemies overlap, no lane traffic jams (2026-11-06) | Enemies never block each other: no lane queue and no overtaking side step, bodies in a lane overlap, and every enemy that reaches the defense line or a live non-trap structure attacks. Structures still block (barricades, not traffic); traps still cover the lane. `EnemyPhase::Queued` stays for old saves and is never assigned; `pass_offset` only eases back to 0. Presentation fans a stack out with a static per-id stagger and paints each lane far to near. GOLDEN and GAMEPLAY_TRACE are re-blessed once for it (W1-69, the wave-1 re-bless). No balance retune here: wave 2's pacing work owns the measured shift (§9.6). | `enemies_in_one_lane_never_block_each_other`, `enemies_still_stop_at_structures`, `a_saved_queued_enemy_resolves_on_the_next_tick` (W1-69) |
 | Camera (R1) | Uniform zoom-to-fit that keeps today's lane:yard proportion: base = today's per-geometry `clearing_rect` (with its 160/86 clamps), zoom = min(arena.w/base.w, arena.h/base.h) ≥ 1, centred, no texel clamp. Fewer lanes means more zoom. 17x30 and every other already-filling field stays pixel-identical. The observer window uses the same fit. Construction is an overlay panel and never rescales the arena; an INCOMING chevron marks spawns it covers; Save/Clear plan stay in the panel. Owner vfx-lighting, wave 1. | G7.9, G2.10 (W1-43..46) |
 
 ### 2.3 Archive list (decision 10 as extended by the user)
@@ -685,12 +686,13 @@ Digest ledger:
 2. The wave's one save-determinism re-bless commit (W2-49, W4-08) folds `PROVISIONAL` into `GOLDEN` and `GAMEPLAY_TRACE`, writes a reason per moved digest into the determinism log and the commit body, and resets `PROVISIONAL` to None and the causes to empty.
 3. The wave-close critic checks that `PROVISIONAL` is None. A move with no listed cause, or a G move where none is expected, stops the work.
 
-**Wave 1 result:** `GOLDEN` 0/6 and `GAMEPLAY_TRACE` 0/6 moved over the whole wave (both families are identical to the pre-W1-01 parent of `b82658a`); `PROVISIONAL` is None with no causes; `RULESET_VERSION` 2 (W1-20, label only); V1-V6 continuation pins unchanged.
+**Wave 1 result:** through W1-68 `GOLDEN` 0/6 and `GAMEPLAY_TRACE` 0/6 moved (both families identical to the pre-W1-01 parent of `b82658a`). W1-69, the user's 2026-11-06 decision that enemies overlap (§2.2), is the wave-1 re-bless: `GOLDEN` 1/6 (0x1A57_1167 Personal) and `GAMEPLAY_TRACE` 3/6 (0x1A57_1167 Personal and Npc, 0xDEAD_BEEF_2026 Npc), class G, folded directly with a reason per digest in `tests/determinism.rs`. `PROVISIONAL` is None with no causes; `RULESET_VERSION` 2 (W1-20, label only); V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins unchanged.
 
 ### Expected moves after the freeze
 
 | Wave | Digest | Expected | Class | Cause (commit) | Re-bless |
 |---|---|---|---|---|---|
+| 1 | GOLDEN 1/6, GAMEPLAY_TRACE 3/6 | yes (user decision 2026-11-06) | G | enemies never block each other (W1-69) | W1-69 |
 | 2 | GOLDEN 6/6 | yes | F | `drop_tier` always Some plus `drop_ids` at depth 0 (W2-06) | W2-49 |
 | 2 | GOLDEN 6/6 | yes | T | per-archetype telemetry writer (W2-05) | W2-49 |
 | 2 | GOLDEN | yes | C | the 39 `loot_only` items enlarge the tier pool (W2-08) | W2-49 |
@@ -711,7 +713,7 @@ Full commit list: `docs/plans/production-pass/waves.md`. Every commit is test-fi
 
 | Wave | Scope | Commits | Owners | Digest | Exit |
 |---|---|---|---|---|---|
-| 1 | Goal 1, camera (R1), sale eligibility, v7 schema + migration + fixtures, enemy_visuals v2, archive, PS 5.1, review panic fix | W1-01..W1-63 | all 10 | 0 moves | PERF gates pass (W1-61); `save_v7.json` frozen; camera capture review logged (W1-60); GOLDEN 0/6, TRACE 0/6 |
+| 1 | Goal 1, camera (R1), sale eligibility, v7 schema + migration + fixtures, enemy_visuals v2, archive, PS 5.1, review panic fix, enemies overlap (user decision) | W1-01..W1-69 | all 10 | one re-bless (W1-69, user decision) | PERF gates pass (W1-61); `save_v7.json` frozen; camera capture review logged (W1-60); GOLDEN 1/6, TRACE 3/6, all from W1-69 |
 | 2 | Auto-sell, takeover, SelectCountry, scaling, archetypes, elites, bosses, progression and skills | W2-01..W2-49 | all but audio | one re-bless (W2-49) | Pacing and smoke before/after; stress re-gate; visual twins for audio |
 | 3 | Goal 2 and the UI for goals 3-4 (horde_game plus pure core reads) | W3-01..W3-28 | ux-flow, loot-economy, progression-tree, enemy-balance, vfx-lighting, qa-captures | 0 | Full-loop headless test at both sizes; W3 capture matrix reviewed |
 | 4 | Balance (goals 5-6) and the goal-3 numbers | W4-01..W4-11 plus tuning loops | enemy-balance, progression-tree, loot-economy, campaign-defenders, save-determinism | one re-bless (W4-08) | Every ignored `pacing_targets` assertion passes in release, with before/after tables |
@@ -775,6 +777,25 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 | Boss TTK median (s) | (W2-04) | | |
 | Smoke Personal stages 1-5 / Npc stages 1-5 | see 1.3 | | |
 | Strategy profile: liberations 2/4/10, coins per minute | (W2-43) | | |
+
+### 9.6 Enemies overlap (W1-69): pacing and smoke
+
+User decision of 2026-11-06 (§2.2). Pacing: `cargo run --locked --release -p horde_core --example pacing -- 60 --runs`, on the parent `63168c1` (before) and on W1-69 (after), 60 runs per profile, as runs / battle minutes.
+
+| Milestone | expert, tree first, DEU (before → after) | novice, tree first, DEU | novice, gear first, LUX |
+|---|---|---|---|
+| First victory | 4 / 13 → 3 / 9 | 3 / 9 → 5 / 17 | 2 / 6 → 3 / 10 |
+| First liberation | 14 / 60 → 14 / 58 | 14 / 59 → 17 / 69 | 5 / 18 → 6 / 22 |
+| Tier 2 affordable | 5 / 17 → 5 / 17 | 5 / 17 → 6 / 20 | 5 / 18 → 5 / 18 |
+| Tier 3 affordable | 7 / 25 → 7 / 25 | 6 / 21 → 8 / 28 | 6 / 21 → 6 / 22 |
+| Tier 4 affordable | 7 / 25 → 7 / 25 | 7 / 25 → 9 / 32 | 7 / 26 → 7 / 25 |
+| Parallel defenses unlocked | 17 / 72 → 17 / 71 | 17 / 72 → 20 / 82 | 8 / 30 → 9 / 34 |
+| Defeats in 60 runs (runs) | 5 (1, 2, 3, 8, 10) → 5 (1, 2, 4, 8, 10) | 5 (1, 2, 4, 7, 8) → 8 (1, 2, 3, 4, 6, 7, 11, 12) | 2 (1, 3) → 3 (1, 2, 5) |
+| Coins over 60 runs | 269,900 → 269,927 | 269,546 → 248,312 | 306,599 → 299,150 |
+
+Runs are harder, as expected: every enemy at a wall or the line now attacks, instead of one per lane with the rest queued behind it (59 enemies in contact against 19 at tick 420 of the progressed-peak fixture). The novice profile takes the shift: 3 more defeats, 2 of them after run 10, and its first victory moves from run 3 to run 5. The expert profile is unchanged within noise. Nothing is retuned in W1-69. This is the input for wave 2's pacing work (W2-01 baseline, W2-49 re-bless).
+
+Smoke (`cargo run --locked -p horde-defense -- --smoke`): PASS before and after. Before is wave 0 §1.3; gameplay did not move between wave 0 and W1-68 (GOLDEN and TRACE 0/6), and it was not re-run on `63168c1`. Failed attempts: Personal 2 → 1 (stage 1 victory at attempt 2 instead of 3), Npc 1 → 3 (stage 1 victory at attempt 3 instead of 2, plus one stage-2 defeat). The legacy autonomous run is still a Defeat: 33 kills, 110 coins in 119.0 s before; 49 kills, 163 coins in 136.0 s after. Personal stage 5 is a Victory in 253.8 s with 284 kills and 2,653 coins (254.2 s, 284 kills, 2,741 before). Npc stage 5 is a Victory in 256.0 s with 150 kills and 1,564 coins (250.0 s, 146 kills, 1,615 before).
 
 ### 9.3 Audio
 
@@ -911,6 +932,8 @@ Format owned by qa-captures and checked by `scripts/check_capture_findings.py` (
 | CF-1-03 | 1 | max-lanes, progressed-peak, every Battle still | both | both | Review captures read the live OS pointer: `f.battle.aim` follows `response.hover_pos()` whenever the reticle preview is off (ui/battle/field.rs:56-66), so aim, the painted reticle and inspector hover depend on where the mouse sat during the run (most of the 7,026 changed pixels in w1-60 normal max-lanes.png). Before/after pairs then differ for reasons outside the reviewed change, including in W7-11's compare_captures | minor | qa-captures | open | | | |
 | CF-1-04 | 1 | damage, damage-4x | both | normal | Damage-number pop is stepped since W1-64: the punch snaps to the nearest of x0.85 / 1.0 / 1.15 / 1.3 (0.85, 1.0, 1.15, 1.3, 1.15, 1.0 over its first 0.18 s at 60 fps) instead of a continuous scale, and every face places glyphs on whole pixels, so battle frames stop re-uploading the egui font atlas. Reduced mode never punched and is unchanged. Motion rows in 10.2; the feel of the stepped pop is a human check | polish | perf-architecture | fixed | W1-64 | target/production-after/w1-64/damage-motion/frame-0004.png#75d2c40b0af8, target/production-after/w1-64/damage-motion-small/frame-0004.png#fcf13e1011b1 | |
 | CF-1-05 | 1 | menu, battle, leveled-armory | both | normal | Since W1-64 every font face places glyphs on whole pixels (no subpixel bins), not only the display face, so all text on every screen can move by under a pixel. Against a build with the bins back on (`text-subpixel-on-b`), 0.23 / 0.36% of menu pixels change (1440x900 / 1050x700@1.35), 0.43 / 1.05% of battle pixels and 1.20 / 1.11% of leveled-armory pixels; two runs of the same build differ by 0.04-0.17%. Side-by-side crops show no wrap, clip or layout change. Whether spacing looks uneven at 1.35 is a human check (section 11) | polish | perf-architecture | fixed | W1-64 | target/production-after/w1-64/text-after/normal/menu-small.png#b66540800f6d, target/production-after/w1-64/text-after/normal/battle-small.png#4a244348b2ce, target/production-after/w1-64/text-after/normal/leveled-armory-small.png#cea1d9c06907 | |
+| CF-1-06 | 1 | progressed-peak, stress (motion), peak, progressed-peak, fx-stress | both | both | Enemies overlap since W1-69 (user decision), so 2-6 bodies stack on each wall face and at the line. Unhandled, a stack drew as one body with 2-6 red windup rings and contact bands on top of each other. W1-69 fans each body by a static per-id stagger (up to 0.15 yd behind the feet and 0.12 lane across), paints a lane far to near, then by id, and draws one contact band per lane and one windup ring per stack. Every body keeps its own windup and health bars and its hit flash. In the motion frames, wall stacks read as 2-3 distinct bodies at both sizes | minor | enemies-elites-bosses | fixed | W1-69 | target/production-after/w1-69-motion/progressed-peak-normal/frame-0023.png#4fb857ba7304, target/production-after/w1-69-motion/progressed-peak-small/frame-0023.png#26c54a66c0d3, target/production-after/w1-69-motion/stress-normal/frame-0023.png#7fff9c10d676, target/production-after/w1-69-motion/stress-small/frame-0023.png#ab19be1add6d | |
+| CF-1-07 | 1 | progressed-peak, stress (motion) | 1050x700@1.35 | normal | With every stacked enemy now striking walls, nearly every wall in the 17-lane field shows a damage number or MISS in a frame. At 1050x700@1.35 those numbers ("-80", "MISS") cover the wall face and the front of its stack. At 1440x900 they cover the wall prop only. Placement of wall-hit numbers is fx work and is not changed here | minor | vfx-lighting | open | | | |
 | CF-0-04 | 0 | battle, menu, leveled-armory | both | both | Non-practice review captures show "Practice scenario - progress is isolated from your campaign", and menu and camp reviews draw "Practice profile" (amber), "Separate practice saves" and the "Practice · separate campaign" footer | minor | qa-captures | fixed | 299470a, 3d6e5c0 | target/production-after/w1-05/normal/battle.png#d44738e6cb6a, target/production-after/w1-05-review/normal/menu.png#be3544456adb, target/production-after/w1-05-review/normal/leveled-armory.png#b6163c62d2a9 | |
 <!-- capture-findings:end -->
 

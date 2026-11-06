@@ -1009,8 +1009,11 @@ fn npc_hit_stop_holds_translation_without_extra_decisions_or_rerolls() {
     );
 }
 
+/// W1-69 (user decision, 2026-11-06): enemies no longer queue, so the body
+/// 0.65 yd behind the one in contact keeps advancing instead of waiting
+/// `Queued`. Hit-stop still holds its translation for the fixed ticks only.
 #[test]
-fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
+fn hit_stop_expires_in_fixed_ticks_while_contacted_or_advancing_in_either_mode() {
     use horde_core::sim::EnemyPhase;
     for mode in [Mode::Personal, Mode::Npc] {
         let mut g = game(mode);
@@ -1019,8 +1022,9 @@ fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
         advance(&mut g, 1);
         let a = g.attempt_mut().unwrap();
         assert_eq!(a.enemies[0].attack_phase, EnemyPhase::Windup);
-        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Queued);
+        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Advance);
         let windup = a.enemies[0].attack_left;
+        let held = a.enemies[1].x;
         for e in &mut a.enemies {
             e.statuses.refresh(StatusId::HitStop, 6);
         }
@@ -1028,7 +1032,10 @@ fn hit_stop_expires_in_fixed_ticks_while_contacted_or_queued_in_either_mode() {
         let a = g.attempt().unwrap();
         assert!(a.enemies.iter().all(|e| e.hit_stop_remaining() == 0));
         assert_eq!(a.enemies[0].attack_left, windup - 6);
-        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Queued);
+        assert_eq!(a.enemies[1].attack_phase, EnemyPhase::Advance);
+        assert_eq!(a.enemies[1].x, held, "hit-stop held the advancing body");
+        advance(&mut g, 1);
+        assert!(g.attempt().unwrap().enemies[1].x < held);
     }
 }
 

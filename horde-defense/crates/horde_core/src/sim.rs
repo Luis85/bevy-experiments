@@ -106,6 +106,7 @@ pub struct Enemy {
     #[serde(default = "legacy_width")]
     pub arena_width: f32,
     /// Saved within-lane passing displacement; real hit and area geometry use y().
+    /// Overtaking is gone since W1-69, so it only eases back to 0 (older saves).
     #[serde(default)]
     pub pass_offset: f32,
     pub id: u64,
@@ -199,6 +200,9 @@ pub struct CorpseRecord {
 pub enum EnemyPhase {
     #[default]
     Advance,
+    /// Waiting behind another enemy. Never assigned since W1-69 (enemies
+    /// overlap, user decision 2026-11-06); kept so older saves load, and
+    /// resolved to `Advance` or contact on the next movement step.
     Queued,
     Windup,
     Recovery,
@@ -1499,23 +1503,6 @@ fn enemy_profile(e: &Enemy) -> &crate::enemy_catalog::ResolvedEnemy {
     e.resolved
         .as_ref()
         .unwrap_or_else(|| crate::enemy_catalog::enemy_catalog().default_profile(e.kind))
-}
-fn enemy_step_speed(a: &Attempt, e: &Enemy) -> f32 {
-    if e.statuses.active(StatusId::HitStop)
-        || (a.mode == Mode::Npc && (e.injury.prone || e.injury.stunned))
-    {
-        return 0.0;
-    }
-    let mut multiplier = a.modifiers.enemy_speed;
-    if a.mode == Mode::Npc {
-        if e.injury.hp * 3 < e.injury.max_hp {
-            multiplier *= 0.5;
-        }
-        if e.injury.fp * 3 < e.injury.max_fp {
-            multiplier *= 0.5;
-        }
-    }
-    (if e.boss { 0.6 } else { enemy_profile(e).speed }) * multiplier
 }
 fn enemy_armor(a: &Attempt, e: &Enemy) -> i32 {
     if e.boss {

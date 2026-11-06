@@ -738,3 +738,110 @@ fn field_views_equal_the_by_id_reference_on_peak_and_stress() {
         assert_eq!(views, 60, "{scene} sampled every eighth tick");
     }
 }
+
+/// Six hostiles stacked on the defense line of lane 3 and one behind them,
+/// as enemies overlap since W1-69 (user decision, 2026-11-06).
+fn stacked_line() -> Game {
+    let mut game = fixture();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.enemies.clear();
+    for (n, kind) in [
+        EnemyKind::Brute,
+        EnemyKind::Runner,
+        EnemyKind::Shambler,
+        EnemyKind::Armored,
+        EnemyKind::Demolisher,
+        EnemyKind::Runner,
+        EnemyKind::Shambler,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        game.spawn_enemy(&mut a, kind, 3, false);
+        a.enemies.last_mut().unwrap().x = if n < 6 {
+            horde_core::sim::DEFENSE_LINE
+        } else {
+            4.0
+        };
+    }
+    *game.attempt_slot_mut() = Some(a);
+    game
+}
+
+#[test]
+fn a_lane_paints_far_to_near_then_by_id() {
+    let game = stacked_line();
+    let a = game.attempt().unwrap();
+    let view = view(a, SceneBlend::NONE);
+    let ids: Vec<u64> = view.enemies.iter().map(|e| e.id).collect();
+    let mut expected: Vec<&horde_core::sim::Enemy> = a.enemies.iter().collect();
+    expected.sort_by(|p, q| q.x.total_cmp(&p.x).then(p.id.cmp(&q.id)));
+    assert_eq!(
+        ids,
+        expected.iter().map(|e| e.id).collect::<Vec<_>>(),
+        "the body behind the stack paints first, the stack by id"
+    );
+    assert_eq!(ids[0], a.enemies[6].id);
+}
+
+#[test]
+fn a_stack_on_one_spot_is_drawn_apart_by_a_static_bounded_stagger() {
+    use super::field::{CROWD_STAGGER_LANES, CROWD_STAGGER_YARDS, crowd_stagger};
+    for id in 0..20_000u64 {
+        let [dx, dy] = crowd_stagger(id);
+        assert!((0.0..=CROWD_STAGGER_YARDS).contains(&dx), "id {id} dx {dx}");
+        assert!(dy.abs() <= CROWD_STAGGER_LANES, "id {id} dy {dy}");
+        assert_eq!(crowd_stagger(id), [dx, dy], "a pure function of the id");
+    }
+    for first in [0u64, 1_000, u64::MAX - 8] {
+        let window: Vec<[f32; 2]> = (first..first + 8).map(crowd_stagger).collect();
+        for (n, p) in window.iter().enumerate() {
+            for q in &window[n + 1..] {
+                let apart = (p[0] - q[0]).abs().max((p[1] - q[1]).abs());
+                assert!(apart >= 0.03, "ids from {first}: {p:?} and {q:?}");
+            }
+        }
+    }
+    let mut game = stacked_line();
+    let a = game.attempt().unwrap();
+    let rng = serde_json::to_string(&a.rng).unwrap();
+    let first = view(a, SceneBlend::NONE);
+    assert_eq!(serde_json::to_string(&a.rng).unwrap(), rng);
+    let stack: Vec<&EnemyView> = first
+        .enemies
+        .iter()
+        .filter(|e| e.position[0] == horde_core::sim::DEFENSE_LINE)
+        .collect();
+    assert_eq!(stack.len(), 6);
+    for e in &stack {
+        assert_eq!(e.stagger, crowd_stagger(e.id));
+        assert_eq!(
+            e.drawn(),
+            [e.position[0] + e.stagger[0], e.position[1] + e.stagger[1]]
+        );
+        assert!(
+            e.drawn()[0] >= horde_core::sim::DEFENSE_LINE,
+            "never past the line"
+        );
+    }
+    // Every pair of stacked bodies is drawn at least 0.03 lane or yard
+    // apart, so the stack reads as six bodies. The R2 offsets of any eight
+    // consecutive ids are 0.036 apart or more.
+    for (n, p) in stack.iter().enumerate() {
+        for q in &stack[n + 1..] {
+            let (dx, dy) = (p.drawn()[0] - q.drawn()[0], p.drawn()[1] - q.drawn()[1]);
+            assert!(
+                dx.abs().max(dy.abs()) >= 0.03,
+                "{} and {} drawn on one spot",
+                p.id,
+                q.id
+            );
+        }
+    }
+    // Static: a later frame of the same bodies keeps the same offsets.
+    game.tick(Input::default());
+    let a = game.attempt().unwrap();
+    for e in view(a, SceneBlend::NONE).enemies {
+        assert_eq!(e.stagger, crowd_stagger(e.id));
+    }
+}

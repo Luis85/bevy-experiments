@@ -2,15 +2,17 @@
 //! light, health and boss callouts.
 //!
 //! Hostiles paint as layered meshes ([`super::batch::FieldMeshes`]) whatever
-//! their number: the underlay (contact lane bands, windup ground rings), one
-//! shadow mesh, one sprite mesh in feet-then-id order with each hit flash
+//! their number: the underlay (one contact band per lane, one windup ground
+//! ring per stack), one
+//! shadow mesh, one sprite mesh in the view's painter order (lane feet, x
+//! descending, id; hostiles at their crowd-staggered spot) with each hit flash
 //! right after its sprite, the overlay (outline, stun and windup rings,
 //! health and windup bars), then the callout text. Rejected enemy art keeps
 //! the per-enemy procedural figure path.
 use super::super::{AMBER, ArenaProjection, GREEN, RED, bar, figure, line, soft_shadow};
 use super::batch::{FieldMeshes, MeshBuilder};
 use crate::{
-    battle_view::{BattleViewModel, EnemyView, HealthView},
+    battle_view::{BattleViewModel, ContactView, EnemyView, HealthView},
     visual_assets::{self, Actor, ArtTextures, HitFlash},
 };
 use bevy_egui::egui::{
@@ -62,8 +64,13 @@ pub(super) fn paint(
     rig_shadow: RigShadow,
 ) -> HostilesDrawn {
     if textures.enemy_art_rejected {
-        for e in &view.enemies {
-            enemy(p, arena, view, e, textures, outlines, reduced);
+        for (lane, contact) in lane_contacts(view) {
+            let (band, gauge) = contact_band(arena, view, lane, contact);
+            p.rect_filled(band, 0.0, RED.gamma_multiply(0.18));
+            line(p, gauge[0], gauge[1], 3.0, gauge_color(contact));
+        }
+        for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
+            enemy(p, arena, e, ring, textures, outlines, reduced);
         }
         return HostilesDrawn::default();
     }
@@ -79,15 +86,25 @@ pub(super) fn paint(
     layers
         .shadows
         .shadow(rig_shadow.at, rig_shadow.size, rig_shadow.alpha);
-    for e in &view.enemies {
-        let at = arena.world(e.position[0], e.position[1]);
+    for (lane, contact) in lane_contacts(view) {
+        let (band, gauge) = contact_band(arena, view, lane, contact);
+        layers.underlay.quad(band, RED.gamma_multiply(0.18));
+        layers
+            .underlay
+            .line(gauge[0], gauge[1], 3.0, gauge_color(contact));
+    }
+    for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
+        let [x, y] = e.drawn();
+        let at = arena.world(x, y);
         let pose = &e.pose;
-        underlay(&mut layers.underlay, arena, view, e, at);
+        if ring {
+            windup_ring(&mut layers.underlay, sy, at);
+        }
         let actor = e.sprite.map(Actor::Enemy);
         let has_walk = e.sprite.is_some_and(|s| s.is_walk()) && textures.walkers.is_some();
         let painted_at = arena.world(
-            e.position[0] + pose.offset[0],
-            e.position[1] + if has_walk { 0. } else { pose.offset[1] },
+            x + pose.offset[0],
+            y + if has_walk { 0. } else { pose.offset[1] },
         );
         let figure_height = e.height.pixels(sy);
         let size = vec2(figure_height * 1.2, figure_height);
@@ -159,40 +176,88 @@ pub(super) fn paint(
     drawn
 }
 
-/// Contact lane band with its readiness gauge, and the windup ground ring.
-fn underlay(
-    mesh: &mut MeshBuilder,
+/// The contact of each lane with a hostile on the line: one band per lane
+/// however many hostiles stack there (W1-69, enemies overlap), so the band
+/// keeps one shade and its gauge shows the readiest of them.
+pub(super) fn lane_contacts(view: &BattleViewModel) -> Vec<(u8, ContactView)> {
+    let mut lanes: Vec<Option<ContactView>> = vec![None; usize::from(view.lanes)];
+    for e in &view.enemies {
+        if let Some(contact) = e.contact
+            && let Some(slot) = lanes.get_mut(usize::from(e.lane))
+            && slot.is_none_or(|held| contact.ready > held.ready)
+        {
+            *slot = Some(contact);
+        }
+    }
+    lanes
+        .into_iter()
+        .zip(0u8..)
+        .filter_map(|(contact, lane)| contact.map(|contact| (lane, contact)))
+        .collect()
+}
+
+/// A contact lane's band and its readiness gauge (from, to).
+fn contact_band(
     arena: ArenaProjection,
     view: &BattleViewModel,
-    e: &EnemyView,
-    at: Pos2,
-) {
-    let sy = arena.lane_height();
-    let build_left = view.construction_bounds[0];
-    if let Some(contact) = e.contact {
-        mesh.quad(
-            Rect::from_min_max(
-                arena.world(1.5, e.lane as f32 + 0.05),
-                arena.world(build_left, e.lane as f32 + 0.95),
-            ),
-            RED.gamma_multiply(0.18),
-        );
-        mesh.line(
-            arena.world(1.52, e.lane as f32 + 0.95),
-            arena.world(1.52, e.lane as f32 + 0.95 - contact.ready * 0.9),
-            3.0,
-            if contact.recovering { GREEN } else { RED },
-        );
-    }
-    if e.windup.is_some() {
-        mesh.ring(
-            at + vec2(0., sy * 0.3),
-            vec2(sy * 0.36, sy * 0.13),
-            2.,
-            RING_SEGMENTS,
-            RED,
-        );
-    }
+    lane: u8,
+    contact: ContactView,
+) -> (Rect, [Pos2; 2]) {
+    let lane = f32::from(lane);
+    (
+        Rect::from_min_max(
+            arena.world(1.5, lane + 0.05),
+            arena.world(view.construction_bounds[0], lane + 0.95),
+        ),
+        [
+            arena.world(1.52, lane + 0.95),
+            arena.world(1.52, lane + 0.95 - contact.ready * 0.9),
+        ],
+    )
+}
+
+fn gauge_color(contact: ContactView) -> C {
+    if contact.recovering { GREEN } else { RED }
+}
+
+/// Hostiles closer than this along their lane share one windup ring.
+pub(super) const STACK_YARDS: f32 = 0.3;
+
+/// Which hostiles of `view.enemies` draw a windup ground ring: every one
+/// winding up, except one within [`STACK_YARDS`] of a body already ringed in
+/// its lane. Bodies stack on the line and at walls since W1-69 (enemies
+/// overlap), and one ring per stack reads where six would smear; each body
+/// still draws its own windup bar.
+pub(super) fn windup_rings(view: &BattleViewModel) -> Vec<bool> {
+    let mut ringed: Vec<Option<f32>> = vec![None; usize::from(view.lanes)];
+    view.enemies
+        .iter()
+        .map(|e| {
+            if e.windup.is_none() {
+                return false;
+            }
+            let Some(last) = ringed.get_mut(usize::from(e.lane)) else {
+                return true;
+            };
+            if last.is_some_and(|x| (x - e.position[0]).abs() < STACK_YARDS) {
+                return false;
+            }
+            *last = Some(e.position[0]);
+            true
+        })
+        .collect()
+}
+
+/// The windup ground ring under the feet at `at`; the contact bands are drawn
+/// per lane first.
+fn windup_ring(mesh: &mut MeshBuilder, sy: f32, at: Pos2) {
+    mesh.ring(
+        at + vec2(0., sy * 0.3),
+        vec2(sy * 0.36, sy * 0.13),
+        2.,
+        RING_SEGMENTS,
+        RED,
+    );
 }
 
 /// Outline, windup bar, stun ring and health bar, above every sprite.
@@ -232,46 +297,34 @@ fn overlay(mesh: &mut MeshBuilder, sy: f32, e: &EnemyView, at: Pos2, outlines: b
 fn enemy(
     p: &Painter,
     arena: ArenaProjection,
-    view: &BattleViewModel,
     e: &EnemyView,
+    ring: bool,
     textures: ArtTextures,
     outlines: bool,
     reduced: bool,
 ) {
     let sy = arena.lane_height();
-    let build_left = view.construction_bounds[0];
-    let at = arena.world(e.position[0], e.position[1]);
+    let [x, y] = e.drawn();
+    let at = arena.world(x, y);
     let pose = &e.pose;
-    if let Some(contact) = e.contact {
-        let rr = Rect::from_min_max(
-            arena.world(1.5, e.lane as f32 + 0.05),
-            arena.world(build_left, e.lane as f32 + 0.95),
-        );
-        p.rect_filled(rr, 0.0, RED.gamma_multiply(0.18));
-        line(
-            p,
-            arena.world(1.52, e.lane as f32 + 0.95),
-            arena.world(1.52, e.lane as f32 + 0.95 - contact.ready * 0.9),
-            3.0,
-            if contact.recovering { GREEN } else { RED },
-        );
-    }
     let actor = e.sprite.map(Actor::Enemy);
     let has_walk = e.sprite.is_some_and(|s| s.is_walk()) && textures.walkers.is_some();
     let painted_at = arena.world(
-        e.position[0] + pose.offset[0],
-        e.position[1] + if has_walk { 0. } else { pose.offset[1] },
+        x + pose.offset[0],
+        y + if has_walk { 0. } else { pose.offset[1] },
     );
     let figure_height = e.height.pixels(sy);
     if outlines {
         p.circle_stroke(at, sy * 0.4, Stroke::new(1., AMBER));
     }
     if let Some(progress) = e.windup {
-        p.add(egui::Shape::ellipse_stroke(
-            at + vec2(0., sy * 0.3),
-            vec2(sy * 0.36, sy * 0.13),
-            Stroke::new(2., RED),
-        ));
+        if ring {
+            p.add(egui::Shape::ellipse_stroke(
+                at + vec2(0., sy * 0.3),
+                vec2(sy * 0.36, sy * 0.13),
+                Stroke::new(2., RED),
+            ));
+        }
         bar(
             p,
             Rect::from_center_size(at + vec2(0., sy * 0.43), vec2(sy * 0.66, 3.)),

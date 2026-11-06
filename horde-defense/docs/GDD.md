@@ -164,7 +164,7 @@ This abstraction is the highest-priority visual playtest. If it feels confusing 
 
 Basic melee selects one contact lane under the cursor and strikes its front eligible enemy. Enemies still approaching farther to the right are ineligible. Later sweep abilities can affect a stated number of adjacent contact lanes, subject to their own rules.
 
-At actual line contact, use an effective distance of one yard and a frontal engagement for both contact attacks and defender responses. This replaces ordinary distance for melee reach and ranged distance modifiers against that contacted enemy. The cursor still selects the enemy at its displayed lane position. Queued enemies behind the contact attacker keep their ordinary world distances until they reach the line.
+At actual line contact, use an effective distance of one yard and a frontal engagement for both contact attacks and defender responses. This replaces ordinary distance for melee reach and ranged distance modifiers against that contacted enemy. The cursor still selects the enemy at its displayed lane position. Enemies still walking behind the contact attacker keep their ordinary world distances until they reach the line (since W1-69 enemies never queue; they overlap).
 
 The effective distance applies only between the active defender and that contacted enemy. Turrets and traps always evaluate range from their own world positions. Manual cursor targeting remains geometric, while any applicable personal weapon range effect uses the same declared contact relationship.
 

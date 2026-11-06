@@ -93,7 +93,7 @@ Watch an earned drop at the defeated actor’s position: its quality outline/ico
 
 The user chose to retain GURPS injury rules. In NPC mode a conscious zero/negative-HP hostile can still move/fight with existing injury penalties; inspect signed HP and the explicit CRIT · FIGHTING label. Do not treat zero alone as a kill. Actual dead/unconscious/mortally wounded terminals must stop and become a single paid corpse in the resolving tick. Compare 1×/2×/4× without changing outcomes.
 
-Watch faster approaches overtake slower moving peers through a small within-lane side step. Aim, AoE, corpse and loot positions must follow the visible displacement. Walls/contact still stop and queue, and traps still cover the whole lane strip.
+Enemies never block each other (W1-69): faster bodies walk through slower ones without a side step, and every enemy that reaches the line or a wall attacks, so a crowd stacks there. A stack draws slightly fanned out, with one contact band and one windup ring per lane spot and every body's own bars. Walls still stop enemies, and traps still cover the whole lane strip.
 
 ## Gameplay settings, DPS and history
 

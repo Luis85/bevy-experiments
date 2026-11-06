@@ -86,6 +86,7 @@ The full commit detail is in `wave1_commits`. Order and summary:
 | W1-66 | perf-architecture | One quad per hit flash via a packed white silhouette (gates 1 and 2) | W1-65 |
 | W1-67 | perf-architecture | Build BattleFrame without per-enemy maps and clones (gate 1) | W1-66 |
 | W1-68 | perf-architecture | Attribute the 0.5 s frames: between-frame gap, pipelined wait, per-frame event counts (gate 3 investigation) | W1-67 |
+| W1-69 | enemies-elites-bosses | Enemies never block each other: no lane queue, overlap allowed, every enemy that reaches the line or a structure attacks (user decision, 2026-11-06); the wave-1 GOLDEN/TRACE re-bless | W1-61 |
 
 W1-64..W1-68 were added after W1-61 blocked on the Goal-1 gates; W1-61 re-runs after W1-68.
 
@@ -110,8 +111,16 @@ At 18:09 that binary had 4-14 such frames per stress run. With 0 slow frames, th
 
 The 0 egui uploads, 0 asset events and 0 audio voices (review scenes are muted) come from probes with no stalls, so they exclude nothing. No fix commit follows. Gate 3 needs a user ruling on two open items: the environmental VSync-on stall, and the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe. No gate was moved. Details are in VALIDATION.md.
 
+W1-69 done_when evidence (2026-11-06): enemies never block each other, the user's decision of 2026-11-06 (plan §2.2). In core, `sim/movement.rs` lost the lane queue (the stop 0.65 yd behind the body in front, `EnemyPhase::Queued`) and the speed-difference passing offsets. Each enemy stops only at the defense line or the face of a live non-trap structure in its lane, and attacks there. `Queued` stays for old saves (`a_saved_queued_enemy_resolves_on_the_next_tick`), and a saved `pass_offset` eases back to 0 at the old rate. The commit pins the rule in `enemies_in_one_lane_never_block_each_other` and `enemies_still_stop_at_structures`. `tests/overtaking.rs` and the simulation.rs hit-stop test were rewritten for the new rule. Presentation-only changes:
+- a static per-id crowd stagger, R2 sequence, at most 0.15 yd behind the feet and 0.12 lane across;
+- lanes painted far to near, then by id;
+- one contact band per lane and one windup ring per stack;
+- prop hit outlines moved to the readout pass, so struck walls no longer split the props pass. With every wall struck, the progressed peak drew 51 primitives against the gate of 48; the pin is `struck_structures_add_no_primitives`.
+
+Without the per-stack rings the progressed peak drew 40,124 vertices at tick 420 against the gate of 40,000, from 59 enemies in contact where there were 19. No gate was moved. Re-bless (wave-1, R7): GOLDEN 1/6 and GAMEPLAY_TRACE 3/6, class G, with a reason per digest in `tests/determinism.rs`. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins did not move. Pacing (60 runs) and smoke before and after are in plan §9.6. The novice Germany profile has 5 → 8 defeats and its first victory moves from run 3 to run 5. Smoke passes, with failed attempts Personal 2 → 1 and Npc 1 → 3. Balance is not retuned; wave 2's pacing work owns the shift. Captures: peak, progressed-peak and fx-stress stills at both sizes in both modes (12 of 12, `target/production-after/w1-69`), plus motion for progressed-peak and stress at both viewports (`target/production-after/w1-69-motion`), reviewed in ledger rows CF-1-06 (fixed) and CF-1-07 (open, vfx-lighting).
+
 Wave-1 exit:
-- GOLDEN 0/6, TRACE 0/6, V1-V6 unchanged.
+- GOLDEN 1/6, TRACE 3/6, all from the W1-69 re-bless; V1-V6 unchanged.
 - PERF gates pass (W1-61).
 - `save_v7.json` frozen.
 - Capture review logged (W1-60).

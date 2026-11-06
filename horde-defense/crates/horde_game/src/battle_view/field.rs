@@ -64,6 +64,9 @@ pub struct EnemyView {
     pub lane: u8,
     /// Interpolated world position (yards, lanes) of the feet.
     pub position: [f32; 2],
+    /// Presentation-only crowd offset ([`crowd_stagger`]); painters draw the
+    /// hostile, its flash, rings and bars at [`EnemyView::drawn`].
+    pub stagger: [f32; 2],
     pub pose: ActorPose,
     pub sprite: Option<&'static EnemySprite>,
     /// RGBA in 0..=1; `None` draws untinted.
@@ -79,6 +82,41 @@ pub struct EnemyView {
     pub health: HealthView,
     pub label: Option<&'static str>,
 }
+impl EnemyView {
+    /// Where the painters draw the feet: `position` plus the crowd stagger.
+    pub fn drawn(&self) -> [f32; 2] {
+        [
+            self.position[0] + self.stagger[0],
+            self.position[1] + self.stagger[1],
+        ]
+    }
+}
+
+/// Largest crowd stagger behind the feet, in yards (W1-69).
+pub const CROWD_STAGGER_YARDS: f32 = 0.15;
+/// Largest crowd stagger across the lane, either way, in lanes (W1-69).
+pub const CROWD_STAGGER_LANES: f32 = 0.12;
+
+/// The static, presentation-only draw offset `[yards, lanes]` of hostile `id`.
+///
+/// Enemies overlap in the simulation since W1-69 (user decision, 2026-11-06),
+/// so a crowd at the line or at a wall shares one spot. Each body is drawn a
+/// little apart so the crowd reads as a crowd: up to
+/// [`CROWD_STAGGER_YARDS`] behind its feet (never past the line or into a
+/// wall face) and up to [`CROWD_STAGGER_LANES`] across its lane. The offset
+/// is a function of the id alone, never an RNG draw, so it is the same every
+/// frame and never touches the simulation.
+pub fn crowd_stagger(id: u64) -> [f32; 2] {
+    // The R2 low-discrepancy sequence (fractional parts of id / plastic
+    // number and id / its square) in 64-bit fixed point: bodies spawned close
+    // together, as a crowd is, land well apart, and exactly for any id.
+    let unit = |step: u64| (id.wrapping_mul(step) >> 48) as f32 / 65535.0;
+    [
+        unit(0xC13F_A9A9_02A6_3000) * CROWD_STAGGER_YARDS,
+        (unit(0x91E1_0DA5_C79E_7800) * 2.0 - 1.0) * CROWD_STAGGER_LANES,
+    ]
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct CorpseView {
     pub at: [f32; 2],
@@ -255,7 +293,8 @@ pub struct BattleViewModel {
     pub settled: SettledCorpses,
     /// Collapsing bodies only, oldest first.
     pub corpses: Vec<CorpseView>,
-    /// Visible enemies in painter order (feet, then id).
+    /// Visible enemies in painter order: lane feet, then x descending (the
+    /// body nearest the line on top), then id.
     pub enemies: Vec<EnemyView>,
     pub fire_zones: Vec<FireZoneView>,
     pub projectiles: Vec<ProjectileView>,
@@ -323,9 +362,15 @@ impl BattleViewModel {
             .enumerate()
             .filter(|(_, e)| e.condition(a.mode) != EnemyCondition::Defeated && e.in_view())
             .collect();
-        // Passing offsets are authoritative geometry. Painter order follows actual
-        // feet rather than creation order when a faster actor passes behind another.
-        visible.sort_by(|(_, a), (_, b)| a.y().total_cmp(&b.y()).then(a.id.cmp(&b.id)));
+        // Lanes paint top to bottom by their feet. Within a lane bodies overlap
+        // (W1-69), so they paint far to near, the nearest to the line on top,
+        // with the id as a stable tie-break for a stack on one spot.
+        visible.sort_by(|(_, a), (_, b)| {
+            a.y()
+                .total_cmp(&b.y())
+                .then(b.x.total_cmp(&a.x))
+                .then(a.id.cmp(&b.id))
+        });
         let enemies = visible
             .into_iter()
             .map(|(index, e)| {
@@ -495,6 +540,7 @@ fn enemy_view(
         boss: e.boss,
         lane: e.lane,
         position,
+        stagger: crowd_stagger(e.id),
         pose,
         sprite,
         tint: visual.map(|v| v.tint),
