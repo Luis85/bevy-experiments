@@ -1,4 +1,6 @@
 //! Staged campaign and battle fixtures the scenario matrix builds on.
+pub(super) mod production;
+
 use crate::settings::Settings;
 use crate::ui::{FrontendParts, Screen, Tab, battle};
 use horde_core::{

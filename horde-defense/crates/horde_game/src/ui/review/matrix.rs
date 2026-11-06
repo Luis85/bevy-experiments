@@ -53,9 +53,10 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         return;
     }
     // The unsaveable 400-enemy perf fixture (launch refuses it as practice):
-    // it never submits a save, so no autosave can fail on it.
+    // it never submits a save, so no autosave can fail on it. fx-stress is
+    // the same fixture registered as a still (one fixture, two names).
     #[cfg(feature = "review")]
-    if screen == "stress" {
+    if matches!(screen.as_str(), "stress" | "fx-stress") {
         f.game = horde_core::sim::stress_render_fixture().expect("stress render fixture");
         f.runtime.forbid_saves();
         f.screen = Screen::Battle;
@@ -79,6 +80,11 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
         f.campaign.mode = Mode::Npc;
         f.campaign.selected_country = "USA".into();
         f.status.message = if matches!(screen.as_str(),"progressed-peak"|"max-lanes") { "Synthetic maximum-rank fixture · authored population cap plus boss · no gameplay or FPS claim" } else { "Paused peak-render fixture · no simulation FPS claim" }.into();
+        return;
+    }
+    // The wave-1 scenes stage their own country and state through commands,
+    // before the shared progression below.
+    if production::prepare(f, &screen) {
         return;
     }
     f.screen = Screen::Camp;

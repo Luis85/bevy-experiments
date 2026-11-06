@@ -258,7 +258,7 @@ pub(super) fn apply_motion_override(f: &mut FrontendParts, config: &crate::launc
     if config.scenario.is_some() && !config.practice && config.motion_review() {
         f.game.set_paused(false);
         f.battle.construction = false;
-        if config.scenario.as_deref() != Some("stress") {
+        if !matches!(config.scenario.as_deref(), Some("stress" | "fx-stress")) {
             f.status.message =
                 "Live motion review · progress is isolated from your campaign".into();
         }

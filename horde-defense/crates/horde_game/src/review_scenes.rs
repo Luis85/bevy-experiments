@@ -77,6 +77,20 @@ const fn motion_still(name: &'static str) -> ReviewScene {
 const fn practice_still(name: &'static str) -> ReviewScene {
     scene(name, SceneKind::Still, false, false, true)
 }
+/// A wave-1 still with its owner and its wave-0 "before" scene.
+const fn wave1_still(
+    name: &'static str,
+    owner: &'static str,
+    before_proxy: &'static str,
+    motion: bool,
+) -> ReviewScene {
+    ReviewScene {
+        before_proxy: Some(before_proxy),
+        owner,
+        since_wave: 1,
+        ..scene(name, SceneKind::Still, motion, false, false)
+    }
+}
 
 /// Every named scene. Workshop prefixes are in `WORKSHOP_PREFIXES`.
 pub const REVIEW_SCENES: &[ReviewScene] = &[
@@ -142,6 +156,21 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
         // The unsaveable 400-enemy perf fixture; never a practice campaign.
         ..scene("stress", MotionOnly, true, true, false)
     },
+    // Wave-1 stills (design-qa-captures 1.8).
+    wave1_still("results-defeat", "ux-flow", "results", false),
+    wave1_still("save-error", "ux-flow", "world", false),
+    wave1_still("night-checkpoint", "qa-captures", "arid", false),
+    wave1_still("weapon-classes-pistol", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-smg", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-shotgun", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-rifle", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-marksman", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-machine-gun", "qa-captures", "battle", true),
+    wave1_still("weapon-classes-turret", "qa-captures", "construction", true),
+    // The stress fixture as a paused still; never a practice campaign.
+    wave1_still("fx-stress", "perf-architecture", "max-lanes", true),
+    wave1_still("battle-mid", "ux-flow", "battle", false),
+    wave1_still("operations-observer", "ux-flow", "operations", false),
 ];
 
 /// Workshop scenes named `<prefix><model id>`.
@@ -246,7 +275,7 @@ mod tests {
     }
     #[test]
     fn the_wave0_stills_plus_the_five_unlisted_ones_are_46() {
-        assert_eq!(stills().count(), 46);
+        assert_eq!(stills().filter(|scene| scene.since_wave == 0).count(), 46);
         for name in [
             "max-lanes",
             "journey-victory",
@@ -255,6 +284,28 @@ mod tests {
             "skills-search",
         ] {
             assert_eq!(lookup(name), Some(SceneKind::Still), "{name}");
+        }
+    }
+    #[test]
+    fn wave1_registers_its_13_stills_with_wave0_before_proxies() {
+        let wave1: Vec<_> = stills().filter(|scene| scene.since_wave == 1).collect();
+        assert_eq!(wave1.len(), 13);
+        for scene in &wave1 {
+            let proxy = scene
+                .before_proxy
+                .expect("a wave-1 still has a before proxy");
+            assert!(
+                stills().any(|still| still.name == proxy && still.since_wave == 0),
+                "{}: before proxy {proxy} is not a wave-0 still",
+                scene.name
+            );
+            assert!(!scene.practice && !scene.perf, "{}", scene.name);
+        }
+        for name in ["weapon-classes-shotgun", "weapon-classes-machine-gun"] {
+            assert!(
+                wave1.iter().any(|scene| scene.name == name && scene.motion),
+                "capture_motion accepts {name}"
+            );
         }
     }
     #[test]
@@ -300,7 +351,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46
+            46 + 13
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

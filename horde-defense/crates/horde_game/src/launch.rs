@@ -496,8 +496,9 @@ impl LaunchConfig {
                 "Unknown review scene \"{scene}\"; run --list-scenes"
             ));
         }
-        // A practice campaign saves; the staged stress game never can.
-        if self.practice && self.scenario.as_deref() == Some("stress") {
+        // A practice campaign saves; the staged stress game (also staged as
+        // the fx-stress still) never can.
+        if self.practice && matches!(self.scenario.as_deref(), Some("stress" | "fx-stress")) {
             return Err(
                 "The stress scene is an unsaveable review fixture; it cannot run with LASTLIGHT_PRACTICE".into(),
             );
@@ -728,6 +729,30 @@ mod tests {
             assert!(stress(false).is_ok());
         } else {
             assert_eq!(error, "Unknown review scene \"stress\"; run --list-scenes");
+        }
+    }
+    /// fx-stress stages the same unsaveable fixture, so it is refused alike.
+    #[test]
+    fn practice_flag_with_fx_stress_screen_is_rejected() {
+        let error = parse(
+            &[],
+            &[
+                ("LASTLIGHT_REVIEW_SCREEN", "fx-stress"),
+                ("LASTLIGHT_PRACTICE", "1"),
+            ],
+        )
+        .unwrap_err();
+        if cfg!(feature = "review") {
+            assert_eq!(
+                error,
+                "The stress scene is an unsaveable review fixture; it cannot run with LASTLIGHT_PRACTICE"
+            );
+            assert!(parse(&[], &[("LASTLIGHT_REVIEW_SCREEN", "fx-stress")]).is_ok());
+        } else {
+            assert_eq!(
+                error,
+                "Unknown review scene \"fx-stress\"; run --list-scenes"
+            );
         }
     }
     /// A build without `review` accepts exactly the scenes `--list-scenes`

@@ -249,6 +249,20 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("journey-liberated", Screen::Results, None),
     ("journey-upgrades", Screen::Results, None),
     ("skills-search", Screen::Results, None),
+    // Wave 1 (design-qa-captures 1.8).
+    ("results-defeat", Screen::Results, None),
+    ("save-error", Screen::Camp, Some(Tab::World)),
+    ("night-checkpoint", Screen::Battle, None),
+    ("weapon-classes-pistol", Screen::Battle, None),
+    ("weapon-classes-smg", Screen::Battle, None),
+    ("weapon-classes-shotgun", Screen::Battle, None),
+    ("weapon-classes-rifle", Screen::Battle, None),
+    ("weapon-classes-marksman", Screen::Battle, None),
+    ("weapon-classes-machine-gun", Screen::Battle, None),
+    ("weapon-classes-turret", Screen::Battle, None),
+    ("fx-stress", Screen::Battle, None),
+    ("battle-mid", Screen::Battle, None),
+    ("operations-observer", Screen::Camp, Some(Tab::Operations)),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -293,6 +307,10 @@ fn one_frame(f: &mut FrontendParts) -> egui::FullOutput {
 fn stills_prepare_headless(screens: &[Screen]) {
     let mut checked = 0;
     for &(name, screen, tab) in EXPECTED.iter().filter(|(_, s, _)| screens.contains(s)) {
+        // The stress fixture behind fx-stress exists only in review builds.
+        if name == "fx-stress" && !cfg!(feature = "review") {
+            continue;
+        }
         let scene = review_scenes::REVIEW_SCENES
             .iter()
             .find(|scene| scene.name == name)
@@ -705,4 +723,205 @@ fn observer_filling_field_is_unchanged() {
     let mut f = staged("operations");
     let (field, observer_box) = observed_operations(&mut f, (11, 30.0));
     assert_eq!(field, observer_box, "an 11x30 field fills its box");
+}
+
+// ----- Wave-1 review scenes (design-qa-captures 1.8, W1-54) -----
+
+#[test]
+fn results_defeat_fixture_settles_a_real_defeat() {
+    let f = staged("results-defeat");
+    assert!(f.screen == Screen::Results, "{:?}", f.screen);
+    assert!(f.game.attempt().is_none(), "the defense settled");
+    let report = f.game.last_result().expect("a settled report");
+    assert_eq!(report.outcome, horde_core::sim::Outcome::Defeat);
+    assert!(!report.cause.is_empty(), "a defeat names its cause");
+    assert!(!report.tip.is_empty(), "a defeat carries a tip");
+    assert_eq!(
+        (report.country_id.as_deref(), report.stage),
+        (Some("DEU"), 0)
+    );
+    assert_eq!(f.game.campaign().run_history.len(), 1);
+    assert!(f.game.global_paused());
+}
+
+#[test]
+fn save_error_fixture_surfaces_the_failure_without_io() {
+    let f = staged("save-error");
+    assert!(f.screen == Screen::Camp, "{:?}", f.screen);
+    assert_eq!(f.nav.tab, Tab::World);
+    assert!(
+        f.status.message.contains("Save failed"),
+        "{:?}",
+        f.status.message
+    );
+    assert!(f.status.message.contains("Access is denied. (os error 5)"));
+    assert!(f.status.message_error);
+    assert!(!f.paths.campaign().exists(), "no campaign.json was written");
+    assert!(!f.paths.settings().exists(), "no settings.json was written");
+    #[cfg(feature = "review")]
+    {
+        let metrics = f.runtime.persistence_metrics();
+        assert_eq!(
+            (
+                metrics.completed_background_saves,
+                metrics.failed_background_saves,
+                metrics.pending
+            ),
+            (0, 0, false),
+            "the failure is a notice, not a real save"
+        );
+    }
+}
+
+/// The first (country, stage) in world file order whose theme is the night
+/// checkpoint: an oracle independent of the fixture's search helper.
+fn first_night_checkpoint() -> (String, usize) {
+    horde_core::world::world()
+        .countries
+        .iter()
+        .find_map(|country| {
+            (0..country.level_count())
+                .find(|&stage| {
+                    let theme = country.stage_theme(stage);
+                    theme.lighting == "night" && theme.id == "checkpoint"
+                })
+                .map(|stage| (country.id.clone(), stage))
+        })
+        .expect("world.json has a night checkpoint stage")
+}
+
+#[test]
+fn night_checkpoint_fixture_is_a_night_stage() {
+    let f = staged("night-checkpoint");
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    let a = f.game.attempt().expect("a deployed night stage");
+    assert!(a.paused && f.game.global_paused(), "deployed paused");
+    let (country, stage) = first_night_checkpoint();
+    assert_eq!((a.country_id.as_deref(), a.stage), (Some(&*country), stage));
+    let theme = horde_core::world::world()
+        .country(&country)
+        .unwrap()
+        .stage_theme(a.stage);
+    assert_eq!(
+        (theme.id.as_str(), theme.lighting.as_str()),
+        ("checkpoint", "night")
+    );
+    assert_eq!(f.campaign.selected_country, country);
+    assert_eq!(f.campaign.mode, horde_core::content::Mode::Personal);
+}
+
+#[test]
+fn weapon_classes_fixtures_equip_and_fire_their_class() {
+    use horde_core::{
+        content::{Mode, Slot, StructureKind},
+        sim::EventKind,
+        weapons::{WeaponClass, WeaponSpec},
+    };
+    for (scene, class) in [
+        ("weapon-classes-pistol", WeaponClass::Pistol),
+        ("weapon-classes-smg", WeaponClass::Smg),
+        ("weapon-classes-shotgun", WeaponClass::Shotgun),
+        ("weapon-classes-rifle", WeaponClass::Rifle),
+        ("weapon-classes-marksman", WeaponClass::Marksman),
+        ("weapon-classes-machine-gun", WeaponClass::MachineGun),
+    ] {
+        let f = staged(scene);
+        assert!(f.screen == Screen::Battle, "{scene}: {:?}", f.screen);
+        let equipped = f.game.campaign().equipped(Mode::Personal, Slot::Ranged);
+        assert_eq!(equipped.tier, 1, "{scene}: {}", equipped.name);
+        assert_eq!(WeaponSpec::from_item(equipped).class, class, "{scene}");
+        let a = f.game.attempt().expect("a live battle");
+        assert_eq!(a.mode, Mode::Personal, "{scene}");
+        assert!(a.paused, "{scene}: paused on the shot");
+        assert!(
+            a.events
+                .iter()
+                .any(|event| event.kind == EventKind::Shot && event.actor_id.is_none()),
+            "{scene}: the player fired"
+        );
+        assert!(f.battle.fire_latched, "{scene}: motion keeps firing");
+    }
+    let f = staged("weapon-classes-turret");
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    let a = f.game.attempt().expect("a live battle");
+    assert!(a.paused);
+    let turrets: Vec<_> = a
+        .structures
+        .iter()
+        .filter(|s| s.kind == StructureKind::Turret)
+        .map(|s| s.id)
+        .collect();
+    assert!(!turrets.is_empty(), "a placed turret");
+    assert!(
+        a.events.iter().any(|event| event.kind == EventKind::Shot
+            && event.actor_id.is_some_and(|id| turrets.contains(&id))),
+        "the turret fired"
+    );
+}
+
+#[test]
+fn battle_mid_fixture_is_7x20() {
+    // 7 lanes x 20 yd is not a geometry balance.json reaches at any level
+    // (lanes and width grow together), so the scene records the nearest
+    // reachable pair with the same lane count, 7 x 16 (design-qa-captures 1.8).
+    let settings = horde_core::balance::BalanceSettings::default();
+    let reachable: Vec<_> = (1..=horde_core::campaign::Player::level_cap())
+        .map(|level| settings.geometry(level))
+        .collect();
+    assert!(!reachable.contains(&(7, 20.0)), "7x20 became reachable");
+    assert!(reachable.contains(&(7, 16.0)));
+    let f = staged("battle-mid");
+    assert!(f.screen == Screen::Battle, "{:?}", f.screen);
+    let a = f.game.attempt().expect("a live battle");
+    assert_eq!((a.lane_count, a.width_yards), (7, 16.0));
+    assert_eq!(f.game.campaign().arena_geometry(), (7, 16.0));
+    assert!(a.paused);
+}
+
+#[test]
+fn operations_observer_fixture_opens_the_observer() {
+    let mut f = staged("operations-observer");
+    assert!(f.screen == Screen::Camp, "{:?}", f.screen);
+    assert_eq!(f.nav.tab, Tab::Operations);
+    let observed = f.campaign.observed.expect("the observer is open");
+    assert!(
+        f.game
+            .battles()
+            .iter()
+            .any(|b| b.id == observed && !b.settled && b.game().attempt().is_some()),
+        "it observes a live expedition"
+    );
+    one_frame(&mut f);
+    assert!(
+        f.battle.observer_arena_rect.is_some(),
+        "the observer window drew its field"
+    );
+}
+
+#[cfg(feature = "review")]
+#[test]
+fn fx_stress_aliases_the_stress_fixture() {
+    let row = review_scenes::REVIEW_SCENES
+        .iter()
+        .find(|scene| scene.name == "fx-stress")
+        .expect("fx-stress registry row");
+    assert_eq!(row.kind, review_scenes::SceneKind::Still);
+    assert!(!row.practice && !review_scenes::accepts("fx-stress", false));
+    let stress = staged("stress");
+    let fx = staged("fx-stress");
+    assert!(fx.screen == stress.screen && fx.screen == Screen::Battle);
+    assert_eq!(fx.campaign.mode, stress.campaign.mode);
+    assert_eq!(
+        fx.campaign.selected_country,
+        stress.campaign.selected_country
+    );
+    assert_eq!(fx.status.message, stress.status.message);
+    let (a, b) = (fx.game.attempt().unwrap(), stress.game.attempt().unwrap());
+    assert!(a.paused);
+    assert_eq!(a.enemies.len(), b.enemies.len());
+    assert_eq!(
+        (a.tick, a.lane_count, a.width_yards, a.stage),
+        (b.tick, b.lane_count, b.width_yards, b.stage)
+    );
+    assert_eq!(fx.game.battles().len(), stress.game.battles().len());
 }

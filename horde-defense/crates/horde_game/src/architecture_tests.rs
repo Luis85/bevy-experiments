@@ -49,7 +49,12 @@ const RULES: &[Rule] = &[
     },
     Rule {
         needle: ".tick(",
-        allowed: &["runner/", "ui/review/fixtures.rs", "ui/review/matrix.rs"],
+        allowed: &[
+            "runner/",
+            "ui/review/fixtures.rs",
+            "ui/review/fixtures/production.rs",
+            "ui/review/matrix.rs",
+        ],
         reason: "only the runner advances the simulation (review fixtures stage their own isolated Game before it is shown)",
     },
 ];
