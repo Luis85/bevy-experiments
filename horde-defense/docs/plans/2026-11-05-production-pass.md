@@ -613,7 +613,7 @@ The full decision and rejection lists (206 decisions, 239 rejected options) are 
 
 ## 6. Final v7 schema
 
-Full table: `docs/plans/production-pass/schema-v7.md` (frozen by `save_v7.json` at W1-63). Summary:
+**Status: FROZEN at the wave-1 close (W1-63, 6 November 2026)** by `crates/horde_core/tests/fixtures/save_v7.json`; see "The freeze" below. Full table: `docs/plans/production-pass/schema-v7.md`. Summary of the frozen schema:
 
 | Area | v7 change |
 |---|---|
@@ -644,6 +644,64 @@ Digest ledger:
 | 3 | 0 | 0 | unchanged | 3 |
 | 4 | G, one re-bless W4-08 | G | unchanged (charges pin re-blessed with reason only if it moves) | 4 |
 | 5-7 | 0 | 0 (PROGRESSED 0/4) | unchanged | 4 |
+
+### The freeze (W1-63)
+
+**Declared.** Save format 7 is frozen by `crates/horde_core/tests/fixtures/save_v7.json`, a real `Game::save` generation (envelope version 7, ruleset 2), 94,965 bytes (budget 96 KB). From now on:
+
+- **Any later saved field** must be `#[serde(default)]` (or `default = "fn"`) with a legacy-neutral value, skipped at that value, and must load `save_v7.json` unchanged: it loads, validates and resaves to the same payload (`v7_fixture_loads_validates_and_resaves_byte_identically`). A field that cannot meet this stops the work, and the user is asked. The one pre-approved exception is R5, `SkillModifiers.heavy_target_damage_multiplier` (`is_one_f32` skip).
+- **The file is never re-cut.** Later cases use inline JSON or new `save_v7_w2_*.json` / `save_v7_w4_*.json` fixtures. Its `V7_CONTINUATION_FNV` is pinned at the wave-4 close (W4-09).
+
+**How it was cut.** `save_fixtures.rs::write_save_v7_fixture` (`#[ignore]`, `LASTLIGHT_WRITE_SAVE_V7_FIXTURE=<path>`, refuses to overwrite, asserts `SAVE_VERSION == 7`) runs `stage_v7_scenario` with seed `0x5AFE_0007`:
+
+- Played through `Game::apply` and the smoke bot: Rook liberates Moldova and Romania; Mara replays Moldova stage 1 (the root report); three recruits join; recruit 2 wins Ukraine stage 1 on an expedition; recruit 3 is out in Hungary with a synced drop; the stash is sold down; the preset becomes Custom on Hard's extras; auto-sell is on; Mara holds Romania stage 1 to tick 1740 with kills, a corpse and a drop.
+- Staged through the test-support seams, because wave 1 has no writer for them: `Staging::stage_takeover(1)` (recruit 1 Defending, its loadout reserved, `reserved_recruit`, the seat and identity appearance); then, through the staging handle and the `*_mut` accessors (`Game::pending_runs_mut` was added for this), drop tracking at the frozen drop tier, a Capstone snapshot on wave tier 11 with every multiplier above 1, per-class skill modifiers, an armored stagger-immune elite, a stationed spitter mid-windup, a splitter and its child, a group of exploders, a boss with `boss_state.entered = 1`, per-archetype telemetry, the auto-sold receipt and unacknowledged summary of the settled expedition, the pending auto-sale and a pending run record of the live one, `next_defender` = recruit 2, `milestones_claimed {5}`, `level_grant_paid`, a main-run takeover record with its receipts, `folded_outcomes` and `containments`. Combat logs are trimmed to their last four lines (presentation history) to fit the budget.
+
+**Guards** (`tests/save_migration.rs`):
+
+| Test | Proves |
+|---|---|
+| `v7_fixture_is_a_real_v7_generation` | Envelope version 7, at most 96 KB, and every `V7_SAVED_KEYS` key (root or worker) at a non-default value; the section 11 content |
+| `v7_fixture_holds_every_defender_key_at_non_default` | The defender state by JSON pointer, and the typed reads agree |
+| `v7_fixture_loads_validates_and_resaves_byte_identically` | Load, `validate_game`, resave to the same payload; a second resave is byte-identical; one flipped payload byte is refused |
+| `v7_fixture_round_trips_every_enemy_balance_field_to_equal_digest` | The 37 enemy and balance keys (3.1 basis, 3.8-3.12) keep their saved text; the loaded digest is the saved checksum |
+
+### Conventions (binding after the freeze; schema-v7.md section 1)
+
+| # | Rule |
+|---|---|
+| C1 | Every new field: serde default with a legacy-neutral value plus `skip_serializing_if` at that value; mandatory on types without a container default. |
+| C2 | Predicates live in `crate::schema` (`is_default`, `is_false`, `is_zero_f32` by bits, `is_one_f32` by bits, `one_f32`, `one_u8`). Writers produce the literal 1.0 at neutral inputs; validation rejects non-finite values. |
+| C3 | Wave-1 writers were GOLDEN-neutral only (worker seat stamping, auto-sell commands, the extras basis). |
+| C4 | `deny_unknown_fields` types stay closed: `BalanceSettings` gains no field; `ResolvedEnemy` only under C1. |
+| C5 | `v6_to_v7` is path-based, idempotent and catalogue-free. |
+| C6 | Command, CommandError, CommandOutcome, RecruitStatus, BossRank, SettlementIssue, EventKind/SimEvent and the hash tags are append-only; recorded Command shapes are frozen. |
+| C7 | `state_digest` is the FNV of the serialized game; serde-skipped state, settings, catalogues and assets are never in it. |
+| C8 | Presentation and keyed rolls never draw `Attempt.rng` or the strategy RNG; keyed rolls use `hash::keyed` with append-only tags. |
+
+### Provisional-pin and re-bless protocol (ruling P3)
+
+1. A digest-moving commit never edits `GOLDEN` or `GAMEPLAY_TRACE`. It sets `PROVISIONAL` (in `tests/determinism.rs`) to the six new digests of each family and appends one `PROVISIONAL_CAUSES` row: commit tag, class (F format, C content, T telemetry, G gameplay, as `support::classify` assigns from `determinism_anatomy`) and the reason. The test accepts `PROVISIONAL` only while the causes are non-empty.
+2. The wave's one save-determinism re-bless commit (W2-49, W4-08) folds `PROVISIONAL` into `GOLDEN` and `GAMEPLAY_TRACE`, writes a reason per moved digest into the determinism log and the commit body, and resets `PROVISIONAL` to None and the causes to empty.
+3. The wave-close critic checks that `PROVISIONAL` is None. A move with no listed cause, or a G move where none is expected, stops the work.
+
+**Wave 1 result:** `GOLDEN` 0/6 and `GAMEPLAY_TRACE` 0/6 moved over the whole wave (both families are identical to the pre-W1-01 parent of `b82658a`); `PROVISIONAL` is None with no causes; `RULESET_VERSION` 2 (W1-20, label only); V1-V6 continuation pins unchanged.
+
+### Expected moves after the freeze
+
+| Wave | Digest | Expected | Class | Cause (commit) | Re-bless |
+|---|---|---|---|---|---|
+| 2 | GOLDEN 6/6 | yes | F | `drop_tier` always Some plus `drop_ids` at depth 0 (W2-06) | W2-49 |
+| 2 | GOLDEN 6/6 | yes | T | per-archetype telemetry writer (W2-05) | W2-49 |
+| 2 | GOLDEN | yes | C | the 39 `loot_only` items enlarge the tier pool (W2-08) | W2-49 |
+| 2 | GOLDEN | only if a GOLDEN item changes | G | the weighted or relative pick (W2-07, W2-09) | W2-49 |
+| 2 | GAMEPLAY_TRACE | no (rank 0: no elites, no new archetypes; one draw) | G | any move needs a G reason plus smoke and pacing evidence | W2-49 |
+| 2 | V1-V6 continuation, `V6_DROP_TRACE` | no (the `drop_tier` None path is byte-identical) | - | - | - |
+| 3 | all | no | - | UI only | - |
+| 4 | GOLDEN and GAMEPLAY_TRACE | yes, if rank-0 inputs move | G | balance (W4-*) | W4-08 |
+| 4 | trap `charges_per_rank` pin | not expected | G | re-blessed in W4-08 with its reason if it moves | W4-08 |
+| 4 | PROGRESSED_GOLDEN (4), PROGRESSED_TRACE, `V7_CONTINUATION_FNV` | new pins | - | cut at the wave-4 close (W4-09) | - |
+| 5-7 | every family | no | - | any core move: stop and ask the user | - |
 
 ---
 

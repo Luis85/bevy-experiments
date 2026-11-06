@@ -41,6 +41,19 @@
 //! with enemies, a corpse and a drop. Rook's natural level is 33 (Moldova
 //! alone reaches 14), and the file is 120,842 bytes: the 14 run records, two
 //! 80-line Npc logs and two worker games are most of it.
+//!
+//! `fixtures/save_v7.json` is the save format 7 freeze (W1-63, schema-v7.md
+//! section 11), written by `Game::save` through the `#[ignore]`d
+//! `write_save_v7_fixture` in `save_fixtures.rs` (seed 0x5AFE_0007; see
+//! `stage_v7_scenario` there). Played through `Game::apply`: Rook liberates
+//! Moldova and Romania, Mara replays Moldova stage 1 (the restored root
+//! report), recruit 2 wins Ukraine stage 1 on an expedition, recruit 3 is out
+//! in Hungary with a synced drop, the preset is Custom on Hard's extras,
+//! auto-sell is on, and Mara holds Romania stage 1 at tick 1740 (rank 8).
+//! Staged through the test-support seams: recruit 1 takes that defense over
+//! (`stage_takeover`), and every v7 field without a wave-1 writer is set to a
+//! valid non-default value. It is 94,965 bytes (budget 96 KB) and is never
+//! re-cut: a later saved field must load it unchanged.
 mod support;
 
 use horde_core::campaign::{BodyAttribute, NpcTraining};
@@ -1301,5 +1314,302 @@ fn rejects_milestone_claimed_above_rank() {
             v["campaign"]["milestones_claimed"] = claim(&many);
         }),
         "65 claims",
+    );
+}
+
+// ---------------------------------------------------------------------------
+// save_v7.json: the schema-freeze file (W1-63; schema-v7.md section 11).
+// ---------------------------------------------------------------------------
+
+const FIXTURE_V7: &str = include_str!("fixtures/save_v7.json");
+/// The frozen file's size budget (schema-v7.md section 11).
+const V7_FIXTURE_MAX_BYTES: usize = 96 * 1024;
+
+fn fixture_v7() -> Game {
+    Game::decode_save_generation(FIXTURE_V7.as_bytes()).expect("v7 fixture loads and validates")
+}
+
+/// The v7 fixture's envelope, as `Game::save` wrote it.
+fn envelope_v7() -> serde_json::Value {
+    serde_json::from_str(FIXTURE_V7).unwrap()
+}
+
+/// The saved JSON of the v7 fixture's game.
+fn payload_v7() -> serde_json::Value {
+    serde_json::from_str(envelope_v7()["payload"].as_str().unwrap()).unwrap()
+}
+
+/// Every value at the registry key path `path` (see
+/// `support::values_at_key_path`), in the root game and in every worker game.
+fn v7_values<'a>(payload: &'a serde_json::Value, path: &str) -> Vec<&'a serde_json::Value> {
+    let mut values = support::values_at_key_path(payload, path);
+    values.extend(support::values_at_key_path(
+        payload,
+        &format!("{}{path}", support::WORKER_GAME_PREFIX),
+    ));
+    values
+}
+
+/// Whether `value` is what the v7 field `key` (the last path segment) holds
+/// at its default, the value convention C1 skips: null, false, zero, empty,
+/// an object of such values (an all-zero quality map, an empty receipt), or
+/// the field's named default.
+fn is_v7_default(key: &str, value: &serde_json::Value) -> bool {
+    use serde_json::Value;
+    fn empty(value: &Value) -> bool {
+        match value {
+            Value::Null => true,
+            Value::Bool(b) => !b,
+            Value::Number(n) => n.as_f64() == Some(0.0),
+            Value::String(s) => s.is_empty(),
+            Value::Array(items) => items.is_empty(),
+            Value::Object(map) => map.values().all(empty),
+        }
+    }
+    let named = match key {
+        "auto_sell" => serde_json::to_value(horde_core::campaign::AutoSellRule::default()).unwrap(),
+        "defender" => serde_json::json!("ModeOwner"),
+        "boss_rank" => serde_json::json!("Sector"),
+        "balance_extras_basis" => serde_json::json!("Normal"),
+        "group_size" => serde_json::json!(1),
+        "front_ramp" | "hazard_damage_multiplier" => serde_json::json!(1.0),
+        key if key.starts_with("boss_") && key.ends_with("_multiplier") => serde_json::json!(1.0),
+        _ => Value::Null,
+    };
+    empty(value) || *value == named
+}
+
+/// The frozen file is a real save format 7 generation, written by
+/// `Game::save`, within its size budget, and every field save format 7 added
+/// (`support::V7_SAVED_KEYS`) occurs in it at a non-default value.
+#[test]
+fn v7_fixture_is_a_real_v7_generation() {
+    assert!(
+        FIXTURE_V7.len() <= V7_FIXTURE_MAX_BYTES,
+        "save_v7.json is {} bytes",
+        FIXTURE_V7.len()
+    );
+    let envelope = envelope_v7();
+    assert_eq!(envelope["version"], 7);
+    assert!(envelope["ruleset_version"].is_u64());
+    assert!(envelope["content_fingerprint"].is_u64());
+    let payload = payload_v7();
+    let mut missing = Vec::new();
+    for (section, path) in support::V7_SAVED_KEYS {
+        let key = path.rsplit('/').next().unwrap();
+        if v7_values(&payload, path)
+            .into_iter()
+            .all(|value| is_v7_default(key, value))
+        {
+            missing.push(format!("{section} {path}"));
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "never at a non-default value: {missing:?}"
+    );
+    // The section 11 content beyond the defender keys.
+    let campaign = &payload["campaign"];
+    assert_eq!(campaign["balance_settings"]["preset"], "Custom");
+    assert_eq!(campaign["balance_extras_basis"], "Hard");
+    assert_eq!(campaign["auto_sell"]["enabled"], true);
+    let snapshot = &payload["attempt"]["progression"];
+    assert_eq!(snapshot["wave_tier"], 11);
+    assert_eq!(snapshot["boss_rank"], "Capstone");
+    assert_eq!(snapshot["boss_phases"], 2);
+    assert!(snapshot["elite_rate_bp"].as_u64().unwrap() > 0);
+    for key in [
+        "front_ramp",
+        "boss_armor_multiplier",
+        "boss_health_multiplier",
+        "boss_reward_multiplier",
+        "boss_damage_multiplier",
+    ] {
+        assert!(snapshot[key].as_f64().unwrap() > 1.0, "{key}");
+    }
+    let enemies = payload["attempt"]["enemies"].as_array().unwrap();
+    let resolved = |e: &serde_json::Value, key: &str| e["resolved"][key].clone();
+    assert!(enemies.iter().any(|e| resolved(e, "elite").is_object()));
+    assert!(enemies.iter().any(|e| {
+        resolved(e, "archetype_id") == "spitter"
+            && resolved(e, "reach").as_f64().unwrap_or(0.0) > 0.0
+            && e["attack_phase"] == "Windup"
+            && e["contact_since"].is_null()
+    }));
+    assert!(enemies.iter().any(|e| e["split_child"] == true));
+    assert!(
+        enemies
+            .iter()
+            .any(|e| e["boss"] == true && e["boss_state"]["entered"] == 1)
+    );
+    let modifiers = &payload["attempt"]["profile"]["modifiers"];
+    assert_eq!(modifiers["class_modifiers"].as_object().unwrap().len(), 1);
+    assert!(modifiers["hazard_damage_multiplier"].as_f64().unwrap() < 1.0);
+}
+
+/// The defender state of section 11, by JSON pointer: a live depth-0 Npc
+/// defense held by recruit 1 (Defending, its loadout reserved, its identity
+/// appearance), recruit 2 named as the next defender, one settled
+/// unacknowledged expedition and one live one in their recruits' seats, a
+/// folded outcome, a containment and a main-run takeover record.
+#[test]
+fn v7_fixture_holds_every_defender_key_at_non_default() {
+    use serde_json::json;
+    let payload = payload_v7();
+    let (defending, next, settled, live) = (1u64, 2u64, 2u64, 3u64);
+    let appearance = horde_core::defenders::recruit_identity(defending).1;
+    for (pointer, expected) in [
+        ("/attempt/mode", json!("Npc")),
+        ("/attempt/defender", json!({"Recruit": defending})),
+        ("/attempt/profile/appearance", json!(appearance)),
+        ("/campaign/reserved", json!("Npc")),
+        ("/campaign/reserved_recruit", json!(defending)),
+        ("/campaign/next_defender", json!({"Recruit": next})),
+        ("/strategy/roster/0/id", json!(defending)),
+        ("/strategy/roster/0/status", json!("Defending")),
+        ("/strategy/roster/1/id", json!(next)),
+        ("/strategy/roster/1/status", json!("Ready")),
+        ("/strategy/roster/2/id", json!(live)),
+        ("/strategy/roster/2/status", json!("Deployed")),
+        ("/battles/0/recruit_id", json!(settled)),
+        ("/battles/0/settled", json!(true)),
+        (
+            "/battles/0/game/last_result/defender",
+            json!({"Recruit": settled}),
+        ),
+        ("/battles/0/summary/acknowledged", json!(false)),
+        ("/battles/1/recruit_id", json!(live)),
+        ("/battles/1/settled", json!(false)),
+        ("/battles/1/game/attempt/defender", json!({"Recruit": live})),
+    ] {
+        assert_eq!(payload.pointer(pointer), Some(&expected), "{pointer}");
+    }
+    let reserved = payload["campaign"]["reserved_items"].as_array().unwrap();
+    for item in payload["strategy"]["roster"][0]["npc"]["loadout"]
+        .as_array()
+        .unwrap()
+    {
+        assert!(reserved.contains(item), "loadout item {item} is reserved");
+    }
+    assert!(payload["strategy"]["folded_outcomes"].as_u64().unwrap() > 0);
+    assert!(
+        payload["strategy"]["roster"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["containments"].as_u64().unwrap_or(0) > 0)
+    );
+    assert!(
+        payload["campaign"]["run_history"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|r| r["worker_id"].is_null() && r["recruit_id"].is_u64() && r["mode"] == "Npc")
+    );
+    // The typed reads agree.
+    let game = fixture_v7();
+    assert_eq!(
+        game.attempt().unwrap().defender(),
+        DefenderId::Recruit(defending)
+    );
+    assert_eq!(
+        game.campaign().next_defender,
+        Some(DefenderId::Recruit(next))
+    );
+    assert_eq!(game.strategy().roster[0].status, RecruitStatus::Defending);
+    assert_eq!(
+        game.battles()[0].game().last_result().unwrap().defender(),
+        DefenderId::Recruit(settled)
+    );
+    assert_eq!(
+        game.battles()[1].game().attempt().unwrap().defender(),
+        DefenderId::Recruit(live)
+    );
+}
+
+/// The frozen file loads, validates and saves back to the very same payload,
+/// and a second resave is byte-identical to the first. One flipped payload
+/// byte is refused.
+#[test]
+fn v7_fixture_loads_validates_and_resaves_byte_identically() {
+    let envelope = envelope_v7();
+    let saved = envelope["payload"].as_str().unwrap();
+    let game = fixture_v7();
+    assert_eq!(game.to_save_json().unwrap(), saved);
+    let dir = std::env::temp_dir();
+    let path = |n: u8| {
+        dir.join(format!(
+            "lastlight-v7-resave-{n}-{}.json",
+            std::process::id()
+        ))
+    };
+    game.save(&path(1)).unwrap();
+    let first = std::fs::read(path(1)).unwrap();
+    Game::load(&path(1)).unwrap().save(&path(2)).unwrap();
+    let second = std::fs::read(path(2)).unwrap();
+    for n in [1, 2] {
+        for extension in ["json", "bak"] {
+            let _ = std::fs::remove_file(path(n).with_extension(extension));
+        }
+    }
+    assert!(first == second, "the second resave is byte-identical");
+    let resaved: serde_json::Value = serde_json::from_slice(&first).unwrap();
+    assert_eq!(resaved["version"], SAVE_VERSION);
+    assert_eq!(resaved["payload"].as_str().unwrap(), saved);
+    // The checksum guards every payload byte.
+    let at = FIXTURE_V7
+        .find("\\\"seed\\\":")
+        .expect("the payload holds a seed");
+    let mut flipped = FIXTURE_V7.as_bytes().to_vec();
+    flipped[at + 2] ^= 0x01;
+    assert!(Game::decode_save_generation(&flipped).is_err());
+}
+
+/// Every enemy and balance field save format 7 added (sections 3.1
+/// `balance_extras_basis` and 3.8-3.12) survives load and resave with the
+/// same saved text, and the loaded game digests to the saved checksum.
+#[test]
+fn v7_fixture_round_trips_every_enemy_balance_field_to_equal_digest() {
+    let envelope = envelope_v7();
+    let payload = payload_v7();
+    let game = fixture_v7();
+    assert_eq!(
+        serde_json::json!(game.state_digest()),
+        envelope["checksum"],
+        "the loaded game digests to the saved checksum"
+    );
+    let resaved: serde_json::Value = serde_json::from_str(&game.to_save_json().unwrap()).unwrap();
+    let reloaded: Game = serde_json::from_value(resaved.clone()).unwrap();
+    assert_eq!(reloaded.state_digest(), game.state_digest());
+    let sections = ["3.8 ", "3.9 ", "3.10 ", "3.11 ", "3.12 "];
+    let mut checked = 0;
+    for (section, path) in support::V7_SAVED_KEYS {
+        if !(sections.iter().any(|s| section.starts_with(s))
+            || path.ends_with("/balance_extras_basis"))
+        {
+            continue;
+        }
+        let before = v7_values(&payload, path);
+        assert!(!before.is_empty(), "{section} {path} is saved");
+        assert_eq!(before, v7_values(&resaved, path), "{section} {path}");
+        checked += 1;
+    }
+    assert_eq!(checked, 37);
+    // The typed values behind the saved text.
+    let a = game.attempt().unwrap();
+    let snapshot = &a.progression;
+    assert_eq!(snapshot.wave_tier, 11);
+    assert_eq!(
+        snapshot.boss_rank,
+        horde_core::progression::BossRank::Capstone
+    );
+    assert_eq!(snapshot.boss_phases, 2);
+    let boss = a.enemies.iter().find(|e| e.boss).unwrap();
+    let state = boss.boss_state.as_ref().unwrap();
+    assert_eq!((state.transitions, state.entered), (2, 1));
+    assert_eq!(a.telemetry.boss_phase_ticks.len(), 1);
+    assert_eq!(
+        game.campaign().balance_extras_basis,
+        horde_core::balance::BalancePreset::Hard
     );
 }

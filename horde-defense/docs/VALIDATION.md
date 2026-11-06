@@ -214,7 +214,7 @@ All six painted PNGs have exact prompt provenance embedded and recorded in `asse
 
 Country records retain source years (mainly 2019), attribution, symmetric travel links, actual boundaries and validated connectivity. Content validation rejects unsupported/missing profiles, bad ordering, nonfinite/overflow values and unsafe geometry. Culture/architecture is original regional dressing, not bespoke research or art for every country.
 
-Save generations retain RNG, actions, equipment reservations, pending boss mechanics, workers and settlement cursors coherently. Corrupt primary/backup bytes are preserved before replacement; failed writes never acknowledge quit. The save format (envelope v6; the limit is version-independent) has an inclusive **64 MiB encoded-generation ceiling**. Oversized saves fail before touching any existing generation or temporary file. Inventory has no gameplay capacity limit and collected items are never discarded, but a future storage format is needed for persistence beyond that technical ceiling.
+Save generations retain RNG, actions, equipment reservations, pending boss mechanics, workers and settlement cursors coherently. Corrupt primary/backup bytes are preserved before replacement; failed writes never acknowledge quit. The save format (envelope v7, frozen by `save_v7.json`; the limit is version-independent) has an inclusive **64 MiB encoded-generation ceiling**. Oversized saves fail before touching any existing generation or temporary file. Inventory has no gameplay capacity limit and collected items are never discarded, but a future storage format is needed for persistence beyond that technical ceiling.
 
 ## Remaining playtest questions
 
@@ -482,6 +482,23 @@ Re-run, three runs per profile, same machine (about 53% CPU load from other work
 | release | 5,000 | 0.994, 0.961, 1.070 | 0.994 | 0.479 | 7.44 | 1,882,516 |
 
 **The gate passes in every dev and playtest run (p99 at most 0.764 ms at 1,000 items).** 5,000 items remain above 1.0 ms at p99. That size is informational, and from 2,500 items the stash itself (0.13 to 0.30 ms mean) is the largest component. If it ever becomes gated, the next lever is `ItemDefId(Arc<str>)`. Reports: `target/perf/save-clone/` (before) and `target/perf/save-clone-remedy/` (after).
+
+## Save format 7 frozen — 6 November 2026 (W1-63)
+
+**Save format 7 is frozen.** `crates/horde_core/tests/fixtures/save_v7.json` is a real `Game::save` generation: envelope version 7, ruleset 2, 94,965 bytes (budget 96 KB). It was cut once by the `#[ignore]`d writer `write_save_v7_fixture` in `tests/save_fixtures.rs` (`LASTLIGHT_WRITE_SAVE_V7_FIXTURE=<path>`; it refuses to overwrite and asserts `SAVE_VERSION == 7`), and is never re-cut. Two cuts from the same tree were byte-identical.
+
+Its scenario (`stage_v7_scenario`, seed `0x5AFE_0007`) is played through `Game::apply` and the smoke bot up to a live Npc defense of Romania stage 1 at tick 1740, beside one settled and one live expedition. The v7 fields that have no wave-1 writer are then staged through the test-support seams: `Staging::stage_takeover` hands the defense to recruit 1, and the staging handle and the `*_mut` accessors (plus the new test-support `Game::pending_runs_mut`) stage drop tracking, receipts, the expedition summary and pending sale, ledgers, a Capstone snapshot on wave tier 11, per-class skill modifiers, the new enemy-side state (an elite, a spitter mid-windup, a splitter and its child, exploders, a phased boss) and per-archetype telemetry. Combat logs are trimmed to their last four lines to fit the budget. Every `V7_SAVED_KEYS` key occurs at a non-default value, and the file loads through `validate_game`.
+
+Guards in `tests/save_migration.rs`:
+
+- `v7_fixture_is_a_real_v7_generation`: the envelope, the size budget and every v7 key at a non-default value (root or worker game).
+- `v7_fixture_holds_every_defender_key_at_non_default`: the defender state by JSON pointer (seat, Defending recruit, reserved loadout, appearance, next defender, expedition seats, the unacknowledged summary, folded outcomes, containments, the main-run takeover record).
+- `v7_fixture_loads_validates_and_resaves_byte_identically`: the payload resaves unchanged, a second resave is byte-identical, and one flipped payload byte is refused.
+- `v7_fixture_round_trips_every_enemy_balance_field_to_equal_digest`: the 37 enemy and balance keys keep their saved text, and the loaded game digests to the saved checksum.
+
+Proofs recorded at the cut: removing one key (`pending_runs[0].boss_rank`, checksum recomputed) fails `v7_fixture_is_a_real_v7_generation` with `never at a non-default value: ["3.5 RunRecord /pending_runs/boss_rank"]`; flipping one payload byte without the checksum fails the three loading tests with `ChecksumMismatch`.
+
+From now on a new saved field must be serde-defaulted, skipped at its default and load `save_v7.json` unchanged; otherwise the work stops and the user is asked (the only pre-approved exception is R5, `SkillModifiers.heavy_target_damage_multiplier`). Later cases use inline JSON or new `save_v7_w2_*.json` / `save_v7_w4_*.json` files. Over the whole of wave 1, `GOLDEN` and `GAMEPLAY_TRACE` moved 0/6 each and `PROVISIONAL` is None.
 
 ## Full verify
 

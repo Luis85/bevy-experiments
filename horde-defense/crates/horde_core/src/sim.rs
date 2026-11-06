@@ -1126,6 +1126,12 @@ impl Game {
     pub fn battles_mut(&mut self) -> &mut Vec<ParallelBattle> {
         &mut self.battles
     }
+    /// A worker game's finished-run records awaiting the parent's sync, for
+    /// staging the receipt fields they carry (the v7 fixture's
+    /// `pending_runs` keys).
+    pub fn pending_runs_mut(&mut self) -> &mut Vec<crate::stats::RunRecord> {
+        &mut self.pending_runs
+    }
     /// Runs `f` with the strategy layer and the campaign it mutates, for
     /// strategy calls that take `&mut Campaign` (recruiting, equipping).
     pub fn with_strategy<R>(
