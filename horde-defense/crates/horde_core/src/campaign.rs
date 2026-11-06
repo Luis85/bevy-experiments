@@ -42,8 +42,10 @@ pub struct Campaign {
     pub legacy_features: bool,
     #[serde(default)]
     pub balance_settings: crate::balance::BalanceSettings,
+    /// Shared copy-on-write (W1-50): a save snapshot shares it with the live
+    /// game, and recording a run replaces it. Serialized as a plain sequence.
     #[serde(default)]
-    pub run_history: Vec<crate::stats::RunRecord>,
+    pub run_history: std::sync::Arc<[crate::stats::RunRecord]>,
     #[serde(default = "crate::stats::first_run_id")]
     pub next_run_id: u64,
     /// Zero denotes pre-victory-threat saves; migrate their clear high-water once.
@@ -132,7 +134,7 @@ impl Default for Campaign {
             journey_revision: 1,
             legacy_features: false,
             balance_settings: Default::default(),
-            run_history: Vec::new(),
+            run_history: Default::default(),
             next_run_id: 1,
             threat_revision: 1,
             selected_survivor: None,
@@ -295,7 +297,7 @@ impl Campaign {
             journey_revision: 1,
             legacy_features: self.legacy_features,
             balance_settings: self.balance_settings.clone(),
-            run_history: Vec::new(),
+            run_history: Default::default(),
             next_run_id: 1,
             threat_revision: self.threat_revision,
             selected_survivor: self.selected_survivor,
@@ -348,7 +350,7 @@ impl Campaign {
         if self.next_run_id == 0 || self.run_history.windows(2).any(|p| p[0].id >= p[1].id) {
             return Err("Invalid run history sequence".into());
         }
-        for record in &self.run_history {
+        for record in self.run_history.iter() {
             record.validate()?;
             if record.id == 0 || record.id >= self.next_run_id {
                 return Err("Invalid persistent run identity".into());

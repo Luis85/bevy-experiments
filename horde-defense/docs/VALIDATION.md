@@ -462,3 +462,23 @@ Before any remedy, three runs per profile, Intel Core Ultra 9 185H with other de
 | release | 5,000 | 3.010, 2.064, 1.551 | 2.064 | 1.014 | 10.77 | 1,882,516 |
 
 Component means at 1,000 items in playtest: run history 0.109 ms, attempt 0.086 ms, expeditions 0.078 ms, stash items 0.052 ms. From 2,500 items the stash is the largest. **The gate fails in playtest (p99 above 1.0 ms in every run) and is marginal in dev (one run of three above).** So the conditional remedy applies, aimed at the run history, the largest component at the gated 1,000 items. The timings are wall-clock on a shared desktop, so single runs vary by up to 5x at p99, release included. The means are stable to about 10%.
+
+### Remedy: the run history is shared copy-on-write
+
+`Campaign.run_history` is now an `Arc<[RunRecord]>` (serde `rc`). A save snapshot shares it with the live game. Recording a run builds a new history, so snapshots still in flight keep the old one (`consecutive_snapshots_share_unchanged_component`). It serializes as the same plain sequence. The save payloads of the v6 fixture and of the saveable stress game (`stress_authored_fixture`, 150 records, standing in for `save_v7.json`, which save-determinism cuts at the wave-1 close) are pinned by FNV-1a hashes cut before the change. Both still round-trip byte-identical (`save_v6_and_v7_fixtures_round_trip_byte_identical`). The benchmark's byte counts are unchanged, and `GOLDEN` and `GAMEPLAY_TRACE` are unchanged.
+
+Re-run, three runs per profile, same machine (about 53% CPU load from other work):
+
+| Profile | Items | `save_snapshot` p99 per run (ms) | p99 median | mean | `to_vec` p99 | Bytes |
+|---|---:|---|---:|---:|---:|---:|
+| dev | 1,000 | 0.649, 0.654, 0.764 | **0.654** | 0.339 | 7.47 | 1,408,714 |
+| dev | 2,500 | 0.706, 1.003, 0.900 | 0.900 | 0.427 | 7.76 | 1,586,397 |
+| dev | 5,000 | 1.272, 1.011, 1.144 | 1.144 | 0.562 | 9.47 | 1,882,516 |
+| playtest | 1,000 | 0.552, 0.692, 0.672 | **0.672** | 0.303 | 6.02 | 1,408,714 |
+| playtest | 2,500 | 0.739, 0.657, 0.806 | 0.739 | 0.333 | 6.99 | 1,586,397 |
+| playtest | 5,000 | 1.187, 1.133, 1.157 | 1.157 | 0.538 | 7.40 | 1,882,516 |
+| release | 1,000 | 0.469, 0.604, 0.690 | 0.604 | 0.303 | 5.51 | 1,408,714 |
+| release | 2,500 | 0.910, 0.635, 0.698 | 0.698 | 0.323 | 6.70 | 1,586,397 |
+| release | 5,000 | 0.994, 0.961, 1.070 | 0.994 | 0.479 | 7.44 | 1,882,516 |
+
+**The gate passes in every dev and playtest run (p99 at most 0.764 ms at 1,000 items).** 5,000 items remain above 1.0 ms at p99. That size is informational, and from 2,500 items the stash itself (0.13 to 0.30 ms mean) is the largest component. If it ever becomes gated, the next lever is `ItemDefId(Arc<str>)`. Reports: `target/perf/save-clone/` (before) and `target/perf/save-clone-remedy/` (after).

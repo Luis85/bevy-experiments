@@ -189,7 +189,9 @@ fn drop_tracking_fields_round_trip_and_skip_when_empty() {
     // Emptied again, every field leaves the save.
     let mut game = loaded;
     game.campaign_mut().auto_sell = AutoSellRule::default();
-    let record = game.campaign_mut().run_history.last_mut().unwrap();
+    let record = std::sync::Arc::make_mut(&mut game.campaign_mut().run_history)
+        .last_mut()
+        .unwrap();
     (record.auto_sold_count, record.auto_sold_coins) = (0, 0);
     let a = game.attempt_mut().unwrap();
     (a.drop_ids, a.drop_tier) = (Vec::new(), None);

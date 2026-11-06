@@ -84,3 +84,75 @@ fn save_snapshot_skips_transient_outbox_and_equals_serialized_state() {
     assert!(pending_events(&g) > 0);
     assert!(pending_issues(&g) > 0);
 }
+
+// The conditional remedy (W1-50): the save clone's gate failed in the
+// playtest profile, so the largest measured component at 1,000 items, the run
+// history, is shared copy-on-write between the game and its snapshots. The
+// save bytes must not move.
+
+const FIXTURE_V6: &str = include_str!("fixtures/save_v6.json");
+/// FNV-1a of the payloads below, cut before the remedy with the history a
+/// plain `Vec`: the shared history serializes to the same bytes.
+const V6_PAYLOAD_FNV: u64 = 11_732_925_792_674_115_074;
+const V7_PAYLOAD_FNV: u64 = 13_001_265_918_725_101_081;
+
+/// The validated save payload of `g`, and that payload loaded and saved again.
+fn payload_round_trip(g: &Game) -> (String, String) {
+    let payload = g.to_save_json().expect("saveable");
+    let again: Game = serde_json::from_str(&payload).expect("payload loads");
+    (payload, again.to_save_json().expect("still saveable"))
+}
+
+#[test]
+fn consecutive_snapshots_share_unchanged_component() {
+    let mut g = Game::decode_save_generation(FIXTURE_V6.as_bytes()).expect("v6 fixture");
+    let history = |g: &Game| g.campaign().run_history.as_ptr();
+    assert!(!g.campaign().run_history.is_empty());
+    let first = g.save_snapshot();
+    let second = g.save_snapshot();
+    assert_eq!(
+        history(&first),
+        history(&g),
+        "the snapshot shares the history"
+    );
+    assert_eq!(
+        history(&second),
+        history(&first),
+        "and so does the next one"
+    );
+
+    // Recording a run copies on write: the earlier snapshot keeps its records.
+    let records = g.campaign().run_history.len();
+    if g.attempt().is_none() {
+        g.deploy(0, Mode::Npc).unwrap();
+    }
+    g.withdraw();
+    assert_eq!(g.campaign().run_history.len(), records + 1);
+    assert_eq!(first.campaign().run_history.len(), records);
+    let third = g.save_snapshot();
+    assert_ne!(history(&third), history(&first));
+    assert_eq!(history(&third), history(&g));
+}
+
+#[test]
+fn save_v6_and_v7_fixtures_round_trip_byte_identical() {
+    // v6: the checked-in fixture, migrated. v7: save_v7.json is cut at the
+    // wave-1 close (save-determinism), so the saveable stress game (150 run
+    // records, 1,200 items, three expeditions) stands in at today's format.
+    let v6 = Game::decode_save_generation(FIXTURE_V6.as_bytes()).expect("v6 fixture");
+    let v7 = horde_core::sim::stress_authored_fixture().expect("stress fixture");
+    for (name, g, pinned) in [("v6", v6, V6_PAYLOAD_FNV), ("v7", v7, V7_PAYLOAD_FNV)] {
+        let (payload, again) = payload_round_trip(&g);
+        assert_eq!(payload, again, "{name} round-trips byte-identical");
+        assert_eq!(
+            serde_json::to_string(&g.save_snapshot()).unwrap(),
+            payload,
+            "{name} snapshot bytes"
+        );
+        assert_eq!(
+            support::fnv1a(payload.as_bytes()),
+            pinned,
+            "{name} payload bytes moved"
+        );
+    }
+}

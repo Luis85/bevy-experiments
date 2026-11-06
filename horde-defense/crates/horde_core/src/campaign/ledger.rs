@@ -17,7 +17,11 @@ impl Campaign {
             .next_run_id
             .checked_add(1)
             .expect("Run history sequence exhausted");
-        self.run_history.push(record);
+        // Copy on write: snapshots still holding the old history keep it.
+        let mut history = Vec::with_capacity(self.run_history.len() + 1);
+        history.extend_from_slice(&self.run_history);
+        history.push(record);
+        self.run_history = history.into();
     }
     pub fn reward(&mut self, coins: u64, xp: u64, mode: Mode) -> u64 {
         self.coins = self.coins.saturating_add(coins);

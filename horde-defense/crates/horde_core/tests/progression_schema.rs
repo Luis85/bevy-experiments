@@ -255,7 +255,9 @@ fn progression_ledgers_round_trip_and_skip_at_default() {
     // Emptied again, every key leaves the save.
     let mut game = loaded;
     game.campaign_mut().player.level_grant_paid = 0;
-    let record = game.campaign_mut().run_history.last_mut().unwrap();
+    let record = std::sync::Arc::make_mut(&mut game.campaign_mut().run_history)
+        .last_mut()
+        .unwrap();
     (record.level_grant_coins, record.milestone_coins) = (0, 0);
     game.last_result_mut().as_mut().unwrap().progression_rewards = ProgressionRewards::default();
     game.battles_mut()[settled]
