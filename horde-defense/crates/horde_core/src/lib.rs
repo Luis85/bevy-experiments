@@ -12,6 +12,8 @@ pub mod progression;
 pub mod quality;
 pub mod rules;
 mod schema;
+#[cfg(any(test, feature = "test-support"))]
+pub mod sha256;
 pub mod sim;
 pub mod skill_catalog;
 pub mod stats;
