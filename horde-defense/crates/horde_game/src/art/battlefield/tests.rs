@@ -377,8 +377,11 @@ fn legacy_actor_meshes(view: &BattleViewModel, textures: ArtTextures) -> Vec<egu
                 pose
             ));
             if let Some(strength) = e.hit_flash {
-                visual_assets::actor_hit_flash(
-                    p,
+                // The flash is one quad on the packed silhouette (W1-66).
+                let masks = visual_assets::flash_masks(p.ctx()).unwrap();
+                let mut flash = egui::Mesh::default();
+                let quads = visual_assets::hit_flash_quad(
+                    &masks,
                     textures,
                     actor,
                     painted_at,
@@ -388,7 +391,11 @@ fn legacy_actor_meshes(view: &BattleViewModel, textures: ArtTextures) -> Vec<egu
                         reduced: false,
                     },
                     pose,
+                    &mut flash,
+                    &textures.battle_atlas.unwrap(),
                 );
+                assert_eq!(quads, 1);
+                p.add(egui::Shape::mesh(flash));
             }
         }
     });
@@ -429,7 +436,8 @@ fn batched_actor_layer_keeps_feet_then_id_order_across_sheets() {
         .collect();
     assert_eq!(sprites.len(), 1, "one sprite mesh for every hostile");
     let sprites = sprites[0];
-    // The legacy painters, enemy by enemy: sprite, then its flash runs.
+    // The legacy painters, enemy by enemy: sprite, then its flash quad
+    // (already in atlas coordinates).
     let mut expected = Vec::new();
     let mut sheets = [0; 2];
     for mesh in legacy_actor_meshes(&view, textures) {
@@ -451,7 +459,7 @@ fn batched_actor_layer_keeps_feet_then_id_order_across_sheets() {
                         .uv(sheet, Rect::from_min_max(vertex.uv, vertex.uv))
                         .min
                 }
-                None => atlas.white_uv,
+                None => vertex.uv,
             };
             expected.push((vertex.pos, uv));
         }
@@ -1069,4 +1077,55 @@ fn battlefield_reports_hit_flash_quads() {
         .count();
     assert!(drawn.flash_quads >= flashing);
     assert_eq!(4 * drawn.flash_quads, additive);
+}
+
+/// W1-66: with the packed atlas every hit flash is one posed quad on its
+/// white silhouette, right after its sprite: the sprite layer holds one quad
+/// per hostile plus one per flashing hostile, in normal and reduced effects.
+#[test]
+fn hit_flash_is_one_quad_per_sprite() {
+    let (game, view) = mixed_sheet_view();
+    let a = game.attempt().unwrap();
+    let textures = textures();
+    let atlas = textures.battle_atlas.unwrap();
+    let flashing = view
+        .enemies
+        .iter()
+        .filter(|e| e.hit_flash.is_some())
+        .count();
+    assert!(flashing > 10, "{flashing} flashing hostiles");
+    for reduced in [false, true] {
+        let mut drawn = enemies::HostilesDrawn::default();
+        let shapes = painted(|p| {
+            drawn = enemies::paint(
+                p,
+                ArenaProjection::for_attempt(arena(), a),
+                &view,
+                textures,
+                false,
+                reduced,
+                rig_shadow(),
+            );
+        });
+        assert_eq!((drawn.flashing, drawn.flash_quads), (flashing, flashing));
+        let sprites = meshes(&shapes)
+            .into_iter()
+            .find(|mesh| mesh.texture_id == atlas.texture)
+            .expect("the sprite layer");
+        assert_eq!(
+            sprites.vertices.len(),
+            4 * (view.enemies.len() + flashing),
+            "reduced {reduced}"
+        );
+        // Each flash quad samples the silhouette column, never the white
+        // block or a sheet.
+        let column_top = atlas.silhouette_origin()[1] as f32 / atlas.size[1] as f32;
+        let column_right = atlas.actors_size[0] as f32 / atlas.size[0] as f32;
+        let flash_vertices = sprites
+            .vertices
+            .iter()
+            .filter(|v| v.uv.y >= column_top && v.uv.x <= column_right)
+            .count();
+        assert_eq!(flash_vertices, 4 * flashing, "reduced {reduced}");
+    }
 }

@@ -107,9 +107,9 @@ impl MeshBuilder {
 }
 
 /// The sprite layer of a battlefield: one packed-atlas mesh that keeps the
-/// exact painter order across both sheets, hit flashes included, or (when the
-/// atlas does not fit the device) a walker mesh, then an actor mesh, then
-/// the flash runs.
+/// exact painter order across both sheets, each hit flash one quad right
+/// after its sprite, or (when the atlas does not fit the device) a walker
+/// mesh, then an actor mesh, then the flash runs.
 pub(super) enum ActorMeshes {
     Packed {
         atlas: BattleAtlas,
@@ -158,8 +158,9 @@ impl ActorMeshes {
             }
         }
     }
-    /// Appends the hit-flash runs of the sprite `actor` just pushed and
-    /// returns how many quads they took.
+    /// Appends the hit flash of the sprite `actor` just pushed and returns
+    /// how many quads it took: one posed quad on its packed white silhouette,
+    /// or (split meshes) its mask runs.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn flash(
         &mut self,
@@ -171,21 +172,30 @@ impl ActorMeshes {
         flash: HitFlash,
         pose: &crate::animation::ActorPose,
     ) -> usize {
-        let (mesh, white) = match self {
-            Self::Packed { atlas, mesh } => (mesh, atlas.white_uv),
-            Self::Split { flashes, .. } => (flashes, WHITE_UV),
-        };
-        visual_assets::hit_flash_runs(
-            masks,
-            textures,
-            actor,
-            center,
-            size,
-            flash,
-            pose,
-            mesh.mesh_mut(),
-            white,
-        )
+        match self {
+            Self::Packed { atlas, mesh } => visual_assets::hit_flash_quad(
+                masks,
+                textures,
+                actor,
+                center,
+                size,
+                flash,
+                pose,
+                mesh.mesh_mut(),
+                atlas,
+            ),
+            Self::Split { flashes, .. } => visual_assets::hit_flash_runs(
+                masks,
+                textures,
+                actor,
+                center,
+                size,
+                flash,
+                pose,
+                flashes.mesh_mut(),
+                WHITE_UV,
+            ),
+        }
     }
     pub(super) fn paint(self, p: &Painter) {
         match self {

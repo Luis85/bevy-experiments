@@ -95,7 +95,7 @@ pub use atlas::{RigAtlas, RigSheet, WalkSheet};
 use enemy_visuals::{EnemySprite, SpriteArt, WalkArt};
 #[cfg(test)]
 use flash::{FlashMask, hit_flash_color};
-pub use flash::{FlashMasks, HitFlash, actor_hit_flash, hit_flash_runs};
+pub use flash::{FlashMasks, HitFlash, actor_hit_flash, hit_flash_quad, hit_flash_runs};
 #[cfg(test)]
 pub(crate) use loading::PATHS;
 #[cfg(feature = "review")]
@@ -136,8 +136,11 @@ pub enum ActorSheet {
     Walkers,
 }
 /// Where the packed battle atlas keeps each sheet: repacked existing pixels,
-/// never a new raster. Sizes are the loaded sheets' own pixel sizes, so the
-/// normalised source UVs of a uniformly rescaled sheet stay valid.
+/// never a new asset file. Beside the sheets it holds a white block and the
+/// hit-flash silhouettes, both derived at load (the silhouettes from the
+/// enemy frames' own alpha, see [`FlashMasks`]). Sizes are the loaded sheets'
+/// own pixel sizes, so the normalised source UVs of a uniformly rescaled
+/// sheet stay valid.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct BattleAtlas {
     pub texture: TextureId,
@@ -158,13 +161,25 @@ impl BattleAtlas {
     /// Actors at the origin, walkers to their right and the white block below
     /// the actors, each `GUTTER` texels apart.
     pub fn layout(texture: TextureId, actors_size: [u32; 2], walkers_size: [u32; 2]) -> Self {
+        Self::layout_with_silhouettes(texture, actors_size, walkers_size, 0)
+    }
+    /// [`Self::layout`], at least tall enough for `silhouette_rows` rows of
+    /// hit-flash silhouettes from [`Self::silhouette_origin`] (W1-66).
+    pub fn layout_with_silhouettes(
+        texture: TextureId,
+        actors_size: [u32; 2],
+        walkers_size: [u32; 2],
+        silhouette_rows: u32,
+    ) -> Self {
         let walkers_origin = [actors_size[0] + Self::GUTTER, 0];
         let white = [0, actors_size[1] + Self::GUTTER];
+        let silhouettes = white[1] + Self::WHITE_SIDE + Self::GUTTER;
         let size = [
             walkers_origin[0] + walkers_size[0],
             walkers_size[1]
                 .max(actors_size[1])
-                .max(white[1] + Self::WHITE_SIDE),
+                .max(white[1] + Self::WHITE_SIDE)
+                .max(silhouettes + silhouette_rows),
         ];
         let half = Self::WHITE_SIDE as f32 * 0.5;
         Self {
@@ -183,6 +198,11 @@ impl BattleAtlas {
     /// The top-left texel of the white block.
     pub fn white_origin(&self) -> [u32; 2] {
         [0, self.actors_size[1] + Self::GUTTER]
+    }
+    /// The top-left texel of the hit-flash silhouettes: the free column under
+    /// the actor sheet (as wide as it), `GUTTER` texels below the white block.
+    pub fn silhouette_origin(&self) -> [u32; 2] {
+        [0, self.white_origin()[1] + Self::WHITE_SIDE + Self::GUTTER]
     }
     /// `uv`, normalised to `sheet`, in normalised atlas coordinates.
     pub fn uv(&self, sheet: ActorSheet, uv: Rect) -> Rect {
