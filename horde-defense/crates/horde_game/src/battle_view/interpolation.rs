@@ -4,8 +4,7 @@ use crate::{
     ui::BattleUi,
 };
 use bevy::prelude::*;
-use horde_core::sim::Attempt;
-use std::collections::BTreeMap;
+use horde_core::sim::{Attempt, Enemy};
 
 /// Observation speed advances at most this many whole ticks per fixed step.
 pub(super) const MAX_TICKS_PER_STEP: u64 = 4;
@@ -54,17 +53,20 @@ pub fn blend_fraction(config: &LaunchConfig, overstep: f32) -> f32 {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 struct TickSnapshot {
     /// `None` for the active attempt, else the parallel battle id.
     scope: Option<u64>,
     attempt: u64,
     tick: u64,
-    positions: BTreeMap<u64, [f32; 2]>,
+    /// `(id, position)` of every enemy, in `a.enemies` order.
+    positions: Vec<(u64, [f32; 2])>,
+    /// The largest recorded id: an enemy with a larger one spawned since.
+    newest: Option<u64>,
 }
 
 /// Presentation-only cache of the positions each actor had before the latest
-/// fixed step, keyed by scene and actor id.
+/// fixed step, per scene, in the attempt's enemy order.
 #[derive(Clone, Debug)]
 pub struct ActorInterpolation {
     pub fraction: f32,
@@ -79,16 +81,25 @@ impl Default for ActorInterpolation {
     }
 }
 impl ActorInterpolation {
+    /// Replaces the snapshots, reusing their position buffers.
     pub fn record<'a>(&mut self, attempts: impl IntoIterator<Item = (Option<u64>, &'a Attempt)>) {
-        self.snapshots.clear();
+        let mut recorded = 0;
         for (scope, a) in attempts {
-            self.snapshots.push(TickSnapshot {
-                scope,
-                attempt: a.id,
-                tick: a.tick,
-                positions: a.enemies.iter().map(|e| (e.id, [e.x, e.y()])).collect(),
-            });
+            if recorded == self.snapshots.len() {
+                self.snapshots.push(TickSnapshot::default());
+            }
+            let snapshot = &mut self.snapshots[recorded];
+            snapshot.scope = scope;
+            snapshot.attempt = a.id;
+            snapshot.tick = a.tick;
+            snapshot.positions.clear();
+            snapshot
+                .positions
+                .extend(a.enemies.iter().map(|e| (e.id, [e.x, e.y()])));
+            snapshot.newest = a.enemies.iter().map(|e| e.id).max();
+            recorded += 1;
         }
+        self.snapshots.truncate(recorded);
     }
     /// The blend for one drawn attempt; identity unless a snapshot of this
     /// scene was taken within the latest fixed step.
@@ -101,16 +112,20 @@ impl ActorInterpolation {
         });
         SceneBlend {
             fraction: self.fraction,
-            previous: snapshot.map(|s| &s.positions),
+            previous: snapshot.map(|s| (s.positions.as_slice(), s.newest)),
         }
     }
 }
+
+/// (id, position) of a snapshot's enemies, in attempt order.
+type Positions<'a> = &'a [(u64, [f32; 2])];
 
 /// Copyable blend handle for one attempt's frame.
 #[derive(Clone, Copy, Debug)]
 pub struct SceneBlend<'a> {
     fraction: f32,
-    previous: Option<&'a BTreeMap<u64, [f32; 2]>>,
+    /// The snapshot's positions in attempt order, and its largest id.
+    previous: Option<(Positions<'a>, Option<u64>)>,
 }
 impl SceneBlend<'_> {
     /// Draw authoritative positions exactly.
@@ -119,13 +134,48 @@ impl SceneBlend<'_> {
         fraction: 1.0,
         previous: None,
     };
-    pub fn position(&self, id: u64, current: [f32; 2]) -> [f32; 2] {
-        match self.previous.and_then(|previous| previous.get(&id)) {
-            Some(before) if self.fraction < 1.0 => [
-                before[0] + (current[0] - before[0]) * self.fraction,
-                before[1] + (current[1] - before[1]) * self.fraction,
-            ],
-            _ => current,
-        }
+    /// The drawn position of each of `enemies`, in their order.
+    ///
+    /// The snapshot is walked once beside them: the core removes enemies in
+    /// place and appends new ones, so each enemy's previous position lies
+    /// after the one before it. An id beyond the snapshot's largest spawned
+    /// since and draws where it is. Only an enemy found neither way (a
+    /// reordered list) is searched for by id.
+    pub fn positions(&self, enemies: &[Enemy]) -> Vec<[f32; 2]> {
+        let current = |e: &Enemy| [e.x, e.y()];
+        let (previous, newest) = match self.previous {
+            Some(previous) if self.fraction < 1.0 => previous,
+            _ => return enemies.iter().map(current).collect(),
+        };
+        let mut cursor = 0;
+        enemies
+            .iter()
+            .map(|e| {
+                let now = current(e);
+                let ahead = previous[cursor..].iter().position(|(id, _)| *id == e.id);
+                let before = match ahead {
+                    Some(skip) => {
+                        cursor += skip + 1;
+                        Some(previous[cursor - 1].1)
+                    }
+                    None if newest.is_none_or(|newest| e.id > newest) => None,
+                    None => {
+                        #[cfg(test)]
+                        super::builds::record_id_lookup();
+                        previous[..cursor]
+                            .iter()
+                            .find(|(id, _)| *id == e.id)
+                            .map(|(_, at)| *at)
+                    }
+                };
+                match before {
+                    Some(before) => [
+                        before[0] + (now[0] - before[0]) * self.fraction,
+                        before[1] + (now[1] - before[1]) * self.fraction,
+                    ],
+                    None => now,
+                }
+            })
+            .collect()
     }
 }

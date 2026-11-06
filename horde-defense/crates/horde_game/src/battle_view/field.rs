@@ -7,7 +7,7 @@ use horde_core::{
     content::{EnemyKind, StructureKind, content},
     enemy_catalog::EnemyVisual,
     ordnance::{self, OrdnanceKind},
-    sim::{Attempt, Enemy, EnemyCondition, EnemyPhase, EventKind},
+    sim::{Attempt, CorpseRecord, Enemy, EnemyCondition, EnemyPhase, EventKind},
 };
 
 /// Figure height in lanes: `factor`, times the archetype scale when present.
@@ -282,12 +282,13 @@ impl BattleViewModel {
         let structures = a
             .structures
             .iter()
-            .map(|s| StructureView {
+            .enumerate()
+            .map(|(index, s)| StructureView {
                 id: s.id,
                 kind: s.kind,
                 position: [s.x(), s.y()],
                 footprint_width: s.footprint_width(),
-                pose: motion.structures[&s.id],
+                pose: aligned(&motion.structures, index, s.id).expect("a sampled structure"),
                 hp: s.hp,
                 max_hp: s.max_hp,
                 charges: s.charges,
@@ -297,14 +298,16 @@ impl BattleViewModel {
         let corpses = motion
             .deaths
             .iter()
-            .map(|body| {
+            .enumerate()
+            .map(|(n, body)| {
                 body_view(
                     catalog,
                     level_boss,
                     BodyPose {
                         at: body.at,
                         appearance: body.appearance,
-                        visual: body.visual.as_ref(),
+                        visual: death_record(a, motion.settled_corpses + n, body.id)
+                            .and_then(|record| record.visual.as_ref()),
                         frame: body.frame,
                         lean: body.lean,
                         collapse: body.collapse,
@@ -312,17 +315,23 @@ impl BattleViewModel {
                 )
             })
             .collect();
-        let mut visible: Vec<&Enemy> = a
+        // Indexed by attempt order, like the pose store.
+        let positions = blend.positions(&a.enemies);
+        let mut visible: Vec<(usize, &Enemy)> = a
             .enemies
             .iter()
-            .filter(|e| e.condition(a.mode) != EnemyCondition::Defeated && e.in_view())
+            .enumerate()
+            .filter(|(_, e)| e.condition(a.mode) != EnemyCondition::Defeated && e.in_view())
             .collect();
         // Passing offsets are authoritative geometry. Painter order follows actual
         // feet rather than creation order when a faster actor passes behind another.
-        visible.sort_by(|a, b| a.y().total_cmp(&b.y()).then(a.id.cmp(&b.id)));
+        visible.sort_by(|(_, a), (_, b)| a.y().total_cmp(&b.y()).then(a.id.cmp(&b.id)));
         let enemies = visible
             .into_iter()
-            .map(|e| enemy_view(a, e, motion.enemies[&e.id], blend, reduced, catalog))
+            .map(|(index, e)| {
+                let pose = aligned(&motion.enemies, index, e.id).expect("a sampled enemy");
+                enemy_view(a, e, pose, positions[index], reduced, catalog)
+            })
             .collect();
         Self {
             tick: a.tick,
@@ -388,11 +397,40 @@ impl BattleViewModel {
     }
 }
 
+/// The value `store` holds for `id`, the `index`th actor of the attempt it
+/// was sampled from: read in place when the store lines up with the attempt,
+/// else searched for by id.
+fn aligned<T: Copy>(store: &[(u64, T)], index: usize, id: u64) -> Option<T> {
+    match store.get(index) {
+        Some(&(stored, value)) if stored == id => Some(value),
+        _ => {
+            #[cfg(test)]
+            super::builds::record_id_lookup();
+            store
+                .iter()
+                .find(|(stored, _)| *stored == id)
+                .map(|&(_, value)| value)
+        }
+    }
+}
+/// The saved record of the collapsing body `id`, which sampling took from
+/// `a.corpses[index]`; searched for by id if the attempt changed since.
+fn death_record(a: &Attempt, index: usize, id: u64) -> Option<&CorpseRecord> {
+    match a.corpses.get(index) {
+        Some(record) if record.id == id => Some(record),
+        _ => {
+            #[cfg(test)]
+            super::builds::record_id_lookup();
+            a.corpses.iter().find(|record| record.id == id)
+        }
+    }
+}
+
 fn enemy_view(
     a: &Attempt,
     e: &Enemy,
     pose: ActorPose,
-    blend: SceneBlend,
+    position: [f32; 2],
     reduced: bool,
     catalog: &'static EnemyVisualCatalog,
 ) -> EnemyView {
@@ -456,7 +494,7 @@ fn enemy_view(
         kind: e.kind,
         boss: e.boss,
         lane: e.lane,
-        position: blend.position(e.id, [e.x, e.y()]),
+        position,
         pose,
         sprite,
         tint: visual.map(|v| v.tint),

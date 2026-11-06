@@ -59,4 +59,19 @@ pub(crate) mod builds {
     pub(crate) fn take() -> ViewBuilds {
         VIEW_BUILDS.with(Cell::take)
     }
+
+    thread_local! {
+        static ID_LOOKUPS: Cell<u32> = const { Cell::new(0) };
+    }
+
+    /// Counts one search by id for an actor's pose or previous position: the
+    /// fallback for a store that does not line up with the attempt's order.
+    pub(crate) fn record_id_lookup() {
+        ID_LOOKUPS.with(|cell| cell.set(cell.get() + 1));
+    }
+
+    /// This thread's id searches since the last take, which resets them.
+    pub(crate) fn take_id_lookups() -> u32 {
+        ID_LOOKUPS.with(Cell::take)
+    }
 }

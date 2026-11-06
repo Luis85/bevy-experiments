@@ -75,6 +75,26 @@ pub struct WalkArt {
     pub frames: Vec<WalkFrame>,
     pub feet_y: f32,
     pub height: f32,
+    /// The widest frame's bounds width, measured once at load: every frame
+    /// fits the box at the scale this width allows.
+    max_width: f32,
+}
+impl WalkArt {
+    pub fn new(frames: Vec<WalkFrame>, feet_y: f32, height: f32) -> Self {
+        let max_width = frames
+            .iter()
+            .map(|frame| frame.bounds[2] - frame.bounds[0])
+            .fold(0., f32::max);
+        Self {
+            frames,
+            feet_y,
+            height,
+            max_width,
+        }
+    }
+    pub fn max_width(&self) -> f32 {
+        self.max_width
+    }
 }
 /// A single standing pose on the actor sheet: bounds, torso, deepest boot, height.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
@@ -244,11 +264,7 @@ impl EnemyVisualCatalog {
                     for frame in &walk.frames {
                         anchored(&name, frame.bounds, frame.hip_x, walk.feet_y, size)?;
                     }
-                    let art = SpriteArt::Walk(WalkArt {
-                        frames: walk.frames,
-                        feet_y: walk.feet_y,
-                        height: walk.height,
-                    });
+                    let art = SpriteArt::Walk(WalkArt::new(walk.frames, walk.feet_y, walk.height));
                     (art, size)
                 }
                 (None, Some(standing)) => {

@@ -222,7 +222,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     if view.personal() && !f.battle.construction {
                         personal_controls(ui, f, &ctx, view);
                     }
-                    if view.any_blueprint()
+                    if view.any_blueprint
                         && ui
                             .button(if f.battle.construction {
                                 "Close construction"

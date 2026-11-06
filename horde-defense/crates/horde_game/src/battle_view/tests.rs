@@ -1,4 +1,5 @@
 use super::{
+    builds,
     interpolation::{MAX_TICKS_PER_STEP, blend_fraction},
     readouts::{LOG_TAIL, WeaponView},
     *,
@@ -300,9 +301,11 @@ fn battle_screen_mirrors_the_attempt_headlessly_without_mutating_it() {
     assert_eq!(view.log_tail[0], "line 24");
     assert_eq!(view.log_tail[LOG_TAIL - 1], "line 7");
     assert_eq!(view.targets.len(), a.enemies.len());
-    assert_eq!(view.blueprints, game.campaign().blueprints);
+    for kind in StructureKind::ALL {
+        assert_eq!(view.blueprint(kind), game.campaign().blueprints[kind]);
+    }
     assert_eq!(
-        view.any_blueprint(),
+        view.any_blueprint,
         game.campaign().blueprints.iter().any(|b| *b)
     );
     assert_eq!(view.global_paused, game.global_paused());
@@ -325,6 +328,40 @@ fn country_stages_carry_their_biome_theme_and_local_setting() {
     let view = BattleScreen::build(&legacy).unwrap();
     assert_eq!(view.theme, legacy.attempt().unwrap().level);
     assert_eq!(view.field.setting, None);
+}
+
+/// Pin: the allocation-free biome match gives the theme the former
+/// `to_lowercase` match gave, for every world biome and other cases.
+#[test]
+fn biome_themes_ignore_case_like_the_lowercase_match() {
+    let lowercase = |biome: &str| match biome.to_lowercase().as_str() {
+        "desert" | "arid" => 2,
+        "tundra" | "polar" | "boreal" => 3,
+        "tropical" | "rainforest" => 4,
+        "mediterranean" => 1,
+        _ => 0,
+    };
+    let world_biomes = world().countries.iter().map(|c| c.biome.as_str());
+    let others = [
+        "DESERT",
+        "Tundra",
+        "polar",
+        "RainForest",
+        "Mediterranean",
+        "Alpine",
+        "Temperate",
+        "",
+        "arid ",
+    ];
+    for biome in world_biomes.chain(others) {
+        assert_eq!(
+            super::screen::biome_theme(biome),
+            lowercase(biome),
+            "{biome}"
+        );
+    }
+    assert_eq!(super::screen::biome_theme("Arid"), 2);
+    assert_eq!(super::screen::biome_theme("Tropical"), 4);
 }
 
 #[test]
@@ -519,4 +556,185 @@ fn fx_view_keeps_only_events_within_painter_lifetime() {
     // The boss warning outlives the 1.5 s ux-flow banner.
     assert!(crate::art::fx_lifetime(EventKind::BossWarning) >= 1.5);
     assert_eq!(crate::art::fx_lifetime(EventKind::Explosion), 0.5);
+}
+
+/// The progressed-peak fixture after `ticks` unpaused ticks, with the
+/// interpolation snapshot of the tick before and the given blend fraction.
+fn live_peak(ticks: usize, fraction: f32) -> (Game, ActorInterpolation) {
+    let mut game = horde_core::sim::maximum_progression_render_fixture().expect("fixture");
+    game.set_paused(false);
+    game.attempt_mut().unwrap().paused = false;
+    let mut blend = ActorInterpolation::default();
+    for _ in 0..ticks {
+        blend.record([(None, game.attempt().unwrap())]);
+        game.tick(Input::default());
+    }
+    blend.fraction = fraction;
+    (game, blend)
+}
+
+/// The field view reads each enemy's and structure's pose, and each enemy's
+/// previous position, from stores in attempt order, without one search by id
+/// per actor (W1-67): poses and positions line up with `a.enemies`.
+#[test]
+fn field_view_reads_poses_and_blended_positions_without_id_lookups() {
+    let (game, blend) = live_peak(120, 0.5);
+    let a = game.attempt().unwrap();
+    assert!(a.enemies.len() > 100, "a crowded progressed peak");
+    assert!(!a.structures.is_empty());
+    builds::take_id_lookups();
+    let view = BattleViewModel::build(
+        a,
+        SceneAnimation::sample(a, false),
+        blend.scene(None, a),
+        false,
+    );
+    assert!(view.enemies.len() > 100);
+    assert_eq!(builds::take_id_lookups(), 0);
+}
+
+/// A pose store or corpse list that no longer lines up with the attempt (a
+/// scene sampled before an enemy and a body moved) falls back to ids: the
+/// view equals the one built from a scene sampled from that attempt.
+#[test]
+fn misaligned_stores_fall_back_to_the_ids() {
+    let (mut game, _) = live_peak(60, 1.0);
+    let a = game.attempt_mut().unwrap();
+    let template = a.enemies[0].clone();
+    a.corpses.push(horde_core::sim::CorpseRecord {
+        id: u64::MAX,
+        kind: template.kind,
+        boss_kind: None,
+        at: [template.x, template.y()],
+        visual: template.resolved.as_ref().map(|r| r.visual.clone()),
+        tick: a.tick,
+    });
+    let a = game.attempt().unwrap();
+    let motion = SceneAnimation::sample(a, false);
+    let mut moved = a.clone();
+    moved.enemies.remove(0);
+    let mut settled_body = moved.corpses[0].clone();
+    settled_body.id = u64::MAX - 1;
+    settled_body.tick = 0;
+    moved.corpses.insert(0, settled_body);
+    builds::take_id_lookups();
+    let view = BattleViewModel::build(&moved, motion, SceneBlend::NONE, false);
+    assert!(builds::take_id_lookups() > 0, "the stores were searched");
+    let expected = BattleViewModel::build(
+        &moved,
+        SceneAnimation::sample(&moved, false),
+        SceneBlend::NONE,
+        false,
+    );
+    assert!(!view.corpses.is_empty());
+    assert!(view.corpses.iter().all(|body| body.tint.is_some()));
+    assert_eq!(view.corpses, expected.corpses);
+    assert_eq!(view.enemies, expected.enemies);
+}
+
+/// Each enemy blends from its own previous position, by id, across
+/// removals, spawns and a reordered list; an enemy the snapshot lacks draws
+/// where it is.
+#[test]
+fn blended_positions_follow_ids_across_deaths_spawns_and_reorders() {
+    let (game, _) = live_peak(30, 1.0);
+    let before = game.attempt().unwrap().clone();
+    let mut blend = ActorInterpolation::default();
+    blend.record([(None, &before)]);
+    let previous: BTreeMap<u64, [f32; 2]> = before
+        .enemies
+        .iter()
+        .map(|e| (e.id, [e.x, e.y()]))
+        .collect();
+    let mut now = before.clone();
+    now.tick += 1;
+    for e in &mut now.enemies {
+        e.x -= 0.5;
+    }
+    now.enemies.remove(10);
+    now.enemies.remove(3);
+    now.enemies.swap(0, 5);
+    let mut spawned = now.enemies[1].clone();
+    spawned.id = previous.keys().max().unwrap() + 1;
+    now.enemies.push(spawned);
+    let mut unknown = now.enemies[2].clone();
+    unknown.id = 0;
+    assert!(!previous.contains_key(&0));
+    now.enemies.insert(7, unknown);
+    for fraction in [0.0, 0.25, 0.5, 1.0] {
+        blend.fraction = fraction;
+        let drawn = blend.scene(None, &now).positions(&now.enemies);
+        assert_eq!(drawn.len(), now.enemies.len());
+        for (e, at) in now.enemies.iter().zip(drawn) {
+            let current = [e.x, e.y()];
+            let expected = match previous.get(&e.id) {
+                Some(p) if fraction < 1.0 => [
+                    p[0] + (current[0] - p[0]) * fraction,
+                    p[1] + (current[1] - p[1]) * fraction,
+                ],
+                _ => current,
+            };
+            assert_eq!(at, expected, "enemy {} at fraction {fraction}", e.id);
+        }
+    }
+}
+
+/// Characterisation pin (W1-67): on the progressed-peak and stress fixtures,
+/// live, the view read from the stores in attempt order equals the by-id
+/// reference: poses from a reversed (so searched) store and positions
+/// blended from a by-id map of the previous tick, normal and reduced.
+#[test]
+fn field_views_equal_the_by_id_reference_on_peak_and_stress() {
+    let fixtures: [fn() -> Result<Game, String>; 2] = [
+        horde_core::sim::maximum_progression_render_fixture,
+        horde_core::sim::stress_render_fixture,
+    ];
+    for (scene, fixture) in ["progressed-peak", "stress"].into_iter().zip(fixtures) {
+        let mut game = fixture().expect("fixture");
+        game.set_paused(false);
+        game.attempt_mut().unwrap().paused = false;
+        let mut blend = ActorInterpolation::default();
+        let mut views = 0;
+        for tick in 0..240 {
+            let a = game.attempt().unwrap();
+            let previous: BTreeMap<u64, [f32; 2]> =
+                a.enemies.iter().map(|e| (e.id, [e.x, e.y()])).collect();
+            blend.record([(None, a)]);
+            game.tick(Input::default());
+            let Some(a) = game.attempt() else { break };
+            if tick % 8 != 0 {
+                continue;
+            }
+            for (fraction, reduced) in [(0.5, false), (0.25, true)] {
+                blend.fraction = fraction;
+                let view = BattleViewModel::build(
+                    a,
+                    SceneAnimation::sample(a, reduced),
+                    blend.scene(None, a),
+                    reduced,
+                );
+                let mut searched = SceneAnimation::sample(a, reduced);
+                searched.enemies.reverse();
+                searched.structures.reverse();
+                let reference = BattleViewModel::build(a, searched, blend.scene(None, a), reduced);
+                assert_eq!(view, reference, "{scene} tick {tick}");
+                for actor in &view.enemies {
+                    let e = a.enemies.iter().find(|e| e.id == actor.id).unwrap();
+                    let expected = previous.get(&e.id).map_or([e.x, e.y()], |p| {
+                        [
+                            p[0] + (e.x - p[0]) * fraction,
+                            p[1] + (e.y() - p[1]) * fraction,
+                        ]
+                    });
+                    assert_eq!(
+                        actor.position, expected,
+                        "{scene} tick {tick} enemy {}",
+                        e.id
+                    );
+                }
+                views += 1;
+            }
+        }
+        assert_eq!(views, 60, "{scene} sampled every eighth tick");
+    }
 }

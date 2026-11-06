@@ -15,7 +15,7 @@ pub(super) fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &Bat
     muted(ui, "Cost in supply per defense");
     for kind in StructureKind::ALL {
         let def = content().structure(kind);
-        ui.add_enabled_ui(view.blueprints[kind], |ui| {
+        ui.add_enabled_ui(view.blueprint(kind), |ui| {
             ui.selectable_value(
                 &mut f.battle.build_kind,
                 kind,
@@ -61,7 +61,7 @@ pub(super) fn construction_controls(ui: &mut egui::Ui, f: &mut UiCtx, view: &Bat
             "Combat continues while building"
         },
     );
-    if !view.any_blueprint() {
+    if !view.any_blueprint {
         muted(
             ui,
             "Unlock traps after 1 boss clear, walls after 2, turrets after 3. Purchase blueprints in camp.",

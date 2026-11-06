@@ -2,12 +2,11 @@
 //! random draws, action decisions or hit geometry are written back to the core.
 use horde_core::{
     content::{BossKind, EnemyKind, Mode, StructureKind, content},
-    enemy_catalog::EnemyVisual,
     ordnance::OrdnanceKind,
     sim::{Attempt, Enemy, EnemyPhase, Event, EventKind, Structure},
     world::world,
 };
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::VecDeque;
 
 pub const MAX_SCENES: usize = 8;
 pub const MAX_PARTICLES: usize = 128;
@@ -136,12 +135,14 @@ pub struct Appearance {
     pub boss: bool,
     pub boss_kind: Option<BossKind>,
 }
+/// A collapsing body. Its archetype visual stays on the saved record
+/// (`a.corpses[settled_corpses + n]` for the `n`th death), so sampling does
+/// not copy it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeathPose {
     pub id: u64,
     pub at: [f32; 2],
     pub appearance: Option<Appearance>,
-    pub visual: Option<EnemyVisual>,
     pub frame: u8,
     pub alpha: f32,
     pub collapse: f32,
@@ -150,9 +151,11 @@ pub struct DeathPose {
 #[derive(Clone, Debug, PartialEq)]
 pub struct SceneAnimation {
     pub tick: u64,
-    pub enemies: BTreeMap<u64, ActorPose>,
+    /// `(id, pose)` of every enemy, in `a.enemies` order.
+    pub enemies: Vec<(u64, ActorPose)>,
     pub defender: DefenderPose,
-    pub structures: BTreeMap<u64, StructurePose>,
+    /// `(id, pose)` of every structure, in `a.structures` order.
+    pub structures: Vec<(u64, StructurePose)>,
     /// Poses of the collapsing bodies only: the newest
     /// `CORPSES_COLLAPSING_DRAWN` of `a.corpses` younger than
     /// `COLLAPSE_TICKS`, none in reduced mode.
@@ -166,22 +169,25 @@ pub struct SceneAnimation {
 }
 impl SceneAnimation {
     pub fn sample(a: &Attempt, reduced: bool) -> Self {
+        let pulses = EnemyPulses::of(a);
         let mut frame = Self {
             tick: a.tick,
-            enemies: BTreeMap::new(),
+            enemies: a
+                .enemies
+                .iter()
+                .map(|e| (e.id, enemy_pose(a, e, reduced, &pulses)))
+                .collect(),
             defender: defender_pose(a, reduced),
-            structures: BTreeMap::new(),
+            structures: a
+                .structures
+                .iter()
+                .map(|s| (s.id, structure_pose(a, s, reduced)))
+                .collect(),
             deaths: vec![],
             settled_corpses: 0,
             particles: vec![],
             weather: scene_weather(a),
         };
-        for e in &a.enemies {
-            frame.enemies.insert(e.id, enemy_pose(a, e, reduced));
-        }
-        for s in &a.structures {
-            frame.structures.insert(s.id, structure_pose(a, s, reduced));
-        }
         sample_deaths(a, reduced, &mut frame);
         if !reduced {
             for event in a.events.iter().rev().take(EVENT_BUDGET) {
@@ -276,7 +282,6 @@ fn sample_deaths(a: &Attempt, reduced: bool, frame: &mut SceneAnimation) {
                 boss: corpse.boss_kind.is_some(),
                 boss_kind: corpse.boss_kind,
             }),
-            visual: corpse.visual.clone(),
             frame: 0,
             alpha: 1.,
             collapse,
@@ -310,7 +315,56 @@ fn sample_deaths(a: &Attempt, reduced: bool, frame: &mut SceneAnimation) {
     }
 }
 
-fn enemy_pose(a: &Attempt, e: &Enemy, reduced: bool) -> ActorPose {
+/// The birth tick of each enemy's latest hit and latest attack event, from
+/// one pass over the events rather than two event scans per enemy.
+struct EnemyPulses {
+    /// `(target id, tick)` of the latest damaging Hit or WeakPoint, by id.
+    hits: Vec<(u64, u64)>,
+    /// `(actor id, tick)` of the latest Damage, Miss, Defended or Armor, by id.
+    lunges: Vec<(u64, u64)>,
+}
+impl EnemyPulses {
+    fn of(a: &Attempt) -> Self {
+        Self {
+            hits: latest_ticks_by_id(a, |event| {
+                (event.value > 0 && matches!(event.kind, EventKind::Hit | EventKind::WeakPoint))
+                    .then_some(event.target_id)
+                    .flatten()
+            }),
+            lunges: latest_ticks_by_id(a, |event| {
+                matches!(
+                    event.kind,
+                    EventKind::Damage | EventKind::Miss | EventKind::Defended | EventKind::Armor
+                )
+                .then_some(event.actor_id)
+                .flatten()
+            }),
+        }
+    }
+}
+/// `(id, tick)` of the latest event at or before `a.tick` that `actor`
+/// assigns to each id, sorted by id: what `latest` finds for that id.
+fn latest_ticks_by_id(a: &Attempt, actor: impl Fn(&Event) -> Option<u64>) -> Vec<(u64, u64)> {
+    let mut latest: Vec<(u64, u64)> = a
+        .events
+        .iter()
+        .rev()
+        .filter(|event| event.tick <= a.tick)
+        .filter_map(|event| actor(event).map(|id| (id, event.tick)))
+        .collect();
+    // Newest first; the stable sort keeps each id's newest event first.
+    latest.sort_by_key(|&(id, _)| id);
+    latest.dedup_by_key(|&mut (id, _)| id);
+    latest
+}
+fn latest_tick_of(latest: &[(u64, u64)], id: u64) -> Option<u64> {
+    latest
+        .binary_search_by_key(&id, |&(id, _)| id)
+        .ok()
+        .map(|n| latest[n].1)
+}
+
+fn enemy_pose(a: &Attempt, e: &Enemy, reduced: bool, pulses: &EnemyPulses) -> ActorPose {
     let moving = e.attack_phase == EnemyPhase::Advance && !e.injury.prone && !e.injury.stunned;
     let base_frame_ticks = match e.kind {
         EnemyKind::Runner => 7,
@@ -345,20 +399,8 @@ fn enemy_pose(a: &Attempt, e: &Enemy, reduced: bool) -> ActorPose {
     };
     let clock = pose_tick.wrapping_add(e.id.wrapping_mul(7));
     let phase = (clock % cycle) as f32 / cycle as f32 * std::f32::consts::TAU;
-    let hit = latest(a, |event| {
-        event.target_id == Some(e.id)
-            && event.value > 0
-            && matches!(event.kind, EventKind::Hit | EventKind::WeakPoint)
-    })
-    .map_or(0., |event| pulse(a.tick, event.tick, 12));
-    let lunge = latest(a, |event| {
-        event.actor_id == Some(e.id)
-            && matches!(
-                event.kind,
-                EventKind::Damage | EventKind::Miss | EventKind::Defended | EventKind::Armor
-            )
-    })
-    .map_or(0., |event| pulse(a.tick, event.tick, 14));
+    let hit = latest_tick_of(&pulses.hits, e.id).map_or(0., |born| pulse(a.tick, born, 12));
+    let lunge = latest_tick_of(&pulses.lunges, e.id).map_or(0., |born| pulse(a.tick, born, 14));
     let windup = if e.attack_phase == EnemyPhase::Windup {
         e.windup_progress().clamp(0., 1.)
     } else {
@@ -477,12 +519,11 @@ fn structure_pose(a: &Attempt, s: &Structure, reduced: bool) -> StructurePose {
     let shot = latest(a, |event| {
         event.actor_id == Some(s.id) && event.kind == EventKind::Shot
     });
+    let range = content().structure(s.kind).range;
     let nearest = a
         .enemies
         .iter()
-        .filter(|e| {
-            e.in_view() && (e.x - s.x()).hypot(e.y() - s.y()) <= content().structure(s.kind).range
-        })
+        .filter(|e| e.in_view() && (e.x - s.x()).hypot(e.y() - s.y()) <= range)
         .min_by(|e, f| e.x.total_cmp(&f.x).then(e.id.cmp(&f.id)))
         .map(|e| [e.x, e.y()])
         .unwrap_or([s.x() + 6., s.y()]);
@@ -737,6 +778,15 @@ fn sample_weather(a: &Attempt, weather: WeatherKind, out: &mut Vec<Particle>) {
 mod tests {
     use super::*;
     use horde_core::sim::{Game, Input};
+    /// The sampled pose of enemy `id`.
+    fn pose(frame: &SceneAnimation, id: u64) -> ActorPose {
+        frame
+            .enemies
+            .iter()
+            .find(|(enemy, _)| *enemy == id)
+            .expect("a sampled enemy")
+            .1
+    }
     fn fixture() -> Game {
         let mut game = Game::default();
         game.campaign_mut()
@@ -761,8 +811,8 @@ mod tests {
         a.tick += 7;
         let next = SceneAnimation::sample(a, false);
         assert_ne!(
-            first.enemies[&a.enemies[0].id].frame,
-            next.enemies[&a.enemies[0].id].frame
+            pose(&first, a.enemies[0].id).frame,
+            pose(&next, a.enemies[0].id).frame
         );
     }
     #[test]
@@ -831,7 +881,7 @@ mod tests {
         a.enemies[0].attack_left = 15;
         a.reload_left = 30;
         let sample = SceneAnimation::sample(a, true);
-        let pose = sample.enemies[&a.enemies[0].id];
+        let pose = pose(&sample, a.enemies[0].id);
         assert_eq!(pose.offset, [0.; 2]);
         assert_eq!(pose.lean, 0.);
         assert_eq!(pose.windup, 0.75);
@@ -876,6 +926,85 @@ mod tests {
             WeatherKind::Rain
         );
     }
+    /// Pin (W1-67): the one-pass pulse tables give every enemy, on a live
+    /// progressed peak, the hit and attack event its own two scans of the
+    /// events found, including events stamped after the attempt's tick.
+    #[test]
+    fn enemy_pulses_match_the_latest_event_scans() {
+        let mut game = horde_core::sim::maximum_progression_render_fixture().expect("fixture");
+        game.set_paused(false);
+        game.attempt_mut().unwrap().paused = false;
+        let mut checked = 0;
+        for tick in 0..300 {
+            game.tick(Input::default());
+            let a = game.attempt_mut().unwrap();
+            if tick % 10 != 0 {
+                continue;
+            }
+            // The first enemy was hit and attacked twice, the newest at this
+            // tick; a hit stamped after it (as a sampled earlier tick sees)
+            // is skipped.
+            let template = a.events.back().cloned().expect("live events");
+            let first = a.enemies.first().map(|e| e.id);
+            let staged = |kind, tick, actor_id, target_id| Event {
+                kind,
+                tick,
+                value: 1,
+                actor_id,
+                target_id,
+                ..template.clone()
+            };
+            let now = a.tick;
+            a.events
+                .push_front(staged(EventKind::Hit, now.saturating_sub(5), None, first));
+            a.events.push_front(staged(
+                EventKind::Damage,
+                now.saturating_sub(6),
+                first,
+                None,
+            ));
+            a.events.push_back(staged(EventKind::Hit, now, None, first));
+            a.events
+                .push_back(staged(EventKind::Miss, now, first, None));
+            a.events
+                .push_back(staged(EventKind::Hit, now + 1, None, first));
+            let a = game.attempt().unwrap();
+            let pulses = EnemyPulses::of(a);
+            for e in &a.enemies {
+                let hit = latest(a, |event| {
+                    event.target_id == Some(e.id)
+                        && event.value > 0
+                        && matches!(event.kind, EventKind::Hit | EventKind::WeakPoint)
+                })
+                .map(|event| event.tick);
+                let lunge = latest(a, |event| {
+                    event.actor_id == Some(e.id)
+                        && matches!(
+                            event.kind,
+                            EventKind::Damage
+                                | EventKind::Miss
+                                | EventKind::Defended
+                                | EventKind::Armor
+                        )
+                })
+                .map(|event| event.tick);
+                assert_eq!(latest_tick_of(&pulses.hits, e.id), hit, "enemy {}", e.id);
+                assert_eq!(
+                    latest_tick_of(&pulses.lunges, e.id),
+                    lunge,
+                    "enemy {}",
+                    e.id
+                );
+                checked += usize::from(hit.is_some()) + usize::from(lunge.is_some());
+            }
+            assert_eq!(latest_tick_of(&pulses.hits, first.unwrap()), Some(now));
+            assert_eq!(latest_tick_of(&pulses.lunges, first.unwrap()), Some(now));
+            let events = &mut game.attempt_mut().unwrap().events;
+            events.drain(..2);
+            events.truncate(events.len() - 3);
+        }
+        assert!(checked > 100, "the peak hits and attacks: {checked}");
+    }
     #[test]
     fn authoritative_remains_persist_without_events_and_after_save_resume() {
         let mut game = fixture();
@@ -901,7 +1030,8 @@ mod tests {
         // The settled body is drawn from the saved record, not re-sampled.
         assert!(later.deaths.is_empty());
         assert_eq!(later.settled_corpses, 1);
-        assert_eq!(resumed.corpses[0].visual, first.deaths[0].visual);
+        assert_eq!(first.deaths[0].id, resumed.corpses[0].id);
+        assert!(resumed.corpses[0].visual.is_some());
     }
     /// `count` saved bodies of the fixture's kind: the newest `fresh` died
     /// within the collapse window, the rest long ago, at ascending ticks.
@@ -993,16 +1123,16 @@ mod tests {
         .into();
         let before = serde_json::to_string(a).unwrap();
         let frame = SceneAnimation::sample(a, false);
-        assert_eq!(frame.enemies[&id].offset, [0.; 2]);
-        assert!(frame.enemies[&id].lunge > 0.);
-        assert!(frame.enemies[&id].lean < 0.);
+        assert_eq!(pose(&frame, id).offset, [0.; 2]);
+        assert!(pose(&frame, id).lunge > 0.);
+        assert!(pose(&frame, id).lean < 0.);
         assert!(frame.defender.recoil > 0.);
         assert!(frame.defender.hit > 0.);
         assert_eq!(serde_json::to_string(a).unwrap(), before);
         a.tick += 15;
         let settled = SceneAnimation::sample(a, false);
         assert_eq!(settled.defender.recoil, 0.);
-        assert_eq!(settled.enemies[&id].lunge, 0.);
+        assert_eq!(pose(&settled, id).lunge, 0.);
     }
     #[test]
     fn a_full_defeat_burst_keeps_every_body_and_bounds_only_transient_effects() {

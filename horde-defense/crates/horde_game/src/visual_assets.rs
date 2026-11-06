@@ -594,12 +594,7 @@ fn walk_frame_layout(
     available: Vec2,
 ) -> (Rect, Rect, Pos2) {
     let frame = walk.frames[frame as usize % walk.frames.len()];
-    let max_width = walk
-        .frames
-        .iter()
-        .map(|frame| frame.bounds[2] - frame.bounds[0])
-        .fold(0., f32::max);
-    let scale = (available.y / walk.height).min(available.x / max_width);
+    let scale = (available.y / walk.height).min(available.x / walk.max_width());
     let foot = center + vec2(0., available.y * 0.5);
     let rect = Rect::from_min_max(
         foot + vec2(

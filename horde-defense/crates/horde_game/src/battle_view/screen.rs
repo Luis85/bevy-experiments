@@ -24,6 +24,23 @@ pub fn arena_geometry(game: &Game) -> (u8, f32) {
     )
 }
 
+/// The backdrop and terrain theme of a country's biome, matched without
+/// regard to ASCII case and without allocating.
+pub(super) fn biome_theme(biome: &str) -> usize {
+    let is = |names: &[&str]| names.iter().any(|name| biome.eq_ignore_ascii_case(name));
+    if is(&["desert", "arid"]) {
+        2
+    } else if is(&["tundra", "polar", "boreal"]) {
+        3
+    } else if is(&["tropical", "rainforest"]) {
+        4
+    } else if is(&["mediterranean"]) {
+        1
+    } else {
+        0
+    }
+}
+
 /// Every attempt value the battle screen lays out around the painter.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BattleScreen {
@@ -47,7 +64,10 @@ pub struct BattleScreen {
     pub log_tail: Vec<String>,
     /// Every enemy's position, in attempt order, for aim assist.
     pub targets: Vec<[f32; 2]>,
-    pub blueprints: KindMap<StructureKind, bool>,
+    /// Owned blueprints, by `StructureKind::index`.
+    pub blueprints: [bool; StructureKind::ALL.len()],
+    /// Some blueprint is owned.
+    pub any_blueprint: bool,
     pub global_paused: bool,
     /// The campaign has not finished a deployment yet.
     pub first_deployment: bool,
@@ -59,15 +79,7 @@ impl BattleScreen {
         super::builds::record(|b| &mut b.screen);
         let a = game.attempt()?;
         let country = world().country(a.country_id.as_deref().unwrap_or(""));
-        let theme = country
-            .map(|country| match country.biome.to_lowercase().as_str() {
-                "desert" | "arid" => 2,
-                "tundra" | "polar" | "boreal" => 3,
-                "tropical" | "rainforest" => 4,
-                "mediterranean" => 1,
-                _ => 0,
-            })
-            .unwrap_or(a.level);
+        let theme = country.map_or(a.level, |country| biome_theme(&country.biome));
         let hint = if a.tick == 0 {
             FieldHint::Opening
         } else if a.shots == 0 {
@@ -108,7 +120,8 @@ impl BattleScreen {
             },
             log_tail: a.log.iter().rev().take(LOG_TAIL).cloned().collect(),
             targets: a.enemies.iter().map(|e| [e.x, e.y()]).collect(),
-            blueprints: game.campaign().blueprints.clone(),
+            blueprints: StructureKind::ALL.map(|kind| game.campaign().blueprints[kind]),
+            any_blueprint: game.campaign().blueprints.iter().any(|owned| *owned),
             global_paused: game.global_paused(),
             first_deployment: game.campaign().attempts == 0,
         })
@@ -116,8 +129,8 @@ impl BattleScreen {
     pub fn personal(&self) -> bool {
         self.mode == Mode::Personal
     }
-    pub fn any_blueprint(&self) -> bool {
-        self.blueprints.iter().any(|owned| *owned)
+    pub fn blueprint(&self, kind: StructureKind) -> bool {
+        self.blueprints[kind.index()]
     }
     pub fn slot(&self, kind: OrdnanceKind) -> &OrdnanceSlotView {
         &self.ordnance[kind]
