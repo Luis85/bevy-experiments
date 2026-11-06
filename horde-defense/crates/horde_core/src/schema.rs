@@ -2,7 +2,6 @@
 //! C1/C2). A new saved field defaults to its legacy-neutral value and is
 //! skipped at exactly that value, so old saves and `state_digest` are
 //! unchanged. Float predicates compare bits, never with a tolerance.
-#![allow(dead_code, reason = "the first saved-field users land in W1-26..W1-29")]
 
 pub(crate) fn is_default<T: Default + PartialEq>(value: &T) -> bool {
     *value == T::default()
@@ -22,6 +21,13 @@ pub(crate) fn is_one_f32(value: &f32) -> bool {
     value.to_bits() == 1.0f32.to_bits()
 }
 
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "every saved 1.0 field so far takes it from a container Default"
+    )
+)]
 pub(crate) fn one_f32() -> f32 {
     1.0
 }
