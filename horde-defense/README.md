@@ -25,7 +25,7 @@ The smoke check validates authored content and an identical save/resume round tr
 ## Packaged playtest
 
 ```powershell
-pwsh -NoProfile -File scripts/package_playtest.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/package_playtest.ps1
 ```
 
 The script builds the `playtest` profile (release optimisation with line tables for readable crash backtraces) by default; pass `-Profile debug` or `-Profile release` to choose another. Packages are built with `--no-default-features`, leaving out the `review` tooling (practice scenes still work); pass `-Review` to include it, which `verify_playtest.ps1 -NativeCapture` needs. It creates a versioned Windows x64 folder and ZIP under `target/playtest/`, with the executable, pixel art, audio, font/geography notices, editable content JSON, manifest and playtest documentation. `Play Lastlight.cmd` opens the ordinary persistent campaign; `Battle practice.cmd` and `Strategy practice.cmd` open separate resumable practice profiles with clearly staged resources. No Rust installation is needed to run this build. See the [playtest guide](docs/PLAYTEST_GUIDE.md).
@@ -168,7 +168,7 @@ pwsh -NoProfile -File ../scripts/dev.ps1 verify -Project horde-defense
 To reproduce the native framebuffer matrix, including every screen at the minimum window and 135% UI scale:
 
 ```powershell
-pwsh -NoProfile -File scripts/capture_review.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_review.ps1
 ```
 
 The [capture script](scripts/capture_review.ps1) stages isolated native fixtures in its requested output directory (default target/playtest-review/screenshots), at both supported sizes. Its scene lists and [VALIDATION.md](docs/VALIDATION.md) define current coverage/results; older matrix counts are historical. Framebuffers do not establish an OS playthrough.

@@ -172,7 +172,7 @@ The initial neutral-template NPC defeat banked 181 coins after 208 seconds. A se
 ## Native presentation
 
 ```powershell
-pwsh -NoProfile -File scripts/capture_review.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_review.ps1
 ```
 
 Actual Bevy framebuffers are generated under `target/playtest-review/screenshots/` (ignored review artifacts). The 25-view matrix covers menu, map, personal/NPC combat, boss, construction, character, survivor, inventory, skills, engineering, results, operations, settings, arid/tropical regions and peak pressure, plus minimum-window variants. Normal resolution is 1440 by 900 logical pixels; minimum is 1050 by 700 with UI scale 1.35. Windows pixel density on this machine is 2x. Fixtures are labeled and isolated; their supplied resources are not balance evidence. Original prototype captures in `docs/screenshots/` remain historical evidence rather than regression oracles.
@@ -232,7 +232,7 @@ The [playtest guide](PLAYTEST_GUIDE.md) provides ordinary and isolated practice 
 `scripts/package_playtest.ps1` created `target/playtest/Lastlight-playtest-20261101-225239.zip` and its unpacked folder. ZIP SHA-256: `f6056ba47d91285c453c10c6b203000ec112a6ea1a7d06b8acea2296613fa3f6`.
 
 ```powershell
-pwsh -NoProfile -File scripts/verify_playtest.ps1 -Package target/playtest/Lastlight-playtest-20261101-225239.zip -NativeCapture
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify_playtest.ps1 -Package target/playtest/Lastlight-playtest-20261101-225239.zip -NativeCapture
 ```
 
 Verification **passed** all 41 manifest hashes and sizes from a fresh extraction, rejected unexpected/path-escaping entries by construction, ran the copied executable's full campaign smoke using the bundled editable content and assets, and captured its actual peak-render framebuffer. Evidence is under `target/playtest-verification/5da55c154535430498dd52e583e8089f/`. The portable copy is a Windows x64 development-profile playtest, not a claim of compatibility with every PC. No ordinary campaign was used for verification.
@@ -482,3 +482,21 @@ Re-run, three runs per profile, same machine (about 53% CPU load from other work
 | release | 5,000 | 0.994, 0.961, 1.070 | 0.994 | 0.479 | 7.44 | 1,882,516 |
 
 **The gate passes in every dev and playtest run (p99 at most 0.764 ms at 1,000 items).** 5,000 items remain above 1.0 ms at p99. That size is informational, and from 2,500 items the stash itself (0.13 to 0.30 ms mean) is the largest component. If it ever becomes gated, the next lever is `ItemDefId(Arc<str>)`. Reports: `target/perf/save-clone/` (before) and `target/perf/save-clone-remedy/` (after).
+
+## Full verify
+
+From `horde-defense/`, before every production-pass commit:
+
+```powershell
+cargo fmt --all -- --check
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo clippy --locked -p horde-defense --all-targets --no-default-features -- -D warnings
+cargo clippy --locked -p horde-defense --all-targets --features dev -- -D warnings
+cargo test --locked --workspace
+cargo test --locked -p horde-defense --features dev
+cargo run --locked -p horde-defense -- --smoke
+python -I -B scripts/check_views.py
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/run_script_tests.ps1
+```
+
+`check_views.py` prints `PASS: <n> Views` and exits 0. `run_script_tests.ps1` exercises `scripts/lib/Native.ps1` and `measure_performance.ps1` against a fake game executable under Windows PowerShell 5.1; it prints PASS or FAIL and exits 0 or 1. Documented `scripts/` commands use the Windows PowerShell 5.1 that ships with Windows (`powershell`, not `pwsh`). The three PowerShell 7 scripts (`capture_player_models.ps1`, `trace_npc.ps1`, `verify_player_models.ps1`) say so where they are documented. `repo_checks::docs_invoke_scripts_with_windows_powershell` enforces both outside `docs/plans/`.

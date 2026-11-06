@@ -5,6 +5,12 @@
 //! .NET Core APIs, and native processes only through `scripts/lib/Native.ps1`
 //! (an `&` call on a native exe that writes stderr raises NativeCommandError
 //! under 5.1 as soon as the caller redirects streams).
+//!
+//! `docs_invoke_scripts_with_windows_powershell` keeps the documented commands
+//! runnable the same way: no Markdown outside `docs/plans/` tells a reader to run
+//! `pwsh ... -File scripts/<x>.ps1`, except a PowerShell 7 allowlisted script
+//! whose surrounding prose carries [`PS7_DOC_NOTE`]. The root helper
+//! (`-File ../scripts/dev.ps1`) is outside this workspace and is not checked.
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.
@@ -325,4 +331,195 @@ fn lint_reports_each_rule_and_ignores_comments() {
         Vec::<String>::new(),
         "the library itself need not dot-source itself"
     );
+}
+
+/// The note that must sit beside a documented PowerShell 7 allowlisted command.
+const PS7_DOC_NOTE: &str = "requires PowerShell 7; not ported in the production pass";
+
+/// The documented form of a workspace script command.
+const DOC_COMMAND: &str = "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/";
+
+fn workspace_directory() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+/// Every `.md` in the workspace except `target/` and `docs/plans/`, as
+/// `/`-separated paths relative to the workspace, sorted.
+fn markdown_files(workspace: &Path) -> Vec<String> {
+    fn walk(root: &Path, directory: &Path, found: &mut Vec<String>) {
+        let entries = std::fs::read_dir(directory)
+            .unwrap_or_else(|error| panic!("read {}: {error}", directory.display()));
+        for entry in entries {
+            let path = entry.expect("directory entry").path();
+            let relative = path.strip_prefix(root).expect("below the root");
+            let parts: Vec<String> = relative
+                .components()
+                .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                .collect();
+            let name = parts.join("/");
+            if path.is_dir() {
+                if !matches!(name.as_str(), "target" | ".git" | "docs/plans") {
+                    walk(root, &path, found);
+                }
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+            {
+                found.push(name);
+            }
+        }
+    }
+    let mut found = Vec::new();
+    walk(workspace, workspace, &mut found);
+    found.sort();
+    found
+}
+
+/// Lower-cased, whitespace-collapsed text, so a wrapped note still matches.
+fn normalized(text: &str) -> String {
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+/// Every `pwsh ... -File scripts/<x>.ps1` line in `text`, as `name:line: reason`.
+/// A line inside a fenced block is excused only for a PowerShell 7 allowlisted
+/// script when the prose paragraph just before the fence carries the note; a
+/// line outside a fence needs the note on the line itself.
+fn lint_doc(name: &str, text: &str) -> Vec<String> {
+    let note = normalized(PS7_DOC_NOTE);
+    let mut violations = Vec::new();
+    let mut in_fence = false;
+    let mut fence_noted = false;
+    let mut paragraph = String::new();
+    let mut last_paragraph = String::new();
+    for (index, line) in text.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") {
+            if !in_fence {
+                if !paragraph.is_empty() {
+                    last_paragraph = std::mem::take(&mut paragraph);
+                }
+                fence_noted = normalized(&last_paragraph).contains(&note);
+            }
+            in_fence = !in_fence;
+            continue;
+        }
+        if !in_fence {
+            if trimmed.is_empty() {
+                if !paragraph.is_empty() {
+                    last_paragraph = std::mem::take(&mut paragraph);
+                }
+            } else {
+                paragraph.push(' ');
+                paragraph.push_str(line);
+            }
+        }
+        let lowered = line.to_ascii_lowercase().replace('\\', "/");
+        if !lowered.contains("pwsh") {
+            continue;
+        }
+        let Some(start) = lowered.find("-file scripts/") else {
+            continue;
+        };
+        let script: String = lowered[start + "-file scripts/".len()..]
+            .chars()
+            .take_while(|c| !c.is_whitespace() && !matches!(c, '`' | '"' | '\''))
+            .collect();
+        let allowlisted = PS7_ALLOWLIST
+            .iter()
+            .any(|allowed| allowed.eq_ignore_ascii_case(&script));
+        let noted = if in_fence {
+            fence_noted
+        } else {
+            normalized(line).contains(&note)
+        };
+        if !(allowlisted && noted) {
+            let fix = if allowlisted {
+                format!("PowerShell 7 only, so say it {PS7_DOC_NOTE}")
+            } else {
+                format!("write `{DOC_COMMAND}{script}`")
+            };
+            violations.push(format!(
+                "{name}:{}: `pwsh` for scripts/{script}; {fix}",
+                index + 1
+            ));
+        }
+    }
+    violations
+}
+
+#[test]
+fn docs_invoke_scripts_with_windows_powershell() {
+    let workspace = workspace_directory();
+    let files = markdown_files(&workspace);
+    assert!(
+        files.iter().any(|name| name == "README.md"),
+        "the workspace README is missing: {files:?}"
+    );
+    assert!(
+        !files.iter().any(|name| name.starts_with("docs/plans/")),
+        "docs/plans/ records history and is not checked"
+    );
+    let mut violations = Vec::new();
+    for name in &files {
+        let text = std::fs::read_to_string(workspace.join(name)).expect("read Markdown");
+        violations.extend(lint_doc(name, &text));
+    }
+    assert!(
+        violations.is_empty(),
+        "documented commands that need PowerShell 7:\n{}",
+        violations.join("\n")
+    );
+}
+
+#[test]
+fn doc_lint_ignores_the_root_helper_and_honours_the_ps7_note() {
+    let clean = "Run it:\n\n```powershell\n\
+                 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_review.ps1\n\
+                 pwsh -NoProfile -File ../scripts/dev.ps1 verify -Project horde-defense\n\
+                 ```\n\n\
+                 This checker requires PowerShell 7;\nnot ported in the production pass.\n\n\
+                 ```powershell\n\
+                 pwsh -NoProfile -File scripts/verify_player_models.ps1 `\n  -Capture a.png\n\
+                 pwsh -NoProfile -File scripts\\capture_player_models.ps1 -BindOnly\n\
+                 ```\n\n\
+                 Inline: `pwsh -File scripts/trace_npc.ps1` (requires PowerShell 7; not ported in the production pass).\n";
+    assert_eq!(lint_doc("doc.md", clean), Vec::<String>::new());
+
+    let cases: &[(&str, &str)] = &[
+        (
+            "```powershell\npwsh -NoProfile -File scripts/capture_review.ps1\n```\n",
+            "doc.md:2: `pwsh` for scripts/capture_review.ps1; write `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_review.ps1`",
+        ),
+        (
+            "Requires PowerShell 7; not ported in the production pass.\n\n\
+             ```powershell\npwsh -NoProfile -File scripts/package_playtest.ps1\n```\n",
+            "scripts/package_playtest.ps1; write",
+        ),
+        (
+            "```powershell\npwsh -NoProfile -File scripts/verify_player_models.ps1\n```\n",
+            "verify_player_models.ps1; PowerShell 7 only, so say it requires PowerShell 7",
+        ),
+        (
+            "Requires PowerShell 7; not ported in the production pass.\n\n\
+             ```powershell\nx\n```\n\nRecheck:\n\n\
+             ```powershell\npwsh -NoProfile -File scripts/verify_player_models.ps1\n```\n",
+            "doc.md:10:",
+        ),
+        (
+            "Run `pwsh -NoProfile -File scripts/trace_npc.ps1` here.\n",
+            "doc.md:1:",
+        ),
+    ];
+    for (doc, expected) in cases {
+        let violations = lint_doc("doc.md", doc);
+        assert!(
+            violations
+                .iter()
+                .any(|violation| violation.contains(expected)),
+            "{doc:?} should report {expected:?}, got {violations:?}"
+        );
+    }
 }

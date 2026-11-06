@@ -61,7 +61,8 @@ an exact whole image from concealing a fallback body or meaningless labels.
 
 ## Reproduce the bind proof
 
-From the `horde-defense` workspace:
+From the `horde-defense` workspace (the runner requires PowerShell 7; not ported in the
+production pass):
 
 ```powershell
 pwsh -NoProfile -File scripts/capture_player_models.ps1 -BindOnly
@@ -74,7 +75,8 @@ and writes `summary.json` in a fresh evidence directory. `-NoBuild` and
 are restored, including the parity manifest path; saves use an isolated root.
 Read-only PNG analysis requires Python with Pillow.
 
-To recheck existing captures without running the game:
+To recheck existing captures without running the game (the checker requires
+PowerShell 7; not ported in the production pass):
 
 ```powershell
 pwsh -NoProfile -File scripts/verify_player_models.ps1 `
