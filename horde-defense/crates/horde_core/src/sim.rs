@@ -1172,7 +1172,6 @@ impl Game {
     }
     /// The single public sale-eligibility read (LE-1): what selling `id` pays
     /// now, or the first guard that blocks it. Pure: no mutation, no RNG.
-    /// Replaces `sale_preview` / `StrategySaleQuote`.
     pub fn sale_eligibility(&self, id: u64) -> Result<SaleQuote, SaleBlock> {
         self.sale_eligibility_for(id, SaleOrigin::Player, &self.strategy.sale_refs())
     }
