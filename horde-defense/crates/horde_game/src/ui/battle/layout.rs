@@ -9,8 +9,11 @@
 //! already-filling field (17x30, 11x20, every field with 11 or more lanes) is
 //! today's rect bit for bit. Construction never moves the field: its panel is
 //! an overlay anchored to the arena.
-use crate::art::{self, FieldFit, camera::REFERENCE_LANES};
-use bevy_egui::egui::{Pos2, Rect, pos2, vec2};
+use crate::{
+    art::{self, FieldFit, camera::REFERENCE_LANES},
+    battle_view::EnemyView,
+};
+use bevy_egui::egui::{Pos2, Rect, Vec2, pos2, vec2};
 
 /// Canvas rows above the arena: the corner HUD, the attack selector and the
 /// loot receipt.
@@ -39,12 +42,10 @@ pub(super) const PANEL_TOP_GAP: f32 = 8.0;
 pub(super) const PANEL_MIN_HEIGHT: f32 = 180.0;
 /// The construction panel's black fill alpha.
 pub(super) const PANEL_FILL_ALPHA: u8 = 235;
-/// How far left of the construction panel an INCOMING chevron sits.
-#[allow(
-    dead_code,
-    reason = "C4 (W1-46) draws the INCOMING chevron this far left of the panel"
-)]
+/// How far left of the construction panel an INCOMING chevron's centre sits.
 pub(super) const CHEVRON_GAP: f32 = 10.0;
+/// The INCOMING chevron's width and height.
+pub(super) const CHEVRON_SIZE: Vec2 = vec2(12.0, 16.0);
 
 /// Every rect the main battle screen lays out, from one canvas. Later owners
 /// may append fields; none is redefined.
@@ -171,6 +172,30 @@ impl BattleLayout {
     pub(in crate::ui) fn dressing_unit_cap(&self) -> f32 {
         self.arena.height() / REFERENCE_LANES
     }
+}
+
+/// The INCOMING cues while the construction `panel` is open: one per lane in
+/// which a live enemy (bosses included) stands at or right of the panel's
+/// left edge on the projected `field`, in lane order. Each cue is the
+/// chevron's centre, `CHEVRON_GAP` left of the panel on the lane's centre
+/// line, so the chevron points at what the panel hides.
+pub(in crate::ui) fn occluded_spawn_cues(
+    field: art::ArenaProjection,
+    panel: Rect,
+    enemies: &[EnemyView],
+) -> Vec<(u8, Pos2)> {
+    let mut lanes: Vec<u8> = enemies
+        .iter()
+        .filter(|e| field.world(e.position[0], 0.0).x >= panel.left())
+        .map(|e| e.lane)
+        .collect();
+    lanes.sort_unstable();
+    lanes.dedup();
+    let x = panel.left() - CHEVRON_GAP;
+    lanes
+        .into_iter()
+        .map(|lane| (lane, pos2(x, field.world(0.0, f32::from(lane) + 0.5).y)))
+        .collect()
 }
 
 #[cfg(test)]
@@ -459,6 +484,80 @@ mod tests {
                     "{label}"
                 );
                 assert!(layout.effects_clip.bottom() <= layout.bar.top(), "{label}");
+            }
+        }
+    }
+
+    /// C-7: a lane gets one INCOMING cue when a live enemy (a boss too) stands
+    /// at or right of the panel's left edge, even while it is still left of
+    /// the panel's right edge; an enemy left of the panel marks nothing.
+    #[test]
+    fn occluded_spawn_cues_mark_lanes_hidden_by_the_panel() {
+        use crate::{
+            animation::SceneAnimation,
+            battle_view::{BattleViewModel, SceneBlend},
+        };
+        use horde_core::content::EnemyKind;
+        for (lanes, width) in [(3u8, 12u8), (5, 14), (7, 16)] {
+            let mut game = Game::default();
+            game.campaign_mut()
+                .set_balance_settings(BalanceSettings {
+                    start_lanes: lanes,
+                    max_lanes: lanes,
+                    start_width: width,
+                    max_width: width,
+                    ..Default::default()
+                })
+                .unwrap();
+            game.deploy(0, Mode::Personal).unwrap();
+            for canvas in target_canvases() {
+                let mut a = game.attempt().unwrap().clone();
+                a.enemies.clear();
+                let layout = BattleLayout::new(canvas, a.lane_count, a.width_yards, false);
+                let field = art::ArenaProjection::for_attempt(layout.field.rect, &a);
+                let panel = layout.construction_panel;
+                // Half a point either side of the panel's left edge, both
+                // inside the field and left of the panel's right edge.
+                let left_of = field.inverse(pos2(panel.left() - 0.5, 0.0))[0];
+                let under = field.inverse(pos2(panel.left() + 0.5, 0.0))[0];
+                assert!(under < a.width_yards && field.world(under, 0.0).x < panel.right());
+                for (kind, lane, boss, x) in [
+                    (EnemyKind::Runner, 0, false, left_of),
+                    (EnemyKind::Runner, 1, false, under),
+                    (EnemyKind::Brute, 2, true, under),
+                    (EnemyKind::Runner, 2, false, a.width_yards - 0.2),
+                ] {
+                    game.spawn_enemy(&mut a, kind, lane, boss);
+                    a.enemies.last_mut().unwrap().x = x;
+                }
+                assert_eq!(a.enemies.len(), 4);
+                let view = BattleViewModel::build(
+                    &a,
+                    &SceneAnimation::sample(&a, false),
+                    SceneBlend::NONE,
+                    false,
+                );
+                assert_eq!(view.enemies.len(), 4, "every enemy is live and in view");
+                let label = format!("{lanes}x{width} in {:?}", canvas.size());
+                let centre = |lane: u8| field.world(0.0, f32::from(lane) + 0.5).y;
+                let x = panel.left() - CHEVRON_GAP;
+                assert_eq!(
+                    occluded_spawn_cues(field, panel, &view.enemies),
+                    vec![(1, pos2(x, centre(1))), (2, pos2(x, centre(2)))],
+                    "{label}"
+                );
+                for (_, cue) in occluded_spawn_cues(field, panel, &view.enemies) {
+                    let chevron = Rect::from_center_size(cue, CHEVRON_SIZE);
+                    assert!(chevron.right() < panel.left(), "{label}: under the panel");
+                    assert!(layout.field.rect.contains_rect(chevron), "{label}");
+                }
+                let open: Vec<_> = view
+                    .enemies
+                    .iter()
+                    .filter(|e| e.lane == 0)
+                    .cloned()
+                    .collect();
+                assert_eq!(occluded_spawn_cues(field, panel, &open), vec![], "{label}");
             }
         }
     }

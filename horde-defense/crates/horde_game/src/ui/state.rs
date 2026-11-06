@@ -125,6 +125,10 @@ pub(crate) struct BattleUi {
     /// window draws a live attempt and cleared when it closes (presentation
     /// only; review captures read it).
     pub(super) observer_arena_rect: Option<Rect>,
+    /// The lanes the construction panel hides a live enemy in, in lane
+    /// order: written each frame construction is open, cleared when it closes
+    /// (presentation only; the INCOMING chevrons mark them).
+    pub(super) occluded_lanes: Vec<u8>,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
@@ -148,6 +152,7 @@ impl BattleUi {
             arena_rect: None,
             effects_rect: None,
             observer_arena_rect: None,
+            occluded_lanes: Vec::new(),
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,

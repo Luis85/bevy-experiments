@@ -4,8 +4,8 @@ use super::{
     construction::{construction_controls, placement_cursor},
     details::field_details,
     input::{preview_aim, reticle_ownership},
-    layout::PANEL_FILL_ALPHA,
-    overlays::{corner_hud, field_hint_callout, pause_banner},
+    layout::{PANEL_FILL_ALPHA, occluded_spawn_cues},
+    overlays::{corner_hud, field_hint_callout, incoming_cues, pause_banner},
     projection,
 };
 use crate::{
@@ -23,6 +23,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
     let game = f.game;
     let perf = f.perf;
     let (Some(views), Some(a)) = (views, game.attempt()) else {
+        f.battle.occluded_lanes.clear();
         f.go(Screen::Results);
         return;
     };
@@ -173,6 +174,15 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                                 .show(ui, |ui| construction_controls(ui, f, view));
                         });
                 });
+                // Spawns the panel hides get a chevron left of it.
+                let cues = occluded_spawn_cues(arena, panel, &views.field.enemies);
+                incoming_cues(ui.painter(), &cues);
+                f.battle.occluded_lanes.clear();
+                f.battle
+                    .occluded_lanes
+                    .extend(cues.iter().map(|&(lane, _)| lane));
+            } else {
+                f.battle.occluded_lanes.clear();
             }
             // The controls are always named; a new player has no other
             // place to learn the defaults.

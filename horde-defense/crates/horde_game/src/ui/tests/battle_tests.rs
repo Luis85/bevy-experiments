@@ -996,6 +996,57 @@ fn construction_panel_swallows_field_hover() {
     }
 }
 
+/// C-7: while construction is open, a lane whose live enemy the panel hides
+/// gets an INCOMING chevron left of the panel; closing construction clears
+/// the lanes and the cue.
+#[test]
+fn construction_frame_draws_incoming_chevron() {
+    use horde_core::content::EnemyKind;
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        let mut a = f.game.attempt_slot_mut().take().unwrap();
+        assert!(a.lane_count >= 2);
+        a.enemies.clear();
+        let width = a.width_yards;
+        for (lane, x) in [(0, 1.5), (1, width - 0.5)] {
+            f.game.spawn_enemy(&mut a, EnemyKind::Runner, lane, false);
+            a.enemies.last_mut().unwrap().x = x;
+        }
+        // The spawn events' own field flash also reads INCOMING.
+        a.events.clear();
+        *f.game.attempt_slot_mut() = Some(a);
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert!(
+            f.battle.occluded_lanes.is_empty(),
+            "{size:?}: no panel, no cue"
+        );
+        assert_eq!(text_count(&output, "INCOMING"), 0, "{size:?}");
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.occluded_lanes, vec![1], "{size:?}");
+        assert_eq!(text_count(&output, "INCOMING"), 1, "{size:?}");
+        let layout = field_layout(&h, f);
+        let at = output
+            .shapes
+            .iter()
+            .find_map(|shape| text_position(&shape.shape, "INCOMING"))
+            .unwrap();
+        let lane = layout.field.rect.height() / f32::from(f.game.attempt().unwrap().lane_count);
+        let centre = layout.field.rect.top() + 1.5 * lane;
+        assert!(
+            at.x < layout.construction_panel.left() && (at.y - centre).abs() < 1.0,
+            "{size:?}: INCOMING at {at:?}, lane 1 centre {centre}"
+        );
+        h.click_size(f, View::Battle, "Close construction", size);
+        assert!(!f.battle.construction);
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert!(f.battle.occluded_lanes.is_empty(), "{size:?}: close clears");
+        assert_eq!(text_count(&output, "INCOMING"), 0, "{size:?}");
+    }
+}
+
 /// Pin: battlefield sprites clip to the arena, never to the taller effects
 /// clip.
 #[test]

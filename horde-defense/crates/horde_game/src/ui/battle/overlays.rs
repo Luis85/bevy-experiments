@@ -1,10 +1,10 @@
-use super::BattleLayout;
+use super::{BattleLayout, layout::CHEVRON_SIZE};
 use crate::{
-    art::{AMBER, RED, TEXT},
+    art::{AMBER, INK, RED, TEXT},
     battle_view::{BattleScreen, FieldHint},
     ui::{UiCtx, hud, progress},
 };
-use bevy_egui::egui::{self, Color32, FontId, Rect, RichText, Sense, Stroke, vec2};
+use bevy_egui::egui::{self, Color32, FontId, Pos2, Rect, RichText, Sense, Stroke, pos2, vec2};
 
 pub(super) fn corner_hud(
     ui: &mut egui::Ui,
@@ -194,4 +194,36 @@ pub(super) fn pause_banner(
         Color32::from_black_alpha(200),
     );
     painter.galley(at, galley, AMBER);
+}
+
+/// The INCOMING cues over the construction overlay's left edge: a static
+/// AMBER right-pointing chevron on an INK backing per cue (no motion in any
+/// mode), and the word on the first cue only.
+pub(super) fn incoming_cues(painter: &egui::Painter, cues: &[(u8, Pos2)]) {
+    for (n, &(_, at)) in cues.iter().enumerate() {
+        let chevron = Rect::from_center_size(at, CHEVRON_SIZE);
+        let backing = chevron.expand(3.0);
+        painter.rect_filled(backing, 2.0, INK);
+        painter.add(egui::Shape::line(
+            vec![
+                chevron.left_top(),
+                pos2(chevron.right(), at.y),
+                chevron.left_bottom(),
+            ],
+            Stroke::new(2.5, AMBER),
+        ));
+        if n == 0 {
+            let galley =
+                painter.layout_no_wrap("INCOMING".into(), FontId::proportional(10.0), AMBER);
+            let label = Rect::from_min_size(
+                pos2(
+                    backing.left() - 4.0 - galley.size().x,
+                    at.y - galley.size().y * 0.5,
+                ),
+                galley.size(),
+            );
+            painter.rect_filled(label.expand2(vec2(3.0, 1.0)), 2.0, INK);
+            painter.galley(label.min, galley, AMBER);
+        }
+    }
 }
