@@ -146,15 +146,120 @@ fn priority(kind: Kind) -> u8 {
 pub(super) struct Feedback {
     streams: BTreeMap<u64, Stream>,
     review_start: Option<u64>,
+    warmed: Option<Warmed>,
+}
+/// The only scales the punch takes (W1-64). Every popup font size is a base
+/// size times one of these, so the font atlas holds a fixed glyph set that
+/// `warm_glyphs` rasterises once; a continuous scale rasterised new glyph
+/// sizes on every frame and re-uploaded the whole atlas.
+const SCALE_STEPS: [f32; 4] = [0.85, 1.0, 1.15, 1.3];
+/// Every glyph a popup can draw, plus egui's overflow ellipsis.
+const GLYPHS: &str = "0123456789-!ARMODGEFNIS\u{2026}";
+const KINDS: [Kind; 7] = [
+    Kind::Hit,
+    Kind::Weak,
+    Kind::Incoming,
+    Kind::Armor,
+    Kind::Dodge,
+    Kind::Defend,
+    Kind::Miss,
+];
+fn display_font(size: f32) -> FontId {
+    FontId::new(size, egui::FontFamily::Name("display".into()))
+}
+/// Unscaled point size of one popup kind.
+fn base_size(kind: Kind, reduced: bool) -> f32 {
+    match kind {
+        Kind::Hit if reduced => 23.0,
+        Kind::Hit => 27.0,
+        Kind::Weak if reduced => 27.0,
+        Kind::Weak => 33.0,
+        Kind::Incoming => 26.0,
+        Kind::Dodge => 19.0,
+        Kind::Armor | Kind::Defend | Kind::Miss => 18.0,
+    }
+}
+/// Every font size `draw_for` can ask for, each once.
+fn popup_sizes() -> Vec<f32> {
+    let mut sizes: Vec<f32> = KINDS
+        .iter()
+        .flat_map(|&kind| {
+            SCALE_STEPS
+                .iter()
+                .map(move |&scale| base_size(kind, false) * scale)
+                .chain([base_size(kind, true)])
+        })
+        .collect();
+    sizes.sort_by(f32::total_cmp);
+    sizes.dedup_by(|a, b| a.to_bits() == b.to_bits());
+    sizes
+}
+/// The fonts generation `warm_glyphs` rasterised for: its pixels-per-point
+/// and the atlas fill seen on the latest pass. Within one generation the fill
+/// only grows; egui rebuilds an atlas that nears full, so a lower fill means
+/// the warmed glyphs are gone.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Warmed {
+    pixels_per_point: f32,
+    fill: f32,
+}
+/// The fonts of battle text whose characters change while it plays: enemy
+/// labels (8, 10), HUD and overlay readouts (10-14, DPS 12), coin pop-ups
+/// (15, 16), the body and button styles (16), the field labels (18) and the
+/// monospace trap charges and terrain notes (10).
+fn battle_text_fonts() -> impl Iterator<Item = FontId> {
+    [8.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 18.0]
+        .map(FontId::proportional)
+        .into_iter()
+        .chain([FontId::monospace(10.0)])
+}
+/// Printable ASCII plus the separators the battle readouts use.
+fn battle_text_glyphs() -> String {
+    (' '..='~')
+        .chain(['\u{b7}', '\u{d7}', '\u{2026}'])
+        .collect()
+}
+/// Rasterises the fixed popup glyph set at every popup size, and every
+/// battle-text glyph in the battle text fonts, once per fonts generation, so
+/// no later battle frame adds a glyph to the atlas (W1-64).
+fn warm_glyphs(ctx: &egui::Context, warmed: &mut Option<Warmed>) {
+    let pixels_per_point = ctx.pixels_per_point();
+    let fill = || ctx.fonts(|fonts| fonts.font_atlas_fill_ratio());
+    let seen = fill();
+    let fill = if warmed.is_some_and(|w| w.pixels_per_point == pixels_per_point && seen >= w.fill) {
+        seen
+    } else {
+        ctx.fonts_mut(|fonts| {
+            for size in popup_sizes() {
+                fonts.layout_no_wrap(GLYPHS.into(), display_font(size), Color32::WHITE);
+            }
+            let text = battle_text_glyphs();
+            for font in battle_text_fonts() {
+                fonts.layout_no_wrap(text.clone(), font, Color32::WHITE);
+            }
+        });
+        fill()
+    };
+    *warmed = Some(Warmed {
+        pixels_per_point,
+        fill,
+    });
+}
+/// The nearest of `SCALE_STEPS`.
+fn snap(scale: f32) -> f32 {
+    SCALE_STEPS
+        .into_iter()
+        .min_by(|a, b| (a - scale).abs().total_cmp(&(b - scale).abs()))
+        .unwrap_or(1.0)
 }
 fn motion(age: f64, reduced: bool) -> (f32, f32, f32) {
     let t = (age / LIFE).clamp(0.0, 1.0) as f32;
     let scale = if reduced {
         1.0
     } else if age < 0.06 {
-        0.85 + 0.45 * (age as f32 / 0.06)
+        snap(0.85 + 0.45 * (age as f32 / 0.06))
     } else if age < 0.18 {
-        1.0 + 0.30 * (1.0 - (age as f32 - 0.06) / 0.12).powi(2)
+        snap(1.0 + 0.30 * (1.0 - (age as f32 - 0.06) / 0.12).powi(2))
     } else {
         1.0
     };
@@ -224,31 +329,24 @@ pub(super) fn draw_for(
     }
     let stream = state.streams.entry(battle).or_default();
     stream.observe(a, now, enabled, replay);
+    warm_glyphs(ui.ctx(), &mut state.warmed);
     let p = ui.painter_at(arena.effects_clip);
     for bubble in &stream.active {
         let age = (now - bubble.started).max(0.0);
         let (scale, rise, fade) = motion(age, reduced);
-        let (text, color, size) = match bubble.kind {
-            Kind::Hit => (
-                bubble.value.to_string(),
-                TEXT,
-                if reduced { 23.0 } else { 27.0 },
-            ),
-            Kind::Weak => (
-                format!("{}!", bubble.value),
-                AMBER,
-                if reduced { 27.0 } else { 33.0 },
-            ),
-            Kind::Incoming => (format!("-{}", bubble.value), RED, 26.0),
-            Kind::Armor => ("ARMOR".into(), MUTED, 18.0),
-            Kind::Dodge => ("DODGE".into(), GREEN, 19.0),
-            Kind::Defend => ("DEFENDED".into(), GREEN, 18.0),
-            Kind::Miss => ("MISS".into(), MUTED, 18.0),
+        let (text, color) = match bubble.kind {
+            Kind::Hit => (bubble.value.to_string(), TEXT),
+            Kind::Weak => (format!("{}!", bubble.value), AMBER),
+            Kind::Incoming => (format!("-{}", bubble.value), RED),
+            Kind::Armor => ("ARMOR".into(), MUTED),
+            Kind::Dodge => ("DODGE".into(), GREEN),
+            Kind::Defend => ("DEFENDED".into(), GREEN),
+            Kind::Miss => ("MISS".into(), MUTED),
         };
         let color = color.gamma_multiply(fade);
         let mut job = egui::text::LayoutJob::simple(
             text,
-            FontId::new(size * scale, egui::FontFamily::Name("display".into())),
+            display_font(base_size(bubble.kind, reduced) * scale),
             color,
             (arena.rect.width() - 12.0).clamp(1.0, 220.0),
         );
@@ -342,11 +440,104 @@ mod tests {
         stream.observe(a, 10.05, true, false);
         assert_eq!(stream.active[0].value, 40);
     }
+    /// W1-64: popups at staggered ages, every kind, over 120 egui passes at
+    /// both window scales the budget runs. After a short warmup no pass may
+    /// add a glyph to the font atlas: bevy_egui writes every partial atlas
+    /// update into `Assets<Image>`, so the render world re-extracts and
+    /// re-uploads the whole atlas.
+    #[test]
+    fn damage_popups_stop_uploading_font_texture_after_warmup() {
+        const WARMUP_PASSES: usize = 10;
+        let kinds = [
+            EventKind::Hit,
+            EventKind::WeakPoint,
+            EventKind::Damage,
+            EventKind::Armor,
+            EventKind::Miss,
+            EventKind::Defended,
+            EventKind::Melee,
+        ];
+        for pixels_per_point in [1.0, 2.0] {
+            let ctx = egui::Context::default();
+            crate::settings::install_font(&ctx);
+            let mut game = fixture();
+            game.attempt_mut().unwrap().events.clear();
+            let settings = Settings::default();
+            let mut state = Feedback::default();
+            let mut uploads = Vec::new();
+            for pass in 0..120u64 {
+                if pass % 3 == 0 {
+                    let a = game.attempt_mut().unwrap();
+                    let n = pass / 3;
+                    let value = 1 + ((n * 7919) % 1499) as i32;
+                    let mut event = hit(a, value, kinds[n as usize % kinds.len()], pass + 1);
+                    event.target_id = Some(100 + n % 11);
+                    a.events.push_back(event);
+                }
+                let a = game.attempt().unwrap();
+                let mut input = egui::RawInput {
+                    time: Some(pass as f64 / 60.0),
+                    screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(1440.0, 900.0))),
+                    ..Default::default()
+                };
+                input
+                    .viewports
+                    .entry(egui::ViewportId::ROOT)
+                    .or_default()
+                    .native_pixels_per_point = Some(pixels_per_point);
+                let mut output = ctx.run_ui(input, |ui| {
+                    let arena = Rect::from_min_size(pos2(24.0, 124.0), vec2(1392.0, 692.0));
+                    draw_for(
+                        ui,
+                        a,
+                        art::ArenaProjection::for_attempt(arena, a),
+                        0,
+                        &mut state,
+                        &settings,
+                        review::LootCaptureMode::Disabled,
+                    );
+                });
+                uploads.push(output.textures_delta.set.len());
+                output.textures_delta.clear();
+            }
+            let late: Vec<_> = uploads
+                .iter()
+                .enumerate()
+                .skip(WARMUP_PASSES)
+                .filter(|(_, n)| **n > 0)
+                .map(|(pass, _)| pass)
+                .collect();
+            let allowed = crate::perf_budget::EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX;
+            assert_eq!(
+                late.len().saturating_sub(allowed),
+                0,
+                "pixels_per_point {pixels_per_point}: font texture uploads after pass \
+                 {WARMUP_PASSES} in passes {late:?}"
+            );
+        }
+    }
     #[test]
     fn punch_is_large_then_settles_while_reduced_feedback_has_no_punch_or_drift() {
         assert!(motion(0.06, false).0 > 1.25);
         assert_eq!(motion(0.3, false).0, 1.0);
         assert!(motion(0.5, false).1 > motion(0.1, false).1);
+        // W1-64: the punch steps through the fixed scales only, so every
+        // drawn size is one `popup_sizes` warms.
+        let mut steps = Vec::new();
+        for frame in 0..=60 {
+            let scale = motion(frame as f64 / 60.0, false).0;
+            assert!(SCALE_STEPS.contains(&scale), "{scale} at frame {frame}");
+            if steps.last() != Some(&scale) {
+                steps.push(scale);
+            }
+            for kind in KINDS {
+                for (reduced, scale) in [(false, scale), (true, 1.0)] {
+                    let size = base_size(kind, reduced) * scale;
+                    assert!(popup_sizes().iter().any(|s| s.to_bits() == size.to_bits()));
+                }
+            }
+        }
+        assert_eq!(steps, [0.85, 1.0, 1.15, 1.3, 1.15, 1.0]);
         for age in [0.0, 0.05, 0.3, 0.8] {
             let (scale, rise, _) = motion(age, true);
             assert_eq!((scale, rise), (1.0, 0.0));

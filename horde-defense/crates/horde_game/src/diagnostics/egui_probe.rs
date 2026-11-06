@@ -3,13 +3,14 @@
 //!   of the primary context plus `end_pass`;
 //! - `egui_tessellate_ms` spans `ProcessOutput`, where `process_output_system`
 //!   tessellates (bevy_egui output.rs:51);
-//! - shapes are counted from `EguiFullOutput` between the two, primitives,
+//! - shapes and texture uploads are counted from `EguiFullOutput` between the
+//!   two, before bevy_egui's texture update drains them; primitives,
 //!   vertices, indices and textured quads from `EguiRenderOutput::paint_jobs`.
 use super::{EguiCount, Mark, PerfProbe};
 use bevy::prelude::*;
 use bevy_egui::{
     EguiFullOutput, EguiPostUpdateSet, EguiRenderOutput,
-    egui::{ClippedPrimitive, TextureId, epaint::Primitive},
+    egui::{ClippedPrimitive, TextureId, TexturesDelta, epaint::Primitive},
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -55,6 +56,25 @@ pub fn egui_counts(jobs: &[ClippedPrimitive]) -> EguiCounts {
     counts
 }
 
+/// Texture uploads one egui output asks bevy_egui for (W1-64): every
+/// `textures_delta.set` entry, full or partial, and its pixel bytes. bevy_egui
+/// writes each into `Assets<Image>`, so the render world re-extracts and
+/// re-uploads the whole texture, not just the delta.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TextureUploads {
+    pub count: u64,
+    pub bytes: u64,
+}
+pub fn texture_uploads(delta: &TexturesDelta) -> TextureUploads {
+    let mut uploads = TextureUploads::default();
+    for image in delta.set.values().flatten() {
+        let [width, height] = image.image.size();
+        uploads.count += 1;
+        uploads.bytes += (width * height * image.image.bytes_per_pixel()) as u64;
+    }
+    uploads
+}
+
 impl PerfProbe {
     fn end_span(&self, mark: Mark, total: &AtomicU64) {
         total.fetch_add(self.since(mark), Ordering::Relaxed);
@@ -69,12 +89,16 @@ fn begin_pass(probe: Res<PerfProbe>) {
 }
 fn end_pass(probe: Res<PerfProbe>, outputs: Query<&EguiFullOutput>) {
     probe.end_span(Mark::EguiPass, &probe.0.egui_pass_ns);
-    let shapes = outputs
-        .iter()
-        .filter_map(|output| output.0.as_ref())
-        .map(|output| output.shapes.len() as u64)
-        .sum();
+    let (mut shapes, mut uploads) = (0, TextureUploads::default());
+    for output in outputs.iter().filter_map(|output| output.0.as_ref()) {
+        shapes += output.shapes.len() as u64;
+        let delta = texture_uploads(&output.textures_delta);
+        uploads.count += delta.count;
+        uploads.bytes += delta.bytes;
+    }
     probe.set_egui(EguiCount::Shapes, shapes);
+    probe.set_egui(EguiCount::TextureUploads, uploads.count);
+    probe.set_egui(EguiCount::TextureUploadBytes, uploads.bytes);
     probe.mark(Mark::Tessellate);
 }
 fn end_tessellate(probe: Res<PerfProbe>, outputs: Query<&EguiRenderOutput>) {
@@ -96,7 +120,11 @@ fn end_tessellate(probe: Res<PerfProbe>, outputs: Query<&EguiRenderOutput>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bevy_egui::egui::{Color32, Rect, epaint::Mesh, pos2};
+    use bevy_egui::egui::{
+        Color32, ColorImage, Rect, TextureOptions,
+        epaint::{ImageDelta, Mesh},
+        pos2,
+    };
 
     fn quad_mesh(texture_id: TextureId, quads: usize) -> ClippedPrimitive {
         let mut mesh = Mesh::with_texture(texture_id);
@@ -132,5 +160,32 @@ mod tests {
             }
         );
         assert_eq!(egui_counts(&[]), EguiCounts::default());
+    }
+
+    #[test]
+    fn texture_uploads_count_every_set_entry_and_its_bytes() {
+        let mut delta = TexturesDelta::default();
+        assert_eq!(texture_uploads(&delta), TextureUploads::default());
+        let image = |w, h| ColorImage::filled([w, h], Color32::WHITE);
+        // Two partial atlas patches in one frame count as two uploads.
+        for pos in [[0, 0], [8, 0]] {
+            delta.push(
+                TextureId::default(),
+                ImageDelta::partial(pos, image(8, 2), TextureOptions::LINEAR),
+            );
+        }
+        delta.push(
+            TextureId::Managed(3),
+            ImageDelta::full(image(4, 4), TextureOptions::LINEAR),
+        );
+        delta.free(TextureId::Managed(9));
+        assert_eq!(
+            texture_uploads(&delta),
+            TextureUploads {
+                count: 3,
+                bytes: 4 * (2 * 8 * 2 + 4 * 4),
+            }
+        );
+        delta.clear();
     }
 }

@@ -404,6 +404,17 @@ pub fn install_font(ctx: &Context) {
             "../../../assets/fonts/AtkinsonHyperlegible-Regular.ttf"
         ))),
     );
+    // Every face places glyphs on whole pixels (no subpixel bins, W1-64), so
+    // a glyph has one bitmap per size: text whose digits change (damage
+    // popups, DPS, coin pop-ups, trap charges, HUD counters) stops adding
+    // glyph variants to the font atlas once each size has been seen, and
+    // `ui::damage` can warm the battle set once. bevy_egui re-uploads the
+    // whole atlas on every change.
+    for data in fonts.font_data.values_mut() {
+        let mut face = (**data).clone();
+        face.tweak.subpixel_binning = Some(false);
+        *data = std::sync::Arc::new(face);
+    }
     // Pixelify carries the pixel identity on headings and the wordmark only;
     // body text, buttons and labels use a face built for legibility.
     fonts.families.insert(

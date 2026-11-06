@@ -81,6 +81,13 @@ The full commit detail is in `wave1_commits`. Order and summary:
 | W1-61 | perf-architecture | Acceptance runs, the pipelined decision, shipped smoke timing | W1-34, W1-36, W1-48 to W1-51 |
 | W1-62 | perf-architecture | Rewrite ARCHITECTURE.md as an ownership table plus the coverage gate | W1-38 to W1-46 |
 | W1-63 | save-determinism | Wave-1 close: freeze `save_v7.json`, docs | W1-17, W1-23, W1-25, W1-28, W1-29, W1-30 |
+| W1-64 | perf-architecture | Fixed damage-popup font sizes so battle frames stop re-uploading the egui font atlas (gates 2 and 1) | W1-61 |
+| W1-65 | perf-architecture | Paint the ground once: skip patches under the field and cache ground/backdrop meshes (gate 1) | W1-64 |
+| W1-66 | perf-architecture | One quad per hit flash via a packed white silhouette (gates 1 and 2) | W1-65 |
+| W1-67 | perf-architecture | Build BattleFrame without per-enemy maps and clones (gate 1) | W1-66 |
+| W1-68 | perf-architecture | Attribute the 0.5 s frames: between-frame gap, pipelined wait, per-frame event counts (gate 3 investigation) | W1-67 |
+
+W1-64..W1-68 were added after W1-61 blocked on the Goal-1 gates; W1-61 re-runs after W1-68.
 
 Wave-1 exit:
 - GOLDEN 0/6, TRACE 0/6, V1-V6 unchanged.

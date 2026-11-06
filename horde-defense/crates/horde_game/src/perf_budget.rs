@@ -43,6 +43,13 @@ pub const PRIMITIVE_GROWTH_52_TO_400_MAX: usize = 2;
 /// caps full (x 1.25 = 61,097.5).
 pub const BATTLEFIELD_VERTICES_MAX: &[(&str, usize)] =
     &[("progressed-peak", 40_000), ("stress", 61_098)];
+/// egui texture uploads (`textures_delta.set` entries) allowed in battle once
+/// warmup is over (W1-64): none. bevy_egui writes every partial font-atlas
+/// update into `Assets<Image>`, so the render world re-extracts and
+/// re-uploads the whole atlas. The frame report counts them as
+/// `egui.texture_uploads`; `damage_popups_stop_uploading_font_texture_after_warmup`
+/// holds damage popups to it headless.
+pub const EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX: usize = 0;
 
 /// Whole-number presentation caps, keyed as in `PERF_BUDGET.json` `caps`
 /// (whose one float, `fx_lifetime_max_seconds`, is `FX_LIFETIME_MAX_SECONDS`).
@@ -157,8 +164,14 @@ mod tests {
                 "battlefield_primitives_max",
                 "primitive_growth_52_to_400_max",
                 "battlefield_vertices_max",
+                "texture_uploads_after_warmup_max",
             ])
         );
+        assert_eq!(
+            whole(&json, "/egui/texture_uploads_after_warmup_max"),
+            EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX
+        );
+        assert_eq!(EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX, 0);
         assert_eq!(
             whole(&json, "/egui/battlefield_primitives_max"),
             BATTLEFIELD_PRIMITIVES_MAX

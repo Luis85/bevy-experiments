@@ -2,9 +2,10 @@
 //! version 3. `capture_performance` runs at the end of `Last`, after
 //! `PerfSet::CloseFrame`, so every phase of frame i lands in sample i. Every v2
 //! key keeps its name and meaning; v3 adds `phases`, the interface breakdown,
-//! egui and scene counts, the present and build context and GPU time.
+//! egui and scene counts, the present and build context and GPU time, and
+//! (W1-64) `egui.texture_uploads`.
 use super::{
-    FrameSample, PerfFrame, PerfProbe,
+    EguiCount, FrameSample, PerfFrame, PerfProbe,
     gpu_span::{EGUI_GPU_PATH, gpu_timing_support},
 };
 use bevy::{
@@ -154,6 +155,17 @@ struct EguiReport {
     mesh_indices: CountStats,
     textured_quads: CountStats,
     passes_per_frame: CountStats,
+    texture_uploads: TextureUploadTotals,
+}
+/// Every egui texture upload over the sampled (post-warmup) frames: the
+/// `textures_delta.set` entries and their bytes, gated at
+/// `perf_budget::EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX` in battle.
+#[derive(Serialize)]
+struct TextureUploadTotals {
+    count: u64,
+    bytes: u64,
+    /// Sampled frames with at least one upload.
+    frames: usize,
 }
 #[derive(Serialize)]
 struct SceneLoad {
@@ -365,6 +377,18 @@ fn gpu_report(input: &ReportInput) -> GpuReport {
     }
 }
 
+fn texture_upload_totals(frames: &[RecordedFrame]) -> TextureUploadTotals {
+    let count = |f: &RecordedFrame| f.probe.egui[EguiCount::TextureUploads as usize];
+    TextureUploadTotals {
+        count: frames.iter().map(count).sum(),
+        bytes: frames
+            .iter()
+            .map(|f| f.probe.egui[EguiCount::TextureUploadBytes as usize])
+            .sum(),
+        frames: frames.iter().filter(|f| count(f) > 0).count(),
+    }
+}
+
 /// Pure assembly of the report from what the capture system gathered.
 pub(super) fn build_report(input: &ReportInput) -> FrameReport {
     let frames = &input.frames;
@@ -476,6 +500,7 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
             mesh_indices: egui(3),
             textured_quads: egui(4),
             passes_per_frame: egui(5),
+            texture_uploads: texture_upload_totals(frames),
         },
         scene_load: SceneLoad {
             visible_enemies: scene(|f| f.visible_enemies),

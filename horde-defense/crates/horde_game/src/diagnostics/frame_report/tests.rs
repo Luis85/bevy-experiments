@@ -138,6 +138,35 @@ fn v3_keeps_every_v2_key_and_adds_phases() {
     assert_eq!(report["longest_frames"][0]["sample_index"], 0);
 }
 
+/// W1-64: `egui.texture_uploads` totals every sampled frame's
+/// `textures_delta.set` entries and bytes, so a battle run after warmup can
+/// be held to zero.
+#[test]
+fn egui_texture_uploads_total_the_sampled_frames() {
+    let mut frames = vec![
+        frame(16.7, 4.0, None),
+        frame(16.7, 4.0, None),
+        frame(16.7, 4.0, None),
+    ];
+    for (frame, (count, bytes)) in frames.iter_mut().zip([(2, 4096), (0, 0), (1, 64)]) {
+        frame.probe.egui[EguiCount::TextureUploads as usize] = count;
+        frame.probe.egui[EguiCount::TextureUploadBytes as usize] = bytes;
+    }
+    let report = report_json(&ReportInput {
+        frames,
+        ..default()
+    });
+    let uploads = &report["egui"]["texture_uploads"];
+    assert_eq!(uploads["count"], 3);
+    assert_eq!(uploads["bytes"], 4160);
+    assert_eq!(uploads["frames"], 2);
+    let quiet = report_json(&ReportInput {
+        frames: vec![frame(16.7, 4.0, None)],
+        ..default()
+    });
+    assert_eq!(quiet["egui"]["texture_uploads"]["count"], 0);
+}
+
 #[test]
 fn cpu_frame_quantiles_are_per_sample_sums() {
     // Main and render world peak on alternate frames: the CPU frame never

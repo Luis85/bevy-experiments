@@ -896,6 +896,7 @@ Format owned by qa-captures and checked by `scripts/check_capture_findings.py` (
 | CF-1-01 | 1 | battle, peak, damage, boss, intro | both | both | The PAUSED / READY banner keeps its arena.bottom-18 position (ruling C-3), so on a zoomed field it now covers units in the bottom lane (peak-small lane 7 barricade, the damage target under "69!"); before the zoom it sat below the small clearing. Intro only at 1050x700@1.35: "READY · Begin defense or Escape" draws at y 400-432 pt inside the 217.8-432.8 field, over about half of the bottom lane of the 3-lane first defense (at 1440x900 it sits below the field) | minor | vfx-lighting | open | | | |
 | CF-1-02 | 1 | construction | 1050x700@1.35 | both | The field-top "NO BUILDING BEYOND MIDPOINT" label overlaps the top edge of the construction overlay panel; "OND MIDPOINT" lies on the panel at low contrast | polish | vfx-lighting | open | | | |
 | CF-1-03 | 1 | max-lanes, progressed-peak, every Battle still | both | both | Review captures read the live OS pointer: `f.battle.aim` follows `response.hover_pos()` whenever the reticle preview is off (ui/battle/field.rs:56-66), so aim, the painted reticle and inspector hover depend on where the mouse sat during the run (most of the 7,026 changed pixels in w1-60 normal max-lanes.png). Before/after pairs then differ for reasons outside the reviewed change, including in W7-11's compare_captures | minor | qa-captures | open | | | |
+| CF-1-04 | 1 | damage, damage-4x | both | normal | Damage-number pop is stepped since W1-64: the punch snaps to the nearest of x0.85 / 1.0 / 1.15 / 1.3 (0.85, 1.0, 1.15, 1.3, 1.15, 1.0 over its first 0.18 s at 60 fps) instead of a continuous scale, and every face places glyphs on whole pixels, so battle frames stop re-uploading the egui font atlas. Reduced mode never punched and is unchanged. Motion row in 10.2; the feel of the stepped pop is a human check | polish | perf-architecture | fixed | W1-64 | target/production-after/w1-64/damage-motion/frame-0004.png#75d2c40b0af8 | |
 | CF-0-04 | 0 | battle, menu, leveled-armory | both | both | Non-practice review captures show "Practice scenario - progress is isolated from your campaign", and menu and camp reviews draw "Practice profile" (amber), "Separate practice saves" and the "Practice · separate campaign" footer | minor | qa-captures | fixed | 299470a, 3d6e5c0 | target/production-after/w1-05/normal/battle.png#d44738e6cb6a, target/production-after/w1-05-review/normal/menu.png#be3544456adb, target/production-after/w1-05-review/normal/leveled-armory.png#b6163c62d2a9 | |
 <!-- capture-findings:end -->
 
@@ -939,6 +940,16 @@ Ruling C-12, after C1-C4 (W1-43..W1-46) and the sidecar (W1-53). Recorded 2026-1
   - CF-1-02, owner vfx-lighting: same commit. Fail-first `midpoint_label_clears_the_construction_panel` at 1050x700@1.35 (the label rect and `construction_panel` do not intersect).
   - CF-1-03, owner qa-captures: before the W3-27 capture matrix is reviewed. Fail-first `review_capture_aim_ignores_the_os_pointer`: with a review-capture launch and a hover position over the field, `f.battle.aim` stays at the scene's pinned aim and no hover reticle or inspector draws.
 
+### 10.2 Damage pop motion (W1-64)
+
+The stepped pop of CF-1-04, recorded 2026-11-06 with `scripts/capture_motion.ps1 -Scene damage -OutputDirectory target/production-after/w1-64/damage-motion` (not committed; manifest v2, `reduced_effects` false, 1440x900 at scale 1.0, `windows_scale` 2).
+
+<!-- motion-review:begin -->
+| Scene | Viewport | Mode | Directory | Frames | Simulation ticks | Change | Review |
+|---|---|---|---|---|---|---|---|
+| damage | normal | normal | target/production-after/w1-64/damage-motion | 24 (native 60-152) | 2339 → 2431 | Pop scale stepped to x0.85 / 1.0 / 1.15 / 1.3; whole-pixel glyph placement in every face | Numbers draw with their outline at the stepped sizes ("29" in frame-0004); rise and fade unchanged; the feel of the step at 60 fps is a human check |
+<!-- motion-review:end -->
+
 ---
 
 ## 11. Human checks pending
@@ -948,6 +959,7 @@ These have no automated substitute. Each is logged as "pending human check" in `
 | Check | Wave | Protocol | Status |
 |---|---|---|---|
 | Camera feel: a 3x12 field at 2.5x zoom (on-screen enemy speed rises 2.5x) | 1 | Play the first defense at both sizes | pending |
+| Stepped damage pop (CF-1-04, W1-64) | 1 | Watch damage numbers at 60 fps in a live battle, normal mode, both sizes | pending |
 | Sheet upscale on 3-lane sprites at 2.5x | 1 | Inspect battle captures at both sizes | pending |
 | Weapon-classes review (silhouette and readability per class) | 5 | `weapon-classes-*` captures | pending |
 | Night and storm look (grade, lightning, cue readability) | 5 | `night-checkpoint`, `storm`, `dawn-reference` captures and motion | pending |

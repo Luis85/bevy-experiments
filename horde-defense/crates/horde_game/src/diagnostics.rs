@@ -74,8 +74,11 @@ enum EguiCount {
     MeshIndices,
     TexturedQuads,
     Passes,
+    /// `textures_delta.set` entries and their bytes (W1-64).
+    TextureUploads,
+    TextureUploadBytes,
 }
-const EGUI_COUNTS: usize = 6;
+const EGUI_COUNTS: usize = 8;
 
 /// One completed render-world frame: extraction, the Render schedule and the
 /// swap-chain wait inside it (`prepare_windows`), in milliseconds.
@@ -108,7 +111,8 @@ pub struct FrameSample {
     pub work_ms: [f64; 3],
     /// `[battle_frame_build, battlefield_paint, backdrop]`.
     pub interface_ms: [f64; 3],
-    /// `[shapes, clipped_primitives, mesh_vertices, mesh_indices, textured_quads, passes]`.
+    /// `[shapes, clipped_primitives, mesh_vertices, mesh_indices, textured_quads, passes,
+    /// texture_uploads, texture_upload_bytes]`.
     pub egui: [u64; EGUI_COUNTS],
     pub scene: SceneDraw,
 }

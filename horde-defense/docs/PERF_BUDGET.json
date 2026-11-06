@@ -17,7 +17,8 @@
   "definitions": {
     "interface_draw_ms": "ui::draw wall time (v2 WorkPhase::Interface)",
     "interface_total_ms": "egui pass loop + tessellation",
-    "cpu_frame_ms": "main First..Last + (extract + Render schedule - present wait) of latest completed render sample; per-sample sum; VsyncOff runs only"
+    "cpu_frame_ms": "main First..Last + (extract + Render schedule - present wait) of latest completed render sample; per-sample sum; VsyncOff runs only",
+    "texture_uploads": "egui textures_delta.set entries (and their bytes) per frame, read after EndPass and before bevy_egui's texture update; frame report v3 egui.texture_uploads totals them over the sampled frames (W1-64)"
   },
   "profiles": {
     "dev": { "dir": "debug", "features": ["review"] },
@@ -148,7 +149,8 @@
   "egui": {
     "battlefield_primitives_max": 48,
     "primitive_growth_52_to_400_max": 2,
-    "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 61098 }
+    "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 61098 },
+    "texture_uploads_after_warmup_max": 0
   },
   "save_clone": {
     "items_min": 1000,
