@@ -485,6 +485,9 @@ fn driver_stalls_are_excluded_from_the_gated_frame_counts() {
     assert_eq!(listed[0]["sample_index"], 1);
     assert!(close(&listed[0]["acquire_wait_ms"], 480.), "{listed}");
     assert!(close(&listed[0]["acquire_share"], 0.96), "{listed}");
+    // No main schedule overlaps the window (992..1000 and 1500..1509 lie
+    // outside it), so the stall sample's own 9 ms main schedule stands in:
+    // in_process_ms is max(in-window, own) main + render CPU.
     assert!(close(&listed[0]["in_process_ms"], 26.3), "{listed}");
     assert!(report["driver_stalls"]["rule"].is_string());
     // The interval statistics outside the stall see only the 16.7 ms frame.
@@ -555,6 +558,102 @@ fn driver_stalls_are_excluded_from_the_gated_frame_counts() {
         "{}",
         report["driver_stalls"]
     );
+}
+
+/// W1-61 review: a frame's window `time_ms - frame_ms .. time_ms` closes at
+/// First, so the sample's own First..Last runs after it and the main
+/// schedule inside the stalled frame is the previous sample's. The ruling's
+/// in-process limit reads the main CPU that overlaps the window (or the
+/// sample's own, whichever is larger).
+#[test]
+fn driver_stall_in_process_work_reads_the_main_schedule_inside_the_window() {
+    // Not pipelined: window 1000..1500. The previous sample's main schedule
+    // runs 1000..1000 + main inside it, then the hand-off to 1498 holds a
+    // 420 ms prepare_windows (share 0.84) and 7.3 ms of render CPU; the
+    // stalled sample's own main schedule (1500..1508) is outside the window.
+    let frames = |main: f64| {
+        let previous = timed(1000., 16.7, 1000., main, [0.5, 0.4, 0.]);
+        let gap = 500. - main;
+        let mut stall = timed(1500., 500., 1500., 8., [gap, gap - 2., 0.]);
+        stall.probe.render = Some(RenderSample {
+            render_schedule_ms: 427.,
+            ..render_span(1000. + main + 0.5, 1072., 420., 1497.5)
+        });
+        report_json(&ReportInput {
+            frames: vec![previous, stall],
+            ..default()
+        })
+    };
+    // 70 ms of main schedule inside the window: in-process work, gated.
+    let report = frames(70.);
+    let window = &report["longest_frames"][0]["attribution"];
+    assert!(close(&window["main_cpu_ms"], 70.), "{window}");
+    assert!(close(&window["acquire_wait_ms"], 420.), "{window}");
+    assert!(
+        window["named_coverage"].as_f64().unwrap() >= 0.95,
+        "{window}"
+    );
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+    // 30 ms inside the window stays a stall, listed with the in-window main.
+    let report = frames(30.);
+    assert_eq!(
+        gated(&report),
+        (0.into(), 1.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+    let listed = &report["driver_stalls"]["frames"][0];
+    assert!(close(&listed["in_process_ms"], 30. + 7.3), "{listed}");
+}
+
+/// W1-61 review: the named-coverage and acquire-share legs of the rule each
+/// decide on their own. A frame that qualifies on acquire share and in-process
+/// work but whose window is 10% outside App::update stays gated; the share
+/// threshold is probed on both sides of 0.8.
+#[test]
+fn driver_stall_needs_named_coverage_and_the_acquire_share() {
+    let quick = timed(1000., 16.7, 992., 8., [0.5, 0.4, 0.]);
+    // Window 1000..1500: hand-off 1000..1450 holding a 440 ms acquire (share
+    // 0.88), then 50 ms outside App::update: named coverage 0.90.
+    let mut unnamed = timed(1500., 500., 1500., 9., [500., 450., 0.]);
+    unnamed.probe.render = Some(render_span(1000.5, 1001., 440., 1449.5));
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), unnamed],
+        ..default()
+    });
+    let window = &report["longest_frames"][0]["attribution"];
+    assert!(close(&window["named_coverage"], 0.9), "{window}");
+    assert!(close(&window["acquire_wait_ms"], 440.), "{window}");
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+    // Fully named hand-off 1000..1498 with 8.3 ms of render CPU: an acquire
+    // share of 0.79 is gated, 0.81 is a stall.
+    for (acquire, expected) in [(395., (1, 0)), (405., (0, 1))] {
+        let mut stall = timed(1500., 500., 1500., 9., [500., 498., 0.]);
+        stall.probe.render = Some(RenderSample {
+            render_schedule_ms: acquire + 8.,
+            ..render_span(1000.5, 1001., acquire, 1497.5)
+        });
+        let report = report_json(&ReportInput {
+            frames: vec![quick.clone(), stall],
+            ..default()
+        });
+        assert_eq!(
+            gated(&report),
+            (expected.0.into(), expected.1.into()),
+            "acquire {acquire}: {}",
+            report["driver_stalls"]
+        );
+    }
 }
 
 /// Pipelined, the main thread waits on the render channel while the render

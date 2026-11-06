@@ -563,7 +563,7 @@ fn render_frames(frames: &[RecordedFrame]) -> Vec<RenderSample> {
     renders
 }
 
-const DRIVER_STALL_RULE: &str = "W1-61, user ruling on gate 3 (2026-11-06, 'Exclude driver stalls'). A sampled frame over 50 ms is an environmental driver stall when its swap-chain acquire wait holds at least 80% of it (attribution.acquire_wait_ms: the main thread's render hand-off overlapping a render frame's prepare_windows, i.e. present_wait when not pipelined, or the channel wait while the render thread is in present), its named spans cover at least 95% (attribution.named_coverage) and its in-process work stays below 50 ms (in_process_ms = main_cpu + render CPU, the larger of the latest and the stalled render frame's extract + Render schedule - present wait). A frame without attribution is never a stall. frames lists every stall; outside holds the interval statistics and counts of every other sampled frame: measure_performance gates frames_over_50ms on outside.frames_over_50ms, and the pipelined decision reads outside.frames_over_33ms, mean_observed_fps and p99_frame_ms. The v2 frames_over_* keys still count every frame.";
+const DRIVER_STALL_RULE: &str = "W1-61, user ruling on gate 3 (2026-11-06, 'Exclude driver stalls'). A sampled frame over 50 ms is an environmental driver stall when its swap-chain acquire wait holds at least 80% of it (attribution.acquire_wait_ms: the main thread's render hand-off overlapping a render frame's prepare_windows, i.e. present_wait when not pipelined, or the channel wait while the render thread is in present), its named spans cover at least 95% (attribution.named_coverage) and its in-process work stays below 50 ms (in_process_ms = main CPU + render CPU. Main CPU is the larger of attribution.main_cpu_ms, the main schedules overlapping the window, which closes at First and so holds the previous sample's First..Last, and the sample's own phases.main_cpu_ms. Render CPU is the larger of the latest and the stalled render frame's extract + Render schedule - present wait). A frame without attribution is never a stall. frames lists every stall; outside holds the interval statistics and counts of every other sampled frame: measure_performance gates frames_over_50ms on outside.frames_over_50ms, and the pipelined decision reads outside.frames_over_33ms, mean_observed_fps and p99_frame_ms. The v2 frames_over_* keys still count every frame.";
 
 /// The driver-stall rule (`perf_budget::DRIVER_STALL_*`) for one frame.
 fn driver_stall(
@@ -585,7 +585,11 @@ fn driver_stall(
         .probe
         .slowest_present
         .map_or(0., |render| render.cpu_ms());
-    let in_process_ms = phases.main_cpu_ms + phases.render_world_cpu_ms.max(stalled_render);
+    // The window closes at First, so the sample's own First..Last runs after
+    // it: the main schedule inside the stalled frame is the previous one's
+    // (attribution.main_cpu_ms). The larger of the two stays conservative.
+    let main_cpu = attribution.main_cpu_ms.max(phases.main_cpu_ms);
+    let in_process_ms = main_cpu + phases.render_world_cpu_ms.max(stalled_render);
     (acquire_share >= DRIVER_STALL_ACQUIRE_SHARE_MIN
         && attribution.named_coverage >= DRIVER_STALL_NAMED_COVERAGE_MIN
         && in_process_ms < DRIVER_STALL_IN_PROCESS_MS_BELOW)

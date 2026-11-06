@@ -585,6 +585,8 @@ In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms at progressed-pe
 
 The gate stays at 0 frames over 50 ms; what it counts changed. The thresholds are in `docs/PERF_BUDGET.json` `driver_stall`: over 50 ms, acquire share at least 0.8, named coverage at least 0.95, in-process work below 50 ms.
 
+In-process work (`in_process_ms`) is main CPU plus render CPU. A frame's window is `time_ms - frame_ms .. time_ms` and closes at First, so the sample's own First..Last runs after it; the main schedule inside the stalled frame is the previous sample's. Main CPU is therefore the larger of `attribution.main_cpu_ms` (the main schedules overlapping the window) and the sample's own `phases.main_cpu_ms` (W1-61 review; before it, only the sample's own was read). Render CPU is the larger of the latest and the stalled render frame's extract + Render schedule − present wait. Re-classified with this rule, every recorded W1-61 report (`target/perf/w1-61/head-*`, 127 reports) keeps exactly its driver stalls: 235 of 235, in-process work at most 19.2 ms.
+
 **Report fields (report version 3; `frames_over_50ms` and every other earlier key keep their meaning).**
 - `longest_frames[].attribution.acquire_wait_ms`: the part of the frame's window where a main-thread render hand-off overlaps a render frame's `prepare_windows`. Not pipelined, the hand-off holds the frame's own Render schedule, so this is its present_wait. Pipelined, it is the channel wait while the render thread is in present.
 - `slowest_present` in the probe: each close also receives the render frame with the longest present wait since the previous close. Pipelined, the render frame that stalled finishes, and the next one replaces it before the main thread closes the frame. The first W1-61 VSync-off A/B runs (before W1-69) showed this in all 94 pipelined frames over 50 ms: the main thread sat 481-625 ms in the channel wait, and no recorded render frame overlapped the window. Their pipelined-off twins had 160 such frames, each with 467-503 ms of present_wait. The attribution now counts that render frame too.
@@ -596,6 +598,8 @@ Pins:
 - `driver_stalls_are_excluded_from_the_gated_frame_counts`: a 500 ms present-wait frame passes; a 500 ms main-schedule frame, a 60 ms frame with 40% present wait, a stall with 60 ms of render CPU and an untimed frame still count.
 - `pipelined_channel_wait_is_a_stall_only_while_the_render_thread_presents`.
 - `a_replaced_render_frame_still_attributes_the_channel_wait` and `close_keeps_the_slowest_present_since_the_previous_close`.
+- `driver_stall_in_process_work_reads_the_main_schedule_inside_the_window` (W1-61 review): a 500 ms frame with a 420 ms acquire and 70 ms of the previous sample's main schedule inside its window stays gated; with 30 ms it is a stall listed at 37.3 ms.
+- `driver_stall_needs_named_coverage_and_the_acquire_share` (W1-61 review): named coverage 0.90 stays gated; acquire share 0.79 is gated, 0.81 is a stall.
 - `driver_stall_rule_matches_the_ruling`.
 - The `-SelfTest` fixtures `driver-stall` (exit 0) and `missing-driver-stalls` (exit 2).
 
@@ -614,7 +618,7 @@ Pins:
 - `frames_over_50ms`: the gate counts the frames outside driver stalls (`driver_stalls.outside.frames_over_50ms`, see above), worst repeat.
 - Medians are taken over 3 repeats.
 
-**Acceptance passes** (`target/perf/w1-61/head-acc-*`; every pass exited 0, every repeat had 0 frames over 50 ms, and 0 driver stalls were excluded):
+**Acceptance passes** (`target/perf/w1-61/head-acc-*`; every pass exited 0, every repeat had 0 frames over 50 ms, and 0 driver stalls were excluded, in a stall-free hour: see "The acceptance passes and the A/B disagree on driver stalls" below):
 
 | Pass | Gate | normal | small | Limit |
 |---|---|---|---|---|
@@ -666,6 +670,19 @@ The counts, FPS and p99 interval are taken outside driver stalls. The off arm me
 Pipelined, the stalled render frame finished before the main thread closed its frame, so the earlier reports never saw its present wait. `slowest_present` now keeps it. W1-68's open VSync-off half is therefore the same swap-chain acquire stall as the VSync-on half.
 
 One VSync-on stress repeat with pipelining (`head-ab-playtest-vsync/stress-on-r2`) had a stretch of about 400 frames of 47-67 ms. The six of them over 50 ms were mostly acquire wait (acquire shares 0.78-0.86), but their named coverage was only 0.89-0.94, with 4-6 ms outside App::update. So the rule kept them gated, and that repeat exited 1. It stays visible as evidence, and the gate was not moved.
+
+**Open (W1-61 review, 2026-11-07).** That repeat ran the shipped default configuration (playtest, pipelined on, VSync on). Outside driver stalls it had 6 frames over 50 ms, 407 frames over 33 ms, a p99 interval of 47.1 ms and a mean of 46.3 FPS. That is a sustained 15-20 FPS episode, not an isolated stall. Its twins were clean, it is not attributed (4-6 ms per frame outside App::update), and gate 3 on HEAD is not claimed clean while it stands. It is an open item next to W1-68's VSync-off half (plan 9.4, waves.md) and a candidate new finding for the orchestrator.
+
+**The acceptance passes and the A/B disagree on driver stalls (W1-61 review, 2026-11-07).** Both ran the same commit, 1,800 stress frames, pipelining on. The 12 acceptance stress runs with -VsyncOff (dev and playtest) had 0 driver stalls; the 12 pipelined-on A/B stress runs had 58 (0-12 each). The harness differs only in `-Pipelined on` (`LASTLIGHT_PERF_PIPELINED=1`, which sets the same plan value; `present.source` is `launch-override` either way because of -VsyncOff) and `-Repeat 1` per invocation. One discriminating pass ran both, interleaved, on 2026-11-06 23:10-23:16 UTC (`target/perf/w1-61/review/`; playtest, -VsyncOff, stress, both sizes, 1,800 frames):
+
+| Pass | Harness | Runs | Frames > 50 ms | Driver stalls |
+|---|---|---|---|---|
+| `a1-on-r1`, `a2-on-r1` | `-Pipelined on -Repeat 1` (A/B) | 4 | 0 | 0 |
+| `b1-default-r3` | default, `-Repeat 3` (acceptance) | 6 | 0 | 0 |
+| `c1-on-r3` | `-Pipelined on -Repeat 3` | 6 | 0 | 0 |
+| `d1-default-r1` | default, `-Repeat 1` | 2 | 0 | 0 |
+
+No harness variable brings the stalls in. They come and go with time. The last driver stall in the W1-61 evidence fell in the VSync-on A/B at about 22:22 UTC; none followed in the 54 acceptance runs from 22:32 or in these 18 runs. W1-68 saw the same thing: 4-14 per stress run at 18:09, then 0 in 66 probes. So the A/B on arm stands for the default. The acceptance pass's 0 driver stalls shows a stall-free hour, not that the stall is gone; on another hour the same passes would exclude stalls under the ruling. Caveats: the discriminating pass ran the W1-61 review binary (it differs only in the stall rule) and had no CPU-load sampler.
 
 ## Full verify
 

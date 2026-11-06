@@ -207,7 +207,7 @@
     }
   },
   "acceptance": {
-    "note": "W1-61 Goal-1 acceptance on commit 199d823 (W1-69 included; the pipelined default unchanged), informational: the script never reads it. Every pass exited 0; production-pass plan 9.1 and VALIDATION.md 'Goal-1 acceptance'.",
+    "note": "W1-61 Goal-1 acceptance on commit 199d823 (W1-69 included; the pipelined default unchanged), informational: the script never reads it. Every pass exited 0; production-pass plan 9.1 and VALIDATION.md 'Goal-1 acceptance'. W1-61 review: the 0 driver stalls fell in a stall-free hour (a discriminating pass, target/perf/w1-61/review, had 0 under the A/B and acceptance harnesses alike), and one A/B repeat in the shipped default configuration (target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2: playtest, pipelined on, VSync on, stress normal) had 6 gated frames over 50 ms and exited 1. That episode is open, so gate 3 on HEAD is not claimed clean.",
     "commit": "199d823",
     "passes": ["target/perf/w1-61/head-acc-dev-vsync-progressed-peak", "target/perf/w1-61/head-acc-dev-vsync-peak", "target/perf/w1-61/head-acc-dev-vsync-stress", "target/perf/w1-61/head-acc-dev-novsync", "target/perf/w1-61/head-acc-playtest-novsync"],
     "interface_draw_mean_ms": { "progressed-peak": { "normal": 0.9903, "small": 0.9517 }, "peak": { "normal": 0.7745, "small": 0.7681 } },
