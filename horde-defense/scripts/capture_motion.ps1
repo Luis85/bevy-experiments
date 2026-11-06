@@ -3,12 +3,16 @@
 # Run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture_motion.ps1 -Scene peak -OutputDirectory target/motion/peak
 # The game creates -OutputDirectory itself (frames and manifest.json) and refuses an existing one, so the
 # process logs, cargo log and the isolated LASTLIGHT_SAVE_DIR go to the sibling folder <OutputDirectory>.logs.
+# -Viewport normal is 1440x900 at UI scale 1.0, small is 1050x700 at 1.35 (capture_review's two sizes). The
+# version-2 manifest must report the requested reduced_effects, width, height and scale, plus windows_scale.
 [CmdletBinding()]
 param(
     # Any scene the binary's --list-scenes marks motion=true.
     [string]$Scene = 'peak',
     [string]$OutputDirectory = 'target/animation-playtest-review/motion',
     [switch]$ReducedEffects,
+    [ValidateSet('normal', 'small')]
+    [string]$Viewport = 'normal',
     [switch]$NoBuild,
     [string]$Executable,
     [int]$TimeoutSeconds = 300
@@ -21,6 +25,8 @@ else { $directory = [IO.Path]::GetFullPath((Join-Path $workspace $OutputDirector
 $logs = $directory.TrimEnd('\', '/') + '.logs'
 if (Test-Path -LiteralPath $directory) { throw "Use a fresh evidence directory: $directory" }
 if (Test-Path -LiteralPath $logs) { throw "Use a fresh evidence directory: $logs already exists" }
+if ($Viewport -eq 'small') { $view = @{ Width = 1050; Height = 700; Scale = 1.35 } }
+else { $view = @{ Width = 1440; Height = 900; Scale = 1.0 } }
 $saved = Reset-LastlightEnv
 try {
     if (-not $NoBuild) {
@@ -39,8 +45,8 @@ try {
         })
     if ($motionScenes -cnotcontains $Scene) { throw "Unknown motion scene `"$Scene`"; run --list-scenes (motion scenes: $($motionScenes -join ', '))" }
     $env:LASTLIGHT_REVIEW_SCREEN = $Scene
-    $env:LASTLIGHT_REVIEW_SIZE = '1440x900'
-    $env:LASTLIGHT_REVIEW_SCALE = '1.0'
+    $env:LASTLIGHT_REVIEW_SIZE = '{0}x{1}' -f $view.Width, $view.Height
+    $env:LASTLIGHT_REVIEW_SCALE = $view.Scale.ToString('0.0##', [Globalization.CultureInfo]::InvariantCulture)
     $env:LASTLIGHT_REVIEW_MOTION = '1'
     $env:LASTLIGHT_CAPTURE_SEQUENCE = $directory
     $env:LASTLIGHT_SAVE_DIR = Join-Path $logs 'saves'
@@ -51,6 +57,11 @@ try {
     if (Test-Path -LiteralPath $reviewProfile) { Remove-Item -LiteralPath $reviewProfile -Recurse -Force }
     if ($result.ExitCode -ne 0) { throw "Native animation export failed with exit code $($result.ExitCode); see $($result.Err)" }
     $manifest = Get-Content -Raw -LiteralPath (Join-Path $directory 'manifest.json') | ConvertFrom-Json
+    if ($manifest.version -ne 2) { throw "Expected motion manifest version 2, got $($manifest.version)" }
+    if ($manifest.reduced_effects -isnot [bool] -or $manifest.reduced_effects -ne [bool]$ReducedEffects) { throw "Manifest reduced_effects is $($manifest.reduced_effects); expected $([bool]$ReducedEffects)" }
+    if ($manifest.width -ne $view.Width -or $manifest.height -ne $view.Height) { throw "Manifest viewport is $($manifest.width)x$($manifest.height); expected $($view.Width)x$($view.Height)" }
+    if ($null -eq $manifest.scale -or [Math]::Abs([double]$manifest.scale - $view.Scale) -gt 0.001) { throw "Manifest scale is $($manifest.scale); expected $($view.Scale)" }
+    if ($null -eq $manifest.windows_scale -or [double]$manifest.windows_scale -le 0) { throw "Manifest windows_scale is missing or not positive: $($manifest.windows_scale)" }
     if (@($manifest.frames).Count -ne 24) { throw 'Expected all 24 frames' }
     foreach ($frame in $manifest.frames) { if (-not (Test-Path -LiteralPath (Join-Path $directory $frame.file))) { throw "Missing $($frame.file)" } }
     for ($i = 1; $i -lt $manifest.frames.Count; $i++) {

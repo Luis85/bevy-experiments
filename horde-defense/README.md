@@ -175,7 +175,7 @@ The [capture script](scripts/capture_review.ps1) stages isolated native fixtures
 
 The follow-up [animation](docs/REVIEW_ANIMATION.md), [atmosphere](docs/REVIEW_ATMOSPHERE.md) and [UX](docs/REVIEW_UX.md) pass adds original four-pose enemy gaits, contact/recoil/reload feedback, persistent fallen bodies and bounded impact effects, regional weather and layered environmental audio. The [survival audio guide](docs/AUDIO_SURVIVAL.md) covers the new 72-file WAV library and its separate listening-evidence limits. Reduced effects retain tactical cues. Camp offers explicit world pause/speed controls, and debriefs identify banked rewards and the next preparation step.
 
-`scripts/capture_motion.ps1` exports 24 native frames into a fresh directory, with a normal/reduced-effects comparison option. Its isolated fixed-timestep export is animation evidence, never a real-time frame-rate measurement.
+`scripts/capture_motion.ps1` exports 24 native frames into a fresh directory, with a normal/reduced-effects comparison option and `-Viewport normal|small` (1440x900 or 1050x700 at 1.35); its version-2 `manifest.json` records the mode and viewport it ran at. Its isolated fixed-timestep export is animation evidence, never a real-time frame-rate measurement.
 
 `horde_core` owns validated balance/catalogues, saved geometry, fixed-tick rules, DPS, run records, economy and persistence. `horde-defense` owns input, projections, UI, graphics and sound. Contact stays x=1.5; shared helpers derive build bounds/centers from frozen width. The schedule remains60Hz with legal one-second NPC opportunities. Rendering never rerolls attacks or advances metrics.
 

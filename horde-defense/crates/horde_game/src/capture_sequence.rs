@@ -46,13 +46,46 @@ struct SequenceFrame {
     melee_commit: Option<u32>,
     corpse_count: usize,
 }
+/// The shortest decimal of an `f32`, so a JSON reader sees `1.35`, not
+/// `1.350000023841858` (a `serde_json::Value` holds every number as `f64`).
+fn decimal(value: f32) -> f64 {
+    value.to_string().parse().unwrap_or(f64::from(value))
+}
+/// The motion `manifest.json`, version 2: version 1 plus the run's effective
+/// reduced-effects setting, the logical window size in points, the UI scale
+/// and the Windows display scale (PNG pixels per point), so capture_motion can
+/// prove which mode and viewport produced the frames.
+fn sequence_manifest(
+    scene: Option<&str>,
+    reduced_effects: bool,
+    (width, height): (u32, u32),
+    scale: f32,
+    windows_scale: f32,
+    frames: &[SequenceFrame],
+) -> serde_json::Value {
+    serde_json::json!({
+        "version": 2,
+        "scene": scene,
+        "reduced_effects": reduced_effects,
+        "width": width,
+        "height": height,
+        "scale": decimal(scale),
+        "windows_scale": decimal(windows_scale),
+        "timing": "Fixed presentation timestep per native frame; authoritative ticks advance only in combat fixtures. NOT a real-time FPS measurement",
+        "nominal_video_fps": 60 / STEP,
+        "frames": frames,
+    })
+}
+#[allow(clippy::too_many_arguments)]
 pub fn capture_frames(
     mut commands: Commands,
     session: Res<crate::runner::GameSession>,
+    settings: Res<crate::settings::Settings>,
     mut battle: ResMut<crate::ui::BattleUi>,
     mut state: Local<SequenceCapture>,
     config: Res<crate::launch::LaunchConfig>,
     mut exit: MessageWriter<AppExit>,
+    window: Option<Single<&Window, With<bevy::window::PrimaryWindow>>>,
 ) {
     if !state.initialized {
         state.initialized = true;
@@ -136,7 +169,23 @@ pub fn capture_frames(
             exit.write(AppExit::error());
             return;
         }
-        let report = serde_json::json!({"version":1,"scene":config.scenario,"timing":"Fixed presentation timestep per native frame; authoritative ticks advance only in combat fixtures. NOT a real-time FPS measurement","nominal_video_fps":60/STEP,"frames":state.records});
+        let (viewport, windows_scale) = window.as_ref().map_or((config.window, 1.0), |window| {
+            (
+                (
+                    window.resolution.width().round() as u32,
+                    window.resolution.height().round() as u32,
+                ),
+                window.resolution.scale_factor(),
+            )
+        });
+        let report = sequence_manifest(
+            config.scenario.as_deref(),
+            settings.reduced_effects,
+            viewport,
+            settings.scale,
+            windows_scale,
+            &state.records,
+        );
         let result = serde_json::to_vec_pretty(&report)
             .map_err(|e| e.to_string())
             .and_then(|bytes| {
@@ -158,6 +207,28 @@ pub fn capture_frames(
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn manifest_records_reduced_effects_and_viewport() {
+        let manifest = sequence_manifest(Some("peak"), true, (1050, 700), 1.35, 2.0, &[]);
+        assert_eq!(manifest["version"], 2);
+        assert_eq!(manifest["scene"], "peak");
+        assert_eq!(manifest["reduced_effects"], true);
+        assert_eq!(manifest["width"], 1050);
+        assert_eq!(manifest["height"], 700);
+        // The shortest decimal of the f32, so the script compares 1.35, not 1.350000023841858.
+        assert_eq!(manifest["scale"], 1.35);
+        assert_eq!(manifest["windows_scale"], 2.0);
+        assert_eq!(manifest["nominal_video_fps"], 15);
+        assert_eq!(manifest["frames"], serde_json::json!([]));
+        let normal = sequence_manifest(None, false, (1440, 900), 1.0, 1.0, &[]);
+        assert_eq!(normal["reduced_effects"], false);
+        assert_eq!(normal["scene"], serde_json::Value::Null);
+        assert_eq!(
+            (normal["width"].clone(), normal["height"].clone()),
+            (1440.into(), 900.into())
+        );
+        assert_eq!(normal["scale"], 1.0);
+    }
     #[test]
     fn interrupted_run_frames_are_never_accepted_or_overwritten() {
         let nonce = std::time::SystemTime::now()
