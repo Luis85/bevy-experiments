@@ -500,3 +500,5 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/tests/run_script_tes
 ```
 
 `check_views.py` prints `PASS: <n> Views` and exits 0. `run_script_tests.ps1` exercises `scripts/lib/Native.ps1` and `measure_performance.ps1` against a fake game executable under Windows PowerShell 5.1; it prints PASS or FAIL and exits 0 or 1. Documented `scripts/` commands use the Windows PowerShell 5.1 that ships with Windows (`powershell`, not `pwsh`). The three PowerShell 7 scripts (`capture_player_models.ps1`, `trace_npc.ps1`, `verify_player_models.ps1`) say so where they are documented. `repo_checks::docs_invoke_scripts_with_windows_powershell` enforces both outside `docs/plans/`.
+
+The two generator checks, `python -I -B scripts/generate_audio.py --check` and `python -I -B scripts/generate_atmosphere_audio.py --check`, join this block in W1-57, which gives the generators their `--check` mode; until then they have none.

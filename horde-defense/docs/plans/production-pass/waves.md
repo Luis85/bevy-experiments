@@ -74,7 +74,7 @@ The full commit detail is in `wave1_commits`. Order and summary:
 | W1-54 | qa-captures | New wave-1 review scenes | W1-05, W1-35 |
 | W1-55 | qa-captures | check_views sources, 5.1 doc commands, the AGENTS.md target rule | W1-03 |
 | W1-56 | qa-captures | `horde_core::sha256` (test-support) | - |
-| W1-57 | qa-captures | Archive move, asset_audit, generator retarget plus `--check`, CREDITS index | W1-56 |
+| W1-57 | qa-captures | Archive move, asset_audit, generator retarget plus `--check` (both `--check` runs join the docs/VALIDATION.md Full verify), CREDITS index | W1-56 |
 | W1-58 | audio | Retire NpcShot and archive survival_npc_shot_0..2 | W1-57 |
 | W1-59 | qa-captures | Motion manifest v2 and `-Viewport` | W1-03 |
 | W1-60 | qa-captures | Camera capture review with written reasons | W1-45, W1-46, W1-53 |

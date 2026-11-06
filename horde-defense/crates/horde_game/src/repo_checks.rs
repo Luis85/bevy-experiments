@@ -343,7 +343,19 @@ fn workspace_directory() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../..")
 }
 
-/// Every `.md` in the workspace except `target/` and `docs/plans/`, as
+/// Folders the doc lint never enters, by `/`-separated workspace path:
+/// `docs/plans/` (history) and the untracked local folders from `.gitignore`
+/// (`target/`, `saves/`, `screenshots/` and every dot-folder such as `.git/`,
+/// `.obsidian/` or `.claude/`), so files outside version control cannot fail it.
+fn skipped_directory(name: &str) -> bool {
+    matches!(name, "target" | "saves" | "screenshots" | "docs/plans")
+        || name
+            .rsplit('/')
+            .next()
+            .is_some_and(|folder| folder.starts_with('.'))
+}
+
+/// Every `.md` in the workspace outside [`skipped_directory`] folders, as
 /// `/`-separated paths relative to the workspace, sorted.
 fn markdown_files(workspace: &Path) -> Vec<String> {
     fn walk(root: &Path, directory: &Path, found: &mut Vec<String>) {
@@ -358,7 +370,7 @@ fn markdown_files(workspace: &Path) -> Vec<String> {
                 .collect();
             let name = parts.join("/");
             if path.is_dir() {
-                if !matches!(name.as_str(), "target" | ".git" | "docs/plans") {
+                if !skipped_directory(&name) {
                     walk(root, &path, found);
                 }
             } else if path
@@ -450,6 +462,18 @@ fn lint_doc(name: &str, text: &str) -> Vec<String> {
     violations
 }
 
+/// [`lint_doc`] on the workspace file `name`; a file that is not UTF-8 is
+/// itself a violation.
+fn lint_markdown_file(workspace: &Path, name: &str) -> Vec<String> {
+    let path = workspace.join(name);
+    let bytes =
+        std::fs::read(&path).unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    match String::from_utf8(bytes) {
+        Ok(text) => lint_doc(name, &text),
+        Err(_) => vec![format!("{name}: not UTF-8; save it as UTF-8")],
+    }
+}
+
 #[test]
 fn docs_invoke_scripts_with_windows_powershell() {
     let workspace = workspace_directory();
@@ -464,8 +488,7 @@ fn docs_invoke_scripts_with_windows_powershell() {
     );
     let mut violations = Vec::new();
     for name in &files {
-        let text = std::fs::read_to_string(workspace.join(name)).expect("read Markdown");
-        violations.extend(lint_doc(name, &text));
+        violations.extend(lint_markdown_file(&workspace, name));
     }
     assert!(
         violations.is_empty(),
@@ -522,4 +545,40 @@ fn doc_lint_ignores_the_root_helper_and_honours_the_ps7_note() {
             "{doc:?} should report {expected:?}, got {violations:?}"
         );
     }
+}
+
+#[test]
+fn doc_lint_skips_ignored_folders_and_reports_non_utf8() {
+    struct Fixture(PathBuf);
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let fixture =
+        Fixture(std::env::temp_dir().join(format!("horde-doc-lint-{}", std::process::id())));
+    let workspace = fixture.0.clone();
+    let _ = std::fs::remove_dir_all(&workspace);
+    const PWSH: &[u8] = b"pwsh -File scripts/x.ps1\n";
+    let files: &[(&str, &[u8])] = &[
+        ("README.md", b"# Readme\n"),
+        ("docs/bad.md", b"caf\xe9\n"),
+        ("docs/plans/old.md", PWSH),
+        ("target/debug/x.md", PWSH),
+        ("saves/notes.md", PWSH),
+        ("screenshots/notes.md", PWSH),
+        (".obsidian/x.md", PWSH),
+        (".impeccable/x.md", PWSH),
+        ("docs/.notes/x.md", PWSH),
+    ];
+    for (name, bytes) in files {
+        let path = workspace.join(name);
+        std::fs::create_dir_all(path.parent().expect("parent")).expect("create fixture folder");
+        std::fs::write(&path, bytes).expect("write fixture");
+    }
+    assert_eq!(markdown_files(&workspace), ["README.md", "docs/bad.md"]);
+    assert_eq!(
+        lint_markdown_file(&workspace, "docs/bad.md"),
+        ["docs/bad.md: not UTF-8; save it as UTF-8"]
+    );
 }
