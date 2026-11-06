@@ -28,7 +28,8 @@
 # LASTLIGHT_SAVE_DIR, and writes <scene>-<size>[-rN].json. A run is valid only when the report is version 3, met its
 # sample target, is not paused, had no unfocused sample frame, and echoes the requested present mode, pipelined state,
 # scene and profile. An invalid run is rerun once (the rejected report is kept as <stem>.invalid.json).
-# Budget compare: repeats by median, frames_over_50ms by the worst repeat. frames_over_50ms always; cpu_frame p99 only
+# Budget compare: repeats by median, frames_over_50ms and egui texture uploads by the worst repeat. frames_over_50ms and
+# egui.texture_uploads.count (against egui.texture_uploads_after_warmup_max, every scene, W1-64) always; cpu_frame p99 only
 # with -VsyncOff; interface_draw (v2 work_mean_ms[2], ui::draw) only when profile and VSync match baseline.wave0;
 # interface_total only against baseline.v3.interface_total_mean_ms.<scene>.<size> when baseline.v3 is recorded and its
 # profile and vsync match the run. A gated metric missing from any repeat, or a recorded baseline.v3 without that layout
@@ -240,6 +241,12 @@ function Measure-PerfBudget($Runs, $Context, $Budget, $ExtraChecks = @()) {
             & $measure 'frames_over_50ms' 'worst' $limit { param($r) Get-Field $r @('frames_over_50ms') } 'frames_over_50ms'
         }
 
+        # Every gated scene is a battle, so no repeat may upload an egui texture after warmup (W1-64), worst repeat.
+        $limit = Get-Field $Budget @('egui', 'texture_uploads_after_warmup_max')
+        if ($null -ne $limit) {
+            & $measure 'egui_texture_uploads' 'worst' $limit { param($r) Get-Field $r @('egui', 'texture_uploads', 'count') } 'egui.texture_uploads.count'
+        }
+
         $limit = Get-Field $sceneBudget @('cpu_frame_p99_ms_max')
         if ($null -ne $limit) {
             if ($Context.VsyncOff) {
@@ -340,7 +347,7 @@ function Invoke-SelfTest {
     $expected = [ordered]@{
         'within-budget' = 0; 'over-budget-cpu' = 1; 'over-50ms' = 1; 'unfocused' = 2
         'vsync-on-within-budget' = 0; 'over-interface-draw' = 1; 'playtest-vsync-on' = 0
-        'missing-metric' = 2; 'missing-cpu-frame' = 2
+        'missing-metric' = 2; 'missing-cpu-frame' = 2; 'over-texture-uploads' = 1; 'missing-texture-uploads' = 2
     }
     $script:selfTestFailed = 0
     foreach ($file in @(Get-ChildItem -LiteralPath $fixtureDirectory -Filter '*.json' -File)) {
@@ -618,6 +625,7 @@ finally {
                 scene = $_.Scene; size = $_.Size; repeat = $_.Repeat; file = $_.File; attempts = $_.Attempts
                 valid = (@($_.Problems).Count -eq 0); problems = @($_.Problems); rejected_attempts = @($_.Rejected); seconds = $_.Seconds
                 frames_over_50ms = (Get-Field $r @('frames_over_50ms'))
+                egui_texture_uploads = (Get-Field $r @('egui', 'texture_uploads', 'count'))
                 cpu_frame_p99_ms = (Get-Field $r @('phases', 'cpu_frame_ms', 'p99'))
                 interface_draw_mean_ms = (@(Get-Field $r @('work_mean_ms')) + @($null, $null, $null))[2]
                 interface_total_mean_ms = (Get-Field $r @('phases', 'interface_total_ms', 'mean'))
@@ -660,10 +668,10 @@ finally {
     if ($null -ne $shipped) { $md.Add("- Shipped --smoke median $(Format-Number $shipped.median_seconds) s over 3 runs") }
     if ($saveCloneReport) { $md.Add("- Save clone report: $saveCloneReport") }
     $md.Add('')
-    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Frames > 50 ms | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
-    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|')
+    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Frames > 50 ms | egui texture uploads | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
+    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|---|')
     foreach ($row in $rows) {
-        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.frames_over_50ms) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
+        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.frames_over_50ms) | $($row.egui_texture_uploads) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
     }
     $md.Add('')
     $md.Add('## Budget checks')

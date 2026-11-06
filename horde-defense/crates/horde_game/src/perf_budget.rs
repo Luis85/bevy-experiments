@@ -47,8 +47,10 @@ pub const BATTLEFIELD_VERTICES_MAX: &[(&str, usize)] =
 /// warmup is over (W1-64): none. bevy_egui writes every partial font-atlas
 /// update into `Assets<Image>`, so the render world re-extracts and
 /// re-uploads the whole atlas. The frame report counts them as
-/// `egui.texture_uploads`; `damage_popups_stop_uploading_font_texture_after_warmup`
-/// holds damage popups to it headless.
+/// `egui.texture_uploads`; `measure_performance.ps1` fails any scene whose
+/// worst repeat is over it, and
+/// `damage_popups_stop_uploading_font_texture_after_warmup` holds damage
+/// popups to it headless.
 pub const EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX: usize = 0;
 
 /// Whole-number presentation caps, keyed as in `PERF_BUDGET.json` `caps`
@@ -172,6 +174,17 @@ mod tests {
             EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX
         );
         assert_eq!(EGUI_TEXTURE_UPLOADS_AFTER_WARMUP_MAX, 0);
+        // The cap is a live gate: the script compares every scene's worst
+        // repeat of the report's upload count with it.
+        for read in [
+            "Get-Field $Budget @('egui', 'texture_uploads_after_warmup_max')",
+            "Get-Field $r @('egui', 'texture_uploads', 'count')",
+        ] {
+            assert!(
+                SCRIPT.contains(read),
+                "measure_performance.ps1 reads {read}"
+            );
+        }
         assert_eq!(
             whole(&json, "/egui/battlefield_primitives_max"),
             BATTLEFIELD_PRIMITIVES_MAX

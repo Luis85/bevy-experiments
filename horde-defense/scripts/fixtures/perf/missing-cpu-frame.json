@@ -47,6 +47,13 @@
             "max": 4.0
           }
         },
+        "egui": {
+          "texture_uploads": {
+            "count": 0,
+            "bytes": 0,
+            "frames": 0
+          }
+        },
         "present": {
           "requested_mode": "AutoNoVsync",
           "source": "launch-override",
@@ -83,6 +90,13 @@
             "p95": 2.6,
             "p99": 3.0,
             "max": 4.0
+          }
+        },
+        "egui": {
+          "texture_uploads": {
+            "count": 0,
+            "bytes": 0,
+            "frames": 0
           }
         },
         "present": {
@@ -128,6 +142,13 @@
             "p95": 2.6,
             "p99": 3.0,
             "max": 4.0
+          }
+        },
+        "egui": {
+          "texture_uploads": {
+            "count": 0,
+            "bytes": 0,
+            "frames": 0
           }
         },
         "present": {

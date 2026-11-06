@@ -441,7 +441,8 @@ mod tests {
         assert_eq!(stream.active[0].value, 40);
     }
     /// W1-64: popups at staggered ages, every kind, over 120 egui passes at
-    /// both window scales the budget runs. After a short warmup no pass may
+    /// both budget sizes (UI scale 1.0 and 1.35), each at windows scale 1 and
+    /// 2. After a short warmup no pass may
     /// add a glyph to the font atlas: bevy_egui writes every partial atlas
     /// update into `Assets<Image>`, so the render world re-extracts and
     /// re-uploads the whole atlas.
@@ -457,9 +458,21 @@ mod tests {
             EventKind::Defended,
             EventKind::Melee,
         ];
-        for pixels_per_point in [1.0, 2.0] {
+        // The budget's two sizes, 1440x900 at UI scale 1.0 and 1050x700 at
+        // 1.35, each at windows scale 1 and 2: pixels per point 1, 2, 1.35
+        // and 2.7, the last two putting every popup size on a fractional
+        // pixel size.
+        for (native, zoom, window) in [
+            (1.0, 1.0, vec2(1440.0, 900.0)),
+            (2.0, 1.0, vec2(1440.0, 900.0)),
+            (1.0, 1.35, vec2(1050.0, 700.0)),
+            (2.0, 1.35, vec2(1050.0, 700.0)),
+        ] {
+            let pixels_per_point = native * zoom;
             let ctx = egui::Context::default();
             crate::settings::install_font(&ctx);
+            crate::settings::configure(&ctx, zoom);
+            let screen = window / zoom;
             let mut game = fixture();
             game.attempt_mut().unwrap().events.clear();
             let settings = Settings::default();
@@ -477,16 +490,17 @@ mod tests {
                 let a = game.attempt().unwrap();
                 let mut input = egui::RawInput {
                     time: Some(pass as f64 / 60.0),
-                    screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(1440.0, 900.0))),
+                    screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), screen)),
                     ..Default::default()
                 };
                 input
                     .viewports
                     .entry(egui::ViewportId::ROOT)
                     .or_default()
-                    .native_pixels_per_point = Some(pixels_per_point);
+                    .native_pixels_per_point = Some(native);
                 let mut output = ctx.run_ui(input, |ui| {
-                    let arena = Rect::from_min_size(pos2(24.0, 124.0), vec2(1392.0, 692.0));
+                    // The canvas inset 24/124/24/84: 1392x692 and 729.8x310.5.
+                    let arena = Rect::from_min_size(pos2(24.0, 124.0), screen - vec2(48.0, 208.0));
                     draw_for(
                         ui,
                         a,
@@ -500,6 +514,11 @@ mod tests {
                 uploads.push(output.textures_delta.set.len());
                 output.textures_delta.clear();
             }
+            assert!(
+                (ctx.pixels_per_point() - pixels_per_point).abs() < 1e-6,
+                "the context ran at {} pixels per point, not {pixels_per_point}",
+                ctx.pixels_per_point()
+            );
             let late: Vec<_> = uploads
                 .iter()
                 .enumerate()

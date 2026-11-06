@@ -101,6 +101,7 @@ public static class LastLightNativeHelper {
                 + ",\"completed_sample_target\":true,\"paused\":false,\"unfocused_sample_frames\":" + unfocused
                 + ",\"frames_over_50ms\":0,\"work_mean_ms\":[0.4,0.0,1.0]"
                 + ",\"phases\":{\"cpu_frame_ms\":{\"mean\":4.0,\"p50\":4.0,\"p95\":4.5,\"p99\":5.0,\"max\":6.0},\"interface_total_ms\":{\"mean\":1.0,\"p50\":1.0,\"p95\":1.2,\"p99\":1.3,\"max\":1.5}}"
+                + ",\"egui\":{\"texture_uploads\":{\"count\":0,\"bytes\":0,\"frames\":0}}"
                 + ",\"present\":{\"requested_mode\":\"" + mode + "\",\"pipelined_rendering\":" + pipelined + "}"
                 + ",\"build\":{\"profile_label\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PROFILE") + "\"}}");
             return 0;
@@ -277,7 +278,8 @@ try {
         $lines = @(
             'ok   within-budget -> 0', 'ok   over-budget-cpu -> 1', 'ok   over-50ms -> 1', 'ok   unfocused -> 2',
             'ok   vsync-on-within-budget -> 0', 'ok   over-interface-draw -> 1', 'ok   playtest-vsync-on -> 0',
-            'ok   missing-metric -> 2', 'ok   missing-cpu-frame -> 2', 'ok   v3: v3 interface_total above the baseline -> 1',
+            'ok   missing-metric -> 2', 'ok   missing-cpu-frame -> 2', 'ok   over-texture-uploads -> 1',
+            'ok   missing-texture-uploads -> 2', 'ok   v3: v3 interface_total above the baseline -> 1',
             'ok   v3: v3 without a small value -> 2', 'SELFTEST PASS'
         )
         foreach ($line in $lines) {

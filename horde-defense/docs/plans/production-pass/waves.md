@@ -89,6 +89,8 @@ The full commit detail is in `wave1_commits`. Order and summary:
 
 W1-64..W1-68 were added after W1-61 blocked on the Goal-1 gates; W1-61 re-runs after W1-68.
 
+W1-64 done_when evidence (review fix, 2026-11-06): the W1-64 commit's probes ran on a shared machine (41-56% CPU from other processes) and missed render_schedule and cpu_frame. They were re-run with `measure_performance.ps1 -Scene all -Profile playtest -VsyncOff -Repeat 3`, the budget's repeat_acceptance, at about 22-24% load from other processes before the run. All 18 runs were valid and the script exited 0 with the new egui upload gate in place. Medians of 3 are given as 1440x900 / 1050x700@1.35. Progressed-peak: extract p95 0.328 / 0.291, render_schedule p95 2.644 / 2.370, cpu_frame p99 6.785 / 6.099. Stress: extract p95 0.324 / 0.340, render_schedule p95 2.803 / 2.976, cpu_frame p99 7.847 / 8.188. Every scene had 0 egui texture uploads and 0 frames over 50 ms. One stress repeat per size went above 3.0 ms render_schedule p95 (3.075 at 1440x900, 3.083 at 1050x700@1.35), and peak, which is not part of done_when, has a render_schedule median of 3.506 at 1440x900. Evidence is in `target/perf/w1-64/review-playtest-novsync`. Gate 3 (the 0.5 s frames) is still W1-68's.
+
 Wave-1 exit:
 - GOLDEN 0/6, TRACE 0/6, V1-V6 unchanged.
 - PERF gates pass (W1-61).
