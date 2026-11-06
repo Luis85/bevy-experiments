@@ -1,6 +1,9 @@
 //! Enemy sprite atlas mapping, keyed by the enemy catalogue's visual sprite id.
 //! `assets/art/enemy_visuals.json` is read and validated once at startup; a new
 //! visual variant needs only a data entry for the sprite it names.
+//!
+//! Schema 2 adds the optional `elite_tells` table (a default tell plus per-affix
+//! tells); a schema 1 file still loads and gets [`BUILTIN_ELITE_TELL`].
 use horde_core::{
     content::{BossKind, EnemyKind},
     enemy_catalog::{VisualSprite, enemy_catalog},
@@ -12,6 +15,11 @@ const FILE: &str = "art/enemy_visuals.json";
 const MAX_BYTES: u64 = 256 * 1024;
 const MAX_SPRITES: usize = 64;
 const MAX_FRAMES: usize = 16;
+const MAX_AFFIX_TELLS: usize = 16;
+/// Survivor art height in source pixels and its figure height in lanes; it
+/// takes part in [`EnemyVisualCatalog::crisp_lane_px`] beside the enemy sprites.
+const SURVIVOR_ART_PX: f32 = 806.0;
+const SURVIVOR_LANES: f32 = 0.87;
 const BUNDLED: &str = include_str!("../../../../assets/art/enemy_visuals.json");
 
 #[derive(Debug, Deserialize)]
@@ -22,6 +30,15 @@ struct File {
     default_height: f32,
     sheets: Sheets,
     sprites: Vec<Entry>,
+    /// Schema 2 only; a schema 1 file that names it is rejected.
+    #[serde(default)]
+    elite_tells: Option<EliteTellsEntry>,
+}
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EliteTellsEntry {
+    default: EliteTell,
+    affixes: Vec<AffixTell>,
 }
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -68,6 +85,51 @@ pub struct StandingArt {
     pub feet_y: f32,
     pub height: f32,
 }
+/// The shape drawn above an elite's health bar; shape, not colour, carries the
+/// meaning so the tell stays colour-blind safe.
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub enum TellMarker {
+    Chevron,
+    Crown,
+    Pips1,
+    Pips2,
+    Pips3,
+    Shield,
+    Spark,
+}
+/// How an elite reads on the field: outline tint, ground ring width, glow
+/// strength and pulse rate (sim-tick based, so it freezes on pause).
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct EliteTell {
+    pub outline_rgb: [u8; 3],
+    pub marker: TellMarker,
+    /// Ground ring width in pixels, 1..=4.
+    pub ring_px: u8,
+    /// Tint lerp strength toward `outline_rgb`, 0..=0.4.
+    pub glow: f32,
+    /// Pulse frequency in Hz, 0..=2.0.
+    pub pulse_hz: f32,
+}
+/// A tell for one elite affix id.
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+#[cfg_attr(not(test), allow(dead_code))]
+pub struct AffixTell {
+    pub affix: String,
+    pub tell: EliteTell,
+}
+/// The tell a schema 1 file, or a schema 2 file without `elite_tells`, gets:
+/// an AMBER ring with a chevron, glow 0.15 at 1.2 Hz.
+pub const BUILTIN_ELITE_TELL: EliteTell = EliteTell {
+    outline_rgb: [239, 181, 82],
+    marker: TellMarker::Chevron,
+    ring_px: 2,
+    glow: 0.15,
+    pulse_hz: 1.2,
+};
 #[derive(Clone, Debug, PartialEq)]
 pub enum SpriteArt {
     Walk(WalkArt),
@@ -97,6 +159,8 @@ pub struct EnemyVisualCatalog {
     /// Height of a legacy body that names no kind or visual.
     pub default_height: f32,
     sprites: Vec<EnemySprite>,
+    elite_default: EliteTell,
+    elite_affixes: Vec<AffixTell>,
 }
 impl EnemyVisualCatalog {
     pub fn from_json(text: &str) -> Result<Self, String> {
@@ -107,12 +171,36 @@ impl EnemyVisualCatalog {
         Ok(catalog)
     }
     fn compile(file: File) -> Result<Self, String> {
-        if file.schema_version != 1 {
-            return Err(format!(
-                "Unsupported enemy visuals schema {}",
-                file.schema_version
-            ));
-        }
+        let (elite_default, elite_affixes) = match (file.schema_version, file.elite_tells) {
+            (1, None) | (2, None) => (BUILTIN_ELITE_TELL, Vec::new()),
+            (1, Some(_)) => {
+                return Err("Enemy visuals schema 1 cannot carry elite_tells".into());
+            }
+            (2, Some(tells)) => {
+                validate_tell("default", &tells.default)?;
+                if tells.affixes.len() > MAX_AFFIX_TELLS {
+                    return Err(format!(
+                        "Enemy visuals allow at most {MAX_AFFIX_TELLS} affix tells"
+                    ));
+                }
+                for (index, entry) in tells.affixes.iter().enumerate() {
+                    if entry.affix.trim().is_empty() {
+                        return Err("Enemy visuals affix tell needs an affix id".into());
+                    }
+                    if tells.affixes[..index]
+                        .iter()
+                        .any(|known| known.affix == entry.affix)
+                    {
+                        return Err(format!("Enemy visuals repeat affix tell {}", entry.affix));
+                    }
+                    validate_tell(&entry.affix, &entry.tell)?;
+                }
+                (tells.default, tells.affixes)
+            }
+            (other, _) => {
+                return Err(format!("Unsupported enemy visuals schema {other}"));
+            }
+        };
         if !in_range(file.boss_height, 0.0, 4.0) || !in_range(file.default_height, 0.0, 3.0) {
             return Err("Enemy visuals boss/default heights are out of range".into());
         }
@@ -195,6 +283,8 @@ impl EnemyVisualCatalog {
             boss_height: file.boss_height,
             default_height: file.default_height,
             sprites,
+            elite_default,
+            elite_affixes,
         })
     }
     /// Every sprite the enemy catalogue or a legacy save can name has art.
@@ -230,6 +320,53 @@ impl EnemyVisualCatalog {
     pub fn sprites(&self) -> &[EnemySprite] {
         &self.sprites
     }
+    /// The tell for an elite with `affix`; no affix or an unknown one gets the default.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn elite_tell(&self, affix: Option<&str>) -> &EliteTell {
+        affix
+            .and_then(|id| self.elite_affixes.iter().find(|known| known.affix == id))
+            .map_or(&self.elite_default, |known| &known.tell)
+    }
+    /// Source pixels per lane at which the coarsest art draws 1:1: the minimum
+    /// over sprites of art height / figure height in lanes (bosses use the boss
+    /// height; archetype scale is ignored), and the survivor's 806 px / 0.87.
+    /// Sheets sample NEAREST, so the camera clamps magnification against it.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub fn crisp_lane_px(&self) -> f32 {
+        let bosses = [BossKind::Breacher, BossKind::Caller, BossKind::SiegeBrute]
+            .map(|boss| legacy_sprite(EnemyKind::Brute, Some(boss)));
+        self.sprites
+            .iter()
+            .map(|sprite| {
+                let art_px = match &sprite.art {
+                    SpriteArt::Walk(walk) => walk.height,
+                    SpriteArt::Standing(standing) => standing.height,
+                };
+                let lanes = if bosses.contains(&sprite.sprite) {
+                    self.boss_height
+                } else {
+                    sprite.height
+                };
+                art_px / lanes
+            })
+            .fold(SURVIVOR_ART_PX / SURVIVOR_LANES, f32::min)
+    }
+}
+
+/// [`EnemyVisualCatalog::crisp_lane_px`] of the active mapping.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn crisp_lane_px() -> f32 {
+    active().crisp_lane_px()
+}
+
+fn validate_tell(owner: &str, tell: &EliteTell) -> Result<(), String> {
+    let within = |value: f32, high: f32| value.is_finite() && (0.0..=high).contains(&value);
+    if !(1..=4).contains(&tell.ring_px) || !within(tell.glow, 0.4) || !within(tell.pulse_hz, 2.0) {
+        return Err(format!(
+            "Enemy visuals elite tell {owner} needs ring_px 1..=4, glow 0..=0.4, pulse_hz 0..=2"
+        ));
+    }
+    Ok(())
 }
 
 /// The sprite an enemy saved without a resolved profile draws as.
@@ -360,6 +497,155 @@ mod tests {
     }
 
     #[test]
+    fn v2_with_default_elite_tell_parses() {
+        let mut value = bundled();
+        value["schema_version"] = 2.into();
+        value["elite_tells"] = serde_json::json!({
+            "default": {
+                "outline_rgb": [239, 181, 82], "marker": "Chevron",
+                "ring_px": 2, "glow": 0.15, "pulse_hz": 1.2
+            },
+            "affixes": [{
+                "affix": "volatile",
+                "tell": {
+                    "outline_rgb": [213, 94, 0], "marker": "Spark",
+                    "ring_px": 3, "glow": 0.4, "pulse_hz": 2.0
+                }
+            }]
+        });
+        let catalog = compile(value).unwrap();
+        assert_eq!(catalog.elite_tell(None), &BUILTIN_ELITE_TELL);
+        assert_eq!(catalog.elite_tell(Some("unknown")), &BUILTIN_ELITE_TELL);
+        let volatile = catalog.elite_tell(Some("volatile"));
+        assert_eq!(volatile.marker, TellMarker::Spark);
+        assert_eq!(volatile.outline_rgb, [213, 94, 0]);
+        assert_eq!(volatile.ring_px, 3);
+        // The bundled file is schema 2 with the default tell only.
+        assert_eq!(bundled()["schema_version"], 2);
+        let shipped = active();
+        assert_eq!(shipped.elite_tell(None), &BUILTIN_ELITE_TELL);
+        assert!(shipped.elite_affixes.is_empty());
+        // Schema 2 without the table also gets the built-in tell.
+        let mut bare = bundled();
+        bare.as_object_mut().unwrap().remove("elite_tells");
+        assert_eq!(compile(bare).unwrap().elite_tell(None), &BUILTIN_ELITE_TELL);
+    }
+
+    #[test]
+    fn v1_fixture_loads_and_gets_builtin_elite_tell() {
+        let text = include_str!("fixtures/enemy_visuals_v1.json");
+        let raw: serde_json::Value = serde_json::from_str(text).unwrap();
+        assert_eq!(raw["schema_version"], 1);
+        assert!(raw.get("elite_tells").is_none());
+        let v1 = EnemyVisualCatalog::from_json(text).unwrap();
+        assert_eq!(v1.elite_tell(None), &BUILTIN_ELITE_TELL);
+        assert_eq!(v1.elite_tell(Some("volatile")), &BUILTIN_ELITE_TELL);
+        assert_eq!(BUILTIN_ELITE_TELL.marker, TellMarker::Chevron);
+        assert_eq!(BUILTIN_ELITE_TELL.outline_rgb, [239, 181, 82]);
+        // Same art as the bundled v2 file: v2 changed only the tells.
+        let v2 = EnemyVisualCatalog::from_json(BUNDLED).unwrap();
+        assert_eq!(v1.sprites(), v2.sprites());
+        assert_eq!(v1.boss_height, v2.boss_height);
+        assert_eq!(v1.default_height, v2.default_height);
+    }
+
+    #[test]
+    fn schema_3_and_v1_with_elite_tells_are_rejected() {
+        let mut v3 = bundled();
+        v3["schema_version"] = 3.into();
+        assert_eq!(
+            compile(v3).unwrap_err(),
+            "Unsupported enemy visuals schema 3"
+        );
+        let mut v1 = bundled();
+        v1["schema_version"] = 1.into();
+        assert!(v1.get("elite_tells").is_some());
+        assert!(compile(v1.clone()).unwrap_err().contains("schema 1"));
+        v1.as_object_mut().unwrap().remove("elite_tells");
+        assert!(compile(v1).is_ok());
+    }
+
+    #[test]
+    fn elite_tell_bounds_rejected() {
+        type Edit = fn(&mut serde_json::Value);
+        let tell = serde_json::json!({
+            "outline_rgb": [86, 180, 233], "marker": "Shield",
+            "ring_px": 1, "glow": 0.0, "pulse_hz": 0.0
+        });
+        let affix = |id: &str| serde_json::json!({ "affix": id, "tell": tell.clone() });
+        // The bounds themselves are accepted.
+        let mut edge = bundled();
+        edge["elite_tells"]["default"]["ring_px"] = 4.into();
+        edge["elite_tells"]["affixes"] = (0..16).map(|i| affix(&format!("a{i}"))).collect();
+        assert!(compile(edge).is_ok());
+        let cases: [(&str, Edit); 11] = [
+            ("ring 0", |v| {
+                v["elite_tells"]["default"]["ring_px"] = 0.into()
+            }),
+            ("ring 5", |v| {
+                v["elite_tells"]["default"]["ring_px"] = 5.into()
+            }),
+            ("glow", |v| {
+                v["elite_tells"]["default"]["glow"] = 0.41.into()
+            }),
+            ("negative glow", |v| {
+                v["elite_tells"]["default"]["glow"] = (-0.01).into()
+            }),
+            ("pulse", |v| {
+                v["elite_tells"]["default"]["pulse_hz"] = 2.01.into()
+            }),
+            ("negative pulse", |v| {
+                v["elite_tells"]["default"]["pulse_hz"] = (-0.5).into()
+            }),
+            ("unknown marker", |v| {
+                v["elite_tells"]["default"]["marker"] = "Skull".into()
+            }),
+            ("unknown tell field", |v| {
+                v["elite_tells"]["default"]["blink"] = 1.into()
+            }),
+            ("affix out of range", |v| {
+                let mut bad = v["elite_tells"]["default"].clone();
+                bad["pulse_hz"] = 3.into();
+                v["elite_tells"]["affixes"] = serde_json::json!([{ "affix": "x", "tell": bad }]);
+            }),
+            ("duplicate affix", |v| {
+                let tell = v["elite_tells"]["default"].clone();
+                let entry = serde_json::json!({ "affix": "x", "tell": tell });
+                v["elite_tells"]["affixes"] = serde_json::json!([entry.clone(), entry]);
+            }),
+            ("17 affixes", |v| {
+                let tell = v["elite_tells"]["default"].clone();
+                v["elite_tells"]["affixes"] = (0..17)
+                    .map(|i| serde_json::json!({ "affix": format!("a{i}"), "tell": tell }))
+                    .collect();
+            }),
+        ];
+        for (name, edit) in cases {
+            let mut value = bundled();
+            edit(&mut value);
+            assert!(compile(value).is_err(), "{name} must be rejected");
+        }
+    }
+
+    #[test]
+    fn crisp_lane_px_is_measured_from_sprite_art() {
+        // Brute 267 px / 0.90 lanes is the coarsest art today.
+        let crisp = crisp_lane_px();
+        assert!((crisp - 296.7).abs() <= 0.5, "{crisp}");
+        assert_eq!(crisp, 267.0_f32 / 0.9_f32);
+        // Bosses measure against boss_height and the survivor bounds it above.
+        let mut value = bundled();
+        value["boss_height"] = 2.0.into();
+        assert_eq!(compile(value).unwrap().crisp_lane_px(), 416.0_f32 / 2.0);
+        let mut value = bundled();
+        for sprite in value["sprites"].as_array_mut().unwrap() {
+            sprite["height"] = 0.1.into();
+        }
+        value["boss_height"] = 0.1.into();
+        assert_eq!(compile(value).unwrap().crisp_lane_px(), 806.0_f32 / 0.87);
+    }
+
+    #[test]
     fn a_new_variant_is_data_only_and_frame_counts_follow_the_data() {
         // Re-pointing a sprite at different cells needs no code: a two-frame
         // shambler cycle and a standing runner both compile.
@@ -385,7 +671,7 @@ mod tests {
     fn invalid_mappings_fail_with_a_clean_error() {
         type Edit = fn(&mut serde_json::Value);
         let cases: [(&str, Edit); 8] = [
-            ("schema", |v| v["schema_version"] = 2.into()),
+            ("schema", |v| v["schema_version"] = 0.into()),
             ("missing sprite", |v| {
                 v["sprites"].as_array_mut().unwrap().remove(2);
             }),

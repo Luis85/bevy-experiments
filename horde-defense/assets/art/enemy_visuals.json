@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "boss_height": 1.08,
   "default_height": 0.78,
   "sheets": {
@@ -92,5 +92,9 @@
       "height": 0.78,
       "standing": { "bounds": [10, 447, 428, 877], "hip_x": 204, "feet_y": 874, "height": 424 }
     }
-  ]
+  ],
+  "elite_tells": {
+    "default": { "outline_rgb": [239, 181, 82], "marker": "Chevron", "ring_px": 2, "glow": 0.15, "pulse_hz": 1.2 },
+    "affixes": []
+  }
 }

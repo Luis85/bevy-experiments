@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "boss_height": 1.08,
+  "default_height": 0.78,
+  "sheets": {
+    "walkers": [1122, 1402],
+    "actors": [1774, 887]
+  },
+  "sprites": [
+    {
+      "sprite": "Shambler",
+      "height": 0.78,
+      "walk": {
+        "feet_y": 271,
+        "height": 249,
+        "frames": [
+          { "bounds": [74, 18, 250, 275], "hip_x": 173 },
+          { "bounds": [357, 18, 499, 275], "hip_x": 440 },
+          { "bounds": [609, 18, 782, 275], "hip_x": 714 },
+          { "bounds": [897, 18, 1041, 275], "hip_x": 977 }
+        ]
+      }
+    },
+    {
+      "sprite": "Runner",
+      "height": 0.78,
+      "walk": {
+        "feet_y": 540,
+        "height": 235,
+        "frames": [
+          { "bounds": [69, 302, 257, 544], "hip_x": 172 },
+          { "bounds": [358, 302, 511, 544], "hip_x": 439 },
+          { "bounds": [608, 302, 795, 544], "hip_x": 707 },
+          { "bounds": [892, 301, 1041, 544], "hip_x": 975 }
+        ]
+      }
+    },
+    {
+      "sprite": "Brute",
+      "height": 0.9,
+      "walk": {
+        "feet_y": 833,
+        "height": 267,
+        "frames": [
+          { "bounds": [38, 567, 271, 837], "hip_x": 162 },
+          { "bounds": [331, 562, 531, 837], "hip_x": 432 },
+          { "bounds": [575, 569, 814, 837], "hip_x": 710 },
+          { "bounds": [871, 569, 1074, 837], "hip_x": 980 }
+        ]
+      }
+    },
+    {
+      "sprite": "Armored",
+      "height": 0.78,
+      "walk": {
+        "feet_y": 1112,
+        "height": 257,
+        "frames": [
+          { "bounds": [68, 852, 251, 1116], "hip_x": 171 },
+          { "bounds": [345, 851, 504, 1116], "hip_x": 439 },
+          { "bounds": [605, 855, 791, 1116], "hip_x": 716 },
+          { "bounds": [887, 851, 1050, 1116], "hip_x": 981 }
+        ]
+      }
+    },
+    {
+      "sprite": "Demolisher",
+      "height": 0.78,
+      "walk": {
+        "feet_y": 1387,
+        "height": 253,
+        "frames": [
+          { "bounds": [64, 1130, 249, 1391], "hip_x": 163 },
+          { "bounds": [344, 1135, 520, 1391], "hip_x": 433 },
+          { "bounds": [601, 1135, 789, 1391], "hip_x": 706 },
+          { "bounds": [877, 1136, 1059, 1391], "hip_x": 976 }
+        ]
+      }
+    },
+    {
+      "sprite": "Breacher",
+      "height": 0.78,
+      "standing": { "bounds": [917, 10, 1293, 435], "hip_x": 1109, "feet_y": 432, "height": 419 }
+    },
+    {
+      "sprite": "Caller",
+      "height": 0.78,
+      "standing": { "bounds": [1371, 10, 1700, 432], "hip_x": 1577, "feet_y": 429, "height": 416 }
+    },
+    {
+      "sprite": "SiegeBrute",
+      "height": 0.78,
+      "standing": { "bounds": [10, 447, 428, 877], "hip_x": 204, "feet_y": 874, "height": 424 }
+    }
+  ]
+}
