@@ -7,7 +7,13 @@
 //! the bodies that settled since the last pass are appended (through the pure
 //! [`visual_assets::settled_corpse_quad`]) and the same mesh is painted
 //! again; any key change, a shrinking count or a different newest body
-//! rebuilds it. Saved `CorpseRecord`s are only read.
+//! rebuilds it. Attempt and corpse ids restart every campaign, so the key also
+//! holds the run (country, level, mode, arena geometry) and the first and
+//! newest bodies are compared by id, tick and position, not by id alone: a
+//! loaded save of another run never keeps this run's bodies. Past
+//! `CORPSES_SETTLED_DRAWN` (a safety cap, more than 7x the measured maximum
+//! per stage) the window slides and each settle rebuilds. Saved
+//! `CorpseRecord`s are only read.
 use super::super::ArenaProjection;
 use super::batch::ActorMeshes;
 use super::enemies::tint;
@@ -19,20 +25,49 @@ use crate::{
 use bevy_egui::egui::{
     self, Color32 as C, Painter, Pos2, Rect, Shape, TextureId, Vec2, epaint::Mesh, vec2,
 };
-use horde_core::sim::Attempt;
+use horde_core::{
+    content::Mode,
+    sim::{Attempt, CorpseRecord},
+};
 use std::sync::Arc;
+
+/// A saved body as the cache compares it: ids repeat across runs, so its tick
+/// and position are compared too.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct BodyStamp {
+    pub id: u64,
+    pub tick: u64,
+    pub at_bits: [u32; 2],
+}
+impl BodyStamp {
+    fn of(record: &CorpseRecord) -> Self {
+        Self {
+            id: record.id,
+            tick: record.tick,
+            at_bits: record.at.map(f32::to_bits),
+        }
+    }
+}
 
 /// What the settled-corpse mesh was built for. Any change rebuilds it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) struct CorpseCacheKey {
     pub layer: egui::LayerId,
-    /// The attempt the bodies belong to.
+    /// The attempt the bodies belong to, and its run: attempt ids restart
+    /// every campaign.
     pub attempt: u64,
-    /// Id of the first drawn body: a new attempt, or the drawn window
+    /// `Id` hash of the campaign's country id.
+    pub country: u64,
+    pub level: usize,
+    pub mode: Mode,
+    /// The first drawn body: a new attempt or run, or the drawn window
     /// sliding past `CORPSES_SETTLED_DRAWN`.
-    pub first_id: u64,
-    /// The arena rectangle (resize, zoom, layout).
+    pub first: BodyStamp,
+    /// The arena rectangle (resize, zoom, layout) and the projection's lane
+    /// count and width in yards.
     pub rect_bits: [u32; 4],
+    pub lanes: u8,
+    pub width_bits: u32,
     /// The corpse cell's texture and UV (an atlas reload or repack).
     pub texture: TextureId,
     pub uv_bits: [u32; 4],
@@ -45,11 +80,13 @@ pub(super) struct SettledMesh {
     pub key: CorpseCacheKey,
     /// Bodies in the mesh: `view.settled.count` when it was last painted.
     pub count: usize,
-    /// Id of the newest cached body, checked before appending.
-    last_id: u64,
+    /// The newest cached body, checked before appending.
+    last: Option<BodyStamp>,
     pub mesh: Arc<Mesh>,
     /// From-scratch builds of this layer's mesh; appends do not count.
     pub rebuilds: u64,
+    /// Settled-body quads built into this layer's meshes, over every build.
+    pub quads_built: u64,
 }
 
 fn cache_id(layer: egui::LayerId) -> egui::Id {
@@ -92,14 +129,20 @@ fn settled(
         return false;
     };
     let settled = view.settled;
-    let Some(first_id) = settled.first_id else {
+    // `first_id` is `None` when nothing has settled.
+    let Some(first) = settled.first_id.and(a.corpses.get(settled.start)) else {
         return true;
     };
     let key = CorpseCacheKey {
         layer: p.layer_id(),
         attempt: a.id,
-        first_id,
+        country: egui::Id::new(&a.country_id).value(),
+        level: a.level,
+        mode: a.mode,
+        first: BodyStamp::of(first),
         rect_bits: bits(arena.rect),
+        lanes: arena.lanes,
+        width_bits: arena.width.to_bits(),
         texture,
         uv_bits: bits(uv),
         blood,
@@ -112,22 +155,23 @@ fn settled(
     });
     let newest = |count: usize| {
         let last = (settled.start + count).checked_sub(1)?;
-        a.corpses.get(last).map(|c| c.id)
+        a.corpses.get(last).map(BodyStamp::of)
     };
     let mut entry = match cached {
         Some(entry)
             if entry.key == key
                 && entry.count <= settled.count
-                && newest(entry.count) == Some(entry.last_id) =>
+                && newest(entry.count) == entry.last =>
         {
             entry
         }
         previous => SettledMesh {
             key,
             count: 0,
-            last_id: 0,
+            last: None,
             mesh: Arc::new(Mesh::with_texture(texture)),
-            rebuilds: previous.map_or(0, |entry| entry.rebuilds) + 1,
+            rebuilds: previous.as_ref().map_or(0, |entry| entry.rebuilds) + 1,
+            quads_built: previous.map_or(0, |entry| entry.quads_built),
         },
     };
     if entry.count < settled.count {
@@ -144,8 +188,9 @@ fn settled(
                 quad.push(mesh);
             }
         }
+        entry.quads_built += added as u64;
         entry.count = settled.count;
-        entry.last_id = newest(settled.count).unwrap_or(0);
+        entry.last = newest(settled.count);
     }
     let mesh = Arc::clone(&entry.mesh);
     p.ctx().data_mut(|data| data.insert_temp(id, Some(entry)));

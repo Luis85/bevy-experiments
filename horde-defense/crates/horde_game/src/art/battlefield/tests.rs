@@ -703,6 +703,95 @@ fn corpse_cache_rebuilds_on_new_attempt_resize_or_atlas_reload() {
     assert_eq!(rebuilds(&game, resized, bloodless(reloaded)), 7);
 }
 
+/// A loaded save of another run can reuse the attempt id and the corpse ids
+/// (both restart at 1 every campaign): the cache must not keep its bodies.
+#[test]
+fn corpse_cache_does_not_keep_another_runs_bodies_with_the_same_ids() {
+    let mut game = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    stage_bodies(&mut game, 300, 0);
+    let ctx = egui::Context::default();
+    // The settled mesh `ctx` paints, its rebuild count, and the mesh a fresh
+    // context paints for the same game.
+    let pass = |game: &Game| {
+        let (layer, shapes, _) = paint_pass(&ctx, game, arena(), options(textures()));
+        let cached = corpses::cached(&ctx, layer).unwrap();
+        let painted = settled_mesh_of(&shapes, &cached);
+        let fresh = egui::Context::default();
+        let (layer, shapes, _) = paint_pass(&fresh, game, arena(), options(textures()));
+        let expected = settled_mesh_of(&shapes, &corpses::cached(&fresh, layer).unwrap());
+        (cached.rebuilds, painted.vertices == expected.vertices)
+    };
+    assert_eq!(pass(&game), (1, true));
+    let mut rebuilds = 1;
+    let mut expect_rebuild = |game: &Game, what: &str| {
+        rebuilds += 1;
+        assert_eq!(pass(game), (rebuilds, true), "{what}");
+    };
+    // Another run: the same attempt id and corpse ids, other bodies and lanes.
+    let a = game.attempt_mut().unwrap();
+    for body in &mut a.corpses {
+        body.at = [body.at[0] * 0.5 + 1.0, body.at[1] * 0.5];
+    }
+    a.lane_count -= 4;
+    expect_rebuild(&game, "other positions and lane count, same ids");
+    // Only the newest body differs (a divergent save of the same attempt).
+    let a = game.attempt_mut().unwrap();
+    a.corpses.last_mut().unwrap().at[0] += 2.0;
+    expect_rebuild(&game, "another newest body with the same id");
+    // Only the first body differs.
+    a_mut(&mut game).corpses[0].at[0] += 2.0;
+    expect_rebuild(&game, "another first body with the same id");
+    let a = a_mut(&mut game);
+    a.corpses.last_mut().unwrap().tick += 1;
+    expect_rebuild(&game, "another newest tick with the same id");
+    a_mut(&mut game).width_yards += 5.0;
+    expect_rebuild(&game, "another arena width");
+    a_mut(&mut game).country_id = Some("another-country".into());
+    expect_rebuild(&game, "another campaign country");
+    let a = a_mut(&mut game);
+    a.level = (a.level + 1) % horde_core::content::content().levels.len();
+    expect_rebuild(&game, "another level");
+    let a = a_mut(&mut game);
+    a.mode = match a.mode {
+        horde_core::content::Mode::Personal => horde_core::content::Mode::Npc,
+        horde_core::content::Mode::Npc => horde_core::content::Mode::Personal,
+    };
+    expect_rebuild(&game, "another mode");
+    // The same run again only repaints.
+    assert_eq!(pass(&game), (rebuilds, true), "unchanged");
+}
+
+fn a_mut(game: &mut Game) -> &mut horde_core::sim::Attempt {
+    game.attempt_mut().unwrap()
+}
+
+/// Bodies settling one per pass on one context are each built once: the
+/// settled mesh is never rebuilt below the cap, so the paint does not grow
+/// with the bodies already on the ground.
+#[test]
+fn settled_bodies_are_built_once_across_passes_below_the_cap() {
+    let mut game = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    stage_bodies(&mut game, 1_000, 0);
+    let ctx = egui::Context::default();
+    let mut layer = egui::LayerId::background();
+    for pass in 0..200 {
+        let a = a_mut(&mut game);
+        let mut next = a.corpses[pass % 7].clone();
+        next.id = 6_000_000 + pass as u64;
+        next.tick = 1_000 + pass as u64;
+        a.corpses.push(next);
+        let (painted, _, drawn) = paint_pass(&ctx, &game, arena(), options(textures()));
+        layer = painted;
+        assert_eq!(drawn.settled_corpses, 1_001 + pass);
+    }
+    let cached = corpses::cached(&ctx, layer).unwrap();
+    assert_eq!(
+        (cached.rebuilds, cached.quads_built, cached.count),
+        (1, 1_200, 1_200),
+        "every body built once, the mesh never rebuilt"
+    );
+}
+
 #[test]
 fn corpse_draw_respects_caps_with_5000_records() {
     use crate::perf_budget::{
@@ -729,7 +818,7 @@ fn corpse_draw_respects_caps_with_5000_records() {
         let settled = 5_000 - collapsing;
         assert_eq!(crate::animation::settled_corpse_count(a, false), settled);
         assert_eq!(
-            cached.key.first_id,
+            cached.key.first.id,
             a.corpses[settled - CORPSES_SETTLED_DRAWN].id
         );
         // Saved records are untouched and uncapped.
