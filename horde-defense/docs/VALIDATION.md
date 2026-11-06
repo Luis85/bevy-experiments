@@ -434,3 +434,31 @@ Final documentation checks passed **69 source-backed Views**, retaining all 64 p
 `SellItem` is strict from ruleset 2 (`RULESET_VERSION` 2). An equipped, preset-referenced, recruit-equipped, reserved or NPC-issue item is refused with a typed `SaleBlocked` reason instead of being sold with its loadout slots replaced by starter equipment; `DeletePreset` removes a preset so its items can be sold. Seeded runs never sell, so `GOLDEN` and `GAMEPLAY_TRACE` are unchanged and `TRACE_RULESET` moved to 2 with them.
 
 **Debug recordings made under ruleset 1 are not expected to reproduce across the strict-sale change.** Replay still loads their initial state through the save migration, applies every recorded command and reaches the end line, but a recorded sale of an equipped, preset or recruit-equipped item is now a typed rejection, so the final digest can differ. Replay warns that the recording was made under ruleset 1 (and, for v6 headers, save version 6). `pre_strict_recording_diverges_with_ruleset_warning` pins this with the v6 equipped-sale fixture. Recording FORMAT stays 1.
+
+## Save clone — 6 November 2026 (W1-50)
+
+Every save copies the game on the main thread and hands the copy to the storage worker. That copy is now `Game::save_snapshot`, used at `runner/apply.rs` instead of `Game::clone`. It leaves out the never-saved state: the typed event outbox, the live attempt's queued records and the settlement issues, in the root game and in every expedition's worker game. It serializes to exactly the game's bytes (`save_snapshot_skips_transient_outbox_and_equals_serialized_state`).
+
+```powershell
+cargo run --locked -p horde_core --example save_clone -- --out target/perf/save-clone/dev.json
+cargo run --locked -p horde_core --example save_clone --profile playtest -- --profile-name playtest --out target/perf/save-clone/playtest.json
+cargo run --locked -p horde_core --example save_clone --release -- --out target/perf/save-clone/release.json
+```
+
+`scripts/measure_performance.ps1 -SaveClone` runs the same example in the run's profile and adds its gate to the budget checks. The fixture is `save_clone_fixture(1000 | 2500 | 5000)`: the synthetic review-only stress game (three unsettled expeditions, 150 run records, 1,500 corpses, a 400-drawn main field) with its stash sized to that many items. Each series is 50 untimed and 1,000 timed iterations. Fixture creation is excluded. The gate (`PERF_BUDGET.json` `save_clone`) is `save_snapshot` p99 ≤ 1.0 ms at 1,000 items with 3 workers, in dev and playtest. Release is informational. `to_vec` is the storage worker's `serde_json::to_vec`, off the main thread, for scale.
+
+Before any remedy, three runs per profile, Intel Core Ultra 9 185H with other desktop work running (about 28% CPU load), medians of the three:
+
+| Profile | Items | `save_snapshot` p99 per run (ms) | p99 median | mean | `to_vec` p99 | Bytes |
+|---|---:|---|---:|---:|---:|---:|
+| dev | 1,000 | 1.140, 0.956, 0.981 | 0.981 | 0.526 | 6.60 | 1,408,714 |
+| dev | 2,500 | 1.266, 1.106, 1.054 | 1.106 | 0.553 | 7.12 | 1,586,397 |
+| dev | 5,000 | 1.604, 1.323, 1.410 | 1.410 | 0.724 | 9.81 | 1,882,516 |
+| playtest | 1,000 | 1.049, 1.159, 2.445 | **1.159** | 0.501 | 5.57 | 1,408,714 |
+| playtest | 2,500 | 0.994, 0.953, 1.491 | 0.994 | 0.493 | 6.58 | 1,586,397 |
+| playtest | 5,000 | 1.317, 1.215, 2.345 | 1.317 | 0.640 | 7.62 | 1,882,516 |
+| release | 1,000 | 1.735, 5.219, 0.979 | 1.735 | 0.767 | 11.04 | 1,408,714 |
+| release | 2,500 | 1.825, 1.923, 1.127 | 1.825 | 0.738 | 11.22 | 1,586,397 |
+| release | 5,000 | 3.010, 2.064, 1.551 | 2.064 | 1.014 | 10.77 | 1,882,516 |
+
+Component means at 1,000 items in playtest: run history 0.109 ms, attempt 0.086 ms, expeditions 0.078 ms, stash items 0.052 ms. From 2,500 items the stash is the largest. **The gate fails in playtest (p99 above 1.0 ms in every run) and is marginal in dev (one run of three above).** So the conditional remedy applies, aimed at the run history, the largest component at the gated 1,000 items. The timings are wall-clock on a shared desktop, so single runs vary by up to 5x at p99, release included. The means are stable to about 10%.

@@ -25,3 +25,8 @@ review = []
 
 [dev-dependencies]
 horde_core = { path = ".", features = ["test-support"] }
+
+# The save-clone benchmark's fixture and report tests run under `cargo test`.
+[[example]]
+name = "save_clone"
+test = true

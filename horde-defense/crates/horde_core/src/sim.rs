@@ -977,6 +977,91 @@ impl Default for Game {
         }
     }
 }
+impl Game {
+    /// The copy a save is written from: every saved field cloned, the
+    /// transient never-saved state left empty (the typed event outbox, the
+    /// live attempt's queued records and settlement issues, here and in every
+    /// expedition's worker game). It serializes to exactly this game's bytes;
+    /// the runtime hands it to the storage worker instead of a full clone.
+    pub fn save_snapshot(&self) -> Game {
+        // Destructured so a new field must choose: saved (cloned) or transient.
+        let Game {
+            pending_runs,
+            campaign,
+            attempt,
+            last_result,
+            next_attempt_id,
+            seed,
+            repeat_remaining,
+            strategy,
+            battles,
+            global_paused,
+            worker,
+            settlement_issues: _,
+            next_event_seq,
+            event_outbox: _,
+        } = self;
+        Game {
+            pending_runs: pending_runs.clone(),
+            campaign: campaign.clone(),
+            attempt: attempt.as_ref().map(Attempt::save_snapshot),
+            last_result: last_result.clone(),
+            next_attempt_id: *next_attempt_id,
+            seed: *seed,
+            repeat_remaining: *repeat_remaining,
+            strategy: strategy.clone(),
+            battles: battles.iter().map(ParallelBattle::save_snapshot).collect(),
+            global_paused: *global_paused,
+            worker: *worker,
+            settlement_issues: Vec::new(),
+            next_event_seq: *next_event_seq,
+            event_outbox: Vec::new(),
+        }
+    }
+}
+impl Attempt {
+    /// A clone without the queued, never-saved event records.
+    fn save_snapshot(&self) -> Attempt {
+        let mut copy = self.clone();
+        copy.emitted = Vec::new();
+        copy
+    }
+}
+impl ParallelBattle {
+    /// A clone whose worker game is its [`Game::save_snapshot`].
+    fn save_snapshot(&self) -> ParallelBattle {
+        let ParallelBattle {
+            id,
+            recruit_id,
+            country_id,
+            stage,
+            game,
+            synced_coins,
+            synced_item_id,
+            synced_item_index,
+            settled,
+            loadout,
+            country_operation,
+            summary,
+            pending_auto_sell,
+        } = self;
+        ParallelBattle {
+            id: *id,
+            recruit_id: *recruit_id,
+            country_id: country_id.clone(),
+            stage: *stage,
+            game: Box::new(game.save_snapshot()),
+            synced_coins: *synced_coins,
+            synced_item_id: *synced_item_id,
+            synced_item_index: *synced_item_index,
+            settled: *settled,
+            loadout: *loadout,
+            country_operation: *country_operation,
+            summary: summary.clone(),
+            pending_auto_sell: pending_auto_sell.clone(),
+        }
+    }
+}
 impl ParallelBattle {
     /// The expedition's isolated worker game (read-only for frontends).
     pub fn game(&self) -> &Game {

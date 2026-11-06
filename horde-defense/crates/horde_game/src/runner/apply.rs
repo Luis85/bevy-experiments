@@ -314,7 +314,8 @@ pub(super) fn persist_pending(ctx: &mut RuntimeCtx) -> bool {
         return quit;
     }
     let snapshot = persistence::Snapshot {
-        game: ctx.game.clone(),
+        // Saved fields only: the transient event outbox stays with the frontend.
+        game: ctx.game.save_snapshot(),
         settings: ctx.settings.clone(),
         campaign_path: ctx.paths.campaign(),
         settings_path: ctx.paths.settings(),

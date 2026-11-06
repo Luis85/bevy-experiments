@@ -17,7 +17,8 @@
 #   -OutputDirectory <dir>                   default <target>/perf/<yyyyMMdd-HHmmss>-<profile>[-novsync]; must
 #                                            be missing or empty
 #   -NoBuild, -NoBudget                      skip the cargo build / the budget compare (validity still counts)
-#   -SaveClone                               also runs the horde_core save_clone example in the same profile
+#   -SaveClone                               also runs the horde_core save_clone example in the same profile and
+#                                            gates its save_snapshot p99 against PERF_BUDGET.json save_clone (W1-50)
 #   -ShippedSmoke                            first builds --profile playtest --no-default-features, copies that exe
 #                                            to <out>/shipped/, times --smoke three times (median wall seconds),
 #                                            and only then builds the review variant
@@ -174,9 +175,33 @@ function Get-GatedValues($Reports, [scriptblock]$Read) {
     return , $values.ToArray()
 }
 
-function Measure-PerfBudget($Runs, $Context, $Budget) {
+function Get-SaveCloneCheck($Report, [string]$RunProfile, $Budget) {
+    # The save_clone example's gate (W1-50) as one budget check: save_snapshot p99 at the budget's fixture, gated only in
+    # the budget's profiles. A report for another fixture, or without the p99, is invalid evidence.
+    $gate = Get-Field $Budget @('save_clone')
+    $limit = Get-Field $gate @('p99_ms_max')
+    $items = Get-Field $Report @('gate', 'items')
+    $check = [pscustomobject][ordered]@{
+        scene = 'save_clone'; size = "$items items"; metric = 'save_snapshot_p99_ms'; aggregate = 'p99'
+        value = (Get-Field $Report @('gate', 'p99_ms')); limit = $limit; status = 'pass'; note = ''
+    }
+    if ($null -eq $gate -or $null -eq $limit) { $check.status = 'invalid'; $check.note = 'PERF_BUDGET.json has no save_clone.p99_ms_max' }
+    elseif ($items -ne (Get-Field $gate @('items_min')) -or (Get-Field $Report @('gate', 'workers')) -ne (Get-Field $gate @('workers'))) {
+        $check.status = 'invalid'; $check.note = 'the report measured another fixture than save_clone.items_min and workers'
+    }
+    elseif ($null -eq $check.value -or $check.value -is [bool] -or $check.value -isnot [ValueType]) {
+        $check.status = 'invalid'; $check.note = 'the report has no gate.p99_ms'
+    }
+    elseif (@(Get-Field $gate @('profiles')) -notcontains $RunProfile) { $check.status = 'skipped'; $check.note = 'informational outside the budget profiles' }
+    elseif ([double]$check.value -gt [double]$limit) { $check.status = 'over' }
+    return $check
+}
+
+function Measure-PerfBudget($Runs, $Context, $Budget, $ExtraChecks = @()) {
     # Runs: objects with Scene, Size, Repeat, Report, Problems. Context: Profile, VsyncOff, NoBudget, Informational.
+    # ExtraChecks: finished check rows (the save clone) that count like the scene checks.
     $checks = New-Object System.Collections.Generic.List[object]
+    foreach ($extra in @($ExtraChecks)) { if ($null -ne $extra) { $checks.Add($extra) } }
     $invalid = @($Runs | Where-Object { @($_.Problems).Count -gt 0 })
     $wave0 = Get-Field $Budget @('baseline', 'wave0')
     $v3 = Get-Field $Budget @('baseline', 'v3')
@@ -284,9 +309,9 @@ function Get-FixtureRuns($Fixture) {
         })
 }
 
-function Test-BudgetCase([string]$Name, $Runs, $Context, $Budget, [int]$Expected, [string[]]$Checks) {
+function Test-BudgetCase([string]$Name, $Runs, $Context, $Budget, [int]$Expected, [string[]]$Checks, $ExtraChecks = @()) {
     # One self-test case: the exit code and every named "<scene>/<size> <metric> <status>" check line.
-    $result = Measure-PerfBudget $Runs $Context $Budget
+    $result = Measure-PerfBudget $Runs $Context $Budget $ExtraChecks
     $lines = @($result.Checks | ForEach-Object { "$($_.scene)/$($_.size) $($_.metric) $($_.status)" })
     $detail = @($result.Checks | Where-Object { $_.status -ne 'pass' } | ForEach-Object { "$($_.scene)/$($_.size) $($_.metric) $($_.status)" }) -join '; '
     $absent = @($Checks | Where-Object { $_ -and $lines -notcontains $_ })
@@ -353,6 +378,28 @@ function Invoke-SelfTest {
             $target.Report = $report
         }
         Test-BudgetCase "v3: $($case.Name)" $runs $onContext $copy $case.Expected $case.Checks
+    }
+
+    # The save clone gate (W1-50) joins the scene checks of a valid run.
+    $within = Read-JsonFile (Join-Path $fixtureDirectory 'within-budget.json')
+    $withinContext = [pscustomobject]@{ Profile = $within.run.profile; VsyncOff = [bool]$within.run.vsync_off; NoBudget = $false; Informational = $false }
+    $cloneLimit = [double]$budget.save_clone.p99_ms_max
+    $clone = {
+        param($P99, [int]$Items = [int]$budget.save_clone.items_min)
+        [pscustomobject]@{ gate = [pscustomobject]@{ items = $Items; workers = [int]$budget.save_clone.workers; p99_ms = $P99 } }
+    }
+    $cloneLine = "save_clone/$($budget.save_clone.items_min) items save_snapshot_p99_ms"
+    $cloneCases = @(
+        @{ Name = 'within the limit'; Report = (& $clone ($cloneLimit * 0.5)); Profile = 'dev'; Expected = 0; Checks = @("$cloneLine pass") },
+        @{ Name = 'over the limit in dev'; Report = (& $clone ($cloneLimit * 1.5)); Profile = 'dev'; Expected = 1; Checks = @("$cloneLine over") },
+        @{ Name = 'over the limit in playtest'; Report = (& $clone ($cloneLimit * 1.5)); Profile = 'playtest'; Expected = 1; Checks = @("$cloneLine over") },
+        @{ Name = 'outside the budget profiles'; Report = (& $clone ($cloneLimit * 1.5)); Profile = 'release'; Expected = 0; Checks = @("$cloneLine skipped") },
+        @{ Name = 'without a p99'; Report = (& $clone $null); Profile = 'dev'; Expected = 2; Checks = @("$cloneLine invalid") },
+        @{ Name = 'another fixture'; Report = (& $clone ($cloneLimit * 0.5) 999); Profile = 'dev'; Expected = 2; Checks = @('save_clone/999 items save_snapshot_p99_ms invalid') }
+    )
+    foreach ($case in $cloneCases) {
+        $extra = Get-SaveCloneCheck $case.Report $case.Profile $budget
+        Test-BudgetCase "save clone: $($case.Name)" (Get-FixtureRuns $within) $withinContext $fixtureBudget $case.Expected $case.Checks @($extra)
     }
     $failed = $script:selfTestFailed
     $rerunCases = @(
@@ -424,6 +471,7 @@ $exe = $null
 $stamp = $null
 $shipped = $null
 $saveCloneReport = $null
+$saveCloneCheck = $null
 $cpuName = $null
 $saved = Reset-LastlightEnv
 $savedAdapter = [Environment]::GetEnvironmentVariable('WGPU_ADAPTER_NAME', 'Process')
@@ -535,14 +583,24 @@ try {
     if ($SaveClone) {
         $example = Join-Path $workspace 'crates\horde_core\examples\save_clone.rs'
         if (-not (Test-Path -LiteralPath $example)) { throw "-SaveClone needs crates/horde_core/examples/save_clone.rs (W1-50)" }
-        $cloneArguments = @('run', '--locked', '-p', 'horde_core', '--example', 'save_clone')
-        if ($Profile -eq 'playtest') { $cloneArguments += @('--profile', 'playtest') }
-        $cloneArguments += @('--', '--out', (Join-Path $destination 'save-clone.json'))
-        Invoke-Cargo -Arguments $cloneArguments -LogStem (Join-Path $tools 'save-clone') | Out-Null
+        # Built, then run directly: the example exits 1 over its gate, which is a budget verdict, not a run failure.
+        $cloneArguments = @('build', '--locked', '-p', 'horde_core', '--example', 'save_clone')
+        $cloneDirectory = 'debug'
+        if ($Profile -eq 'playtest') { $cloneArguments += @('--profile', 'playtest'); $cloneDirectory = 'playtest' }
+        Invoke-Cargo -Arguments $cloneArguments -LogStem (Join-Path $tools 'cargo-save-clone') | Out-Null
+        $cloneExe = Join-Path $target "$cloneDirectory\examples\save_clone.exe"
+        $clonePath = Join-Path $destination 'save-clone.json'
+        $env:LASTLIGHT_BENCH_CPU = $cpuName
+        $clone = Invoke-Native -FilePath $cloneExe -Arguments @('--profile-name', $Profile, '--out', $clonePath) -LogStem (Join-Path $tools 'save-clone') -TimeoutSeconds 1800 -WorkingDirectory $workspace
+        [Environment]::SetEnvironmentVariable('LASTLIGHT_BENCH_CPU', $null, 'Process')
+        if (@(0, 1) -notcontains $clone.ExitCode) { throw "save_clone failed with exit code $($clone.ExitCode); see $($clone.Err)" }
+        if (-not (Test-Path -LiteralPath $clonePath -PathType Leaf)) { throw "save_clone wrote no report; see $($clone.Err)" }
         $saveCloneReport = 'save-clone.json'
+        $saveCloneCheck = Get-SaveCloneCheck (Read-JsonFile $clonePath) $Profile $budget
+        Write-Output "save clone p99 $(Format-Number $saveCloneCheck.value) ms (limit $(Format-Number $saveCloneCheck.limit)) $($saveCloneCheck.status)"
     }
 
-    $verdict = Measure-PerfBudget $runs.ToArray() $context $budget
+    $verdict = Measure-PerfBudget $runs.ToArray() $context $budget @($saveCloneCheck)
     $exitCode = $verdict.ExitCode
 }
 catch {
@@ -553,7 +611,7 @@ catch {
 finally {
     Restore-LastlightEnv -Saved $saved
     [Environment]::SetEnvironmentVariable('WGPU_ADAPTER_NAME', $savedAdapter, 'Process')
-    if ($null -eq $verdict -and $runs.Count -gt 0) { $verdict = Measure-PerfBudget $runs.ToArray() $context $budget }
+    if ($null -eq $verdict -and $runs.Count -gt 0) { $verdict = Measure-PerfBudget $runs.ToArray() $context $budget @($saveCloneCheck) }
     $rows = @($runs | ForEach-Object {
             $r = $_.Report
             [ordered]@{
