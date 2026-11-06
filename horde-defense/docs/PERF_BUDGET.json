@@ -156,6 +156,27 @@
     "p99_ms_max": 1.0,
     "profiles": ["dev", "playtest"]
   },
+  "evidence": {
+    "camera_zoom_delta": {
+      "note": "W1-47, informational: the script never reads it and no gate moves; production-pass plan section 9.5",
+      "commit_before": "bbaa01c",
+      "commit": "d74a13e",
+      "profile": "dev",
+      "vsync": true,
+      "repeat": 3,
+      "aggregate": "median of every valid repeat over all passes",
+      "before": ["target/perf/w1-47/before-c2-bbaa01c-peak", "target/perf/w1-47/before-c2-bbaa01c-b-peak", "target/perf/w1-47/before-c2-bbaa01c-progressed-peak", "target/perf/w1-47/before-c2-bbaa01c-b-progressed-peak"],
+      "after": ["target/perf/w1-47/c2-d74a13e-peak", "target/perf/w1-47/c2-d74a13e-b-peak", "target/perf/w1-47/c2-d74a13e-c-peak", "target/perf/w1-47/c2-d74a13e-progressed-peak", "target/perf/w1-47/c2-d74a13e-b-progressed-peak"],
+      "interface_draw_mean_ms": {
+        "peak": { "normal": { "before": 1.1888, "after": 1.2623 }, "small": { "before": 1.0655, "after": 1.1087 } },
+        "progressed-peak": { "normal": { "before": 1.6594, "after": 1.6421 }, "small": { "before": 1.4401, "after": 1.4675 } }
+      },
+      "interface_total_mean_ms": {
+        "peak": { "normal": { "before": 2.5215, "after": 2.6351 }, "small": { "before": 2.3551, "after": 2.4706 } },
+        "progressed-peak": { "normal": { "before": 4.7029, "after": 4.6447 }, "small": { "before": 4.4162, "after": 4.4801 } }
+      }
+    }
+  },
   "decisions": {
     "pipelined_rendering": null
   }

@@ -698,7 +698,7 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 | stress (400) | both | CPU p99 (ms, -VsyncOff) | n/a (v3 dev: 31.8 / 38.1, see 9.4) | ≤ 10.0 | | | | |
 | progressed-peak, stress | both | frames > 50 ms | 0 (VSync on, 300 frames; v3 600/1800 frames: 6-64, see 9.4) | 0 | | | | |
 | peak | 1440x900 / 1050x700@1.35 | interface mean (ms) | 1.190 / 1.075 | informational | | | | |
-| camera zoom delta (W1-47) | both | peak and progressed-peak, commit before C2 vs C2 | n/a | recorded | | | | |
+| camera zoom delta (W1-47) | both | peak and progressed-peak, commit before C2 vs C2 | n/a | recorded | interface_draw peak +6.2% / +4.1%, progressed-peak -1.0% / +1.9% (see 9.5) | | | |
 | pipelined decision (W1-61) | both | on vs off, Repeat 3 | n/a | recorded | | | | |
 | save clone (W1-50) | n/a | p99 (ms) at 1,000 / 2,500 / 5,000 items, 3 workers | n/a | remedy if > 1 ms | | | | |
 | shipped `--smoke` | n/a | seconds | n/a | recorded | | | | |
@@ -799,6 +799,29 @@ All times are means in ms except cpu_frame p99; primitives, vertices and texture
 | on | stress | small | 63.4 / 49.9 | 52.2 / 49.9 | 16.72 / 16.86 | 37.7 / 38.0 | 64 / 254 |
 
 Reading: with VSync off, pipelining raises throughput (median frame 4.1-8.8 ms against 6.3-12.7 ms) at a similar cpu_frame p99. With VSync on, both hold a 16.7 ms median, but pipelining carries the 0.5 s present_wait stalls (mean FPS 41-48 against 58-60 at peak and progressed-peak). Mean FPS includes those stalls; it is not a smoothness measure on its own.
+
+### 9.5 Camera zoom delta (W1-47)
+
+Recorded 2026-11-06 on `bbaa01c` (W1-43, the commit before C2: `fit_field` exists but the battle still draws the fixed-scale `clearing_rect`) against `d74a13e` (W1-44, C2: `BattleLayout` and uniform zoom-to-fit), same hardware and power state as 9.4. `measure_performance.ps1 -Scene peak` and `-Scene progressed-peak`, `-Profile dev`, VSync on (Fifo, pipelined default, the 9.4 baseline state), `-Repeat 3`, budget window (warmup 180, 600 frames). Each commit was checked out detached in this worktree, built by the script and measured, then the branch was restored. The machine was shared again, so the same 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass and both sides were measured in more than one pass: before C2 two passes per scene (`before-c2-bbaa01c`, `-b`), C2 three passes of peak (`c2-d74a13e`, `-b`, `-c`) and two of progressed-peak (`c2-d74a13e`, `-b`). Values are the median of every valid repeat over all passes of a side (6 before; 8 / 9 / 6 / 6 at C2); frames > 50 ms is the worst repeat. One repeat was invalid and is not counted: `c2-d74a13e-b` peak normal repeat 2 ran during about 60 s of 100% load and missed its sample target on both attempts. Evidence: `target/perf/w1-47/<pass>-<scene>` (not committed), each with summary.json and summary.md.
+
+What C2 changes in these scenes: peak is the 7x16 field, which was drawn at 742.4x440.4 pt (normal) and 389.2x197.6 pt (small) and is now fit at zoom 1.571 to 1166.6x692 and 611.6x310.5, 1.571² = 2.47x the pixels. progressed-peak is 17x30, which fills the arena at zoom 1 before and after (pixel-identical by the W1-43 pin), so it is the control for C2's code cost and for machine noise.
+
+| Scene | Size | Field | interface_draw before / C2 | delta | interface_total before / C2 | delta | battlefield_paint before / C2 | egui_pass before / C2 | tessellate before / C2 | main_cpu before / C2 | primitives before / C2 | vertices before / C2 | textured quads before / C2 | GPU egui before / C2 | frames > 50 ms (worst) before / C2 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| peak | normal | 7x16, z 1.571 | 1.1888 / 1.2623 | +0.074 ms (+6.2%) | 2.5215 / 2.6351 | +4.5% | 0.490 / 0.560 | 1.461 / 1.541 | 1.066 / 1.099 | 4.096 / 4.227 | 149 / 149 | 49893 / 53954 (+8.1%) | 11804 / 13636 (+15.5%) | 1.776 / 1.987 | 13 / 8 |
+| peak | small | 7x16, z 1.571 | 1.0655 / 1.1087 | +0.043 ms (+4.1%) | 2.3551 / 2.4706 | +4.9% | 0.466 / 0.495 | 1.355 / 1.414 | 1.003 / 1.061 | 4.042 / 4.246 | 149 / 149 | 41710 / 43223 (+3.6%) | 7524 / 8082 (+7.4%) | 1.257 / 1.353 | 13 / 16 |
+| progressed-peak | normal | 17x30, z 1 | 1.6594 / 1.6421 | -0.017 ms (-1.0%) | 4.7029 / 4.6447 | -1.2% | 0.689 / 0.680 | 1.950 / 1.935 | 2.760 / 2.715 | 6.507 / 6.514 | 514 / 514 | 94380 / 94404 (+0.0%) | 14399 / 14399 (+0.0%) | 2.094 / 2.228 | 12 / 8 |
+| progressed-peak | small | 17x30, z 1 | 1.4401 / 1.4675 | +0.027 ms (+1.9%) | 4.4162 / 4.4801 | +1.4% | 0.580 / 0.591 | 1.743 / 1.784 | 2.666 / 2.730 | 6.280 / 6.418 | 516 / 516 | 83328 / 83346 (+0.0%) | 8411 / 8411 (+0.0%) | 1.372 / 1.418 | 12 / 11 |
+
+Times are means in ms; primitives, vertices and textured quads are per-frame means over the whole egui output; GPU egui is the `gpu.egui_pass_ms` timestamp mean.
+
+Per-pass interface_draw medians (3 repeats each, 2 for `c2-d74a13e-b` peak normal): peak normal 1.1785 / 1.2041 before against 1.2635 / 1.2627 / 1.2562 at C2; peak small 1.0238 / 1.0873 against 1.1087 / 1.1216 / 1.0973; progressed-peak normal 1.6329 / 1.7710 against 1.6767 / 1.6373; progressed-peak small 1.4281 / 1.4409 against 1.4954 / 1.4348.
+
+- peak: every C2 pass is above every before pass at both sizes, so the +4-6% interface_draw and +4.5-4.9% interface_total are the camera's cost, not noise. The zoomed field emits the same 149 clipped primitives but 8.1% / 3.6% more vertices and 15.5% / 7.4% more textured quads, and battlefield_paint is the largest CPU share of the rise (+0.070 / +0.029 ms).
+- progressed-peak: its egui output is unchanged (primitives, vertices and textured quads within 0.1%), and its interface_draw and interface_total deltas (-1.2% to +1.9%) are inside the spread of its own before passes (1.6329 / 1.7710 at normal). C2's layout code costs nothing measurable on a field that already filled the arena, so the progressed-peak interface gate (≤ 1.129 / ≤ 1.030) faces the same work after C2 as before.
+- GPU egui rose at peak (+0.21 / +0.10 ms) and also at the unchanged progressed-peak (+0.13 / +0.05 ms); with these repeats the fill cost of 2.47x the pixels is not separable from the span's pass-to-pass noise. median frame stayed 16.67-16.69 ms everywhere (VSync).
+- Load check: three valid repeats overlapped a ≥ 90% load sample (`c2-d74a13e` peak small repeat 2, 1.5017; `c2-d74a13e` progressed-peak small repeat 2, 2.1560; `before-c2-bbaa01c-b` peak normal repeat 3) and one a 99% sample 2 s after launch (`before-c2-bbaa01c-b` progressed-peak normal repeat 1). Without those four the interface_draw deltas are +6.9% / +3.9% at peak and -0.4% / +1.0% at progressed-peak: the same reading.
+- Gates: nothing here moves a budget. The 30% progressed-peak interface gate (≤ 1.129 / ≤ 1.030) is unchanged and still evaluated in W1-61. The peak not-above-wave-0 gate (1.1904 / 1.0752) was met before C2 (1.1888 / 1.0655) and is now exceeded by 6.0% / 3.1% (1.2623 / 1.1087); the camera's battlefield_paint and vertex cost at peak is work for the batched battlefield meshes (W1-48) before W1-61's acceptance runs.
 
 ---
 
