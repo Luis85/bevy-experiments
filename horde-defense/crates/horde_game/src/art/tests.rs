@@ -1,5 +1,6 @@
 use super::backdrop::{
-    inset_tree_foot, perimeter_foot, peripheral_details, peripheral_kind, peripheral_strips,
+    dressing_unit, inset_tree_foot, perimeter_foot, peripheral_details, peripheral_kind,
+    peripheral_strips,
 };
 use super::figures::{FALLBACK_LOOKS, FallbackLook, fallback_look};
 use super::*;
@@ -130,16 +131,13 @@ mod terrain_tests {
             let canvas = Rect::from_min_size(Pos2::ZERO, size);
             let maximum = Rect::from_min_max(pos2(24.0, 124.0), canvas.max - vec2(24.0, 84.0));
             for (lanes, width) in [(3, 12.0), (7, 16.0), (17, 30.0)] {
-                let extent = vec2(
-                    maximum.width() * width / 30.0,
-                    (maximum.height() * (lanes as f32 / 11.0).min(1.0)).max(86.0),
+                // The zoomed field and the capped dressing unit the main
+                // battle draws (ui::battle::BattleLayout).
+                let arena = fit_field(maximum, maximum, lanes, width).rect;
+                let unit = dressing_unit(
+                    arena.height() / f32::from(lanes),
+                    maximum.height() / camera::REFERENCE_LANES,
                 );
-                let arena = if lanes == 17 {
-                    maximum
-                } else {
-                    Rect::from_center_size(maximum.center(), extent)
-                };
-                let unit = arena.height() / lanes as f32;
                 let gap = unit * 0.08;
                 let mut visible = [0; 4];
                 for (edge, strip) in peripheral_strips(canvas, arena).into_iter().enumerate() {
@@ -172,10 +170,13 @@ mod terrain_tests {
                     }
                 }
                 assert!(visible[0] > 0 && visible[1] > 0);
-                if lanes < 17 {
+                // A width-limited field spans the arena, leaving only the
+                // side insets; a narrower (height-limited) one shows its
+                // forest on all four edges.
+                if arena.width() < maximum.width() - 1.0 {
                     assert!(
                         visible.iter().all(|count| *count > 0),
-                        "Opening and intermediate clearings need all four perimeter cues"
+                        "{lanes}x{width}: a narrower field needs all four perimeter cues"
                     );
                 }
             }
@@ -251,6 +252,7 @@ mod terrain_tests {
                     props: Some(egui::TextureId::User(2)),
                     ..Default::default()
                 },
+                arena.height() / camera::REFERENCE_LANES,
             );
         });
         let props: Vec<_> = output
@@ -291,6 +293,48 @@ mod terrain_tests {
             );
         }
         output.textures_delta.clear();
+    }
+
+    /// Pin: the zoom dressing cap never touches a field with 11 or more
+    /// lanes: capped at the arena's reference lane, every such field paints
+    /// exactly today's uncapped dressing.
+    #[test]
+    fn dressing_unchanged_for_filling_fields() {
+        let textures = ArtTextures {
+            props: Some(egui::TextureId::User(2)),
+            ..Default::default()
+        };
+        let paint = |canvas: Rect, projection: ArenaProjection, theme: usize, max_unit: f32| {
+            let ctx = egui::Context::default();
+            let mut output = ctx.run_ui(Default::default(), |ui| {
+                world_backdrop(ui.painter(), canvas, projection, theme, textures, max_unit);
+            });
+            output.textures_delta.clear();
+            output.shapes
+        };
+        let mut pinned = 0;
+        for size in [vec2(1440.0, 900.0), vec2(1050.0 / 1.35, 700.0 / 1.35)] {
+            let canvas = Rect::from_min_size(Pos2::ZERO, size);
+            let maximum = Rect::from_min_max(pos2(24.0, 124.0), canvas.max - vec2(24.0, 84.0));
+            let cap = maximum.height() / camera::REFERENCE_LANES;
+            for lanes in 11..=17u8 {
+                for width in [8.0, 12.0, 20.0, 30.0] {
+                    let fit = fit_field(maximum, maximum, lanes, width);
+                    assert_eq!(fit.zoom, 1.0, "{lanes}x{width} already fills");
+                    let projection = ArenaProjection::with_geometry(fit.rect, lanes, width);
+                    for theme in [0, 2, 4] {
+                        let capped = paint(canvas, projection, theme, cap);
+                        assert!(capped.len() > 4, "{lanes}x{width}: no dressing painted");
+                        assert!(
+                            capped == paint(canvas, projection, theme, f32::INFINITY),
+                            "{lanes}x{width} theme {theme} in {size:?}: the cap moved the dressing"
+                        );
+                        pinned += 1;
+                    }
+                }
+            }
+        }
+        assert_eq!(pinned, 2 * 7 * 4 * 3);
     }
 
     #[test]

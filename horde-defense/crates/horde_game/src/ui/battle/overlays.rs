@@ -1,12 +1,18 @@
+use super::BattleLayout;
 use crate::{
     art::{AMBER, RED, TEXT},
     battle_view::{BattleScreen, FieldHint},
     ui::{UiCtx, hud, progress},
 };
-use bevy_egui::egui::{self, Color32, FontId, Rect, RichText, Sense, Stroke, pos2, vec2};
+use bevy_egui::egui::{self, Color32, FontId, Rect, RichText, Sense, Stroke, vec2};
 
-pub(super) fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx, view: &hud::HudView) {
-    let left = Rect::from_min_size(canvas.min + vec2(14., 12.), vec2(322., 108.));
+pub(super) fn corner_hud(
+    ui: &mut egui::Ui,
+    layout: &BattleLayout,
+    f: &mut UiCtx,
+    view: &hud::HudView,
+) {
+    let left = layout.hud_left;
     ui.scope_builder(egui::UiBuilder::new().max_rect(left), |ui| {
         egui::Frame::new()
             .fill(Color32::from_black_alpha(220))
@@ -49,10 +55,7 @@ pub(super) fn corner_hud(ui: &mut egui::Ui, canvas: Rect, f: &mut UiCtx, view: &
                 });
             });
     });
-    let right = Rect::from_min_size(
-        pos2(canvas.right() - 206., canvas.top() + 12.),
-        vec2(192., 86.),
-    );
+    let right = layout.hud_right;
     ui.scope_builder(egui::UiBuilder::new().max_rect(right), |ui| {
         egui::Frame::new()
             .fill(Color32::from_black_alpha(220))
@@ -143,19 +146,16 @@ pub(super) fn hint_text(hint: FieldHint, paused: bool, bindings: &[String]) -> S
         FieldHint::Banked => "Coins and items are already banked. Kill the boss to win, or Retreat & train to spend them.".to_owned(),
     }
 }
-/// The current first-defense lesson as one line over the top of the field.
+/// The current first-defense lesson in `area`, the layout's callout rect at
+/// the top of the arena (inside the hint band over a zoomed field).
 pub(super) fn field_hint_callout(
     ui: &mut egui::Ui,
-    arena: Rect,
+    area: Rect,
     f: &mut UiCtx,
     view: &BattleScreen,
 ) {
     let text = hint_text(view.field.hint, view.paused, &f.settings.bindings);
-    let width = (arena.width() - 24.0).clamp(160.0, 620.0);
-    let area = Rect::from_min_size(
-        pos2(arena.center().x - width * 0.5, arena.top() + 4.0),
-        vec2(width, 84.0),
-    );
+    let width = area.width();
     ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
         egui::Frame::new()
             .fill(Color32::from_black_alpha(215))
@@ -173,16 +173,21 @@ pub(super) fn field_hint_callout(
 }
 /// Names the paused state on the field, so a frozen field never reads as a
 /// hang.
-pub(super) fn pause_banner(ui: &egui::Ui, arena: Rect, view: &BattleScreen, bindings: &[String]) {
+pub(super) fn pause_banner(
+    ui: &egui::Ui,
+    layout: &BattleLayout,
+    view: &BattleScreen,
+    bindings: &[String],
+) {
     let pause = bindings.get(6).map_or("Escape", String::as_str);
     let text = if view.tick == 0 {
         format!("READY · Begin defense or {pause}")
     } else {
         format!("PAUSED · {pause} to resume")
     };
-    let painter = ui.painter_at(arena);
+    let painter = ui.painter_at(layout.arena);
     let galley = painter.layout_no_wrap(text, FontId::proportional(18.0), AMBER);
-    let at = pos2(arena.center().x, arena.bottom() - 18.0) - galley.size() * 0.5;
+    let at = layout.pause_banner_center - galley.size() * 0.5;
     painter.rect_filled(
         Rect::from_min_size(at - vec2(10.0, 5.0), galley.size() + vec2(20.0, 10.0)),
         0.0,

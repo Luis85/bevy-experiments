@@ -665,7 +665,7 @@ fn grown_lane_count_drives_outer_row_construction_and_grenade_cells() {
 }
 
 #[test]
-fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_throw() {
+fn fresh_three_lane_battle_fills_the_arena_width_at_small_size() {
     use horde_core::balance::BalanceSettings;
     let mut fixture = IsolatedFrontend::new();
     fixture
@@ -677,12 +677,24 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
     fixture.deploy();
     let h = Harness::new();
     let f = &mut fixture.frontend;
-    h.frame_size(f, View::Battle, vec![], vec2(1050.0 / 1.35, 700.0 / 1.35));
+    let size = vec2(1050.0 / 1.35, 700.0 / 1.35);
+    h.frame_size(f, View::Battle, vec![], size);
     let rect = f.battle.arena_rect.unwrap();
     let a = f.game.attempt().unwrap();
     assert_eq!((a.lane_count, a.width_yards), (3, 12.0));
-    assert!(rect.width() < 400.0 && rect.height() < 150.0);
-    assert!(rect.height() >= 86.0);
+    // Zoomed to fill: the width-limited 3x12 field spans the whole arena
+    // (1050x700@1.35: 729.8 pt) at 2.5x today's 291.9x86 clearing.
+    let canvas = h.ctx.content_rect();
+    let arena_width = canvas.width() - 48.0;
+    assert!(
+        (rect.width() - arena_width).abs() < 1e-3 && (rect.height() - 215.0).abs() < 0.05,
+        "3x12 field {:?}, expected {arena_width} x 215.0",
+        rect.size()
+    );
+    assert_eq!(
+        rect.x_range(),
+        egui::Rangef::new(24.0, canvas.right() - 24.0)
+    );
     let projection = art::ArenaProjection::for_attempt(rect, a);
     let center = projection.inverse(rect.center());
     assert!((center[0] - 6.0).abs() < 0.0001 && (center[1] - 1.5).abs() < 0.0001);
@@ -780,4 +792,229 @@ fn the_first_defense_teaches_on_the_field_and_always_names_the_keys() {
     assert!(painted(&output, "PAUSED · Escape to resume"));
     h.click(f, View::Battle, "Hide hints");
     assert!(!f.settings.show_guidance);
+}
+
+/// The two target battle sizes in points: 1440x900 and 1050x700@1.35.
+fn target_sizes() -> [Vec2; 2] {
+    [vec2(1440.0, 900.0), vec2(1050.0 / 1.35, 700.0 / 1.35)]
+}
+
+/// An unpaused fresh-balance battle (a zoomed opening field: the first clear
+/// that unlocks the trap levels it to 5x14) in `mode` with the trap blueprint.
+/// A `veteran` campaign has finished an attempt; otherwise the battle reads as
+/// a first deployment (`BattleScreen::first_deployment` is the campaign's
+/// attempt count, zeroed after the deploy because Mara joins only after the
+/// introductory attempt).
+fn fresh_battle(mode: Mode, veteran: bool) -> IsolatedFrontend {
+    let mut fixture = IsolatedFrontend::new();
+    fixture.unlock_trap();
+    let campaign = fixture.frontend.game.campaign_mut();
+    campaign
+        .set_balance_settings(horde_core::balance::BalanceSettings::default())
+        .unwrap();
+    campaign.choose_start_country("DEU").unwrap();
+    fixture.frontend.game.deploy_country_stage(0, mode).unwrap();
+    fixture.frontend.game.campaign_mut().attempts = u64::from(veteran);
+    fixture.frontend.game.set_paused(false);
+    fixture.frontend.screen = Screen::Battle;
+    fixture
+}
+
+/// The layout the frame drew for the active attempt, without a hint band.
+fn field_layout(h: &Harness, f: &FrontendParts) -> battle::BattleLayout {
+    let a = f.game.attempt().unwrap();
+    assert!(a.lane_count < 11, "the fixture field is zoomed");
+    battle::BattleLayout::new(h.ctx.content_rect(), a.lane_count, a.width_yards, false)
+}
+
+#[test]
+fn construction_toggle_keeps_arena_rect() {
+    for size in target_sizes() {
+        let mut fixture = IsolatedFrontend::new();
+        fixture.unlock_trap();
+        fixture.deploy();
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        assert_eq!(f.game.attempt().unwrap().lane_count, 11);
+        h.frame_size(f, View::Battle, vec![], size);
+        let (field, effects) = (f.battle.arena_rect.unwrap(), f.battle.effects_rect);
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(text_count(&output, "Save country plan"), 1);
+        assert_eq!(
+            f.battle.arena_rect.unwrap(),
+            field,
+            "construction rescaled the {size:?} arena"
+        );
+        assert_eq!(f.battle.effects_rect, effects);
+    }
+}
+
+#[test]
+fn battle_frame_records_layout_rects() {
+    use horde_core::balance::BalanceSettings;
+    for size in target_sizes() {
+        for settings in [BalanceSettings::default(), BalanceSettings::legacy()] {
+            for construction in [false, true] {
+                let mut fixture = IsolatedFrontend::new();
+                fixture
+                    .frontend
+                    .game
+                    .campaign_mut()
+                    .set_balance_settings(settings.clone())
+                    .unwrap();
+                fixture.deploy();
+                let h = Harness::new();
+                let f = &mut fixture.frontend;
+                f.battle.construction = construction;
+                h.frame_size(f, View::Battle, vec![], size);
+                let a = f.game.attempt().unwrap();
+                let first = f.game.campaign().attempts == 0;
+                assert!(first, "a fresh fixture is a first deployment");
+                let layout = battle::BattleLayout::new(
+                    h.ctx.content_rect(),
+                    a.lane_count,
+                    a.width_yards,
+                    first,
+                );
+                let label = format!(
+                    "{}x{} construction {construction} at {size:?}",
+                    a.lane_count, a.width_yards
+                );
+                assert_eq!(f.battle.arena_rect, Some(layout.field.rect), "{label}");
+                assert_eq!(f.battle.effects_rect, Some(layout.effects_clip), "{label}");
+            }
+        }
+    }
+}
+
+/// Pin: "Hide hints" removes the callout but never moves the field; the band
+/// belongs to the whole first attempt.
+#[test]
+fn hide_hints_never_moves_the_field() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, false);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        assert!(f.settings.show_guidance);
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(text_count(&output, "Hide hints"), 1);
+        let shown = f.battle.arena_rect.unwrap();
+        assert!(
+            shown.top() >= 124.0 + 92.0,
+            "{size:?}: field {shown:?} under the band"
+        );
+        f.settings.show_guidance = false;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(text_count(&output, "Hide hints"), 0);
+        assert_eq!(
+            f.battle.arena_rect.unwrap(),
+            shown,
+            "{size:?}: hiding hints moved the field"
+        );
+    }
+}
+
+/// Pin: an observed (Npc) first deployment shows no lesson, so it reserves no
+/// band.
+#[test]
+fn npc_first_deployment_has_no_hint_band() {
+    let size = vec2(1050.0 / 1.35, 700.0 / 1.35);
+    let mut fixture = fresh_battle(Mode::Npc, false);
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    assert_eq!(f.game.campaign().attempts, 0);
+    h.frame_size(f, View::Battle, vec![], size);
+    let a = f.game.attempt().unwrap();
+    let (lanes, width) = (a.lane_count, a.width_yards);
+    assert!(lanes < 11, "Mara's opening field is zoomed");
+    let open = battle::BattleLayout::new(h.ctx.content_rect(), lanes, width, false);
+    let banded = battle::BattleLayout::new(h.ctx.content_rect(), lanes, width, true);
+    assert_ne!(
+        open.field.rect, banded.field.rect,
+        "the band moves a {lanes}x{width} field"
+    );
+    assert_eq!(f.battle.arena_rect, Some(open.field.rect));
+}
+
+/// Pin: the plan buttons stay inside the construction overlay at both sizes.
+#[test]
+fn construction_panel_keeps_plan_buttons() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let panel = field_layout(&h, f).construction_panel;
+        for label in ["Save country plan", "Clear country plan"] {
+            let at = output
+                .shapes
+                .iter()
+                .find_map(|shape| text_position(&shape.shape, label))
+                .unwrap_or_else(|| panic!("{label} is not painted at {size:?}"));
+            assert!(
+                panel.contains(at),
+                "{label} at {at:?} leaves the panel {panel:?}"
+            );
+        }
+    }
+}
+
+/// Pin: a pointer over the construction overlay neither hovers nor aims the
+/// field under it.
+#[test]
+fn construction_panel_swallows_field_hover() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        h.frame_size(f, View::Battle, vec![], size);
+        let layout = field_layout(&h, f);
+        let (panel, field) = (layout.construction_panel, layout.field.rect);
+        let covered = pos2(panel.left() + 4.0, panel.center().y);
+        assert!(
+            field.contains(covered),
+            "{size:?}: the panel overlaps the field"
+        );
+        let aim = f.battle.aim;
+        for _ in 0..2 {
+            h.frame_size(f, View::Battle, vec![Event::PointerMoved(covered)], size);
+        }
+        assert!(
+            !f.battle.arena_hover,
+            "{size:?}: the panel let the field hover"
+        );
+        assert_eq!(f.battle.aim, aim, "{size:?}: the panel let the field aim");
+        let open = pos2(field.left() + field.width() * 0.25, field.center().y);
+        for _ in 0..2 {
+            h.frame_size(f, View::Battle, vec![Event::PointerMoved(open)], size);
+        }
+        assert!(f.battle.arena_hover, "{size:?}: the open field must hover");
+        assert_ne!(f.battle.aim, aim);
+    }
+}
+
+/// Pin: battlefield sprites clip to the arena, never to the taller effects
+/// clip.
+#[test]
+fn battlefield_sprite_clip_stays_the_arena() {
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let layout = field_layout(&h, f);
+        assert_ne!(layout.arena, layout.effects_clip);
+        let clipped = output
+            .shapes
+            .iter()
+            .filter(|shape| shape.clip_rect == layout.arena)
+            .count();
+        assert!(
+            clipped > 0,
+            "{size:?}: no battlefield shape clips to the arena"
+        );
+    }
 }

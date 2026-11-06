@@ -97,6 +97,7 @@ The source catalogue now has seven active managed textures, eight pixel provenan
 These explicit user changes supersede the earlier fresh11/30 opening; legacy active fields stay frozen.
 
 - Normal starts at 3 lanes/12 yards, with 1.25× authored movement, adding two lanes/two yards every three character levels, capped 17/30. The clearing grows physically rather than stretching three rows across the viewport.
+  - **Superseded 4 November 2026 (user requirement, camera):** the field now uses uniform zoom-to-fit. It keeps the lane:yard proportion of the per-geometry clearing above and zooms until one axis fills the bounded arena, so fewer lanes or yards zoom in (3x12 is 2.5x). Every already-filling field (17x30, 11x20, all eleven-plus-lane fields) stays pixel-identical. Construction is an overlay panel and never rescales the arena. See docs/plans/2026-11-05-production-pass.md (CAM-1, CAM-2) and `art::camera::fit_field`.
 - Validated Easy/Normal/Hard/Custom JSON presets and saved per-profile settings apply to the next run, including a chained worker's next deployment. Active attempts retain copied settings and dimensions.
 - Actual DPS uses five simulation seconds, plus whole-run average/peak and damage-source totals. Pause,4× observation and checkpoint restoration preserve its time base.
 - Every newly settled victory/defeat/withdrawal produces a saved context/gear/balance/geometry/reward/XP/damage/DPS record. Parent-owned worker outboxes append once. History is not silently truncated or retroactively invented.

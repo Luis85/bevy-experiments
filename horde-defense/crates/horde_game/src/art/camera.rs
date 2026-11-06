@@ -9,13 +9,6 @@
 //! the field is centred. A field that already fills an axis (every geometry
 //! with 11 or more lanes, or the full 30-yard width) is today's clearing bit
 //! for bit.
-#![cfg_attr(
-    not(test),
-    allow(
-        dead_code,
-        reason = "C2 (W1-44) wires fit_field into the battle layout and deletes ui::battle::clearing_rect"
-    )
-)]
 use bevy_egui::egui::{Rect, Vec2, vec2};
 
 /// Lane count whose clearing fills the reference height.

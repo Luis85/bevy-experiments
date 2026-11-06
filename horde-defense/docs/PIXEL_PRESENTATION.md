@@ -76,6 +76,8 @@ how the live mix sounds on a particular device.
 
 Normal starts with three lanes/twelve yards and 1.25× authored movement. Every three character levels adds two lanes/two yards, capped at 17/30. The physical clearing grows instead of stretching a few rows across the viewport; active and old eleven-lane/thirty-yard saves stay fixed. Peripheral dressing defines actual edges and retains full-sprite clearance. A separate bounded effects region does not expand gameplay inputs.
 
+> **Superseded 4 November 2026 (user requirement, camera):** the physical clearing no longer stays at the normal yard scale. The field uses uniform zoom-to-fit: the clearing's lane:yard proportion is kept and it zooms until one axis fills the arena, so a 3-lane opening fills the viewport width. Already-filling fields (17x30, 11x20, eleven or more lanes) are pixel-identical; props are capped at the reference lane size; construction overlays the field without rescaling it; overlay effects get 60 pt of headroom above the arena. See docs/plans/2026-11-05-production-pass.md (CAM-1 to CAM-5).
+
 Gameplay presets/custom drafts commit only for the next run. Actual DPS uses five simulation seconds, average/peak and source totals. Read-only History shows saved all-outcome records, frozen detail and last-forty trends while fields are paused. Its plot window never truncates stored history. [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md) defines those contracts and compatibility.
 
 ## Authoring and evidence

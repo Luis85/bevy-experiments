@@ -1,10 +1,10 @@
 use super::{
-    BattleFrame,
-    attack::{attack_selector, attack_selector_rect, ordnance_cursor, personal_controls},
-    battle_arena, clearing_rect,
+    BattleFrame, BattleLayout,
+    attack::{attack_selector, ordnance_cursor, personal_controls},
     construction::{construction_controls, placement_cursor},
     details::field_details,
     input::{preview_aim, reticle_ownership},
+    layout::PANEL_FILL_ALPHA,
     overlays::{corner_hud, field_hint_callout, pause_banner},
     projection,
 };
@@ -14,7 +14,7 @@ use crate::{
     runner::SaveIntent,
     ui::{Screen, UiCtx, armory, damage, loot, policy, reticle, status},
 };
-use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Sense, Stroke, pos2, vec2};
+use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke};
 use horde_core::{command::Command, content::Mode};
 
 /// The battle screen of this pass's `views` (`None` outside a battle, which
@@ -34,9 +34,16 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
         .frame(egui::Frame::new().fill(INK))
         .show(root, |ui| {
             let canvas = ui.max_rect();
-            let maximum = battle_arena(canvas, f.battle.construction);
-            let r = clearing_rect(maximum, view.lanes, view.width_yards);
-            f.battle.effects_rect = Some(maximum);
+            // The hint band belongs to the whole first personal attempt, not
+            // to the hint toggle, so "Hide hints" never moves the field.
+            let layout = BattleLayout::new(
+                canvas,
+                view.lanes,
+                view.width_yards,
+                view.first_deployment && view.personal(),
+            );
+            let r = layout.field.rect;
+            f.battle.effects_rect = Some(layout.effects_clip);
             let arena = projection(f, r);
             let response = ui.interact(
                 r,
@@ -44,20 +51,32 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 Sense::click_and_drag(),
             );
             f.battle.arena_rect = Some(r);
-            f.battle.arena_hover = response.hovered();
+            // The construction overlay swallows the field under it.
+            let pointer = response
+                .hover_pos()
+                .filter(|p| layout.addresses_field(*p, f.battle.construction));
+            let hovered = response.hovered() && pointer.is_some();
+            f.battle.arena_hover = hovered;
             let diagnostic_reticle = f.launch.reticle_capture_preview();
             if diagnostic_reticle {
                 f.battle.aim = preview_aim(arena);
-            } else if let Some(pointer) = response.hover_pos() {
+            } else if let Some(pointer) = pointer {
                 f.battle.aim = arena.inverse(pointer);
             }
             {
                 let _span = diagnostics::interface_span(perf, InterfaceSpan::Backdrop);
-                art::world_backdrop(ui.painter(), canvas, arena, view.theme, f.textures);
+                art::world_backdrop(
+                    ui.painter(),
+                    canvas,
+                    arena,
+                    view.theme,
+                    f.textures,
+                    layout.dressing_unit_cap(),
+                );
             }
             let paint = diagnostics::interface_span(perf, InterfaceSpan::BattlefieldPaint);
             let drawn = art::battlefield(
-                &ui.painter_at(maximum),
+                &ui.painter_at(layout.arena),
                 r,
                 &views.field,
                 a,
@@ -77,8 +96,8 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 perf.record_scene(drawn);
             }
             art::world_atmosphere(ui.painter(), canvas);
-            crate::inspector::hover(&response, a, f.battle.aim);
-            if response.hovered() {
+            if hovered {
+                crate::inspector::hover(&response, a, f.battle.aim);
                 if f.battle.construction {
                     placement_cursor(ui, r, f);
                 } else if f.battle.attack_selection.ordnance().is_some() && view.personal() {
@@ -87,7 +106,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             }
             if let Some(owns_cursor) = reticle_ownership(
                 diagnostic_reticle,
-                response.hovered(),
+                hovered,
                 ui.input(|i| i.raw.focused),
                 ctx.any_popup_open() || f.status.feedback.details_open,
             ) {
@@ -111,20 +130,16 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             }
             damage::draw(ui, r, f);
             loot::draw(ui, r, f);
-            // Both sit in the field margin around the clearing, so neither
-            // covers the defender or the other at the minimum size.
             if view.paused && !f.battle.construction {
-                pause_banner(ui, maximum, view, &f.settings.bindings);
+                pause_banner(ui, &layout, view, &f.settings.bindings);
             }
+            // The callout sits in the reserved band over a zoomed field.
             if f.settings.show_guidance && view.first_deployment && view.personal() {
-                field_hint_callout(ui, maximum, f, view);
+                field_hint_callout(ui, layout.hint_callout, f, view);
             }
-            corner_hud(ui, canvas, f, hud_view);
+            corner_hud(ui, &layout, f, hud_view);
             if let Some(receipt) = &view.last_loot {
-                let area = Rect::from_min_max(
-                    pos2(canvas.left() + 350.0, canvas.top() + 72.0),
-                    pos2(canvas.right() - 222.0, r.top() - 8.0),
-                );
+                let area = layout.receipt_slot;
                 ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
                     ui.set_clip_rect(area.intersect(ui.clip_rect()));
                     ui.label(
@@ -136,24 +151,23 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 });
             }
             if view.personal() && !f.battle.construction {
-                let selector = attack_selector_rect(canvas, r);
+                let selector = layout.selector;
                 ui.scope_builder(egui::UiBuilder::new().max_rect(selector), |ui| {
                     ui.set_clip_rect(selector.intersect(ui.clip_rect()));
                     attack_selector(ui, f, view)
                 });
             }
             if f.battle.construction {
-                let panel = Rect::from_min_size(
-                    pos2(canvas.right() - 296.0, r.top() + 8.0),
-                    vec2(280.0, (r.height() - 16.0).max(180.0)),
-                );
+                // An overlay over the field: opening it never rescales the
+                // arena, and it never covers a build cell.
+                let panel = layout.construction_panel;
                 ui.scope_builder(egui::UiBuilder::new().max_rect(panel), |ui| {
                     egui::Frame::new()
-                        .fill(Color32::from_black_alpha(235))
+                        .fill(Color32::from_black_alpha(PANEL_FILL_ALPHA))
                         .stroke(Stroke::new(1., TEXT))
                         .inner_margin(10)
                         .show(ui, |ui| {
-                            ui.set_width(258.0);
+                            ui.set_width(panel.width() - 22.0);
                             egui::ScrollArea::vertical()
                                 .max_height(panel.height() - 24.0)
                                 .show(ui, |ui| construction_controls(ui, f, view));
@@ -164,7 +178,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             // place to learn the defaults.
             {
                 ui.painter().text(
-                    pos2(canvas.left() + 12., canvas.bottom() - 2.),
+                    layout.legend_anchor,
                     Align2::LEFT_BOTTOM,
                     format!(
                         "{} fire · {} melee · {} reload · {} build · {} pause",
@@ -178,10 +192,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     MUTED,
                 );
             }
-            let bar = Rect::from_min_max(
-                pos2(canvas.left() + 12., canvas.bottom() - 76.),
-                pos2(canvas.right() - 12., canvas.bottom() - 5.),
-            );
+            let bar = layout.bar;
             let observed = view.mode == Mode::Npc;
             ui.scope_builder(egui::UiBuilder::new().max_rect(bar), |ui| {
                 ui.horizontal_wrapped(|ui| {

@@ -10,12 +10,6 @@ use crate::{
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Stroke, pos2, vec2};
 
-pub(super) fn attack_selector_rect(canvas: Rect, arena: Rect) -> Rect {
-    Rect::from_min_max(
-        pos2(canvas.left() + 350.0, canvas.top() + 12.0),
-        pos2(canvas.right() - 222.0, arena.top() - 12.0),
-    )
-}
 pub(super) fn attack_selector(ui: &mut egui::Ui, f: &mut UiCtx, view: &BattleScreen) {
     let class = view.weapon_class;
     let spacing = 4.0;

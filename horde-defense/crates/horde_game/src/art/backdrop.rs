@@ -25,17 +25,22 @@ pub(super) fn paint_ground(p: &Painter, r: Rect, theme: usize, textures: ArtText
 /// The forest belongs to the world surrounding the complete projected arena.
 /// Clip every prop to its peripheral strip so dressing can never conceal a
 /// combat lane, a contact position, a construction cell or the aiming origin.
+///
+/// Props scale with the lane height up to `max_unit` (a lane of the reference
+/// clearing), so a zoomed field never grows them past today's size; fields
+/// with 11 or more lanes are below the cap and unchanged.
 pub fn world_backdrop(
     p: &Painter,
     canvas: Rect,
     projection: ArenaProjection,
     theme: usize,
     textures: ArtTextures,
+    max_unit: f32,
 ) {
     let arena = projection.rect;
     paint_ground(p, canvas, theme, textures);
     let strips = peripheral_strips(canvas, arena);
-    let unit = projection.lane_height().max(1.);
+    let unit = dressing_unit(projection.lane_height(), max_unit);
     for (edge, strip) in strips.into_iter().enumerate() {
         if !strip.is_positive() {
             continue;
@@ -97,6 +102,12 @@ pub fn world_backdrop(
             visual_assets::prop_grounded(&clipped, textures, prop, foot, size, tint);
         }
     }
+}
+
+/// The dressing's size unit: the lane height, capped at `max_unit`, at least
+/// one point.
+pub(super) fn dressing_unit(lane_height: f32, max_unit: f32) -> f32 {
+    lane_height.min(max_unit).max(1.)
 }
 
 pub(super) fn peripheral_strips(canvas: Rect, arena: Rect) -> [Rect; 4] {
