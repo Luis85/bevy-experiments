@@ -393,3 +393,38 @@ fn slow_frame_reports_unattributed_time() {
     assert_eq!(report["slow_frames"]["timed"], 0);
     assert!(report["slow_frames"]["min_coverage"].is_null());
 }
+
+/// W1-68 review: `coverage` counts the `outside_update` residual, so the
+/// main-thread timeline tiles every window and a stall outside every named
+/// span still reads as covered. `named_coverage` leaves the residual out: a
+/// 499 ms frame whose gap is 489.5 ms outside App::update is named only for
+/// its main schedule, channel wait and hand-off.
+#[test]
+fn slow_frame_outside_every_named_span_has_low_named_coverage() {
+    let quick = timed(990., 16.7, 990., 8., [8., 7., 6.5]);
+    // 998..1489 between frames: 1 ms channel wait, 0.5 ms extract and send,
+    // 489.5 ms outside App::update.
+    let slow = timed(1489., 499., 1489., 9., [491., 1.5, 1.]);
+    let report = report_json(&ReportInput {
+        frames: vec![quick, slow],
+        ..default()
+    });
+    let window = &report["longest_frames"][0]["attribution"];
+    assert!(close(&window["outside_update_ms"], 489.5), "{window}");
+    assert!(
+        close(&window["coverage"], 1.),
+        "the residual tiles: {window}"
+    );
+    assert!(
+        close(&window["named_coverage"], 9.5 / 499.),
+        "only 8 + 1 + 0.5 ms are named: {window}"
+    );
+    let summary = &report["slow_frames"];
+    assert_eq!(summary["covered_95"], 1);
+    assert_eq!(summary["covered_95_named"], 0, "{summary}");
+    assert!(
+        close(&summary["min_named_coverage"], 9.5 / 499.),
+        "{summary}"
+    );
+    assert!(close(&summary["max_outside_update_ms"], 489.5), "{summary}");
+}

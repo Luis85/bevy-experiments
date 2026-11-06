@@ -104,7 +104,11 @@ W1-68 done_when evidence (2026-11-06): the report now records the between-frames
 - playtest, VSync on, stress;
 - two passes of the unchanged W1-67 binary, dev VSync-on stress.
 
-At 18:09 that binary had 4-14 such frames per stress run. With 0 slow frames, the 95% coverage holds trivially. Over the 20 longest frames of each instrumented run (1,080 frames, the longest 23.4 ms), 1,077 are covered to 100%; the other 3 are first samples whose windows begin before the first kept sample. Cause named: an intermittent swap-chain acquire stall in the driver or compositor, not in-process. The stall sits in `get_current_texture`, the 1.0 s frames equal wgpu-core's acquire timeout, and there were 0 egui uploads, 0 asset events and 0 audio voices (review scenes are muted). No fix commit follows. Gate 3 needs a user ruling; no gate was moved. Details are in VALIDATION.md.
+At 18:09 that binary had 4-14 such frames per stress run. With 0 slow frames, the 95% coverage holds trivially. Over the 20 longest frames of each instrumented run (1,080 frames, the longest 23.4 ms), 1,077 are covered to 100%; the other 3 are first samples whose windows begin before the first kept sample. That 100% is an identity: `outside_update` is the gap's residual, so `coverage` is 1.0 inside the recorded range. The W1-68 review added `named_coverage`, `covered_95_named` and `max_outside_update_ms`, which leave the residual out, and pins for both hand-off paths. Cause, in two halves (narrowed by the review):
+- VSync on (W1-67): named. It is an intermittent swap-chain acquire stall in the driver or compositor, not in-process. The stall sits in `get_current_texture` in 47 of 56 frames, and the 1.0 s frames equal wgpu-core's acquire timeout.
+- VSync off (W1-61, the spec's 446-532 ms stalls): not named. All 16 frames over 50 ms had present_wait 0.09-0.20 ms, so they were not in the acquire call and sat outside every span then recorded. None has recurred under the new probe. **W1-68 is not done for this half.**
+
+The 0 egui uploads, 0 asset events and 0 audio voices (review scenes are muted) come from probes with no stalls, so they exclude nothing. No fix commit follows. Gate 3 needs a user ruling on two open items: the environmental VSync-on stall, and the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe. No gate was moved. Details are in VALIDATION.md.
 
 Wave-1 exit:
 - GOLDEN 0/6, TRACE 0/6, V1-V6 unchanged.

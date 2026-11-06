@@ -865,7 +865,11 @@ Reading: with VSync off, pipelining raises throughput (median frame 4.1-8.8 ms a
 - playtest, VSync on, stress;
 - 12 runs of the unchanged W1-67 binary (dev, VSync on, stress).
 
-That binary had 4-14 such frames per stress run 40 minutes earlier, so the A/B arms cannot be told apart today. The stalled W1-67 frames sat in `get_current_texture` (present_wait 497-547 ms, or about 1.0 s, which is wgpu-core's 1,000 ms acquire timeout) with normal main and render CPU. The fresh probes had no egui texture uploads, asset events or audio voices. Cause: an intermittent swap-chain acquire stall in the driver or compositor of this hybrid-graphics laptop, not in-process. Gate 3 is unchanged and needs a user ruling. Details are in VALIDATION.md, "The isolated 0.5 s frames (gate 3)". In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms (informational for W1-61).
+That binary had 4-14 such frames per stress run 40 minutes earlier, so the A/B arms cannot be told apart today. The stalled W1-67 frames sat in `get_current_texture` (present_wait 497-547 ms, or about 1.0 s, which is wgpu-core's 1,000 ms acquire timeout) with normal main and render CPU. The fresh probes had no egui texture uploads, asset events or audio voices, but they also had no stalls. The finding has two halves (narrowed by the W1-68 review):
+- VSync on (W1-67): an intermittent swap-chain acquire stall in the driver or compositor of this hybrid-graphics laptop, not in-process.
+- VSync off (W1-61, the spec's 446-532 ms stalls): not attributed. All 16 frames over 50 ms had present_wait 0.09-0.20 ms, so they were not in the acquire call. They sat outside every span the report then recorded, and they did not recur under the new probe. W1-68 is not done for this half.
+
+The attribution `coverage` is 1.0 by construction inside the recorded range, because `outside_update` is the residual of the gap. So the review added `named_coverage`, `covered_95_named` and `max_outside_update_ms`, which leave that residual out. Gate 3 is unchanged and needs a user ruling on two separate open items: the environmental VSync-on stall, and the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe. Details are in VALIDATION.md, "The isolated 0.5 s frames (gate 3)". In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms (informational for W1-61).
 
 ### 9.5 Camera zoom delta (W1-47)
 

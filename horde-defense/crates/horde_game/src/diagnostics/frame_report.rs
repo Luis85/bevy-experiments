@@ -217,7 +217,11 @@ struct SlowFrameEvents {
 /// (W1-68). Main thread: the main schedules, the pipelined channel waits,
 /// the rest of the render hand-offs, and the time outside App::update, as
 /// overlaps with the window; `unattributed_ms` is the window no main-thread
-/// span covers and `coverage` the covered share. Render thread: present
+/// span covers and `coverage` the covered share. `outside_update_ms` is a
+/// residual (gap minus hand-off), so consecutive samples tile the main
+/// thread and `coverage` is 1.0 by construction inside the recorded range;
+/// `named_coverage` leaves the residual out, so a stall outside every named
+/// span shows as a low share (W1-68 review). Render thread: present
 /// waits, the rest of the render frames, and the window outside any recorded
 /// render frame (idle, or a frame no sample kept).
 #[derive(Serialize)]
@@ -229,13 +233,16 @@ struct Attribution {
     outside_update_ms: f64,
     unattributed_ms: f64,
     coverage: f64,
+    named_coverage: f64,
     render_present_ms: f64,
     render_other_ms: f64,
     render_unbusy_ms: f64,
 }
 /// Every sampled frame over 50 ms (W1-68): how many had a wall-clock window,
 /// how many of those main-thread spans cover to at least 95%, the lowest
-/// coverage and the most unattributed time.
+/// coverage and the most unattributed time. The `_named` counts and
+/// `max_outside_update_ms` leave out the `outside_update` residual (W1-68
+/// review).
 #[derive(Serialize)]
 struct SlowFrameSummary {
     over_50ms: usize,
@@ -243,6 +250,9 @@ struct SlowFrameSummary {
     covered_95: usize,
     min_coverage: Option<f64>,
     max_unattributed_ms: f64,
+    covered_95_named: usize,
+    min_named_coverage: Option<f64>,
+    max_outside_update_ms: f64,
 }
 #[derive(Serialize)]
 struct BuildInfo {
@@ -426,7 +436,7 @@ fn phase_stats(frames: &[Phases<f64>]) -> Phases<Stats> {
     }
 }
 
-/// Frames at or above this are slow for `slow_frames` and are attributed.
+/// Frames above this are slow for `slow_frames` and are attributed.
 const SLOW_FRAME_MS: f64 = 50.;
 /// The coverage `slow_frames.covered_95` counts.
 const COVERED_SHARE: f64 = 0.95;
@@ -472,7 +482,15 @@ fn attribute(frames: &[RecordedFrame], index: usize) -> Option<Attribution> {
             window,
         );
     }
-    let covered = main_cpu + wait + handoff_other + outside;
+    let named = main_cpu + wait + handoff_other;
+    let covered = named + outside;
+    let share = |part: f64| {
+        if frame.frame_ms > 0. {
+            (part / frame.frame_ms).min(1.)
+        } else {
+            1.
+        }
+    };
     Some(Attribution {
         window_begin_ms: window.0,
         main_cpu_ms: main_cpu,
@@ -480,11 +498,8 @@ fn attribute(frames: &[RecordedFrame], index: usize) -> Option<Attribution> {
         handoff_other_ms: handoff_other,
         outside_update_ms: outside,
         unattributed_ms: (frame.frame_ms - covered).max(0.),
-        coverage: if frame.frame_ms > 0. {
-            (covered / frame.frame_ms).min(1.)
-        } else {
-            1.
-        },
+        coverage: share(covered),
+        named_coverage: share(named),
         render_present_ms: present,
         render_other_ms: (busy - present).max(0.),
         render_unbusy_ms: (frame.frame_ms - busy).max(0.),
@@ -506,6 +521,15 @@ fn slow_frame_summary(frames: &[RecordedFrame]) -> SlowFrameSummary {
         max_unattributed_ms: attributed
             .iter()
             .map(|a| a.unattributed_ms)
+            .fold(0., f64::max),
+        covered_95_named: attributed
+            .iter()
+            .filter(|a| a.named_coverage >= COVERED_SHARE)
+            .count(),
+        min_named_coverage: attributed.iter().map(|a| a.named_coverage).reduce(f64::min),
+        max_outside_update_ms: attributed
+            .iter()
+            .map(|a| a.outside_update_ms)
             .fold(0., f64::max),
     }
 }
@@ -715,7 +739,7 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
             audio_assets: count_stats(frames.iter().map(|f| f.probe.events.audio_assets)),
             audio_voices: count_stats(frames.iter().map(|f| f.probe.events.audio_voices)),
         },
-        attribution_scope: "W1-68. Instants are wall clock in ms since the probe epoch. A frame's window is time_ms - frame_ms .. time_ms, where time_ms is the instant Time<Real> used (the render world's send_time when it arrived, else First). gap = previous end of Last to First on the main thread; handoff = its first part, the render hand-off (pipelined: RenderExtractApp extract = channel receive + RenderApp extract + send, channel_wait = that minus the extract; not pipelined: RenderApp extract + Render schedule); outside_update = gap - handoff (winit event loop, OS). render_idle = previous render end to this render begin. attribution overlaps the window with every sample's main-thread spans and every distinct render sample; slow_frames counts frames over 50 ms.",
+        attribution_scope: "W1-68. Instants are wall clock in ms since the probe epoch. A frame's window is time_ms - frame_ms .. time_ms, where time_ms is the instant Time<Real> used (the render world's send_time when it arrived, else First). gap = previous end of Last to First on the main thread; handoff = its first part, the render hand-off (pipelined: RenderExtractApp extract = channel receive + RenderApp extract + send, channel_wait = that minus the extract; not pipelined: RenderApp extract + Render schedule); outside_update = gap - handoff (winit event loop, OS). render_idle = previous render end to this render begin. attribution overlaps the window with every sample's main-thread spans and every distinct render sample. outside_update is a residual, so coverage (which counts it) is 1.0 by construction inside the recorded range; named_coverage = (main_cpu + channel_wait + handoff_other) / frame_ms leaves it out, and an unexplained stall shows as a large outside_update and a low named_coverage. slow_frames counts frames over 50 ms; covered_95_named, min_named_coverage and max_outside_update_ms are the named-span counterparts.",
         slow_frames: slow_frame_summary(frames),
         present: input.present.clone(),
         build: build_info(input.profile_label.as_deref()),

@@ -157,3 +157,93 @@ fn perf_launch_records_the_between_frames_gap_and_events() {
     let third = app.world().resource::<PerfFrame>().0.clone().unwrap();
     assert_eq!(third.events, FrameEvents::default());
 }
+
+#[cfg(feature = "review")]
+fn sleep_ms(ms: u64) {
+    std::thread::sleep(std::time::Duration::from_millis(ms));
+}
+
+/// W1-68 review: pipelined, the hand-off is the `RenderExtractApp` extract
+/// (here a 5 ms wait, then the `RenderApp` extract of 3 ms), and the channel
+/// wait is that minus the inner extract. As in `PipelinedRenderingPlugin`,
+/// the `RenderApp` leaves the app and only the hand-off runs its extract.
+#[cfg(feature = "review")]
+#[test]
+fn pipelined_handoff_holds_the_channel_wait_and_the_extract() {
+    use bevy::app::SubApp;
+    use bevy::render::{RenderApp, pipelined_rendering::RenderExtractApp};
+    use std::sync::{Arc, Mutex};
+    let mut app = perf_app();
+    let mut render = SubApp::new();
+    render.set_extract(|_, _| sleep_ms(3));
+    app.insert_sub_app(RenderApp, render);
+    let channel: Arc<Mutex<Option<SubApp>>> = Arc::default();
+    let receive = channel.clone();
+    let mut handoff = SubApp::new();
+    handoff.set_extract(move |main, _| {
+        sleep_ms(5);
+        if let Some(render) = receive.lock().unwrap().as_mut() {
+            render.extract(main);
+        }
+    });
+    app.insert_sub_app(RenderExtractApp, handoff);
+    app.finish();
+    let probe = app.world().resource::<PerfProbe>().clone();
+    assert!(probe.pipelined());
+    *channel.lock().unwrap() = app.remove_sub_app(RenderApp);
+    app.update();
+    app.update();
+    let frame = app.world().resource::<PerfFrame>().0.clone().unwrap();
+    assert!(frame.handoff_ms >= 8.0, "{frame:?}");
+    assert!(frame.channel_wait_ms >= 5.0, "{frame:?}");
+    assert!(
+        frame.channel_wait_ms <= frame.handoff_ms - 3.0,
+        "the extract is not channel wait: {frame:?}"
+    );
+    assert!(frame.gap_ms >= frame.handoff_ms, "{frame:?}");
+}
+
+/// W1-68 review: not pipelined, the hand-off is the `RenderApp` extract
+/// (3 ms) plus the Render schedule (4 ms), both on the main thread before
+/// the next First, and there is no channel wait.
+#[cfg(feature = "review")]
+#[test]
+fn unpipelined_handoff_holds_the_extract_and_the_render_schedule() {
+    use bevy::app::SubApp;
+    use bevy::ecs::schedule::ScheduleLabel;
+    use bevy::render::{Render, RenderApp, RenderSystems};
+    let mut app = perf_app();
+    let probe = app.world().resource::<PerfProbe>().clone();
+    let mut render = SubApp::new();
+    render.insert_resource(probe.clone());
+    render.update_schedule = Some(Render.intern());
+    render.configure_sets(
+        Render,
+        (
+            RenderSystems::ExtractCommands,
+            RenderSystems::PrepareViews,
+            RenderSystems::PostCleanup,
+        )
+            .chain(),
+    );
+    render.add_systems(
+        Render,
+        (|| sleep_ms(4))
+            .after(RenderSystems::ExtractCommands)
+            .before(RenderSystems::PostCleanup),
+    );
+    render_probe::add(&mut render);
+    render.set_extract(|_, _| sleep_ms(3));
+    app.insert_sub_app(RenderApp, render);
+    app.finish();
+    assert!(!probe.pipelined());
+    app.update();
+    app.update();
+    let frame = app.world().resource::<PerfFrame>().0.clone().unwrap();
+    assert!(frame.handoff_ms >= 7.0, "{frame:?}");
+    assert_eq!(frame.channel_wait_ms, 0., "{frame:?}");
+    assert!(frame.gap_ms >= frame.handoff_ms, "{frame:?}");
+    let sample = frame.render.expect("the Render schedule ran");
+    assert!(sample.extract_ms >= 3.0, "{sample:?}");
+    assert!(sample.render_schedule_ms >= 4.0, "{sample:?}");
+}

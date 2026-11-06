@@ -502,7 +502,11 @@ From now on a new saved field must be serde-defaulted, skipped at its default an
 
 ## The isolated 0.5 s frames (gate 3) — 6 November 2026 (W1-68)
 
-**Finding: the 0.5 s and 1.0 s frames are a swap-chain acquire stall in the graphics driver or compositor of this hybrid-graphics laptop. They come and go with the machine's state, not with the code.** Nothing in process was found to cause them. Gate 3 (`frames_over_50ms` 0) is unchanged and needs a user ruling.
+**Finding, in two halves (narrowed by the W1-68 review).**
+- **VSync on (the W1-67 stalls): a swap-chain acquire stall in the graphics driver or compositor of this hybrid-graphics laptop.** In 47 of the 56 stalled W1-67 frames the time sat in `get_current_texture`. These stalls come and go with the machine's state, not with the code.
+- **VSync off (the W1-61 playtest stalls of 446-532 ms, the spec's own observation): not attributed.** They were not in the acquire call: all 16 frames over 50 ms had a present_wait of 0.09-0.20 ms. No span that the v3 report recorded at the time holds them. They did not recur under the W1-68 instrumentation, so the new gap fields have never seen one. Their cause is not named, and W1-68's done_when ("the cause is named with evidence") is not met for this half.
+
+Nothing in process was found to cause either. Gate 3 (`frames_over_50ms` 0) is unchanged. It needs a user ruling on two separate open items: the environmental VSync-on acquire stall, and the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe.
 
 **What the frame report now records (W1-68).** These fields are still report version 3; every earlier key keeps its meaning.
 - `phases.gap_ms`: the main thread from the previous frame's end of `Last` to this frame's First.
@@ -514,10 +518,10 @@ From now on a new saved field must be serde-defaulted, skipped at its default an
 - `longest_frames`:
   - Wall-clock instants, in ms since the probe epoch: the `Time<Real>` instant that closed the frame, First begin, end of `Last`, and the render sample's begin, present begin and end.
   - The frame's events and egui texture-upload bytes.
-  - An `attribution` that overlaps the frame's window (`time_ms - frame_ms .. time_ms`) with every sample's main-thread spans: main schedule, channel wait, the rest of the hand-off, and outside update. It does the same with every distinct render sample: present wait, the rest of the render frame, and time with no render frame. `coverage` is the covered share of the window.
-- `slow_frames`: how many frames were over 50 ms, how many were timed, and how many of those are covered to at least 95%.
+  - An `attribution` that overlaps the frame's window (`time_ms - frame_ms .. time_ms`) with every sample's main-thread spans: main schedule, channel wait, the rest of the hand-off, and outside update. It does the same with every distinct render sample: present wait, the rest of the render frame, and time with no render frame. `coverage` is the covered share of the window. `outside_update` is a residual (gap minus hand-off). Consecutive samples tile the main thread, so `coverage` is 1.0 by construction for any window inside the recorded range; only missing samples (the first sample, warmup) lower it. `named_coverage` (W1-68 review) leaves the residual out: (main schedule + channel wait + rest of the hand-off) / frame. An unexplained stall shows as a large `outside_update_ms` and a low `named_coverage`.
+- `slow_frames`: how many frames were over 50 ms, how many were timed, and how many of those are covered to at least 95%. `covered_95_named`, `min_named_coverage` and `max_outside_update_ms` give the same over the named spans only.
 
-Pins: `slow_frame_reports_unattributed_time` and `perf_launch_records_the_between_frames_gap_and_events`.
+Pins: `slow_frame_reports_unattributed_time`, `slow_frame_outside_every_named_span_has_low_named_coverage`, `perf_launch_records_the_between_frames_gap_and_events`, `pipelined_handoff_holds_the_channel_wait_and_the_extract` and `unpipelined_handoff_holds_the_extract_and_the_render_schedule`.
 
 **Fresh probes.** Same hardware and power state as before (mains, Balanced). The machine was shared, and a 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (up to 100% load in two passes). Each pass is `measure_performance.ps1 -Repeat 3` at both sizes. Every run was valid, and every pass exited 0.
 
@@ -537,7 +541,7 @@ Pins: `slow_frame_reports_unattributed_time` and `perf_launch_records_the_betwee
 
 The last two passes ran the W1-67 binary itself. In the first, the W1-68 files were set aside so the build was HEAD. The second ran an unrebuilt HEAD dev build, because restoring the files with their older timestamps did not trigger a rebuild. Its report has no W1-68 fields, which confirms it was the HEAD build.
 
-**Evidence for the cause.**
+**Evidence.** Items 1 and 2 are about the VSync-on stalls only.
 1. **The same code stalls or not depending on the hour.**
    - At 18:09 the W1-67 binary (this HEAD) had 4-14 frames over 50 ms in every dev VSync-on stress run (`target/perf/w1-67/after-dev-vsync-stress`).
    - From 18:50 to 19:04 the same binary had 0 in 12 runs (6 x 1,800 and 6 x 3,600 frames).
@@ -548,21 +552,32 @@ The last two passes ran the W1-67 binary itself. In the first, the W1-68 files w
    - Main CPU was 5.6-12.9 ms, and render-world CPU was a normal 2.3-3.5 ms.
    - In the other 9, the frame's render sample was a normal one (Render schedule 2.7-10 ms). The v3 report keeps only the latest render sample per frame, and the stall had landed in a render frame it did not keep. The W1-68 per-sample instants and the attribution now place such a frame.
    - The 1.0 s frames equal wgpu-core's surface acquire timeout (`FRAME_TIMEOUT_MS = 1000`, wgpu-core 30.0.1 present.rs:32, :178). The render thread waited out that whole timeout in the driver's image acquire, sometimes five frames in a row (stress-small-r3, samples 1024-1028).
-3. **No in-process work lines up with them.**
+3. **No in-process work was busy in the fresh probes, but they had no stalls.** These counts come from the W1-68 probes, which had 0 frames over 50 ms. They rule nothing out for a stalled frame; they show that none of these sources was busy in the passes run.
    - egui texture uploads were 0 in every sampled frame of every pass, so the W1-64 churn is gone.
    - `Image` and `AudioSource` asset events were 0 in every frame.
    - Window messages were 0, except 2 in one stress run.
    - No audio voice was ever spawned. The review scenes run with master volume 0 (`ui/review/matrix.rs:21`), so `play_sounds` returns before spawning. Audio voice creation therefore cannot have caused the stalls measured in these scenes. Ordinary play with sound is not covered by this.
-   - OS descheduling cannot be excluded in general. But it would not land, time after time, inside the one swap-chain call, in multiples of about 0.5 s and at the 1.0 s timeout.
-4. **The new fields close on real frames.** The attribution was taken over the 20 longest frames of each instrumented run (1,080 frames, the longest 23.4 ms). It covered 1,077 of them to 100%. The other 3 are a run's first samples, whose windows begin before the first kept sample. With VSync on, the gap of about 13.3 ms is the channel wait (about 12.4 ms) plus 0.8 ms outside the update: the main thread waits on a render thread that is held by the present. If the stall returns, a frame over 50 ms will show whether it was:
-   - the channel wait, with the render thread's present wait;
-   - time outside App::update (winit or OS);
+   - OS descheduling cannot be excluded in general. For the VSync-on stalls it would not land, time after time, inside the one swap-chain call, in multiples of about 0.5 s and at the 1.0 s timeout. For the VSync-off stalls it is not excluded.
+4. **The VSync-off stalls (W1-61) were not in the acquire call, and are not attributed.** `target/perf/w1-61/probe-playtest-novsync` and `-stress` (AutoNoVsync, pipelined, RTX, Vulkan) had 16 frames over 50 ms: 4 in stress-normal, 8 in stress-small, 2 in progressed-peak-normal and 2 in progressed-peak-small. All but one (58 ms) were 445.5-510.2 ms. In every one of them:
+   - present_wait was 0.09-0.20 ms;
+   - main CPU was 5.8-11.7 ms and the Render schedule 2.0-7.4 ms.
+
+   The v3 report keeps only the latest render sample per frame, so for any single frame a stall in a render frame it did not keep cannot be excluded. In the VSync-on W1-67 runs that applied to 9 of 56 stalled frames; here it would have to apply to 16 of 16. So the VSync-off stalls sat outside every span that report recorded: in the main-thread gap (winit, the OS) or in render-thread idle. W1-61 predates both the W1-64 egui texture-upload counter and the W1-68 gap and event fields. So egui texture churn (fixed in W1-64), window or asset events, and OS descheduling are all still open for them. Audio voices are not: the review scenes were already muted then (`ui/review/matrix.rs`, since 4 November). Since W1-64, no VSync-off probe has had a frame near 0.5 s. The W1-64 review pass (`target/perf/w1-64/review-playtest-novsync`, 18 runs) and the six W1-68 VSync-off passes (36 runs) had 0 frames over 50 ms. A deliberately unfocused W1-64 stress run (`playtest-novsync-stress-unfocused`) had 1-2 frames of 52-157 ms, with present_wait of 0.06-0.37 ms and 0 texture uploads. That is consistent with W1-64's fix but does not show it, because the VSync-on stall also stopped in the same hours.
+5. **What the new fields show on real frames, and what they cannot.** Over the 20 longest frames of each instrumented run (1,080 frames, the longest 23.4 ms), the attribution `coverage` was 100% for 1,077. The other 3 are a run's first samples, whose windows begin before the first kept sample. That 100% is an identity, not evidence: `outside_update` takes whatever the named spans leave, so `coverage` is 1.0 for any window inside the recorded range. These probes were recorded before `named_coverage` existed. With VSync on, the gap of about 13.3 ms is the channel wait (about 12.4 ms) plus 0.8 ms outside the update: the main thread waits on a render thread that is held by the present. If a stall returns, a frame over 50 ms will show whether it was:
+   - the channel wait, with the render thread's present wait (high `named_coverage`);
+   - time outside App::update, winit or the OS (large `outside_update_ms`, low `named_coverage`);
    - the main schedule.
+6. **The A/B probes cannot tell the arms apart today.** Pipelined off, the integrated Intel Arc adapter and the DX12 backend all had 0 frames over 50 ms. So did the default arm in the same hour. Without pipelining the gap holds the render work (2.9 ms) and the median frame rises from 3.2 to 5.5 ms. DX12 has a longer channel wait (2.2 ms against 0.1 ms on Vulkan) at a similar cpu_frame p99.
 
-   The VSync-off 0.5 s frames of the W1-61 probes had present_wait of about 0.1 ms and fell outside every span. They did not recur here.
-5. **The A/B probes cannot tell the arms apart today.** Pipelined off, the integrated Intel Arc adapter and the DX12 backend all had 0 frames over 50 ms. So did the default arm in the same hour. Without pipelining the gap holds the render work (2.9 ms) and the median frame rises from 3.2 to 5.5 ms. DX12 has a longer channel wait (2.2 ms against 0.1 ms on Vulkan) at a similar cpu_frame p99.
+**Status: W1-68 is not done for the VSync-off half.** Every fresh probe meets the done_when coverage (every frame over 50 ms covered to at least 95%) only trivially, because there were 0 such frames.
+- VSync on: the cause is named, an environmental acquire stall, so no in-process fix follows. The intermittent stall makes gate 3 unreachable on demand on this machine.
+- VSync off: the cause is not named. The W1-61 stalls were not in the acquire call, and none has been seen under the W1-68 probe.
 
-**Status.** Every fresh probe meets the done_when coverage (every frame over 50 ms covered to at least 95%) only trivially, because there were 0 such frames. The cause is environmental, so no in-process fix follows. The intermittent stall makes gate 3 unreachable on demand on this machine. This needs a user ruling; the gate was not moved. In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms at progressed-peak and 6.6-6.7 ms in stress, against ≤ 10.0. That is informational for W1-61, which re-runs the gates.
+Two open items need a user ruling; the gate was not moved:
+1. the environmental VSync-on acquire stall;
+2. the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe (`named_coverage`, `outside_update_ms`, events).
+
+In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms at progressed-peak and 6.6-6.7 ms in stress, against ≤ 10.0. That is informational for W1-61, which re-runs the gates.
 
 ## Full verify
 
