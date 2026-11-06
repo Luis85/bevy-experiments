@@ -20,7 +20,8 @@ const WALKERS: usize = 4;
 /// Legacy `defender-rig-v1.png`: now only the firearm/ordnance icon source.
 const RIG: usize = 5;
 const MENU_IDLE: usize = 6;
-const PATHS: [&str; 7] = [
+/// The egui art slots, relative to `assets/`; the asset audit's runtime set.
+pub(crate) const PATHS: [&str; 7] = [
     "art/pixel/actors-v1.png",
     "art/pixel/props-v1.png",
     "art/pixel/keyart-v2.png",

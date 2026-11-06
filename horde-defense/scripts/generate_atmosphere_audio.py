@@ -1,28 +1,59 @@
-"""Original Lastlight scene layers/source cues, synthesized with the stdlib.
+"""Original Lastlight ambience beds and legacy source cues, synthesized with the stdlib.
 
-No recordings, samples or external assets are inputs. Existing nine clips are
-read only for provenance and preservation checks; this script writes nine new
-files. Fixed seeds and cycle-complete oscillators make regeneration repeatable.
+No recordings, samples or external assets are inputs. Fixed seeds and
+cycle-complete oscillators make regeneration repeatable.
+
+Owned files: the five ambient_* loops in assets/audio (shipped beds) and the
+four legacy cues in archive/audio (archived, not shipped, by production-pass
+decision 10). The nine clips of scripts/generate_audio.py (ambience in
+assets/audio, the other eight in archive/audio) are read only, for provenance
+and the preservation check. This script is the one writer of the two Python
+manifests: assets/audio/PROVENANCE.json (the six beds) and
+archive/audio/PROVENANCE.json (the twelve archived clips).
+assets/audio/SURVIVAL_PROVENANCE.json belongs to the Rust exporter and is never
+read or written here.
+
+--check (the default) renders into a temporary directory outside the
+workspace, compares every owned clip and both manifests with the committed
+bytes, writes nothing and exits 1 on any mismatch. --write regenerates the
+owned clips and both manifests in place. Run it as
+python -I -B scripts/generate_atmosphere_audio.py [--check | --write].
 """
+import argparse
 import hashlib
 import json
 import math
 from pathlib import Path
 import random
 import struct
+import sys
+import tempfile
 import wave
 
 ROOT = Path(__file__).resolve().parents[1]
-OUTPUT = ROOT / "assets" / "audio"
+ASSETS = ROOT / "assets" / "audio"
+ARCHIVE = ROOT / "archive" / "audio"
 RATE = 22_050
 TAU = math.tau
-ORIGINAL = ("shot", "reload", "melee", "damage", "boss", "ambience", "incoming", "ready", "structure")
+# scripts/generate_audio.py's clips, read only, and the folder each lives in.
+ORIGINAL = {"shot": ARCHIVE, "reload": ARCHIVE, "melee": ARCHIVE, "damage": ARCHIVE, "boss": ARCHIVE, "ambience": ASSETS, "incoming": ARCHIVE, "ready": ARCHIVE, "structure": ARCHIVE}
+# Owned: the loops ship in assets/audio, the cues are archived.
 LOOPS = {"ambient_wind": (16.0, 301), "ambient_urban": (20.0, 302), "ambient_nature": (24.0, 303), "ambient_rain": (18.0, 304), "ambient_cold": (22.0, 305)}
 CUES = {"npc_shot": (0.26, 401), "turret_shot": (0.20, 402), "trap": (0.65, 403), "armor": (0.15, 404)}
+OWNED = {**{name: ASSETS for name in LOOPS}, **{name: ARCHIVE for name in CUES}}
+ARCHIVED = "2026-11-06"
+ARCHIVE_NOTE = "Not shipped; retained by production-pass decision 10; restore with git mv"
+ARCHIVE_REASON = "Not loaded at runtime; archived by production-pass decision 10 (user archive list)"
+SEAM_VALIDATION = "Boundary one-sample change does not exceed the larger of 0.004 full scale and the clip's 99th-percentile interior one-sample change; cycle-complete oscillators and cyclic IIR memory avoid a special seam impulse."
 
 
 def digest(path):
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def source_digest(path):
+    """The LF-normalised SHA-256 of a text source, the same on every checkout."""
+    return hashlib.sha256(path.read_bytes().replace(b"\r\n", b"\n")).hexdigest()
 
 
 def chirp(t, onset, duration, pitch, rise, gain):
@@ -118,15 +149,22 @@ def render_cue(name, seconds, seed):
     return values
 
 
-def write_clip(name, values):
-    assert values and all(math.isfinite(value) and abs(value) < 0.95 for value in values), name
+def write_clip(path, values):
+    assert values and all(math.isfinite(value) and abs(value) < 0.95 for value in values), path.name
     payload = b"".join(struct.pack("<h", round(value * 32767)) for value in values)
-    path = OUTPUT / f"{name}.wav"
     with wave.open(str(path), "wb") as audio:
         audio.setnchannels(1)
         audio.setsampwidth(2)
         audio.setframerate(RATE)
         audio.writeframes(payload)
+
+
+def render_owned(destination):
+    """Render every owned clip; destination(name) is the folder to write it in."""
+    for name, (seconds, seed) in LOOPS.items():
+        write_clip(destination(name) / f"{name}.wav", render_loop(name, seconds, seed))
+    for name, (seconds, seed) in CUES.items():
+        write_clip(destination(name) / f"{name}.wav", render_cue(name, seconds, seed))
 
 
 def inspect(path):
@@ -139,32 +177,96 @@ def inspect(path):
     return {"file": path.name, "seconds": frames / RATE, "frames": frames, "peak": peak, "rms": math.sqrt(sum(value * value for value in values) / frames) / 32767.0, "boundary_step": abs(values[-1] - values[0]) / 32767.0, "sha256": digest(path)}
 
 
-def main():
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    originals = {name: digest(OUTPUT / f"{name}.wav") for name in ORIGINAL}
-    for name, (seconds, seed) in LOOPS.items():
-        write_clip(name, render_loop(name, seconds, seed))
-    for name, (seconds, seed) in CUES.items():
-        write_clip(name, render_cue(name, seconds, seed))
-    assert all(digest(OUTPUT / f"{name}.wav") == sha for name, sha in originals.items()), "Existing audio changed"
-    records = []
-    for path in sorted(OUTPUT.glob("*.wav")):
-        record = inspect(path)
-        if path.stem in LOOPS:
-            with wave.open(str(path), "rb") as audio:
-                values = struct.unpack(f"<{audio.getnframes()}h", audio.readframes(audio.getnframes()))
-            differences = sorted(abs(b - a) / 32767.0 for a, b in zip(values, values[1:]))
-            limit = max(0.004, differences[int(len(differences) * 0.99)])
-            assert record["boundary_step"] <= limit, (path.name, record["boundary_step"], limit)
-            record["seam_limit"] = limit
-        record["generator"] = "scripts/generate_atmosphere_audio.py" if path.stem in LOOPS or path.stem in CUES else "scripts/generate_audio.py"
-        record["seed"] = (LOOPS.get(path.stem) or CUES.get(path.stem) or (0.0, 12))[1]
-        records.append(record)
-    provenance = {"authored": "2026-11-02", "license": "MIT (repository original assets)", "inputs": "Python standard-library synthesis; no recordings or third-party samples", "sample_rate": RATE, "channels": 1, "bits": 16, "generator_sha256": digest(Path(__file__)), "loop_seam_validation": "Boundary one-sample change does not exceed the larger of 0.004 full scale and the clip's 99th-percentile interior one-sample change; cycle-complete oscillators and cyclic IIR memory avoid a special seam impulse.", "preserved_originals": originals, "files": records}
-    (OUTPUT / "PROVENANCE.json").write_text(json.dumps(provenance, indent=2) + "\n", encoding="utf-8")
-    print(json.dumps(records, indent=2))
-    print("PASS: original nine WAV files are byte-identical; all clips are mono 16-bit 22,050 Hz PCM, unclipped, and new loop seams pass.")
+def record(name, path):
+    entry = inspect(path)
+    if name in LOOPS:
+        with wave.open(str(path), "rb") as audio:
+            values = struct.unpack(f"<{audio.getnframes()}h", audio.readframes(audio.getnframes()))
+        differences = sorted(abs(b - a) / 32767.0 for a, b in zip(values, values[1:]))
+        limit = max(0.004, differences[int(len(differences) * 0.99)])
+        assert entry["boundary_step"] <= limit, (path.name, entry["boundary_step"], limit)
+        entry["seam_limit"] = limit
+    entry["generator"] = "scripts/generate_atmosphere_audio.py" if name in OWNED else "scripts/generate_audio.py"
+    entry["seed"] = (LOOPS.get(name) or CUES.get(name) or (0.0, 12))[1]
+    if (OWNED.get(name) or ORIGINAL.get(name)) == ARCHIVE:
+        entry["bytes"] = path.stat().st_size
+        entry["archived_from"] = f"assets/audio/{name}.wav"
+        entry["archived"] = ARCHIVED
+        entry["reason"] = ARCHIVE_REASON
+    return entry
+
+
+def manifests(location, originals):
+    """Both Python manifests as {path: text}; location(name) is the clip to inspect."""
+    header = {"authored": "2026-11-02", "license": "MIT (repository original assets)", "inputs": "Python standard-library synthesis; no recordings or third-party samples", "sample_rate": RATE, "channels": 1, "bits": 16, "generator_sha256": source_digest(Path(__file__))}
+    texts = {}
+    for folder in (ASSETS, ARCHIVE):
+        names = sorted(name for name in (*ORIGINAL, *OWNED) if (OWNED.get(name) or ORIGINAL.get(name)) == folder)
+        provenance = dict(header)
+        if folder == ASSETS:
+            provenance["loop_seam_validation"] = SEAM_VALIDATION
+        else:
+            provenance["note"] = ARCHIVE_NOTE
+        provenance["preserved_originals"] = {name: sha for name, sha in originals.items() if ORIGINAL[name] == folder}
+        provenance["files"] = [record(name, location(name)) for name in names]
+        texts[folder / "PROVENANCE.json"] = json.dumps(provenance, indent=2) + "\n"
+    return texts
+
+
+def committed(path):
+    return path.read_bytes().replace(b"\r\n", b"\n") if path.is_file() else None
+
+
+def check():
+    failures = []
+    missing = [f"{folder / name}.wav" for name, folder in ORIGINAL.items() if not (folder / f"{name}.wav").is_file()]
+    if missing:
+        print("FAIL: missing generate_audio.py clips: " + ", ".join(missing))
+        return 1
+    originals = {name: digest(folder / f"{name}.wav") for name, folder in ORIGINAL.items()}
+    with tempfile.TemporaryDirectory(prefix="lastlight-atmosphere-") as temp:
+        temp = Path(temp)
+        render_owned(lambda name: temp)
+        for name, folder in OWNED.items():
+            path = folder / f"{name}.wav"
+            if not path.is_file():
+                failures.append(f"{path.relative_to(ROOT)}: missing")
+            elif digest(path) != digest(temp / f"{name}.wav"):
+                failures.append(f"{path.relative_to(ROOT)}: rendered sha256 differs")
+        texts = manifests(lambda name: temp / f"{name}.wav" if name in OWNED else ORIGINAL[name] / f"{name}.wav", originals)
+        for path, text in texts.items():
+            if committed(path) != text.encode("utf-8"):
+                failures.append(f"{path.relative_to(ROOT)}: differs from the rendered manifest")
+    for failure in failures:
+        print("FAIL: " + failure)
+    if failures:
+        print("Run with --write to regenerate, then review the diff.")
+        return 1
+    print(f"PASS: {len(OWNED)} owned clips and both Python manifests are byte-identical to a fresh render; nothing written.")
+    return 0
+
+
+def write():
+    for folder in (ASSETS, ARCHIVE):
+        folder.mkdir(parents=True, exist_ok=True)
+    originals = {name: digest(folder / f"{name}.wav") for name, folder in ORIGINAL.items()}
+    render_owned(lambda name: OWNED[name])
+    assert all(digest(ORIGINAL[name] / f"{name}.wav") == sha for name, sha in originals.items()), "Existing audio changed"
+    texts = manifests(lambda name: (OWNED.get(name) or ORIGINAL[name]) / f"{name}.wav", originals)
+    for path, text in texts.items():
+        path.write_bytes(text.encode("utf-8"))
+    print("PASS: generate_audio.py's nine clips are byte-identical; all clips are mono 16-bit 22,050 Hz PCM, unclipped, and loop seams pass.")
+    return 0
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--check", action="store_true", help="render to a temp dir and compare (default)")
+    mode.add_argument("--write", action="store_true", help="regenerate the owned clips and both manifests")
+    arguments = parser.parse_args(argv)
+    return write() if arguments.write else check()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

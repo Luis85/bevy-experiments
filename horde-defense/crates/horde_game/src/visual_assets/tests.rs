@@ -359,8 +359,9 @@ fn calibrated_pixel_sources_keep_their_original_dimensions_and_rgba_pixels() {
             0xbe09_5ad1_ad84_d49d,
         ),
         (
+            // Archived (production-pass decision 10): the edit source of keyart-v2.
             "keyart",
-            include_bytes!("../../../../assets/art/pixel/keyart-v1.png").as_slice(),
+            include_bytes!("../../../../archive/art/pixel/keyart-v1.png").as_slice(),
             [1672., 941.],
             0x6759_02fc_df6f_a532,
         ),

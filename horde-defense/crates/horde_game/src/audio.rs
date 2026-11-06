@@ -127,6 +127,23 @@ pub fn variant_path(cue: Cue, variant: u64) -> String {
     format!("audio/survival_{}_{}.wav", cue.name(), variant % 3)
 }
 
+/// Every WAV the runtime can load, relative to `assets/`: each synthesized
+/// family's three variants (alias cues play these banks) plus the ambience
+/// beds. The asset audit holds `assets/audio` to exactly this set.
+#[cfg(test)]
+pub(crate) fn runtime_wav_paths() -> Vec<String> {
+    let mut paths: Vec<String> = synthesis::ALL
+        .iter()
+        .flat_map(|&cue| (0..3).map(move |variant| variant_path(cue, variant)))
+        .collect();
+    paths.extend(
+        crate::atmosphere_audio::AmbienceChannel::ALL
+            .iter()
+            .map(|channel| channel.path().to_owned()),
+    );
+    paths
+}
+
 /// Coalesce repeated ticks and accelerated observation into a restrained real-
 /// time soundscape. A cue dropped by the gate never delays a simulation action.
 #[derive(Debug, Default)]

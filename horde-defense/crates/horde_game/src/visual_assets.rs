@@ -94,6 +94,8 @@ use enemy_visuals::{EnemySprite, SpriteArt, WalkArt};
 #[cfg(test)]
 use flash::{FlashMask, hit_flash_color};
 pub use flash::{FlashMasks, HitFlash, actor_hit_flash, hit_flash_runs};
+#[cfg(test)]
+pub(crate) use loading::PATHS;
 #[cfg(feature = "review")]
 pub use loading::VisualAssets;
 #[cfg(test)]

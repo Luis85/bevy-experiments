@@ -5,18 +5,10 @@
   "sample_rate": 22050,
   "channels": 1,
   "bits": 16,
-  "generator_sha256": "277e444216d8c56cc7fb36fb2dc0337d67446b301439d370fc87d07cc8d20914",
+  "generator_sha256": "07a4cfb82ede55c0b3004dd59aa8984846d89deea8159a017ab46fdca7380ed2",
   "loop_seam_validation": "Boundary one-sample change does not exceed the larger of 0.004 full scale and the clip's 99th-percentile interior one-sample change; cycle-complete oscillators and cyclic IIR memory avoid a special seam impulse.",
   "preserved_originals": {
-    "shot": "d60410c0505d0657e970db69d582b2068fa71ceaca92faba574aadf9c994ae88",
-    "reload": "c0aa21fe77682aea50c6292b761b8743197b23a14d9d5e98748a9ccd3882b1fa",
-    "melee": "90812f57a3d6b4fc79b7fda7879756d70a57d4b097d3ad92d3ed09731ec41221",
-    "damage": "b4ad0f0fa3754b47519f20e59d2a5ce829126c99f12cb940c6f6a99a81fafbb6",
-    "boss": "4d1840e3d922488efcf8b863186adb76c3e63323cff9978763be8ff4af08679d",
-    "ambience": "fcc36d85b248692bf45351f3a4152e7a10147bc12e0071ffe66cd599844a45f9",
-    "incoming": "66b8ad6b3e6bf8e28d7e4870c321ce576a684562de330707ac9d33376e8d7b85",
-    "ready": "4e98782c1ea691e9027be415987f10779f32f61fbab9f931ee10edcab442c151",
-    "structure": "ad47a01296ac59d9dc982020ad949285d7fbbb5b36da82c9e3df66fa5e9de966"
+    "ambience": "fcc36d85b248692bf45351f3a4152e7a10147bc12e0071ffe66cd599844a45f9"
   },
   "files": [
     {
@@ -89,138 +81,6 @@
       "seam_limit": 0.08267464217047639,
       "generator": "scripts/generate_atmosphere_audio.py",
       "seed": 301
-    },
-    {
-      "file": "armor.wav",
-      "seconds": 0.15002267573696146,
-      "frames": 3308,
-      "peak": 7642,
-      "rms": 0.032122901877488966,
-      "boundary_step": 0.0,
-      "sha256": "8b1d7caf5598fdc20553c967de3b312adae28af4e89d8cd5c5a5c1558e9b0336",
-      "generator": "scripts/generate_atmosphere_audio.py",
-      "seed": 404
-    },
-    {
-      "file": "boss.wav",
-      "seconds": 1.6,
-      "frames": 35280,
-      "peak": 10054,
-      "rms": 0.10078523821596673,
-      "boundary_step": 0.0,
-      "sha256": "4d1840e3d922488efcf8b863186adb76c3e63323cff9978763be8ff4af08679d",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "damage.wav",
-      "seconds": 0.4,
-      "frames": 8820,
-      "peak": 15773,
-      "rms": 0.11303223620613986,
-      "boundary_step": 0.0,
-      "sha256": "b4ad0f0fa3754b47519f20e59d2a5ce829126c99f12cb940c6f6a99a81fafbb6",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "incoming.wav",
-      "seconds": 0.34,
-      "frames": 7497,
-      "peak": 8565,
-      "rms": 0.041965643646489546,
-      "boundary_step": 0.0,
-      "sha256": "66b8ad6b3e6bf8e28d7e4870c321ce576a684562de330707ac9d33376e8d7b85",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "melee.wav",
-      "seconds": 0.44,
-      "frames": 9702,
-      "peak": 23158,
-      "rms": 0.08230076148461576,
-      "boundary_step": 0.0,
-      "sha256": "90812f57a3d6b4fc79b7fda7879756d70a57d4b097d3ad92d3ed09731ec41221",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "npc_shot.wav",
-      "seconds": 0.26,
-      "frames": 5733,
-      "peak": 16848,
-      "rms": 0.06265163986471595,
-      "boundary_step": 0.0,
-      "sha256": "709f58746558ded8f7357e008484439d517b71433525c7e00f5a33c68cb9447b",
-      "generator": "scripts/generate_atmosphere_audio.py",
-      "seed": 401
-    },
-    {
-      "file": "ready.wav",
-      "seconds": 0.36,
-      "frames": 7938,
-      "peak": 7582,
-      "rms": 0.04923746701436766,
-      "boundary_step": 0.0,
-      "sha256": "4e98782c1ea691e9027be415987f10779f32f61fbab9f931ee10edcab442c151",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "reload.wav",
-      "seconds": 0.68,
-      "frames": 14994,
-      "peak": 12084,
-      "rms": 0.03082008612599085,
-      "boundary_step": 0.0,
-      "sha256": "c0aa21fe77682aea50c6292b761b8743197b23a14d9d5e98748a9ccd3882b1fa",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "shot.wav",
-      "seconds": 0.22,
-      "frames": 4851,
-      "peak": 31129,
-      "rms": 0.1150342101210703,
-      "boundary_step": 0.0,
-      "sha256": "d60410c0505d0657e970db69d582b2068fa71ceaca92faba574aadf9c994ae88",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "structure.wav",
-      "seconds": 0.78,
-      "frames": 17199,
-      "peak": 12750,
-      "rms": 0.06175310446939564,
-      "boundary_step": 0.0,
-      "sha256": "ad47a01296ac59d9dc982020ad949285d7fbbb5b36da82c9e3df66fa5e9de966",
-      "generator": "scripts/generate_audio.py",
-      "seed": 12
-    },
-    {
-      "file": "trap.wav",
-      "seconds": 0.6499773242630386,
-      "frames": 14332,
-      "peak": 18768,
-      "rms": 0.062112013455326597,
-      "boundary_step": 0.0,
-      "sha256": "10899bf45f2bfe0b1a81053375d500a301a0e4251109952bcd8b8c5491343849",
-      "generator": "scripts/generate_atmosphere_audio.py",
-      "seed": 403
-    },
-    {
-      "file": "turret_shot.wav",
-      "seconds": 0.2,
-      "frames": 4410,
-      "peak": 15540,
-      "rms": 0.060803737029389474,
-      "boundary_step": 0.0,
-      "sha256": "5eeabbde446d9bb91a2199c1a44fb7366e13eaafdd31f9196e62872d79394250",
-      "generator": "scripts/generate_atmosphere_audio.py",
-      "seed": 402
     }
   ]
 }

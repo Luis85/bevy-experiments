@@ -2,6 +2,8 @@ mod animation;
 #[cfg(test)]
 mod architecture_tests;
 mod art;
+#[cfg(test)]
+mod asset_audit;
 mod atmosphere_audio;
 mod audio;
 mod battle_view;
