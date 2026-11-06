@@ -8,9 +8,8 @@
 //! health and windup bars), then the callout text. Rejected enemy art keeps
 //! the per-enemy procedural figure path.
 use super::super::{AMBER, ArenaProjection, GREEN, RED, bar, figure, line, soft_shadow};
-use super::batch::{ActorMeshes, FieldMeshes, MeshBuilder};
+use super::batch::{FieldMeshes, MeshBuilder};
 use crate::{
-    animation::ActorPose,
     battle_view::{BattleViewModel, EnemyView, HealthView},
     visual_assets::{self, Actor, ArtTextures, HitFlash},
 };
@@ -21,7 +20,7 @@ use bevy_egui::egui::{
 /// Segments of the batched outline, stun and windup rings.
 const RING_SEGMENTS: u32 = 20;
 
-fn tint(rgba: Option<[f32; 4]>) -> C {
+pub(super) fn tint(rgba: Option<[f32; 4]>) -> C {
     rgba.map_or(C::WHITE, |v| {
         C::from_rgba_unmultiplied(
             (v[0] * 255.) as u8,
@@ -30,68 +29,6 @@ fn tint(rgba: Option<[f32; 4]>) -> C {
             (v[3] * 255.) as u8,
         )
     })
-}
-
-pub(super) fn corpses(
-    p: &Painter,
-    arena: ArenaProjection,
-    view: &BattleViewModel,
-    textures: ArtTextures,
-) {
-    let sy = arena.lane_height();
-    let settled_batched = visual_assets::corpse_batch(
-        p,
-        textures,
-        view.corpses
-            .iter()
-            .filter(|body| body.collapse > 0.9)
-            .map(|body| {
-                let height = body.height.pixels(sy);
-                (
-                    arena.world(body.at[0], body.at[1]) + vec2(0., height * 0.28),
-                    vec2(height * 1.25, height * 0.45),
-                    tint(body.tint).gamma_multiply(0.8),
-                )
-            }),
-    );
-    // Collapsing bodies share one sprite mesh (the packed atlas, or one per
-    // sheet); legacy bodies without a figure keep their ground shadow, under it.
-    let mut collapsing = ActorMeshes::new(textures, view.corpses.len());
-    for corpse in &view.corpses {
-        if settled_batched && corpse.collapse > 0.9 {
-            continue;
-        }
-        let at = arena.world(corpse.at[0], corpse.at[1]);
-        let height = corpse.height.pixels(sy);
-        if corpse.has_figure {
-            let Some(sprite) = corpse.sprite else {
-                continue;
-            };
-            let pose = ActorPose {
-                frame: corpse.frame,
-                lean: corpse.lean,
-                scale: [1. + corpse.collapse * 0.16, 1. - corpse.collapse * 0.72],
-                ..Default::default()
-            };
-            if let Some(quad) = visual_assets::actor_quad(
-                textures,
-                Actor::Enemy(sprite),
-                at,
-                vec2(height * 1.2, height),
-                tint(corpse.tint).gamma_multiply(0.8),
-                &pose,
-            ) {
-                collapsing.sprite(&quad);
-            }
-        } else {
-            p.add(egui::Shape::ellipse_filled(
-                at + vec2(0., sy * 0.25),
-                vec2(sy * 0.3, sy * 0.10),
-                C::from_black_alpha(90),
-            ));
-        }
-    }
-    collapsing.paint(p);
 }
 
 /// The survivor rig's soft shadow, which the hostiles' shadow mesh draws.

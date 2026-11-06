@@ -602,21 +602,63 @@ fn walk_frame_layout(
     );
     (rect, uv, foot)
 }
-/// Every settled body shares one draw mesh. Count and lifetime come from the
-/// saved attempt; only the short collapse animation is rendered separately.
+/// One settled body: the corpse cell of the actor sheet fitted into a box.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CorpseQuad {
+    pub texture: TextureId,
+    pub rect: Rect,
+    pub uv: Rect,
+    pub tint: Color32,
+}
+impl CorpseQuad {
+    pub fn push(&self, mesh: &mut bevy_egui::egui::epaint::Mesh) {
+        mesh.add_rect_with_uv(self.rect, self.uv, self.tint);
+    }
+}
+/// The texture and UV of the corpse cell: the packed battle atlas when it is
+/// loaded (so settled bodies share the hostiles' texture), else the actor
+/// sheet. `None` while the actor sheet is missing or rejected.
+pub fn settled_corpse_texture(textures: ArtTextures) -> Option<(TextureId, Rect)> {
+    let actors = textures
+        .actors
+        .filter(|_| !textures.survivor_art_rejected)?;
+    let uv = region_for(CORPSE_RECT, ACTOR_SIZE);
+    Some(match textures.battle_atlas {
+        Some(atlas) => (atlas.texture, atlas.uv(ActorSheet::Actors, uv)),
+        None => (actors, uv),
+    })
+}
+/// The settled body centred at `center` in the box `size`: pure geometry,
+/// shared by the cached settled-corpse mesh and [`corpse_batch`].
+pub fn settled_corpse_quad(
+    textures: ArtTextures,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+) -> Option<CorpseQuad> {
+    let (texture, uv) = settled_corpse_texture(textures)?;
+    Some(CorpseQuad {
+        texture,
+        rect: fit(center, size, CORPSE_RECT),
+        uv,
+        tint,
+    })
+}
+/// Settled bodies as one draw mesh. Count and lifetime come from the saved
+/// attempt; only the short collapse animation is rendered separately.
 pub fn corpse_batch(
     p: &Painter,
     textures: ArtTextures,
     bodies: impl IntoIterator<Item = (Pos2, Vec2, Color32)>,
 ) -> bool {
-    let Some(texture) = textures.actors.filter(|_| !textures.survivor_art_rejected) else {
+    let Some((texture, _)) = settled_corpse_texture(textures) else {
         return false;
     };
-    let source = CORPSE_RECT;
-    let uv = region_for(source, ACTOR_SIZE);
     let mut mesh = bevy_egui::egui::epaint::Mesh::with_texture(texture);
     for (center, size, tint) in bodies {
-        mesh.add_rect_with_uv(fit(center, size, source), uv, tint);
+        if let Some(quad) = settled_corpse_quad(textures, center, size, tint) {
+            quad.push(&mut mesh);
+        }
     }
     if !mesh.vertices.is_empty() {
         p.add(bevy_egui::egui::Shape::mesh(mesh));

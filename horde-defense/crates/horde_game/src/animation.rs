@@ -12,6 +12,10 @@ use std::collections::{BTreeMap, VecDeque};
 pub const MAX_SCENES: usize = 8;
 pub const MAX_PARTICLES: usize = 128;
 pub(crate) const EVENT_BUDGET: usize = 64;
+/// Ticks a body takes to collapse; older bodies are settled.
+pub const COLLAPSE_TICKS: u64 = 18;
+/// Ticks a fresh body raises dust.
+const DUST_TICKS: u64 = 36;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ActorPose {
@@ -149,7 +153,14 @@ pub struct SceneAnimation {
     pub enemies: BTreeMap<u64, ActorPose>,
     pub defender: DefenderPose,
     pub structures: BTreeMap<u64, StructurePose>,
+    /// Poses of the collapsing bodies only: the newest
+    /// `CORPSES_COLLAPSING_DRAWN` of `a.corpses` younger than
+    /// `COLLAPSE_TICKS`, none in reduced mode.
     pub deaths: Vec<DeathPose>,
+    /// Length of the settled prefix of `a.corpses`, which is not sampled:
+    /// saved bodies are append-only at ascending ticks, so every body before
+    /// the collapsing ones has settled.
+    pub settled_corpses: usize,
     pub particles: Vec<Particle>,
     pub weather: WeatherKind,
 }
@@ -161,6 +172,7 @@ impl SceneAnimation {
             defender: defender_pose(a, reduced),
             structures: BTreeMap::new(),
             deaths: vec![],
+            settled_corpses: 0,
             particles: vec![],
             weather: scene_weather(a),
         };
@@ -229,15 +241,33 @@ impl SceneCache {
     }
 }
 
+/// Bodies before this index of `a.corpses` have settled: all of them in
+/// reduced mode, otherwise those at least `COLLAPSE_TICKS` old and every body
+/// beyond the newest `CORPSES_COLLAPSING_DRAWN`.
+pub fn settled_corpse_count(a: &Attempt, reduced: bool) -> usize {
+    if reduced {
+        return a.corpses.len();
+    }
+    let collapsed = older_than(a, COLLAPSE_TICKS);
+    collapsed.max(
+        a.corpses
+            .len()
+            .saturating_sub(crate::perf_budget::CORPSES_COLLAPSING_DRAWN),
+    )
+}
+/// Length of the prefix of `a.corpses` at least `ticks` old (ascending ticks).
+fn older_than(a: &Attempt, ticks: u64) -> usize {
+    a.corpses
+        .partition_point(|corpse| a.tick.saturating_sub(corpse.tick) >= ticks)
+}
+
 fn sample_deaths(a: &Attempt, reduced: bool, frame: &mut SceneAnimation) {
-    frame.deaths.reserve(a.corpses.len());
-    for corpse in &a.corpses {
+    let settled = settled_corpse_count(a, reduced);
+    frame.settled_corpses = settled;
+    frame.deaths.reserve(a.corpses.len() - settled);
+    for corpse in &a.corpses[settled..] {
         let age = a.tick.saturating_sub(corpse.tick) as f32;
-        let collapse = if reduced {
-            1.
-        } else {
-            smooth((age / 18.).min(1.))
-        };
+        let collapse = smooth((age / COLLAPSE_TICKS as f32).min(1.));
         frame.deaths.push(DeathPose {
             id: corpse.id,
             at: corpse.at,
@@ -250,10 +280,17 @@ fn sample_deaths(a: &Attempt, reduced: bool, frame: &mut SceneAnimation) {
             frame: 0,
             alpha: 1.,
             collapse,
-            lean: if reduced { 0. } else { -0.85 * collapse },
+            lean: -0.85 * collapse,
         });
-        if !reduced && age < 36. && frame.particles.len() < MAX_PARTICLES {
-            let t = age / 36.;
+    }
+    if reduced {
+        return;
+    }
+    // Fresh bodies raise dust a little longer than they collapse, oldest first.
+    for corpse in &a.corpses[older_than(a, DUST_TICKS)..] {
+        let age = a.tick.saturating_sub(corpse.tick) as f32;
+        if age < DUST_TICKS as f32 && frame.particles.len() < MAX_PARTICLES {
+            let t = age / DUST_TICKS as f32;
             for n in 0..3 {
                 push_particle(
                     &mut frame.particles,
@@ -861,10 +898,63 @@ mod tests {
         a.events.clear();
         let resumed: Attempt = serde_json::from_str(&serde_json::to_string(a).unwrap()).unwrap();
         let later = SceneCache::default().sample(&resumed, false);
-        assert_eq!(later.deaths.len(), 1);
-        assert_eq!(later.deaths[0].alpha, 1.);
-        assert_eq!(later.deaths[0].collapse, 1.);
-        assert_eq!(later.deaths[0].visual, first.deaths[0].visual);
+        // The settled body is drawn from the saved record, not re-sampled.
+        assert!(later.deaths.is_empty());
+        assert_eq!(later.settled_corpses, 1);
+        assert_eq!(resumed.corpses[0].visual, first.deaths[0].visual);
+    }
+    /// `count` saved bodies of the fixture's kind: the newest `fresh` died
+    /// within the collapse window, the rest long ago, at ascending ticks.
+    fn stage_bodies(a: &mut Attempt, count: usize, fresh: usize) {
+        a.tick = 100_000;
+        let template = a.enemies[0].clone();
+        a.corpses = (0..count)
+            .map(|n| horde_core::sim::CorpseRecord {
+                id: 10_000 + n as u64,
+                kind: template.kind,
+                boss_kind: None,
+                at: [5.0 + (n % 20) as f32, 0.5 + (n % 10) as f32],
+                visual: template.resolved.as_ref().map(|v| v.visual.clone()),
+                tick: if n + fresh < count {
+                    n as u64
+                } else {
+                    a.tick - COLLAPSE_TICKS + 1 + ((n + fresh - count) / 3) as u64
+                },
+            })
+            .collect();
+    }
+    #[test]
+    fn scene_animation_samples_only_collapsing_corpses() {
+        let mut game = fixture();
+        let a = game.attempt_mut().unwrap();
+        stage_bodies(a, 1_500, 50);
+        let before = serde_json::to_string(a).unwrap();
+        let sample = SceneAnimation::sample(a, false);
+        assert_eq!(sample.deaths.len(), 50);
+        let newest: Vec<u64> = a.corpses[1_450..].iter().map(|c| c.id).collect();
+        let sampled: Vec<u64> = sample.deaths.iter().map(|d| d.id).collect();
+        assert_eq!(sampled, newest, "the collapsing bodies are the newest");
+        assert!(sample.deaths.iter().all(|d| d.collapse < 1.));
+        assert_eq!(sample.settled_corpses, 1_450);
+        // Reduced effects show every body settled: nothing collapses.
+        let reduced = SceneAnimation::sample(a, true);
+        assert!(reduced.deaths.is_empty());
+        assert_eq!(reduced.settled_corpses, 1_500);
+        // A burst larger than the cap collapses only its newest bodies.
+        stage_bodies(a, 1_500, 200);
+        let burst = SceneAnimation::sample(a, false);
+        assert_eq!(
+            burst.deaths.len(),
+            crate::perf_budget::CORPSES_COLLAPSING_DRAWN
+        );
+        assert_eq!(
+            burst.settled_corpses,
+            1_500 - crate::perf_budget::CORPSES_COLLAPSING_DRAWN
+        );
+        assert_eq!(burst.deaths.last().unwrap().id, a.corpses[1_499].id);
+        // Saved records are only read.
+        stage_bodies(a, 1_500, 50);
+        assert_eq!(serde_json::to_string(a).unwrap(), before);
     }
     #[test]
     fn resolved_attack_events_drive_lunges_and_recoil_without_moving_the_anchors() {
@@ -942,7 +1032,10 @@ mod tests {
         assert_eq!(first, cache.sample(&a, false));
         assert_eq!(before, serde_json::to_string(&a).unwrap());
         a.tick += 500_000;
-        assert_eq!(cache.sample(&a, true).deaths.len(), 64);
+        let settled = cache.sample(&a, true);
+        assert!(settled.deaths.is_empty());
+        assert_eq!(settled.settled_corpses, 64);
+        assert_eq!(a.corpses.len(), 64);
     }
     #[test]
     fn loading_a_different_campaign_at_the_same_tick_does_not_leak_old_corpses() {

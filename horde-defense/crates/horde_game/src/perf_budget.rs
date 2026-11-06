@@ -6,7 +6,7 @@
     not(test),
     allow(
         dead_code,
-        reason = "the budget is read by the tests and docs/PERF_BUDGET.json now; the batched battlefield and corpse cache consume it later"
+        reason = "the budget is read by the tests and docs/PERF_BUDGET.json; the corpse sampling and cache consume the corpse caps, the egui ceilings are test gates"
     )
 )]
 use crate::{animation, ui};

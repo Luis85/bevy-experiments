@@ -4,10 +4,12 @@
 //!
 //! Anything drawn per hostile, per body or per particle is batched into
 //! layer meshes (`batch`), so the primitive count does not grow with the
-//! crowd: settled and collapsing bodies, the hostiles' underlay, one shadow
-//! mesh (the rig's included), one sprite mesh on the packed battle atlas, the
-//! overlay, callout text and one impact-particle mesh.
+//! crowd: settled bodies (one cached mesh, see `corpses`), collapsing
+//! bodies, the hostiles' underlay, one shadow mesh (the rig's included), one
+//! sprite mesh on the packed battle atlas, the overlay, callout text and one
+//! impact-particle mesh.
 mod batch;
+mod corpses;
 mod enemies;
 mod fx;
 mod ordnance;
@@ -76,7 +78,8 @@ pub fn battlefield_for_attempt(
 }
 
 /// Paints the field `view` of `a` and returns what it drew, for the perf
-/// report's `scene_load` (settled bodies are those past 0.9 collapse).
+/// report's `scene_load`: the settled bodies drawn from the cached mesh and
+/// the collapsing bodies sampled this pass.
 pub fn battlefield(
     p: &Painter,
     r: Rect,
@@ -87,10 +90,9 @@ pub fn battlefield(
 ) -> SceneDraw {
     let arena = ArenaProjection::for_attempt(r, a);
     render(p, arena, view, a, aim, &options);
-    let settled_corpses = view.corpses.iter().filter(|c| c.collapse > 0.9).count();
     SceneDraw {
-        settled_corpses,
-        collapsing_corpses: view.corpses.len() - settled_corpses,
+        settled_corpses: view.settled.count,
+        collapsing_corpses: view.corpses.len(),
         particles: view.particles.len(),
         fx_views: view.fx.len(),
     }
@@ -115,7 +117,7 @@ fn render(
         terrain::construction_grid(p, arena, view);
     }
     structures::paint(p, arena, view, textures);
-    enemies::corpses(p, arena, view, textures);
+    corpses::paint(p, arena, view, a, textures, options.blood);
     let rig_shadow = rig_shadow(arena, view);
     let rig_shadow_drawn = enemies::paint(
         p,

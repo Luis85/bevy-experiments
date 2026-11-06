@@ -1,6 +1,7 @@
 //! Batched battlefield tests: primitive counts, layer order and the pure
 //! geometry the batched and legacy paths share.
 use super::*;
+use crate::diagnostics::SceneDraw;
 use crate::{
     animation::SceneAnimation,
     battle_view::{BattleViewModel, SceneBlend},
@@ -8,6 +9,7 @@ use crate::{
 };
 use bevy_egui::egui::{ClippedPrimitive, TextureId, pos2, vec2};
 use horde_core::sim::Game;
+use std::sync::Arc;
 
 /// Fake egui ids for every sheet the battlefield samples.
 fn textures() -> ArtTextures {
@@ -522,5 +524,221 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         view.fx = vec![event(kind, fx::fx_lifetime(kind) + 1.0 / 60.0)];
         let stale = painted(|p| fx::events(p, projection, &view, None, &options));
         assert!(stale.is_empty(), "{kind:?} draws past its lifetime");
+    }
+}
+
+/// Gives `game`'s attempt `count` saved bodies, copies of its staged ones
+/// with fresh ids at ascending ticks: the newest `fresh` died this tick, the
+/// rest long ago.
+fn stage_bodies(game: &mut Game, count: usize, fresh: usize) {
+    let a = game.attempt_mut().unwrap();
+    a.tick = 1_000_000;
+    let staged = std::mem::take(&mut a.corpses);
+    assert!(!staged.is_empty(), "the fixture stages bodies");
+    a.corpses = (0..count)
+        .map(|n| horde_core::sim::CorpseRecord {
+            id: 5_000_000 + n as u64,
+            tick: if n + fresh < count { n as u64 } else { a.tick },
+            ..staged[n % staged.len()].clone()
+        })
+        .collect();
+}
+
+/// One pass of `game`'s battlefield on `ctx`: the painter's layer, its
+/// shapes and what it drew.
+fn paint_pass(
+    ctx: &egui::Context,
+    game: &Game,
+    rect: Rect,
+    options: RenderOptions,
+) -> (egui::LayerId, Vec<egui::Shape>, SceneDraw) {
+    let a = game.attempt().unwrap();
+    let motion = SceneAnimation::sample(a, options.reduced);
+    let view = BattleViewModel::build(a, motion, SceneBlend::NONE, options.reduced);
+    let mut drawn = (egui::LayerId::background(), SceneDraw::default());
+    let mut options = Some(options);
+    let mut output = ctx.run_ui(Default::default(), |ui| {
+        let painter = ui.painter().with_clip_rect(rect);
+        let options = options.take().expect("one pass");
+        drawn = (
+            painter.layer_id(),
+            battlefield(&painter, rect, &view, a, [10.0, 5.0], options),
+        );
+    });
+    output.textures_delta.clear();
+    let shapes = output.shapes.into_iter().map(|shape| shape.shape).collect();
+    (drawn.0, shapes, drawn.1)
+}
+
+/// The painted shape that is the layer's cached settled-corpse mesh.
+fn settled_mesh_of(shapes: &[egui::Shape], cached: &corpses::SettledMesh) -> Arc<egui::Mesh> {
+    shapes
+        .iter()
+        .find_map(|shape| match shape {
+            egui::Shape::Mesh(mesh) if Arc::ptr_eq(mesh, &cached.mesh) => Some(Arc::clone(mesh)),
+            _ => None,
+        })
+        .expect("the cached settled mesh is painted")
+}
+
+#[test]
+fn settled_mesh_is_reused_until_a_body_settles() {
+    let mut game = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    stage_bodies(&mut game, 1_500, 1);
+    let ctx = egui::Context::default();
+    let (layer, first, drawn) = paint_pass(&ctx, &game, arena(), options(textures()));
+    assert_eq!(drawn.settled_corpses, 1_499);
+    assert_eq!(drawn.collapsing_corpses, 1);
+    let cached = corpses::cached(&ctx, layer).expect("a cached settled mesh");
+    assert_eq!((cached.count, cached.rebuilds), (1_499, 1));
+    let first_mesh = settled_mesh_of(&first, &cached);
+    assert_eq!(first_mesh.vertices.len(), 4 * 1_499);
+    assert_eq!(
+        first_mesh.texture_id,
+        textures().battle_atlas.unwrap().texture,
+        "settled bodies sample the packed atlas"
+    );
+
+    // Nothing settles: the same mesh is painted again, nothing is rebuilt.
+    let (_, second, _) = paint_pass(&ctx, &game, arena(), options(textures()));
+    let cached = corpses::cached(&ctx, layer).unwrap();
+    assert!(Arc::ptr_eq(&settled_mesh_of(&second, &cached), &first_mesh));
+    assert_eq!(cached.rebuilds, 1);
+
+    // The last body settles: it is appended, the others are kept.
+    game.attempt_mut().unwrap().tick += crate::animation::COLLAPSE_TICKS;
+    let (_, third, drawn) = paint_pass(&ctx, &game, arena(), options(textures()));
+    assert_eq!(
+        (drawn.settled_corpses, drawn.collapsing_corpses),
+        (1_500, 0)
+    );
+    let cached = corpses::cached(&ctx, layer).unwrap();
+    assert_eq!(
+        (cached.count, cached.rebuilds),
+        (1_500, 1),
+        "appended, not rebuilt"
+    );
+    let grown = settled_mesh_of(&third, &cached);
+    assert_eq!(grown.vertices.len(), 4 * 1_500);
+    assert_eq!(grown.vertices[..4 * 1_499], first_mesh.vertices[..]);
+    assert_eq!(grown.indices[..6 * 1_499], first_mesh.indices[..]);
+
+    // The appended quad is the pure corpse quad of the newest settled view.
+    let a = game.attempt().unwrap();
+    let view = BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
+    let projection = ArenaProjection::for_attempt(arena(), a);
+    let body = view.settled.view(a, 1_499).unwrap();
+    let height = body.height.pixels(projection.lane_height());
+    let quad = visual_assets::settled_corpse_quad(
+        textures(),
+        projection.world(body.at[0], body.at[1]) + vec2(0., height * 0.28),
+        vec2(height * 1.25, height * 0.45),
+        enemies::tint(body.tint).gamma_multiply(0.8),
+    )
+    .unwrap();
+    let mut expected = egui::Mesh::with_texture(quad.texture);
+    quad.push(&mut expected);
+    assert_eq!(grown.vertices[4 * 1_499..], expected.vertices[..]);
+}
+
+#[test]
+fn corpse_cache_rebuilds_on_new_attempt_resize_or_atlas_reload() {
+    let mut game = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    stage_bodies(&mut game, 300, 0);
+    let ctx = egui::Context::default();
+    let rebuilds = |game: &Game, rect: Rect, options: RenderOptions| {
+        let (layer, shapes, drawn) = paint_pass(&ctx, game, rect, options);
+        let cached = corpses::cached(&ctx, layer).unwrap();
+        assert_eq!(cached.count, drawn.settled_corpses);
+        assert_eq!(
+            settled_mesh_of(&shapes, &cached).vertices.len(),
+            4 * cached.count
+        );
+        cached.rebuilds
+    };
+    let bloodless = |textures| RenderOptions {
+        blood: false,
+        ..options(textures)
+    };
+    assert_eq!(rebuilds(&game, arena(), options(textures())), 1);
+    assert_eq!(
+        rebuilds(&game, arena(), options(textures())),
+        1,
+        "unchanged"
+    );
+    // A resized arena.
+    let resized = Rect::from_min_size(pos2(24.0, 124.0), vec2(1166.6, 692.0));
+    assert_eq!(rebuilds(&game, resized, options(textures())), 2);
+    assert_eq!(rebuilds(&game, resized, options(textures())), 2);
+    // A reloaded atlas is a new texture.
+    let reloaded = ArtTextures {
+        battle_atlas: Some(BattleAtlas::layout(
+            TextureId::User(50),
+            [1774, 887],
+            [1122, 1402],
+        )),
+        ..textures()
+    };
+    assert_eq!(rebuilds(&game, resized, options(reloaded)), 3);
+    // A new attempt, even with the same bodies.
+    game.attempt_mut().unwrap().id += 1;
+    assert_eq!(rebuilds(&game, resized, options(reloaded)), 4);
+    // Fewer bodies (an earlier save of the same attempt).
+    game.attempt_mut().unwrap().corpses.truncate(200);
+    assert_eq!(rebuilds(&game, resized, options(reloaded)), 5);
+    // A different newest body at the same count.
+    let a = game.attempt_mut().unwrap();
+    a.corpses.truncate(199);
+    let mut other = a.corpses[0].clone();
+    other.id = 9_000_000;
+    a.corpses.push(other);
+    assert_eq!(rebuilds(&game, resized, options(reloaded)), 6);
+    // The blood setting is part of the key.
+    assert_eq!(rebuilds(&game, resized, bloodless(reloaded)), 7);
+    // Another body settling only appends.
+    let a = game.attempt_mut().unwrap();
+    let mut next = a.corpses[1].clone();
+    next.id = 9_000_001;
+    a.corpses.push(next);
+    assert_eq!(rebuilds(&game, resized, bloodless(reloaded)), 7);
+}
+
+#[test]
+fn corpse_draw_respects_caps_with_5000_records() {
+    use crate::perf_budget::{
+        BATTLEFIELD_PRIMITIVES_MAX, CORPSES_COLLAPSING_DRAWN, CORPSES_SETTLED_DRAWN,
+    };
+    let mut game = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    for (fresh, collapsing) in [(5_000, CORPSES_COLLAPSING_DRAWN), (0, 0), (30, 30)] {
+        stage_bodies(&mut game, 5_000, fresh);
+        let before = serde_json::to_string(game.attempt().unwrap()).unwrap();
+        let ctx = egui::Context::default();
+        let (layer, shapes, drawn) = paint_pass(&ctx, &game, arena(), options(textures()));
+        assert_eq!(
+            (drawn.settled_corpses, drawn.collapsing_corpses),
+            (CORPSES_SETTLED_DRAWN, collapsing),
+            "{fresh} fresh bodies of 5000"
+        );
+        let cached = corpses::cached(&ctx, layer).unwrap();
+        assert_eq!(
+            settled_mesh_of(&shapes, &cached).vertices.len(),
+            4 * CORPSES_SETTLED_DRAWN
+        );
+        // The newest settled bodies are the ones drawn.
+        let a = game.attempt().unwrap();
+        let settled = 5_000 - collapsing;
+        assert_eq!(crate::animation::settled_corpse_count(a, false), settled);
+        assert_eq!(
+            cached.key.first_id,
+            a.corpses[settled - CORPSES_SETTLED_DRAWN].id
+        );
+        // Saved records are untouched and uncapped.
+        assert_eq!(a.corpses.len(), 5_000);
+        assert_eq!(serde_json::to_string(a).unwrap(), before);
+        let primitives = battlefield_primitives(&game, textures()).len();
+        assert!(
+            primitives <= BATTLEFIELD_PRIMITIVES_MAX,
+            "{primitives} primitives"
+        );
     }
 }

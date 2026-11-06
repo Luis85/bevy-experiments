@@ -1,6 +1,6 @@
 use super::interpolation::SceneBlend;
 use crate::{
-    animation::{ActorPose, DefenderPose, Particle, SceneAnimation, StructurePose},
+    animation::{ActorPose, Appearance, DefenderPose, Particle, SceneAnimation, StructurePose},
     visual_assets::enemy_visuals::{self, EnemySprite, EnemyVisualCatalog},
 };
 use horde_core::{
@@ -91,6 +91,113 @@ pub struct CorpseView {
     pub lean: f32,
     pub collapse: f32,
 }
+/// The settled bodies a view draws: the newest `CORPSES_SETTLED_DRAWN` of the
+/// settled prefix of `a.corpses`, `a.corpses[start..start + count]`. Their
+/// views are not materialised per pass: the painter's cached mesh builds
+/// only the bodies it lacks, through [`SettledCorpses::view`].
+#[derive(Clone, Copy)]
+pub struct SettledCorpses {
+    /// Id of the first drawn body.
+    pub first_id: Option<u64>,
+    pub start: usize,
+    pub count: usize,
+    reduced: bool,
+    catalog: &'static EnemyVisualCatalog,
+}
+impl SettledCorpses {
+    fn new(
+        a: &Attempt,
+        settled: usize,
+        reduced: bool,
+        catalog: &'static EnemyVisualCatalog,
+    ) -> Self {
+        let settled = settled.min(a.corpses.len());
+        let start = settled.saturating_sub(crate::perf_budget::CORPSES_SETTLED_DRAWN);
+        Self {
+            first_id: a.corpses[start..settled].first().map(|c| c.id),
+            start,
+            count: settled - start,
+            reduced,
+            catalog,
+        }
+    }
+    /// The `n`th drawn settled body of `a`, the attempt this view was built from.
+    pub fn view(&self, a: &Attempt, n: usize) -> Option<CorpseView> {
+        if n >= self.count {
+            return None;
+        }
+        let record = a.corpses.get(self.start + n)?;
+        Some(body_view(
+            self.catalog,
+            content().levels[a.level].boss,
+            BodyPose {
+                at: record.at,
+                appearance: Some(Appearance {
+                    kind: record.kind,
+                    boss: record.boss_kind.is_some(),
+                    boss_kind: record.boss_kind,
+                }),
+                visual: record.visual.as_ref(),
+                frame: 0,
+                lean: if self.reduced { 0. } else { -0.85 },
+                collapse: 1.,
+            },
+        ))
+    }
+}
+impl PartialEq for SettledCorpses {
+    fn eq(&self, other: &Self) -> bool {
+        (self.first_id, self.start, self.count, self.reduced)
+            == (other.first_id, other.start, other.count, other.reduced)
+            && std::ptr::eq(self.catalog, other.catalog)
+    }
+}
+impl std::fmt::Debug for SettledCorpses {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SettledCorpses")
+            .field("first_id", &self.first_id)
+            .field("start", &self.start)
+            .field("count", &self.count)
+            .field("reduced", &self.reduced)
+            .finish_non_exhaustive()
+    }
+}
+/// What a body view is built from: a sampled collapse or a settled record.
+struct BodyPose<'a> {
+    at: [f32; 2],
+    appearance: Option<Appearance>,
+    visual: Option<&'a EnemyVisual>,
+    frame: u8,
+    lean: f32,
+    collapse: f32,
+}
+fn body_view(
+    catalog: &'static EnemyVisualCatalog,
+    level_boss: horde_core::content::BossKind,
+    body: BodyPose,
+) -> CorpseView {
+    let boss = body.appearance.is_some_and(|v| v.boss);
+    let sprite = body.visual.map_or_else(
+        || {
+            body.appearance.map(|v| {
+                let boss = v.boss.then(|| v.boss_kind.unwrap_or(level_boss));
+                enemy_visuals::legacy_sprite(v.kind, boss)
+            })
+        },
+        |visual| Some(visual.sprite),
+    );
+    let art = sprite.and_then(|sprite| catalog.get(sprite));
+    CorpseView {
+        at: body.at,
+        has_figure: body.appearance.is_some(),
+        sprite: art,
+        tint: body.visual.map(|v| v.tint),
+        height: figure_height(catalog, boss, body.visual, art),
+        frame: body.frame,
+        lean: body.lean,
+        collapse: body.collapse,
+    }
+}
 #[derive(Clone, Debug, PartialEq)]
 pub struct StructureView {
     pub id: u64,
@@ -144,6 +251,9 @@ pub struct BattleViewModel {
     pub construction_bounds: [f32; 2],
     pub construction_cell_width: f32,
     pub structures: Vec<StructureView>,
+    /// Settled bodies, drawn from the painter's cached mesh.
+    pub settled: SettledCorpses,
+    /// Collapsing bodies only, oldest first.
     pub corpses: Vec<CorpseView>,
     /// Visible enemies in painter order (feet, then id).
     pub enemies: Vec<EnemyView>,
@@ -183,31 +293,23 @@ impl BattleViewModel {
                 charges: s.charges,
             })
             .collect();
+        let settled = SettledCorpses::new(a, motion.settled_corpses, reduced, catalog);
         let corpses = motion
             .deaths
             .iter()
             .map(|body| {
-                let boss = body.appearance.is_some_and(|v| v.boss);
-                let sprite = body.visual.as_ref().map_or_else(
-                    || {
-                        body.appearance.map(|v| {
-                            let boss = v.boss.then(|| v.boss_kind.unwrap_or(level_boss));
-                            enemy_visuals::legacy_sprite(v.kind, boss)
-                        })
+                body_view(
+                    catalog,
+                    level_boss,
+                    BodyPose {
+                        at: body.at,
+                        appearance: body.appearance,
+                        visual: body.visual.as_ref(),
+                        frame: body.frame,
+                        lean: body.lean,
+                        collapse: body.collapse,
                     },
-                    |visual| Some(visual.sprite),
-                );
-                let art = sprite.and_then(|sprite| catalog.get(sprite));
-                CorpseView {
-                    at: body.at,
-                    has_figure: body.appearance.is_some(),
-                    sprite: art,
-                    tint: body.visual.as_ref().map(|v| v.tint),
-                    height: figure_height(catalog, boss, body.visual.as_ref(), art),
-                    frame: body.frame,
-                    lean: body.lean,
-                    collapse: body.collapse,
-                }
+                )
             })
             .collect();
         let mut visible: Vec<&Enemy> = a
@@ -229,6 +331,7 @@ impl BattleViewModel {
             construction_bounds: a.construction_bounds(),
             construction_cell_width: a.construction_cell_width(),
             structures,
+            settled,
             corpses,
             enemies,
             fire_zones: a
