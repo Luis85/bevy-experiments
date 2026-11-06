@@ -509,8 +509,8 @@ A GOLDEN or GAMEPLAY_TRACE diff in a campaign-defenders commit is a defect, not 
 
 | Number | Requirement |
 |---|---|
-| `--smoke` | Equal to target/production-before/smoke.txt (Personal stage1 falls on attempt 3, Npc on attempt 2) after every wave-2 step |
-| `pacing -- 60 --runs`, 3 solo profiles | Empty diff vs pacing.txt (first victory run 4, tree exhausted run 26) |
+| `--smoke` | Equal to the post-W1-69 baseline target/production-after/w1-69/smoke.txt (Personal stage1 falls on attempt 2, Npc on attempt 3; wave 0's production-before/smoke.txt had 3 and 2, plan §9.6) after every wave-2 step |
+| `pacing -- 60 --runs`, 3 solo profiles | Empty diff vs the post-W1-69 baseline target/production-after/w1-69/pacing.txt (expert first victory run 3, wave 0 run 4; tree exhausted run 26) |
 | 20-seed strategy medians and p90 | runs and minutes to liberations 2/4/10; coins/min; battle and camp minutes; S2b/S2a runs-to-free-3 (target ≤ 0.667); overruns per 10 liberations after the Operations unlock (target < 5). Before tuning in `target/production-before/strategy-pacing.txt`, after in the plan |
 | defender_power | Release cost per call and for 13 defenders (target < 50 µs total, recorded) |
 | liberated_count | Before and after cost (recorded) |

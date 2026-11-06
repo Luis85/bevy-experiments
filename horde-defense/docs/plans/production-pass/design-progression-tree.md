@@ -232,7 +232,7 @@ Each also needs: EffectCategory (Firearms; Survival for hazard), keywords (class
   - `--fit-tiers a,b,c`, which prints median earned at each target run ÷ tier cost;
   - `--values`, which prints the tree_value table;
   - strict parsing: unknown arguments exit 2.
-- The default `pacing [N]` prints the 3 legacy profiles at 1 seed, which reproduces target/production-before/pacing.txt.
+- The default `pacing [N]` prints the 3 legacy profiles at 1 seed, which reproduces the post-W1-69 baseline target/production-after/w1-69/pacing.txt (W1-69 moved pacing on purpose; the wave-0 target/production-before/pacing.txt is no longer the pin, plan §9.6).
 - **Acceptance** (ignored `tests/pacing_targets.rs`, release, expert-deu, Normal, 20 seeds):
   - goal5_first_victory_run_2_to_4;
   - goal5_tiers_affordable_3_5_7_9_11_13;

@@ -146,7 +146,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `stop_after_liberation_ends_the_profile_after_that_run`
   - `pacing_sweep_is_order_independent_of_thread_count`
   - `milestone_stats_counts_missing_as_max_runs_plus_one`
-- Pin: the default `pacing 60 --runs` output equals `target/production-before/pacing.txt`. Mutation proof: change the legacy seed.
+- Pin: the default `pacing 60 --runs` output equals the post-W1-69 baseline `target/production-after/w1-69/pacing.txt` (UTF-8, no BOM, LF), not the wave-0 `target/production-before/pacing.txt`: W1-69 moved pacing on purpose (plan §9.6). Mutation proof: change the legacy seed.
 - Done: the 20-seed "before" baseline CSV is recorded.
 - Deps: W1 close.
 

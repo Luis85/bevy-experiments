@@ -119,6 +119,8 @@ pub fn crowd_stagger(id: u64) -> [f32; 2] {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct CorpseView {
+    /// Where the painters draw the feet: the core position at death plus the
+    /// dead hostile's [`crowd_stagger`], as its [`EnemyView::drawn`] was.
     pub at: [f32; 2],
     /// Legacy bodies without an appearance draw only a ground shadow.
     pub has_figure: bool,
@@ -169,6 +171,7 @@ impl SettledCorpses {
             self.catalog,
             content().levels[a.level].boss,
             BodyPose {
+                id: record.id,
                 at: record.at,
                 appearance: Some(Appearance {
                     kind: record.kind,
@@ -202,6 +205,9 @@ impl std::fmt::Debug for SettledCorpses {
 }
 /// What a body view is built from: a sampled collapse or a settled record.
 struct BodyPose<'a> {
+    /// The dead hostile's id, for its crowd stagger.
+    id: u64,
+    /// Core position of the feet at death.
     at: [f32; 2],
     appearance: Option<Appearance>,
     visual: Option<&'a EnemyVisual>,
@@ -225,8 +231,11 @@ fn body_view(
         |visual| Some(visual.sprite),
     );
     let art = sprite.and_then(|sprite| catalog.get(sprite));
+    // The body falls where the hostile was drawn (W1-69 review): the same
+    // static crowd stagger, so a body in a stack does not jump as it dies.
+    let [dx, dy] = crowd_stagger(body.id);
     CorpseView {
-        at: body.at,
+        at: [body.at[0] + dx, body.at[1] + dy],
         has_figure: body.appearance.is_some(),
         sprite: art,
         tint: body.visual.map(|v| v.tint),
@@ -294,7 +303,7 @@ pub struct BattleViewModel {
     /// Collapsing bodies only, oldest first.
     pub corpses: Vec<CorpseView>,
     /// Visible enemies in painter order: lane feet, then x descending (the
-    /// body nearest the line on top), then id.
+    /// body nearest the line on top), then drawn feet, then id.
     pub enemies: Vec<EnemyView>,
     pub fire_zones: Vec<FireZoneView>,
     pub projectiles: Vec<ProjectileView>,
@@ -343,6 +352,7 @@ impl BattleViewModel {
                     catalog,
                     level_boss,
                     BodyPose {
+                        id: body.id,
                         at: body.at,
                         appearance: body.appearance,
                         visual: death_record(a, motion.settled_corpses + n, body.id)
@@ -363,12 +373,15 @@ impl BattleViewModel {
             .filter(|(_, e)| e.condition(a.mode) != EnemyCondition::Defeated && e.in_view())
             .collect();
         // Lanes paint top to bottom by their feet. Within a lane bodies overlap
-        // (W1-69), so they paint far to near, the nearest to the line on top,
-        // with the id as a stable tie-break for a stack on one spot.
+        // (W1-69), so they paint far to near, the nearest to the line on top.
+        // A stack on one spot paints by its drawn feet (the crowd stagger
+        // moves them across the lane), farther first, then by id.
+        let drawn_feet = |e: &Enemy| e.y() + crowd_stagger(e.id)[1];
         visible.sort_by(|(_, a), (_, b)| {
             a.y()
                 .total_cmp(&b.y())
                 .then(b.x.total_cmp(&a.x))
+                .then(drawn_feet(a).total_cmp(&drawn_feet(b)))
                 .then(a.id.cmp(&b.id))
         });
         let enemies = visible

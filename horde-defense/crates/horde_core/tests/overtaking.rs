@@ -11,7 +11,7 @@ mod support;
 use horde_core::{
     content::{EnemyKind, Mode, StructureKind},
     kind_map::KindMap,
-    sim::{DEFENSE_LINE, EnemyPhase, Game, Input},
+    sim::{DEFENSE_LINE, EnemyPhase, Game, Input, MAX_PASS_OFFSET},
 };
 use support::{game, legacy_game};
 
@@ -313,10 +313,26 @@ fn walls_hold_every_enemy_and_traps_still_trigger() {
     assert!(a.corpses.iter().all(|e| e.at[0] >= DEFENSE_LINE));
 }
 
+/// A save taken mid-easing (an old save's side step, W1-69) keeps its
+/// `pass_offset`, and the easing back to the lane centre is identical at 1, 2
+/// and 4 ticks per batch.
 #[test]
-fn passing_state_roundtrips_and_produces_identical_fixed_ticks_at_1_2_4x() {
-    let (mut original, _, _) = fixture(5);
+fn a_saved_pass_offset_roundtrips_and_eases_identically_at_1_2_4x() {
+    let (mut original, _, fast) = fixture(5);
     step(&mut original, 20, 1);
+    let offset = |g: &Game| {
+        g.attempt()
+            .unwrap()
+            .enemies
+            .iter()
+            .find(|e| e.id == fast)
+            .unwrap()
+            .pass_offset
+    };
+    let a = original.attempt_mut().unwrap();
+    assert!(a.lane_count > 6, "lane 5 may step out either way");
+    let e = a.enemies.iter_mut().find(|e| e.id == fast).unwrap();
+    e.pass_offset = MAX_PASS_OFFSET;
     let path = std::env::temp_dir().join(format!("lastlight-pass-{}.json", std::process::id()));
     original.set_paused(true);
     let paused = serde_json::to_string(&original).unwrap();
@@ -326,8 +342,16 @@ fn passing_state_roundtrips_and_produces_identical_fixed_ticks_at_1_2_4x() {
     let mut reference = None;
     for batch in [1, 2, 4] {
         let mut g = Game::load(&path).unwrap();
+        assert_eq!(offset(&g), MAX_PASS_OFFSET, "saved mid-easing");
         g.set_paused(false);
-        step(&mut g, 180, batch);
+        step(&mut g, 4, batch);
+        assert!(
+            (0.0..MAX_PASS_OFFSET).contains(&offset(&g)),
+            "easing at batch {batch}: {}",
+            offset(&g)
+        );
+        step(&mut g, 176, batch);
+        assert_eq!(offset(&g), 0.0, "eased back at batch {batch}");
         let actual = serde_json::to_string(&g).unwrap();
         if let Some(expected) = &reference {
             assert_eq!(&actual, expected);

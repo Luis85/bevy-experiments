@@ -769,19 +769,78 @@ fn stacked_line() -> Game {
 }
 
 #[test]
-fn a_lane_paints_far_to_near_then_by_id() {
+fn a_lane_paints_far_to_near_then_by_drawn_feet() {
+    use super::field::crowd_stagger;
     let game = stacked_line();
     let a = game.attempt().unwrap();
     let view = view(a, SceneBlend::NONE);
     let ids: Vec<u64> = view.enemies.iter().map(|e| e.id).collect();
     let mut expected: Vec<&horde_core::sim::Enemy> = a.enemies.iter().collect();
-    expected.sort_by(|p, q| q.x.total_cmp(&p.x).then(p.id.cmp(&q.id)));
+    expected.sort_by(|p, q| {
+        q.x.total_cmp(&p.x)
+            .then((p.y() + crowd_stagger(p.id)[1]).total_cmp(&(q.y() + crowd_stagger(q.id)[1])))
+            .then(p.id.cmp(&q.id))
+    });
     assert_eq!(
         ids,
         expected.iter().map(|e| e.id).collect::<Vec<_>>(),
-        "the body behind the stack paints first, the stack by id"
+        "the body behind the stack paints first, the stack by its drawn feet"
     );
     assert_eq!(ids[0], a.enemies[6].id);
+    // Inside a stack on one x, a body whose drawn feet are nearer the viewer
+    // (lower on screen) never paints under one whose feet are farther.
+    for pair in view.enemies.windows(2) {
+        if pair[0].position[0] == pair[1].position[0] {
+            assert!(
+                pair[0].drawn()[1] <= pair[1].drawn()[1],
+                "{} (feet {}) paints over {} (feet {})",
+                pair[1].id,
+                pair[1].drawn()[1],
+                pair[0].id,
+                pair[0].drawn()[1]
+            );
+        }
+    }
+}
+
+/// A killed hostile starts to collapse, and later settles, where it was
+/// drawn: the crowd stagger carries over to its body, so a body in a stack
+/// does not jump on the frame it dies.
+#[test]
+fn a_killed_hostile_collapses_and_settles_where_it_was_drawn() {
+    use crate::animation::COLLAPSE_TICKS;
+    let mut game = stacked_line();
+    let a = game.attempt().unwrap();
+    assert!(a.corpses.is_empty());
+    let victim = a.enemies[2].id;
+    let last = view(a, SceneBlend::NONE)
+        .enemies
+        .into_iter()
+        .find(|e| e.id == victim)
+        .unwrap()
+        .drawn();
+    assert_ne!(last, [a.enemies[2].x, a.enemies[2].y()], "a staggered body");
+    game.attempt_mut()
+        .unwrap()
+        .enemies
+        .iter_mut()
+        .find(|e| e.id == victim)
+        .unwrap()
+        .hp = 0;
+    game.tick(Input::default());
+    let a = game.attempt().unwrap();
+    let record = a.corpses.iter().find(|c| c.id == victim).expect("a body");
+    assert_eq!(record.at, [horde_core::sim::DEFENSE_LINE, 3.5]);
+    let collapsing = view(a, SceneBlend::NONE);
+    assert_eq!(collapsing.corpses.len(), 1);
+    assert_eq!(collapsing.corpses[0].at, last, "the first collapsing frame");
+    for _ in 0..COLLAPSE_TICKS {
+        game.tick(Input::default());
+    }
+    let a = game.attempt().unwrap();
+    let settled = view(a, SceneBlend::NONE);
+    assert!(settled.corpses.is_empty());
+    assert_eq!(settled.settled.view(a, 0).expect("a settled body").at, last);
 }
 
 #[test]

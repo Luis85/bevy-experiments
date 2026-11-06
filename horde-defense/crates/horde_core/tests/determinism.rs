@@ -62,7 +62,7 @@
 //!
 //! W1-69 is the wave-1 re-bless (ruling R7, folded directly: the user's
 //! 2026-11-06 decision that enemies overlap is the only cause, so no
-//! `PROVISIONAL` step). The other three GOLDEN and three TRACE digests, the
+//! `PROVISIONAL` step). The other five GOLDEN and three TRACE digests, the
 //! V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins
 //! did not move.
 mod support;
