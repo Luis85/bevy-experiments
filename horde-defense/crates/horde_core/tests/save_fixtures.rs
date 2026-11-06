@@ -591,9 +591,10 @@ fn stage_v7_scenario() -> Game {
     let veteran = recruit(&mut g);
     let scout = recruit(&mut g);
 
-    // Mara replays Moldova's first stage: the main-run Npc record that later
-    // carries the takeover fields, and the settled report the final
-    // deployment clears and the staging restores (`lifecycle.rs:234`).
+    // Mara replays Moldova's first stage: the main-run Npc record and the
+    // settled report (cleared by the final deployment and restored by the
+    // staging, `lifecycle.rs:234`) that are later staged, together, as the
+    // veteran's main-run takeover with its receipts.
     prepare(&mut g, Mode::Npc);
     apply(
         &mut g,
@@ -708,7 +709,7 @@ fn stage_v7_scenario() -> Game {
     g.staging().stage_takeover(defender).unwrap();
     *g.staging().last_result() = Some(mara);
 
-    stage_root_report(&mut g);
+    stage_root_report(&mut g, veteran);
     stage_root_attempt(&mut g);
     stage_expeditions(&mut g, settled, live, synced_from..synced_to, receipt_coins);
     stage_campaign(&mut g, veteran);
@@ -726,12 +727,19 @@ fn stage_v7_scenario() -> Game {
     g
 }
 
-/// Mara's restored report: its drops, their qualities, a level-up and
-/// milestone receipt, a Regional boss rank and per-archetype telemetry.
-fn stage_root_report(g: &mut Game) {
+/// The restored root report, staged as the veteran's main-run takeover (the
+/// seat its run record names, see [`stage_campaign`]): its drops, their
+/// qualities, an auto-sold, level-up and milestone receipt, a Regional boss
+/// rank and per-archetype telemetry.
+fn stage_root_report(g: &mut Game, veteran: u64) {
     let level = g.campaign().player.level;
     let report = g.staging().last_result().as_mut().unwrap();
     assert!(!report.loot_events.is_empty() && report.kills > 0);
+    assert_eq!(report.mode, Mode::Npc);
+    // The seat has no test-support writer; it is set through the saved form.
+    let mut saved = serde_json::to_value(&*report).unwrap();
+    saved["defender"] = serde_json::json!({ "Recruit": veteran });
+    *report = serde_json::from_value(saved).unwrap();
     report.drop_ids = drop_ids(&report.loot_events);
     report.loot_by_quality = by_quality(&report.loot_events);
     let granted = report.loot_events[0].clone();
@@ -745,6 +753,21 @@ fn stage_root_report(g: &mut Game) {
             item_id: Some(granted.item_id),
             item_definition: Some(granted.definition),
         }],
+    };
+    let sold = report.loot_events[1].clone();
+    let mut sold_by_quality = horde_core::kind_map::KindMap::default();
+    sold_by_quality[sold.quality] = 1;
+    report.auto_sold = AutoSoldReceipt {
+        count: 1,
+        coins: TAKEOVER_SOLD_COINS,
+        by_quality: sold_by_quality,
+        lines: vec![AutoSoldLine {
+            definition: sold.definition,
+            level: sold.level,
+            quality: sold.quality,
+            coins: TAKEOVER_SOLD_COINS,
+        }],
+        kept_on_overflow: 0,
     };
     report.boss_rank = BossRank::Regional;
     let shambler = horde_core::enemy_catalog::resolve_kind(EnemyKind::Shambler).archetype_id;
@@ -908,8 +931,15 @@ fn stage_root_attempt(g: &mut Game) {
     *g.staging().attempt_slot() = Some(a);
 }
 
+/// Coins of the takeover run's one auto-sold drop (its report and record).
+const TAKEOVER_SOLD_COINS: u64 = 18;
+
 /// The settled expedition's receipt and unacknowledged notice, and the live
-/// one's pending auto-sale and a chained-stage record awaiting its sync.
+/// one's pending auto-sale and a pending record awaiting its sync. That
+/// record is the live expedition's own: Hungary at its stage, under an
+/// attempt id reserved from the shared counter (no game has issued it, so no
+/// record or report holds it), unstamped (the sync stamps the worker and the
+/// recruit), and a Withdrawal, so the sync appends it and clears nothing.
 fn stage_expeditions(
     g: &mut Game,
     settled: u64,
@@ -936,6 +966,8 @@ fn stage_expeditions(
         .collect();
     assert!(!pending.is_empty(), "a synced drop is still in the stash");
     let sold = battle(g, settled).game().last_result().unwrap().loot_events[0].clone();
+    let attempt_id = g.next_attempt_id();
+    g.set_next_attempt_id(attempt_id + 1);
     let battles = g.staging().battles();
 
     let b = battles.iter_mut().find(|b| b.id == settled).unwrap();
@@ -969,10 +1001,21 @@ fn stage_expeditions(
 
     let b = battles.iter_mut().find(|b| b.id == live).unwrap();
     b.pending_auto_sell = pending;
+    let a = b.game().attempt().expect("the live expedition's attempt");
     let mut record = template;
     record.id = 0;
+    record.attempt_id = attempt_id;
     record.worker_id = None;
     record.recruit_id = None;
+    record.outcome = Outcome::Withdrawal;
+    record.cause = "Recalled to camp with all banked rewards".into();
+    record.country_id = Some(b.country_id.clone());
+    record.country_name = a.country_name.clone();
+    record.stage = b.stage;
+    record.template = a.level;
+    record.lane_count = a.lane_count;
+    record.width_yards = a.width_yards;
+    record.completion_xp = 0;
     record.auto_sold_count = 1;
     record.auto_sold_coins = coins;
     record.level_grant_coins = 60;
@@ -984,9 +1027,20 @@ fn stage_expeditions(
 }
 
 /// The campaign ledgers, the next defender, a main-run takeover record with
-/// its receipts, a folded outcome and a containment.
+/// its receipts (those of the restored root report, the same attempt), a
+/// folded outcome and a containment.
 fn stage_campaign(g: &mut Game, veteran: u64) {
     let rank = g.campaign().progression_rank();
+    let name = g
+        .strategy()
+        .roster
+        .iter()
+        .find(|r| r.id == veteran)
+        .unwrap()
+        .npc
+        .name
+        .clone();
+    let report = g.last_result().unwrap().clone();
     let c = g.staging().campaign();
     c.next_defender = Some(DefenderId::Recruit(veteran));
     c.milestones_claimed = [5, 10, 15, 20].into_iter().filter(|r| *r <= rank).collect();
@@ -994,23 +1048,26 @@ fn stage_campaign(g: &mut Game, veteran: u64) {
     assert!(c.player.level >= 2);
     c.player.level_grant_paid = c.player.level;
     let mut records = c.run_history.to_vec();
-    let takeover = records
+    let r = records
+        .iter_mut()
+        .find(|r| r.worker_id.is_none() && r.attempt_id == report.attempt_id)
+        .expect("the root report's main-run record");
+    assert_eq!(r.mode, Mode::Npc);
+    assert!(r.loot > 0 && r.kills > 0);
+    r.recruit_id = Some(veteran);
+    r.defender_name = name;
+    r.auto_sold_count = report.auto_sold.count;
+    r.auto_sold_coins = report.auto_sold.coins;
+    r.level_grant_coins = report.progression_rewards.level_coins;
+    r.milestone_coins = report
+        .progression_rewards
+        .milestones
         .iter()
-        .rposition(|r| r.worker_id.is_none() && r.mode == Mode::Npc)
-        .expect("Mara's main-run record");
-    records[takeover].recruit_id = Some(veteran);
-    let receipt = records
-        .iter()
-        .rposition(|r| r.worker_id.is_none() && r.loot > 0 && r.kills > 0)
-        .expect("a main-run record with drops and kills");
-    let r = &mut records[receipt];
-    r.auto_sold_count = 1;
-    r.auto_sold_coins = 18;
-    r.level_grant_coins = 120;
-    r.milestone_coins = 250;
-    r.elite_kills = 1;
+        .map(|m| m.coins)
+        .sum();
+    r.elite_kills = report.telemetry.elites_killed;
     r.boss_ttk_ticks = Some(r.duration_ticks / 3);
-    r.boss_rank = BossRank::Capstone;
+    r.boss_rank = report.boss_rank;
     c.run_history = records.into();
     let strategy = g.staging().strategy();
     strategy.folded_outcomes = 1;

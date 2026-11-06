@@ -47,13 +47,14 @@
 //! `write_save_v7_fixture` in `save_fixtures.rs` (seed 0x5AFE_0007; see
 //! `stage_v7_scenario` there). Played through `Game::apply`: Rook liberates
 //! Moldova and Romania, Mara replays Moldova stage 1 (the restored root
-//! report), recruit 2 wins Ukraine stage 1 on an expedition, recruit 3 is out
+//! report, staged as recruit 2's main-run takeover), recruit 2 wins Ukraine stage 1 on an expedition, recruit 3 is out
 //! in Hungary with a synced drop, the preset is Custom on Hard's extras,
 //! auto-sell is on, and Mara holds Romania stage 1 at tick 1740 (rank 8).
 //! Staged through the test-support seams: recruit 1 takes that defense over
 //! (`stage_takeover`), and every v7 field without a wave-1 writer is set to a
-//! valid non-default value. It is 94,965 bytes (budget 96 KB) and is never
-//! re-cut: a later saved field must load it unchanged.
+//! valid non-default value. It is 95,266 bytes (budget 96 KB), its checksum
+//! and length are pinned, and it is never re-cut: a later saved field must
+//! load it unchanged.
 mod support;
 
 use horde_core::campaign::{BodyAttribute, NpcTraining};
@@ -1324,6 +1325,11 @@ fn rejects_milestone_claimed_above_rank() {
 const FIXTURE_V7: &str = include_str!("fixtures/save_v7.json");
 /// The frozen file's size budget (schema-v7.md section 11).
 const V7_FIXTURE_MAX_BYTES: usize = 96 * 1024;
+/// The frozen file's identity: its envelope checksum (FNV-1a of the payload)
+/// and its byte length. A re-cut fails here and goes through the
+/// stop-and-ask path the freeze declares.
+const V7_FIXTURE_CHECKSUM: u64 = 8_527_615_155_064_533_385;
+const V7_FIXTURE_BYTES: usize = 95_266;
 
 fn fixture_v7() -> Game {
     Game::decode_save_generation(FIXTURE_V7.as_bytes()).expect("v7 fixture loads and validates")
@@ -1390,6 +1396,11 @@ fn v7_fixture_is_a_real_v7_generation() {
         FIXTURE_V7.len()
     );
     let envelope = envelope_v7();
+    assert_eq!(
+        (envelope["checksum"].as_u64(), FIXTURE_V7.len()),
+        (Some(V7_FIXTURE_CHECKSUM), V7_FIXTURE_BYTES),
+        "save_v7.json is frozen and never re-cut"
+    );
     assert_eq!(envelope["version"], 7);
     assert!(envelope["ruleset_version"].is_u64());
     assert!(envelope["content_fingerprint"].is_u64());
@@ -1499,13 +1510,51 @@ fn v7_fixture_holds_every_defender_key_at_non_default() {
             .iter()
             .any(|r| r["containments"].as_u64().unwrap_or(0) > 0)
     );
-    assert!(
-        payload["campaign"]["run_history"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|r| r["worker_id"].is_null() && r["recruit_id"].is_u64() && r["mode"] == "Npc")
+    let history = payload["campaign"]["run_history"].as_array().unwrap();
+    // The main-run takeover record carries its receipts, and the restored
+    // root report of the same attempt names the same recruit.
+    let takeover = history
+        .iter()
+        .find(|r| r["worker_id"].is_null() && r["recruit_id"].is_u64() && r["mode"] == "Npc")
+        .expect("a main-run takeover record");
+    for key in [
+        "auto_sold_count",
+        "level_grant_coins",
+        "milestone_coins",
+        "elite_kills",
+        "boss_ttk_ticks",
+        "boss_rank",
+    ] {
+        assert!(
+            !is_v7_default(key, &takeover[key]),
+            "the takeover record's {key} is {}",
+            takeover[key]
+        );
+    }
+    let report = &payload["last_result"];
+    assert_eq!(report["attempt_id"], takeover["attempt_id"]);
+    assert_eq!(
+        report["defender"],
+        json!({"Recruit": takeover["recruit_id"]}),
+        "the takeover record and its report name one defender"
     );
+    // A worker's pending record is that expedition's own run: its country,
+    // and an attempt the parent has not recorded yet.
+    let mut pending = 0;
+    for battle in payload["battles"].as_array().unwrap() {
+        for record in battle["game"]["pending_runs"].as_array().unwrap() {
+            assert_eq!(record["country_id"], battle["country_id"]);
+            assert!(
+                history
+                    .iter()
+                    .all(|r| r["attempt_id"] != record["attempt_id"]),
+                "pending attempt {} is already in run_history",
+                record["attempt_id"]
+            );
+            pending += 1;
+        }
+    }
+    assert!(pending > 0, "a worker holds a pending run record");
     // The typed reads agree.
     let game = fixture_v7();
     assert_eq!(
@@ -1556,13 +1605,23 @@ fn v7_fixture_loads_validates_and_resaves_byte_identically() {
     let resaved: serde_json::Value = serde_json::from_slice(&first).unwrap();
     assert_eq!(resaved["version"], SAVE_VERSION);
     assert_eq!(resaved["payload"].as_str().unwrap(), saved);
-    // The checksum guards every payload byte.
-    let at = FIXTURE_V7
-        .find("\\\"seed\\\":")
-        .expect("the payload holds a seed");
+    // The checksum guards every payload byte: the last digit of the seed,
+    // flipped to another digit, still parses as a valid, typed payload and is
+    // refused on the checksum alone.
+    let key = "\\\"seed\\\":";
+    let at = FIXTURE_V7.find(key).expect("the payload holds a seed") + key.len();
+    let digits = FIXTURE_V7[at..]
+        .bytes()
+        .take_while(u8::is_ascii_digit)
+        .count();
+    assert!(digits > 1, "the seed is a multi-digit number");
     let mut flipped = FIXTURE_V7.as_bytes().to_vec();
-    flipped[at + 2] ^= 0x01;
-    assert!(Game::decode_save_generation(&flipped).is_err());
+    flipped[at + digits - 1] ^= 0x01;
+    assert!(flipped[at + digits - 1].is_ascii_digit());
+    assert!(matches!(
+        Game::decode_save_generation(&flipped),
+        Err(SaveError::ChecksumMismatch)
+    ));
 }
 
 /// Every enemy and balance field save format 7 added (sections 3.1
