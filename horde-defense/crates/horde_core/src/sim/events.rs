@@ -51,6 +51,22 @@ pub struct Strike {
     pub value: i32,
 }
 
+/// What set an exploder's blast off. The saved presentation window keeps
+/// only `EventKind::Detonation` and `target_id`, so a fuse on the defender
+/// and a death burst (both without a target) differ only here.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum DetonationTrigger {
+    /// Its windup completed in contact: the blast struck `target_id` (a
+    /// structure, or `None` for the defender) standing at `to`.
+    Fuse {
+        target_id: Option<u64>,
+        to: [f32; 2],
+    },
+    /// It was killed: the burst strikes enemies and structures around it,
+    /// never the defender.
+    Death,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum SimEvent {
     Shot {
@@ -164,11 +180,11 @@ pub enum SimEvent {
     /// A ranged enemy strike; `target_id` is a structure, or `None` when the
     /// defender was struck.
     Spit(Strike),
-    /// A dying or fused enemy's blast. `target_id` names the fuse target (a
-    /// structure, or `None` for the defender) and is `None` for a death burst.
+    /// A fused or dying enemy's blast centred on `at`; `trigger` names the
+    /// fuse target or marks a death burst.
     Detonation {
         enemy_id: u64,
-        target_id: Option<u64>,
+        trigger: DetonationTrigger,
         lane: Option<u8>,
         at: [f32; 2],
         /// Blast radius in yards.
@@ -376,7 +392,20 @@ impl Attempt {
             EventKind::Spit => SimEvent::Spit(strike()),
             EventKind::Detonation => SimEvent::Detonation {
                 enemy_id: id,
-                target_id: meta.target_id,
+                trigger: {
+                    // The writer names the trigger; the window's target agrees.
+                    debug_assert!(
+                        match meta.detonation {
+                            Some(DetonationTrigger::Fuse { target_id, .. }) => {
+                                target_id == meta.target_id
+                            }
+                            Some(DetonationTrigger::Death) => meta.target_id.is_none(),
+                            None => false,
+                        },
+                        "detonation events name a trigger that matches their target"
+                    );
+                    meta.detonation.unwrap_or(DetonationTrigger::Death)
+                },
                 lane,
                 at: from,
                 radius: value as f32 / 100.0,
@@ -490,13 +519,36 @@ mod tests {
         };
         let (from, to) = ([6.0, 2.5], [1.5, 2.5]);
         a.event_with(EventKind::Spit, from, to, 7, meta(runner, None, 2));
-        a.event_with(
-            EventKind::Detonation,
-            from,
-            to,
-            160,
-            meta(runner, Some(9), 2),
-        );
+        // A fuse on a structure, a fuse on the defender and a death burst:
+        // the trigger tells the last two apart although neither has a target.
+        for (target, trigger) in [
+            (
+                Some(9),
+                DetonationTrigger::Fuse {
+                    target_id: Some(9),
+                    to,
+                },
+            ),
+            (
+                None,
+                DetonationTrigger::Fuse {
+                    target_id: None,
+                    to,
+                },
+            ),
+            (None, DetonationTrigger::Death),
+        ] {
+            a.event_with(
+                EventKind::Detonation,
+                from,
+                to,
+                160,
+                EventMetadata {
+                    detonation: Some(trigger),
+                    ..meta(runner, target, 2)
+                },
+            );
+        }
         a.event_with(EventKind::Split, from, to, 3, meta(runner, None, 2));
         a.event_with(EventKind::BossPhase, from, to, 2, meta(boss, None, 4));
         let events: Vec<SimEvent> = a.emitted.iter().map(|r| r.event.clone()).collect();
@@ -513,7 +565,27 @@ mod tests {
                 }),
                 SimEvent::Detonation {
                     enemy_id: runner,
-                    target_id: Some(9),
+                    trigger: DetonationTrigger::Fuse {
+                        target_id: Some(9),
+                        to,
+                    },
+                    lane: Some(2),
+                    at: from,
+                    radius: 1.6,
+                },
+                SimEvent::Detonation {
+                    enemy_id: runner,
+                    trigger: DetonationTrigger::Fuse {
+                        target_id: None,
+                        to,
+                    },
+                    lane: Some(2),
+                    at: from,
+                    radius: 1.6,
+                },
+                SimEvent::Detonation {
+                    enemy_id: runner,
+                    trigger: DetonationTrigger::Death,
                     lane: Some(2),
                     at: from,
                     radius: 1.6,
@@ -538,7 +610,7 @@ mod tests {
             .events
             .iter()
             .rev()
-            .take(4)
+            .take(6)
             .map(|e| serde_json::to_string(&e.kind).unwrap())
             .collect();
         assert_eq!(
@@ -546,6 +618,8 @@ mod tests {
             [
                 r#""BossPhase""#,
                 r#""Split""#,
+                r#""Detonation""#,
+                r#""Detonation""#,
                 r#""Detonation""#,
                 r#""Spit""#
             ]

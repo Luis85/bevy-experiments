@@ -234,10 +234,10 @@ All mechanics are deterministic. `a.rng` is drawn only when an effect triggers, 
   - Personal: `(damage × enemy_damage × balance.enemy_damage) - armor`, halved by brace.
   - NPC: new `rules::resolve_blast(rng, dice, add, dodge: Option<i32>, dr, ht)` with no attack roll and dodge allowed.
   - The exploder is removed in the same pass. Its id goes into `reward_ledger`, so reap pays no reward and writes no corpse or Kill event.
-  - Emits `EventKind::Detonation` with `target_id` Some.
+  - Emits `EventKind::Detonation` with the target's `target_id` (a structure id, or None for the defender) and `SimEvent::Detonation { trigger: DetonationTrigger::Fuse { target_id, to } }` (W1 review: `target_id` alone cannot tell a defender fuse from a death burst).
 - Death: when killed, it bursts on enemies and structures within the radius, never the defender. The kill pays its reward normally.
   - Bursts are collected in `reap` (combat.rs:308) and applied after the loop. Enemies killed by a burst are reaped next tick, so chains resolve one tick later and terminate (each enemy bursts once).
-  - Emits `Detonation` with `target_id` None.
+  - Emits `Detonation` with `target_id` None and `trigger: DetonationTrigger::Death`.
 
 **Splitter.**
 - On death it spawns `min(count, enemy_cap - non_boss_count)` children.

@@ -16,7 +16,7 @@ mod smoke;
 mod structures;
 mod telemetry;
 pub use auto_sell::{AutoSellPreview, AutoSellScope};
-pub use events::{Actor, BattleId, SimEvent, SimEventRecord, Strike};
+pub use events::{Actor, BattleId, DetonationTrigger, SimEvent, SimEventRecord, Strike};
 #[cfg(any(test, feature = "test-support", feature = "review"))]
 pub use fixtures::{
     STRESS_ENEMY_CAP, save_clone_fixture, stress_authored_fixture, stress_render_fixture,
@@ -362,6 +362,8 @@ struct EventMetadata {
     lane: Option<u8>,
     duration_ticks: u32,
     ordnance: Option<OrdnanceKind>,
+    /// Typed stream only (never saved): what set a `Detonation` off.
+    detonation: Option<DetonationTrigger>,
 }
 #[derive(
     Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
