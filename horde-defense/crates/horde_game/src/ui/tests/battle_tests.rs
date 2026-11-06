@@ -850,6 +850,61 @@ fn construction_toggle_keeps_arena_rect() {
     }
 }
 
+/// The capture sidecar reports the rects the battle frame recorded, as
+/// `[left, top, right, bottom]` points; `hud_rows` stays None until ux-flow's
+/// bar measurement lands (C-10, wave 3).
+#[cfg(feature = "review")]
+#[test]
+fn review_frame_facts_report_arena_rect_and_hud_rows() {
+    let corners = |r: Rect| [r.left(), r.top(), r.right(), r.bottom()];
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        h.frame_size(f, View::Battle, vec![], size);
+        let facts = review::ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            f.screen,
+            f.nav.tab,
+            &f.battle,
+        );
+        let a = f.game.attempt().unwrap();
+        assert!(f.battle.arena_rect.is_some(), "{size:?}: no field recorded");
+        assert_eq!(
+            facts.arena_rect,
+            f.battle.arena_rect.map(corners),
+            "{size:?}"
+        );
+        assert_eq!(facts.effects_rect, f.battle.effects_rect.map(corners));
+        assert_eq!(facts.observer_arena_rect, None, "no observer in a battle");
+        assert_eq!(facts.screen, "Battle");
+        assert_eq!(facts.tab, None, "a battle has no camp tab");
+        assert_eq!(facts.overlays, ["construction"]);
+        assert_eq!(
+            (facts.lanes, facts.width_yards),
+            (Some(a.lane_count), Some(a.width_yards))
+        );
+        assert_eq!(facts.hud_rows, None, "ux-flow W3 measures the bar rows");
+        assert_eq!(facts.reduced_effects, f.settings.reduced_effects);
+        assert_eq!(facts.ui_scale, f.settings.scale);
+        // Off the battle screen a stale field is never reported.
+        f.screen = Screen::Results;
+        let facts = review::ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            f.screen,
+            f.nav.tab,
+            &f.battle,
+        );
+        assert_eq!((facts.arena_rect, facts.effects_rect), (None, None));
+        assert_eq!((facts.lanes, facts.overlays.len()), (None, 0));
+    }
+}
+
 #[test]
 fn battle_frame_records_layout_rects() {
     use horde_core::balance::BalanceSettings;

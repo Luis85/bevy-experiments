@@ -230,7 +230,7 @@ use self::operations::operations;
 
 mod review;
 #[cfg(feature = "review")]
-pub(crate) use review::schedule_gesture_review;
+pub(crate) use review::{ReviewFrameFacts, schedule_gesture_review};
 
 mod feedback;
 

@@ -1,20 +1,32 @@
 //! `ReviewToolsPlugin`: isolated review and measurement services. Compiled only
 //! with the `review` feature and added only when `LaunchConfig::review` is set,
 //! so ordinary play and practice never schedule these systems.
-use crate::{capture_sequence, diagnostics, launch::LaunchConfig, ui, visual_assets};
+use crate::{
+    capture_sequence, diagnostics, launch::LaunchConfig, runner::GameSession, settings::Settings,
+    ui, visual_assets,
+};
 use bevy::{
     app::AppExit,
     prelude::*,
     render::view::screenshot::{Screenshot, save_to_disk},
+    window::PrimaryWindow,
 };
+use bevy_egui::EguiPrimaryContextPass;
 
 pub struct ReviewToolsPlugin;
 impl Plugin for ReviewToolsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            (automated_capture, capture_sequence::capture_frames),
-        );
+        app.init_resource::<ui::ReviewFrameFacts>()
+            .add_systems(
+                Update,
+                (automated_capture, capture_sequence::capture_frames),
+            )
+            .add_systems(
+                EguiPrimaryContextPass,
+                record_frame_facts
+                    .after(ui::draw)
+                    .run_if(|config: Res<LaunchConfig>| config.capture_path().is_some()),
+            );
         // The report reads the frame `PerfPlugin` closes at the end of `Last`,
         // so each phase is attributed to the frame that did the work.
         if app.world().resource::<LaunchConfig>().perf().is_some() {
@@ -32,14 +44,57 @@ struct StaticCapture {
     ready_frames: u32,
     requested: Option<(u32, std::path::PathBuf)>,
 }
-/// `LASTLIGHT_REVIEW_CAPTURE`: one screenshot once assets are ready, plus the
-/// optional player-model manifest; `LASTLIGHT_REVIEW_EXIT` exits once it exists.
+/// Still captures only: refreshes `ReviewFrameFacts` from the pass `ui::draw`
+/// just drew, plus the canvas and the window's scale factor.
+#[allow(clippy::too_many_arguments)]
+fn record_frame_facts(
+    mut facts: ResMut<ui::ReviewFrameFacts>,
+    session: Res<GameSession>,
+    config: Res<LaunchConfig>,
+    settings: Res<Settings>,
+    screen: Res<State<ui::Screen>>,
+    tab: Option<Res<State<ui::Tab>>>,
+    battle: Res<ui::BattleUi>,
+    window: Option<Single<&Window, With<PrimaryWindow>>>,
+    mut contexts: bevy_egui::EguiContexts,
+) {
+    let mut next = ui::ReviewFrameFacts::collect(
+        &session.game,
+        &config,
+        &settings,
+        *screen.get(),
+        tab.map_or(ui::Tab::World, |tab| *tab.get()),
+        &battle,
+    );
+    next.canvas_rect = contexts.ctx_mut().ok().map(|ctx| {
+        let r = ctx.content_rect();
+        [r.left(), r.top(), r.right(), r.bottom()]
+    });
+    next.windows_scale = window.map_or(1.0, |window| window.scale_factor());
+    *facts = next;
+}
+
+/// The capture sidecar: format version 1 plus the frame facts.
+fn sidecar_json(facts: &ui::ReviewFrameFacts) -> Result<Vec<u8>, String> {
+    #[derive(serde::Serialize)]
+    struct Sidecar<'a> {
+        version: u32,
+        #[serde(flatten)]
+        facts: &'a ui::ReviewFrameFacts,
+    }
+    serde_json::to_vec_pretty(&Sidecar { version: 1, facts }).map_err(|error| error.to_string())
+}
+
+/// `LASTLIGHT_REVIEW_CAPTURE`: one screenshot once assets are ready, its
+/// `<capture>.json` sidecar (written first) and the optional player-model
+/// manifest; `LASTLIGHT_REVIEW_EXIT` exits once the PNG exists.
 fn automated_capture(
     mut commands: Commands,
     mut state: Local<StaticCapture>,
     assets: Res<visual_assets::VisualAssets>,
     mut contexts: bevy_egui::EguiContexts,
     config: Res<LaunchConfig>,
+    facts: Res<ui::ReviewFrameFacts>,
     mut exit: MessageWriter<AppExit>,
 ) {
     state.frames += 1;
@@ -86,6 +141,20 @@ fn automated_capture(
                 return;
             }
         }
+        // The workshop's player-model manifest already owns `<capture>.json`.
+        let sidecar = path.with_extension("json");
+        let model_manifest = config
+            .review()
+            .and_then(|r| r.model_report.as_ref())
+            .is_some_and(|report| *report == sidecar);
+        if !model_manifest
+            && let Err(error) = sidecar_json(&facts)
+                .and_then(|bytes| std::fs::write(&sidecar, bytes).map_err(|e| e.to_string()))
+        {
+            error!("Review capture sidecar failed: {error}");
+            exit.write(AppExit::error());
+            return;
+        }
         state.requested = Some((state.frames, path.clone()));
         commands
             .spawn(Screenshot::primary_window())
@@ -105,5 +174,59 @@ fn automated_capture(
             error!("Native capture timed out before assets or the completed PNG were ready");
             exit.write(AppExit::error());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The keys capture_review.ps1 and the camera review read from every
+    /// still's sidecar; a missing measurement is an explicit null.
+    #[test]
+    fn sidecar_json_has_required_keys() {
+        let facts = ui::ReviewFrameFacts {
+            scene: "max-lanes".into(),
+            screen: "Battle".into(),
+            arena_rect: Some([24.0, 124.0, 1416.0, 816.0]),
+            lanes: Some(17),
+            ui_scale: 1.0,
+            windows_scale: 2.0,
+            ..Default::default()
+        };
+        let bytes = sidecar_json(&facts).unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        let object = value.as_object().expect("a JSON object");
+        let mut keys: Vec<&str> = object.keys().map(String::as_str).collect();
+        keys.sort_unstable();
+        assert_eq!(
+            keys,
+            [
+                "arena_rect",
+                "canvas_rect",
+                "effects_rect",
+                "hud_rows",
+                "lanes",
+                "observer_arena_rect",
+                "overlays",
+                "reduced_effects",
+                "scene",
+                "screen",
+                "tab",
+                "ui_scale",
+                "version",
+                "width_yards",
+                "windows_scale",
+            ]
+        );
+        assert_eq!(object["version"], 1);
+        assert_eq!(object["windows_scale"], 2.0);
+        assert_eq!(
+            object["arena_rect"],
+            serde_json::json!([24.0, 124.0, 1416.0, 816.0])
+        );
+        assert!(object["hud_rows"].is_null());
+        assert!(object["tab"].is_null());
+        assert_eq!(object["overlays"], serde_json::json!([]));
     }
 }

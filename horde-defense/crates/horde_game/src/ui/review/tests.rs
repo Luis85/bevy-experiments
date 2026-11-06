@@ -674,6 +674,32 @@ fn observer_uses_fit_field() {
     assert!(fit.zoom > 1.0, "the 3x12 field zooms in: {}", fit.zoom);
 }
 
+/// The capture sidecar reads the observer's fitted field from
+/// `observer_arena_rect`; the camp screen reports its tab and no battle field.
+#[cfg(feature = "review")]
+#[test]
+fn review_frame_facts_report_the_observer_field() {
+    let mut f = staged("operations");
+    let (field, _) = observed_operations(&mut f, (3, 12.0));
+    let facts = ReviewFrameFacts::collect(
+        &f.game,
+        &f.launch,
+        &f.settings,
+        f.screen,
+        f.nav.tab,
+        &f.battle,
+    );
+    let corners = [field.left(), field.top(), field.right(), field.bottom()];
+    assert_eq!(facts.scene, "operations");
+    assert_eq!(facts.observer_arena_rect, Some(corners));
+    assert_eq!(facts.overlays, ["observer"]);
+    assert_eq!(
+        (facts.screen.as_str(), facts.tab.as_deref()),
+        ("Camp", Some("Operations"))
+    );
+    assert_eq!((facts.arena_rect, facts.lanes), (None, None));
+}
+
 #[test]
 fn observer_filling_field_is_unchanged() {
     let mut f = staged("operations");

@@ -6,7 +6,10 @@
 #   saves/<mode>-<scene>[-small]/  per-capture LASTLIGHT_SAVE_DIR, so logs never reach the player profile
 #   scenes.tsv                     the binary's --list-scenes output
 #   tools/                         cargo, --list-scenes and --version logs
-#   captures.json                  version 1, UTF-8 without BOM
+#   captures.json                  version 1, UTF-8 without BOM, with the sidecar_checks rows
+# Sidecar checks (a 'fail' row fails the run): every capture has a sidecar; battle stills at small size report
+# hud_rows <= 2 ('pending' while the build reports null, until ux-flow W3); construction keeps the battle's
+# arena_rect at the same size and mode; max-lanes (17x30) keeps the pre-zoom arena, canvas inset 24/124/24/84.
 # -Scenes defaults to every Still the binary lists; -SmallScenes defaults to -Scenes. List parameters accept
 # 'a,b' as one argument, because -File passes commas through verbatim.
 [CmdletBinding()]
@@ -52,6 +55,75 @@ function Get-LogListing([string]$Directory) {
     if (-not (Test-Path -LiteralPath $Directory)) { return '' }
     $rows = @(Get-ChildItem -LiteralPath $Directory -Force -Recurse -File | Sort-Object FullName | ForEach-Object { '{0}|{1}|{2}' -f $_.FullName, $_.Length, $_.LastWriteTimeUtc.Ticks })
     return ($rows -join "`n")
+}
+
+function Format-Rect($Rect) {
+    if ($null -eq $Rect) { return 'null' }
+    return '[' + ((@($Rect) | ForEach-Object { ([double]$_).ToString('0.###', [Globalization.CultureInfo]::InvariantCulture) }) -join ', ') + ']'
+}
+
+function Test-RectEqual($Left, $Right, [double]$Tolerance) {
+    if ($null -eq $Left -or $null -eq $Right) { return $false }
+    $a = @($Left)
+    $b = @($Right)
+    if ($a.Count -ne 4 -or $b.Count -ne 4) { return $false }
+    for ($i = 0; $i -lt 4; $i++) {
+        if ([Math]::Abs([double]$a[$i] - [double]$b[$i]) -gt $Tolerance) { return $false }
+    }
+    return $true
+}
+
+function New-SidecarCheck([string]$Check, [string]$Mode, [string]$Size, [string]$Scene, [string]$Result, [string]$Detail) {
+    return [ordered]@{ check = $Check; mode = $Mode; size = $Size; scene = $Scene; result = $Result; detail = $Detail }
+}
+
+function Test-CaptureSidecars($Entries, [string]$Root) {
+    # Reads every successful capture's sidecar and returns the check rows (result pass, fail or pending).
+    $rows = New-Object System.Collections.Generic.List[object]
+    $facts = @{}
+    foreach ($entry in $Entries) {
+        if ($null -ne $entry.error -or $null -eq $entry.sha256) { continue }
+        if ($null -eq $entry.sidecar) {
+            $rows.Add((New-SidecarCheck 'sidecar_present' $entry.mode $entry.size $entry.scene 'fail' 'no sidecar beside the PNG'))
+            continue
+        }
+        try {
+            $facts["$($entry.mode)|$($entry.size)|$($entry.scene)"] = [IO.File]::ReadAllText((Join-Path $Root $entry.sidecar)) | ConvertFrom-Json
+            $rows.Add((New-SidecarCheck 'sidecar_present' $entry.mode $entry.size $entry.scene 'pass' $entry.sidecar))
+        }
+        catch {
+            $rows.Add((New-SidecarCheck 'sidecar_present' $entry.mode $entry.size $entry.scene 'fail' "unreadable sidecar: $($_.Exception.Message)"))
+        }
+    }
+    foreach ($key in @($facts.Keys | Sort-Object)) {
+        $mode, $size, $scene = $key -split '\|', 3
+        $fact = $facts[$key]
+        if ($fact.screen -eq 'Battle' -and $size -eq 'small') {
+            if ($null -eq $fact.hud_rows) { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'pending' 'hud_rows is null until ux-flow measures the bar (C-10, wave 3)')) }
+            elseif ([int]$fact.hud_rows -le 2) { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'pass' "hud_rows $($fact.hud_rows)")) }
+            else { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'fail' "hud_rows $($fact.hud_rows)")) }
+        }
+        if ($scene -eq 'construction') {
+            $battle = $facts["$mode|$size|battle"]
+            if ($null -ne $battle) {
+                $same = Test-RectEqual $fact.arena_rect $battle.arena_rect 0.001
+                $detail = "construction $(Format-Rect $fact.arena_rect), battle $(Format-Rect $battle.arena_rect)"
+                $rows.Add((New-SidecarCheck 'construction_keeps_battle_arena' $mode $size $scene $(if ($same) { 'pass' } else { 'fail' }) $detail))
+            }
+        }
+        if ($scene -eq 'max-lanes') {
+            # The pre-zoom battle_arena(canvas, false): a 17x30 field fills it, so zoom-to-fit must not move it.
+            $expected = $null
+            if ($null -ne $fact.canvas_rect -and @($fact.canvas_rect).Count -eq 4) {
+                $c = @($fact.canvas_rect)
+                $expected = @(([double]$c[0] + 24), ([double]$c[1] + 124), ([double]$c[2] - 24), ([double]$c[3] - 84))
+            }
+            $same = Test-RectEqual $fact.arena_rect $expected 0.01
+            $detail = "arena $(Format-Rect $fact.arena_rect), pre-zoom arena $(Format-Rect $expected), $($fact.lanes)x$($fact.width_yards)"
+            $rows.Add((New-SidecarCheck 'max_lanes_keeps_pre_zoom_arena' $mode $size $scene $(if ($same) { 'pass' } else { 'fail' }) $detail))
+        }
+    }
+    return $rows.ToArray()
 }
 
 $modeList = @(Split-ListArgument $Modes)
@@ -198,6 +270,16 @@ finally {
         $pair = @($entries | Where-Object { $_.mode -eq 'normal' -and $_.scene -eq $entry.scene -and $_.size -eq $entry.size -and $null -ne $_.sha256 })
         if ($pair.Count -gt 0) { $entry.identical_to_normal = ($pair[0].sha256 -eq $entry.sha256) }
     }
+    $sidecarChecks = @(Test-CaptureSidecars $entries.ToArray() $destination)
+    foreach ($row in $sidecarChecks) {
+        $line = "$($row.check) $($row.mode)/$($row.size)/$($row.scene) - $($row.detail)"
+        if ($row.result -eq 'fail') {
+            $failures.Add("Sidecar check failed: $line")
+            Write-Warning "Sidecar check failed: $line"
+        }
+        elseif ($row.result -eq 'pending') { Write-Output "pend $line" }
+        elseif ($row.check -ne 'sidecar_present') { Write-Output "ok   $line" }
+    }
     $playerLogsUnchanged = ((Get-LogListing $playerLogs) -eq $playerLogsBefore)
     if (-not $playerLogsUnchanged) { Write-Warning "The player log folder changed during the run: $playerLogs" }
     $exePath = $null
@@ -217,6 +299,7 @@ finally {
         scene_list            = $sceneListFile
         player_logs_unchanged = $playerLogsUnchanged
         captures              = $entries.ToArray()
+        sidecar_checks        = $sidecarChecks
     }
     Write-Utf8NoBom -Path (Join-Path $destination 'captures.json') -Text ($report | ConvertTo-Json -Depth 5)
 }

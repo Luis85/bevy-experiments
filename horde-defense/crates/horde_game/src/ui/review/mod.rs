@@ -114,6 +114,76 @@ pub(crate) fn schedule_gesture_review(
     }
 }
 
+/// What one review still showed, written beside its PNG as the capture
+/// sidecar (`<capture>.json`). Rects are `[left, top, right, bottom]` in egui
+/// points. The battle field and its effects clip come from the rects the
+/// battle frame recorded (`BattleUi::arena_rect` / `effects_rect`), the
+/// worker observer's from `observer_arena_rect`; nothing is re-measured here.
+/// `hud_rows` stays None until ux-flow's bar measurement lands (C-10, wave 3).
+/// The review tools fill `canvas_rect` and `windows_scale` from the window,
+/// and own all of the IO.
+#[cfg(feature = "review")]
+#[derive(bevy::prelude::Resource, Clone, Debug, Default, PartialEq, serde::Serialize)]
+pub(crate) struct ReviewFrameFacts {
+    pub(crate) scene: String,
+    pub(crate) screen: String,
+    pub(crate) tab: Option<String>,
+    pub(crate) overlays: Vec<&'static str>,
+    pub(crate) canvas_rect: Option<[f32; 4]>,
+    pub(crate) arena_rect: Option<[f32; 4]>,
+    pub(crate) effects_rect: Option<[f32; 4]>,
+    pub(crate) observer_arena_rect: Option<[f32; 4]>,
+    pub(crate) lanes: Option<u8>,
+    pub(crate) width_yards: Option<f32>,
+    pub(crate) hud_rows: Option<u8>,
+    pub(crate) reduced_effects: bool,
+    pub(crate) ui_scale: f32,
+    pub(crate) windows_scale: f32,
+}
+#[cfg(feature = "review")]
+impl ReviewFrameFacts {
+    /// The facts of the last drawn pass. Field facts are reported only on
+    /// the battle screen, so a stale rect from an earlier battle never is.
+    pub(crate) fn collect(
+        game: &Game,
+        launch: &crate::launch::LaunchConfig,
+        settings: &crate::settings::Settings,
+        screen: super::Screen,
+        tab: super::Tab,
+        battle: &BattleUi,
+    ) -> Self {
+        let corners = |r: bevy_egui::egui::Rect| [r.left(), r.top(), r.right(), r.bottom()];
+        let in_battle = screen == super::Screen::Battle;
+        let attempt = game.attempt().filter(|_| in_battle);
+        let mut overlays = Vec::new();
+        if in_battle && battle.construction {
+            overlays.push("construction");
+        }
+        if in_battle && battle.inspect_log {
+            overlays.push("inspect-log");
+        }
+        if battle.observer_arena_rect.is_some() {
+            overlays.push("observer");
+        }
+        Self {
+            scene: launch.scenario.clone().unwrap_or_default(),
+            screen: format!("{screen:?}"),
+            tab: (screen == super::Screen::Camp).then(|| format!("{tab:?}")),
+            overlays,
+            canvas_rect: None,
+            arena_rect: battle.arena_rect.filter(|_| in_battle).map(corners),
+            effects_rect: battle.effects_rect.filter(|_| in_battle).map(corners),
+            observer_arena_rect: battle.observer_arena_rect.map(corners),
+            lanes: attempt.map(|a| a.lane_count),
+            width_yards: attempt.map(|a| a.width_yards),
+            hud_rows: None,
+            reduced_effects: settings.reduced_effects,
+            ui_scale: settings.scale,
+            windows_scale: 1.0,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum LootCaptureMode {
     Disabled,
