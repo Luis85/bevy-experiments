@@ -1,7 +1,8 @@
 //! Bodies on the ground: the cached settled-corpse mesh, then the collapsing
 //! bodies.
 //!
-//! Settled bodies are the battlefield's single cross-frame cache: one
+//! Settled bodies are cached across frames (as the ground meshes of
+//! `visual_assets::ground_material` are): one
 //! `Arc<Mesh>` per painter layer in egui temp data, keyed by
 //! [`CorpseCacheKey`]. While the key holds and the settled prefix only grows,
 //! the bodies that settled since the last pass are appended (through the pure

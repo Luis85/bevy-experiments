@@ -222,17 +222,19 @@ fn peripheral_sprite_bases_share_the_requested_ground_plane() {
             Prop::Rock,
             Prop::Lamp,
         ] {
-            assert!(prop_grounded(
-                ui.painter(),
-                ArtTextures {
-                    props: Some(TextureId::User(2)),
-                    ..Default::default()
-                },
-                kind,
-                foot,
-                vec2(90., 80.),
-                Color32::WHITE
-            ));
+            ui.painter().add(
+                prop_grounded_shape(
+                    ArtTextures {
+                        props: Some(TextureId::User(2)),
+                        ..Default::default()
+                    },
+                    kind,
+                    foot,
+                    vec2(90., 80.),
+                    Color32::WHITE,
+                )
+                .expect("the prop sheet is loaded"),
+            );
         }
     });
     let meshes: Vec<_> = output

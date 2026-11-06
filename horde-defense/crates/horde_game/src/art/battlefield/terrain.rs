@@ -5,7 +5,7 @@ use bevy_egui::egui::{Align2, Color32 as C, FontId, Painter, Rect};
 
 pub fn paint(p: &Painter, arena: ArenaProjection, theme: usize, textures: ArtTextures) {
     let r = arena.rect;
-    paint_ground(p, r, theme, textures);
+    paint_ground(p, r, None, theme, textures);
     // A faded chalk line joins all eleven contact positions. Lane beds and
     // construction cells appear only when the player needs those coordinates.
     line(

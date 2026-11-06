@@ -1,6 +1,9 @@
 use super::ArenaProjection;
 use crate::visual_assets::{self, ArtTextures, Prop};
-use bevy_egui::egui::{self, Color32 as C, Painter, Pos2, Rect, Stroke, Vec2, pos2, vec2};
+use bevy_egui::egui::{
+    self, Color32 as C, Painter, Pos2, Rect, Shape, Stroke, TextureId, Vec2, pos2, vec2,
+};
+use std::sync::Arc;
 
 pub(super) fn line(p: &Painter, a: Pos2, b: Pos2, width: f32, c: C) {
     p.line_segment([a, b], Stroke::new(width, c));
@@ -9,8 +12,14 @@ pub(super) fn box_at(p: &Painter, center: Pos2, size: Vec2, c: C) {
     p.rect_filled(Rect::from_center_size(center, size), 0.0, c);
 }
 
-pub(super) fn paint_ground(p: &Painter, r: Rect, theme: usize, textures: ArtTextures) {
-    if !visual_assets::ground(p, r, textures, theme) {
+pub(super) fn paint_ground(
+    p: &Painter,
+    r: Rect,
+    hidden: Option<Rect>,
+    theme: usize,
+    textures: ArtTextures,
+) {
+    if !visual_assets::ground(p, r, hidden, textures, theme) {
         let soils = [
             C::from_rgb(46, 65, 52),
             C::from_rgb(48, 62, 62),
@@ -29,6 +38,11 @@ pub(super) fn paint_ground(p: &Painter, r: Rect, theme: usize, textures: ArtText
 /// Props scale with the lane height up to `max_unit` (a lane of the reference
 /// clearing), so a zoomed field never grows them past today's size; fields
 /// with 11 or more lanes are below the cap and unchanged.
+///
+/// The caller paints the field (`art::battlefield`) over `projection.rect`
+/// afterwards, so the canvas ground leaves out the patches under it. The
+/// dressing is placed once per [`DressingKey`] and painted again from a
+/// small cache in egui temp data, like the ground meshes.
 pub fn world_backdrop(
     p: &Painter,
     canvas: Rect,
@@ -38,14 +52,86 @@ pub fn world_backdrop(
     max_unit: f32,
 ) {
     let arena = projection.rect;
-    paint_ground(p, canvas, theme, textures);
-    let strips = peripheral_strips(canvas, arena);
+    paint_ground(p, canvas, Some(arena), theme, textures);
+    let Some(props) = textures.props else {
+        return;
+    };
     let unit = dressing_unit(projection.lane_height(), max_unit);
+    let key = DressingKey {
+        canvas: bits(canvas),
+        arena: bits(arena),
+        clip: bits(p.clip_rect()),
+        theme,
+        props,
+        unit: unit.to_bits(),
+    };
+    let id = egui::Id::new("lastlight_backdrop_dressing");
+    let cached = p.ctx().data_mut(|data| {
+        let cache = data.get_temp_mut_or_default::<DressingCache>(id);
+        let n = cache.0.iter().position(|(k, _)| *k == key)?;
+        let entry = cache.0.remove(n);
+        let strips = Arc::clone(&entry.1);
+        cache.0.insert(0, entry);
+        Some(strips)
+    });
+    let strips = cached.unwrap_or_else(|| {
+        let strips: Arc<[DressedStrip]> =
+            dressing(canvas, arena, p.clip_rect(), theme, textures, unit).into();
+        p.ctx().data_mut(|data| {
+            let cache = data.get_temp_mut_or_default::<DressingCache>(id);
+            cache.0.insert(0, (key, Arc::clone(&strips)));
+            cache.0.truncate(DRESSING_CACHE_SLOTS);
+        });
+        strips
+    });
+    for (clip, shapes) in strips.iter() {
+        let clipped = p.with_clip_rect(*clip);
+        for shape in shapes {
+            clipped.add(shape.clone());
+        }
+    }
+}
+
+/// What a backdrop's dressing was placed for. Any change places it again.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct DressingKey {
+    canvas: [u32; 4],
+    arena: [u32; 4],
+    /// The painter's clip, which every strip's clip is cut from.
+    clip: [u32; 4],
+    theme: usize,
+    props: TextureId,
+    unit: u32,
+}
+
+/// One peripheral strip: its clip and its props, far feet first.
+type DressedStrip = (Rect, Vec<Shape>);
+
+/// The most recently painted dressings, newest first: the main battle and a
+/// few observer views.
+#[derive(Clone, Default)]
+struct DressingCache(Vec<(DressingKey, Arc<[DressedStrip]>)>);
+const DRESSING_CACHE_SLOTS: usize = 4;
+
+fn bits(rect: Rect) -> [u32; 4] {
+    [rect.min.x, rect.min.y, rect.max.x, rect.max.y].map(f32::to_bits)
+}
+
+/// Places the dressing of every peripheral strip around `arena`.
+fn dressing(
+    canvas: Rect,
+    arena: Rect,
+    clip: Rect,
+    theme: usize,
+    textures: ArtTextures,
+    unit: f32,
+) -> Vec<DressedStrip> {
+    let strips = peripheral_strips(canvas, arena);
+    let mut dressed = Vec::with_capacity(strips.len());
     for (edge, strip) in strips.into_iter().enumerate() {
         if !strip.is_positive() {
             continue;
         }
-        let clipped = p.with_clip_rect(strip.intersect(p.clip_rect()));
         let horizontal = edge < 2;
         let span = if horizontal {
             arena.width()
@@ -98,10 +184,15 @@ pub fn world_backdrop(
             }
         }
         dressing.sort_by(|a, b| a.1.y.total_cmp(&b.1.y).then(a.1.x.total_cmp(&b.1.x)));
-        for (prop, foot, size, tint) in dressing {
-            visual_assets::prop_grounded(&clipped, textures, prop, foot, size, tint);
-        }
+        let shapes = dressing
+            .into_iter()
+            .filter_map(|(prop, foot, size, tint)| {
+                visual_assets::prop_grounded_shape(textures, prop, foot, size, tint)
+            })
+            .collect();
+        dressed.push((strip.intersect(clip), shapes));
     }
+    dressed
 }
 
 /// The dressing's size unit: the lane height, capped at `max_unit`, at least

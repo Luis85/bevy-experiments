@@ -337,6 +337,156 @@ mod terrain_tests {
         assert_eq!(pinned, 2 * 7 * 4 * 3);
     }
 
+    /// The rectangles of the textured ground patches in `shapes`: every patch
+    /// is a 4x4 vertex grid from its min to its max corner.
+    fn ground_patches(
+        shapes: &[egui::epaint::ClippedShape],
+        texture: egui::TextureId,
+    ) -> Vec<Rect> {
+        shapes
+            .iter()
+            .filter_map(|shape| match &shape.shape {
+                egui::Shape::Mesh(mesh) if mesh.texture_id == texture => Some(mesh),
+                _ => None,
+            })
+            .flat_map(|mesh| {
+                mesh.vertices
+                    .chunks(16)
+                    .map(|patch| Rect::from_min_max(patch[0].pos, patch[15].pos))
+                    .collect::<Vec<_>>()
+            })
+            .collect()
+    }
+
+    /// The field paints its own opaque soil over `projection.rect`, so the
+    /// canvas ground leaves out every patch that soil covers completely and
+    /// keeps, in order, every patch that shows anywhere outside it.
+    #[test]
+    fn canvas_ground_skips_patches_under_the_field() {
+        let texture = egui::TextureId::User(3);
+        let textures = ArtTextures {
+            ground: Some(texture),
+            ..Default::default()
+        };
+        // The soil's rounding and feathering (up to one physical pixel) stay
+        // inside the margin down to half a pixel per point.
+        const { assert!(visual_assets::HIDDEN_GROUND_MARGIN >= 2.0) };
+        let covered = |field: Rect, patch: Rect| {
+            field
+                .shrink(visual_assets::HIDDEN_GROUND_MARGIN)
+                .contains_rect(patch)
+        };
+        let paint = |draw: &dyn Fn(&egui::Painter)| {
+            let ctx = egui::Context::default();
+            let mut output = ctx.run_ui(Default::default(), |ui| draw(ui.painter()));
+            output.textures_delta.clear();
+            ground_patches(&output.shapes, texture)
+        };
+        for size in [vec2(1440.0, 900.0), vec2(1050.0 / 1.35, 700.0 / 1.35)] {
+            let canvas = Rect::from_min_size(Pos2::ZERO, size);
+            let maximum = Rect::from_min_max(pos2(24.0, 124.0), canvas.max - vec2(24.0, 84.0));
+            for (lanes, width) in [(17u8, 30.0), (11, 20.0), (3, 12.0)] {
+                let field = fit_field(maximum, maximum, lanes, width).rect;
+                let projection = ArenaProjection::with_geometry(field, lanes, width);
+                for theme in 0..5 {
+                    let everything = paint(&|p| {
+                        assert!(visual_assets::ground(p, canvas, None, textures, theme));
+                    });
+                    let painted = paint(&|p| {
+                        world_backdrop(p, canvas, projection, theme, textures, f32::INFINITY);
+                    });
+                    let label = format!("{lanes}x{width} theme {theme} in {size:?}");
+                    for patch in &painted {
+                        assert!(
+                            !covered(field, *patch),
+                            "{label}: patch {patch:?} lies under the field's opaque soil"
+                        );
+                    }
+                    let visible: Vec<_> = everything
+                        .iter()
+                        .copied()
+                        .filter(|patch| !covered(field, *patch))
+                        .collect();
+                    assert_eq!(painted, visible, "{label}: a visible patch was lost");
+                    assert!(
+                        painted.len() < everything.len(),
+                        "{label}: the field hides no canvas ground"
+                    );
+                    if size.x == 1440.0 && (lanes, width) == (17, 30.0) {
+                        assert!(
+                            painted.len() * 2 < everything.len(),
+                            "{label}: a filling field hides most of the canvas ground ({} of {})",
+                            painted.len(),
+                            everything.len()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// The forest dressing is built once per canvas, field, clip, theme,
+    /// prop sheet and size unit, then the same meshes are painted again.
+    #[test]
+    fn backdrop_dressing_is_reused_across_passes() {
+        let props = egui::TextureId::User(2);
+        let textures = ArtTextures {
+            props: Some(props),
+            ..Default::default()
+        };
+        let canvas = Rect::from_min_size(Pos2::ZERO, vec2(1440.0, 900.0));
+        let maximum = Rect::from_min_max(pos2(24.0, 124.0), canvas.max - vec2(24.0, 84.0));
+        let pass = |ctx: &egui::Context, lanes: u8, width: f32, theme: usize, unit: f32| {
+            let field = fit_field(maximum, maximum, lanes, width).rect;
+            let projection = ArenaProjection::with_geometry(field, lanes, width);
+            let mut output = ctx.run_ui(Default::default(), |ui| {
+                world_backdrop(ui.painter(), canvas, projection, theme, textures, unit);
+            });
+            output.textures_delta.clear();
+            output
+                .shapes
+                .into_iter()
+                .filter_map(|shape| match shape.shape {
+                    egui::Shape::Mesh(mesh) if mesh.texture_id == props => {
+                        Some((shape.clip_rect, mesh))
+                    }
+                    _ => None,
+                })
+                .collect::<Vec<_>>()
+        };
+        let ctx = egui::Context::default();
+        let cap = maximum.height() / camera::REFERENCE_LANES;
+        let first = pass(&ctx, 17, 30.0, 0, cap);
+        assert!(first.len() > 4, "no dressing painted");
+        let second = pass(&ctx, 17, 30.0, 0, cap);
+        assert_eq!(first.len(), second.len());
+        for ((clip, mesh), (again_clip, again)) in first.iter().zip(&second) {
+            assert_eq!(clip, again_clip);
+            assert!(
+                std::sync::Arc::ptr_eq(mesh, again),
+                "an unchanged backdrop must paint the cached dressing"
+            );
+        }
+        for (lanes, width, theme, unit) in [
+            (17, 30.0, 2, cap),
+            (3, 12.0, 0, cap),
+            (17, 30.0, 0, cap * 0.5),
+        ] {
+            let changed = pass(&ctx, lanes, width, theme, unit);
+            let fresh = pass(&egui::Context::default(), lanes, width, theme, unit);
+            assert_eq!(
+                changed, fresh,
+                "{lanes}x{width} theme {theme} unit {unit}: a stale dressing was painted"
+            );
+            assert!(
+                changed.iter().all(|(_, mesh)| first
+                    .iter()
+                    .all(|(_, old)| !std::sync::Arc::ptr_eq(mesh, old))),
+                "{lanes}x{width} theme {theme} unit {unit}: the dressing was not rebuilt"
+            );
+        }
+    }
+
     #[test]
     fn biome_dressing_uses_arid_rocks_tropical_canopies_and_boreal_pines() {
         for index in 0..128 {

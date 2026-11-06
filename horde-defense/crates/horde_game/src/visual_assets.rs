@@ -84,6 +84,8 @@ mod atlas;
 pub mod enemy_visuals;
 mod flash;
 mod ground_material;
+#[cfg(test)]
+pub(crate) use ground_material::HIDDEN_GROUND_MARGIN;
 mod loading;
 #[cfg(test)]
 mod tests;
@@ -705,12 +707,28 @@ pub fn prop(
     size: Vec2,
     tint: Color32,
 ) -> bool {
-    let Some(texture) = textures.props else {
+    let Some(shape) = prop_shape(textures, kind, center, size, tint) else {
         return false;
     };
-    let source = PROP_RECTS[kind as usize];
-    p.image(texture, fit(center, size, source), region(source), tint);
+    p.add(shape);
     true
+}
+/// The image [`prop`] paints, as a shape; `None` without the prop sheet.
+pub fn prop_shape(
+    textures: ArtTextures,
+    kind: Prop,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+) -> Option<bevy_egui::egui::Shape> {
+    let texture = textures.props?;
+    let source = PROP_RECTS[kind as usize];
+    Some(bevy_egui::egui::Shape::image(
+        texture,
+        fit(center, size, source),
+        region(source),
+        tint,
+    ))
 }
 /// Full fitted source bounds, including transparent padding. Placement checks
 /// use this same rectangle as rendering rather than only a trunk/center point.
@@ -718,16 +736,17 @@ pub fn prop_ground_rect(kind: Prop, foot: Pos2, size: Vec2) -> Rect {
     let fitted = fit(Pos2::ZERO, size, PROP_RECTS[kind as usize]);
     Rect::from_center_size(foot - vec2(0.0, fitted.height() * 0.5), fitted.size())
 }
-pub fn prop_grounded(
-    p: &Painter,
+/// A prop standing with its fitted source bounds on `foot`, as a shape;
+/// `None` without the prop sheet.
+pub fn prop_grounded_shape(
     textures: ArtTextures,
     kind: Prop,
     foot: Pos2,
     size: Vec2,
     tint: Color32,
-) -> bool {
+) -> Option<bevy_egui::egui::Shape> {
     let rect = prop_ground_rect(kind, foot, size);
-    prop(p, textures, kind, rect.center(), size, tint)
+    prop_shape(textures, kind, rect.center(), size, tint)
 }
 pub fn prop_animated(
     p: &Painter,
@@ -897,8 +916,17 @@ pub fn keyart(p: &Painter, r: Rect, textures: ArtTextures) -> bool {
     p.image(texture, r, uv, Color32::WHITE);
     true
 }
-pub fn ground(p: &Painter, r: Rect, textures: ArtTextures, theme: usize) -> bool {
-    ground_material::ground(p, r, textures, theme)
+/// Paints the pixel-art ground of `r`; `false` without the ground texture.
+/// `hidden` is a field the caller paints over afterwards with its own opaque
+/// ground (`art::battlefield` does): patches that field covers are left out.
+pub fn ground(
+    p: &Painter,
+    r: Rect,
+    hidden: Option<Rect>,
+    textures: ArtTextures,
+    theme: usize,
+) -> bool {
+    ground_material::ground(p, r, hidden, textures, theme)
 }
 
 pub fn panorama(p: &Painter, r: Rect, textures: ArtTextures, _biome: &str) -> bool {
