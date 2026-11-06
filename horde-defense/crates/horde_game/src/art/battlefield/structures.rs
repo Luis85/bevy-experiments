@@ -14,6 +14,13 @@ pub(super) fn paint(
     textures: ArtTextures,
 ) {
     let sy = arena.lane_height();
+    // Three passes (every shadow, every prop, every readout) keep the
+    // battlefield's primitive count independent of how many structures stand:
+    // shapes sharing a texture merge in tessellation, alternating ones do not.
+    for s in &view.structures {
+        let at = arena.world(s.position[0], s.position[1]);
+        soft_shadow(p, at + vec2(2., sy * 0.29), vec2(sy * 0.48, sy * 0.14), 0.7);
+    }
     for s in &view.structures {
         let at = arena.world(s.position[0], s.position[1]);
         let pose = &s.pose;
@@ -23,7 +30,6 @@ pub(super) fn paint(
             StructureKind::Wall => Prop::Wall,
             StructureKind::Turret => Prop::Turret,
         };
-        soft_shadow(p, at + vec2(2., sy * 0.29), vec2(sy * 0.48, sy * 0.14), 0.7);
         let tint = if s.kind == StructureKind::Trap && s.charges == 0 {
             C::from_rgb(132, 126, 109)
         } else {
@@ -53,6 +59,9 @@ pub(super) fn paint(
                 pose.recoil,
             );
         }
+    }
+    for s in &view.structures {
+        let at = arena.world(s.position[0], s.position[1]);
         if s.hp < s.max_hp {
             let damage = 1. - s.hp.max(0) as f32 / s.max_hp as f32;
             for n in 0..3 {

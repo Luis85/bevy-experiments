@@ -10,6 +10,7 @@ mod tests;
 
 use backdrop::{box_at, line, paint_ground};
 pub use backdrop::{world_atmosphere, world_backdrop};
+pub(crate) use battlefield::fx_lifetime;
 pub use battlefield::{RenderOptions, battlefield, battlefield_for_attempt, sample_motion};
 pub use camera::{FieldFit, fit_field};
 pub use figures::{bar, figure, structure};

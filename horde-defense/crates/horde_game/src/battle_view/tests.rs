@@ -39,7 +39,7 @@ fn fixture() -> Game {
     game
 }
 fn view(a: &Attempt, blend: SceneBlend) -> BattleViewModel {
-    BattleViewModel::build(a, &SceneAnimation::sample(a, false), blend, false)
+    BattleViewModel::build(a, SceneAnimation::sample(a, false), blend, false)
 }
 fn drawn_at(a: &Attempt, blend: SceneBlend, id: u64) -> [f32; 2] {
     view(a, blend)
@@ -97,7 +97,13 @@ fn view_model_mirrors_the_attempt_headlessly_without_mutating_it() {
         }
     }
     assert_eq!(view.structures.len(), a.structures.len());
-    assert_eq!(view.fx.len(), a.events.len());
+    assert_eq!(
+        view.fx.len(),
+        a.events
+            .iter()
+            .filter(|e| (a.tick - e.tick) as f32 / 60.0 <= crate::art::fx_lifetime(e.kind))
+            .count()
+    );
     assert_eq!(view.defender.position, a.defender_position());
     assert_eq!(view.fire_zones.len(), a.ordnance.fire_zones.len());
     assert_eq!(view.projectiles.len(), a.ordnance.projectiles.len());
@@ -464,4 +470,53 @@ fn capture_modes_draw_the_authoritative_tick_exactly() {
             assert_eq!(blend_fraction(&config, overstep), 1.0);
         }
     }
+}
+#[test]
+fn fx_view_keeps_only_events_within_painter_lifetime() {
+    use horde_core::sim::{Event, EventKind};
+    let mut game = fixture();
+    let a = game.attempt_mut().unwrap();
+    a.tick = 600;
+    a.events.clear();
+    let kinds = [
+        EventKind::Shot,
+        EventKind::Hit,
+        EventKind::Kill,
+        EventKind::Explosion,
+        EventKind::BossWarning,
+        EventKind::Spawn,
+    ];
+    for kind in kinds {
+        // Fresh, exactly at the lifetime (kept) and one tick past it (dropped).
+        let lifetime_ticks = (crate::art::fx_lifetime(kind) * 60.0).round() as u64;
+        for age in [0, lifetime_ticks, lifetime_ticks + 1] {
+            a.events.push_back(Event {
+                kind,
+                from: [2.0, 1.5],
+                to: [10.0, 1.5],
+                value: age as i32,
+                tick: a.tick - age,
+                actor_id: None,
+                target_id: None,
+                lane: None,
+                duration_ticks: 0,
+                seq: 0,
+            });
+        }
+    }
+    let view = view(a, SceneBlend::NONE);
+    assert_eq!(view.fx.len(), 2 * kinds.len());
+    for kind in kinds {
+        let ages: Vec<_> = view
+            .fx
+            .iter()
+            .filter(|fx| fx.kind == kind)
+            .map(|fx| fx.age)
+            .collect();
+        assert_eq!(ages.len(), 2, "{kind:?}");
+        assert!(ages.iter().all(|age| *age <= crate::art::fx_lifetime(kind)));
+    }
+    // The boss warning outlives the 1.5 s ux-flow banner.
+    assert!(crate::art::fx_lifetime(EventKind::BossWarning) >= 1.5);
+    assert_eq!(crate::art::fx_lifetime(EventKind::Explosion), 0.5);
 }

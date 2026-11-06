@@ -154,12 +154,14 @@ pub struct BattleViewModel {
     pub defender: DefenderView,
 }
 impl BattleViewModel {
-    pub fn build(a: &Attempt, motion: &SceneAnimation, blend: SceneBlend, reduced: bool) -> Self {
+    /// The field view of `a`. `motion` is consumed: its particles move into
+    /// the view rather than being cloned.
+    pub fn build(a: &Attempt, motion: SceneAnimation, blend: SceneBlend, reduced: bool) -> Self {
         Self::build_with(a, motion, blend, reduced, enemy_visuals::active())
     }
     pub fn build_with(
         a: &Attempt,
-        motion: &SceneAnimation,
+        mut motion: SceneAnimation,
         blend: SceneBlend,
         reduced: bool,
         catalog: &'static EnemyVisualCatalog,
@@ -253,9 +255,13 @@ impl BattleViewModel {
                         .clamp(0., 1.),
                 })
                 .collect(),
+            // Only events some painter can still draw (`art::fx_lifetime`).
             fx: a
                 .events
                 .iter()
+                .filter(|e| {
+                    a.tick.saturating_sub(e.tick) as f32 / 60.0 <= crate::art::fx_lifetime(e.kind)
+                })
                 .map(|e| FxView {
                     kind: e.kind,
                     age: a.tick.saturating_sub(e.tick) as f32 / 60.0,
@@ -267,7 +273,7 @@ impl BattleViewModel {
                     target_id: e.target_id,
                 })
                 .collect(),
-            particles: motion.particles.clone(),
+            particles: std::mem::take(&mut motion.particles),
             defender: DefenderView {
                 position: a.defender_position(),
                 pose: motion.defender,

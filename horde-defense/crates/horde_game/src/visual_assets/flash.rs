@@ -131,12 +131,44 @@ pub fn actor_hit_flash(
     flash: HitFlash,
     pose: &ActorPose,
 ) {
-    if flash.strength <= 0. {
-        return;
-    }
     let Some(masks) = loading::flash_masks(p.ctx()) else {
         return;
     };
+    let mut mesh = bevy_egui::egui::epaint::Mesh::default();
+    hit_flash_runs(
+        &masks,
+        textures,
+        kind,
+        center,
+        size,
+        flash,
+        pose,
+        &mut mesh,
+        bevy_egui::egui::epaint::WHITE_UV,
+    );
+    if !mesh.is_empty() {
+        p.add(bevy_egui::egui::Shape::mesh(mesh));
+    }
+}
+/// The hit-flash runs of [`actor_hit_flash`], appended to `mesh` as quads
+/// sampling `white_uv` (the font atlas's white texel, or the packed battle
+/// atlas's white block) and posed like the sprite. Appends nothing when the
+/// flash is spent or the art is unavailable.
+#[allow(clippy::too_many_arguments)]
+pub fn hit_flash_runs(
+    masks: &FlashMasks,
+    textures: ArtTextures,
+    kind: Actor,
+    center: Pos2,
+    size: Vec2,
+    flash: HitFlash,
+    pose: &ActorPose,
+    mesh: &mut bevy_egui::egui::epaint::Mesh,
+    white_uv: Pos2,
+) {
+    if flash.strength <= 0. {
+        return;
+    }
     let (mask, source, rect, pivot) = match kind {
         Actor::Enemy(_) if textures.enemy_art_rejected => return,
         Actor::Enemy(sprite) => {
@@ -191,7 +223,10 @@ pub fn actor_hit_flash(
         }
     };
     let color = hit_flash_color(flash);
-    let mut mesh = bevy_egui::egui::epaint::Mesh::default();
+    let white = Rect::from_min_max(white_uv, white_uv);
+    let start = mesh.vertices.len();
+    mesh.reserve_vertices(mask.runs.len() * 4);
+    mesh.reserve_triangles(mask.runs.len() * 2);
     for run in &mask.runs {
         let point = |x, y| {
             rect.min
@@ -200,13 +235,13 @@ pub fn actor_hit_flash(
                     (y - source[1]) / (source[3] - source[1]) * rect.height(),
                 )
         };
-        mesh.add_colored_rect(
+        mesh.add_rect_with_uv(
             Rect::from_min_max(point(run[0], run[1]), point(run[2], run[3])),
+            white,
             color,
         );
     }
-    apply_actor_pose(&mut mesh, pose, pivot);
-    p.add(bevy_egui::egui::Shape::mesh(mesh));
+    pose_vertices(&mut mesh.vertices[start..], pose, pivot);
 }
 pub(super) fn hit_flash_color(flash: HitFlash) -> Color32 {
     if flash.reduced {

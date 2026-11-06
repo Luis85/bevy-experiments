@@ -1,12 +1,15 @@
 //! Weather, impact particles and short-lived event effects: explosions,
 //! callouts, tracers, contact damage and hit sparks.
 use super::super::{AMBER, ArenaProjection, MUTED, PANEL, RED, TEXT, box_at, line};
+use super::batch::MeshBuilder;
 use crate::{
     animation::{Particle, ParticleKind},
     battle_view::BattleViewModel,
     visual_assets::{self, ArtTextures, PropMotion},
 };
-use bevy_egui::egui::{self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, vec2};
+use bevy_egui::egui::{
+    self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, Vec2, vec2,
+};
 use horde_core::{content::StructureKind, sim::EventKind};
 
 pub(super) struct FxOptions {
@@ -16,16 +19,33 @@ pub(super) struct FxOptions {
     pub textures: ArtTextures,
 }
 
+/// Segments of a batched particle dot.
+const DOT_SEGMENTS: u32 = 8;
+
+/// How long after its tick an event can still be painted, in seconds: the
+/// single table the field view's event filter and the painters share. No
+/// painter draws an event older than this; the boss warning keeps 2.0 s for
+/// the ux-flow banner (at least 1.5 s visible).
+pub(crate) fn fx_lifetime(kind: EventKind) -> f32 {
+    match kind {
+        EventKind::BossWarning => 2.0,
+        EventKind::Explosion => 0.5,
+        _ => 0.45,
+    }
+}
+
+/// Weather and ambient motes as one untextured mesh (lines as 4-vertex
+/// quads, dots as 8-segment fans, no feathering), under every body.
 pub(super) fn ambient(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
     let sy = arena.lane_height();
+    let mut mesh = MeshBuilder::untextured(particles.len() * 2);
     for particle in particles {
         let at = arena.world(particle.at[0], particle.at[1]);
         let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;
         match particle.kind {
             ParticleKind::Rain => {
                 let direction = vec2(particle.angle.cos(), particle.angle.sin());
-                line(
-                    p,
+                mesh.line(
                     at - direction * sy * particle.size,
                     at,
                     0.8,
@@ -33,50 +53,56 @@ pub(super) fn ambient(p: &Painter, arena: ArenaProjection, particles: &[Particle
                 );
             }
             ParticleKind::Snow => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    (sy * particle.size).clamp(0.7, 1.7),
+                    Vec2::splat((sy * particle.size).clamp(0.7, 1.7)),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(211, 219, 211, alpha),
                 );
             }
             ParticleKind::Mist => {
-                p.add(egui::Shape::ellipse_filled(
+                mesh.fan(
                     at,
                     vec2(sy * particle.size * 3.5, sy * particle.size * 0.35),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(155, 171, 156, alpha),
-                ));
+                );
             }
             ParticleKind::Ash => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    (sy * particle.size).max(0.5),
+                    Vec2::splat((sy * particle.size).max(0.5)),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(175, 171, 154, alpha),
                 );
             }
             // Ambient motes share the dust material, while impact dust is drawn
             // above actors only when its stronger opacity marks a resolved hit.
             ParticleKind::Dust if particle.alpha <= 0.15 => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    (sy * particle.size).max(0.5),
+                    Vec2::splat((sy * particle.size).max(0.5)),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(169, 151, 109, alpha),
                 );
             }
             _ => {}
         }
     }
+    mesh.paint(p);
 }
 
+/// Impact particles as one untextured mesh above every actor.
 pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
     let sy = arena.lane_height();
+    let mut mesh = MeshBuilder::untextured(particles.len() * 2);
     for particle in particles {
         let at = arena.world(particle.at[0], particle.at[1]);
         let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;
         match particle.kind {
             ParticleKind::Casing => {
                 let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size;
-                line(
-                    p,
+                mesh.line(
                     at - d,
                     at + d,
                     1.1,
@@ -85,8 +111,7 @@ pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Partic
             }
             ParticleKind::Spark => {
                 let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size * 1.8;
-                line(
-                    p,
+                mesh.line(
                     at - d,
                     at + d,
                     1.,
@@ -95,8 +120,7 @@ pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Partic
             }
             ParticleKind::Debris => {
                 let d = vec2(particle.angle.cos(), particle.angle.sin()) * sy * particle.size;
-                line(
-                    p,
+                mesh.line(
                     at - d,
                     at + d,
                     (sy * particle.size * 0.65).max(1.),
@@ -104,15 +128,17 @@ pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Partic
                 );
             }
             ParticleKind::Dust if particle.alpha > 0.15 => {
-                p.circle_filled(
+                mesh.fan(
                     at,
-                    sy * particle.size,
+                    Vec2::splat(sy * particle.size),
+                    DOT_SEGMENTS,
                     C::from_rgba_unmultiplied(156, 144, 109, alpha),
                 );
             }
             _ => {}
         }
     }
+    mesh.paint(p);
 }
 
 /// `muzzle` is the drawn survivor's muzzle socket, when the rig resolved.
@@ -134,11 +160,11 @@ pub(super) fn events(
     let origin = arena.world(view.defender.position[0], view.defender.position[1]);
     for e in &view.fx {
         let age = e.age;
-        let alpha = (1.0 - age / 0.45).clamp(0.0, 1.0);
+        let alpha = (1.0 - age / fx_lifetime(e.kind)).clamp(0.0, 1.0);
         match e.kind {
-            EventKind::Explosion if age < 0.5 => {
+            EventKind::Explosion if age < fx_lifetime(EventKind::Explosion) => {
                 let at = arena.world(e.to[0], e.to[1]);
-                let progress = (age / 0.5).clamp(0., 1.);
+                let progress = (age / fx_lifetime(EventKind::Explosion)).clamp(0., 1.);
                 let radius = (e.value as f32 / 100.).max(0.1);
                 let range = vec2(arena.yard_width(), sy) * radius;
                 let alpha = ((1. - progress) * if reduced { 105. } else { 190. }) as u8;
@@ -192,7 +218,7 @@ pub(super) fn events(
                     AMBER,
                 );
             }
-            EventKind::Reinforcements if age < 0.45 => {
+            EventKind::Reinforcements if age < fx_lifetime(EventKind::Reinforcements) => {
                 let lane = e.lane.unwrap_or(view.lanes / 2) as f32 + 0.5;
                 p.text(
                     arena.world(view.width - 1.0, lane),
@@ -202,7 +228,7 @@ pub(super) fn events(
                     AMBER,
                 );
             }
-            EventKind::Spawn | EventKind::Boss if age < 0.45 => {
+            EventKind::Spawn | EventKind::Boss if age < fx_lifetime(e.kind) => {
                 let at = arena.world(view.width - 0.5, e.to[1]);
                 p.add(egui::Shape::convex_polygon(
                     vec![

@@ -15,6 +15,8 @@ mod screen;
 #[cfg(test)]
 mod tests;
 
+#[cfg(test)]
+pub use field::FxView;
 pub use field::{BattleViewModel, EnemyView, HealthView};
 pub use interpolation::{ActorInterpolation, BattleViewPlugin, SceneBlend};
 pub use placement::placement_preview;

@@ -533,7 +533,7 @@ mod tests {
                 assert_eq!(a.enemies.len(), 4);
                 let view = BattleViewModel::build(
                     &a,
-                    &SceneAnimation::sample(&a, false),
+                    SceneAnimation::sample(&a, false),
                     SceneBlend::NONE,
                     false,
                 );

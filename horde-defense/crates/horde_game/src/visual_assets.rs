@@ -93,10 +93,12 @@ pub use atlas::{RigAtlas, RigSheet, WalkSheet};
 use enemy_visuals::{EnemySprite, SpriteArt, WalkArt};
 #[cfg(test)]
 use flash::{FlashMask, hit_flash_color};
-pub use flash::{FlashMasks, HitFlash, actor_hit_flash};
+pub use flash::{FlashMasks, HitFlash, actor_hit_flash, hit_flash_runs};
 #[cfg(feature = "review")]
 pub use loading::VisualAssets;
-pub use loading::{load_assets, refresh_art};
+#[cfg(test)]
+pub(crate) use loading::publish_source_flash_masks;
+pub use loading::{flash_masks, load_assets, refresh_art};
 use validation::*;
 
 /// Egui texture ids and derived data for the loaded art, republished each
@@ -115,6 +117,119 @@ pub struct ArtTextures {
     /// Weapon and ordnance icon atlas (legacy defender rig sheet; no bodies are drawn from it).
     pub rig: Option<RigSheet>,
     pub menu_idle: Option<TextureId>,
+    /// The actor and walker sheets plus a white block packed into one texture,
+    /// so every hostile and hit flash shares one battlefield mesh. `None`
+    /// while loading or when the packed size exceeds the device's texture
+    /// limit: the battlefield then draws a walker mesh and an actor mesh.
+    pub battle_atlas: Option<BattleAtlas>,
+    /// The procedural soft shadow ([`soft_shadow_image`]), linearly sampled.
+    pub shadow: Option<TextureId>,
+}
+/// Which source sheet an actor quad samples.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ActorSheet {
+    Actors,
+    Walkers,
+}
+/// Where the packed battle atlas keeps each sheet: repacked existing pixels,
+/// never a new raster. Sizes are the loaded sheets' own pixel sizes, so the
+/// normalised source UVs of a uniformly rescaled sheet stay valid.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct BattleAtlas {
+    pub texture: TextureId,
+    pub actors_origin: [u32; 2],
+    pub actors_size: [u32; 2],
+    pub walkers_origin: [u32; 2],
+    pub walkers_size: [u32; 2],
+    /// The centre of the opaque white block: untextured runs (hit flashes)
+    /// sample it inside the atlas mesh.
+    pub white_uv: Pos2,
+    pub size: [u32; 2],
+}
+impl BattleAtlas {
+    /// Transparent texels between the packed regions.
+    pub const GUTTER: u32 = 2;
+    /// Side of the opaque white block.
+    pub const WHITE_SIDE: u32 = 4;
+    /// Actors at the origin, walkers to their right and the white block below
+    /// the actors, each `GUTTER` texels apart.
+    pub fn layout(texture: TextureId, actors_size: [u32; 2], walkers_size: [u32; 2]) -> Self {
+        let walkers_origin = [actors_size[0] + Self::GUTTER, 0];
+        let white = [0, actors_size[1] + Self::GUTTER];
+        let size = [
+            walkers_origin[0] + walkers_size[0],
+            walkers_size[1]
+                .max(actors_size[1])
+                .max(white[1] + Self::WHITE_SIDE),
+        ];
+        let half = Self::WHITE_SIDE as f32 * 0.5;
+        Self {
+            texture,
+            actors_origin: [0, 0],
+            actors_size,
+            walkers_origin,
+            walkers_size,
+            white_uv: pos2(
+                (white[0] as f32 + half) / size[0] as f32,
+                (white[1] as f32 + half) / size[1] as f32,
+            ),
+            size,
+        }
+    }
+    /// The top-left texel of the white block.
+    pub fn white_origin(&self) -> [u32; 2] {
+        [0, self.actors_size[1] + Self::GUTTER]
+    }
+    /// `uv`, normalised to `sheet`, in normalised atlas coordinates.
+    pub fn uv(&self, sheet: ActorSheet, uv: Rect) -> Rect {
+        let (origin, size) = match sheet {
+            ActorSheet::Actors => (self.actors_origin, self.actors_size),
+            ActorSheet::Walkers => (self.walkers_origin, self.walkers_size),
+        };
+        let map = |point: Pos2| {
+            pos2(
+                (origin[0] as f32 + point.x * size[0] as f32) / self.size[0] as f32,
+                (origin[1] as f32 + point.y * size[1] as f32) / self.size[1] as f32,
+            )
+        };
+        Rect::from_min_max(map(uv.min), map(uv.max))
+    }
+}
+/// Pixel size of the procedural soft-shadow texture.
+pub const SOFT_SHADOW_SIZE: [usize; 2] = [128, 64];
+/// The legacy soft shadow's three stacked ellipses: (spread of the shadow
+/// size, alpha at full shadow strength).
+pub const SOFT_SHADOW_RINGS: [(f32, u8); 3] = [(1.35, 10), (1.12, 15), (0.9, 23)];
+/// A soft ground shadow as premultiplied black whose alpha reproduces the
+/// legacy three rings (spreads 1.35, 1.12 and 0.9 with alphas 10, 15 and 23,
+/// so 48 at the centre). The image spans the outer ring, so the quad of
+/// [`soft_shadow_quad`] draws the shadow `art::soft_shadow` drew.
+pub fn soft_shadow_image() -> bevy_egui::egui::ColorImage {
+    let [width, height] = SOFT_SHADOW_SIZE;
+    let outer = SOFT_SHADOW_RINGS[0].0;
+    let mut pixels = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let u = ((x as f32 + 0.5) / width as f32 * 2.0 - 1.0) * outer;
+            let v = ((y as f32 + 0.5) / height as f32 * 2.0 - 1.0) * outer;
+            let distance = (u * u + v * v).sqrt();
+            let alpha: u8 = SOFT_SHADOW_RINGS
+                .iter()
+                .filter(|(spread, _)| distance <= *spread)
+                .map(|(_, alpha)| *alpha)
+                .sum();
+            pixels.push(Color32::from_rgba_premultiplied(0, 0, 0, alpha));
+        }
+    }
+    bevy_egui::egui::ColorImage::new([width, height], pixels)
+}
+/// The quad and tint that draw, from [`soft_shadow_image`], the soft shadow
+/// `art::soft_shadow(at, size, alpha)` draws as three ellipses.
+pub fn soft_shadow_quad(at: Pos2, size: Vec2, alpha: f32) -> (Rect, Color32) {
+    (
+        Rect::from_center_size(at, size * (2.0 * SOFT_SHADOW_RINGS[0].0)),
+        Color32::from_black_alpha((alpha.clamp(0.0, 1.0) * 255.0).round() as u8),
+    )
 }
 #[derive(Clone, Copy, Debug, Default)]
 pub struct PropMotion {
@@ -317,13 +432,53 @@ pub fn actor_animated(
     tint: Color32,
     pose: &ActorPose,
 ) -> bool {
-    let (texture, rect, uv, pivot) = match kind {
-        Actor::Enemy(_) if textures.enemy_art_rejected => return false,
+    let Some(quad) = actor_quad(textures, kind, center, size, tint, pose) else {
+        return false;
+    };
+    let mut mesh = bevy_egui::egui::epaint::Mesh::with_texture(quad.texture);
+    quad.push(&mut mesh, quad.uv);
+    p.add(bevy_egui::egui::Shape::mesh(mesh));
+    true
+}
+/// One posed actor sprite: the pure layout that both the legacy per-actor
+/// painter and the batched battlefield meshes draw, so their geometry is
+/// identical.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ActorQuad {
+    pub sheet: ActorSheet,
+    /// The sheet's own egui texture.
+    pub texture: TextureId,
+    pub rect: Rect,
+    /// Normalised to `sheet`.
+    pub uv: Rect,
+    pub pivot: Pos2,
+    pub tint: Color32,
+    pub pose: ActorPose,
+}
+impl ActorQuad {
+    /// Appends the quad to `mesh`, sampling `uv` (its own, or remapped into
+    /// the packed atlas), and poses only the four vertices it added.
+    pub fn push(&self, mesh: &mut bevy_egui::egui::epaint::Mesh, uv: Rect) {
+        let start = mesh.vertices.len();
+        mesh.add_rect_with_uv(self.rect, uv, self.tint);
+        pose_vertices(&mut mesh.vertices[start..], &self.pose, self.pivot);
+    }
+}
+/// The sprite `kind` draws at `center` within `size`, or `None` when its art
+/// is rejected or its sheet has not loaded.
+pub fn actor_quad(
+    textures: ArtTextures,
+    kind: Actor,
+    center: Pos2,
+    size: Vec2,
+    tint: Color32,
+    pose: &ActorPose,
+) -> Option<ActorQuad> {
+    let (sheet, texture, rect, uv, pivot) = match kind {
+        Actor::Enemy(_) if textures.enemy_art_rejected => return None,
         Actor::Enemy(sprite) => match &sprite.art {
             SpriteArt::Walk(walk) => {
-                let Some(sheet) = textures.walkers else {
-                    return false;
-                };
+                let sheet = textures.walkers?;
                 let (rect, uv, pivot) = walk_frame_layout(
                     walk,
                     sprite.source_size,
@@ -332,7 +487,7 @@ pub fn actor_animated(
                     center,
                     size,
                 );
-                (Some(sheet.texture), rect, uv, pivot)
+                (ActorSheet::Walkers, Some(sheet.texture), rect, uv, pivot)
             }
             SpriteArt::Standing(art) => {
                 let (rect, pivot) = standing_actor_layout(
@@ -342,6 +497,7 @@ pub fn actor_animated(
                     size,
                 );
                 (
+                    ActorSheet::Actors,
                     textures.actors,
                     rect,
                     region_for(art.bounds, sprite.source_size),
@@ -349,26 +505,35 @@ pub fn actor_animated(
                 )
             }
         },
-        Actor::Player | Actor::Mara if textures.survivor_art_rejected => return false,
+        Actor::Player | Actor::Mara if textures.survivor_art_rejected => return None,
         Actor::Player | Actor::Mara => {
             let index = kind.survivor_index().unwrap_or_default();
             let source = SURVIVOR_RECTS[index];
             let (rect, pivot) =
                 standing_actor_layout(source, SURVIVOR_ANCHORS[index], center, size);
-            (textures.actors, rect, region_for(source, ACTOR_SIZE), pivot)
+            (
+                ActorSheet::Actors,
+                textures.actors,
+                rect,
+                region_for(source, ACTOR_SIZE),
+                pivot,
+            )
         }
     };
-    let Some(texture) = texture else {
-        return false;
-    };
-    let mut mesh = bevy_egui::egui::epaint::Mesh::with_texture(texture);
-    mesh.add_rect_with_uv(rect, uv, tint);
-    apply_actor_pose(&mut mesh, pose, pivot);
-    p.add(bevy_egui::egui::Shape::mesh(mesh));
-    true
+    Some(ActorQuad {
+        sheet,
+        texture: texture?,
+        rect,
+        uv,
+        pivot,
+        tint,
+        pose: *pose,
+    })
 }
-fn apply_actor_pose(mesh: &mut bevy_egui::egui::epaint::Mesh, pose: &ActorPose, pivot: Pos2) {
-    for vertex in &mut mesh.vertices {
+/// Leans, squashes and turns `vertices` about `pivot` exactly as the former
+/// whole-mesh pose did: shear and scale, then `Mesh::rotate`'s formula.
+fn pose_vertices(vertices: &mut [bevy_egui::egui::epaint::Vertex], pose: &ActorPose, pivot: Pos2) {
+    for vertex in vertices.iter_mut() {
         let relative = vertex.pos - pivot;
         vertex.pos = pivot
             + vec2(
@@ -376,10 +541,10 @@ fn apply_actor_pose(mesh: &mut bevy_egui::egui::epaint::Mesh, pose: &ActorPose, 
                 relative.y * pose.scale[1],
             );
     }
-    mesh.rotate(
-        bevy_egui::egui::emath::Rot2::from_angle(pose.lean * 0.5),
-        pivot,
-    );
+    let rotation = bevy_egui::egui::emath::Rot2::from_angle(pose.lean * 0.5);
+    for vertex in vertices.iter_mut() {
+        vertex.pos = pivot + rotation * (vertex.pos - pivot);
+    }
 }
 
 fn standing_actor_layout(

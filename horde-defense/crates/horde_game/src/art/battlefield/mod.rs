@@ -1,11 +1,21 @@
 //! Egui renderer of a `BattleViewModel`, painted back to front: ground and
 //! weather, burning ground, construction grid, structures, bodies, hostiles,
 //! the survivor rig, thrown ordnance, event effects and impact particles.
+//!
+//! Anything drawn per hostile, per body or per particle is batched into
+//! layer meshes (`batch`), so the primitive count does not grow with the
+//! crowd: settled and collapsing bodies, the hostiles' underlay, one shadow
+//! mesh (the rig's included), one sprite mesh on the packed battle atlas, the
+//! overlay, callout text and one impact-particle mesh.
+mod batch;
 mod enemies;
 mod fx;
 mod ordnance;
 mod structures;
 pub mod terrain;
+pub(crate) use fx::fx_lifetime;
+#[cfg(test)]
+mod tests;
 
 use super::{ArenaProjection, RED, soft_shadow};
 use crate::{
@@ -61,7 +71,7 @@ pub fn battlefield_for_attempt(
     options: RenderOptions,
 ) -> SceneDraw {
     let motion = sample_motion(p.ctx(), p.layer_id(), a, options.reduced);
-    let view = BattleViewModel::build(a, &motion, blend, options.reduced);
+    let view = BattleViewModel::build(a, motion, blend, options.reduced);
     battlefield(p, r, &view, a, aim, options)
 }
 
@@ -106,8 +116,20 @@ fn render(
     }
     structures::paint(p, arena, view, textures);
     enemies::corpses(p, arena, view, textures);
-    enemies::paint(p, arena, view, textures, options.outlines, reduced);
+    let rig_shadow = rig_shadow(arena, view);
+    let rig_shadow_drawn = enemies::paint(
+        p,
+        arena,
+        view,
+        textures,
+        options.outlines,
+        reduced,
+        rig_shadow,
+    );
     let equipment = crate::gear_appearance::from_frozen_gear(&a.profile, &a.gear_snapshot);
+    if !rig_shadow_drawn {
+        soft_shadow(p, rig_shadow.at, rig_shadow.size, rig_shadow.alpha);
+    }
     let muzzle = defender(p, arena, view, a, aim, reduced, equipment.as_ref());
     ordnance::thrown(p, arena, view, a, reduced, textures, equipment.as_ref());
     fx::events(
@@ -125,6 +147,17 @@ fn render(
     fx::particles(p, arena, &view.particles);
 }
 
+/// The survivor rig's soft shadow, drawn in the hostiles' shadow layer.
+fn rig_shadow(arena: ArenaProjection, view: &BattleViewModel) -> enemies::RigShadow {
+    let sy = arena.lane_height();
+    let origin = arena.world(view.defender.position[0], view.defender.position[1]);
+    enemies::RigShadow {
+        at: origin + vec2(1., sy * 0.87 * 0.48),
+        size: vec2(sy * 0.30, sy * 0.11),
+        alpha: 0.8,
+    }
+}
+
 /// Draws the survivor rig and returns its muzzle socket when it resolved.
 fn defender(
     p: &Painter,
@@ -137,12 +170,6 @@ fn defender(
 ) -> Option<Pos2> {
     let sy = arena.lane_height();
     let origin = arena.world(view.defender.position[0], view.defender.position[1]);
-    soft_shadow(
-        p,
-        origin + vec2(1., sy * 0.87 * 0.48),
-        vec2(sy * 0.30, sy * 0.11),
-        0.8,
-    );
     let appearance = if a.mode == Mode::Npc {
         horde_core::survivors::Appearance::Female
     } else {

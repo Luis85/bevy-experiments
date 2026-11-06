@@ -4,8 +4,8 @@
 //! replaced sheet (with the `dev` feature's file watcher) hot-reloads, and a
 //! rejected sheet recovers once a valid one replaces it.
 use super::{
-    ArtTextures, FlashMasks, RigAtlas, RigSheet, WalkSheet, enemy_art_problem, prop_art_problem,
-    survivor_art_problem,
+    ArtTextures, BattleAtlas, FlashMasks, RigAtlas, RigSheet, WalkSheet, enemy_art_problem,
+    prop_art_problem, soft_shadow_image, survivor_art_problem,
 };
 use bevy::image::{ImageLoaderSettings, ImageSampler};
 use bevy::prelude::*;
@@ -74,6 +74,12 @@ pub struct VisualAssets {
     handles: [Handle<Image>; 7],
     slots: [ArtSlot; 7],
     rig_atlas: Option<RigAtlas>,
+    /// The actor and walker sheets packed for the batched battlefield,
+    /// rebuilt beside the flash masks whenever either sheet reloads.
+    battle_atlas: Option<(egui::TextureHandle, BattleAtlas)>,
+    atlas_check: ArtCheck,
+    /// The procedural soft shadow, uploaded once.
+    shadow: Option<egui::TextureHandle>,
     enemy_check: ArtCheck,
     survivor_check: ArtCheck,
     prop_check: ArtCheck,
@@ -88,6 +94,9 @@ impl VisualAssets {
             handles,
             slots: Default::default(),
             rig_atlas: None,
+            battle_atlas: None,
+            atlas_check: ArtCheck::default(),
+            shadow: None,
             enemy_check: ArtCheck::default(),
             survivor_check: ArtCheck::default(),
             prop_check: ArtCheck::default(),
@@ -149,6 +158,29 @@ impl VisualAssets {
                     .zip(actors)
                     .map(|(walkers, actors)| Arc::new(FlashMasks::from_images(walkers, actors))),
             );
+            self.battle_atlas = match actors.zip(walkers) {
+                Some((actors, walkers)) => {
+                    match pack_battle_atlas(context, actors, walkers, max_side) {
+                        Ok(packed) => {
+                            self.atlas_check.rejected("Packed battle atlas", None);
+                            Some(packed)
+                        }
+                        Err(problem) => {
+                            self.atlas_check
+                                .rejected("Packed battle atlas", Some(problem));
+                            None
+                        }
+                    }
+                }
+                None => None,
+            };
+        }
+        if self.shadow.is_none() {
+            self.shadow = Some(context.load_texture(
+                "lastlight-soft-shadow",
+                soft_shadow_image(),
+                egui::TextureOptions::LINEAR,
+            ));
         }
         if changed[ACTORS] {
             let problem = rgba(ACTORS).and_then(survivor_art_problem);
@@ -183,6 +215,8 @@ impl VisualAssets {
                 .zip(self.rig_atlas)
                 .map(|(texture, atlas)| RigSheet { texture, atlas }),
             menu_idle: id(MENU_IDLE),
+            battle_atlas: self.battle_atlas.as_ref().map(|(_, atlas)| *atlas),
+            shadow: self.shadow.as_ref().map(egui::TextureHandle::id),
         }
     }
 }
@@ -196,8 +230,31 @@ fn flash_masks_id() -> egui::Id {
 pub(super) fn publish_flash_masks(context: &egui::Context, masks: Option<Arc<FlashMasks>>) {
     context.data_mut(|data| data.insert_temp(flash_masks_id(), masks));
 }
+/// Publishes the masks of the shipped walker and actor sheets, for painter
+/// tests that run without the asset pipeline.
+#[cfg(test)]
+pub(crate) fn publish_source_flash_masks(context: &egui::Context) {
+    let decode = |path: &str| {
+        let bytes = std::fs::read(format!(
+            "{}/../../assets/{path}",
+            env!("CARGO_MANIFEST_DIR")
+        ))
+        .unwrap();
+        Image::from_buffer(
+            &bytes,
+            bevy::image::ImageType::Extension("png"),
+            bevy::image::CompressedImageFormats::NONE,
+            true,
+            ImageSampler::nearest(),
+            bevy::asset::RenderAssetUsages::MAIN_WORLD,
+        )
+        .unwrap()
+    };
+    let masks = FlashMasks::from_images(&decode(PATHS[WALKERS]), &decode(PATHS[ACTORS]));
+    publish_flash_masks(context, Some(Arc::new(masks)));
+}
 /// The current hit-flash masks, as last published by `refresh`.
-pub(super) fn flash_masks(context: &egui::Context) -> Option<Arc<FlashMasks>> {
+pub fn flash_masks(context: &egui::Context) -> Option<Arc<FlashMasks>> {
     context
         .data(|data| data.get_temp::<Option<Arc<FlashMasks>>>(flash_masks_id()))
         .flatten()
@@ -269,6 +326,71 @@ pub(super) fn image_for_egui(image: &Image) -> Result<egui::ColorImage, String> 
         [image.width() as usize, image.height() as usize],
         rgba8(image)?,
     ))
+}
+
+/// Packs the actor and walker sheets plus an opaque white block into one
+/// NEAREST texture (see [`BattleAtlas::layout`]). Errs, uploading nothing,
+/// when the packed size exceeds the device limit: the battlefield then draws
+/// the two sheets as two meshes.
+fn pack_battle_atlas(
+    context: &egui::Context,
+    actors: &Image,
+    walkers: &Image,
+    max_side: usize,
+) -> Result<(egui::TextureHandle, BattleAtlas), String> {
+    let layout = BattleAtlas::layout(
+        egui::TextureId::default(),
+        [actors.width(), actors.height()],
+        [walkers.width(), walkers.height()],
+    );
+    if layout.size.iter().any(|side| *side as usize > max_side) {
+        return Err(format!(
+            "{}x{} exceeds the active render device limit {max_side}; drawing walkers and actors as two meshes",
+            layout.size[0], layout.size[1]
+        ));
+    }
+    let image = battle_atlas_image(&image_for_egui(actors)?, &image_for_egui(walkers)?, &layout);
+    context.input_mut(|input| {
+        input.max_texture_side = max_side;
+        input.raw.max_texture_side = Some(max_side);
+    });
+    let handle = context.load_texture(
+        "lastlight-battle-atlas",
+        image,
+        egui::TextureOptions::NEAREST,
+    );
+    let atlas = BattleAtlas {
+        texture: handle.id(),
+        ..layout
+    };
+    Ok((handle, atlas))
+}
+
+/// The packed pixels of `layout`: both sheets copied unchanged, transparent
+/// gutters and the opaque white block.
+pub(super) fn battle_atlas_image(
+    actors: &egui::ColorImage,
+    walkers: &egui::ColorImage,
+    layout: &BattleAtlas,
+) -> egui::ColorImage {
+    let width = layout.size[0] as usize;
+    let mut image =
+        egui::ColorImage::filled([width, layout.size[1] as usize], egui::Color32::TRANSPARENT);
+    for (sheet, origin) in [
+        (actors, layout.actors_origin),
+        (walkers, layout.walkers_origin),
+    ] {
+        for (row, pixels) in sheet.pixels.chunks_exact(sheet.size[0]).enumerate() {
+            let start = (origin[1] as usize + row) * width + origin[0] as usize;
+            image.pixels[start..start + pixels.len()].copy_from_slice(pixels);
+        }
+    }
+    let [left, top] = layout.white_origin().map(|v| v as usize);
+    let side = BattleAtlas::WHITE_SIDE as usize;
+    for row in top..top + side {
+        image.pixels[row * width + left..row * width + left + side].fill(egui::Color32::WHITE);
+    }
+    image
 }
 
 pub(super) fn managed_texture(
@@ -396,6 +518,67 @@ mod tests {
         visuals.refresh(&context, &images, 8192);
         assert!(visuals.textures().survivor_art_rejected);
         assert!(visuals.survivor_check.reported.is_some());
+    }
+
+    #[test]
+    fn packed_atlas_rebuilds_with_the_sheets_and_respects_the_device_limit() {
+        let context = egui::Context::default();
+        let mut images = Assets::<Image>::default();
+        let mut visuals = loaded(&mut images, false);
+        visuals.refresh(&context, &images, 4096);
+        let textures = visuals.textures();
+        let atlas = textures.battle_atlas.expect("the packed atlas fits 4096");
+        assert_eq!(atlas.size, [2898, 1402]);
+        assert_eq!(atlas.actors_origin, [0, 0]);
+        assert_eq!(atlas.walkers_origin, [1776, 0]);
+        assert_eq!(atlas.white_origin(), [0, 889]);
+        assert!(textures.shadow.is_some());
+        assert!(visuals.atlas_check.reported.is_none());
+        // The packed pixels are the sheets' own, plus an opaque white block.
+        let actors = image_for_egui(&decode(PATHS[ACTORS])).unwrap();
+        let walkers = image_for_egui(&decode(PATHS[WALKERS])).unwrap();
+        let packed = battle_atlas_image(&actors, &walkers, &atlas);
+        assert_eq!(packed.size, [2898, 1402]);
+        let at = |x: u32, y: u32| packed.pixels[(y * 2898 + x) as usize];
+        for (x, y) in [(0, 0), (900, 400), (1773, 886)] {
+            assert_eq!(at(x, y), actors.pixels[(y * 1774 + x) as usize]);
+        }
+        for (x, y) in [(0, 0), (600, 700), (1121, 1401)] {
+            assert_eq!(at(1776 + x, y), walkers.pixels[(y * 1122 + x) as usize]);
+        }
+        assert_eq!(at(1, 890), egui::Color32::WHITE);
+        assert_eq!(at(1775, 10), egui::Color32::TRANSPARENT, "gutter");
+        assert_eq!(
+            at(10, 893),
+            egui::Color32::TRANSPARENT,
+            "below the white block"
+        );
+
+        // Nothing is repacked without an image event.
+        visuals.refresh(&context, &images, 4096);
+        assert_eq!(visuals.textures().battle_atlas, Some(atlas));
+        // A reload repacks into a new texture.
+        visuals.mark_stale(visuals.handles[WALKERS].id());
+        visuals.refresh(&context, &images, 4096);
+        let repacked = visuals.textures().battle_atlas.unwrap();
+        assert_ne!(repacked.texture, atlas.texture);
+
+        // Both sheets fit 2048 on their own, the packed atlas does not: the
+        // sheets stay drawable, the atlas is dropped and the problem logged.
+        let mut limited = loaded(&mut images, false);
+        limited.refresh(&context, &images, 2048);
+        let textures = limited.textures();
+        assert!(textures.actors.is_some() && textures.walkers.is_some());
+        assert!(textures.battle_atlas.is_none());
+        assert!(
+            limited
+                .atlas_check
+                .reported
+                .as_ref()
+                .is_some_and(
+                    |problem| problem.contains("2898x1402") && problem.contains("two meshes")
+                )
+        );
     }
 
     #[test]

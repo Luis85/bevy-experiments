@@ -29,7 +29,7 @@ impl BattleFrame {
         let reduced = f.settings.reduced_effects;
         let motion = art::sample_motion(ctx, egui::LayerId::background(), a, reduced);
         let field =
-            BattleViewModel::build(a, &motion, f.battle.interpolation.scene(None, a), reduced);
+            BattleViewModel::build(a, motion, f.battle.interpolation.scene(None, a), reduced);
         Some(Self { screen, hud, field })
     }
 }
