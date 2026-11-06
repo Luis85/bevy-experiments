@@ -253,7 +253,25 @@ mod tests {
             gate(primitives, CEILING_PRIMITIVES)
         );
 
+        let vertices_by_scene = object(&json, &format!("{measured}/battlefield_vertices_by_scene"));
+        assert_eq!(
+            keys(by_scene),
+            keys(vertices_by_scene),
+            "the primitive and vertex tables cover the same measured cases"
+        );
         let vertices = object(&json, &format!("{measured}/battlefield_vertices_max"));
+        for (scene, max) in vertices {
+            let covered = vertices_by_scene
+                .iter()
+                .filter(|(case, _)| *case == scene || case.starts_with(&format!("{scene}-")))
+                .filter_map(|(_, value)| value.as_u64())
+                .max();
+            assert_eq!(
+                covered,
+                max.as_u64(),
+                "{scene}: the vertex maximum is the largest of its measured cases"
+            );
+        }
         assert_eq!(
             keys(vertices),
             BATTLEFIELD_VERTICES_MAX

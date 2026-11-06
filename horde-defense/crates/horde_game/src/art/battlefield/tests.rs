@@ -124,10 +124,123 @@ fn battlefield_vertices_stay_within_the_measured_gates() {
     }
 }
 
+/// The largest battlefield load of one live sim run: its maxima, the ticks
+/// they were painted at and how many ticks the run actually simulated.
+#[derive(Debug)]
+struct LiveLoad {
+    ticks_run: usize,
+    primitives_max: usize,
+    primitives_max_tick: usize,
+    vertices_max: usize,
+    vertices_max_tick: usize,
+}
+
+/// Runs `scene`'s perf fixture unpaused for `ticks` ticks with no input and
+/// paints its battlefield in `rect` on every `stride`-th tick.
+/// `stress-5000-corpses` is the stress fixture with both corpse draw caps
+/// full ([`stage_bodies`], which moves the attempt to tick 1,000,000 first).
+fn live_battlefield_load(scene: &str, ticks: usize, stride: usize, rect: Rect) -> LiveLoad {
+    let mut game = match scene {
+        "peak" => horde_core::sim::peak_render_fixture(),
+        "progressed-peak" => horde_core::sim::maximum_progression_render_fixture(),
+        "stress" | "stress-5000-corpses" => horde_core::sim::stress_render_fixture(),
+        _ => panic!("{scene}: no perf fixture"),
+    }
+    .expect("perf fixture");
+    if scene == "stress-5000-corpses" {
+        stage_bodies(
+            &mut game,
+            5_000,
+            crate::perf_budget::CORPSES_COLLAPSING_DRAWN,
+        );
+    }
+    game.set_paused(false);
+    game.attempt_mut().expect("fixture battle").paused = false;
+    let mut load = LiveLoad {
+        ticks_run: 0,
+        primitives_max: 0,
+        primitives_max_tick: 0,
+        vertices_max: 0,
+        vertices_max_tick: 0,
+    };
+    for tick in 0..=ticks {
+        if tick % stride == 0 {
+            let primitives = battlefield_primitives_in(&game, textures(), rect);
+            if primitives.len() > load.primitives_max {
+                (load.primitives_max, load.primitives_max_tick) = (primitives.len(), tick);
+            }
+            let painted = vertices(&primitives);
+            if painted > load.vertices_max {
+                (load.vertices_max, load.vertices_max_tick) = (painted, tick);
+            }
+        }
+        if tick == ticks {
+            break;
+        }
+        game.tick(horde_core::sim::Input::default());
+        load.ticks_run += 1;
+        if game.attempt().is_none() {
+            break;
+        }
+    }
+    load
+}
+
+/// The vertex gate that covers `scene` (`stress-5000-corpses` is a stress
+/// case); peak has none.
+fn vertex_gate_covering(scene: &str) -> Option<usize> {
+    crate::perf_budget::BATTLEFIELD_VERTICES_MAX
+        .iter()
+        .find(|(name, _)| scene == *name || scene.starts_with(&format!("{name}-")))
+        .map(|(_, max)| *max)
+}
+
+/// `load` ran all `ticks` and stays within the egui gates of `scene`.
+fn assert_live_load_within_gates(scene: &str, size: &str, ticks: usize, load: &LiveLoad) {
+    assert_eq!(
+        load.ticks_run, ticks,
+        "{scene} {size}: the run ended early ({load:?})"
+    );
+    let primitives_gate = crate::perf_budget::BATTLEFIELD_PRIMITIVES_MAX;
+    assert!(
+        load.primitives_max <= primitives_gate,
+        "{scene} {size}: {} primitives at tick {}, gate {primitives_gate}",
+        load.primitives_max,
+        load.primitives_max_tick
+    );
+    if let Some(gate) = vertex_gate_covering(scene) {
+        assert!(
+            load.vertices_max <= gate,
+            "{scene} {size}: {} vertices at tick {}, gate {gate}",
+            load.vertices_max,
+            load.vertices_max_tick
+        );
+    }
+}
+
+/// The live gate (W1-51 review): the first `LIVE_GATE_TICKS` ticks of each
+/// gated perf fixture's sim run, painted at the normal arena, stay within
+/// `BATTLEFIELD_PRIMITIVES_MAX` and the scene's vertex gate, so a live frame
+/// (event FX, not only the static fixture) that crosses a gate fails here.
+/// Every maximum the full-length `measure_battlefield_egui_load` records is
+/// painted by tick 420 and on a tick divisible by 20 (stress primitives 47 at
+/// tick 420), so these shorter runs, painting every 10th tick to stay fast,
+/// reach the measured maxima.
+#[test]
+fn live_battlefield_runs_stay_within_the_egui_gates() {
+    const LIVE_GATE_TICKS: usize = 420;
+    const LIVE_GATE_STRIDE: usize = 10;
+    for scene in ["progressed-peak", "stress", "stress-5000-corpses"] {
+        let load = live_battlefield_load(scene, LIVE_GATE_TICKS, LIVE_GATE_STRIDE, arena());
+        assert_live_load_within_gates(scene, "normal", LIVE_GATE_TICKS, &load);
+    }
+}
+
 /// The measurement behind `PERF_BUDGET.json` `evidence.egui_measured`: the
 /// battlefield's largest primitive and vertex counts over every 2nd tick of a
 /// sim run from each perf fixture (warmup_frames + run.frames ticks), at the
-/// normal and small arenas. Several minutes in a debug build; prints only.
+/// normal and small arenas. Several minutes in a debug build; prints the
+/// measurement and asserts every run is complete and within the gates.
 #[test]
 #[ignore = "W1-51 measurement, run with --ignored --nocapture"]
 #[allow(clippy::print_stdout, reason = "prints the measurement it exists for")]
@@ -140,34 +253,16 @@ fn measure_battlefield_egui_load() {
         ("stress-5000-corpses", 1980),
     ] {
         for (size, rect) in [("normal", arena()), ("small", small)] {
-            let mut game = match scene {
-                "peak" => horde_core::sim::peak_render_fixture(),
-                "progressed-peak" => horde_core::sim::maximum_progression_render_fixture(),
-                _ => horde_core::sim::stress_render_fixture(),
-            }
-            .expect("perf fixture");
-            if scene == "stress-5000-corpses" {
-                stage_bodies(
-                    &mut game,
-                    5_000,
-                    crate::perf_budget::CORPSES_COLLAPSING_DRAWN,
-                );
-            }
-            game.set_paused(false);
-            game.attempt_mut().expect("fixture battle").paused = false;
-            let (mut primitives_max, mut vertices_max) = (0, 0);
-            for tick in 0..=ticks {
-                if tick % 2 == 0 {
-                    let primitives = battlefield_primitives_in(&game, textures(), rect);
-                    primitives_max = primitives_max.max(primitives.len());
-                    vertices_max = vertices_max.max(vertices(&primitives));
-                }
-                game.tick(horde_core::sim::Input::default());
-                if game.attempt().is_none() {
-                    break;
-                }
-            }
-            println!("W1-51 {scene} {size}: primitives {primitives_max} vertices {vertices_max}");
+            let load = live_battlefield_load(scene, ticks, 2, rect);
+            println!(
+                "W1-51 {scene} {size}: ticks {} primitives {} (tick {}) vertices {} (tick {})",
+                load.ticks_run,
+                load.primitives_max,
+                load.primitives_max_tick,
+                load.vertices_max,
+                load.vertices_max_tick
+            );
+            assert_live_load_within_gates(scene, size, ticks, &load);
         }
     }
 }

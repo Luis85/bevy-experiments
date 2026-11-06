@@ -177,7 +177,7 @@
       }
     },
     "egui_measured": {
-      "note": "W1-51: the egui gates are min(W1-32 ceiling, ceil(measured max x factor)); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn). Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
+      "note": "W1-51: the egui gates are min(W1-32 ceiling, ceil(measured max x factor)); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn; that case starts from tick 1,000,000, the tick stage_bodies sets, not from the fixture schedule). Every run simulated all its ticks (780, 780, 1980, 1980) and every maximum was painted by tick 420; live_battlefield_runs_stay_within_the_egui_gates gates the first 420 ticks of progressed-peak, stress and stress-5000-corpses at the normal arena, painted every 10th tick (every maximum fell on a tick divisible by 20), and the re-measure asserts full length and the gates. Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
       "commit": "a93e340",
       "factor": 1.25,
       "ceilings": {
@@ -185,7 +185,7 @@
         "battlefield_vertices_max": { "progressed-peak": 40000, "stress": 72000 }
       },
       "battlefield_primitives_max": 47,
-      "battlefield_primitives_by_scene": { "peak": 29, "progressed-peak": 45, "stress": 47 },
+      "battlefield_primitives_by_scene": { "peak": 29, "progressed-peak": 45, "stress": 47, "stress-5000-corpses": 41 },
       "battlefield_vertices_max": { "progressed-peak": 37940, "stress": 48878 },
       "battlefield_vertices_by_scene": { "peak": 32667, "progressed-peak": 37940, "stress": 46801, "stress-5000-corpses": 48878 }
     }
