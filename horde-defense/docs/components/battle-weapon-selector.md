@@ -4,7 +4,7 @@ id: battle-weapon-selector
 title: "Battle attack selector"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::attack_selector"
+source: "crates/horde_game/src/ui/battle/attack.rs::attack_selector"
 ---
 
 # Battle attack selector

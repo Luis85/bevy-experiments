@@ -4,7 +4,7 @@ id: battle
 title: "Active defense battlefield"
 parent: game
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::battle"
+source: "crates/horde_game/src/ui/battle/field.rs::battle"
 ---
 
 # Active defense battlefield

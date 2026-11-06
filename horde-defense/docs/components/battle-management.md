@@ -4,7 +4,7 @@ id: battle-management
 title: "Battle management"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::battle, field_details"
+source: "crates/horde_game/src/ui/battle/field.rs::battle; crates/horde_game/src/ui/battle/details.rs::field_details"
 ---
 
 # Battle management

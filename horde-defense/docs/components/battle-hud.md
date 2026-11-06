@@ -4,7 +4,7 @@ id: battle-hud
 title: "Compact battle HUD and actions"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::corner_hud, personal_controls"
+source: "crates/horde_game/src/ui/battle/overlays.rs::corner_hud; crates/horde_game/src/ui/battle/attack.rs::personal_controls"
 ---
 
 # Compact battle HUD and actions

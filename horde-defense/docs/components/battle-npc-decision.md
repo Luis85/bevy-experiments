@@ -4,7 +4,7 @@ id: battle-npc-decision
 title: "NPC decision and policy popup"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::battle; crates/horde_game/src/inspector.rs::npc_decision"
+source: "crates/horde_game/src/ui/battle/field.rs::battle; crates/horde_game/src/inspector.rs::npc_decision"
 ---
 
 # NPC decision and policy popup

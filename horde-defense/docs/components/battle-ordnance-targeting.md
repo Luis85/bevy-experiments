@@ -4,7 +4,7 @@ id: battle-ordnance-targeting
 title: "Ordnance area targeting"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::ordnance_cursor, gather_combat_input"
+source: "crates/horde_game/src/ui/battle/attack.rs::ordnance_cursor; crates/horde_game/src/ui/battle/input.rs::gather_combat_input"
 ---
 
 # Ordnance area targeting

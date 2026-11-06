@@ -4,7 +4,7 @@ id: battle-build
 title: "Live construction"
 parent: battle
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::construction_controls, placement_cursor"
+source: "crates/horde_game/src/ui/battle/construction.rs::construction_controls, placement_cursor"
 ---
 
 # Live construction

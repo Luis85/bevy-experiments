@@ -4,7 +4,7 @@ id: saved-layouts
 title: "Country plans during live construction"
 parent: battle-build
 status: Implemented
-source: "crates/horde_game/src/ui/battle.rs::construction_controls"
+source: "crates/horde_game/src/ui/battle/construction.rs::construction_controls"
 ---
 
 # Country plans during live construction
