@@ -877,25 +877,22 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         }
     }
     if let Some(id) = takeover {
-        // D7 rule 2: the takeover recruit holds no other duty and its
-        // loadout is reserved for the main run alone.
+        // D7 rule 2: the takeover recruit's loadout is reserved for the main
+        // run alone. It holds no other duty by construction: a garrison
+        // needs a Guarding recruit (`StrategyState::validate`) and an
+        // unsettled battle a Deployed one (the loop above), never Defending.
         let r = game
             .strategy
             .roster
             .iter()
             .find(|r| r.id == id)
             .ok_or("Defending survivor missing from roster")?;
-        if game.strategy.guards.iter().any(|g| g.recruit_id == id)
-            || game
-                .battles
-                .iter()
-                .any(|b| !b.settled && b.recruit_id == id)
-            || r.npc
-                .loadout
-                .iter()
-                .any(|item| !expected_reservations.insert(*item))
+        if r.npc
+            .loadout
+            .iter()
+            .any(|item| !expected_reservations.insert(*item))
         {
-            return Err("Defending survivor has another duty or shares equipment".into());
+            return Err("Defending survivor shares equipment with another duty".into());
         }
     }
     if actual_reservations != expected_reservations {

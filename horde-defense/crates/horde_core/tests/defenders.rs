@@ -1042,12 +1042,10 @@ fn staged_recruit_defending_main_run_validates() {
 #[test]
 fn seat_validation_rejects_each_inconsistency() {
     let mut saves = takeover_saves();
-    let (a, b, c, d) = (saves.defender, saves.ready, saves.expedition, saves.guard);
+    let (a, b, c) = (saves.defender, saves.ready, saves.expedition);
     let mara = saves.mara.clone();
     let takeover = saves.takeover.clone();
     let loadout_a = saved_loadout(&mut saves.takeover, a);
-    let loadout_c = saved_loadout(&mut saves.takeover, c);
-    let loadout_d = saved_loadout(&mut saves.takeover, d);
 
     // Personal defenses with a recruit on the roster, live and reported.
     let mut personal = strategic_game();
@@ -1129,25 +1127,6 @@ fn seat_validation_rejects_each_inconsistency() {
             }),
         ),
         (
-            "Defending plus guard",
-            row(&takeover, &|v| {
-                v["strategy"]["guards"][0]["recruit_id"] = json!(a);
-                set_status(v, d, "Ready");
-                unreserve(v, &loadout_d);
-            }),
-        ),
-        (
-            "Defending plus unsettled battle",
-            row(&takeover, &|v| {
-                let battle = &mut v["battles"][0];
-                battle["recruit_id"] = json!(a);
-                battle["loadout"] = loadout_a.clone();
-                battle["game"]["attempt"]["defender"] = json!({"Recruit": a});
-                set_status(v, c, "Ready");
-                unreserve(v, &loadout_c);
-            }),
-        ),
-        (
             "reserved_recruit names another recruit",
             row(&takeover, &|v| v["campaign"]["reserved_recruit"] = json!(b)),
         ),
@@ -1183,6 +1162,66 @@ fn seat_validation_rejects_each_inconsistency() {
             }),
         ),
     ]);
+}
+
+/// D7 rule 2, pinned by the check that rejects each row. A Defending
+/// recruit cannot also guard or hold an unsettled battle: the garrison and
+/// expedition checks demand Guarding and Deployed first. What is left to the
+/// takeover check itself is equipment shared with another duty.
+#[test]
+fn takeover_duties_fail_at_the_check_that_owns_them() {
+    let mut saves = takeover_saves();
+    let (a, c, d) = (saves.defender, saves.expedition, saves.guard);
+    let takeover = saves.takeover.clone();
+    let loadout_a = saved_loadout(&mut saves.takeover, a);
+    let loadout_c = saved_loadout(&mut saves.takeover, c);
+    let loadout_d = saved_loadout(&mut saves.takeover, d);
+    let row = |edit: &dyn Fn(&mut serde_json::Value)| {
+        let mut value = takeover.clone();
+        edit(&mut value);
+        value
+    };
+    let rows = [
+        (
+            "Defending plus guard",
+            row(&|v| {
+                v["strategy"]["guards"][0]["recruit_id"] = json!(a);
+                set_status(v, d, "Ready");
+                unreserve(v, &loadout_d);
+            }),
+            "Invalid garrison reservation",
+        ),
+        (
+            "Defending plus unsettled battle",
+            row(&|v| {
+                let battle = &mut v["battles"][0];
+                battle["recruit_id"] = json!(a);
+                battle["loadout"] = loadout_a.clone();
+                battle["game"]["attempt"]["defender"] = json!({"Recruit": a});
+                set_status(v, c, "Ready");
+                unreserve(v, &loadout_c);
+            }),
+            "Expedition reservation is inconsistent",
+        ),
+        (
+            "Defending shares the guard's equipment",
+            row(&|v| {
+                roster_entry(v, d)["npc"]["loadout"] = loadout_a.clone();
+            }),
+            "Defending survivor shares equipment with another duty",
+        ),
+    ];
+    let wrong: Vec<String> = rows
+        .into_iter()
+        .filter_map(
+            |(name, value, expected)| match Game::from_payload(value, SAVE_VERSION) {
+                Err(SaveError::Invalid(message)) if message == expected => None,
+                Ok(_) => Some(format!("{name}: loaded")),
+                Err(error) => Some(format!("{name}: {error}")),
+            },
+        )
+        .collect();
+    assert_eq!(wrong, Vec::<String>::new(), "rows rejected elsewhere");
 }
 
 #[test]
