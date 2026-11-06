@@ -1,4 +1,5 @@
 use super::{
+    BattleFrame,
     attack::{attack_selector, attack_selector_rect, ordnance_cursor, personal_controls},
     battle_arena, clearing_rect,
     construction::{construction_controls, placement_cursor},
@@ -9,29 +10,25 @@ use super::{
 };
 use crate::{
     art::{self, INK, MUTED, TEXT},
-    battle_view::BattleScreen,
     diagnostics::{self, InterfaceSpan},
     runner::SaveIntent,
-    ui::{Screen, UiCtx, armory, damage, hud, loot, policy, reticle, status},
+    ui::{Screen, UiCtx, armory, damage, loot, policy, reticle, status},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, Rect, RichText, Sense, Stroke, pos2, vec2};
 use horde_core::{command::Command, content::Mode};
 
-pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
+/// The battle screen of this pass's `views` (`None` outside a battle, which
+/// leaves for the results).
+pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&BattleFrame>) {
     let game = f.game;
     let perf = f.perf;
-    let built = {
-        let _span = diagnostics::interface_span(perf, InterfaceSpan::BattleFrameBuild);
-        (
-            BattleScreen::build(game),
-            hud::view_model(game),
-            game.attempt(),
-        )
-    };
-    let (Some(view), Some(hud_view), Some(a)) = built else {
+    let (Some(views), Some(a)) = (views, game.attempt()) else {
         f.go(Screen::Results);
         return;
     };
+    // The frame sampled the field's scene cache for this layer.
+    debug_assert_eq!(root.layer_id(), egui::LayerId::background());
+    let (view, hud_view) = (&views.screen, &views.hud);
     let ctx = root.ctx().clone();
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK))
@@ -59,10 +56,10 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                 art::world_backdrop(ui.painter(), canvas, arena, view.theme, f.textures);
             }
             let paint = diagnostics::interface_span(perf, InterfaceSpan::BattlefieldPaint);
-            // The painter builds its own `BattleViewModel` from the attempt.
             let drawn = art::battlefield(
                 &ui.painter_at(maximum),
                 r,
+                &views.field,
                 a,
                 f.battle.aim,
                 art::RenderOptions {
@@ -73,7 +70,6 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                     blood: f.settings.blood,
                     theme: view.theme,
                     textures: f.textures,
-                    blend: f.battle.interpolation.scene(None, a),
                 },
             );
             drop(paint);
@@ -86,7 +82,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                 if f.battle.construction {
                     placement_cursor(ui, r, f);
                 } else if f.battle.attack_selection.ordnance().is_some() && view.personal() {
-                    ordnance_cursor(ui, r, f, &view);
+                    ordnance_cursor(ui, r, f, view);
                 }
             }
             if let Some(owns_cursor) = reticle_ownership(
@@ -118,12 +114,12 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
             // Both sit in the field margin around the clearing, so neither
             // covers the defender or the other at the minimum size.
             if view.paused && !f.battle.construction {
-                pause_banner(ui, maximum, &view, &f.settings.bindings);
+                pause_banner(ui, maximum, view, &f.settings.bindings);
             }
             if f.settings.show_guidance && view.first_deployment && view.personal() {
-                field_hint_callout(ui, maximum, f, &view);
+                field_hint_callout(ui, maximum, f, view);
             }
-            corner_hud(ui, canvas, f, &hud_view);
+            corner_hud(ui, canvas, f, hud_view);
             if let Some(receipt) = &view.last_loot {
                 let area = Rect::from_min_max(
                     pos2(canvas.left() + 350.0, canvas.top() + 72.0),
@@ -143,7 +139,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                 let selector = attack_selector_rect(canvas, r);
                 ui.scope_builder(egui::UiBuilder::new().max_rect(selector), |ui| {
                     ui.set_clip_rect(selector.intersect(ui.clip_rect()));
-                    attack_selector(ui, f, &view)
+                    attack_selector(ui, f, view)
                 });
             }
             if f.battle.construction {
@@ -160,7 +156,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                             ui.set_width(258.0);
                             egui::ScrollArea::vertical()
                                 .max_height(panel.height() - 24.0)
-                                .show(ui, |ui| construction_controls(ui, f, &view));
+                                .show(ui, |ui| construction_controls(ui, f, view));
                         });
                 });
             }
@@ -203,7 +199,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         f.battle.fire_latched = false;
                     }
                     if view.personal() && !f.battle.construction {
-                        personal_controls(ui, f, &ctx, &view);
+                        personal_controls(ui, f, &ctx, view);
                     }
                     if view.any_blueprint()
                         && ui
@@ -280,7 +276,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx) {
                         ui.checkbox(&mut f.battle.inspect_log, "Combat log");
                         egui::ScrollArea::vertical()
                             .max_height(280.)
-                            .show(ui, |ui| field_details(ui, f, &view, &hud_view));
+                            .show(ui, |ui| field_details(ui, f, view, hud_view));
                     });
                 });
                 if !f.status.message.is_empty() {

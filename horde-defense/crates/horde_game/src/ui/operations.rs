@@ -283,11 +283,12 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         .map(|p| projection.inverse(p))
                         .unwrap_or([a.width_yards*0.5,a.defender_position()[1]]);
                     art::world_backdrop(ui.painter(),effects_clip,projection,a.level,f.textures);
-                    art::battlefield(
+                    art::battlefield_for_attempt(
                         &ui.painter_at(effects_clip),
                         r,
                         a,
                         aim,
+                        f.battle.interpolation.scene(Some(id), a),
                         art::RenderOptions {
                             construction: true,
                             outlines: f.settings.outlines,
@@ -296,7 +297,6 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                             blood: f.settings.blood,
                             theme: a.level,
                             textures: f.textures,
-                            blend: f.battle.interpolation.scene(Some(id), a),
                         },
                     );
                     damage::draw_for(ui,a,projection,id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode());

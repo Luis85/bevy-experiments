@@ -164,6 +164,8 @@ impl BattleViewModel {
         reduced: bool,
         catalog: &'static EnemyVisualCatalog,
     ) -> Self {
+        #[cfg(test)]
+        super::builds::record(|b| &mut b.field);
         let level_boss = content().levels[a.level].boss;
         let structures = a
             .structures

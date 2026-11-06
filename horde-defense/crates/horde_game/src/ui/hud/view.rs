@@ -78,6 +78,8 @@ pub(in crate::ui) struct HudView {
 
 /// The player's own battle HUD, or `None` outside a battle.
 pub(in crate::ui) fn view_model(game: &Game) -> Option<HudView> {
+    #[cfg(test)]
+    crate::battle_view::builds::record(|b| &mut b.hud);
     let a = game.attempt()?;
     Some(HudView {
         defender: if a.mode == Mode::Personal {

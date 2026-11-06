@@ -190,8 +190,9 @@ impl Harness {
                         egui::CentralPanel::default().show(ui, |ui| country_dossier(ui, f));
                     }
                     View::Battle => {
-                        controls(ui.ctx(), f);
-                        battle(ui, f);
+                        let views = BattleFrame::build(ui.ctx(), f);
+                        controls(ui.ctx(), f, views.as_ref());
+                        battle(ui, f, views.as_ref());
                     }
                     View::Settings => settings_ui(ui, f),
                     View::WorldWithChrome => {
@@ -288,7 +289,11 @@ impl Harness {
                 events,
                 ..RawInput::default()
             },
-            |ui| publish_controls(ui.ctx(), &mut f.ctx(), true, false),
+            |ui| {
+                let mut c = f.ctx();
+                let views = BattleFrame::build(ui.ctx(), &c);
+                publish_controls(ui.ctx(), &mut c, views.as_ref(), true, false);
+            },
         );
         output.textures_delta.clear();
     }
@@ -300,11 +305,19 @@ impl Harness {
                 ..RawInput::default()
             },
             |ui| {
-                input = gather_combat_input(ui.ctx(), &mut f.ctx());
+                let mut c = f.ctx();
+                let views = BattleFrame::build(ui.ctx(), &c);
+                input = gather_combat_input(ui.ctx(), &mut c, views.as_ref());
             },
         );
         output.textures_delta.clear();
         input
+    }
+    /// Combat input gathered outside a pass, from the last pass's input state.
+    fn combat_input_after_pass(&self, f: &mut FrontendParts) -> Input {
+        let mut c = f.ctx();
+        let views = BattleFrame::build(&self.ctx, &c);
+        gather_combat_input(&self.ctx, &mut c, views.as_ref())
     }
 }
 fn key_event(key: Key, pressed: bool) -> Event {
@@ -435,6 +448,7 @@ mod camp_tests;
 mod character_tests;
 mod chrome_tests;
 mod feedback_tests;
+mod frame_tests;
 mod history_tests;
 mod menu_tests;
 mod navigation_tests;

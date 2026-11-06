@@ -1,7 +1,7 @@
 //! Battle presentation. Game changes are queued typed intents. Every attempt
 //! value laid out here comes from `battle_view::BattleScreen` (or the HUD view
-//! model); the attempt itself is only handed to the battlefield painter and
-//! the inspector tools.
+//! model), built once per egui pass in a `BattleFrame`; the attempt itself is
+//! only handed to the battlefield painter and the inspector tools.
 use super::UiCtx;
 use crate::{art, battle_view};
 use bevy_egui::egui::{Rect, pos2, vec2};
@@ -10,12 +10,14 @@ mod attack;
 mod construction;
 mod details;
 mod field;
+mod frame;
 mod input;
 mod overlays;
 #[cfg(test)]
 mod tests;
 
 pub(super) use field::battle;
+pub(super) use frame::BattleFrame;
 pub(super) use input::{AttackSelection, controls, gather_combat_input};
 
 fn projection(f: &UiCtx, r: Rect) -> art::ArenaProjection {

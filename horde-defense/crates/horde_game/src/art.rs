@@ -9,7 +9,7 @@ mod tests;
 
 use backdrop::{box_at, line, paint_ground};
 pub use backdrop::{world_atmosphere, world_backdrop};
-pub use battlefield::{RenderOptions, battlefield};
+pub use battlefield::{RenderOptions, battlefield, battlefield_for_attempt, sample_motion};
 pub use figures::{bar, figure, structure};
 use figures::{soft_shadow, structure_fallback};
 pub use palette::{AMBER, GREEN, INK, MUTED, PANEL, RED, TEXT};

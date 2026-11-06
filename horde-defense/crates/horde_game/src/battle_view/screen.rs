@@ -55,6 +55,8 @@ pub struct BattleScreen {
 impl BattleScreen {
     /// The active battle's screen, or `None` outside a battle.
     pub fn build(game: &Game) -> Option<Self> {
+        #[cfg(test)]
+        super::builds::record(|b| &mut b.screen);
         let a = game.attempt()?;
         let country = world().country(a.country_id.as_deref().unwrap_or(""));
         let theme = country

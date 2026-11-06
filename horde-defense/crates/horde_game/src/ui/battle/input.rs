@@ -1,4 +1,4 @@
-use super::projection;
+use super::{BattleFrame, projection};
 use crate::{
     art,
     battle_view::{self, BattleScreen},
@@ -37,7 +37,7 @@ pub(super) fn target_cell(aim: [f32; 2], lanes: u8, width: f32) -> Option<[u8; 2
     .filter(|cell| horde_core::ordnance::valid_cell_for_arena(*cell, lanes, width))
 }
 
-pub(in crate::ui) fn controls(ctx: &egui::Context, f: &mut UiCtx) {
+pub(in crate::ui) fn controls(ctx: &egui::Context, f: &mut UiCtx, views: Option<&BattleFrame>) {
     let frame = ctx.cumulative_frame_nr();
     if f.battle.last_control_frame == frame {
         return;
@@ -47,7 +47,7 @@ pub(in crate::ui) fn controls(ctx: &egui::Context, f: &mut UiCtx) {
         return;
     }
     if f.settings.pressed(ctx, Action::Pause, false) {
-        let pause = !BattleScreen::build(f.game).is_some_and(|view| view.paused);
+        let pause = !views.is_some_and(|views| views.screen.paused);
         f.dispatch(Command::SetPaused(pause), "");
         f.battle.construction = false;
         f.battle.fire_latched = false;
@@ -72,7 +72,11 @@ pub(in crate::ui) fn controls(ctx: &egui::Context, f: &mut UiCtx) {
         f.toggle_fire(ctx);
     }
 }
-pub(in crate::ui) fn gather_combat_input(ctx: &egui::Context, f: &mut UiCtx) -> Input {
+pub(in crate::ui) fn gather_combat_input(
+    ctx: &egui::Context,
+    f: &mut UiCtx,
+    views: Option<&BattleFrame>,
+) -> Input {
     if f.battle.construction
         || ctx.text_edit_focused()
         || ctx.any_popup_open()
@@ -84,8 +88,7 @@ pub(in crate::ui) fn gather_combat_input(ctx: &egui::Context, f: &mut UiCtx) -> 
             ..Input::default()
         };
     }
-    let view = BattleScreen::build(f.game);
-    let view = view.as_ref();
+    let view = views.map(|views| &views.screen);
     let mut input = Input {
         aim: assisted_aim(f, view),
         auto_reload: f.settings.auto_reload,

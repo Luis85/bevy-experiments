@@ -7,39 +7,24 @@ use crate::ui::UiCtx;
 use bevy_egui::egui;
 
 pub(in crate::ui) fn model_workshop(root: &mut egui::Ui, f: &UiCtx) -> bool {
-    let scene = f.launch.scenario.clone();
-    if let Some(id) = scene
-        .as_deref()
-        .and_then(|scene| scene.strip_prefix("model-parity-"))
-    {
+    let scene = f.launch.scenario.as_deref();
+    if let Some(id) = scene.and_then(|scene| scene.strip_prefix("model-parity-")) {
         model_parity(root, f, id);
         return true;
     }
-    if let Some(id) = scene
-        .as_deref()
-        .and_then(|scene| scene.strip_prefix("model-parts-"))
-    {
+    if let Some(id) = scene.and_then(|scene| scene.strip_prefix("model-parts-")) {
         model_parts(root, f, id);
         return true;
     }
-    if let Some(id) = scene
-        .as_deref()
-        .and_then(|scene| scene.strip_prefix("model-matrix-"))
-    {
+    if let Some(id) = scene.and_then(|scene| scene.strip_prefix("model-matrix-")) {
         model_matrix(root, f.launch, id);
         return true;
     }
-    if let Some(id) = scene
-        .as_deref()
-        .and_then(|scene| scene.strip_prefix("model-repairs-"))
-    {
+    if let Some(id) = scene.and_then(|scene| scene.strip_prefix("model-repairs-")) {
         model_repairs(root, f.launch, id);
         return true;
     }
-    if !matches!(
-        scene.as_deref(),
-        Some("model-workshop" | "model-comparison")
-    ) {
+    if !matches!(scene, Some("model-workshop" | "model-comparison")) {
         return false;
     }
     let launch = &f.launch;
@@ -51,7 +36,7 @@ pub(in crate::ui) fn model_workshop(root: &mut egui::Ui, f: &UiCtx) -> bool {
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK).inner_margin(16))
         .show(root, |ui| {
-            let compare = scene.as_deref() == Some("model-comparison");
+            let compare = scene == Some("model-comparison");
             ui.heading(if compare {
                 "Still artwork and battle stance"
             } else {

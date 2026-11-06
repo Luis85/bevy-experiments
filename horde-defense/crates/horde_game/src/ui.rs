@@ -122,8 +122,19 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
             .layer_id(egui::LayerId::background()),
     );
     let root = &mut root_ui;
+    // The battle views of this pass, built once for every reader below.
+    let views = (f.screen == Screen::Battle)
+        .then(|| {
+            let _span = crate::diagnostics::interface_span(
+                f.perf,
+                crate::diagnostics::InterfaceSpan::BattleFrameBuild,
+            );
+            BattleFrame::build(ctx, f)
+        })
+        .flatten();
+    let views = views.as_ref();
     if f.screen == Screen::Battle {
-        controls(ctx, f);
+        controls(ctx, f, views);
     }
     if f.screen.shows_header() {
         navigation::header(root, f, view_accent);
@@ -131,14 +142,14 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
     navigation::field_status(root, f);
     #[cfg(feature = "review")]
     if review::model_workshop(root, f) {
-        publish_controls(ctx, f, false, false);
+        publish_controls(ctx, f, None, false, false);
         return;
     }
     match f.screen {
         Screen::Menu => menu(root, f, now),
         Screen::SurvivorSelection => menu::survivor_selection(root, f, now),
         Screen::Camp => camp(root, f),
-        Screen::Battle => battle(root, f),
+        Screen::Battle => battle(root, f, views),
         Screen::Results => results(root, f),
         Screen::History => history::show(root, f),
         Screen::Settings => settings_ui(root, f),
@@ -150,12 +161,19 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
         && !f.leaving()
         && f.game.attempt().is_none()
         && !f.game.global_paused();
-    publish_controls(ctx, f, active, strategy_active);
+    publish_controls(ctx, f, views, active, strategy_active);
 }
 
-fn publish_controls(ctx: &egui::Context, f: &mut UiCtx, active: bool, strategy_active: bool) {
+/// Publishes this pass's control frame; live combat input reads `views`.
+fn publish_controls(
+    ctx: &egui::Context,
+    f: &mut UiCtx,
+    views: Option<&BattleFrame>,
+    active: bool,
+    strategy_active: bool,
+) {
     let mut held = if active {
-        gather_combat_input(ctx, f)
+        gather_combat_input(ctx, f, views)
     } else {
         Input::default()
     };
@@ -201,7 +219,7 @@ pub(crate) mod damage;
 pub(crate) mod loot;
 mod progression;
 mod reticle;
-use self::battle::{battle, controls, gather_combat_input};
+use self::battle::{BattleFrame, battle, controls, gather_combat_input};
 mod results;
 use self::results::results;
 mod history;

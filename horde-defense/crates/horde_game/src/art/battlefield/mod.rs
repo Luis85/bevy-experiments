@@ -9,7 +9,7 @@ pub mod terrain;
 
 use super::{ArenaProjection, RED, soft_shadow};
 use crate::{
-    animation::{self, SceneCache},
+    animation::{self, SceneAnimation, SceneCache},
     battle_view::{BattleViewModel, SceneBlend},
     diagnostics::SceneDraw,
     visual_assets::{self, ArtTextures},
@@ -18,7 +18,7 @@ use bevy::log::warn;
 use bevy_egui::egui::{self, Align2, FontId, Painter, Pos2, Rect, Stroke, pos2, vec2};
 use horde_core::{content::Mode, sim::Attempt};
 
-pub struct RenderOptions<'a> {
+pub struct RenderOptions {
     pub construction: bool,
     pub outlines: bool,
     pub numbers: bool,
@@ -26,31 +26,57 @@ pub struct RenderOptions<'a> {
     pub blood: bool,
     pub theme: usize,
     pub textures: ArtTextures,
-    /// Actor position blend between the last two fixed ticks.
-    pub blend: SceneBlend<'a>,
 }
 
-/// Paints the field and returns what it drew, for the perf report's
-/// `scene_load` (settled bodies are those past 0.9 collapse).
+/// The cosmetic scene animation of `a` for a painter on `layer`, sampled from
+/// the context's scene cache. The root background layer shares one unscoped
+/// history; every other layer (an observer window) keeps its own.
+pub fn sample_motion(
+    ctx: &egui::Context,
+    layer: egui::LayerId,
+    a: &Attempt,
+    reduced: bool,
+) -> SceneAnimation {
+    ctx.data_mut(|data| {
+        let cache =
+            data.get_temp_mut_or_default::<SceneCache>(egui::Id::new("lastlight_cosmetic_scenes"));
+        if layer == egui::LayerId::background() {
+            cache.sample(a, reduced)
+        } else {
+            cache.sample_scoped(a, reduced, layer.id.value())
+        }
+    })
+}
+
+/// Builds the field view of `a` for the painter's layer, blending actor
+/// positions by `blend`, then paints it (see [`battlefield`]). Each call is
+/// one `BattleViewModel` build: the operations observer, once per visible
+/// worker. The main battle builds its view once per pass in `BattleFrame`.
+pub fn battlefield_for_attempt(
+    p: &Painter,
+    r: Rect,
+    a: &Attempt,
+    aim: [f32; 2],
+    blend: SceneBlend,
+    options: RenderOptions,
+) -> SceneDraw {
+    let motion = sample_motion(p.ctx(), p.layer_id(), a, options.reduced);
+    let view = BattleViewModel::build(a, &motion, blend, options.reduced);
+    battlefield(p, r, &view, a, aim, options)
+}
+
+/// Paints the field `view` of `a` and returns what it drew, for the perf
+/// report's `scene_load` (settled bodies are those past 0.9 collapse).
 pub fn battlefield(
     p: &Painter,
     r: Rect,
+    view: &BattleViewModel,
     a: &Attempt,
     aim: [f32; 2],
     options: RenderOptions,
 ) -> SceneDraw {
     let arena = ArenaProjection::for_attempt(r, a);
-    let motion = p.ctx().data_mut(|data| {
-        let cache =
-            data.get_temp_mut_or_default::<SceneCache>(egui::Id::new("lastlight_cosmetic_scenes"));
-        if p.layer_id() == egui::LayerId::background() {
-            cache.sample(a, options.reduced)
-        } else {
-            cache.sample_scoped(a, options.reduced, p.layer_id().id.value())
-        }
-    });
-    let view = BattleViewModel::build(a, &motion, options.blend, options.reduced);
-    render(p, arena, &view, a, aim, &options);
+    render(p, arena, view, a, aim, &options);
     let settled_corpses = view.corpses.iter().filter(|c| c.collapse > 0.9).count();
     SceneDraw {
         settled_corpses,

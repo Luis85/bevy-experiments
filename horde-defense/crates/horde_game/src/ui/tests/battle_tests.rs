@@ -700,7 +700,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
         }],
         vec2(1050.0 / 1.35, 700.0 / 1.35),
     );
-    battle::gather_combat_input(&h.ctx, &mut f.ctx());
+    h.combat_input_after_pass(f);
     assert!(f.battle.pending.throw.is_none());
     h.frame_size(
         f,
@@ -725,7 +725,7 @@ fn fresh_three_lane_battle_uses_actual_small_clearing_and_invalid_clicks_do_not_
         }],
         vec2(1050.0 / 1.35, 700.0 / 1.35),
     );
-    battle::gather_combat_input(&h.ctx, &mut f.ctx());
+    h.combat_input_after_pass(f);
     assert_eq!(f.battle.pending.throw.unwrap().cell, [11, 2]);
 }
 
