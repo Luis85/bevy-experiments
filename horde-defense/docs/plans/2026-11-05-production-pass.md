@@ -753,16 +753,16 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 
 | Scene | Size | Metric | Wave 0 | Target | After W1 | After W2 | After W5 | Release candidate (W7-09) |
 |---|---|---|---|---|---|---|---|---|
-| progressed-peak | 1440x900 | interface mean (ms, VSync on) | 1.613 | ≤ 1.129 | | | | |
-| progressed-peak | 1050x700@1.35 | interface mean (ms, VSync on) | 1.472 | ≤ 1.030 | | | | |
-| progressed-peak | both | CPU p99 (ms, -VsyncOff) | n/a (v3 dev: 20.7 / 19.1, see 9.4) | ≤ 10.0 | | | | |
-| stress (400) | both | CPU p99 (ms, -VsyncOff) | n/a (v3 dev: 31.8 / 38.1, see 9.4) | ≤ 10.0 | | | | |
-| progressed-peak, stress | both | frames > 50 ms | 0 (VSync on, 300 frames; v3 600/1800 frames: 6-64, see 9.4) | 0 | | | | |
-| peak | 1440x900 / 1050x700@1.35 | interface mean (ms) | 1.190 / 1.075 | informational | | | | |
+| progressed-peak | 1440x900 | interface mean (ms, VSync on) | 1.613 | ≤ 1.129 | 0.990 (dev, median of 3, W1-61) | | | |
+| progressed-peak | 1050x700@1.35 | interface mean (ms, VSync on) | 1.472 | ≤ 1.030 | 0.952 (dev, median of 3, W1-61) | | | |
+| progressed-peak | both | CPU p99 (ms, -VsyncOff) | n/a (v3 dev: 20.7 / 19.1, see 9.4) | ≤ 10.0 | dev 8.85 / 7.01, playtest 6.26 / 6.44 (median of 3, W1-61) | | | |
+| stress (400) | both | CPU p99 (ms, -VsyncOff) | n/a (v3 dev: 31.8 / 38.1, see 9.4) | ≤ 10.0 | dev 7.50 / 7.84, playtest 6.48 / 6.54 (median of 3, W1-61) | | | |
+| progressed-peak, stress | both | frames > 50 ms | 0 (VSync on, 300 frames; v3 600/1800 frames: 6-64, see 9.4) | 0 | 0 in every repeat of every W1-61 acceptance pass (dev VSync on; dev and playtest -VsyncOff), 0 driver stalls excluded; the A/B passes had 3-21 driver stalls per cell, excluded by the user ruling (2.2) | | | |
+| peak | 1440x900 / 1050x700@1.35 | interface mean (ms) | 1.190 / 1.075 | informational | 0.775 / 0.768 (dev, VSync on, median of 3, W1-61) | | | |
 | camera zoom delta (W1-47) | both | peak and progressed-peak, commit before C2 vs C2 | n/a | recorded | interface_draw peak +6.2% / +4.1%, progressed-peak -1.0% / +1.9% (see 9.5) | | | |
-| pipelined decision (W1-61) | both | on vs off, Repeat 3 | n/a | recorded | | | | |
+| pipelined decision (W1-61) | both | on vs off, Repeat 3 | n/a | recorded | default stays on: off misses the VSync-on p99 interval at the small size (19.13 / 19.66 ms > 17.7); see 9.4 | | | |
 | save clone (W1-50) | n/a | p99 (ms) at 1,000 / 2,500 / 5,000 items, 3 workers | n/a | remedy if > 1 ms | | | | |
-| shipped `--smoke` | n/a | seconds | n/a | recorded | | | | |
+| shipped `--smoke` | n/a | seconds | n/a | recorded | shipped_smoke_seconds 1.23 (median of 2.43 / 1.19 / 1.23, playtest `--no-default-features`, W1-61) | | | |
 
 ### 9.2 Pacing and smoke
 
@@ -902,6 +902,40 @@ The attribution `coverage` is 1.0 by construction inside the recorded range, bec
 - `frames_over_50ms_driver_stall` counts the stalls, and `driver_stalls.frames` lists them. `driver_stalls.outside` gives the sample count, mean FPS, p99 interval and frames over 33 and 50 ms of every other frame.
 - `measure_performance.ps1` gates `frames_over_50ms` on `driver_stalls.outside.frames_over_50ms` (worst repeat). A report without it is invalid evidence (exit 2). summary.json and summary.md list every stall per run. The pipelined decision reads the `outside` statistics.
 - The thresholds live in PERF_BUDGET.json `driver_stall`, mirrored by `perf_budget::DRIVER_STALL_*`.
+
+**Goal-1 acceptance and the pipelined decision (W1-61, 2026-11-06, commit 199d823 with W1-69).** RTX 1000 Ada, Vulkan, mains, focused window, a 5 s CPU-load sampler beside every pass. Every run was valid at its first attempt.
+- Acceptance passes, all exit 0, 0 frames over 50 ms in every repeat and 0 driver stalls excluded:
+  - dev, VSync on, progressed-peak, Repeat 3: interface_draw 0.990 / 0.952 ms against ≤ 1.129 / 1.030; interface_total 1.95 / 1.80 against the v3 4.64 / 4.59.
+  - dev, VSync on, peak and stress (informational runs, exit 0): peak interface_draw 0.775 / 0.768 against wave 0's 1.190 / 1.075.
+  - -VsyncOff, Repeat 3, all scenes: cpu_frame p99 dev 8.85 / 7.01 (progressed-peak) and 7.50 / 7.84 (stress); playtest 6.26 / 6.44 and 6.48 / 6.54, all against ≤ 10.0.
+  - CPU load during the measured runs was at most 64% (dev) and 78% (playtest). The playtest pass's 100% sample fell in its shipped cargo build, before the first run.
+- Low latency: a launch without a scenario, with settings `{version 1, low_latency true, master 0}` and `LASTLIGHT_PERF_REPORT`, reported `present {requested_mode Mailbox, source settings, pipelined_rendering false, low_latency true}` (`target/perf/w1-61/head-low-latency-playtest`).
+- Shipped smoke: `-ShippedSmoke` (playtest, `--no-default-features`) took 2.43, 1.19 and 1.23 s, so shipped_smoke_seconds is 1.23 (the median).
+- Integrated GPU: still logged pending (`hardware.integrated_gpu.status` pending, ACCEPTANCE.md human-check row).
+
+The pipelined A/B was re-run on this commit. The first W1-61 A/B predates W1-69 and its slow frames were never classified, so it was not reused. The protocol was interleaved ABAB at the run level: playtest and dev, -VsyncOff, progressed-peak and stress, both sizes, 3 repeats per arm, 1,800 frames, then the playtest VSync-on pair. That gave 12 valid runs per arm and group. Medians of 3. "Outside stalls" values follow the user ruling, and stalls are summed over the 3 repeats.
+
+| Profile, VSync off | Scene | Size | cpu_frame p99 on / off | median frame on / off | frames > 33 ms outside stalls (worst) on / off | driver stalls on / off |
+|---|---|---|---|---|---|---|
+| playtest | progressed-peak | normal | 6.15 / 6.32 | 2.99 / 4.99 | 0 / 0 | 13 / 13 |
+| playtest | progressed-peak | small | 6.12 / 5.73 | 2.91 / 4.89 | 0 / 0 | 7 / 16 |
+| playtest | stress | normal | 7.30 / 6.09 | 3.06 / 5.15 | 0 / 0 | 17 / 16 |
+| playtest | stress | small | 6.08 / 6.03 | 3.02 / 5.01 | 0 / 0 | 8 / 9 |
+| dev | progressed-peak | normal | 7.11 / 6.93 | 3.52 / 5.84 | 0 / 0 | 9 / 21 |
+| dev | progressed-peak | small | 6.49 / 6.54 | 3.40 / 5.67 | 0 / 0 | 10 / 13 |
+| dev | stress | normal | 7.55 / 6.87 | 3.72 / 6.00 | 0 / 0 | 20 / 21 |
+| dev | stress | small | 7.03 / 6.73 | 3.59 / 5.85 | 0 / 0 | 13 / 14 |
+
+| Playtest, VSync on | Size | mean FPS outside stalls on / off | p99 interval outside stalls on / off | frames > 50 ms outside stalls (worst) on / off | driver stalls on / off |
+|---|---|---|---|---|---|
+| progressed-peak | normal | 60.00 / 60.00 | 17.45 / 17.40 | 0 / 0 | 1 / 5 |
+| progressed-peak | small | 60.00 / 59.99 | 19.69 / 19.13 | 0 / 0 | 3 / 3 |
+| stress | normal | 60.00 / 60.00 | 17.82 / 17.35 | 6 / 0 | 3 / 0 |
+| stress | small | 60.00 / 60.00 | 19.60 / 19.66 | 0 / 0 | 0 / 0 |
+
+Decision: **the default stays on** (`PIPELINED_DEFAULT` true, `decisions.pipelined_rendering`). With pipelining off, every VSync-off cell meets the 12.0 ms and 0-over-33-ms limits. But the VSync-on p99 interval at the small size is 19.13 and 19.66 ms, above 17.7 ms, so the rule keeps pipelining on. Both arms miss that interval at the small size, so it is not a pipelining cost. With VSync off, pipelining lowers the median frame from 4.9-6.0 ms to 2.9-3.7 ms at a similar cpu_frame p99. One VSync-on stress repeat with pipelining (`stress-on-r2`) had a stretch of about 400 frames of 47-67 ms. The six of them over 50 ms (52-67 ms) were mostly acquire wait, with acquire shares of 0.78-0.86. But their named coverage was 0.89-0.94, with 4-6 ms outside App::update, so they are not driver stalls. That repeat exited 1.
+
+The VSync-off half of the 0.5 s stall is now named. With `slowest_present`, all 220 VSync-off frames over 50 ms in this A/B, pipelined or not, were the swap-chain acquire. Their acquire shares were 0.981-0.992, the in-process work 7.8-19.2 ms and the frames 480-623 ms. Pipelined, the render frame that held the stall finished before the main thread closed its frame, which is why the earlier reports never saw it (VALIDATION.md, "Goal-1 acceptance").
 
 ### 9.5 Camera zoom delta (W1-47)
 

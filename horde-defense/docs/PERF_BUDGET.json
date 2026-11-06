@@ -206,7 +206,60 @@
       "battlefield_vertices_by_scene": { "peak": 32667, "progressed-peak": 37940, "stress": 46801, "stress-5000-corpses": 48878 }
     }
   },
+  "acceptance": {
+    "note": "W1-61 Goal-1 acceptance on commit 199d823 (W1-69 included; the pipelined default unchanged), informational: the script never reads it. Every pass exited 0; production-pass plan 9.1 and VALIDATION.md 'Goal-1 acceptance'.",
+    "commit": "199d823",
+    "passes": ["target/perf/w1-61/head-acc-dev-vsync-progressed-peak", "target/perf/w1-61/head-acc-dev-vsync-peak", "target/perf/w1-61/head-acc-dev-vsync-stress", "target/perf/w1-61/head-acc-dev-novsync", "target/perf/w1-61/head-acc-playtest-novsync"],
+    "interface_draw_mean_ms": { "progressed-peak": { "normal": 0.9903, "small": 0.9517 }, "peak": { "normal": 0.7745, "small": 0.7681 } },
+    "cpu_frame_p99_ms": {
+      "dev": { "progressed-peak": { "normal": 8.8481, "small": 7.0104 }, "stress": { "normal": 7.5018, "small": 7.8428 } },
+      "playtest": { "progressed-peak": { "normal": 6.2634, "small": 6.4433 }, "stress": { "normal": 6.4769, "small": 6.5375 } }
+    },
+    "frames_over_50ms_worst": 0,
+    "driver_stalls": 0,
+    "low_latency": { "evidence": "target/perf/w1-61/head-low-latency-playtest", "requested_mode": "Mailbox", "source": "settings", "pipelined_rendering": false },
+    "shipped_smoke_seconds": { "median": 1.23, "runs": [2.432, 1.186, 1.23], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w1-61/head-acc-playtest-novsync/shipped" }
+  },
   "decisions": {
-    "pipelined_rendering": null
+    "pipelined_rendering": {
+      "default": true,
+      "rule": "Switch the default off only if, with pipelining off, every -VsyncOff progressed-peak and stress cpu_frame p99 (median of 3, playtest and dev, both sizes) is at most 12.0 ms with 0 frames over 33 ms (worst repeat), and the playtest VSync-on runs keep a mean FPS of at least 59.5, a p99 frame interval of at most 17.7 ms (medians of 3) and 0 frames over 50 ms (worst repeat); otherwise keep it on. Per the W1-61 user ruling on gate 3 the frame counts, mean FPS and p99 interval are those outside driver stalls (driver_stalls.outside); driver_stalls counts the excluded stalls per cell over its 3 repeats. Low latency always turns pipelining off.",
+      "commit": "199d823",
+      "thresholds": { "cpu_frame_p99_ms_max": 12.0, "frames_over_33ms_max": 0, "vsync_on_mean_fps_min": 59.5, "vsync_on_p99_frame_ms_max": 17.7, "vsync_on_frames_over_50ms_max": 0 },
+      "runs": {"playtest": {"on": 12, "off": 12}, "dev": {"on": 12, "off": 12}, "vsync_on": {"on": 12, "off": 12}},
+      "off": {
+        "vsync_off": {
+          "playtest": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 6.3207, "frames_over_33ms_worst": 0, "driver_stalls": 13}, "small": {"cpu_frame_p99_ms_median": 5.7295, "frames_over_33ms_worst": 0, "driver_stalls": 16}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 6.0891, "frames_over_33ms_worst": 0, "driver_stalls": 16}, "small": {"cpu_frame_p99_ms_median": 6.0313, "frames_over_33ms_worst": 0, "driver_stalls": 9}}
+          },
+          "dev": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 6.9265, "frames_over_33ms_worst": 0, "driver_stalls": 21}, "small": {"cpu_frame_p99_ms_median": 6.5375, "frames_over_33ms_worst": 0, "driver_stalls": 13}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 6.8747, "frames_over_33ms_worst": 0, "driver_stalls": 21}, "small": {"cpu_frame_p99_ms_median": 6.7268, "frames_over_33ms_worst": 0, "driver_stalls": 14}}
+          }
+        },
+        "vsync_on": {
+          "progressed-peak": {"normal": {"mean_fps_median": 59.999, "p99_frame_ms_median": 17.3962, "frames_over_50ms_worst": 0, "driver_stalls": 5}, "small": {"mean_fps_median": 59.9936, "p99_frame_ms_median": 19.1265, "frames_over_50ms_worst": 0, "driver_stalls": 3}},
+          "stress": {"normal": {"mean_fps_median": 59.9993, "p99_frame_ms_median": 17.3545, "frames_over_50ms_worst": 0, "driver_stalls": 0}, "small": {"mean_fps_median": 59.9976, "p99_frame_ms_median": 19.6554, "frames_over_50ms_worst": 0, "driver_stalls": 0}}
+        }
+      },
+      "on": {
+        "vsync_off": {
+          "playtest": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 6.1473, "frames_over_33ms_worst": 0, "driver_stalls": 13}, "small": {"cpu_frame_p99_ms_median": 6.1237, "frames_over_33ms_worst": 0, "driver_stalls": 7}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 7.3011, "frames_over_33ms_worst": 0, "driver_stalls": 17}, "small": {"cpu_frame_p99_ms_median": 6.0757, "frames_over_33ms_worst": 0, "driver_stalls": 8}}
+          },
+          "dev": {
+            "progressed-peak": {"normal": {"cpu_frame_p99_ms_median": 7.1142, "frames_over_33ms_worst": 0, "driver_stalls": 9}, "small": {"cpu_frame_p99_ms_median": 6.4874, "frames_over_33ms_worst": 0, "driver_stalls": 10}},
+            "stress": {"normal": {"cpu_frame_p99_ms_median": 7.5468, "frames_over_33ms_worst": 0, "driver_stalls": 20}, "small": {"cpu_frame_p99_ms_median": 7.0343, "frames_over_33ms_worst": 0, "driver_stalls": 13}}
+          }
+        },
+        "vsync_on": {
+          "progressed-peak": {"normal": {"mean_fps_median": 59.9972, "p99_frame_ms_median": 17.4479, "frames_over_50ms_worst": 0, "driver_stalls": 1}, "small": {"mean_fps_median": 60.0007, "p99_frame_ms_median": 19.6888, "frames_over_50ms_worst": 0, "driver_stalls": 3}},
+          "stress": {"normal": {"mean_fps_median": 59.999, "p99_frame_ms_median": 17.825, "frames_over_50ms_worst": 6, "driver_stalls": 3}, "small": {"mean_fps_median": 59.9966, "p99_frame_ms_median": 19.6043, "frames_over_50ms_worst": 0, "driver_stalls": 0}}
+        }
+      },
+      "evidence": ["target/perf/w1-61/head-ab-playtest-novsync", "target/perf/w1-61/head-ab-dev-novsync", "target/perf/w1-61/head-ab-playtest-vsync"]
+    }
   }
 }

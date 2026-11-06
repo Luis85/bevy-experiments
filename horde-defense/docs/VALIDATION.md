@@ -599,6 +599,74 @@ Pins:
 - `driver_stall_rule_matches_the_ruling`.
 - The `-SelfTest` fixtures `driver-stall` (exit 0) and `missing-driver-stalls` (exit 2).
 
+## Goal-1 acceptance, the pipelined decision and the shipped smoke — 6 November 2026 (W1-61)
+
+**Conditions.**
+- Commit 199d823, which includes W1-69 (enemies no longer queue, so more of them are in contact). The working tree added only tests and docs.
+- Intel Core Ultra 9 185H, NVIDIA RTX 1000 Ada Generation Laptop GPU, Vulkan, mains power, a focused window at 1440x900 @ 1.0 and 1050x700 @ 1.35.
+- A 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (`target/perf/w1-61/<pass>.load.tsv`). During the measured runs the load stayed below 90%, except one A/B pass (`head-ab-dev-novsync/progressed-peak-on-r1`, 93%), whose cells are in line with their repeats.
+- Every run was valid at its first attempt.
+
+**Definitions (frame report v3).**
+- `interface_draw`: `work_mean_ms[2]`, the `ui::draw` wall time; it is v2-compatible and gated against wave 0.
+- `interface_total`: the egui pass loop plus tessellation.
+- `cpu_frame`: per sample, main First..Last plus (extract + Render schedule − present wait) of the latest completed render sample. Quantiles are taken over those sums. It is gated only with `-VsyncOff`.
+- `frames_over_50ms`: the gate counts the frames outside driver stalls (`driver_stalls.outside.frames_over_50ms`, see above), worst repeat.
+- Medians are taken over 3 repeats.
+
+**Acceptance passes** (`target/perf/w1-61/head-acc-*`; every pass exited 0, every repeat had 0 frames over 50 ms, and 0 driver stalls were excluded):
+
+| Pass | Gate | normal | small | Limit |
+|---|---|---|---|---|
+| dev, VSync on, progressed-peak | interface_draw mean (ms) | 0.990 | 0.952 | ≤ 1.129 / 1.030 |
+| dev, VSync on, progressed-peak | interface_total mean (ms) | 1.952 | 1.805 | ≤ 4.645 / 4.590 (v3) |
+| dev, VSync on, peak | interface_draw mean (ms) | 0.775 | 0.768 | ≤ 1.190 / 1.075 |
+| dev, -VsyncOff | cpu_frame p99 progressed-peak / stress (ms) | 8.85 / 7.50 | 7.01 / 7.84 | ≤ 10.0 |
+| playtest, -VsyncOff | cpu_frame p99 progressed-peak / stress (ms) | 6.26 / 6.48 | 6.44 / 6.54 | ≤ 10.0 |
+
+The dev VSync-on stress pass (frames over 50 ms and texture uploads only) also exited 0. In the playtest pass, the one 100% load sample fell in its shipped cargo build, before the first run; during the runs the load was at most 78%.
+
+**Low latency** (`head-low-latency-playtest`). This was a playtest review launch without a scenario. Its `LASTLIGHT_SAVE_DIR` held `settings.json` `{"version":1,"low_latency":true,"master":0}`, and `LASTLIGHT_PERF_REPORT` was set. The report shows `present {requested_mode Mailbox, source settings, pipelined_rendering false, desired_maximum_frame_latency 1, low_latency true}`: 300 frames on the title screen, median 16.65 ms.
+
+**Shipped smoke.** `-ShippedSmoke` builds `--profile playtest --no-default-features`, copies the exe out and times `--smoke` three times: 2.43, 1.19 and 1.23 s. shipped_smoke_seconds is 1.23 (the median), recorded in `PERF_BUDGET.json` `acceptance`. The first, cold run is the slow one.
+
+**Integrated GPU.** Still pending: `hardware.integrated_gpu.status` is `pending`, with the ACCEPTANCE.md human-check row.
+
+**Pipelined A/B on this commit** (`head-ab-playtest-novsync`, `head-ab-dev-novsync`, `head-ab-playtest-vsync`). The first W1-61 A/B (`ab-*`) predates W1-69 and the driver-stall rule, so it was re-run rather than re-classified. Protocol: interleaved on/off at the run level; playtest and dev; -VsyncOff; progressed-peak and stress at both sizes; 3 repeats per arm; 1,800 frames. Then the playtest VSync-on pair at the budget frame counts. That makes 12 valid runs per arm in each group. Values are medians of 3, frame counts are the worst repeat, and driver stalls are summed over the 3 repeats.
+
+| Profile, VSync off | Scene | Size | cpu_frame p99 on / off | median frame on / off | frames > 33 ms outside stalls on / off | driver stalls on / off |
+|---|---|---|---|---|---|---|
+| playtest | progressed-peak | normal | 6.15 / 6.32 | 2.99 / 4.99 | 0 / 0 | 13 / 13 |
+| playtest | progressed-peak | small | 6.12 / 5.73 | 2.91 / 4.89 | 0 / 0 | 7 / 16 |
+| playtest | stress | normal | 7.30 / 6.09 | 3.06 / 5.15 | 0 / 0 | 17 / 16 |
+| playtest | stress | small | 6.08 / 6.03 | 3.02 / 5.01 | 0 / 0 | 8 / 9 |
+| dev | progressed-peak | normal | 7.11 / 6.93 | 3.52 / 5.84 | 0 / 0 | 9 / 21 |
+| dev | progressed-peak | small | 6.49 / 6.54 | 3.40 / 5.67 | 0 / 0 | 10 / 13 |
+| dev | stress | normal | 7.55 / 6.87 | 3.72 / 6.00 | 0 / 0 | 20 / 21 |
+| dev | stress | small | 7.03 / 6.73 | 3.59 / 5.85 | 0 / 0 | 13 / 14 |
+
+| Playtest, VSync on | Size | mean FPS outside stalls on / off | p99 interval outside stalls on / off | frames > 50 ms outside stalls on / off | driver stalls on / off |
+|---|---|---|---|---|---|
+| progressed-peak | normal | 60.00 / 60.00 | 17.45 / 17.40 | 0 / 0 | 1 / 5 |
+| progressed-peak | small | 60.00 / 59.99 | 19.69 / 19.13 | 0 / 0 | 3 / 3 |
+| stress | normal | 60.00 / 60.00 | 17.82 / 17.35 | 6 / 0 | 3 / 0 |
+| stress | small | 60.00 / 60.00 | 19.60 / 19.66 | 0 / 0 | 0 / 0 |
+
+**Decision: pipelined rendering stays on by default.** The rule is to switch it off only if, with pipelining off:
+- every VSync-off cpu_frame p99 is ≤ 12.0 ms with 0 frames over 33 ms;
+- the VSync-on runs keep a mean FPS ≥ 59.5, a p99 interval ≤ 17.7 ms and 0 frames over 50 ms.
+
+The counts, FPS and p99 interval are taken outside driver stalls. The off arm meets every VSync-off limit, but its VSync-on p99 interval at the small size is 19.13 ms (progressed-peak) and 19.66 ms (stress). The on arm misses that interval too, so the small size has a wider VSync interval tail either way. With VSync off, pipelining roughly halves the median frame at a similar cpu_frame p99. The decision is recorded in `PERF_BUDGET.json` `decisions.pipelined_rendering`, which `pipelined_default_matches_recorded_decision` re-judges against `PIPELINED_DEFAULT`. Mutating the recorded default to false fails that test with "the recorded default does not follow the rule from the recorded off-arm numbers". Low latency still turns pipelining off.
+
+**The VSync-off stall is named.** Every one of the 220 VSync-off frames over 50 ms in this A/B, with pipelining on or off, was a driver stall:
+- frames of 480-623 ms;
+- acquire shares of 0.981-0.992, named coverage of at least 0.95;
+- in-process work of 7.8-19.2 ms.
+
+Pipelined, the stalled render frame finished before the main thread closed its frame, so the earlier reports never saw its present wait. `slowest_present` now keeps it. W1-68's open VSync-off half is therefore the same swap-chain acquire stall as the VSync-on half.
+
+One VSync-on stress repeat with pipelining (`head-ab-playtest-vsync/stress-on-r2`) had a stretch of about 400 frames of 47-67 ms. The six of them over 50 ms were mostly acquire wait (acquire shares 0.78-0.86), but their named coverage was only 0.89-0.94, with 4-6 ms outside App::update. So the rule kept them gated, and that repeat exited 1. It stays visible as evidence, and the gate was not moved.
+
 ## Full verify
 
 From `horde-defense/`, before every production-pass commit:

@@ -815,4 +815,151 @@ mod tests {
         hits.retain(|path| !path.starts_with("/decisions/"));
         assert!(hits.is_empty(), "12.0 outside decisions: {hits:?}");
     }
+
+    /// The measured pipelined-rendering decision (W1-61). The rule (design
+    /// perf-architecture, "Pipelined rendering default"): switch the default
+    /// OFF only if, with pipelining off, every -VsyncOff progressed-peak and
+    /// stress cpu_frame p99 (median of 3, both profiles, both sizes) is at most
+    /// 12.0 ms with 0 frames over 33 ms, and the VSync-on runs keep a mean FPS
+    /// of at least 59.5, a p99 frame interval of at most 17.7 ms and 0 frames
+    /// over 50 ms. Otherwise keep it ON. Per the user ruling on gate 3 the
+    /// frame counts, FPS and p99 interval are those outside driver stalls. The
+    /// recorded off-arm numbers are re-judged here, so `PIPELINED_DEFAULT`, the
+    /// recorded default and the recorded evidence cannot drift apart.
+    #[test]
+    fn pipelined_default_matches_recorded_decision() {
+        let json = budget();
+        let path = "/decisions/pipelined_rendering";
+        let decision = json
+            .pointer(path)
+            .filter(|decision| decision.is_object())
+            .unwrap_or_else(|| {
+                panic!("decisions.pipelined_rendering is not recorded (needs >= 12 playtest runs)")
+            });
+        assert_eq!(
+            keys(object(&json, path)),
+            BTreeSet::from([
+                "default",
+                "rule",
+                "commit",
+                "thresholds",
+                "runs",
+                "off",
+                "on",
+                "evidence",
+            ]),
+            "{path} keys"
+        );
+        let default = decision["default"]
+            .as_bool()
+            .expect("decisions.pipelined_rendering.default is a bool");
+        let rule = decision["rule"].as_str().unwrap_or("");
+        assert!(
+            rule.contains("12.0"),
+            "the rule text names the 12.0 ms threshold"
+        );
+        assert!(
+            rule.contains("driver_stalls.outside"),
+            "the rule text says its counts exclude driver stalls"
+        );
+        let commit = decision["commit"].as_str().unwrap_or("");
+        assert!(
+            commit.len() >= 7 && commit.chars().all(|c| c.is_ascii_hexdigit()),
+            "the decision names the measured commit: {commit:?}"
+        );
+        // The rule's thresholds, pinned: they are the decision, not tunables.
+        let thresholds = format!("{path}/thresholds");
+        assert_eq!(
+            keys(object(&json, &thresholds)),
+            BTreeSet::from([
+                "cpu_frame_p99_ms_max",
+                "frames_over_33ms_max",
+                "vsync_on_mean_fps_min",
+                "vsync_on_p99_frame_ms_max",
+                "vsync_on_frames_over_50ms_max",
+            ])
+        );
+        assert_eq!(
+            number(&json, &format!("{thresholds}/cpu_frame_p99_ms_max")),
+            12.0
+        );
+        assert_eq!(
+            whole(&json, &format!("{thresholds}/frames_over_33ms_max")),
+            0
+        );
+        assert_eq!(
+            number(&json, &format!("{thresholds}/vsync_on_mean_fps_min")),
+            59.5
+        );
+        assert_eq!(
+            number(&json, &format!("{thresholds}/vsync_on_p99_frame_ms_max")),
+            17.7
+        );
+        assert_eq!(
+            whole(
+                &json,
+                &format!("{thresholds}/vsync_on_frames_over_50ms_max")
+            ),
+            0
+        );
+
+        // At least 12 valid runs per arm (2 scenes x 2 sizes x 3 repeats) for
+        // playtest and dev with VSync off, and for the VSync-on pair.
+        for group in ["playtest", "dev", "vsync_on"] {
+            for arm in ["on", "off"] {
+                let runs = whole(&json, &format!("{path}/runs/{group}/{arm}"));
+                assert!(
+                    runs >= 12,
+                    "{group} pipelined {arm}: {runs} runs, need >= 12"
+                );
+            }
+        }
+        let evidence = decision["evidence"].as_array().expect("evidence is a list");
+        assert!(
+            !evidence.is_empty()
+                && evidence.iter().all(|item| item
+                    .as_str()
+                    .is_some_and(|dir| dir.starts_with("target/perf/"))),
+            "evidence names the target/perf passes"
+        );
+
+        // Both arms carry every cell; only the off arm decides.
+        let mut off_qualifies = true;
+        for arm in ["off", "on"] {
+            for profile in ["playtest", "dev"] {
+                for scene in CPU_GATED_SCENES {
+                    for size in ["normal", "small"] {
+                        let at = format!("{path}/{arm}/vsync_off/{profile}/{scene}/{size}");
+                        let p99 = number(&json, &format!("{at}/cpu_frame_p99_ms_median"));
+                        let over_33 = whole(&json, &format!("{at}/frames_over_33ms_worst"));
+                        whole(&json, &format!("{at}/driver_stalls"));
+                        if arm == "off" {
+                            off_qualifies &= p99 <= 12.0 && over_33 == 0;
+                        }
+                    }
+                }
+            }
+            for scene in CPU_GATED_SCENES {
+                for size in ["normal", "small"] {
+                    let at = format!("{path}/{arm}/vsync_on/{scene}/{size}");
+                    let fps = number(&json, &format!("{at}/mean_fps_median"));
+                    let p99 = number(&json, &format!("{at}/p99_frame_ms_median"));
+                    let over_50 = whole(&json, &format!("{at}/frames_over_50ms_worst"));
+                    whole(&json, &format!("{at}/driver_stalls"));
+                    if arm == "off" {
+                        off_qualifies &= fps >= 59.5 && p99 <= 17.7 && over_50 == 0;
+                    }
+                }
+            }
+        }
+        assert_eq!(
+            default, !off_qualifies,
+            "the recorded default does not follow the rule from the recorded off-arm numbers"
+        );
+        assert_eq!(
+            crate::render_plan::PIPELINED_DEFAULT,
+            default,
+            "PIPELINED_DEFAULT differs from decisions.pipelined_rendering.default"
+        );
+    }
 }

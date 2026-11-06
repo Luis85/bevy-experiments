@@ -19,8 +19,11 @@ use bevy::{
 use std::path::Path;
 
 /// Whether the render world runs pipelined on its own thread when neither
-/// Low latency nor a launch override says otherwise. Stays `true` until the
-/// measured decision (W1-61) records otherwise.
+/// Low latency nor a launch override says otherwise. Measured in W1-61
+/// (`PERF_BUDGET.json` `decisions.pipelined_rendering`): with pipelining off
+/// the VSync-on p99 interval at the small size is 19.1-19.7 ms, above the
+/// rule's 17.7 ms, so it stays on; `pipelined_default_matches_recorded_decision`
+/// holds this constant to the recorded decision.
 pub const PIPELINED_DEFAULT: bool = true;
 
 /// Low latency gives Mailbox (Bevy falls back Mailbox → Immediate → Fifo
