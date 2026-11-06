@@ -409,15 +409,18 @@ fn batched_actor_layer_keeps_feet_then_id_order_across_sheets() {
     );
     let arena_projection = ArenaProjection::for_attempt(arena(), a);
     let shapes = painted(|p| {
-        assert!(enemies::paint(
-            p,
-            arena_projection,
-            &view,
-            textures,
-            true,
-            false,
-            rig_shadow()
-        ));
+        assert!(
+            enemies::paint(
+                p,
+                arena_projection,
+                &view,
+                textures,
+                true,
+                false,
+                rig_shadow()
+            )
+            .rig_shadow
+        );
     });
     let batched = meshes(&shapes);
     let sprites: Vec<_> = batched
@@ -1031,4 +1034,39 @@ fn corpse_draw_respects_caps_with_5000_records() {
             "{primitives} primitives"
         );
     }
+}
+
+/// W1-66: the battlefield reports its hit flashes for the frame report's
+/// `scene_load`: the hostiles that flashed and the quads their flashes drew
+/// into the sprite layer.
+#[test]
+fn battlefield_reports_hit_flash_quads() {
+    let (game, view) = mixed_sheet_view();
+    let a = game.attempt().unwrap();
+    let textures = textures();
+    let flashing = view
+        .enemies
+        .iter()
+        .filter(|e| e.hit_flash.is_some())
+        .count();
+    assert!(flashing > 10, "{flashing} flashing hostiles");
+    let mut drawn = SceneDraw::default();
+    let shapes = painted(|p| {
+        drawn = battlefield(p, arena(), &view, a, [10.0, 5.0], options(textures));
+    });
+    assert_eq!(drawn.flashing_enemies, flashing);
+    // Every flash vertex is additive in the sprite layer, so the quads it
+    // reports are the sprite layer's additive quads.
+    let atlas = textures.battle_atlas.unwrap();
+    let sprites = meshes(&shapes)
+        .into_iter()
+        .find(|mesh| mesh.texture_id == atlas.texture)
+        .expect("the sprite layer");
+    let additive = sprites
+        .vertices
+        .iter()
+        .filter(|v| v.color.a() == 0 && v.color.r() > 0)
+        .count();
+    assert!(drawn.flash_quads >= flashing);
+    assert_eq!(4 * drawn.flash_quads, additive);
 }

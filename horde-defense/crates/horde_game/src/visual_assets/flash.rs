@@ -152,8 +152,8 @@ pub fn actor_hit_flash(
 }
 /// The hit-flash runs of [`actor_hit_flash`], appended to `mesh` as quads
 /// sampling `white_uv` (the font atlas's white texel, or the packed battle
-/// atlas's white block) and posed like the sprite. Appends nothing when the
-/// flash is spent or the art is unavailable.
+/// atlas's white block) and posed like the sprite. Returns the quads
+/// appended: none when the flash is spent or the art is unavailable.
 #[allow(clippy::too_many_arguments)]
 pub fn hit_flash_runs(
     masks: &FlashMasks,
@@ -165,21 +165,21 @@ pub fn hit_flash_runs(
     pose: &ActorPose,
     mesh: &mut bevy_egui::egui::epaint::Mesh,
     white_uv: Pos2,
-) {
+) -> usize {
     if flash.strength <= 0. {
-        return;
+        return 0;
     }
     let (mask, source, rect, pivot) = match kind {
-        Actor::Enemy(_) if textures.enemy_art_rejected => return,
+        Actor::Enemy(_) if textures.enemy_art_rejected => return 0,
         Actor::Enemy(sprite) => {
             let Some(frames) = masks.enemies.get(sprite.index) else {
-                return;
+                return 0;
             };
             match &sprite.art {
                 SpriteArt::Walk(walk) => {
                     let frame = pose.frame as usize % walk.frames.len();
                     let Some(sheet) = textures.walkers else {
-                        return;
+                        return 0;
                     };
                     let (rect, _, pivot) = walk_frame_layout(
                         walk,
@@ -190,13 +190,13 @@ pub fn hit_flash_runs(
                         size,
                     );
                     let Some(mask) = frames.get(frame) else {
-                        return;
+                        return 0;
                     };
                     (mask, walk.frames[frame].bounds, rect, pivot)
                 }
                 SpriteArt::Standing(art) => {
                     if textures.actors.is_none() {
-                        return;
+                        return 0;
                     }
                     let (rect, pivot) = standing_actor_layout(
                         art.bounds,
@@ -205,7 +205,7 @@ pub fn hit_flash_runs(
                         size,
                     );
                     let Some(mask) = frames.first() else {
-                        return;
+                        return 0;
                     };
                     (mask, art.bounds, rect, pivot)
                 }
@@ -214,7 +214,7 @@ pub fn hit_flash_runs(
         Actor::Player | Actor::Mara => {
             let index = kind.survivor_index().unwrap_or_default();
             if textures.actors.is_none() || textures.survivor_art_rejected {
-                return;
+                return 0;
             }
             let source = SURVIVOR_RECTS[index];
             let (rect, pivot) =
@@ -242,6 +242,7 @@ pub fn hit_flash_runs(
         );
     }
     pose_vertices(&mut mesh.vertices[start..], pose, pivot);
+    mask.runs.len()
 }
 pub(super) fn hit_flash_color(flash: HitFlash) -> Color32 {
     if flash.reduced {

@@ -253,3 +253,30 @@ fn gpu_report_rejects_inconsistent_timestamps() {
     assert_eq!(missing["gpu"]["reason"], "no TIMESTAMP_QUERY");
     assert_eq!(missing["gpu"]["supported"], false);
 }
+
+/// W1-66: `scene_load` reports how many hostiles flashed and how many quads
+/// their hit flashes drew, recorded through the probe like the other counts.
+#[test]
+fn scene_load_reports_hit_flash_quads() {
+    let probe = crate::diagnostics::PerfProbe::default();
+    let mut frames = Vec::new();
+    for (flashing_enemies, flash_quads) in [(2, 140), (0, 0), (4, 300)] {
+        probe.record_scene(crate::diagnostics::SceneDraw {
+            flashing_enemies,
+            flash_quads,
+            ..Default::default()
+        });
+        let mut recorded = frame(16.7, 4.0, None);
+        recorded.probe.scene = probe.close_frame().scene;
+        frames.push(recorded);
+    }
+    let report = report_json(&ReportInput {
+        frames,
+        ..default()
+    });
+    let scene = &report["scene_load"];
+    assert_eq!(scene["flashing_enemies"]["max"], 4);
+    assert_eq!(scene["flashing_enemies"]["mean"], 2.0);
+    assert_eq!(scene["flash_quads"]["max"], 300);
+    assert_eq!(scene["flash_quads"]["mean"], 440.0 / 3.0);
+}

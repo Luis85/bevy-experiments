@@ -39,9 +39,19 @@ pub(super) struct RigShadow {
     pub alpha: f32,
 }
 
-/// Paints every hostile. Returns whether the rig's shadow was drawn in the
-/// hostiles' shadow layer; the per-enemy path for rejected art leaves it to
-/// the rig.
+/// What [`paint`] drew beyond the hostiles themselves.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(super) struct HostilesDrawn {
+    /// The rig's shadow was drawn in the hostiles' shadow layer; the
+    /// per-enemy path for rejected art leaves it to the rig.
+    pub rig_shadow: bool,
+    /// Hostiles drawn with a hit flash in the batched sprite layer.
+    pub flashing: usize,
+    /// Quads those hit flashes appended to the sprite layer.
+    pub flash_quads: usize,
+}
+
+/// Paints every hostile and reports what it drew ([`HostilesDrawn`]).
 pub(super) fn paint(
     p: &Painter,
     arena: ArenaProjection,
@@ -50,13 +60,17 @@ pub(super) fn paint(
     outlines: bool,
     reduced: bool,
     rig_shadow: RigShadow,
-) -> bool {
+) -> HostilesDrawn {
     if textures.enemy_art_rejected {
         for e in &view.enemies {
             enemy(p, arena, view, e, textures, outlines, reduced);
         }
-        return false;
+        return HostilesDrawn::default();
     }
+    let mut drawn = HostilesDrawn {
+        rig_shadow: true,
+        ..Default::default()
+    };
     let sy = arena.lane_height();
     let masks = visual_assets::flash_masks(p.ctx());
     let mut layers = FieldMeshes::new(textures, view.enemies.len());
@@ -89,7 +103,8 @@ pub(super) fn paint(
             (Some(quad), Some(actor)) => {
                 layers.actors.sprite(&quad);
                 if let (Some(strength), Some(masks)) = (e.hit_flash, masks.as_deref()) {
-                    layers.actors.flash(
+                    drawn.flashing += 1;
+                    drawn.flash_quads += layers.actors.flash(
                         masks,
                         textures,
                         actor,
@@ -141,7 +156,7 @@ pub(super) fn paint(
     for (at, align, text, size) in labels {
         p.text(at, align, text, FontId::proportional(size), AMBER);
     }
-    true
+    drawn
 }
 
 /// Contact lane band with its readiness gauge, and the windup ground ring.

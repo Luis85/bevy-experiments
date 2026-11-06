@@ -175,6 +175,9 @@ struct SceneLoad {
     collapsing_corpses_drawn: CountStats,
     particles: CountStats,
     fx_views: CountStats,
+    /// Hostiles drawn with a hit flash, and the quads those flashes drew (W1-66).
+    flashing_enemies: CountStats,
+    flash_quads: CountStats,
 }
 #[derive(Serialize)]
 struct BuildInfo {
@@ -509,6 +512,8 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
             collapsing_corpses_drawn: scene(|f| f.probe.scene.collapsing_corpses),
             particles: scene(|f| f.probe.scene.particles),
             fx_views: scene(|f| f.probe.scene.fx_views),
+            flashing_enemies: scene(|f| f.probe.scene.flashing_enemies),
+            flash_quads: scene(|f| f.probe.scene.flash_quads),
         },
         present: input.present.clone(),
         build: build_info(input.profile_label.as_deref()),

@@ -53,6 +53,10 @@ pub struct SceneDraw {
     pub collapsing_corpses: usize,
     pub particles: usize,
     pub fx_views: usize,
+    /// Hostiles drawn with a hit flash this pass (W1-66).
+    pub flashing_enemies: usize,
+    /// Quads those hit flashes appended to the sprite layer (W1-66).
+    pub flash_quads: usize,
 }
 
 /// Main-world begin marks, as nanoseconds since `PerfCounters::epoch`.
@@ -79,6 +83,8 @@ enum EguiCount {
     TextureUploadBytes,
 }
 const EGUI_COUNTS: usize = 8;
+/// The [`SceneDraw`] fields, in `record_scene` order.
+const SCENE_COUNTS: usize = 6;
 
 /// One completed render-world frame: extraction, the Render schedule and the
 /// swap-chain wait inside it (`prepare_windows`), in milliseconds.
@@ -126,7 +132,7 @@ pub struct PerfCounters {
     egui_pass_ns: AtomicU64,
     tessellate_ns: AtomicU64,
     egui: [AtomicU64; EGUI_COUNTS],
-    scene: [AtomicU64; 4],
+    scene: [AtomicU64; SCENE_COUNTS],
     extract_ns: AtomicU64,
     present_wait_ns: AtomicU64,
     /// The latest completed render-world sample and its sequence number.
@@ -190,6 +196,8 @@ impl PerfProbe {
             draw.collapsing_corpses,
             draw.particles,
             draw.fx_views,
+            draw.flashing_enemies,
+            draw.flash_quads,
         ];
         for (slot, count) in self.0.scene.iter().zip(counts) {
             slot.store(count as u64, Ordering::Relaxed);
@@ -200,7 +208,7 @@ impl PerfProbe {
         let take = |slot: &AtomicU64| slot.swap(0, Ordering::Relaxed);
         let main_cpu_ms = ms(self.since(Mark::Main));
         self.0.marks_ns[Mark::Main as usize].store(0, Ordering::Relaxed);
-        let scene: [u64; 4] = std::array::from_fn(|i| take(&self.0.scene[i]));
+        let scene: [u64; SCENE_COUNTS] = std::array::from_fn(|i| take(&self.0.scene[i]));
         let (render_seq, render) = self.0.render.lock().map_or((0, None), |latest| *latest);
         FrameSample {
             main_cpu_ms,
@@ -216,6 +224,8 @@ impl PerfProbe {
                 collapsing_corpses: scene[1] as usize,
                 particles: scene[2] as usize,
                 fx_views: scene[3] as usize,
+                flashing_enemies: scene[4] as usize,
+                flash_quads: scene[5] as usize,
             },
         }
     }

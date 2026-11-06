@@ -158,7 +158,8 @@ impl ActorMeshes {
             }
         }
     }
-    /// Appends the hit-flash runs of the sprite `actor` just pushed.
+    /// Appends the hit-flash runs of the sprite `actor` just pushed and
+    /// returns how many quads they took.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn flash(
         &mut self,
@@ -169,7 +170,7 @@ impl ActorMeshes {
         size: Vec2,
         flash: HitFlash,
         pose: &crate::animation::ActorPose,
-    ) {
+    ) -> usize {
         let (mesh, white) = match self {
             Self::Packed { atlas, mesh } => (mesh, atlas.white_uv),
             Self::Split { flashes, .. } => (flashes, WHITE_UV),
@@ -184,7 +185,7 @@ impl ActorMeshes {
             pose,
             mesh.mesh_mut(),
             white,
-        );
+        )
     }
     pub(super) fn paint(self, p: &Painter) {
         match self {

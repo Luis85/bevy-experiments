@@ -89,17 +89,20 @@ pub fn battlefield(
     options: RenderOptions,
 ) -> SceneDraw {
     let arena = ArenaProjection::for_attempt(r, a);
-    render(p, arena, view, a, aim, &options);
+    let hostiles = render(p, arena, view, a, aim, &options);
     SceneDraw {
         settled_corpses: view.settled.count,
         collapsing_corpses: view.corpses.len(),
         particles: view.particles.len(),
         fx_views: view.fx.len(),
+        flashing_enemies: hostiles.flashing,
+        flash_quads: hostiles.flash_quads,
     }
 }
 
 /// `a` is read only where the survivor rig resolves poses from the attempt:
-/// the defender's action sample and projectile release origins.
+/// the defender's action sample and projectile release origins. Returns what
+/// the hostiles' layers drew.
 fn render(
     p: &Painter,
     arena: ArenaProjection,
@@ -107,7 +110,7 @@ fn render(
     a: &Attempt,
     aim: [f32; 2],
     options: &RenderOptions,
-) {
+) -> enemies::HostilesDrawn {
     let textures = options.textures;
     let reduced = options.reduced;
     terrain::paint(p, arena, options.theme, textures);
@@ -119,7 +122,7 @@ fn render(
     structures::paint(p, arena, view, textures);
     corpses::paint(p, arena, view, a, textures, options.blood);
     let rig_shadow = rig_shadow(arena, view);
-    let rig_shadow_drawn = enemies::paint(
+    let hostiles = enemies::paint(
         p,
         arena,
         view,
@@ -129,7 +132,7 @@ fn render(
         rig_shadow,
     );
     let equipment = crate::gear_appearance::from_frozen_gear(&a.profile, &a.gear_snapshot);
-    if !rig_shadow_drawn {
+    if !hostiles.rig_shadow {
         soft_shadow(p, rig_shadow.at, rig_shadow.size, rig_shadow.alpha);
     }
     let muzzle = defender(p, arena, view, a, aim, reduced, equipment.as_ref());
@@ -147,6 +150,7 @@ fn render(
         },
     );
     fx::particles(p, arena, &view.particles);
+    hostiles
 }
 
 /// The survivor rig's soft shadow, drawn in the hostiles' shadow layer.
