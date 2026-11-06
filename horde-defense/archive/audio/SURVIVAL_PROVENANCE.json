@@ -1,0 +1,50 @@
+{
+  "authored": "2026-11-02",
+  "license": "MIT (repository original assets)",
+  "inputs": "Original deterministic Rust synthesis; no recordings, third-party samples or model-generated audio",
+  "generator": "crates/horde_game/src/audio.rs (cfg(test) offline authoring module)",
+  "generator_sha256": "50793b100905f772b62600c26cee3150deafc87fa1e75eb0dc780fd1a33f94aa",
+  "note": "Not shipped; retained by production-pass decision 10; restore with git mv. Header copied from assets/audio/SURVIVAL_PROVENANCE.json; its generator_sha256 is stale (see the note there).",
+  "format": "44100 Hz, mono, signed PCM16 little endian WAV",
+  "variants": 3,
+  "peak_limit": 0.18,
+  "voice_limit": 6,
+  "files": [
+    {
+      "file": "survival_npc_shot_0.wav",
+      "frames": 18522,
+      "seconds": 0.42,
+      "peak": 0.17999816888943143,
+      "rms": 0.015374482798219648,
+      "sha256": "4ae7e1846b09d673227c4b825207cc3c70d75a05e56f8af8175c94fdbeeb7275",
+      "bytes": 37088,
+      "archived_from": "assets/audio/survival_npc_shot_0.wav",
+      "archived": "2026-11-06",
+      "reason": "Cue::NpcShot retired; NPCs use their weapon class (user 2026-11-04)"
+    },
+    {
+      "file": "survival_npc_shot_1.wav",
+      "frames": 18522,
+      "seconds": 0.42,
+      "peak": 0.17999816888943143,
+      "rms": 0.014400070777503125,
+      "sha256": "0cb4c362c6205d07d97de6d7e4370f5459d117b401c7a26afcdeff272e6c56b7",
+      "bytes": 37088,
+      "archived_from": "assets/audio/survival_npc_shot_1.wav",
+      "archived": "2026-11-06",
+      "reason": "Cue::NpcShot retired; NPCs use their weapon class (user 2026-11-04)"
+    },
+    {
+      "file": "survival_npc_shot_2.wav",
+      "frames": 18522,
+      "seconds": 0.42,
+      "peak": 0.17999816888943143,
+      "rms": 0.014676506575515832,
+      "sha256": "103fac7c7b85b2475b1b85e63cb1f9f7097378c52b292c1874dec7af7d3cdded",
+      "bytes": 37088,
+      "archived_from": "assets/audio/survival_npc_shot_2.wav",
+      "archived": "2026-11-06",
+      "reason": "Cue::NpcShot retired; NPCs use their weapon class (user 2026-11-04)"
+    }
+  ]
+}

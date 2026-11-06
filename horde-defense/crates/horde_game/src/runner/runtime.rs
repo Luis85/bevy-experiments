@@ -6,7 +6,7 @@ use bevy::prelude::*;
 #[cfg(feature = "dev")]
 use horde_core::command::Command;
 use horde_core::{
-    content::{Mode, StructureKind},
+    content::StructureKind,
     ordnance::OrdnanceKind,
     sim::{Actor, BattleId, Game, Input, Outcome, SimEvent},
 };
@@ -374,8 +374,9 @@ pub(super) fn merge_actions(into: &mut Input, from: &Input) {
     }
 }
 
-/// Queues `cue` once per batch.
+/// Queues `cue` once per batch. A retired cue has no shipped file.
 pub(crate) fn push_cue(cues: &mut Vec<SoundCue>, cue: SoundCue) {
+    debug_assert!(!cue.retired(), "{cue:?} is retired");
     if !cues.contains(&cue) {
         cues.push(cue);
     }
@@ -412,9 +413,7 @@ pub(super) fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
                 kind: StructureKind::Turret,
                 ..
             } => Some(SoundCue::TurretShot),
-            Actor::Defender {
-                mode: Mode::Npc, ..
-            } => Some(SoundCue::NpcShot),
+            // Either mode sounds like its weapon; NpcShot is retired.
             Actor::Defender { weapon, .. } => Some(match weapon {
                 horde_core::weapons::WeaponClass::Pistol => SoundCue::Pistol,
                 horde_core::weapons::WeaponClass::Smg => SoundCue::Smg,

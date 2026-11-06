@@ -4,6 +4,7 @@
   "inputs": "Original deterministic Rust synthesis; no recordings, third-party samples or model-generated audio",
   "generator": "crates/horde_game/src/audio.rs (cfg(test) offline authoring module)",
   "generator_sha256": "50793b100905f772b62600c26cee3150deafc87fa1e75eb0dc780fd1a33f94aa",
+  "note": "generator_sha256 is the hash of crates/horde_game/src/audio.rs when these files were exported on 2026-11-02; that source has changed since without changing the synthesis, so the value is stale (every file sha256 still matches). The wave-6 exporter rewrites this manifest with an LF-normalised generator_sha256.",
   "format": "44100 Hz, mono, signed PCM16 little endian WAV",
   "variants": 3,
   "peak_limit": 0.18,
@@ -272,30 +273,6 @@
       "peak": 0.17999816888943143,
       "rms": 0.009111816230741972,
       "sha256": "aed80e9ad883eda78f725e3c7354cdffdb5a19df3799140753f947b30fe19326"
-    },
-    {
-      "file": "survival_npc_shot_0.wav",
-      "frames": 18522,
-      "seconds": 0.42,
-      "peak": 0.17999816888943143,
-      "rms": 0.015374482798219648,
-      "sha256": "4ae7e1846b09d673227c4b825207cc3c70d75a05e56f8af8175c94fdbeeb7275"
-    },
-    {
-      "file": "survival_npc_shot_1.wav",
-      "frames": 18522,
-      "seconds": 0.42,
-      "peak": 0.17999816888943143,
-      "rms": 0.014400070777503125,
-      "sha256": "0cb4c362c6205d07d97de6d7e4370f5459d117b401c7a26afcdeff272e6c56b7"
-    },
-    {
-      "file": "survival_npc_shot_2.wav",
-      "frames": 18522,
-      "seconds": 0.42,
-      "peak": 0.17999816888943143,
-      "rms": 0.014676506575515832,
-      "sha256": "103fac7c7b85b2475b1b85e63cb1f9f7097378c52b292c1874dec7af7d3cdded"
     },
     {
       "file": "survival_pistol_0.wav",

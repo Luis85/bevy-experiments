@@ -264,6 +264,37 @@ fn runtime_consumes_throw_edge_once_even_at_observation_speed_four() {
     assert!(runtime.input().throw.is_none());
 }
 #[test]
+fn npc_defender_shot_uses_weapon_class_cue() {
+    use horde_core::sim::{Actor, SimEvent};
+    use horde_core::weapons::WeaponClass;
+    // NpcShot is retired: a defender's shot sounds like its weapon in either
+    // mode, so an NPC with a rifle is heard as a rifle.
+    for (weapon, expected) in [
+        (WeaponClass::Pistol, SoundCue::Pistol),
+        (WeaponClass::Smg, SoundCue::Smg),
+        (WeaponClass::Shotgun, SoundCue::Shotgun),
+        (WeaponClass::Rifle, SoundCue::Rifle),
+        (WeaponClass::Marksman, SoundCue::Marksman),
+        (WeaponClass::MachineGun, SoundCue::MachineGun),
+    ] {
+        for mode in [Mode::Npc, Mode::Personal] {
+            let mut cues = Vec::new();
+            event_sound(
+                &mut cues,
+                &SimEvent::Shot {
+                    shooter: Actor::Defender { mode, weapon },
+                    target_id: None,
+                    lane: Some(0),
+                    from: horde_core::sim::DEFENDER,
+                    to: [15.0, 5.5],
+                },
+            );
+            assert_eq!(cues, vec![expected], "{mode:?} {weapon:?}");
+            assert!(cues.iter().all(|cue| !cue.retired()), "{mode:?} {weapon:?}");
+        }
+    }
+}
+#[test]
 fn trap_shots_never_fabricate_a_turret_and_missing_sources_stay_silent() {
     use horde_core::sim::{Actor, SimEvent, Strike};
     let mut cues = Vec::new();

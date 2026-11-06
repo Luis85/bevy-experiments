@@ -33,7 +33,7 @@ Lastlight's tactical overlays, particles and fallback drawings are original
 procedural/vector artwork authored for this experiment. No proprietary game art
 or franchise reference images were used.
 
-The shipped audio is six WAV beds plus 72 survival cues. The six beds are
+The shipped audio is six WAV beds plus 69 survival cues. The six beds are
 original synthesized ambience generated with Python's standard library: the
 base `audio/ambience.wav` by `scripts/generate_audio.py`, and the cyclic wind,
 distant urban machinery, fictional bird-like nature calls, rain and cold-air
@@ -43,7 +43,7 @@ recordings or claims about real species, countries or weapon models.
 `audio/PROVENANCE.json` records their generators, fixed seeds, exact file
 hashes, PCM dimensions, levels and loop-boundary checks; the original ambience
 clip remains byte-identical. Both generators default to `--check`, which
-re-renders into a temporary folder and compares, writing nothing. The 72
+re-renders into a temporary folder and compares, writing nothing. The 69
 survival cues are described below.
 No recordings, sound libraries, proprietary game assets or third-party samples
 were used. These original assets follow the repository's MIT license.
@@ -66,10 +66,15 @@ under the repository's MIT license:
   reload, melee, damage, boss, incoming radio ticks, the melee-readiness chime
   and the structure-collapse sound from `scripts/generate_audio.py`, and the
   NPC-shot, turret-shot, trap-trigger and armor-impact cues from
-  `scripts/generate_atmosphere_audio.py`.
+  `scripts/generate_atmosphere_audio.py`;
+- the three retired Rust-synthesized NPC-shot variants
+  (`archive/audio/survival_npc_shot_*.wav`): `Cue::NpcShot` was
+  retired on 4 November 2026 and NPC defenders now sound like their weapon
+  class.
 
 Their exact prompts, seeds, SHA-256 hashes and original paths are in
-`archive/art/PROVENANCE.json` and `archive/audio/PROVENANCE.json`.
+`archive/art/PROVENANCE.json`, `archive/audio/PROVENANCE.json` and
+`archive/audio/SURVIVAL_PROVENANCE.json`.
 
 ## Barlow Condensed
 
@@ -106,10 +111,11 @@ pixels and transparent alpha are retained. Runtime crops and source anchors
 calibrate planted feet, aiming arms and actual weapon muzzles. No reference
 game artwork was copied or bundled. Original assets use this repository's MIT license.
 
-`audio/survival_*.wav` adds 72 original synthesized effects: 24 cue families
-with three deterministic variants. They contain no recordings or third-party
-samples. The pure Rust exporter is `crates/horde_game/src/audio.rs`;
-`audio/SURVIVAL_PROVENANCE.json` records seeds, dimensions and SHA-256 hashes.
+`audio/survival_*.wav` adds 69 original synthesized effects: 23 cue families
+with three deterministic variants (the 24th, NpcShot, is retired and archived).
+They contain no recordings or third-party samples. The pure Rust exporter is
+`crates/horde_game/src/audio.rs`; `audio/SURVIVAL_PROVENANCE.json` records
+seeds, dimensions and SHA-256 hashes.
 The six Python-synthesized beds and their notices remain intact; the twelve
 earlier one-shot WAVs are archived (see above). See
 `docs/AUDIO_SURVIVAL.md` for the mix, export checks and audition reel.
@@ -234,9 +240,6 @@ and checked by `asset_audit::credits_index_matches_provenance`.
 | `audio/survival_molotov_0.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `3fa00daa4ca9` |
 | `audio/survival_molotov_1.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `e5c8d56114db` |
 | `audio/survival_molotov_2.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `aed80e9ad883` |
-| `audio/survival_npc_shot_0.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `4ae7e1846b09` |
-| `audio/survival_npc_shot_1.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `0cb4c362c620` |
-| `audio/survival_npc_shot_2.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `103fac7c7b85` |
 | `audio/survival_pistol_0.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `fd65323eae54` |
 | `audio/survival_pistol_1.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `5d56c08765f0` |
 | `audio/survival_pistol_2.wav` | crates/horde_game/src/audio.rs (cfg(test) offline authoring module) | `audio/SURVIVAL_PROVENANCE.json` | `021e03be5e40` |

@@ -12,6 +12,11 @@ pub enum Cue {
     Rifle,
     Marksman,
     MachineGun,
+    /// Retired (see [`Cue::retired`]); the slot keeps later discriminants.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "retired cue: nothing emits it at runtime")
+    )]
     NpcShot,
     TurretShot,
     Impact,
@@ -52,6 +57,12 @@ impl Cue {
             Self::Confirm => Self::Ready,
             cue => cue,
         }
+    }
+    /// A retired cue keeps its slot (and its synthesis, the provenance of its
+    /// archived files) but is never emitted, loaded or shipped. NpcShot retired
+    /// on 2026-11-04 (user): NPC defenders sound like their weapon class.
+    pub fn retired(self) -> bool {
+        matches!(self, Self::NpcShot)
     }
     fn name(self) -> &'static str {
         match self {
@@ -127,14 +138,14 @@ pub fn variant_path(cue: Cue, variant: u64) -> String {
     format!("audio/survival_{}_{}.wav", cue.name(), variant % 3)
 }
 
-/// Every WAV the runtime can load, relative to `assets/`: each synthesized
-/// family's three variants (alias cues play these banks) plus the ambience
-/// beds. The asset audit holds `assets/audio` to exactly this set.
+/// Every WAV the runtime can load, relative to `assets/`: each live
+/// synthesized family's three variants (alias cues play these banks; retired
+/// cues are archived) plus the ambience beds. The asset audit holds
+/// `assets/audio` to exactly this set.
 #[cfg(test)]
 pub(crate) fn runtime_wav_paths() -> Vec<String> {
-    let mut paths: Vec<String> = synthesis::ALL
-        .iter()
-        .flat_map(|&cue| (0..3).map(move |variant| variant_path(cue, variant)))
+    let mut paths: Vec<String> = synthesis::shipped()
+        .flat_map(|cue| (0..3).map(move |variant| variant_path(cue, variant)))
         .collect();
     paths.extend(
         crate::atmosphere_audio::AmbienceChannel::ALL
@@ -201,6 +212,11 @@ mod synthesis {
         Cue::Trap,
         Cue::Incoming,
     ];
+    /// The synthesized families that ship: `ALL` minus retired cues. `ALL`
+    /// keeps every family so seeds and the archived files stay reproducible.
+    pub fn shipped() -> impl Iterator<Item = Cue> {
+        ALL.into_iter().filter(|cue| !cue.retired())
+    }
     struct Noise {
         state: u64,
         low: f32,
@@ -464,7 +480,7 @@ mod tests {
     #[test]
     fn every_variant_is_repeatable_click_free_and_has_mix_headroom() {
         let mut measured_peak = 0.0_f32;
-        for cue in ALL {
+        for cue in shipped() {
             for variant in 0..3 {
                 let samples = synthesize(cue, variant);
                 assert_eq!(samples, synthesize(cue, variant));
@@ -560,6 +576,36 @@ mod tests {
         assert!(gate.accept(Cue::Confirm, 160, false));
     }
     #[test]
+    fn retired_cues_have_no_runtime_path_and_no_shipped_file() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let every: Vec<Cue> = ALL
+            .into_iter()
+            .chain([Cue::Kill, Cue::Victory, Cue::Defeat, Cue::Confirm])
+            .collect();
+        assert_eq!(every.len(), CUE_COUNT);
+        let retired: Vec<Cue> = every.iter().copied().filter(|cue| cue.retired()).collect();
+        assert_eq!(retired, vec![Cue::NpcShot]);
+        let runtime = runtime_wav_paths();
+        for cue in &every {
+            // No live cue plays a retired bank.
+            assert!(cue.retired() || !cue.bank().retired(), "{cue:?}");
+        }
+        for cue in retired {
+            for variant in 0..3 {
+                let path = variant_path(cue, variant);
+                assert!(!runtime.contains(&path), "{path} is a runtime path");
+                assert!(
+                    !root.join("assets").join(&path).exists(),
+                    "assets/{path} still ships"
+                );
+                assert!(
+                    root.join("archive").join(&path).is_file(),
+                    "archive/{path} is missing"
+                );
+            }
+        }
+    }
+    #[test]
     #[ignore = "Offline asset authoring: explicitly set LASTLIGHT_AUDIO_EXPORT to workspace root"]
     fn export_survival_audio_assets_and_audition() {
         let root = std::path::PathBuf::from(
@@ -571,7 +617,8 @@ mod tests {
         std::fs::create_dir_all(&audition).unwrap();
         let mut reel = Vec::new();
         let mut index = String::from("cue,start_seconds,duration_seconds\n");
-        for cue in ALL {
+        // Retired families are archived; the exporter never ships them again.
+        for cue in shipped() {
             for variant in 0..3 {
                 let samples = synthesize(cue, variant);
                 let path = root.join("assets").join(variant_path(cue, variant));

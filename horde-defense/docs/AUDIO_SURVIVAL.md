@@ -48,7 +48,7 @@ $env:LASTLIGHT_AUDIO_EXPORT = (Get-Location).Path
 target/audio-authoring-tests.exe --ignored --exact tests::export_survival_audio_assets_and_audition
 ```
 
-The export explicitly regenerates the 72 files and audition reel; ordinary tests never write those artifacts. Regenerate the provenance hashes when changing synthesis. Normal application tests also include `audio::tests`; its export test remains ignored unless explicitly invoked.
+The export explicitly regenerates the 69 shipped files and audition reel (the retired NpcShot family stays archived in `archive/audio/`); ordinary tests never write those artifacts. Regenerate the provenance hashes when changing synthesis. Normal application tests also include `audio::tests`; its export test remains ignored unless explicitly invoked.
 
 Tests check deterministic variants, distinct weapon decay/energy profiles, finite samples, DC offset, zero-valued endpoints, useful RMS levels, effect headroom and repeat gating. Independent WAV inspection confirmed all 72 encoded files have the expected format and endpoints; their peak is at most 0.179998 and RMS spans 0.008312–0.057572 before mixer gains.
 

@@ -29,10 +29,12 @@ const ART_MANIFESTS: [&str; 2] = [
     "assets/art/PROVENANCE.json",
     "assets/art/pixel/PROVENANCE.json",
 ];
-/// The archive manifests, entries keyed relative to their own folder.
-const ARCHIVE_MANIFESTS: [&str; 2] = [
+/// The archive manifests, entries keyed relative to their own folder. The
+/// survival one holds the retired `Cue::NpcShot` variants.
+const ARCHIVE_MANIFESTS: [&str; 3] = [
     "archive/art/PROVENANCE.json",
     "archive/audio/PROVENANCE.json",
+    "archive/audio/SURVIVAL_PROVENANCE.json",
 ];
 /// The Python manifest of archived audio, written by the atmosphere script.
 const PYTHON_ARCHIVE_MANIFEST: &str = "archive/audio/PROVENANCE.json";
@@ -373,7 +375,7 @@ fn every_shipped_wav_is_loaded_and_matches_provenance() {
         orphans.len(),
         missing.len()
     );
-    assert_eq!(shipped.len(), 78, "shipped WAV count");
+    assert_eq!(shipped.len(), 75, "shipped WAV count");
     let problems = check_provenance(&shipped, audio_manifests());
     assert!(problems.is_empty(), "{problems:#?}");
 }
@@ -401,7 +403,7 @@ fn shipped_art_is_referenced_at_runtime() {
 #[test]
 fn archived_files_keep_matching_provenance() {
     let records = archive_manifest();
-    assert_eq!(records.len(), 24, "archived file count");
+    assert_eq!(records.len(), 27, "archived file count");
     let mut problems = Vec::new();
     for record in &records {
         let path = workspace_root().join(&record.path);
