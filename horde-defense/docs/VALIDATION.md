@@ -579,6 +579,26 @@ Two open items need a user ruling; the gate was not moved:
 
 In the same probes, cpu_frame p99 with VSync off was 6.2-7.8 ms at progressed-peak and 6.6-6.7 ms in stress, against ≤ 10.0. That is informational for W1-61, which re-runs the gates.
 
+## Gate 3 driver stalls: the user ruling — 6 November 2026 (W1-61)
+
+**The ruling, verbatim (user, in chat, 2026-11-06): "Exclude driver stalls".** Frames over 50 ms in which the swap-chain acquire wait (present_wait, or channel_wait while the render thread is in present) holds at least 80% of the frame are classified as environmental driver stalls and excluded from frames_over_50ms. They must still be attributed (named coverage), the in-process work in that frame (main_cpu and render CPU) must stay below 50 ms, and the excluded stalls are counted and listed in the report and summary (frames_over_50ms_driver_stall). The same exclusion applies to the pipelined rule's frames_over_33ms and VSync-on FPS and p99-interval checks, computed on frames outside stalls.
+
+The gate stays at 0 frames over 50 ms; what it counts changed. The thresholds are in `docs/PERF_BUDGET.json` `driver_stall`: over 50 ms, acquire share at least 0.8, named coverage at least 0.95, in-process work below 50 ms.
+
+**Report fields (report version 3; `frames_over_50ms` and every other earlier key keep their meaning).**
+- `longest_frames[].attribution.acquire_wait_ms`: the part of the frame's window where a main-thread render hand-off overlaps a render frame's `prepare_windows`. Not pipelined, the hand-off holds the frame's own Render schedule, so this is its present_wait. Pipelined, it is the channel wait while the render thread is in present.
+- `slowest_present` in the probe: each close also receives the render frame with the longest present wait since the previous close. Pipelined, the render frame that stalled finishes, and the next one replaces it before the main thread closes the frame. The first W1-61 VSync-off A/B runs (before W1-69) showed this in all 94 pipelined frames over 50 ms: the main thread sat 481-625 ms in the channel wait, and no recorded render frame overlapped the window. Their pipelined-off twins had 160 such frames, each with 467-503 ms of present_wait. The attribution now counts that render frame too.
+- `frames_over_50ms_driver_stall` and `driver_stalls`: `rule`, `frames` (every stall: `sample_index`, `frame_ms`, `acquire_wait_ms`, `acquire_share`, `in_process_ms`, `named_coverage`) and `outside` (`sample_frames`, `mean_observed_fps`, `p99_frame_ms`, `frames_over_33ms` and `frames_over_50ms` of every other sampled frame).
+
+**Gate.** `measure_performance.ps1` compares the worst repeat of `driver_stalls.outside.frames_over_50ms` with `frames_over_50ms_max`. A report without that field is invalid evidence (exit 2). summary.json rows add `frames_over_50ms_driver_stall`, `frames_over_50ms_outside_stalls` and `driver_stalls`. summary.md shows every frame over 50 ms with its stalls in brackets.
+
+Pins:
+- `driver_stalls_are_excluded_from_the_gated_frame_counts`: a 500 ms present-wait frame passes; a 500 ms main-schedule frame, a 60 ms frame with 40% present wait, a stall with 60 ms of render CPU and an untimed frame still count.
+- `pipelined_channel_wait_is_a_stall_only_while_the_render_thread_presents`.
+- `a_replaced_render_frame_still_attributes_the_channel_wait` and `close_keeps_the_slowest_present_since_the_previous_close`.
+- `driver_stall_rule_matches_the_ruling`.
+- The `-SelfTest` fixtures `driver-stall` (exit 0) and `missing-driver-stalls` (exit 2).
+
 ## Full verify
 
 From `horde-defense/`, before every production-pass commit:

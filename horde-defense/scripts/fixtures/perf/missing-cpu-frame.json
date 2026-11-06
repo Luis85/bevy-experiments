@@ -26,6 +26,12 @@
         "window_focused": true,
         "unfocused_sample_frames": 0,
         "frames_over_50ms": 0,
+        "frames_over_50ms_driver_stall": 0,
+        "driver_stalls": {
+          "outside": {
+            "frames_over_50ms": 0
+          }
+        },
         "work_mean_ms": [
           0.42,
           0.01,
@@ -78,6 +84,12 @@
         "window_focused": true,
         "unfocused_sample_frames": 0,
         "frames_over_50ms": 0,
+        "frames_over_50ms_driver_stall": 0,
+        "driver_stalls": {
+          "outside": {
+            "frames_over_50ms": 0
+          }
+        },
         "work_mean_ms": [
           0.42,
           0.01,
@@ -123,6 +135,12 @@
         "window_focused": true,
         "unfocused_sample_frames": 0,
         "frames_over_50ms": 0,
+        "frames_over_50ms_driver_stall": 0,
+        "driver_stalls": {
+          "outside": {
+            "frames_over_50ms": 0
+          }
+        },
         "work_mean_ms": [
           0.42,
           0.01,

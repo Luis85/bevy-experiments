@@ -8,7 +8,7 @@
 //! wall-clock instants and a window `attribution` in `longest_frames`, and
 //! `slow_frames`.
 use super::{
-    EguiCount, FrameSample, PerfFrame, PerfProbe,
+    EguiCount, FrameSample, PerfFrame, PerfProbe, RenderSample,
     gpu_span::{EGUI_GPU_PATH, gpu_timing_support},
 };
 use bevy::{
@@ -237,6 +237,40 @@ struct Attribution {
     render_present_ms: f64,
     render_other_ms: f64,
     render_unbusy_ms: f64,
+    /// W1-61: the main thread's render hand-offs (not pipelined: its own
+    /// extract and Render schedule; pipelined: the channel receive) that
+    /// overlap a render frame's swap-chain acquire (`prepare_windows`), inside
+    /// the window. The driver-stall rule reads it.
+    acquire_wait_ms: f64,
+}
+/// One sampled frame the driver-stall rule excluded (W1-61 user ruling):
+/// its acquire wait and share, its in-process work (main + render CPU) and
+/// its named coverage.
+#[derive(Serialize)]
+struct DriverStall {
+    sample_index: usize,
+    frame_ms: f64,
+    acquire_wait_ms: f64,
+    acquire_share: f64,
+    in_process_ms: f64,
+    named_coverage: f64,
+}
+/// The frame-interval statistics and counts of every sampled frame outside
+/// the driver stalls: the gated `frames_over_50ms`, and the pipelined
+/// decision's frames over 33 ms, mean FPS and p99 interval.
+#[derive(Serialize)]
+struct OutsideStalls {
+    sample_frames: usize,
+    mean_observed_fps: f64,
+    p99_frame_ms: f64,
+    frames_over_33ms: usize,
+    frames_over_50ms: usize,
+}
+#[derive(Serialize)]
+struct DriverStallReport {
+    rule: &'static str,
+    frames: Vec<DriverStall>,
+    outside: OutsideStalls,
 }
 /// Every sampled frame over 50 ms (W1-68): how many had a wall-clock window,
 /// how many of those main-thread spans cover to at least 95%, the lowest
@@ -308,6 +342,9 @@ pub(super) struct FrameReport {
     frames_over_50ms: usize,
     frames_over_100ms: usize,
     frames_over_250ms: usize,
+    /// W1-61: of `frames_over_50ms`, the driver stalls (`driver_stalls`).
+    frames_over_50ms_driver_stall: usize,
+    driver_stalls: DriverStallReport,
     work_scope: &'static str,
     work_mean_ms: [f64; 3],
     work_max_ms: [f64; 3],
@@ -448,12 +485,17 @@ fn overlap(begin: f64, end: f64, window: (f64, f64)) -> f64 {
 /// main-thread and render-thread span it overlaps. Each sample's main thread
 /// is, in order: the hand-off right after the previous `Last` (channel wait
 /// first, it is the receive), the rest of the gap, then First..Last. Render
-/// frames are counted once per sequence number.
-fn attribute(frames: &[RecordedFrame], index: usize) -> Option<Attribution> {
+/// frames are counted once each (`render_frames`).
+fn attribute(
+    frames: &[RecordedFrame],
+    renders: &[RenderSample],
+    index: usize,
+) -> Option<Attribution> {
     let frame = &frames[index];
     let end = frame.time_ms?;
     let window = (end - frame.frame_ms, end);
     let (mut main_cpu, mut wait, mut handoff_other, mut outside) = (0., 0., 0., 0.);
+    let mut handoffs = Vec::new();
     for sample in frames.iter().map(|f| &f.probe) {
         if sample.main_begin_ms <= 0. {
             continue;
@@ -465,22 +507,25 @@ fn attribute(frames: &[RecordedFrame], index: usize) -> Option<Attribution> {
         wait += overlap(gap_begin, wait_end, window);
         handoff_other += overlap(wait_end, handoff_end, window);
         outside += overlap(handoff_end, sample.main_begin_ms, window);
-    }
-    let (mut busy, mut present, mut last_seq) = (0., 0., None);
-    for frame in frames {
-        let Some(render) = frame.probe.render else {
-            continue;
-        };
-        if last_seq == Some(frame.probe.render_seq) || render.end_ms <= 0. {
-            continue;
+        let begin = gap_begin.max(window.0);
+        let end = handoff_end.min(window.1);
+        if end > begin {
+            handoffs.push((begin, end));
         }
-        last_seq = Some(frame.probe.render_seq);
+    }
+    let (mut busy, mut present, mut acquire) = (0., 0., 0.);
+    for render in renders {
         busy += overlap(render.begin_ms, render.end_ms, window);
-        present += overlap(
+        let acquire_span = (
             render.present_begin_ms,
             render.present_begin_ms + render.present_wait_ms,
-            window,
         );
+        present += overlap(acquire_span.0, acquire_span.1, window);
+        // Both are disjoint sets of spans (one main thread, one render
+        // thread), so the pairwise overlaps add up without double counting.
+        for &handoff in &handoffs {
+            acquire += overlap(acquire_span.0, acquire_span.1, handoff);
+        }
     }
     let named = main_cpu + wait + handoff_other;
     let covered = named + outside;
@@ -503,13 +548,98 @@ fn attribute(frames: &[RecordedFrame], index: usize) -> Option<Attribution> {
         render_present_ms: present,
         render_other_ms: (busy - present).max(0.),
         render_unbusy_ms: (frame.frame_ms - busy).max(0.),
+        acquire_wait_ms: acquire,
     })
 }
-fn slow_frame_summary(frames: &[RecordedFrame]) -> SlowFrameSummary {
+/// Every distinct completed render frame the samples kept, in end order.
+fn render_frames(frames: &[RecordedFrame]) -> Vec<RenderSample> {
+    let mut renders: Vec<RenderSample> = frames
+        .iter()
+        .flat_map(|f| f.probe.render.into_iter().chain(f.probe.slowest_present))
+        .filter(|render| render.end_ms > 0.)
+        .collect();
+    renders.sort_by(|a, b| a.end_ms.total_cmp(&b.end_ms));
+    renders.dedup_by(|a, b| a.end_ms == b.end_ms);
+    renders
+}
+
+const DRIVER_STALL_RULE: &str = "W1-61, user ruling on gate 3 (2026-11-06, 'Exclude driver stalls'). A sampled frame over 50 ms is an environmental driver stall when its swap-chain acquire wait holds at least 80% of it (attribution.acquire_wait_ms: the main thread's render hand-off overlapping a render frame's prepare_windows, i.e. present_wait when not pipelined, or the channel wait while the render thread is in present), its named spans cover at least 95% (attribution.named_coverage) and its in-process work stays below 50 ms (in_process_ms = main_cpu + render CPU, the larger of the latest and the stalled render frame's extract + Render schedule - present wait). A frame without attribution is never a stall. frames lists every stall; outside holds the interval statistics and counts of every other sampled frame: measure_performance gates frames_over_50ms on outside.frames_over_50ms, and the pipelined decision reads outside.frames_over_33ms, mean_observed_fps and p99_frame_ms. The v2 frames_over_* keys still count every frame.";
+
+/// The driver-stall rule (`perf_budget::DRIVER_STALL_*`) for one frame.
+fn driver_stall(
+    index: usize,
+    frame: &RecordedFrame,
+    phases: &Phases<f64>,
+    attribution: Option<&Attribution>,
+) -> Option<DriverStall> {
+    use crate::perf_budget::{
+        DRIVER_STALL_ACQUIRE_SHARE_MIN, DRIVER_STALL_FRAME_MS_OVER,
+        DRIVER_STALL_IN_PROCESS_MS_BELOW, DRIVER_STALL_NAMED_COVERAGE_MIN,
+    };
+    if frame.frame_ms <= DRIVER_STALL_FRAME_MS_OVER {
+        return None;
+    }
+    let attribution = attribution?;
+    let acquire_share = attribution.acquire_wait_ms / frame.frame_ms;
+    let stalled_render = frame
+        .probe
+        .slowest_present
+        .map_or(0., |render| render.cpu_ms());
+    let in_process_ms = phases.main_cpu_ms + phases.render_world_cpu_ms.max(stalled_render);
+    (acquire_share >= DRIVER_STALL_ACQUIRE_SHARE_MIN
+        && attribution.named_coverage >= DRIVER_STALL_NAMED_COVERAGE_MIN
+        && in_process_ms < DRIVER_STALL_IN_PROCESS_MS_BELOW)
+        .then_some(DriverStall {
+            sample_index: index,
+            frame_ms: frame.frame_ms,
+            acquire_wait_ms: attribution.acquire_wait_ms,
+            acquire_share,
+            in_process_ms,
+            named_coverage: attribution.named_coverage,
+        })
+}
+fn driver_stall_report(
+    frames: &[RecordedFrame],
+    renders: &[RenderSample],
+    phases: &[Phases<f64>],
+) -> DriverStallReport {
+    let stalls: Vec<DriverStall> = (0..frames.len())
+        .filter(|&i| frames[i].frame_ms > crate::perf_budget::DRIVER_STALL_FRAME_MS_OVER)
+        .filter_map(|i| {
+            let attribution = attribute(frames, renders, i);
+            driver_stall(i, &frames[i], &phases[i], attribution.as_ref())
+        })
+        .collect();
+    let outside: Vec<f64> = frames
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| !stalls.iter().any(|stall| stall.sample_index == *i))
+        .map(|(_, frame)| frame.frame_ms)
+        .collect();
+    let mut sorted = outside.clone();
+    sorted.sort_by(f64::total_cmp);
+    let mean_ms = mean(&outside);
+    let over = |limit: f64| outside.iter().filter(|&&ms| ms > limit).count();
+    DriverStallReport {
+        rule: DRIVER_STALL_RULE,
+        frames: stalls,
+        outside: OutsideStalls {
+            sample_frames: outside.len(),
+            mean_observed_fps: if mean_ms > 0. { 1000. / mean_ms } else { 0. },
+            p99_frame_ms: quantile(&sorted, 0.99),
+            frames_over_33ms: over(33.),
+            frames_over_50ms: over(50.),
+        },
+    }
+}
+fn slow_frame_summary(frames: &[RecordedFrame], renders: &[RenderSample]) -> SlowFrameSummary {
     let slow: Vec<usize> = (0..frames.len())
         .filter(|&i| frames[i].frame_ms > SLOW_FRAME_MS)
         .collect();
-    let attributed: Vec<Attribution> = slow.iter().filter_map(|&i| attribute(frames, i)).collect();
+    let attributed: Vec<Attribution> = slow
+        .iter()
+        .filter_map(|&i| attribute(frames, renders, i))
+        .collect();
     SlowFrameSummary {
         over_50ms: slow.len(),
         timed: attributed.len(),
@@ -633,6 +763,8 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
         .collect();
     render_seqs.dedup();
     let over = |limit: f64| frame_ms.iter().filter(|&&ms| ms > limit).count();
+    let renders = render_frames(frames);
+    let driver_stalls = driver_stall_report(frames, &renders, &phases);
     let end = &input.end;
     FrameReport {
         version: REPORT_VERSION,
@@ -673,6 +805,8 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
         frames_over_50ms: over(50.),
         frames_over_100ms: over(100.),
         frames_over_250ms: over(250.),
+        frames_over_50ms_driver_stall: driver_stalls.frames.len(),
+        driver_stalls,
         work_scope: "Simulation, persistence, interface elapsed application work in milliseconds, in that order (wall clock, including waits). Interface is ui::draw. Sampled at the end of Last, so each phase is attributed to the native frame that did the work; aggregates and maxima locate expensive phases, not GPU timestamps or CPU-cycle samples.",
         work_mean_ms,
         work_max_ms,
@@ -701,7 +835,7 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
                         audio_voices: events.audio_voices,
                         texture_upload_bytes: sample.egui[EguiCount::TextureUploadBytes as usize],
                     },
-                    attribution: attribute(frames, sample_index),
+                    attribution: attribute(frames, &renders, sample_index),
                 }
             })
             .collect(),
@@ -740,7 +874,7 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
             audio_voices: count_stats(frames.iter().map(|f| f.probe.events.audio_voices)),
         },
         attribution_scope: "W1-68. Instants are wall clock in ms since the probe epoch. A frame's window is time_ms - frame_ms .. time_ms, where time_ms is the instant Time<Real> used (the render world's send_time when it arrived, else First). gap = previous end of Last to First on the main thread; handoff = its first part, the render hand-off (pipelined: RenderExtractApp extract = channel receive + RenderApp extract + send, channel_wait = that minus the extract; not pipelined: RenderApp extract + Render schedule); outside_update = gap - handoff (winit event loop, OS). render_idle = previous render end to this render begin. attribution overlaps the window with every sample's main-thread spans and every distinct render sample. outside_update is a residual, so coverage (which counts it) is 1.0 by construction inside the recorded range; named_coverage = (main_cpu + channel_wait + handoff_other) / frame_ms leaves it out, and an unexplained stall shows as a large outside_update and a low named_coverage. slow_frames counts frames over 50 ms; covered_95_named, min_named_coverage and max_outside_update_ms are the named-span counterparts.",
-        slow_frames: slow_frame_summary(frames),
+        slow_frames: slow_frame_summary(frames, &renders),
         present: input.present.clone(),
         build: build_info(input.profile_label.as_deref()),
         gpu: gpu_report(input),

@@ -247,3 +247,29 @@ fn unpipelined_handoff_holds_the_extract_and_the_render_schedule() {
     assert!(sample.extract_ms >= 3.0, "{sample:?}");
     assert!(sample.render_schedule_ms >= 4.0, "{sample:?}");
 }
+
+/// W1-61: a render frame stalled in `prepare_windows` that completes and is
+/// replaced before the next close is still handed to that close, as the
+/// longest present wait since the previous one.
+#[test]
+fn close_keeps_the_slowest_present_since_the_previous_close() {
+    let probe = PerfProbe::default();
+    let sample = |present_wait_ms: f64, end_ms: f64| RenderSample {
+        present_wait_ms,
+        end_ms,
+        ..Default::default()
+    };
+    probe.publish_render(sample(480., 10.));
+    probe.publish_render(sample(0.1, 12.));
+    let closed = probe.close_frame();
+    assert_eq!(closed.render, Some(sample(0.1, 12.)));
+    assert_eq!(closed.render_seq, 2);
+    assert_eq!(closed.slowest_present, Some(sample(480., 10.)));
+    // The next close sees only what completed after this one.
+    probe.publish_render(sample(0.2, 14.));
+    let closed = probe.close_frame();
+    assert_eq!(closed.slowest_present, Some(sample(0.2, 14.)));
+    let idle = probe.close_frame();
+    assert_eq!(idle.render, Some(sample(0.2, 14.)));
+    assert_eq!(idle.slowest_present, None);
+}

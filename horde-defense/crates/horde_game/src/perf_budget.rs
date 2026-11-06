@@ -17,6 +17,21 @@ use crate::{animation, ui};
 pub const CPU_FRAME_P99_MS_MAX: f64 = 10.0;
 /// Frames over 50 ms allowed in any gated scene, worst repeat.
 pub const FRAMES_OVER_50MS_MAX: usize = 0;
+/// W1-61, user ruling on gate 3 (2026-11-06, "Exclude driver stalls"): a
+/// frame over `DRIVER_STALL_FRAME_MS_OVER` is an environmental driver stall
+/// when the swap-chain acquire wait (present_wait, or the pipelined channel
+/// wait while the render thread is in present) holds at least
+/// `DRIVER_STALL_ACQUIRE_SHARE_MIN` of it, its named spans cover at least
+/// `DRIVER_STALL_NAMED_COVERAGE_MIN` of it and its in-process work (main and
+/// render CPU) stays below `DRIVER_STALL_IN_PROCESS_MS_BELOW`. The frame
+/// report counts and lists every one (`frames_over_50ms_driver_stall`,
+/// `driver_stalls`); `frames_over_50ms` gates the frames outside them, and
+/// the pipelined decision reads its frames over 33 ms and VSync-on FPS and
+/// p99 interval outside them too.
+pub const DRIVER_STALL_FRAME_MS_OVER: f64 = 50.0;
+pub const DRIVER_STALL_ACQUIRE_SHARE_MIN: f64 = 0.8;
+pub const DRIVER_STALL_NAMED_COVERAGE_MIN: f64 = 0.95;
+pub const DRIVER_STALL_IN_PROCESS_MS_BELOW: f64 = 50.0;
 /// Scenes that carry the CPU p99 gate.
 pub const CPU_GATED_SCENES: &[&str] = &["progressed-peak", "stress"];
 
@@ -669,6 +684,104 @@ mod tests {
                 }
             }
         }
+    }
+
+    const VALIDATION: &str = include_str!("../../../docs/VALIDATION.md");
+
+    /// W1-61, the user ruling on gate 3 ("Exclude driver stalls"): the
+    /// thresholds the frame report classifies with are the ones the budget
+    /// records, the script gates frames_over_50ms on the frames outside the
+    /// stalls, and the plan and VALIDATION.md quote the ruling.
+    #[test]
+    fn driver_stall_rule_matches_the_ruling() {
+        let json = budget();
+        let path = "/driver_stall";
+        assert_eq!(
+            keys(object(&json, path)),
+            BTreeSet::from([
+                "ruling",
+                "ruled",
+                "rule",
+                "frame_ms_over",
+                "acquire_share_min",
+                "named_coverage_min",
+                "in_process_ms_below",
+                "report",
+            ])
+        );
+        assert_eq!(
+            json.pointer("/driver_stall/ruling"),
+            Some(&"Exclude driver stalls".into())
+        );
+        let rule = json
+            .pointer("/driver_stall/rule")
+            .and_then(Value::as_str)
+            .expect("driver_stall.rule is text");
+        for value in [
+            (
+                "/driver_stall/frame_ms_over",
+                DRIVER_STALL_FRAME_MS_OVER,
+                "over 50 ms",
+            ),
+            (
+                "/driver_stall/acquire_share_min",
+                DRIVER_STALL_ACQUIRE_SHARE_MIN,
+                "at least 80%",
+            ),
+            (
+                "/driver_stall/in_process_ms_below",
+                DRIVER_STALL_IN_PROCESS_MS_BELOW,
+                "below 50 ms",
+            ),
+        ] {
+            assert_eq!(number(&json, value.0), value.1, "{}", value.0);
+            assert!(rule.contains(value.2), "the rule text says {:?}", value.2);
+        }
+        assert_eq!(
+            number(&json, "/driver_stall/named_coverage_min"),
+            DRIVER_STALL_NAMED_COVERAGE_MIN
+        );
+        assert_eq!(DRIVER_STALL_FRAME_MS_OVER, 50.0);
+        assert_eq!(DRIVER_STALL_ACQUIRE_SHARE_MIN, 0.8);
+        assert_eq!(DRIVER_STALL_IN_PROCESS_MS_BELOW, 50.0);
+        assert_eq!(DRIVER_STALL_NAMED_COVERAGE_MIN, 0.95);
+        for (key, field) in [
+            ("count", "frames_over_50ms_driver_stall"),
+            ("list", "driver_stalls.frames"),
+            ("gated", "driver_stalls.outside"),
+        ] {
+            assert_eq!(
+                json.pointer(&format!("/driver_stall/report/{key}")),
+                Some(&field.into())
+            );
+        }
+        for read in [
+            "Get-Field $r @('driver_stalls', 'outside', 'frames_over_50ms')",
+            "Get-Field $r @('frames_over_50ms_driver_stall')",
+            "Get-Field $r @('driver_stalls', 'frames')",
+        ] {
+            assert!(
+                SCRIPT.contains(read),
+                "measure_performance.ps1 reads {read}"
+            );
+        }
+        assert!(
+            !SCRIPT.contains("Get-Field $r @('frames_over_50ms') } 'frames_over_50ms'"),
+            "the frames_over_50ms gate reads the frames outside driver stalls"
+        );
+        let quoted = "Exclude driver stalls";
+        for (name, text) in [("the plan", PLAN), ("VALIDATION.md", VALIDATION)] {
+            assert!(text.contains(quoted), "{name} quotes the ruling");
+        }
+        let section_9_4 = PLAN
+            .split(V3_SECTION)
+            .nth(1)
+            .map(|rest| rest.split("\n### 9.5").next().unwrap_or(rest))
+            .expect("the plan has section 9.4");
+        assert!(
+            section_9_4.contains(quoted),
+            "plan section 9.4 quotes the ruling"
+        );
     }
 
     /// 12.0 ms is only the pipelined-rendering decision threshold (ruling

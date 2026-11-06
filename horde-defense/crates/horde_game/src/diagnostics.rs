@@ -137,6 +137,12 @@ pub struct FrameSample {
     pub render: Option<RenderSample>,
     /// Sequence number of `render`, so the report counts distinct samples.
     pub render_seq: u64,
+    /// Of every render frame completed since the previous close, the one with
+    /// the longest swap-chain acquire (W1-61), or `None` when none completed.
+    /// Pipelined, a render frame stalled in `prepare_windows` can complete
+    /// and be replaced by the next one before any close reads `render`; the
+    /// driver-stall rule still sees its present wait here.
+    pub slowest_present: Option<RenderSample>,
     /// `[Simulation, Persistence, Interface]`.
     pub work_ms: [f64; 3],
     /// `[battle_frame_build, battlefield_paint, backdrop]`.
@@ -183,7 +189,7 @@ pub struct PerfCounters {
     channel_wait_ns: AtomicU64,
     events: [AtomicU64; EVENT_COUNTS],
     /// The latest completed render-world sample and its sequence number.
-    render: Mutex<(u64, Option<RenderSample>)>,
+    render: Mutex<RenderSlot>,
     pipelined: AtomicBool,
 }
 impl Default for PerfCounters {
@@ -204,10 +210,20 @@ impl Default for PerfCounters {
             handoff_ns: AtomicU64::new(0),
             channel_wait_ns: AtomicU64::new(0),
             events: Default::default(),
-            render: Mutex::new((0, None)),
+            render: Mutex::new(RenderSlot::default()),
             pipelined: AtomicBool::new(false),
         }
     }
+}
+
+/// The render samples the render world publishes for the next close: the
+/// latest and its sequence number, and the one with the longest present wait
+/// since the previous close (W1-61).
+#[derive(Default)]
+struct RenderSlot {
+    seq: u64,
+    latest: Option<RenderSample>,
+    slowest_present: Option<RenderSample>,
 }
 
 /// The one probe of a perf launch. The same `Arc` is a resource of the main
@@ -277,6 +293,19 @@ impl PerfProbe {
             slot.fetch_add(count, Ordering::Relaxed);
         }
     }
+    /// Publishes one completed render-world frame for the main world.
+    fn publish_render(&self, sample: RenderSample) {
+        if let Ok(mut slot) = self.0.render.lock() {
+            slot.seq += 1;
+            slot.latest = Some(sample);
+            if slot
+                .slowest_present
+                .is_none_or(|slowest| sample.present_wait_ms > slowest.present_wait_ms)
+            {
+                slot.slowest_present = Some(sample);
+            }
+        }
+    }
     /// Takes this frame's counters and the latest completed render sample.
     fn close_frame(&self) -> FrameSample {
         let take = |slot: &AtomicU64| slot.swap(0, Ordering::Relaxed);
@@ -296,13 +325,17 @@ impl PerfProbe {
         };
         let events: [u64; EVENT_COUNTS] = std::array::from_fn(|i| take(&self.0.events[i]));
         let scene: [u64; SCENE_COUNTS] = std::array::from_fn(|i| take(&self.0.scene[i]));
-        let (render_seq, render) = self.0.render.lock().map_or((0, None), |latest| *latest);
+        let (render_seq, render, slowest_present) =
+            self.0.render.lock().map_or((0, None, None), |mut slot| {
+                (slot.seq, slot.latest, slot.slowest_present.take())
+            });
         FrameSample {
             main_cpu_ms,
             egui_pass_ms: ms(take(&self.0.egui_pass_ns)),
             egui_tessellate_ms: ms(take(&self.0.tessellate_ns)),
             render,
             render_seq,
+            slowest_present,
             work_ms: std::array::from_fn(|i| ms(take(&self.0.work_ns[i]))),
             interface_ms: std::array::from_fn(|i| ms(take(&self.0.interface_ns[i]))),
             egui: std::array::from_fn(|i| take(&self.0.egui[i])),

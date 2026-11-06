@@ -134,6 +134,20 @@
       "cpu_frame_p99_ms_max": 10.0
     }
   },
+  "driver_stall": {
+    "ruling": "Exclude driver stalls",
+    "ruled": "2026-11-06, user ruling on gate 3, in chat (W1-61)",
+    "rule": "Frames over 50 ms in which the swap-chain acquire wait (present_wait, or channel_wait while the render thread is in present) holds at least 80% of the frame are classified as environmental driver stalls and excluded from frames_over_50ms. They must still be attributed (named coverage), the in-process work in that frame (main_cpu and render CPU) must stay below 50 ms, and the excluded stalls are counted and listed in the report and summary (frames_over_50ms_driver_stall). The same exclusion applies to the pipelined rule's frames_over_33ms and VSync-on FPS and p99-interval checks, computed on the frames outside stalls.",
+    "frame_ms_over": 50.0,
+    "acquire_share_min": 0.8,
+    "named_coverage_min": 0.95,
+    "in_process_ms_below": 50.0,
+    "report": {
+      "count": "frames_over_50ms_driver_stall",
+      "list": "driver_stalls.frames",
+      "gated": "driver_stalls.outside"
+    }
+  },
   "caps": {
     "enemies_ceiling": 225,
     "enemies_stress": 400,

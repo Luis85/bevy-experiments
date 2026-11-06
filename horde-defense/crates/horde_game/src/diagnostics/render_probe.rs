@@ -121,7 +121,5 @@ fn end_render(probe: Res<PerfProbe>) {
             ms(begin.saturating_sub(previous_end))
         },
     };
-    if let Ok(mut latest) = probe.0.render.lock() {
-        *latest = (latest.0 + 1, Some(sample));
-    }
+    probe.publish_render(sample);
 }

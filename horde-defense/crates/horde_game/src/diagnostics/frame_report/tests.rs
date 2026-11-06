@@ -428,3 +428,210 @@ fn slow_frame_outside_every_named_span_has_low_named_coverage() {
     );
     assert!(close(&summary["max_outside_update_ms"], 489.5), "{summary}");
 }
+
+/// A render frame on the probe's wall clock: the Render schedule ran
+/// `begin..end`, and `prepare_windows` (the swap-chain acquire) waited
+/// `present_wait` from `present_begin`.
+fn render_span(begin: f64, present_begin: f64, present_wait: f64, end: f64) -> RenderSample {
+    RenderSample {
+        extract_ms: 0.3,
+        render_schedule_ms: end - begin,
+        present_wait_ms: present_wait,
+        begin_ms: begin,
+        present_begin_ms: present_begin,
+        end_ms: end,
+        idle_ms: 0.5,
+    }
+}
+/// The gated counts of a report: frames over 50 ms outside driver stalls,
+/// and the stalls excluded.
+fn gated(report: &Value) -> (Value, Value) {
+    (
+        report["driver_stalls"]["outside"]["frames_over_50ms"].clone(),
+        report["frames_over_50ms_driver_stall"].clone(),
+    )
+}
+
+/// W1-61, user ruling on gate 3 (2026-11-06, "Exclude driver stalls"): a
+/// frame over 50 ms whose swap-chain acquire wait holds at least 80% of it,
+/// named to at least 95% and with under 50 ms of in-process work, is an
+/// environmental driver stall. It stays in the v2 `frames_over_50ms`, is
+/// counted and listed in `driver_stalls`, and is left out of the gated
+/// counts and the stall-free interval statistics.
+#[test]
+fn driver_stalls_are_excluded_from_the_gated_frame_counts() {
+    // Not pipelined: frame 1's window 1000..1500 is the main thread's render
+    // hand-off 1000..1498 (extract, Render schedule), 480 ms of it in
+    // prepare_windows; 9 ms main schedule and 17.3 ms render CPU.
+    let quick = timed(1000., 16.7, 992., 8., [0.5, 0.4, 0.]);
+    let mut stall = timed(1500., 500., 1500., 9., [500., 498., 0.]);
+    stall.probe.render = Some(render_span(1000.5, 1001., 480., 1497.5));
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), stall.clone()],
+        ..default()
+    });
+    assert_eq!(
+        report["frames_over_50ms"], 1,
+        "the v2 count keeps its meaning"
+    );
+    assert_eq!(
+        gated(&report),
+        (0.into(), 1.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+    let listed = &report["driver_stalls"]["frames"];
+    assert_eq!(listed.as_array().map(Vec::len), Some(1));
+    assert_eq!(listed[0]["sample_index"], 1);
+    assert!(close(&listed[0]["acquire_wait_ms"], 480.), "{listed}");
+    assert!(close(&listed[0]["acquire_share"], 0.96), "{listed}");
+    assert!(close(&listed[0]["in_process_ms"], 26.3), "{listed}");
+    assert!(report["driver_stalls"]["rule"].is_string());
+    // The interval statistics outside the stall see only the 16.7 ms frame.
+    let outside = &report["driver_stalls"]["outside"];
+    assert_eq!(outside["sample_frames"], 1);
+    assert!(close(&outside["p99_frame_ms"], 16.7), "{outside}");
+    assert!(
+        close(&outside["mean_observed_fps"], 1000. / 16.7),
+        "{outside}"
+    );
+    assert_eq!(outside["frames_over_33ms"], 0);
+
+    // A 500 ms main schedule is in-process work, never a stall.
+    let mut busy = timed(1500., 500., 1000.4, 499.6, [0.4, 0.3, 0.]);
+    busy.probe.render = Some(render_span(1000., 1000.1, 0.1, 1000.3));
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), busy],
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+
+    // 60 ms with 40% in the acquire is below the 80% share.
+    let mut partial = timed(1060., 60., 1060., 2., [60., 58., 0.]);
+    partial.probe.render = Some(render_span(1000.2, 1001., 24., 1057.8));
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), partial],
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+
+    // 480 ms of acquire, but 60 ms of render CPU besides: in-process work.
+    let mut heavy = stall.clone();
+    heavy.probe.render = Some(RenderSample {
+        render_schedule_ms: 540.,
+        ..render_span(1000.5, 1001., 480., 1497.5)
+    });
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), heavy],
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+
+    // A frame without a wall-clock window cannot be attributed, so it counts.
+    let mut untimed = stall.clone();
+    untimed.time_ms = None;
+    let report = report_json(&ReportInput {
+        frames: vec![quick, untimed],
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+}
+
+/// Pipelined, the main thread waits on the render channel while the render
+/// thread sits in `prepare_windows`: the acquire wait is the channel wait
+/// that overlaps the render thread's present. A channel wait with the render
+/// thread anywhere else is not a driver stall.
+#[test]
+fn pipelined_channel_wait_is_a_stall_only_while_the_render_thread_presents() {
+    let quick = timed(990., 16.7, 990., 8., [8., 7., 6.5]);
+    // 998..1485.5 channel wait; the render thread presents 1002..1482.
+    let mut stall = timed(1489., 499., 1489., 9., [491., 488., 487.5]);
+    stall.probe.render = Some(render_span(1000., 1002., 480., 1485.));
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), stall.clone()],
+        pipelined: true,
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (0.into(), 1.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+    assert!(close(
+        &report["driver_stalls"]["frames"][0]["acquire_wait_ms"],
+        480.
+    ));
+
+    // The same channel wait, the render thread busy outside prepare_windows.
+    let mut elsewhere = stall;
+    elsewhere.probe.render = Some(render_span(1000., 1484., 0.2, 1485.));
+    let report = report_json(&ReportInput {
+        frames: vec![quick, elsewhere],
+        pipelined: true,
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+}
+
+/// W1-61: pipelined, the render frame that stalled in `prepare_windows`
+/// during a channel wait finished and was replaced before the close, so
+/// `render` holds the next, quick one and only `slowest_present` holds the
+/// stall. It is attributed and excluded all the same.
+#[test]
+fn a_replaced_render_frame_still_attributes_the_channel_wait() {
+    let quick = timed(990., 16.7, 990., 8., [8., 7., 6.5]);
+    let mut stall = timed(1489., 499., 1489., 9., [491., 488., 487.5]);
+    stall.probe.render = Some(render_span(1486., 1486.2, 0.1, 1488.));
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), stall.clone()],
+        pipelined: true,
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (1.into(), 0.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+    stall.probe.slowest_present = Some(render_span(1000., 1002., 480., 1485.));
+    let report = report_json(&ReportInput {
+        frames: vec![quick, stall],
+        pipelined: true,
+        ..default()
+    });
+    assert_eq!(
+        gated(&report),
+        (0.into(), 1.into()),
+        "{}",
+        report["driver_stalls"]
+    );
+    let window = &report["longest_frames"][0]["attribution"];
+    assert!(close(&window["render_present_ms"], 480.1), "{window}");
+    assert!(close(&window["acquire_wait_ms"], 480.), "{window}");
+}
