@@ -177,9 +177,10 @@ non-neutral value yet (enemy-balance, wave 2).
   siege_recovery_mult, hold_ticks}, transitions, entered, hold_until}`).
   Loading rejects a split child that is a boss, an elite or a splitter, a
   `boss_state` on a regular enemy, more than two transitions, `entered`
-  above `transitions`, or a profile outside its bounds (name 1–40 bytes,
+  above `transitions`, a profile outside its bounds (name 1–40 bytes,
   speed 1–2, armor 0.25–1, call interval and siege recovery 0.3–1, hold at
-  most 180 ticks).
+  most 180 ticks), a non-zero `hold_until` before any transition was
+  entered, or a `hold_until` more than `hold_ticks` past the attempt tick.
 - `attempt.progression` may carry `elite_rate_bp` (0–10000), `front_ramp`
   (1–2, absent at exactly 1.0), `boss_rank` (`Sector`, `Regional` or
   `Capstone`; absent at `Sector`), `boss_phases` (0–2),

@@ -182,8 +182,18 @@ pub struct BossState {
     pub hold_until: u64,
 }
 impl BossState {
-    pub fn valid(&self) -> bool {
-        self.profile.valid() && self.transitions <= 2 && self.entered <= self.transitions
+    /// Valid in an attempt at `tick`: a hold began at or before `tick`, so it
+    /// ends at most `hold_ticks` later, and a boss that entered no transition
+    /// holds nothing.
+    pub fn valid(&self, tick: u64) -> bool {
+        self.profile.valid()
+            && self.transitions <= 2
+            && self.entered <= self.transitions
+            && if self.entered == 0 {
+                self.hold_until == 0
+            } else {
+                self.hold_until <= tick.saturating_add(u64::from(self.profile.hold_ticks))
+            }
     }
 }
 /// Permanent battlefield remains for this attempt, independent of transient effects.

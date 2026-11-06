@@ -495,8 +495,14 @@ fn boss_state(transitions: u8, entered: u8) -> Value {
         },
         "transitions": transitions,
         "entered": entered,
-        "hold_until": 90
+        "hold_until": if entered == 0 { 0 } else { 90 }
     })
+}
+
+/// `live_battle()` as saved, its boss holding `state` until `hold_until`.
+fn boss_holding(mut state: Value, hold_until: Value) -> Value {
+    state["hold_until"] = hold_until;
+    with_enemy(1, |e| e["boss_state"] = state)
 }
 
 #[test]
@@ -508,6 +514,12 @@ fn enemy_split_child_and_boss_state_round_trip_and_validate() {
     };
     let game = load(populated.clone()).expect("a split child and a phased boss load");
     assert_eq!(as_saved(&game), populated, "round trip");
+    // A hold ends at most `hold_ticks` after the save tick, and a boss that
+    // entered no transition holds nothing.
+    let tick = populated["attempt"]["tick"].as_u64().unwrap();
+    load(boss_holding(boss_state(2, 1), json!(tick + 90)))
+        .expect("a hold ending hold_ticks after the save tick loads");
+    load(boss_holding(boss_state(2, 0), json!(0))).expect("a boss before its first transition");
 
     let rows: Vec<(&str, Value)> = vec![
         (
@@ -539,6 +551,18 @@ fn enemy_split_child_and_boss_state_round_trip_and_validate() {
         (
             "entered above transitions",
             with_enemy(1, |e| e["boss_state"] = boss_state(1, 2)),
+        ),
+        (
+            "hold past the save tick",
+            boss_holding(boss_state(2, 1), json!(tick + 91)),
+        ),
+        (
+            "unbounded hold",
+            boss_holding(boss_state(2, 1), json!(u64::MAX)),
+        ),
+        (
+            "hold before any transition",
+            boss_holding(boss_state(2, 0), json!(1)),
         ),
     ];
     let mut rows = rows;

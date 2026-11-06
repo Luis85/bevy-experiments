@@ -723,7 +723,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
                         .is_some_and(|r| r.elite.is_some() || splits(r))))
                 || e.boss_state
                     .as_ref()
-                    .is_some_and(|state| !e.boss || !state.valid())
+                    .is_some_and(|state| !e.boss || !state.valid(a.tick))
             {
                 return Err("Saved split child or boss phase state is invalid".into());
             }
