@@ -18,6 +18,8 @@ pub mod terrain;
 pub(crate) use enemies::HEALTH_BAR_LIFT;
 pub(crate) use fx::fx_lifetime;
 #[cfg(test)]
+pub(crate) use fx::{OCCLUDER_GAP, boss_banner_rect, reinforcements_anchor};
+#[cfg(test)]
 mod tests;
 
 use super::{ArenaProjection, RED, soft_shadow};
@@ -39,6 +41,11 @@ pub struct RenderOptions {
     pub blood: bool,
     pub theme: usize,
     pub textures: ArtTextures,
+    /// An opaque overlay painted over the field after it (the main battle's
+    /// open construction panel; `None` for the observer and with the panel
+    /// closed). Field callouts that are the visual twin of an audio warning
+    /// (BOSS APPROACHING, REINFORCEMENTS) move left of it.
+    pub occluder: Option<Rect>,
 }
 
 /// The cosmetic scene animation of `a` for a painter on `layer`, sampled from
@@ -148,6 +155,7 @@ fn render(
             reduced,
             blood: options.blood,
             textures,
+            occluder: options.occluder,
         },
     );
     fx::particles(p, arena, &view.particles);

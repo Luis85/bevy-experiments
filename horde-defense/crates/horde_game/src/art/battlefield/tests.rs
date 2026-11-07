@@ -44,6 +44,7 @@ fn options(textures: ArtTextures) -> RenderOptions {
         blood: true,
         theme: 0,
         textures,
+        occluder: None,
     }
 }
 
@@ -856,6 +857,7 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         reduced: false,
         blood: true,
         textures: textures(),
+        occluder: None,
     };
     for kind in kinds {
         view.fx = vec![event(kind, 0.0)];

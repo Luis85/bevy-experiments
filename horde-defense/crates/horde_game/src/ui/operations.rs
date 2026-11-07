@@ -303,6 +303,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                             blood: f.settings.blood,
                             theme: a.level,
                             textures: f.textures,
+                            occluder: None,
                         },
                     );
                     damage::draw_for(ui,a,projection,id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode());

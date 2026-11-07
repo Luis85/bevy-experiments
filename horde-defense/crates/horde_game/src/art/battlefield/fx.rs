@@ -17,6 +17,46 @@ pub(super) struct FxOptions {
     pub reduced: bool,
     pub blood: bool,
     pub textures: ArtTextures,
+    /// See [`super::RenderOptions::occluder`].
+    pub occluder: Option<Rect>,
+}
+
+/// The least gap between a field callout and the overlay that would cover it.
+pub(crate) const OCCLUDER_GAP: f32 = 4.0;
+
+/// The BOSS APPROACHING banner, the on-field twin of the boss warning's
+/// sound: centred at 80% of a `width`-yard field on the lane centre line
+/// `lane`. Under an `occluder` (the open construction panel) it moves left
+/// until it ends [`OCCLUDER_GAP`] short of the panel, so the warning stays
+/// visible while building.
+pub(crate) fn boss_banner_rect(
+    arena: ArenaProjection,
+    width: f32,
+    lane: f32,
+    occluder: Option<Rect>,
+) -> Rect {
+    let size = vec2((arena.rect.width() * 0.34).min(290.), 36.);
+    let mut center = arena.world(width * 0.8, lane);
+    if let Some(occluder) = occluder {
+        center.x = center.x.min(occluder.left() - OCCLUDER_GAP - size.x * 0.5);
+    }
+    Rect::from_center_size(center, size)
+}
+
+/// The REINFORCEMENTS label's right-centre anchor: a yard inside the right
+/// edge of a `width`-yard field on the lane centre line `lane`, or
+/// [`OCCLUDER_GAP`] left of an `occluder` that would cover it.
+pub(crate) fn reinforcements_anchor(
+    arena: ArenaProjection,
+    width: f32,
+    lane: f32,
+    occluder: Option<Rect>,
+) -> Pos2 {
+    let mut at = arena.world(width - 1.0, lane);
+    if let Some(occluder) = occluder {
+        at.x = at.x.min(occluder.left() - OCCLUDER_GAP);
+    }
+    at
 }
 
 /// Segments of a batched particle dot.
@@ -155,8 +195,8 @@ pub(super) fn events(
         reduced,
         blood,
         textures,
+        occluder,
     } = *options;
-    let r = arena.rect;
     let sy = arena.lane_height();
     let origin = arena.world(view.defender.position[0], view.defender.position[1]);
     for e in &view.fx {
@@ -203,16 +243,11 @@ pub(super) fn events(
                 }
             }
             EventKind::BossWarning if age < 1.0 => {
-                p.rect_filled(
-                    Rect::from_center_size(
-                        arena.world(view.width * 0.8, view.defender.position[1]),
-                        vec2((r.width() * 0.34).min(290.), 36.),
-                    ),
-                    2.,
-                    PANEL,
-                );
+                let banner =
+                    boss_banner_rect(arena, view.width, view.defender.position[1], occluder);
+                p.rect_filled(banner, 2., PANEL);
                 p.text(
-                    arena.world(view.width * 0.8, view.defender.position[1]),
+                    banner.center(),
                     Align2::CENTER_CENTER,
                     "BOSS APPROACHING",
                     FontId::proportional(14.),
@@ -222,7 +257,7 @@ pub(super) fn events(
             EventKind::Reinforcements if age < fx_lifetime(EventKind::Reinforcements) => {
                 let lane = e.lane.unwrap_or(view.lanes / 2) as f32 + 0.5;
                 p.text(
-                    arena.world(view.width - 1.0, lane),
+                    reinforcements_anchor(arena, view.width, lane, occluder),
                     Align2::RIGHT_CENTER,
                     "REINFORCEMENTS",
                     FontId::proportional(10.),

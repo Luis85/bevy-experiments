@@ -90,6 +90,8 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     blood: f.settings.blood,
                     theme: view.theme,
                     textures: f.textures,
+                    // The construction panel is painted over the field below.
+                    occluder: f.battle.construction.then_some(layout.construction_panel),
                 },
             );
             drop(paint);

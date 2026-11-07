@@ -632,6 +632,72 @@ mod tests {
         }
     }
 
+    /// W1 review: the BOSS APPROACHING banner and the REINFORCEMENTS label
+    /// are the on-field twins of the wave sound, so the open construction
+    /// overlay never covers them: on every lane of every geometry at both
+    /// target sizes, both end at least `OCCLUDER_GAP` left of the panel.
+    /// With the panel closed they keep their field points.
+    #[test]
+    fn construction_panel_never_covers_the_wave_warning_callouts() {
+        let ctx = bevy_egui::egui::Context::default();
+        let mut label = Vec2::ZERO;
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            label = ui
+                .painter()
+                .layout_no_wrap(
+                    "REINFORCEMENTS".into(),
+                    bevy_egui::egui::FontId::proportional(10.0),
+                    bevy_egui::egui::Color32::WHITE,
+                )
+                .size();
+        });
+        output.textures_delta.clear();
+        assert!(label.x > 0.0);
+        for canvas in target_canvases() {
+            for (lanes, width) in geometries() {
+                for band in [false, true] {
+                    let layout = BattleLayout::new(canvas, lanes, width, band);
+                    let field =
+                        art::ArenaProjection::with_geometry(layout.field.rect, lanes, width);
+                    let panel = layout.construction_panel;
+                    let name = format!("{lanes}x{width} band {band} in {:?}", canvas.size());
+                    for lane in 0..lanes {
+                        let lane = f32::from(lane) + 0.5;
+                        let banner = art::boss_banner_rect(field, width, lane, Some(panel));
+                        assert!(
+                            banner.right() <= panel.left() - art::OCCLUDER_GAP
+                                && !banner.intersects(panel),
+                            "{name}: banner {banner:?} under the panel {panel:?}"
+                        );
+                        let anchor = art::reinforcements_anchor(field, width, lane, Some(panel));
+                        let text =
+                            Rect::from_min_size(anchor - vec2(label.x, label.y * 0.5), label);
+                        assert!(
+                            text.right() <= panel.left() - art::OCCLUDER_GAP
+                                && !text.intersects(panel),
+                            "{name}: REINFORCEMENTS {text:?} under the panel {panel:?}"
+                        );
+                        // The observer, and the closed panel, keep the
+                        // field points.
+                        assert_eq!(
+                            art::boss_banner_rect(field, width, lane, None),
+                            Rect::from_center_size(
+                                field.world(width * 0.8, lane),
+                                vec2((field.rect.width() * 0.34).min(290.0), 36.0),
+                            ),
+                            "{name}"
+                        );
+                        assert_eq!(
+                            art::reinforcements_anchor(field, width, lane, None),
+                            field.world(width - 1.0, lane),
+                            "{name}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     /// Pin: the field is centred, so the last build column ends at the canvas
     /// centre, left of the panel at every geometry and size.
     #[test]

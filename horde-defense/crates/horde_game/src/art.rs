@@ -11,6 +11,8 @@ mod tests;
 use backdrop::{box_at, line, paint_ground};
 pub use backdrop::{world_atmosphere, world_backdrop};
 pub(crate) use battlefield::{HEALTH_BAR_LIFT, fx_lifetime};
+#[cfg(test)]
+pub(crate) use battlefield::{OCCLUDER_GAP, boss_banner_rect, reinforcements_anchor};
 pub use battlefield::{RenderOptions, battlefield, battlefield_for_attempt, sample_motion};
 pub use camera::{FieldFit, fit_field};
 pub use figures::{bar, figure, structure};
