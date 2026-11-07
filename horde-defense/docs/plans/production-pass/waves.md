@@ -86,7 +86,7 @@ The full commit detail is in `wave1_commits`. Order and summary:
 | W1-66 | perf-architecture | One quad per hit flash via a packed white silhouette (gates 1 and 2) | W1-65 |
 | W1-67 | perf-architecture | Build BattleFrame without per-enemy maps and clones (gate 1) | W1-66 |
 | W1-68 | perf-architecture | Attribute the 0.5 s frames: between-frame gap, pipelined wait, per-frame event counts (gate 3 investigation) | W1-67 |
-| W1-69 | enemies-elites-bosses | Enemies never block each other: no lane queue, overlap allowed, every enemy that reaches the line or a structure attacks (user decision, 2026-11-06); the wave-1 GOLDEN/TRACE re-bless | W1-61 |
+| W1-69 | enemy-balance | Enemies never block each other: no lane queue, overlap allowed, every enemy that reaches the line or a structure attacks (user decision, 2026-11-06); the wave-1 GOLDEN/TRACE re-bless | W1-61 |
 
 W1-64..W1-68 were added after W1-61 blocked on the Goal-1 gates; W1-61 re-runs after W1-68.
 
