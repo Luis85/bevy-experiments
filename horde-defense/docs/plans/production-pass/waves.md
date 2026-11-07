@@ -256,6 +256,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `deploy_command_stays_player_or_mara_with_next_defender_set`
   - `dispatching_the_next_defender_resets_it_to_player_with_note`
   - `recruit_on_main_run_cannot_be_dispatched_trained_or_equipped`
+  - `migrated_v6_continues_with_mara` (the v6 fixture loads with `next_defender` None, pinned in wave 1 by `v6_fixture_defenders_resolve`; a retry or repeat of its settled Mara report deploys Mara and `active_defender()` then names Mara)
   - `new_defender_commands_round_trip_serde`
 - Deps: W2-11.
 

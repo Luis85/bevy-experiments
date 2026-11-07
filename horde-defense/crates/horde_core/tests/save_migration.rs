@@ -1071,12 +1071,20 @@ fn v6_stash_table(game: &Game) -> String {
 
 /// The v6 fixture through the SAVE_VERSION 7 migration: the root report is
 /// Mara's (Npc, keyless), the root attempt is the player's, and every worker
-/// attempt and report sits in its expedition's recruit seat.
+/// attempt and report sits in its expedition's recruit seat. No next
+/// defender is chosen, so the migrated campaign continues with the report's
+/// defender, Mara (the active-defender leg is W2-12's
+/// `migrated_v6_continues_with_mara`).
 #[test]
 fn v6_fixture_defenders_resolve() {
     let game = fixture_v6();
     assert_eq!(game.attempt().unwrap().defender(), DefenderId::Player);
     assert_eq!(game.last_result().unwrap().defender(), DefenderId::Mara);
+    assert_eq!(
+        game.campaign().next_defender,
+        None,
+        "no next defender chosen"
+    );
     let (mut attempts, mut reports) = (0, 0);
     for battle in game.battles() {
         let seat = DefenderId::Recruit(battle.recruit_id);
