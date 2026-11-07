@@ -357,7 +357,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Deps: W2-11.
 
 **W2-22 · progression-tree · W2-C `settle_progression_rewards`**
-- Files: finish() after H1; once at the end of settle_parallel when idle; milestone item keyed MILESTONE.
+- Files: finish() after H1; once at the end of settle_parallel when idle; milestone item keyed MILESTONE; remove `Campaign::claim_neutral_milestones` (the wave-1 neutral claim from 3df1242, called from `first_clear`), which this settlement replaces.
 - Fail-first:
   - `level_grant_is_paid_once_at_root_finish` (77)
   - `grant_is_not_paid_while_the_attempt_is_live`

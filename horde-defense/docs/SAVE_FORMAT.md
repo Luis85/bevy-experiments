@@ -123,6 +123,12 @@ the operation-chain sync. Loading rejects, in any game, a `level_grant_paid`
 above the player's `level`, more than 64 claims, or a claim above the
 campaign's progression rank.
 
+Wave 1 has no milestone rewards, so every victory claims the frozen ranks
+5/10/15/20 that the progression rank has reached
+(`Campaign::claim_neutral_milestones`), unpaid and with no receipt, the same
+as migration step (d). A wave-1 save can therefore hold claims that were
+never paid. W2-22 replaces this with `settle_progression_rewards`.
+
 The receipts of what settlement paid are optional and absent at their
 default. `last_result.progression_rewards` (root or expedition report) holds
 `level_from`, `level_to`, `level_coins` and up to four `milestones`, each

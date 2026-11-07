@@ -73,6 +73,8 @@ Legend:
 | `milestones_claimed` | `BTreeSet<u32>` | empty; skip empty | ≤ 64 entries, each ≤ `progression_rank()` | copied to workers and on the op-chain sync | (d) | W2 | none |
 | `balance_extras_basis` | `BalancePreset` | Normal; skip Normal | never Custom; preset != Custom implies Normal | copied to workers and on the op-chain sync (parallel.rs ~:286) | none (v6 Hard gets Hard extras at the next deploy; v6 Custom gets Normal) | W1 (set_balance_settings) | none |
 
+**As cut (annotation, 7 November 2026, W1 review):** the first non-default writer of `milestones_claimed` is wave 1, not W2. Besides migration step (d), 3df1242 added `Campaign::claim_neutral_milestones` (campaign/progression.rs), called from `first_clear` (campaign/world.rs) after each victory: while the catalogue authors no milestones, it inserts every `V7_MILESTONE_RANKS` entry at or below `progression_rank()`, unpaid and with no receipt. A native v7 save made by a wave-1 build can therefore carry claims at ranks 5, 10 and so on that no reward paid. W2-22's `settle_progression_rewards` removes the shim. The row above is unchanged.
+
 ### 3.2 Player (campaign/progression.rs:147)
 
 | Field | Type | Default / skip | Validation | Mig | W | Digest |
