@@ -84,6 +84,11 @@ fn compatibility_warnings(header: &Header, game: &Game) -> Vec<String> {
 
 /// Replays `lines`. Catalogues must already be initialised.
 pub fn replay(lines: Vec<Line>) -> Result<ReplayReport, String> {
+    replay_game(lines).map(|(_, report)| report)
+}
+
+/// [`replay`], also returning the replayed game in its final state.
+pub fn replay_game(lines: Vec<Line>) -> Result<(Game, ReplayReport), String> {
     let mut iter = lines.into_iter();
     let Some(Line::Header(header)) = iter.next() else {
         return Err("recording does not start with a header line".into());
@@ -146,13 +151,14 @@ pub fn replay(lines: Vec<Line>) -> Result<ReplayReport, String> {
         }
         tick += 1;
     }
-    Ok(ReplayReport {
+    let report = ReplayReport {
         ticks: tick - header.start_tick,
         commands,
         digest: game.state_digest(),
         recorded_digest,
         warnings,
-    })
+    };
+    Ok((game, report))
 }
 
 /// Rejected commands were rejected when recorded too; the outcome is state, not an error.

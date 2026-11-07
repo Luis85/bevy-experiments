@@ -5,7 +5,8 @@ use crate::{
     settings::Settings,
 };
 use horde_core::{
-    command::Command,
+    campaign::SaleBlock,
+    command::{Command, CommandError},
     content::{Mode, StructureKind},
     sim::Input,
 };
@@ -479,7 +480,22 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
         panic!("the recording ends with its digest");
     };
     let recorded = digest.clone();
-    let report = replay(lines).unwrap();
+    let sold = *sold;
+    let mut without_sale = lines.clone();
+    let sale = without_sale
+        .iter()
+        .rposition(|line| {
+            matches!(
+                line,
+                Line::Command {
+                    command: Command::SellItem(_),
+                    ..
+                }
+            )
+        })
+        .unwrap();
+    without_sale.remove(sale);
+    let (game, report) = replay_game(lines).unwrap();
     assert_eq!(
         report.commands,
         commands.len(),
@@ -492,6 +508,20 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
         "ruleset 2 refuses the equipped sale"
     );
     assert!(!report.matches_recording());
+    // The divergence is that sale: ruleset 2 refuses it as a typed
+    // SaleBlocked rejection that changes nothing, so the item stays owned and
+    // the recording without its final sale replays to the same state.
+    let mut again = game.clone();
+    assert_eq!(
+        again.apply(&Command::SellItem(sold)),
+        Err(CommandError::SaleBlocked(SaleBlock::EquippedPersonal))
+    );
+    assert_eq!(again.state_digest(), report.digest);
+    assert!(
+        game.campaign().item(sold).is_some(),
+        "the sold item is kept"
+    );
+    assert_eq!(replay(without_sale).unwrap().digest, report.digest);
     // Only compatibility warnings, never a format or seed mismatch. A content
     // fingerprint warning is allowed: the fixture's fingerprint covers item
     // ids, and appending content moves it without changing this property.
