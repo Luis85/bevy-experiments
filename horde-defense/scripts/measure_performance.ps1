@@ -24,7 +24,8 @@
 #   -ShippedSmoke                            first builds --profile playtest --no-default-features, copies that exe
 #                                            to <out>/shipped/, times --smoke three times (median wall seconds),
 #                                            and only then builds the review variant
-#   -SelfTest                                evaluates scripts/fixtures/perf/*.json and the rerun rule; no build
+#   -SelfTest                                evaluates scripts/fixtures/perf/*.json, the rerun rule and the power plan
+#                                            names; no build
 # <target> is CARGO_TARGET_DIR (relative values are joined to the workspace), else <workspace>/target.
 # Every run sets LASTLIGHT_PERF_ACTIVE_ONLY=1, LASTLIGHT_PERF_NPC_SPEED=1, LASTLIGHT_PERF_PROFILE=<profile> and a fresh
 # LASTLIGHT_SAVE_DIR, and writes <scene>-<size>[-rN].json. A run is valid only when the report is version 3, met its
@@ -125,10 +126,24 @@ function Get-Median([double[]]$Values) {
     return ($sorted[$middle - 1] + $sorted[$middle]) / 2
 }
 
+function ConvertFrom-PowercfgText([string]$Text) {
+    # The plan name in `powercfg /getactivescheme` output, or $null. powercfg localizes the plan name, so the built-in
+    # plans are named by their fixed GUIDs; any other plan keeps the name powercfg prints in parentheses.
+    $builtIn = @{
+        '381b4222-f694-41f0-9685-ff5bb260df2e' = 'Balanced'; '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' = 'High performance'
+        'a1841308-3541-4fab-bc81-f71556f20b4a' = 'Power saver'; 'e9a42b02-d5df-448d-aa00-03f14749eb61' = 'Ultimate Performance'
+    }
+    if ($Text -match '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})') {
+        $guid = $Matches[1].ToLowerInvariant()
+        if ($builtIn.ContainsKey($guid)) { return $builtIn[$guid] }
+    }
+    if ($Text -match '\(([^)]+)\)\s*$') { return $Matches[1].Trim() }
+    return $null
+}
+
 function Get-PowerPlan {
-    # The active Windows power plan, or $null when it cannot be read. powercfg localizes the plan name, so the built-in
-    # plans are named by their fixed GUIDs; any other plan keeps the name powercfg prints. It runs before the evidence
-    # directory exists, so its logs go to a per-PID temp stem that is removed again.
+    # The active Windows power plan (ConvertFrom-PowercfgText), or $null when it cannot be read. It runs before the
+    # evidence directory exists, so its logs go to a per-PID temp stem that is removed again.
     $stem = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-powercfg-' + $PID)
     try {
         $r = Invoke-Native -FilePath (Resolve-Tool 'powercfg') -Arguments @('/getactivescheme') -LogStem $stem -TimeoutSeconds 30
@@ -142,16 +157,7 @@ function Get-PowerPlan {
             if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue }
         }
     }
-    $builtIn = @{
-        '381b4222-f694-41f0-9685-ff5bb260df2e' = 'Balanced'; '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' = 'High performance'
-        'a1841308-3bce-3e2b-91e2-8e6c1b6f9f3c' = 'Power saver'; 'e9a42b02-d5df-448d-aa00-03f14749eb61' = 'Ultimate Performance'
-    }
-    if ($text -match '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})') {
-        $guid = $Matches[1].ToLowerInvariant()
-        if ($builtIn.ContainsKey($guid)) { return $builtIn[$guid] }
-    }
-    if ($text -match '\(([^)]+)\)\s*$') { return $Matches[1].Trim() }
-    return $null
+    return (ConvertFrom-PowercfgText $text)
 }
 
 function Format-Number($Value) {
@@ -520,6 +526,22 @@ function Invoke-SelfTest {
     foreach ($case in $cloneCases) {
         $extra = Get-SaveCloneCheck $case.Report $case.Profile $budget
         Test-BudgetCase "save clone: $($case.Name)" (Get-FixtureRuns $within) $withinContext $fixtureBudget $case.Expected $case.Checks @($extra)
+    }
+
+    # powercfg localizes the plan name (German here), so every built-in plan is named by its GUID; another plan keeps
+    # the name in parentheses.
+    $planCases = @(
+        @{ Name = 'Balanced'; Text = 'GUID des Energieschemas: 381b4222-f694-41f0-9685-ff5bb260df2e  (Ausbalanciert)'; Plan = 'Balanced' },
+        @{ Name = 'High performance'; Text = 'GUID des Energieschemas: 8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c  (Hoechstleistung)'; Plan = 'High performance' },
+        @{ Name = 'Power saver'; Text = 'GUID des Energieschemas: a1841308-3541-4fab-bc81-f71556f20b4a  (Energiesparmodus)'; Plan = 'Power saver' },
+        @{ Name = 'Ultimate Performance'; Text = 'GUID des Energieschemas: E9A42B02-D5DF-448D-AA00-03F14749EB61  (Ultimative Leistung)'; Plan = 'Ultimate Performance' },
+        @{ Name = 'a custom plan'; Text = 'Power Scheme GUID: 0f1e2d3c-4b5a-6978-8796-a5b4c3d2e1f0  (Quiet desk)'; Plan = 'Quiet desk' },
+        @{ Name = 'no scheme line'; Text = 'Access denied.'; Plan = $null }
+    )
+    foreach ($case in $planCases) {
+        $plan = ConvertFrom-PowercfgText $case.Text
+        if ($plan -ceq $case.Plan) { Write-Output "ok   power plan: $($case.Name) -> '$plan'" }
+        else { $script:selfTestFailed += 1; Write-Output "FAIL power plan: $($case.Name) -> '$plan', expected '$($case.Plan)'" }
     }
     $failed = $script:selfTestFailed
     $rerunCases = @(

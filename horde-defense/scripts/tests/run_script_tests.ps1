@@ -405,7 +405,7 @@ try {
             'ok   missing-metric -> 2', 'ok   missing-cpu-frame -> 2', 'ok   over-texture-uploads -> 1',
             'ok   missing-texture-uploads -> 2', 'ok   driver-stall -> 0', 'ok   missing-driver-stalls -> 2',
             'ok   v3: v3 interface_total above the baseline -> 1',
-            'ok   v3: v3 without a small value -> 2', 'SELFTEST PASS'
+            'ok   v3: v3 without a small value -> 2', "ok   power plan: Power saver -> 'Power saver'", 'SELFTEST PASS'
         )
         foreach ($line in $lines) {
             Assert-True ($out.Contains($line)) "self-test output lacks '$line'"
