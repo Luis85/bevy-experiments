@@ -1,4 +1,7 @@
-use super::{BattleLayout, layout::CHEVRON_SIZE};
+use super::{
+    BattleLayout,
+    layout::{CHEVRON_BACKING, cue_chevron},
+};
 use crate::{
     art::{AMBER, INK, RED, TEXT},
     battle_view::{BattleScreen, FieldHint},
@@ -198,11 +201,11 @@ pub(super) fn pause_banner(
 
 /// The INCOMING cues over the construction overlay's left edge: a static
 /// AMBER right-pointing chevron on an INK backing per cue (no motion in any
-/// mode), and the word on the first cue only.
-pub(super) fn incoming_cues(painter: &egui::Painter, cues: &[(u8, Pos2)]) {
+/// mode), and the word on the first cue only. Lanes are `lane_height` pt apart.
+pub(super) fn incoming_cues(painter: &egui::Painter, cues: &[(u8, Pos2)], lane_height: f32) {
     for (n, &(_, at)) in cues.iter().enumerate() {
-        let chevron = Rect::from_center_size(at, CHEVRON_SIZE);
-        let backing = chevron.expand(3.0);
+        let chevron = cue_chevron(at, lane_height);
+        let backing = chevron.expand(CHEVRON_BACKING);
         painter.rect_filled(backing, 2.0, INK);
         painter.add(egui::Shape::line(
             vec![

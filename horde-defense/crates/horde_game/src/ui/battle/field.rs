@@ -176,7 +176,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 });
                 // Spawns the panel hides get a chevron left of it.
                 let cues = occluded_spawn_cues(arena, panel, &views.field.enemies);
-                incoming_cues(ui.painter(), &cues);
+                incoming_cues(ui.painter(), &cues, arena.lane_height());
                 f.battle.occluded_lanes.clear();
                 f.battle
                     .occluded_lanes

@@ -46,6 +46,10 @@ pub(super) const PANEL_FILL_ALPHA: u8 = 235;
 pub(super) const CHEVRON_GAP: f32 = 10.0;
 /// The INCOMING chevron's width and height.
 pub(super) const CHEVRON_SIZE: Vec2 = vec2(12.0, 16.0);
+/// How far the INCOMING chevron's INK backing reaches past the chevron.
+pub(super) const CHEVRON_BACKING: f32 = 3.0;
+/// The least gap between the backings of INCOMING cues in adjacent lanes.
+pub(super) const CHEVRON_CLEARANCE: f32 = 1.0;
 
 /// Every rect the main battle screen lays out, from one canvas. Later owners
 /// may append fields; none is redefined.
@@ -179,6 +183,15 @@ impl BattleLayout {
 /// left edge on the projected `field`, in lane order. Each cue is the
 /// chevron's centre, `CHEVRON_GAP` left of the panel on the lane's centre
 /// line, so the chevron points at what the panel hides.
+/// The chevron of the INCOMING cue centred at `at` on a field whose lanes are
+/// `lane_height` pt apart: `CHEVRON_SIZE`, scaled down uniformly where the
+/// lanes are too close for it, so its backing stays a point clear of the
+/// next lane's (15 or more lanes at 1050x700@1.35 are about 18.3 pt apart).
+pub(in crate::ui) fn cue_chevron(at: Pos2, lane_height: f32) -> Rect {
+    let fit = (lane_height - 2.0 * CHEVRON_BACKING - CHEVRON_CLEARANCE) / CHEVRON_SIZE.y;
+    Rect::from_center_size(at, CHEVRON_SIZE * fit.min(1.0))
+}
+
 pub(in crate::ui) fn occluded_spawn_cues(
     field: art::ArenaProjection,
     panel: Rect,
@@ -547,7 +560,7 @@ mod tests {
                     "{label}"
                 );
                 for (_, cue) in occluded_spawn_cues(field, panel, &view.enemies) {
-                    let chevron = Rect::from_center_size(cue, CHEVRON_SIZE);
+                    let chevron = cue_chevron(cue, field.lane_height());
                     assert!(chevron.right() < panel.left(), "{label}: under the panel");
                     assert!(layout.field.rect.contains_rect(chevron), "{label}");
                 }
@@ -558,6 +571,61 @@ mod tests {
                     .cloned()
                     .collect();
                 assert_eq!(occluded_spawn_cues(field, panel, &open), vec![], "{label}");
+            }
+        }
+    }
+
+    /// The INCOMING cues of adjacent lanes stay apart: at every geometry and
+    /// both target sizes (1050x700@1.35 with 15 or more lanes puts lanes
+    /// about 18.3 pt apart), each cue's backed chevron stays apart from the
+    /// next, left of the panel and between the field's edges, so neighbouring cues
+    /// never merge into one zigzag. Wide lanes keep the full 12x16 chevron.
+    #[test]
+    fn incoming_cues_of_adjacent_lanes_never_overlap() {
+        for canvas in target_canvases() {
+            for (lanes, width) in geometries() {
+                let layout = BattleLayout::new(canvas, lanes, width, false);
+                let field = art::ArenaProjection::with_geometry(layout.field.rect, lanes, width);
+                let panel = layout.construction_panel;
+                let pitch = field.lane_height();
+                let label = format!("{lanes}x{width} in {:?}", canvas.size());
+                let backed: Vec<Rect> = (0..lanes)
+                    .map(|lane| {
+                        let at = pos2(
+                            panel.left() - CHEVRON_GAP,
+                            field.world(0.0, f32::from(lane) + 0.5).y,
+                        );
+                        let chevron = cue_chevron(at, pitch);
+                        assert!(chevron.right() < panel.left(), "{label}");
+                        // A narrow field may end left of the panel (then no
+                        // spawn is ever hidden); the lanes still bound the cue.
+                        assert!(
+                            layout.field.rect.y_range().contains(chevron.top()),
+                            "{label}"
+                        );
+                        assert!(
+                            layout.field.rect.y_range().contains(chevron.bottom()),
+                            "{label}"
+                        );
+                        assert!(chevron.height() >= 8.0, "{label}: still reads as a chevron");
+                        if pitch >= CHEVRON_SIZE.y + 2.0 * CHEVRON_BACKING + CHEVRON_CLEARANCE {
+                            assert_eq!(
+                                chevron,
+                                Rect::from_center_size(at, CHEVRON_SIZE),
+                                "{label}"
+                            );
+                        }
+                        chevron.expand(CHEVRON_BACKING)
+                    })
+                    .collect();
+                for pair in backed.windows(2) {
+                    assert!(
+                        pair[0].bottom() < pair[1].top(),
+                        "{label}: {:?} meets {:?}",
+                        pair[0],
+                        pair[1]
+                    );
+                }
             }
         }
     }
