@@ -257,6 +257,11 @@ fn gpu_report_rejects_inconsistent_timestamps() {
 
 /// W1-66: `scene_load` reports how many hostiles flashed and how many quads
 /// their hit flashes drew, recorded through the probe like the other counts.
+/// Written after the plumbing, so its mutation proofs stand in for a
+/// fail-first (W1 review): the two fields swapped in `report_json`'s
+/// `SceneLoad` fail the `flashing_enemies` max (300, expected 4), and
+/// `flash_quads` dropped from `PerfProbe::record_scene` fails the
+/// `flash_quads` max (0, expected 300).
 #[test]
 fn scene_load_reports_hit_flash_quads() {
     let probe = crate::diagnostics::PerfProbe::default();
