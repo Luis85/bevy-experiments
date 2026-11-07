@@ -309,7 +309,7 @@ fn toggle_time(f: &mut UiCtx) {
     let paused = f.game.global_paused() || f.game.attempt().is_some_and(|attempt| attempt.paused);
     if paused && f.game.attempt().is_some() {
         f.go(Screen::Battle);
-        f.battle.construction = false;
+        f.battle.set_construction(false);
     }
     f.dispatch(Command::SetPaused(!paused), "");
     f.battle.fire_latched = false;

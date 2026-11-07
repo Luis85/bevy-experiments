@@ -216,7 +216,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     };
                     if ui.button(RichText::new(label).strong()).clicked() {
                         f.dispatch(Command::SetPaused(!paused), "");
-                        f.battle.construction = false;
+                        f.battle.set_construction(false);
                         f.battle.fire_latched = false;
                     }
                     if view.personal() && !f.battle.construction {
@@ -231,7 +231,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                             })
                             .clicked()
                     {
-                        f.battle.construction = !f.battle.construction;
+                        f.battle.set_construction(!f.battle.construction);
                         f.battle.fire_latched = false;
                     }
                     if observed {

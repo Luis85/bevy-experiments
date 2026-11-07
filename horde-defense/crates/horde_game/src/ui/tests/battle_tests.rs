@@ -1096,9 +1096,25 @@ fn construction_frame_draws_incoming_chevron() {
         );
         h.click_size(f, View::Battle, "Close construction", size);
         assert!(!f.battle.construction);
+        // The button closes after this frame's cues drew; the close itself
+        // clears the lanes, before any later battle frame.
+        assert!(
+            f.battle.occluded_lanes.is_empty(),
+            "{size:?}: the close button clears"
+        );
         let output = h.frame_size(f, View::Battle, vec![], size);
         assert!(f.battle.occluded_lanes.is_empty(), "{size:?}: close clears");
         assert_eq!(text_count(&output, "INCOMING"), 0, "{size:?}");
+        // Pausing from the bar closes construction too, and so clears.
+        f.battle.construction = true;
+        h.frame_size(f, View::Battle, vec![], size);
+        assert_eq!(f.battle.occluded_lanes, vec![1], "{size:?}");
+        h.click_size(f, View::Battle, "Pause", size);
+        assert!(!f.battle.construction);
+        assert!(
+            f.battle.occluded_lanes.is_empty(),
+            "{size:?}: the pause button clears"
+        );
     }
 }
 

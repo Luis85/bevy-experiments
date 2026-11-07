@@ -69,7 +69,7 @@ pub(super) fn reset_new_battle(
         battle.aim = [a.width_yards * 0.5, a.defender_position()[1]];
         campaign.mode = a.mode;
     }
-    battle.construction = false;
+    battle.set_construction(false);
     battle.attack_selection = AttackSelection::Gun;
     battle.fire_latched = false;
     battle.speed = 1;
@@ -248,7 +248,7 @@ impl UiCtx<'_> {
                 self.campaign.observed = None;
                 self.status.profile_exists = true;
                 self.battle.fire_latched = false;
-                self.battle.construction = false;
+                self.battle.set_construction(false);
                 self.battle.speed = 1;
                 self.status.message = match outcome {
                     AppOutcome::JourneyArchived(Some(path)) => format!(

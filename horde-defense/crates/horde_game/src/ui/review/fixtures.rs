@@ -327,7 +327,7 @@ pub(super) fn prepare_battle(f: &mut FrontendParts, screen: &str) {
         f.screen = Screen::Battle;
     }
     f.campaign.mode = mode;
-    f.battle.construction = screen == "construction";
+    f.battle.set_construction(screen == "construction");
     if let Some(enemy) = f.game.attempt().and_then(|a| {
         a.enemies
             .iter()

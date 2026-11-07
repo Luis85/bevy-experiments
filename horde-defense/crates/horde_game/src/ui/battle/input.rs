@@ -49,14 +49,14 @@ pub(in crate::ui) fn controls(ctx: &egui::Context, f: &mut UiCtx, views: Option<
     if f.settings.pressed(ctx, Action::Pause, false) {
         let pause = !views.is_some_and(|views| views.screen.paused);
         f.dispatch(Command::SetPaused(pause), "");
-        f.battle.construction = false;
+        f.battle.set_construction(false);
         f.battle.fire_latched = false;
     }
     if f.settings.pressed(ctx, Action::Build, false) {
         if f.game.campaign().blueprints.iter().any(|owned| *owned) {
-            f.battle.construction = !f.battle.construction;
+            f.battle.set_construction(!f.battle.construction);
         } else {
-            f.battle.construction = false;
+            f.battle.set_construction(false);
             f.status.message = format!(
                 "{} Combat continues; use Pause when you need time.",
                 f.game.campaign().construction_blocker().unwrap_or_default()

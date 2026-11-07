@@ -159,6 +159,14 @@ impl BattleUi {
             interpolation: crate::battle_view::ActorInterpolation::default(),
         }
     }
+    /// Opens or closes the construction overlay. Closing clears
+    /// `occluded_lanes` at once, whether or not a battle frame follows.
+    pub(super) fn set_construction(&mut self, open: bool) {
+        self.construction = open;
+        if !open {
+            self.occluded_lanes.clear();
+        }
+    }
 }
 
 /// Settings screen drafts and key rebinding.
