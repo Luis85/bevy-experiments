@@ -216,16 +216,21 @@ pub fn outcome_summary(seed: u64, mode: Mode) -> OutcomeSummary {
     summary
 }
 
-/// Object keys whose value is a map keyed by data (level and country IDs),
-/// not by field names: `Campaign::country_layouts`,
-/// `first_clear_claimed`, `WorldProgress::country_levels` and
-/// `clear_high_water`. Their entries are state, so [`json_key_paths`] reports
-/// their children as one `*` segment.
-pub const DATA_KEYED_MAPS: [&str; 4] = [
+/// Object keys whose value is a map keyed by data (level, country and
+/// archetype IDs), not by field names: `Campaign::country_layouts`,
+/// `first_clear_claimed`, `WorldProgress::country_levels`,
+/// `clear_high_water` and the per-archetype `CombatTelemetry` maps
+/// `spawned_by_archetype`, `kills_by_archetype` and
+/// `damage_taken_by_archetype` (W1-27). Their entries are state, so
+/// [`json_key_paths`] reports their children as one `*` segment.
+pub const DATA_KEYED_MAPS: [&str; 7] = [
     "country_layouts",
     "first_clear_claimed",
     "country_levels",
     "clear_high_water",
+    "spawned_by_archetype",
+    "kills_by_archetype",
+    "damage_taken_by_archetype",
 ];
 
 /// Every JSON-pointer path of an object key in `value` (no leaf values),

@@ -327,7 +327,13 @@ fn planted_payload() -> serde_json::Value {
         },
         "attempt": {
             "hp": 30,
-            "telemetry": {"misses": 2, "kills_by_kind": {"Shambler": 3}},
+            "telemetry": {
+                "misses": 2,
+                "kills_by_kind": {"Shambler": 3},
+                "spawned_by_archetype": {"shambler": 3},
+                "kills_by_archetype": {"shambler": 3},
+                "damage_taken_by_archetype": {"shambler": 12},
+            },
         },
     })
 }
@@ -424,11 +430,39 @@ fn anatomy_classifier_labels_planted_changes() {
         support::json_key_paths_fnv(&claimed)
     );
     assert!(support::json_key_paths(&base).contains("/campaign/first_clear_claimed/*"));
+
+    // The per-archetype telemetry maps (W1-27) are keyed by archetype ID: a
+    // newly seen archetype does not move the key paths either.
+    for map in [
+        "spawned_by_archetype",
+        "kills_by_archetype",
+        "damage_taken_by_archetype",
+    ] {
+        let mut seen = base.clone();
+        seen["attempt"]["telemetry"][map]["spitter"] = 1.into();
+        assert_eq!(
+            support::json_key_paths_fnv(&base),
+            support::json_key_paths_fnv(&seen),
+            "a new archetype ID in {map} is data, not shape"
+        );
+        assert!(support::json_key_paths(&base).contains(&format!("/attempt/telemetry/{map}/*")));
+    }
 }
 
 #[test]
 fn anatomy_reads_the_real_payload_shape() {
-    let g = support::game(Mode::Personal);
+    let mut g = support::game(Mode::Personal);
+    // The per-archetype telemetry maps are absent while empty; one entry each
+    // puts their real serialized names in the payload.
+    let mut a = g.attempt_slot_mut().take().unwrap();
+    a.telemetry
+        .spawned_by_archetype
+        .insert("shambler".into(), 1);
+    a.telemetry.kills_by_archetype.insert("shambler".into(), 1);
+    a.telemetry
+        .damage_taken_by_archetype
+        .insert("shambler".into(), 4);
+    *g.attempt_slot_mut() = Some(a);
     let payload = serde_json::to_value(&g).unwrap();
     let paths = support::json_key_paths(&payload);
     for path in [
