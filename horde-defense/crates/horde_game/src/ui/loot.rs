@@ -169,6 +169,26 @@ pub(super) fn drop_icon_center(
             .max(projection.effects_clip.top() + LABEL_RISE + 4.0),
     )
 }
+/// Where a drop's rise starts: the drawn body of the kill that dropped it,
+/// the core kill point plus that hostile's [`crowd_stagger`], so the drop
+/// rises beside its kill coin (W1 review). The receipt names no enemy, but
+/// the body recorded the same tick at the same point is the one; with no
+/// such body (a legacy receipt) the rise keeps the core point.
+///
+/// [`crowd_stagger`]: crate::battle_view::crowd_stagger
+fn drop_origin(attempt: &horde_core::sim::Attempt, receipt: &LootEvent) -> [f32; 2] {
+    let since = attempt
+        .corpses
+        .partition_point(|corpse| corpse.tick < receipt.tick);
+    attempt.corpses[since..]
+        .iter()
+        .take_while(|corpse| corpse.tick == receipt.tick)
+        .find(|corpse| corpse.at == receipt.at)
+        .map_or(receipt.at, |corpse| {
+            let [dx, dy] = crate::battle_view::crowd_stagger(corpse.id);
+            [receipt.at[0] + dx, receipt.at[1] + dy]
+        })
+}
 /// How far above the icon centre the quality label starts.
 const LABEL_RISE: f32 = 29.0;
 pub(super) fn draw_for(
@@ -199,7 +219,8 @@ pub(super) fn draw_for(
     for entry in &state.streams[&battle].active {
         let age = ((now - entry.started) / LIFETIME).clamp(0.0, 1.0) as f32;
         let fade = (1.0 - age).powf(0.65);
-        let at = drop_icon_center(projection, entry.receipt.at, entry.receipt.item_id, age);
+        let origin = drop_origin(attempt, &entry.receipt);
+        let at = drop_icon_center(projection, origin, entry.receipt.item_id, age);
         let icon = Rect::from_center_size(at, vec2(25.0, 25.0));
         let color = armory::quality_color(entry.receipt.quality).gamma_multiply(fade);
         painter.rect_filled(icon, 0.0, Color32::from_black_alpha((180.0 * fade) as u8));
@@ -355,6 +376,48 @@ mod tests {
             true,
         );
         assert!(feedback.streams[&0].active.is_empty());
+    }
+    /// W1 review: a drop rises from the drawn, crowd-staggered body of the
+    /// kill that dropped it, beside its kill coin; a receipt whose body is
+    /// gone (or never recorded) keeps the core point.
+    #[test]
+    fn a_drop_from_a_staggered_kill_starts_over_the_drawn_body() {
+        use crate::battle_view::crowd_stagger;
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let a = game.attempt_mut().unwrap();
+        let dead = a.next_id + 10;
+        let neighbour = a.next_id + 11;
+        let event = receipt(6, Quality::Rare);
+        let body = |id, at| horde_core::sim::CorpseRecord {
+            id,
+            kind: horde_core::content::EnemyKind::Runner,
+            boss_kind: None,
+            at,
+            visual: None,
+            tick: event.tick,
+        };
+        // A neighbour fell the same tick a yard off; only the body under the
+        // receipt's point owns the drop.
+        a.corpses = vec![body(neighbour, [19.0, 5.5]), body(dead, event.at)];
+        let a = game.attempt().unwrap();
+        let [dx, dy] = crowd_stagger(dead);
+        let drawn = [event.at[0] + dx, event.at[1] + dy];
+        assert_ne!(drawn, event.at, "the fixture body is staggered");
+        let projection = art::ArenaProjection::for_attempt(
+            Rect::from_min_size(pos2(0., 0.), vec2(800., 400.)),
+            a,
+        );
+        assert_eq!(
+            drop_icon_center(projection, drop_origin(a, &event), 6, 0.0),
+            drop_icon_center(projection, drawn, 6, 0.0),
+        );
+        let stray = LootEvent {
+            tick: event.tick + 1,
+            ..event.clone()
+        };
+        assert_eq!(drop_origin(a, &stray), stray.at, "no body, core point");
     }
     #[test]
     fn independent_workers_with_equal_attempt_and_item_ids_do_not_share_feedback_identity() {
