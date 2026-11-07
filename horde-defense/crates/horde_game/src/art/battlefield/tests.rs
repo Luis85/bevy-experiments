@@ -224,9 +224,13 @@ fn assert_live_load_within_gates(scene: &str, size: &str, ticks: usize, load: &L
 /// `BATTLEFIELD_PRIMITIVES_MAX` and the scene's vertex gate, so a live frame
 /// (event FX, not only the static fixture) that crosses a gate fails here.
 /// Every maximum the full-length `measure_battlefield_egui_load` records is
-/// painted by tick 420 and on a tick divisible by 20 (stress primitives 47 at
-/// tick 420), so these shorter runs, painting every 10th tick to stay fast,
-/// reach the measured maxima.
+/// first painted by tick 420. In the W1-51 measurement every one also fell on
+/// a tick divisible by 20 (stress primitives 47 at tick 420), so these
+/// shorter runs, painting every 10th tick to stay fast, reached the measured
+/// maxima. In the post-W1-69 re-measure (`PERF_BUDGET.json`
+/// `evidence.egui_measured.remeasured`) two first fall off that stride
+/// (stress-5000-corpses vertices at tick 142, stress primitives at tick 2),
+/// so the 10th-tick samples are no longer guaranteed to reach those two.
 #[test]
 fn live_battlefield_runs_stay_within_the_egui_gates() {
     const LIVE_GATE_TICKS: usize = 420;

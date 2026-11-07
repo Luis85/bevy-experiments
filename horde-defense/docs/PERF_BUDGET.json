@@ -206,7 +206,19 @@
       "battlefield_primitives_max": 47,
       "battlefield_primitives_by_scene": { "peak": 29, "progressed-peak": 45, "stress": 47, "stress-5000-corpses": 41 },
       "battlefield_vertices_max": { "progressed-peak": 37940, "stress": 48878 },
-      "battlefield_vertices_by_scene": { "peak": 32667, "progressed-peak": 37940, "stress": 46801, "stress-5000-corpses": 48878 }
+      "battlefield_vertices_by_scene": { "peak": 32667, "progressed-peak": 37940, "stress": 46801, "stress-5000-corpses": 48878 },
+      "remeasured": {
+        "note": "W1 review: the maxima above (and the note's 'every maximum fell on a tick divisible by 20') were measured at a93e340, before W1-64 to W1-69, and the gates are still derived from them. The same re-measure on the post-W1-69 renderer gave these maxima (normal arena; the small arena is lower in every case), every run complete and within the current gates, every maximum first painted by tick 420 but not all on a tick divisible by 10 (stress-5000-corpses vertices at tick 142, stress primitives at tick 2). Re-deriving the gates from them would move BATTLEFIELD_PRIMITIVES_MAX 48 -> 24 and the stress vertex gate 61098 -> 61878 (progressed-peak stays at its 40000 ceiling); that gate change is left to the orchestrator, so the figures above stay the gate source until it is decided.",
+        "commit": "4d599a5",
+        "battlefield_primitives_by_scene": { "peak": 19, "progressed-peak": 19, "stress": 19, "stress-5000-corpses": 19 },
+        "battlefield_vertices_by_scene": { "peak": 32675, "progressed-peak": 38819, "stress": 47435, "stress-5000-corpses": 49502 },
+        "max_tick_by_scene": {
+          "peak": { "primitives": 120, "vertices": 120 },
+          "progressed-peak": { "primitives": 60, "vertices": 360 },
+          "stress": { "primitives": 2, "vertices": 300 },
+          "stress-5000-corpses": { "primitives": 2, "vertices": 142 }
+        }
+      }
     }
   },
   "acceptance": {
