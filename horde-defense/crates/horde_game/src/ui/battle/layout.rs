@@ -178,11 +178,6 @@ impl BattleLayout {
     }
 }
 
-/// The INCOMING cues while the construction `panel` is open: one per lane in
-/// which a live enemy (bosses included) stands at or right of the panel's
-/// left edge on the projected `field`, in lane order. Each cue is the
-/// chevron's centre, `CHEVRON_GAP` left of the panel on the lane's centre
-/// line, so the chevron points at what the panel hides.
 /// The chevron of the INCOMING cue centred at `at` on a field whose lanes are
 /// `lane_height` pt apart: `CHEVRON_SIZE`, scaled down uniformly where the
 /// lanes are too close for it, so its backing stays a point clear of the
@@ -192,6 +187,11 @@ pub(in crate::ui) fn cue_chevron(at: Pos2, lane_height: f32) -> Rect {
     Rect::from_center_size(at, CHEVRON_SIZE * fit.min(1.0))
 }
 
+/// The INCOMING cues while the construction `panel` is open: one per lane in
+/// which a live enemy (bosses included) stands at or right of the panel's
+/// left edge on the projected `field`, in lane order. Each cue is the
+/// chevron's centre, `CHEVRON_GAP` left of the panel on the lane's centre
+/// line, so the chevron points at what the panel hides.
 pub(in crate::ui) fn occluded_spawn_cues(
     field: art::ArenaProjection,
     panel: Rect,
@@ -503,7 +503,9 @@ mod tests {
 
     /// C-7: a lane gets one INCOMING cue when a live enemy (a boss too) stands
     /// at or right of the panel's left edge, even while it is still left of
-    /// the panel's right edge; an enemy left of the panel marks nothing.
+    /// the panel's right edge; an enemy left of the panel marks nothing. The
+    /// boss is alone in its lane, so only the boss can cue lane 2, and lane 1
+    /// holds two hidden enemies for one cue.
     #[test]
     fn occluded_spawn_cues_mark_lanes_hidden_by_the_panel() {
         use crate::{
@@ -537,8 +539,8 @@ mod tests {
                 for (kind, lane, boss, x) in [
                     (EnemyKind::Runner, 0, false, left_of),
                     (EnemyKind::Runner, 1, false, under),
+                    (EnemyKind::Runner, 1, false, a.width_yards - 0.2),
                     (EnemyKind::Brute, 2, true, under),
-                    (EnemyKind::Runner, 2, false, a.width_yards - 0.2),
                 ] {
                     game.spawn_enemy(&mut a, kind, lane, boss);
                     a.enemies.last_mut().unwrap().x = x;
