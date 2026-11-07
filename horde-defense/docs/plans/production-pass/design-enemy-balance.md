@@ -218,10 +218,10 @@ All mechanics are deterministic. `a.rng` is drawn only when an effect triggers, 
 
 **Spitter.**
 - `ranged_stop(a,e) = clamp(DEFENSE_LINE + reach, DEFENSE_LINE, 0.5·a.width_yards)`, using the frozen width of 8-30 yd (balance.rs:117-118). That gives 2.5 yd at width 8 and 4.0 at 12.
-- In `move_enemies` (movement.rs:62-160) the stop is `max(structure blocker, ranged_stop)`. A live non-trap structure ahead of the stop is met in melee. Otherwise the spitter stations at the stop.
+- In `move_enemies` (movement.rs:13; the stop and contact block is movement.rs:34-108) the stop is `max(structure blocker, ranged_stop)`. A live non-trap structure ahead of the stop is met in melee. Otherwise the spitter stations at the stop.
 - Target: the nearest live non-trap structure between the station and the line (walls intercept spit), else the defender.
-- A stationed spitter does not set `queue_front` (movement.rs:156, 82-86) and counts as passable in the passing gate (movement.rs:35), so followers overtake it.
-- The contact test at movement.rs:114 uses `ranged_stop` (reach 0 is identical to today).
+- Integration ruling (W1-69, user decision 2026-11-06): enemies never block each other, so a stationed spitter needs no queue or passing exemption, and followers simply walk through it. W1-69 removed the lane queue, `queue_front` and the passing gate.
+- The contact test (`blocked`, movement.rs:71) uses `ranged_stop` (reach 0 is identical to today).
 - The attack uses the existing Windup→attack path (combat.rs:102-245).
   - Personal: `damage - armor`, halved by brace.
   - NPC: `npc_skill + rules::range_penalty(distance)` against the defender's dodge.
@@ -252,7 +252,7 @@ All mechanics are deterministic. `a.rng` is drawn only when an effect triggers, 
 - Counters: grenades, traps, or letting it close for melee.
 
 **Juggernaut.**
-- `stagger_immune` skips the HitStop refresh (sim.rs:175-178) and NPC prone/stun movement and attack loss (movement.rs:90-91, sim.rs:1187-1189).
+- `stagger_immune` skips the HitStop refresh (sim.rs:175-178) and NPC prone/stun movement and attack loss (movement.rs:50, sim.rs:1187-1189).
 - Injury rolls are unchanged, so RNG use is identical.
 
 **Sprinter.**
@@ -333,7 +333,7 @@ All mechanics are deterministic. `a.rng` is drawn only when an effect triggers, 
 **Saved state.** `Enemy.boss_state: Option<BossState { profile: BossPhaseProfile, transitions: u8, entered: u8, hold_until: u64 }>`, snapshotted at spawn like `boss_timing` (director.rs:212). None means a legacy boss, which behaves as today.
 
 **Code touch points.**
-- `const BOSS_BASE_SPEED = 0.6` and `fn boss_speed(e)` replace the literals at movement.rs:88 and sim.rs:1201.
+- `const BOSS_BASE_SPEED = 0.6` and `fn boss_speed(e)` replace the literals at movement.rs:47 and sim.rs:1201.
 - `armor_mult` applies in `enemy_armor_vs`.
 - `call_interval_mult` applies at director.rs:96.
 - `siege_recovery_mult` applies at combat.rs:120.

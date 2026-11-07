@@ -406,7 +406,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Deps: W2-04.
 
 **W2-27 · enemy-balance · Spitter**
-- Files: reach, station, walls, overtaking; far-half guard.
+- Files: reach, station, walls, followers walk through (W1-69: no queue, no overtaking); far-half guard.
 - Fail-first:
   - `spitter_never_winds_up_or_damages_from_the_far_half`
   - `spitter_stations_at_clamped_stop`
