@@ -245,15 +245,12 @@ mod tests {
             select_sounds(vec![SoundCue::Wave, SoundCue::Incoming], 0),
             vec![SoundCue::Wave]
         );
-        let a = select_sounds(
-            vec![SoundCue::Armor, SoundCue::NpcShot, SoundCue::TurretShot],
-            0,
-        );
-        let b = select_sounds(
-            vec![SoundCue::Armor, SoundCue::NpcShot, SoundCue::TurretShot],
-            1,
-        );
-        assert!(a.contains(&SoundCue::Armor) && a.contains(&SoundCue::NpcShot));
+        // Rotation is exercised with cues the game still emits.
+        let turns = [SoundCue::Armor, SoundCue::Rifle, SoundCue::TurretShot];
+        assert!(turns.iter().all(|cue| !cue.retired()), "{turns:?}");
+        let a = select_sounds(turns.to_vec(), 0);
+        let b = select_sounds(turns.to_vec(), 1);
+        assert!(a.contains(&SoundCue::Armor) && a.contains(&SoundCue::Rifle));
         assert!(b.contains(&SoundCue::Armor) && b.contains(&SoundCue::TurretShot));
     }
     #[test]
