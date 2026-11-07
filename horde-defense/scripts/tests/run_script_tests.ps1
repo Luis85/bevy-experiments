@@ -148,8 +148,17 @@ public static class LastLightNativeHelper {
             // The adapter the renderer used: Bevy falls back to the default GPU when WGPU_ADAPTER_NAME matches none.
             string adapter = Environment.GetEnvironmentVariable("HORDE_FAKE_ADAPTER");
             if (String.IsNullOrEmpty(adapter)) { adapter = "Fake Adapter"; }
+            // The window opens at the requested size at Windows scale 2, unless HORDE_FAKE_WINDOW names the physical
+            // WIDTHxHEIGHT the OS clamped it to.
+            string[] size = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SIZE").Split('x');
+            string window = Environment.GetEnvironmentVariable("HORDE_FAKE_WINDOW");
+            string[] physical = String.IsNullOrEmpty(window)
+                ? new string[] { (int.Parse(size[0]) * 2).ToString(), (int.Parse(size[1]) * 2).ToString() }
+                : window.Split('x');
             File.WriteAllText(report, "{\"version\":3,\"scene\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN")
-                + "\",\"adapter\":\"" + adapter
+                + "\",\"width_physical\":" + physical[0] + ",\"height_physical\":" + physical[1]
+                + ",\"windows_scale\":2.0,\"ui_scale\":" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCALE")
+                + ",\"adapter\":\"" + adapter
                 + "\",\"sample_frames\":" + Environment.GetEnvironmentVariable("LASTLIGHT_PERF_FRAMES")
                 + ",\"completed_sample_target\":true,\"paused\":false,\"unfocused_sample_frames\":" + unfocused
                 + ",\"frames_over_50ms\":0,\"frames_over_50ms_driver_stall\":0,\"driver_stalls\":{\"frames\":[],\"outside\":{\"frames_over_50ms\":0}}"
@@ -410,7 +419,8 @@ try {
             'ok   within-budget -> 0', 'ok   over-budget-cpu -> 1', 'ok   over-50ms -> 1', 'ok   unfocused -> 2',
             'ok   vsync-on-within-budget -> 0', 'ok   over-interface-draw -> 1', 'ok   playtest-vsync-on -> 0',
             'ok   missing-metric -> 2', 'ok   missing-cpu-frame -> 2', 'ok   over-texture-uploads -> 1',
-            'ok   missing-texture-uploads -> 2', 'ok   driver-stall -> 0', 'ok   missing-driver-stalls -> 2',
+            'ok   missing-texture-uploads -> 2', 'ok   driver-stall -> 0', 'ok   missing-driver-stalls -> 2', 'ok   wrong-size -> 2',
+            'ok   window size: a clamped height', 'ok   window size: no windows_scale',
             'ok   v3: v3 interface_total above the baseline -> 1',
             'ok   v3: v3 without a small value -> 2', "ok   power plan: Power saver -> 'Power saver'", 'SELFTEST PASS'
         )
@@ -520,6 +530,25 @@ try {
             }
         }
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_ADAPTER', $null, 'Process') }
+    }
+
+    Test-Case 'measure_performance exits 2 when the window did not open at the requested size' {
+        # The budget gates per size: a window the OS clamped (or launch.rs's 1440x900 fallback) is not normal or small.
+        $sizeTarget = Join-Path $temporary 'perf-size-target'
+        try {
+            New-FakeTarget $sizeTarget
+            $env:CARGO_TARGET_DIR = $sizeTarget
+            $env:HORDE_FAKE_WINDOW = '2880x1700'
+            $out = Join-Path $temporary 'perf-size-clamped'
+            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-OutputDirectory', $out) 'measure-size-clamped'
+            Assert-Equal 2 $r.ExitCode ("clamped window: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            $problems = @($summary.runs | ForEach-Object { "$($_.file): $(@($_.problems) -join '; ')" })
+            Assert-Equal 2 @($summary.runs | Where-Object { $_.attempts -eq 2 }).Count 'each size was rerun once'
+            Assert-Equal 'peak-normal.json: window 1440x850 (2880x1700 physical at windows_scale 2), requested 1440x900' $problems[0] 'normal problems'
+            Assert-Equal 'peak-small.json: window 1440x850 (2880x1700 physical at windows_scale 2), requested 1050x700' $problems[1] 'small problems'
+        }
+        finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_WINDOW', $null, 'Process') }
     }
 
     Test-Case 'capture_review reports every sidecar check row and fails the run on a failed one' {

@@ -19,6 +19,10 @@
       "repeat": 1,
       "report": {
         "version": 3,
+        "width_physical": 2880,
+        "height_physical": 1800,
+        "windows_scale": 2.0,
+        "ui_scale": 1.0,
         "scene": "progressed-peak",
         "sample_frames": 600,
         "requested_sample_frames": 600,
@@ -70,6 +74,10 @@
       "repeat": 1,
       "report": {
         "version": 3,
+        "width_physical": 2100,
+        "height_physical": 1400,
+        "windows_scale": 2.0,
+        "ui_scale": 1.35,
         "scene": "progressed-peak",
         "sample_frames": 600,
         "requested_sample_frames": 600,

@@ -1,0 +1,138 @@
+{
+  "fixture": "wrong-size",
+  "description": "VSync-on dev run inside every gate whose windows did not open at the requested sizes: the OS clamped progressed-peak normal to 2880x1700 physical at windows_scale 2 (1440x850, not 1440x900), and progressed-peak small has no windows_scale. Both are invalid evidence (exit 2), never gated as normal or small.",
+  "run": {
+    "profile": "dev",
+    "vsync_off": false,
+    "pipelined": "default"
+  },
+  "expected_checks": [
+    "progressed-peak/normal all skipped",
+    "progressed-peak/small all skipped"
+  ],
+  "reports": [
+    {
+      "scene": "progressed-peak",
+      "size": "normal",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "width_physical": 2880,
+        "height_physical": 1700,
+        "windows_scale": 2.0,
+        "ui_scale": 1.0,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "frames_over_50ms_driver_stall": 0,
+        "driver_stalls": {
+          "outside": {
+            "frames_over_50ms": 0
+          }
+        },
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.05
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 11.48,
+            "p50": 11.15,
+            "p95": 14.76,
+            "p99": 16.4,
+            "max": 19.68
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "egui": {
+          "texture_uploads": {
+            "count": 0,
+            "bytes": 0,
+            "frames": 0
+          }
+        },
+        "present": {
+          "requested_mode": "Fifo",
+          "source": "settings",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    },
+    {
+      "scene": "progressed-peak",
+      "size": "small",
+      "repeat": 1,
+      "report": {
+        "version": 3,
+        "width_physical": 2100,
+        "height_physical": 1400,
+        "ui_scale": 1.35,
+        "scene": "progressed-peak",
+        "sample_frames": 600,
+        "requested_sample_frames": 600,
+        "completed_sample_target": true,
+        "paused": false,
+        "window_focused": true,
+        "unfocused_sample_frames": 0,
+        "frames_over_50ms": 0,
+        "frames_over_50ms_driver_stall": 0,
+        "driver_stalls": {
+          "outside": {
+            "frames_over_50ms": 0
+          }
+        },
+        "work_mean_ms": [
+          0.42,
+          0.01,
+          1.0
+        ],
+        "phases": {
+          "cpu_frame_ms": {
+            "mean": 11.34,
+            "p50": 11.02,
+            "p95": 14.58,
+            "p99": 16.2,
+            "max": 19.44
+          },
+          "interface_total_ms": {
+            "mean": 2.0,
+            "p50": 2.0,
+            "p95": 2.6,
+            "p99": 3.0,
+            "max": 4.0
+          }
+        },
+        "egui": {
+          "texture_uploads": {
+            "count": 0,
+            "bytes": 0,
+            "frames": 0
+          }
+        },
+        "present": {
+          "requested_mode": "Fifo",
+          "source": "settings",
+          "pipelined_rendering": true
+        },
+        "build": {
+          "profile_label": "dev"
+        }
+      }
+    }
+  ]
+}

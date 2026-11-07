@@ -30,7 +30,8 @@
 # Every run sets LASTLIGHT_PERF_ACTIVE_ONLY=1, LASTLIGHT_PERF_NPC_SPEED=1, LASTLIGHT_PERF_PROFILE=<profile> and a fresh
 # LASTLIGHT_SAVE_DIR, and writes <scene>-<size>[-rN].json. A run is valid only when the report is version 3, met its
 # sample target, is not paused, had no unfocused sample frame, and echoes the requested present mode, pipelined state,
-# scene, profile and (with -Adapter) adapter. An invalid run is rerun once (the rejected report is kept as
+# scene, profile, (with -Adapter) adapter and window size (width_physical and height_physical over windows_scale within
+# 1 px of sizes.<size>.size, ui_scale at sizes.<size>.scale). An invalid run is rerun once (the rejected report is kept as
 # <stem>.invalid.json).
 # Budget compare: repeats by median, frames_over_50ms and egui texture uploads by the worst repeat. frames_over_50ms and
 # egui.texture_uploads.count (against egui.texture_uploads_after_warmup_max, every scene, W1-64) always; frames_over_50ms
@@ -176,8 +177,41 @@ function Get-PerfExpectation([string]$RunProfile, [bool]$NoVsync, [string]$Pipel
     return [pscustomobject]@{ PresentMode = $mode; Pipelined = $pipelinedState; Profile = $RunProfile; Adapter = $adapterName }
 }
 
-function Test-PerfReport($Report, [string]$SceneName, $Expect) {
-    # Every reason the report is not valid evidence; empty when it is.
+function Test-Number($Value) { return ($Value -is [ValueType] -and $Value -isnot [bool]) }
+
+function Test-WindowSize($Report, $Size, [string]$SizeName, $Problems) {
+    # The budget gates per size, so a window that did not open at sizes.<size> (the OS clamped it, or launch.rs ignored
+    # a malformed LASTLIGHT_REVIEW_SIZE and opened 1440x900) is not evidence for that size. capture_motion.ps1 checks its
+    # manifest the same way. The logical size is the physical size over windows_scale, within 1 px of the request.
+    if ($null -eq $Size) { $Problems.Add("no PERF_BUDGET.json sizes entry '$SizeName'"); return }
+    $requested = [string](Get-Field $Size @('size'))
+    $width = Get-Field $Report @('width_physical')
+    $height = Get-Field $Report @('height_physical')
+    $scale = Get-Field $Report @('windows_scale')
+    if ($requested -notmatch '^(\d+)x(\d+)$') { $Problems.Add("PERF_BUDGET.json sizes.$SizeName.size '$requested' is not WIDTHxHEIGHT") }
+    elseif (-not (Test-Number $width) -or -not (Test-Number $height) -or -not (Test-Number $scale) -or [double]$scale -le 0) {
+        $Problems.Add("window size unknown (width_physical '$width', height_physical '$height', windows_scale '$scale'), requested $requested")
+    }
+    else {
+        $wantWidth = [int]$Matches[1]
+        $wantHeight = [int]$Matches[2]
+        $logicalWidth = [int][Math]::Round([double]$width / [double]$scale)
+        $logicalHeight = [int][Math]::Round([double]$height / [double]$scale)
+        if ([Math]::Abs($logicalWidth - $wantWidth) -gt 1 -or [Math]::Abs($logicalHeight - $wantHeight) -gt 1) {
+            $Problems.Add("window ${logicalWidth}x$logicalHeight (${width}x$height physical at windows_scale $(Format-Number $scale)), requested $requested")
+        }
+    }
+    $uiScale = Get-Field $Report @('ui_scale')
+    $wantScale = Get-Field $Size @('scale')
+    if (-not (Test-Number $uiScale)) { $Problems.Add("ui_scale '$uiScale', requested $(Format-Number $wantScale)") }
+    elseif ($null -eq $wantScale -or [Math]::Abs([double]$uiScale - [double]$wantScale) -gt 0.001) {
+        $Problems.Add("ui_scale $(Format-Number $uiScale), requested $(Format-Number $wantScale)")
+    }
+}
+
+function Test-PerfReport($Report, [string]$SceneName, $Expect, $Size, [string]$SizeName) {
+    # Every reason the report is not valid evidence; empty when it is. $Size is the PERF_BUDGET.json sizes.<SizeName>
+    # entry the run requested.
     $problems = New-Object System.Collections.Generic.List[string]
     if ($null -eq $Report) { $problems.Add('no report'); return , $problems.ToArray() }
     $version = Get-Field $Report @('version')
@@ -203,6 +237,7 @@ function Test-PerfReport($Report, [string]$SceneName, $Expect) {
             $problems.Add("adapter '$reportAdapter', requested '$($Expect.Adapter)'")
         }
     }
+    Test-WindowSize $Report $Size $SizeName $problems
     return , $problems.ToArray()
 }
 
@@ -391,13 +426,14 @@ function Get-ExitLabel([int]$Code) {
     }
 }
 
-function Get-FixtureRuns($Fixture) {
+function Get-FixtureRuns($Fixture, $Budget) {
+    # Each fixture report is checked against the window size its budget's sizes.<size> entry requests.
     $run = $Fixture.run
     $expect = Get-PerfExpectation $run.profile ([bool]$run.vsync_off) $run.pipelined
     return , @($Fixture.reports | ForEach-Object {
             [pscustomobject]@{
                 Scene = $_.scene; Size = $_.size; Repeat = $_.repeat; Report = $_.report
-                Problems = (Test-PerfReport $_.report $_.scene $expect)
+                Problems = (Test-PerfReport $_.report $_.scene $expect (Get-Field $Budget @('sizes', $_.size)) $_.size)
             }
         })
 }
@@ -436,6 +472,7 @@ function Invoke-SelfTest {
         'within-budget' = 0; 'over-budget-cpu' = 1; 'over-50ms' = 1; 'unfocused' = 2; 'driver-stall' = 0; 'missing-driver-stalls' = 2
         'vsync-on-within-budget' = 0; 'over-interface-draw' = 1; 'playtest-vsync-on' = 0
         'missing-metric' = 2; 'missing-cpu-frame' = 2; 'over-texture-uploads' = 1; 'missing-texture-uploads' = 2
+        'wrong-size' = 2
     }
     $script:selfTestFailed = 0
     foreach ($file in @(Get-ChildItem -LiteralPath $fixtureDirectory -Filter '*.json' -File)) {
@@ -446,7 +483,38 @@ function Invoke-SelfTest {
         $fixture = Read-JsonFile (Join-Path $fixtureDirectory "$name.json")
         $run = $fixture.run
         $context = [pscustomobject]@{ Profile = $run.profile; VsyncOff = [bool]$run.vsync_off; NoBudget = $false; Informational = $false; PowerPlan = 'Balanced' }
-        Test-BudgetCase $name (Get-FixtureRuns $fixture) $context $fixtureBudget $expected[$name] @($fixture.expected_checks)
+        Test-BudgetCase $name (Get-FixtureRuns $fixture $fixtureBudget) $context $fixtureBudget $expected[$name] @($fixture.expected_checks)
+    }
+
+    # The window size every report must echo: width_physical and height_physical over windows_scale within 1 px of
+    # sizes.<size>.size, and ui_scale at sizes.<size>.scale.
+    $sized = Read-JsonFile (Join-Path $fixtureDirectory 'vsync-on-within-budget.json')
+    $sizedRun = @($sized.reports | Where-Object { $_.size -eq 'normal' })[0]
+    $sizedExpect = Get-PerfExpectation $sized.run.profile ([bool]$sized.run.vsync_off) $sized.run.pipelined
+    $clamped = 'window 1440x850 (2880x1700 physical at windows_scale 2), requested 1440x900'
+    $windowCases = @(
+        @{ Name = 'the requested size'; Set = @{}; Problems = '' },
+        @{ Name = 'within 1 px after rounding'; Set = @{ width_physical = 2882; height_physical = 1799 }; Problems = '' },
+        @{ Name = 'Windows scale 1.5'; Set = @{ width_physical = 2160; height_physical = 1350; windows_scale = 1.5 }; Problems = '' },
+        @{ Name = 'a clamped height'; Set = @{ height_physical = 1700 }; Problems = $clamped },
+        @{ Name = '2 px narrower'; Set = @{ width_physical = 2876 }; Problems = 'window 1438x900 (2876x1800 physical at windows_scale 2), requested 1440x900' },
+        @{ Name = 'the 1440x900 fallback for small'; Size = 'small'; Set = @{}; Problems = 'window 1440x900 (2880x1800 physical at windows_scale 2), requested 1050x700; ui_scale 1, requested 1.35' },
+        @{ Name = 'no windows_scale'; Remove = 'windows_scale'; Problems = "window size unknown (width_physical '2880', height_physical '1800', windows_scale ''), requested 1440x900" },
+        @{ Name = 'a zero windows_scale'; Set = @{ windows_scale = 0 }; Problems = "window size unknown (width_physical '2880', height_physical '1800', windows_scale '0'), requested 1440x900" },
+        @{ Name = 'another ui_scale'; Set = @{ ui_scale = 1.35 }; Problems = 'ui_scale 1.35, requested 1' },
+        @{ Name = 'no ui_scale'; Remove = 'ui_scale'; Problems = "ui_scale '', requested 1" },
+        @{ Name = 'no size entry'; Size = 'tiny'; Set = @{}; Problems = "no PERF_BUDGET.json sizes entry 'tiny'" }
+    )
+    foreach ($case in $windowCases) {
+        $report = $sizedRun.report | ConvertTo-Json -Depth 20 | ConvertFrom-Json
+        foreach ($key in $case.Set.Keys) { $report.$key = $case.Set[$key] }
+        if ($case.Remove) { $report.PSObject.Properties.Remove($case.Remove) }
+        $sizeName = 'normal'
+        if ($case.Size) { $sizeName = $case.Size }
+        $found = Test-PerfReport $report $sizedRun.scene $sizedExpect (Get-Field $budget @('sizes', $sizeName)) $sizeName
+        $problems = @($found) -join '; '
+        if ($problems -ceq $case.Problems) { Write-Output "ok   window size: $($case.Name)" }
+        else { $script:selfTestFailed += 1; Write-Output "FAIL window size: $($case.Name) -> '$problems', expected '$($case.Problems)'" }
     }
 
     # The interface_total gate runs against copies of the budget that record their own baseline.v3.
@@ -474,7 +542,7 @@ function Invoke-SelfTest {
     foreach ($case in $v3Cases) {
         $copy = $budget | ConvertTo-Json -Depth 20 | ConvertFrom-Json
         $copy.baseline.v3 = $case.V3
-        $runs = Get-FixtureRuns $vsyncOn
+        $runs = Get-FixtureRuns $vsyncOn $copy
         if ($case.Strip) {
             $target = @($runs | Where-Object { $_.Scene -eq 'progressed-peak' -and $_.Size -eq 'normal' })[0]
             $report = $target.Report | ConvertTo-Json -Depth 20 | ConvertFrom-Json
@@ -525,7 +593,7 @@ function Invoke-SelfTest {
     )
     foreach ($case in $cloneCases) {
         $extra = Get-SaveCloneCheck $case.Report $case.Profile $budget
-        Test-BudgetCase "save clone: $($case.Name)" (Get-FixtureRuns $within) $withinContext $fixtureBudget $case.Expected $case.Checks @($extra)
+        Test-BudgetCase "save clone: $($case.Name)" (Get-FixtureRuns $within $fixtureBudget) $withinContext $fixtureBudget $case.Expected $case.Checks @($extra)
     }
 
     # powercfg localizes the plan name (German here), so every built-in plan is named by its GUID; another plan keeps
@@ -695,7 +763,7 @@ try {
                     if ($result.ExitCode -ne 0) { throw "Run $attemptStem failed with exit code $($result.ExitCode); see $($result.Err)" }
                     if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) { throw "Run $attemptStem wrote no report; see $($result.Err)" }
                     $report = Read-JsonFile $reportPath
-                    [pscustomobject]@{ Report = $report; Problems = (Test-PerfReport $report $sceneName $expect); Seconds = $result.Seconds }
+                    [pscustomobject]@{ Report = $report; Problems = (Test-PerfReport $report $sceneName $expect $sizeBudget $sizeName); Seconds = $result.Seconds }
                 }
                 $runs.Add([pscustomobject]@{
                         Scene = $sceneName; Size = $sizeName; Repeat = $repeatIndex; File = "$stem.json"
