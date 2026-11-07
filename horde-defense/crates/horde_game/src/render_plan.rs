@@ -5,7 +5,8 @@
 //! - Present mode and window mode apply live (`apply_display_settings`).
 //! - Pipelined rendering is a plugin choice, so it applies only on restart.
 //! - A `LASTLIGHT_PERF_PRESENT_MODE` or `LASTLIGHT_PERF_PIPELINED` value wins
-//!   over settings and is recorded as the plan's source in the frame report.
+//!   over settings for its own half of the plan, and the frame report records
+//!   each half's source (`present.source`, `present.pipelined_source`).
 use crate::{
     launch::{LaunchConfig, PerfOptions, PresentModeOverride},
     settings::{Settings, WindowModeSetting},
@@ -51,17 +52,18 @@ pub fn window_mode_for(setting: WindowModeSetting, monitor: MonitorSelection) ->
     }
 }
 
-/// Where the plan's present mode and pipelined state came from.
+/// Where one half of the plan (present mode, or pipelined state) came from.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PlanSource {
     /// The startup settings read.
     Settings,
-    /// `LASTLIGHT_PERF_PRESENT_MODE` or `LASTLIGHT_PERF_PIPELINED` set part
-    /// of the plan; settings then never change the present mode live.
+    /// A launch override set it: `LASTLIGHT_PERF_PRESENT_MODE` for the
+    /// present mode, which settings then never change live, or
+    /// `LASTLIGHT_PERF_PIPELINED` for pipelining.
     LaunchOverride,
 }
 impl PlanSource {
-    /// The frame report's `present.source`.
+    /// The frame report's `present.source` and `present.pipelined_source`.
     #[cfg(feature = "review")]
     pub fn label(self) -> &'static str {
         match self {
@@ -79,7 +81,10 @@ pub struct RenderPlan {
     pub pipelined: bool,
     /// The window mode the window is created with (primary monitor).
     pub window_mode: WindowMode,
+    /// Where `present_mode` came from.
     pub source: PlanSource,
+    /// Where `pipelined` came from.
+    pub pipelined_source: PlanSource,
 }
 
 /// The plan for `settings`; any perf override wins over them.
@@ -94,11 +99,15 @@ pub fn render_plan(settings: &Settings, perf: Option<&PerfOptions>) -> RenderPla
         pipelined: pipelined_for(settings.low_latency, pipelined_override),
         // A new window has no current monitor yet.
         window_mode: window_mode_for(settings.window_mode, MonitorSelection::Primary),
-        source: if present_override.is_some() || pipelined_override.is_some() {
-            PlanSource::LaunchOverride
-        } else {
-            PlanSource::Settings
-        },
+        source: plan_source(present_override.is_some()),
+        pipelined_source: plan_source(pipelined_override.is_some()),
+    }
+}
+fn plan_source(overridden: bool) -> PlanSource {
+    if overridden {
+        PlanSource::LaunchOverride
+    } else {
+        PlanSource::Settings
     }
 }
 
@@ -165,8 +174,8 @@ impl Plugin for DisplayPlugin {
     }
 }
 
-/// Writes the primary window's mode and, unless a launch override fixed it,
-/// its present mode, each only when it differs. Pipelined rendering never
+/// Writes the primary window's mode and, unless `LASTLIGHT_PERF_PRESENT_MODE`
+/// fixed it, its present mode, each only when it differs. Pipelined rendering never
 /// changes here.
 pub fn apply_display_settings(
     settings: Res<Settings>,
@@ -233,6 +242,7 @@ mod tests {
                 );
                 assert_eq!(plan.present_mode, expected, "{setting:?}");
                 assert_eq!(plan.source, PlanSource::LaunchOverride);
+                assert_eq!(plan.pipelined_source, PlanSource::Settings);
             }
         }
         // A perf launch without overrides still follows settings.
@@ -259,7 +269,8 @@ mod tests {
         assert!(!render_plan(&settings(true, true), None).pipelined);
         let overridden = render_plan(&settings(true, true), Some(&perf(None, Some(true))));
         assert!(overridden.pipelined);
-        assert_eq!(overridden.source, PlanSource::LaunchOverride);
+        assert_eq!(overridden.pipelined_source, PlanSource::LaunchOverride);
+        assert_eq!(overridden.source, PlanSource::Settings);
         // Low latency still asks for Mailbox when only pipelining is overridden.
         assert_eq!(overridden.present_mode, PresentMode::Mailbox);
         let plugins = |plan: &RenderPlan| {
@@ -281,6 +292,7 @@ mod tests {
                 pipelined: true,
                 window_mode: WindowMode::Windowed,
                 source: PlanSource::Settings,
+                pipelined_source: PlanSource::Settings,
             }
         );
         let window = primary_window(&LaunchConfig::default(), &plan);
@@ -374,6 +386,24 @@ mod tests {
                 WindowMode::BorderlessFullscreen(MonitorSelection::Current)
             )
         );
+    }
+
+    /// W1 review: `LASTLIGHT_PERF_PIPELINED` alone fixes only pipelining, so
+    /// VSync and Low latency still apply live and the present mode's source
+    /// stays settings.
+    #[test]
+    fn pipelined_override_alone_leaves_present_mode_to_settings() {
+        let plan = render_plan(&Settings::default(), Some(&perf(None, Some(false))));
+        assert!(!plan.pipelined);
+        assert_eq!(plan.source, PlanSource::Settings);
+        assert_eq!(plan.pipelined_source, PlanSource::LaunchOverride);
+        let mut app = display_app(plan);
+        app.world_mut().resource_mut::<Settings>().vsync = false;
+        app.update();
+        assert_eq!(window(&mut app).0, PresentMode::AutoNoVsync);
+        app.world_mut().resource_mut::<Settings>().low_latency = true;
+        app.update();
+        assert_eq!(window(&mut app).0, PresentMode::Mailbox);
     }
 
     #[test]

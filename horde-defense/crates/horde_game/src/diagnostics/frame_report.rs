@@ -85,9 +85,11 @@ pub(super) struct EndState {
 #[derive(Clone, Debug, Default, Serialize)]
 pub(super) struct Present {
     pub requested_mode: String,
-    /// `settings` or `launch-override`.
+    /// Where `requested_mode` came from: `settings` or `launch-override`.
     pub source: &'static str,
     pub pipelined_rendering: bool,
+    /// Where the pipelined plan came from: `settings` or `launch-override`.
+    pub pipelined_source: &'static str,
     pub desired_maximum_frame_latency: Option<u32>,
     pub low_latency: bool,
 }
@@ -903,7 +905,7 @@ pub fn capture_performance(
         ResMut<crate::runner::Runtime>,
         ResMut<crate::ui::StatusUi>,
     ),
-    // The plan says whether a launch override set the present mode.
+    // The plan says whether a launch override set the present mode or pipelining.
     (window, plan): (Single<&Window>, Option<Res<crate::render_plan::RenderPlan>>),
     RendererInfo {
         adapter,
@@ -1028,8 +1030,9 @@ pub fn capture_performance(
         },
         present: Present {
             requested_mode: format!("{:?}", window.present_mode),
-            source: plan.map_or("settings", |plan| plan.source.label()),
+            source: plan.as_ref().map_or("settings", |plan| plan.source.label()),
             pipelined_rendering: probe.pipelined(),
+            pipelined_source: plan.map_or("settings", |plan| plan.pipelined_source.label()),
             desired_maximum_frame_latency: window.desired_maximum_frame_latency.map(|n| n.get()),
             low_latency: settings.as_ref().is_some_and(|s| s.low_latency),
         },
