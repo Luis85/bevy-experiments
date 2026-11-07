@@ -27,12 +27,17 @@ pub use migrations::SAVE_VERSION;
 pub(crate) use migrations::V7_MILESTONE_RANKS;
 use npc::structure_bonus;
 pub use pacing::{
-    ArchetypeRun, DEFAULT_PROFILE_ID, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, LEGACY_PROFILE_IDS,
-    Milestone, MilestoneStats, PacingAim, PacingDefender, PacingFarm, PacingPlan, PacingProfile,
-    PacingReport, PacingRun, PacingSell, PacingSpend, UNLOCK_ORDER, by_id, median_earned_after,
-    median_run_within, node_depths, node_retired, nodes_left, pacing_archetype_ids,
-    pacing_profiles, pacing_registry, pacing_seed, pacing_sweep, pacing_sweep_with_threads,
-    simulate_pacing, simulate_pacing_seed, tier_affordable_runs, tier_cost, tree_exhausted,
+    ArchetypeRun, DEFAULT_PROFILE_ID, DefeatWindow, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS,
+    GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT, GOAL6_LUX_EASY_MAX_RUNS,
+    GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS, GOAL6_START_PROFILE_IDS,
+    GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, LEGACY_PROFILE_IDS, Milestone,
+    MilestoneStats, PacingAim, PacingDefender, PacingFarm, PacingPlan, PacingProfile, PacingReport,
+    PacingRun, PacingSell, PacingSpend, RunsToLiberate, UNLOCK_ORDER, archetype_coverage,
+    boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows, defeat_windows,
+    longest_win_streak, max_win_streak, median_earned_after, median_run_within, node_depths,
+    node_retired, nodes_left, pacing_archetype_ids, pacing_profiles, pacing_registry, pacing_seed,
+    pacing_sweep, pacing_sweep_with_threads, runs_to_liberate, simulate_pacing,
+    simulate_pacing_seed, tier_affordable_runs, tier_cost, tree_exhausted,
     tree_outlasts_liberation, unlock_order,
 };
 pub use parallel::SettlementIssue;

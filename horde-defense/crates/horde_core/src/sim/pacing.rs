@@ -7,8 +7,16 @@
 //! variation ([`pacing_seed`]), a threaded sweep ([`pacing_sweep`]) and
 //! milestone statistics over seeds ([`MilestoneStats`]). Other remits add
 //! registry rows and evaluators on this API. The goal-5 evaluators (W2-03)
-//! live in [`targets`].
+//! live in [`targets`], the goal-6 rows' evaluators (W2-04) in [`goal6`].
+mod goal6;
 mod targets;
+pub use goal6::{
+    DefeatWindow, GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT,
+    GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
+    GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS,
+    RunsToLiberate, archetype_coverage, boss_ttk_median_s, clamped_start_first_victory,
+    defeat_rate_windows, defeat_windows, longest_win_streak, max_win_streak, runs_to_liberate,
+};
 pub use targets::{
     GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, UNLOCK_ORDER, median_run_within, tier_affordable_runs,
     tree_outlasts_liberation, unlock_order,
@@ -120,8 +128,22 @@ pub const DEFAULT_PROFILE_ID: &str = "expert-deu";
 /// The profiles the default table prints, in column order. Their output at
 /// one seed is the pre-v2 table.
 pub const LEGACY_PROFILE_IDS: [&str; 3] = ["expert-deu", "novice-deu", "novice-gear-lux"];
+/// The expert, tree-first player of the acceptance profile, on Normal, for
+/// the goal-6 rows to vary by country, preset and stop.
+const GOAL6_PLAYER: PacingProfile = PacingProfile {
+    id: "",
+    name: "",
+    seed: 0x1A571167,
+    country: "",
+    aim: PacingAim::Expert,
+    spend: PacingSpend::Recommended,
+    max_runs: 20,
+    difficulty: BalancePreset::Normal,
+    plan: PacingPlan::SOLO,
+    stop_after: None,
+};
 /// Every named profile. Ids are stable and unique; rows are appended.
-const REGISTRY: [PacingProfile; 3] = [
+const REGISTRY: [PacingProfile; 8] = [
     PacingProfile {
         id: "expert-deu",
         name: "expert, tree first, Germany",
@@ -157,6 +179,47 @@ const REGISTRY: [PacingProfile; 3] = [
         difficulty: BalancePreset::Normal,
         plan: PacingPlan::SOLO,
         stop_after: None,
+    },
+    // Goal 6 (W2-04, ruling W-4): Luxembourg runs to liberate per preset,
+    // each stopping at the first liberation within 20 runs.
+    PacingProfile {
+        id: "lux-easy",
+        name: "expert, tree first, Luxembourg, Easy",
+        country: "LUX",
+        difficulty: BalancePreset::Easy,
+        stop_after: Some(Milestone::Liberation(1)),
+        ..GOAL6_PLAYER
+    },
+    PacingProfile {
+        id: "lux-normal",
+        name: "expert, tree first, Luxembourg, Normal",
+        country: "LUX",
+        stop_after: Some(Milestone::Liberation(1)),
+        ..GOAL6_PLAYER
+    },
+    PacingProfile {
+        id: "lux-hard",
+        name: "expert, tree first, Luxembourg, Hard",
+        country: "LUX",
+        difficulty: BalancePreset::Hard,
+        stop_after: Some(Milestone::Liberation(1)),
+        ..GOAL6_PLAYER
+    },
+    // The clamped starts: only the first victory is checked, so each stops
+    // there within 20 runs.
+    PacingProfile {
+        id: "start-aut",
+        name: "expert, tree first, Austria start",
+        country: "AUT",
+        stop_after: Some(Milestone::FirstVictory),
+        ..GOAL6_PLAYER
+    },
+    PacingProfile {
+        id: "start-bgd",
+        name: "expert, tree first, Bangladesh start",
+        country: "BGD",
+        stop_after: Some(Milestone::FirstVictory),
+        ..GOAL6_PLAYER
     },
 ];
 /// Every registered profile, in registry order.

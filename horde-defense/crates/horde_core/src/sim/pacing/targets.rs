@@ -29,11 +29,11 @@ pub const GOAL5_FIRST_VICTORY: RangeInclusive<usize> = 2..=4;
 pub const GOAL5_TIER_WINDOWS: [(usize, RangeInclusive<usize>); 3] =
     [(1, 3..=5), (2, 7..=9), (3, 11..=13)];
 
-fn stats_of(reports: &[PacingReport], m: Milestone) -> Result<MilestoneStats, String> {
+pub(super) fn stats_of(reports: &[PacingReport], m: Milestone) -> Result<MilestoneStats, String> {
     MilestoneStats::of(reports, m).ok_or_else(|| "no pacing reports to evaluate".to_owned())
 }
 /// The largest `max_runs` of the sweep, for printing missed milestones.
-fn max_runs(reports: &[PacingReport]) -> usize {
+pub(super) fn max_runs(reports: &[PacingReport]) -> usize {
     reports
         .iter()
         .map(|r| r.profile.max_runs)
@@ -41,14 +41,14 @@ fn max_runs(reports: &[PacingReport]) -> usize {
         .unwrap_or(0)
 }
 /// A run count as a table prints it: above `max_runs` is `>max_runs`.
-fn run_cell(run: usize, max_runs: usize) -> String {
+pub(super) fn run_cell(run: usize, max_runs: usize) -> String {
     if run > max_runs {
         format!(">{max_runs}")
     } else {
         run.to_string()
     }
 }
-fn verdict(problems: Vec<String>, summary: String) -> Result<String, String> {
+pub(super) fn verdict(problems: Vec<String>, summary: String) -> Result<String, String> {
     if problems.is_empty() {
         Ok(summary)
     } else {
