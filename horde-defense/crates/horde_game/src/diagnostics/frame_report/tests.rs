@@ -809,11 +809,44 @@ fn a_replaced_render_frame_still_attributes_the_channel_wait() {
 
 #[test]
 fn ui_scale_is_the_drawn_scale_not_the_launch_request() {
+    use crate::launch::{LaunchConfig, PerfOptions, ReviewOptions};
+    // A perf launch whose LASTLIGHT_REVIEW_SCALE request (1.5) differs from
+    // every scale the live settings hold.
+    let config = LaunchConfig {
+        scenario: Some("peak".into()),
+        review: Some(ReviewOptions {
+            scale: Some(1.5),
+            perf: PerfOptions {
+                report: Some("frame-report.json".into()),
+                cpu: Some("test cpu".into()),
+                profile_label: Some("release".into()),
+                ..default()
+            },
+            ..default()
+        }),
+        ..default()
+    };
     let with = |scale| crate::settings::Settings { scale, ..default() };
-    // A saved 1.2 with no review request is drawn at 1.2.
-    assert_eq!(report_ui_scale(Some(&with(1.2))), 1.2);
-    // A request past the slider's range is drawn at the clamp.
-    assert_eq!(report_ui_scale(Some(&with(1.5))), 1.35);
-    assert_eq!(report_ui_scale(Some(&with(0.5))), 0.75);
-    assert_eq!(report_ui_scale(None), 1.0);
+    let ui_scale = |settings: Option<&crate::settings::Settings>| {
+        ReportInput::from_launch(&config, settings).ui_scale
+    };
+    // A saved 1.2 is drawn at 1.2, whatever the launch requested.
+    assert_eq!(ui_scale(Some(&with(1.2))), 1.2);
+    // A scale past the slider's range is drawn at the clamp.
+    assert_eq!(ui_scale(Some(&with(1.5))), 1.35);
+    assert_eq!(ui_scale(Some(&with(0.5))), 0.75);
+    // Without settings egui keeps its default zoom.
+    assert_eq!(ui_scale(None), 1.0);
+    let input = ReportInput::from_launch(&config, None);
+    assert_eq!(
+        (input.scene.as_str(), input.cpu.as_str()),
+        ("peak", "test cpu")
+    );
+    assert_eq!(input.profile_label.as_deref(), Some("release"));
+    let ordinary = ReportInput::from_launch(&LaunchConfig::default(), None);
+    assert_eq!(
+        (ordinary.scene.as_str(), ordinary.cpu.as_str()),
+        ("ordinary-session", "not recorded")
+    );
+    assert_eq!(ordinary.profile_label, None);
 }

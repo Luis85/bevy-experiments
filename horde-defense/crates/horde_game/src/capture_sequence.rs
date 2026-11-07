@@ -53,23 +53,24 @@ fn decimal(value: f32) -> f64 {
 }
 /// The motion `manifest.json`, version 2: version 1 plus the run's effective
 /// reduced-effects setting, the logical window size in points, the UI scale
-/// and the Windows display scale (PNG pixels per point), so capture_motion can
-/// prove which mode and viewport produced the frames.
+/// egui draws at (`settings::applied_scale` of the live settings, never the
+/// raw saved or requested value) and the Windows display scale (PNG pixels per
+/// point), so capture_motion can prove which mode and viewport produced the
+/// frames.
 fn sequence_manifest(
     scene: Option<&str>,
-    reduced_effects: bool,
+    settings: &crate::settings::Settings,
     (width, height): (u32, u32),
-    scale: f32,
     windows_scale: f32,
     frames: &[SequenceFrame],
 ) -> serde_json::Value {
     serde_json::json!({
         "version": 2,
         "scene": scene,
-        "reduced_effects": reduced_effects,
+        "reduced_effects": settings.reduced_effects,
         "width": width,
         "height": height,
-        "scale": decimal(scale),
+        "scale": decimal(crate::settings::applied_scale(settings.scale)),
         "windows_scale": decimal(windows_scale),
         "timing": "Fixed presentation timestep per native frame; authoritative ticks advance only in combat fixtures. NOT a real-time FPS measurement",
         "nominal_video_fps": 60 / STEP,
@@ -192,10 +193,8 @@ pub fn capture_frames(
         };
         let report = sequence_manifest(
             config.scenario.as_deref(),
-            settings.reduced_effects,
+            &settings,
             viewport,
-            // The zoom egui draws at, not the raw request.
-            crate::settings::applied_scale(settings.scale),
             windows_scale,
             &state.records,
         );
@@ -222,7 +221,13 @@ mod tests {
     use super::*;
     #[test]
     fn manifest_records_reduced_effects_and_viewport() {
-        let manifest = sequence_manifest(Some("peak"), true, (1050, 700), 1.35, 2.0, &[]);
+        let settings = |scale, reduced_effects| crate::settings::Settings {
+            scale,
+            reduced_effects,
+            ..default()
+        };
+        let manifest =
+            sequence_manifest(Some("peak"), &settings(1.35, true), (1050, 700), 2.0, &[]);
         assert_eq!(manifest["version"], 2);
         assert_eq!(manifest["scene"], "peak");
         assert_eq!(manifest["reduced_effects"], true);
@@ -233,7 +238,7 @@ mod tests {
         assert_eq!(manifest["windows_scale"], 2.0);
         assert_eq!(manifest["nominal_video_fps"], 15);
         assert_eq!(manifest["frames"], serde_json::json!([]));
-        let normal = sequence_manifest(None, false, (1440, 900), 1.0, 1.0, &[]);
+        let normal = sequence_manifest(None, &settings(1.0, false), (1440, 900), 1.0, &[]);
         assert_eq!(normal["reduced_effects"], false);
         assert_eq!(normal["scene"], serde_json::Value::Null);
         assert_eq!(
@@ -241,6 +246,18 @@ mod tests {
             (1440.into(), 900.into())
         );
         assert_eq!(normal["scale"], 1.0);
+    }
+    #[test]
+    fn manifest_scale_is_the_drawn_scale_not_the_saved_value() {
+        let scale = |scale| {
+            let settings = crate::settings::Settings { scale, ..default() };
+            sequence_manifest(None, &settings, (1440, 900), 1.0, &[])["scale"].clone()
+        };
+        // In range, the saved scale is the drawn one.
+        assert_eq!(scale(1.2), 1.2);
+        // Past the slider's range egui draws at the clamp, so the manifest does too.
+        assert_eq!(scale(1.5), 1.35);
+        assert_eq!(scale(0.5), 0.75);
     }
     #[test]
     fn manifest_viewport_is_measured_from_the_primary_window_or_refused() {

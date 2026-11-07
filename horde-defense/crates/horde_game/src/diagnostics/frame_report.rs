@@ -887,10 +887,29 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
     }
 }
 
-/// The interface scale the report records: the zoom egui draws at
-/// (`settings::applied_scale` of the live settings), not a launch request.
-pub(super) fn report_ui_scale(settings: Option<&crate::settings::Settings>) -> f32 {
-    settings.map_or(1., |s| crate::settings::applied_scale(s.scale))
+impl ReportInput {
+    /// The fields the launch and the live settings decide; `capture_performance`
+    /// fills the measured rest. `ui_scale` is the zoom egui draws at
+    /// (`settings::applied_scale` of the live settings), never the
+    /// `LASTLIGHT_REVIEW_SCALE` request.
+    pub(super) fn from_launch(
+        config: &crate::launch::LaunchConfig,
+        settings: Option<&crate::settings::Settings>,
+    ) -> Self {
+        let perf = config.perf();
+        Self {
+            scene: config
+                .scenario
+                .clone()
+                .unwrap_or_else(|| "ordinary-session".into()),
+            cpu: perf
+                .and_then(|perf| perf.cpu.clone())
+                .unwrap_or_else(|| "not recorded".into()),
+            ui_scale: settings.map_or(1., |s| crate::settings::applied_scale(s.scale)),
+            profile_label: perf.and_then(|perf| perf.profile_label.clone()),
+            ..default()
+        }
+    }
 }
 
 /// The renderer resources the report reads; any may be absent.
@@ -995,15 +1014,7 @@ pub fn capture_performance(
     }
     state.done = true;
     let attempt = session.game.attempt();
-    let perf = config.perf();
     let input = ReportInput {
-        scene: config
-            .scenario
-            .clone()
-            .unwrap_or_else(|| "ordinary-session".into()),
-        cpu: perf
-            .and_then(|perf| perf.cpu.clone())
-            .unwrap_or_else(|| "not recorded".into()),
         adapter: adapter
             .as_ref()
             .map_or_else(|| "not reported".into(), |a| a.name.clone()),
@@ -1013,7 +1024,6 @@ pub fn capture_performance(
         width_physical: window.resolution.physical_width(),
         height_physical: window.resolution.physical_height(),
         windows_scale: f64::from(window.resolution.scale_factor()),
-        ui_scale: report_ui_scale(settings.as_deref()),
         warmup_frames: state.warmup,
         requested_sample_frames: state.target_samples,
         frames: std::mem::take(&mut state.samples),
@@ -1042,7 +1052,6 @@ pub fn capture_performance(
             desired_maximum_frame_latency: window.desired_maximum_frame_latency.map(|n| n.get()),
             low_latency: settings.as_ref().is_some_and(|s| s.low_latency),
         },
-        profile_label: perf.and_then(|perf| perf.profile_label.clone()),
         gpu_support: device
             .as_ref()
             .zip(adapter.as_ref())
@@ -1063,6 +1072,8 @@ pub fn capture_performance(
                 .collect()
         }),
         pipelined: probe.pipelined(),
+        // Scene, CPU, profile label and the drawn UI scale.
+        ..ReportInput::from_launch(&config, settings.as_deref())
     };
     let report = build_report(&input);
     let path = state.path.as_ref().expect("configured report");
