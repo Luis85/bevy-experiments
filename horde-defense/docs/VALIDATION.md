@@ -435,6 +435,17 @@ Final documentation checks passed **69 source-backed Views**, retaining all 64 p
 
 **Debug recordings made under ruleset 1 are not expected to reproduce across the strict-sale change.** Replay still loads their initial state through the save migration, applies every recorded command and reaches the end line, but a recorded sale of an equipped, preset or recruit-equipped item is now a typed rejection, so the final digest can differ. Replay warns that the recording was made under ruleset 1 (and, for v6 headers, save version 6). `pre_strict_recording_diverges_with_ruleset_warning` pins this with the v6 equipped-sale fixture. Recording FORMAT stays 1.
 
+## save_v6.json as cut — 5 November 2026 (W1-01, recorded 7 November in the W1 review)
+
+`crates/horde_core/tests/fixtures/save_v6.json` does not match the plan in schema-v7.md §11 on four points. The plan has not been changed and no ruling covers the differences; this note only records them.
+
+- **Size:** 120,842 bytes, against the planned "at most 64 KB". No test bounds the v6 fixture size; only `save_v7.json` has a byte bound (`V7_FIXTURE_MAX_BYTES`, 96 KB).
+- **Player level:** `campaign.player.level` is 33, not the planned 12. The live Personal attempt is at rank 14 and tick 423, which meets "≥ 10" and "about tick 420".
+- **Run history:** `campaign.run_history` holds 14 records, not 1 main and 1 worker: 13 main records (one Custom and twelve Hard; 12 Personal and 1 Npc) and 1 Normal worker record. All 14 are victories, and `campaign.victories` is 14.
+- **Parent:** it was cut on parent `3d492cd`, not `7bd5de8`. `3d492cd` adds only wave-0 documents on top of `7bd5de8` and changes nothing under `crates/`, so the fixture is still a generation of untouched v6 code (SAVE_VERSION 6, RULESET 1).
+
+These differences come from the `--smoke` bot driving the writer through `Game::apply` (b82658a). The v6 pins and load tests were recorded on this file, and v6 saves can never be generated again ("v6 fixture timing" in design-save-determinism.md), so it stays as cut.
+
 ## Save clone — 6 November 2026 (W1-50)
 
 Every save copies the game on the main thread and hands the copy to the storage worker. That copy is now `Game::save_snapshot`, used at `runner/apply.rs` instead of `Game::clone`. It leaves out the never-saved state: the typed event outbox, the live attempt's queued records and the settlement issues, in the root game and in every expedition's worker game. It serializes to exactly the game's bytes (`save_snapshot_skips_transient_outbox_and_equals_serialized_state`).

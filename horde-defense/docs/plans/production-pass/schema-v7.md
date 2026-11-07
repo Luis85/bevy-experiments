@@ -381,6 +381,8 @@ The 13 existing keys and `bindings: [String; 8]` are unchanged.
   - the 10k-tuple quality-roll table;
   - the v6 item stat/value table.
 
+  **As cut (annotation, 7 November 2026, W1 review):** the fixture checked in by W1-01 (b82658a) is 120,842 bytes, has player level 33 and 14 run_history records (13 main and 1 worker), and was cut on parent 3d492cd (no `crates/` change from 7bd5de8). No ruling covers these differences. The plan above is unchanged; see VALIDATION.md "save_v6.json as cut".
+
   The same commit also cuts `recording_vocabulary_v1.json` (41 Command + 2 Input), `recording_v6_equipped_sale.jsonl` (a fresh new game: buy, Equip, SellItem the equipped item, End digest) and `crates/horde_game/tests/fixtures/settings_v0.json` (13 keys, custom bindings, effects 0.45).
 - **`save_v7.json` (W1-63, wave-1 close, then frozen; ≤ 96 KB).** It is staged through test-support seams: `stage_takeover`, `stage_review_*` for enemy state, receipts and summaries. It must pass `validate_game`, and every `V7_SAVED_KEYS` key must occur at a non-default value:
   - a live depth-0 Npc attempt with seat Recruit(a), that recruit Defending, its loadout reserved, `reserved_recruit` Some(a), appearance from the recruit identity, drop_ids, drop_tier Some;
