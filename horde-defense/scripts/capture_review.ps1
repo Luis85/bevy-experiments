@@ -12,6 +12,7 @@
 # arena_rect at the same size and mode; max-lanes (17x30) keeps the pre-zoom arena, canvas inset 24/124/24/84.
 # -Scenes defaults to every Still the binary lists; -SmallScenes defaults to -Scenes. List parameters accept
 # 'a,b' as one argument, because -File passes commas through verbatim.
+# A relative -OutputDirectory or -Executable resolves against the workspace, never the caller's directory.
 [CmdletBinding()]
 param(
     [string]$OutputDirectory = 'target/playtest-review/screenshots',
@@ -132,8 +133,7 @@ foreach ($mode in $modeList) {
 }
 if ($modeList.Count -eq 0) { throw 'No -Modes given' }
 
-if ([IO.Path]::IsPathRooted($OutputDirectory)) { $destination = [IO.Path]::GetFullPath($OutputDirectory) }
-else { $destination = [IO.Path]::GetFullPath((Join-Path $workspace $OutputDirectory)) }
+$destination = Resolve-WorkspacePath $OutputDirectory -Workspace $workspace
 if (Test-Path -LiteralPath $destination) {
     if (-not (Test-Path -LiteralPath $destination -PathType Container)) { throw "Output path is a file: $destination" }
     if (@(Get-ChildItem -LiteralPath $destination -Force).Count -gt 0) {
@@ -156,7 +156,7 @@ try {
         Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $tools 'cargo-build') | Out-Null
     }
     if ($Executable) {
-        $exe = [IO.Path]::GetFullPath($Executable)
+        $exe = Resolve-WorkspacePath $Executable -Workspace $workspace
         if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "No executable at $exe" }
     }
     else { $exe = Get-HordeExecutable -Profile dev }

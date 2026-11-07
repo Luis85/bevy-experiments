@@ -17,6 +17,18 @@ function Resolve-HordeTarget {
     return [IO.Path]::GetFullPath((Join-Path $Workspace $configured))
 }
 
+function Resolve-WorkspacePath {
+    # A rooted path is normalised as-is, a relative one is joined to the workspace. Never the process directory,
+    # which a caller's Set-Location does not move.
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Workspace = $script:NativeHordeWorkspace
+    )
+    if ([IO.Path]::IsPathRooted($Path)) { return [IO.Path]::GetFullPath($Path) }
+    return [IO.Path]::GetFullPath((Join-Path $Workspace $Path))
+}
+
 function Get-HordeExecutable {
     [CmdletBinding()]
     param(

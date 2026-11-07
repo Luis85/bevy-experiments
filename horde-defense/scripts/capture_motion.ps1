@@ -5,6 +5,7 @@
 # process logs, cargo log and the isolated LASTLIGHT_SAVE_DIR go to the sibling folder <OutputDirectory>.logs.
 # -Viewport normal is 1440x900 at UI scale 1.0, small is 1050x700 at 1.35 (capture_review's two sizes). The
 # version-2 manifest must report the requested reduced_effects, width, height and scale, plus windows_scale.
+# A relative -OutputDirectory or -Executable resolves against the workspace, never the caller's directory.
 [CmdletBinding()]
 param(
     # Any scene the binary's --list-scenes marks motion=true.
@@ -20,8 +21,7 @@ param(
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'lib\Native.ps1')
 $workspace = Split-Path -Parent $PSScriptRoot
-if ([IO.Path]::IsPathRooted($OutputDirectory)) { $directory = [IO.Path]::GetFullPath($OutputDirectory) }
-else { $directory = [IO.Path]::GetFullPath((Join-Path $workspace $OutputDirectory)) }
+$directory = Resolve-WorkspacePath $OutputDirectory -Workspace $workspace
 $logs = $directory.TrimEnd('\', '/') + '.logs'
 if (Test-Path -LiteralPath $directory) { throw "Use a fresh evidence directory: $directory" }
 if (Test-Path -LiteralPath $logs) { throw "Use a fresh evidence directory: $logs already exists" }
@@ -33,7 +33,7 @@ try {
         Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $logs 'cargo-build') | Out-Null
     }
     if ($Executable) {
-        $exe = [IO.Path]::GetFullPath($Executable)
+        $exe = Resolve-WorkspacePath $Executable -Workspace $workspace
         if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "No executable at $exe" }
     }
     else { $exe = Get-HordeExecutable -Profile dev }

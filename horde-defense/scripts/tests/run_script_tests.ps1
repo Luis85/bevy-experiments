@@ -318,6 +318,13 @@ try {
         Assert-Equal $rooted (Resolve-HordeTarget) 'rooted'
     }
 
+    Test-Case 'Resolve-WorkspacePath keeps a rooted path and joins a relative one to the workspace' {
+        $rooted = Join-Path $temporary 'rooted\file.exe'
+        Assert-Equal $rooted (Resolve-WorkspacePath $rooted) 'rooted'
+        Assert-Equal ([IO.Path]::GetFullPath((Join-Path $workspace 'target\debug\x.exe'))) (Resolve-WorkspacePath 'target/debug/x.exe') 'relative'
+        Assert-Equal (Join-Path $temporary 'x.exe') (Resolve-WorkspacePath 'x.exe' -Workspace $temporary) 'explicit workspace'
+    }
+
     Test-Case 'Get-HordeExecutable maps profiles and refuses missing builds' {
         $target = Join-Path $temporary 'exe-target'
         $env:CARGO_TARGET_DIR = $target
@@ -503,6 +510,27 @@ try {
         Assert-Equal 'arena [0, 0, 1440, 900], pre-zoom arena [24, 124, 1416, 816], 17x30' $details['max_lanes_keeps_pre_zoom_arena small max-lanes'] 'pre-zoom detail'
         $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: *' })
         Assert-Equal 7 $failLines.Count "one FAIL line per failed row; $log"
+    }
+
+    Test-Case 'capture_review and capture_motion resolve a relative -Executable against the workspace' {
+        # Started from another directory, the path must still name the helper relative to the workspace,
+        # as -OutputDirectory does, not the process directory.
+        $base = New-Object Uri (([IO.Path]::GetFullPath($workspace)).TrimEnd('\') + '\')
+        $relative = [Uri]::UnescapeDataString($base.MakeRelativeUri((New-Object Uri $helper)).ToString()).Replace('/', '\')
+        Assert-True (-not [IO.Path]::IsPathRooted($relative)) "relative helper path: $relative"
+        $elsewhere = Join-Path $temporary 'elsewhere'
+        New-Item -ItemType Directory -Force -Path $elsewhere | Out-Null
+        $review = Join-Path $scriptsDirectory 'capture_review.ps1'
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $review, '-NoBuild', '-Executable', $relative,
+            '-Scenes', 'battle', '-OutputDirectory', (Join-Path $temporary 'relative-captures'))
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-review-relative') -TimeoutSeconds 300 -WorkingDirectory $elsewhere
+        Assert-Equal 0 $r.ExitCode ('capture_review; out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+        $motion = Join-Path $scriptsDirectory 'capture_motion.ps1'
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $motion, '-NoBuild', '-Executable', $relative,
+            '-Scene', 'no-such-scene', '-OutputDirectory', (Join-Path $temporary 'relative-motion'))
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-motion-relative') -TimeoutSeconds 300 -WorkingDirectory $elsewhere
+        $log = (Read-Log $r.Out) + (Read-Log $r.Err)
+        Assert-True ($log -match 'Unknown motion scene') "capture_motion reached the scene list; $log"
     }
 }
 finally {
