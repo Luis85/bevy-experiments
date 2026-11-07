@@ -877,6 +877,7 @@ Pins:
 - `a_replaced_render_frame_still_attributes_the_channel_wait` and `close_keeps_the_slowest_present_since_the_previous_close`.
 - `driver_stall_in_process_work_reads_the_main_schedule_inside_the_window` (W1-61 review): a 500 ms frame with a 420 ms acquire and 70 ms of the previous sample's main schedule inside its window stays gated; with 30 ms it is a stall listed at 37.3 ms.
 - `driver_stall_needs_named_coverage_and_the_acquire_share` (W1-61 review): named coverage 0.90 stays gated; acquire share 0.79 is gated, 0.81 is a stall.
+- `driver_stall_needs_a_frame_over_50ms` (W1 review): a 16.7 ms and a 45 ms frame that hold 90% of their window in the acquire are not stalls and stay in `outside`; 50.0 ms is not a stall, 50.1 ms is.
 - `driver_stall_rule_matches_the_ruling`.
 - The `-SelfTest` fixtures `driver-stall` (exit 0) and `missing-driver-stalls` (exit 2).
 
