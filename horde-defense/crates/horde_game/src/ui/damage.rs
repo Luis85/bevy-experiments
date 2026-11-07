@@ -41,8 +41,11 @@ struct Bubble {
     target: Target,
     started: f64,
     /// The side of the struck hostile's health bar the popup went to, once
-    /// it met the bar; it then follows the bar there for the rest of its life.
-    beside: Option<Side>,
+    /// it met the bar, and the bar it last followed there; it follows the bar
+    /// on that side for the rest of its life, and stays beside the last bar
+    /// once none is painted (the hostile died of a hit merged into it, W1
+    /// review).
+    beside: Option<(Side, Rect)>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Side {
@@ -492,13 +495,18 @@ pub(super) fn draw_for(
         // bar instead, right or else left, still clear of the HUD (W1 review).
         // The bar walks on with the hostile, so the number follows the bar
         // painted this frame for the rest of its life, on the side it first
-        // took while that side stays on the field.
-        if let Some(bar) = struck_bar(a, arena, blend, &mut positions, bubble)
-            && (bubble.beside.is_some()
-                || Rect::from_center_size(center, galley.size())
-                    .expand(border)
-                    .intersects(bar))
-        {
+        // took while that side stays on the field; once no bar is painted
+        // (the hostile died, or is down critical), beside the last one.
+        let painted = struck_bar(a, arena, blend, &mut positions, bubble);
+        let bar = match (painted, bubble.beside) {
+            (Some(bar), Some(_)) => Some(bar),
+            (Some(bar), None) => Rect::from_center_size(center, galley.size())
+                .expand(border)
+                .intersects(bar)
+                .then_some(bar),
+            (None, beside) => beside.map(|(_, bar)| bar),
+        };
+        if let Some(bar) = bar {
             let half = galley.size().x * 0.5 + border;
             let right = bar.right() + KEEP_CLEAR_GAP + half;
             let left = bar.left() - KEEP_CLEAR_GAP - half;
@@ -513,11 +521,11 @@ pub(super) fn draw_for(
             let fits_right = bar.right() + KEEP_CLEAR_GAP + width <= arena.rect.right();
             let fits_left = bar.left() - KEEP_CLEAR_GAP - width >= arena.rect.left();
             let side = match bubble.beside {
-                Some(Side::Left) if fits_left || !fits_right => Side::Left,
+                Some((Side::Left, _)) if fits_left || !fits_right => Side::Left,
                 _ if fits_right => Side::Right,
                 _ => Side::Left,
             };
-            bubble.beside = Some(side);
+            bubble.beside = Some((side, bar));
             let x = if side == Side::Right { right } else { left };
             center = pos2(x, bar.center().y - rise);
             let beside = Rect::from_center_size(center, galley.size()).expand(border);
@@ -1254,6 +1262,88 @@ mod tests {
                 }
             }
         }
+    }
+    /// W1 review: a number beside the struck hostile's health bar stays
+    /// beside it for the rest of its life, even when a second hit merged into
+    /// it kills the hostile and the core reaps it the same tick. It stays
+    /// beside the bar it last followed, drawn as it is when the hostile lives
+    /// on, instead of jumping back over the corpse under the HUD.
+    #[test]
+    fn a_number_beside_the_bar_stays_there_when_a_merged_hit_kills_the_hostile() {
+        /// A wounded top-lane Runner at `x` struck at age 0 and again 0.1 s
+        /// later, the second hit merging into the first number and, with
+        /// `kill`, reaping the Runner: the bar painted at the first hit and
+        /// the number drawn at either hit.
+        fn struck_twice(
+            canvas: Rect,
+            zoom: f32,
+            (lanes, width): (u8, f32),
+            x: f32,
+            kill: bool,
+        ) -> (Rect, Rect, Rect) {
+            let (mut game, id) = top_lane_runner(lanes, width, x);
+            let a = game.attempt_mut().unwrap();
+            let enemy = &mut a.enemies[0];
+            enemy.hp = enemy.max_hp / 2;
+            let feet = [enemy.x, enemy.y()];
+            let struck = |a: &Attempt, value, seq| Event {
+                to: feet,
+                target_id: Some(id),
+                lane: Some(0),
+                ..hit(a, value, EventKind::Hit, seq)
+            };
+            let first = struck(a, 20, 1);
+            a.events.push_back(first);
+            let ctx = egui::Context::default();
+            crate::settings::install_font(&ctx);
+            crate::settings::configure(&ctx, zoom);
+            let mut state = Feedback::default();
+            let a = game.attempt().unwrap();
+            let (arena, drawn) = draw_kept_clear(&ctx, &mut state, a, canvas, 0.0);
+            let first = drawn.expect("a damage number is drawn");
+            let sy = arena.lane_height();
+            let [dx, dy] = crate::battle_view::crowd_stagger(id);
+            let bar = Rect::from_center_size(
+                arena.world(feet[0] + dx, feet[1] + dy) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
+                vec2(sy * 0.65, 3.0),
+            );
+            let a = game.attempt_mut().unwrap();
+            let second = struck(a, 40, 2);
+            a.events.push_back(second);
+            if kill {
+                a.enemies.clear();
+            }
+            let a = game.attempt().unwrap();
+            let (_, drawn) = draw_kept_clear(&ctx, &mut state, a, canvas, 0.1);
+            (bar, first, drawn.expect("the merged number is drawn"))
+        }
+        let mut moved_beside = 0;
+        for (size, zoom) in TARGET_SIZES {
+            let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+            for field in ZOOMED_FIELDS {
+                for x in (1..(field.1 / 0.8) as u32).map(|i| i as f32 * 0.8) {
+                    let (bar, first, lived) = struck_twice(canvas, zoom, field, x, false);
+                    let level =
+                        |drawn: Rect| drawn.top() < bar.bottom() && bar.top() < drawn.bottom();
+                    if !level(first) || first.intersects(bar) {
+                        continue;
+                    }
+                    moved_beside += 1;
+                    let (_, _, killed) = struck_twice(canvas, zoom, field, x, true);
+                    let label = format!("{}x{}, x {x} in {size:?}", field.0, field.1);
+                    assert!(
+                        (killed.center() - lived.center()).length() < 1.0,
+                        "{label}: beside the bar at {lived:?} while the hostile lives, the \
+                         number jumped to {killed:?} when it died"
+                    );
+                    assert!(
+                        level(killed),
+                        "{label}: the number at {killed:?} left the level of the bar at {bar:?}"
+                    );
+                }
+            }
+        }
+        assert!(moved_beside > 0, "no case put the number beside the bar");
     }
     /// The lift moves only on the 2.1-2.5x fields: 17x30, 11x20 and 7x16
     /// keep the fixed lift at both target sizes, with or without the hint
