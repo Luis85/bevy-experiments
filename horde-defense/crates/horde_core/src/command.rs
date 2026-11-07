@@ -227,10 +227,14 @@ impl fmt::Display for CommandError {
             Self::WalletLimit => f.write_str("Sale would exceed the wallet limit"),
             Self::AutoSellRuleInvalid(_) => f.write_str("Auto-sell threshold must be above Poor"),
             Self::NothingToSell => f.write_str("Nothing in the stash matches the auto-sell rule"),
-            Self::SaleQuoteChanged { count, coins } => write!(
-                f,
-                "The stash changed: auto-sell would now sell {count} items for {coins} coins"
-            ),
+            Self::SaleQuoteChanged { count, coins } => {
+                let items = if *count == 1 { "item" } else { "items" };
+                let unit = if *coins == 1 { "coin" } else { "coins" };
+                write!(
+                    f,
+                    "The stash changed: auto-sell would now sell {count} {items} for {coins} {unit}"
+                )
+            }
         }
     }
 }
@@ -778,5 +782,19 @@ mod tests {
             let text = error.to_string();
             assert!(!text.is_empty() && !text.contains("::"), "{text}");
         }
+    }
+
+    #[test]
+    fn sale_quote_changed_picks_nouns_by_count() {
+        let single = CommandError::SaleQuoteChanged { count: 1, coins: 1 };
+        assert_eq!(
+            single.to_string(),
+            "The stash changed: auto-sell would now sell 1 item for 1 coin"
+        );
+        let several = CommandError::SaleQuoteChanged { count: 2, coins: 5 };
+        assert_eq!(
+            several.to_string(),
+            "The stash changed: auto-sell would now sell 2 items for 5 coins"
+        );
     }
 }
