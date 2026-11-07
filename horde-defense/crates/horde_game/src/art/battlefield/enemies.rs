@@ -248,10 +248,10 @@ pub(super) fn windup_rings(view: &BattleViewModel) -> Vec<bool> {
         .collect()
 }
 
-/// The windup ground ring under the feet at `at`; the contact bands are drawn
-/// per lane first.
 /// How far over its feet, in lane heights, a hostile's health bar is centred.
 pub(crate) const HEALTH_BAR_LIFT: f32 = 0.41;
+/// The windup ground ring under the feet at `at`; the contact bands are drawn
+/// per lane first.
 fn windup_ring(mesh: &mut MeshBuilder, sy: f32, at: Pos2) {
     mesh.ring(
         at + vec2(0., sy * 0.3),
