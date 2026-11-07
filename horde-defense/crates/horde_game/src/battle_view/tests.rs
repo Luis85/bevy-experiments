@@ -919,3 +919,85 @@ fn a_stack_on_one_spot_is_drawn_apart_by_a_static_bounded_stagger() {
         assert_eq!(e.stagger, crowd_stagger(e.id));
     }
 }
+
+/// W1-69 review: every mark painted for a hostile an event struck (the hit
+/// cross, the kill blood and coin, the tracer end) lands on the drawn,
+/// crowd-staggered body, as the impact sparks do; a structure target, a
+/// miss into open ground and an explosion keep the event point.
+#[test]
+fn impact_marks_and_tracer_ends_land_on_the_drawn_hostile() {
+    use super::field::crowd_stagger;
+    use horde_core::sim::{Event, EventKind};
+    let mut game = fixture();
+    let a = game.attempt_mut().unwrap();
+    a.tick = 600;
+    let live = a.enemies[0].id;
+    let at = [a.enemies[0].x, a.enemies[0].y()];
+    let dead = a.next_id + 10;
+    let structure = a.next_id + 20;
+    let fallen = [14., 2.5];
+    a.corpses = vec![horde_core::sim::CorpseRecord {
+        id: dead,
+        kind: EnemyKind::Runner,
+        boss_kind: None,
+        at: fallen,
+        visual: None,
+        tick: 600,
+    }];
+    let event = |kind, from: [f32; 2], to: [f32; 2], value: i32, actor_id, target_id| Event {
+        kind,
+        from,
+        to,
+        value,
+        tick: 600,
+        actor_id,
+        target_id,
+        lane: Some(4),
+        duration_ticks: 0,
+        seq: value as u64,
+    };
+    let survivor = a.defender_position();
+    let turret = [9., 4.5];
+    a.events = vec![
+        // The survivor's own shot names no target; it ends on the hostile
+        // its impact this tick struck.
+        event(EventKind::Shot, survivor, at, 1, None, None),
+        event(EventKind::Hit, survivor, at, 2, None, Some(live)),
+        event(EventKind::WeakPoint, survivor, at, 3, None, Some(live)),
+        event(EventKind::Armor, survivor, at, 4, None, Some(live)),
+        event(EventKind::Melee, survivor, at, 5, None, Some(live)),
+        event(EventKind::Shot, turret, at, 6, Some(structure), Some(live)),
+        event(EventKind::Kill, fallen, fallen, 7, Some(dead), None),
+        event(EventKind::Hit, survivor, fallen, 8, None, Some(dead)),
+        event(
+            EventKind::Armor,
+            [20., 4.5],
+            turret,
+            9,
+            Some(live),
+            Some(structure),
+        ),
+        event(EventKind::Shot, survivor, [40., 6.5], 10, None, None),
+        event(EventKind::Explosion, [12., 3.5], [12., 3.5], 11, None, None),
+    ]
+    .into();
+    let view = view(a, SceneBlend::NONE);
+    let to = |value| view.fx.iter().find(|fx| fx.value == value).unwrap().to;
+    let staggered = |at: [f32; 2], id| {
+        let [dx, dy] = crowd_stagger(id);
+        [at[0] + dx, at[1] + dy]
+    };
+    assert_ne!(staggered(at, live), at, "the fixture hostile is staggered");
+    assert_ne!(staggered(fallen, dead), fallen);
+    let drawn = view.enemies.iter().find(|e| e.id == live).unwrap().drawn();
+    assert_eq!(drawn, staggered(at, live));
+    for value in 1..=6 {
+        assert_eq!(to(value), drawn, "event {value} ends on the drawn body");
+    }
+    for value in 7..=8 {
+        assert_eq!(to(value), staggered(fallen, dead), "event {value}");
+    }
+    assert_eq!(to(9), turret, "a structure target keeps its point");
+    assert_eq!(to(10), [40., 6.5], "a miss into open ground");
+    assert_eq!(to(11), [12., 3.5], "an explosion");
+}

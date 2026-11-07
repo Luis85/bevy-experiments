@@ -7,7 +7,7 @@ use horde_core::{
     content::{EnemyKind, StructureKind, content},
     enemy_catalog::EnemyVisual,
     ordnance::{self, OrdnanceKind},
-    sim::{Attempt, CorpseRecord, Enemy, EnemyCondition, EnemyPhase, EventKind},
+    sim::{Attempt, CorpseRecord, Enemy, EnemyCondition, EnemyPhase, Event, EventKind},
 };
 
 /// Figure height in lanes: `factor`, times the archetype scale when present.
@@ -115,6 +115,46 @@ pub fn crowd_stagger(id: u64) -> [f32; 2] {
         unit(0xC13F_A9A9_02A6_3000) * CROWD_STAGGER_YARDS,
         (unit(0x91E1_0DA5_C79E_7800) * 2.0 - 1.0) * CROWD_STAGGER_LANES,
     ]
+}
+
+/// The [`crowd_stagger`] of the hostile `event` struck or killed, so every
+/// mark painted for it (sparks, hit cross, kill blood and coin, tracer end,
+/// damage number) lands on the drawn body (W1-69 review); zero for any other
+/// target, such as a structure an enemy struck, and for a shot into open
+/// ground. The hostile may have died of the hit since.
+pub fn struck_stagger(a: &Attempt, event: &Event) -> [f32; 2] {
+    let id = match event.kind {
+        EventKind::Kill => event.actor_id,
+        // The survivor's own shot names no target: it ends on the farthest
+        // hostile it struck, whose impact this tick shares its end points.
+        EventKind::Shot if event.target_id.is_none() => a
+            .events
+            .iter()
+            .filter(|other| {
+                matches!(
+                    other.kind,
+                    EventKind::Hit | EventKind::WeakPoint | EventKind::Armor
+                ) && other.tick == event.tick
+                    && other.from == event.from
+                    && other.to == event.to
+            })
+            .find_map(|other| other.target_id),
+        EventKind::Shot
+        | EventKind::Hit
+        | EventKind::WeakPoint
+        | EventKind::Armor
+        | EventKind::Melee
+        | EventKind::Miss
+        | EventKind::Defended => event.target_id,
+        _ => None,
+    };
+    let Some(id) = id else {
+        return [0.; 2];
+    };
+    let since = a.corpses.partition_point(|corpse| corpse.tick < event.tick);
+    let hostile = a.enemies.iter().any(|e| e.id == id)
+        || a.corpses[since..].iter().any(|corpse| corpse.id == id);
+    if hostile { crowd_stagger(id) } else { [0.; 2] }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -277,6 +317,8 @@ pub struct FxView {
     pub kind: EventKind,
     pub age: f32,
     pub from: [f32; 2],
+    /// The event point, on the drawn body when a hostile was struck
+    /// ([`struck_stagger`]).
     pub to: [f32; 2],
     pub value: i32,
     pub lane: Option<u8>,
@@ -436,7 +478,10 @@ impl BattleViewModel {
                     kind: e.kind,
                     age: a.tick.saturating_sub(e.tick) as f32 / 60.0,
                     from: e.from,
-                    to: e.to,
+                    to: {
+                        let [dx, dy] = struck_stagger(a, e);
+                        [e.to[0] + dx, e.to[1] + dy]
+                    },
                     value: e.value,
                     lane: e.lane,
                     actor_id: e.actor_id,

@@ -59,10 +59,12 @@ fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
     } else {
         Target::Point(event.to.map(f32::to_bits))
     };
+    // Over a struck hostile the number rises from its drawn body.
+    let [dx, dy] = crate::battle_view::struck_stagger(a, event);
     Some(Bubble {
         kind,
         value: event.value,
-        at: event.to,
+        at: [event.to[0] + dx, event.to[1] + dy],
         target,
         started: 0.0,
     })
@@ -439,6 +441,53 @@ mod tests {
         assert_eq!(stream.active[0].value, 40);
         stream.observe(a, 10.05, true, false);
         assert_eq!(stream.active[0].value, 40);
+    }
+    /// W1-69 review: a number over a hostile rises from its drawn,
+    /// crowd-staggered body, alive or fallen this tick; a structure keeps the
+    /// event point.
+    #[test]
+    fn numbers_over_a_hostile_anchor_on_its_drawn_body() {
+        use crate::battle_view::crowd_stagger;
+        let mut game = fixture();
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        game.spawn_enemy(&mut a, horde_core::content::EnemyKind::Runner, 5, false);
+        *game.attempt_slot_mut() = Some(a);
+        let a = game.attempt_mut().unwrap();
+        let live = a.enemies.last().unwrap().id;
+        let at = [a.enemies.last().unwrap().x, a.enemies.last().unwrap().y()];
+        let dead = a.next_id + 10;
+        let structure = a.next_id + 20;
+        a.corpses = vec![horde_core::sim::CorpseRecord {
+            id: dead,
+            kind: horde_core::content::EnemyKind::Runner,
+            boss_kind: None,
+            at: [12.0, 5.5],
+            visual: None,
+            tick: a.tick,
+        }];
+        let a = game.attempt().unwrap();
+        let staggered = |at: [f32; 2], id| {
+            let [dx, dy] = crowd_stagger(id);
+            [at[0] + dx, at[1] + dy]
+        };
+        let struck = |to, target| Event {
+            to,
+            target_id: Some(target),
+            ..hit(a, 20, EventKind::Hit, 1)
+        };
+        assert_ne!(staggered(at, live), at);
+        assert_eq!(
+            classify(a, &struck(at, live)).unwrap().at,
+            staggered(at, live)
+        );
+        assert_eq!(
+            classify(a, &struck([12.0, 5.5], dead)).unwrap().at,
+            staggered([12.0, 5.5], dead)
+        );
+        assert_eq!(
+            classify(a, &struck([9.0, 4.5], structure)).unwrap().at,
+            [9.0, 4.5]
+        );
     }
     /// W1-64: popups at staggered ages, every kind, over 120 egui passes at
     /// both budget sizes (UI scale 1.0 and 1.35), each at windows scale 1 and

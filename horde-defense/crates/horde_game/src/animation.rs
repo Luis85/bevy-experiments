@@ -1,6 +1,6 @@
 //! Bounded cosmetic sampling. Tick/IDs/events are read-only inputs; no clocks,
 //! random draws, action decisions or hit geometry are written back to the core.
-use crate::battle_view::crowd_stagger;
+use crate::battle_view::{crowd_stagger, struck_stagger};
 use horde_core::{
     content::{BossKind, EnemyKind, Mode, StructureKind, content},
     ordnance::OrdnanceKind,
@@ -664,7 +664,7 @@ fn sample_event_particles(a: &Attempt, event: &Event, out: &mut Vec<Particle>) {
             }
         }
         EventKind::Hit | EventKind::WeakPoint | EventKind::Armor if age < 0.3 => {
-            let [dx, dy] = hostile_stagger(a, event);
+            let [dx, dy] = struck_stagger(a, event);
             let to = [event.to[0] + dx, event.to[1] + dy];
             for n in 0..3 {
                 let theta = noise(seed + n) * std::f32::consts::TAU;
@@ -708,18 +708,6 @@ fn sample_event_particles(a: &Attempt, event: &Event, out: &mut Vec<Particle>) {
         }
         _ => {}
     }
-}
-/// The crowd stagger of the hostile an impact `event` struck, so its sparks
-/// start on the drawn body (W1-69 review); zero for any other target, such as
-/// a structure an enemy struck. The hostile may have died of the hit since.
-fn hostile_stagger(a: &Attempt, event: &Event) -> [f32; 2] {
-    let Some(id) = event.target_id else {
-        return [0.; 2];
-    };
-    let since = a.corpses.partition_point(|corpse| corpse.tick < event.tick);
-    let hostile = a.enemies.iter().any(|e| e.id == id)
-        || a.corpses[since..].iter().any(|corpse| corpse.id == id);
-    if hostile { crowd_stagger(id) } else { [0.; 2] }
 }
 fn sample_weather(a: &Attempt, weather: WeatherKind, out: &mut Vec<Particle>) {
     if weather == WeatherKind::Calm {
