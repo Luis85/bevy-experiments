@@ -277,7 +277,7 @@ fn close_keeps_the_slowest_present_since_the_previous_close() {
 /// W1-33 review: egui_pass_ms opens only when bevy_egui's exclusive pass loop
 /// can start, so a PostUpdate system running beside the probe (here 8 ms,
 /// unordered against `EguiPostUpdateSet`) is never counted as egui work, in
-/// either registration order.
+/// either registration order, while work inside `EndPass` (5 ms) is.
 #[cfg(feature = "review")]
 #[test]
 fn egui_pass_excludes_unrelated_post_update_systems() {
@@ -306,15 +306,30 @@ fn egui_pass_excludes_unrelated_post_update_systems() {
                 .chain()
                 .in_set(EguiPostUpdateSet::EndPass),
         );
+        // 5 ms of egui work (or a descheduling) inside the span. Exclusive,
+        // so the sleeper never runs beside it.
+        app.add_systems(
+            PostUpdate,
+            (|_: &mut World| sleep_ms(5))
+                .in_set(EguiPostUpdateSet::EndPass)
+                .after(run_egui_context_pass_loop_system)
+                .before(end_pass_system),
+        );
         if !sleeper_first {
             app.add_systems(PostUpdate, sleeper);
         }
         for _ in 0..3 {
             app.update();
             let frame = app.world().resource::<PerfFrame>().0.clone().unwrap();
+            // Relative bounds, not absolute ones: a descheduling inside the
+            // span inflates the span and the frame alike (W1 review).
             assert!(
-                frame.egui_pass_ms < 4.0,
+                frame.egui_pass_ms >= 5.0,
                 "sleeper first {sleeper_first}: {frame:?}"
+            );
+            assert!(
+                frame.egui_pass_ms + 8.0 <= frame.main_cpu_ms,
+                "sleeper first {sleeper_first}: the 8 ms sleeper is outside the span: {frame:?}"
             );
         }
     }
@@ -324,8 +339,9 @@ fn egui_pass_excludes_unrelated_post_update_systems() {
 /// (re)configuration in `create_surfaces`, which bevy_render 0.20.1 orders
 /// only before `prepare_windows`, and the `PrepareViews` work ordered before
 /// it (here a 6 ms stand-in for `clear_view_attachments`) stay render-world
-/// CPU. The real systems are registered with false conditions: their render
-/// resources do not exist here.
+/// CPU, while a 4 ms wait inside the span is present wait. The real systems
+/// are registered with false conditions: their render resources do not exist
+/// here.
 #[cfg(feature = "review")]
 #[test]
 fn present_wait_excludes_surface_configuration() {
@@ -356,8 +372,13 @@ fn present_wait_excludes_surface_configuration() {
                 .in_set(RenderSystems::PrepareViews)
                 .before(create_surfaces),
             create_surfaces.run_if(|| false).before(prepare_windows),
+            // Its condition runs inside the span, after the begin mark, and
+            // stands in for a 4 ms swap-chain acquire (or a descheduling).
             prepare_windows
-                .run_if(|| false)
+                .run_if(|| {
+                    sleep_ms(4);
+                    false
+                })
                 .in_set(RenderSystems::PrepareViews),
         ),
     );
@@ -370,7 +391,12 @@ fn present_wait_excludes_surface_configuration() {
         app.update();
         let frame = app.world().resource::<PerfFrame>().0.clone().unwrap();
         let sample = frame.render.expect("the Render schedule ran");
-        assert!(sample.render_schedule_ms >= 6.0, "{sample:?}");
-        assert!(sample.present_wait_ms < 3.0, "{sample:?}");
+        // Relative bounds, not absolute ones: a descheduling inside the span
+        // inflates the span and the Render schedule alike (W1 review).
+        assert!(sample.present_wait_ms >= 4.0, "{sample:?}");
+        assert!(
+            sample.present_wait_ms + 6.0 <= sample.render_schedule_ms,
+            "the 6 ms PrepareViews work is outside the span: {sample:?}"
+        );
     }
 }
