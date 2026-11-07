@@ -5,8 +5,8 @@
 //! default (convention C1), so:
 //! - the v6 fixture, migrated, decodes into the v7 types and re-encodes to the
 //!   very same JSON (no field lost, renamed or written at its default);
-//! - the default game and every GOLDEN run write no v7 key, so wave 1 moves
-//!   no digest;
+//! - the default game and every GOLDEN run write no v7 key, so the v7 schema
+//!   fields move no digest;
 //! - every v7 field keeps a non-default value through a save round trip;
 //! - one v6-shaped object per touched type decodes and re-encodes unchanged;
 //! - `support::V7_SAVED_KEYS` lists exactly the fields the types serialize
@@ -642,9 +642,10 @@ fn v6_payload_round_trips_unchanged_through_v7_types() {
     );
 }
 
-/// Wave 1 moves no digest (schema-v7.md section 12): the default game and
-/// every GOLDEN run, live and after a withdrawal settles it into a report,
-/// write no registry key and no key path the v6 build did not write.
+/// The v7 schema fields move no digest (schema-v7.md section 12): the
+/// default game and every GOLDEN run, live and after a withdrawal settles it
+/// into a report, write no registry key and no key path the v6 build did not
+/// write.
 #[test]
 fn default_and_golden_games_serialize_no_v7_key() {
     let v6_paths = game_key_paths(&v6_payload());

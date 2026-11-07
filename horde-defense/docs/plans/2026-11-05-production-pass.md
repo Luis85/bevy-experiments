@@ -642,7 +642,7 @@ Digest ledger:
 
 | Wave | GOLDEN (6) | GAMEPLAY_TRACE (6) | V1-V6 continuation | RULESET |
 |---|---|---|---|---|
-| 1 | 0 | 0 | unchanged | 2 |
+| 1 | 1/6 (G, W1-69 re-bless, user decision) | 3/6 (G, W1-69) | unchanged | 2 |
 | 2 | F, T, C (+ G if a pick changes), one re-bless W2-49 | 0 expected | unchanged | 3 |
 | 3 | 0 | 0 | unchanged | 3 |
 | 4 | G, one re-bless W4-08 | G | unchanged (charges pin re-blessed with reason only if it moves) | 4 |
