@@ -213,6 +213,8 @@ Rules:
 - There is no `acknowledged` insert and no notice burst.
 - `Game::from_payload(value, version)` runs migrate, then reconcile, then validate. Debug replay uses it when `header.version < SAVE_VERSION`.
 
+**As cut (annotation, 7 November 2026, W1 review):** sub-step (d) as implemented by W1-24 (24c879f, `v7_milestones_claimed` in `sim/migrations.rs`) does not give each `battles[*].game.campaign` the parent's full set. It gives the parent's claims limited to `r <= min(parent rank, v6_rank(that campaign))`, so an expedition keeps only the claims its own v6 rank reached; the root is unchanged. Without the cap, a v6 expedition cloned below the parent's rank would carry a claim above its own rank, fail the `milestones_claimed` bound (section 3 table, checked by `validate_game` per section 5: each claim <= `progression_rank()` in every game), and that v6 save would not load. The pin is `v7_ledgers_mark_levels_paid_and_claim_reached_milestones_idempotently` (a rank-9 expedition under a rank-15 parent keeps `[5]`); SAVE_FORMAT.md step 5 documents the capped rule. The pseudo-code above is unchanged.
+
 ## 5. Save validation added in v7 (persistence.rs `validate_game`)
 
 **D7 seat and reservation rules:**
