@@ -508,9 +508,8 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
         "ruleset 2 refuses the equipped sale"
     );
     assert!(!report.matches_recording());
-    // The divergence is that sale: ruleset 2 refuses it as a typed
-    // SaleBlocked rejection that changes nothing, so the item stays owned and
-    // the recording without its final sale replays to the same state.
+    // Ruleset 2 refuses the sale as a typed SaleBlocked rejection that
+    // changes nothing, so the item stays owned.
     let mut again = game.clone();
     assert_eq!(
         again.apply(&Command::SellItem(sold)),
@@ -521,7 +520,20 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
         game.campaign().item(sold).is_some(),
         "the sold item is kept"
     );
-    assert_eq!(replay(without_sale).unwrap().digest, report.digest);
+    // The play before the sale is pinned here, because the recorded End
+    // digest cannot vouch for it. Rebuilding the ruleset 1 sale legally
+    // (equip the personal starter outfit, then sell) reaches
+    // 107ff7ceb7fde8d3, the same state as redoing the old unequip-and-replace
+    // sale by hand, and not the recorded 9308db57c71cb2f0. So the 2,592
+    // recorded combat ticks no longer replay as they did on v6. The expected
+    // cause is W1-69 (enemies never block each other), whose re-bless clause
+    // names this replay. With this pin, any further drift in the replayed
+    // combat, retreat, buy or equip fails the test, not only the sale.
+    assert_eq!(
+        hex(replay(without_sale).unwrap().digest),
+        "81559980e3a904d7",
+        "the replay of the recording up to its sale is pinned"
+    );
     // Only compatibility warnings, never a format or seed mismatch. A content
     // fingerprint warning is allowed: the fixture's fingerprint covers item
     // ids, and appending content moves it without changing this property.
