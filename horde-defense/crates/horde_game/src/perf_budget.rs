@@ -374,7 +374,21 @@ mod tests {
         let json = budget();
         let gpu = object(&json, "/hardware/integrated_gpu");
         assert_eq!(keys(gpu), BTreeSet::from(["status", "adapter", "report"]));
-        assert_eq!(gpu["adapter"], "Intel(R) Arc(TM) Graphics");
+        // The target laptop's integrated adapter as wgpu names it (W1-68's
+        // playtest-novsync-arc reports). Bevy picks an adapter only when the
+        // lowercased request is a substring of its name, so a request missing
+        // "Pro" silently runs on the NVIDIA GPU and every report is invalid.
+        const ADAPTER: &str = "Intel(R) Arc(TM) Pro Graphics";
+        assert_eq!(gpu["adapter"], ADAPTER);
+        let command = format!("measure_performance.ps1 -Adapter \"{ADAPTER}\"");
+        let plan_row = PLAN
+            .lines()
+            .find(|line| line.starts_with('|') && line.contains("Integrated-GPU run"))
+            .expect("the plan's human checks have an Integrated-GPU run row");
+        assert!(
+            plan_row.contains(&command),
+            "the plan row gives the protocol as {command}: {plan_row}"
+        );
         match gpu["status"].as_str() {
             Some("pending") => {
                 assert_eq!(gpu["report"], Value::Null, "a pending run has no report");
@@ -383,9 +397,8 @@ mod tests {
                     .find(|line| line.starts_with('|') && line.contains("Integrated-GPU run"))
                     .expect("docs/ACCEPTANCE.md has an Integrated-GPU run human-check row");
                 assert!(
-                    row.contains("pending human check")
-                        && row.contains("Intel(R) Arc(TM) Graphics"),
-                    "the ACCEPTANCE.md row logs the run as pending on the adapter: {row}"
+                    row.contains("pending human check") && row.contains(&command),
+                    "the ACCEPTANCE.md row logs the run as pending with {command}: {row}"
                 );
             }
             Some("measured") => assert!(

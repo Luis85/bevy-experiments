@@ -1060,7 +1060,7 @@ These have no automated substitute. Each is logged as "pending human check" in `
 | Night and storm look (grade, lightning, cue readability) | 5 | `night-checkpoint`, `storm`, `dawn-reference` captures and motion | pending |
 | Listening pass | 6-7 | PLAYTEST_GUIDE "Listening pass" section | pending |
 | Click-to-photon run | 7 | PLAYTEST_GUIDE protocol: 240 fps phone, 20 shots per row in 3 rows (default VSync, Low latency, VSync off); targets median ≤ 50 ms default and ≤ 34 ms Low latency | pending |
-| Integrated-GPU run | 1-7 | `measure_performance.ps1 -Adapter "Intel(R) Arc(TM) Graphics" -VsyncOff`; `PERF_BUDGET.json hardware.integrated_gpu.status` | pending |
+| Integrated-GPU run | 1-7 | `measure_performance.ps1 -Adapter "Intel(R) Arc(TM) Pro Graphics" -VsyncOff`; `PERF_BUDGET.json hardware.integrated_gpu.status` | pending |
 
 ---
 

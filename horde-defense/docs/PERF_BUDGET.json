@@ -6,7 +6,7 @@
     "backend": "Vulkan",
     "integrated_gpu": {
       "status": "pending",
-      "adapter": "Intel(R) Arc(TM) Graphics",
+      "adapter": "Intel(R) Arc(TM) Pro Graphics",
       "report": null
     }
   },
