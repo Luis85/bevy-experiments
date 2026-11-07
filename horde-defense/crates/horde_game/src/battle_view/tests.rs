@@ -582,14 +582,29 @@ fn field_view_reads_poses_and_blended_positions_without_id_lookups() {
     let a = game.attempt().unwrap();
     assert!(a.enemies.len() > 100, "a crowded progressed peak");
     assert!(!a.structures.is_empty());
-    builds::take_id_lookups();
-    let view = BattleViewModel::build(
-        a,
-        SceneAnimation::sample(a, false),
-        blend.scene(None, a),
-        false,
+    // Both in-place paths run: bodies are collapsing (each reads its saved
+    // record through `death_record`) and the blend moves enemies between
+    // the snapshot and the current tick.
+    let motion = SceneAnimation::sample(a, false);
+    let collapsing = motion.deaths.len();
+    assert!(collapsing > 0, "the scene has collapsing bodies");
+    let scene = blend.scene(None, a);
+    let blended = scene.positions(&a.enemies);
+    assert!(
+        a.enemies
+            .iter()
+            .zip(&blended)
+            .any(|(e, at)| *at != [e.x, e.y()]),
+        "the blend is not the identity"
     );
+    builds::take_id_lookups();
+    let view = BattleViewModel::build(a, motion, scene, false);
     assert!(view.enemies.len() > 100);
+    assert_eq!(view.corpses.len(), collapsing);
+    assert!(
+        view.corpses.iter().all(|body| body.tint.is_some()),
+        "every collapsing body found its saved record"
+    );
     assert_eq!(builds::take_id_lookups(), 0);
 }
 
