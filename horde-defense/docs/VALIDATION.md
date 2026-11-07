@@ -1007,6 +1007,35 @@ Its five twins (normal r2-r3, small r1-r3) were clean. It is the tail of a drive
 
 **Shipped smoke** (`acc-playtest-novsync/shipped`): 2.79, 1.23 and 1.19 s, median 1.23 s, the same as W1-61. The first, cold run is again the slow one. Low latency was not re-run; its W1-61 evidence (`head-low-latency-playtest`) stands. The numbers are in `PERF_BUDGET.json` `acceptance` (the W1-61 ones under `acceptance.w1_61`) and plan 9.1 / 9.4.
 
+## Goal-1 acceptance re-run at HEAD, attempt 2 — 7 November 2026 (W1 review)
+
+**Conditions.**
+- Commit bee4236, a clean tree. The commits since 867f786 change docs only; the dev executable hashed the same as in the first re-run (`77b67433…`). The three W1-61 gate passes, same harness, gates and probe spans (`7abb0ab`).
+- Same hardware and state as the first re-run: RTX 1000 Ada, Vulkan, mains, power plan Balanced, a focused window at 1440x900 @ 1.0 and 1050x700 @ 1.35. 2026-11-07, 17:42-17:56 UTC.
+- Before each pass, `tasklist` showed no horde-defense.exe, and no other cargo command ran. A 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (`target/perf/w1-review2/<pass>.load.tsv`). The 81% and 94% samples of the playtest pass fell before its first measured run (shipped build and smoke, review build).
+- Every run was valid at its first attempt. Evidence: `target/perf/w1-review2/acc-*`, each with summary.json and summary.md.
+
+| Pass | Command | Exit | Gate | normal | small | Limit | Driver stalls excluded | Load during runs, max / mean of pass |
+|---|---|---|---|---|---|---|---|---|
+| `acc-dev-vsync-progressed-peak` | `-Scene progressed-peak -Profile dev -Repeat 3` | 0 | interface_draw mean (ms) | 0.9976 | 0.9889 | ≤ 1.129 / 1.030 | 15 | 55% / 25% |
+| | | | interface_total mean (ms) | 1.8981 | 1.8237 | ≤ 4.6447 / 4.5895 (v3, old spans) | | |
+| `acc-dev-novsync` | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.77 / 7.30 | 6.63 / 7.28 | ≤ 10.0 | 48 | 60% / 28% |
+| `acc-playtest-novsync` | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.25 / 6.43 | 5.92 / 6.28 | ≤ 10.0 | 48 | 52% / 27% |
+
+No CPU p99 cell missed, so no pass was re-run. Peak cpu_frame p99 with -VsyncOff (not gated) was dev 6.54 / 5.89 and playtest 5.79 / 5.23 ms. The extra dev VSync-on peak and stress passes of the first re-run were not repeated.
+
+**Gate 3.** All three passes had 0 frames over 50 ms outside driver stalls in every repeat, with the stall active in every pass:
+- dev VSync on excluded 15: 69-1,000 ms, acquire shares 0.867-0.993, in-process work 8.8-11.3 ms, named coverage at least 0.992. Five were 955-1,000 ms, wgpu-core's acquire timeout. The 85 and 69 ms ones were the frames directly after a 1,000 ms stall (normal r2 sample 596, small r2 sample 328), the same position as the 867f786 sample-932 frame, but with acquire shares of 0.869 and 0.867 they cleared the 0.80 rule.
+- dev and playtest -VsyncOff excluded 48 each: 487-612 ms, acquire shares 0.983-0.991, in-process work 6.7-12.5 ms, named coverage at least 0.999.
+
+This is a pass of the three gates, not a clean gate 3 on HEAD: the 867f786 stress frame (sample 932) and the W1-61 `stress-on-r2` episode stay open for W2-50.
+
+**Against the first re-run** (867f786, same dev executable):
+- progressed-peak VSync-on interface_draw fell 3.9% / 2.3% (1.039 / 1.012 to 0.998 / 0.989), leaving 11.6% / 4.0% headroom. With the executable unchanged, the 867f786 rise over W1-61 was run-to-run spread, as that section suspected; the small size remains the closest cell to its gate.
+- cpu_frame p99 moved by -0.28 to +0.34 ms per cell; the worst cell (dev stress normal, 7.30 ms) is 2.70 ms under the gate.
+
+**Shipped smoke** (`acc-playtest-novsync/shipped`): 2.72, 1.25 and 1.26 s, median 1.26 s. The cold first run is again the slow one. Low latency was not re-run. The numbers are in `PERF_BUDGET.json` `acceptance` (the first re-run under `acceptance.w1_review_867f786`, W1-61 under `acceptance.w1_61`) and plan 9.1 / 9.4.
+
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 
 W1-49 is done when `battlefield_paint` does not grow over the stress run, and the perf design asks for `settled_corpses_drawn` in stress. Neither number had been written down: the W1-49 commits had only headless cache tests.
