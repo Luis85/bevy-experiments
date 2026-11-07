@@ -1333,6 +1333,44 @@ fn rejects_milestone_claimed_above_rank() {
     );
 }
 
+/// The load-path leg of the save repair (W1 review): a v6 save whose Ready
+/// recruit has a weapon slot pointing at an item the stash no longer holds
+/// (a damaged or hand-edited file) still loads. `reconcile_saved_game` puts
+/// the slot back on that recruit's own protected starter weapon, the bundle
+/// issued at recruitment (recruit 2 is the second roster ordinal), before
+/// validation runs, and leaves the other slots and recruits as saved.
+#[test]
+fn v6_save_with_an_unowned_recruit_item_loads_on_that_recruits_starter() {
+    let mut payload = payload_v6();
+    let roster = payload["strategy"]["roster"].as_array_mut().unwrap();
+    assert_eq!(roster[1]["id"], 2);
+    assert_eq!(roster[1]["status"], "Ready");
+    let saved: Vec<serde_json::Value> =
+        roster.iter().map(|r| r["npc"]["loadout"].clone()).collect();
+    let missing = 9_999_999u64;
+    roster[1]["npc"]["loadout"][0] = missing.into();
+    let game = Game::from_payload(payload, 6).expect("the repair runs before validation");
+    let c = game.campaign();
+    assert!(c.item(missing).is_none());
+    let recruits = &game.strategy().roster;
+    let repaired = recruits[1].npc.loadout[0];
+    // Recruit 2's starter weapon in the fixture, not Mara's (item 1).
+    assert_eq!(repaired, 72);
+    let item = c.item(repaired).unwrap();
+    assert!(item.protected && item.definition_index() == 0);
+    let mut expected = saved[1].clone();
+    expected[0] = repaired.into();
+    assert_eq!(serde_json::json!(recruits[1].npc.loadout), expected);
+    for n in [0, 2] {
+        assert_eq!(
+            serde_json::json!(recruits[n].npc.loadout),
+            saved[n],
+            "recruit {}",
+            n + 1
+        );
+    }
+}
+
 // ---------------------------------------------------------------------------
 // save_v7.json: the schema-freeze file (W1-63; schema-v7.md section 11).
 // ---------------------------------------------------------------------------

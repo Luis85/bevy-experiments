@@ -1189,6 +1189,32 @@ mod tests {
         assert_eq!(s.reconcile_loadouts(&c), 0, "no loadout needs repair");
         assert!(s.validate(&c).is_ok());
     }
+    /// The positive leg of the save repair (W1 review; W1-20 rewrote the old
+    /// sale test into a consistent-state check). An old or hand-edited save
+    /// can hold an idle recruit slot whose item is no longer owned; loading
+    /// it puts that slot back on the recruit's own protected starter bundle,
+    /// picked by roster ordinal, and leaves every other recruit alone.
+    #[test]
+    fn reconcile_loadouts_restores_a_missing_item_to_the_recruits_own_starter() {
+        let mut c = liberated(1);
+        let mut s = StrategyState::default();
+        let country = c.world.cleared[0].clone();
+        let first = s.recruit(&mut c, &country).unwrap();
+        s.recruit(&mut c, &country).unwrap();
+        let starter = s.roster[0].npc.loadout[0];
+        let second = s.roster[1].npc.loadout;
+        let rifle = c.add_item(4).unwrap();
+        s.equip_recruit(&c, first, rifle).unwrap();
+        // Stands in for a save whose stash lost the equipped rifle.
+        c.items.retain(|i| i.id != rifle);
+        assert!(s.validate(&c).is_err(), "the damaged state is invalid");
+        assert_eq!(s.reconcile_loadouts(&c), 1);
+        assert_eq!(s.roster[0].npc.loadout[0], starter);
+        assert_ne!(starter, 1, "the recruit's own bundle, not Mara's");
+        assert_ne!(starter, second[0], "the first recruit's bundle");
+        assert_eq!(s.roster[1].npc.loadout, second);
+        assert!(s.validate(&c).is_ok());
+    }
     /// Replaces the W1-18 characterisation test
     /// `old_campaign_filter_sells_recruit_equipped_item` (LE-1, acceptance
     /// G4.2), inverted: every sell path reads the recruit loadouts through
