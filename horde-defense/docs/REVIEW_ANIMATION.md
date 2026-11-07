@@ -28,12 +28,17 @@ Independent cosmetic variation comes from stable IDs and resolved event keys.
 Particle trajectories do not change merely because an unrelated event is added
 to the event list.
 
-## Five painted walk strips
+## Five painted walk strips (archived)
 
-All five ordinary enemy families have four generated poses under
-`assets/art/animation/`. The original actor atlas remains the fallback while a
-strip is unavailable. Bosses and defenders retain their original painted poses
-with procedural action/reaction transforms.
+In this phase all five ordinary enemy families had four generated poses, then
+under `assets/art/animation/`, with the original actor atlas as the fallback
+while a strip was unavailable. Bosses and defenders retained their original
+painted poses with procedural action/reaction transforms. The game no longer
+loads these strips: W1-57 (production-pass decision 10) moved them unchanged to
+`archive/art/animation/`, see `archive/README.md` and `assets/CREDITS.md`
+("Archived (not shipped)"). Enemies now walk from the twenty-pose infected gait
+sheet `assets/art/pixel/walkers-v1.png`. The table and notes below record the
+archived strips as they were measured.
 
 | Strip | Native canvas | Shared feet baseline | Common body-height reference | Padding |
 |---|---:|---:|---:|---:|
