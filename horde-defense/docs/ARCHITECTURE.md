@@ -4,7 +4,7 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 
 ## Ownership
 
-One row per module. Paths are relative to the crate's `src/` (`crates/horde_core/src` for core rows, `crates/horde_game/src` for game rows); other paths are relative to this workspace. `python -I -B scripts/check_views.py` fails when a module or directory to depth 2 has no row here, when a row names a module or file that does not exist, or when a guard test named in the last column is neither a Rust `#[test]` fn in `crates/` nor an existing workspace file. `lib.rs`, `main.rs` and test-only `tests`/`*_tests` modules need no row.
+One row per module. Paths are relative to the crate's `src/` (`crates/horde_core/src` for core rows, `crates/horde_game/src` for game rows); other paths are relative to this workspace. `python -I -B scripts/check_views.py` fails when a module or directory to depth 2 has no row here, when a row names a module or file that does not exist, when a row's first cell backticks nothing or a `core`/`game` row names a path outside that crate, or when a guard test named in the last column is neither a Rust `#[test]` fn in `crates/` nor an existing workspace file. `lib.rs`, `main.rs` and test-only `tests`/`*_tests` modules need no row.
 
 | Module (file) | Owns | Does not own | Entry points / key types | Guard tests |
 |---|---|---|---|---|

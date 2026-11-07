@@ -73,10 +73,11 @@ def _module_name(relative: Path) -> str | None:
     return "/".join(parts)
 
 
-def architecture_modules(workspace: Path, max_depth: int | None = 2) -> set[str]:
+def architecture_modules(workspace: Path, max_depth: int | None = 2) -> set[tuple[str, str]]:
     """Every module file, or directory holding Rust files, under crates/*/src
-    down to `max_depth` path components (lib, main and tests excluded)."""
-    modules: set[str] = set()
+    down to `max_depth` path components (lib, main and tests excluded), as
+    (crate directory, module path) pairs."""
+    modules: set[tuple[str, str]] = set()
     for src in sorted(workspace.glob("crates/*/src")):
         for path in sorted(src.rglob("*")):
             relative = path.relative_to(src)
@@ -87,12 +88,15 @@ def architecture_modules(workspace: Path, max_depth: int | None = 2) -> set[str]
             if path.is_file() and path.suffix != ".rs":
                 continue
             if (name := _module_name(relative)) is not None:
-                modules.add(name)
+                modules.add((src.parent.name, name))
     return modules
 
 
 # A `#[test]` fn, past any further attributes (`#[ignore]`, `#[should_panic]`) and a visibility.
 TEST_FN = re.compile(r"#\[test\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?fn\s+(\w+)")
+
+# The first word of a module row and the crate whose `src/` its paths are relative to.
+CRATE_QUALIFIERS = {"core": "horde_core", "game": "horde_game"}
 
 OWNERSHIP_COLUMNS = ["Module (file)", "Owns", "Does not own", "Entry points / key types", "Guard tests"]
 
@@ -115,7 +119,7 @@ def _ownership_rows(text: str) -> tuple[list[list[str]], list[str]]:
             errors.append(f"ARCHITECTURE.md: ownership row needs 5 columns: {stripped[:60]}")
         elif cells == OWNERSHIP_COLUMNS:
             header_seen = True
-        elif not set(cells[0]) <= set("-: "):
+        elif not all(cell and set(cell) <= set("-: ") for cell in cells):
             rows.append(cells)
     if not header_seen:
         errors.append("ARCHITECTURE.md: no ownership table header under '## Ownership': "
@@ -123,24 +127,30 @@ def _ownership_rows(text: str) -> tuple[list[list[str]], list[str]]:
     return rows, errors
 
 
-def _module_token(token: str) -> str | None:
-    """`art/camera.rs`, `ui/battle/mod.rs` and `sim/director` as module paths."""
-    name = re.sub(r"^crates/[^/]+/src/", "", token.strip().rstrip("/"))
+def _module_token(token: str, crate: str | None) -> tuple[str | None, str]:
+    """`art/camera.rs`, `ui/battle/mod.rs` and `sim/director` in a row of
+    `crate`, or a full `crates/<crate>/src/...` path, as (crate, module path)."""
+    name = token.strip().rstrip("/")
+    if explicit := re.match(r"crates/([^/]+)/src/(.+)", name):
+        crate, name = explicit.groups()
     if name.endswith("/mod.rs"):
         name = name[: -len("/mod.rs")]
     elif name.endswith(".rs"):
         name = name[: -len(".rs")]
-    return name
+    return crate, name
 
 
 def check_architecture(workspace: Path) -> tuple[int, list[str]]:
     """docs/ARCHITECTURE.md's ownership table has a row for every module to
     depth 2, and every module or file a row names exists.
 
-    A row documents a module when its first cell backticks the module's path
-    under `src` (`sim/director`, `art/camera.rs`, `ui/battle/mod.rs`). Other
-    first-cell tokens must be workspace-relative paths that exist
-    (`scripts/measure_performance.ps1`). Every backticked guard test must be
+    A row documents a module when its first cell is `core` or `game` followed
+    by the module's backticked path under that crate's `src`
+    (`sim/director`, `art/camera.rs`, `ui/battle/mod.rs`). An unqualified
+    row's tokens must be workspace-relative paths that exist
+    (`scripts/measure_performance.ps1`). A row whose first cell backticks
+    nothing, an unknown qualifier, or a path outside the qualifier's crate
+    is an error. Every backticked guard test must be
     a Rust `#[test]` fn in crates/ or a workspace path that exists; a
     production fn of the same name does not count.
     """
@@ -152,19 +162,34 @@ def check_architecture(workspace: Path) -> tuple[int, list[str]]:
     for path in workspace.glob("crates/*/**/*.rs"):
         if "target" not in path.relative_to(workspace).parts:
             tests.update(TEST_FN.findall(path.read_text(encoding="utf-8-sig")))
-    documented: set[str] = set()
+    short = {crate: qualifier for qualifier, crate in CRATE_QUALIFIERS.items()}
+    documented: set[tuple[str, str]] = set()
     for cells in rows:
-        for token in re.findall(r"`([^`]+)`", cells[0]):
-            name = _module_token(token)
-            if name in known:
-                documented.add(name)
+        first = cells[0]
+        tokens = re.findall(r"`([^`]+)`", first)
+        qualifier = first.split("`", 1)[0].strip()
+        crate = CRATE_QUALIFIERS.get(qualifier)
+        if not tokens:
+            errors.append("ARCHITECTURE.md: ownership row names no backticked module or file: "
+                          + (first or "(empty first cell)"))
+        elif qualifier and crate is None:
+            errors.append(f"ARCHITECTURE.md: unknown crate qualifier {qualifier!r} (use core or game): {first}")
+        for token in tokens:
+            token_crate, name = _module_token(token, crate)
+            if crate is not None and token_crate != crate:
+                errors.append(f"ARCHITECTURE.md: {qualifier} row names a "
+                              f"{short.get(token_crate, token_crate)} path: {token}")
+            elif token_crate is not None and (token_crate, name) in known:
+                documented.add((token_crate, name))
+            elif crate is not None:
+                errors.append(f"ARCHITECTURE.md: {qualifier} row names no module in crates/{crate}/src: {token}")
             elif not (workspace / token).is_file():
                 errors.append(f"ARCHITECTURE.md: row names no module or file: {token}")
         for token in re.findall(r"`([^`]+)`", cells[-1]):
             if token not in tests and not (workspace / token).is_file():
                 errors.append(f"ARCHITECTURE.md: guard test not found: {token}")
-    for missing in sorted(required - documented):
-        errors.append(f"ARCHITECTURE.md: no ownership row for module {missing}")
+    for crate, missing in sorted(required - documented):
+        errors.append(f"ARCHITECTURE.md: no ownership row for {short.get(crate, crate)} module {missing}")
     if not required:
         errors.append("No crate modules found")
     return len(required), errors

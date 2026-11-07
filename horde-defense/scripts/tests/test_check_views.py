@@ -71,6 +71,39 @@ class CheckArchitectureTests(unittest.TestCase):
         self.assertEqual(["ARCHITECTURE.md: guard test not found: fit_field"],
                          self.errors(CORE_ROW + art + GAME_ROW))
 
+    ART_ROW = "| game `art` | Drawing | Rules | `art::plugin` | `field_fits_the_window` |\n"
+
+    def test_a_row_without_a_backticked_module_is_an_error(self):
+        plain = "| game art | Drawing | Rules | `art::plugin` | `field_fits_the_window` |\n"
+        self.assertEqual(["ARCHITECTURE.md: ownership row names no backticked module or file: game art"],
+                         self.errors(CORE_ROW + self.ART_ROW + GAME_ROW + plain))
+
+    def test_a_row_with_an_empty_first_cell_is_not_a_separator(self):
+        empty = "|  | Drawing | Rules | `art::plugin` | `field_fits_the_window` |\n"
+        self.assertEqual(["ARCHITECTURE.md: ownership row names no backticked module or file: (empty first cell)"],
+                         self.errors(CORE_ROW + self.ART_ROW + GAME_ROW + empty))
+
+    def test_the_crate_qualifier_must_match_the_module_crate(self):
+        wrong = "| core `art/camera.rs` | The camera | Rules | `fit_field` | `field_fits_the_window` |\n"
+        self.assertEqual(["ARCHITECTURE.md: core row names no module in crates/horde_core/src: art/camera.rs",
+                          "ARCHITECTURE.md: no ownership row for game module art/camera"],
+                         self.errors(CORE_ROW + self.ART_ROW + wrong))
+
+    def test_a_full_crate_path_must_agree_with_the_row_qualifier(self):
+        wrong = ("| core `crates/horde_game/src/art/camera.rs` | The camera | Rules | `fit_field` "
+                 "| `field_fits_the_window` |\n")
+        self.assertEqual(["ARCHITECTURE.md: core row names a game path: crates/horde_game/src/art/camera.rs",
+                          "ARCHITECTURE.md: no ownership row for game module art/camera"],
+                         self.errors(CORE_ROW + self.ART_ROW + wrong))
+
+    def test_an_unknown_qualifier_or_an_unqualified_module_is_an_error(self):
+        unknown = "| engine `art/camera.rs` | The camera | Rules | `fit_field` | `field_fits_the_window` |\n"
+        self.assertIn("ARCHITECTURE.md: unknown crate qualifier 'engine' (use core or game): engine `art/camera.rs`",
+                      self.errors(CORE_ROW + self.ART_ROW + GAME_ROW + unknown))
+        bare = "| `art/camera.rs` | The camera | Rules | `fit_field` | `field_fits_the_window` |\n"
+        self.assertEqual(["ARCHITECTURE.md: row names no module or file: art/camera.rs"],
+                         self.errors(CORE_ROW + self.ART_ROW + GAME_ROW + bare))
+
 
 if __name__ == "__main__":
     unittest.main()
