@@ -290,7 +290,7 @@ The JSON:
   - otherwise, if not `[IO.Path]::IsPathRooted`, join it to the workspace;
   - then the one-argument `[IO.Path]::GetFullPath`.
 - `Invoke-Native -File -Arguments -LogStem -TimeoutSeconds [-Gui]`:
-  - `Start-Process -PassThru` with `-RedirectStandardOutput`/`-RedirectStandardError` to `<stem>.out.txt`/`<stem>.err.txt`;
+  - `Start-Process -PassThru` with `-RedirectStandardOutput`/`-RedirectStandardError` to `<stem>.out.txt`/`<stem>.err.txt` (amended by R24, plan §2.4: `[Diagnostics.Process]::Start` with a `ProcessStartInfo`, UseShellExecute off and both streams redirected to those logs, is the accepted form; see S14);
   - `-NoNewWindow` for cargo, `-WindowStyle Normal` for the game (never both);
   - a splat hashtable that omits `-ArgumentList` when it is empty;
   - `$null = $p.Handle` right after start;
@@ -535,7 +535,7 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 #### S14. Native.ps1: one PowerShell 5.1 helper
 
 - **Owner / wave:** qa-captures, wave 1.
-- **Ruling:** One dot-sourced scripts/lib/Native.ps1 (ASCII, LF, no BOM, #requires -Version 5.1), qa names only: Resolve-HordeTarget, Get-HordeExecutable, ConvertTo-NativeArgument, Invoke-Native (Start-Process with redirected streams, taskkill on timeout, returns ExitCode/Id/Seconds/Out/Err), Invoke-Cargo, Resolve-Tool, Reset-/Restore-LastlightEnv, Write-Utf8NoBom, Get-FileSha256. Timeouts cargo 1800 s, capture 300 s, smoke 900 s, --version 30 s, git/rustc 30 s. Tested by scripts/tests/run_script_tests.ps1.
+- **Ruling:** One dot-sourced scripts/lib/Native.ps1 (ASCII, LF, no BOM, #requires -Version 5.1), qa names only: Resolve-HordeTarget, Get-HordeExecutable, ConvertTo-NativeArgument, Invoke-Native (Start-Process with redirected streams, or, as amended by R24 (plan §2.4, user 2026-11-07), `[Diagnostics.Process]::Start` with a `ProcessStartInfo`, UseShellExecute off and stdout and stderr redirected to the logs; never `>`; taskkill /T /F on timeout, returns ExitCode/Id/Seconds/Out/Err), Invoke-Cargo, Resolve-Tool, Reset-/Restore-LastlightEnv, Write-Utf8NoBom, Get-FileSha256. Timeouts cargo 1800 s, capture 300 s, smoke 900 s, --version 30 s, git/rustc 30 s. Tested by scripts/tests/run_script_tests.ps1.
 - **Supersedes in this spec:** §9 Native.ps1 (Resolve-TargetDir, Invoke-Native returning ExitCode only, -Gui, Write-Utf8, Stop-Process).
 
 #### S15. Script porting order and the 5.1 lint

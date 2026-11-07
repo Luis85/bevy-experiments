@@ -81,6 +81,7 @@ Items marked **(ask)** need my explicit yes. All others use the default shown if
 - PowerShell 5.1 only:
   - Never use `>`. Use `Out-File -Encoding utf8` or `git --output`.
   - Run native exes through `Start-Process` with redirected streams. `capture_review.ps1`, `measure_performance.ps1` and `verify_playtest.ps1` all break otherwise.
+    - Amended by R24 (user, 2026-11-07; plan §2.4): `Invoke-Native` in `scripts/lib/Native.ps1` starts native children with `[Diagnostics.Process]::Start` and a `ProcessStartInfo`, UseShellExecute off and stdout and stderr redirected to the `.out.txt`/`.err.txt` logs. That form satisfies this rule, because in 5.1 `Start-Process -PassThru` can report a `$null` ExitCode once the child has exited (381e563). `>` stays forbidden, and a timeout still kills the tree with `taskkill /T /F`.
   - Fixing these scripts under `horde-defense/scripts` is allowed.
 - No bare `git stash`. No push or merge. Ask before fast-forwarding local `main`.
 - Ids never change. Content files are append-only. v1-v6 saves and old settings files must load.

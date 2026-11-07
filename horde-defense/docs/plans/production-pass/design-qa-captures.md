@@ -22,7 +22,7 @@ The file is ASCII, LF, without BOM, and starts with `#requires -Version 5.1`. Th
 | Function | Contract |
 |---|---|
 | `ConvertTo-NativeArgument([string[]]$Arguments)` | Returns ONE string using MSVC quoting rules. An argument containing whitespace or `"` is wrapped in quotes, inner `"` becomes `\"`, and trailing backslashes are doubled before the closing quote. An empty argument becomes `""`. |
-| `Invoke-Native -FilePath -Arguments [string[]] -LogStem -TimeoutSeconds -WorkingDirectory` | Runs `Start-Process -NoNewWindow -PassThru -RedirectStandardOutput <stem>.out.txt -RedirectStandardError <stem>.err.txt`. `-ArgumentList` is passed only when the argument string is non-empty, because an empty value throws in 5.1. Then `$null=$p.Handle`. If `$p.WaitForExit(ms)` returns false it runs **`taskkill.exe /PID <id> /T /F`** (graft B: this kills cargo's rustc children) and throws `Timed out after N s`. Otherwise it calls `$p.WaitForExit()`. Returns `[pscustomobject]@{ExitCode;Id;Seconds;Out;Err}`. |
+| `Invoke-Native -FilePath -Arguments [string[]] -LogStem -TimeoutSeconds -WorkingDirectory` | Runs `Start-Process -NoNewWindow -PassThru -RedirectStandardOutput <stem>.out.txt -RedirectStandardError <stem>.err.txt`. `-ArgumentList` is passed only when the argument string is non-empty, because an empty value throws in 5.1. Then `$null=$p.Handle`. If `$p.WaitForExit(ms)` returns false it runs **`taskkill.exe /PID <id> /T /F`** (graft B: this kills cargo's rustc children) and throws `Timed out after N s`. Otherwise it calls `$p.WaitForExit()`. Returns `[pscustomobject]@{ExitCode;Id;Seconds;Out;Err}`. Amended by R24 (plan §2.4, user 2026-11-07): it starts the child with `[Diagnostics.Process]::Start` and a `ProcessStartInfo` instead, UseShellExecute off and stdout and stderr redirected to the same two logs, because in 5.1 `Start-Process -PassThru` can report a `$null` ExitCode once the child has exited (381e563). `>` stays forbidden, and the timeout still runs `taskkill.exe /PID <id> /T /F`. |
 | `Invoke-Cargo` | Wraps Invoke-Native. On a non-zero exit it throws and prints the last 40 lines of the err log. |
 | `Resolve-Tool <name>` | `(Get-Command <name> -CommandType Application)[0].Source` |
 | `Resolve-HordeTarget` | A rooted `$env:CARGO_TARGET_DIR` is used as-is. A relative one is joined to `$workspace`. Otherwise `$workspace\target`. |
@@ -238,7 +238,7 @@ Targets: median at most 50 ms in the default row and at most 34 ms with Low late
 ## 2. Decisions table
 | Question | Chosen | Rejected (reason) |
 |---|---|---|
-| Native invocation | One dot-sourced lib/Native.ps1, Start-Process, `$p.Handle`, taskkill /T | inline copies (they drift); `&` with EAP=Continue (violates the brief, `*>` writes UTF-16); Stop-Process only (leaves rustc children running) |
+| Native invocation | One dot-sourced lib/Native.ps1, Start-Process, `$p.Handle`, taskkill /T. Amended by R24 (plan §2.4): `[Diagnostics.Process]::Start` with a `ProcessStartInfo` and both streams redirected to the logs is the accepted form | `Start-Process -PassThru` (R24: in 5.1 it can report a `$null` ExitCode once the child has exited, 381e563); inline copies (they drift); `&` with EAP=Continue (violates the brief, `*>` writes UTF-16); Stop-Process only (leaves rustc children running) |
 | Scripts ported | 5 in scope plus the new scripts; 3 allowlisted | port all 8 (no wave needs them; 2-argument GetFullPath risk) |
 | Registry home | ui-free crate::review_scenes | ui/review/scenes.rs embedding Screen/Tab (`mod review` is private; couples launch to the UI); enum + FromStr (large refactor); JSON file (two parsers) |
 | Scene list sync | `--list-scenes` from the binary | include_str! sync tests with hard-coded ps1 lists (copies still exist) |
@@ -579,7 +579,7 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 #### S14. Native.ps1: one PowerShell 5.1 helper
 
 - **Owner / wave:** qa-captures, wave 1.
-- **Ruling:** One dot-sourced scripts/lib/Native.ps1 (ASCII, LF, no BOM, #requires -Version 5.1), qa names only: Resolve-HordeTarget, Get-HordeExecutable, ConvertTo-NativeArgument, Invoke-Native (Start-Process with redirected streams, taskkill on timeout, returns ExitCode/Id/Seconds/Out/Err), Invoke-Cargo, Resolve-Tool, Reset-/Restore-LastlightEnv, Write-Utf8NoBom, Get-FileSha256. Timeouts cargo 1800 s, capture 300 s, smoke 900 s, --version 30 s, git/rustc 30 s. Tested by scripts/tests/run_script_tests.ps1.
+- **Ruling:** One dot-sourced scripts/lib/Native.ps1 (ASCII, LF, no BOM, #requires -Version 5.1), qa names only: Resolve-HordeTarget, Get-HordeExecutable, ConvertTo-NativeArgument, Invoke-Native (Start-Process with redirected streams, or, as amended by R24 (plan §2.4, user 2026-11-07), `[Diagnostics.Process]::Start` with a `ProcessStartInfo`, UseShellExecute off and stdout and stderr redirected to the logs; never `>`; taskkill /T /F on timeout, returns ExitCode/Id/Seconds/Out/Err), Invoke-Cargo, Resolve-Tool, Reset-/Restore-LastlightEnv, Write-Utf8NoBom, Get-FileSha256. Timeouts cargo 1800 s, capture 300 s, smoke 900 s, --version 30 s, git/rustc 30 s. Tested by scripts/tests/run_script_tests.ps1.
 - **Supersedes in this spec:** Nothing beyond the ruling itself; this remit implements it.
 
 #### S15. Script porting order and the 5.1 lint

@@ -1,6 +1,6 @@
 # Production pass: Last Light (horde-defense)
 
-Status: **design frozen, ready for wave 1** (2026-11-05). Brief: `docs/plans/2026-11-04-production-pass-prompt.md`. Branch `claude/horde-production-pass`, worktree `.claude/worktrees/horde-production-pass`, cut from local `main` at `7bd5de8`.
+Status: **wave 1 closed under R25 at HEAD ab03da9** (2026-11-07; §7, "Wave-1 close"); design frozen 2026-11-05. Brief: `docs/plans/2026-11-04-production-pass-prompt.md`. Branch `claude/horde-production-pass`, worktree `.claude/worktrees/horde-production-pass`, cut from local `main` at `7bd5de8`.
 
 This file is the plan of record. The detail lives in `docs/plans/production-pass/`:
 
@@ -11,7 +11,7 @@ This file is the plan of record. The detail lives in `docs/plans/production-pass
 | `acceptance.md` | The acceptance matrix: every brief criterion, user restatement and ruling mapped to its proof and wave. |
 | `design-<remit>.md` (10 files) | Each expert remit's synthesized spec, followed by the integration rulings that supersede parts of it. |
 
-Precedence when documents disagree: user decisions, then orchestrator rulings R1-R23 and RL, then `schema-v7.md` / `waves.md` / `acceptance.md`, then the "Integration rulings" section of each design doc, then the synthesized spec text above it.
+Precedence when documents disagree: user decisions, then orchestrator rulings R1-R25 and RL, then `schema-v7.md` / `waves.md` / `acceptance.md`, then the "Integration rulings" section of each design doc, then the synthesized spec text above it.
 
 ## Contents
 
@@ -203,6 +203,8 @@ Shipped WAV count: 90 today, 78 after W1-57, 75 after W1-58. `docs/audio/surviva
 | R21 | The Custom difficulty chip keeps the basis of the preset it was clicked from (clicking Hard then Custom without edits sends Custom with the Hard basis). Fix in code with TDD. |
 | R22 | Gates only tighten. BATTLEFIELD_PRIMITIVES_MAX goes 48 -> 24 (re-derived min(ceiling, ceil(max x 1.25)) from the post-W1-69 measure of 19). The stress vertex gate stays 61098 (no loosening; measured 49502). progressed-peak stays at its 40000 ceiling. live_battlefield_runs_stay_within_the_egui_gates samples every 2nd tick of the first 420 (or the exact maxima ticks). Update PERF_BUDGET.json evidence.egui_measured to the post-W1-69 maxima. |
 | R23 | Pending human checks stay pending; fix the integrated-GPU check so it names how to select the adapter this machine actually has, or marks it not possible on this machine. |
+| R24 | User decision (2026-11-07). `Invoke-Native` (`scripts/lib/Native.ps1`) starts native children with `[Diagnostics.Process]::Start` and a `ProcessStartInfo`, with UseShellExecute off and stdout and stderr redirected to the `<stem>.out.txt`/`<stem>.err.txt` logs. That is the accepted form of the brief's "run native exes through Start-Process with redirected streams" rule, because in 5.1 `Start-Process -PassThru` can report a `$null` ExitCode once the child has exited (fix 381e563). `>` stays forbidden, and a timeout still kills the tree with `taskkill /T /F`. Every binding text that names Start-Process for native runs points at R24 and allows this form. |
+| R25 | User decision (2026-11-07): the wave-close rule. A wave closes when two review rounds in a row find nothing above minor, the perf acceptance and the full verify are green at HEAD, and every confirmed finding is fixed or explicitly ruled. Remaining minor findings carry into the next wave's review. |
 
 R12-R23 are the wave-1 close rulings (2026-11-07), recorded verbatim. Where they land:
 - **R12:** schema-v7.md §11 note and VALIDATION.md "save_v6.json as cut".
@@ -217,6 +219,10 @@ R12-R23 are the wave-1 close rulings (2026-11-07), recorded verbatim. Where they
 - **R21:** the settings screen (horde_game) and a pure core outcome in `Campaign`, in their own commit.
 - **R22:** `PERF_BUDGET.json` and `perf_budget.rs`, in their own commit, which also answers the §2.5 row. W2-51 is then done in the W1 review.
 - **R23:** §11 and docs/ACCEPTANCE.md.
+
+R24 and R25 are user decisions made in chat (2026-11-07). Where they land:
+- **R24:** the brief's PowerShell rule (`2026-11-04-production-pass-prompt.md`, an "amended by R24" note beside the original sentence), acceptance.md ISO-2, the qa-captures row "Native exes in 5.1" in §5.2, Ruling S14 in design-qa-captures.md and design-perf-architecture.md, the Native.ps1 contract and decisions table in design-qa-captures.md, design-perf-architecture.md §9, and the comment on the late-exit case in `scripts/tests/run_script_tests.ps1`, which now says the case guards against a return to `Start-Process -PassThru`. It resolves the Invoke-Native item, the one confirmed finding of review rounds 5-10 that was not fixed in code.
+- **R25:** waves.md "Global rules for every commit", beside the verify rule. Applied to wave 1 in §7, "Wave-1 close".
 
 ### 2.5 Still open for the user
 
@@ -632,7 +638,7 @@ The full decision and rejection lists (206 decisions, 239 rejected options) are 
 
 | Question | Chosen | Rejected (reason) |
 |---|---|---|
-| Native exes in 5.1 | `scripts/lib/Native.ps1` with Start-Process and redirected streams; taskkill /T on timeout (S14) | Stop-Process on timeout (leaves rustc children running); Pester (in-box 3.4 is outdated) |
+| Native exes in 5.1 | `scripts/lib/Native.ps1` with redirected streams; taskkill /T on timeout (S14). R24: `Invoke-Native` starts the child with `[Diagnostics.Process]::Start` and a `ProcessStartInfo` (UseShellExecute off, stdout and stderr redirected to the logs), the accepted form of the brief's Start-Process rule (Start-Process -PassThru until 381e563) | Stop-Process on timeout (leaves rustc children running); Pester (in-box 3.4 is outdated); `Start-Process -PassThru` (in 5.1 it can report a `$null` ExitCode once the child has exited; R24); `>` (forbidden by the brief) |
 | Scene list | A ui-free `review_scenes` registry with `--list-scenes`; unknown names rejected at launch; matrix.rs:358 kept for Workshop prefixes | A registry embedding Screen/Tab (ui is private); `include_str!` sync tests over the ps1 lists; making matrix.rs:358 `unreachable!` (panics Workshop scenes) |
 | fixtures.rs:138 panic | Idempotent `enable_legacy_ledgers` before progressed clears (W1-05), then supplemental before-captures (W1-06) | No supplemental before set (the crashed scenes would have no before evidence) |
 | Sidecars | `ReviewFrameFacts` (screen, tab, arena_rect, effects_rect, hud_rows, ...) | No sidecar (construction rescale and HUD rows unverifiable); collecting amber primaries from every screen (invasive) |
@@ -746,7 +752,7 @@ Full commit list: `docs/plans/production-pass/waves.md`. Every commit is test-fi
 
 | Wave | Scope | Commits | Owners | Digest | Exit |
 |---|---|---|---|---|---|
-| 1 | Goal 1, camera (R1), sale eligibility, v7 schema + migration + fixtures, enemy_visuals v2, archive, PS 5.1, review panic fix, enemies overlap (user decision) | W1-01..W1-69 | all but ux-flow | one re-bless (W1-69, user decision) | PERF gates pass at 199d823 except the open gate-3 episode (stress-on-r2, W2-50); `save_v7.json` frozen; camera capture review logged (W1-60); GOLDEN 1/6, TRACE 3/6, all from W1-69 |
+| 1 | Goal 1, camera (R1), sale eligibility, v7 schema + migration + fixtures, enemy_visuals v2, archive, PS 5.1, review panic fix, enemies overlap (user decision) | W1-01..W1-69 | all but ux-flow | one re-bless (W1-69, user decision) | **Closed under R25 at HEAD ab03da9 (2026-11-07; "Wave-1 close" below).** PERF gates pass at 199d823 except the open gate-3 episode (stress-on-r2, W2-50); `save_v7.json` frozen; camera capture review logged (W1-60); GOLDEN 1/6, TRACE 3/6, all from W1-69 |
 | 2 | Auto-sell, takeover, SelectCountry, scaling, archetypes, elites, bosses, progression and skills | W2-01..W2-53 (W2-50 and W2-51 before W2-47's re-gate; W2-52 before the W2-49 re-bless, R16; W2-53, the frozen-catalogue guard, before W2-08 and W2-26 (W1 review); W2-51's gate change was applied in the W1 review, R22) | all but audio | one re-bless (W2-49) | Pacing and smoke before/after; stress re-gate; visual twins for audio |
 | 3 | Goal 2 and the UI for goals 3-4 (horde_game plus pure core reads) | W3-01..W3-31 (W3-29 slots beside W3-14, W3-30 and W3-31 before W3-27's review; all three vfx-lighting, R17) | ux-flow, loot-economy, progression-tree, enemy-balance, vfx-lighting, qa-captures | 0 | Full-loop headless test at both sizes; W3 capture matrix reviewed |
 | 4 | Balance (goals 5-6) and the goal-3 numbers | W4-01..W4-11 plus tuning loops | enemy-balance, progression-tree, loot-economy, campaign-defenders, save-determinism | one re-bless (W4-08) | Every ignored `pacing_targets` assertion passes in release, with before/after tables |
@@ -755,6 +761,20 @@ Full commit list: `docs/plans/production-pass/waves.md`. Every commit is test-fi
 | 7 | Goals 9-10 and docs | W7-01..W7-12 | qa-captures, audio, loot-economy, progression-tree, campaign-defenders, ux-flow, perf-architecture, save-determinism | 0 | Package verified under 5.1; `check_capture_findings.py --final` exits 0; Outcome written |
 
 Ordering constraints that cross remits: perf's `ui/battle` split (W1-39) lands before vfx C2 (W1-44); SD's settings commit (W1-31) lands before perf's `render_plan` (W1-34); qa's archive (W1-57) lands before audio's NpcShot commit (W1-58); CD's takeover core (W2-11) lands before LE's H1 (W2-14); H1 lands before PT's progression settlement (W2-22); EB's spitter and boss commits land before vfx's visual twins (W2-28, W2-37).
+
+**Wave-1 close (R25, 2026-11-07).** Wave 1 is closed under R25 at HEAD ab03da9. Each condition:
+- **Two review rounds in a row with nothing above minor.** Review rounds 1-4 confirmed 22, 14, 16 and 13 findings. Rounds 5-10 confirmed 4, 9, 2, 5, 3 and 3, all minor, so every pair of consecutive rounds from round 5 on holds nothing above minor.
+- **Perf acceptance green at HEAD.** The Goal-1 acceptance re-run at bee4236 (attempt 2, recorded in ab03da9; §9.1 and §9.4) passed every cell. ab03da9 changes docs only.
+- **Full verify green at HEAD.** The full verify at ab03da9 was green: fmt, the 3 clippy configs, the workspace tests (1,046 passed), `-p horde-defense --no-default-features` (521) and `--features dev` (578), `--smoke`, check_views, both audio generators' `--check`, `run_script_tests.ps1` (31 cases), and `pacing 60 --runs` byte-identical to the post-W1-69 baseline `target/production-after/w1-69/pacing.txt`. Evidence: `target/production-after/wave1/verify-final/`.
+- **Every confirmed finding fixed or ruled.** Every finding of rounds 5-10 is fixed except the Invoke-Native item, which R24 resolves. The wave-1 close rulings are R12-R25. Under R25, minor findings still open would carry into the wave-2 review; rounds 5-10 leave none open.
+
+Wave 1 hands on these open items:
+- **`pacing_targets` (W2-03).** `tests/pacing_targets.rs` does not exist yet, so the wave-1 release run (`target/production-after/wave1/pacing_targets.log`) matched 0 tests. W2-03 creates the goal-5 evaluators and the ignored goal5_* tests, and W2-04 adds the goal6_* tests.
+- **The W1-69 balance shift (wave 2).** The novice Germany profile went from 5 to 8 defeats and its first victory moved from run 3 to run 5; smoke failed attempts went Personal 2 → 1 and Npc 1 → 3 (§9.6). Balance was not retuned in wave 1. Wave 2's pacing work owns the shift, measured against the post-W1-69 baseline.
+- **Gate 3 (W2-50).** The sample-932 stall-tail frame from the 867f786 re-run and the W1-61 stress-on-r2 episode stay open. W2-50 owns both, before the W2-47 re-gate. Gate 3 is not claimed clean in dev VSync-on stress or in the shipped default configuration (§2.5).
+- **W2-52 before W2-49.** The `level_grant_paid` shim moves three Personal GOLDEN state digests, so it lands before the wave-2 re-bless (R16).
+- **The R18 items in W2-47:** the sustained 15-20 FPS VSync-on stress episode, the 1050x700@1.35 VSync-on p99 interval of 19.1-19.7 ms, the script-level battlefield primitive and vertex gates in `measure_performance.ps1`, and any egui_probe/present_wait span-ordering item not fixed in wave 1, including the `baseline.v3` re-measure on the 7abb0ab spans (§2.5).
+- **Pending human checks (§11, R23).** The four wave-1 checks (camera feel, stepped damage pop, whole-pixel text placement, sheet upscale at 2.5x) and the integrated-GPU run stay pending.
 
 ---
 

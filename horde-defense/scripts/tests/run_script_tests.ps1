@@ -208,8 +208,11 @@ try {
     }
 
     Test-Case 'Invoke-Native reads the exit code of a child that exited before Invoke-Native looked at it' {
-        # A Start-Process that returns late stands in for a busy machine: the child has exited, and its creation
-        # handle has been closed, before Invoke-Native gets the process object. The exit code must still be read.
+        # Guards against a return to Start-Process -PassThru (ruling R24, plan 2.4). Invoke-Native starts the child with
+        # [Diagnostics.Process]::Start, so these runs never reach this shim. If it went back to Start-Process, this shim would
+        # return late, standing in for a busy machine: the child has exited, and its creation handle has been closed,
+        # before Invoke-Native gets the process object. In 5.1 ExitCode then reads $null (fix 381e563), and the asserts
+        # below fail. The exit code must always be read.
         function Start-Process {
             [CmdletBinding()]
             param($FilePath, $ArgumentList, $WorkingDirectory, [switch]$NoNewWindow, [switch]$PassThru, [switch]$Wait,
