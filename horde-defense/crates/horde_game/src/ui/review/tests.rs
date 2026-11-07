@@ -852,6 +852,11 @@ fn a_collapsed_observer_records_no_field() {
     assert_eq!(f.battle.observer_arena_rect, None);
 }
 
+/// An 11x30 field already fills the observer box, so the uniform fit leaves
+/// it as the box itself. Perturbation proof (W1 review): giving the observer
+/// 12 points of headroom (`fit_field(r, r.shrink2(vec2(0.0, 12.0)), ..)` in
+/// `ui/operations.rs`) fails here with
+/// `left: [[50.6 159.0] - [727.2 453.5]] right: [[23.0 147.0] - [754.8 465.5]]`.
 #[test]
 fn observer_filling_field_is_unchanged() {
     let mut f = staged("operations");
