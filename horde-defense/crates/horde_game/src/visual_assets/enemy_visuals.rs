@@ -344,8 +344,9 @@ impl EnemyVisualCatalog {
             .map_or(&self.elite_default, |known| &known.tell)
     }
     /// Source pixels per lane at which the coarsest art draws 1:1: the minimum
-    /// over sprites of art height / figure height in lanes (bosses use the boss
-    /// height; archetype scale is ignored), and the survivor's 806 px / 0.87.
+    /// over sprites of art height / figure height in lanes (boss art uses the
+    /// larger of the boss height and its own pack height; archetype scale is
+    /// ignored), and the survivor's 806 px / 0.87.
     /// Sheets sample NEAREST, so the camera clamps magnification against it.
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn crisp_lane_px(&self) -> f32 {
@@ -358,8 +359,9 @@ impl EnemyVisualCatalog {
                     SpriteArt::Walk(walk) => walk.height,
                     SpriteArt::Standing(standing) => standing.height,
                 };
+                // Boss art also draws as pack enemies at the sprite height.
                 let lanes = if bosses.contains(&sprite.sprite) {
-                    self.boss_height
+                    self.boss_height.max(sprite.height)
                 } else {
                     sprite.height
                 };
@@ -659,6 +661,18 @@ mod tests {
         }
         value["boss_height"] = 0.1.into();
         assert_eq!(compile(value).unwrap().crisp_lane_px(), 806.0_f32 / 0.87);
+        // Boss art also draws as pack enemies (breacher-pack) at the sprite's
+        // own height, so a boss height below it does not hide that size.
+        let mut value = bundled();
+        let breacher = value["sprites"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .find(|sprite| sprite["sprite"] == "Breacher")
+            .unwrap();
+        breacher["height"] = 2.0.into();
+        value["boss_height"] = 0.5.into();
+        assert_eq!(compile(value).unwrap().crisp_lane_px(), 419.0_f32 / 2.0);
     }
 
     #[test]
