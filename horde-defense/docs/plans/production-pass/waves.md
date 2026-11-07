@@ -118,7 +118,7 @@ At 18:09 that binary had 4-14 such frames per stress run. With 0 slow frames, th
 
 The 0 egui uploads, 0 asset events and 0 audio voices (review scenes are muted) come from probes with no stalls, so they exclude nothing. No fix commit follows. Gate 3 needs a user ruling on two open items: the environmental VSync-on stall, and the unattributed VSync-off stall, which needs a reproduction under the W1-68 probe. No gate was moved. Details are in VALIDATION.md. Both items are settled since: the user ruled "Exclude driver stalls" on 2026-11-06 (plan §2.2), and W1-61 named the VSync-off half as the same acquire stall.
 
-Open (W1-61 review, 2026-11-07; W1-68's VSync-off half is closed by W1-61): one W1-61 A/B repeat in the shipped default configuration (playtest, pipelined on, VSync on, stress normal: `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2`) ran a sustained 15-20 FPS episode. It had about 400 frames of 47-67 ms. Outside driver stalls: 6 frames over 50 ms (exit 1), 407 over 33 ms, p99 47.1 ms, 46.3 FPS. It is not a driver stall under the ruling (named coverage 0.89-0.94, 4-6 ms per frame outside App::update) and is not attributed. Candidate new finding for the orchestrator; details in plan 9.4 and VALIDATION.md.
+Open (W1-61 review, 2026-11-07; W1-68's VSync-off half is closed by W1-61): one W1-61 A/B repeat in the shipped default configuration (playtest, pipelined on, VSync on, stress normal: `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2`) ran a sustained 15-20 FPS episode. It had about 400 frames of 47-67 ms. Outside driver stalls: 6 frames over 50 ms (exit 1), 407 over 33 ms, p99 47.1 ms, 46.3 FPS. It is not a driver stall under the ruling (named coverage 0.89-0.94, 4-6 ms per frame outside App::update) and is not attributed. Scheduled as W2-50 (perf-architecture, before the W2-47 re-gate) and tracked in plan §2.5; details in plan 9.4 and VALIDATION.md.
 
 W1-69 done_when evidence (2026-11-06): enemies never block each other, the user's decision of 2026-11-06 (plan §2.2). In core, `sim/movement.rs` lost the lane queue (the stop 0.65 yd behind the body in front, `EnemyPhase::Queued`) and the speed-difference passing offsets. Each enemy stops only at the defense line or the face of a live non-trap structure in its lane, and attacks there. `Queued` stays for old saves (`a_saved_queued_enemy_resolves_on_the_next_tick`), and a saved `pass_offset` eases back to 0 at the old rate. The commit pins the rule in `enemies_in_one_lane_never_block_each_other` and `enemies_still_stop_at_structures`. `tests/overtaking.rs` and the simulation.rs hit-stop test were rewritten for the new rule. Presentation-only changes:
 - a static per-id crowd stagger, R2 sequence, at most 0.15 yd behind the feet and 0.12 lane across;
@@ -130,7 +130,7 @@ Without the per-stack rings the progressed peak drew 40,124 vertices at tick 420
 
 Wave-1 exit:
 - GOLDEN 1/6, TRACE 3/6, all from the W1-69 re-bless; V1-V6 unchanged.
-- PERF gates pass (W1-61).
+- PERF gates pass at 199d823 except the open gate-3 episode (stress-on-r2), which W2-50 owns (W1-61; plan §2.5).
 - `save_v7.json` frozen.
 - Capture review logged (W1-60).
 - The first freeze's open items are closed.
@@ -556,7 +556,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 **W2-47 · perf-architecture · Stress fixture follows the new content, then re-gate**
 - Fail-first: `stress_render_fixture_includes_every_catalog_archetype_and_an_elite`.
 - Done: `-Scene stress -VsyncOff` (dev and playtest) exits 0.
-- Deps: W2-36, W2-33.
+- Deps: W2-36, W2-33, W2-50.
 - Open before this re-gate (W1 review, 2026-11-07): review commit `7abb0ab` changed the egui_pass and present_wait spans after baseline.v3 and the W1-61 acceptance. The orchestrator or the user decides whether `PERF_BUDGET.json baseline.v3` is re-measured on the new spans before interface_total is gated again. Until then, interface_total and cpu_frame compare unlike spans (plan 2.5; VALIDATION.md W1-61 "Span boundaries changed after this acceptance"). The same applies to W5-11 and W7-09.
 
 **W2-48 · save-determinism · RNG isolation and legacy guards, plus behaviour tests on the v6/v7 fixtures**
@@ -579,11 +579,22 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Done: PROVISIONAL None; V1-V6 unchanged.
 - Deps: W2-48.
 
+**W2-50 · perf-architecture · The gate-3 episode in the shipped default configuration, before the W2-47 re-gate**
+- Slot: before W2-47; the id is appended so no id changes. W1-61's A/B repeat `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2` (playtest, pipelined on, VSync on, stress normal: the shipped default configuration) ran about 400 frames of 47-67 ms. Outside driver stalls it had 6 frames over 50 ms (exit 1), 407 over 33 ms, a p99 of 47.1 ms and 46.3 FPS. It is not a driver stall under the user ruling (named coverage 0.89-0.94) and is not attributed (4-6 ms per frame outside App::update). Plan 9.4 and §2.5; VALIDATION.md W1-61.
+- Steps:
+  - reproduce that configuration (`measure_performance.ps1 -Scene stress -Profile playtest -Pipelined on`, VSync on) at both sizes, at least 12 repeats per size, under the W1-68 probe and with the load sampler beside it;
+  - record per repeat `named_coverage`, `covered_95_named`, `max_outside_update_ms`, and the per-frame events of every frame over 33 ms outside stalls;
+  - attribute the episode (name the span, or the process outside the update, that holds the time) or fix it.
+- Fail-first: only when a fix lands: a pin for the attributed cause that fails on the parent (a test in the owning crate, or a `scripts/fixtures/perf/` report that `-SelfTest` must classify). Attribution alone needs no test.
+- Done: evidence in `target/perf/w2-50/`. VALIDATION.md and plan 9.4 record the attribution, the fix, or that the repeats did not reproduce it, and the §2.5 row is answered. No gate is moved.
+- Deps: none; W2-47 depends on it.
+
 Wave-2 exit:
 - One re-bless with reasons.
 - Pacing and smoke before/after recorded.
 - Captures (stress, battles) taken.
 - Audio handoffs exist: the BossPhase event and the twins W2-28/W2-37.
+- The gate-3 episode of the shipped default configuration (W2-50) is attributed or fixed, or closed by the §2.5 decision.
 
 ---
 
