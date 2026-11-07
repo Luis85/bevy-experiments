@@ -471,6 +471,13 @@ fn archive_paths_mirror_archived_from() {
     assert!(problems.is_empty(), "{problems:#?}");
 }
 
+/// Every model and skin source's `png_sha256` is its file's digest; the set is
+/// never empty (`player_model_sources` asserts it). Mutation proofs (W1
+/// review): one changed digit in the `defender-rig-v1.png` digest of
+/// `attachments.json` fails here with "art/pixel/defender-rig-v1.png:
+/// png_sha256 differs from the file", and a walk that finds no source (the
+/// key read as `png_sha256x`) panics "the player-model manifest names no
+/// source" instead of passing vacuously.
 #[test]
 fn player_model_png_sha256_matches_file() {
     for (path, hash) in player_model_sources() {
