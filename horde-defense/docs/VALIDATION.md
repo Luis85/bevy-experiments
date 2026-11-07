@@ -902,7 +902,7 @@ Pins:
 - `egui_pass_ms` opened `.before(EguiPostUpdateSet::EndPass)`, at the start of PostUpdate, so it also held every PostUpdate system unordered against `EndPass` that ran first. From `7abb0ab` it opens in an exclusive system inside `EndPass`, directly before bevy_egui's `run_egui_context_pass_loop_system`. `7abb0ab`'s failing test measured 8.59 ms of egui_pass for a pass that held a sleeping unrelated system.
 - `present_wait_ms` was not ordered against `create_surfaces`, so surface (re)configuration and the `PrepareViews` work before it could count as present wait. That work was then subtracted from render-world CPU. From `7abb0ab` the span opens `.after(create_surfaces)`, so that work counts as render-world CPU.
 
-So `interface_total` (egui_pass + tessellate) and `cpu_frame` (main + extract + Render schedule - present wait) from `7abb0ab` on are not like-for-like with the numbers above or with baseline.v3. Under the new spans, interface_total can only be the same or lower. That makes the `interface_total_not_above_baseline_v3` gate looser than it was at W1-61. cpu_frame can only be the same or higher, so the W1-61 cpu_frame p99 values (6.26-8.85 ms) may leave out work that the gate now counts. The driver-stall acquire wait reads the same present span. No measurement has been made on the new spans yet. Before the next interface_total re-gate (W2-47, W5-11, W7-09), the orchestrator or the user must decide whether baseline.v3 is re-measured on the new spans. Plan §2.5 tracks this.
+So `interface_total` (egui_pass + tessellate) and `cpu_frame` (main + extract + Render schedule - present wait) from `7abb0ab` on are not like-for-like with the numbers above or with baseline.v3. Under the new spans, interface_total can only be the same or lower. That makes the `interface_total_not_above_baseline_v3` gate looser than it was at W1-61. cpu_frame can only be the same or higher, so the W1-61 cpu_frame p99 values (6.26-8.85 ms) may leave out work that the gate now counts. The driver-stall acquire wait reads the same present span. The first acceptance measurement on the new spans is "Goal-1 acceptance re-run at HEAD" below; baseline.v3 itself has not been re-measured. Before the next interface_total re-gate (W2-47, W5-11, W7-09), the orchestrator or the user must decide whether baseline.v3 is re-measured on the new spans. Plan §2.5 tracks this.
 
 **Acceptance passes** (`target/perf/w1-61/head-acc-*`; every pass exited 0, every repeat had 0 frames over 50 ms, and 0 driver stalls were excluded, in a stall-free hour: see "The acceptance passes and the A/B disagree on driver stalls" below):
 
@@ -969,6 +969,43 @@ One VSync-on stress repeat with pipelining (`head-ab-playtest-vsync/stress-on-r2
 | `d1-default-r1` | default, `-Repeat 1` | 2 | 0 | 0 |
 
 No harness variable brings the stalls in. They come and go with time. The last driver stall in the W1-61 evidence fell in the VSync-on A/B at about 22:22 UTC; none followed in the 54 acceptance runs from 22:32 or in these 18 runs. W1-68 saw the same thing: 4-14 per stress run at 18:09, then 0 in 66 probes. So the A/B on arm stands for the default. The acceptance pass's 0 driver stalls shows a stall-free hour, not that the stall is gone; on another hour the same passes would exclude stalls under the ruling. Caveats: the discriminating pass ran the W1-61 review binary (it differs only in the stall rule) and had no CPU-load sampler.
+
+## Goal-1 acceptance re-run at HEAD — 7 November 2026 (W1 review)
+
+**Conditions.**
+- Commit 867f786, a clean tree. The W1-61 passes with the same harness and gates, on the probe spans from `7abb0ab` (see "Span boundaries changed after this acceptance" above).
+- Intel Core Ultra 9 185H, NVIDIA RTX 1000 Ada Generation Laptop GPU, Vulkan, mains, power plan Balanced, a focused window at 1440x900 @ 1.0 and 1050x700 @ 1.35. 2026-11-07, 17:07-17:30 UTC.
+- Before each pass, `tasklist` showed no horde-defense.exe, and no other cargo command ran. A 5 s `Win32_Processor.LoadPercentage` sampler ran beside every pass (`target/perf/w1-review/<pass>.load.tsv`). Samples of 97% and 94% fell in cargo builds, before the first run of their pass.
+- Every run was valid at its first attempt. Evidence: `target/perf/w1-review/acc-*`, each with summary.json and summary.md.
+
+| Pass | Command | Exit | Gate | normal | small | Limit | Driver stalls excluded | Load during runs, max / mean of pass |
+|---|---|---|---|---|---|---|---|---|
+| `acc-dev-vsync-progressed-peak` | `-Scene progressed-peak -Profile dev -Repeat 3` | 0 | interface_draw mean (ms) | 1.0386 | 1.0117 | ≤ 1.129 / 1.030 | 0 | 47% / 29% |
+| | | | interface_total mean (ms) | 1.9647 | 1.8655 | ≤ 4.6447 / 4.5895 (v3, old spans) | | |
+| `acc-dev-novsync` | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.80 / 7.58 | 6.47 / 7.13 | ≤ 10.0 | 0 | 67% / 33% |
+| `acc-playtest-novsync` | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | cpu_frame p99 progressed-peak / stress (ms) | 5.91 / 6.48 | 5.61 / 6.09 | ≤ 10.0 | 35 | 59% / 35% |
+| `acc-dev-vsync-peak` (extra) | `-Scene peak -Profile dev -Repeat 3 -NoBuild` | 0 | interface_draw mean (ms) | 0.7837 | 0.7738 | ≤ 1.1904 / 1.0752 | 5 | 51% / 22% |
+| `acc-dev-vsync-stress` (extra) | `-Scene stress -Profile dev -Repeat 3 -NoBuild` | 1 | frames > 50 ms outside stalls (worst) | 1 | 0 | 0 | 40 | 46% / 28% |
+
+No CPU p99 cell missed, so no pass was re-run. Peak cpu_frame p99 with -VsyncOff (not gated) was dev 6.34 / 6.16 and playtest 5.51 / 5.26 ms.
+
+**Gate 3.** The three gate passes had 0 frames over 50 ms outside driver stalls in every repeat. Unlike the W1-61 acceptance hour, the stall was active:
+- The playtest -VsyncOff pass excluded 35 stalls: 494-531 ms, acquire shares 0.987-0.990, in-process work 7.3-13.9 ms, named coverage at least 0.999. The dev -VsyncOff pass, which ran just before it, had none.
+- The extra dev VSync-on passes excluded 5 (peak, 525-567 ms) and 40 (stress, 84-1,001 ms, acquire shares 0.868-0.994). Seven of the stress stalls were about 1,000 ms, wgpu-core's acquire timeout.
+
+**The one gated frame** is in `acc-dev-vsync-stress/stress-normal-r1.json`, sample 932:
+- 54.74 ms, with a present wait of 50.61 ms, a channel wait of 46.76 ms and an acquire wait of 43.46 ms. That is an acquire share of 0.794, under the 0.80 threshold.
+- Named coverage 0.989. In-process work about 11 ms (main 7.05, render 3.92). No window, asset, audio or texture-upload events.
+- It comes directly after the stalls at samples 929-931 (998-1,001 ms each). Outside stalls, that repeat had 9 frames over 33 ms, a p99 interval of 19.4 ms and 59.6 FPS.
+
+Its five twins (normal r2-r3, small r1-r3) were clean. It is the tail of a driver stall, not in-process work. The gate was not moved. With the W1-61 episode (`head-ab-playtest-vsync/stress-on-r2`), it is the second gated VSync-on stress frame set on this branch, so gate 3 on HEAD is still not claimed clean. Both are for W2-50.
+
+**Against W1-61** (`199d823`, old spans):
+- progressed-peak VSync-on interface_draw rose 4.9% / 6.3% (0.990 / 0.952 to 1.039 / 1.012). That leaves 8.0% / 1.8% headroom. The same scene's -VsyncOff twins fell (dev 0.952 / 0.880 to 0.909 / 0.872 ms; playtest 0.738 / 0.739 to 0.671 / 0.671 ms), and peak with VSync on rose 1.2% / 0.7%. So the rise shows only in the VSync-on cell, and is not a draw regression on this evidence. The small size is close to its gate, so W2-47's re-gate should watch it.
+- interface_total (now narrower spans) is 1.965 / 1.866 against 1.952 / 1.805.
+- cpu_frame p99 (now wider spans) is lower in every cell but stress normal: dev 7.50 to 7.58 ms, playtest 6.477 to 6.481 ms.
+
+**Shipped smoke** (`acc-playtest-novsync/shipped`): 2.79, 1.23 and 1.19 s, median 1.23 s, the same as W1-61. The first, cold run is again the slow one. Low latency was not re-run; its W1-61 evidence (`head-low-latency-playtest`) stands. The numbers are in `PERF_BUDGET.json` `acceptance` (the W1-61 ones under `acceptance.w1_61`) and plan 9.1 / 9.4.
 
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 

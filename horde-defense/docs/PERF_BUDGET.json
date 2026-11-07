@@ -228,18 +228,34 @@
     }
   },
   "acceptance": {
-    "note": "W1-61 Goal-1 acceptance on commit 199d823 (W1-69 included; the pipelined default unchanged), informational: the script never reads it. Every pass exited 0; production-pass plan 9.1 and VALIDATION.md 'Goal-1 acceptance'. W1-61 review: the 0 driver stalls fell in a stall-free hour (a discriminating pass, target/perf/w1-61/review, had 0 under the A/B and acceptance harnesses alike), and one A/B repeat in the shipped default configuration (target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2: playtest, pipelined on, VSync on, stress normal) had 6 gated frames over 50 ms and exited 1. That episode is open, so gate 3 on HEAD is not claimed clean.",
-    "commit": "199d823",
-    "passes": ["target/perf/w1-61/head-acc-dev-vsync-progressed-peak", "target/perf/w1-61/head-acc-dev-vsync-peak", "target/perf/w1-61/head-acc-dev-vsync-stress", "target/perf/w1-61/head-acc-dev-novsync", "target/perf/w1-61/head-acc-playtest-novsync"],
-    "interface_draw_mean_ms": { "progressed-peak": { "normal": 0.9903, "small": 0.9517 }, "peak": { "normal": 0.7745, "small": 0.7681 } },
+    "note": "Goal-1 acceptance re-run at HEAD in the W1 review (commit 867f786, 2026-11-07 17:07-17:30 UTC), with the W1-61 passes and gates; informational: the script never reads it. These numbers use the probe spans from review commit 7abb0ab, so interface_total and cpu_frame are not like-for-like with w1_61 or baseline.v3 (VALIDATION.md 'Span boundaries changed after this acceptance'). The three gate passes (dev VSync on progressed-peak; dev and playtest -VsyncOff, all scenes; each -Repeat 3) exited 0 with 0 frames over 50 ms outside driver stalls in every repeat; the playtest pass excluded 35 driver stalls under the user ruling. The dev VSync-on peak pass exited 0; the dev VSync-on stress pass exited 1 on one gated frame (stress normal r1, sample 932, 54.74 ms, acquire share 0.794, directly after three ~1,000 ms stalls). That frame and the open W1-61 episode (target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2) mean gate 3 on HEAD is not claimed clean. Production-pass plan 9.1 and 9.4, VALIDATION.md 'Goal-1 acceptance re-run at HEAD'.",
+    "commit": "867f786",
+    "passes": ["target/perf/w1-review/acc-dev-vsync-progressed-peak", "target/perf/w1-review/acc-dev-novsync", "target/perf/w1-review/acc-playtest-novsync", "target/perf/w1-review/acc-dev-vsync-peak", "target/perf/w1-review/acc-dev-vsync-stress"],
+    "exit_codes": { "acc-dev-vsync-progressed-peak": 0, "acc-dev-novsync": 0, "acc-playtest-novsync": 0, "acc-dev-vsync-peak": 0, "acc-dev-vsync-stress": 1 },
+    "load_percent_max_during_runs": { "acc-dev-vsync-progressed-peak": 47, "acc-dev-novsync": 67, "acc-playtest-novsync": 59, "acc-dev-vsync-peak": 51, "acc-dev-vsync-stress": 46 },
+    "interface_draw_mean_ms": { "progressed-peak": { "normal": 1.0386, "small": 1.0117 }, "peak": { "normal": 0.7837, "small": 0.7738 } },
+    "interface_total_mean_ms": { "progressed-peak": { "normal": 1.9647, "small": 1.8655 } },
     "cpu_frame_p99_ms": {
-      "dev": { "progressed-peak": { "normal": 8.8481, "small": 7.0104 }, "stress": { "normal": 7.5018, "small": 7.8428 } },
-      "playtest": { "progressed-peak": { "normal": 6.2634, "small": 6.4433 }, "stress": { "normal": 6.4769, "small": 6.5375 } }
+      "dev": { "progressed-peak": { "normal": 6.7953, "small": 6.4726 }, "stress": { "normal": 7.5778, "small": 7.1283 } },
+      "playtest": { "progressed-peak": { "normal": 5.9143, "small": 5.6117 }, "stress": { "normal": 6.4805, "small": 6.0934 } }
     },
     "frames_over_50ms_worst": 0,
-    "driver_stalls": 0,
-    "low_latency": { "evidence": "target/perf/w1-61/head-low-latency-playtest", "requested_mode": "Mailbox", "source": "settings", "pipelined_rendering": false },
-    "shipped_smoke_seconds": { "median": 1.23, "runs": [2.432, 1.186, 1.23], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w1-61/head-acc-playtest-novsync/shipped" }
+    "driver_stalls": { "acc-dev-vsync-progressed-peak": 0, "acc-dev-novsync": 0, "acc-playtest-novsync": 35, "acc-dev-vsync-peak": 5, "acc-dev-vsync-stress": 40 },
+    "dev_vsync_stress_gated_frames_over_50ms_worst": 1,
+    "low_latency": { "evidence": "target/perf/w1-61/head-low-latency-playtest", "commit": "199d823", "requested_mode": "Mailbox", "source": "settings", "pipelined_rendering": false },
+    "shipped_smoke_seconds": { "median": 1.23, "runs": [2.793, 1.23, 1.185], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w1-review/acc-playtest-novsync/shipped" },
+    "w1_61": {
+      "commit": "199d823",
+      "passes": ["target/perf/w1-61/head-acc-dev-vsync-progressed-peak", "target/perf/w1-61/head-acc-dev-vsync-peak", "target/perf/w1-61/head-acc-dev-vsync-stress", "target/perf/w1-61/head-acc-dev-novsync", "target/perf/w1-61/head-acc-playtest-novsync"],
+      "interface_draw_mean_ms": { "progressed-peak": { "normal": 0.9903, "small": 0.9517 }, "peak": { "normal": 0.7745, "small": 0.7681 } },
+      "cpu_frame_p99_ms": {
+        "dev": { "progressed-peak": { "normal": 8.8481, "small": 7.0104 }, "stress": { "normal": 7.5018, "small": 7.8428 } },
+        "playtest": { "progressed-peak": { "normal": 6.2634, "small": 6.4433 }, "stress": { "normal": 6.4769, "small": 6.5375 } }
+      },
+      "frames_over_50ms_worst": 0,
+      "driver_stalls": 0,
+      "shipped_smoke_seconds": { "median": 1.23, "runs": [2.432, 1.186, 1.23], "evidence": "target/perf/w1-61/head-acc-playtest-novsync/shipped" }
+    }
   },
   "decisions": {
     "pipelined_rendering": {
