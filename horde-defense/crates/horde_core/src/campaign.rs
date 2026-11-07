@@ -788,7 +788,16 @@ mod tests {
         assert!(c.delete_preset(2).is_err(), "unknown preset index");
         c.delete_preset(1).unwrap();
         assert_eq!(c.sell(id, &SaleRefs::empty()), Ok(22));
-        assert!(c.apply_preset(1, Mode::Personal).is_err());
+        // Only the starter preset is left, it never held the sold rifle, and
+        // it still applies; "Rifle" is gone rather than pointing at nothing.
+        assert_eq!(c.presets.len(), 1);
+        assert!(c.presets.iter().all(|p| !p.loadout.contains(&id)));
+        c.apply_preset(0, Mode::Personal).unwrap();
+        assert_eq!(c.player.loadout, c.presets[0].loadout);
+        assert_eq!(
+            c.apply_preset(1, Mode::Personal),
+            Err("Unknown preset".into())
+        );
         assert!(c.validate().is_ok());
     }
     #[test]
