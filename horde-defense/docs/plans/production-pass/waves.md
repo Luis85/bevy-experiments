@@ -771,9 +771,24 @@ Wave-2 exit:
 **W3-28 · ux-flow · Full-loop headless acceptance test at both sizes**
 - Fail-first: `full_loop_new_game_to_recruit_defends`. Each of the 10 steps asserts Screen, Tab and exactly one primary. The battle steps assert "Begin defense" / "Resume defense".
 
+**W3-29 · vfx-lighting · Pause banner and midpoint label placement (capture rows CF-1-01, CF-1-02)**
+- Slot: beside W3-14 (the ux-flow banner work), not after W3-28: the id is appended so no id changes. `pause_banner_center` is C-3 geometry and C-11 bars ux-flow from redefining it, so this is a BattleLayout change by vfx-lighting (design-perf-architecture.md, "Zoom-to-fit and wave-3 UI"). The new banner place is the owner's choice; design-vfx-lighting.md's letterbox rule alone does not help a height-limited 7x16 field.
+- Fail-first:
+  - `pause_banner_never_covers_the_bottom_lane` over the zoomed 7x16 and the 3x12 hint-band fields at both sizes (CF-1-01)
+  - `midpoint_label_clears_the_construction_panel` at 1050x700@1.35: the label rect and `construction_panel` do not intersect (CF-1-02)
+- Done: CF-1-01 and CF-1-02 are fixed in the plan's capture ledger.
+- Deps: W3-14.
+
+**W3-30 · qa-captures · Review captures ignore the OS pointer (capture row CF-1-03)**
+- Slot: before the W3-27 capture matrix is reviewed; the id is appended so no id changes.
+- Fail-first: `review_capture_aim_ignores_the_os_pointer`: with a review-capture launch and a hover position over the field, `f.battle.aim` stays at the scene's pinned aim and no hover reticle or inspector draws.
+- Done: CF-1-03 is fixed in the plan's capture ledger.
+- Deps: none; W3-27's matrix review depends on it.
+
 Wave-3 exit:
 - GOLDEN and TRACE 0.
 - The W3 capture matrix is reviewed.
+- Capture rows CF-1-01, CF-1-02 (W3-29) and CF-1-03 (W3-30) are fixed.
 - The construction-rect CF row is closed (already fixed in W1).
 
 ---
