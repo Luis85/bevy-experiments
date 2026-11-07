@@ -1,7 +1,10 @@
 //! Log file output and crash reports.
 //!
 //! Bevy's `LogPlugin` owns the subscriber; this module only supplies the extra
-//! file layer and a panic hook. Logs live in `<save dir>/logs/`.
+//! file layer and a panic hook. Logs live in `<save dir>/logs/`, except that
+//! an isolated review (a `review`-build launch with a staged scenario, not
+//! practice, and no `LASTLIGHT_SAVE_DIR`) logs to its throwaway profile,
+//! `<temp>/lastlight-review-<pid>/logs/` (`LaunchConfig::log_directory`).
 //!
 //! The file layer also feeds a bounded in-memory ring of the newest lines, so
 //! the panic hook can append them to the crash report without re-reading the

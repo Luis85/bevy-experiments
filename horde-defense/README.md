@@ -112,7 +112,7 @@ The game serializes campaign, armory, active encounters, action timers, random s
 
 ## Logging and crash reports
 
-The game logs through Bevy's `LogPlugin` to the console and to a plain-text file, `<save dir>\logs\lastlight-<unix-timestamp>.log` (the save directory is described above; the newest 10 log files are kept). The default filter is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`. Set `RUST_LOG` (for example `RUST_LOG=horde_core=debug,warn`) to replace it entirely. A panic also writes `<save dir>\logs\crash-<unix-timestamp>.txt` with the version, OS, panic message and location, a backtrace and the last 200 log lines. Attach the newest crash file and log to any bug report. `--smoke` keeps its plain stdout report, which `scripts/verify_playtest.ps1` reads.
+The game logs through Bevy's `LogPlugin` to the console and to a plain-text file, `<save dir>\logs\lastlight-<unix-timestamp>.log` (the save directory is described above; the newest 10 log files are kept). The default filter is `warn,horde_core=info,horde_defense=info,wgpu=error,naga=warn`. Set `RUST_LOG` (for example `RUST_LOG=horde_core=debug,warn`) to replace it entirely. A panic also writes `<save dir>\logs\crash-<unix-timestamp>.txt` with the version, OS, panic message and location, a backtrace and the last 200 log lines. An isolated review launch (a `review` build with a staged scenario, outside practice, without `LASTLIGHT_SAVE_DIR`) never writes into the player's profile: its logs and crash reports go to `%TEMP%\lastlight-review-<pid>\logs\` instead. Attach the newest crash file and log to any bug report. `--smoke` keeps its plain stdout report, which `scripts/verify_playtest.ps1` reads.
 
 ## Develop and verify
 
