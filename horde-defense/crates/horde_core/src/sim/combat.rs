@@ -313,14 +313,9 @@ impl Game {
         }
     }
     /// Today's drop pool (catalogue index 4 on, tiers 1 to the encounter
-    /// template's level + 1), its uniform pick (exactly one `a.rng` draw) and
-    /// the absolute quality roll (keyed, no `a.rng`). None when the pool is
-    /// empty, which draws nothing.
-    fn legacy_drop_pick(
-        &self,
-        a: &mut Attempt,
-        e: &Enemy,
-    ) -> Option<(usize, crate::quality::Quality)> {
+    /// template's level + 1) and its uniform pick (exactly one `a.rng`
+    /// draw). None when the pool is empty, which draws nothing.
+    fn legacy_drop_definition(a: &mut Attempt) -> Option<usize> {
         let available: Vec<usize> = content()
             .items
             .iter()
@@ -331,7 +326,16 @@ impl Game {
         if available.is_empty() {
             return None;
         }
-        let definition = available[a.rng.below(available.len() as u64) as usize];
+        Some(available[a.rng.below(available.len() as u64) as usize])
+    }
+    /// The legacy drop: [`Self::legacy_drop_definition`] and the absolute
+    /// quality roll (keyed, no `a.rng`).
+    fn legacy_drop_pick(
+        &self,
+        a: &mut Attempt,
+        e: &Enemy,
+    ) -> Option<(usize, crate::quality::Quality)> {
+        let definition = Self::legacy_drop_definition(a)?;
         let quality = crate::quality::catalog().roll(self.seed, a.id, e.id, a.progression.rank);
         Some((definition, quality))
     }
@@ -451,10 +455,19 @@ impl Game {
                     if let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
                         self.bank_drop(a, &e, definition, quality);
                     }
-                } else if let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
-                    // The Some path keeps today's pool, pick and quality
-                    // until the relative roll (W2-07) and the weighted
-                    // DropTable (W2-09) replace them here.
+                } else if let Some(definition) = Self::legacy_drop_definition(a) {
+                    // The Some path keeps today's pool and pick until the
+                    // weighted DropTable (W2-09) replaces them, and rolls its
+                    // quality relative to the item's base (decision 7). The
+                    // elite floor arrives with the elite drop split (W2-35).
+                    let quality = crate::loot::drop_quality(
+                        content().items[definition].base_quality,
+                        self.seed,
+                        a.id,
+                        e.id,
+                        a.progression.rank,
+                        false,
+                    );
                     if let Some(item_id) = self.bank_drop(a, &e, definition, quality) {
                         self.record_drop(a, item_id);
                     }

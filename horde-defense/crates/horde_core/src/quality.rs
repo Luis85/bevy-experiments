@@ -109,14 +109,19 @@ impl QualityCatalog {
         }
         Ok(())
     }
+    /// A tier's weight at `rank`: 0 below its `min_rank`, otherwise its base
+    /// weight plus the per-rank weight (rank capped at 1000).
+    fn rank_weight(tier: &QualityDefinition, rank: u32) -> u64 {
+        if rank >= tier.min_rank {
+            u64::from(tier.weight) + u64::from(tier.weight_per_rank) * u64::from(rank.min(1000))
+        } else {
+            0
+        }
+    }
+    /// The absolute roll: one keyed draw (tag QUALITY, never the combat RNG)
+    /// over the rank weights of the six tiers.
     pub fn roll(&self, seed: u64, attempt: u64, enemy: u64, rank: u32) -> Quality {
-        let weight = |q: &QualityDefinition| {
-            if rank >= q.min_rank {
-                u64::from(q.weight) + u64::from(q.weight_per_rank) * u64::from(rank.min(1000))
-            } else {
-                0
-            }
-        };
+        let weight = |q: &QualityDefinition| Self::rank_weight(q, rank);
         let total = self.tiers.iter().map(weight).sum::<u64>();
         // Counter-based keyed roll with an explicit quality-purpose tag.
         let mut roll = hash::keyed(seed, attempt, enemy, hash::tags::QUALITY) % total;
@@ -129,6 +134,55 @@ impl QualityCatalog {
         }
         Quality::Common
     }
+    /// The relative roll (decision 7, option b1; design-loot-economy §4).
+    ///
+    /// Same key, tag and rank weights as [`Self::roll`], but each tier is read
+    /// as a step from Common (Poor -1 .. Legendary +4) and the outcome is
+    /// [`shift`]`(base, step)`, so a higher-tier drop no longer mostly
+    /// downgrades. With `floor`, every tier whose outcome lies below it weighs
+    /// 0 and the roll is the key modulo the renormalised total (sub-floor
+    /// zeroing, not `max()`); if nothing is left the result is
+    /// `max(base, floor)`. A Common base with no floor equals `roll` exactly.
+    pub fn roll_relative(
+        &self,
+        base: Quality,
+        floor: Option<Quality>,
+        seed: u64,
+        attempt: u64,
+        enemy: u64,
+        rank: u32,
+    ) -> Quality {
+        let outcome = |q: &QualityDefinition| shift(base, step_from_common(q.quality));
+        let weight = |q: &QualityDefinition| {
+            if floor.is_some_and(|floor| outcome(q) < floor) {
+                0
+            } else {
+                Self::rank_weight(q, rank)
+            }
+        };
+        let total = self.tiers.iter().map(weight).sum::<u64>();
+        if total == 0 {
+            return floor.map_or(base, |floor| base.max(floor));
+        }
+        let mut roll = hash::keyed(seed, attempt, enemy, hash::tags::QUALITY) % total;
+        for tier in &self.tiers {
+            let n = weight(tier);
+            if roll < n {
+                return outcome(tier);
+            }
+            roll -= n;
+        }
+        base
+    }
+}
+/// A tier read as a step from Common: Poor -1, Common 0 .. Legendary +4.
+fn step_from_common(quality: Quality) -> i32 {
+    quality as i32 - Quality::Common as i32
+}
+/// `base` moved `step` tiers, clamped to Poor..=Legendary.
+pub fn shift(base: Quality, step: i32) -> Quality {
+    let last = Quality::ALL.len() as i32 - 1;
+    Quality::ALL[(base as i32).saturating_add(step).clamp(0, last) as usize]
 }
 static VALUE: OnceLock<QualityCatalog> = OnceLock::new();
 pub(crate) fn install() -> Result<&'static QualityCatalog, ContentError> {

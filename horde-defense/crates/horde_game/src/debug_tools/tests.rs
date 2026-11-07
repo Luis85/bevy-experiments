@@ -536,9 +536,14 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
     // 0da44f5dc0a31d2c: attempts save their frozen drop_tier and drop_ids,
     // and reports their drop_ids and loot_by_quality. With those four keys
     // left unserialized the replayed state digests to 0da44f5dc0a31d2c again.
+    // W2-07 (relative drop quality) moved it from dfcb186697a88f45: the
+    // replayed deploys take the drop_tier Some path, so a drop of an
+    // Uncommon-base item rolls its quality relative to that base. With
+    // drop_quality returning the absolute roll the replayed state digests to
+    // dfcb186697a88f45 again, so no combat moved.
     assert_eq!(
         hex(replay(without_sale).unwrap().digest),
-        "dfcb186697a88f45",
+        "3894ac12174eb3f7",
         "the replay of the recording up to its sale is pinned"
     );
     // Only compatibility warnings, never a format or seed mismatch. A content

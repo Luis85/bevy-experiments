@@ -4,8 +4,11 @@
 //! ([`deploy_drop_tier`]), so `Attempt::drop_tier` None means "deployed
 //! before v7": that attempt keeps today's drop path byte-identical (pinned by
 //! `V6_DROP_TRACE_FNV`) and never records `drop_ids`. Only a root attempt on
-//! the Some path records its drops.
+//! the Some path records its drops. A Some-path drop rolls its quality
+//! relative to the item's base quality ([`drop_quality`], decision 7); the
+//! legacy path keeps the absolute roll.
 use crate::content::content;
+use crate::quality::{self, Quality};
 
 /// The highest tier the drop pool holds (4 with today's catalogue): a saved
 /// `Attempt::drop_tier` lies in `1..=max_drop_tier()`.
@@ -23,6 +26,31 @@ pub fn deploy_drop_tier(level: usize, unlocked: usize) -> u8 {
     u8::try_from(tier)
         .unwrap_or(u8::MAX)
         .clamp(1, max_drop_tier().max(1))
+}
+
+/// The quality floor of an elite's drop (ruling E8): tiers whose outcome
+/// lies below it weigh 0. Bosses get no floor.
+pub const ELITE_QUALITY_FLOOR: Quality = Quality::Uncommon;
+
+/// The quality of a Some-path drop: the keyed relative roll
+/// ([`quality::QualityCatalog::roll_relative`]) on the item's `base`, with
+/// [`ELITE_QUALITY_FLOOR`] for an elite. It reads no combat RNG.
+pub fn drop_quality(
+    base: Quality,
+    seed: u64,
+    attempt: u64,
+    enemy: u64,
+    rank: u32,
+    elite: bool,
+) -> Quality {
+    quality::catalog().roll_relative(
+        base,
+        elite.then_some(ELITE_QUALITY_FLOOR),
+        seed,
+        attempt,
+        enemy,
+        rank,
+    )
 }
 
 #[cfg(test)]
