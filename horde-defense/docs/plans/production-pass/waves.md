@@ -787,10 +787,16 @@ Wave-2 exit:
 - Done: CF-1-03 is fixed in the plan's capture ledger.
 - Deps: none; W3-27's matrix review depends on it.
 
+**W3-31 · vfx-lighting · Wall-hit numbers clear the wall face and its stack (capture row CF-1-07)**
+- Slot: beside W3-29 (the other vfx-lighting placement fix over the field), before W3-27's capture matrix is reviewed; the id is appended so no id changes. Since W1-69 every stacked enemy strikes its wall, so at 1050x700@1.35 the wall-hit numbers ("-80", "MISS") cover the wall face and the front of its stack. The placement is `ui/damage.rs` presentation only: it reads the drawn wall and stack rects and never touches core RNG or state. The new place is the owner's choice, and reduced mode uses the same placement.
+- Fail-first: `wall_hit_numbers_clear_the_wall_face_and_its_stack_at_small_size`: at 1050x700@1.35, on the progressed-peak field, the drawn rect of each wall-hit popup does not intersect the struck wall's face rect or the drawn body of the front enemy in its stack.
+- Done: CF-1-07 is fixed in the plan's capture ledger, with after-capture evidence from progressed-peak and from stress motion (`scripts/capture_motion.ps1 -Scene stress -Viewport small`) at 1050x700@1.35.
+- Deps: none.
+
 Wave-3 exit:
 - GOLDEN and TRACE 0.
 - The W3 capture matrix is reviewed.
-- Capture rows CF-1-01, CF-1-02 (W3-29), CF-1-03 (W3-30) and CF-1-08 (W3-12) are fixed.
+- Capture rows CF-1-01, CF-1-02 (W3-29), CF-1-03 (W3-30), CF-1-07 (W3-31) and CF-1-08 (W3-12) are fixed.
 - The construction-rect CF row is closed (already fixed in W1).
 
 ---
