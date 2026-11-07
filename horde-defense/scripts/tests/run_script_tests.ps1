@@ -207,6 +207,33 @@ try {
         Assert-Equal 'err' (Read-Log $r.Err).Trim() 'stderr log'
     }
 
+    Test-Case 'Invoke-Native reads the exit code of a child that exited before Invoke-Native looked at it' {
+        # A Start-Process that returns late stands in for a busy machine: the child has exited, and its creation
+        # handle has been closed, before Invoke-Native gets the process object. The exit code must still be read.
+        function Start-Process {
+            [CmdletBinding()]
+            param($FilePath, $ArgumentList, $WorkingDirectory, [switch]$NoNewWindow, [switch]$PassThru, [switch]$Wait,
+                $RedirectStandardOutput, $RedirectStandardError)
+            $process = Microsoft.PowerShell.Management\Start-Process @PSBoundParameters
+            Start-Sleep -Milliseconds 500
+            return $process
+        }
+        $r = Invoke-Native -FilePath (Resolve-Tool 'cmd') -Arguments @('/c', 'exit 3') -LogStem (Join-Path $temporary 'logs\late-exit3') -TimeoutSeconds 30
+        Assert-Equal 3 $r.ExitCode 'late exit code 3'
+        $r = Invoke-Native -FilePath $helper -Arguments @('echo', 'late') -LogStem (Join-Path $temporary 'logs\late-echo') -TimeoutSeconds 30
+        Assert-Equal 0 $r.ExitCode 'late exit code 0'
+        Assert-Equal '[late]' (Read-Log $r.Out).Trim() 'late stdout log'
+    }
+
+    Test-Case 'Invoke-Native reads the exit code of every instant-exit run' {
+        for ($i = 0; $i -lt 150; $i++) {
+            $r = Invoke-Native -FilePath $helper -Arguments @('echo') -LogStem (Join-Path $temporary 'logs\instant-echo') -TimeoutSeconds 30
+            Assert-Equal 0 $r.ExitCode "echo run $i exit code"
+            $r = Invoke-Native -FilePath (Resolve-Tool 'cmd') -Arguments @('/c', 'exit 3') -LogStem (Join-Path $temporary 'logs\instant-exit3') -TimeoutSeconds 30
+            Assert-Equal 3 $r.ExitCode "exit 3 run $i exit code"
+        }
+    }
+
     Test-Case 'Invoke-Native survives a caller redirecting every stream' {
         # The caller's all-streams redirect is generated so the 5.1 lint, which bans that
         # operator in shipped scripts, does not flag this file.

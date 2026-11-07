@@ -1,6 +1,6 @@
 #requires -Version 5.1
 # Shared Windows PowerShell 5.1 harness for scripts/. Dot-source it: . (Join-Path $PSScriptRoot 'lib\Native.ps1')
-# Native processes always run through Invoke-Native (Start-Process with redirected streams), because
+# Native processes always run through Invoke-Native (a Diagnostics.Process with redirected streams), because
 # '&' on a native exe that writes stderr raises NativeCommandError under 5.1 when streams are redirected.
 # Suggested timeouts: cargo 1800 s, capture 300 s, smoke 900 s, --version 30 s, git and rustc 30 s.
 # Self-tests: scripts/tests/run_script_tests.ps1.
@@ -91,22 +91,38 @@ function Invoke-Native {
     if (-not (Test-Path -LiteralPath $logDirectory)) { New-Item -ItemType Directory -Force -Path $logDirectory | Out-Null }
     $outLog = "$LogStem.out.txt"
     $errLog = "$LogStem.err.txt"
-    $start = @{
-        FilePath               = $FilePath
-        NoNewWindow            = $true
-        PassThru               = $true
-        RedirectStandardOutput = $outLog
-        RedirectStandardError  = $errLog
-    }
     $argumentLine = ConvertTo-NativeArgument -Arguments $Arguments
-    # An empty -ArgumentList throws in 5.1, so it is passed only when there is something to pass.
-    if ($argumentLine.Length -gt 0) { $start.ArgumentList = $argumentLine }
-    if ($WorkingDirectory) { $start.WorkingDirectory = $WorkingDirectory }
+    # The Process object that creates the child owns its creation handle, so ExitCode is always readable. Start-Process
+    # -PassThru returns a process looked up by id instead: when the child exits and Start-Process closes its handle
+    # before the caller opens one, ExitCode reads as $null.
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = $FilePath
+    if ($FilePath.IndexOfAny([char[]]@('\', '/')) -ge 0) {
+        $info.FileName = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($FilePath)
+    }
+    $info.Arguments = $argumentLine
+    $info.UseShellExecute = $false
+    $info.RedirectStandardOutput = $true
+    $info.RedirectStandardError = $true
+    # As Start-Process did, the default working directory is the caller's location, not the process directory.
+    $info.WorkingDirectory = (Get-Location -PSProvider FileSystem).ProviderPath
+    if ($WorkingDirectory) {
+        $info.WorkingDirectory = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($WorkingDirectory)
+    }
+    $outFile = $null
+    $errFile = $null
+    $copies = @()
+    $process = $null
     $watch = [Diagnostics.Stopwatch]::StartNew()
-    $process = Start-Process @start
-    # Touching Handle keeps ExitCode readable after the process exits (5.1 Start-Process quirk).
-    $null = $process.Handle
     try {
+        $outFile = New-Object IO.FileStream($outLog, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+        $errFile = New-Object IO.FileStream($errLog, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::ReadWrite)
+        $process = [Diagnostics.Process]::Start($info)
+        # Raw bytes, as a file redirect writes them.
+        $copies = @(
+            $process.StandardOutput.BaseStream.CopyToAsync($outFile),
+            $process.StandardError.BaseStream.CopyToAsync($errFile)
+        )
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
             $kill = @{
                 FilePath               = (Resolve-Tool 'taskkill')
@@ -123,13 +139,29 @@ function Invoke-Native {
         }
         $process.WaitForExit()
         $watch.Stop()
+        $exitCode = $process.ExitCode
+        $processId = $process.Id
+        # Never report a run whose exit code could not be read as an ordinary failure with a blank code.
+        if ($null -eq $exitCode) { throw "Exit code unavailable (PID $processId): $FilePath $argumentLine" }
     }
     finally {
-        if ($RemoveReviewProfile) { Remove-ReviewProfile -ProcessId $process.Id }
+        # The pipes close once every process holding them has exited. A straggler (a grandchild that inherited them)
+        # still holding one after 10 s only cuts the logs off; the call does not wait for it.
+        if ($copies.Count -gt 0) {
+            $drained = $false
+            try { $drained = [Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]$copies, 10000) } catch { $drained = $true }
+            if (-not $drained) { Write-Warning "A process still holds the output pipes of PID $($process.Id); the $LogStem logs are cut off" }
+        }
+        if ($null -ne $outFile) { $outFile.Dispose() }
+        if ($null -ne $errFile) { $errFile.Dispose() }
+        if ($null -ne $process) {
+            if ($RemoveReviewProfile) { Remove-ReviewProfile -ProcessId $process.Id }
+            $process.Dispose()
+        }
     }
     return [pscustomobject]@{
-        ExitCode = $process.ExitCode
-        Id       = $process.Id
+        ExitCode = $exitCode
+        Id       = $processId
         Seconds  = [Math]::Round($watch.Elapsed.TotalSeconds, 3)
         Out      = $outLog
         Err      = $errLog
