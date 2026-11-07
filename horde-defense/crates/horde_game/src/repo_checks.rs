@@ -54,7 +54,9 @@ const FORBIDDEN: &[(&str, &str)] = &[
 
 const REQUIRES: &str = "#requires -version 5.1";
 const ZIP_TYPE: &str = "io.compression.zipfile]";
-const ZIP_ASSEMBLY: &str = "add-type -assemblyname system.io.compression";
+/// The assembly that holds `ZipFile` on .NET Framework 4.x (PowerShell 5.1);
+/// `System.IO.Compression` alone has only `ZipArchive`.
+const ZIP_ASSEMBLY: &str = "system.io.compression.filesystem";
 const LIBRARY: &str = "lib/native.ps1";
 
 fn scripts_directory() -> PathBuf {
@@ -179,12 +181,12 @@ fn lint_script(name: &str, bytes: &[u8]) -> Vec<String> {
                 violations.push(format!("{name}:{line}: `{needle}`: {reason}"));
             }
         }
-        if code.contains(ZIP_ASSEMBLY) {
+        if code.contains("add-type") && code.contains(ZIP_ASSEMBLY) {
             zip_assembly_loaded = true;
         }
         if code.contains(ZIP_TYPE) && !zip_assembly_loaded {
             violations.push(format!(
-                "{name}:{line}: [IO.Compression.ZipFile] needs an earlier `Add-Type -AssemblyName System.IO.Compression`"
+                "{name}:{line}: [IO.Compression.ZipFile] needs an earlier `Add-Type -AssemblyName System.IO.Compression.FileSystem`"
             ));
         }
     }
@@ -298,6 +300,12 @@ fn lint_reports_each_rule_and_ignores_comments() {
         (
             "#requires -Version 5.1\n[IO.Compression.ZipFile]::OpenRead($p)\n",
             "Add-Type",
+        ),
+        (
+            // ZipFile lives in System.IO.Compression.FileSystem on .NET Framework 4.x.
+            "#requires -Version 5.1\nAdd-Type -AssemblyName System.IO.Compression\n\
+             [IO.Compression.ZipFile]::OpenRead($p)\n",
+            "System.IO.Compression.FileSystem",
         ),
         (
             "#requires -Version 5.1\nStart-Process cmd\n",
