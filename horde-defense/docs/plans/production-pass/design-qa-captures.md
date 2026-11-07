@@ -491,7 +491,7 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 #### R6. Root files
 
 - **Owner / wave:** qa-captures, wave all.
-- **Ruling:** No root-repo file is touched. Drop any dev.ps1 annotation; README.md:165 and VALIDATION.md:147 stay byte-identical.
+- **Ruling:** No root-repo file is touched. Drop any dev.ps1 annotation; the `pwsh -NoProfile -File ../scripts/dev.ps1 verify -Project horde-defense` line in README.md and docs/VALIDATION.md (README.md:165 at 3d492cd, :166 after the wave-1 review; VALIDATION.md:147) stays byte-identical, pinned by `repo_checks::root_helper_line_is_unannotated`.
 - **Supersedes in this spec:** §1.12 "annotate README.md:165 and VALIDATION.md:147 (root dev.ps1)".
 
 #### R8. Single owners
@@ -591,7 +591,7 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 #### S16. Root dev.ps1, AGENTS.md target rule, __pycache__
 
 - **Owner / wave:** qa-captures, wave 1.
-- **Ruling:** Nothing annotates dev.ps1 (R6); README.md:165 and docs/VALIDATION.md:147 stay byte-identical; the docs lint matches only "-File scripts/". AGENTS.md:10 becomes "Each workspace owns target/ unless CARGO_TARGET_DIR is set; every script under scripts/ honours it." horde-defense/.gitignore gains /scripts/__pycache__/.
+- **Ruling:** Nothing annotates dev.ps1 (R6); the root dev.ps1 line in README.md and docs/VALIDATION.md stays byte-identical to 3d492cd (named by content in R6, since its README line number moved from 165 to 166); the docs lint matches only "-File scripts/". AGENTS.md:10 becomes "Each workspace owns target/ unless CARGO_TARGET_DIR is set; every script under scripts/ honours it." horde-defense/.gitignore gains /scripts/__pycache__/.
 - **Supersedes in this spec:** §1.12 annotation of root dev.ps1.
 
 ### Cluster: enemies-world-pacing

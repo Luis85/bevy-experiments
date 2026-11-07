@@ -11,6 +11,9 @@
 //! `pwsh ... -File scripts/<x>.ps1`, except a PowerShell 7 allowlisted script
 //! whose surrounding prose carries [`PS7_DOC_NOTE`]. The root helper
 //! (`-File ../scripts/dev.ps1`) is outside this workspace and is not checked.
+//!
+//! `root_helper_line_is_unannotated` pins that root helper line (ISO-1): README.md
+//! and docs/VALIDATION.md each carry it once, byte-identical to 3d492cd.
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.
@@ -754,6 +757,74 @@ fn doc_lint_ignores_the_root_helper_and_honours_the_ps7_note() {
             "{doc:?} should report {expected:?}, got {violations:?}"
         );
     }
+}
+
+/// The root helper line, byte-identical to 3d492cd in README.md and
+/// docs/VALIDATION.md (ruling R6/S16, acceptance ISO-1): never annotated.
+const ROOT_HELPER_LINE: &str =
+    "pwsh -NoProfile -File ../scripts/dev.ps1 verify -Project horde-defense";
+
+/// Every way `text` breaks ISO-1, as `name[:line]: reason`: a line that names
+/// `../scripts/dev.ps1` but is not exactly [`ROOT_HELPER_LINE`], or a count of
+/// exact lines other than one.
+fn root_helper_violations(name: &str, text: &str) -> Vec<String> {
+    let mut violations = Vec::new();
+    let mut exact = 0;
+    for (index, line) in text.lines().enumerate() {
+        if line == ROOT_HELPER_LINE {
+            exact += 1;
+        } else if line.contains("../scripts/dev.ps1") {
+            violations.push(format!(
+                "{name}:{}: the root dev.ps1 line is changed",
+                index + 1
+            ));
+        }
+    }
+    if exact != 1 {
+        violations.push(format!(
+            "{name}: the root dev.ps1 line appears {exact} times"
+        ));
+    }
+    violations
+}
+
+#[test]
+fn root_helper_line_is_unannotated() {
+    let workspace = workspace_directory();
+    for name in ["README.md", "docs/VALIDATION.md"] {
+        let path = workspace.join(name);
+        let text = std::fs::read_to_string(&path)
+            .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+        assert_eq!(
+            root_helper_violations(name, &text),
+            Vec::<String>::new(),
+            "ISO-1: {name} must keep the root dev.ps1 line byte-identical"
+        );
+    }
+
+    let annotated = format!("```\n{ROOT_HELPER_LINE} # requires PowerShell 7\n```\n");
+    let twice = format!("{ROOT_HELPER_LINE}\n{ROOT_HELPER_LINE}\n");
+    let trailing = format!("{ROOT_HELPER_LINE} \n");
+    let cases: &[(&str, &str)] = &[
+        (
+            "# Nothing\n",
+            "doc.md: the root dev.ps1 line appears 0 times",
+        ),
+        (&annotated, "doc.md:2: the root dev.ps1 line is changed"),
+        (&twice, "doc.md: the root dev.ps1 line appears 2 times"),
+        (&trailing, "doc.md:1: the root dev.ps1 line is changed"),
+    ];
+    for (doc, expected) in cases {
+        let violations = root_helper_violations("doc.md", doc);
+        assert!(
+            violations.iter().any(|violation| violation == expected),
+            "{doc:?} should report {expected:?}, got {violations:?}"
+        );
+    }
+    assert_eq!(
+        root_helper_violations("doc.md", &format!("```\r\n{ROOT_HELPER_LINE}\r\n```\r\n")),
+        Vec::<String>::new()
+    );
 }
 
 #[test]

@@ -612,7 +612,7 @@ The full decision and rejection lists (206 decisions, 239 rejected options) are 
 | Archive | **Ruling S9/U7:** mirrored `git mv` of the full user list | Source-only tagging of strips and keyart (the user approved the archive) |
 | Storm | **Ruling W-8:** vfx's table | `storm: bool` on themes; an 11th storm theme; a hashed storm chance |
 | Build stamp | `option_env!(LASTLIGHT_BUILD_COMMIT)` on the menu, crash report, startup log and `--version` (W7-01) | A SaveEnvelope stamp (GOLDEN churn); build.rs running git |
-| Root dev.ps1 | **Ruling R6/S16:** untouched | Annotating README.md:165 and VALIDATION.md:147 |
+| Root dev.ps1 | **Ruling R6/S16:** untouched | Annotating the `../scripts/dev.ps1 verify -Project horde-defense` line in README.md and docs/VALIDATION.md (README.md:165 at 3d492cd, :166 now; VALIDATION.md:147) |
 | Committed pairs | Downsampled 2:1, at most 40 MB, CF ledger in this plan (§10) | Raw 2x PNG pairs with a 64 MB budget |
 
 ---
