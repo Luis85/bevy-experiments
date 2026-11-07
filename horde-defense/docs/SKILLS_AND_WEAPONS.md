@@ -193,7 +193,7 @@ feedback do not resolve a second hit.
 ## Evidence and related contracts
 
 Source: `skill_catalog.rs`, `weapons.rs`, `ordnance.rs`, `campaign.rs`,
-`sim.rs` and `ui/battle.rs` in the core/game crates. See
+`sim.rs` and `ui/battle/` (`attack.rs`, `field.rs`) in the core/game crates. See
 [enemy composition](ENEMY_COMPOSITION.md), [view hierarchy](VIEW_HIERARCHY.md),
 [dated user overrides](EXPANSION.md) and [survival audio](AUDIO_SURVIVAL.md).
 

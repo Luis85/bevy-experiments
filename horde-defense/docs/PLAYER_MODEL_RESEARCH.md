@@ -39,7 +39,7 @@ The independent workspace declares Bevy `=0.20.0`, `bevy_egui =0.43.1` and Rust 
 | `bevy_egui-0.43.1/src/render/mod.rs` | The pipeline uses premultiplied-alpha blending. |
 | `bevy_egui-0.43.1/src/render/egui.wesl` | The shader samples the supplied texture without the former blanket RGB-by-alpha multiplication. |
 | Project `visual_assets.rs` | Managed `ColorImage::from_rgba_unmultiplied` conversion is cached once and uses nearest sampling and the actual render-device texture budget. |
-| Project `ui/battle.rs` and `art.rs` | Terrain, actors and atmosphere are painted inside the egui canvas in order. |
+| Project `ui/battle/field.rs` and `art/` (`backdrop.rs`, `battlefield/`) | Terrain, actors and atmosphere are painted inside the egui canvas in order. |
 
 The installed source files are under Cargo's registry source root, currently `%USERPROFILE%/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/`. They were read; no Cargo command or build was run for this document. Some attempted public pinned-version documentation URLs were inaccessible to the research tool, so they are not presented as verified API references.
 
