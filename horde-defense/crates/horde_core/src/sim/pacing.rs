@@ -6,13 +6,20 @@
 //! Harness v2 (W2-01): named profiles in a registry ([`by_id`]), per-seed
 //! variation ([`pacing_seed`]), a threaded sweep ([`pacing_sweep`]) and
 //! milestone statistics over seeds ([`MilestoneStats`]). Other remits add
-//! registry rows and evaluators on this API.
+//! registry rows and evaluators on this API. The goal-5 evaluators (W2-03)
+//! live in [`targets`].
+mod targets;
+pub use targets::{
+    GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, UNLOCK_ORDER, median_run_within, tier_affordable_runs,
+    tree_outlasts_liberation, unlock_order,
+};
+
 use super::smoke::smoke_buy_gear;
 use super::*;
 use crate::balance::{BalancePreset, BalanceSettings};
 use crate::command::Command;
 use crate::enemy_catalog::enemy_catalog;
-use crate::skill_catalog::{CampaignFeature, skills};
+use crate::skill_catalog::{CampaignFeature, SkillNode, skills};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -210,7 +217,8 @@ pub struct PacingRun {
     pub spent_recruit: u64,
     pub auto_sold_count: u32,
     pub auto_sold_coins: u64,
-    /// Skill nodes owned and not yet owned after the run.
+    /// Skill nodes owned after the run, and those neither owned nor retired
+    /// ([`nodes_left`]).
     pub nodes_owned: usize,
     pub nodes_left: usize,
     /// Coins held after the run.
@@ -231,7 +239,7 @@ pub enum Milestone {
     Feature(CampaignFeature),
     /// At least this many countries are liberated.
     Liberation(u32),
-    /// Every skill node is owned.
+    /// No unowned, non-retired skill node is left ([`tree_exhausted`]).
     TreeExhausted,
     /// The progression rank is at least this.
     Rank(u32),
@@ -355,6 +363,34 @@ pub fn node_depths() -> BTreeMap<String, usize> {
         depth(&node.id, &mut out);
     }
     out
+}
+/// A node retired from sale: the append-only catalogue keeps its id, but
+/// no campaign can buy it, so the tree is exhausted without it (ruling
+/// W-3). Today that is only the innate starter root: price 0, granted at
+/// campaign creation and never sold, and the only price-0 node the
+/// catalogue validator allows.
+pub fn node_retired(node: &SkillNode) -> bool {
+    node.price == 0
+}
+/// The nodes of `nodes` that are neither owned nor retired.
+pub fn nodes_left<'a>(
+    nodes: impl IntoIterator<Item = &'a SkillNode>,
+    owned: impl Fn(&SkillNode) -> bool,
+    retired: impl Fn(&SkillNode) -> bool,
+) -> usize {
+    nodes
+        .into_iter()
+        .filter(|n| !owned(n) && !retired(n))
+        .count()
+}
+/// [`Milestone::TreeExhausted`] holds: no unowned, non-retired node is
+/// left (ruling W-3).
+pub fn tree_exhausted<'a>(
+    nodes: impl IntoIterator<Item = &'a SkillNode>,
+    owned: impl Fn(&SkillNode) -> bool,
+    retired: impl Fn(&SkillNode) -> bool,
+) -> bool {
+    nodes_left(nodes, owned, retired) == 0
 }
 /// Coins needed to learn every node up to and including `depth`.
 pub fn tier_cost(depth: usize) -> u64 {
@@ -589,8 +625,12 @@ pub fn simulate_pacing_seed(
             .iter()
             .filter(|n| g.campaign.has_node(&n.id))
             .count();
-        let nodes_left = skills().nodes.len() - nodes_owned;
-        if nodes_left == 0 {
+        let left = nodes_left(
+            &skills().nodes,
+            |n| g.campaign.has_node(&n.id),
+            node_retired,
+        );
+        if left == 0 {
             reached(&mut milestones, Milestone::TreeExhausted, run, minutes);
         }
         let rank = g.campaign.progression_rank();
@@ -628,7 +668,7 @@ pub fn simulate_pacing_seed(
             auto_sold_count: r.auto_sold.count,
             auto_sold_coins: r.auto_sold.coins,
             nodes_owned,
-            nodes_left,
+            nodes_left: left,
             wallet: g.campaign.coins,
             boss_ttk_s: t
                 .boss_arrival_tick

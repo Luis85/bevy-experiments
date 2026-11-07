@@ -27,11 +27,13 @@ pub use migrations::SAVE_VERSION;
 pub(crate) use migrations::V7_MILESTONE_RANKS;
 use npc::structure_bonus;
 pub use pacing::{
-    ArchetypeRun, DEFAULT_PROFILE_ID, LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingAim,
-    PacingDefender, PacingFarm, PacingPlan, PacingProfile, PacingReport, PacingRun, PacingSell,
-    PacingSpend, by_id, median_earned_after, node_depths, pacing_archetype_ids, pacing_profiles,
-    pacing_registry, pacing_seed, pacing_sweep, pacing_sweep_with_threads, simulate_pacing,
-    simulate_pacing_seed, tier_cost,
+    ArchetypeRun, DEFAULT_PROFILE_ID, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, LEGACY_PROFILE_IDS,
+    Milestone, MilestoneStats, PacingAim, PacingDefender, PacingFarm, PacingPlan, PacingProfile,
+    PacingReport, PacingRun, PacingSell, PacingSpend, UNLOCK_ORDER, by_id, median_earned_after,
+    median_run_within, node_depths, node_retired, nodes_left, pacing_archetype_ids,
+    pacing_profiles, pacing_registry, pacing_seed, pacing_sweep, pacing_sweep_with_threads,
+    simulate_pacing, simulate_pacing_seed, tier_affordable_runs, tier_cost, tree_exhausted,
+    tree_outlasts_liberation, unlock_order,
 };
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;

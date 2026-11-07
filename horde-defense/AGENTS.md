@@ -18,3 +18,8 @@ dev with VSync on (interface gates) plus -VsyncOff in dev and playtest (CPU p99)
 50 ms leave out driver stalls (PERF_BUDGET.json driver_stall, user ruling). Evidence lands in
 <target>/perf/<stamp>-<profile>[-novsync]/summary.json and summary.md. Keep the machine quiet, the window
 focused and on mains, and never run a cargo command beside it.
+Pacing acceptance (W2-03): cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture,
+run after the debug builds. Every test in crates/horde_core/tests/pacing_targets.rs is #[ignore = "release-only"];
+one OnceLock sweep (expert-deu, Normal, 20 seeds, 60 runs) feeds them all, and each prints a PASS or FAIL summary.
+Goal-5 rows exist now and goal-6 rows join in W2-04; rows may fail until the wave-4 balance pass. The evaluators'
+synthetic tests (tests/pacing_harness.rs) run in the normal suite.
