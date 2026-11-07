@@ -27,8 +27,11 @@ pub use migrations::SAVE_VERSION;
 pub(crate) use migrations::V7_MILESTONE_RANKS;
 use npc::structure_bonus;
 pub use pacing::{
-    Milestone, PacingAim, PacingProfile, PacingReport, PacingRun, PacingSpend, node_depths,
-    pacing_profiles, simulate_pacing, tier_cost,
+    ArchetypeRun, DEFAULT_PROFILE_ID, LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingAim,
+    PacingDefender, PacingFarm, PacingPlan, PacingProfile, PacingReport, PacingRun, PacingSell,
+    PacingSpend, by_id, median_earned_after, node_depths, pacing_archetype_ids, pacing_profiles,
+    pacing_registry, pacing_seed, pacing_sweep, pacing_sweep_with_threads, simulate_pacing,
+    simulate_pacing_seed, tier_cost,
 };
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;

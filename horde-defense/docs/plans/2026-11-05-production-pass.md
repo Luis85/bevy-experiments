@@ -822,9 +822,9 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 
 | Measure | Wave 0 | After W2 (W2-49) | After W4 (W4-08) |
 |---|---|---|---|
-| expert-deu first victory (1 seed / 20-seed median) | run 4 / (W2-01) | | |
+| expert-deu first victory (1 seed / 20-seed median) | run 4 / (W2-01, post-W1-69: run 3 / 3 [2, 5]) | | |
 | Tier 1 / 2 / 3 affordable | runs 3 / 5 / 7 | | |
-| Tree exhausted vs Liberation(2) | run 24 vs (W2-01) | | |
+| Tree exhausted vs Liberation(2) | run 24 vs (W2-01, post-W1-69 20-seed median: 25 [24, 26] vs 17 [16, 18]) | | |
 | Unlock order Fortifications / Mara / Operations (median) | 4 / 14 / 14 (Recruitment) | | |
 | Defeat rate per 20-run window after first victory | 0% after run 10 | | |
 | Longest win streak after run 10 | 50 | | |
@@ -832,6 +832,8 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 | Boss TTK median (s) | (W2-04) | | |
 | Smoke Personal stages 1-5 / Npc stages 1-5 | see 1.3 | | |
 | Strategy profile: liberations 2/4/10, coins per minute | (W2-43) | | |
+
+W2-01 20-seed baseline (2026-11-07, pacing harness v2 on the post-W1-69 rules): `cargo run --locked --release -p horde_core --example pacing -- 60 --profile expert-deu --profile novice-deu --profile novice-gear-lux --seeds 20`, once with `--csv --out target/production-before/pacing_20seed_before.csv` (3,600 runs, sha256 af9763f3...54b1b) and once with `--fit-tiers 3,5,7,9,11,13 --out target/production-before/pacing_20seed_before.txt` (sha256 321a9af1...98b3), both not committed. Cells are the lower median [p25, p75] of runs completed; a missed milestone counts as 61. expert-deu: first victory 3 [2, 5]; tiers 1 / 2 / 3 affordable 3 / 5 / 7; Fortifications / Mara / Recruitment / Operations unlocked 3 / 14 / 14 / 23; Liberation(1) 14 [13, 15], Liberation(2) 17 [16, 18]; tree exhausted 25 [24, 26]; rank 5 / 10 / 15 / 20 at 10 / 15 / 20 / 25. Median earned at runs 3 / 5 / 7 / 9 / 11 / 13 over tier 1-6 cost: 1.37 / 0.87 / 1.07 / 1.56 / 1.88 / 2.23. Seed index 0 is the profile's own seed, so the default `pacing 60 --runs` still equals `target/production-after/w1-69/pacing.txt` byte for byte (§9.6).
 
 ### 9.6 Enemies overlap (W1-69): pacing and smoke
 

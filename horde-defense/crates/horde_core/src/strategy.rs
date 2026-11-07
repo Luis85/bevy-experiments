@@ -101,6 +101,9 @@ pub struct StrategyState {
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub folded_outcomes: u32,
 }
+/// A fresh game's strategy RNG seed (ASCII "PLAGUE"); [`StrategyState::seeded`]
+/// mixes another seed into it.
+const STRATEGY_RNG_SALT: u64 = 0x504c41475545;
 impl Default for StrategyState {
     fn default() -> Self {
         Self {
@@ -108,7 +111,7 @@ impl Default for StrategyState {
             guards: vec![],
             outbreaks: vec![],
             tick: 0,
-            rng: Rng::new(0x504c41475545),
+            rng: Rng::new(STRATEGY_RNG_SALT),
             next_recruit_id: 1,
             next_outbreak_id: 1,
             peak_freed: 0,
@@ -118,6 +121,15 @@ impl Default for StrategyState {
     }
 }
 impl StrategyState {
+    /// A fresh strategy layer whose RNG starts at `seed ^ STRATEGY_RNG_SALT`,
+    /// so `seeded(0)` is the default. The pacing sweep's seam: seed index 0
+    /// keeps the default RNG and every later index varies it.
+    pub(crate) fn seeded(seed: u64) -> Self {
+        Self {
+            rng: Rng::new(seed ^ STRATEGY_RNG_SALT),
+            ..Self::default()
+        }
+    }
     pub fn readiness(&self, campaign: &Campaign, id: u64) -> Result<RecruitReadiness, String> {
         let recruit = self
             .roster
@@ -1126,6 +1138,20 @@ mod tests {
         assert!(
             injured,
             "at least one sourced injury must retain shock at the end of the hostile action"
+        );
+    }
+    #[test]
+    fn seeded_zero_is_the_default_and_other_seeds_vary_the_rng() {
+        assert_eq!(StrategyState::seeded(0), StrategyState::default());
+        let mut a = StrategyState::seeded(1);
+        let mut b = StrategyState::seeded(2);
+        assert_ne!(a.rng.next_u64(), b.rng.next_u64());
+        assert_eq!(
+            StrategyState {
+                rng: StrategyState::default().rng,
+                ..StrategyState::seeded(7)
+            },
+            StrategyState::default()
         );
     }
     #[test]
