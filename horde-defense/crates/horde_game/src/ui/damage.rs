@@ -61,13 +61,42 @@ fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
     };
     // Over a struck hostile the number rises from its drawn body.
     let [dx, dy] = crate::battle_view::struck_stagger(a, event);
+    let mut at = [event.to[0] + dx, event.to[1] + dy];
+    if matches!(target, Target::Point(_)) {
+        // A shot into open ground ends 40 yards out, far off a zoomed field:
+        // its MISS sits where the tracer leaves the field (W1 review).
+        at = on_field(event.from, at, [a.width_yards, f32::from(a.lane_count)]);
+    }
     Some(Bubble {
         kind,
         value: event.value,
-        at: [event.to[0] + dx, event.to[1] + dy],
+        at,
         target,
         started: 0.0,
     })
+}
+/// `to` when it lies in the world box `[0, size[0]] x [0, size[1]]`;
+/// otherwise where the segment from `from` leaves the box (`to` clamped into
+/// it when `from` lies outside too).
+fn on_field(from: [f32; 2], to: [f32; 2], size: [f32; 2]) -> [f32; 2] {
+    let inside = |p: [f32; 2]| (0..2).all(|i| (0.0..=size[i]).contains(&p[i]));
+    if inside(to) {
+        return to;
+    }
+    let t = if inside(from) {
+        (0..2).fold(1.0_f32, |t, i| {
+            let d = to[i] - from[i];
+            let edge = if d > 0.0 { size[i] } else { 0.0 };
+            if d == 0.0 {
+                t
+            } else {
+                t.min((edge - from[i]) / d)
+            }
+        })
+    } else {
+        1.0
+    };
+    [0, 1].map(|i| (from[i] + (to[i] - from[i]) * t).clamp(0.0, size[i]))
 }
 fn positive(kind: Kind) -> bool {
     matches!(kind, Kind::Hit | Kind::Weak | Kind::Incoming)
@@ -356,12 +385,19 @@ pub(super) fn draw_for(
         job.wrap.break_anywhere = true;
         let galley = p.layout_job(job);
         let world = arena.world(bubble.at[0], bubble.at[1]);
+        // A popup over open ground stays on the field; one over an actor may
+        // rise into the forest and the headroom above the arena.
+        let bounds = if matches!(bubble.target, Target::Point(_)) {
+            arena.rect
+        } else {
+            arena.effects_clip
+        };
         let center = pos2(
             world.x.clamp(
-                arena.effects_clip.left() + galley.size().x * 0.5 + 4.0,
-                arena.effects_clip.right() - galley.size().x * 0.5 - 4.0,
+                bounds.left() + galley.size().x * 0.5 + 4.0,
+                bounds.right() - galley.size().x * 0.5 - 4.0,
             ),
-            (world.y - 62.0 - rise).max(arena.effects_clip.top() + galley.size().y * 0.5 + 4.0),
+            (world.y - 62.0 - rise).max(bounds.top() + galley.size().y * 0.5 + 4.0),
         );
         let origin = center - galley.size() * 0.5;
         let outline = Color32::from_black_alpha((240.0 * fade) as u8);
@@ -581,6 +617,92 @@ mod tests {
                 0,
                 "pixels_per_point {pixels_per_point}: font texture uploads after pass \
                  {WARMUP_PASSES} in passes {late:?}"
+            );
+        }
+    }
+    /// `game`'s attempt resized to a 3-lane, 12-yard field, the 2.5x zoom of
+    /// the fit table, with no events.
+    fn zoomed_fixture() -> Game {
+        let mut game = fixture();
+        let a = game.attempt_mut().unwrap();
+        a.lane_count = 3;
+        a.width_yards = 12.0;
+        a.events.clear();
+        game
+    }
+    /// One egui pass of `draw_for` over `a` in the 1440x900 battle layout of
+    /// its geometry (first deployment, so with the hint band): the layout and
+    /// the screen rect of every popup text shape drawn, outline included.
+    fn drawn_popup(a: &Attempt) -> (crate::ui::battle::BattleLayout, Option<Rect>) {
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        crate::settings::configure(&ctx, 1.0);
+        let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(1440.0, 900.0));
+        let layout =
+            crate::ui::battle::BattleLayout::new(canvas, a.lane_count, a.width_yards, true);
+        let input = egui::RawInput {
+            time: Some(0.0),
+            screen_rect: Some(canvas),
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            draw_for(
+                ui,
+                a,
+                art::ArenaProjection::for_attempt(layout.field.rect, a)
+                    .with_effects_clip(layout.effects_clip),
+                0,
+                &mut Feedback::default(),
+                &Settings::default(),
+                review::LootCaptureMode::Disabled,
+            );
+        });
+        let drawn = output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::Shape::Text(text) => Some(text.galley.rect.translate(text.pos.to_vec2())),
+                _ => None,
+            })
+            .reduce(|a, b| a.union(b));
+        output.textures_delta.clear();
+        (layout, drawn)
+    }
+    /// W1 review: a manual shot that strikes nothing ends 40 yards out, far
+    /// off a zoomed field. Its MISS sits where the tracer leaves the field,
+    /// inside the field, never in the HUD band or the forest strips.
+    #[test]
+    fn a_missed_shot_popup_sits_on_the_field_where_its_tracer_leaves_it() {
+        for angle in [0.3_f32, 0.0, -0.3] {
+            let mut game = zoomed_fixture();
+            let a = game.attempt_mut().unwrap();
+            let from = a.defender_position();
+            let to = [from[0] + 40.0 * angle.cos(), from[1] + 40.0 * angle.sin()];
+            a.events.push_back(Event {
+                kind: EventKind::Miss,
+                from,
+                to,
+                value: 0,
+                target_id: None,
+                lane: None,
+                ..hit(a, 0, EventKind::Miss, 1)
+            });
+            let a = game.attempt().unwrap();
+            let (layout, drawn) = drawn_popup(a);
+            let drawn = drawn.expect("a MISS popup is drawn");
+            assert!(
+                layout.field.rect.contains_rect(drawn) && layout.arena.contains_rect(drawn),
+                "{angle}: MISS at {drawn:?} leaves the field {:?}",
+                layout.field.rect
+            );
+            // Anchored where the from-to segment crosses the field's edge.
+            let at = classify(a, a.events.back().unwrap()).unwrap().at;
+            let off_tracer =
+                ((at[0] - from[0]) * angle.sin() - (at[1] - from[1]) * angle.cos()).abs();
+            assert!(off_tracer < 1e-4, "{angle}: {at:?} is off the tracer");
+            assert!(
+                at[0] == 12.0 || at[1] == 0.0 || at[1] == 3.0,
+                "{angle}: {at:?} is not on the field's edge"
             );
         }
     }
