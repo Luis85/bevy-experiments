@@ -4,7 +4,7 @@ use crate::{
     visual_assets::enemy_visuals::{self, EnemySprite, EnemyVisualCatalog},
 };
 use horde_core::{
-    content::{EnemyKind, StructureKind, content},
+    content::{EnemyKind, Mode, StructureKind, content},
     enemy_catalog::EnemyVisual,
     ordnance::{self, OrdnanceKind},
     sim::{Attempt, CorpseRecord, Enemy, EnemyCondition, EnemyPhase, Event, EventKind},
@@ -55,6 +55,22 @@ pub enum HealthView {
     Hidden,
     Critical,
     Bar { fraction: f32, boss: bool },
+}
+/// What the battlefield paints for `e`'s health in `mode`: the critical
+/// callout, a health bar on a wounded hostile or a boss, or nothing on a
+/// hostile at full HP. The damage popups move beside the bar only where
+/// this paints one (W1 review).
+pub fn health_view(e: &Enemy, mode: Mode) -> HealthView {
+    if e.critically_wounded(mode) {
+        HealthView::Critical
+    } else if e.hp < e.max_hp || e.boss {
+        HealthView::Bar {
+            fraction: (e.hp.max(0) as f32 / e.max_hp as f32).clamp(0.0, 1.0),
+            boss: e.boss,
+        }
+    } else {
+        HealthView::Hidden
+    }
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct EnemyView {
@@ -569,16 +585,7 @@ fn enemy_view(
             recovering,
         }
     });
-    let health = if e.critically_wounded(a.mode) {
-        HealthView::Critical
-    } else if e.hp < e.max_hp || e.boss {
-        HealthView::Bar {
-            fraction: (e.hp.max(0) as f32 / e.max_hp as f32).clamp(0.0, 1.0),
-            boss: e.boss,
-        }
-    } else {
-        HealthView::Hidden
-    };
+    let health = health_view(e, a.mode);
     let label = e.boss.then(|| {
         if e.attack_phase == EnemyPhase::Recovery {
             "RECOVERING · WINDOW OPEN"

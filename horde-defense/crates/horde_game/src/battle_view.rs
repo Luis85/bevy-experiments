@@ -18,7 +18,7 @@ mod tests;
 #[cfg(test)]
 pub use field::FxView;
 pub use field::{BattleViewModel, ContactView, CorpseView, EnemyView, HealthView};
-pub use field::{crowd_stagger, struck_stagger};
+pub use field::{crowd_stagger, health_view, struck_stagger};
 pub use interpolation::{ActorInterpolation, BattleViewPlugin, SceneBlend};
 pub use placement::placement_preview;
 pub use readouts::{FieldHint, OrdnanceSlotView, ReticleReadout};

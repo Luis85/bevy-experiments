@@ -350,7 +350,9 @@ fn number_lift(arena: art::ArenaProjection) -> f32 {
 /// a popup reports on: over its body where `BattleViewModel` draws it, at the
 /// blended position plus its crowd stagger. A hostile walks on after the
 /// hit, so this is not the bar over `bubble.at`, the body at the hit (W1
-/// review). `drawn` caches `blend`'s positions of `a.enemies` for the frame.
+/// review). `None` where no bar is painted: the hostile is gone, at full HP
+/// or critically wounded (`battle_view::health_view`). `drawn` caches
+/// `blend`'s positions of `a.enemies` for the frame.
 fn struck_bar(
     a: &Attempt,
     arena: art::ArenaProjection,
@@ -362,19 +364,17 @@ fn struck_bar(
         return None;
     };
     let index = a.enemies.iter().position(|e| e.id == id)?;
+    let crate::battle_view::HealthView::Bar { boss, .. } =
+        crate::battle_view::health_view(&a.enemies[index], a.mode)
+    else {
+        return None;
+    };
     let [x, y] = drawn.get_or_insert_with(|| blend.positions(&a.enemies))[index];
     let [dx, dy] = crate::battle_view::crowd_stagger(id);
     let sy = arena.lane_height();
     Some(Rect::from_center_size(
         arena.world(x + dx, y + dy) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
-        vec2(
-            if a.enemies[index].boss {
-                sy * 1.1
-            } else {
-                sy * 0.65
-            },
-            3.0,
-        ),
+        vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
     ))
 }
 pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
@@ -1006,6 +1006,8 @@ mod tests {
                         let a = game.attempt_mut().unwrap();
                         let enemy = a.enemies.last_mut().unwrap();
                         enemy.x = x;
+                        // Wounded by the hit, so its health bar is painted.
+                        enemy.hp = enemy.max_hp / 2;
                         let (id, feet) = (enemy.id, [enemy.x, enemy.y()]);
                         a.events.push_back(Event {
                             to: feet,
@@ -1130,6 +1132,124 @@ mod tests {
                                 beside = now_beside.map(|on_right| (age, on_right));
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+    /// The two target sizes in points with their UI scale: 1440x900 at 1.0
+    /// and 1050x700 at 1.35.
+    const TARGET_SIZES: [(egui::Vec2, f32); 2] = [
+        (vec2(1440.0, 900.0), 1.0),
+        (vec2(1050.0 / 1.35, 700.0 / 1.35), 1.35),
+    ];
+    /// The zoomed fields, lanes by yards, whose top lane meets the HUD band.
+    const ZOOMED_FIELDS: [(u8, f32); 3] = [(3, 12.0), (5, 14.0), (7, 16.0)];
+    /// A `lanes` x `width` attempt with one Runner at `x` in the top lane and
+    /// no events.
+    fn top_lane_runner(lanes: u8, width: f32, x: f32) -> (Game, u64) {
+        let mut game = fixture();
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        a.lane_count = lanes;
+        a.width_yards = width;
+        a.events.clear();
+        a.enemies.clear();
+        a.tick = 100;
+        game.spawn_enemy(&mut a, horde_core::content::EnemyKind::Runner, 0, false);
+        a.enemies[0].x = x;
+        let id = a.enemies[0].id;
+        *game.attempt_slot_mut() = Some(a);
+        (game, id)
+    }
+    /// One egui pass of `draw_for` at `time` over `a` in the battle layout of
+    /// `canvas` (no hint band), keeping clear of its HUD top band: the arena
+    /// and the screen rect of every popup text shape drawn, outline included.
+    fn draw_kept_clear(
+        ctx: &egui::Context,
+        state: &mut Feedback,
+        a: &Attempt,
+        canvas: Rect,
+        time: f64,
+    ) -> (art::ArenaProjection, Option<Rect>) {
+        let layout =
+            crate::ui::battle::BattleLayout::new(canvas, a.lane_count, a.width_yards, false);
+        let arena = art::ArenaProjection::for_attempt(layout.field.rect, a)
+            .with_effects_clip(layout.effects_clip);
+        let input = egui::RawInput {
+            time: Some(time),
+            screen_rect: Some(canvas),
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            draw_for(
+                ui,
+                a,
+                arena,
+                SceneBlend::NONE,
+                0,
+                state,
+                &Settings::default(),
+                review::LootCaptureMode::Disabled,
+                &layout.effects_keep_clear(),
+            );
+        });
+        output.textures_delta.clear();
+        let drawn = output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::Shape::Text(text) => Some(text.galley.rect.translate(text.pos.to_vec2())),
+                _ => None,
+            })
+            .reduce(|a, b| a.union(b));
+        (arena, drawn)
+    }
+    /// The x a popup `drawn` (outline included) over world point `at` takes
+    /// when nothing moves it sideways: over `at`, clamped into the effects
+    /// clip.
+    fn default_x(arena: art::ArenaProjection, at: [f32; 2], drawn: Rect) -> f32 {
+        let half = drawn.width() * 0.5 - 2.0;
+        let clip = arena.effects_clip;
+        arena
+            .world(at[0], at[1])
+            .x
+            .clamp(clip.left() + half + 4.0, clip.right() - half - 4.0)
+    }
+    /// W1 review: a hostile at full HP draws no health bar (only a wounded
+    /// one or a boss does; a critically wounded one draws its callout), so an
+    /// ARMOR popup on a full-HP top-lane hostile that the HUD keep-clear drops
+    /// stays over the body it reports on, never beside a bar not painted.
+    #[test]
+    fn a_popup_on_a_full_hp_hostile_never_moves_beside_an_unpainted_bar() {
+        for (size, zoom) in TARGET_SIZES {
+            let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+            for (lanes, width) in ZOOMED_FIELDS {
+                for x in (1..(width / 0.8) as u32).map(|i| i as f32 * 0.8) {
+                    let (mut game, id) = top_lane_runner(lanes, width, x);
+                    let a = game.attempt_mut().unwrap();
+                    let enemy = &a.enemies[0];
+                    assert_eq!(enemy.hp, enemy.max_hp);
+                    a.events.push_back(Event {
+                        to: [enemy.x, enemy.y()],
+                        target_id: Some(id),
+                        lane: Some(0),
+                        ..hit(a, 0, EventKind::Armor, 1)
+                    });
+                    let a = game.attempt().unwrap();
+                    let body = classify(a, a.events.back().unwrap()).unwrap().at;
+                    let ctx = egui::Context::default();
+                    crate::settings::install_font(&ctx);
+                    crate::settings::configure(&ctx, zoom);
+                    let mut state = Feedback::default();
+                    for age in [0.0, 0.06, 0.5, 0.85] {
+                        let (arena, drawn) = draw_kept_clear(&ctx, &mut state, a, canvas, age);
+                        let drawn = drawn.expect("an ARMOR popup is drawn");
+                        let over = default_x(arena, body, drawn);
+                        assert!(
+                            (drawn.center().x - over).abs() < 1.0,
+                            "{lanes}x{width}, x {x} in {size:?}, age {age}: the ARMOR popup \
+                             at {drawn:?} left the body at {over}"
+                        );
                     }
                 }
             }
