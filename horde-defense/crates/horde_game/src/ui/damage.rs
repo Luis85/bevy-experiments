@@ -536,6 +536,24 @@ mod tests {
             classify(a, &struck([9.0, 4.5], structure)).unwrap().at,
             [9.0, 4.5]
         );
+        // A friendly miss (MISS) and a hostile's dodge (DODGE) rise from the
+        // drawn body too.
+        let missed = Event {
+            kind: EventKind::Miss,
+            value: 0,
+            ..struck(at, live)
+        };
+        let dodged = Event {
+            kind: EventKind::Defended,
+            value: 0,
+            ..struck(at, live)
+        };
+        let miss = classify(a, &missed).unwrap();
+        assert_eq!(miss.kind, Kind::Miss);
+        assert_eq!(miss.at, staggered(at, live));
+        let dodge = classify(a, &dodged).unwrap();
+        assert_eq!(dodge.kind, Kind::Dodge);
+        assert_eq!(dodge.at, staggered(at, live));
     }
     /// W1-64: popups at staggered ages, every kind, over 120 egui passes at
     /// both budget sizes (UI scale 1.0 and 1.35), each at windows scale 1 and

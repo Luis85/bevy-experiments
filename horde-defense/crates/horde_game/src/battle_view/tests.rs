@@ -979,6 +979,10 @@ fn impact_marks_and_tracer_ends_land_on_the_drawn_hostile() {
         ),
         event(EventKind::Shot, survivor, [40., 6.5], 10, None, None),
         event(EventKind::Explosion, [12., 3.5], [12., 3.5], 11, None, None),
+        // A friendly miss and a dodge on a hostile name it: their MISS and
+        // DODGE popups belong on the drawn body too.
+        event(EventKind::Miss, survivor, at, 12, None, Some(live)),
+        event(EventKind::Defended, survivor, at, 13, None, Some(live)),
     ]
     .into();
     let view = view(a, SceneBlend::NONE);
@@ -991,7 +995,7 @@ fn impact_marks_and_tracer_ends_land_on_the_drawn_hostile() {
     assert_ne!(staggered(fallen, dead), fallen);
     let drawn = view.enemies.iter().find(|e| e.id == live).unwrap().drawn();
     assert_eq!(drawn, staggered(at, live));
-    for value in 1..=6 {
+    for value in (1..=6).chain(12..=13) {
         assert_eq!(to(value), drawn, "event {value} ends on the drawn body");
     }
     for value in 7..=8 {
