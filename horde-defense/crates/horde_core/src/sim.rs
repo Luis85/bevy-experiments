@@ -24,6 +24,7 @@ pub use fixtures::{
 pub use fixtures::{Staging, maximum_progression_render_fixture, peak_render_fixture};
 pub use journey::JourneyContinuation;
 pub use migrations::SAVE_VERSION;
+pub(crate) use migrations::V7_MILESTONE_RANKS;
 use npc::structure_bonus;
 pub use pacing::{
     Milestone, PacingAim, PacingProfile, PacingReport, PacingRun, PacingSpend, node_depths,

@@ -45,6 +45,7 @@ impl Campaign {
         }
         let first = self.first_clears.insert(id.clone());
         self.victories = self.victories.saturating_add(1);
+        self.claim_neutral_milestones();
         if mode == Mode::Npc {
             self.npc.victories += 1;
             self.npc.first_clears.insert(id);

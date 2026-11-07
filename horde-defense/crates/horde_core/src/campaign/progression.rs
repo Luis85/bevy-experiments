@@ -460,6 +460,21 @@ impl Campaign {
         };
         u32::try_from(victories).unwrap_or(u32::MAX)
     }
+    /// Wave-1 shim, removed by W2-22's settle_progression_rewards: while the
+    /// catalogue authors no milestones nothing is owed, so every frozen v7
+    /// milestone the rank reached is claimed, and a native v7 save owes no
+    /// backlog (as migration step (d)).
+    pub(super) fn claim_neutral_milestones(&mut self) {
+        if !crate::progression::catalog().rewards.milestones.is_empty() {
+            return;
+        }
+        let rank = self.progression_rank();
+        self.milestones_claimed.extend(
+            crate::sim::V7_MILESTONE_RANKS
+                .into_iter()
+                .filter(|milestone| *milestone <= rank),
+        );
+    }
     fn legacy_clear_rank(&self) -> u32 {
         let mut cleared = self.world.clear_high_water.clone();
         for (id, count) in &self.world.country_levels {

@@ -511,8 +511,9 @@ fn v7_level_grant_paid(value: &mut Value) -> Result<(), SaveError> {
 
 /// The milestone ranks at save format v7, frozen for sub-step (d): the
 /// milestones a v6 campaign had reached are claimed, whatever the current
-/// catalogue authors.
-const V7_MILESTONE_RANKS: [u32; 4] = [5, 10, 15, 20];
+/// catalogue authors. The wave-1 neutral claim
+/// (`Campaign::claim_neutral_milestones`) reads the same ranks.
+pub(crate) const V7_MILESTONE_RANKS: [u32; 4] = [5, 10, 15, 20];
 
 /// A frozen copy of `Campaign::progression_rank` on a v6 campaign as it will
 /// load: a pre-threat campaign (revision 0) counts the larger of its

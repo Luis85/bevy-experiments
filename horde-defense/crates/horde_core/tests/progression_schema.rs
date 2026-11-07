@@ -307,3 +307,19 @@ fn milestone_item_lost_names_rank_and_item() {
         "Rank 10 milestone item fire_axe was not stored: Inventory is full"
     );
 }
+
+/// While the catalogue authors no milestones, every frozen v7 milestone a
+/// victory reaches is claimed, so W2-22 pays a native v7 save no backlog,
+/// like a migrated v6 save (step (d)).
+#[test]
+fn neutral_victories_claim_the_reached_milestones() {
+    let mut game = Game::default();
+    for _ in 0..12 {
+        game.campaign_mut().first_clear(0, Mode::Personal);
+    }
+    let campaign = game.campaign();
+    assert_eq!(campaign.progression_rank(), 12);
+    assert_eq!(campaign.milestones_claimed, [5, 10].into());
+    let loaded = load(serde_json::to_value(&game).unwrap()).unwrap();
+    assert_eq!(loaded.campaign().milestones_claimed, [5, 10].into());
+}
