@@ -663,6 +663,7 @@ Wave-2 exit:
   - `battle_bar_stays_within_two_rows_at_small_size` (matrix)
   - `field_actions_keep_their_keys`
 - Deps: W3-11.
+- Done: capture row CF-1-08 (the controls legend at `layout.legend_anchor` lies under the second button row at 1050x700@1.35) is fixed in the plan's capture ledger; the legend is clear of the bar at both sizes.
 
 **W3-13 · ux-flow · Hold-to-retreat (0.8 s)**
 - Fail-first:
@@ -788,7 +789,7 @@ Wave-2 exit:
 Wave-3 exit:
 - GOLDEN and TRACE 0.
 - The W3 capture matrix is reviewed.
-- Capture rows CF-1-01, CF-1-02 (W3-29) and CF-1-03 (W3-30) are fixed.
+- Capture rows CF-1-01, CF-1-02 (W3-29), CF-1-03 (W3-30) and CF-1-08 (W3-12) are fixed.
 - The construction-rect CF row is closed (already fixed in W1).
 
 ---
