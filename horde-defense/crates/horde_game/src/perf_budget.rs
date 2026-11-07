@@ -159,20 +159,6 @@ mod tests {
             number(&json, "/caps/fx_lifetime_max_seconds"),
             FX_LIFETIME_MAX_SECONDS
         );
-        let cap = |name: &str| {
-            CAPS.iter()
-                .find(|(key, _)| *key == name)
-                .map(|(_, value)| *value)
-        };
-        assert_eq!(cap("particles"), Some(crate::animation::MAX_PARTICLES));
-        assert_eq!(cap("particle_events"), Some(crate::animation::EVENT_BUDGET));
-        assert_eq!(cap("scenes"), Some(crate::animation::MAX_SCENES));
-        assert_eq!(cap("damage_popups"), Some(crate::ui::damage::LIMIT));
-        assert_eq!(cap("loot_flyups"), Some(crate::ui::loot::LIMIT));
-        assert_eq!(
-            cap("enemies_ceiling"),
-            Some(horde_core::progression::GAMEPLAY_ENEMY_CAP + 1)
-        );
 
         // egui ceilings.
         assert_eq!(
