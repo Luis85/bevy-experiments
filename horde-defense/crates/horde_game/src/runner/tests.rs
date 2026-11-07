@@ -907,6 +907,33 @@ fn failed_new_journey_archive_or_commit_preserves_the_current_live_and_saved_gen
         }
     }
 }
+/// W1-35 review: the stress review never saves (`Runtime::forbid_saves`), so
+/// New Journey from its menu is refused before the storage reset: no archive,
+/// no fresh campaign.json, the live game unchanged and a failed completion.
+#[cfg(feature = "review")]
+#[test]
+fn new_journey_on_an_unsaveable_review_writes_nothing() {
+    let mut host = Host::new();
+    host.deploy();
+    host.game.set_paused(true);
+    host.runtime.forbid_saves();
+    let path = host.directory.join("campaign.json");
+    let before = state(&host.game);
+    host.runtime.enqueue(AppCommand::NewJourney, "");
+    assert!(!flush_for_test(&mut host.ctx()));
+    assert!(!path.exists(), "no campaign.json was written");
+    assert!(!host.directory.join("journey-archives").exists());
+    assert!(!host.runtime.reset_in_progress());
+    assert_eq!(state(&host.game), before);
+    assert!(host.notices.iter().any(|n| matches!(
+        n,
+        RuntimeNotice::CommandCompleted {
+            command: AppCommand::NewJourney,
+            result: Err(_),
+            ..
+        }
+    )));
+}
 #[test]
 fn leaving_journey_is_acknowledged_only_after_durable_save_and_never_loses_earned_state() {
     let mut host = Host::new();

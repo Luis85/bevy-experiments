@@ -131,6 +131,11 @@ pub(super) fn report_settlement_issues(ctx: &mut RuntimeCtx) {
 }
 /// The reset is a serialized storage barrier. Live state swaps only on its ack.
 pub(super) fn begin_new_journey(ctx: &mut RuntimeCtx, success: String) -> Result<(), String> {
+    // `Runtime::forbid_saves`: the reset writes an archive and a fresh
+    // campaign.json, so an unsaveable review refuses it before any of that.
+    if ctx.runtime.unsaveable {
+        return Err("This review never saves, so it cannot start a new journey".into());
+    }
     // The live state is swapped on the storage acknowledgement, at a tick a
     // recording cannot place, so the recording ends here.
     #[cfg(feature = "dev")]
