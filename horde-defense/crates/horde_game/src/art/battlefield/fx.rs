@@ -35,10 +35,11 @@ pub(crate) fn fx_lifetime(kind: EventKind) -> f32 {
 }
 
 /// Weather and ambient motes as one untextured mesh (lines as 4-vertex
-/// quads, dots as 8-segment fans, no feathering), under every body.
+/// quads, dots as 8-segment fans, no feathering, sub-pixel ones floored at
+/// one pixel), under every body.
 pub(super) fn ambient(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
     let sy = arena.lane_height();
-    let mut mesh = MeshBuilder::untextured(particles.len() * 2);
+    let mut mesh = MeshBuilder::untextured(particles.len() * 2).pixel_floor(p.pixels_per_point());
     for particle in particles {
         let at = arena.world(particle.at[0], particle.at[1]);
         let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;
@@ -95,7 +96,7 @@ pub(super) fn ambient(p: &Painter, arena: ArenaProjection, particles: &[Particle
 /// Impact particles as one untextured mesh above every actor.
 pub(super) fn particles(p: &Painter, arena: ArenaProjection, particles: &[Particle]) {
     let sy = arena.lane_height();
-    let mut mesh = MeshBuilder::untextured(particles.len() * 2);
+    let mut mesh = MeshBuilder::untextured(particles.len() * 2).pixel_floor(p.pixels_per_point());
     for particle in particles {
         let at = arena.world(particle.at[0], particle.at[1]);
         let alpha = (particle.alpha * 255.).clamp(0., 255.) as u8;

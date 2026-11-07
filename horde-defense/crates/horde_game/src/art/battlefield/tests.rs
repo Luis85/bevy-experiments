@@ -694,6 +694,68 @@ fn particles_paint_as_one_untextured_mesh() {
     assert!(painted(|p| fx::particles(p, projection, &[])).is_empty());
 }
 
+/// Sub-pixel particles keep one physical pixel at reduced opacity, as egui's
+/// feathered tessellator did before the batch: a 0.8-pt rain streak at 1.0
+/// pixels per point is a 1-px quad at 80 % alpha (continuous, not dashed), and
+/// a 0.5-pt ash or dust mote is a fan whose inscribed circle reaches the pixel
+/// lattice's covering radius (so it always covers a pixel centre and never
+/// blinks), its alpha scaled by the area ratio so its coverage is kept.
+#[test]
+fn sub_pixel_particles_keep_one_pixel_at_reduced_opacity() {
+    use crate::animation::{Particle, ParticleKind};
+    let projection = ArenaProjection::with_geometry(arena(), 11, 30.0);
+    let particle = |kind, size| Particle {
+        kind,
+        at: [10.0, 5.0],
+        size,
+        alpha: 0.1,
+        angle: 1.0,
+    };
+    let source_alpha = (0.1_f32 * 255.0) as u8;
+    let rain = painted(|p| fx::ambient(p, projection, &[particle(ParticleKind::Rain, 0.08)]));
+    let quad = &meshes(&rain)[0].vertices;
+    let width = (quad[0].pos - quad[1].pos).length();
+    assert!(
+        (width - 1.0).abs() < 1e-4,
+        "a 0.8-pt rain streak is {width} pt wide at 1.0 ppp"
+    );
+    assert_eq!(
+        quad[0].color.a(),
+        (f32::from(source_alpha) * 0.8).round() as u8,
+        "the widened streak keeps its coverage"
+    );
+    let min_radius = std::f32::consts::FRAC_1_SQRT_2 / (std::f32::consts::PI / 8.0).cos();
+    for kind in [ParticleKind::Ash, ParticleKind::Dust] {
+        let mote = painted(|p| fx::ambient(p, projection, &[particle(kind, 0.001)]));
+        let fan = &meshes(&mote)[0].vertices;
+        let radius = (fan[1].pos - fan[0].pos).length();
+        assert!(
+            radius >= min_radius - 1e-4,
+            "{kind:?}: a 0.5-pt mote is a {radius}-pt fan, under the {min_radius}-pt floor"
+        );
+        let kept = f32::from(fan[0].color.a()) * radius * radius;
+        let source = f32::from(source_alpha) * 0.5 * 0.5;
+        assert!(
+            (kept - source).abs() <= radius * radius,
+            "{kind:?}: coverage {kept} against {source}"
+        );
+    }
+    // Wider than a pixel, nothing changes: the 3-pt gauge line and a 2-pt dot.
+    let mut mesh = batch::MeshBuilder::untextured(2).pixel_floor(1.0);
+    mesh.line(pos2(0.0, 0.0), pos2(10.0, 0.0), 3.0, egui::Color32::WHITE);
+    mesh.fan(pos2(20.0, 0.0), vec2(2.0, 2.0), 8, egui::Color32::WHITE);
+    let built = &mesh.mesh_mut().vertices;
+    assert_eq!((built[0].pos - built[1].pos).length(), 3.0);
+    assert_eq!((built[5].pos - built[4].pos).length(), 2.0);
+    assert!(built.iter().all(|v| v.color == egui::Color32::WHITE));
+    // At 2.0 pixels per point a 0.8-pt streak is already 1.6 px wide.
+    let mut mesh = batch::MeshBuilder::untextured(1).pixel_floor(2.0);
+    mesh.line(pos2(0.0, 0.0), pos2(10.0, 0.0), 0.8, egui::Color32::WHITE);
+    let built = &mesh.mesh_mut().vertices;
+    assert!(((built[0].pos - built[1].pos).length() - 0.8).abs() < 1e-5);
+    assert_eq!(built[0].color, egui::Color32::WHITE);
+}
+
 #[test]
 fn fx_painters_draw_nothing_past_fx_lifetime() {
     use horde_core::sim::EventKind;

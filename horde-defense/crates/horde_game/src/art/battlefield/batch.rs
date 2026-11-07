@@ -1,7 +1,10 @@
 //! Layered battlefield meshes. Each layer is one egui mesh built with
 //! reserved capacity, so the tessellator emits a fixed number of primitives
 //! however many hostiles, shadows, bars and particles are drawn, and none of
-//! that geometry is tessellated (or feathered) shape by shape.
+//! that geometry is tessellated (or feathered) shape by shape. A builder
+//! with a [`MeshBuilder::pixel_floor`] keeps egui's sub-pixel rule instead:
+//! a line or dot thinner than a physical pixel is widened to one at reduced
+//! opacity, so it neither dashes nor blinks as it moves.
 use crate::visual_assets::{
     self, ActorQuad, ActorSheet, ArtTextures, BattleAtlas, FlashMasks, HitFlash,
 };
@@ -10,13 +13,24 @@ use bevy_egui::egui::{
     epaint::{Mesh, Vertex, WHITE_UV},
     vec2,
 };
-use std::f32::consts::TAU;
+use std::f32::consts::{FRAC_1_SQRT_2, PI, TAU};
+
+/// The smallest fan radius, in physical pixels, whose inscribed circle (at
+/// `cos(pi / segments)` of it, 8 segments the coarsest) reaches the pixel
+/// lattice's covering radius `1 / sqrt(2)`: wherever such a fan lands, it
+/// covers a pixel centre.
+fn min_fan_radius_px(segments: u32) -> f32 {
+    FRAC_1_SQRT_2 / (PI / segments.max(8) as f32).cos()
+}
 
 /// One mesh under construction. Untextured geometry samples `white`, an
 /// opaque white texel of the mesh's texture.
 pub(super) struct MeshBuilder {
     mesh: Mesh,
     white: Pos2,
+    /// Points per physical pixel when sub-pixel lines and fans are floored,
+    /// else 0.0 (drawn as given).
+    pixel: f32,
 }
 impl MeshBuilder {
     /// A mesh on the font atlas, the texture of every egui shape and text.
@@ -27,7 +41,20 @@ impl MeshBuilder {
         let mut mesh = Mesh::with_texture(texture);
         mesh.reserve_vertices(quads * 4);
         mesh.reserve_triangles(quads * 2);
-        Self { mesh, white }
+        Self {
+            mesh,
+            white,
+            pixel: 0.0,
+        }
+    }
+    /// Floors [`Self::line`] widths at one physical pixel and [`Self::fan`]
+    /// radii at [`min_fan_radius_px`], scaling the colour by the lost width
+    /// or area so the coverage is kept (egui's feathered thin-line rule).
+    pub(super) fn pixel_floor(mut self, pixels_per_point: f32) -> Self {
+        if pixels_per_point > 0.0 {
+            self.pixel = 1.0 / pixels_per_point;
+        }
+        self
     }
     pub(super) fn mesh_mut(&mut self) -> &mut Mesh {
         &mut self.mesh
@@ -51,6 +78,11 @@ impl MeshBuilder {
     }
     /// A segment of `width` as one 4-vertex quad (no feathering).
     pub(super) fn line(&mut self, a: Pos2, b: Pos2, width: f32, color: C) {
+        let (width, color) = if width < self.pixel {
+            (self.pixel, color.gamma_multiply(width / self.pixel))
+        } else {
+            (width, color)
+        };
         let normal = (b - a).normalized().rot90() * (width * 0.5);
         let first = self.vertex(a + normal, color);
         self.vertex(a - normal, color);
@@ -61,6 +93,13 @@ impl MeshBuilder {
     }
     /// A filled ellipse of `radii` as a fan of `segments` triangles.
     pub(super) fn fan(&mut self, center: Pos2, radii: Vec2, segments: u32, color: C) {
+        let floored = radii.max(Vec2::splat(self.pixel * min_fan_radius_px(segments)));
+        let (radii, color) = if floored == radii {
+            (radii, color)
+        } else {
+            let kept = (radii.x * radii.y) / (floored.x * floored.y);
+            (floored, color.gamma_multiply(kept))
+        };
         let hub = self.vertex(center, color);
         for n in 0..segments {
             let angle = n as f32 / segments as f32 * TAU;
