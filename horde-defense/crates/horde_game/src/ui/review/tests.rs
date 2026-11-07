@@ -876,6 +876,26 @@ fn battle_mid_fixture_is_7x20() {
     assert_eq!((a.lane_count, a.width_yards), (7, 16.0));
     assert_eq!(f.game.campaign().arena_geometry(), (7, 16.0));
     assert!(a.paused);
+    // Twenty unanswered seconds: a crowd of at least one enemy a lane is on
+    // the field and the defender still stands. Two a lane is only reached
+    // near defeat (about 14 enemies at a third of the defender's health).
+    assert_eq!(
+        a.tick,
+        fixtures::production::BATTLE_MID_TICKS,
+        "the fixture ran its full span"
+    );
+    assert!(
+        a.enemies.len() >= usize::from(a.lane_count),
+        "a mid-battle crowd: {} enemies on {} lanes",
+        a.enemies.len(),
+        a.lane_count
+    );
+    assert!(
+        a.hp * 2 > a.max_hp,
+        "the defender stands: {}/{}",
+        a.hp,
+        a.max_hp
+    );
 }
 
 #[test]

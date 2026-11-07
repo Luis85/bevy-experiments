@@ -52,6 +52,9 @@ pub(in crate::ui::review) const WEAPON_CLASS_SCENES: [(&str, WeaponClass, &str);
 /// never deploys (lanes and width grow in the same level steps), so the scene
 /// records the nearest reachable geometry with the same lane count.
 pub(in crate::ui::review) const BATTLE_MID_GEOMETRY: (u8, f32) = (7, 16.0);
+/// How long the battle-mid stage runs unanswered before its still: twenty
+/// seconds. Two enemies a lane only gather near defeat.
+pub(in crate::ui::review) const BATTLE_MID_TICKS: u64 = 60 * 20;
 
 /// A results-defeat run that has not settled after 10 minutes is a bug.
 const DEFEAT_TICK_CAP: u32 = 36_000;
@@ -330,7 +333,9 @@ fn prepare_turret(f: &mut FrontendParts) {
 }
 
 /// The first level whose deployed geometry is `BATTLE_MID_GEOMETRY`, reached
-/// through entitled experience, deployed and ticked until the field fills.
+/// through entitled experience, deployed and left unanswered for
+/// `BATTLE_MID_TICKS`: a crowd of at least one enemy a lane is on the field
+/// and the defender still stands.
 fn prepare_battle_mid(f: &mut FrontendParts) {
     entitle_start(f, "DEU");
     let balance = f.game.campaign().balance_settings.clone();
@@ -344,11 +349,8 @@ fn prepare_battle_mid(f: &mut FrontendParts) {
     }
     assert_eq!(f.game.campaign().arena_geometry(), BATTLE_MID_GEOMETRY);
     deploy(f, 0, Mode::Personal);
-    for _ in 0..60 * 20 {
-        let a = f.game.attempt().expect("battle-mid stays live");
-        if a.enemies.len() >= usize::from(a.lane_count) * 2 {
-            break;
-        }
+    for _ in 0..BATTLE_MID_TICKS {
+        assert!(f.game.attempt().is_some(), "battle-mid stays live");
         f.game.tick(Input::default());
     }
     pause(f);
