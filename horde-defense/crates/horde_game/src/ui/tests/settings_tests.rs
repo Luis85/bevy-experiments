@@ -580,6 +580,44 @@ fn choosing_custom_after_a_named_preset_keeps_its_extras() {
     );
 }
 
+/// R21 (wave-1 close): the Custom chip keeps the basis of the preset it was
+/// clicked from, so Hard then Custom without an edit applies Custom on the
+/// Hard basis instead of Hard itself, and is then nothing new to apply.
+#[test]
+fn choosing_custom_over_an_unedited_preset_applies_custom_on_its_basis() {
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game
+        .apply(&Command::SetBalance(BalanceSettings::for_preset(
+            BalancePreset::Normal,
+        )))
+        .unwrap();
+    f.act(|c| c.open_settings());
+    f.flush_for_test();
+    h.click(f, View::Settings, "Hard");
+    h.click(f, View::Settings, "Custom");
+    h.click(f, View::Settings, "Apply to next run");
+    let campaign = f.game.campaign();
+    assert_eq!(
+        campaign.balance_settings,
+        BalanceSettings {
+            preset: BalancePreset::Custom,
+            ..BalanceSettings::for_preset(BalancePreset::Hard)
+        }
+    );
+    assert_eq!(campaign.balance_extras_preset(), BalancePreset::Hard);
+    let output = h.frame(f, View::Settings, vec![]);
+    assert_eq!(
+        text_count(
+            &output,
+            "Unapplied draft. Apply before saving and returning."
+        ),
+        0
+    );
+}
+
 #[test]
 fn older_autosave_ack_keeps_navigation_busy_and_freezes_raw_settings_binding_capture() {
     let mut fixture = IsolatedFrontend::new();

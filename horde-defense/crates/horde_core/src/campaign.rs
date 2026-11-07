@@ -226,6 +226,50 @@ impl Default for Campaign {
         }
     }
 }
+/// [`Campaign::balance_outcome`] after a campaign whose stored preset is
+/// `previous` and whose extras basis is `old_basis`.
+fn balance_outcome_after(
+    previous: crate::balance::BalancePreset,
+    old_basis: crate::balance::BalancePreset,
+    mut settings: crate::balance::BalanceSettings,
+) -> Result<
+    (
+        crate::balance::BalanceSettings,
+        crate::balance::BalancePreset,
+    ),
+    String,
+> {
+    use crate::balance::{BalancePreset, BalanceSettings};
+    settings.validate()?;
+    let requested = settings.preset;
+    if requested != BalancePreset::Custom && settings != BalanceSettings::for_preset(requested) {
+        settings.preset = BalancePreset::Custom;
+    }
+    let basis = if settings.preset != BalancePreset::Custom {
+        BalancePreset::Normal
+    } else if requested != BalancePreset::Custom {
+        requested
+    } else if previous != BalancePreset::Custom {
+        previous
+    } else {
+        old_basis
+    };
+    Ok((settings, basis))
+}
+
+/// The Custom settings that the Custom chip stores for `draft` when it is an
+/// unedited named preset, which `SetBalance` alone would store as that preset.
+fn unedited_custom_choice(
+    draft: &crate::balance::BalanceSettings,
+) -> Option<crate::balance::BalanceSettings> {
+    use crate::balance::{BalancePreset, BalanceSettings};
+    (draft.preset != BalancePreset::Custom && *draft == BalanceSettings::for_preset(draft.preset))
+        .then(|| BalanceSettings {
+            preset: BalancePreset::Custom,
+            ..draft.clone()
+        })
+}
+
 impl Campaign {
     fn preparation(&self) -> Result<(), String> {
         if self.reserved.is_some() {
@@ -249,7 +293,7 @@ impl Campaign {
     /// named preset, else the previous named preset, else the old basis).
     pub fn balance_outcome(
         &self,
-        mut settings: crate::balance::BalanceSettings,
+        settings: crate::balance::BalanceSettings,
     ) -> Result<
         (
             crate::balance::BalanceSettings,
@@ -257,24 +301,43 @@ impl Campaign {
         ),
         String,
     > {
-        use crate::balance::{BalancePreset, BalanceSettings};
-        settings.validate()?;
-        let requested = settings.preset;
-        if requested != BalancePreset::Custom && settings != BalanceSettings::for_preset(requested)
-        {
-            settings.preset = BalancePreset::Custom;
+        balance_outcome_after(
+            self.balance_settings.preset,
+            self.balance_extras_basis,
+            settings,
+        )
+    }
+    /// R21 (wave-1 close): the `SetBalance` settings, in order, that store
+    /// `draft` as the player's Custom choice on the settings screen. An
+    /// unedited named draft would store that preset itself, so it is sent as
+    /// the preset first (so the preset is the previous one) and then as
+    /// Custom with the same values. Any other draft is sent as it is: an
+    /// edited named draft already normalises to Custom on its own preset.
+    pub fn custom_balance_steps(
+        draft: &crate::balance::BalanceSettings,
+    ) -> Vec<crate::balance::BalanceSettings> {
+        match unedited_custom_choice(draft) {
+            Some(custom) => vec![draft.clone(), custom],
+            None => vec![draft.clone()],
         }
-        let previous = self.balance_settings.preset;
-        let basis = if settings.preset != BalancePreset::Custom {
-            BalancePreset::Normal
-        } else if requested != BalancePreset::Custom {
-            requested
-        } else if previous != BalancePreset::Custom {
-            previous
-        } else {
-            self.balance_extras_basis
+    }
+    /// What applying [`Self::custom_balance_steps`] of `draft` in order would
+    /// store, without storing it.
+    pub fn custom_balance_outcome(
+        &self,
+        draft: crate::balance::BalanceSettings,
+    ) -> Result<
+        (
+            crate::balance::BalanceSettings,
+            crate::balance::BalancePreset,
+        ),
+        String,
+    > {
+        let Some(custom) = unedited_custom_choice(&draft) else {
+            return self.balance_outcome(draft);
         };
-        Ok((settings, basis))
+        let (named, basis) = self.balance_outcome(draft)?;
+        balance_outcome_after(named.preset, basis, custom)
     }
     /// The named preset whose catalogue extras apply: the preset itself, or
     /// for Custom the preset the edit came from.

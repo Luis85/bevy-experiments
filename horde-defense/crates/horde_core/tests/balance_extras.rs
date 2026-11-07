@@ -161,6 +161,61 @@ fn balance_outcome_previews_the_normalised_settings_and_basis_without_writing() 
     assert!(c.balance_outcome(bad).is_err());
 }
 
+/// R21 (wave-1 close): the Custom chip over an unedited named preset keeps
+/// that preset as the basis. It is sent as the preset and then as Custom
+/// with the same values, and the preview equals what applying those steps
+/// through `Game::apply` stores. Any other draft is one step.
+#[test]
+fn custom_chip_over_an_unedited_preset_keeps_it_as_the_basis() {
+    use horde_core::command::Command;
+    let named = [
+        BalancePreset::Easy,
+        BalancePreset::Normal,
+        BalancePreset::Hard,
+    ];
+    for committed in named {
+        for chosen in named {
+            let mut game = Game::default();
+            game.apply(&Command::SetBalance(BalanceSettings::for_preset(committed)))
+                .unwrap();
+            let draft = BalanceSettings::for_preset(chosen);
+            let custom = BalanceSettings {
+                preset: BalancePreset::Custom,
+                ..draft.clone()
+            };
+            let steps = Campaign::custom_balance_steps(&draft);
+            assert_eq!(steps, vec![draft.clone(), custom.clone()]);
+            let preview = game.campaign().custom_balance_outcome(draft).unwrap();
+            for settings in steps {
+                game.apply(&Command::SetBalance(settings)).unwrap();
+            }
+            let c = game.campaign();
+            assert_eq!(
+                preview,
+                (c.balance_settings.clone(), c.balance_extras_basis),
+                "{committed:?} -> {chosen:?}"
+            );
+            assert_eq!(c.balance_settings, custom);
+            assert_eq!(c.balance_extras_preset(), chosen);
+        }
+    }
+    // An edited named draft already normalises to Custom on its own preset,
+    // and a Custom draft keeps the committed basis: one step each.
+    let c = on(BalancePreset::Normal);
+    let mut custom_edit = hard_edit();
+    custom_edit.preset = BalancePreset::Custom;
+    for draft in [hard_edit(), custom_edit] {
+        assert_eq!(Campaign::custom_balance_steps(&draft), vec![draft.clone()]);
+        assert_eq!(
+            c.custom_balance_outcome(draft.clone()),
+            c.balance_outcome(draft)
+        );
+    }
+    let mut bad = hard_edit();
+    bad.enemy_speed = f32::NAN;
+    assert!(c.custom_balance_outcome(bad).is_err());
+}
+
 #[test]
 fn returning_to_a_named_preset_resets_basis_to_normal_and_skips_the_key() {
     for preset in [

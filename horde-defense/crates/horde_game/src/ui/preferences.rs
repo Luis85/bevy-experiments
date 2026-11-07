@@ -267,9 +267,15 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
             ),
         );
         // Pending when applying would change the saved settings or the
-        // extras basis (the same values edited from another preset).
-        let changed = campaign.balance_outcome(draft.clone())
-            != Ok((committed.clone(), campaign.balance_extras_basis));
+        // extras basis (the same values edited from another preset). With
+        // the Custom chip chosen, an unedited named draft applies as Custom
+        // on that preset's basis (R21), in the core's steps.
+        let outcome = if *custom_chosen {
+            campaign.custom_balance_outcome(draft.clone())
+        } else {
+            campaign.balance_outcome(draft.clone())
+        };
+        let changed = outcome != Ok((committed.clone(), campaign.balance_extras_basis));
         let apply = ui
             .add_enabled(
                 valid.is_ok() && changed,
@@ -284,13 +290,27 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
         if changed {
             muted(ui, "Unapplied draft. Apply before saving and returning.");
         }
-        apply.then(|| draft.clone())
+        apply.then(|| {
+            if *custom_chosen {
+                horde_core::campaign::Campaign::custom_balance_steps(draft)
+            } else {
+                vec![draft.clone()]
+            }
+        })
     };
-    if let Some(settings) = apply {
-        f.dispatch(
-            Command::SetBalance(settings),
-            "Difficulty saved for the next deployment. Active fields are unchanged.",
-        );
+    if let Some(steps) = apply {
+        // Only the last step reports success; the steps apply in order.
+        let last = steps.len().saturating_sub(1);
+        for (step, settings) in steps.into_iter().enumerate() {
+            f.dispatch(
+                Command::SetBalance(settings),
+                if step == last {
+                    "Difficulty saved for the next deployment. Active fields are unchanged."
+                } else {
+                    ""
+                },
+            );
+        }
     }
     ui.separator();
 }
