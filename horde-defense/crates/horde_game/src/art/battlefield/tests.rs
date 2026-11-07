@@ -301,8 +301,33 @@ fn battlefield_primitives_are_independent_of_enemy_count() {
 
 /// The peak view with alternating walker and standing sprites (so the actor
 /// layer crosses sheets enemy by enemy) and every third hostile flashing.
+/// Two visible hostiles share one spot, as a crowd does at a wall or the line
+/// since W1-69, and the later id has the farther drawn feet, so the painter
+/// order's drawn-feet tie-break and an id tie-break disagree on them.
 fn mixed_sheet_view() -> (Game, BattleViewModel) {
-    let game = horde_core::sim::peak_render_fixture().expect("peak fixture");
+    use crate::battle_view::crowd_stagger;
+    let mut game = horde_core::sim::peak_render_fixture().expect("peak fixture");
+    let a = game.attempt_mut().unwrap();
+    let visible: Vec<usize> = (0..a.enemies.len())
+        .filter(|&n| {
+            let e = &a.enemies[n];
+            e.condition(a.mode) != horde_core::sim::EnemyCondition::Defeated && e.in_view()
+        })
+        .collect();
+    let (under, onto) = visible
+        .iter()
+        .flat_map(|&p| visible.iter().map(move |&q| (p, q)))
+        .find(|&(p, q)| {
+            let (p, q) = (&a.enemies[p], &a.enemies[q]);
+            p.id < q.id && crowd_stagger(q.id)[1] < crowd_stagger(p.id)[1]
+        })
+        .expect("two hostiles whose id and drawn-feet orders disagree");
+    let (lane, x, pass_offset) = {
+        let e = &a.enemies[under];
+        (e.lane, e.x, e.pass_offset)
+    };
+    let e = &mut a.enemies[onto];
+    (e.lane, e.x, e.pass_offset) = (lane, x, pass_offset);
     let a = game.attempt().unwrap();
     let mut view =
         BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
@@ -404,18 +429,31 @@ fn legacy_actor_meshes(view: &BattleViewModel, textures: ArtTextures) -> Vec<egu
 }
 
 #[test]
-fn batched_actor_layer_keeps_feet_then_id_order_across_sheets() {
+fn batched_actor_layer_keeps_painter_order_across_sheets() {
+    use crate::battle_view::crowd_stagger;
     let (game, view) = mixed_sheet_view();
     let a = game.attempt().unwrap();
     let textures = textures();
     let atlas = textures.battle_atlas.unwrap();
     let a_enemy = |id: u64| a.enemies.iter().find(|e| e.id == id).unwrap();
+    // The production painter key (`BattleViewModel::build_with`): lane feet,
+    // far to near, then the drawn feet of a stack on one spot, then id.
+    let key = |id: u64| {
+        let e = a_enemy(id);
+        (e.y(), -e.x, e.y() + crowd_stagger(e.id)[1], e.id)
+    };
     assert!(
-        view.enemies.windows(2).all(|pair| {
+        view.enemies
+            .windows(2)
+            .all(|pair| key(pair[0].id) <= key(pair[1].id)),
+        "the view is in lane-feet, x-descending, drawn-feet, id order"
+    );
+    assert!(
+        view.enemies.windows(2).any(|pair| {
             let (p, q) = (a_enemy(pair[0].id), a_enemy(pair[1].id));
-            (p.y(), -p.x, p.id) <= (q.y(), -q.x, q.id)
+            (p.y(), p.x) == (q.y(), q.x) && p.id > q.id
         }),
-        "the view is in lane-feet, x-descending, id order"
+        "a stack on one spot paints by drawn feet, not by id"
     );
     let arena_projection = ArenaProjection::for_attempt(arena(), a);
     let shapes = painted(|p| {
