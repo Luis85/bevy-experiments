@@ -181,6 +181,67 @@ fn automated_capture(
 mod tests {
     use super::*;
 
+    /// W1 review: the report system consumes `PerfFrame`, so it must run in
+    /// `Last` after `PerfSet::CloseFrame`, or frame i's work lands in sample
+    /// i - 1. Checks the schedule `ReviewToolsPlugin` builds: the system is
+    /// in `Last`, not `Update`; it runs after `close_frame`; and the two are
+    /// not an unordered pair on `PerfFrame`.
+    #[test]
+    fn performance_capture_runs_after_the_frame_closes() {
+        let config = LaunchConfig::parse(std::iter::empty(), |name| {
+            (name == "LASTLIGHT_PERF_REPORT").then(|| "perf.json".into())
+        })
+        .unwrap();
+        assert!(config.perf().is_some());
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(config.clone());
+        diagnostics::install(&mut app, &config);
+        app.add_plugins(ReviewToolsPlugin);
+        let capture = "::capture_performance";
+        let in_update = app
+            .world()
+            .resource::<Schedules>()
+            .get(Update)
+            .unwrap()
+            .graph()
+            .systems
+            .iter()
+            .any(|(_, system, _)| system.name().to_string().ends_with(capture));
+        assert!(!in_update, "capture_performance is scheduled in Update");
+        let mut last = app
+            .world_mut()
+            .resource_mut::<Schedules>()
+            .remove(Last)
+            .expect("a Last schedule");
+        last.initialize(app.world_mut()).unwrap();
+        // Executable order is topological; keys name the conflicting pairs.
+        let order: Vec<_> = last
+            .systems()
+            .unwrap()
+            .map(|(key, system)| (key, system.name().to_string()))
+            .collect();
+        let key = |suffix: &str| {
+            order
+                .iter()
+                .position(|(_, name)| name.ends_with(suffix))
+                .unwrap_or_else(|| panic!("no {suffix} in Last: {order:?}"))
+        };
+        let (capture_at, close_at) = (key(capture), key("::close_frame"));
+        assert!(capture_at > close_at, "{order:?}");
+        let pair = [order[capture_at].0, order[close_at].0];
+        let unordered = last
+            .graph()
+            .conflicting_systems()
+            .0
+            .iter()
+            .any(|(a, b, _)| pair.contains(a) && pair.contains(b));
+        assert!(
+            !unordered,
+            "capture_performance and close_frame are unordered"
+        );
+    }
+
     /// The keys capture_review.ps1 and the camera review read from every
     /// still's sidecar; a missing measurement is an explicit null.
     #[test]
