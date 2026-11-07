@@ -48,19 +48,20 @@ pub const FX_LIFETIME_MAX_SECONDS: f64 = 2.0;
 
 /// egui gates for the battlefield painter: the measured maximum x 1.25
 /// (W1-51, `PERF_BUDGET.json` `evidence.egui_measured`), never above the
-/// W1-32 hard ceilings (48 primitives; 40,000 / 72,000 vertices). The W1-51
-/// measurement (a93e340, before W1-64 to W1-69) reached 47 primitives
-/// (stress), so 47 x 1.25 keeps the 48 ceiling. The post-W1-69 re-measure
-/// (`egui_measured.remeasured`) reaches 19 in every scene; re-deriving this
-/// gate from it (24) is an open gate decision.
-pub const BATTLEFIELD_PRIMITIVES_MAX: usize = 48;
+/// W1-32 hard ceilings (48 primitives; 40,000 / 72,000 vertices) and, by
+/// ruling R22 (gates only tighten), never above the gate it replaces
+/// (`egui_measured.previous.gates`). The post-W1-69 measurement (4d599a5)
+/// reaches 19 primitives in every scene, so 19 x 1.25 gives 24. The W1-51
+/// measurement (a93e340) reached 47, which kept the 48 ceiling.
+pub const BATTLEFIELD_PRIMITIVES_MAX: usize = 24;
 /// Most extra primitives 400 enemies may cost over 52.
 pub const PRIMITIVE_GROWTH_52_TO_400_MAX: usize = 2;
-/// Battlefield vertex gates per measured scene, from the W1-51 measurement
-/// (a93e340): progressed-peak 37,940 (x 1.25 is above its 40,000 ceiling),
-/// stress 48,878 with the corpse caps full (x 1.25 = 61,097.5). The
-/// post-W1-69 re-measure reaches 38,819 and 49,502 (x 1.25 = 61,877.5);
-/// re-deriving the stress gate from it is an open gate decision.
+/// Battlefield vertex gates per measured scene. The post-W1-69 measurement
+/// (4d599a5) reaches progressed-peak 38,819 (x 1.25 is above its 40,000
+/// ceiling) and stress 49,502 with the corpse caps full (x 1.25 = 61,877.5).
+/// That is above the 61,098 derived from the W1-51 measurement (a93e340,
+/// stress 48,878), so under R22 (gates only tighten) the stress gate stays
+/// 61,098.
 pub const BATTLEFIELD_VERTICES_MAX: &[(&str, usize)] =
     &[("progressed-peak", 40_000), ("stress", 61_098)];
 /// egui texture uploads (`textures_delta.set` entries) allowed in battle once
@@ -241,18 +242,34 @@ mod tests {
 
     /// W1-51: every egui gate is its measured maximum x 1.25, rounded up, and
     /// never above the W1-32 hard ceiling, so a re-measurement moves the
-    /// recorded evidence and the gate together.
+    /// recorded evidence and the gate together. R22 (wave-1 close): gates only
+    /// tighten, so a re-derived gate is also never above the gate it replaces
+    /// (`egui_measured.previous.gates`, the W1-51 gates from a93e340).
     #[test]
     fn egui_gates_are_measured_x_1_25_capped_at_the_w1_32_ceilings() {
         const CEILING_PRIMITIVES: usize = 48;
         const CEILING_VERTICES: &[(&str, usize)] =
             &[("progressed-peak", 40_000), ("stress", 72_000)];
+        const W1_51_PRIMITIVES: usize = 48;
+        const W1_51_VERTICES: &[(&str, usize)] = &[("progressed-peak", 40_000), ("stress", 61_098)];
         let json = budget();
         let measured = "/evidence/egui_measured";
         let factor = number(&json, &format!("{measured}/factor"));
         assert_eq!(factor, 1.25);
-        let gate = |measured: usize, ceiling: usize| {
-            ((measured as f64 * factor).ceil() as usize).min(ceiling)
+        let previous = format!("{measured}/previous/gates");
+        assert_eq!(
+            whole(&json, &format!("{previous}/battlefield_primitives_max")),
+            W1_51_PRIMITIVES
+        );
+        assert_table_matches(
+            W1_51_VERTICES,
+            object(&json, &format!("{previous}/battlefield_vertices_max")),
+            "previous/gates/battlefield_vertices_max",
+        );
+        let gate = |measured: usize, ceiling: usize, previous: usize| {
+            ((measured as f64 * factor).ceil() as usize)
+                .min(ceiling)
+                .min(previous)
         };
         assert_eq!(
             whole(
@@ -282,7 +299,7 @@ mod tests {
         );
         assert_eq!(
             BATTLEFIELD_PRIMITIVES_MAX,
-            gate(primitives, CEILING_PRIMITIVES)
+            gate(primitives, CEILING_PRIMITIVES, W1_51_PRIMITIVES)
         );
 
         let vertices_by_scene = object(&json, &format!("{measured}/battlefield_vertices_by_scene"));
@@ -317,11 +334,20 @@ mod tests {
                 .find(|(name, _)| name == scene)
                 .map(|(_, ceiling)| *ceiling)
                 .unwrap_or_else(|| panic!("{scene}: no W1-32 vertex ceiling"));
+            let previous = W1_51_VERTICES
+                .iter()
+                .find(|(name, _)| name == scene)
+                .map(|(_, gate)| *gate)
+                .unwrap_or_else(|| panic!("{scene}: no W1-51 vertex gate"));
             let scene_max = whole(
                 &json,
                 &format!("{measured}/battlefield_vertices_max/{scene}"),
             );
-            assert_eq!(*max, gate(scene_max, ceiling), "{scene}: vertex gate");
+            assert_eq!(
+                *max,
+                gate(scene_max, ceiling, previous),
+                "{scene}: vertex gate"
+            );
             assert!(*max <= ceiling, "{scene}: above the W1-32 ceiling");
         }
     }

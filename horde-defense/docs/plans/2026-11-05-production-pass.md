@@ -763,7 +763,7 @@ Full matrix: `docs/plans/production-pass/acceptance.md` (also copied into `docs/
 
 | Group | Rows | Key numeric gates |
 |---|---|---|
-| Goal 1 | G1.1-G1.15 | -VsyncOff CPU p99 ≤ 10 ms and 0 frames > 50 ms (progressed-peak, stress); interface ≤ 1.129 / ≤ 1.030 ms; BattleScreen/BVM/HUD built {1,1,1} per pass; ≤ 48 battlefield primitives, 400 vs 52 enemies differ by ≤ 2; save clone remedy if p99 > 1 ms |
+| Goal 1 | G1.1-G1.15 | -VsyncOff CPU p99 ≤ 10 ms and 0 frames > 50 ms (progressed-peak, stress); interface ≤ 1.129 / ≤ 1.030 ms; BattleScreen/BVM/HUD built {1,1,1} per pass; ≤ 24 battlefield primitives (48 until R22), 400 vs 52 enemies differ by ≤ 2; save clone remedy if p99 > 1 ms |
 | Goal 2 | G2.1-G2.12 | exactly one amber primary per screen; 3 Results actions; ≤ 2 HUD rows at 1050x700@1.35; boss banner ≥ 1.5 s wall; retreat hold 0.8 s; construction keeps the arena rect |
 | Goal 3 | G3.1-G3.16 | allowance 84 (10 levels) by the 6th liberation; parallel ≤ 2/3 of solo runs for 3-stage neighbours; < 5 outbreak reopens over 10 liberations; liberations 2/4/10 and coins per minute reported (20 seeds) |
 | Goal 4 | G4.1-G4.15 | 500-case property test; receipt ≤ 12 lines with exact totals; auto-sell profile within 1 run of baseline at tiers 1-3 |
