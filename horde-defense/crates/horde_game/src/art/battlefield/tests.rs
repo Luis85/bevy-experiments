@@ -1360,3 +1360,101 @@ fn a_stack_on_the_line_draws_one_band_and_one_windup_ring() {
         .collect();
     assert_eq!(ringed, [(0, 1.5), (1, 1.5)], "one ring per stack");
 }
+
+/// CF-1-11: a boss at the far right of a 17x30 field at 1050x700@1.35 (the
+/// arena is the field, 24/124/24/84 inset) kept its name label centred on
+/// its body, so the arena clip cut "SIEGE BRUTE" to "SIEGE BR". Every
+/// callout a hostile paints (boss names, EXPOSED, CRIT) stays whole inside
+/// the battlefield clip: at the right edge, the left edge and in the top
+/// lane, on the batched path and the rejected-art figures.
+#[test]
+fn boss_label_at_the_field_edge_stays_inside_the_clip() {
+    use horde_core::{balance::BalanceSettings, content::EnemyKind};
+    let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(1050.0, 700.0) / 1.35);
+    let clip = Rect::from_min_max(
+        canvas.min + vec2(24.0, 124.0),
+        canvas.max - vec2(24.0, 84.0),
+    );
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings {
+            start_lanes: 17,
+            max_lanes: 17,
+            start_width: 30,
+            max_width: 30,
+            ..Default::default()
+        })
+        .unwrap();
+    game.deploy(0, horde_core::content::Mode::Personal).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.enemies.clear();
+    let w = a.width_yards;
+    // Core spawns one boss; the painter takes copies at the other spots.
+    game.spawn_enemy(&mut a, EnemyKind::Brute, 8, true);
+    let boss = a.enemies.pop().expect("a boss");
+    for (lane, x) in [
+        (8, w + 0.5),
+        (8, w - 0.3),
+        (0, w + 0.5),
+        (16, 0.2),
+        (0, 0.2),
+    ] {
+        let mut copy = boss.clone();
+        (copy.id, copy.lane, copy.x) = (a.next_id, lane, x);
+        a.next_id += 1;
+        a.enemies.push(copy);
+    }
+    *game.attempt_slot_mut() = Some(a);
+    let a = game.attempt().unwrap();
+    let mut view =
+        BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
+    assert_eq!(view.enemies.len(), 5, "every boss is in view");
+    assert!(view.enemies.iter().all(|e| e.label.is_some()));
+    // One body is critically wounded, so its CRIT callout is checked too.
+    view.enemies[1].health = crate::battle_view::HealthView::Critical;
+    let arena = ArenaProjection::with_geometry(clip, view.lanes, view.width);
+    for rejected in [false, true] {
+        let textures = ArtTextures {
+            enemy_art_rejected: rejected,
+            ..textures()
+        };
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        crate::settings::configure(&ctx, 1.35);
+        crate::visual_assets::publish_source_flash_masks(&ctx);
+        let input = egui::RawInput {
+            screen_rect: Some(canvas),
+            ..Default::default()
+        };
+        let mut output = ctx.run_ui(input, |ui| {
+            enemies::paint(
+                &ui.painter().with_clip_rect(clip),
+                arena,
+                &view,
+                textures,
+                false,
+                false,
+                rig_shadow(),
+            );
+        });
+        output.textures_delta.clear();
+        let labels: Vec<(String, Rect)> = output
+            .shapes
+            .iter()
+            .filter_map(|clipped| match &clipped.shape {
+                egui::Shape::Text(text) => Some((
+                    text.galley.text().to_owned(),
+                    text.galley.rect.translate(text.pos.to_vec2()),
+                )),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(labels.len(), 6, "rejected {rejected}: {labels:?}");
+        for (text, rect) in labels {
+            assert!(
+                clip.contains_rect(rect),
+                "rejected {rejected}: {text:?} at {rect:?} is cut by the clip {clip:?}"
+            );
+        }
+    }
+}

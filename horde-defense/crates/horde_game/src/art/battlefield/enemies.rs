@@ -16,7 +16,7 @@ use crate::{
     visual_assets::{self, Actor, ArtTextures, HitFlash},
 };
 use bevy_egui::egui::{
-    self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, Vec2, vec2,
+    self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, Vec2, pos2, vec2,
 };
 
 /// Segments of the batched outline, stun and windup rings.
@@ -171,9 +171,38 @@ pub(super) fn paint(
     }
     layers.overlay.paint(p);
     for (at, align, text, size) in labels {
-        p.text(at, align, text, FontId::proportional(size), AMBER);
+        callout(p, at, align, text, size);
     }
     drawn
+}
+
+/// How far inside the battlefield clip a hostile's callout stays.
+const CALLOUT_MARGIN: f32 = 2.0;
+
+/// A hostile's amber callout (boss name, EXPOSED, CRIT) anchored at `at` by
+/// `align`, moved the least that keeps the whole text `CALLOUT_MARGIN` inside
+/// the painter's clip, so a boss at the field's edge or in its top lane keeps
+/// a readable name (CF-1-11). An anchor already inside paints exactly where
+/// `Painter::text` did.
+fn callout(p: &Painter, at: Pos2, align: Align2, text: &str, size: f32) {
+    let galley = p.layout_no_wrap(text.to_owned(), FontId::proportional(size), AMBER);
+    let rect = align.anchor_size(at, galley.size());
+    let clip = p.clip_rect().shrink(CALLOUT_MARGIN);
+    let min = pos2(
+        rect.min.x.min(clip.right() - rect.width()).max(clip.left()),
+        rect.min
+            .y
+            .min(clip.bottom() - rect.height())
+            .max(clip.top()),
+    );
+    // Moved only when it would be cut: an anchor inside keeps its exact
+    // position, so callouts away from the edges paint as before.
+    let min = if p.clip_rect().contains_rect(rect) {
+        rect.min
+    } else {
+        min
+    };
+    p.galley(min, galley, AMBER);
 }
 
 /// The contact of each lane with a hostile on the line: one band per lane
@@ -378,12 +407,12 @@ fn enemy(
     }
     match e.health {
         HealthView::Critical => {
-            p.text(
+            callout(
+                p,
                 at + vec2(0.0, -sy * 0.44),
                 Align2::CENTER_BOTTOM,
                 "CRIT · FIGHTING",
-                FontId::proportional(8.0),
-                AMBER,
+                8.0,
             );
         }
         HealthView::Bar { fraction, boss } => {
@@ -400,12 +429,12 @@ fn enemy(
         HealthView::Hidden => {}
     }
     if let Some(label) = e.label {
-        p.text(
+        callout(
+            p,
             at + vec2(0.0, -sy * 0.7),
             Align2::CENTER_CENTER,
             label,
-            FontId::proportional(10.0),
-            AMBER,
+            10.0,
         );
     }
 }
