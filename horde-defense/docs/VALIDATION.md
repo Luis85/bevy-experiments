@@ -950,6 +950,29 @@ One VSync-on stress repeat with pipelining (`head-ab-playtest-vsync/stress-on-r2
 
 No harness variable brings the stalls in. They come and go with time. The last driver stall in the W1-61 evidence fell in the VSync-on A/B at about 22:22 UTC; none followed in the 54 acceptance runs from 22:32 or in these 18 runs. W1-68 saw the same thing: 4-14 per stress run at 18:09, then 0 in 66 probes. So the A/B on arm stands for the default. The acceptance pass's 0 driver stalls shows a stall-free hour, not that the stall is gone; on another hour the same passes would exclude stalls under the ruling. Caveats: the discriminating pass ran the W1-61 review binary (it differs only in the stall rule) and had no CPU-load sampler.
 
+## Settled corpses in stress — 7 November 2026 (W1-49)
+
+W1-49 is done when `battlefield_paint` does not grow over the stress run, and the perf design asks for `settled_corpses_drawn` in stress. Neither number had been written down: the W1-49 commits had only headless cache tests.
+
+**Conditions.** Commit `fa4c6f9` (W1-49 landed in `e208c55` and `5f733c4`). `measure_performance.ps1 -Scene stress -Profile dev -VsyncOff -NoBudget`, pipelining at its default (on), 180 warmup frames, one repeat per size. The runs used three windows: `-Frames 300` twice and `-Frames 3600` once. Intel Core Ultra 9 185H, mains, Balanced, 2026-11-07 01:47-01:49 UTC. Evidence is in `target/perf/w1-49-review/{frames-300,frames-300-b,frames-3600}`. Every run had 1 attempt, 0 frames over 50 ms, `present.source` `launch-override` (from -VsyncOff) and `present.pipelined_source` `settings`.
+
+**Scene.** The stress run starts with 1,500 corpses and keeps up to 400 enemies on the field. It gains about 3 corpses in a 300-frame window and 13-14 in the 3,600-frame window.
+
+| Window | Size | `battlefield_paint` mean ms | `settled_corpses_drawn` mean / max | `collapsing_corpses_drawn` mean / max | `scene_load.corpses` mean / max |
+|---|---|---|---|---|---|
+| 300 (`frames-300`) | normal | 0.557 | 1,501.1 / 1,503 | 0.69 / 3 | 1,501.8 / 1,503 |
+| 300 (`frames-300`) | small | 0.503 | 1,500.4 / 1,503 | 0.77 / 3 | 1,501.2 / 1,503 |
+| 300 (`frames-300-b`) | normal | 0.505 | 1,500.4 / 1,503 | 0.75 / 3 | 1,501.1 / 1,503 |
+| 300 (`frames-300-b`) | small | 0.492 | 1,500.4 / 1,503 | 0.76 / 3 | 1,501.2 / 1,503 |
+| 3,600 (`frames-3600`) | normal | 0.516 | 1,507.9 / 1,513 | 0.28 / 3 | 1,508.2 / 1,514 |
+| 3,600 (`frames-3600`) | small | 0.477 | 1,507.3 / 1,513 | 0.29 / 3 | 1,507.6 / 1,513 |
+
+**`battlefield_paint` does not grow over the stress run.** The 3,600-frame mean includes 3,300 later frames and 13-14 more corpses. It is 0.516 ms at the normal size and 0.477 ms at the small size, inside the 300-frame range at each size (0.505-0.557 and 0.492-0.503). The W1-61 acceptance stress runs (1,800 frames, dev, VSync off, `target/perf/w1-61/acceptance-dev-novsync` and `head-acc-dev-novsync`) agree, at 0.480-0.510 ms. The report gives only a mean for each window, not a per-frame series, so this compares windows of different lengths that start at the same frame.
+
+**`settled_corpses_drawn` in stress.** Every corpse is drawn: about 1,500-1,508 on average, up to 1,513, from the cached settled mesh. The sampled collapsing set is at most 3 per frame. The difference between corpses and drawn corpses is the collapsing bodies (0.3-0.8 on average).
+
+For context, the last stress runs before W1-48 and W1-49 (`target/perf/w1-37/dev-novsync`, dev, VSync off, about 1,514 corpses) painted the battlefield in 1.22-1.33 ms. Both commits landed between those runs and these, so the drop is not W1-49's alone.
+
 ## Full verify
 
 From `horde-defense/`, before every production-pass commit:
