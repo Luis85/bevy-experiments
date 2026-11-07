@@ -748,6 +748,36 @@ fn review_frame_facts_drop_the_observer_off_its_tab() {
     }
 }
 
+/// The sidecar's `ui_scale` is the zoom the still was drawn at: an
+/// out-of-range `LASTLIGHT_REVIEW_SCALE` is clamped as `configure` clamps it.
+#[cfg(feature = "review")]
+#[test]
+fn review_frame_facts_report_the_applied_ui_scale() {
+    for (requested, applied) in [(1.5, 1.35), (0.5, 0.75), (1.2, 1.2)] {
+        let mut f = crate::ui::test_support::test_frontend();
+        f.launch = LaunchConfig {
+            scenario: Some("menu".into()),
+            review: Some(ReviewOptions {
+                capture: Some("headless-review-capture.png".into()),
+                scale: Some(requested),
+                ..ReviewOptions::default()
+            }),
+            ..LaunchConfig::default()
+        };
+        prepare(&mut f);
+        assert_eq!(f.settings.scale, requested, "the fixture keeps the request");
+        let facts = ReviewFrameFacts::collect(
+            &f.game,
+            &f.launch,
+            &f.settings,
+            f.screen,
+            f.nav.tab,
+            &f.battle,
+        );
+        assert_eq!(facts.ui_scale, applied, "requested {requested}");
+    }
+}
+
 /// A collapsed observer window draws no field, so it records none: the rect
 /// of the frame before the collapse is not kept.
 #[test]

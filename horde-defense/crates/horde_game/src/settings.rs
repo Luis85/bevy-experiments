@@ -343,9 +343,14 @@ impl Settings {
         })
     }
 }
+/// The egui zoom `configure` applies for an interface `scale`: the
+/// preferences slider's range, whatever a settings file or review asks for.
+pub fn applied_scale(scale: f32) -> f32 {
+    scale.clamp(0.75, 1.35)
+}
 pub fn configure(ctx: &Context, scale: f32) {
     ctx.set_theme(egui::Theme::Dark);
-    ctx.set_zoom_factor(scale.clamp(0.75, 1.35));
+    ctx.set_zoom_factor(applied_scale(scale));
     let mut style = (*ctx.style_of(egui::Theme::Dark)).clone();
     style.visuals = egui::Visuals::dark();
     style.visuals.override_text_color = Some(crate::art::TEXT);

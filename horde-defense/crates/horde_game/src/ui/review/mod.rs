@@ -181,7 +181,7 @@ impl ReviewFrameFacts {
             width_yards: attempt.map(|a| a.width_yards),
             hud_rows: None,
             reduced_effects: settings.reduced_effects,
-            ui_scale: settings.scale,
+            ui_scale: crate::settings::applied_scale(settings.scale),
             windows_scale: 1.0,
         }
     }
