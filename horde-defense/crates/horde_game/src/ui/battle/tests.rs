@@ -260,6 +260,7 @@ fn headroom_popups_never_overlap_hud_rects() {
                                 ui,
                                 &a,
                                 projection,
+                                crate::battle_view::SceneBlend::NONE,
                                 0,
                                 &mut damage,
                                 &settings,

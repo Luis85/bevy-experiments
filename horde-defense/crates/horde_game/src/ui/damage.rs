@@ -6,6 +6,7 @@ use super::{
 };
 use crate::{
     art::{self, AMBER, GREEN, MUTED, RED, TEXT},
+    battle_view::SceneBlend,
     settings::Settings,
 };
 use bevy_egui::egui::{self, Color32, FontId, Rect, pos2, vec2};
@@ -39,6 +40,14 @@ struct Bubble {
     at: [f32; 2],
     target: Target,
     started: f64,
+    /// The side of the struck hostile's health bar the popup went to, once
+    /// it met the bar; it then follows the bar there for the rest of its life.
+    beside: Option<Side>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Side {
+    Right,
+    Left,
 }
 fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
     let kind = match event.kind {
@@ -82,6 +91,7 @@ fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
         at,
         target,
         started: 0.0,
+        beside: None,
     })
 }
 /// `to` when it lies in the world box `[0, size[0]] x [0, size[1]]`;
@@ -336,17 +346,35 @@ const BAR_CLEARANCE: f32 = 21.0;
 fn number_lift(arena: art::ArenaProjection) -> f32 {
     NUMBER_LIFT.max(arena.lane_height() * art::HEALTH_BAR_LIFT + BAR_CLEARANCE)
 }
-/// The health bar `art::battlefield` paints over the drawn body a popup
-/// rises from, when that popup reports on a live hostile.
-fn struck_bar(a: &Attempt, arena: art::ArenaProjection, bubble: &Bubble) -> Option<Rect> {
+/// The health bar `art::battlefield` paints this frame over the live hostile
+/// a popup reports on: over its body where `BattleViewModel` draws it, at the
+/// blended position plus its crowd stagger. A hostile walks on after the
+/// hit, so this is not the bar over `bubble.at`, the body at the hit (W1
+/// review). `drawn` caches `blend`'s positions of `a.enemies` for the frame.
+fn struck_bar(
+    a: &Attempt,
+    arena: art::ArenaProjection,
+    blend: SceneBlend,
+    drawn: &mut Option<Vec<[f32; 2]>>,
+    bubble: &Bubble,
+) -> Option<Rect> {
     let Target::Actor(id) = bubble.target else {
         return None;
     };
-    let enemy = a.enemies.iter().find(|e| e.id == id)?;
+    let index = a.enemies.iter().position(|e| e.id == id)?;
+    let [x, y] = drawn.get_or_insert_with(|| blend.positions(&a.enemies))[index];
+    let [dx, dy] = crate::battle_view::crowd_stagger(id);
     let sy = arena.lane_height();
     Some(Rect::from_center_size(
-        arena.world(bubble.at[0], bubble.at[1]) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
-        vec2(if enemy.boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
+        arena.world(x + dx, y + dy) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
+        vec2(
+            if a.enemies[index].boss {
+                sy * 1.1
+            } else {
+                sy * 0.65
+            },
+            3.0,
+        ),
     ))
 }
 pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
@@ -356,6 +384,7 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
             a,
             art::ArenaProjection::for_attempt(arena, a)
                 .with_effects_clip(f.battle.effects_rect.unwrap_or(arena)),
+            f.battle.interpolation.scene(None, a),
             0,
             &mut f.battle.damage_feedback,
             f.settings,
@@ -365,11 +394,13 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     }
 }
 /// Draws `battle`'s popups; none meets a rect of `keep_clear` (CF-1-09).
+/// `blend` is the one the field painted `a`'s hostiles with this frame.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
     ui: &egui::Ui,
     a: &Attempt,
     arena: art::ArenaProjection,
+    blend: SceneBlend,
     battle: u64,
     state: &mut Feedback,
     settings: &Settings,
@@ -413,7 +444,8 @@ pub(super) fn draw_for(
     stream.observe(a, now, enabled, replay);
     warm_glyphs(ui.ctx(), &mut state.warmed);
     let p = ui.painter_at(arena.effects_clip);
-    for bubble in &stream.active {
+    let mut positions = None;
+    for bubble in &mut stream.active {
         let age = (now - bubble.started).max(0.0);
         let (scale, rise, fade) = motion(age, reduced);
         let (text, color) = match bubble.kind {
@@ -458,18 +490,35 @@ pub(super) fn draw_for(
         // Dropped under the HUD, a top-lane number would sit on the struck
         // hostile's own health bar for its whole life: it goes beside the
         // bar instead, right or else left, still clear of the HUD (W1 review).
-        if let Some(bar) = struck_bar(a, arena, bubble)
-            && Rect::from_center_size(center, galley.size())
-                .expand(border)
-                .intersects(bar)
+        // The bar walks on with the hostile, so the number follows the bar
+        // painted this frame for the rest of its life, on the side it first
+        // took while that side stays on the field.
+        if let Some(bar) = struck_bar(a, arena, blend, &mut positions, bubble)
+            && (bubble.beside.is_some()
+                || Rect::from_center_size(center, galley.size())
+                    .expand(border)
+                    .intersects(bar))
         {
             let half = galley.size().x * 0.5 + border;
             let right = bar.right() + KEEP_CLEAR_GAP + half;
-            let x = if right + half <= arena.rect.right() {
-                right
+            let left = bar.left() - KEEP_CLEAR_GAP - half;
+            // A side fits the number at its punch peak, so the punch never
+            // pushes it across the bar.
+            let peak = if reduced {
+                1.0
             } else {
-                bar.left() - KEEP_CLEAR_GAP - half
+                SCALE_STEPS[SCALE_STEPS.len() - 1]
             };
+            let width = galley.size().x * peak / scale + 2.0 * border;
+            let fits_right = bar.right() + KEEP_CLEAR_GAP + width <= arena.rect.right();
+            let fits_left = bar.left() - KEEP_CLEAR_GAP - width >= arena.rect.left();
+            let side = match bubble.beside {
+                Some(Side::Left) if fits_left || !fits_right => Side::Left,
+                _ if fits_right => Side::Right,
+                _ => Side::Left,
+            };
+            bubble.beside = Some(side);
+            let x = if side == Side::Right { right } else { left };
             center = pos2(x, bar.center().y - rise);
             let beside = Rect::from_center_size(center, galley.size()).expand(border);
             center += vec2(0.0, keep_clear_shift(beside, keep_clear));
@@ -682,6 +731,7 @@ mod tests {
                         ui,
                         a,
                         art::ArenaProjection::for_attempt(arena, a),
+                        SceneBlend::NONE,
                         0,
                         &mut state,
                         &settings,
@@ -744,6 +794,7 @@ mod tests {
                 a,
                 art::ArenaProjection::for_attempt(layout.field.rect, a)
                     .with_effects_clip(layout.effects_clip),
+                SceneBlend::NONE,
                 0,
                 &mut Feedback::default(),
                 &Settings::default(),
@@ -913,8 +964,20 @@ mod tests {
     /// shift dropped it onto the struck enemy's own health bar for its whole
     /// life. It now meets neither, fresh, at the punch peak and late, at both
     /// target sizes, in normal and reduced effects, across the lane.
+    ///
+    /// The struck Runner walks toward the line between frames and is painted
+    /// blended between the previous fixed step (four ticks back, the most one
+    /// step advances) and now, so the bar checked is the one painted where
+    /// the body is drawn on that frame, not where it was struck. A number
+    /// beside the bar stays beside it, on one side, for the rest of its life.
     #[test]
     fn a_top_lane_number_kept_clear_of_the_hud_clears_the_struck_enemy_health_bar() {
+        /// The Runner's speed in content.json, yards per second.
+        const RUNNER_SPEED: f32 = 1.1;
+        /// Ticks between the painted previous position and now.
+        const STEP_TICKS: u64 = 4;
+        /// The frame's blend between the previous position and now.
+        const FRACTION: f32 = 0.5;
         for (size, zoom) in [
             (vec2(1440.0, 900.0), 1.0),
             (vec2(1050.0, 700.0) / 1.35, 1.35),
@@ -929,6 +992,7 @@ mod tests {
                         a.width_yards = 16.0;
                         a.events.clear();
                         a.enemies.clear();
+                        a.tick = 100;
                         game.spawn_enemy(&mut a, horde_core::content::EnemyKind::Runner, 0, false);
                         *game.attempt_slot_mut() = Some(a);
                         let a = game.attempt_mut().unwrap();
@@ -941,7 +1005,10 @@ mod tests {
                             lane: Some(0),
                             ..hit(a, 4632, kind, 1)
                         });
-                        let a = game.attempt().unwrap();
+                        let hit_tick = a.tick;
+                        // Where the Runner's feet are `t` seconds after the
+                        // hit: it walks left until it meets the line.
+                        let walked = |t: f32| x - (RUNNER_SPEED * t).min(x - 0.4);
                         let layout = crate::ui::battle::BattleLayout::new(
                             canvas,
                             a.lane_count,
@@ -952,12 +1019,6 @@ mod tests {
                         let arena = art::ArenaProjection::for_attempt(layout.field.rect, a)
                             .with_effects_clip(layout.effects_clip);
                         let sy = arena.lane_height();
-                        let body = classify(a, a.events.back().unwrap()).unwrap().at;
-                        // The bar `art::battlefield` paints over the drawn body.
-                        let bar = Rect::from_center_size(
-                            arena.world(body[0], body[1]) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
-                            vec2(sy * 0.65, 3.0),
-                        );
                         let settings = Settings {
                             reduced_effects: reduced,
                             ..Settings::default()
@@ -966,7 +1027,34 @@ mod tests {
                         crate::settings::install_font(&ctx);
                         crate::settings::configure(&ctx, zoom);
                         let mut state = Feedback::default();
-                        for age in [0.0, 0.06, 0.5] {
+                        let mut beside: Option<(f64, bool)> = None;
+                        for age in [0.0, 0.06, 0.5, 0.85] {
+                            let ticks = (age * 60.0_f64).round() as u64;
+                            let a = game.attempt_mut().unwrap();
+                            a.tick = hit_tick + ticks;
+                            a.enemies[0].x = walked(age as f32);
+                            let mut previous = a.clone();
+                            previous.tick -= STEP_TICKS;
+                            previous.enemies[0].x =
+                                walked((ticks as f32 - STEP_TICKS as f32) / 60.0);
+                            let mut interpolation =
+                                crate::battle_view::ActorInterpolation::default();
+                            interpolation.record([(None, &previous)]);
+                            interpolation.fraction = FRACTION;
+                            let a = game.attempt().unwrap();
+                            // The bar `art::battlefield` paints over the body
+                            // drawn on this frame.
+                            let (before, now) = (previous.enemies[0].x, a.enemies[0].x);
+                            let [dx, dy] = crate::battle_view::crowd_stagger(id);
+                            let body = [
+                                before + (now - before) * FRACTION + dx,
+                                a.enemies[0].y() + dy,
+                            ];
+                            let bar = Rect::from_center_size(
+                                arena.world(body[0], body[1])
+                                    + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
+                                vec2(sy * 0.65, 3.0),
+                            );
                             let input = egui::RawInput {
                                 time: Some(age),
                                 screen_rect: Some(canvas),
@@ -977,6 +1065,7 @@ mod tests {
                                     ui,
                                     a,
                                     arena,
+                                    interpolation.scene(None, a),
                                     0,
                                     &mut state,
                                     &settings,
@@ -1014,6 +1103,24 @@ mod tests {
                                 "{label}: the number at {drawn:?} leaves the effects clip {:?}",
                                 layout.effects_clip
                             );
+                            // Beside the bar: level with it, a gap's width off
+                            // one end.
+                            let level = drawn.top() < bar.bottom() && bar.top() < drawn.bottom();
+                            let near = |gap: f32| (0.0..=KEEP_CLEAR_GAP + 2.0).contains(&gap);
+                            let on_right = near(drawn.left() - bar.right());
+                            let on_left = near(bar.left() - drawn.right());
+                            let now_beside = (level && (on_right || on_left)).then_some(on_right);
+                            if let Some((since, was_right)) = beside {
+                                assert_eq!(
+                                    now_beside,
+                                    Some(was_right),
+                                    "{label}: beside the bar on the {} since age {since}, the \
+                                     number at {drawn:?} left the bar at {bar:?}",
+                                    if was_right { "right" } else { "left" }
+                                );
+                            } else {
+                                beside = now_beside.map(|on_right| (age, on_right));
+                            }
                         }
                     }
                 }
