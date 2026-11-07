@@ -200,7 +200,8 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
         chrome::row(ui, |ui| {
             // An edited named draft keeps its preset, so the core keeps that
             // preset's extras when it normalises the edit to Custom; it is
-            // shown as Custom. Choosing Custom only sets the highlight and
+            // shown as Custom. Choosing Custom sets the highlight and switches
+            // the preview and Apply to the core's Custom steps (R21), and
             // never overwrites the named preset the draft came from.
             let shown = if !*custom_chosen && *draft == BalanceSettings::for_preset(draft.preset) {
                 draft.preset

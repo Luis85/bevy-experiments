@@ -177,8 +177,10 @@ impl BattleUi {
 #[derive(Resource, Default)]
 pub(crate) struct SettingsUi {
     pub(super) balance_draft: Option<horde_core::balance::BalanceSettings>,
-    /// The player chose Custom over a named draft. The draft keeps that
-    /// preset so the core keeps its extras; this only highlights Custom.
+    /// The player chose Custom over a named draft. It highlights Custom and
+    /// makes Apply store an unedited named draft as Custom on that preset's
+    /// basis (R21, `Campaign::custom_balance_steps`); the draft keeps the
+    /// named preset so the core keeps its extras.
     pub(super) balance_custom_chosen: bool,
     pub(super) rebind: Option<Action>,
     pub(super) binding_armed: bool,
