@@ -138,7 +138,11 @@ public static class LastLightNativeHelper {
             if (Environment.GetEnvironmentVariable("HORDE_FAKE_UNFOCUSED_ALWAYS") == "1") { unfocused = 2; }
             string mode = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PRESENT_MODE") == "autonovsync" ? "AutoNoVsync" : "Fifo";
             string pipelined = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PIPELINED") == "0" ? "false" : "true";
+            // The adapter the renderer used: Bevy falls back to the default GPU when WGPU_ADAPTER_NAME matches none.
+            string adapter = Environment.GetEnvironmentVariable("HORDE_FAKE_ADAPTER");
+            if (String.IsNullOrEmpty(adapter)) { adapter = "Fake Adapter"; }
             File.WriteAllText(report, "{\"version\":3,\"scene\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN")
+                + "\",\"adapter\":\"" + adapter
                 + "\",\"sample_frames\":" + Environment.GetEnvironmentVariable("LASTLIGHT_PERF_FRAMES")
                 + ",\"completed_sample_target\":true,\"paused\":false,\"unfocused_sample_frames\":" + unfocused
                 + ",\"frames_over_50ms\":0,\"frames_over_50ms_driver_stall\":0,\"driver_stalls\":{\"frames\":[],\"outside\":{\"frames_over_50ms\":0}}"
@@ -476,6 +480,39 @@ try {
             }
         }
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_UNFOCUSED_ALWAYS', $null, 'Process') }
+    }
+
+    Test-Case 'measure_performance -Adapter exits 2 when the report names another adapter' {
+        # Bevy never fails on an unmatched WGPU_ADAPTER_NAME; it renders on the default GPU, so the report must echo it.
+        $adapterTarget = Join-Path $temporary 'perf-adapter-target'
+        try {
+            New-FakeTarget $adapterTarget
+            $env:CARGO_TARGET_DIR = $adapterTarget
+            $env:HORDE_FAKE_ADAPTER = 'NVIDIA GeForce RTX 4070 Laptop GPU'
+            $out = Join-Path $temporary 'perf-adapter-other'
+            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-Adapter', 'Intel(R) Arc(TM) Graphics', '-OutputDirectory', $out) 'measure-adapter-other'
+            Assert-Equal 2 $r.ExitCode ("another adapter: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            Assert-Equal 2 @($summary.runs).Count 'one run per size'
+            foreach ($run in @($summary.runs)) {
+                Assert-Equal 2 $run.attempts "$($run.file) attempts"
+                Assert-Equal 'NVIDIA GeForce RTX 4070 Laptop GPU' $run.adapter "$($run.file) adapter column"
+                Assert-Equal "adapter 'NVIDIA GeForce RTX 4070 Laptop GPU', requested 'Intel(R) Arc(TM) Graphics'" (@($run.problems) -join '; ') "$($run.file) problems"
+            }
+            Assert-True ((Read-Log (Join-Path $out 'summary.md')) -match '\| NVIDIA GeForce RTX 4070 Laptop GPU \|') 'summary.md adapter column'
+
+            # Bevy matches a lowercased substring of the adapter name.
+            $env:HORDE_FAKE_ADAPTER = 'Intel(R) Arc(TM) Graphics'
+            $out = Join-Path $temporary 'perf-adapter-same'
+            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-Adapter', 'intel(r) arc', '-OutputDirectory', $out) 'measure-adapter-same'
+            Assert-Equal 0 $r.ExitCode ("matching adapter: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            foreach ($run in @($summary.runs)) {
+                Assert-Equal 1 $run.attempts "$($run.file) attempts"
+                Assert-Equal 'Intel(R) Arc(TM) Graphics' $run.adapter "$($run.file) adapter column"
+            }
+        }
+        finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_ADAPTER', $null, 'Process') }
     }
 
     Test-Case 'capture_review reports every sidecar check row and fails the run on a failed one' {

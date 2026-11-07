@@ -13,7 +13,9 @@
 #   -Frames N                                0 = the budget's per-scene run.frames; otherwise 300..3600
 #   -Warmup N                                default the budget's run.warmup_frames (180)
 #   -Repeat N                                runs per scene and size (3 for acceptance)
-#   -Adapter <name>                          WGPU_ADAPTER_NAME; an informational run that never fails the budget
+#   -Adapter <name>                          WGPU_ADAPTER_NAME; an informational run that never fails the budget. Bevy
+#                                            falls back to the default GPU when no adapter matches, so a run is valid
+#                                            only when its report's adapter contains the name (case-insensitive)
 #   -OutputDirectory <dir>                   default <target>/perf/<yyyyMMdd-HHmmss>-<profile>[-novsync]; must
 #                                            be missing or empty
 #   -NoBuild, -NoBudget                      skip the cargo build / the budget compare (validity still counts)
@@ -27,7 +29,8 @@
 # Every run sets LASTLIGHT_PERF_ACTIVE_ONLY=1, LASTLIGHT_PERF_NPC_SPEED=1, LASTLIGHT_PERF_PROFILE=<profile> and a fresh
 # LASTLIGHT_SAVE_DIR, and writes <scene>-<size>[-rN].json. A run is valid only when the report is version 3, met its
 # sample target, is not paused, had no unfocused sample frame, and echoes the requested present mode, pipelined state,
-# scene and profile. An invalid run is rerun once (the rejected report is kept as <stem>.invalid.json).
+# scene, profile and (with -Adapter) adapter. An invalid run is rerun once (the rejected report is kept as
+# <stem>.invalid.json).
 # Budget compare: repeats by median, frames_over_50ms and egui texture uploads by the worst repeat. frames_over_50ms and
 # egui.texture_uploads.count (against egui.texture_uploads_after_warmup_max, every scene, W1-64) always; frames_over_50ms
 # counts the frames outside driver stalls (driver_stalls.outside.frames_over_50ms: W1-61 user ruling 'Exclude driver
@@ -156,13 +159,15 @@ function Format-Number($Value) {
     return ([double]$Value).ToString('0.####', $invariant)
 }
 
-function Get-PerfExpectation([string]$RunProfile, [bool]$NoVsync, [string]$PipelinedRequest) {
+function Get-PerfExpectation([string]$RunProfile, [bool]$NoVsync, [string]$PipelinedRequest, [string]$AdapterRequest = '') {
     $pipelinedState = $null
     if ($PipelinedRequest -eq 'on') { $pipelinedState = $true }
     elseif ($PipelinedRequest -eq 'off') { $pipelinedState = $false }
     $mode = 'Fifo'
     if ($NoVsync) { $mode = 'AutoNoVsync' }
-    return [pscustomobject]@{ PresentMode = $mode; Pipelined = $pipelinedState; Profile = $RunProfile }
+    $adapterName = $null
+    if ($AdapterRequest) { $adapterName = $AdapterRequest }
+    return [pscustomobject]@{ PresentMode = $mode; Pipelined = $pipelinedState; Profile = $RunProfile; Adapter = $adapterName }
 }
 
 function Test-PerfReport($Report, [string]$SceneName, $Expect) {
@@ -185,6 +190,13 @@ function Test-PerfReport($Report, [string]$SceneName, $Expect) {
     }
     $label = Get-Field $Report @('build', 'profile_label')
     if ($label -ne $Expect.Profile) { $problems.Add("profile label '$label', expected '$($Expect.Profile)'") }
+    if ($Expect.Adapter) {
+        # Bevy 0.20 matches a lowercased substring of the adapter name and otherwise silently uses the default GPU.
+        $reportAdapter = Get-Field $Report @('adapter')
+        if ($reportAdapter -isnot [string] -or -not $reportAdapter.ToLowerInvariant().Contains($Expect.Adapter.ToLowerInvariant())) {
+            $problems.Add("adapter '$reportAdapter', requested '$($Expect.Adapter)'")
+        }
+    }
     return , $problems.ToArray()
 }
 
@@ -535,7 +547,7 @@ if ($Scene -eq 'all') { $sceneNames = @($budget.run.frames.PSObject.Properties |
 else { $sceneNames = @($Scene) }
 if ($Warmup -lt 0) { $Warmup = [int]$budget.run.warmup_frames }
 $sizeNames = @($budget.sizes.PSObject.Properties | ForEach-Object { $_.Name })
-$expect = Get-PerfExpectation $Profile ([bool]$VsyncOff) $Pipelined
+$expect = Get-PerfExpectation $Profile ([bool]$VsyncOff) $Pipelined $Adapter
 $context = [pscustomobject]@{ Profile = $Profile; VsyncOff = [bool]$VsyncOff; NoBudget = [bool]$NoBudget; Informational = [bool]$Adapter; PowerPlan = (Get-PowerPlan) }
 
 $target = Resolve-HordeTarget -Workspace $workspace
@@ -697,6 +709,7 @@ finally {
             [ordered]@{
                 scene = $_.Scene; size = $_.Size; repeat = $_.Repeat; file = $_.File; attempts = $_.Attempts
                 valid = (@($_.Problems).Count -eq 0); problems = @($_.Problems); rejected_attempts = @($_.Rejected); seconds = $_.Seconds
+                adapter = (Get-Field $r @('adapter'))
                 frames_over_50ms = (Get-Field $r @('frames_over_50ms'))
                 frames_over_50ms_driver_stall = (Get-Field $r @('frames_over_50ms_driver_stall'))
                 frames_over_50ms_outside_stalls = (Get-Field $r @('driver_stalls', 'outside', 'frames_over_50ms'))
@@ -747,11 +760,11 @@ finally {
     $md.Add('')
     $md.Add('Frames > 50 ms: every frame, then (driver stalls: frame ms at acquire share). The gate counts the frames outside the driver stalls (W1-61 user ruling).')
     $md.Add('')
-    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Frames > 50 ms | egui texture uploads | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
-    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Adapter | Frames > 50 ms | egui texture uploads | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
+    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
     foreach ($row in $rows) {
         $stalls = @($row.driver_stalls | ForEach-Object { "$(Format-Number $_.frame_ms) ms at $(Format-Number $_.acquire_share)" }) -join ', '
-        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.frames_over_50ms) ($($row.frames_over_50ms_driver_stall)$(if ($stalls) { ': ' + $stalls })) | $($row.egui_texture_uploads) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
+        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.adapter) | $($row.frames_over_50ms) ($($row.frames_over_50ms_driver_stall)$(if ($stalls) { ': ' + $stalls })) | $($row.egui_texture_uploads) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
     }
     $md.Add('')
     $md.Add('## Budget checks')
