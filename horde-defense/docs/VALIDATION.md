@@ -1001,6 +1001,7 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo clippy --locked -p horde-defense --all-targets --no-default-features -- -D warnings
 cargo clippy --locked -p horde-defense --all-targets --features dev -- -D warnings
 cargo test --locked --workspace
+cargo test --locked -p horde-defense --no-default-features
 cargo test --locked -p horde-defense --features dev
 cargo run --locked -p horde-defense -- --smoke
 python -I -B scripts/check_views.py
