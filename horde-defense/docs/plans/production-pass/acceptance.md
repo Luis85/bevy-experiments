@@ -182,7 +182,7 @@
 | ISO-8 | Presentation never touches core RNG | `presentation_never_reads_core_rng` (self-test on a planted string; forbids `hash::keyed`), `sky_flash_never_reads_core_rng`, `shot_fx_never_mutates_attempt`, `horde_audio_never_reads_core_rng` | 1, 5, 6 |
 | ISO-9 | No screen shake | `field_rect_never_offsets_on_damage_or_explosion` (W5-06) | 5 |
 | ISO-10 | Reduced effects covers every new effect | reduced MOTION gates (Δmean L < 0.01, block ΔL < 0.1); the per-feature `reduced_*` tests (toast, banner, low-HP, retreat hold, chevron static, shots, lights, explosions, decals, elite pulse, fly-ups, lightning) | 3, 5 |
-| ISO-11 | Full verify every wave | fmt; clippy -D warnings ×3; `cargo test --locked --workspace` and `--features dev`; `--smoke`; `check_views.py`; release `pacing_targets` | all |
+| ISO-11 | Full verify every wave | fmt; clippy -D warnings ×3; `cargo test --locked --workspace`, `-p horde-defense --no-default-features` and `--features dev`; `--smoke`; `check_views.py`; release `pacing_targets` | all |
 | R7 | One GOLDEN/TRACE re-bless per wave in a dedicated commit with reasons | W1-69 (user decision), W2-49 and W4-08; PROVISIONAL None at every wave close (critic check) | 1, 2, 4 |
 | R8 | Stress cap only behind a review/test seam | `production_validation_rejects_enemy_cap_225`; a `--no-default-features` build compiles without the seam | 1 |
 | HUMAN | Human checks: weapon-classes and night/storm review; 3x12 at 2.5x zoom feel; sheet upscale on 3-lane sprites; click-to-photon; listening pass; integrated-GPU run; stepped damage pop (CF-1-04, W1-64); whole-pixel text placement (CF-1-05, W1-64) | Logged as "pending human check" in ACCEPTANCE.md and the plan if not done; they do not block | 1, 5, 6, 7 |

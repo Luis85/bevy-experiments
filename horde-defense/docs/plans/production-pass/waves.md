@@ -3,7 +3,7 @@
 ## Global rules for every commit
 - **One commit per finding.** Writers run one at a time.
 - **Test-first.** Each commit's named test fails on the parent commit. A characterisation pin must record a mutation or perturbation proof in the commit message.
-- **Verify before committing.** Every commit leaves the full verify green: fmt, the 3 clippy configs, the workspace tests, `--features dev` tests, `--smoke` and check_views.
+- **Verify before committing.** Every commit leaves the full verify green: fmt, the 3 clippy configs, the workspace tests, the `-p horde-defense --no-default-features` and `--features dev` tests, `--smoke` and check_views.
 - **Digest moves.** A commit that moves a digest sets the provisional pin and its cause (P3). Only the wave's SD re-bless commit folds the pins.
 - **Scope.** No root-repo file is touched (R6). The review checks `git diff --name-only main... | grep -v ^horde-defense/` is empty.
 - **Scripts.** Scripts run under Windows PowerShell 5.1 and use `Native.ps1` once it exists (W1-02).
