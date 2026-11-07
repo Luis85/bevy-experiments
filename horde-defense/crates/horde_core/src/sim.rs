@@ -1275,6 +1275,22 @@ impl Game {
     pub fn global_paused(&self) -> bool {
         self.global_paused
     }
+    /// The Operations page is reachable: Recruitment, Parallel defenses or
+    /// Country operations is unlocked, or a recruit or an expedition already
+    /// exists (older saves). Pure: no mutation, no RNG. Moved verbatim from
+    /// the camp UI (W2-02), which delegates here; the pacing harness records
+    /// `Milestone::OperationsOpen` from it.
+    pub fn operations_available(&self) -> bool {
+        [
+            crate::skill_catalog::CampaignFeature::Recruitment,
+            crate::skill_catalog::CampaignFeature::Parallel,
+            crate::skill_catalog::CampaignFeature::Operations,
+        ]
+        .into_iter()
+        .any(|feature| self.campaign.has_feature(feature))
+            || !self.strategy.roster.is_empty()
+            || !self.battles.is_empty()
+    }
 }
 /// Test-only mutators (`test-support` feature, or this crate's unit tests).
 /// They bypass every rule `apply` enforces; production builds never see them.

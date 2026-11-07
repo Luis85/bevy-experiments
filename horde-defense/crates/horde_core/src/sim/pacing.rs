@@ -239,6 +239,8 @@ pub enum Milestone {
     FirstTakeover,
     /// The scripted player owns every node of this depth (report only).
     TierOwned(usize),
+    /// The Operations page is reachable ([`Game::operations_available`]).
+    OperationsOpen,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct PacingReport {
@@ -249,8 +251,8 @@ pub struct PacingReport {
     pub runs: Vec<PacingRun>,
     /// Milestone, the number of runs completed when it first held, and the
     /// battle minutes so far. Camp milestones (`Feature`, `TierFirstNode`,
-    /// `TierOwned`) are checked before run `i` (1-based) and count `i - 1`;
-    /// the others are checked after run `i` and count `i`.
+    /// `TierOwned`, `OperationsOpen`) are checked before run `i` (1-based)
+    /// and count `i - 1`; the others are checked after run `i` and count `i`.
     pub milestones: Vec<(Milestone, usize, f32)>,
 }
 impl PacingReport {
@@ -519,6 +521,9 @@ pub fn simulate_pacing_seed(
             if g.campaign.has_feature(f) {
                 reached(&mut milestones, Milestone::Feature(f), index, minutes);
             }
+        }
+        if g.operations_available() {
+            reached(&mut milestones, Milestone::OperationsOpen, index, minutes);
         }
         if index == 0 {
             g.deploy_country_stage(0, Mode::Personal)?;

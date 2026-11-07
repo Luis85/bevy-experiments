@@ -16,10 +16,7 @@ use crate::{
 };
 use bevy::{ecs::system::SystemParam, prelude::*};
 use bevy_egui::egui;
-use horde_core::{
-    campaign::UpgradeFocus, command::Command, sim::Game, skill_catalog::CampaignFeature,
-    world::world,
-};
+use horde_core::{campaign::UpgradeFocus, command::Command, sim::Game, world::world};
 
 pub(crate) struct UiCtx<'a> {
     pub(super) game: &'a Game,
@@ -230,16 +227,10 @@ impl UiCtx<'_> {
     pub(super) fn settings_return_label(&self) -> &'static str {
         self.nav.return_screen.settings_return_label()
     }
+    /// The Operations page is reachable; the rule is core's
+    /// [`Game::operations_available`].
     pub(super) fn operations_available(&self) -> bool {
-        [
-            CampaignFeature::Recruitment,
-            CampaignFeature::Parallel,
-            CampaignFeature::Operations,
-        ]
-        .into_iter()
-        .any(|feature| self.game.campaign().has_feature(feature))
-            || !self.game.strategy().roster.is_empty()
-            || !self.game.battles().is_empty()
+        self.game.operations_available()
     }
 
     // ----- commands -----

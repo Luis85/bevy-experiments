@@ -266,3 +266,37 @@ fn the_single_row_stays_one_line_inside_the_minimum_window() {
         "one line at 1050x700@1.35: {top}..{bottom}"
     );
 }
+
+#[test]
+fn context_operations_available_delegates_to_core() {
+    let mut fixture = IsolatedFrontend::new();
+    let f = &mut fixture.frontend;
+    let check = |f: &mut FrontendParts, expected: bool, state: &str| {
+        let ui = f.act(|c| c.operations_available());
+        assert_eq!(ui, f.game.operations_available(), "{state}");
+        assert_eq!(ui, expected, "{state}");
+    };
+    f.game.campaign_mut().legacy_features = false;
+    check(f, false, "fresh profile");
+    f.game.campaign_mut().legacy_features = true;
+    f.game.campaign_mut().attempts = 1;
+    check(f, true, "legacy features");
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.game.campaign_mut().coins = 500;
+    for id in ["DEU", "FRA"] {
+        f.game.campaign_mut().world.cleared.push(id.into());
+        f.game
+            .campaign_mut()
+            .world
+            .country_levels
+            .insert(id.into(), world().country(id).unwrap().level_count());
+    }
+    let recruit = f
+        .game
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, "DEU"))
+        .unwrap();
+    f.game.deploy_survivor(recruit, "POL", 0).unwrap();
+    // With every feature gone, the roster and the expedition still open it.
+    f.game.campaign_mut().legacy_features = false;
+    check(f, true, "roster and expedition");
+}

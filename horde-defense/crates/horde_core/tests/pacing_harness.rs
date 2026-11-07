@@ -4,6 +4,7 @@ use horde_core::sim::{
     DEFAULT_PROFILE_ID, LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingAim, PacingProfile,
     PacingReport, by_id, pacing_registry, pacing_seed, pacing_sweep_with_threads, simulate_pacing,
 };
+use horde_core::skill_catalog::CampaignFeature;
 use std::collections::BTreeSet;
 
 #[test]
@@ -54,6 +55,32 @@ fn stop_after_liberation_ends_the_profile_after_that_run() {
     // is the last one and its report shows the country freed.
     assert!(report.runs[run - 1].country_freed);
     assert!(report.runs[..run - 1].iter().all(|r| !r.country_freed));
+}
+
+#[test]
+fn operations_open_is_the_first_camp_count_with_operations_available() {
+    let profile = PacingProfile {
+        max_runs: 20,
+        stop_after: Some(Milestone::OperationsOpen),
+        ..by_id("novice-gear-lux").expect("registered")
+    };
+    let report = simulate_pacing(&profile).expect("profile runs");
+    let (open, _) = report
+        .milestone(Milestone::OperationsOpen)
+        .expect("the Operations page opens inside 20 runs");
+    // The solo plan never recruits or sends an expedition, so the page opens
+    // with the first of the three features behind it.
+    let first_feature = [
+        CampaignFeature::Recruitment,
+        CampaignFeature::Parallel,
+        CampaignFeature::Operations,
+    ]
+    .into_iter()
+    .map(|f| report.milestone_or_missing(Milestone::Feature(f)))
+    .min();
+    assert_eq!(Some(open), first_feature);
+    // A camp milestone: checked before run `open + 1`, the last run played.
+    assert_eq!(report.runs.len(), open + 1);
 }
 
 #[test]

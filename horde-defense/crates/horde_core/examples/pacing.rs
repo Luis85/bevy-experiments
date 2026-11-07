@@ -138,6 +138,7 @@ fn milestone_rows(extended: bool) -> Vec<(String, Milestone)> {
             rows.push((format!("Rank {rank}"), Milestone::Rank(rank)));
         }
         rows.push(("First takeover".to_owned(), Milestone::FirstTakeover));
+        rows.push(("Operations open".to_owned(), Milestone::OperationsOpen));
     }
     rows
 }
