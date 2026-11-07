@@ -687,9 +687,9 @@ $saveCloneCheck = $null
 $cpuName = $null
 $saved = Reset-LastlightEnv
 $savedAdapter = [Environment]::GetEnvironmentVariable('WGPU_ADAPTER_NAME', 'Process')
-try {
 # Bevy honours any WGPU_ADAPTER_NAME it inherits: only -Adapter (an informational run) may steer the GPU.
 [Environment]::SetEnvironmentVariable('WGPU_ADAPTER_NAME', $null, 'Process')
+try {
     if ($ShippedSmoke) {
         # One CARGO_TARGET_DIR: the shipped and review playtest builds share an exe path, so copy the shipped one out first.
         Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense', '--profile', 'playtest', '--no-default-features') -LogStem (Join-Path $tools 'cargo-shipped') | Out-Null

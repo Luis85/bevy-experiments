@@ -146,13 +146,13 @@ public static class LastLightNativeHelper {
             string mode = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PRESENT_MODE") == "autonovsync" ? "AutoNoVsync" : "Fifo";
             string pipelined = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PIPELINED") == "0" ? "false" : "true";
             // The adapter the renderer used: Bevy falls back to the default GPU when WGPU_ADAPTER_NAME matches none.
-            string adapter = Environment.GetEnvironmentVariable("HORDE_FAKE_ADAPTER");
-            if (String.IsNullOrEmpty(adapter)) { adapter = "Fake Adapter"; }
-            // The window opens at the requested size at Windows scale 2, unless HORDE_FAKE_WINDOW names the physical
             // Without HORDE_FAKE_ADAPTER, a WGPU_ADAPTER_NAME the fake inherits steers it, as Bevy honours any it sees.
-            // WIDTHxHEIGHT the OS clamped it to.
+            string adapter = Environment.GetEnvironmentVariable("HORDE_FAKE_ADAPTER");
             string steered = Environment.GetEnvironmentVariable("WGPU_ADAPTER_NAME");
             if (String.IsNullOrEmpty(adapter) && !String.IsNullOrEmpty(steered)) { adapter = "Fake Adapter steered to " + steered; }
+            if (String.IsNullOrEmpty(adapter)) { adapter = "Fake Adapter"; }
+            // The window opens at the requested size at Windows scale 2, unless HORDE_FAKE_WINDOW names the physical
+            // WIDTHxHEIGHT the OS clamped it to.
             string[] size = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SIZE").Split('x');
             string window = Environment.GetEnvironmentVariable("HORDE_FAKE_WINDOW");
             string[] physical = String.IsNullOrEmpty(window)
@@ -535,10 +535,6 @@ try {
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_ADAPTER', $null, 'Process') }
     }
 
-    Test-Case 'measure_performance exits 2 when the window did not open at the requested size' {
-        # The budget gates per size: a window the OS clamped (or launch.rs's 1440x900 fallback) is not normal or small.
-        $sizeTarget = Join-Path $temporary 'perf-size-target'
-        try {
     Test-Case 'measure_performance clears an inherited WGPU_ADAPTER_NAME without -Adapter' {
         # Bevy honours any WGPU_ADAPTER_NAME it inherits, so a shell left steered to another GPU would gate that GPU
         # against the budget's hardware; only -Adapter steers a run, and that run is informational.
@@ -562,6 +558,10 @@ try {
         finally { [Environment]::SetEnvironmentVariable('WGPU_ADAPTER_NAME', $savedSteer, 'Process') }
     }
 
+    Test-Case 'measure_performance exits 2 when the window did not open at the requested size' {
+        # The budget gates per size: a window the OS clamped (or launch.rs's 1440x900 fallback) is not normal or small.
+        $sizeTarget = Join-Path $temporary 'perf-size-target'
+        try {
             New-FakeTarget $sizeTarget
             $env:CARGO_TARGET_DIR = $sizeTarget
             $env:HORDE_FAKE_WINDOW = '2880x1700'
