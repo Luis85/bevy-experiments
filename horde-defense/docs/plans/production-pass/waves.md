@@ -86,9 +86,9 @@ The full commit detail is in `wave1_commits`. Order and summary:
 | W1-66 | perf-architecture | One quad per hit flash via a packed white silhouette (gates 1 and 2) | W1-65 |
 | W1-67 | perf-architecture | Build BattleFrame without per-enemy maps and clones (gate 1) | W1-66 |
 | W1-68 | perf-architecture | Attribute the 0.5 s frames: between-frame gap, pipelined wait, per-frame event counts (gate 3 investigation) | W1-67 |
-| W1-69 | enemy-balance | Enemies never block each other: no lane queue, overlap allowed, every enemy that reaches the line or a structure attacks (user decision, 2026-11-06); the wave-1 GOLDEN/TRACE re-bless | W1-61 |
+| W1-69 | enemy-balance | Enemies never block each other: no lane queue, overlap allowed, every enemy that reaches the line or a structure attacks (user decision, 2026-11-06); the wave-1 GOLDEN/TRACE re-bless | W1-68 |
 
-W1-64..W1-68 were added after W1-61 blocked on the Goal-1 gates; W1-61 re-runs after W1-68.
+W1-64..W1-68 were added after W1-61 blocked on the Goal-1 gates; W1-61 re-ran after W1-68 and W1-69 (W1-69, db25cd7, landed on W1-68's review commit 63168c1, before every W1-61 commit), so its acceptance, measured on 199d823, includes the overlap rule.
 
 W1-64 done_when evidence (review fix, 2026-11-06): the W1-64 commit's probes ran on a shared machine (41-56% CPU from other processes) and missed render_schedule and cpu_frame. They were re-run with `measure_performance.ps1 -Scene all -Profile playtest -VsyncOff -Repeat 3`, the budget's repeat_acceptance, at about 22-24% load from other processes before the run. All 18 runs were valid and the script exited 0 with the new egui upload gate in place. Medians of 3 are given as 1440x900 / 1050x700@1.35. Progressed-peak: extract p95 0.328 / 0.291, render_schedule p95 2.644 / 2.370, cpu_frame p99 6.785 / 6.099. Stress: extract p95 0.324 / 0.340, render_schedule p95 2.803 / 2.976, cpu_frame p99 7.847 / 8.188. Every scene had 0 egui texture uploads and 0 frames over 50 ms. One stress repeat per size went above 3.0 ms render_schedule p95 (3.075 at 1440x900, 3.083 at 1050x700@1.35), and peak, which is not part of done_when, has a render_schedule median of 3.506 at 1440x900. Evidence is in `target/perf/w1-64/review-playtest-novsync`. Gate 3 (the 0.5 s frames) is still W1-68's.
 
