@@ -130,7 +130,7 @@ Without the per-stack rings the progressed peak drew 40,124 vertices at tick 420
 
 Wave-1 exit:
 - GOLDEN 1/6, TRACE 3/6, all from the W1-69 re-bless; V1-V6 unchanged.
-- PERF gates pass at 199d823 except the open gate-3 episode (stress-on-r2), which W2-50 owns (W1-61; plan §2.5).
+- PERF gates pass at 199d823 except the open gate-3 episode (stress-on-r2), which W2-50 owns (W1-61; plan §2.5). At 867f786 the extra dev VSync-on stress pass also kept one stall-tail frame gated (sample 932, acquire share 0.794); W2-50 owns it too.
 - `save_v7.json` frozen.
 - Capture review logged (W1-60).
 - The first freeze's open items are closed.
@@ -590,12 +590,14 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 
 **W2-50 · perf-architecture · The gate-3 episode in the shipped default configuration, before the W2-47 re-gate**
 - Slot: before W2-47; the id is appended so no id changes. W1-61's A/B repeat `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2` (playtest, pipelined on, VSync on, stress normal: the shipped default configuration) ran about 400 frames of 47-67 ms. Outside driver stalls it had 6 frames over 50 ms (exit 1), 407 over 33 ms, a p99 of 47.1 ms and 46.3 FPS. It is not a driver stall under the user ruling (named coverage 0.89-0.94) and is not attributed (4-6 ms per frame outside App::update). Plan 9.4 and §2.5; VALIDATION.md W1-61.
+- Also owns (W1 review, 2026-11-07): the second gated VSync-on stress frame on this branch. In the Goal-1 acceptance re-run at 867f786, `target/perf/w1-review/acc-dev-vsync-stress/stress-normal-r1.json` sample 932 (dev, VSync on, stress normal) was 54.74 ms with a present wait of 50.61 ms and an acquire wait of 43.46 ms: acquire share 0.794, under the 0.80 threshold, so the rule keeps it gated and that pass exited 1. Named coverage 0.989, in-process work about 11 ms; it comes directly after three ~1,000 ms stalls (samples 929-931). The acquire wait is counted only where the hand-off overlaps prepare_windows (43.5 of the 50.6 ms present wait). Plan 9.4 and §2.5; VALIDATION.md 'Goal-1 acceptance re-run at HEAD'.
 - Steps:
   - reproduce that configuration (`measure_performance.ps1 -Scene stress -Profile playtest -Pipelined on`, VSync on) at both sizes, at least 12 repeats per size, under the W1-68 probe and with the load sampler beside it;
   - record per repeat `named_coverage`, `covered_95_named`, `max_outside_update_ms`, and the per-frame events of every frame over 33 ms outside stalls;
   - attribute the episode (name the span, or the process outside the update, that holds the time) or fix it.
+  - for the sample-932 tail: decide whether the frame right after a stall counts its whole present wait toward the acquire share, or whether such tails stay gated. A change to the `driver_stall` rule is a gate change: it needs a user ruling (§2.5 row) first and lands as its own commit with a pin in `frame_report/tests.rs`.
 - Fail-first: only when a fix lands: a pin for the attributed cause that fails on the parent (a test in the owning crate, or a `scripts/fixtures/perf/` report that `-SelfTest` must classify). Attribution alone needs no test.
-- Done: evidence in `target/perf/w2-50/`. VALIDATION.md and plan 9.4 record the attribution, the fix, or that the repeats did not reproduce it, and the §2.5 row is answered. No gate is moved.
+- Done: evidence in `target/perf/w2-50/`. VALIDATION.md and plan 9.4 record the attribution, the fix, or that the repeats did not reproduce it, and the sample-932 tail's outcome; both §2.5 rows are answered. No gate is moved without that ruling.
 - Deps: none; W2-47 depends on it.
 
 **W2-51 · perf-architecture · Apply the W1-51 egui gate re-derivation decision, before the W2-47 re-gate**
@@ -624,7 +626,7 @@ Wave-2 exit:
 - Pacing and smoke before/after recorded.
 - Captures (stress, battles) taken.
 - Audio handoffs exist: the BossPhase event and the twins W2-28/W2-37.
-- The gate-3 episode of the shipped default configuration (W2-50) is attributed or fixed, or closed by the §2.5 decision.
+- The gate-3 episode of the shipped default configuration (W2-50) is attributed or fixed, or closed by the §2.5 decision; the sample-932 stall-tail question is answered.
 
 ---
 
