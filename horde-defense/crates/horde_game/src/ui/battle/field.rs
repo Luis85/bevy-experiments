@@ -45,6 +45,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             );
             let r = layout.field.rect;
             f.battle.effects_rect = Some(layout.effects_clip);
+            f.battle.effects_keep_clear = layout.effects_keep_clear();
             let arena = projection(f, r);
             let response = ui.interact(
                 r,

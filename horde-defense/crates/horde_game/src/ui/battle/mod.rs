@@ -20,9 +20,9 @@ mod tests;
 pub(super) use field::battle;
 pub(super) use frame::BattleFrame;
 pub(super) use input::{AttackSelection, controls, gather_combat_input};
-pub(in crate::ui) use layout::BattleLayout;
 #[cfg(test)]
 pub(in crate::ui) use layout::PANEL_FILL_ALPHA;
+pub(in crate::ui) use layout::{BattleLayout, keep_clear_shift};
 
 fn projection(f: &UiCtx, r: Rect) -> art::ArenaProjection {
     let (lanes, width) = battle_view::arena_geometry(f.game);

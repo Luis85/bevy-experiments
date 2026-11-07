@@ -1,6 +1,6 @@
 //! Bounded, real-time feedback for already-banked model receipts. No rewards
 //! or authoritative random state are produced by this presentation cache.
-use super::{UiCtx, armory, review};
+use super::{UiCtx, armory, battle::keep_clear_shift, review};
 use crate::art;
 use bevy_egui::egui::{self, Color32, FontId, Rect, Stroke, pos2, vec2};
 use horde_core::quality::{LootEvent, Quality};
@@ -146,6 +146,7 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         f.textures,
         &mut f.battle.loot_feedback,
         capture,
+        &f.battle.effects_keep_clear,
     ) {
         f.notify_rare_loot();
     }
@@ -191,6 +192,8 @@ fn drop_origin(attempt: &horde_core::sim::Attempt, receipt: &LootEvent) -> [f32;
 }
 /// How far above the icon centre the quality label starts.
 const LABEL_RISE: f32 = 29.0;
+/// Draws `battle`'s fly-ups; none meets a rect of `keep_clear` (CF-1-09).
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
     ui: &egui::Ui,
     projection: art::ArenaProjection,
@@ -199,6 +202,7 @@ pub(super) fn draw_for(
     textures: crate::visual_assets::ArtTextures,
     state: &mut Feedback,
     capture: review::LootCaptureMode,
+    keep_clear: &[Rect],
 ) -> bool {
     let ready = textures.actors.is_some()
         && textures.props.is_some()
@@ -221,8 +225,34 @@ pub(super) fn draw_for(
         let fade = (1.0 - age).powf(0.65);
         let origin = drop_origin(attempt, &entry.receipt);
         let at = drop_icon_center(projection, origin, entry.receipt.item_id, age);
-        let icon = Rect::from_center_size(at, vec2(25.0, 25.0));
         let color = armory::quality_color(entry.receipt.quality).gamma_multiply(fade);
+        let text = if entry.receipt.quality >= Quality::Rare {
+            format!("{} · {}", entry.receipt.quality.name(), entry.receipt.name)
+        } else {
+            entry.receipt.quality.name().to_owned()
+        };
+        let mut job = egui::text::LayoutJob::simple(text, FontId::proportional(10.0), color, 180.0);
+        job.wrap.max_rows = 1;
+        job.wrap.break_anywhere = true;
+        let galley = painter.layout_job(job);
+        let text_at = pos2(
+            (at.x - galley.size().x * 0.5).clamp(
+                projection.effects_clip.left() + 4.0,
+                projection.effects_clip.right() - galley.size().x - 4.0,
+            ),
+            (at.y - LABEL_RISE).max(projection.effects_clip.top() + 4.0),
+        );
+        let icon = Rect::from_center_size(at, vec2(25.0, 25.0));
+        // The headroom is the HUD band's too: a fly-up whose icon or label
+        // would meet a HUD rect drops under it as one (CF-1-09).
+        let drop = vec2(
+            0.0,
+            keep_clear_shift(
+                icon.union(Rect::from_min_size(text_at, galley.size())),
+                keep_clear,
+            ),
+        );
+        let (icon, text_at) = (icon.translate(drop), text_at + drop);
         painter.rect_filled(icon, 0.0, Color32::from_black_alpha((180.0 * fade) as u8));
         armory::paint_item_icon(
             &painter,
@@ -247,22 +277,6 @@ pub(super) fn draw_for(
                 color,
             ),
             egui::StrokeKind::Inside,
-        );
-        let text = if entry.receipt.quality >= Quality::Rare {
-            format!("{} · {}", entry.receipt.quality.name(), entry.receipt.name)
-        } else {
-            entry.receipt.quality.name().to_owned()
-        };
-        let mut job = egui::text::LayoutJob::simple(text, FontId::proportional(10.0), color, 180.0);
-        job.wrap.max_rows = 1;
-        job.wrap.break_anywhere = true;
-        let galley = painter.layout_job(job);
-        let text_at = pos2(
-            (at.x - galley.size().x * 0.5).clamp(
-                projection.effects_clip.left() + 4.0,
-                projection.effects_clip.right() - galley.size().x - 4.0,
-            ),
-            (at.y - LABEL_RISE).max(projection.effects_clip.top() + 4.0),
         );
         painter.galley(text_at, galley, color);
     }

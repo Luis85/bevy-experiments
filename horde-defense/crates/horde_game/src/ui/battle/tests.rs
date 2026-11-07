@@ -153,3 +153,152 @@ fn lane_zero_drop_envelope_fits_the_effects_clip_at_progressed_peak() {
         }
     }
 }
+
+/// CF-1-09: the effects headroom shares the top band with the HUD. On the
+/// zoomed 7x16 and 9x18 fields at both sizes, with and without the hint
+/// band, in normal and reduced effects, no damage number, MISS or loot
+/// fly-up over a top-lane enemy meets the corner panels, the attack selector
+/// or the loot receipt at any age, and the clip keeps its headroom.
+#[test]
+fn headroom_popups_never_overlap_hud_rects() {
+    use crate::{settings::Settings, ui::review::LootCaptureMode};
+    use horde_core::{
+        balance::BalanceSettings,
+        content::{EnemyKind, ItemDefId},
+        quality::{LootEvent, Quality},
+        sim::{Event, EventKind},
+    };
+    let mut checked = 0;
+    for (lanes, width) in [(7u8, 16u8), (9, 18)] {
+        let mut game = Game::default();
+        game.campaign_mut()
+            .set_balance_settings(BalanceSettings {
+                start_lanes: lanes,
+                max_lanes: lanes,
+                start_width: width,
+                max_width: width,
+                ..Default::default()
+            })
+            .unwrap();
+        game.deploy(0, Mode::Personal).unwrap();
+        let mut a = game.attempt().unwrap().clone();
+        a.enemies.clear();
+        a.events.clear();
+        a.loot_events.clear();
+        a.corpses.clear();
+        let w = a.width_yards;
+        let columns = [0.4, w * 0.2, w * 0.4, w * 0.5, w * 0.6, w * 0.8, w - 0.4];
+        let mut seq = 0;
+        for (i, &x) in columns.iter().enumerate() {
+            for kind in [EventKind::Hit, EventKind::WeakPoint, EventKind::Miss] {
+                game.spawn_enemy(&mut a, EnemyKind::Runner, 0, false);
+                let enemy = a.enemies.last_mut().unwrap();
+                enemy.x = x;
+                let (id, feet) = (enemy.id, [enemy.x, enemy.y()]);
+                seq += 1;
+                a.events.push_back(Event {
+                    seq,
+                    kind,
+                    from: a.defender_position(),
+                    to: feet,
+                    value: if kind == EventKind::Miss { 0 } else { 4632 },
+                    tick: a.tick,
+                    actor_id: None,
+                    target_id: Some(id),
+                    lane: Some(0),
+                    duration_ticks: 0,
+                });
+            }
+            a.loot_events.push(LootEvent {
+                item_id: 900 + i as u64,
+                definition: ItemDefId::at(4),
+                level: 1,
+                quality: if i % 2 == 0 {
+                    Quality::Rare
+                } else {
+                    Quality::Uncommon
+                },
+                name: "Padded vest".into(),
+                tick: a.tick,
+                at: [x, 0.5],
+            });
+        }
+        for (size, zoom) in [
+            (vec2(1440.0, 900.0), 1.0),
+            (vec2(1050.0, 700.0) / 1.35, 1.35),
+        ] {
+            let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+            for band in [false, true] {
+                let layout = BattleLayout::new(canvas, a.lane_count, a.width_yards, band);
+                assert_eq!(layout.effects_clip.top(), canvas.top() + 64.0);
+                let keep_clear = layout.effects_keep_clear();
+                for reduced in [false, true] {
+                    let settings = Settings {
+                        reduced_effects: reduced,
+                        ..Settings::default()
+                    };
+                    let ctx = egui::Context::default();
+                    crate::settings::install_font(&ctx);
+                    crate::settings::configure(&ctx, zoom);
+                    let mut damage = crate::ui::damage::Feedback::default();
+                    let mut loot = crate::ui::loot::Feedback::default();
+                    let label = format!(
+                        "{lanes}x{width} band {band} reduced {reduced} in {:?}",
+                        canvas.size()
+                    );
+                    for step in 0..=22 {
+                        let input = egui::RawInput {
+                            time: Some(f64::from(step) * 0.07),
+                            screen_rect: Some(canvas),
+                            ..Default::default()
+                        };
+                        let mut output = ctx.run_ui(input, |ui| {
+                            let projection =
+                                art::ArenaProjection::for_attempt(layout.field.rect, &a)
+                                    .with_effects_clip(layout.effects_clip);
+                            crate::ui::damage::draw_for(
+                                ui,
+                                &a,
+                                projection,
+                                0,
+                                &mut damage,
+                                &settings,
+                                LootCaptureMode::Disabled,
+                                &keep_clear,
+                            );
+                            crate::ui::loot::draw_for(
+                                ui,
+                                projection,
+                                &a,
+                                0,
+                                Default::default(),
+                                &mut loot,
+                                LootCaptureMode::Disabled,
+                                &keep_clear,
+                            );
+                        });
+                        output.textures_delta.clear();
+                        for clipped in &output.shapes {
+                            let drawn = clipped
+                                .shape
+                                .visual_bounding_rect()
+                                .intersect(clipped.clip_rect);
+                            if !drawn.is_positive() {
+                                continue;
+                            }
+                            checked += 1;
+                            for hud in keep_clear {
+                                assert!(
+                                    !drawn.intersects(hud),
+                                    "{label} at {:.2} s: popup {drawn:?} meets HUD {hud:?}",
+                                    f64::from(step) * 0.07
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(checked > 1000, "only {checked} shapes drawn");
+}

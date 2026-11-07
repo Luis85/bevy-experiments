@@ -176,6 +176,40 @@ impl BattleLayout {
     pub(in crate::ui) fn dressing_unit_cap(&self) -> f32 {
         self.arena.height() / REFERENCE_LANES
     }
+    /// The top-band rects the effects headroom shares with the HUD: the two
+    /// corner panels, the attack selector and the loot receipt. Damage, MISS
+    /// and loot popups keep clear of them (CF-1-09).
+    pub(in crate::ui) fn effects_keep_clear(&self) -> [Rect; 4] {
+        [
+            self.hud_left,
+            self.hud_right,
+            self.selector,
+            self.receipt_slot,
+        ]
+    }
+}
+
+/// The least gap between a popup and a top-band rect it keeps clear of.
+pub(in crate::ui) const KEEP_CLEAR_GAP: f32 = 2.0;
+
+/// How far `popup` must move down so it meets none of `keep_clear`: each rect
+/// it meets pushes its top `KEEP_CLEAR_GAP` under that rect's bottom, until
+/// it meets none (0 when it meets none already). The headroom only ever
+/// lies over the arena, so moving down never leaves the effects clip.
+pub(in crate::ui) fn keep_clear_shift(popup: Rect, keep_clear: &[Rect]) -> f32 {
+    let mut moved = popup;
+    for _ in 0..=keep_clear.len() {
+        let Some(bottom) = keep_clear
+            .iter()
+            .filter(|rect| rect.intersects(moved))
+            .map(|rect| rect.bottom())
+            .max_by(f32::total_cmp)
+        else {
+            break;
+        };
+        moved = moved.translate(vec2(0.0, bottom + KEEP_CLEAR_GAP - moved.top()));
+    }
+    moved.top() - popup.top()
 }
 
 /// The chevron of the INCOMING cue centred at `at` on a field whose lanes are

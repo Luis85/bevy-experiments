@@ -306,8 +306,8 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                             occluder: None,
                         },
                     );
-                    damage::draw_for(ui,a,projection,id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode());
-                    if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode()) { f.notify_rare_loot(); }
+                    damage::draw_for(ui,a,projection,id,&mut f.battle.damage_feedback,f.settings,f.launch.damage_capture_mode(),&[]);
+                    if loot::draw_for(ui,projection,a,id,f.textures,&mut f.battle.loot_feedback,f.launch.loot_capture_mode(),&[]) { f.notify_rare_loot(); }
                     if response.hover_pos().is_some_and(|p| r.contains(p)) && ui.input(|i|i.raw.focused) && !ui.ctx().any_popup_open() {
                         ui.ctx().set_cursor_icon(egui::CursorIcon::Crosshair);
                         reticle::paint(ui,&crate::battle_view::ReticleReadout::build(a,None),projection,aim,reticle::Marks{cross:false,building:false,reduced:f.settings.reduced_effects});

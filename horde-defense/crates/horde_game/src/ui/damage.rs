@@ -1,5 +1,5 @@
 //! Read-only, real-time presentation of already-resolved combat results.
-use super::{UiCtx, review};
+use super::{UiCtx, battle::keep_clear_shift, review};
 use crate::{
     art::{self, AMBER, GREEN, MUTED, RED, TEXT},
     settings::Settings,
@@ -325,9 +325,12 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
             &mut f.battle.damage_feedback,
             f.settings,
             f.launch.damage_capture_mode(),
+            &f.battle.effects_keep_clear,
         );
     }
 }
+/// Draws `battle`'s popups; none meets a rect of `keep_clear` (CF-1-09).
+#[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
     ui: &egui::Ui,
     a: &Attempt,
@@ -336,6 +339,7 @@ pub(super) fn draw_for(
     state: &mut Feedback,
     settings: &Settings,
     mode: review::LootCaptureMode,
+    keep_clear: &[Rect],
 ) {
     let (enabled, reduced) = (settings.numbers, settings.reduced_effects);
     let frame = ui.ctx().cumulative_frame_nr();
@@ -411,9 +415,13 @@ pub(super) fn draw_for(
             ),
             (world.y - number_lift(arena) - rise).max(bounds.top() + galley.size().y * 0.5 + 4.0),
         );
+        let border = if reduced { 1.0 } else { 2.0 };
+        // The headroom is the HUD band's too: a popup that would meet a HUD
+        // rect drops under it (CF-1-09), the same in reduced effects.
+        let drawn = Rect::from_center_size(center, galley.size()).expand(border);
+        let center = center + vec2(0.0, keep_clear_shift(drawn, keep_clear));
         let origin = center - galley.size() * 0.5;
         let outline = Color32::from_black_alpha((240.0 * fade) as u8);
-        let border = if reduced { 1.0 } else { 2.0 };
         for direction in [
             vec2(-1.0, -1.0),
             vec2(0.0, -1.0),
@@ -624,6 +632,7 @@ mod tests {
                         &mut state,
                         &settings,
                         review::LootCaptureMode::Disabled,
+                        &[],
                     );
                 });
                 uploads.push(output.textures_delta.set.len());
@@ -685,6 +694,7 @@ mod tests {
                 &mut Feedback::default(),
                 &Settings::default(),
                 review::LootCaptureMode::Disabled,
+                &[],
             );
         });
         let drawn = output
