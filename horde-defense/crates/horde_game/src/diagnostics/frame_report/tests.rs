@@ -806,3 +806,14 @@ fn a_replaced_render_frame_still_attributes_the_channel_wait() {
     assert!(close(&window["render_present_ms"], 480.1), "{window}");
     assert!(close(&window["acquire_wait_ms"], 480.), "{window}");
 }
+
+#[test]
+fn ui_scale_is_the_drawn_scale_not_the_launch_request() {
+    let with = |scale| crate::settings::Settings { scale, ..default() };
+    // A saved 1.2 with no review request is drawn at 1.2.
+    assert_eq!(report_ui_scale(Some(&with(1.2))), 1.2);
+    // A request past the slider's range is drawn at the clamp.
+    assert_eq!(report_ui_scale(Some(&with(1.5))), 1.35);
+    assert_eq!(report_ui_scale(Some(&with(0.5))), 0.75);
+    assert_eq!(report_ui_scale(None), 1.0);
+}

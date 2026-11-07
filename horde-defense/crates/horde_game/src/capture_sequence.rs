@@ -194,7 +194,8 @@ pub fn capture_frames(
             config.scenario.as_deref(),
             settings.reduced_effects,
             viewport,
-            settings.scale,
+            // The zoom egui draws at, not the raw request.
+            crate::settings::applied_scale(settings.scale),
             windows_scale,
             &state.records,
         );

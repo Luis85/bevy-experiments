@@ -887,6 +887,12 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
     }
 }
 
+/// The interface scale the report records: the zoom egui draws at
+/// (`settings::applied_scale` of the live settings), not a launch request.
+pub(super) fn report_ui_scale(settings: Option<&crate::settings::Settings>) -> f32 {
+    settings.map_or(1., |s| crate::settings::applied_scale(s.scale))
+}
+
 /// The renderer resources the report reads; any may be absent.
 #[derive(SystemParam)]
 pub struct RendererInfo<'w> {
@@ -1007,7 +1013,7 @@ pub fn capture_performance(
         width_physical: window.resolution.physical_width(),
         height_physical: window.resolution.physical_height(),
         windows_scale: f64::from(window.resolution.scale_factor()),
-        ui_scale: config.review().and_then(|r| r.scale).unwrap_or(1.),
+        ui_scale: report_ui_scale(settings.as_deref()),
         warmup_frames: state.warmup,
         requested_sample_frames: state.target_samples,
         frames: std::mem::take(&mut state.samples),
