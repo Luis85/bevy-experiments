@@ -178,9 +178,11 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 
 **W2-05 · enemy-balance · Per-archetype telemetry population (T move)**
 - Files: `director.rs:218`, `combat.rs:351`, the npc injury path, `lifecycle.rs` RunRecord `elite_kills`, `boss_ttk_ticks`, `boss_rank`.
+- Writer obligation (schema-v7 §3.12, design-progression-tree "Schema v7 §3.12"): loading rejects an archetype with more kills than spawns, and an attempt resumed from an older save has living enemies whose spawns were never counted. So a kill is counted in `kills_by_archetype` only while that archetype's kills are below its `spawned_by_archetype` count.
 - Fail-first:
   - `combat_telemetry_counts_spawns_kills_and_damage_taken_by_archetype`
   - `kills_by_archetype_sums...`
+  - `resumed_attempt_counts_a_kill_only_below_its_archetype_spawns`: a resumed attempt kills an enemy spawned before the maps were written, and the save still loads.
 - Done: provisional GOLDEN with cause T, "telemetry population, no gameplay change". TRACE unchanged.
 - Deps: W2-01.
 

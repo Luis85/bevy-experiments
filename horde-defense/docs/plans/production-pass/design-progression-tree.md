@@ -330,6 +330,12 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** PT owns sim/pacing.rs v2; EB, CD and LE add registry rows and pure evaluators in their own commits; EB owns per-archetype telemetry population.
 - **Supersedes in this spec:** PT W2-B telemetry population.
 
+#### Schema v7 §3.12. Per-archetype kills <= spawned
+
+- **Owner / wave:** save-determinism, wave 1 (validator, W1-27); enemy-balance, wave 2 (writer, W2-05).
+- **Ruling:** The frozen master-planner schema (`schema-v7.md` §3.12) keeps the per-archetype rule: loading rejects a `kills_by_archetype` entry above that archetype's `spawned_by_archetype` count, next to Σ kills_by_archetype <= kills (`sim/persistence.rs` `validate_telemetry`, pinned by `tests/telemetry_schema.rs`). An attempt resumed from a save made before the maps were written has living enemies whose spawns were never counted, so the W2-05 writer counts a kill in `kills_by_archetype` only while that archetype's kills are below its spawned count. Otherwise the next load fails with `SaveError::Invalid` (writer obligation recorded in e3f1e38, `sim/telemetry.rs` and `docs/SAVE_FORMAT.md`). Recorded here in the wave-1 review.
+- **Supersedes in this spec:** The Synthesis line "Telemetry validation does not assert kills <= spawned per archetype" and the §10 Validation bullet "There is no per-archetype kills <= spawned check (A)".
+
 ### Cluster: defenders
 
 #### D15. Camp prices in core and existing UI labels
