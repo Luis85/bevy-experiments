@@ -182,6 +182,20 @@ fn progression_rewards_round_trip_and_reject_five_milestones() {
                     json!("no_such_item")
             }),
         ),
+        (
+            "item id without its definition",
+            edited(|s| {
+                let milestone = &mut s.value["last_result"]["progression_rewards"]["milestones"][0];
+                milestone.as_object_mut().unwrap().remove("item_definition");
+            }),
+        ),
+        (
+            "item definition without its id",
+            edited(|s| {
+                let milestone = &mut s.value["last_result"]["progression_rewards"]["milestones"][0];
+                milestone.as_object_mut().unwrap().remove("item_id");
+            }),
+        ),
     ]);
 }
 

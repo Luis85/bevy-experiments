@@ -122,7 +122,8 @@ default. `last_result.progression_rewards` (root or expedition report) holds
 item was stored). A run record may carry `level_grant_coins` and
 `milestone_coins`, with no bound of their own. Loading rejects a receipt with
 more than four milestones, milestone ranks that are not strictly increasing,
-an `item_definition` that does not resolve, or `level_from` above `level_to`
+a milestone with only one of `item_id` and `item_definition`, an
+`item_definition` that does not resolve, or `level_from` above `level_to`
 or `level_to` above the player level cap. A milestone item that could not be
 stored is reported to the frontend once (`MilestoneItemLost`) and is never
 saved.

@@ -441,7 +441,8 @@ fn validate_attempt_loot(a: &Attempt, next_item_id: u64, depth: usize) -> Result
 }
 /// A report's progression receipt (schema v7 §3.4): at most
 /// [`MAX_RECEIPT_MILESTONES`] milestones at strictly increasing ranks, each
-/// granted definition resolving, and `level_from <= level_to <= cap`.
+/// granted item carrying both its id and a resolving definition (or neither,
+/// when the item was lost), and `level_from <= level_to <= cap`.
 fn validate_progression_rewards(rewards: &ProgressionRewards) -> Result<(), String> {
     if rewards.milestones.len() > MAX_RECEIPT_MILESTONES
         || rewards
@@ -449,9 +450,10 @@ fn validate_progression_rewards(rewards: &ProgressionRewards) -> Result<(), Stri
             .windows(2)
             .any(|pair| pair[0].rank >= pair[1].rank)
         || rewards.milestones.iter().any(|m| {
-            m.item_definition
-                .as_ref()
-                .is_some_and(|definition| definition.index().is_none())
+            m.item_id.is_some() != m.item_definition.is_some()
+                || m.item_definition
+                    .as_ref()
+                    .is_some_and(|definition| definition.index().is_none())
         })
         || rewards.level_from > rewards.level_to
         || rewards.level_to > crate::campaign::Player::level_cap()
