@@ -124,6 +124,31 @@ fn recruit_identities_keep_todays_names() {
     }
 }
 
+/// `StrategyState::recruit` names recruit `id` from `recruit_identity(id)`:
+/// ids 1 to 12 take the bare table name, and an id past the table adds the
+/// id as a suffix, on both the roster entry and its npc.
+#[test]
+fn recruits_take_the_table_name_and_a_suffix_past_it() {
+    let names = |game: &Game, id: u64| {
+        let r = game.strategy().roster.iter().find(|r| r.id == id).unwrap();
+        assert_eq!(r.name, r.npc.name, "recruit {id}");
+        r.name.clone()
+    };
+    let mut game = liberated_game(4);
+    let country = game.campaign().world.cleared[0].clone();
+    for (index, (name, _)) in RECRUIT_IDENTITIES.iter().enumerate() {
+        let id = recruit(&mut game, &country);
+        assert_eq!(id, index as u64 + 1);
+        assert_eq!(names(&game, id), *name, "recruit {id}");
+    }
+    for (next, expected) in [(13, "Alex Rowan 13"), (24, "Morgan Reyes 24")] {
+        let mut game = liberated_game(4);
+        game.staging().strategy().next_recruit_id = next;
+        let id = recruit(&mut game, &country);
+        assert_eq!((id, names(&game, id).as_str()), (next, expected));
+    }
+}
+
 fn is_human(label: &str) -> bool {
     let mut chars = label.chars();
     let starts_upper = chars.next().is_some_and(char::is_uppercase);
@@ -338,27 +363,72 @@ fn defending_recruit_rejects_every_ready_gated_mutation() {
             policy: Policy::Guardian,
         },
     ];
-    // Control: every command is accepted while the recruit is Ready, so the
-    // rejections below come from the status gate and nothing else.
+    // Control: every command and strategy call is accepted while the recruit
+    // is Ready, so the rejections below come from the Defending status alone.
+    // Through `Game::apply` they come from W1-12's typed pre-check (pinned by
+    // `defending_recruit_commands_return_typed_defender_unavailable`); the
+    // direct strategy calls after it reach each method's own Ready gate.
     for command in &commands {
         let mut game = ready.clone();
         game.apply(command)
             .unwrap_or_else(|e| panic!("{command:?} on a Ready recruit: {e}"));
     }
-    {
+    type Call = fn(
+        &mut horde_core::strategy::StrategyState,
+        &mut Campaign,
+        u64,
+        u64,
+        &str,
+    ) -> Result<(), String>;
+    let calls: [(&str, Call, &str); 6] = [
+        (
+            "equip_recruit",
+            |s, c, id, item, _| s.equip_recruit(c, id, item),
+            "Recall this survivor before changing equipment",
+        ),
+        (
+            "train_recruit",
+            |s, c, id, _, _| s.train_recruit(c, id, NpcTraining::Guns),
+            "Recall this survivor before training",
+        ),
+        (
+            "buy_training_point",
+            |s, c, id, _, _| s.buy_training_point(c, id),
+            "Recall this survivor before training",
+        ),
+        (
+            "assign_guard",
+            |s, c, id, _, country| s.assign_guard(c, id, country),
+            "Survivor is already on duty",
+        ),
+        (
+            "respec_recruit",
+            |s, c, id, _, _| s.respec_recruit(c, id),
+            "Recall this survivor before redistributing advancement",
+        ),
+        (
+            "reserve_recruit",
+            |s, _, id, _, _| s.reserve_recruit(id).map(drop),
+            "Survivor is already deployed or guarding a country",
+        ),
+    ];
+    for (name, call, _) in calls {
         let mut game = ready.clone();
         let (s, c) = game.staging().strategy_and_campaign();
-        s.respec_recruit(c, id).unwrap();
-        s.reserve_recruit(id).unwrap();
+        call(s, c, id, item, &country).unwrap_or_else(|e| panic!("{name} on a Ready recruit: {e}"));
     }
 
     let mut defending = ready.clone();
     defending.staging().strategy().reserve_defender(id).unwrap();
     let before = serde_json::to_value(&defending).unwrap();
     for command in &commands {
-        assert!(
-            defending.apply(command).is_err(),
-            "{command:?} accepted for a Defending recruit"
+        assert_eq!(
+            defending.apply(command),
+            Err(CommandError::DefenderUnavailable {
+                defender: DefenderId::Recruit(id),
+                blocker: DefenderBlocker::Defending,
+            }),
+            "{command:?}"
         );
         assert_eq!(
             serde_json::to_value(&defending).unwrap(),
@@ -366,10 +436,11 @@ fn defending_recruit_rejects_every_ready_gated_mutation() {
             "{command:?}"
         );
     }
-    let (s, c) = defending.staging().strategy_and_campaign();
-    assert!(s.respec_recruit(c, id).is_err());
-    assert!(s.reserve_recruit(id).is_err());
-    assert_eq!(serde_json::to_value(&defending).unwrap(), before);
+    for (name, call, gate) in calls {
+        let (s, c) = defending.staging().strategy_and_campaign();
+        assert_eq!(call(s, c, id, item, &country), Err(gate.into()), "{name}");
+        assert_eq!(serde_json::to_value(&defending).unwrap(), before, "{name}");
+    }
     assert_eq!(status(&defending, id), RecruitStatus::Defending);
 }
 
