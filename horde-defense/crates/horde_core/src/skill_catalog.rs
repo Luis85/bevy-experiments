@@ -977,9 +977,16 @@ mod tests {
             )
             .collect();
         assert_eq!(passed, Vec::<String>::new(), "rows that did not fail");
-        // Counters name archetype ids: at most 8 distinct lowercase ids.
+        // Counters name archetype ids: at most 8 distinct lowercase ids of
+        // 1-48 bytes.
+        let longest = "a".repeat(48);
+        let too_long = "a".repeat(49);
+        with_probe(vec![perk(Shotgun, Damage, 1.1)], vec![longest.as_str()])
+            .validate()
+            .unwrap();
         let counters = [
             ("empty", vec![""]),
+            ("49 bytes", vec![too_long.as_str()]),
             ("uppercase", vec!["Shield-bearer"]),
             ("space", vec!["shield bearer"]),
             ("duplicate", vec!["exploder", "exploder"]),

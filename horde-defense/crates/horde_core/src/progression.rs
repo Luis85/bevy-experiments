@@ -538,7 +538,7 @@ mod tests {
             with_rewards(rewards).validate()
         };
         type Edit<'a> = &'a dyn Fn(&mut ProgressionRewardCatalog);
-        let rows: [(&str, Edit); 13] = [
+        let rows: [(&str, Edit); 17] = [
             ("unsorted", &|r| r.milestones.swap(1, 2)),
             ("duplicate rank", &|r| r.milestones[1].rank = 5),
             ("five milestones", &|r| {
@@ -553,8 +553,14 @@ mod tests {
             ("fraction above 1", &|r| r.level_grant_xp_fraction = 1.5),
             ("fraction NaN", &|r| r.level_grant_xp_fraction = f32::NAN),
             ("training base 0", &|r| r.camp_prices.npc_training_base = 0),
+            ("training base above 1000000", &|r| {
+                r.camp_prices.npc_training_base = 1_000_001
+            }),
+            ("per rank negative", &|r| r.camp_prices.per_rank = -0.25),
             ("per rank above 1", &|r| r.camp_prices.per_rank = 1.5),
+            ("per rank NaN", &|r| r.camp_prices.per_rank = f32::NAN),
             ("max below 1", &|r| r.camp_prices.max_multiplier = 0.9),
+            ("max above 10", &|r| r.camp_prices.max_multiplier = 10.5),
             ("max infinite", &|r| {
                 r.camp_prices.max_multiplier = f32::INFINITY
             }),
@@ -568,6 +574,13 @@ mod tests {
             })
             .collect();
         assert_eq!(passed, Vec::<String>::new(), "rows that did not fail");
+        // The camp price bounds are inclusive.
+        edit(&|r| {
+            r.camp_prices.npc_training_base = 1_000_000;
+            r.camp_prices.per_rank = 1.0;
+            r.camp_prices.max_multiplier = 10.0;
+        })
+        .unwrap();
     }
 
     #[test]
