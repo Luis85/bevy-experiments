@@ -43,9 +43,10 @@ pub struct Campaign {
     #[serde(default)]
     pub balance_settings: crate::balance::BalanceSettings,
     /// Shared copy-on-write (W1-50): a save snapshot shares it with the live
-    /// game, and recording a run replaces it. Serialized as a plain sequence.
+    /// game. Recording a run appends in place, and copies the records only
+    /// while a snapshot still holds them. Serialized as a plain sequence.
     #[serde(default)]
-    pub run_history: std::sync::Arc<[crate::stats::RunRecord]>,
+    pub run_history: std::sync::Arc<Vec<crate::stats::RunRecord>>,
     #[serde(default = "crate::stats::first_run_id")]
     pub next_run_id: u64,
     /// Zero denotes pre-victory-threat saves; migrate their clear high-water once.

@@ -143,6 +143,29 @@ fn consecutive_snapshots_share_unchanged_component() {
     assert_eq!(history(&third), history(&g));
 }
 
+/// W1-50 review: with no snapshot in flight, recording a run appends to the
+/// history in place instead of copying every earlier record.
+#[test]
+fn recording_a_run_without_a_snapshot_appends_in_place() {
+    let mut g = Game::decode_save_generation(FIXTURE_V6.as_bytes()).expect("v6 fixture");
+    let shared = |g: &Game| std::sync::Arc::as_ptr(&g.campaign().run_history) as *const u8;
+    let before = shared(&g);
+    let records = g.campaign().run_history.len();
+    if g.attempt().is_none() {
+        g.deploy(0, Mode::Npc).unwrap();
+    }
+    g.withdraw();
+    assert_eq!(g.campaign().run_history.len(), records + 1);
+    assert_eq!(shared(&g), before, "the unshared history was not copied");
+    // A snapshot in flight still keeps its own records.
+    let snapshot = g.save_snapshot();
+    g.deploy(0, Mode::Npc).unwrap();
+    g.withdraw();
+    assert_eq!(snapshot.campaign().run_history.len(), records + 1);
+    assert_eq!(g.campaign().run_history.len(), records + 2);
+    assert_ne!(shared(&g), shared(&snapshot));
+}
+
 #[test]
 fn save_v6_and_v7_fixtures_round_trip_byte_identical() {
     // v6: the checked-in fixture, migrated, against its pinned FNV-1a. v7:

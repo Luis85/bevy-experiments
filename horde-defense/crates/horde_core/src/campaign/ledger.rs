@@ -17,11 +17,9 @@ impl Campaign {
             .next_run_id
             .checked_add(1)
             .expect("Run history sequence exhausted");
-        // Copy on write: snapshots still holding the old history keep it.
-        let mut history = Vec::with_capacity(self.run_history.len() + 1);
-        history.extend_from_slice(&self.run_history);
-        history.push(record);
-        self.run_history = history.into();
+        // Copy on write: a snapshot still holding the history keeps it, and
+        // only then are the earlier records copied.
+        std::sync::Arc::make_mut(&mut self.run_history).push(record);
     }
     pub fn reward(&mut self, coins: u64, xp: u64, mode: Mode) -> u64 {
         self.coins = self.coins.saturating_add(coins);
