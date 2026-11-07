@@ -15,7 +15,7 @@ All paths are relative to `horde-defense/`. HEAD is 7bd5de8 (v6).
 3. **Legacy continuation pins are never re-blessed.** This covers V1-V5, V6 (recorded in wave-1 commit 1) and V7 (pinned at the wave-4 close).
    - Behaviour that ticks a saved encounter may read only two kinds of input:
      - frozen per-encounter state: ProgressionSnapshot, Attempt.balance, Attempt.modifiers, Attempt.profile.modifiers, ResolvedEnemy and Enemy fields. Their defaults reproduce v6 bit-for-bit.
-     - catalogue records pinned as frozen: the 11 existing archetype resolutions, wave tiers 0..=4 in enemy_catalog.json, and the 5 content.json levels.
+     - catalogue records pinned as frozen: the 11 existing archetype resolutions, the enemy_catalog.json `defaults` mapping of the 5 legacy enemy kinds (boss and event spawns and snapshot-less saved enemies resolve through it), wave tiers 0..=4 in enemy_catalog.json, and the 5 content.json levels.
    - New content enters only through new records and new wave tiers numbered 5 and up.
    - No new `Attempt.rng` draw may occur on a path that is reachable with neutral snapshot values.
    - If a pin moves, the change is wrong. Fix it or stop and ask the user.

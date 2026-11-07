@@ -1018,16 +1018,20 @@ const FROZEN_ARCHETYPES: [&str; 11] = [
 const FROZEN_WAVE_TIERS: std::ops::RangeInclusive<usize> = 0..=4;
 
 /// FNV-1a of [`frozen_catalogue_table`] on the bundled catalogues, recorded
-/// at the wave-1 close (W2-53, parent af530f0). Design-save-determinism
-/// invariant 3: these are the only catalogue records a saved V1-V6 encounter
+/// at the wave-1 close (W2-53, parent af530f0), re-recorded when the legacy
+/// kind defaults joined the table (W2-53 review). Design-save-determinism
+/// invariant 3: these are the catalogue records a saved V1-V6 encounter
 /// ticks, so they are append-only (ISO-3). A move means a frozen record was
 /// edited: fix the edit. A content change meant to reach legacy attempts
 /// (Ruling R4) re-blesses the continuation pins it moves in that wave's
 /// GOLDEN re-bless with a written reason; there is no `rules_revision`.
-const FROZEN_CATALOGUE_FNV: u64 = 0x51a3_36a7_df99_eb22;
+const FROZEN_CATALOGUE_FNV: u64 = 0x58a8_acb7_5443_1bad;
 
 /// One line per frozen record, as the catalogues resolve it: each frozen
-/// archetype's `ResolvedEnemy`, each frozen wave tier's entries (sorted by
+/// archetype's `ResolvedEnemy`, the archetype each legacy `EnemyKind` defaults
+/// to (boss and event spawns go through `resolve_kind`, and a saved enemy
+/// without a snapshot falls back to `default_profile`), each frozen wave
+/// tier's entries (sorted by
 /// archetype id, the order `EnemyCatalog` keeps) and each of the 5 content
 /// levels. Records are serialized through their types, so a new field at its
 /// skipped neutral default writes nothing. Wave entries come from the authored
@@ -1044,6 +1048,13 @@ fn frozen_catalogue_table(enemy_json: &str, content_json: &str) -> String {
         table.push_str(&format!(
             "archetype {id} {}\n",
             serde_json::to_string(&enemy).unwrap()
+        ));
+    }
+    for kind in EnemyKind::ALL {
+        table.push_str(&format!(
+            "default {kind:?} {}
+",
+            catalog.default_for_kind(kind)
         ));
     }
     let authored: serde_json::Value = serde_json::from_str(enemy_json).unwrap();
@@ -1083,7 +1094,7 @@ fn legacy_catalogue_records_that_tick_saved_encounters_are_frozen() {
     let table = frozen_catalogue_table(ENEMY_CATALOG_JSON, CONTENT_JSON);
     assert_eq!(
         table.lines().count(),
-        FROZEN_ARCHETYPES.len() + FROZEN_WAVE_TIERS.count() + 5
+        FROZEN_ARCHETYPES.len() + EnemyKind::ALL.len() + FROZEN_WAVE_TIERS.count() + 5
     );
     assert_eq!(
         support::fnv1a(table.as_bytes()),
@@ -1123,6 +1134,22 @@ fn legacy_catalogue_records_that_tick_saved_encounters_are_frozen() {
         *health = (health.as_i64().unwrap() + 1).into();
     });
     assert_ne!(frozen_catalogue_table(&tougher, CONTENT_JSON), table);
+
+    // Re-pointing a legacy kind default (boss and event spawns, snapshot-less
+    // enemies) at another unrestricted archetype of that kind moves it.
+    let repointed = edited_enemy_catalog(|authored| {
+        let defaults = authored["defaults"].as_array_mut().unwrap();
+        let runner = defaults
+            .iter_mut()
+            .find(|default| default["kind"] == "Runner")
+            .unwrap();
+        runner["archetype_id"] = "skitter".into();
+    });
+    assert_ne!(
+        frozen_catalogue_table(&repointed, CONTENT_JSON),
+        table,
+        "a re-pointed kind default moves the table"
+    );
 }
 
 /// The v6 fixture through the SAVE_VERSION 7 migration: the auto-sell rule
