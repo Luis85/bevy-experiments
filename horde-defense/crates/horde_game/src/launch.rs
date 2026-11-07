@@ -60,9 +60,11 @@ pub struct PerfOptions {
     pub profile_label: Option<String>,
     pub audio: bool,
     pub npc_speed: Option<u32>,
-    /// `LASTLIGHT_PERF_PRESENT_MODE`: wins over the VSync and Low latency settings.
+    /// `LASTLIGHT_PERF_PRESENT_MODE`: wins over the VSync and Low latency
+    /// settings in a perf launch; without a report it is ignored with a warning.
     pub present_mode: Option<PresentModeOverride>,
-    /// `LASTLIGHT_PERF_PIPELINED` (0|1): wins over Low latency and the default.
+    /// `LASTLIGHT_PERF_PIPELINED` (0|1): wins over Low latency and the default
+    /// in a perf launch; without a report it is ignored with a warning.
     pub pipelined: Option<bool>,
 }
 impl Default for PerfOptions {
@@ -216,9 +218,11 @@ ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
     LASTLIGHT_PERF_PROFILE        Build profile label recorded in the report
     LASTLIGHT_PERF_AUDIO          Flag: keep audio in the perf-audio fixture
     LASTLIGHT_PERF_NPC_SPEED      Observation speed 1, 2 or 4 for perf fixtures
-    LASTLIGHT_PERF_PRESENT_MODE   fifo, mailbox, immediate or autonovsync; wins over
-                                  the VSync and Low latency settings
-    LASTLIGHT_PERF_PIPELINED      0 or 1: pipelined rendering, wins over Low latency
+    LASTLIGHT_PERF_PRESENT_MODE   fifo, mailbox, immediate or autonovsync; with
+                                  LASTLIGHT_PERF_REPORT, wins over the VSync and Low
+                                  latency settings (ignored with a warning without it)
+    LASTLIGHT_PERF_PIPELINED      0 or 1: pipelined rendering; with LASTLIGHT_PERF_REPORT,
+                                  wins over Low latency (ignored with a warning without it)
   Developer tools (builds with the `dev` feature; otherwise rejected or ignored)
     LASTLIGHT_RECORD              Same as --record
   Logging
@@ -439,6 +443,22 @@ impl LaunchConfig {
                 "1" => true,
                 _ => return Err("LASTLIGHT_PERF_PIPELINED must be 0 or 1".into()),
             });
+        }
+        // The render plan reads them only from a perf launch (`Self::perf`).
+        if let Some(review) = review.as_ref().filter(|r| r.perf.report.is_none()) {
+            for (name, set) in [
+                (
+                    "LASTLIGHT_PERF_PRESENT_MODE",
+                    review.perf.present_mode.is_some(),
+                ),
+                ("LASTLIGHT_PERF_PIPELINED", review.perf.pipelined.is_some()),
+            ] {
+                if set {
+                    warnings.push(format!(
+                        "Ignoring {name}: it applies only with LASTLIGHT_PERF_REPORT"
+                    ));
+                }
+            }
         }
         // An isolated review stages a throwaway profile; without an explicit save
         // directory its logs go there too, never into the player's profile.
@@ -1019,6 +1039,36 @@ mod tests {
             PresentModeOverride::AutoNoVsync.present_mode(),
             bevy::window::PresentMode::AutoNoVsync
         );
+    }
+    /// W1-34 review: the render plan reads the overrides only from a perf
+    /// launch (`LaunchConfig::perf`), so without LASTLIGHT_PERF_REPORT each one
+    /// is named in a warning instead of being dropped silently.
+    #[cfg(feature = "review")]
+    #[test]
+    fn perf_render_overrides_without_a_report_warn_that_they_are_ignored() {
+        let override_vars = [
+            ("LASTLIGHT_PERF_PRESENT_MODE", "immediate"),
+            ("LASTLIGHT_PERF_PIPELINED", "0"),
+        ];
+        let c = parse(&[], &override_vars).unwrap();
+        assert!(c.perf().is_none());
+        for (name, _) in override_vars {
+            assert_eq!(
+                c.warnings
+                    .iter()
+                    .filter(|w| w.contains(name) && w.contains("LASTLIGHT_PERF_REPORT"))
+                    .count(),
+                1,
+                "{name}: {:?}",
+                c.warnings
+            );
+        }
+        let mut with_report = override_vars.to_vec();
+        with_report.push(("LASTLIGHT_PERF_REPORT", "perf.json"));
+        let c = parse(&[], &with_report).unwrap();
+        assert!(c.warnings.is_empty(), "{:?}", c.warnings);
+        assert_eq!(c.perf().and_then(|p| p.pipelined), Some(false));
+        assert!(HELP.contains("with LASTLIGHT_PERF_REPORT"));
     }
     #[cfg(not(feature = "review"))]
     #[test]
