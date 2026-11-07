@@ -886,6 +886,9 @@ fn v6_drop_trace() -> String {
     ];
     let mut trace = String::new();
     let mut root_drops = 0;
+    // Bounded like the fixture writer's drop search: an attempt that stays
+    // alive without dropping fails here instead of hanging the suite.
+    let resumed = g.attempt().unwrap().tick;
     while root_drops < 3 {
         let input = smoke_input(&g);
         g.tick(input);
@@ -893,6 +896,10 @@ fn v6_drop_trace() -> String {
         assert!(
             attempts[0].is_some(),
             "the root attempt ended first:\n{trace}"
+        );
+        assert!(
+            attempts[0].unwrap().tick < resumed + 3600,
+            "no third root drop within a minute of the resume:\n{trace}"
         );
         for (source, attempt) in attempts.into_iter().enumerate() {
             let Some(a) = attempt else { continue };
