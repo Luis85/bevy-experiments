@@ -84,7 +84,7 @@ These explicit later decisions supersede fixed-eleven geometry, unique-clear-onl
 
 ## Menu pose, cursor and impact presentation — 3 November 2026
 
-The user's additional presentation requests preserve all quality, victory-threat, frozen-lane, overtaking and GURPS contracts above.
+The user's additional presentation requests preserve all quality, victory-threat, frozen-lane, enemy-overlap (W1-69) and GURPS contracts above.
 
 - Replace the assembled menu arms/gun with a new cohesive Rook/June low-ready-pistol atlas. Keep the original cabin anchor/21% source height, planted boots and restrained breathing. The calibrated battle aiming rig stays unchanged.
 - The focused unobscured battlefield has one custom crosshair with ammunition/reload/charge feedback. Native pointer visibility restores for ordinary menus, controls, popups, leaving the window and focus loss.

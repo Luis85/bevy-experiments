@@ -205,6 +205,6 @@ native GUI and listening evidence must be reported separately in
 [VALIDATION.md](VALIDATION.md); this authoring guide establishes no such result.
 
 
-Current deployment geometry, completion XP and victory threat are defined in [PROGRESSION_SCALING.md](PROGRESSION_SCALING.md). Quality is independent of instance level and unlock tier; its effective ratios and already-banked receipts are in [ITEM_QUALITY.md](ITEM_QUALITY.md). Passing positions and critical NPC state follow [OVERTAKING_AND_CRITICAL.md](OVERTAKING_AND_CRITICAL.md).
+Current deployment geometry, completion XP and victory threat are defined in [PROGRESSION_SCALING.md](PROGRESSION_SCALING.md). Quality is independent of instance level and unlock tier; its effective ratios and already-banked receipts are in [ITEM_QUALITY.md](ITEM_QUALITY.md). Enemy positions (enemies overlap since W1-69) and critical NPC state follow [OVERTAKING_AND_CRITICAL.md](OVERTAKING_AND_CRITICAL.md).
 
 ItemDefinition.visual_style and the saved EquipmentVisual snapshot describe actual equipped appearance, separate from stats, class eligibility and ownership. [CHARACTER_COMPONENTS.md](CHARACTER_COMPONENTS.md) defines the part/socket/style authoring contract; previewing the rig never creates or equips an item.
