@@ -91,10 +91,19 @@ fn save_snapshot_skips_transient_outbox_and_equals_serialized_state() {
 // save bytes must not move.
 
 const FIXTURE_V6: &str = include_str!("fixtures/save_v6.json");
-/// FNV-1a of the payloads below, cut before the remedy with the history a
-/// plain `Vec`: the shared history serializes to the same bytes.
+const FIXTURE_V7: &str = include_str!("fixtures/save_v7.json");
+/// FNV-1a of the migrated v6 payload, cut before the remedy with the history
+/// a plain `Vec`: the shared history serializes to the same bytes.
 const V6_PAYLOAD_FNV: u64 = 11_732_925_792_674_115_074;
-const V7_PAYLOAD_FNV: u64 = 13_001_265_918_725_101_081;
+
+/// The payload text checked in inside `save_v7.json`'s envelope.
+fn v7_fixture_payload() -> String {
+    let envelope: serde_json::Value = serde_json::from_str(FIXTURE_V7).expect("v7 envelope");
+    envelope["payload"]
+        .as_str()
+        .expect("the envelope's payload is text")
+        .to_owned()
+}
 
 /// The validated save payload of `g`, and that payload loaded and saved again.
 fn payload_round_trip(g: &Game) -> (String, String) {
@@ -136,12 +145,13 @@ fn consecutive_snapshots_share_unchanged_component() {
 
 #[test]
 fn save_v6_and_v7_fixtures_round_trip_byte_identical() {
-    // v6: the checked-in fixture, migrated. v7: save_v7.json is cut at the
-    // wave-1 close (save-determinism), so the saveable stress game (150 run
-    // records, 1,200 items, three expeditions) stands in at today's format.
+    // v6: the checked-in fixture, migrated, against its pinned FNV-1a. v7:
+    // the checked-in save_v7.json (W1-63), against the payload its own
+    // envelope holds. The synthetic stress fixture is in no digest.
     let v6 = Game::decode_save_generation(FIXTURE_V6.as_bytes()).expect("v6 fixture");
-    let v7 = horde_core::sim::stress_authored_fixture().expect("stress fixture");
-    for (name, g, pinned) in [("v6", v6, V6_PAYLOAD_FNV), ("v7", v7, V7_PAYLOAD_FNV)] {
+    let v7 = Game::decode_save_generation(FIXTURE_V7.as_bytes()).expect("v7 fixture");
+    let v7_pinned = support::fnv1a(v7_fixture_payload().as_bytes());
+    for (name, g, pinned) in [("v6", v6, V6_PAYLOAD_FNV), ("v7", v7, v7_pinned)] {
         let (payload, again) = payload_round_trip(&g);
         assert_eq!(payload, again, "{name} round-trips byte-identical");
         assert_eq!(
