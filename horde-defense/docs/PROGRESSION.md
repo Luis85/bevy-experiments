@@ -22,7 +22,7 @@ The campaign owns one shared wallet and armory. Items have persistent monotonica
 
 The four legacy starter items and the fresh campaign’s separate personal pistol cannot be sold or unlocked. They are sufficient to start another attempt after all optional loot is sold. The armory has no gameplay capacity ceiling. Automatic collection never silently discards an item. There is no automatic sale system.
 
-Individual sale previews expose affected saved presets. A deliberate sale falls back to the starter item if that item was equipped; a saved preset referencing the sold item remains visibly invalid and cannot be applied. Batch sale quotes and sales exclude protected, locked, favorited, equipped and preset-referenced items.
+Sales are strict since ruleset 2 (W1-20): one rule (`Campaign::sale_block`) decides every single and batch sale, and an item sells only when nothing holds it. Protected starter, locked, favorited and NPC-issue items, equipment worn by you, Mara or an idle recruit, items a saved preset references and items reserved by a deployment or a country guard cannot be sold: `SellItem` answers `CommandError::SaleBlocked` and the armory disables the sale and states the first reason. A sale never rewrites a loadout and never leaves a preset incomplete (GDD.md, "Selling and loadout safety"). Batch sale quotes and sales apply the same rule.
 
 ## Personal development
 
@@ -63,7 +63,7 @@ Automated tests cover XP ownership, advancement conservation across respecializa
 
 `compare_item(mode, id)` compares the complete current and hypothetical loadout without changing ownership. Personal comparisons expose damage, magazine, cadence, reload, armor, health, stamina, weak-point bonus and a body-hit Shambler breakpoint. NPC comparisons expose the actual purchased skills, weapon dice/adds/type, accuracy, protection, HP/FP, Dodge and melee profile. NPC mean basic damage is explicitly **before** attack rolls, defense, armor and wounding; it is not a probability of injury.
 
-Armory identities remain sorted by monotonically increasing creation ID. Binary lookup makes large-stash comparisons efficient without imposing a gameplay item cap. A failed purchase at identity exhaustion and a sale that would overflow the wallet leave both inventory and currency untouched. Save validation checks the actual frontier, body cap, processed XP, unique skill ownership, legal blueprint upgrades, layouts and preset slot references. Intentionally incomplete presets may retain a previously sold ID and continue to warn when applied.
+Armory identities remain sorted by monotonically increasing creation ID. Binary lookup makes large-stash comparisons efficient without imposing a gameplay item cap. A failed purchase at identity exhaustion and a sale that would overflow the wallet leave both inventory and currency untouched. Save validation checks the actual frontier, body cap, processed XP, unique skill ownership, legal blueprint upgrades, layouts and preset slot references. A preset saved under ruleset 1, when a sale could leave it pointing at a sold ID, still loads with that ID and is refused when applied ("Preset references sold equipment"); no ruleset-2 sale creates one.
 
 ## Individual recruit creation
 

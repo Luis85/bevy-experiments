@@ -78,7 +78,7 @@ The settings screen supports rebinding all essential actions, toggle firing, aut
 
 ## Equipment, training and construction
 
-Four slots share an armory: ranged weapon, melee weapon, outfit and accessory. Items have unique persistent identities; presets reference items rather than duplicating them. Protected starter equipment always remains available. Lock and favorite controls protect equipment. Sale previews expose affected presets; bulk selling excludes protected, favorited, equipped and preset-referenced items. Deployed or garrison-reserved items cannot be sold or equipped by a second active survivor. Loot storage has no gameplay capacity limit.
+Four slots share an armory: ranged weapon, melee weapon, outfit and accessory. Items have unique persistent identities; presets reference items rather than duplicating them. Protected starter equipment always remains available. Lock and favorite controls protect equipment. Sales are strict: an item sells only when nothing holds it, so single and bulk sales both refuse protected, locked, favorited, equipped and preset-referenced items, and the armory states the first reason. Deployed or garrison-reserved items cannot be sold or equipped by a second active survivor. Loot storage has no gameplay capacity limit.
 
 Fresh Personal XP and completion XP develop level and future geometry; body upgrades are coin-paid nodes in the complete tree. Eligible legacy CP remains a distinct payment, and NPC training remains separate. Proficiency only permits an owned eligible gun; it never manufactures or equips one. Six weapon classes, ordnance and JSON authoring are described in [SKILLS_AND_WEAPONS.md](docs/SKILLS_AND_WEAPONS.md).
 
