@@ -6,9 +6,13 @@
 //! `MIN_CLEARING` and to the reference. `fit_field` scales that base uniformly
 //! by the smaller of the two axis ratios, so the lane:yard proportion is kept,
 //! fewer lanes or yards zoom in, the limiting axis fills the area exactly and
-//! the field is centred. A field that already fills an axis (every geometry
-//! with 11 or more lanes, or the full 30-yard width) is today's clearing bit
-//! for bit.
+//! the field is centred. When the area is the reference (`fit_field(r, r, ..)`,
+//! the open battle arena and the observer box), a field that already fills an
+//! axis (every geometry with 11 or more lanes, or the full 30-yard width) is
+//! today's clearing bit for bit. A different area (the first-defense hint
+//! band's `below`) still sizes the base from the reference, so the zoom is
+//! `area / reference` on the limiting axis and a filling field shrinks under 1.0;
+//! `ui::battle::layout` keeps the open fit then.
 use bevy_egui::egui::{Rect, Vec2, vec2};
 
 /// Lane count whose clearing fills the reference height.
@@ -41,7 +45,9 @@ pub fn clearing_size(reference: Rect, lanes: u8, width_yards: f32) -> Vec2 {
 
 /// Uniformly zooms the `reference` clearing for (lanes, width_yards) to fit
 /// `area`: the smaller axis ratio wins, that axis snaps exactly to the area and
-/// the field is centred. No texel or magnification clamp.
+/// the field is centred. No texel or magnification clamp. Zoom 1.0 and the
+/// legacy rect for a filling field hold only when `area == reference`; any
+/// other area scales the reference clearing by the area's limiting ratio.
 pub fn fit_field(reference: Rect, area: Rect, lanes: u8, width_yards: f32) -> FieldFit {
     let base = clearing_size(reference, lanes, width_yards);
     let (zx, zy) = (area.width() / base.x, area.height() / base.y);
@@ -52,7 +58,8 @@ pub fn fit_field(reference: Rect, area: Rect, lanes: u8, width_yards: f32) -> Fi
     } else {
         let centred = Rect::from_center_size(area.center(), size).intersect(area);
         if zoom == 1.0 {
-            // Already filling: today's clearing, bit for bit.
+            // The base fits the area as is: centred and clipped like the
+            // legacy clearing (bit for bit when area == reference).
             centred
         } else if zx <= zy {
             Rect::from_x_y_ranges(area.x_range(), centred.y_range())
@@ -198,9 +205,55 @@ mod tests {
         }
     }
 
-    /// Pin: every geometry whose clearing already fills an axis (all fields
-    /// with 11 or more lanes, and the full 30-yard width) keeps today's rect
-    /// bit for bit and is not zoomed.
+    /// `fit_field(reference, area, ..)` with `area` the hint band's `below`
+    /// (the reference minus its top 92 pt): the base stays the reference's
+    /// clearing, so a field filling the reference is zoomed below 1.0 to the
+    /// shorter area, not kept bit for bit, and a zoomed field never zooms more.
+    #[test]
+    fn fit_field_in_a_smaller_area_scales_the_reference_clearing() {
+        for reference in target_arenas() {
+            let below = Rect::from_min_max(reference.min + vec2(0.0, 92.0), reference.max);
+            for (lanes, width) in [(17, 30.0), (11, 20.0), (3, 12.0), (7, 16.0)] {
+                let label = format!("{lanes}x{width} in {:?}", reference.size());
+                let base = clearing_size(reference, lanes, width);
+                let open = fit_field(reference, reference, lanes, width);
+                let fit = fit_field(reference, below, lanes, width);
+                let expected = (below.width() / base.x).min(below.height() / base.y);
+                assert!(
+                    close(fit.zoom, expected, 1e-5),
+                    "{label}: zoom {}",
+                    fit.zoom
+                );
+                assert!(fit.zoom <= open.zoom, "{label}: the band zooms it in");
+                let scale = fit.rect.size() / base;
+                assert!(
+                    close(scale.x, fit.zoom, 1e-4) && close(scale.y, fit.zoom, 1e-4),
+                    "{label}: axis scales {scale:?} against zoom {}",
+                    fit.zoom
+                );
+                assert!(below.contains_rect(fit.rect), "{label}: leaves the area");
+                assert!(
+                    fit.rect.x_range() == below.x_range() || fit.rect.y_range() == below.y_range(),
+                    "{label}: {:?} snaps no axis",
+                    fit.rect
+                );
+                assert!(
+                    (fit.rect.center() - below.center()).length() < 0.01,
+                    "{label}: not centred"
+                );
+                if open.zoom == 1.0 {
+                    // Filling the reference: shrunk under the band, never
+                    // today's rect.
+                    assert!(fit.zoom < 1.0, "{label}: zoom {}", fit.zoom);
+                    assert_ne!(fit.rect, legacy_clearing_rect(reference, lanes, width));
+                }
+            }
+        }
+    }
+
+    /// Pin: with `area == reference`, every geometry whose clearing already
+    /// fills an axis (all fields with 11 or more lanes, and the full 30-yard
+    /// width) keeps today's rect bit for bit and is not zoomed.
     #[test]
     fn fit_field_keeps_every_filling_geometry_bit_identical() {
         // The two named sentinels: max lanes at full width, and 11 lanes at
