@@ -762,7 +762,7 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 | peak | 1440x900 / 1050x700@1.35 | interface mean (ms, VSync on) | 1.190 / 1.075 | ≤ 1.1904 / 1.0752 (not above wave 0; PERF_BUDGET.json `scenes.peak`, gated by measure_performance.ps1 in the dev profile with VSync on) | 0.775 / 0.768 (dev, VSync on, median of 3, W1-61) | | | |
 | camera zoom delta (W1-47) | both | peak and progressed-peak, commit before C2 vs C2 | n/a | recorded | interface_draw peak +6.2% / +4.1%, progressed-peak -1.0% / +1.9% (see 9.5) | | | |
 | pipelined decision (W1-61) | both | on vs off, Repeat 3 | n/a | recorded | default stays on: off misses the VSync-on p99 interval at the small size (19.13 / 19.66 ms > 17.7); see 9.4 | | | |
-| save clone (W1-50) | n/a | p99 (ms) at 1,000 / 2,500 / 5,000 items, 3 workers | n/a | remedy if > 1 ms | | | | |
+| save clone (W1-50) | n/a | p99 (ms) at 1,000 / 2,500 / 5,000 items, 3 workers | n/a | remedy if > 1 ms | remedy applied (Arc run history, a93e340): p99 median dev 0.654 / 0.900 / 1.144, playtest 0.672 / 0.739 / 1.157 ms; gate (1,000 items) passes; VALIDATION.md "Save clone" | | | |
 | shipped `--smoke` | n/a | seconds | n/a | recorded | shipped_smoke_seconds 1.23 (median of 2.43 / 1.19 / 1.23, playtest `--no-default-features`, W1-61) | | | |
 
 ### 9.2 Pacing and smoke
