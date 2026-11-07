@@ -443,6 +443,9 @@ pub(crate) struct Stamp {
     pub epoch: u64,
     pub reset: bool,
     pub coins: u64,
+    /// Transient event records the job's game still carries (counted on a
+    /// clone, so the job itself is written unchanged).
+    pub events: usize,
 }
 #[cfg(test)]
 pub(crate) struct Gate {
@@ -472,15 +475,18 @@ pub(super) fn gated() -> (Service, Gate) {
     }
     impl Backend for Controlled {
         fn execute(&mut self, job: Job) -> Completion {
-            let coins = match &job.payload {
-                Payload::Save(s) => s.game.campaign().coins,
-                Payload::Reset { old, .. } => old.campaign().coins,
+            let game = match &job.payload {
+                Payload::Save(s) => &s.game,
+                Payload::Reset { old, .. } => &**old,
             };
+            let coins = game.campaign().coins;
+            let events = game.clone().drain_events().count();
             self.started
                 .send(Stamp {
                     epoch: job.identity.epoch,
                     reset: job.identity.reset,
                     coins,
+                    events,
                 })
                 .unwrap();
             self.release

@@ -1041,6 +1041,36 @@ fn manual_and_navigation_requests_never_acknowledge_an_older_inflight_snapshot()
         ));
     }
 }
+/// `persist_pending` hands the storage worker `Game::save_snapshot`, not a
+/// full clone: the live game's undrained event records stay with the
+/// frontend and never cross to the worker.
+#[test]
+fn a_save_hands_storage_the_snapshot_without_transient_events() {
+    let pending = |game: &Game| game.clone().drain_events().count();
+    let mut host = Host::new();
+    host.deploy();
+    for _ in 0..600 {
+        if pending(&host.game) > 0 {
+            break;
+        }
+        host.game.tick(Input::default());
+    }
+    let live = pending(&host.game);
+    assert!(live > 0, "the live game holds undrained records");
+    let (service, gate) = persistence::gated();
+    host.runtime.storage = service;
+    host.runtime.request_save(SaveIntent::Manual);
+    assert!(!persist_pending(&mut host.ctx()));
+    assert_eq!(
+        gate.started().events,
+        0,
+        "the worker was handed {live} transient records"
+    );
+    assert_eq!(pending(&host.game), live, "the live outbox is untouched");
+    gate.release();
+    persistence::wait_for_test(&mut host.runtime.storage);
+    assert!(!persist_pending(&mut host.ctx()));
+}
 #[test]
 fn critical_save_barrier_rejects_legal_mutations_and_saves_the_ordered_paused_generation() {
     for intent in [SaveIntent::Menu, SaveIntent::Quit, SaveIntent::SettingsBack] {
