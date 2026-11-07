@@ -484,8 +484,9 @@ mod tests {
     }
 
     /// Every way `baseline.v3` breaks the layout `measure_performance.ps1`
-    /// reads for the interface_total gate: `{profile, vsync,
-    /// interface_total_mean_ms.<scene>.<size>}` for every scene with
+    /// reads for the interface_total gate: `{profile, vsync, present_mode,
+    /// pipelined, power_plan, interface_total_mean_ms.<scene>.<size>}` for
+    /// every scene with
     /// `interface_total_not_above_baseline_v3` and every size. Null (not yet
     /// recorded by W1-37) has no problems.
     fn v3_layout_problems(json: &Value) -> Vec<String> {
@@ -503,6 +504,26 @@ mod tests {
         }
         if !v3.get("vsync").is_some_and(Value::is_boolean) {
             problems.push("baseline.v3.vsync is not a bool".into());
+        }
+        // W1-37 review: the conditions the gate compares a run against.
+        match (
+            v3.get("vsync").and_then(Value::as_bool),
+            v3.get("present_mode").and_then(Value::as_str),
+        ) {
+            (Some(true), Some("Fifo")) | (Some(false), Some("AutoNoVsync")) | (None, _) => {}
+            (_, mode) => problems.push(format!(
+                "baseline.v3.present_mode {mode:?} is not the mode its vsync requests"
+            )),
+        }
+        if !v3.get("pipelined").is_some_and(Value::is_boolean) {
+            problems.push("baseline.v3.pipelined is not a bool".into());
+        }
+        if !v3
+            .get("power_plan")
+            .and_then(Value::as_str)
+            .is_some_and(|plan| !plan.trim().is_empty())
+        {
+            problems.push("baseline.v3.power_plan is not a plan name".into());
         }
         for (scene, gates) in object(json, "/scenes") {
             if gates.get("interface_total_not_above_baseline_v3") != Some(&Value::Bool(true)) {
@@ -533,6 +554,9 @@ mod tests {
             "Get-Field $v3 @('profile')",
             "Get-Field $v3 @('vsync')",
             "Get-Field $v3 @('interface_total_mean_ms', $first.Scene, $first.Size)",
+            "Get-Field $v3 @('present_mode')",
+            "Get-Field $v3 @('pipelined')",
+            "Get-Field $v3 @('power_plan')",
         ] {
             assert!(
                 SCRIPT.contains(read),
@@ -549,6 +573,7 @@ mod tests {
         };
         let complete = serde_json::json!({
             "profile": "dev", "vsync": true,
+            "present_mode": "Fifo", "pipelined": true, "power_plan": "Balanced",
             "interface_total_mean_ms": { "progressed-peak": { "normal": 2.1, "small": 1.9 } }
         });
         assert_eq!(with_v3(complete.clone()), Vec::<String>::new());
@@ -564,12 +589,33 @@ mod tests {
         let per_profile = serde_json::json!({ "dev": complete.clone() });
         assert_eq!(
             with_v3(per_profile).len(),
-            4,
+            6,
             "a per-profile layout is not read"
         );
-        let mut no_vsync = complete;
+        let mut no_vsync = complete.clone();
         no_vsync.as_object_mut().unwrap().remove("vsync");
         assert_eq!(with_v3(no_vsync), ["baseline.v3.vsync is not a bool"]);
+        // The measured conditions are part of the layout (W1-37 review).
+        let without = |key: &str| {
+            let mut v3 = complete.clone();
+            v3.as_object_mut().unwrap().remove(key);
+            with_v3(v3)
+        };
+        assert_eq!(
+            without("present_mode"),
+            ["baseline.v3.present_mode None is not the mode its vsync requests"]
+        );
+        assert_eq!(
+            without("pipelined"),
+            ["baseline.v3.pipelined is not a bool"]
+        );
+        assert_eq!(
+            without("power_plan"),
+            ["baseline.v3.power_plan is not a plan name"]
+        );
+        let mut other_mode = complete;
+        other_mode["present_mode"] = "AutoNoVsync".into();
+        assert_eq!(with_v3(other_mode).len(), 1);
     }
 
     const PLAN: &str = include_str!("../../../docs/plans/2026-11-05-production-pass.md");
@@ -654,6 +700,16 @@ mod tests {
             .nth(1)
             .map(|rest| rest.split("\n## ").next().unwrap_or(rest))
             .expect("the plan records the v3 baseline in its own section");
+        // The recorded conditions are the ones the plan states it ran under:
+        // the W1-34 render plan defaults and the unchanged power plan.
+        assert_eq!(v3.get("present_mode"), Some(&"Fifo".into()));
+        assert_eq!(v3.get("pipelined"), Some(&true.into()));
+        let power_plan = v3.get("power_plan").and_then(Value::as_str).unwrap_or("");
+        assert!(
+            section.contains("(Fifo, pipelined, frame latency 1)")
+                && section.contains(&format!("power plan {power_plan} ")),
+            "the plan's v3 section states Fifo, pipelined and the {power_plan:?} power plan"
+        );
         let wave0 = object(&json, "/baseline/wave0/interface_mean_ms");
         for scene in keys(object(&json, "/scenes")) {
             for size in keys(object(&json, "/sizes")) {

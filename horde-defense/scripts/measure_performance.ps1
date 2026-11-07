@@ -34,7 +34,9 @@
 # stalls', PERF_BUDGET.json driver_stall; the report and summary still count and list every stall); cpu_frame p99 only
 # with -VsyncOff; interface_draw (v2 work_mean_ms[2], ui::draw) only when profile and VSync match baseline.wave0;
 # interface_total only against baseline.v3.interface_total_mean_ms.<scene>.<size> when baseline.v3 is recorded and its
-# profile and vsync match the run. A gated metric missing from any repeat, or a recorded baseline.v3 without that layout
+# profile and vsync match the run and every repeat echoes its present_mode and pipelined state; a run under another
+# power plan than baseline.v3.power_plan (powercfg /getactivescheme) is still gated, with a 'noted' baseline_v3_conditions
+# check naming both plans. A gated metric missing from any repeat, or a recorded baseline.v3 without that layout
 # (perf_budget.rs pins it), is invalid evidence (exit 2), never a pass or a skip.
 # Exit codes: 0 pass, 1 over budget, 2 invalid evidence, 3 build or run failure. summary.json and summary.md are
 # always written to the output directory once it exists.
@@ -120,6 +122,23 @@ function Get-Median([double[]]$Values) {
     return ($sorted[$middle - 1] + $sorted[$middle]) / 2
 }
 
+function Get-PowerPlan {
+    # The active Windows power plan, or $null when it cannot be read. powercfg localizes the plan name, so the built-in
+    # plans are named by their fixed GUIDs; any other plan keeps the name powercfg prints.
+    try { $text = @(& powercfg.exe /getactivescheme) -join ' ' }
+    catch { return $null }
+    $builtIn = @{
+        '381b4222-f694-41f0-9685-ff5bb260df2e' = 'Balanced'; '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' = 'High performance'
+        'a1841308-3bce-3e2b-91e2-8e6c1b6f9f3c' = 'Power saver'; 'e9a42b02-d5df-448d-aa00-03f14749eb61' = 'Ultimate Performance'
+    }
+    if ($text -match '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})') {
+        $guid = $Matches[1].ToLowerInvariant()
+        if ($builtIn.ContainsKey($guid)) { return $builtIn[$guid] }
+    }
+    if ($text -match '\(([^)]+)\)\s*$') { return $Matches[1].Trim() }
+    return $null
+}
+
 function Format-Number($Value) {
     if ($null -eq $Value) { return '-' }
     return ([double]$Value).ToString('0.####', $invariant)
@@ -201,7 +220,8 @@ function Get-SaveCloneCheck($Report, [string]$RunProfile, $Budget) {
 }
 
 function Measure-PerfBudget($Runs, $Context, $Budget, $ExtraChecks = @()) {
-    # Runs: objects with Scene, Size, Repeat, Report, Problems. Context: Profile, VsyncOff, NoBudget, Informational.
+    # Runs: objects with Scene, Size, Repeat, Report, Problems. Context: Profile, VsyncOff, NoBudget, Informational,
+    # PowerPlan (Get-PowerPlan; $null when unknown).
     # ExtraChecks: finished check rows (the save clone) that count like the scene checks.
     $checks = New-Object System.Collections.Generic.List[object]
     foreach ($extra in @($ExtraChecks)) { if ($null -ne $extra) { $checks.Add($extra) } }
@@ -275,19 +295,45 @@ function Measure-PerfBudget($Runs, $Context, $Budget, $ExtraChecks = @()) {
             # Once baseline.v3 is recorded, any other layout than perf_budget.rs pins is invalid evidence, never a skip.
             $v3Profile = Get-Field $v3 @('profile')
             $v3Vsync = Get-Field $v3 @('vsync')
+            $v3Mode = Get-Field $v3 @('present_mode')
+            $v3Pipelined = Get-Field $v3 @('pipelined')
+            $v3Plan = Get-Field $v3 @('power_plan')
             $limit = Get-Field $v3 @('interface_total_mean_ms', $first.Scene, $first.Size)
+            # W1-37 review: the baseline was measured in one present mode and pipelined state; a repeat in another is
+            # not gated against it, and a repeat that does not echo its state is invalid evidence.
+            $noState = $false
+            $unlike = $false
+            foreach ($report in $reports) {
+                $state = Get-Field $report @('present', 'pipelined_rendering')
+                if ($state -isnot [bool]) { $noState = $true }
+                elseif ($state -ne $v3Pipelined -or (Get-Field $report @('present', 'requested_mode')) -ne $v3Mode) { $unlike = $true }
+            }
             if ($null -eq $v3) { & $check 'interface_total_mean_ms' 'median' $null $null 'skipped' 'baseline.v3 is not recorded yet' }
             elseif ($v3Profile -isnot [string] -or $v3Vsync -isnot [bool]) {
                 & $check 'interface_total_mean_ms' 'median' $null $null 'invalid' 'baseline.v3 has no profile and vsync'
             }
+            elseif ($v3Mode -isnot [string] -or $v3Pipelined -isnot [bool] -or $v3Plan -isnot [string]) {
+                & $check 'interface_total_mean_ms' 'median' $null $null 'invalid' 'baseline.v3 has no present_mode, pipelined state and power_plan'
+            }
             elseif ($Context.Profile -ne $v3Profile -or $vsyncOn -ne $v3Vsync) {
                 & $check 'interface_total_mean_ms' 'median' $null $limit 'skipped' 'gated only in the baseline.v3 profile and VSync state'
+            }
+            elseif ($noState) {
+                & $check 'interface_total_mean_ms' 'median' $null $limit 'invalid' 'a repeat has no present.pipelined_rendering'
+            }
+            elseif ($unlike) {
+                & $check 'interface_total_mean_ms' 'median' $null $limit 'skipped' "gated only in the baseline.v3 present mode $v3Mode with pipelined $v3Pipelined"
             }
             elseif ($null -eq $limit -or $limit -is [bool] -or $limit -isnot [ValueType]) {
                 & $check 'interface_total_mean_ms' 'median' $null $null 'invalid' 'baseline.v3 has no interface_total_mean_ms for this scene and size'
             }
             else {
                 & $measure 'interface_total_mean_ms' 'median' $limit { param($r) Get-Field $r @('phases', 'interface_total_ms', 'mean') } 'phases.interface_total_ms.mean'
+                if ($Context.PowerPlan -ne $v3Plan) {
+                    $plan = 'an unknown'
+                    if ($Context.PowerPlan) { $plan = "the '$($Context.PowerPlan)'" }
+                    & $check 'baseline_v3_conditions' '' $null $null 'noted' "measured under $plan power plan, baseline.v3 under '$v3Plan'"
+                }
             }
         }
     }
@@ -330,12 +376,14 @@ function Test-BudgetCase([string]$Name, $Runs, $Context, $Budget, [int]$Expected
     Write-Output "FAIL $Name -> $($result.ExitCode), expected $Expected ($detail)$(if ($absent.Count -gt 0) { '; missing check ' + ($absent -join ', ') })"
 }
 
-function New-V3Baseline([string]$RunProfile, [bool]$Vsync, $Normal, $Small) {
+function New-V3Baseline([string]$RunProfile, [bool]$Vsync, $Normal, $Small, $Pipelined = $true) {
     $means = [ordered]@{}
     if ($null -ne $Normal) { $means['normal'] = $Normal }
     if ($null -ne $Small) { $means['small'] = $Small }
+    $mode = 'Fifo'
+    if (-not $Vsync) { $mode = 'AutoNoVsync' }
     return [pscustomobject]@{
-        profile = $RunProfile; vsync = $Vsync
+        profile = $RunProfile; vsync = $Vsync; present_mode = $mode; pipelined = $Pipelined; power_plan = 'Balanced'
         interface_total_mean_ms = [pscustomobject]@{ 'progressed-peak' = [pscustomobject]$means }
     }
 }
@@ -360,14 +408,17 @@ function Invoke-SelfTest {
     foreach ($name in $expected.Keys) {
         $fixture = Read-JsonFile (Join-Path $fixtureDirectory "$name.json")
         $run = $fixture.run
-        $context = [pscustomobject]@{ Profile = $run.profile; VsyncOff = [bool]$run.vsync_off; NoBudget = $false; Informational = $false }
+        $context = [pscustomobject]@{ Profile = $run.profile; VsyncOff = [bool]$run.vsync_off; NoBudget = $false; Informational = $false; PowerPlan = 'Balanced' }
         Test-BudgetCase $name (Get-FixtureRuns $fixture) $context $fixtureBudget $expected[$name] @($fixture.expected_checks)
     }
 
     # The interface_total gate runs against copies of the budget that record their own baseline.v3.
     $vsyncOn = Read-JsonFile (Join-Path $fixtureDirectory 'vsync-on-within-budget.json')
-    $onContext = [pscustomobject]@{ Profile = 'dev'; VsyncOff = $false; NoBudget = $false; Informational = $false }
+    $onContext = [pscustomobject]@{ Profile = 'dev'; VsyncOff = $false; NoBudget = $false; Informational = $false; PowerPlan = 'Balanced' }
+    $highContext = [pscustomobject]@{ Profile = 'dev'; VsyncOff = $false; NoBudget = $false; Informational = $false; PowerPlan = 'High performance' }
     $total = 'progressed-peak/normal interface_total_mean_ms'
+    $noPlan = New-V3Baseline 'dev' $true 2.5 2.5
+    $noPlan.PSObject.Properties.Remove('power_plan')
     $v3Cases = @(
         @{ Name = 'v3 interface_total within the baseline'; V3 = (New-V3Baseline 'dev' $true 2.5 2.5); Expected = 0; Checks = @("$total pass", 'progressed-peak/small interface_total_mean_ms pass') },
         @{ Name = 'v3 interface_total above the baseline'; V3 = (New-V3Baseline 'dev' $true 1.9 2.5); Expected = 1; Checks = @("$total over") },
@@ -375,7 +426,13 @@ function Invoke-SelfTest {
         @{ Name = 'v3 recorded with VSync off'; V3 = (New-V3Baseline 'dev' $false 1.9 1.9); Expected = 0; Checks = @("$total skipped") },
         @{ Name = 'v3 without a small value'; V3 = (New-V3Baseline 'dev' $true 2.5 $null); Expected = 2; Checks = @("$total pass", 'progressed-peak/small interface_total_mean_ms invalid') },
         @{ Name = 'v3 in a per-profile layout'; V3 = [pscustomobject]@{ dev = (New-V3Baseline 'dev' $true 2.5 2.5) }; Expected = 2; Checks = @("$total invalid") },
-        @{ Name = 'v3 recorded, a report without interface_total'; V3 = (New-V3Baseline 'dev' $true 2.5 2.5); Strip = $true; Expected = 2; Checks = @("$total invalid") }
+        @{ Name = 'v3 recorded, a report without interface_total'; V3 = (New-V3Baseline 'dev' $true 2.5 2.5); Strip = $true; Expected = 2; Checks = @("$total invalid") },
+        @{ Name = 'v3 recorded pipelined, a run with pipelining off'; V3 = (New-V3Baseline 'dev' $true 1.9 1.9); Pipelined = $false; Expected = 0; Checks = @("$total skipped", 'progressed-peak/small interface_total_mean_ms skipped') },
+        @{ Name = 'v3 recorded unpipelined, a pipelined run'; V3 = (New-V3Baseline 'dev' $true 1.9 1.9 $false); Expected = 0; Checks = @("$total skipped") },
+        @{ Name = 'v3 recorded, a report without its pipelined state'; V3 = (New-V3Baseline 'dev' $true 2.5 2.5); Pipelined = 'strip'; Expected = 2; Checks = @("$total invalid") },
+        @{ Name = 'v3 without a power plan'; V3 = $noPlan; Expected = 2; Checks = @("$total invalid") },
+        @{ Name = 'v3 under another power plan is gated and noted'; V3 = (New-V3Baseline 'dev' $true 1.9 2.5); Context = $highContext; Expected = 1; Checks = @("$total over", 'progressed-peak/normal baseline_v3_conditions noted') },
+        @{ Name = 'v3 under the same power plan is not noted'; V3 = (New-V3Baseline 'dev' $true 2.5 2.5); Expected = 0; Absent = 'progressed-peak/normal baseline_v3_conditions noted'; Checks = @("$total pass") }
     )
     foreach ($case in $v3Cases) {
         $copy = $budget | ConvertTo-Json -Depth 20 | ConvertFrom-Json
@@ -387,12 +444,26 @@ function Invoke-SelfTest {
             $report.phases.PSObject.Properties.Remove('interface_total_ms')
             $target.Report = $report
         }
-        Test-BudgetCase "v3: $($case.Name)" $runs $onContext $copy $case.Expected $case.Checks
+        if ($case.ContainsKey('Pipelined')) {
+            foreach ($run in @($runs | Where-Object { $_.Scene -eq 'progressed-peak' })) {
+                $report = $run.Report | ConvertTo-Json -Depth 20 | ConvertFrom-Json
+                if ($case.Pipelined -eq 'strip') { $report.present.PSObject.Properties.Remove('pipelined_rendering') }
+                else { $report.present.pipelined_rendering = $case.Pipelined }
+                $run.Report = $report
+            }
+        }
+        $caseContext = $onContext
+        if ($case.Context) { $caseContext = $case.Context }
+        if ($case.Absent) {
+            $lines = @((Measure-PerfBudget $runs $caseContext $copy).Checks | ForEach-Object { "$($_.scene)/$($_.size) $($_.metric) $($_.status)" })
+            if ($lines -contains $case.Absent) { $script:selfTestFailed += 1; Write-Output "FAIL v3: $($case.Name) has the check $($case.Absent)" }
+        }
+        Test-BudgetCase "v3: $($case.Name)" $runs $caseContext $copy $case.Expected $case.Checks
     }
 
     # The save clone gate (W1-50) joins the scene checks of a valid run.
     $within = Read-JsonFile (Join-Path $fixtureDirectory 'within-budget.json')
-    $withinContext = [pscustomobject]@{ Profile = $within.run.profile; VsyncOff = [bool]$within.run.vsync_off; NoBudget = $false; Informational = $false }
+    $withinContext = [pscustomobject]@{ Profile = $within.run.profile; VsyncOff = [bool]$within.run.vsync_off; NoBudget = $false; Informational = $false; PowerPlan = 'Balanced' }
     $cloneLimit = [double]$budget.save_clone.p99_ms_max
     $clone = {
         param($P99, [int]$Items = [int]$budget.save_clone.items_min)
@@ -453,7 +524,7 @@ else { $sceneNames = @($Scene) }
 if ($Warmup -lt 0) { $Warmup = [int]$budget.run.warmup_frames }
 $sizeNames = @($budget.sizes.PSObject.Properties | ForEach-Object { $_.Name })
 $expect = Get-PerfExpectation $Profile ([bool]$VsyncOff) $Pipelined
-$context = [pscustomobject]@{ Profile = $Profile; VsyncOff = [bool]$VsyncOff; NoBudget = [bool]$NoBudget; Informational = [bool]$Adapter }
+$context = [pscustomobject]@{ Profile = $Profile; VsyncOff = [bool]$VsyncOff; NoBudget = [bool]$NoBudget; Informational = [bool]$Adapter; PowerPlan = (Get-PowerPlan) }
 
 $target = Resolve-HordeTarget -Workspace $workspace
 $startedUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
@@ -649,6 +720,7 @@ finally {
         version = 1; started_utc = $startedUtc; finished_utc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
         exit_code = $exitCode; verdict = (Get-ExitLabel $exitCode); failure = $failure
         profile = $Profile; vsync_off = [bool]$VsyncOff; present_mode = $expect.PresentMode; pipelined = $Pipelined
+        power_plan = $context.PowerPlan
         adapter = $(if ($Adapter) { $Adapter } else { $null }); informational = [bool]$Adapter; no_budget = [bool]$NoBudget
         repeat = $Repeat; warmup_frames = $Warmup; frames = $(if ($Frames -gt 0) { $Frames } else { 'budget' })
         scenes = $sceneNames; sizes = $sizeNames; cargo_target_dir = $target
@@ -670,7 +742,7 @@ finally {
     if ($Adapter) { $md.Add("- Adapter $Adapter (informational: the budget never fails this run)") }
     if ($NoBudget) { $md.Add('- -NoBudget: the checks below are recorded, but only validity sets the exit code') }
     $md.Add("- Executable $exe ($exeHash)$(if ($stamp) { ", $stamp" })")
-    $md.Add("- CPU $cpuName; started $startedUtc")
+    $md.Add("- CPU $cpuName; power plan $(if ($context.PowerPlan) { $context.PowerPlan } else { 'unknown' }); started $startedUtc")
     if ($null -ne $shipped) { $md.Add("- Shipped --smoke median $(Format-Number $shipped.median_seconds) s over 3 runs") }
     if ($saveCloneReport) { $md.Add("- Save clone report: $saveCloneReport") }
     $md.Add('')
