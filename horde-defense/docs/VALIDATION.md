@@ -896,6 +896,12 @@ Pins:
 - `frames_over_50ms`: the gate counts the frames outside driver stalls (`driver_stalls.outside.frames_over_50ms`, see above), worst repeat.
 - Medians are taken over 3 repeats.
 
+**Span boundaries changed after this acceptance (W1 review, 2026-11-07).** Every number in this section, `PERF_BUDGET.json baseline.v3` (W1-37, `2339a3d`) and every measurement from W1-37 to W1-61 used the probe spans from before review commit `7abb0ab` (2026-11-07 02:30, after `3f48d1a` and `6ddd359`):
+- `egui_pass_ms` opened `.before(EguiPostUpdateSet::EndPass)`, at the start of PostUpdate, so it also held every PostUpdate system unordered against `EndPass` that ran first. From `7abb0ab` it opens in an exclusive system inside `EndPass`, directly before bevy_egui's `run_egui_context_pass_loop_system`. `7abb0ab`'s failing test measured 8.59 ms of egui_pass for a pass that held a sleeping unrelated system.
+- `present_wait_ms` was not ordered against `create_surfaces`, so surface (re)configuration and the `PrepareViews` work before it could count as present wait. That work was then subtracted from render-world CPU. From `7abb0ab` the span opens `.after(create_surfaces)`, so that work counts as render-world CPU.
+
+So `interface_total` (egui_pass + tessellate) and `cpu_frame` (main + extract + Render schedule - present wait) from `7abb0ab` on are not like-for-like with the numbers above or with baseline.v3. Under the new spans, interface_total can only be the same or lower. That makes the `interface_total_not_above_baseline_v3` gate looser than it was at W1-61. cpu_frame can only be the same or higher, so the W1-61 cpu_frame p99 values (6.26-8.85 ms) may leave out work that the gate now counts. The driver-stall acquire wait reads the same present span. No measurement has been made on the new spans yet. Before the next interface_total re-gate (W2-47, W5-11, W7-09), the orchestrator or the user must decide whether baseline.v3 is re-measured on the new spans. Plan §2.5 tracks this.
+
 **Acceptance passes** (`target/perf/w1-61/head-acc-*`; every pass exited 0, every repeat had 0 frames over 50 ms, and 0 driver stalls were excluded, in a stall-free hour: see "The acceptance passes and the A/B disagree on driver stalls" below):
 
 | Pass | Gate | normal | small | Limit |

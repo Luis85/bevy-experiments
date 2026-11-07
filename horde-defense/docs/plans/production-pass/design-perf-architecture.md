@@ -39,12 +39,12 @@ The Interface gate always compares against these wave-0 numbers. It never switch
 
 ### Span marks
 - **main_cpu_ms**: a First-schedule begin mark to the end of Last. `capture_performance` moves from Update (review_tools.rs:14-21) to the end of Last, which fixes the one-frame-late Interface attribution.
-- **egui_pass_ms**: `.before/.after(EguiPostUpdateSet::EndPass)` in PostUpdate. This covers every multipass draw plus end_pass.
+- **egui_pass_ms**: in PostUpdate, from an exclusive system in `EguiPostUpdateSet::EndPass` directly before bevy_egui's `run_egui_context_pass_loop_system`, to `.after(EguiPostUpdateSet::EndPass)`. This covers every multipass draw plus end_pass, and not the PostUpdate systems unordered against `EndPass`. (Up to W1-61 the span opened `.before(EguiPostUpdateSet::EndPass)` and held those systems; review commit `7abb0ab`, 2026-11-07.)
 - **egui_tessellate_ms**: around the `ProcessOutput` set (bevy_egui output.rs:51).
 - **interface_total_ms** = egui_pass + egui_tessellate.
 - **extract_ms**: a wrapper installed with `SubApp::take_extract`/`set_extract` on RenderApp in `Plugin::finish` (bevy_app-0.20.1 sub_app.rs:174, :207). It times extraction only, never the pipelined channel wait. A missing RenderApp is tolerated, as in MinimalPlugins tests.
 - **render_schedule_ms**: a begin mark `.before(RenderSystems::ExtractCommands)` and an end mark `.after(RenderSystems::PostCleanup)`.
-- **present_wait_ms**: `.before/.after(bevy::render::view::window::prepare_windows)` in PrepareViews (view/window/mod.rs:239-258), where `get_current_texture` blocks.
+- **present_wait_ms**: `.after(create_surfaces).before(prepare_windows)` to `.after(prepare_windows)` in PrepareViews (view/window/mod.rs:239-258), where `get_current_texture` blocks. Surface (re)configuration in `create_surfaces` stays render-world CPU. (Up to W1-61 the span was not ordered after `create_surfaces`; review commit `7abb0ab`, 2026-11-07.)
 - **render_world_cpu_ms** = extract + render_schedule − present_wait.
 - **cpu_frame_ms** = main_cpu(i) + render_world_cpu(latest completed render sample, i−1 under pipelining), summed per sample. It is never a sum of means. The scope string documents this.
 - **critical_path_ms** = max(main, render_world) when pipelined, otherwise the sum. Informational only.

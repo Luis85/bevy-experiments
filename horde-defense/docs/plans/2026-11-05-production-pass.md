@@ -200,6 +200,7 @@ Shipped WAV count: 90 today, 78 after W1-57, 75 after W1-58. `docs/audio/surviva
 | Lane-pan reading: along the lane, listener-relative, at most 3.1 dB level difference (audio, non-blocking) | Proceed with this reading |
 | Any capture finding deferred at goal 10 | Needs "approved by user YYYY-MM-DD" in chat; the orchestrator cannot self-approve |
 | Fast-forwarding local `main` at the end | Ask first |
+| Probe spans changed after W1-61 (review commit `7abb0ab`, 2026-11-07; VALIDATION.md W1-61 "Span boundaries changed after this acceptance"): re-measure `PERF_BUDGET.json baseline.v3` on the new egui_pass and present_wait spans before the next interface_total re-gate (W2-47, then W5-11, W7-09)? Orchestrator or user decides | None: the re-gates compare unlike spans until this is decided |
 
 ---
 
@@ -765,6 +766,8 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 | save clone (W1-50) | n/a | p99 (ms) at 1,000 / 2,500 / 5,000 items, 3 workers | n/a | remedy if > 1 ms | remedy applied (Arc run history, a93e340): p99 median dev 0.654 / 0.900 / 1.144, playtest 0.672 / 0.739 / 1.157 ms; gate (1,000 items) passes; VALIDATION.md "Save clone" | | | |
 | shipped `--smoke` | n/a | seconds | n/a | recorded | shipped_smoke_seconds 1.23 (median of 2.43 / 1.19 / 1.23, playtest `--no-default-features`, W1-61) | | | |
 
+**Spans (W1 review, 2026-11-07).** The "After W1" interface and CPU p99 values, and baseline.v3, were measured on the probe spans from before review commit `7abb0ab`. That commit narrowed egui_pass to `EndPass` itself and moved surface configuration out of present_wait. So interface_total (same or lower) and cpu_frame (same or higher) from `7abb0ab` on are not like-for-like with this column. See 9.4 and the open item in 2.5.
+
 ### 9.2 Pacing and smoke
 
 | Measure | Wave 0 | After W2 (W2-49) | After W4 (W4-08) |
@@ -812,6 +815,8 @@ Smoke (`cargo run --locked -p horde-defense -- --smoke`): PASS before and after.
 ### 9.4 Frame report v3 baseline (W1-37)
 
 Recorded 2026-11-05/06 on `2339a3d`, before any BattleFrame, camera, batching or corpse commit: the wave-0 painters plus the W1-33 probe and the W1-34 render plan at its defaults (Fifo, pipelined, frame latency 1). Hardware as `PERF_BUDGET.json` (RTX 1000 Ada Laptop, Vulkan, 2880x1800 at OS scale 2.0); mains power, Windows power plan Balanced (not changed for the run). `measure_performance.ps1 -Scene all -Repeat 3` per profile and VSync state, the budget window (warmup 180, 600 / 600 / 1800 frames), every recorded report valid (version 3, sample target met, focused, requested present mode and profile echoed; one attempt, `dev-vsync-b` peak normal repeat 3, ended with the battle before its sample target and was rerun by the script's one-rerun rule). Values are medians of 3 repeats; frames > 50 ms is the worst repeat. Evidence: `target/perf/w1-37/<dir>` (not committed), each with summary.json and summary.md.
+
+**Spans (W1 review, 2026-11-07).** Every value in this section was measured on the probe spans from before review commit `7abb0ab` (2026-11-07 02:30, after the W1-61 acceptance). Before it, egui_pass opened at the start of PostUpdate, so it held the PostUpdate systems unordered against `EndPass`. present_wait was not ordered after `create_surfaces`, so surface (re)configuration and the `PrepareViews` work before it could count as present wait instead of render-world CPU. From `7abb0ab` on, interface_total and cpu_frame are not like-for-like with these values or with baseline.v3. The `interface_total_not_above_baseline_v3` gate is therefore looser than at W1-61, and cpu_frame may now count work the W1-61 p99 values left out. Whether baseline.v3 is re-measured on the new spans is open (2.5). VALIDATION.md W1-61 "Span boundaries changed after this acceptance" has the details.
 
 `PERF_BUDGET.json baseline.v3` holds the dev, VSync-on run (`dev-vsync-b`): `interface_total_mean_ms` is the anti-shift guard `measure_performance.ps1` gates progressed-peak on, `interface_draw_mean_ms` is the v2-compatible ui::draw mean. `baseline.v3.runs` records the other three profile and VSync states, informational. `baseline.v3` also records the conditions it was measured under (`present_mode` Fifo, `pipelined` true, `power_plan` Balanced; W1 review): the script gates only repeats that echo that present mode and pipelined state (any other is skipped, a repeat without its state is invalid evidence) and still gates a run under another power plan, with a `noted` `baseline_v3_conditions` check that names both plans. The interface_draw gate stays 0.70x wave 0 (≤ 1.129 / ≤ 1.030); nothing here moves it.
 

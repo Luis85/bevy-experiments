@@ -557,6 +557,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Fail-first: `stress_render_fixture_includes_every_catalog_archetype_and_an_elite`.
 - Done: `-Scene stress -VsyncOff` (dev and playtest) exits 0.
 - Deps: W2-36, W2-33.
+- Open before this re-gate (W1 review, 2026-11-07): review commit `7abb0ab` changed the egui_pass and present_wait spans after baseline.v3 and the W1-61 acceptance. The orchestrator or the user decides whether `PERF_BUDGET.json baseline.v3` is re-measured on the new spans before interface_total is gated again. Until then, interface_total and cpu_frame compare unlike spans (plan 2.5; VALIDATION.md W1-61 "Span boundaries changed after this acceptance"). The same applies to W5-11 and W7-09.
 
 **W2-48 · save-determinism · RNG isolation and legacy guards, plus behaviour tests on the v6/v7 fixtures**
 - Fail-first:
