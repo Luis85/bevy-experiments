@@ -76,6 +76,19 @@ fn sequence_manifest(
         "frames": frames,
     })
 }
+/// The logical window size in points and the Windows display scale, read
+/// from the primary window. Without one nothing was measured, so the export
+/// fails instead of writing the requested size and a display scale of 1.0.
+fn measured_viewport(window: Option<&Window>) -> Result<((u32, u32), f32), &'static str> {
+    let window = window.ok_or("no primary window to measure the viewport and display scale")?;
+    Ok((
+        (
+            window.resolution.width().round() as u32,
+            window.resolution.height().round() as u32,
+        ),
+        window.resolution.scale_factor(),
+    ))
+}
 #[allow(clippy::too_many_arguments)]
 pub fn capture_frames(
     mut commands: Commands,
@@ -169,15 +182,14 @@ pub fn capture_frames(
             exit.write(AppExit::error());
             return;
         }
-        let (viewport, windows_scale) = window.as_ref().map_or((config.window, 1.0), |window| {
-            (
-                (
-                    window.resolution.width().round() as u32,
-                    window.resolution.height().round() as u32,
-                ),
-                window.resolution.scale_factor(),
-            )
-        });
+        let (viewport, windows_scale) = match measured_viewport(window.as_deref().copied()) {
+            Ok(measured) => measured,
+            Err(problem) => {
+                error!("Animation manifest failed: {problem}");
+                exit.write(AppExit::error());
+                return;
+            }
+        };
         let report = sequence_manifest(
             config.scenario.as_deref(),
             settings.reduced_effects,
@@ -228,6 +240,18 @@ mod tests {
             (1440.into(), 900.into())
         );
         assert_eq!(normal["scale"], 1.0);
+    }
+    #[test]
+    fn manifest_viewport_is_measured_from_the_primary_window_or_refused() {
+        let mut window = Window {
+            resolution: bevy::window::WindowResolution::new(2100, 1400),
+            ..default()
+        };
+        window.resolution.set_scale_factor(2.0);
+        assert_eq!(measured_viewport(Some(&window)), Ok(((1050, 700), 2.0)));
+        // Without a window nothing was measured, so the manifest must not
+        // claim the requested size and an invented display scale of 1.0.
+        assert!(measured_viewport(None).is_err());
     }
     #[test]
     fn interrupted_run_frames_are_never_accepted_or_overwritten() {
