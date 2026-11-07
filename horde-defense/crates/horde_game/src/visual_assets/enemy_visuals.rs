@@ -607,7 +607,7 @@ mod tests {
         let edge = compile(edge).unwrap();
         assert_eq!(edge.elite_tell(None).ring_px, 4);
         assert_eq!(edge.elite_tell(Some("a15")).marker, TellMarker::Shield);
-        let cases: [(&str, Edit); 11] = [
+        let cases: [(&str, Edit); 14] = [
             ("ring 0", |v| {
                 v["elite_tells"]["default"]["ring_px"] = 0.into()
             }),
@@ -636,6 +636,18 @@ mod tests {
                 let mut bad = v["elite_tells"]["default"].clone();
                 bad["pulse_hz"] = 3.into();
                 v["elite_tells"]["affixes"] = serde_json::json!([{ "affix": "x", "tell": bad }]);
+            }),
+            ("blank affix id", |v| {
+                let tell = v["elite_tells"]["default"].clone();
+                v["elite_tells"]["affixes"] = serde_json::json!([{ "affix": " ", "tell": tell }]);
+            }),
+            ("unknown elite_tells field", |v| {
+                v["elite_tells"]["fallback"] = v["elite_tells"]["default"].clone()
+            }),
+            ("unknown affix tell field", |v| {
+                let tell = v["elite_tells"]["default"].clone();
+                v["elite_tells"]["affixes"] =
+                    serde_json::json!([{ "affix": "x", "tell": tell, "note": "" }]);
             }),
             ("duplicate affix", |v| {
                 let tell = v["elite_tells"]["default"].clone();
