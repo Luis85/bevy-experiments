@@ -1029,12 +1029,23 @@ mod tests {
         let mut cache = SceneCache::default();
         let a = game.attempt_mut().unwrap();
         let enemy = a.enemies.remove(0);
+        // A tint and scale away from the white 1.0 defaults, so a save that
+        // reset either would show.
+        let visual = enemy
+            .resolved
+            .as_ref()
+            .map(|v| horde_core::enemy_catalog::EnemyVisual {
+                tint: [0.8, 0.6, 0.4, 1.0],
+                scale: 1.15,
+                ..v.visual.clone()
+            });
+        assert!(visual.is_some(), "the fixture enemy has a resolved visual");
         a.corpses.push(horde_core::sim::CorpseRecord {
             id: enemy.id,
             kind: enemy.kind,
             boss_kind: enemy.boss_kind,
             at: [enemy.x, enemy.y()],
-            visual: enemy.resolved.map(|v| v.visual),
+            visual: visual.clone(),
             tick: a.tick,
         });
         let first = cache.sample(a, false);
@@ -1049,7 +1060,10 @@ mod tests {
         assert!(later.deaths.is_empty());
         assert_eq!(later.settled_corpses, 1);
         assert_eq!(first.deaths[0].id, resumed.corpses[0].id);
-        assert!(resumed.corpses[0].visual.is_some());
+        // Corpses read their sprite, tint and scale only from that record, so
+        // the save keeps the whole visual, not just its presence.
+        assert_eq!(resumed.corpses[0].visual, visual);
+        assert_eq!(resumed.corpses, a.corpses);
     }
     /// `count` saved bodies of the fixture's kind: the newest `fresh` died
     /// within the collapse window, the rest long ago, at ascending ticks.
