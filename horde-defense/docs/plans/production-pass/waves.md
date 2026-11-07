@@ -556,7 +556,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 **W2-47 · perf-architecture · Stress fixture follows the new content, then re-gate**
 - Fail-first: `stress_render_fixture_includes_every_catalog_archetype_and_an_elite`.
 - Done: `-Scene stress -VsyncOff` (dev and playtest) exits 0.
-- Deps: W2-36, W2-33, W2-50.
+- Deps: W2-36, W2-33, W2-50, W2-51.
 - Open before this re-gate (W1 review, 2026-11-07): review commit `7abb0ab` changed the egui_pass and present_wait spans after baseline.v3 and the W1-61 acceptance. The orchestrator or the user decides whether `PERF_BUDGET.json baseline.v3` is re-measured on the new spans before interface_total is gated again. Until then, interface_total and cpu_frame compare unlike spans (plan 2.5; VALIDATION.md W1-61 "Span boundaries changed after this acceptance"). The same applies to W5-11 and W7-09.
 
 **W2-48 · save-determinism · RNG isolation and legacy guards, plus behaviour tests on the v6/v7 fixtures**
@@ -587,6 +587,13 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - attribute the episode (name the span, or the process outside the update, that holds the time) or fix it.
 - Fail-first: only when a fix lands: a pin for the attributed cause that fails on the parent (a test in the owning crate, or a `scripts/fixtures/perf/` report that `-SelfTest` must classify). Attribution alone needs no test.
 - Done: evidence in `target/perf/w2-50/`. VALIDATION.md and plan 9.4 record the attribution, the fix, or that the repeats did not reproduce it, and the §2.5 row is answered. No gate is moved.
+- Deps: none; W2-47 depends on it.
+
+**W2-51 · perf-architecture · Apply the W1-51 egui gate re-derivation decision, before the W2-47 re-gate**
+- Slot: before W2-47; the id is appended so no id changes. W1-51's done_when derives the egui gates as min(W1-32 ceiling, ceil(measured max x 1.25)). The W1 review re-measured on the post-W1-69 renderer (4d599a5, `PERF_BUDGET.json evidence.egui_measured.remeasured`): 19 primitives in every scene, stress vertices 47,435 and stress-5000-corpses 49,502. Re-deriving moves `BATTLEFIELD_PRIMITIVES_MAX` 48 -> 24 and the stress vertex gate 61098 -> 61878; progressed-peak stays at its 40,000 ceiling. The plan §2.5 row decides which of them moves (default: primitives only).
+- Steps: change `PERF_BUDGET.json` (`egui` and the `egui_measured` gate source) and `crates/horde_game/src/perf_budget.rs` (the constants and their doc comments) in the same commit, so `perf_budget_json_matches_presentation_caps` stays bidirectional and `egui_gates_are_measured_x_1_25_capped_at_the_w1_32_ceilings` re-derives the decided gates from the recorded maxima.
+- Fail-first: `egui_gates_are_measured_x_1_25_capped_at_the_w1_32_ceilings` with the decided maxima recorded as the gate source and the old constants, failing before the constants move.
+- Done: `measure_battlefield_egui_load -- --ignored` and `live_battlefield_runs_stay_within_the_egui_gates` pass at the decided gates; the §2.5 row is answered.
 - Deps: none; W2-47 depends on it.
 
 Wave-2 exit:
