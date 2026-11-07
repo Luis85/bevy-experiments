@@ -39,13 +39,12 @@ Each waveform peaks at no more than 0.18 full scale. At the maximum effects bus 
 
 ## Reproduce and verify
 
-From the Horde Defense workspace, the synthesis tests can run without building Bevy:
+From the Horde Defense workspace, run the synthesis tests through Cargo. `audio.rs` uses Bevy, `CARGO_MANIFEST_DIR` and `crate::atmosphere_audio`, so it no longer compiles as a standalone `rustc --test` file. The `audio::tests` filter also matches `atmosphere_audio::tests`.
 
 ```powershell
-rustc --edition 2024 --test crates/horde_game/src/audio.rs -o target/audio-authoring-tests.exe
-target/audio-authoring-tests.exe
+cargo test --locked -p horde-defense audio::tests
 $env:LASTLIGHT_AUDIO_EXPORT = (Get-Location).Path
-target/audio-authoring-tests.exe --ignored --exact tests::export_survival_audio_assets_and_audition
+cargo test --locked -p horde-defense audio::tests::export_survival_audio_assets_and_audition -- --ignored --exact
 ```
 
 The export explicitly regenerates the 69 shipped files and audition reel (the retired NpcShot family stays archived in `archive/audio/`); ordinary tests never write those artifacts. Regenerate the provenance hashes when changing synthesis. Normal application tests also include `audio::tests`; its export test remains ignored unless explicitly invoked.
