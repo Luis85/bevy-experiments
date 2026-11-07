@@ -169,9 +169,11 @@ fn blank_comments_and_strings(text: &str) -> Vec<char> {
             continue;
         }
         if c == '\'' {
-            // A char literal ('x', '\n', '\u{..}'); otherwise a lifetime or label.
+            // A char literal ('x', '\n', '\'', '\u{..}'); otherwise a lifetime
+            // or label. An escape's closing quote comes after the escaped
+            // character, which may itself be a quote.
             let end = if next == Some('\\') {
-                (i + 2..chars.len().min(i + 12)).find(|&j| chars[j] == '\'')
+                (i + 3..chars.len().min(i + 12)).find(|&j| chars[j] == '\'')
             } else if chars.get(i + 2) == Some(&'\'') {
                 Some(i + 2)
             } else {
@@ -400,6 +402,14 @@ fn assert_scanner_catches_planted_reads() {
             "let roll = crate::hash::keyed(seed, a, b, TAG);\n",
             "hash::keyed",
         ),
+        // An escaped quote char literal closes at its last quote: closing it
+        // one early left a stray `'` that read `'|'` as a char literal and
+        // `"'` as a string opening, blanking the read after it.
+        (
+            "planted.rs",
+            "let quote = matches!(c, '\\''|'\"'); let r = a.rng.below(2);\n",
+            ".rng",
+        ),
     ];
     for (path, text, needle) in planted {
         let hits = scan_source(path, text).hits;
@@ -463,6 +473,11 @@ fn scanner_ignores_comments_strings_and_test_code() {
     assert_eq!(scanned.hits, Vec::<String>::new());
     assert_eq!(scanned.test_modules, ["fixtures", "support"]);
     assert!(!scanned.test_only);
+    // Escaped char literals blank to the same width, quotes kept.
+    let escaped: String = blank_comments_and_strings(r"'\'' '\\' '\n' '\u{7F}'")
+        .into_iter()
+        .collect();
+    assert_eq!(escaped, "'  ' '  ' '  ' '      '");
 
     let after =
         "#[cfg(test)]\nmod tests {\n    fn t() {}\n}\nfn draw(a: &Attempt) { a.rng.below(2); }\n";
