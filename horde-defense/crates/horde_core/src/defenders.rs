@@ -94,6 +94,10 @@ pub const RECRUIT_IDENTITIES: [(&str, Appearance); 12] = [
     ("Morgan Reyes", Appearance::Male),
 ];
 
+/// The highest advancement level a survivor defender can reach (CD5): the
+/// campaign allowance stops growing here.
+pub const MAX_ADVANCEMENT_LEVEL: u8 = 10;
+
 /// The table entry for recruit `id` (ids start at 1).
 pub fn recruit_identity(id: u64) -> (&'static str, Appearance) {
     let len = RECRUIT_IDENTITIES.len() as u64;

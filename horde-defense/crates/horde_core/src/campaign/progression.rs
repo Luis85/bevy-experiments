@@ -309,6 +309,14 @@ pub struct Npc {
 }
 
 impl Npc {
+    /// The advancement level the awarded points reach: the smallest level
+    /// `n` in 1..=10 whose allowance `12 + 8(n - 1)` covers `awarded`.
+    pub fn advancement_level(&self) -> u8 {
+        let max = crate::defenders::MAX_ADVANCEMENT_LEVEL;
+        (1..=max)
+            .find(|n| 12 + 8 * (u32::from(*n) - 1) >= self.awarded)
+            .unwrap_or(max)
+    }
     pub fn claim_objectives(&mut self, allowance: u32) -> u32 {
         let before = self.awarded;
         let award = |npc: &mut Self, points: u32| {
@@ -374,8 +382,23 @@ impl Campaign {
     pub fn npc_available(&self) -> bool {
         self.has_feature(crate::skill_catalog::CampaignFeature::Companion)
     }
+    /// The highest advancement level the campaign allows its survivor
+    /// defenders (CD5): `max(1 + first_clears, min(10, 1 + ceil(3L/2)))` with
+    /// `L` the high-water liberation count. Never below the legacy level
+    /// `1 + first_clears`, and equal to it with nothing liberated.
+    pub fn advancement_cap_level(&self) -> u8 {
+        self.cap_level().min(u32::from(u8::MAX)) as u8
+    }
+    fn cap_level(&self) -> u32 {
+        let max = u32::from(crate::defenders::MAX_ADVANCEMENT_LEVEL);
+        let by_liberation = (1 + (3 * self.liberated_count()).div_ceil(2)).min(max);
+        let by_clears = 1 + self.first_clears.len() as u32;
+        by_clears.max(by_liberation)
+    }
+    /// Advancement points the campaign allows each survivor defender:
+    /// 12 at level 1 and 8 more per level up to the cap level.
     pub fn allowance(&self) -> u32 {
-        12 + 8 * self.first_clears.len() as u32
+        12 + 8 * (self.cap_level() - 1)
     }
     pub fn body_cap(&self) -> u32 {
         5 + 3 * self.first_clears.len() as u32
@@ -410,21 +433,26 @@ impl Campaign {
             .node(id)
             .is_some_and(|node| self.owns_node_definition(node))
     }
+    /// Catalogue countries currently liberated or whose unique-clear high
+    /// water reached every stage (an outbreak reopening keeps the count).
+    /// Looks up only the ids the ledgers name, through the country index, so
+    /// the per-tick `allowance()` no longer scans the whole world; each
+    /// catalogue country counts once, unknown ids never.
     pub fn liberated_count(&self) -> u32 {
-        crate::world::world()
-            .countries
+        use crate::world::country_stage_count;
+        let cleared = &self.world.cleared;
+        let freed = cleared
             .iter()
-            .filter(|country| {
-                self.world.cleared.contains(&country.id)
-                    || self
-                        .world
-                        .clear_high_water
-                        .get(&country.id)
-                        .copied()
-                        .unwrap_or(0)
-                        == country.level_count()
-            })
-            .count() as u32
+            .enumerate()
+            .filter(|(i, id)| country_stage_count(id).is_some() && !cleared[..*i].contains(id))
+            .count();
+        let by_high_water = self
+            .world
+            .clear_high_water
+            .iter()
+            .filter(|(id, count)| country_stage_count(id) == Some(**count) && !cleared.contains(id))
+            .count();
+        (freed + by_high_water) as u32
     }
     pub fn has_feature(&self, feature: crate::skill_catalog::CampaignFeature) -> bool {
         if self.legacy_features

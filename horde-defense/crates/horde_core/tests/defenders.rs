@@ -11,15 +11,17 @@
 //! `reserved_recruit`, `ParallelBattle.summary`, `StrategyState.folded_outcomes`
 //! and `Recruit.containments`, all skipped at their defaults; and (W1-17)
 //! the D7 seat, Defending and reservation validation, the expedition summary
-//! bounds and the test-support `stage_takeover` seam.
+//! bounds and the test-support `stage_takeover` seam; and (W2-10) the
+//! liberation-based advancement allowance (10 levels by the 6th liberation)
+//! with the indexed `liberated_count`.
 mod support;
 use horde_core::{
     campaign::{Campaign, NpcTraining},
     command::{Command, CommandError},
-    content::{Mode, Policy},
+    content::{Mode, Policy, content},
     defenders::{
-        DefenderBlocker, DefenderId, DefenderSeat, OriginTrait, RECRUIT_IDENTITIES,
-        recruit_identity, resolve,
+        DefenderBlocker, DefenderId, DefenderSeat, MAX_ADVANCEMENT_LEVEL, OriginTrait,
+        RECRUIT_IDENTITIES, recruit_identity, resolve,
     },
     sim::{ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError},
     skill_catalog::skills,
@@ -1441,4 +1443,177 @@ fn run_record_takeover_requires_npc_mode() {
             takeover_record(&mara, "Personal"),
         ),
     ]);
+}
+
+// ---- W2-10: the liberation-based advancement allowance ----
+
+/// A legacy campaign that liberated `countries` (in order, the first is the
+/// start) and first-cleared the first `first_clears` catalogue levels.
+fn allowance_campaign(countries: &[&str], first_clears: usize) -> Campaign {
+    let mut c = Campaign {
+        legacy_features: true,
+        ..Campaign::default()
+    };
+    if let Some(start) = countries.first() {
+        c.choose_start_country(start).unwrap();
+    }
+    for id in countries {
+        let levels = world().country(id).unwrap().level_count();
+        c.world.country_levels.insert((*id).into(), levels);
+        c.world.clear_high_water.insert((*id).into(), levels);
+        c.world.cleared.push((*id).into());
+    }
+    for level in content().levels.iter().take(first_clears) {
+        c.first_clears.insert(level.id.clone());
+    }
+    assert_eq!(c.first_clears.len(), first_clears, "catalogue too short");
+    assert_eq!(c.liberated_count() as usize, countries.len());
+    c
+}
+
+fn country_ids(filter: impl Fn(usize) -> bool, take: usize) -> Vec<&'static str> {
+    let ids: Vec<&'static str> = world()
+        .countries
+        .iter()
+        .filter(|c| filter(c.level_count()))
+        .take(take)
+        .map(|c| c.id.as_str())
+        .collect();
+    assert_eq!(ids.len(), take, "not enough matching countries");
+    ids
+}
+
+fn legacy_allowance(c: &Campaign) -> u32 {
+    12 + 8 * c.first_clears.len() as u32
+}
+
+#[test]
+fn allowance_reaches_level_ten_by_sixth_liberation() {
+    let ids = country_ids(|_| true, 8);
+    // The CD5 table (first_clears below the curve): L = 0..=6, then capped.
+    for (l, cap, allowance) in [
+        (0, 1, 12),
+        (1, 3, 28),
+        (2, 4, 36),
+        (3, 6, 52),
+        (4, 7, 60),
+        (5, 9, 76),
+        (6, 10, 84),
+        (7, 10, 84),
+        (8, 10, 84),
+    ] {
+        let c = allowance_campaign(&ids[..l], 0);
+        assert_eq!(c.allowance(), allowance, "allowance at L = {l}");
+        assert_eq!(c.advancement_cap_level(), cap, "cap level at L = {l}");
+    }
+    // Today a sixth liberation of three-stage fronts leaves the allowance at
+    // 36 (12 + 8 x 3 first clears); it now reaches level 10.
+    let c = allowance_campaign(&country_ids(|n| n == 3, 6), 3);
+    assert_eq!(c.allowance(), 84);
+    assert_eq!(c.advancement_cap_level(), MAX_ADVANCEMENT_LEVEL);
+    // A defender awarded the whole allowance stands at level 10.
+    let mut npc = c.npc.clone();
+    for (awarded, level) in [(0, 1), (12, 1), (13, 2), (28, 3), (76, 9), (84, 10)] {
+        npc.awarded = awarded;
+        assert_eq!(npc.advancement_level(), level, "awarded {awarded}");
+    }
+}
+
+#[test]
+fn three_stage_only_route_keeps_raising_the_allowance() {
+    // A route of three-stage countries first-clears only catalogue levels
+    // 0..3, so the legacy allowance stops at 36 after the first liberation.
+    let ids = country_ids(|n| n == 3, 6);
+    let allowances: Vec<u32> = (0..=6)
+        .map(|l| allowance_campaign(&ids[..l], 3).allowance())
+        .collect();
+    assert_eq!(allowances, [36, 36, 36, 52, 60, 76, 84]);
+    assert!(allowances.windows(2).all(|w| w[0] <= w[1]));
+    assert!(allowances[3..].iter().all(|a| *a > 36));
+}
+
+#[test]
+fn allowance_never_below_legacy_and_monotonic() {
+    let ids = country_ids(|_| true, 12);
+    let levels = content().levels.len();
+    for fc in 0..=levels {
+        let mut previous = 0;
+        for l in 0..=ids.len() {
+            let c = allowance_campaign(&ids[..l], fc);
+            let allowance = c.allowance();
+            assert!(allowance >= legacy_allowance(&c), "fc {fc}, L {l}");
+            if l == 0 {
+                assert_eq!(allowance, legacy_allowance(&c), "L = 0 is legacy");
+            }
+            assert!(allowance >= previous, "monotonic in L: fc {fc}, L {l}");
+            if fc > 0 {
+                let fewer = allowance_campaign(&ids[..l], fc - 1).allowance();
+                assert!(allowance >= fewer, "monotonic in first clears");
+            }
+            previous = allowance;
+        }
+    }
+    // An outbreak that reopens a liberated country keeps the high-water rank.
+    let mut c = allowance_campaign(&ids[..3], 0);
+    let before = c.allowance();
+    assert!(c.world.reopen(ids[1]).unwrap());
+    assert_eq!(c.liberated_count(), 3);
+    assert_eq!(c.allowance(), before);
+}
+
+/// The pre-W2-10 definition: a scan of every catalogue country.
+fn full_scan_liberated(c: &Campaign) -> u32 {
+    world()
+        .countries
+        .iter()
+        .filter(|country| {
+            c.world.cleared.contains(&country.id)
+                || c.world
+                    .clear_high_water
+                    .get(&country.id)
+                    .copied()
+                    .unwrap_or(0)
+                    == country.level_count()
+        })
+        .count() as u32
+}
+
+#[test]
+fn liberated_count_matches_full_scan() {
+    let countries = &world().countries;
+    let mut state = 0x9e37_79b9_7f4a_7c15u64;
+    let mut next = |bound: usize| {
+        state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        (state >> 33) as usize % bound.max(1)
+    };
+    for case in 0..400 {
+        let mut c = Campaign::default();
+        for _ in 0..next(12) {
+            let country = &countries[next(countries.len())];
+            // Duplicates are possible on purpose: the scan counts them once.
+            c.world.cleared.push(country.id.clone());
+        }
+        for _ in 0..next(16) {
+            let country = &countries[next(countries.len())];
+            let count = country.level_count();
+            // Below, at and (invalid) above the country's stage count.
+            let value = match next(4) {
+                0 => count,
+                1 => count + 1,
+                _ => next(count),
+            };
+            c.world.clear_high_water.insert(country.id.clone(), value);
+        }
+        if case % 7 == 0 {
+            // Ids outside the catalogue never count.
+            c.world.cleared.push("ZZZ".into());
+            c.world.clear_high_water.insert("ZZY".into(), 3);
+        }
+        assert_eq!(c.liberated_count(), full_scan_liberated(&c), "case {case}");
+    }
+    assert_eq!(Campaign::default().liberated_count(), 0);
+    let all = allowance_campaign(&country_ids(|_| true, countries.len()), 0);
+    assert_eq!(all.liberated_count(), full_scan_liberated(&all));
 }

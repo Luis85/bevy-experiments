@@ -1,7 +1,7 @@
 //! Data-driven geographical campaign, independent of renderer and battle rules.
 use crate::catalog::{self, ContentError};
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::OnceLock;
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq)]
@@ -442,6 +442,24 @@ pub fn world() -> &'static WorldContent {
     catalog::lazy(&WORLD, "world", WorldContent::try_load, || {
         WorldContent::from_json_str(include_str!("world.json"))
     })
+}
+/// The installed world's countries by id with their stage counts, built once
+/// (country ids are unique, `WorldContent::validate`).
+static COUNTRY_INDEX: OnceLock<HashMap<&'static str, usize>> = OnceLock::new();
+/// `level_count()` of the installed world's country `id`, `None` for an id
+/// outside the catalogue. Same answer as `world().country(id)` without the
+/// linear scan.
+pub(crate) fn country_stage_count(id: &str) -> Option<usize> {
+    COUNTRY_INDEX
+        .get_or_init(|| {
+            world()
+                .countries
+                .iter()
+                .map(|c| (c.id.as_str(), c.level_count()))
+                .collect()
+        })
+        .get(id)
+        .copied()
 }
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WorldProgress {

@@ -764,7 +764,10 @@ fn v6_fixture_decodes_with_the_recorded_campaign_state() {
     let game = fixture_v6();
     let c = game.campaign();
     assert_eq!(c.progression_rank(), 14);
-    assert_eq!((c.player.level, c.allowance()), (33, 52));
+    // Mara's 52 points were the whole v6 allowance (12 + 8 x 5 first clears);
+    // the CD5 allowance at four liberations is cap level 7, 60 (W2-10).
+    assert_eq!((c.player.level, c.allowance()), (33, 60));
+    assert_eq!(c.npc.awarded, 52);
     assert_eq!(c.world.cleared, ["MDA", "ROU", "UKR", "HUN"]);
     let roster: Vec<_> = game
         .strategy()
