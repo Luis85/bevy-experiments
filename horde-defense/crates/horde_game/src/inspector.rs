@@ -93,8 +93,9 @@ pub fn dossier(ui: &mut egui::Ui, attempt: &Attempt, aim: [f32; 2]) {
                 );
             }
             let state = match enemy.attack_phase {
-                EnemyPhase::Advance => "Approaching",
-                EnemyPhase::Queued => "Queued behind a blocker",
+                // Queued is never assigned since W1-69 (enemies never block
+                // each other); a v6 save may hold it until the next tick.
+                EnemyPhase::Advance | EnemyPhase::Queued => "Approaching",
                 EnemyPhase::Windup => "Winding up an attack",
                 EnemyPhase::Recovery => "Recovering after an attack",
             };
@@ -271,5 +272,47 @@ mod tests {
             };
             assert_eq!(hit.id, enemy.id, "hovered the drawn body of #{}", enemy.id);
         }
+    }
+
+    /// Since W1-69 enemies never block each other: a v6 save may still hold
+    /// a Queued phase until the next tick, and the dossier must not describe
+    /// a lane queue the game no longer has (W1 review).
+    #[test]
+    fn a_saved_queued_enemy_is_shown_approaching() {
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let mut attempt = game.attempt_slot_mut().take().unwrap();
+        game.spawn_enemy(&mut attempt, EnemyKind::Runner, 0, false);
+        attempt.enemies[0].x = 7.0;
+        attempt.enemies[0].attack_phase = EnemyPhase::Queued;
+        let attempt: Attempt =
+            serde_json::from_value(serde_json::to_value(&attempt).unwrap()).unwrap();
+        assert_eq!(attempt.enemies[0].attack_phase, EnemyPhase::Queued);
+        let [sx, sy] = crowd_stagger(attempt.enemies[0].id);
+        let aim = [attempt.enemies[0].x + sx, attempt.enemies[0].y() + sy];
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| dossier(ui, &attempt, aim));
+        output.textures_delta.clear();
+        fn texts(shape: &egui::epaint::Shape, out: &mut Vec<String>) {
+            match shape {
+                egui::epaint::Shape::Text(text) => out.push(text.galley.text().to_owned()),
+                egui::epaint::Shape::Vec(shapes) => shapes.iter().for_each(|s| texts(s, out)),
+                _ => {}
+            }
+        }
+        let mut shown = Vec::new();
+        output
+            .shapes
+            .iter()
+            .for_each(|c| texts(&c.shape, &mut shown));
+        assert!(
+            shown.iter().any(|t| t == "Approaching"),
+            "no 'Approaching' in {shown:?}"
+        );
+        assert!(
+            !shown.iter().any(|t| t.contains("Queued")),
+            "a lane queue is described in {shown:?}"
+        );
     }
 }
