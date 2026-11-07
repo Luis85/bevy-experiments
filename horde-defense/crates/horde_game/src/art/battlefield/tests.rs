@@ -519,6 +519,25 @@ fn batched_actor_layer_keeps_feet_then_id_order_across_sheets() {
     }
 }
 
+/// The pre-W1-48 `actor_animated` pose, kept verbatim as the pin: the quad's
+/// mesh is sheared and scaled about the pivot, then turned with egui's own
+/// `Mesh::rotate`. `pose_vertices` must reproduce it bit for bit.
+fn legacy_posed_mesh(quad: &visual_assets::ActorQuad) -> egui::Mesh {
+    let (pose, pivot) = (quad.pose, quad.pivot);
+    let mut mesh = egui::Mesh::with_texture(quad.texture);
+    mesh.add_rect_with_uv(quad.rect, quad.uv, quad.tint);
+    for vertex in &mut mesh.vertices {
+        let relative = vertex.pos - pivot;
+        vertex.pos = pivot
+            + vec2(
+                relative.x * pose.scale[0] - relative.y * pose.lean * 0.45,
+                relative.y * pose.scale[1],
+            );
+    }
+    mesh.rotate(egui::emath::Rot2::from_angle(pose.lean * 0.5), pivot);
+    mesh
+}
+
 #[test]
 fn batched_sprite_quads_match_legacy_actor_layout() {
     let textures = textures();
@@ -538,7 +557,17 @@ fn batched_sprite_quads_match_legacy_actor_layout() {
             };
             let actor = visual_assets::Actor::Enemy(sprite);
             let (center, size) = (pos2(300.5, 211.25), vec2(61.0, 52.0));
-            let legacy = painted(|p| {
+            let quad = visual_assets::actor_quad(
+                textures,
+                actor,
+                center,
+                size,
+                egui::Color32::WHITE,
+                &pose,
+            )
+            .unwrap();
+            let legacy = legacy_posed_mesh(&quad);
+            let animated = painted(|p| {
                 assert!(visual_assets::actor_animated(
                     p,
                     textures,
@@ -549,16 +578,12 @@ fn batched_sprite_quads_match_legacy_actor_layout() {
                     &pose
                 ));
             });
-            let legacy = meshes(&legacy)[0].clone();
-            let quad = visual_assets::actor_quad(
-                textures,
-                actor,
-                center,
-                size,
-                egui::Color32::WHITE,
-                &pose,
-            )
-            .unwrap();
+            assert_eq!(
+                *meshes(&animated)[0],
+                legacy,
+                "{:?} frame {frame}: the per-actor painter keeps the pre-W1-48 pose",
+                sprite.sprite
+            );
             assert_eq!(quad.texture, legacy.texture_id);
             let shapes = painted(|p| batch::ActorMeshes::new(textures, 0).paint(p));
             assert!(shapes.is_empty(), "an empty layer adds no shape");
