@@ -62,14 +62,17 @@ function ConvertTo-NativeArgument {
 
 function Invoke-Native {
     # Runs a native exe with stdout/stderr in <LogStem>.out.txt and <LogStem>.err.txt.
-    # On timeout the whole process tree is killed (taskkill /T, which also stops cargo's rustc children) and it throws.
+    # On timeout the whole process tree is killed (taskkill /T, which also stops cargo's rustc children) and it
+    # throws a message naming the PID. -RemoveReviewProfile deletes the review build's per-PID profile once the
+    # process has exited or been killed, so a hung capture does not leak one.
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
         [AllowEmptyString()][AllowEmptyCollection()][string[]]$Arguments = @(),
         [Parameter(Mandatory = $true)][string]$LogStem,
         [int]$TimeoutSeconds = 300,
-        [string]$WorkingDirectory
+        [string]$WorkingDirectory,
+        [switch]$RemoveReviewProfile
     )
     $LogStem = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($LogStem)
     $logDirectory = Split-Path -Parent $LogStem
@@ -91,22 +94,27 @@ function Invoke-Native {
     $process = Start-Process @start
     # Touching Handle keeps ExitCode readable after the process exits (5.1 Start-Process quirk).
     $null = $process.Handle
-    if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-        $kill = @{
-            FilePath               = (Resolve-Tool 'taskkill')
-            ArgumentList           = "/PID $($process.Id) /T /F"
-            NoNewWindow            = $true
-            PassThru               = $true
-            Wait                   = $true
-            RedirectStandardOutput = "$LogStem.kill.out.txt"
-            RedirectStandardError  = "$LogStem.kill.err.txt"
+    try {
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            $kill = @{
+                FilePath               = (Resolve-Tool 'taskkill')
+                ArgumentList           = "/PID $($process.Id) /T /F"
+                NoNewWindow            = $true
+                PassThru               = $true
+                Wait                   = $true
+                RedirectStandardOutput = "$LogStem.kill.out.txt"
+                RedirectStandardError  = "$LogStem.kill.err.txt"
+            }
+            $null = Start-Process @kill
+            $null = $process.WaitForExit(5000)
+            throw "Timed out after $TimeoutSeconds s (PID $($process.Id)): $FilePath $argumentLine"
         }
-        $null = Start-Process @kill
-        $null = $process.WaitForExit(5000)
-        throw "Timed out after $TimeoutSeconds s: $FilePath $argumentLine"
+        $process.WaitForExit()
+        $watch.Stop()
     }
-    $process.WaitForExit()
-    $watch.Stop()
+    finally {
+        if ($RemoveReviewProfile) { Remove-ReviewProfile -ProcessId $process.Id }
+    }
     return [pscustomobject]@{
         ExitCode = $process.ExitCode
         Id       = $process.Id
@@ -133,6 +141,17 @@ function Invoke-Cargo {
         throw "cargo $($Arguments -join ' ') failed with exit code $($result.ExitCode); see $($result.Err)"
     }
     return $result
+}
+
+function Remove-ReviewProfile {
+    # profile.rs keeps a review build's settings and logs in <temp>\lastlight-review-<pid> and never deletes them.
+    # A failed removal only warns, so cleanup never hides the run's own outcome.
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][int]$ProcessId)
+    $path = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-review-' + $ProcessId)
+    if (-not (Test-Path -LiteralPath $path)) { return }
+    try { Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction Stop }
+    catch { Write-Warning "Could not remove the review profile ${path}: $($_.Exception.Message)" }
 }
 
 function Resolve-Tool {

@@ -51,10 +51,7 @@ try {
     $env:LASTLIGHT_CAPTURE_SEQUENCE = $directory
     $env:LASTLIGHT_SAVE_DIR = Join-Path $logs 'saves'
     if ($ReducedEffects) { $env:LASTLIGHT_REVIEW_REDUCED = '1' }
-    $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $logs $Scene) -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace
-    # profile.rs never deletes the per-PID review profile.
-    $reviewProfile = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-review-' + $result.Id)
-    if (Test-Path -LiteralPath $reviewProfile) { Remove-Item -LiteralPath $reviewProfile -Recurse -Force }
+    $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $logs $Scene) -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace -RemoveReviewProfile
     if ($result.ExitCode -ne 0) { throw "Native animation export failed with exit code $($result.ExitCode); see $($result.Err)" }
     $manifest = Get-Content -Raw -LiteralPath (Join-Path $directory 'manifest.json') | ConvertFrom-Json
     if ($manifest.version -ne 2) { throw "Expected motion manifest version 2, got $($manifest.version)" }

@@ -78,6 +78,16 @@ public static class LastLightNativeHelper {
             Thread.Sleep(int.Parse(args[2]) * 1000);
             return 0;
         }
+        // 'review <pidfile> <s>' leaves a per-PID review profile behind, as profile.rs does.
+        if (args.Length == 3 && args[0] == "review") {
+            int id = Process.GetCurrentProcess().Id;
+            string logs = Path.Combine(Path.Combine(Path.GetTempPath(), "lastlight-review-" + id), "logs");
+            Directory.CreateDirectory(logs);
+            File.WriteAllText(Path.Combine(logs, "review.log"), "review");
+            File.WriteAllText(args[1], id.ToString());
+            Thread.Sleep(int.Parse(args[2]) * 1000);
+            return 0;
+        }
         // Copied to <target>\debug\horde-defense.exe it stands in for the game in measure_performance.ps1 runs.
         if (args.Length == 1 && args[0] == "--version") { Console.WriteLine("horde-defense fake"); return 0; }
         if (args.Length == 1 && args[0] == "--list-scenes") {
@@ -194,6 +204,31 @@ try {
         foreach ($id in $ids) { Stop-Process -Id $id -Force -ErrorAction SilentlyContinue }
         Assert-True $parentGone "parent $($ids[0]) still running"
         Assert-True $childGone "child $($ids[1]) still running"
+    }
+
+    Test-Case 'Invoke-Native -RemoveReviewProfile removes the per-PID profile on exit and on timeout' {
+        $pidFile = Join-Path $temporary 'review.pid'
+        $r = Invoke-Native -FilePath $helper -Arguments @('review', $pidFile, '0') -LogStem (Join-Path $temporary 'logs\review-exit') -TimeoutSeconds 30 -RemoveReviewProfile
+        Assert-Equal 0 $r.ExitCode ('review helper exit code; err: ' + (Read-Log $r.Err))
+        $exited = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-review-' + $r.Id)
+        $exitedLeft = Test-Path -LiteralPath $exited
+        if ($exitedLeft) { Remove-Item -LiteralPath $exited -Recurse -Force }
+        Assert-True (-not $exitedLeft) "profile left after a clean exit: $exited"
+        Remove-Item -LiteralPath $pidFile -Force
+        $message = $null
+        try {
+            Invoke-Native -FilePath $helper -Arguments @('review', $pidFile, '30') -LogStem (Join-Path $temporary 'logs\review-hung') -TimeoutSeconds 1 -RemoveReviewProfile | Out-Null
+        }
+        catch { $message = $_.Exception.Message }
+        Assert-True ($null -ne $message) 'timeout did not throw'
+        Assert-True (Test-Path -LiteralPath $pidFile) 'review helper never started'
+        $id = [int](Get-Content -Raw -LiteralPath $pidFile).Trim()
+        $hung = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-review-' + $id)
+        $hungLeft = Test-Path -LiteralPath $hung
+        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
+        if ($hungLeft) { Remove-Item -LiteralPath $hung -Recurse -Force }
+        Assert-True ($message -match "\(PID $id\)") "timeout message lacks the PID: $message"
+        Assert-True (-not $hungLeft) "profile left after a timeout: $hung"
     }
 
     Test-Case 'Resolve-HordeTarget honours CARGO_TARGET_DIR' {

@@ -633,17 +633,7 @@ try {
                     if ($VsyncOff) { $env:LASTLIGHT_PERF_PRESENT_MODE = 'autonovsync' }
                     if ($Pipelined -eq 'on') { $env:LASTLIGHT_PERF_PIPELINED = '1' }
                     elseif ($Pipelined -eq 'off') { $env:LASTLIGHT_PERF_PIPELINED = '0' }
-                    $result = $null
-                    try {
-                        $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $destination "logs\$attemptStem") -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace
-                    }
-                    finally {
-                        if ($null -ne $result) {
-                            # profile.rs never deletes the per-PID review profile.
-                            $reviewProfile = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-review-' + $result.Id)
-                            if (Test-Path -LiteralPath $reviewProfile) { Remove-Item -LiteralPath $reviewProfile -Recurse -Force }
-                        }
-                    }
+                    $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $destination "logs\$attemptStem") -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace -RemoveReviewProfile
                     if ($result.ExitCode -ne 0) { throw "Run $attemptStem failed with exit code $($result.ExitCode); see $($result.Err)" }
                     if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) { throw "Run $attemptStem wrote no report; see $($result.Err)" }
                     $report = Read-JsonFile $reportPath

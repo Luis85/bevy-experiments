@@ -218,18 +218,11 @@ try {
                 $result = $null
                 $problem = $null
                 try {
-                    $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $modeDirectory $stem) -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace
+                    $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $modeDirectory $stem) -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace -RemoveReviewProfile
                     if ($result.ExitCode -ne 0) { $problem = "exit code $($result.ExitCode)" }
                     elseif (-not (Test-Path -LiteralPath $png -PathType Leaf)) { $problem = 'no PNG written' }
                 }
                 catch { $problem = $_.Exception.Message }
-                finally {
-                    if ($null -ne $result) {
-                        # profile.rs never deletes the per-PID review profile.
-                        $reviewProfile = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-review-' + $result.Id)
-                        if (Test-Path -LiteralPath $reviewProfile) { Remove-Item -LiteralPath $reviewProfile -Recurse -Force }
-                    }
-                }
                 $hasPng = Test-Path -LiteralPath $png -PathType Leaf
                 if ($hasPng -and $null -eq $windowsScale -and $null -eq $problem) {
                     $width = Get-PngWidth $png
