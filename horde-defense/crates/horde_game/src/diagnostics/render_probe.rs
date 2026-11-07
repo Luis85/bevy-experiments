@@ -7,6 +7,9 @@
 //!   to after `RenderSystems::PostCleanup`;
 //! - `present_wait_ms` spans `prepare_windows` in `PrepareViews`, where
 //!   `get_current_texture` blocks on the swap chain (view/window/mod.rs:239-258).
+//!   It opens after `create_surfaces`, which bevy_render orders only before
+//!   `prepare_windows` (view/window/mod.rs:57-59), so surface
+//!   (re)configuration stays render-world CPU, never present wait;
 //!
 //! The end mark publishes one `RenderSample` for the main world to read, with
 //! its wall-clock begin, present begin and end and the render-thread idle
@@ -20,8 +23,9 @@ use bevy::{
     app::SubApp,
     prelude::*,
     render::{
-        Render, RenderApp, RenderSystems, pipelined_rendering::RenderExtractApp,
-        view::window::prepare_windows,
+        Render, RenderApp, RenderSystems,
+        pipelined_rendering::RenderExtractApp,
+        view::window::{create_surfaces, prepare_windows},
     },
 };
 use std::{sync::atomic::Ordering, time::Instant};
@@ -33,6 +37,7 @@ pub(super) fn add(render_app: &mut SubApp) {
             begin_render.before(RenderSystems::ExtractCommands),
             begin_present_wait
                 .in_set(RenderSystems::PrepareViews)
+                .after(create_surfaces)
                 .before(prepare_windows),
             end_present_wait
                 .in_set(RenderSystems::PrepareViews)

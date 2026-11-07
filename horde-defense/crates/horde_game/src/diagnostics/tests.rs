@@ -273,3 +273,104 @@ fn close_keeps_the_slowest_present_since_the_previous_close() {
     assert_eq!(idle.render, Some(sample(0.2, 14.)));
     assert_eq!(idle.slowest_present, None);
 }
+
+/// W1-33 review: egui_pass_ms opens only when bevy_egui's exclusive pass loop
+/// can start, so a PostUpdate system running beside the probe (here 8 ms,
+/// unordered against `EguiPostUpdateSet`) is never counted as egui work, in
+/// either registration order.
+#[cfg(feature = "review")]
+#[test]
+fn egui_pass_excludes_unrelated_post_update_systems() {
+    use bevy_egui::{EguiPostUpdateSet, end_pass_system, run_egui_context_pass_loop_system};
+    for sleeper_first in [true, false] {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        let sleeper = || sleep_ms(8);
+        if sleeper_first {
+            app.add_systems(PostUpdate, sleeper);
+        }
+        install(&mut app, &config(&[("LASTLIGHT_PERF_REPORT", "perf.json")]));
+        app.configure_sets(
+            PostUpdate,
+            (
+                EguiPostUpdateSet::EndPass,
+                EguiPostUpdateSet::ProcessOutput,
+                EguiPostUpdateSet::PostProcessOutput,
+            )
+                .chain(),
+        );
+        // As bevy_egui 0.43.1 registers them (lib.rs:1146-1150).
+        app.add_systems(
+            PostUpdate,
+            (run_egui_context_pass_loop_system, end_pass_system)
+                .chain()
+                .in_set(EguiPostUpdateSet::EndPass),
+        );
+        if !sleeper_first {
+            app.add_systems(PostUpdate, sleeper);
+        }
+        for _ in 0..3 {
+            app.update();
+            let frame = app.world().resource::<PerfFrame>().0.clone().unwrap();
+            assert!(
+                frame.egui_pass_ms < 4.0,
+                "sleeper first {sleeper_first}: {frame:?}"
+            );
+        }
+    }
+}
+
+/// W1-33 review: present_wait_ms spans only `prepare_windows`. Surface
+/// (re)configuration in `create_surfaces`, which bevy_render 0.20.1 orders
+/// only before `prepare_windows`, and the `PrepareViews` work ordered before
+/// it (here a 6 ms stand-in for `clear_view_attachments`) stay render-world
+/// CPU. The real systems are registered with false conditions: their render
+/// resources do not exist here.
+#[cfg(feature = "review")]
+#[test]
+fn present_wait_excludes_surface_configuration() {
+    use bevy::app::SubApp;
+    use bevy::ecs::schedule::ScheduleLabel;
+    use bevy::render::{
+        Render, RenderApp, RenderSystems,
+        view::window::{create_surfaces, prepare_windows},
+    };
+    let mut app = perf_app();
+    let probe = app.world().resource::<PerfProbe>().clone();
+    let mut render = SubApp::new();
+    render.insert_resource(probe.clone());
+    render.update_schedule = Some(Render.intern());
+    render.configure_sets(
+        Render,
+        (
+            RenderSystems::ExtractCommands,
+            RenderSystems::PrepareViews,
+            RenderSystems::PostCleanup,
+        )
+            .chain(),
+    );
+    render.add_systems(
+        Render,
+        (
+            (|| sleep_ms(6))
+                .in_set(RenderSystems::PrepareViews)
+                .before(create_surfaces),
+            create_surfaces.run_if(|| false).before(prepare_windows),
+            prepare_windows
+                .run_if(|| false)
+                .in_set(RenderSystems::PrepareViews),
+        ),
+    );
+    render_probe::add(&mut render);
+    app.insert_sub_app(RenderApp, render);
+    app.finish();
+    // A render sample is published after the frame that closes it.
+    app.update();
+    for _ in 0..3 {
+        app.update();
+        let frame = app.world().resource::<PerfFrame>().0.clone().unwrap();
+        let sample = frame.render.expect("the Render schedule ran");
+        assert!(sample.render_schedule_ms >= 6.0, "{sample:?}");
+        assert!(sample.present_wait_ms < 3.0, "{sample:?}");
+    }
+}

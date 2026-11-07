@@ -1,6 +1,9 @@
 //! Review-only egui probes (bevy_egui =0.43.1). In PostUpdate:
 //! - `egui_pass_ms` spans `EguiPostUpdateSet::EndPass`: every multipass draw
-//!   of the primary context plus `end_pass`;
+//!   of the primary context plus `end_pass`. It opens in an exclusive system
+//!   directly before bevy_egui's exclusive `run_egui_context_pass_loop_system`,
+//!   so the PostUpdate systems unordered against `EndPass` that ran before it
+//!   have finished and are not counted;
 //! - `egui_tessellate_ms` spans `ProcessOutput`, where `process_output_system`
 //!   tessellates (bevy_egui output.rs:51);
 //! - shapes and texture uploads are counted from `EguiFullOutput` between the
@@ -11,6 +14,7 @@ use bevy::prelude::*;
 use bevy_egui::{
     EguiFullOutput, EguiPostUpdateSet, EguiRenderOutput,
     egui::{ClippedPrimitive, TextureId, TexturesDelta, epaint::Primitive},
+    run_egui_context_pass_loop_system,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -18,7 +22,9 @@ pub(super) fn add(app: &mut App) {
     app.add_systems(
         PostUpdate,
         (
-            begin_pass.before(EguiPostUpdateSet::EndPass),
+            begin_pass
+                .in_set(EguiPostUpdateSet::EndPass)
+                .before(run_egui_context_pass_loop_system),
             end_pass
                 .after(EguiPostUpdateSet::EndPass)
                 .before(EguiPostUpdateSet::ProcessOutput),
@@ -84,8 +90,9 @@ impl PerfProbe {
     }
 }
 
-fn begin_pass(probe: Res<PerfProbe>) {
-    probe.mark(Mark::EguiPass);
+/// Exclusive, so it starts only once every running system has finished.
+fn begin_pass(world: &mut World) {
+    world.resource::<PerfProbe>().mark(Mark::EguiPass);
 }
 fn end_pass(probe: Res<PerfProbe>, outputs: Query<&EguiFullOutput>) {
     probe.end_span(Mark::EguiPass, &probe.0.egui_pass_ns);
