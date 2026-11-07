@@ -187,7 +187,9 @@ OPTIONS:
 
 ENVIRONMENT (empty values count as unset; flags accept 1/true/yes/on):
   Play
-    LASTLIGHT_SAVE_DIR            Profile folder (default %LOCALAPPDATA%/LastlightHordeDefense)
+    LASTLIGHT_SAVE_DIR            Profile folder, logging to <save dir>/logs (default
+                                  %LOCALAPPDATA%/LastlightHordeDefense). Unset, an isolated
+                                  review logs to <temp>/lastlight-review-<pid>/logs
     LASTLIGHT_ASSET_DIR           Asset folder (default ./assets beside the executable)
     LASTLIGHT_CAPTURE_DIR         F12 screenshot folder (default <save dir>/screenshots)
     LASTLIGHT_REVIEW_SCREEN       Staged scenario name (practice scene or review fixture)
@@ -692,6 +694,22 @@ mod tests {
             LaunchAction::ListScenes
         );
         assert!(HELP.contains("--list-scenes"));
+    }
+    /// The help names where logs go, including the isolated review's temp
+    /// profile when LASTLIGHT_SAVE_DIR is absent (d5e16bd).
+    #[cfg(feature = "review")]
+    #[test]
+    fn help_names_the_log_folders() {
+        assert!(HELP.contains("<save dir>/logs"), "{HELP}");
+        assert!(
+            HELP.contains("<temp>/lastlight-review-<pid>/logs"),
+            "{HELP}"
+        );
+        let c = parse(&[], &[("LASTLIGHT_REVIEW_SCREEN", "menu")]).unwrap();
+        let review = std::env::temp_dir()
+            .join(format!("lastlight-review-{}", std::process::id()))
+            .join("logs");
+        assert_eq!(c.log_directory(), review, "the help's review folder");
     }
     #[test]
     fn unknown_practice_scene_is_rejected() {
