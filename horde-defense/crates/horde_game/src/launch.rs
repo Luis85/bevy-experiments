@@ -977,6 +977,23 @@ mod tests {
         assert!(parse(&[], &base[..2]).is_err(), "motion flag required");
         assert!(parse(&[], &[base[0], base[2]]).is_err(), "scene required");
     }
+    /// W1 review: a playtest launcher (package_playtest.ps1 -Review) blanks
+    /// every review variable, so a value left in the player's environment
+    /// never turns an ordinary launch into an isolated review session.
+    #[test]
+    fn playtest_launchers_blank_every_review_variable() {
+        let script = std::fs::read_to_string(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../scripts/package_playtest.ps1"),
+        )
+        .unwrap();
+        let missing: Vec<&str> = REVIEW_VARIABLES
+            .iter()
+            .copied()
+            .filter(|name| !script.contains(&format!("'set \"{name}=\"'")))
+            .collect();
+        assert!(missing.is_empty(), "launchers keep {missing:?}");
+    }
     #[test]
     fn perf_present_mode_and_pipelined_parse_and_are_review_variables() {
         for name in [
