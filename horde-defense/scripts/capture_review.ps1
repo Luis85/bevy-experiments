@@ -169,14 +169,11 @@ try {
     }
 
     $registry = $null
-    $listing = Invoke-Native -FilePath $exe -Arguments @('--list-scenes') -LogStem (Join-Path $tools 'list-scenes') -TimeoutSeconds 30 -WorkingDirectory $workspace
+    $listing = Get-ReviewSceneList -Executable $exe -LogStem (Join-Path $tools 'list-scenes') -WorkingDirectory $workspace
     if ($listing.ExitCode -eq 0) {
         $sceneListFile = 'scenes.tsv'
         Copy-Item -LiteralPath $listing.Out -Destination (Join-Path $destination $sceneListFile)
-        $registry = @(Get-Content -LiteralPath $listing.Out | Where-Object { $_.Trim() -and -not $_.StartsWith('#') } | ForEach-Object {
-                $columns = $_ -split "`t"
-                if ($columns[0] -ne 'name') { [pscustomobject]@{ Name = $columns[0]; Kind = $columns[1] } }
-            })
+        $registry = @($listing.Scenes)
     }
     elseif (-not $Scenes) {
         throw "This build has no --list-scenes (exit $($listing.ExitCode), see $($listing.Err)); pass -Scenes explicitly"

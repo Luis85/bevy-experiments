@@ -256,6 +256,27 @@ try {
         Assert-True (-not $hungLeft) "profile left after a timeout: $hung"
     }
 
+    Test-Case 'Get-ReviewSceneList parses the --list-scenes TSV and reports a build without it' {
+        $list = Get-ReviewSceneList -Executable $helper -LogStem (Join-Path $temporary 'logs\list-scenes') -WorkingDirectory $temporary
+        Assert-Equal 0 $list.ExitCode ('exit code; err: ' + (Read-Log $list.Err))
+        Assert-True ((Read-Log $list.Out).StartsWith("name`tkind`t")) 'the raw TSV stays in the out log'
+        $names = @($list.Scenes | ForEach-Object { $_.Name })
+        Assert-Equal 'menu,progressed-peak,peak,stress' ($names[0..3] -join ',') 'rows in order, header skipped'
+        $menu = @($list.Scenes)[0]
+        $stress = @($list.Scenes)[3]
+        Assert-Equal 'Still' $menu.Kind 'menu kind'
+        Assert-Equal 'MotionOnly' $stress.Kind 'stress kind'
+        Assert-True ($menu.Motion -is [bool] -and $menu.Motion) 'menu motion'
+        Assert-True ($menu.Perf -is [bool] -and -not $menu.Perf) 'menu perf'
+        Assert-True ($stress.Perf -and -not $stress.Practice) 'stress perf and practice'
+        Assert-True ($null -eq $menu.Primary -and $null -eq $menu.BeforeProxy) 'empty columns read as null'
+        Assert-Equal 'max-lanes' $stress.BeforeProxy 'before proxy'
+        Assert-Equal 1 $stress.SinceWave 'since wave'
+        $old = Get-ReviewSceneList -Executable (Resolve-Tool 'whoami') -LogStem (Join-Path $temporary 'logs\list-scenes-old') -WorkingDirectory $temporary
+        Assert-True ($old.ExitCode -ne 0) 'an exe without --list-scenes exits non-zero'
+        Assert-True ($null -eq $old.Scenes) 'no rows from a failed listing'
+    }
+
     Test-Case 'Resolve-HordeTarget honours CARGO_TARGET_DIR' {
         [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $null, 'Process')
         Assert-Equal ([IO.Path]::GetFullPath((Join-Path $workspace 'target'))) (Resolve-HordeTarget) 'unset'

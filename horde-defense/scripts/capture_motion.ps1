@@ -37,12 +37,9 @@ try {
         if (-not (Test-Path -LiteralPath $exe -PathType Leaf)) { throw "No executable at $exe" }
     }
     else { $exe = Get-HordeExecutable -Profile dev }
-    $listing = Invoke-Native -FilePath $exe -Arguments @('--list-scenes') -LogStem (Join-Path $logs 'list-scenes') -TimeoutSeconds 30 -WorkingDirectory $workspace
+    $listing = Get-ReviewSceneList -Executable $exe -LogStem (Join-Path $logs 'list-scenes') -WorkingDirectory $workspace
     if ($listing.ExitCode -ne 0) { throw "This build has no --list-scenes (exit $($listing.ExitCode)); see $($listing.Err)" }
-    $motionScenes = @(Get-Content -LiteralPath $listing.Out | Where-Object { $_.Trim() -and -not $_.StartsWith('#') } | ForEach-Object {
-            $columns = $_ -split "`t"
-            if ($columns.Count -ge 3 -and $columns[0] -ne 'name' -and $columns[2] -eq 'true') { $columns[0] }
-        })
+    $motionScenes = @($listing.Scenes | Where-Object { $_.Motion } | ForEach-Object { $_.Name })
     if ($motionScenes -cnotcontains $Scene) { throw "Unknown motion scene `"$Scene`"; run --list-scenes (motion scenes: $($motionScenes -join ', '))" }
     $env:LASTLIGHT_REVIEW_SCREEN = $Scene
     $env:LASTLIGHT_REVIEW_SIZE = '{0}x{1}' -f $view.Width, $view.Height

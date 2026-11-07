@@ -143,6 +143,55 @@ function Invoke-Cargo {
     return $result
 }
 
+function Get-ReviewSceneList {
+    # Runs <Executable> --list-scenes through Invoke-Native and parses its TSV (name kind motion perf practice primary
+    # before_proxy since_wave; the header and '#' lines are skipped). Returns the Invoke-Native result plus Scenes: one
+    # object per row (Name, Kind, Motion, Perf, Practice, Primary, BeforeProxy, SinceWave; an empty column is $null),
+    # or $null when the exit code is not 0, as for a build without --list-scenes. The raw TSV stays in Out.
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Executable,
+        [Parameter(Mandatory = $true)][string]$LogStem,
+        [int]$TimeoutSeconds = 30,
+        [string]$WorkingDirectory
+    )
+    $invoke = @{ FilePath = $Executable; Arguments = @('--list-scenes'); LogStem = $LogStem; TimeoutSeconds = $TimeoutSeconds }
+    if ($WorkingDirectory) { $invoke.WorkingDirectory = $WorkingDirectory }
+    $result = Invoke-Native @invoke
+    $scenes = $null
+    if ($result.ExitCode -eq 0) {
+        $rows = New-Object System.Collections.Generic.List[object]
+        foreach ($line in [IO.File]::ReadAllLines($result.Out)) {
+            if (-not $line.Trim() -or $line.StartsWith('#')) { continue }
+            $columns = @($line -split "`t")
+            if ($columns[0] -eq 'name') { continue }
+            $cells = New-Object object[] 8
+            for ($i = 0; $i -lt 8 -and $i -lt $columns.Count; $i++) {
+                if ($columns[$i].Length -gt 0) { $cells[$i] = $columns[$i] }
+            }
+            $rows.Add([pscustomobject]@{
+                    Name        = $cells[0]
+                    Kind        = $cells[1]
+                    Motion      = ($cells[2] -eq 'true')
+                    Perf        = ($cells[3] -eq 'true')
+                    Practice    = ($cells[4] -eq 'true')
+                    Primary     = $cells[5]
+                    BeforeProxy = $cells[6]
+                    SinceWave   = $(if ($cells[7] -match '^\d+$') { [int]$cells[7] } else { $null })
+                })
+        }
+        $scenes = $rows.ToArray()
+    }
+    return [pscustomobject]@{
+        ExitCode = $result.ExitCode
+        Id       = $result.Id
+        Seconds  = $result.Seconds
+        Out      = $result.Out
+        Err      = $result.Err
+        Scenes   = $scenes
+    }
+}
+
 function Remove-ReviewProfile {
     # profile.rs keeps a review build's settings and logs in <temp>\lastlight-review-<pid> and never deletes them.
     # A failed removal only warns, so cleanup never hides the run's own outcome.

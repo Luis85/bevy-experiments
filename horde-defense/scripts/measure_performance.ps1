@@ -601,13 +601,10 @@ try {
         $line = @(Get-Content -LiteralPath $version.Out | Where-Object { $_.Trim() } | Select-Object -First 1)
         if ($line.Count -gt 0) { $stamp = $line[0].Trim() }
     }
-    $listing = Invoke-Native -FilePath $exe -Arguments @('--list-scenes') -LogStem (Join-Path $tools 'list-scenes') -TimeoutSeconds 30 -WorkingDirectory $workspace
+    $listing = Get-ReviewSceneList -Executable $exe -LogStem (Join-Path $tools 'list-scenes') -WorkingDirectory $workspace
     if ($listing.ExitCode -ne 0) { throw "--list-scenes failed with exit code $($listing.ExitCode); see $($listing.Err)" }
     Copy-Item -LiteralPath $listing.Out -Destination (Join-Path $destination 'scenes.tsv')
-    $perfRows = @(Get-Content -LiteralPath $listing.Out | Where-Object { $_.Trim() } | ForEach-Object {
-            $columns = $_ -split "`t"
-            if ($columns.Count -ge 4 -and $columns[0] -ne 'name' -and $columns[3] -eq 'true') { $columns[0] }
-        })
+    $perfRows = @($listing.Scenes | Where-Object { $_.Perf } | ForEach-Object { $_.Name })
     foreach ($name in $sceneNames) {
         if ($perfRows -notcontains $name) { throw "This build lists no perf scene `"$name`" (--list-scenes); is it a review build?" }
     }
