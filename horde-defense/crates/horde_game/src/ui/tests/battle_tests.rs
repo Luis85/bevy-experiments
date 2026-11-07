@@ -878,6 +878,10 @@ fn review_frame_facts_report_arena_rect_and_hud_rows() {
             f.battle.arena_rect.map(corners),
             "{size:?}"
         );
+        assert!(
+            f.battle.effects_rect.is_some(),
+            "{size:?}: no effects clip recorded"
+        );
         assert_eq!(facts.effects_rect, f.battle.effects_rect.map(corners));
         assert_eq!(facts.observer_arena_rect, None, "no observer in a battle");
         assert_eq!(facts.screen, "Battle");
