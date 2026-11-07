@@ -9,7 +9,7 @@
 - lightning suppressed near Windup and Contact as well;
 - a shared SHA-256 test module with the full FIPS vector set.
 
-**Grafts:** dawn-reference scene, capture sidecar JSON, cue scaling with zoom, colour-blind-safe reduced ordnance rings, scorch tail, stage-theme count guard, `flyup_never_shows_sale_status`, `shot_fx_never_mutates_attempt`, archetype differentiation test.
+**Grafts:** dawn-reference scene, capture sidecar JSON, cue scaling with zoom, colour-blind-safe reduced ordnance rings, scorch tail, stage-theme count guard, `flyup_never_shows_sale_status` (W5-08), `shot_fx_never_mutates_attempt` (W5-03), archetype differentiation test.
 
 All line numbers were re-read at HEAD 7bd5de8. The audit's fx.rs:415-467 citations are stale: fx.rs is 371 lines. Shots are at :228-280, explosions at :139-177, hits and kills at :293-345.
 

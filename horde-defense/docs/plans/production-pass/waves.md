@@ -219,7 +219,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `loot_only_items_are_never_offered_bought_or_recommended`
 - Pin: `appended_ids_keep_v1_order`.
 - Done: provisional cause C.
-- Deps: W2-07.
+- Deps: W2-07, W2-53 (the frozen-catalogue guard lands before the first wave-2 catalogue edit).
 
 **W2-09 · loot-economy · L4: weighted single-draw DropTable**
 - Fail-first:
@@ -298,7 +298,9 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `pruning_prefers_acknowledged_and_legacy_battles`
   - `settle_parallel_twice_is_a_no_op`
   - `random_tick_recall_interleavings_settle_each_battle_once` (200 cases)
-- Pin: `v6_settled_battles_produce_no_notice_burst`.
+- Pins:
+  - `v6_settled_battles_produce_no_notice_burst`;
+  - `worker_victory_credits_recruit_and_threat_once` (acceptance G3.8; design-campaign-defenders §1.9 "Worker credit"): a settled worker victory writes exactly one RunRecord with `recruit_id` Some(id), and the parent's victory and threat credit is applied once, across a repeated `settle_parallel` and a save reload. Mutation proof: apply the parent's credit for the worker victory twice.
 - Deps: W2-11.
 
 **W2-16 · loot-economy · W-a worker and expedition auto-sell plus the final sweep**
@@ -403,7 +405,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `boss_rank_derivation_usa_24`
   - `regional_checkpoint_distribution_is_219_12_4_7`
 - Pins: `front_ramp_is_exactly_one_without_country`; `boss_damage_multiplier_is_exactly_one_through_rank_4`; `neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_depth_0`; `stage_theme_with_is_unchanged_on_checkpoint_stages`.
-- Deps: W2-04.
+- Deps: W2-04, W2-53 (the frozen-catalogue guard lands before the enemy catalogue rows W2-26..W2-36).
 
 **W2-27 · enemy-balance · Spitter**
 - Files: reach, station, walls, followers walk through (W1-69: no queue, no overtaking); far-half guard.
@@ -609,6 +611,13 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Fail-first: `neutral_level_ups_keep_the_grant_ledger_paid`.
 - Digest: sets `PROVISIONAL` for the three Personal GOLDEN digests with a `PROVISIONAL_CAUSES` row (P3). W2-49 folds them.
 - Deps: W1 close; W2-49 depends on it.
+
+**W2-53 · save-determinism · Frozen catalogue records guard, before the first wave-2 catalogue edit**
+- Slot: before W2-08 (the first wave-2 commit that edits a catalogue file: content.json gains 39 items) and W2-26 (the first enemy catalogue row; W2-31 appends the 7 archetype records and waves 5-11); the id is appended so no id changes. W1 review: acceptance ISO-3 and design-save-determinism §13 risk 2 named this guard, but no wave-1 commit or waves.md row created it.
+- Files: a horde_core test beside the V1-V6 continuation pins (`tests/save_migration.rs`), using `support::fnv1a` like those pins.
+- Fail-first (characterisation pin): `legacy_catalogue_records_that_tick_saved_encounters_are_frozen`. It pins the FNV-1a of the catalogue records that V1-V6 encounters tick (design-save-determinism invariant 3): the 11 existing archetype resolutions, wave tiers 0..=4 of `enemy_catalog.json` and the 5 `content.json` levels, as the bundled catalogue resolves them. Appended records, tiers 5 and up, and new fields at their skipped neutral default do not move it. Mutation proof: change one value of a tier-0..=4 wave and one existing archetype's resolved health; each fails the pin.
+- Done: no digest move; V1-V6 pins unchanged. A later wave-2 or wave-4 commit that moves this pin is wrong: fix it, or stop and ask the user (the `ProgressionSnapshot.rules_revision` escape hatch needs user approval).
+- Deps: W1 close; W2-08 and W2-26 depend on it.
 
 Wave-2 exit:
 - One re-bless with reasons.
@@ -860,12 +869,12 @@ Wave-4 exit: every ignored `pacing_targets` assertion passes in release (goal 3,
 |---|---|---|---|---|
 | W5-01 | vfx-lighting | 5a: render-pass split, theme grades, cue halos with ink backing, vignette move, `STORM_THEME_IDS`/`is_storm`, static storm grade on storm stages in reduced mode, observer `scene_look` | `night_grade_at_most_0_70_of_dawn...`, `every_cue_primitive_has_an_ink_backing_with_contrast_at_least_3`, `storm_stage_coverage_is_131_of_1026`, `reduced_effects_storm_stage_draws_static_storm_grade_and_no_flash`, `worker_view_uses_biome_theme_not_level`; pin `stage_theme_ids_are_pinned_to_the_10_in_order` with its self-test | W4 |
 | W5-02 | vfx-lighting | 5b: wall-clock lightning (`SKY_SLOT_MS` 8000, quiet windows; ΔL < 0.2) | `sky_flash_starts_at_least_4000_ms_apart_at_observation_speed_4x`, `sky_flash_peak_delta_below_0_2...`, `sky_flash_never_reads_core_rng` | W5-01 |
-| W5-03 | vfx-lighting | 5c: weapon_fx profiles (6 classes plus turret), shotgun fan, MG tracers, gear-snapshot class | `every_class_and_turret_profile_distinct_on_two_axes...`, `shotgun_volley_paints_one_flash_and_nine_streaks`, `machine_gun_bright_tracer_every_third_volley`, `reduced_shot_paints_no_flash...` | W5-01 |
+| W5-03 | vfx-lighting | 5c: weapon_fx profiles (6 classes plus turret), shotgun fan, MG tracers, gear-snapshot class | `every_class_and_turret_profile_distinct_on_two_axes...`, `shotgun_volley_paints_one_flash_and_nine_streaks`, `machine_gun_bright_tracer_every_third_volley`, `reduced_shot_paints_no_flash...`; pin `shot_fx_never_mutates_attempt` (acceptance ISO-8: painting every weapon_fx profile leaves the attempt, its RNG and the state digest unchanged) | W5-01 |
 | W5-04 | vfx-lighting | 5d: additive light pools (cap 24) | `light_pools_capped_at_24...`, `reduced_has_no_light_pools` | W5-03 |
 | W5-05 | vfx-lighting | 5e: multi-frame explosions and fire; grenade vs Molotov | `grenade_and_molotov_explosions_paint_distinct_shape_sets`, `explosion_has_at_least_4_distinct_frames...` | W5-04 |
 | W5-06 | vfx-lighting | 5f: damage-scaled hits, boss kill burst, blood decals (opt-in, cap 64) | `hit_spark_length_monotonic_in_damage...`, `blood_decals_zero_when_off_newest_64...`; new `field_rect_never_offsets_on_damage_or_explosion` (no screen shake) | W5-05 |
 | W5-07 | vfx-lighting | 5g: elite and affix tells | `elite_enemy_paints_ring_and_marker_with_ink_backing_in_cue_pass`, `reduced_elite_has_no_pulse` | W5-01 |
-| W5-08 | vfx-lighting | 5h: quality glint, tier markers, static reduced fly-ups | `rare_or_better_flyup_paints_one_glint_common_none`, `reduced_flyup_is_static_and_glintless` | W5-01 |
+| W5-08 | vfx-lighting | 5h: quality glint, tier markers, static reduced fly-ups | `rare_or_better_flyup_paints_one_glint_common_none`, `reduced_flyup_is_static_and_glintless`; pin `flyup_never_shows_sale_status` (acceptance G4.9: no fly-up in ui/loot.rs draws auto-sell or sale text, normal and reduced) | W5-01 |
 | W5-09 | vfx-lighting | 5i: review scenes (weapon-classes, storm, night-checkpoint, dawn-reference, fx-stress, elite-tells), `measure_field_luminance.py`, fx budget, reduced MOTION gate | `reduced_96_frame_fx_stress_sequence_has_no_additive_vertex...`, `fx_stress_shape_counts_within_perf_budget` | W5-01..08 |
 | W5-10 | qa-captures | Storm scene, weapon snapshot assertion, flash counters in manifest v2; reduced zero asserts | `storm_fixture_is_a_storm_tagged_stage`, `manifest_v2_records_flash_counters` | W5-09 |
 | W5-11 | perf-architecture | Re-gate after graphics: fx caps in PERF_BUDGET (decals 64, lights 24, explosion frames 8, flames 21/9); fx-stress gates | `perf_budget_json_matches_presentation_caps`, `perf_scenes_agree...`; stress and fx-stress exit 0 with -VsyncOff | W5-09 |

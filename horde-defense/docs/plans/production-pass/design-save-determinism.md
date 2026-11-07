@@ -461,7 +461,7 @@ The ordered steps are in the `steps` output.
 ## 13. Risks
 
 1. **Missing default.** If one `#[serde(default)]` is missing on RunRecord, CombatTelemetry, Recruit, CorpseRecord, StrategyState, WorldProgress or ResolvedEnemy (`deny_unknown_fields`), every save becomes unreadable, and `load_profile` silently starts fresh (`profile.rs:83-92`). Guards: `v6_payload_round_trips_unchanged_through_v7_types` plus the per-pointer table.
-2. **Frozen catalogue records.** Wave-2 and wave-4 edits to frozen catalogue records break V1-V6, which cannot be re-blessed. The guard is `legacy_catalogue_records_that_tick_saved_encounters_are_frozen`. The escape hatch is a per-behaviour `ProgressionSnapshot.rules_revision: u8` (default 0), which needs user approval.
+2. **Frozen catalogue records.** Wave-2 and wave-4 edits to frozen catalogue records break V1-V6, which cannot be re-blessed. The guard is `legacy_catalogue_records_that_tick_saved_encounters_are_frozen` (W2-53, before the first wave-2 catalogue edit W2-08 and the enemy catalogue rows from W2-26). The escape hatch is a per-behaviour `ProgressionSnapshot.rules_revision: u8` (default 0), which needs user approval.
 3. **Missed stamping site.** A missed seat-stamping site makes depth-1 validation reject the save, and the generation silently does not commit. Guard: `country_operation_next_stage_attempt_is_still_credited_to_its_recruit`.
 4. **Grant double-pay.** Without `GrantPolicy::Worker`, grants are paid twice.
 5. **v6 fixture timing.** `save_v6.json` must land before any schema edit. After that, no genuine v6 generation can be produced.
