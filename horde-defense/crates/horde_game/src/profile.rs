@@ -191,10 +191,11 @@ pub fn read_settings(path: &Path) -> SettingsLoad {
     }
 }
 /// Copies the `settings.json` about to be replaced to `settings.unreadable.json`
-/// (synced), unless that copy already holds the same bytes. Called before the
-/// first save of a session whose startup read left the original at risk; an
-/// error blocks that save, so the original is never replaced uncopied. A
-/// missing file needs no copy.
+/// (synced), unless that copy already holds the same bytes. Called before each
+/// save's settings write while the startup read's original is still uncopied;
+/// an error holds back only that settings write (the campaign is already
+/// saved, `Commit::SavedWithoutSettings`), so the original is never replaced
+/// uncopied. A missing file needs no copy.
 pub fn preserve_settings_original(path: &Path) -> Result<(), String> {
     let bytes = match std::fs::read(path) {
         Ok(bytes) => bytes,
