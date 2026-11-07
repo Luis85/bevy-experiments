@@ -518,10 +518,11 @@ mod tests {
     fn v2_with_default_elite_tell_parses() {
         let mut value = bundled();
         value["schema_version"] = 2.into();
+        // A default unlike the built-in one, so the file's own default is seen.
         value["elite_tells"] = serde_json::json!({
             "default": {
-                "outline_rgb": [239, 181, 82], "marker": "Chevron",
-                "ring_px": 2, "glow": 0.15, "pulse_hz": 1.2
+                "outline_rgb": [86, 180, 233], "marker": "Shield",
+                "ring_px": 1, "glow": 0.3, "pulse_hz": 0.5
             },
             "affixes": [{
                 "affix": "volatile",
@@ -532,8 +533,16 @@ mod tests {
             }]
         });
         let catalog = compile(value).unwrap();
-        assert_eq!(catalog.elite_tell(None), &BUILTIN_ELITE_TELL);
-        assert_eq!(catalog.elite_tell(Some("unknown")), &BUILTIN_ELITE_TELL);
+        let file_default = EliteTell {
+            outline_rgb: [86, 180, 233],
+            marker: TellMarker::Shield,
+            ring_px: 1,
+            glow: 0.3,
+            pulse_hz: 0.5,
+        };
+        assert_ne!(file_default, BUILTIN_ELITE_TELL);
+        assert_eq!(catalog.elite_tell(None), &file_default);
+        assert_eq!(catalog.elite_tell(Some("unknown")), &file_default);
         let volatile = catalog.elite_tell(Some("volatile"));
         assert_eq!(volatile.marker, TellMarker::Spark);
         assert_eq!(volatile.outline_rgb, [213, 94, 0]);
@@ -595,7 +604,9 @@ mod tests {
         let mut edge = bundled();
         edge["elite_tells"]["default"]["ring_px"] = 4.into();
         edge["elite_tells"]["affixes"] = (0..16).map(|i| affix(&format!("a{i}"))).collect();
-        assert!(compile(edge).is_ok());
+        let edge = compile(edge).unwrap();
+        assert_eq!(edge.elite_tell(None).ring_px, 4);
+        assert_eq!(edge.elite_tell(Some("a15")).marker, TellMarker::Shield);
         let cases: [(&str, Edit); 11] = [
             ("ring 0", |v| {
                 v["elite_tells"]["default"]["ring_px"] = 0.into()
