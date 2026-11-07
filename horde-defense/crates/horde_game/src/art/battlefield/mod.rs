@@ -15,6 +15,7 @@ mod fx;
 mod ordnance;
 mod structures;
 pub mod terrain;
+pub(crate) use enemies::HEALTH_BAR_LIFT;
 pub(crate) use fx::fx_lifetime;
 #[cfg(test)]
 mod tests;

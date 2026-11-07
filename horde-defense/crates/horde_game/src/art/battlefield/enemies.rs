@@ -250,6 +250,8 @@ pub(super) fn windup_rings(view: &BattleViewModel) -> Vec<bool> {
 
 /// The windup ground ring under the feet at `at`; the contact bands are drawn
 /// per lane first.
+/// How far over its feet, in lane heights, a hostile's health bar is centred.
+pub(crate) const HEALTH_BAR_LIFT: f32 = 0.41;
 fn windup_ring(mesh: &mut MeshBuilder, sy: f32, at: Pos2) {
     mesh.ring(
         at + vec2(0., sy * 0.3),
@@ -284,7 +286,7 @@ fn overlay(mesh: &mut MeshBuilder, sy: f32, e: &EnemyView, at: Pos2, outlines: b
     if let HealthView::Bar { fraction, boss } = e.health {
         mesh.bar(
             Rect::from_center_size(
-                at + vec2(0.0, -sy * 0.41),
+                at + vec2(0.0, -sy * HEALTH_BAR_LIFT),
                 vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
             ),
             fraction,
@@ -388,7 +390,7 @@ fn enemy(
             bar(
                 p,
                 Rect::from_center_size(
-                    at + vec2(0.0, -sy * 0.41),
+                    at + vec2(0.0, -sy * HEALTH_BAR_LIFT),
                     vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
                 ),
                 fraction,

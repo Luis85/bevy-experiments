@@ -302,6 +302,18 @@ fn motion(age: f64, reduced: bool) -> (f32, f32, f32) {
     };
     (scale, rise, fade)
 }
+/// How far over its event point a popup starts at zoom 1.
+const NUMBER_LIFT: f32 = 62.0;
+/// How far a popup's centre stays over a struck hostile's health bar: half a
+/// fresh popup with its outline (16 pt) plus a 5-pt gap.
+const BAR_CLEARANCE: f32 = 21.0;
+/// How far over its event point (a struck hostile's feet) a popup starts: the
+/// fixed lift, or clear of the health bar where the zoom raises the bar past
+/// it (W1 review). Every field up to 7x16 at both target sizes keeps the
+/// fixed lift; only the 2.1-2.5x fields rise further.
+fn number_lift(arena: art::ArenaProjection) -> f32 {
+    NUMBER_LIFT.max(arena.lane_height() * art::HEALTH_BAR_LIFT + BAR_CLEARANCE)
+}
 pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     if let Some(a) = f.game.attempt() {
         draw_for(
@@ -397,7 +409,7 @@ pub(super) fn draw_for(
                 bounds.left() + galley.size().x * 0.5 + 4.0,
                 bounds.right() - galley.size().x * 0.5 - 4.0,
             ),
-            (world.y - 62.0 - rise).max(bounds.top() + galley.size().y * 0.5 + 4.0),
+            (world.y - number_lift(arena) - rise).max(bounds.top() + galley.size().y * 0.5 + 4.0),
         );
         let origin = center - galley.size() * 0.5;
         let outline = Color32::from_black_alpha((240.0 * fade) as u8);
@@ -704,6 +716,73 @@ mod tests {
                 at[0] == 12.0 || at[1] == 0.0 || at[1] == 3.0,
                 "{angle}: {at:?} is not on the field's edge"
             );
+        }
+    }
+    /// W1 review: the zoom raises the enemy health bar (0.41 lane heights
+    /// over the feet) past a fixed lift, so on a 2.5x field a fresh number
+    /// covered the readout it reports on.
+    #[test]
+    fn a_fresh_damage_number_clears_the_struck_enemy_health_bar_on_a_zoomed_field() {
+        let mut game = zoomed_fixture();
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        game.spawn_enemy(&mut a, horde_core::content::EnemyKind::Runner, 1, false);
+        *game.attempt_slot_mut() = Some(a);
+        let a = game.attempt_mut().unwrap();
+        let enemy = a.enemies.last_mut().unwrap();
+        enemy.x = 6.0;
+        let (id, feet) = (enemy.id, [enemy.x, enemy.y()]);
+        a.events.push_back(Event {
+            to: feet,
+            target_id: Some(id),
+            lane: Some(1),
+            ..hit(a, 20, EventKind::Hit, 1)
+        });
+        let a = game.attempt().unwrap();
+        let (layout, drawn) = drawn_popup(a);
+        let drawn = drawn.expect("a damage number is drawn");
+        let arena = art::ArenaProjection::for_attempt(layout.field.rect, a);
+        let sy = arena.lane_height();
+        let body = classify(a, a.events.back().unwrap()).unwrap().at;
+        // The bar `art::battlefield` paints over the drawn body.
+        let bar = Rect::from_center_size(
+            arena.world(body[0], body[1]) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
+            vec2(sy * 0.65, 3.0),
+        );
+        assert!(
+            !drawn.intersects(bar),
+            "the number at {drawn:?} covers the health bar at {bar:?}"
+        );
+    }
+    /// The lift moves only on the 2.1-2.5x fields: 17x30, 11x20 and 7x16
+    /// keep the fixed lift at both target sizes, with or without the hint
+    /// band.
+    #[test]
+    fn number_lift_moves_only_on_fields_zoomed_past_seven_by_sixteen() {
+        let canvases = [
+            Rect::from_min_size(pos2(0.0, 0.0), vec2(1440.0, 900.0)),
+            Rect::from_min_size(pos2(0.0, 0.0), vec2(1050.0, 700.0) / 1.35),
+        ];
+        for canvas in canvases {
+            for band in [false, true] {
+                for (lanes, width, raised) in [
+                    (17, 30.0, false),
+                    (11, 20.0, false),
+                    (7, 16.0, false),
+                    (5, 14.0, canvas.width() == 1440.0),
+                    (3, 12.0, canvas.width() == 1440.0),
+                ] {
+                    let layout = crate::ui::battle::BattleLayout::new(canvas, lanes, width, band);
+                    let arena =
+                        art::ArenaProjection::with_geometry(layout.field.rect, lanes, width);
+                    let lift = number_lift(arena);
+                    let label = format!("{lanes}x{width} in {:?}, band {band}", canvas.size());
+                    if raised {
+                        assert!(lift > NUMBER_LIFT, "{label}: {lift}");
+                    } else {
+                        assert_eq!(lift, NUMBER_LIFT, "{label}");
+                    }
+                }
+            }
         }
     }
     #[test]
