@@ -12,18 +12,30 @@
 //! - `support::V7_SAVED_KEYS` lists exactly the fields the types serialize
 //!   beyond the v6 shape. The field lists come from the types themselves (the
 //!   names serde derive hands to `deserialize_struct`), so a new field that is
-//!   not in the registry fails here even before anything writes it.
+//!   not in the registry fails here even before anything writes it;
+//! - every struct the v6 fixture holds has those field lists checked, not
+//!   only the types section 3 touched.
 mod support;
 use horde_core::{
-    campaign::{Campaign, Player},
+    balance::BalanceSettings,
+    campaign::{Campaign, DefenderProfile, Item, Npc, NpcCreation, Player, Preset},
     command::Command,
-    content::Mode,
-    enemy_catalog::ResolvedEnemy,
+    content::{BossTiming, Mode, NpcProfile, PersonalProfile},
+    enemy_catalog::{EnemyVisual, ResolvedEnemy},
+    ordnance::OrdnanceState,
     progression::ProgressionSnapshot,
-    sim::{Attempt, CombatTelemetry, Enemy, Game, ParallelBattle, Report},
+    quality::LootEvent,
+    rules::{InjuryState, Rng, Stats},
+    sim::{
+        Attempt, CombatTelemetry, CorpseRecord, Enemy, Event, Game, ParallelBattle, Report,
+        Structure,
+    },
     skill_catalog::SkillModifiers,
-    stats::RunRecord,
-    strategy::{Recruit, StrategyState},
+    stats::{DamageBucket, DamageTotals, DpsTracker, GearRecord, RunRecord},
+    strategy::{GuardAssignment, Recruit, StrategyState},
+    survivors::{EquipmentVisual, EquipmentVisualItem},
+    weapons::WeaponSpec,
+    world::{Modifiers, WorldProgress},
 };
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{Value, json};
@@ -164,7 +176,7 @@ fn serde_fields<T: DeserializeOwned>() -> BTreeSet<&'static str> {
     }
 }
 
-/// A saved type touched by save format 7: its name, serde field names and
+/// A saved struct: its name, serde field names and
 /// every key path (as [`game_key_paths`] spells it) where a save holds it.
 struct SavedType {
     name: &'static str,
@@ -172,8 +184,10 @@ struct SavedType {
     places: &'static [&'static str],
 }
 
-/// The section 3 owners, plus `Game` itself (which gained no field).
-const SAVED_TYPES: [SavedType; 14] = [
+/// The section 3 owners, plus `Game` itself (which gained no field) and every
+/// other struct the v6 fixture holds (W1 review), so a later field on any of
+/// them must be registered too.
+const SAVED_TYPES: &[SavedType] = &[
     SavedType {
         name: "Game",
         fields: serde_fields::<Game>,
@@ -243,6 +257,166 @@ const SAVED_TYPES: [SavedType; 14] = [
         name: "CombatTelemetry",
         fields: serde_fields::<CombatTelemetry>,
         places: &["/attempt/telemetry", "/last_result/telemetry"],
+    },
+    SavedType {
+        name: "BalanceSettings",
+        fields: serde_fields::<BalanceSettings>,
+        places: &[
+            "/attempt/balance",
+            "/campaign/balance_settings",
+            "/campaign/run_history/balance",
+        ],
+    },
+    SavedType {
+        name: "CorpseRecord",
+        fields: serde_fields::<CorpseRecord>,
+        places: &["/attempt/corpses"],
+    },
+    SavedType {
+        name: "EnemyVisual",
+        fields: serde_fields::<EnemyVisual>,
+        places: &[
+            "/attempt/corpses/visual",
+            "/attempt/enemies/resolved/visual",
+        ],
+    },
+    SavedType {
+        name: "DpsTracker",
+        fields: serde_fields::<DpsTracker>,
+        places: &["/attempt/dps"],
+    },
+    SavedType {
+        name: "DamageBucket",
+        fields: serde_fields::<DamageBucket>,
+        places: &["/attempt/dps/buckets"],
+    },
+    SavedType {
+        name: "DamageTotals",
+        fields: serde_fields::<DamageTotals>,
+        places: &[
+            "/attempt/dps/buckets/damage",
+            "/attempt/dps/totals",
+            "/campaign/run_history/damage_by_source",
+        ],
+    },
+    SavedType {
+        name: "BossTiming",
+        fields: serde_fields::<BossTiming>,
+        places: &["/attempt/enemies/boss_timing"],
+    },
+    SavedType {
+        name: "InjuryState",
+        fields: serde_fields::<InjuryState>,
+        places: &[
+            "/attempt/enemies/injury",
+            "/attempt/injury",
+            "/strategy/guards/injury",
+        ],
+    },
+    SavedType {
+        name: "Event",
+        fields: serde_fields::<Event>,
+        places: &["/attempt/events"],
+    },
+    SavedType {
+        name: "GearRecord",
+        fields: serde_fields::<GearRecord>,
+        places: &["/attempt/gear_snapshot", "/campaign/run_history/gear"],
+    },
+    SavedType {
+        name: "LootEvent",
+        fields: serde_fields::<LootEvent>,
+        places: &["/attempt/loot_events", "/last_result/loot_events"],
+    },
+    SavedType {
+        name: "Modifiers",
+        fields: serde_fields::<Modifiers>,
+        places: &["/attempt/modifiers"],
+    },
+    SavedType {
+        name: "OrdnanceState",
+        fields: serde_fields::<OrdnanceState>,
+        places: &["/attempt/ordnance"],
+    },
+    SavedType {
+        name: "DefenderProfile",
+        fields: serde_fields::<DefenderProfile>,
+        places: &["/attempt/profile"],
+    },
+    SavedType {
+        name: "EquipmentVisual",
+        fields: serde_fields::<EquipmentVisual>,
+        places: &["/attempt/profile/equipment_visual"],
+    },
+    SavedType {
+        name: "EquipmentVisualItem",
+        fields: serde_fields::<EquipmentVisualItem>,
+        places: &[
+            "/attempt/profile/equipment_visual/accessory",
+            "/attempt/profile/equipment_visual/melee",
+            "/attempt/profile/equipment_visual/outfit",
+            "/attempt/profile/equipment_visual/ranged",
+        ],
+    },
+    SavedType {
+        name: "NpcProfile",
+        fields: serde_fields::<NpcProfile>,
+        places: &["/attempt/profile/npc"],
+    },
+    SavedType {
+        name: "PersonalProfile",
+        fields: serde_fields::<PersonalProfile>,
+        places: &["/attempt/profile/personal"],
+    },
+    SavedType {
+        name: "Stats",
+        fields: serde_fields::<Stats>,
+        places: &["/attempt/profile/stats"],
+    },
+    SavedType {
+        name: "WeaponSpec",
+        fields: serde_fields::<WeaponSpec>,
+        places: &["/attempt/profile/weapon"],
+    },
+    SavedType {
+        name: "Rng",
+        fields: serde_fields::<Rng>,
+        places: &["/attempt/rng", "/strategy/rng"],
+    },
+    SavedType {
+        name: "Structure",
+        fields: serde_fields::<Structure>,
+        places: &["/attempt/structures"],
+    },
+    SavedType {
+        name: "Item",
+        fields: serde_fields::<Item>,
+        places: &["/campaign/items"],
+    },
+    SavedType {
+        name: "Npc",
+        fields: serde_fields::<Npc>,
+        places: &["/campaign/npc", "/strategy/roster/npc"],
+    },
+    SavedType {
+        name: "NpcCreation",
+        fields: serde_fields::<NpcCreation>,
+        places: &["/campaign/npc/creation", "/strategy/roster/npc/creation"],
+    },
+    SavedType {
+        name: "Preset",
+        fields: serde_fields::<Preset>,
+        places: &["/campaign/presets"],
+    },
+    SavedType {
+        name: "WorldProgress",
+        fields: serde_fields::<WorldProgress>,
+        places: &["/campaign/world"],
+    },
+    SavedType {
+        name: "GuardAssignment",
+        fields: serde_fields::<GuardAssignment>,
+        places: &["/strategy/guards"],
     },
 ];
 
@@ -606,7 +780,48 @@ fn v6_shaped_objects_decode_into_every_touched_type() {
     assert_eq!(failures, Vec::<String>::new());
 }
 
-/// `V7_SAVED_KEYS` is exactly the set of fields the touched types serialize
+/// Whether `key` reads as a serde field name (snake case), not a map key: a
+/// `KindMap` writes its variant names and a data-keyed map collapses to `*`.
+fn is_field_name(key: &str) -> bool {
+    key.starts_with(|c: char| c.is_ascii_lowercase())
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+}
+
+/// Every struct the v6 fixture holds (an object whose keys are all field
+/// names) is a place of a [`SAVED_TYPES`] entry, so a later serde-skipped
+/// field on any saved struct, not only the section 3 owners, must reach
+/// `V7_SAVED_KEYS` (the W1-63 freeze rule).
+#[test]
+fn saved_types_cover_every_struct_the_v6_fixture_holds() {
+    let places: BTreeSet<&str> = SAVED_TYPES
+        .iter()
+        .flat_map(|ty| ty.places.iter().copied())
+        .collect();
+    let mut keys_at: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    for path in game_key_paths(&v6_payload()) {
+        let (parent, key) = path.rsplit_once('/').unwrap();
+        keys_at
+            .entry(parent.to_owned())
+            .or_default()
+            .push(key.to_owned());
+    }
+    let uncovered: Vec<&String> = keys_at
+        .iter()
+        .filter(|(parent, keys)| {
+            keys.iter().all(|key| is_field_name(key)) && !places.contains(parent.as_str())
+        })
+        .map(|(parent, _)| parent)
+        .collect();
+    assert_eq!(
+        uncovered,
+        Vec::<&String>::new(),
+        "saved structs with no SAVED_TYPES entry"
+    );
+}
+
+/// `V7_SAVED_KEYS` is exactly the set of fields the saved types serialize
 /// beyond the v6 shape, at every place a save holds each type. The field
 /// lists come from the types, so a new saved field fails here until the
 /// registry (and its sample above) lists it, and a stale row fails too.
@@ -614,7 +829,7 @@ fn v6_shaped_objects_decode_into_every_touched_type() {
 fn v7_saved_keys_registry_matches_types() {
     let v6_paths = game_key_paths(&v6_payload());
     let mut expected: BTreeMap<String, &str> = BTreeMap::new();
-    for ty in &SAVED_TYPES {
+    for ty in SAVED_TYPES {
         let fields = (ty.fields)();
         let v6 = v6_fields(ty, &v6_paths);
         let lost: Vec<&String> = v6.iter().filter(|k| !fields.contains(k.as_str())).collect();
