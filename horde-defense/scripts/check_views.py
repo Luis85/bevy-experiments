@@ -91,6 +91,9 @@ def architecture_modules(workspace: Path, max_depth: int | None = 2) -> set[str]
     return modules
 
 
+# A `#[test]` fn, past any further attributes (`#[ignore]`, `#[should_panic]`) and a visibility.
+TEST_FN = re.compile(r"#\[test\]\s*(?:#\[[^\]]*\]\s*)*(?:pub(?:\([^)]*\))?\s+)?fn\s+(\w+)")
+
 OWNERSHIP_COLUMNS = ["Module (file)", "Owns", "Does not own", "Entry points / key types", "Guard tests"]
 
 
@@ -138,16 +141,17 @@ def check_architecture(workspace: Path) -> tuple[int, list[str]]:
     under `src` (`sim/director`, `art/camera.rs`, `ui/battle/mod.rs`). Other
     first-cell tokens must be workspace-relative paths that exist
     (`scripts/measure_performance.ps1`). Every backticked guard test must be
-    a Rust `fn` in crates/ or a workspace path that exists.
+    a Rust `#[test]` fn in crates/ or a workspace path that exists; a
+    production fn of the same name does not count.
     """
     text = (workspace / "docs/ARCHITECTURE.md").read_text(encoding="utf-8-sig")
     rows, errors = _ownership_rows(text)
     required = architecture_modules(workspace)
     known = architecture_modules(workspace, max_depth=None)
-    functions: set[str] = set()
+    tests: set[str] = set()
     for path in workspace.glob("crates/*/**/*.rs"):
         if "target" not in path.relative_to(workspace).parts:
-            functions.update(re.findall(r"\bfn\s+(\w+)", path.read_text(encoding="utf-8-sig")))
+            tests.update(TEST_FN.findall(path.read_text(encoding="utf-8-sig")))
     documented: set[str] = set()
     for cells in rows:
         for token in re.findall(r"`([^`]+)`", cells[0]):
@@ -157,7 +161,7 @@ def check_architecture(workspace: Path) -> tuple[int, list[str]]:
             elif not (workspace / token).is_file():
                 errors.append(f"ARCHITECTURE.md: row names no module or file: {token}")
         for token in re.findall(r"`([^`]+)`", cells[-1]):
-            if token not in functions and not (workspace / token).is_file():
+            if token not in tests and not (workspace / token).is_file():
                 errors.append(f"ARCHITECTURE.md: guard test not found: {token}")
     for missing in sorted(required - documented):
         errors.append(f"ARCHITECTURE.md: no ownership row for module {missing}")

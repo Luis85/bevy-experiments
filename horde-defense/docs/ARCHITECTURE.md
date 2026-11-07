@@ -4,7 +4,7 @@ Lastlight is an independent two-package Cargo workspace. `horde_core` is engine-
 
 ## Ownership
 
-One row per module. Paths are relative to the crate's `src/` (`crates/horde_core/src` for core rows, `crates/horde_game/src` for game rows); other paths are relative to this workspace. `python -I -B scripts/check_views.py` fails when a module or directory to depth 2 has no row here, when a row names a module or file that does not exist, or when a guard test named in the last column is not a Rust `fn` in `crates/`. `lib.rs`, `main.rs` and test-only `tests`/`*_tests` modules need no row.
+One row per module. Paths are relative to the crate's `src/` (`crates/horde_core/src` for core rows, `crates/horde_game/src` for game rows); other paths are relative to this workspace. `python -I -B scripts/check_views.py` fails when a module or directory to depth 2 has no row here, when a row names a module or file that does not exist, or when a guard test named in the last column is neither a Rust `#[test]` fn in `crates/` nor an existing workspace file. `lib.rs`, `main.rs` and test-only `tests`/`*_tests` modules need no row.
 
 | Module (file) | Owns | Does not own | Entry points / key types | Guard tests |
 |---|---|---|---|---|
@@ -179,7 +179,7 @@ One row per module. Paths are relative to the crate's `src/` (`crates/horde_core
 | `crates/horde_game/src/architecture_tests.rs` | Test-only source scan: presentation never reads the core RNG | Game state | Test functions | `presentation_never_reads_core_rng` |
 | `scripts/measure_performance.ps1` | Native frame evidence against `docs/PERF_BUDGET.json`: peak, progressed-peak and stress scenes, `-Profile`, `-VsyncOff`, `-Repeat`, budget exit codes | Building or gating outside its own run | `-Scene`, `-Profile`, `-SelfTest` | `scripts/tests/run_script_tests.ps1`, `perf_scenes_agree_across_script_budget_and_review_matrix` |
 | `scripts/lib/Native.ps1` | The shared Windows PowerShell 5.1 harness: `Invoke-Native` and target resolution through `CARGO_TARGET_DIR` | PowerShell 7 APIs | `Invoke-Native`, `Resolve-HordeTarget` | `scripts/tests/run_script_tests.ps1`, `powershell_scripts_are_51_safe` |
-| `scripts/check_views.py` | The View graph check and this table's coverage gate | Rust behaviour | `check`, `check_architecture` | — |
+| `scripts/check_views.py` | The View graph check and this table's coverage gate | Rust behaviour | `check`, `check_architecture` | `scripts/tests/test_check_views.py` |
 
 ## Mutation path
 
