@@ -61,7 +61,14 @@ impl SaleBlock {
             Self::NpcOnly => "NPC issued gear cannot be sold".into(),
             Self::EquippedPersonal => "Equipped by you".into(),
             Self::EquippedMara => "Equipped by Mara".into(),
-            Self::Preset { names } => format!("Used by the preset {}", names.join(", ")),
+            Self::Preset { names } => {
+                let noun = if names.len() == 1 {
+                    "preset"
+                } else {
+                    "presets"
+                };
+                format!("Used by the {noun} {}", names.join(", "))
+            }
             Self::RecruitEquipped { name } => format!("Equipped by {name}"),
         }
     }
@@ -243,6 +250,18 @@ mod tests {
         assert_eq!(plan.ids, vec![extra]);
         assert_eq!(plan.coins, c.item_sale_value(extra).unwrap());
         assert_eq!(c.sell_quote(&refs), 0);
+    }
+
+    #[test]
+    fn preset_block_label_picks_the_noun_by_count() {
+        let one = SaleBlock::Preset {
+            names: vec!["A".into()],
+        };
+        assert_eq!(one.label(), "Used by the preset A");
+        let two = SaleBlock::Preset {
+            names: vec!["A".into(), "B".into()],
+        };
+        assert_eq!(two.label(), "Used by the presets A, B");
     }
 
     #[test]
