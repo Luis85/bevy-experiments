@@ -103,12 +103,13 @@ public static class LastLightNativeHelper {
             Console.WriteLine("max-lanes\tStill\tfalse\tfalse\tfalse\t\t\t1");
             Console.WriteLine("broken\tStill\tfalse\tfalse\tfalse\t\t\t1");
             Console.WriteLine("unscaled\tStill\tfalse\tfalse\tfalse\t\t\t1");
+            Console.WriteLine("rescaled\tStill\tfalse\tfalse\tfalse\t\t\t1");
             return 0;
         }
         // A capture_review still: a PNG header at twice the requested width (Windows scale 2) plus a sidecar per scene.
         // battle passes every check, construction moves the arena at small size, max-lanes misses the pre-zoom arena
-        // at small size and has 3 HUD rows, menu writes no sidecar, broken writes one that is not JSON and unscaled
-        // ignores the requested reduced effects and UI scale.
+        // at small size and has 3 HUD rows, menu writes no sidecar, broken writes one that is not JSON, unscaled
+        // ignores the requested reduced effects and UI scale, and rescaled ignores only the UI scale.
         string capture = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_CAPTURE");
         if (args.Length == 0 && !String.IsNullOrEmpty(capture)) {
             string scene = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN");
@@ -122,9 +123,10 @@ public static class LastLightNativeHelper {
             Directory.CreateDirectory(Path.GetDirectoryName(capture));
             File.WriteAllBytes(capture, png);
             // Every sidecar echoes the requested reduced-effects mode and UI scale, except unscaled, which always
-            // reports normal effects at scale 1 (the review overrides did not take).
-            string echo = "\"reduced_effects\":" + (Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_REDUCED") == "1" ? "true" : "false")
-                + ",\"ui_scale\":" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCALE") + ",";
+            // reports normal effects at scale 1 (the review overrides did not take), and rescaled, which echoes the
+            // reduced-effects mode but always reports scale 1 (only LASTLIGHT_REVIEW_SCALE did not take).
+            string reducedEcho = "\"reduced_effects\":" + (Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_REDUCED") == "1" ? "true" : "false");
+            string echo = reducedEcho + ",\"ui_scale\":" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCALE") + ",";
             string sidecar = null;
             if (scene == "battle") { sidecar = "{" + echo + "\"screen\":\"Battle\",\"hud_rows\":2,\"arena_rect\":[10,20,30,40]}"; }
             if (scene == "construction") { sidecar = "{" + echo + "\"screen\":\"Battle\",\"hud_rows\":null,\"arena_rect\":" + (small ? "[11,20,30,40]" : "[10,20,30,40]") + "}"; }
@@ -133,6 +135,7 @@ public static class LastLightNativeHelper {
                     + (small ? "[0,0,1440,900]" : "[24,124,1416,816]") + "}";
             }
             if (scene == "unscaled") { sidecar = "{\"reduced_effects\":false,\"ui_scale\":1.0,\"screen\":\"Menu\"}"; }
+            if (scene == "rescaled") { sidecar = "{" + reducedEcho + ",\"ui_scale\":1.0,\"screen\":\"Menu\"}"; }
             if (scene == "broken") { sidecar = "{not json"; }
             if (sidecar != null) { File.WriteAllText(Path.ChangeExtension(capture, ".json"), sidecar); }
             return 0;
@@ -636,6 +639,26 @@ try {
         Assert-Equal 'reduced_effects true (requested true), ui_scale 1.35 (requested 1.35)' $details['sidecar_echoes_request small battle'] 'pass detail'
         $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: sidecar_echoes_request *' })
         Assert-Equal 2 $failLines.Count "one FAIL line per unechoed still; $log"
+    }
+
+    Test-Case 'capture_review fails a sidecar that echoes the reduced effects but not the requested UI scale' {
+        # rescaled reports the requested reduced-effects mode but always scale 1: the large still matches the request,
+        # the small one is not small-size evidence on the UI scale alone.
+        $out = Join-Path $temporary 'captures-rescaled'
+        $review = Join-Path $scriptsDirectory 'capture_review.ps1'
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $review, '-NoBuild', '-Executable', $helper,
+            '-Scenes', 'rescaled', '-Modes', 'normal', '-OutputDirectory', $out)
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-review-rescaled') -TimeoutSeconds 300
+        $log = 'out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err)
+        Assert-Equal 1 $r.ExitCode "a sidecar that ignores the UI scale exits 1; $log"
+        $report = Get-Content -Raw -LiteralPath (Join-Path $out 'captures.json') | ConvertFrom-Json
+        $rows = @($report.sidecar_checks | Where-Object { $_.check -eq 'sidecar_echoes_request' } | ForEach-Object { "$($_.mode) $($_.size) $($_.scene) $($_.result)" } | Sort-Object)
+        Assert-Equal "normal large rescaled pass`nnormal small rescaled fail" ($rows -join "`n") 'echo rows'
+        $details = @{}
+        foreach ($row in @($report.sidecar_checks)) { $details["$($row.check) $($row.size) $($row.scene)"] = $row.detail }
+        Assert-Equal 'reduced_effects false (requested false), ui_scale 1 (requested 1.35)' $details['sidecar_echoes_request small rescaled'] 'small detail'
+        $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: sidecar_echoes_request *' })
+        Assert-Equal 1 $failLines.Count "one FAIL line for the small still; $log"
     }
 
     Test-Case 'capture_review and capture_motion resolve a relative -Executable against the workspace' {
