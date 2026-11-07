@@ -15,7 +15,9 @@
 #   -Repeat N                                runs per scene and size (3 for acceptance)
 #   -Adapter <name>                          WGPU_ADAPTER_NAME; an informational run that never fails the budget. Bevy
 #                                            falls back to the default GPU when no adapter matches, so a run is valid
-#                                            only when its report's adapter contains the name (case-insensitive)
+#                                            only when its report's adapter contains the name (case-insensitive).
+#                                            Without -Adapter an inherited WGPU_ADAPTER_NAME is cleared for the build
+#                                            and runs (and restored afterwards)
 #   -OutputDirectory <dir>                   default <target>/perf/<yyyyMMdd-HHmmss>-<profile>[-novsync]; must
 #                                            be missing or empty
 #   -NoBuild, -NoBudget                      skip the cargo build / the budget compare (validity still counts)
@@ -686,6 +688,8 @@ $cpuName = $null
 $saved = Reset-LastlightEnv
 $savedAdapter = [Environment]::GetEnvironmentVariable('WGPU_ADAPTER_NAME', 'Process')
 try {
+# Bevy honours any WGPU_ADAPTER_NAME it inherits: only -Adapter (an informational run) may steer the GPU.
+[Environment]::SetEnvironmentVariable('WGPU_ADAPTER_NAME', $null, 'Process')
     if ($ShippedSmoke) {
         # One CARGO_TARGET_DIR: the shipped and review playtest builds share an exe path, so copy the shipped one out first.
         Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense', '--profile', 'playtest', '--no-default-features') -LogStem (Join-Path $tools 'cargo-shipped') | Out-Null

@@ -149,7 +149,10 @@ public static class LastLightNativeHelper {
             string adapter = Environment.GetEnvironmentVariable("HORDE_FAKE_ADAPTER");
             if (String.IsNullOrEmpty(adapter)) { adapter = "Fake Adapter"; }
             // The window opens at the requested size at Windows scale 2, unless HORDE_FAKE_WINDOW names the physical
+            // Without HORDE_FAKE_ADAPTER, a WGPU_ADAPTER_NAME the fake inherits steers it, as Bevy honours any it sees.
             // WIDTHxHEIGHT the OS clamped it to.
+            string steered = Environment.GetEnvironmentVariable("WGPU_ADAPTER_NAME");
+            if (String.IsNullOrEmpty(adapter) && !String.IsNullOrEmpty(steered)) { adapter = "Fake Adapter steered to " + steered; }
             string[] size = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SIZE").Split('x');
             string window = Environment.GetEnvironmentVariable("HORDE_FAKE_WINDOW");
             string[] physical = String.IsNullOrEmpty(window)
@@ -536,6 +539,29 @@ try {
         # The budget gates per size: a window the OS clamped (or launch.rs's 1440x900 fallback) is not normal or small.
         $sizeTarget = Join-Path $temporary 'perf-size-target'
         try {
+    Test-Case 'measure_performance clears an inherited WGPU_ADAPTER_NAME without -Adapter' {
+        # Bevy honours any WGPU_ADAPTER_NAME it inherits, so a shell left steered to another GPU would gate that GPU
+        # against the budget's hardware; only -Adapter steers a run, and that run is informational.
+        $inheritTarget = Join-Path $temporary 'perf-inherit-target'
+        $savedSteer = [Environment]::GetEnvironmentVariable('WGPU_ADAPTER_NAME', 'Process')
+        try {
+            New-FakeTarget $inheritTarget
+            $env:CARGO_TARGET_DIR = $inheritTarget
+            $env:WGPU_ADAPTER_NAME = 'intel'
+            $out = Join-Path $temporary 'perf-inherit'
+            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-OutputDirectory', $out) 'measure-inherit'
+            Assert-Equal 0 $r.ExitCode ("inherited adapter: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            Assert-Equal $null $summary.adapter 'summary adapter'
+            Assert-Equal $false $summary.informational 'summary informational'
+            Assert-Equal 2 @($summary.runs).Count 'one run per size'
+            foreach ($run in @($summary.runs)) {
+                Assert-Equal 'Fake Adapter' $run.adapter "$($run.file) ran on the default adapter"
+            }
+        }
+        finally { [Environment]::SetEnvironmentVariable('WGPU_ADAPTER_NAME', $savedSteer, 'Process') }
+    }
+
             New-FakeTarget $sizeTarget
             $env:CARGO_TARGET_DIR = $sizeTarget
             $env:HORDE_FAKE_WINDOW = '2880x1700'
