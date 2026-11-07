@@ -422,6 +422,7 @@ impl ProgressionSnapshot {
             .into_iter()
             .any(|v| !finite(v, 1.0, 8.0))
             || self.elite_rate_bp > 10_000
+            || (self.rank < 3 && self.elite_rate_bp != 0)
             || !finite(self.front_ramp, 1.0, 2.0)
             || self.boss_phases > 2
             || !finite(self.boss_armor_multiplier, 1.0, 4.0)

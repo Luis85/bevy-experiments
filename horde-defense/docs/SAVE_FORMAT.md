@@ -182,8 +182,8 @@ non-neutral value yet (enemy-balance, wave 2).
   speed 1–2, armor 0.25–1, call interval and siege recovery 0.3–1, hold at
   most 180 ticks), a non-zero `hold_until` before any transition was
   entered, or a `hold_until` more than `hold_ticks` past the attempt tick.
-- `attempt.progression` may carry `elite_rate_bp` (0–10000), `front_ramp`
-  (1–2, absent at exactly 1.0), `boss_rank` (`Sector`, `Regional` or
+- `attempt.progression` may carry `elite_rate_bp` (0–10000, and 0 below
+  rank 3), `front_ramp` (1–2, absent at exactly 1.0), `boss_rank` (`Sector`, `Regional` or
   `Capstone`; absent at `Sector`), `boss_phases` (0–2),
   `boss_armor_multiplier` (1–4), `npc_boss_armor_add` (0–20),
   `boss_health_multiplier` and `boss_reward_multiplier` (1–2) and

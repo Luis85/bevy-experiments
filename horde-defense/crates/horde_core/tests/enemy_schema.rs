@@ -358,6 +358,28 @@ fn progression_snapshot_enemy_fields_round_trip_and_validate_bounds() {
     assert_eq!(passed, Vec::<String>::new(), "rows that did not fail");
 }
 
+/// schema-v7.md 3.10: `elite_rate_bp` is 0 when the rank is below 3, so a
+/// rank 0..=2 snapshot with any elite rate is rejected; rank 3 accepts one.
+#[test]
+fn progression_snapshot_rejects_an_elite_rate_below_rank_three() {
+    let with = |rank: u32, elite_rate_bp: u32| {
+        let mut value = populated_snapshot();
+        value["rank"] = rank.into();
+        value["elite_rate_bp"] = elite_rate_bp.into();
+        parse::<ProgressionSnapshot>(&value).unwrap().validate()
+    };
+    let passed: Vec<u32> = (0..=2).filter(|&rank| with(rank, 1).is_ok()).collect();
+    assert_eq!(
+        passed,
+        Vec::<u32>::new(),
+        "ranks below 3 with an elite rate"
+    );
+    for rank in 0..=2 {
+        assert_eq!(with(rank, 0), Ok(()), "rank {rank} without an elite rate");
+    }
+    assert_eq!(with(3, 1), Ok(()), "rank 3 with an elite rate");
+}
+
 /// A deployed Personal game with a live regular enemy and a live boss.
 fn live_battle() -> Game {
     let mut g = support::game(Mode::Personal);
