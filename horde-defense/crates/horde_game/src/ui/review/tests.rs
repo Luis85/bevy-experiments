@@ -635,27 +635,11 @@ fn observed_operations(f: &mut FrontendParts, geometry: (u8, f32)) -> (egui::Rec
     let a = battle.game_mut().attempt_mut().unwrap();
     (a.lane_count, a.width_yards) = geometry;
     f.campaign.observed = Some(id);
-    let ctx = egui::Context::default();
-    crate::settings::install_font(&ctx);
-    crate::settings::configure(&ctx, 1.35);
-    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
-    warmup.textures_delta.clear();
+    let ctx = operations_context();
     let mut last = None;
     // Windows settle their size over the first passes; read a settled frame.
     for _ in 0..3 {
-        f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
-        let mut output = ctx.run_ui(
-            egui::RawInput {
-                screen_rect: Some(egui::Rect::from_min_size(
-                    egui::Pos2::ZERO,
-                    egui::vec2(1050.0, 700.0) / 1.35,
-                )),
-                ..egui::RawInput::default()
-            },
-            |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
-        );
-        output.textures_delta.clear();
-        last = Some(output);
+        last = Some(operations_frame(&ctx, f));
     }
     let output = last.unwrap();
     let content = ctx.content_rect();
@@ -673,6 +657,32 @@ fn observed_operations(f: &mut FrontendParts, geometry: (u8, f32)) -> (egui::Rec
     boxes.dedup();
     assert_eq!(boxes.len(), 1, "observer boxes {boxes:?} for {field:?}");
     (field, boxes[0])
+}
+
+/// A context configured as `observed_operations` draws: scale 1.35, warmed up.
+fn operations_context() -> egui::Context {
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    crate::settings::configure(&ctx, 1.35);
+    let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+    warmup.textures_delta.clear();
+    ctx
+}
+/// One 1050x700-pixel frame of the staged screen at scale 1.35.
+fn operations_frame(ctx: &egui::Context, f: &mut FrontendParts) -> egui::FullOutput {
+    f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+    let mut output = ctx.run_ui(
+        egui::RawInput {
+            screen_rect: Some(egui::Rect::from_min_size(
+                egui::Pos2::ZERO,
+                egui::vec2(1050.0, 700.0) / 1.35,
+            )),
+            ..egui::RawInput::default()
+        },
+        |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+    );
+    output.textures_delta.clear();
+    output
 }
 
 #[test]
@@ -716,6 +726,55 @@ fn review_frame_facts_report_the_observer_field() {
         ("Camp", Some("Operations"))
     );
     assert_eq!((facts.arena_rect, facts.lanes), (None, None));
+}
+
+/// The observer's field is a fact of the operations tab only: a still taken
+/// on another tab or screen never reports the rect the window last recorded.
+#[cfg(feature = "review")]
+#[test]
+fn review_frame_facts_drop_the_observer_off_its_tab() {
+    let mut f = staged("operations");
+    observed_operations(&mut f, (3, 12.0));
+    assert!(f.battle.observer_arena_rect.is_some());
+    for (screen, tab) in [
+        (Screen::Camp, Tab::World),
+        (Screen::Battle, Tab::Operations),
+        (Screen::Results, Tab::Operations),
+    ] {
+        let facts =
+            ReviewFrameFacts::collect(&f.game, &f.launch, &f.settings, screen, tab, &f.battle);
+        assert_eq!(facts.observer_arena_rect, None, "{screen:?} {tab:?}");
+        assert!(!facts.overlays.contains(&"observer"), "{screen:?} {tab:?}");
+    }
+}
+
+/// A collapsed observer window draws no field, so it records none: the rect
+/// of the frame before the collapse is not kept.
+#[test]
+fn a_collapsed_observer_records_no_field() {
+    let mut f = staged("operations");
+    observed_operations(&mut f, (3, 12.0));
+    assert!(f.battle.observer_arena_rect.is_some());
+    let id = f.campaign.observed.expect("observed");
+    // egui 0.36 keys a window's area by `Id::new(title.text())`, an Option.
+    let title = format!("Live battlefield #{id}");
+    let window = egui::Id::new(Some(title.as_str()));
+    let ctx = operations_context();
+    let mut collapsing = egui::collapsing_header::CollapsingState::load_with_default_open(
+        &ctx,
+        window.with("collapsing"),
+        true,
+    );
+    collapsing.set_open(false);
+    collapsing.store(&ctx);
+    for _ in 0..3 {
+        operations_frame(&ctx, &mut f);
+    }
+    assert!(
+        ctx.memory(|m| m.area_rect(window)).is_some(),
+        "the collapsed window is still drawn"
+    );
+    assert_eq!(f.battle.observer_arena_rect, None);
 }
 
 #[test]

@@ -143,7 +143,8 @@ pub(crate) struct ReviewFrameFacts {
 #[cfg(feature = "review")]
 impl ReviewFrameFacts {
     /// The facts of the last drawn pass. Field facts are reported only on
-    /// the battle screen, so a stale rect from an earlier battle never is.
+    /// their own screen (the battle field on Battle, the observer's on the
+    /// camp's Operations tab), so a stale rect from an earlier pass never is.
     pub(crate) fn collect(
         game: &Game,
         launch: &crate::launch::LaunchConfig,
@@ -154,6 +155,8 @@ impl ReviewFrameFacts {
     ) -> Self {
         let corners = |r: bevy_egui::egui::Rect| [r.left(), r.top(), r.right(), r.bottom()];
         let in_battle = screen == super::Screen::Battle;
+        let in_operations = screen == super::Screen::Camp && tab == super::Tab::Operations;
+        let observer = battle.observer_arena_rect.filter(|_| in_operations);
         let attempt = game.attempt().filter(|_| in_battle);
         let mut overlays = Vec::new();
         if in_battle && battle.construction {
@@ -162,7 +165,7 @@ impl ReviewFrameFacts {
         if in_battle && battle.inspect_log {
             overlays.push("inspect-log");
         }
-        if battle.observer_arena_rect.is_some() {
+        if observer.is_some() {
             overlays.push("observer");
         }
         Self {
@@ -173,7 +176,7 @@ impl ReviewFrameFacts {
             canvas_rect: None,
             arena_rect: battle.arena_rect.filter(|_| in_battle).map(corners),
             effects_rect: battle.effects_rect.filter(|_| in_battle).map(corners),
-            observer_arena_rect: battle.observer_arena_rect.map(corners),
+            observer_arena_rect: observer.map(corners),
             lanes: attempt.map(|a| a.lane_count),
             width_yards: attempt.map(|a| a.width_yards),
             hud_rows: None,

@@ -226,6 +226,9 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
     }
     if let Some(id) = f.campaign.observed {
         let mut open = true;
+        // Only a pass that draws the field records it: a collapsed window or
+        // a settled deployment leaves no stale rect behind.
+        f.battle.observer_arena_rect = None;
         egui::Window::new(format!("Live battlefield #{id}"))
             .default_size(vec2(
                 900.0_f32.min(ui.ctx().content_rect().width() - 32.0),
@@ -346,7 +349,6 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         }
                     }
                 } else {
-                    f.battle.observer_arena_rect = None;
                     muted(
                         ui,
                         "Deployment complete. Its report remains in the expedition list.",
