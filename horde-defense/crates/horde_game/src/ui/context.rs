@@ -310,6 +310,7 @@ impl UiCtx<'_> {
     }
     pub(super) fn open_settings(&mut self) {
         self.prefs.balance_draft = Some(self.game.campaign().balance_settings.clone());
+        self.prefs.balance_custom_chosen = false;
         self.nav.return_screen = self.screen;
         self.nav.return_world_paused = self.game.global_paused();
         self.go(Screen::Settings);

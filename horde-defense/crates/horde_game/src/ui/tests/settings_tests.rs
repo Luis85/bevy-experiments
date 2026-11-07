@@ -535,6 +535,51 @@ fn editing_a_named_preset_on_the_settings_screen_keeps_its_extras() {
     assert_eq!(campaign.balance_extras_preset(), BalancePreset::Easy);
 }
 
+/// W1 review: clicking 'Custom' after a named preset must not drop the preset
+/// the draft came from, or the edit saves the committed preset's extras.
+#[test]
+fn choosing_custom_after_a_named_preset_keeps_its_extras() {
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.game
+        .apply(&Command::SetBalance(BalanceSettings::for_preset(
+            BalancePreset::Normal,
+        )))
+        .unwrap();
+    f.act(|c| c.open_settings());
+    f.flush_for_test();
+    h.click(f, View::Settings, "Hard");
+    h.click(f, View::Settings, "Custom");
+    press_slider_rail(&h, f, "Zombie speed");
+    let draft = f.prefs.balance_draft.clone().unwrap();
+    assert_ne!(
+        draft.enemy_speed,
+        BalanceSettings::for_preset(BalancePreset::Hard).enemy_speed,
+        "the slider did not move"
+    );
+    h.click(f, View::Settings, "Apply to next run");
+    let campaign = f.game.campaign();
+    assert_eq!(campaign.balance_settings.enemy_speed, draft.enemy_speed);
+    assert_eq!(campaign.balance_settings.preset, BalancePreset::Custom);
+    assert_eq!(campaign.balance_extras_preset(), BalancePreset::Hard);
+
+    // Choosing Custom over an unedited preset highlights Custom, and picking
+    // a named preset afterwards highlights that preset again.
+    f.act(|c| c.open_settings());
+    f.flush_for_test();
+    h.click(f, View::Settings, "Easy");
+    h.click(f, View::Settings, "Custom");
+    assert!(f.prefs.balance_custom_chosen);
+    h.click(f, View::Settings, "Normal");
+    assert!(!f.prefs.balance_custom_chosen);
+    assert_eq!(
+        f.prefs.balance_draft.as_ref().unwrap(),
+        &BalanceSettings::for_preset(BalancePreset::Normal)
+    );
+}
+
 #[test]
 fn older_autosave_ack_keeps_navigation_busy_and_freezes_raw_settings_binding_capture() {
     let mut fixture = IsolatedFrontend::new();

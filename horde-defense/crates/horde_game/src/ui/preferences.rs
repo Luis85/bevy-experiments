@@ -194,15 +194,15 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
     let apply = {
         let campaign = f.game.campaign();
         let committed = &campaign.balance_settings;
-        let draft = f
-            .prefs
-            .balance_draft
-            .get_or_insert_with(|| committed.clone());
+        let prefs = &mut *f.prefs;
+        let custom_chosen = &mut prefs.balance_custom_chosen;
+        let draft = prefs.balance_draft.get_or_insert_with(|| committed.clone());
         chrome::row(ui, |ui| {
             // An edited named draft keeps its preset, so the core keeps that
             // preset's extras when it normalises the edit to Custom; it is
-            // shown as Custom.
-            let shown = if *draft == BalanceSettings::for_preset(draft.preset) {
+            // shown as Custom. Choosing Custom only sets the highlight and
+            // never overwrites the named preset the draft came from.
+            let shown = if !*custom_chosen && *draft == BalanceSettings::for_preset(draft.preset) {
                 draft.preset
             } else {
                 BalancePreset::Custom
@@ -213,9 +213,8 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
                     .clicked()
                     && shown != preset
                 {
-                    if preset == BalancePreset::Custom {
-                        draft.preset = preset;
-                    } else {
+                    *custom_chosen = preset == BalancePreset::Custom;
+                    if preset != BalancePreset::Custom {
                         *draft = BalanceSettings::for_preset(preset);
                     }
                 }
