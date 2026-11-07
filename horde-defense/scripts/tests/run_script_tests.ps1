@@ -78,6 +78,7 @@ public static class LastLightNativeHelper {
             Thread.Sleep(int.Parse(args[2]) * 1000);
             return 0;
         }
+        if (args.Length == 1 && args[0] == "cwd") { Console.WriteLine(Environment.CurrentDirectory); return 0; }
         // 'review <pidfile> <s>' leaves a per-PID review profile behind, as profile.rs does.
         if (args.Length == 3 && args[0] == "review") {
             int id = Process.GetCurrentProcess().Id;
@@ -117,6 +118,7 @@ public static class LastLightNativeHelper {
                 + ",\"build\":{\"profile_label\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PROFILE") + "\"}}");
             return 0;
         }
+        Console.WriteLine("unhandled argc " + args.Length);
         return 2;
     }
 }
@@ -163,6 +165,29 @@ try {
         Assert-Equal 'out' (Read-Log "$stem.out.txt").Trim() 'stdout log under redirect'
         Assert-Equal 'err' (Read-Log "$stem.err.txt").Trim() 'stderr log under redirect'
         Assert-True ((Read-Log $callerLog) -match 'caller output') 'caller redirect captured its own output'
+    }
+
+    Test-Case 'Invoke-Native runs an exe with no arguments' {
+        # 5.1 Start-Process rejects an empty -ArgumentList; the review captures launch the game this way.
+        [Environment]::SetEnvironmentVariable('LASTLIGHT_PERF_REPORT', $null, 'Process')
+        $r = Invoke-Native -FilePath $helper -LogStem (Join-Path $temporary 'logs\no-arguments') -TimeoutSeconds 30
+        Assert-Equal 2 $r.ExitCode ('no-argument exit code; err: ' + (Read-Log $r.Err))
+        Assert-Equal 'unhandled argc 0' (Read-Log $r.Out).Trim() 'no-argument argv'
+    }
+
+    Test-Case 'Invoke-Native and Invoke-Cargo run in their working directory, not the caller location' {
+        $probe = Join-Path $temporary 'cwd probe'
+        New-Item -ItemType Directory -Force -Path $probe | Out-Null
+        Push-Location -LiteralPath $temporary
+        try {
+            $r = Invoke-Native -FilePath $helper -Arguments @('cwd') -LogStem (Join-Path $temporary 'logs\cwd') -TimeoutSeconds 30 -WorkingDirectory $probe
+            Assert-Equal 0 $r.ExitCode 'cwd exit code'
+            Assert-Equal $probe (Read-Log $r.Out).Trim() 'Invoke-Native working directory'
+            # Outside any Cargo workspace, only Invoke-Cargo's default working directory finds this one.
+            $c = Invoke-Cargo -Arguments @('locate-project', '--workspace', '--message-format', 'plain') -LogStem (Join-Path $temporary 'logs\cargo-locate') -TimeoutSeconds 60
+            Assert-Equal (Join-Path $workspace 'Cargo.toml') (Read-Log $c.Out).Trim() 'Invoke-Cargo default working directory'
+        }
+        finally { Pop-Location }
     }
 
     Test-Case 'ConvertTo-NativeArgument quotes with MSVC rules' {
