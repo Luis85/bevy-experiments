@@ -230,9 +230,11 @@ No enemy switches lanes or finds a route around a wall. No baseline enemy damage
 
 ## Contact pressure
 
-Start with one contact attacker slot per lane. Additional enemies queue visibly behind it and remain targetable. This bounds simultaneous contact damage and makes a breach understandable. Structures also have an authored number of attackers that can reach them; the initial value is one per lane-facing contact position.
+**Superseded 2026-11-06 (W1-69, user decision): enemies never block each other.** There is no per-lane attacker slot or queue; every enemy at the defense line or a live non-trap structure attacks, and structures still block.
 
-Reaching contact never grants a free immediate hit. A clear attack windup or the next legal NPC-mode combat action must occur first. Queue and collision rules cannot allow enemies to pass through intact blockers.
+Every enemy that reaches the defense line or the face of a live non-trap structure in its lane makes contact and attacks. Bodies in one lane overlap and are drawn slightly staggered; all of them remain targetable. Simultaneous contact damage is bounded by spawn pressure and the enemy cap, not by a slot per lane.
+
+Reaching contact never grants a free immediate hit. A clear attack windup or the next legal NPC-mode combat action must occur first. Collision rules cannot let enemies pass through intact blockers.
 
 ## Initial enemy families
 
@@ -478,7 +480,7 @@ These are explicit mode-specific combat models, not hidden difficulty changes. T
 
 An NPC may defend or change posture while remaining anchored. It receives no benefit that requires a retreat step it cannot take. Knockback or displacement incompatible with the fixed-position rule must be disabled or handled by an explicit adapter. Recalling the whole attempt is different from a defensive retreat maneuver.
 
-Close-engaged enemies use the shared engagement rule in section 5. Their visual lane remains important for traps, walls, targeting, and contact queues. This is an intentional departure from literal tabletop map distance.
+Close-engaged enemies use the shared engagement rule in section 5. Their visual lane remains important for traps, walls, and targeting (since W1-69, user decision 2026-11-06, there are no contact queues). This is an intentional departure from literal tabletop map distance.
 
 ## Probability explanation
 
