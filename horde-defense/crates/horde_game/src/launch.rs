@@ -955,6 +955,32 @@ mod tests {
         .unwrap();
         assert_eq!(unstaged.log_directory(), profile.join("logs"));
     }
+    /// A practice campaign captured or measured in a review build is still the
+    /// player's campaign: review and performance variables never move its
+    /// logs out of the profile.
+    #[cfg(feature = "review")]
+    #[test]
+    fn reviewed_practice_logs_into_the_profile() {
+        let profile = PathBuf::from("C:/x").join("LastlightHordeDefense");
+        for extra in [
+            ("LASTLIGHT_REVIEW_CAPTURE", "practice.png"),
+            ("LASTLIGHT_PERF_REPORT", "practice.json"),
+        ] {
+            let c = parse(
+                &[],
+                &[
+                    ("LASTLIGHT_PRACTICE", "1"),
+                    ("LASTLIGHT_REVIEW_SCREEN", "construction"),
+                    extra,
+                    ("LOCALAPPDATA", "C:/x"),
+                ],
+            )
+            .unwrap();
+            assert!(c.practice && c.review().is_some(), "{extra:?}");
+            assert_eq!(c.log_directory_override, None, "{extra:?}");
+            assert_eq!(c.log_directory(), profile.join("logs"), "{extra:?}");
+        }
+    }
     #[cfg(feature = "review")]
     #[test]
     fn animation_export_requires_isolated_motion_review() {
