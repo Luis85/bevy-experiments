@@ -18,13 +18,21 @@ A save generation is one JSON object:
 
 ## Loading
 
-`Game::from_payload(value, version)` is the one decode seam. An older payload
-is migrated on raw JSON first. Then every game is decoded, reconciled
-(catalogue-aware fills) and validated. A save generation at an older version
-loads through it. The debug replay tool also uses it for a recording whose
-header version is older than this build's, so the recorded initial state
-loads the way that build's save would. A current-version recording is decoded
-as recorded.
+Every loaded game passes through one shared step, `settle_decoded`
+(`sim/persistence.rs`): it reconciles the decoded game (catalogue-aware fills,
+`reconcile_saved_game`) and then validates it. Two paths reach it. A save
+generation at the current version (v7) is decoded straight from the envelope
+payload, without an intermediate JSON tree, and handed to `settle_decoded`; it
+never reaches `Game::from_payload`. `Game::from_payload(value, version)`
+migrates an older payload on raw JSON first, then decodes it and calls
+`settle_decoded`. A save generation at an older version loads through it. So
+a fill that every loaded game needs belongs in `settle_decoded` (in
+`reconcile_saved_game`), not in `from_payload`, which v7 saves skip.
+
+The debug replay tool also uses `from_payload` for a recording whose header
+version is older than this build's, so the recorded initial state loads the
+way that build's save would. A current-version recording is decoded as
+recorded.
 
 Migrations are ordered, one step per version. Each step freezes the meaning of
 its source version, never reads the loaded catalogues and only fills in what is
