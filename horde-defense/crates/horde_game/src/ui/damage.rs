@@ -851,11 +851,11 @@ mod tests {
             );
         }
     }
-    /// Fires one shot per entry of `aims` (a y offset from the defender at
-    /// the field's right edge) from a `pellets`-pellet weapon into open
-    /// ground, observing the stream 0.2 s apart: the MISS bubbles alive after
-    /// each shot.
-    fn misses_per_shot(pellets: u32, aims: &[f32]) -> Vec<usize> {
+    /// Fires one shot per `(aim, now)` entry of `shots` (aim: a y offset from
+    /// the defender at the field's right edge) from a `pellets`-pellet weapon
+    /// into open ground, observing the stream at `now` seconds: for each shot,
+    /// the `started` time of every MISS bubble alive after it, in order.
+    fn misses_per_shot(pellets: u32, shots: &[(f32, f64)]) -> Vec<Vec<f64>> {
         let mut game = fixture();
         {
             let a = game.attempt_mut().unwrap();
@@ -868,10 +868,13 @@ mod tests {
         game.set_paused(false);
         let mut stream = Stream::default();
         let mut misses_per_shot = Vec::new();
-        for (shot, &dy) in aims.iter().enumerate() {
-            let before = game.attempt().unwrap().events.len();
+        for (shot, &(dy, now)) in shots.iter().enumerate() {
+            // The newest event's seq marks the shot: the log is pruned by age,
+            // so its length can fall back to where it was before a shot.
+            let newest = |game: &Game| game.attempt().unwrap().events.back().map(|e| e.seq);
+            let before = newest(&game);
             let mut ticks = 0;
-            while game.attempt().unwrap().events.len() == before {
+            while newest(&game) == before {
                 let aim = {
                     let a = game.attempt().unwrap();
                     [a.width_yards, a.defender_position()[1] + dy]
@@ -888,18 +891,18 @@ mod tests {
             let missed = a
                 .events
                 .iter()
-                .skip(before)
-                .filter(|e| e.kind == EventKind::Miss)
+                .filter(|e| before.is_none_or(|seq| e.seq > seq) && e.kind == EventKind::Miss)
                 .count();
             assert_eq!(missed, pellets as usize, "shot {shot}: every pellet misses");
-            stream.observe(a, 10.0 + shot as f64 * 0.2, true, false);
-            misses_per_shot.push(
-                stream
-                    .active
-                    .iter()
-                    .filter(|bubble| bubble.kind == Kind::Miss)
-                    .count(),
-            );
+            stream.observe(a, now, true, false);
+            let mut started: Vec<f64> = stream
+                .active
+                .iter()
+                .filter(|bubble| bubble.kind == Kind::Miss)
+                .map(|bubble| bubble.started)
+                .collect();
+            started.sort_by(f64::total_cmp);
+            misses_per_shot.push(started);
         }
         misses_per_shot
     }
@@ -911,18 +914,23 @@ mod tests {
     #[test]
     fn a_shotgun_volley_that_misses_with_every_pellet_shows_one_miss() {
         assert_eq!(
-            misses_per_shot(6, &[0.3, -0.3]),
-            [1, 2],
+            misses_per_shot(6, &[(0.3, 10.0), (-0.3, 10.2)]),
+            [vec![10.0], vec![10.0, 10.2]],
             "one MISS per shot"
         );
     }
     /// W1 review: core shots are deterministic, so a steady aim misses
     /// through the same edge point every shot. Its MISS refreshes in place
-    /// (one label), not a rising column of one per shot.
+    /// (one label), not a rising column of one per shot: each new shot's
+    /// bubble replaces the old one and restarts its life and rise, so under
+    /// sustained fire the label stays up past one LIFE from the first miss.
     #[test]
     fn steady_aim_misses_refresh_one_miss_instead_of_stacking() {
-        assert_eq!(misses_per_shot(1, &[0.3, 0.3]), [1, 1], "single projectile");
-        assert_eq!(misses_per_shot(6, &[0.3, 0.3]), [1, 1], "shotgun");
+        let late = 10.0 + LIFE + 0.1;
+        let shots = [(0.3, 10.0), (0.3, 10.2), (0.3, late)];
+        let refreshed = [vec![10.0], vec![10.2], vec![late]];
+        assert_eq!(misses_per_shot(1, &shots), refreshed, "single projectile");
+        assert_eq!(misses_per_shot(6, &shots), refreshed, "shotgun");
     }
     /// W1 review: the zoom raises the enemy health bar (0.41 lane heights
     /// over the feet) past a fixed lift, so on a 2.5x field a fresh number
