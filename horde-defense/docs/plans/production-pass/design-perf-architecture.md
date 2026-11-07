@@ -558,6 +558,40 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** docs/PERF_BUDGET.json is the single gate source: scenes.progressed-peak and stress carry cpu_frame_p99_ms_max 10.0 and frames_over_50ms_max 0, evaluated only on -VsyncOff runs (median of 3 for p99, worst repeat for &gt; 50 ms); 12.0 ms is only the pipelined-decision threshold. perf_budget.rs mirrors CPU_FRAME_P99_MS_MAX / FRAMES_OVER_50MS_MAX with a bidirectional test. hardware.integrated_gpu = {status "pending", adapter "Intel(R) Arc(TM) Graphics", report null} plus the ACCEPTANCE.md human-check row.
 - **Supersedes in this spec:** Any reading of 12.0 ms as acceptance.
 
+### Wave-1 close rulings (2026-11-07)
+
+Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that touch this remit:
+
+#### R14. Per-commit capture reviews
+
+- **Owner / wave:** qa-captures and perf-architecture, wave-1 close.
+- **Ruling:** Per-commit capture reviews named in a done_when (e.g. W1-48 batching) are satisfied by the wave-close pair review (target/production-after/wave1 vs target/production-before, 356 captures, CF ledger rows). Note this on the W1-48 row in waves.md.
+- **Supersedes in this spec:** A separate per-commit pair review for W1-48 (and any other wave-1 done_when that names one). The evidence is plan §10.3 and the CF ledger.
+
+#### R18. What the W2-47 re-gate also owns
+
+- **Owner / wave:** perf-architecture, wave 2 (W2-47).
+- **Ruling:** W2-47 (stress fixture rebuild and re-gate) also owns: the sustained 15-20 FPS VSync-on stress episode, the 1050x700@1.35 VSync-on p99 interval of 19.1-19.7 ms, script-level battlefield primitive/vertex gates in measure_performance.ps1, and any egui_probe/present_wait span-ordering item not fixed in wave 1. Add these to the W2-47 row.
+- **Supersedes in this spec:** Leaving these items without an owning commit after wave 1. W2-50 still attributes the gate-3 episode before W2-47 re-gates.
+
+#### R19. Peak gate, the 30% rounding and the frame window
+
+- **Owner / wave:** perf-architecture, wave-1 close.
+- **Ruling:** Peak interface_draw stays a not-above-wave-0 gate (fix plan §9.1 which calls it informational). 1.129 / 1.030 are the rounded 30% values (fix the 'floor' wording in the plan and acceptance.md). The 600/180 vs 300/90 window difference is accepted as documented.
+- **Supersedes in this spec:** Any "informational" reading of the peak interface_draw gate, and "floor" for 1.129 / 1.030 (0.70 x 1.6128 = 1.12896 and 0.70 x 1.4719 = 1.03033, rounded).
+
+#### R22. egui gates only tighten
+
+- **Owner / wave:** perf-architecture, wave-1 close (W2-51 applied early).
+- **Ruling:** Gates only tighten. BATTLEFIELD_PRIMITIVES_MAX goes 48 -> 24 (re-derived min(ceiling, ceil(max x 1.25)) from the post-W1-69 measure of 19). The stress vertex gate stays 61098 (no loosening; measured 49502). progressed-peak stays at its 40000 ceiling. live_battlefield_runs_stay_within_the_egui_gates samples every 2nd tick of the first 420 (or the exact maxima ticks). Update PERF_BUDGET.json evidence.egui_measured to the post-W1-69 maxima.
+- **Supersedes in this spec:** W2-51's default plan of re-deriving every gate from the 4d599a5 maxima: a re-derived gate above the live one is not applied, so the stress vertex gate keeps 61098.
+
+#### R23. Integrated-GPU human check
+
+- **Owner / wave:** perf-architecture, waves 1-7.
+- **Ruling:** Pending human checks stay pending; fix the integrated-GPU check so it names how to select the adapter this machine actually has, or marks it not possible on this machine.
+- **Supersedes in this spec:** Nothing in the protocol. The check stays pending and names `-Adapter "Intel(R) Arc(TM) Pro Graphics"`, the adapter W1-68 ran on this machine.
+
 ### Rulings owned by this remit
 
-S3, W-11, W-12
+S3, W-11, W-12, R18, R19, R22, R23

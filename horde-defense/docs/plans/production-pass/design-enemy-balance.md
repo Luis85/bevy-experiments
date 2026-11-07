@@ -662,6 +662,22 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** enemy-balance writes ENEMY_COMPOSITION.md, PROGRESSION_SCALING.md, the goal-6 section of BALANCE_AND_RUN_STATS.md and the WORLD.md band paragraph at the wave-4 close (W4-10); progression-tree writes the goal-5 section and the AGENTS.md pacing_targets section (W2-03, W4-11); qa's docs inventory checks presence only.
 - **Supersedes in this spec:** No w7 docs step.
 
+### Wave-1 close rulings (2026-11-07)
+
+Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that touch this remit:
+
+#### R15. No ruleset bump for W1-69
+
+- **Owner / wave:** save-determinism, wave 2 (W2-49).
+- **Ruling:** RULESET_VERSION is not bumped for W1-69 now; the planned W2-49 bump (2 -> 3) must name both W1-69 (no lane queue) and its own change. Document that pre-W1-69 recordings replay without a ruleset warning until then.
+- **Supersedes in this spec:** P4 for wave 1 only: RULESET stays 2 through W1-69, and W2-49's 2 -> 3 bump names both changes. VALIDATION.md "Strict sale and ruleset 2" records the replay behaviour.
+
+#### R21. Custom chip keeps the preset it was clicked from
+
+- **Owner / wave:** enemy-balance (E3 semantics) and ux-flow (the settings screen), wave-1 close.
+- **Ruling:** The Custom difficulty chip keeps the basis of the preset it was clicked from (clicking Hard then Custom without edits sends Custom with the Hard basis). Fix in code with TDD.
+- **Supersedes in this spec:** Sending an unedited named draft as that named preset after the Custom chip. The core stays one `SetBalance` per step: the screen sends the named preset, then the same values as Custom, so the named preset is the previous preset (as the new-journey reset already does).
+
 ### Rulings owned by this remit
 
-P1, P6, E3, E9, W-4, W-5, W-6, W-7, W-9, W-10, W-15
+P1, P6, E3, E9, W-4, W-5, W-6, W-7, W-9, W-10, W-15, R21

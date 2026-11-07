@@ -387,6 +387,8 @@ The 13 existing keys and `bindings: [String; 8]` are unchanged.
 
   **As cut (annotation, 7 November 2026, W1 review):** the fixture checked in by W1-01 (b82658a) is 120,842 bytes, has player level 33 and 14 run_history records (13 main and 1 worker), and was cut on parent 3d492cd (no `crates/` change from 7bd5de8). No ruling covers these differences. The plan above is unchanged; see VALIDATION.md "save_v6.json as cut".
 
+  **Ruling R12 (wave-1 close, 7 November 2026):** the deviation (120,842 B, player level 33, 14 run records against the 64 KB, level 12 and 2 records above) is accepted. The fixture is frozen evidence, and the numbers above were estimates. The fixture is not re-cut and its pins stay.
+
   The same commit also cuts `recording_vocabulary_v1.json` (41 Command + 2 Input), `recording_v6_equipped_sale.jsonl` (a fresh new game: buy, Equip, SellItem the equipped item, End digest) and `crates/horde_game/tests/fixtures/settings_v0.json` (13 keys, custom bindings, effects 0.45).
 - **`save_v7.json` (W1-63, wave-1 close, then frozen; ≤ 96 KB).** It is staged through test-support seams: `stage_takeover`, `stage_review_*` for enemy state, receipts and summaries. It must pass `validate_game`, and every `V7_SAVED_KEYS` key must occur at a non-default value:
   - a live depth-0 Npc attempt with seat Recruit(a), that recruit Defending, its loadout reserved, `reserved_recruit` Some(a), appearance from the recruit identity, drop_ids, drop_tier Some;
@@ -416,3 +418,5 @@ The 13 existing keys and `bindings: [String; 8]` are unchanged.
 | 5-7 | 0 | 0 (PROGRESSED 0/4) | unchanged | 4 | Any core move means stop and ask the user |
 
 **As run (annotation, 7 November 2026, W1 review):** W1-69 (user decision 2026-11-06, enemies overlap) re-blessed GOLDEN 1/6 and GAMEPLAY_TRACE 3/6, class G; V1-V6 continuation, V6_DROP_TRACE_FNV and save_v7.json pins unchanged; see plan §6. The wave-1 row above is unchanged.
+
+**Wave-1 close rulings (annotation, 7 November 2026):** R15: RULESET stays 2 through W1-69. The W2-49 bump to 3 names both W1-69 (no lane queue) and the wave-2 change, and until then a recording made before W1-69 replays without a ruleset warning. R16: the `level_grant_paid` shim (W2-52, neutral level-ups keep the grant ledger paid) moves the three Personal GOLDEN state digests, provisionally, and W2-49 folds them with its reason.

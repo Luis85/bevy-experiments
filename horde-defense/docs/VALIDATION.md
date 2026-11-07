@@ -435,9 +435,11 @@ Final documentation checks passed **69 source-backed Views**, retaining all 64 p
 
 **Debug recordings made under ruleset 1 are not expected to reproduce across the strict-sale change.** Replay still loads their initial state through the save migration, applies every recorded command and reaches the end line, but a recorded sale of an equipped, preset or recruit-equipped item is now a typed rejection, so the final digest can differ. Replay warns that the recording was made under ruleset 1 (and, for v6 headers, save version 6). `pre_strict_recording_diverges_with_ruleset_warning` pins this with the v6 equipped-sale fixture. The sale is not that fixture's only divergence: its 2,592 combat ticks no longer replay as on v6 either (expected cause: W1-69, enemies never block each other), so rebuilding the old sale legally still misses the recorded End digest. The test therefore also pins the current digest of the replay up to the sale, so any further drift fails it. Recording FORMAT stays 1.
 
+**W1-69 does not bump the ruleset (R15, wave-1 close).** Enemies stopped queueing in W1-69, so a debug recording made before W1-69 can diverge in combat on replay. It still carries ruleset 2, so replay prints no ruleset warning for it. The W2-49 bump (2 -> 3) names both W1-69 (no lane queue) and the wave-2 change. From then on these recordings warn like any older ruleset.
+
 ## save_v6.json as cut — 5 November 2026 (W1-01, recorded 7 November in the W1 review)
 
-`crates/horde_core/tests/fixtures/save_v6.json` does not match the plan in schema-v7.md §11 on four points. The plan has not been changed and no ruling covers the differences; this note only records them.
+`crates/horde_core/tests/fixtures/save_v6.json` does not match the plan in schema-v7.md §11 on four points. The plan has not been changed. Ruling R12 (wave-1 close, 7 November 2026) accepts the differences: the fixture is frozen evidence and the §11 numbers were estimates. schema-v7.md §11 carries the ruling as a note.
 
 - **Size:** 120,842 bytes, against the planned "at most 64 KB". No test bounds the v6 fixture size; only `save_v7.json` has a byte bound (`V7_FIXTURE_MAX_BYTES`, 96 KB).
 - **Player level:** `campaign.player.level` is 33, not the planned 12. The live Personal attempt is at rank 14 and tick 423, which meets "≥ 10" and "about tick 420".

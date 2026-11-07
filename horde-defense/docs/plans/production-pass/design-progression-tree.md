@@ -408,6 +408,16 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** enemy-balance writes ENEMY_COMPOSITION.md, PROGRESSION_SCALING.md, the goal-6 section of BALANCE_AND_RUN_STATS.md and the WORLD.md band paragraph at the wave-4 close (W4-10); progression-tree writes the goal-5 section and the AGENTS.md pacing_targets section (W2-03, W4-11); qa's docs inventory checks presence only.
 - **Supersedes in this spec:** AGENTS.md section assigned.
 
+### Wave-1 close rulings (2026-11-07)
+
+Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that touch this remit:
+
+#### R16. level_grant_paid shim in wave 2
+
+- **Owner / wave:** progression-tree, wave 2 (W2-52, before the W2-49 re-bless).
+- **Ruling:** The level_grant_paid shim (neutral level-ups keep the grant ledger paid; test neutral_level_ups_keep_the_grant_ledger_paid) moves three Personal state digests, so it is scheduled as a new wave-2 commit before the wave-2 re-bless: append a row with the next free W2 id in waves.md (owner progression-tree) and a matching entry in the plan.
+- **Supersedes in this spec:** Fixing the level-grant half of the W1 review finding in wave 1 (3df1242 fixed only the milestone half). The three Personal GOLDEN digests move provisionally in W2-52 and are folded by W2-49.
+
 ### Rulings owned by this remit
 
-U5, R5, R8, R10, P7, D15, E2, E12, W-1, W-2, W-3
+U5, R5, R8, R10, P7, D15, E2, E12, W-1, W-2, W-3, R16

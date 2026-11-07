@@ -777,6 +777,34 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** This cluster set MAX_WAVE_TIERS = 64 with wave_tier &lt; 64. The master planner (P1) withdrew it: the bound is MAX_WAVE_TIER = 15 inclusive in W1-28.
 - **Supersedes in this spec:** MAX_WAVE_TIERS = 64 is withdrawn; use MAX_WAVE_TIER = 15.
 
+### Wave-1 close rulings (2026-11-07)
+
+Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that touch this remit:
+
+#### R12. save_v6.json as cut is accepted
+
+- **Owner / wave:** save-determinism, wave-1 close.
+- **Ruling:** save_v6.json deviation (120,842 B, player level 33, 14 run records vs schema-v7 §11's 64 KB / level 12 / 2 records) is accepted: the fixture is frozen evidence and §11's numbers were estimates. Amend schema-v7.md §11 with a note.
+- **Supersedes in this spec:** Section 11's size, player level and run-record counts for save_v6.json (64 KB, level 12, 1 main and 1 worker record). The fixture is not re-cut and its pins stay (schema-v7.md §11 note).
+
+#### R13. Review recipes may advance their own Game
+
+- **Owner / wave:** save-determinism and qa-captures, wave-1 close.
+- **Ruling:** Review recipes (crates/horde_game/src/ui/review/fixtures.rs, ui/review/fixtures/production.rs, ui/review/matrix.rs; review feature only) may call .tick(; record the exception in design-save-determinism.md Integration rulings and cite it in the architecture_tests.rs allowlist comment.
+- **Supersedes in this spec:** Any reading that only the runner may call `.tick(` in horde_game. The `.tick(` rule in `crates/horde_game/src/architecture_tests.rs` allows `runner/` and the three review recipe files and cites this ruling.
+
+#### R15. No ruleset bump for W1-69
+
+- **Owner / wave:** save-determinism, wave 2 (W2-49).
+- **Ruling:** RULESET_VERSION is not bumped for W1-69 now; the planned W2-49 bump (2 -> 3) must name both W1-69 (no lane queue) and its own change. Document that pre-W1-69 recordings replay without a ruleset warning until then.
+- **Supersedes in this spec:** P4 for wave 1 only: RULESET stays 2 through W1-69, and W2-49's 2 -> 3 bump names both changes. VALIDATION.md "Strict sale and ruleset 2" records the replay behaviour.
+
+#### R16. level_grant_paid shim in wave 2
+
+- **Owner / wave:** progression-tree, wave 2 (W2-52, before the W2-49 re-bless).
+- **Ruling:** The level_grant_paid shim (neutral level-ups keep the grant ledger paid; test neutral_level_ups_keep_the_grant_ledger_paid) moves three Personal state digests, so it is scheduled as a new wave-2 commit before the wave-2 re-bless: append a row with the next free W2 id in waves.md (owner progression-tree) and a matching entry in the plan.
+- **Supersedes in this spec:** Fixing the level-grant half of the W1 review finding in wave 1 (3df1242 fixed only the milestone half). The three Personal GOLDEN digests move provisionally in W2-52 and are folded by W2-49.
+
 ### Rulings owned by this remit
 
-U1, R4, R7, P3, P4, D3, D4, D7, D14, E1, E7, E13, S1, S2, S18, W-14
+U1, R4, R7, P3, P4, D3, D4, D7, D14, E1, E7, E13, S1, S2, S18, W-14, R12, R13, R15

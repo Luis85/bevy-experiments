@@ -655,6 +655,16 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** The existing windup ellipse and bar already draws for every Windup enemy, defender-targeted included (critic claim incorrect). Added: EnemyView.aim_target dashed aim line for ranged windups (W2-28); BattleView.boss_phase: Option&lt;BossPhaseView{transition, name, hold_left_ticks}&gt; with label "PHASE n - NAME" and a ring for the whole 90-tick hold, static in reduced mode (W2-37). They precede the audio cues; the UX boss banner is not the twin.
 - **Supersedes in this spec:** Nothing beyond the ruling itself; this remit implements it.
 
+### Wave-1 close rulings (2026-11-07)
+
+Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that touch this remit:
+
+#### R17. Capture rows CF-1-01, CF-1-02, CF-1-03 and CF-1-07
+
+- **Owner / wave:** vfx-lighting, wave 3 (W3-29, W3-30, W3-31).
+- **Ruling:** CF-1-01, CF-1-02, CF-1-03 and CF-1-07 get new wave-3 ids appended in waves.md (owner vfx-lighting, before W3-27, beside W3-14 for BattleLayout), each with its CF fail-first test; update the CF ledger rows with those ids.
+- **Supersedes in this spec:** CF-1-03's qa-captures owner: W3-30 is a vfx-lighting commit. The ledger rows in plan §10 name the ids and fail-first tests.
+
 ### Rulings owned by this remit
 
-U6, R1, RL, C-1, C-2, C-3, C-4, C-5, C-6, C-7, C-8, C-9, D17, W-8, W-13
+U6, R1, RL, C-1, C-2, C-3, C-4, C-5, C-6, C-7, C-8, C-9, D17, W-8, W-13, R17

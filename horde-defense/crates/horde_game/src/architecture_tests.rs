@@ -49,6 +49,9 @@ const RULES: &[Rule] = &[
     },
     Rule {
         needle: ".tick(",
+        // Ruling R13 (wave-1 close, design-save-determinism.md Integration
+        // rulings): the three review recipe files below may tick the isolated
+        // Game they stage for a review scene.
         allowed: &[
             "runner/",
             "ui/review/fixtures.rs",

@@ -687,6 +687,16 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** Operations unlock = the Operations page becoming reachable: Game::operations_available() moved verbatim from ui/context.rs:230-240 (ui delegates). Milestone::OperationsOpen appended. Fortifications = Feature(Construction), Mara = Feature(Companion). goal5_unlock_order_fortifications_mara_operations: per seed Fort &lt;= Mara &lt;= OperationsOpen and medians strictly increasing.
 - **Supersedes in this spec:** Campaign::feature_unlock is a label accessor, not the event.
 
+### Wave-1 close rulings (2026-11-07)
+
+Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that touch this remit:
+
+#### R21. Custom chip keeps the preset it was clicked from
+
+- **Owner / wave:** enemy-balance (E3 semantics) and ux-flow (the settings screen), wave-1 close.
+- **Ruling:** The Custom difficulty chip keeps the basis of the preset it was clicked from (clicking Hard then Custom without edits sends Custom with the Hard basis). Fix in code with TDD.
+- **Supersedes in this spec:** Sending an unedited named draft as that named preset after the Custom chip. The core stays one `SetBalance` per step: the screen sends the named preset, then the same values as Custom, so the named preset is the previous preset (as the new-journey reset already does).
+
 ### Rulings owned by this remit
 
 C-10, C-11, D16, S4, S6

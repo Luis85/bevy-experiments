@@ -620,6 +620,34 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 - **Ruling:** enemy-balance writes ENEMY_COMPOSITION.md, PROGRESSION_SCALING.md, the goal-6 section of BALANCE_AND_RUN_STATS.md and the WORLD.md band paragraph at the wave-4 close (W4-10); progression-tree writes the goal-5 section and the AGENTS.md pacing_targets section (W2-03, W4-11); qa's docs inventory checks presence only.
 - **Supersedes in this spec:** Docs inventory assigns no authors.
 
+### Wave-1 close rulings (2026-11-07)
+
+Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that touch this remit:
+
+#### R13. Review recipes may advance their own Game
+
+- **Owner / wave:** save-determinism and qa-captures, wave-1 close.
+- **Ruling:** Review recipes (crates/horde_game/src/ui/review/fixtures.rs, ui/review/fixtures/production.rs, ui/review/matrix.rs; review feature only) may call .tick(; record the exception in design-save-determinism.md Integration rulings and cite it in the architecture_tests.rs allowlist comment.
+- **Supersedes in this spec:** Any reading that only the runner may call `.tick(` in horde_game. The `.tick(` rule in `crates/horde_game/src/architecture_tests.rs` allows `runner/` and the three review recipe files and cites this ruling.
+
+#### R14. Per-commit capture reviews
+
+- **Owner / wave:** qa-captures and perf-architecture, wave-1 close.
+- **Ruling:** Per-commit capture reviews named in a done_when (e.g. W1-48 batching) are satisfied by the wave-close pair review (target/production-after/wave1 vs target/production-before, 356 captures, CF ledger rows). Note this on the W1-48 row in waves.md.
+- **Supersedes in this spec:** A separate per-commit pair review for W1-48 (and any other wave-1 done_when that names one). The evidence is plan §10.3 and the CF ledger.
+
+#### R17. Capture rows CF-1-01, CF-1-02, CF-1-03 and CF-1-07
+
+- **Owner / wave:** vfx-lighting, wave 3 (W3-29, W3-30, W3-31).
+- **Ruling:** CF-1-01, CF-1-02, CF-1-03 and CF-1-07 get new wave-3 ids appended in waves.md (owner vfx-lighting, before W3-27, beside W3-14 for BattleLayout), each with its CF fail-first test; update the CF ledger rows with those ids.
+- **Supersedes in this spec:** CF-1-03's qa-captures owner: W3-30 is a vfx-lighting commit. The ledger rows in plan §10 name the ids and fail-first tests.
+
+#### R20. PowerShell 7 allowlist
+
+- **Owner / wave:** qa-captures, whole pass.
+- **Ruling:** capture_player_models, trace_npc and verify_player_models stay on the PS7 allowlist (ruling S15); no port in this pass.
+- **Supersedes in this spec:** Any port of these three scripts in this pass; S15 is unchanged.
+
 ### Rulings owned by this remit
 
-U7, R6, C-12, S7, S8, S9, S12, S13, S14, S15, S16
+U7, R6, C-12, S7, S8, S9, S12, S13, S14, S15, S16, R14, R20

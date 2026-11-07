@@ -65,7 +65,7 @@ The full commit detail is in `wave1_commits`. Order and summary:
 | W1-45 | vfx-lighting | C3: observer window fit | W1-44 |
 | W1-46 | vfx-lighting | C4: INCOMING occlusion chevron | W1-44 |
 | W1-47 | perf-architecture | Record the camera-zoom perf delta (the commit before C2 vs C2) | W1-44 |
-| W1-48 | perf-architecture | Batched battlefield meshes | W1-44, W1-42 |
+| W1-48 | perf-architecture | Batched battlefield meshes. R14: the done_when's peak, progressed-peak and stress pair review is satisfied by the wave-close pair review (target/production-after/wave1 against target/production-before, 356 captures, CF ledger rows; plan §10.3) | W1-44, W1-42 |
 | W1-49 | perf-architecture | Corpse sampling and the cached settled mesh | W1-48 |
 | W1-50 | perf-architecture | Save-clone benchmark, `save_snapshot`, conditional remedy | W1-35, W1-30 |
 | W1-51 | perf-architecture | Tighten the egui budgets | W1-48, W1-49 |
@@ -557,6 +557,11 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Fail-first: `stress_render_fixture_includes_every_catalog_archetype_and_an_elite`.
 - Done: `-Scene stress -VsyncOff` (dev and playtest) exits 0.
 - Deps: W2-36, W2-33, W2-50, W2-51.
+- Also owns (R18, wave-1 close):
+  - the sustained 15-20 FPS VSync-on stress episode (`target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2`; W2-50 attributes it first);
+  - the 1050x700@1.35 VSync-on p99 interval of 19.1-19.7 ms;
+  - script-level battlefield primitive and vertex gates in `measure_performance.ps1`;
+  - any egui_probe/present_wait span-ordering item not fixed in wave 1, including the `baseline.v3` item below.
 - Open before this re-gate (W1 review, 2026-11-07): review commit `7abb0ab` changed the egui_pass and present_wait spans after baseline.v3 and the W1-61 acceptance. The orchestrator or the user decides whether `PERF_BUDGET.json baseline.v3` is re-measured on the new spans before interface_total is gated again. Until then, interface_total and cpu_frame compare unlike spans (plan 2.5; VALIDATION.md W1-61 "Span boundaries changed after this acceptance"). The same applies to W5-11 and W7-09.
 
 **W2-48 · save-determinism · RNG isolation and legacy guards, plus behaviour tests on the v6/v7 fixtures**
@@ -575,9 +580,11 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 
 **W2-49 · save-determinism · Wave-2 re-bless (single)**
 - Steps: fold PROVISIONAL into GOLDEN; write a per-digest reason table (classes F/T/C/G with anatomy diffs); `RULESET_VERSION` 3 and `TRACE_RULESET`; smoke and pacing after in `target/production-after-wave2/`.
+- R15 (wave-1 close): W1-69 did not bump the ruleset, so the 2 -> 3 bump names both W1-69 (no lane queue) and the wave-2 change, in the commit body, the reason table and VALIDATION.md. Until this commit a recording made before W1-69 replays without a ruleset warning.
+- R16: it also folds the three Personal GOLDEN state digests that W2-52 moves.
 - Fail-first: `envelopes_carry_version_ruleset_and_fingerprint` asserts 3.
 - Done: PROVISIONAL None; V1-V6 unchanged.
-- Deps: W2-48.
+- Deps: W2-48, W2-52.
 
 **W2-50 · perf-architecture · The gate-3 episode in the shipped default configuration, before the W2-47 re-gate**
 - Slot: before W2-47; the id is appended so no id changes. W1-61's A/B repeat `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2` (playtest, pipelined on, VSync on, stress normal: the shipped default configuration) ran about 400 frames of 47-67 ms. Outside driver stalls it had 6 frames over 50 ms (exit 1), 407 over 33 ms, a p99 of 47.1 ms and 46.3 FPS. It is not a driver stall under the user ruling (named coverage 0.89-0.94) and is not attributed (4-6 ms per frame outside App::update). Plan 9.4 and §2.5; VALIDATION.md W1-61.
@@ -595,6 +602,13 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Fail-first: `egui_gates_are_measured_x_1_25_capped_at_the_w1_32_ceilings` with the decided maxima recorded as the gate source and the old constants, failing before the constants move.
 - Done: `measure_battlefield_egui_load -- --ignored` and `live_battlefield_runs_stay_within_the_egui_gates` pass at the decided gates; the §2.5 row is answered.
 - Deps: none; W2-47 depends on it.
+- **Applied in the W1 review (R22, wave-1 close):** gates only tighten. `BATTLEFIELD_PRIMITIVES_MAX` 48 -> 24, the stress vertex gate stays 61098 (no loosening; measured 49,502), progressed-peak stays at its 40,000 ceiling, `evidence.egui_measured` holds the post-W1-69 maxima, and `live_battlefield_runs_stay_within_the_egui_gates` paints every 2nd tick of the first 420. W2-47 still depends on this row, which has nothing left to change.
+
+**W2-52 · progression-tree · Neutral level-ups keep the grant ledger paid (the `level_grant_paid` shim), before the W2-49 re-bless**
+- Slot: before W2-49 (R16, wave-1 close); the id is appended so no id changes. Wave 1 writes saves at v7 but nothing keeps `Player.level_grant_paid` current while no grant is paid, so a wave-1 save can owe level grants that a migrated v6 save at the same level never gets. The milestone half was fixed in the W1 review (3df1242, `Campaign::claim_neutral_milestones`); this level-grant half moves the three Personal GOLDEN state digests, so it waits for the wave-2 re-bless.
+- Fail-first: `neutral_level_ups_keep_the_grant_ledger_paid`.
+- Digest: sets `PROVISIONAL` for the three Personal GOLDEN digests with a `PROVISIONAL_CAUSES` row (P3). W2-49 folds them.
+- Deps: W1 close; W2-49 depends on it.
 
 Wave-2 exit:
 - One re-bless with reasons.
@@ -793,20 +807,21 @@ Wave-2 exit:
 
 **W3-29 · vfx-lighting · Pause banner and midpoint label placement (capture rows CF-1-01, CF-1-02)**
 - Slot: beside W3-14 (the ux-flow banner work), not after W3-28: the id is appended so no id changes. `pause_banner_center` is C-3 geometry and C-11 bars ux-flow from redefining it, so this is a BattleLayout change by vfx-lighting (design-perf-architecture.md, "Zoom-to-fit and wave-3 UI"). The new banner place is the owner's choice; design-vfx-lighting.md's letterbox rule alone does not help a height-limited 7x16 field.
+- R17 (wave-1 close): owner vfx-lighting, before W3-27's capture matrix is reviewed.
 - Fail-first:
   - `pause_banner_never_covers_the_bottom_lane` over the zoomed 7x16 and the 3x12 hint-band fields at both sizes (CF-1-01)
   - `midpoint_label_clears_the_construction_panel` at 1050x700@1.35: the label rect and `construction_panel` do not intersect (CF-1-02)
 - Done: CF-1-01 and CF-1-02 are fixed in the plan's capture ledger.
 - Deps: W3-14.
 
-**W3-30 · qa-captures · Review captures ignore the OS pointer (capture row CF-1-03)**
-- Slot: before the W3-27 capture matrix is reviewed; the id is appended so no id changes.
+**W3-30 · vfx-lighting · Review captures ignore the OS pointer (capture row CF-1-03)**
+- Slot: before the W3-27 capture matrix is reviewed; the id is appended so no id changes. R17 (wave-1 close): owner vfx-lighting (first qa-captures), beside the other field placement rows W3-29 and W3-31.
 - Fail-first: `review_capture_aim_ignores_the_os_pointer`: with a review-capture launch and a hover position over the field, `f.battle.aim` stays at the scene's pinned aim and no hover reticle or inspector draws.
 - Done: CF-1-03 is fixed in the plan's capture ledger.
 - Deps: none; W3-27's matrix review depends on it.
 
 **W3-31 · vfx-lighting · Wall-hit numbers clear the wall face and its stack (capture row CF-1-07)**
-- Slot: beside W3-29 (the other vfx-lighting placement fix over the field), before W3-27's capture matrix is reviewed; the id is appended so no id changes. Since W1-69 every stacked enemy strikes its wall, so at 1050x700@1.35 the wall-hit numbers ("-80", "MISS") cover the wall face and the front of its stack. The placement is `ui/damage.rs` presentation only: it reads the drawn wall and stack rects and never touches core RNG or state. The new place is the owner's choice, and reduced mode uses the same placement.
+- Slot: beside W3-29 (the other vfx-lighting placement fix over the field), before W3-27's capture matrix is reviewed; the id is appended so no id changes. R17 (wave-1 close) confirms the owner and slot. Since W1-69 every stacked enemy strikes its wall, so at 1050x700@1.35 the wall-hit numbers ("-80", "MISS") cover the wall face and the front of its stack. The placement is `ui/damage.rs` presentation only: it reads the drawn wall and stack rects and never touches core RNG or state. The new place is the owner's choice, and reduced mode uses the same placement.
 - Fail-first: `wall_hit_numbers_clear_the_wall_face_and_its_stack_at_small_size`: at 1050x700@1.35, on the progressed-peak field, the drawn rect of each wall-hit popup does not intersect the struck wall's face rect or the drawn body of the front enemy in its stack.
 - Done: CF-1-07 is fixed in the plan's capture ledger, with after-capture evidence from progressed-peak and from stress motion (`scripts/capture_motion.ps1 -Scene stress -Viewport small`) at 1050x700@1.35.
 - Deps: none.
