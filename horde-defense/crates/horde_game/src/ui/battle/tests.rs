@@ -108,9 +108,11 @@ fn strict_diagnostic_reticle_draws_once_without_claiming_os_cursor_despite_hover
     }
 }
 
-/// Pin: the first half of a top-lane loot rise (and a 48-pt hit envelope at
-/// the feet) stays inside the effects clip at the progressed peak (17x30) and
-/// the 3x12 opening, at both sizes; the clip never reaches the control bar.
+/// Pin: a top-lane loot rise, icon and the quality label 29 pt above it, stays
+/// inside the effects clip for its whole visible life (ages to 1.0) at the
+/// progressed peak (17x30) and the 3x12 opening, at both sizes, and so does a
+/// bottom-lane rise at 3x12; a 48-pt hit envelope at the top-lane feet fits
+/// too, and the clip never reaches the control bar.
 #[test]
 fn lane_zero_drop_envelope_fits_the_effects_clip_at_progressed_peak() {
     for viewport in [vec2(1440.0, 900.0), vec2(1050.0 / 1.35, 700.0 / 1.35)] {
@@ -123,16 +125,30 @@ fn lane_zero_drop_envelope_fits_the_effects_clip_at_progressed_peak() {
             assert_eq!(arena.rect, layout.field.rect);
             assert_eq!(arena.effects_clip, clip);
             assert!(clip.bottom() <= layout.bar.top());
-            let feet = arena.world(width * 0.5, 0.5);
-            // ui::loot draws the icon 12 + age * 78 pt above the feet.
-            for age in [0.0, 0.25, 0.5] {
-                let drop = feet + vec2(0.0, -12.0 - age * 78.0);
-                let icon = Rect::from_center_size(drop, vec2(25.0, 25.0));
-                assert!(
-                    clip.contains_rect(icon),
-                    "{lanes}x{width} age {age} in {viewport:?}: {icon:?} leaves {clip:?}"
-                );
+            let mut rows = vec![0.5];
+            if lanes == 3 {
+                rows.push(f32::from(lanes) - 0.5);
             }
+            for row in rows {
+                for item_id in 0..3 {
+                    for step in 0..=20 {
+                        let age = step as f32 / 20.0;
+                        let drop = crate::ui::loot::drop_icon_center(
+                            arena,
+                            [width * 0.5, row],
+                            item_id,
+                            age,
+                        );
+                        let icon = Rect::from_center_size(drop, vec2(25.0, 25.0));
+                        assert!(
+                            clip.contains_rect(icon) && drop.y - 29.0 >= clip.top() + 4.0,
+                            "{lanes}x{width} row {row} age {age} in {viewport:?}: \
+                             {icon:?} or its label leaves {clip:?}"
+                        );
+                    }
+                }
+            }
+            let feet = arena.world(width * 0.5, 0.5);
             assert!(clip.contains_rect(Rect::from_center_size(feet, vec2(48.0, 48.0))));
         }
     }

@@ -150,6 +150,27 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         f.notify_rare_loot();
     }
 }
+/// The centre of a drop's icon `age` (0..=1) into its rise: 12 + 78 * age pt
+/// above the feet at world `at`, drifting sideways by item id. The rise stops
+/// where the quality label, 29 pt above the centre, meets the top of the
+/// effects clip, so a top-lane drop is never cut off while it still shows.
+pub(super) fn drop_icon_center(
+    projection: art::ArenaProjection,
+    at: [f32; 2],
+    item_id: u64,
+    age: f32,
+) -> egui::Pos2 {
+    let drift = ((item_id % 3) as f32 - 1.0) * age * 8.0;
+    let center = projection.world(at[0], at[1]) + vec2(drift, -12.0 - age * 78.0);
+    pos2(
+        center.x,
+        center
+            .y
+            .max(projection.effects_clip.top() + LABEL_RISE + 4.0),
+    )
+}
+/// How far above the icon centre the quality label starts.
+const LABEL_RISE: f32 = 29.0;
 pub(super) fn draw_for(
     ui: &egui::Ui,
     projection: art::ArenaProjection,
@@ -178,9 +199,7 @@ pub(super) fn draw_for(
     for entry in &state.streams[&battle].active {
         let age = ((now - entry.started) / LIFETIME).clamp(0.0, 1.0) as f32;
         let fade = (1.0 - age).powf(0.65);
-        let drift = ((entry.receipt.item_id % 3) as f32 - 1.0) * age * 8.0;
-        let at = projection.world(entry.receipt.at[0], entry.receipt.at[1])
-            + vec2(drift, -12.0 - age * 78.0);
+        let at = drop_icon_center(projection, entry.receipt.at, entry.receipt.item_id, age);
         let icon = Rect::from_center_size(at, vec2(25.0, 25.0));
         let color = armory::quality_color(entry.receipt.quality).gamma_multiply(fade);
         painter.rect_filled(icon, 0.0, Color32::from_black_alpha((180.0 * fade) as u8));
@@ -222,7 +241,7 @@ pub(super) fn draw_for(
                 projection.effects_clip.left() + 4.0,
                 projection.effects_clip.right() - galley.size().x - 4.0,
             ),
-            (at.y - 29.0).max(projection.effects_clip.top() + 4.0),
+            (at.y - LABEL_RISE).max(projection.effects_clip.top() + 4.0),
         );
         painter.galley(text_at, galley, color);
     }
