@@ -661,6 +661,73 @@ fn driver_stall_needs_named_coverage_and_the_acquire_share() {
     }
 }
 
+/// W1-61 review: the frame-length leg of the rule. Under VSync-on Fifo an
+/// ordinary frame can spend most of its window in `prepare_windows`; a frame
+/// of 50 ms or less is never a driver stall, so it stays in the stall-free
+/// interval statistics the pipelined decision reads.
+#[test]
+fn driver_stall_needs_a_frame_over_50ms() {
+    // Not pipelined: the window opens at `start` (after the previous
+    // sample's main schedule, `previous_main` long), then the main thread's
+    // render hand-off fills it but for 0.2 ms outside App::update, and
+    // prepare_windows holds 90% of the frame. 1 ms main schedule and 1.3 ms
+    // render CPU: only the frame length keeps it from being a stall.
+    let acquire_bound = |start: f64, frame_ms: f64, previous_main: f64| {
+        let time = start + frame_ms;
+        let gap = frame_ms - previous_main;
+        let mut frame = timed(time, frame_ms, time, 1., [gap, gap - 0.2, 0.]);
+        let begin = start + previous_main + 0.1;
+        let acquire = 0.9 * frame_ms;
+        frame.probe.render = Some(RenderSample {
+            render_schedule_ms: acquire + 1.,
+            ..render_span(begin, begin + 0.1, acquire, time - 0.3)
+        });
+        frame
+    };
+    let quick = timed(1000., 16.7, 992., 8., [0.5, 0.4, 0.]);
+    let fifo = acquire_bound(1000., 16.7, 0.);
+    let slow = acquire_bound(fifo.time_ms.unwrap(), 45., 1.);
+    let report = report_json(&ReportInput {
+        frames: vec![quick.clone(), fifo, slow],
+        ..default()
+    });
+    // The 45 ms frame meets every other leg of the rule.
+    let window = report["longest_frames"]
+        .as_array()
+        .and_then(|frames| frames.iter().find(|f| f["sample_index"] == 2))
+        .map(|f| &f["attribution"])
+        .expect("the 45 ms frame is among the longest");
+    assert!(close(&window["acquire_wait_ms"], 40.5), "{window}");
+    assert!(
+        window["named_coverage"].as_f64().unwrap() >= 0.95,
+        "{window}"
+    );
+    let stalls = &report["driver_stalls"];
+    assert_eq!(
+        stalls["frames"].as_array().map(Vec::len),
+        Some(0),
+        "{stalls}"
+    );
+    assert_eq!(report["frames_over_50ms_driver_stall"], 0);
+    assert_eq!(stalls["outside"]["sample_frames"], 3, "{stalls}");
+    assert_eq!(stalls["outside"]["frames_over_33ms"], 1, "{stalls}");
+
+    // The boundary: exactly 50 ms is not over it, 50.1 ms is a stall.
+    for (frame_ms, stalled) in [(50., 0), (50.1, 1)] {
+        let report = report_json(&ReportInput {
+            frames: vec![quick.clone(), acquire_bound(1000., frame_ms, 0.)],
+            ..default()
+        });
+        let stalls = &report["driver_stalls"];
+        assert_eq!(
+            stalls["frames"].as_array().map(Vec::len),
+            Some(stalled),
+            "{frame_ms} ms: {stalls}"
+        );
+        assert_eq!(report["frames_over_50ms_driver_stall"], stalled);
+    }
+}
+
 /// Pipelined, the main thread waits on the render channel while the render
 /// thread sits in `prepare_windows`: the acquire wait is the channel wait
 /// that overlaps the render thread's present. A channel wait with the render
