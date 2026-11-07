@@ -385,7 +385,7 @@ The 13 existing keys and `bindings: [String; 8]` are unchanged.
   - the 10k-tuple quality-roll table;
   - the v6 item stat/value table.
 
-  **As cut (annotation, 7 November 2026, W1 review):** the fixture checked in by W1-01 (b82658a) is 120,842 bytes, has player level 33 and 14 run_history records (13 main and 1 worker), and was cut on parent 3d492cd (no `crates/` change from 7bd5de8). No ruling covers these differences. The plan above is unchanged; see VALIDATION.md "save_v6.json as cut".
+  **As cut (annotation, 7 November 2026, W1 review):** the fixture checked in by W1-01 (b82658a) is 120,842 bytes, has player level 33 and 14 run_history records (13 main and 1 worker), and was cut on parent 3d492cd (no `crates/` change from 7bd5de8). Ruling R12 (below) accepts these differences. The plan above is unchanged; see VALIDATION.md "save_v6.json as cut".
 
   **Ruling R12 (wave-1 close, 7 November 2026):** the deviation (120,842 B, player level 33, 14 run records against the 64 KB, level 12 and 2 records above) is accepted. The fixture is frozen evidence, and the numbers above were estimates. The fixture is not re-cut and its pins stay.
 
