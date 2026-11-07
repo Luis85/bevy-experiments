@@ -5,7 +5,7 @@ This maps the supplied GDD's 34 criteria to implementation and regression eviden
 | ID | Implementation / automated evidence | Remaining assessment |
 |---|---|---|
 | AC01 | `sim::LANES=11`, fixed `DEFENDER=[0.5,5.5]`; all-lane targeting and lane-preservation tests | Inspect all eleven lanes in the native window at supported sizes/scales. |
-| AC02 | Same-lane sorted movement and queues; `enemies_keep_lanes_and_contact_has_a_windup` | Visual clarity of queues and death effects. |
+| AC02 | Same-lane sorted movement; enemies never block each other (W1-69); `enemies_keep_lanes_and_contact_has_a_windup`, `enemies_in_one_lane_never_block_each_other` | Visual clarity of stacked enemies at walls and the line (crowd stagger) and of death effects. |
 | AC03 | Geometric personal rays from the fixed origin; `starter_can_hit_all_eleven_contact_and_approach_lanes` covers every lane at x=1.5,14,29 | Aim feel and silhouette readability. |
 | AC04 | Same contact predicate and one-yard NPC adapter; `melee_contact_eligibility_and_exclusive_recovery` | Human understanding of shared contact across outer lanes. |
 | AC05 | Contact records entry tick and starts windup; `enemies_keep_lanes_and_contact_has_a_windup` | Visible attack-source cues must be checked in play. |
