@@ -177,7 +177,7 @@ pub(super) fn paint(
 }
 
 /// How far inside the battlefield clip a hostile's callout stays.
-const CALLOUT_MARGIN: f32 = 2.0;
+pub(super) const CALLOUT_MARGIN: f32 = 2.0;
 
 /// A hostile's amber callout (boss name, EXPOSED, CRIT) anchored at `at` by
 /// `align`, moved the least that keeps the whole text `CALLOUT_MARGIN` inside

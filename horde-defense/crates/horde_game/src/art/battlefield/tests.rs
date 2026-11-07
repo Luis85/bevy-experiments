@@ -1365,7 +1365,10 @@ fn a_stack_on_the_line_draws_one_band_and_one_windup_ring() {
 /// its body, so the arena clip cut "SIEGE BRUTE" to "SIEGE BR". Every
 /// callout a hostile paints (boss names, EXPOSED, CRIT) stays whole inside
 /// the battlefield clip: at the right edge, the left edge and in the top
-/// lane, on the batched path and the rejected-art figures.
+/// lane, on the batched path and the rejected-art figures. A callout the clip
+/// would cut moves the least that keeps it `CALLOUT_MARGIN` inside, along
+/// only the axes that cut it; one already inside (the mid-field boss) paints
+/// exactly where `Painter::text` did.
 #[test]
 fn boss_label_at_the_field_edge_stays_inside_the_clip() {
     use horde_core::{balance::BalanceSettings, content::EnemyKind};
@@ -1392,6 +1395,7 @@ fn boss_label_at_the_field_edge_stays_inside_the_clip() {
     game.spawn_enemy(&mut a, EnemyKind::Brute, 8, true);
     let boss = a.enemies.pop().expect("a boss");
     for (lane, x) in [
+        (8, w * 0.5),
         (8, w + 0.5),
         (8, w - 0.3),
         (0, w + 0.5),
@@ -1407,11 +1411,31 @@ fn boss_label_at_the_field_edge_stays_inside_the_clip() {
     let a = game.attempt().unwrap();
     let mut view =
         BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
-    assert_eq!(view.enemies.len(), 5, "every boss is in view");
+    assert_eq!(view.enemies.len(), 6, "every boss is in view");
     assert!(view.enemies.iter().all(|e| e.label.is_some()));
     // One body is critically wounded, so its CRIT callout is checked too.
     view.enemies[1].health = crate::battle_view::HealthView::Critical;
     let arena = ArenaProjection::with_geometry(clip, view.lanes, view.width);
+    // Where `Painter::text` anchored each callout, in paint order: a CRIT
+    // above the body, then the name higher up; flagged for the name of the
+    // boss past the right edge in the middle lane.
+    let sy = arena.lane_height();
+    let anchors: Vec<(Pos2, Align2, bool)> =
+        view.enemies
+            .iter()
+            .flat_map(|e| {
+                let [x, y] = e.drawn();
+                let at = arena.world(x, y);
+                let crit = matches!(e.health, crate::battle_view::HealthView::Critical)
+                    .then_some((at + vec2(0.0, -sy * 0.44), Align2::CENTER_BOTTOM, false));
+                let right = e.lane == 8 && x > w;
+                let name = e
+                    .label
+                    .map(|_| (at + vec2(0.0, -sy * 0.7), Align2::CENTER_CENTER, right));
+                crit.into_iter().chain(name)
+            })
+            .collect();
+    let inner = clip.shrink(enemies::CALLOUT_MARGIN);
     for rejected in [false, true] {
         let textures = ArtTextures {
             enemy_art_rejected: rejected,
@@ -1448,12 +1472,74 @@ fn boss_label_at_the_field_edge_stays_inside_the_clip() {
                 _ => None,
             })
             .collect();
-        assert_eq!(labels.len(), 6, "rejected {rejected}: {labels:?}");
-        for (text, rect) in labels {
+        assert_eq!(labels.len(), 7, "rejected {rejected}: {labels:?}");
+        assert_eq!(labels.len(), anchors.len(), "one anchor per callout");
+        let close = |a: f32, b: f32| (a - b).abs() < 0.01;
+        let mut unmoved = 0;
+        for ((text, rect), &(at, align, _)) in labels.iter().zip(&anchors) {
+            let was = align.anchor_size(at, rect.size());
             assert!(
-                clip.contains_rect(rect),
+                clip.contains_rect(*rect),
                 "rejected {rejected}: {text:?} at {rect:?} is cut by the clip {clip:?}"
             );
+            if clip.contains_rect(was) {
+                unmoved += 1;
+                assert!(
+                    close(rect.min.x, was.min.x) && close(rect.min.y, was.min.y),
+                    "rejected {rejected}: {text:?} inside the clip moved from {was:?} to {rect:?}"
+                );
+                continue;
+            }
+            assert!(
+                inner.contains_rect(rect.shrink(0.01)),
+                "rejected {rejected}: {text:?} at {rect:?} is not the margin inside {inner:?}"
+            );
+            // The least move: an axis the clip did not cut keeps its place,
+            // an axis it cut lands on the margin's nearest edge.
+            let least = |lo: f32, hi: f32, min: f32, max: f32, now: f32| {
+                if lo >= min && hi <= max {
+                    close(now, lo)
+                } else if lo < min {
+                    close(now, min)
+                } else {
+                    close(now + (hi - lo), max)
+                }
+            };
+            assert!(
+                least(
+                    was.left(),
+                    was.right(),
+                    inner.left(),
+                    inner.right(),
+                    rect.left()
+                ),
+                "rejected {rejected}: {text:?} moved further than the margin across: {was:?} -> {rect:?}"
+            );
+            assert!(
+                least(
+                    was.top(),
+                    was.bottom(),
+                    inner.top(),
+                    inner.bottom(),
+                    rect.top()
+                ),
+                "rejected {rejected}: {text:?} moved further than the margin down: {was:?} -> {rect:?}"
+            );
         }
+        assert_eq!(
+            unmoved, 1,
+            "rejected {rejected}: only the mid-field boss name is unmoved"
+        );
+        // The right-edge mid-lane boss: pulled in across only, to the margin.
+        let edge = anchors.iter().position(|a| a.2).expect("the right boss");
+        let ((_, right), (at, ..)) = (&labels[edge], anchors[edge]);
+        assert!(
+            close(right.right(), inner.right()),
+            "{right:?} vs {inner:?}"
+        );
+        assert!(
+            close(right.center().y, at.y),
+            "{right:?} moved down from {at:?}"
+        );
     }
 }
