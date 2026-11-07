@@ -575,11 +575,11 @@ function Invoke-SelfTest {
     # The example writes the budget's fixture as gate.items and workers and the gated report's own counts as
     # gate.measured_items and measured_workers.
     $clone = {
-        param($P99, [int]$Measured = [int]$budget.save_clone.items_min, [bool]$NoMeasured = $false)
+        param($P99, [int]$Measured = [int]$budget.save_clone.items_min, [bool]$NoMeasured = $false, [int]$Workers = [int]$budget.save_clone.workers)
         $gate = [pscustomobject]@{ items = [int]$budget.save_clone.items_min; workers = [int]$budget.save_clone.workers; p99_ms = $P99 }
         if (-not $NoMeasured) {
             $gate | Add-Member -NotePropertyName measured_items -NotePropertyValue $Measured
-            $gate | Add-Member -NotePropertyName measured_workers -NotePropertyValue ([int]$budget.save_clone.workers)
+            $gate | Add-Member -NotePropertyName measured_workers -NotePropertyValue $Workers
         }
         [pscustomobject]@{ gate = $gate }
     }
@@ -591,6 +591,7 @@ function Invoke-SelfTest {
         @{ Name = 'outside the budget profiles'; Report = (& $clone ($cloneLimit * 1.5)); Profile = 'release'; Expected = 0; Checks = @("$cloneLine skipped") },
         @{ Name = 'without a p99'; Report = (& $clone $null); Profile = 'dev'; Expected = 2; Checks = @("$cloneLine invalid") },
         @{ Name = 'another fixture'; Report = (& $clone ($cloneLimit * 0.5) 2500); Profile = 'dev'; Expected = 2; Checks = @('save_clone/2500 items save_snapshot_p99_ms invalid') },
+        @{ Name = 'another worker count'; Report = (& $clone ($cloneLimit * 0.5) ([int]$budget.save_clone.items_min) $false 2); Profile = 'dev'; Expected = 2; Checks = @("$cloneLine invalid") },
         @{ Name = 'without the measured counts'; Report = (& $clone ($cloneLimit * 0.5) 0 $true); Profile = 'dev'; Expected = 2; Checks = @('save_clone/- items save_snapshot_p99_ms invalid') }
     )
     foreach ($case in $cloneCases) {
