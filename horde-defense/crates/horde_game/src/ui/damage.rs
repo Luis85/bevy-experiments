@@ -24,6 +24,9 @@ enum Target {
     Actor(u64),
     Defender,
     Point([u32; 2]),
+    /// The pellets of one shot that struck nothing: one tick, one muzzle.
+    /// They share a single MISS (CF-1-12).
+    Volley(u64, [u32; 2]),
 }
 #[derive(Clone, Debug)]
 struct Bubble {
@@ -54,6 +57,8 @@ fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
     };
     let target = if let Some(id) = event.target_id {
         Target::Actor(id)
+    } else if kind == Kind::Miss {
+        Target::Volley(event.tick, event.from.map(f32::to_bits))
     } else if event.to == a.defender_position() {
         Target::Defender
     } else {
@@ -62,7 +67,7 @@ fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
     // Over a struck hostile the number rises from its drawn body.
     let [dx, dy] = crate::battle_view::struck_stagger(a, event);
     let mut at = [event.to[0] + dx, event.to[1] + dy];
-    if matches!(target, Target::Point(_)) {
+    if matches!(target, Target::Point(_) | Target::Volley(..)) {
         // A shot into open ground ends 40 yards out, far off a zoomed field:
         // its MISS sits where the tracer leaves the field (W1 review).
         at = on_field(event.from, at, [a.width_yards, f32::from(a.lane_count)]);
@@ -135,6 +140,12 @@ impl Stream {
                 continue;
             };
             if replay && a.tick.saturating_sub(event.tick) > 240 {
+                continue;
+            }
+            // A later pellet of a shot already showing its MISS adds none.
+            if matches!(next.target, Target::Volley(..))
+                && self.active.iter().any(|old| old.target == next.target)
+            {
                 continue;
             }
             if let Some(old) = self.active.iter_mut().find(|old| {
@@ -403,7 +414,7 @@ pub(super) fn draw_for(
         let world = arena.world(bubble.at[0], bubble.at[1]);
         // A popup over open ground stays on the field; one over an actor may
         // rise into the forest and the headroom above the arena.
-        let bounds = if matches!(bubble.target, Target::Point(_)) {
+        let bounds = if matches!(bubble.target, Target::Point(_) | Target::Volley(..)) {
             arena.rect
         } else {
             arena.effects_clip
@@ -745,6 +756,60 @@ mod tests {
                 "{angle}: {at:?} is not on the field's edge"
             );
         }
+    }
+    /// CF-1-12: every pellet of a shotgun shot that strikes nothing is its
+    /// own core Miss, and each made its own MISS at the field edge, a column
+    /// of six per shot. One shot now shows one MISS (at its first pellet's
+    /// edge point), and the next shot its own; reduced effects share the
+    /// stream, so they show the same.
+    #[test]
+    fn a_shotgun_volley_that_misses_with_every_pellet_shows_one_miss() {
+        let mut game = fixture();
+        {
+            let a = game.attempt_mut().unwrap();
+            a.enemies.clear();
+            a.events.clear();
+            a.profile.weapon.pellets = 6;
+            a.profile.weapon.spread_radians = 0.4;
+            a.ammo = a.magazine.max(2);
+        }
+        game.set_paused(false);
+        let mut stream = Stream::default();
+        let mut misses_per_shot = Vec::new();
+        for shot in 0..2 {
+            let before = game.attempt().unwrap().events.len();
+            let mut ticks = 0;
+            while game.attempt().unwrap().events.len() == before {
+                let aim = {
+                    let a = game.attempt().unwrap();
+                    [a.width_yards, a.defender_position()[1] + 0.3]
+                };
+                game.tick(horde_core::sim::Input {
+                    aim,
+                    fire: true,
+                    ..Default::default()
+                });
+                ticks += 1;
+                assert!(ticks < 120, "shot {shot} never fired");
+            }
+            let a = game.attempt().unwrap();
+            let pellets = a
+                .events
+                .iter()
+                .skip(before)
+                .filter(|e| e.kind == EventKind::Miss)
+                .count();
+            assert_eq!(pellets, 6, "shot {shot}: every pellet misses");
+            stream.observe(a, 10.0 + f64::from(shot) * 0.2, true, false);
+            misses_per_shot.push(
+                stream
+                    .active
+                    .iter()
+                    .filter(|bubble| bubble.kind == Kind::Miss)
+                    .count(),
+            );
+        }
+        assert_eq!(misses_per_shot, [1, 2], "one MISS per shot");
     }
     /// W1 review: the zoom raises the enemy health bar (0.41 lane heights
     /// over the feet) past a fixed lift, so on a 2.5x field a fresh number
