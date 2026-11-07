@@ -32,11 +32,6 @@ const FORBIDDEN: &[(&str, &str)] = &[
         "getrelativepath",
         "[IO.Path]::GetRelativePath is .NET Core only",
     ),
-    ("& cargo", "run cargo through Invoke-Cargo"),
-    (
-        "& './target",
-        "run the game through Get-HordeExecutable and Invoke-Native",
-    ),
     (
         "*>",
         "an all-stream redirect of a native exe raises NativeCommandError; use Invoke-Native logs",
@@ -58,6 +53,28 @@ const ZIP_TYPE: &str = "io.compression.zipfile]";
 /// `System.IO.Compression` alone has only `ZipArchive`.
 const ZIP_ASSEMBLY: &str = "system.io.compression.filesystem";
 const LIBRARY: &str = "lib/native.ps1";
+
+/// Native tools a script must not start directly (any `*.exe` word counts too).
+const NATIVE_TOOLS: &[&str] = &[
+    "cargo",
+    "cmd",
+    "ffmpeg",
+    "git",
+    "horde-defense",
+    "powercfg",
+    "powershell",
+    "py",
+    "python",
+    "robocopy",
+    "rustc",
+    "rustup",
+    "tar",
+    "taskkill",
+    "xcopy",
+];
+
+const NATIVE_REASON: &str =
+    "start native processes through Invoke-Native or Invoke-Cargo (lib/Native.ps1)";
 
 fn scripts_directory() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../scripts")
@@ -146,6 +163,150 @@ fn code_lines(text: &str) -> Vec<(usize, String)> {
     lines
 }
 
+/// `code` (one comment-free line) with every quoted string's contents blanked
+/// to spaces, keeping the quotes, so text inside a string is never read as a call.
+fn blank_strings(code: &str) -> String {
+    let mut blanked = String::with_capacity(code.len());
+    let mut quote: Option<char> = None;
+    let mut characters = code.chars();
+    while let Some(c) = characters.next() {
+        match quote {
+            Some(open) if c == open => {
+                quote = None;
+                blanked.push(c);
+            }
+            Some(open) => {
+                blanked.push(' ');
+                if open == '"' && c == '`' && characters.next().is_some() {
+                    blanked.push(' ');
+                }
+            }
+            None => {
+                if c == '\'' || c == '"' {
+                    quote = Some(c);
+                }
+                blanked.push(c);
+            }
+        }
+    }
+    blanked
+}
+
+/// The leading run of `characters` that `allowed` accepts.
+fn leading_word(characters: &[char], allowed: impl Fn(char) -> bool) -> String {
+    characters.iter().take_while(|&&c| allowed(c)).collect()
+}
+
+fn is_variable_character(c: char) -> bool {
+    c.is_ascii_alphanumeric() || matches!(c, '_' | ':')
+}
+
+/// Variables `blanked` declares as scriptblocks: `[scriptblock]$name` or `$name = {`.
+fn scriptblock_variables(blanked: &[(usize, String)]) -> Vec<String> {
+    let mut names = Vec::new();
+    for (_, code) in blanked {
+        let characters: Vec<char> = code.chars().collect();
+        for (index, &c) in characters.iter().enumerate() {
+            if c != '$' {
+                continue;
+            }
+            let name = leading_word(&characters[index + 1..], is_variable_character);
+            if name.is_empty() {
+                continue;
+            }
+            let typed = characters[..index]
+                .iter()
+                .collect::<String>()
+                .ends_with("[scriptblock]");
+            let rest: String = characters[index + 1 + name.chars().count()..]
+                .iter()
+                .collect();
+            let rest = rest.trim_start();
+            let assigned = rest.strip_prefix('=').is_some_and(|value| {
+                !value.starts_with('=') && value.trim_start().starts_with('{')
+            });
+            if typed || assigned {
+                names.push(name);
+            }
+        }
+    }
+    names
+}
+
+/// Every direct native start in `blanked` (lower-cased, string-blanked code):
+/// a call operator on anything but a scriptblock (`& cargo`, `& 'x.exe'`,
+/// `& $exe`, `& (Resolve-Tool x)`), or a [`NATIVE_TOOLS`] or `*.exe` word at
+/// the start of a command (`cargo build`, `$v = git rev-parse HEAD`).
+fn native_calls(name: &str, blanked: &[(usize, String)]) -> Vec<String> {
+    let scriptblocks = scriptblock_variables(blanked);
+    let mut violations = Vec::new();
+    for (line, code) in blanked {
+        let characters: Vec<char> = code.chars().collect();
+        for (index, &c) in characters.iter().enumerate() {
+            let previous = index.checked_sub(1).map(|i| characters[i]);
+            let starts_command = previous
+                .is_none_or(|p| p.is_whitespace() || matches!(p, '(' | '{' | ';' | '|' | '='));
+            if c == '&' && starts_command && characters.get(index + 1) != Some(&'&') {
+                let rest = &characters[index + 1..];
+                let skip = rest.iter().take_while(|c| c.is_whitespace()).count();
+                let target = &rest[skip..];
+                let problem = match target.first().copied() {
+                    None | Some('{') => None,
+                    Some('$') => {
+                        let variable = leading_word(&target[1..], is_variable_character);
+                        (variable.is_empty() || !scriptblocks.contains(&variable)).then(|| {
+                            format!(
+                                "`& ${variable}`: not a scriptblock in this script; {NATIVE_REASON}"
+                            )
+                        })
+                    }
+                    Some(quote) if quote == '\'' || quote == '"' => {
+                        Some(format!("`& {quote}...{quote}`: {NATIVE_REASON}"))
+                    }
+                    Some('(') => Some(format!("`& (...)`: {NATIVE_REASON}")),
+                    Some(_) => {
+                        let word = leading_word(target, |c| {
+                            !c.is_whitespace() && !matches!(c, '(' | ')' | ';' | '|')
+                        });
+                        Some(format!("`& {word}`: {NATIVE_REASON}"))
+                    }
+                };
+                if let Some(problem) = problem {
+                    violations.push(format!("{name}:{line}: {problem}"));
+                }
+                continue;
+            }
+            let from = if matches!(c, '(' | '{' | ';' | '|' | '=') {
+                if c == '=' && characters.get(index + 1) == Some(&'=') {
+                    continue;
+                }
+                index + 1
+            } else if index == characters.iter().take_while(|c| c.is_whitespace()).count() {
+                index
+            } else {
+                continue;
+            };
+            let rest = &characters[from..];
+            let skip = rest.iter().take_while(|c| c.is_whitespace()).count();
+            let word = leading_word(&rest[skip..], |c| {
+                c.is_ascii_alphanumeric() || matches!(c, '_' | '.' | '-')
+            });
+            let tool = word.strip_suffix(".exe").unwrap_or(&word);
+            let native =
+                NATIVE_TOOLS.contains(&tool) || (word.ends_with(".exe") && !tool.is_empty());
+            let followed = rest[skip + word.chars().count()..]
+                .first()
+                .is_none_or(|c| c.is_whitespace() || matches!(c, ')' | '}' | ';' | '|'));
+            if native && followed {
+                violations.push(format!(
+                    "{name}:{line}: `{word}` starts a command: {NATIVE_REASON}"
+                ));
+            }
+        }
+    }
+    violations
+}
+
 /// Every 5.1 rule `name` breaks, as `name:line: reason` (line 0 for whole-file rules).
 fn lint_script(name: &str, bytes: &[u8]) -> Vec<String> {
     let mut violations = Vec::new();
@@ -190,6 +351,11 @@ fn lint_script(name: &str, bytes: &[u8]) -> Vec<String> {
             ));
         }
     }
+    let blanked: Vec<(usize, String)> = lowered
+        .iter()
+        .map(|(line, code)| (*line, blank_strings(code)))
+        .collect();
+    violations.extend(native_calls(name, &blanked));
     let runs_native = lowered.iter().any(|(_, code)| {
         let trimmed = code.trim_start();
         ["invoke-native", "invoke-cargo", "start-process", ".exe"]
@@ -270,7 +436,12 @@ fn lint_reports_each_rule_and_ignores_comments() {
     let clean = "#requires -Version 5.1\n. (Join-Path $PSScriptRoot 'lib\\Native.ps1')\n\
                  # & cargo build and pwsh in a comment are fine\n\
                  <# block: Compress-Archive\n *> #>\n\
-                 $r = Invoke-Native -FilePath $exe -LogStem 'x#y' # trailing *>\n";
+                 $r = Invoke-Native -FilePath $exe -LogStem 'x#y' # trailing *>\n\
+                 function Run([scriptblock]$Body) { & $Body }\n\
+                 $check = { param($x) $x }\n\
+                 $null = & $check 1; & { 'x' } | Out-Null\n\
+                 $c = Invoke-Native -FilePath (Resolve-Tool 'cmd') -Arguments @('/c', 'echo a & cargo b') -LogStem 'c'\n\
+                 Write-Output \"git status\"; $both = $a -and $b\n";
     assert_eq!(
         lint_script("clean.ps1", clean.as_bytes()),
         Vec::<String>::new()
@@ -281,7 +452,37 @@ fn lint_reports_each_rule_and_ignores_comments() {
         ("#requires -Version 5.1\n& cargo build\n", "`& cargo`"),
         (
             "#requires -Version 5.1\n& './target/debug/x.exe'\n",
-            "`& './target`",
+            "`& '...'`",
+        ),
+        // Dot-sourcing the library is not enough: every native start goes through it.
+        (
+            "#requires -Version 5.1\n. (Join-Path $PSScriptRoot 'lib\\Native.ps1')\n\
+             $exe = Get-HordeExecutable\n& $exe --list-scenes\n",
+            "`& $exe`",
+        ),
+        (
+            "#requires -Version 5.1\n. (Join-Path $PSScriptRoot 'lib\\Native.ps1')\ncargo build --locked\n",
+            "`cargo` starts a command",
+        ),
+        (
+            "#requires -Version 5.1\n. (Join-Path $PSScriptRoot 'lib\\Native.ps1')\nif ($x) { git status }\n",
+            "`git` starts a command",
+        ),
+        (
+            "#requires -Version 5.1\n$head = git rev-parse HEAD\n",
+            "`git` starts a command",
+        ),
+        (
+            "#requires -Version 5.1\n$t = @(& powercfg.exe /getactivescheme) -join ' '\n",
+            "`& powercfg.exe`",
+        ),
+        (
+            "#requires -Version 5.1\n& (Resolve-Tool 'cargo') build\n",
+            "`& (...)`",
+        ),
+        (
+            "#requires -Version 5.1\n$p = tool.exe /x\n",
+            "`tool.exe` starts a command",
         ),
         ("#requires -Version 5.1\n$x = 'a' *> log\n", "`*>`"),
         (

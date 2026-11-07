@@ -124,9 +124,21 @@ function Get-Median([double[]]$Values) {
 
 function Get-PowerPlan {
     # The active Windows power plan, or $null when it cannot be read. powercfg localizes the plan name, so the built-in
-    # plans are named by their fixed GUIDs; any other plan keeps the name powercfg prints.
-    try { $text = @(& powercfg.exe /getactivescheme) -join ' ' }
+    # plans are named by their fixed GUIDs; any other plan keeps the name powercfg prints. It runs before the evidence
+    # directory exists, so its logs go to a per-PID temp stem that is removed again.
+    $stem = Join-Path ([IO.Path]::GetTempPath()) ('lastlight-powercfg-' + $PID)
+    try {
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powercfg') -Arguments @('/getactivescheme') -LogStem $stem -TimeoutSeconds 30
+        if ($r.ExitCode -ne 0) { return $null }
+        $oem = [Text.Encoding]::GetEncoding([Globalization.CultureInfo]::CurrentCulture.TextInfo.OEMCodePage)
+        $text = ([IO.File]::ReadAllText($r.Out, $oem) -split "`r?`n") -join ' '
+    }
     catch { return $null }
+    finally {
+        foreach ($log in @("$stem.out.txt", "$stem.err.txt")) {
+            if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log -Force -ErrorAction SilentlyContinue }
+        }
+    }
     $builtIn = @{
         '381b4222-f694-41f0-9685-ff5bb260df2e' = 'Balanced'; '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c' = 'High performance'
         'a1841308-3bce-3e2b-91e2-8e6c1b6f9f3c' = 'Power saver'; 'e9a42b02-d5df-448d-aa00-03f14749eb61' = 'Ultimate Performance'
