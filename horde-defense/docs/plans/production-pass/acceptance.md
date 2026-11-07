@@ -185,4 +185,4 @@
 | ISO-11 | Full verify every wave | fmt; clippy -D warnings ×3; `cargo test --locked --workspace` and `--features dev`; `--smoke`; `check_views.py`; release `pacing_targets` | all |
 | R7 | One GOLDEN/TRACE re-bless per wave in a dedicated commit with reasons | W1-69 (user decision), W2-49 and W4-08; PROVISIONAL None at every wave close (critic check) | 1, 2, 4 |
 | R8 | Stress cap only behind a review/test seam | `production_validation_rejects_enemy_cap_225`; a `--no-default-features` build compiles without the seam | 1 |
-| HUMAN | Human checks: weapon-classes and night/storm review; 3x12 at 2.5x zoom feel; sheet upscale on 3-lane sprites; click-to-photon; listening pass; integrated-GPU run | Logged as "pending human check" in ACCEPTANCE.md and the plan if not done; they do not block | 1, 5, 6, 7 |
+| HUMAN | Human checks: weapon-classes and night/storm review; 3x12 at 2.5x zoom feel; sheet upscale on 3-lane sprites; click-to-photon; listening pass; integrated-GPU run; stepped damage pop (CF-1-04, W1-64); whole-pixel text placement (CF-1-05, W1-64) | Logged as "pending human check" in ACCEPTANCE.md and the plan if not done; they do not block | 1, 5, 6, 7 |
