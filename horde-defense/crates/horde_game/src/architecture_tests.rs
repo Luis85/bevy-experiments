@@ -69,7 +69,7 @@ struct Scanned {
     hits: Vec<String>,
     /// Modules declared `#[cfg(test)] mod name;`, whose files are skipped.
     test_modules: Vec<String>,
-    /// The whole file is `#![cfg(test)]`.
+    /// The file opens with `#![cfg(test)]` among its leading inner attributes.
     test_only: bool,
 }
 
@@ -279,16 +279,89 @@ fn remove_test_items(code: &mut [char]) -> Vec<String> {
     modules
 }
 
+/// Whether `#![cfg(test)]` is one of the inner attributes that open the
+/// (blanked) file, the only place it applies to the whole file.
+fn file_is_test_only(code: &[char]) -> bool {
+    let attribute: Vec<char> = TEST_FILE_ATTRIBUTE.chars().collect();
+    let mut i = 0;
+    loop {
+        while code.get(i).is_some_and(|c| c.is_whitespace()) {
+            i += 1;
+        }
+        if code[i..].starts_with(&attribute) {
+            return true;
+        }
+        if code[i..].starts_with(&['#', '!', '[']) {
+            i = skip_brackets(code, i + 2);
+        } else {
+            return false;
+        }
+    }
+}
+
+/// Blanks the body of every block that an inner `#![cfg(test)]` makes
+/// test-only (an inline `mod name { #![cfg(test)] .. }`), keeping newlines.
+fn remove_inner_test_blocks(code: &mut [char]) {
+    let attribute: Vec<char> = TEST_FILE_ATTRIBUTE.chars().collect();
+    let mut i = 0;
+    while i + attribute.len() <= code.len() {
+        if code[i..i + attribute.len()] != attribute[..] {
+            i += 1;
+            continue;
+        }
+        // The `{` that opens the enclosing block.
+        let mut depth = 0;
+        let open = (0..i).rev().find(|&j| match code[j] {
+            '}' => {
+                depth += 1;
+                false
+            }
+            '{' if depth == 0 => true,
+            '{' => {
+                depth -= 1;
+                false
+            }
+            _ => false,
+        });
+        let Some(open) = open else {
+            // Outside any block (misplaced): scan the code normally.
+            i += attribute.len();
+            continue;
+        };
+        let mut depth = 0;
+        let mut close = code.len();
+        for (j, &c) in code.iter().enumerate().skip(open) {
+            match c {
+                '{' => depth += 1,
+                '}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        close = j;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        for c in &mut code[open + 1..close] {
+            if *c != '\n' {
+                *c = ' ';
+            }
+        }
+        i = close;
+    }
+}
+
 /// Scans one file's text; `path` is `/`-separated and relative to `src/`.
 fn scan_source(path: &str, text: &str) -> Scanned {
     let mut code = blank_comments_and_strings(text);
-    let flat: String = code.iter().collect();
-    if flat.contains(TEST_FILE_ATTRIBUTE) {
+    if file_is_test_only(&code) {
         return Scanned {
             test_only: true,
             ..Scanned::default()
         };
     }
+    remove_inner_test_blocks(&mut code);
     let test_modules = remove_test_items(&mut code);
     let code: String = code.into_iter().collect();
     let mut hits = Vec::new();
@@ -499,6 +572,29 @@ fn scanner_ignores_comments_strings_and_test_code() {
         "presentation may not step the simulation: {hits:?}"
     );
     assert!(scan_source("x.rs", "#![cfg(test)]\nfn t() {}\n").test_only);
+    // The file attribute may follow docs and other inner attributes.
+    let headed = "//! Docs.\n#![allow(dead_code)]\n#![cfg(test)]\nfn t() { a.rng.below(2); }\n";
+    assert!(scan_source("headed.rs", headed).test_only);
+}
+
+/// `#![cfg(test)]` inside an inline module makes that module test-only, not
+/// the file: the file's production code around it is still scanned.
+#[test]
+fn inner_test_attribute_in_an_inline_module_hides_only_that_module() {
+    let inline = "mod helpers {\n    #![cfg(test)]\n    fn t() { let r = a.rng.below(2); }\n}\n\
+                  fn draw(a: &Attempt) { a.rng.below(3); }\n";
+    let scanned = scan_source("inline.rs", inline);
+    assert!(
+        !scanned.test_only,
+        "the inline module's attribute is not the file's"
+    );
+    assert_eq!(
+        scanned.hits,
+        [
+            "inline.rs:5: `.rng`: the core RNG streams (Attempt.rng, Campaign.rng) belong to horde_core"
+        ],
+        "only the production read after the test module counts"
+    );
 }
 
 #[test]
