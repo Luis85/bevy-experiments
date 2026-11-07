@@ -223,17 +223,24 @@ function Get-GatedValues($Reports, [scriptblock]$Read) {
 
 function Get-SaveCloneCheck($Report, [string]$RunProfile, $Budget) {
     # The save_clone example's gate (W1-50) as one budget check: save_snapshot p99 at the budget's fixture, gated only in
-    # the budget's profiles. A report for another fixture, or without the p99, is invalid evidence.
+    # the budget's profiles. A report for another fixture, or without the p99, is invalid evidence. gate.items and
+    # gate.workers echo the budget; gate.measured_items and measured_workers are the gated report's own counts, and only
+    # the budget's fixture itself (exactly items_min and workers) is the gated measurement.
     $gate = Get-Field $Budget @('save_clone')
     $limit = Get-Field $gate @('p99_ms_max')
-    $items = Get-Field $Report @('gate', 'items')
+    $items = Get-Field $Report @('gate', 'measured_items')
+    $workers = Get-Field $Report @('gate', 'measured_workers')
     $check = [pscustomobject][ordered]@{
-        scene = 'save_clone'; size = "$items items"; metric = 'save_snapshot_p99_ms'; aggregate = 'p99'
+        scene = 'save_clone'; size = "$(Format-Number $items) items"; metric = 'save_snapshot_p99_ms'; aggregate = 'p99'
         value = (Get-Field $Report @('gate', 'p99_ms')); limit = $limit; status = 'pass'; note = ''
     }
     if ($null -eq $gate -or $null -eq $limit) { $check.status = 'invalid'; $check.note = 'PERF_BUDGET.json has no save_clone.p99_ms_max' }
-    elseif ($items -ne (Get-Field $gate @('items_min')) -or (Get-Field $Report @('gate', 'workers')) -ne (Get-Field $gate @('workers'))) {
-        $check.status = 'invalid'; $check.note = 'the report measured another fixture than save_clone.items_min and workers'
+    elseif ($items -isnot [ValueType] -or $items -is [bool] -or $workers -isnot [ValueType] -or $workers -is [bool]) {
+        $check.status = 'invalid'; $check.note = 'the report has no gate.measured_items and gate.measured_workers'
+    }
+    elseif ($items -ne (Get-Field $gate @('items_min')) -or $workers -ne (Get-Field $gate @('workers'))) {
+        $check.status = 'invalid'
+        $check.note = "the report measured $(Format-Number $items) items and $(Format-Number $workers) workers, not save_clone.items_min and workers"
     }
     elseif ($null -eq $check.value -or $check.value -is [bool] -or $check.value -isnot [ValueType]) {
         $check.status = 'invalid'; $check.note = 'the report has no gate.p99_ms'
@@ -489,9 +496,16 @@ function Invoke-SelfTest {
     $within = Read-JsonFile (Join-Path $fixtureDirectory 'within-budget.json')
     $withinContext = [pscustomobject]@{ Profile = $within.run.profile; VsyncOff = [bool]$within.run.vsync_off; NoBudget = $false; Informational = $false; PowerPlan = 'Balanced' }
     $cloneLimit = [double]$budget.save_clone.p99_ms_max
+    # The example writes the budget's fixture as gate.items and workers and the gated report's own counts as
+    # gate.measured_items and measured_workers.
     $clone = {
-        param($P99, [int]$Items = [int]$budget.save_clone.items_min)
-        [pscustomobject]@{ gate = [pscustomobject]@{ items = $Items; workers = [int]$budget.save_clone.workers; p99_ms = $P99 } }
+        param($P99, [int]$Measured = [int]$budget.save_clone.items_min, [bool]$NoMeasured = $false)
+        $gate = [pscustomobject]@{ items = [int]$budget.save_clone.items_min; workers = [int]$budget.save_clone.workers; p99_ms = $P99 }
+        if (-not $NoMeasured) {
+            $gate | Add-Member -NotePropertyName measured_items -NotePropertyValue $Measured
+            $gate | Add-Member -NotePropertyName measured_workers -NotePropertyValue ([int]$budget.save_clone.workers)
+        }
+        [pscustomobject]@{ gate = $gate }
     }
     $cloneLine = "save_clone/$($budget.save_clone.items_min) items save_snapshot_p99_ms"
     $cloneCases = @(
@@ -500,7 +514,8 @@ function Invoke-SelfTest {
         @{ Name = 'over the limit in playtest'; Report = (& $clone ($cloneLimit * 1.5)); Profile = 'playtest'; Expected = 1; Checks = @("$cloneLine over") },
         @{ Name = 'outside the budget profiles'; Report = (& $clone ($cloneLimit * 1.5)); Profile = 'release'; Expected = 0; Checks = @("$cloneLine skipped") },
         @{ Name = 'without a p99'; Report = (& $clone $null); Profile = 'dev'; Expected = 2; Checks = @("$cloneLine invalid") },
-        @{ Name = 'another fixture'; Report = (& $clone ($cloneLimit * 0.5) 999); Profile = 'dev'; Expected = 2; Checks = @('save_clone/999 items save_snapshot_p99_ms invalid') }
+        @{ Name = 'another fixture'; Report = (& $clone ($cloneLimit * 0.5) 2500); Profile = 'dev'; Expected = 2; Checks = @('save_clone/2500 items save_snapshot_p99_ms invalid') },
+        @{ Name = 'without the measured counts'; Report = (& $clone ($cloneLimit * 0.5) 0 $true); Profile = 'dev'; Expected = 2; Checks = @('save_clone/- items save_snapshot_p99_ms invalid') }
     )
     foreach ($case in $cloneCases) {
         $extra = Get-SaveCloneCheck $case.Report $case.Profile $budget

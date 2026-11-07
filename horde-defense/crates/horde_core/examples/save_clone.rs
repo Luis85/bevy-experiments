@@ -60,8 +60,13 @@ pub struct SaveCloneReport {
 }
 #[derive(Debug, Serialize)]
 pub struct Gate {
+    /// The budget's `save_clone.items_min` and `workers`.
     pub items: usize,
     pub workers: usize,
+    /// The gated report's own counts, which `measure_performance.ps1`
+    /// compares with the budget's fixture.
+    pub measured_items: usize,
+    pub measured_workers: usize,
     pub p99_ms_max: f64,
     pub profiles: Vec<String>,
     pub gated: bool,
@@ -169,6 +174,8 @@ pub fn output(profile: &str, reports: Vec<SaveCloneReport>) -> Result<Output, St
         gate: Gate {
             items,
             workers,
+            measured_items: gated_report.items,
+            measured_workers: gated_report.workers,
             p99_ms_max,
             profiles,
             gated,
@@ -282,8 +289,39 @@ mod tests {
             }
             assert!(series["p50_ms"].as_f64() <= series["max_ms"].as_f64());
         }
+        assert_eq!(
+            (
+                value["gate"]["measured_items"].as_u64(),
+                value["gate"]["measured_workers"].as_u64()
+            ),
+            (Some(1000), Some(3)),
+            "the gate echoes the measured fixture"
+        );
         assert!(output("release", Vec::new()).is_err(), "no gated fixture");
         let release = output("release", vec![measure(&g, 1)]).unwrap();
         assert!(!release.gate.gated, "release is informational");
+    }
+
+    /// W1 review: a 1,000-item fixture that falls short gates the next
+    /// report, so the gate records that report's own counts beside the
+    /// budget's and the script can reject another fixture.
+    #[test]
+    fn save_clone_gate_records_the_gated_report_counts() {
+        let g = save_clone_fixture(ITEM_COUNTS[0]).expect("save-clone fixture");
+        let mut short = measure(&g, 1);
+        short.items = 999;
+        let mut larger = measure(&g, 1);
+        larger.items = 2500;
+        let dev = output("dev", vec![short, larger]).expect("a report meets the gate");
+        assert_eq!(
+            (dev.gate.items, dev.gate.workers),
+            (1000, 3),
+            "budget values"
+        );
+        assert_eq!(
+            (dev.gate.measured_items, dev.gate.measured_workers),
+            (2500, 3),
+            "the gated report's own counts"
+        );
     }
 }
