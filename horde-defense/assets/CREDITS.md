@@ -69,8 +69,8 @@ under the repository's MIT license:
   `scripts/generate_atmosphere_audio.py`;
 - the three retired Rust-synthesized NPC-shot variants
   (`archive/audio/survival_npc_shot_*.wav`): `Cue::NpcShot` was
-  retired on 4 November 2026 and NPC defenders now sound like their weapon
-  class.
+  decided by the user on 4 November 2026 and retired on 6 November 2026
+  (W1-58); NPC defenders now sound like their weapon class.
 
 Their exact prompts, seeds, SHA-256 hashes and original paths are in
 `archive/art/PROVENANCE.json`, `archive/audio/PROVENANCE.json` and

@@ -14,7 +14,7 @@ restores it. `scripts/package_playtest.ps1` copies `assets/` and never
 | `archive/art/animation/` | the five 2 November 2026 walk strips | `archive/art/PROVENANCE.json`; the original strip manifest, moved verbatim, is `archive/art/animation/PROVENANCE.json` |
 | `archive/art/pixel/` | `keyart-v1.png`, the edit source of the shipped `assets/art/pixel/keyart-v2.png` | `archive/art/PROVENANCE.json` |
 | `archive/audio/` | the twelve legacy WAVs: armor, boss, damage, incoming, melee, npc_shot, ready, reload, shot, structure, trap, turret_shot | `archive/audio/PROVENANCE.json` (written by `scripts/generate_atmosphere_audio.py`) |
-| `archive/audio/` | `survival_npc_shot_0..2.wav`, the variants of the retired `Cue::NpcShot` (NPC defenders use their weapon class since 4 November 2026) | `archive/audio/SURVIVAL_PROVENANCE.json` (the shipped survival records verbatim) |
+| `archive/audio/` | `survival_npc_shot_0..2.wav`, the variants of the retired `Cue::NpcShot` (user decision 2026-11-04; retired by W1-58 on 6 November 2026, since when NPC defenders use their weapon class) | `archive/audio/SURVIVAL_PROVENANCE.json` (the shipped survival records verbatim) |
 
 Every archive record keeps its original fields and adds `sha256`, `bytes`,
 `archived_from`, `archived` and `reason`. The `asset_audit` tests in
