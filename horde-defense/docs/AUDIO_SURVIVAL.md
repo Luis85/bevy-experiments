@@ -2,7 +2,7 @@
 
 The new `assets/audio/survival_*_[0–2].wav` library contains 23 shipped original effects with three repeatable variations each (69 files). A 24th family, NpcShot, retired on 2026-11-04 (NPC defenders now sound like their weapon class); its three files are archived in `archive/audio/`. Files are mono 44.1 kHz PCM16 WAV. No recordings, external samples or additional runtime libraries are required. Original audio files and their attribution remain intact. `assets/audio/SURVIVAL_PROVENANCE.json` records every new file's SHA-256, duration, peak and RMS level.
 
-Listen to [the audition reel](audio/survival-audition.wav). Its [CSV timeline](audio/survival-audition.csv) identifies each cue; the reel plays variant zero with a third-second gap. The committed reel and CSV were exported before NpcShot retired, so they still play that archived family at 4.81 s; the next export, which iterates only the shipped families, drops it. It is an authoring comparison at the library's recorded level, before the in-game master, effects and cue gains.
+Listen to [the v1 audition reel (pre-production-pass)](audio/survival-audition.wav). Its [CSV timeline](audio/survival-audition.csv) identifies each cue; the reel plays variant zero with a third-second gap. It is not the current library: the committed reel and CSV were exported before NpcShot retired, so they still play that archived family at 4.81 s. A re-export iterates only the shipped families and drops it. Production-pass ruling S19 keeps this v1 reel in `docs/audio/` and, from wave 6, sends new reels only to the uncommitted `target/audio-audition/`. The reel is an authoring comparison at the library's recorded level, before the in-game master, effects and cue gains.
 
 | Sound family | Design |
 | --- | --- |
