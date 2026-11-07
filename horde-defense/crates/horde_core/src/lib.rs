@@ -7,6 +7,7 @@ pub mod defenders;
 pub mod enemy_catalog;
 mod hash;
 pub mod kind_map;
+pub mod loot;
 pub mod ordnance;
 pub mod progression;
 pub mod quality;

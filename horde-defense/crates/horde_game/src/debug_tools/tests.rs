@@ -532,10 +532,13 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
     // W2-05 (per-archetype telemetry, class T) moved the pin from
     // 81559980e3a904d7: the report now carries the archetype maps. With those
     // three maps removed the replayed state digests to 81559980e3a904d7
-    // again, so no combat moved.
+    // again, so no combat moved. W2-06 (drop tracking, class F) moved it from
+    // 0da44f5dc0a31d2c: attempts save their frozen drop_tier and drop_ids,
+    // and reports their drop_ids and loot_by_quality. With those four keys
+    // left unserialized the replayed state digests to 0da44f5dc0a31d2c again.
     assert_eq!(
         hex(replay(without_sale).unwrap().digest),
-        "0da44f5dc0a31d2c",
+        "dfcb186697a88f45",
         "the replay of the recording up to its sale is pinned"
     );
     // Only compatibility warnings, never a format or seed mismatch. A content

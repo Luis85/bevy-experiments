@@ -645,14 +645,20 @@ fn v6_payload_round_trips_unchanged_through_v7_types() {
 
 /// The v7 keys a GOLDEN run may write once a wave-2 writer populates them,
 /// each with the commit whose provisional GOLDEN move (`tests/determinism.rs`,
-/// ruling P3) names it. W2-05 is the per-archetype telemetry writer, class T.
-const WRITTEN_V7_KEYS: [(&str, &str); 6] = [
+/// ruling P3) names it. W2-05 is the per-archetype telemetry writer, class T;
+/// W2-06 is the drop tracking writer (the frozen drop tier, the root drop
+/// list and the report's loot fields), class F.
+const WRITTEN_V7_KEYS: [(&str, &str); 10] = [
     ("W2-05", "/attempt/telemetry/spawned_by_archetype"),
     ("W2-05", "/attempt/telemetry/kills_by_archetype"),
     ("W2-05", "/attempt/telemetry/damage_taken_by_archetype"),
     ("W2-05", "/last_result/telemetry/spawned_by_archetype"),
     ("W2-05", "/last_result/telemetry/kills_by_archetype"),
     ("W2-05", "/last_result/telemetry/damage_taken_by_archetype"),
+    ("W2-06", "/attempt/drop_tier"),
+    ("W2-06", "/attempt/drop_ids"),
+    ("W2-06", "/last_result/drop_ids"),
+    ("W2-06", "/last_result/loot_by_quality"),
 ];
 
 /// Whether `path` is one of [`WRITTEN_V7_KEYS`] or lies below one.

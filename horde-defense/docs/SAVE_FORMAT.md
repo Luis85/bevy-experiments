@@ -113,6 +113,15 @@ uses them is unchanged. Loading rejects any of these as invalid:
   an id at or above the parent's `next_item_id`, an id pending for another
   expedition, a `reserved_items` id or a root `attempt.drop_ids` id.
 
+Since W2-06 every new attempt saves `drop_tier`, frozen at deploy: one above
+its encounter template or the campaign's unlocked stage count, whichever is
+higher, at most the highest droppable tier. A root attempt with a drop tier
+lists every item it drops in `drop_ids` (up to 4096, past the 128 kept loot
+receipts), and the finished run's `last_result` copies that list and the
+run's `loot_by_quality`. An attempt saved without `drop_tier` was deployed
+before v7: it keeps the old drop rules and records no drops, so settlement
+never auto-sells them. Expedition attempts never record drops.
+
 ### Progression ledgers
 
 `campaign.player.level_grant_paid` is the highest level whose level-up coin

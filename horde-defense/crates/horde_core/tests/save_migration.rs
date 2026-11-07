@@ -929,6 +929,80 @@ fn v6_drop_trace_is_pinned() {
     );
 }
 
+/// Ticks `g` under the smoke bot until its root attempt has dropped `count`
+/// more items (at most a minute of battle), and returns their item ids.
+fn root_drops(g: &mut Game, count: usize) -> Vec<u64> {
+    let start = g.attempt().unwrap().tick;
+    let seen = g.campaign().next_item_id;
+    loop {
+        let input = smoke_input(g);
+        g.tick(input);
+        let a = g.attempt().expect("the root attempt is still live");
+        let ids: Vec<u64> = a
+            .loot_events
+            .iter()
+            .map(|e| e.item_id)
+            .filter(|id| *id >= seen)
+            .collect();
+        if ids.len() >= count {
+            return ids;
+        }
+        assert!(a.tick < start + 3600, "no drop within a minute");
+    }
+}
+
+/// Fail-first (ruling E11, R4): the v6 fixture's live root attempt has no
+/// drop tier, so its drops take the legacy path: none is recorded in
+/// `drop_ids`, its report lists none, and with auto-sell on and selling
+/// everything below Legendary every one of them is still owned after the run
+/// settles. Its report still carries the quality counts. The next attempt
+/// in the same game is deployed with a drop tier and records its drops.
+#[test]
+fn legacy_attempt_never_pushes_drop_ids_and_is_never_auto_sold() {
+    let mut g = fixture_v6();
+    assert_eq!(g.attempt().unwrap().drop_tier, None, "deployed before v7");
+    g.apply(&horde_core::command::Command::SetAutoSell(
+        horde_core::campaign::AutoSellRule {
+            enabled: true,
+            sell_below: Quality::Legendary,
+            keep_upgrades: false,
+            ..Default::default()
+        },
+    ))
+    .unwrap();
+    let legacy = root_drops(&mut g, 2);
+    let a = g.attempt().unwrap();
+    assert!(a.drop_ids.is_empty(), "the legacy path records no drop");
+    let counts = a.loot_quality_counts.clone();
+    Game::from_payload(serde_json::to_value(&g).unwrap(), SAVE_VERSION).unwrap();
+    g.apply(&horde_core::command::Command::Withdraw).unwrap();
+    let report = g.last_result().unwrap();
+    assert!(
+        report.drop_ids.is_empty(),
+        "the report lists no legacy drop"
+    );
+    assert!(report.auto_sold.is_empty(), "nothing was auto-sold");
+    assert_eq!(
+        report.loot_by_quality, counts,
+        "the quality counts are kept"
+    );
+    for id in &legacy {
+        assert!(g.campaign().item(*id).is_some(), "legacy drop {id} is kept");
+    }
+
+    g.deploy(0, Mode::Personal).unwrap();
+    assert!(g.attempt().unwrap().drop_tier.is_some());
+    g.set_paused(false);
+    let tracked = root_drops(&mut g, 1);
+    assert_eq!(
+        g.attempt().unwrap().drop_ids,
+        tracked,
+        "a v7 attempt records"
+    );
+    g.apply(&horde_core::command::Command::Withdraw).unwrap();
+    assert_eq!(g.last_result().unwrap().drop_ids, tracked);
+}
+
 /// FNV-1a of 10,000 quality rolls over seeded (seed, attempt, enemy, rank)
 /// tuples, recorded on the v6 build at parent commit 3d492cd. Pins the keyed
 /// quality roll before its mixer moves to `crate::hash` (W1-09).

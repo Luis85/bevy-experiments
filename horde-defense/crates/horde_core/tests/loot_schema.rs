@@ -1,8 +1,10 @@
 //! Loot schema (W1-21): the saved auto-sell rule on `Campaign`, the drop
 //! tracking on `Attempt` and `Report`, the auto-sold receipt on `Report` and
 //! `RunRecord`, `ParallelBattle.pending_auto_sell`, and their save
-//! validation. Every field is skipped at its default and nothing writes a
-//! non-default value yet, so these tests stage the values as a save would.
+//! validation. Every field is skipped at its default. Since W2-06 every
+//! deploy writes `drop_tier` and the drop site and settlement fill the drop
+//! tracking (`tests/loot_tracking.rs`); the other fields have no writer yet,
+//! so these tests stage the values as a save would.
 mod support;
 use horde_core::{
     campaign::{AutoSellRule, AutoSoldLine, AutoSoldReceipt, MAX_AUTO_SOLD_LINES},
@@ -282,8 +284,12 @@ fn new_loot_fields_at_default_are_not_serialized() {
     assert!(AutoSoldReceipt::default().is_empty());
     assert_eq!(MAX_AUTO_SOLD_LINES, 12);
     assert_eq!(MAX_RUN_DROPS, 4096);
-    let LootGame { game, settled, .. } = loot_game();
-    let value = serde_json::to_value(&game).unwrap();
+    let LootGame {
+        game,
+        live,
+        settled,
+    } = loot_game();
+    let mut value = serde_json::to_value(&game).unwrap();
     assert!(value["battles"][settled]["game"]["last_result"].is_object());
     assert!(
         !value["campaign"]["run_history"]
@@ -291,6 +297,22 @@ fn new_loot_fields_at_default_are_not_serialized() {
             .unwrap()
             .is_empty()
     );
+    // Since W2-06 every deploy freezes its drop tier, so the two live
+    // attempts write one. The runs dropped nothing, so every other key stays
+    // at its default and out of the save.
+    assert_eq!(
+        loot_keys(&value),
+        [
+            "attempt.drop_tier".to_string(),
+            format!("battles[{live}].game.attempt.drop_tier"),
+        ]
+    );
+    let attempt = value["attempt"].as_object_mut().unwrap();
+    attempt.remove("drop_tier");
+    let attempt = value["battles"][live]["game"]["attempt"]
+        .as_object_mut()
+        .unwrap();
+    attempt.remove("drop_tier");
     assert_eq!(loot_keys(&value), Vec::<String>::new());
     // Defaults read back from a save with none of the keys.
     let loaded = load(value).unwrap();

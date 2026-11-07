@@ -312,6 +312,73 @@ impl Game {
             }
         }
     }
+    /// Today's drop pool (catalogue index 4 on, tiers 1 to the encounter
+    /// template's level + 1), its uniform pick (exactly one `a.rng` draw) and
+    /// the absolute quality roll (keyed, no `a.rng`). None when the pool is
+    /// empty, which draws nothing.
+    fn legacy_drop_pick(
+        &self,
+        a: &mut Attempt,
+        e: &Enemy,
+    ) -> Option<(usize, crate::quality::Quality)> {
+        let available: Vec<usize> = content()
+            .items
+            .iter()
+            .enumerate()
+            .filter(|(n, i)| *n >= 4 && i.tier > 0 && i.tier <= a.level + 1)
+            .map(|(n, _)| n)
+            .collect();
+        if available.is_empty() {
+            return None;
+        }
+        let definition = available[a.rng.below(available.len() as u64) as usize];
+        let quality = crate::quality::catalog().roll(self.seed, a.id, e.id, a.progression.rank);
+        Some((definition, quality))
+    }
+    /// Banks one drop in the shared armory and counts it on the attempt (the
+    /// loot total, the quality counts, the capped receipts and the log).
+    /// Returns the new item id, or None when the armory refused the item.
+    fn bank_drop(
+        &mut self,
+        a: &mut Attempt,
+        e: &Enemy,
+        definition: usize,
+        quality: crate::quality::Quality,
+    ) -> Option<u64> {
+        let item_id = self
+            .campaign
+            .add_item_with_quality(definition, a.progression.item_level, Some(quality))
+            .ok()?;
+        a.loot += 1;
+        a.loot_quality_counts[quality] += 1;
+        if a.loot_events.len() == crate::quality::MAX_LOOT_EVENTS {
+            a.loot_events.remove(0);
+        }
+        a.loot_events.push(crate::quality::LootEvent {
+            at: [e.x, e.y()],
+            item_id,
+            definition: ItemDefId::at(definition),
+            level: a.progression.item_level,
+            quality,
+            name: content().items[definition].name.clone(),
+            tick: a.tick,
+        });
+        a.note(format!(
+            "Recovered {} {} · level {} · banked in the shared armory",
+            quality.name(),
+            content().items[definition].name,
+            a.progression.item_level
+        ));
+        Some(item_id)
+    }
+    /// Records a drop for settlement (ruling E5): only a root attempt, and
+    /// at most [`MAX_RUN_DROPS`] per run (the save bound). Item ids rise
+    /// monotonically, so the list stays ascending.
+    fn record_drop(&self, a: &mut Attempt, item_id: u64) {
+        if !self.worker && a.drop_ids.len() < MAX_RUN_DROPS {
+            a.drop_ids.push(item_id);
+        }
+    }
     pub(super) fn reap(&mut self, a: &mut Attempt) {
         let defeated: Vec<usize> = a
             .enemies
@@ -377,42 +444,19 @@ impl Game {
             );
             let drop = e.boss || a.rng.below(100) < 3 || a.kills.is_multiple_of(20);
             if drop {
-                let available: Vec<usize> = content()
-                    .items
-                    .iter()
-                    .enumerate()
-                    .filter(|(n, i)| *n >= 4 && i.tier > 0 && i.tier <= a.level + 1)
-                    .map(|(n, _)| n)
-                    .collect();
-                if !available.is_empty() {
-                    let definition = available[a.rng.below(available.len() as u64) as usize];
-                    let quality =
-                        crate::quality::catalog().roll(self.seed, a.id, e.id, a.progression.rank);
-                    if let Ok(item_id) = self.campaign.add_item_with_quality(
-                        definition,
-                        a.progression.item_level,
-                        Some(quality),
-                    ) {
-                        a.loot += 1;
-                        a.loot_quality_counts[quality] += 1;
-                        if a.loot_events.len() == crate::quality::MAX_LOOT_EVENTS {
-                            a.loot_events.remove(0);
-                        }
-                        a.loot_events.push(crate::quality::LootEvent {
-                            at: [e.x, e.y()],
-                            item_id,
-                            definition: ItemDefId::at(definition),
-                            level: a.progression.item_level,
-                            quality,
-                            name: content().items[definition].name.clone(),
-                            tick: a.tick,
-                        });
-                        a.note(format!(
-                            "Recovered {} {} · level {} · banked in the shared armory",
-                            quality.name(),
-                            content().items[definition].name,
-                            a.progression.item_level
-                        ));
+                if a.drop_tier.is_none() {
+                    // An attempt deployed before v7 (ruling E11): today's
+                    // drop, verbatim, pinned by V6_DROP_TRACE_FNV. It records
+                    // no drop id, so settlement never auto-sells it.
+                    if let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
+                        self.bank_drop(a, &e, definition, quality);
+                    }
+                } else if let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
+                    // The Some path keeps today's pool, pick and quality
+                    // until the relative roll (W2-07) and the weighted
+                    // DropTable (W2-09) replace them here.
+                    if let Some(item_id) = self.bank_drop(a, &e, definition, quality) {
+                        self.record_drop(a, item_id);
                     }
                 }
             }

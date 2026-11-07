@@ -185,7 +185,12 @@ impl Game {
             coins: 0,
             loot: 0,
             drop_ids: Vec::new(),
-            drop_tier: None,
+            // Always Some from wave 2 (ruling E11): None marks an attempt
+            // deployed before v7, which keeps the legacy drop path.
+            drop_tier: Some(crate::loot::deploy_drop_tier(
+                level,
+                self.campaign.unlocked(),
+            )),
             decision: "Ready to deploy".into(),
             events: VecDeque::new(),
             log: vec![],
@@ -396,8 +401,11 @@ impl Game {
             country_freed,
             coins: a.coins,
             loot: a.loot,
-            drop_ids: Vec::new(),
-            loot_by_quality: Default::default(),
+            // Every drop the run recorded (root attempts on the drop_tier
+            // Some path only; empty for a legacy or expedition attempt) and
+            // the run's quality counts.
+            drop_ids: std::mem::take(&mut a.drop_ids),
+            loot_by_quality: a.loot_quality_counts.clone(),
             auto_sold: Default::default(),
             progression_rewards: Default::default(),
             boss_rank: a.progression.boss_rank,
