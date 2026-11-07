@@ -942,6 +942,11 @@ fn battle_frame_records_layout_rects() {
                 );
                 assert_eq!(f.battle.arena_rect, Some(layout.field.rect), "{label}");
                 assert_eq!(f.battle.effects_rect, Some(layout.effects_clip), "{label}");
+                assert_eq!(
+                    f.battle.effects_keep_clear,
+                    layout.effects_keep_clear(),
+                    "{label}"
+                );
             }
         }
     }
