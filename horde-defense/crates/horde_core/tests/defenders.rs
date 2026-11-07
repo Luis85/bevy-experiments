@@ -1112,6 +1112,33 @@ fn staged_recruit_defending_main_run_validates() {
         );
         assert_eq!(serde_json::to_value(&*game).unwrap(), before, "{name}");
     }
+
+    // A refusal after the recruit was already reserved rolls it back: a Ready
+    // recruit whose loadout Mara's live defense holds passes reserve_defender
+    // (Ready to Defending), then fails reserve_external, and must be Ready
+    // again with nothing else changed.
+    let mut clash = busy.clone();
+    let mara_loadout = clash.campaign().npc.loadout;
+    clash
+        .staging()
+        .strategy()
+        .roster
+        .iter_mut()
+        .find(|r| r.id == saves.ready)
+        .unwrap()
+        .npc
+        .loadout = mara_loadout;
+    let before = serde_json::to_value(&clash).unwrap();
+    assert!(
+        clash.staging().stage_takeover(saves.ready).is_err(),
+        "a recruit holding Mara's reserved loadout was staged"
+    );
+    assert_eq!(status(&clash, saves.ready), RecruitStatus::Ready);
+    assert_eq!(
+        serde_json::to_value(&clash).unwrap(),
+        before,
+        "reserved loadout"
+    );
 }
 
 #[test]
