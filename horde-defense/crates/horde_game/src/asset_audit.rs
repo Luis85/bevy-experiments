@@ -11,7 +11,14 @@
 //! The runtime sets come from the code that loads the files: the egui art slots
 //! ([`crate::visual_assets::PATHS`], which also hold the enemy-visual sheets),
 //! the player-model sources and [`crate::audio::runtime_wav_paths`]. A commit
-//! that adds or retires an asset extends those, never a list in this module.
+//! that adds or retires an asset extends those and its provenance manifest,
+//! and also updates what this module pins on purpose: the shipped WAV count
+//! (`every_shipped_wav_is_loaded_and_matches_provenance`) and the archived
+//! file count (`archived_files_keep_matching_provenance`), so a silent asset
+//! move fails here. A new manifest file joins `AUDIO_MANIFESTS`,
+//! `ART_MANIFESTS` or `ARCHIVE_MANIFESTS` (W1-58 added the archived survival
+//! manifest), and `LEGACY_WAVS` is the user-approved legacy list (plan 2.3),
+//! which changes only with a new user decision.
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
