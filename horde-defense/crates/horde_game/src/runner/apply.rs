@@ -253,7 +253,7 @@ pub(super) fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
                     runtime.retry_save_at = 0;
                     Ok(AppOutcome::JourneyArchived(archive))
                 }
-                Ok(persistence::Commit::Saved) => {
+                Ok(persistence::Commit::Saved | persistence::Commit::SavedWithoutSettings(_)) => {
                     Err("Storage reset acknowledgement did not match its command".into())
                 }
                 Err(error) => Err(error),
@@ -265,12 +265,17 @@ pub(super) fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
                 success,
             });
         } else {
+            let mut settings_error = None;
             let result = done.result.and_then(|commit| match commit {
                 persistence::Commit::Saved => Ok(()),
-                _ => Err("Storage acknowledgement mismatch".into()),
+                persistence::Commit::SavedWithoutSettings(error) => {
+                    settings_error = Some(error);
+                    Ok(())
+                }
+                persistence::Commit::Reset { .. } => Err("Storage acknowledgement mismatch".into()),
             });
             let runtime = &mut *ctx.runtime;
-            if result.is_err() {
+            if result.is_err() || settings_error.is_some() {
                 runtime.dirty = true;
                 runtime.retry_save_at = runtime.simulated_ticks + 600;
             } else {
@@ -282,6 +287,9 @@ pub(super) fn poll_storage(ctx: &mut RuntimeCtx) -> bool {
                     intent,
                     result: result.clone(),
                 });
+            }
+            if let Some(error) = settings_error {
+                ctx.notice(RuntimeNotice::SettingsNotSaved(error));
             }
         }
     }

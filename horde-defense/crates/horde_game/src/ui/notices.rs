@@ -159,6 +159,13 @@ impl UiCtx<'_> {
                 self.status.message_error = false;
                 self.finish_save_intent(intent);
             }
+            RuntimeNotice::SettingsNotSaved(error) => {
+                self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
+                self.status.message = format!(
+                    "Campaign saved; settings not saved: {error}. Settings retry on the next save."
+                );
+                self.status.message_error = true;
+            }
             RuntimeNotice::RecoveryCopies(paths) => {
                 self.status.feedback_revision = self.status.feedback_revision.wrapping_add(1);
                 self.status.recovery_notice = paths

@@ -252,13 +252,20 @@ fn settings_copy_failure_at_startup_keeps_the_original_until_a_save_can_copy_it(
     fixture.frontend = frontend_loaded_from(&directory);
     let f = &mut fixture.frontend;
     assert_eq!(f.settings, Settings::default());
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
     save_in_frame(f, 1);
     assert_eq!(std::fs::read(&path).unwrap(), original);
+    // Only the settings write waits for the copy: the campaign is saved.
+    let saved = Game::load(&f.paths.campaign()).unwrap();
+    assert!(saved.campaign().world.start.is_some());
     assert!(
-        f.status.message.starts_with("Save failed:"),
+        f.status
+            .message
+            .starts_with("Campaign saved; settings not saved:"),
         "{}",
         f.status.message
     );
+    assert!(f.status.message_error);
     // Once the copy can be made, the next save makes it before replacing.
     std::fs::remove_dir(&copy).unwrap();
     save_in_frame(f, 2);
@@ -269,6 +276,34 @@ fn settings_copy_failure_at_startup_keeps_the_original_until_a_save_can_copy_it(
     save_in_frame(f, 3);
     assert_eq!(std::fs::read(&copy).unwrap(), original);
     assert_eq!(Settings::load(&path).master, 0.4);
+}
+
+#[test]
+fn settings_copy_failure_at_startup_does_not_block_quit() {
+    let mut fixture = IsolatedFrontend::new();
+    let directory = fixture.directory.clone();
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("settings.json");
+    let original = b"{\"master\": 0.3, truncated by a crash";
+    std::fs::write(&path, original).unwrap();
+    let copy = directory.join(crate::profile::UNREADABLE_SETTINGS);
+    std::fs::create_dir(&copy).unwrap();
+    fixture.frontend = frontend_loaded_from(&directory);
+    let f = &mut fixture.frontend;
+    f.game.campaign_mut().choose_start_country("DEU").unwrap();
+    f.runtime.begin_frame(1);
+    f.act(|c| c.request_save(SaveIntent::Quit));
+    assert!(f.flush_for_test(), "{}", f.status.message);
+    assert!(
+        Game::load(&f.paths.campaign())
+            .unwrap()
+            .campaign()
+            .world
+            .start
+            .is_some()
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), original);
+    std::fs::remove_dir(&copy).unwrap();
 }
 
 #[test]

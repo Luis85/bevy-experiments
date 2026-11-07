@@ -52,6 +52,9 @@ struct Job {
 #[derive(Debug)]
 pub(super) enum Commit {
     Saved,
+    /// The campaign was saved; settings.json was left untouched because its
+    /// original could not be copied aside first (the error says why).
+    SavedWithoutSettings(String),
     Reset {
         game: Box<Game>,
         archive: Option<PathBuf>,
@@ -98,13 +101,19 @@ impl Backend for FileStore {
             Payload::Save(snapshot) => {
                 recovered =
                     apply::preserve_unreadable(&snapshot.campaign_path, &mut self.preserved)?;
+                snapshot.game.save(&snapshot.campaign_path)?;
+                // The settings guard holds back only the settings write: the
+                // campaign above is already committed, so a Quit still closes.
                 if snapshot.preserve_settings
                     && !self.settings_preserved.contains(&snapshot.settings_path)
                 {
-                    crate::profile::preserve_settings_original(&snapshot.settings_path)?;
+                    if let Err(error) =
+                        crate::profile::preserve_settings_original(&snapshot.settings_path)
+                    {
+                        return Ok(Commit::SavedWithoutSettings(error));
+                    }
                     self.settings_preserved.push(snapshot.settings_path.clone());
                 }
-                snapshot.game.save(&snapshot.campaign_path)?;
                 apply::write_settings(&snapshot.settings, &snapshot.settings_path)?;
                 Ok(Commit::Saved)
             }

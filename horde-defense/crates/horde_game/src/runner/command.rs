@@ -51,6 +51,9 @@ pub enum RuntimeNotice {
     SaveSkipped {
         intent: SaveIntent,
     },
+    /// The campaign was saved but settings.json was not
+    /// (`persistence::Commit::SavedWithoutSettings`); a later save retries it.
+    SettingsNotSaved(String),
     SimulationFinished,
     RecoveryCopies(Vec<PathBuf>),
     /// Expedition transfers that could not be applied to the shared campaign.
