@@ -1,5 +1,9 @@
 //! Read-only, real-time presentation of already-resolved combat results.
-use super::{UiCtx, battle::keep_clear_shift, review};
+use super::{
+    UiCtx,
+    battle::{KEEP_CLEAR_GAP, keep_clear_shift},
+    review,
+};
 use crate::{
     art::{self, AMBER, GREEN, MUTED, RED, TEXT},
     settings::Settings,
@@ -332,6 +336,19 @@ const BAR_CLEARANCE: f32 = 21.0;
 fn number_lift(arena: art::ArenaProjection) -> f32 {
     NUMBER_LIFT.max(arena.lane_height() * art::HEALTH_BAR_LIFT + BAR_CLEARANCE)
 }
+/// The health bar `art::battlefield` paints over the drawn body a popup
+/// rises from, when that popup reports on a live hostile.
+fn struck_bar(a: &Attempt, arena: art::ArenaProjection, bubble: &Bubble) -> Option<Rect> {
+    let Target::Actor(id) = bubble.target else {
+        return None;
+    };
+    let enemy = a.enemies.iter().find(|e| e.id == id)?;
+    let sy = arena.lane_height();
+    Some(Rect::from_center_size(
+        arena.world(bubble.at[0], bubble.at[1]) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
+        vec2(if enemy.boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
+    ))
+}
 pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
     if let Some(a) = f.game.attempt() {
         draw_for(
@@ -437,7 +454,26 @@ pub(super) fn draw_for(
         // The headroom is the HUD band's too: a popup that would meet a HUD
         // rect drops under it (CF-1-09), the same in reduced effects.
         let drawn = Rect::from_center_size(center, galley.size()).expand(border);
-        let center = center + vec2(0.0, keep_clear_shift(drawn, keep_clear));
+        let mut center = center + vec2(0.0, keep_clear_shift(drawn, keep_clear));
+        // Dropped under the HUD, a top-lane number would sit on the struck
+        // hostile's own health bar for its whole life: it goes beside the
+        // bar instead, right or else left, still clear of the HUD (W1 review).
+        if let Some(bar) = struck_bar(a, arena, bubble)
+            && Rect::from_center_size(center, galley.size())
+                .expand(border)
+                .intersects(bar)
+        {
+            let half = galley.size().x * 0.5 + border;
+            let right = bar.right() + KEEP_CLEAR_GAP + half;
+            let x = if right + half <= arena.rect.right() {
+                right
+            } else {
+                bar.left() - KEEP_CLEAR_GAP - half
+            };
+            center = pos2(x, bar.center().y - rise);
+            let beside = Rect::from_center_size(center, galley.size()).expand(border);
+            center += vec2(0.0, keep_clear_shift(beside, keep_clear));
+        }
         let origin = center - galley.size() * 0.5;
         let outline = Color32::from_black_alpha((240.0 * fade) as u8);
         for direction in [
@@ -871,6 +907,118 @@ mod tests {
             !drawn.intersects(bar),
             "the number at {drawn:?} covers the health bar at {bar:?}"
         );
+    }
+    /// W1 review: on the zoomed 7x16 field the field top is the arena top, so
+    /// a top-lane number always meets a HUD top-band rect, and the keep-clear
+    /// shift dropped it onto the struck enemy's own health bar for its whole
+    /// life. It now meets neither, fresh, at the punch peak and late, at both
+    /// target sizes, in normal and reduced effects, across the lane.
+    #[test]
+    fn a_top_lane_number_kept_clear_of_the_hud_clears_the_struck_enemy_health_bar() {
+        for (size, zoom) in [
+            (vec2(1440.0, 900.0), 1.0),
+            (vec2(1050.0, 700.0) / 1.35, 1.35),
+        ] {
+            let canvas = Rect::from_min_size(pos2(0.0, 0.0), size);
+            for reduced in [false, true] {
+                for x in [0.4_f32, 3.2, 8.0, 12.8, 15.6] {
+                    for kind in [EventKind::Hit, EventKind::WeakPoint] {
+                        let mut game = fixture();
+                        let mut a = game.attempt_slot_mut().take().unwrap();
+                        a.lane_count = 7;
+                        a.width_yards = 16.0;
+                        a.events.clear();
+                        a.enemies.clear();
+                        game.spawn_enemy(&mut a, horde_core::content::EnemyKind::Runner, 0, false);
+                        *game.attempt_slot_mut() = Some(a);
+                        let a = game.attempt_mut().unwrap();
+                        let enemy = a.enemies.last_mut().unwrap();
+                        enemy.x = x;
+                        let (id, feet) = (enemy.id, [enemy.x, enemy.y()]);
+                        a.events.push_back(Event {
+                            to: feet,
+                            target_id: Some(id),
+                            lane: Some(0),
+                            ..hit(a, 4632, kind, 1)
+                        });
+                        let a = game.attempt().unwrap();
+                        let layout = crate::ui::battle::BattleLayout::new(
+                            canvas,
+                            a.lane_count,
+                            a.width_yards,
+                            false,
+                        );
+                        let keep_clear = layout.effects_keep_clear();
+                        let arena = art::ArenaProjection::for_attempt(layout.field.rect, a)
+                            .with_effects_clip(layout.effects_clip);
+                        let sy = arena.lane_height();
+                        let body = classify(a, a.events.back().unwrap()).unwrap().at;
+                        // The bar `art::battlefield` paints over the drawn body.
+                        let bar = Rect::from_center_size(
+                            arena.world(body[0], body[1]) + vec2(0.0, -sy * art::HEALTH_BAR_LIFT),
+                            vec2(sy * 0.65, 3.0),
+                        );
+                        let settings = Settings {
+                            reduced_effects: reduced,
+                            ..Settings::default()
+                        };
+                        let ctx = egui::Context::default();
+                        crate::settings::install_font(&ctx);
+                        crate::settings::configure(&ctx, zoom);
+                        let mut state = Feedback::default();
+                        for age in [0.0, 0.06, 0.5] {
+                            let input = egui::RawInput {
+                                time: Some(age),
+                                screen_rect: Some(canvas),
+                                ..Default::default()
+                            };
+                            let mut output = ctx.run_ui(input, |ui| {
+                                draw_for(
+                                    ui,
+                                    a,
+                                    arena,
+                                    0,
+                                    &mut state,
+                                    &settings,
+                                    review::LootCaptureMode::Disabled,
+                                    &keep_clear,
+                                );
+                            });
+                            output.textures_delta.clear();
+                            let label = format!(
+                                "{kind:?} at x {x} in {size:?}, reduced {reduced}, age {age}"
+                            );
+                            let drawn = output
+                                .shapes
+                                .iter()
+                                .filter_map(|clipped| match &clipped.shape {
+                                    egui::Shape::Text(text) => {
+                                        Some(text.galley.rect.translate(text.pos.to_vec2()))
+                                    }
+                                    _ => None,
+                                })
+                                .reduce(|a, b| a.union(b))
+                                .unwrap_or_else(|| panic!("{label}: a number is drawn"));
+                            assert!(
+                                !drawn.intersects(bar),
+                                "{label}: the number at {drawn:?} covers the health bar at {bar:?}"
+                            );
+                            for hud in keep_clear {
+                                assert!(
+                                    !drawn.intersects(hud),
+                                    "{label}: the number at {drawn:?} meets HUD {hud:?}"
+                                );
+                            }
+                            assert!(
+                                layout.effects_clip.contains_rect(drawn),
+                                "{label}: the number at {drawn:?} leaves the effects clip {:?}",
+                                layout.effects_clip
+                            );
+                        }
+                    }
+                }
+            }
+        }
     }
     /// The lift moves only on the 2.1-2.5x fields: 17x30, 11x20 and 7x16
     /// keep the fixed lift at both target sizes, with or without the hint
