@@ -228,27 +228,37 @@ fn faster_enemy_walks_through_the_slow_one_without_stopping_it_or_leaving_the_la
     }
 }
 
+/// Both signs: pre-W1-69 saves hold negative offsets too (the slow body
+/// swung to -MAX_PASS_OFFSET on middle lanes), and they must glide back to
+/// the centre as smoothly as positive ones, never snap or overshoot.
 #[test]
 fn a_saved_passing_offset_eases_back_to_the_lane_centre() {
-    let (mut g, _, fast) = fixture(5);
-    let a = g.attempt_mut().unwrap();
-    let e = a.enemies.iter_mut().find(|e| e.id == fast).unwrap();
-    e.pass_offset = 0.32;
-    let mut previous = 0.32f32;
-    for _ in 0..30 {
-        g.tick(Input::default());
-        let e = g
-            .attempt()
-            .unwrap()
-            .enemies
-            .iter()
-            .find(|e| e.id == fast)
-            .unwrap()
-            .pass_offset;
-        assert!(e <= previous && previous - e <= 2.0 / 60.0 + 0.00001);
-        previous = e;
+    for start in [0.32f32, -0.32] {
+        let (mut g, _, fast) = fixture(5);
+        let a = g.attempt_mut().unwrap();
+        let e = a.enemies.iter_mut().find(|e| e.id == fast).unwrap();
+        e.pass_offset = start;
+        let mut previous = start;
+        for _ in 0..30 {
+            g.tick(Input::default());
+            let e = g
+                .attempt()
+                .unwrap()
+                .enemies
+                .iter()
+                .find(|e| e.id == fast)
+                .unwrap()
+                .pass_offset;
+            assert!(
+                e.abs() <= previous.abs()
+                    && (previous - e).abs() <= 2.0 / 60.0 + 0.00001
+                    && e * previous >= 0.0,
+                "start {start}: {previous} -> {e}"
+            );
+            previous = e;
+        }
+        assert_eq!(previous, 0.0, "start {start}");
     }
-    assert_eq!(previous, 0.0);
 }
 
 #[test]
