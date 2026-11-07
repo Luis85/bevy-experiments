@@ -281,6 +281,10 @@ fn reserve_and_release_defender_round_trip() {
         s.release_defender(away).is_err(),
         "Deployed is not Defending"
     );
+    assert!(
+        s.release_defender(guard).is_err(),
+        "Guarding is not Defending"
+    );
     assert_eq!(serde_json::to_value(&*s).unwrap(), before);
 
     s.reserve_defender(defender).unwrap();
