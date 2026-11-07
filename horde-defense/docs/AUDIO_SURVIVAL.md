@@ -1,8 +1,8 @@
 # Survival sound effects
 
-The new `assets/audio/survival_*_[0–2].wav` library contains 24 original effects with three repeatable variations each. Files are mono 44.1 kHz PCM16 WAV. No recordings, external samples or additional runtime libraries are required. Original audio files and their attribution remain intact. `assets/audio/SURVIVAL_PROVENANCE.json` records every new file's SHA-256, duration, peak and RMS level.
+The new `assets/audio/survival_*_[0–2].wav` library contains 23 shipped original effects with three repeatable variations each (69 files). A 24th family, NpcShot, retired on 2026-11-04 (NPC defenders now sound like their weapon class); its three files are archived in `archive/audio/`. Files are mono 44.1 kHz PCM16 WAV. No recordings, external samples or additional runtime libraries are required. Original audio files and their attribution remain intact. `assets/audio/SURVIVAL_PROVENANCE.json` records every new file's SHA-256, duration, peak and RMS level.
 
-Listen to [the audition reel](audio/survival-audition.wav). Its [CSV timeline](audio/survival-audition.csv) identifies each cue; the reel plays variant zero with a third-second gap. It is an authoring comparison at the library's recorded level, before the in-game master, effects and cue gains.
+Listen to [the audition reel](audio/survival-audition.wav). Its [CSV timeline](audio/survival-audition.csv) identifies each cue; the reel plays variant zero with a third-second gap. The committed reel and CSV were exported before NpcShot retired, so they still play that archived family at 4.81 s; the next export, which iterates only the shipped families, drops it. It is an authoring comparison at the library's recorded level, before the in-game master, effects and cue gains.
 
 | Sound family | Design |
 | --- | --- |
@@ -12,7 +12,7 @@ Listen to [the audition reel](audio/survival-audition.wav). Its [CSV timeline](a
 | Rifle | Hard narrow transient with a medium outdoor reflection |
 | Marksman | Heavier pressure body and longest outdoor decay |
 | Machine gun | Low mechanical body and rough midrange |
-| NPC / turret | Softer distant report / report with a mechanical action click |
+| Turret | Report with a mechanical action click |
 | Impact / armor | Dull physical strike / short irregular metallic resonance |
 | Reload / ready | Magazine, sliding mechanism and latch transients; no musical chime |
 | Throw / grenade | Small equipment click and cloth/air motion / pressure, debris and reflected noise |
@@ -50,6 +50,6 @@ target/audio-authoring-tests.exe --ignored --exact tests::export_survival_audio_
 
 The export explicitly regenerates the 69 shipped files and audition reel (the retired NpcShot family stays archived in `archive/audio/`); ordinary tests never write those artifacts. Regenerate the provenance hashes when changing synthesis. Normal application tests also include `audio::tests`; its export test remains ignored unless explicitly invoked.
 
-Tests check deterministic variants, distinct weapon decay/energy profiles, finite samples, DC offset, zero-valued endpoints, useful RMS levels, effect headroom and repeat gating. Independent WAV inspection confirmed all 72 encoded files have the expected format and endpoints; their peak is at most 0.179998 and RMS spans 0.008312–0.057572 before mixer gains.
+Tests check deterministic variants, distinct weapon decay/energy profiles, finite samples, DC offset, zero-valued endpoints, useful RMS levels, effect headroom and repeat gating. Independent WAV inspection confirmed all 69 shipped encoded files have the expected format and endpoints; their peak is at most 0.179998 and RMS spans 0.008312–0.057572 before mixer gains.
 
 These checks verify synthesis and scheduling properties. A human listening pass, device output, spatial perception and balance against real gameplay remain separate validation. No listening or device-output result is inferred from compilation or waveform inspection.

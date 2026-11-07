@@ -67,7 +67,7 @@ successful navigation. Readability controls include scale, outlines, damage
 numbers, contextual guidance, blood and reduced effects. Important sounds have
 visible equivalents; fixed-camera aiming never shakes.
 
-[Survival audio](AUDIO_SURVIVAL.md) describes the 72 original WAV variations,
+[Survival audio](AUDIO_SURVIVAL.md) describes the 69 original WAV variations,
 bounded mixer and [audition reel](audio/survival-audition.wav). Audio variations
 consume no combat randomness. An audition or file inspection does not establish
 how the live mix sounds on a particular device.

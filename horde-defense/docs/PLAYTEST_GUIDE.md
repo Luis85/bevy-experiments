@@ -139,7 +139,7 @@ Keep your ordinary campaign intact and use practice or a separate `LASTLIGHT_SAV
 4. Mute Master while a cue is playing, then unmute. Check for complete silence, no delayed burst from a clip that was still loading, and a gentle ambient return. At normal levels, wind and rain should remain behind danger cues and visible enemy windups.
 5. Observe one parallel expedition, then close its observation window. Ordinary fire from every off-screen survivor should not become a wall of sound. Boss/structure alerts still need to be recognizable when relevant to the campaign.
 
-For an offline comparison, [listen to the survival audition reel](audio/survival-audition.wav) and follow its [cue timeline](audio/survival-audition.csv). The [audio guide](AUDIO_SURVIVAL.md) documents the 72 original WAV variations and mixer limits. This reel bypasses the in-game mix and is not a substitute for device listening during combat.
+For an offline comparison, [listen to the survival audition reel](audio/survival-audition.wav) and follow its [cue timeline](audio/survival-audition.csv). The [audio guide](AUDIO_SURVIVAL.md) documents the 69 original WAV variations and mixer limits. This reel bypasses the in-game mix and is not a substitute for device listening during combat.
 
 Record the country, local stage, weather/lighting tags, defender, master/effects/atmosphere values and whether you used speakers or headphones. File/header checks do not establish listening quality; report masking, repetition or a missing source cue as a playtest result.
 
