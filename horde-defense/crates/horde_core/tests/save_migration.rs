@@ -1031,9 +1031,8 @@ const FROZEN_CATALOGUE_FNV: u64 = 0x58a8_acb7_5443_1bad;
 /// archetype's `ResolvedEnemy`, the archetype each legacy `EnemyKind` defaults
 /// to (boss and event spawns go through `resolve_kind`, and a saved enemy
 /// without a snapshot falls back to `default_profile`), each frozen wave
-/// tier's entries (sorted by
-/// archetype id, the order `EnemyCatalog` keeps) and each of the 5 content
-/// levels. Records are serialized through their types, so a new field at its
+/// tier's entries (sorted by archetype id, the order `EnemyCatalog` keeps) and
+/// each of the 5 content levels. Records are serialized through their types, so a new field at its
 /// skipped neutral default writes nothing. Wave entries come from the authored
 /// JSON rather than `wave_pool`, so an entry locked behind any boss still
 /// counts. Panics when either catalogue fails to load.
@@ -1051,11 +1050,8 @@ fn frozen_catalogue_table(enemy_json: &str, content_json: &str) -> String {
         ));
     }
     for kind in EnemyKind::ALL {
-        table.push_str(&format!(
-            "default {kind:?} {}
-",
-            catalog.default_for_kind(kind)
-        ));
+        let id = catalog.default_for_kind(kind);
+        table.push_str(&format!("default {kind:?} {id}\n"));
     }
     let authored: serde_json::Value = serde_json::from_str(enemy_json).unwrap();
     let waves = authored["waves"].as_array().expect("a waves array");
