@@ -440,8 +440,10 @@ mod tests {
 
     /// `tests/fixtures/settings_v0.json`: a settings file as the pre-v2 build
     /// writes it (`Settings::save`, 13 keys, no version), with custom
-    /// bindings and every preference away from its default. Cut on the v6
-    /// build (parent commit 3d492cd) by `write_settings_v0_fixture`.
+    /// bindings and every preference away from its default. Cut by
+    /// `write_settings_v0_fixture` when it was added (b82658a), on a build
+    /// whose `Settings` still had those 13 keys. The file is frozen: the
+    /// writer now refuses to run, since this build cannot cut it.
     const SETTINGS_V0: &str = include_str!("../tests/fixtures/settings_v0.json");
 
     fn customised() -> Settings {
@@ -696,6 +698,14 @@ mod tests {
         };
         let path = std::path::PathBuf::from(path);
         assert!(!path.exists(), "refusing to overwrite {}", path.display());
+        let keys = serde_json::to_value(Settings::default()).unwrap();
+        let keys = keys.as_object().unwrap();
+        assert!(
+            keys.len() == 13 && !keys.contains_key("version"),
+            "this writer cuts the pre-version-1, 13-key file; settings_v0.json is frozen \
+             (this build writes {} keys)",
+            keys.len()
+        );
         customised().save(&path).unwrap();
     }
 }
