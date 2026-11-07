@@ -384,7 +384,7 @@ try {
         Copy-Item -LiteralPath $helper -Destination (Join-Path $Target 'debug\horde-defense.exe')
     }
 
-    Test-Case 'measure_performance -SelfTest gives 0/1/1/2 on the fixtures under redirect' {
+    Test-Case 'measure_performance -SelfTest reports the expected exit code for every fixture under redirect' {
         $r = Invoke-Measure @('-SelfTest') 'measure-selftest'
         $out = Read-Log $r.Out
         Assert-Equal 0 $r.ExitCode ("self-test exit code; out: $out err: " + (Read-Log $r.Err))
