@@ -483,6 +483,272 @@ Re-run, three runs per profile, same machine (about 53% CPU load from other work
 
 **The gate passes in every dev and playtest run (p99 at most 0.764 ms at 1,000 items).** 5,000 items remain above 1.0 ms at p99. That size is informational, and from 2,500 items the stash itself (0.13 to 0.30 ms mean) is the largest component. If it ever becomes gated, the next lever is `ItemDefId(Arc<str>)`. Reports: `target/perf/save-clone/` (before) and `target/perf/save-clone-remedy/` (after).
 
+The `save_clone` example JSON after the remedy, one run per profile: the run with the median `save_snapshot` p99 of its three. Each is quoted verbatim from `target/perf/save-clone-remedy/<run>.json` (git-ignored) up to the end of its gated 1,000-item report; the 2,500- and 5,000-item entries that follow it in `reports` are left out here (the table above gives them), so each excerpt closes the array after the first entry.
+
+Dev (`dev-2.json`):
+
+```json
+{
+  "version": 1,
+  "profile": "dev",
+  "debug_assertions": true,
+  "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "notes": [
+    "CPU-only: Game::save_snapshot on the main thread, fixture creation excluded.",
+    "Synthetic save_clone_fixture: the review-only stress game, never a gameplay claim.",
+    "serialize is the storage worker's serde_json::to_vec, off the main thread."
+  ],
+  "gate": {
+    "items": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": [
+      "dev",
+      "playtest"
+    ],
+    "gated": true,
+    "p99_ms": 0.6541,
+    "pass": true
+  },
+  "reports": [
+    {
+      "items": 1000,
+      "workers": 3,
+      "run_records": 150,
+      "warmup": 50,
+      "iterations": 1000,
+      "save_snapshot": {
+        "samples": 1000,
+        "mean_ms": 0.34606470000000045,
+        "p50_ms": 0.34450000000000003,
+        "p95_ms": 0.5524,
+        "p99_ms": 0.6541,
+        "max_ms": 0.9420999999999999
+      },
+      "components": {
+        "campaign_items": {
+          "samples": 1000,
+          "mean_ms": 0.04656950000000008,
+          "p50_ms": 0.0453,
+          "p95_ms": 0.0519,
+          "p99_ms": 0.0697,
+          "max_ms": 0.11170000000000001
+        },
+        "run_history": {
+          "samples": 1000,
+          "mean_ms": 0.000056000000000000575,
+          "p50_ms": 0.00009999999999999999,
+          "p95_ms": 0.00009999999999999999,
+          "p99_ms": 0.00009999999999999999,
+          "max_ms": 0.00009999999999999999
+        },
+        "attempt": {
+          "samples": 1000,
+          "mean_ms": 0.09423580000000009,
+          "p50_ms": 0.0883,
+          "p95_ms": 0.1282,
+          "p99_ms": 0.1825,
+          "max_ms": 0.4347
+        },
+        "battles": {
+          "samples": 1000,
+          "mean_ms": 0.08204480000000028,
+          "p50_ms": 0.0792,
+          "p95_ms": 0.0917,
+          "p99_ms": 0.134,
+          "max_ms": 0.4729
+        }
+      },
+      "serialize": {
+        "samples": 1000,
+        "mean_ms": 5.077570599999998,
+        "p50_ms": 4.3863,
+        "p95_ms": 7.4043,
+        "p99_ms": 8.086400000000001,
+        "max_ms": 23.5182
+      },
+      "bytes": 1408714
+    }
+  ]
+}
+```
+
+Playtest (`playtest-3.json`):
+
+```json
+{
+  "version": 1,
+  "profile": "playtest",
+  "debug_assertions": false,
+  "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "notes": [
+    "CPU-only: Game::save_snapshot on the main thread, fixture creation excluded.",
+    "Synthetic save_clone_fixture: the review-only stress game, never a gameplay claim.",
+    "serialize is the storage worker's serde_json::to_vec, off the main thread."
+  ],
+  "gate": {
+    "items": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": [
+      "dev",
+      "playtest"
+    ],
+    "gated": true,
+    "p99_ms": 0.6718,
+    "pass": true
+  },
+  "reports": [
+    {
+      "items": 1000,
+      "workers": 3,
+      "run_records": 150,
+      "warmup": 50,
+      "iterations": 1000,
+      "save_snapshot": {
+        "samples": 1000,
+        "mean_ms": 0.30348860000000033,
+        "p50_ms": 0.3244,
+        "p95_ms": 0.448,
+        "p99_ms": 0.6718,
+        "max_ms": 1.0708
+      },
+      "components": {
+        "campaign_items": {
+          "samples": 1000,
+          "mean_ms": 0.04807510000000013,
+          "p50_ms": 0.0458,
+          "p95_ms": 0.0584,
+          "p99_ms": 0.0909,
+          "max_ms": 0.4081
+        },
+        "run_history": {
+          "samples": 1000,
+          "mean_ms": 0.00005580000000000057,
+          "p50_ms": 0.00009999999999999999,
+          "p95_ms": 0.00009999999999999999,
+          "p99_ms": 0.00009999999999999999,
+          "max_ms": 0.00009999999999999999
+        },
+        "attempt": {
+          "samples": 1000,
+          "mean_ms": 0.0794075999999995,
+          "p50_ms": 0.0738,
+          "p95_ms": 0.1067,
+          "p99_ms": 0.1754,
+          "max_ms": 0.36900000000000005
+        },
+        "battles": {
+          "samples": 1000,
+          "mean_ms": 0.07524969999999966,
+          "p50_ms": 0.0707,
+          "p95_ms": 0.0964,
+          "p99_ms": 0.1614,
+          "max_ms": 0.4041
+        }
+      },
+      "serialize": {
+        "samples": 1000,
+        "mean_ms": 3.695138299999995,
+        "p50_ms": 3.3604,
+        "p95_ms": 5.3569,
+        "p99_ms": 6.032,
+        "max_ms": 9.290899999999999
+      },
+      "bytes": 1408714
+    }
+  ]
+}
+```
+
+Release (`release-2.json`):
+
+```json
+{
+  "version": 1,
+  "profile": "release",
+  "debug_assertions": false,
+  "cpu": "Intel64 Family 6 Model 170 Stepping 4, GenuineIntel",
+  "notes": [
+    "CPU-only: Game::save_snapshot on the main thread, fixture creation excluded.",
+    "Synthetic save_clone_fixture: the review-only stress game, never a gameplay claim.",
+    "serialize is the storage worker's serde_json::to_vec, off the main thread."
+  ],
+  "gate": {
+    "items": 1000,
+    "workers": 3,
+    "p99_ms_max": 1.0,
+    "profiles": [
+      "dev",
+      "playtest"
+    ],
+    "gated": false,
+    "p99_ms": 0.6037,
+    "pass": true
+  },
+  "reports": [
+    {
+      "items": 1000,
+      "workers": 3,
+      "run_records": 150,
+      "warmup": 50,
+      "iterations": 1000,
+      "save_snapshot": {
+        "samples": 1000,
+        "mean_ms": 0.3058237000000003,
+        "p50_ms": 0.31520000000000004,
+        "p95_ms": 0.4398,
+        "p99_ms": 0.6037,
+        "max_ms": 0.7374999999999999
+      },
+      "components": {
+        "campaign_items": {
+          "samples": 1000,
+          "mean_ms": 0.04997120000000006,
+          "p50_ms": 0.0455,
+          "p95_ms": 0.0652,
+          "p99_ms": 0.075,
+          "max_ms": 0.2086
+        },
+        "run_history": {
+          "samples": 1000,
+          "mean_ms": 0.000056000000000000575,
+          "p50_ms": 0.00009999999999999999,
+          "p95_ms": 0.00009999999999999999,
+          "p99_ms": 0.00009999999999999999,
+          "max_ms": 0.00009999999999999999
+        },
+        "attempt": {
+          "samples": 1000,
+          "mean_ms": 0.08144290000000028,
+          "p50_ms": 0.07490000000000001,
+          "p95_ms": 0.1141,
+          "p99_ms": 0.1842,
+          "max_ms": 0.4469
+        },
+        "battles": {
+          "samples": 1000,
+          "mean_ms": 0.0719779,
+          "p50_ms": 0.0697,
+          "p95_ms": 0.07880000000000001,
+          "p99_ms": 0.1211,
+          "max_ms": 0.39609999999999995
+        }
+      },
+      "serialize": {
+        "samples": 1000,
+        "mean_ms": 3.483183499999998,
+        "p50_ms": 3.2752,
+        "p95_ms": 4.522,
+        "p99_ms": 5.6297999999999995,
+        "max_ms": 10.418999999999999
+      },
+      "bytes": 1408714
+    }
+  ]
+}
+```
+
 ## Save format 7 frozen — 6 November 2026 (W1-63)
 
 **Save format 7 is frozen.** `crates/horde_core/tests/fixtures/save_v7.json` is a real `Game::save` generation: envelope version 7, ruleset 2, 95,266 bytes (budget 96 KB), envelope checksum `8527615155064533385`. It was cut by the `#[ignore]`d writer `write_save_v7_fixture` in `tests/save_fixtures.rs` (`LASTLIGHT_WRITE_SAVE_V7_FIXTURE=<path>`; it refuses to overwrite and asserts `SAVE_VERSION == 7`), re-cut once in the W1-63 review before the freeze closed, and is never re-cut again: its checksum and byte length are pinned. Two cuts from the same tree were byte-identical.
