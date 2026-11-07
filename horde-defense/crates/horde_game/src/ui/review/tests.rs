@@ -663,6 +663,14 @@ fn workshop_names_still_reach_the_workshop() {
 /// field and the observer box: the clip of the battlefield painter, whose
 /// height is the window's `(content height - 200).clamp(180, 360)` allocation.
 fn observed_operations(f: &mut FrontendParts, geometry: (u8, f32)) -> (egui::Rect, egui::Rect) {
+    let (field, observer_box, _) = observed_operations_output(f, geometry);
+    (field, observer_box)
+}
+/// [`observed_operations`] plus the settled frame's output.
+fn observed_operations_output(
+    f: &mut FrontendParts,
+    geometry: (u8, f32),
+) -> (egui::Rect, egui::Rect, egui::FullOutput) {
     let id = f
         .game
         .battles()
@@ -701,7 +709,7 @@ fn observed_operations(f: &mut FrontendParts, geometry: (u8, f32)) -> (egui::Rec
         .collect();
     boxes.dedup();
     assert_eq!(boxes.len(), 1, "observer boxes {boxes:?} for {field:?}");
-    (field, boxes[0])
+    (field, boxes[0], output)
 }
 
 /// A context configured as `observed_operations` draws: scale 1.35, warmed up.
@@ -862,6 +870,40 @@ fn observer_filling_field_is_unchanged() {
     let mut f = staged("operations");
     let (field, observer_box) = observed_operations(&mut f, (11, 30.0));
     assert_eq!(field, observer_box, "an 11x30 field fills its box");
+}
+
+/// The observer caps its forest dressing at a lane of the reference clearing
+/// in its box (`box height / REFERENCE_LANES`), as the main battle does: a
+/// zoomed 3x12 field, whose lanes are far taller, never grows the props.
+#[test]
+fn observer_dressing_is_capped_at_the_reference_lane() {
+    let props = egui::TextureId::User(2);
+    let mut f = staged("operations");
+    f.textures.props = Some(props);
+    let (field, observer_box, output) = observed_operations_output(&mut f, (3, 12.0));
+    let cap = observer_box.height() / crate::art::camera::REFERENCE_LANES;
+    assert!(
+        field.height() / 3.0 > 2.0 * cap,
+        "the 3x12 lane must exceed the cap"
+    );
+    // Backdrop props are clipped to their peripheral strips, off the field.
+    let sizes: Vec<egui::Vec2> = output
+        .shapes
+        .iter()
+        .filter(|shape| !shape.clip_rect.intersect(field).is_positive())
+        .filter_map(|shape| match &shape.shape {
+            egui::Shape::Mesh(mesh) if mesh.texture_id == props => Some(mesh.calc_bounds().size()),
+            _ => None,
+        })
+        .collect();
+    assert!(!sizes.is_empty(), "no dressing painted around {field:?}");
+    // A tree is at most 1.8 units wide and 1.85 units tall.
+    for size in sizes {
+        assert!(
+            size.x <= 1.8 * cap + 0.01 && size.y <= 1.85 * cap + 0.01,
+            "a {size:?} prop exceeds the {cap} cap"
+        );
+    }
 }
 
 // ----- Wave-1 review scenes (design-qa-captures 1.8, W1-54) -----
