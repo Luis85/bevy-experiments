@@ -1,5 +1,6 @@
 //! Bounded cosmetic sampling. Tick/IDs/events are read-only inputs; no clocks,
 //! random draws, action decisions or hit geometry are written back to the core.
+use crate::battle_view::crowd_stagger;
 use horde_core::{
     content::{BossKind, EnemyKind, Mode, StructureKind, content},
     ordnance::OrdnanceKind,
@@ -296,14 +297,17 @@ fn sample_deaths(a: &Attempt, reduced: bool, frame: &mut SceneAnimation) {
         let age = a.tick.saturating_sub(corpse.tick) as f32;
         if age < DUST_TICKS as f32 && frame.particles.len() < MAX_PARTICLES {
             let t = age / DUST_TICKS as f32;
+            // The dust rises from the drawn, crowd-staggered body (W1-69 review).
+            let [dx, dy] = crowd_stagger(corpse.id);
+            let at = [corpse.at[0] + dx, corpse.at[1] + dy];
             for n in 0..3 {
                 push_particle(
                     &mut frame.particles,
                     Particle {
                         kind: ParticleKind::Dust,
                         at: [
-                            corpse.at[0] + (noise(corpse.id.wrapping_add(n)) - 0.5) * t * 0.7,
-                            corpse.at[1] + 0.22 - t * 0.25,
+                            at[0] + (noise(corpse.id.wrapping_add(n)) - 0.5) * t * 0.7,
+                            at[1] + 0.22 - t * 0.25,
                         ],
                         size: 0.04 + t * 0.12,
                         alpha: (1. - t) * 0.35,
@@ -660,6 +664,8 @@ fn sample_event_particles(a: &Attempt, event: &Event, out: &mut Vec<Particle>) {
             }
         }
         EventKind::Hit | EventKind::WeakPoint | EventKind::Armor if age < 0.3 => {
+            let [dx, dy] = hostile_stagger(a, event);
+            let to = [event.to[0] + dx, event.to[1] + dy];
             for n in 0..3 {
                 let theta = noise(seed + n) * std::f32::consts::TAU;
                 push_particle(
@@ -671,8 +677,8 @@ fn sample_event_particles(a: &Attempt, event: &Event, out: &mut Vec<Particle>) {
                             ParticleKind::Dust
                         },
                         at: [
-                            event.to[0] + theta.cos() * age * 0.85,
-                            event.to[1] + theta.sin() * age * 0.5,
+                            to[0] + theta.cos() * age * 0.85,
+                            to[1] + theta.sin() * age * 0.5,
                         ],
                         size: 0.025 + age * 0.025,
                         alpha: 1. - age / 0.3,
@@ -702,6 +708,18 @@ fn sample_event_particles(a: &Attempt, event: &Event, out: &mut Vec<Particle>) {
         }
         _ => {}
     }
+}
+/// The crowd stagger of the hostile an impact `event` struck, so its sparks
+/// start on the drawn body (W1-69 review); zero for any other target, such as
+/// a structure an enemy struck. The hostile may have died of the hit since.
+fn hostile_stagger(a: &Attempt, event: &Event) -> [f32; 2] {
+    let Some(id) = event.target_id else {
+        return [0.; 2];
+    };
+    let since = a.corpses.partition_point(|corpse| corpse.tick < event.tick);
+    let hostile = a.enemies.iter().any(|e| e.id == id)
+        || a.corpses[since..].iter().any(|corpse| corpse.id == id);
+    if hostile { crowd_stagger(id) } else { [0.; 2] }
 }
 fn sample_weather(a: &Attempt, weather: WeatherKind, out: &mut Vec<Particle>) {
     if weather == WeatherKind::Calm {
@@ -1231,5 +1249,71 @@ mod tests {
             .filter(|p| p.kind == ParticleKind::Casing)
             .collect();
         assert_eq!(before, after);
+    }
+    /// W1-69 review: impact sparks and fresh-body dust start on the drawn,
+    /// crowd-staggered hostile, as its pose and body do; an impact on any
+    /// other target (a structure) keeps the event point.
+    #[test]
+    fn impact_and_death_particles_follow_the_crowd_stagger() {
+        use crate::battle_view::crowd_stagger;
+        let mut game = fixture();
+        let a = game.attempt_mut().unwrap();
+        a.tick = 30;
+        let live = a.enemies[0].id;
+        let dead = live + 1000;
+        let structure = live + 2000;
+        a.corpses = vec![horde_core::sim::CorpseRecord {
+            id: dead,
+            kind: EnemyKind::Runner,
+            boss_kind: None,
+            at: [14., 2.5],
+            visual: None,
+            tick: 30,
+        }];
+        let armor = |to: [f32; 2], target: u64| Event {
+            kind: EventKind::Armor,
+            from: [0.5, 5.5],
+            to,
+            value: 0,
+            tick: 30,
+            actor_id: None,
+            target_id: Some(target),
+            lane: Some(4),
+            duration_ticks: 0,
+            seq: 0,
+        };
+        a.events = vec![
+            armor([20., 4.5], live),
+            armor([14., 2.5], dead),
+            armor([9., 6.5], structure),
+        ]
+        .into();
+        let frame = SceneAnimation::sample(a, false);
+        let sparks_at = |to: [f32; 2]| {
+            frame
+                .particles
+                .iter()
+                .filter(|p| p.kind == ParticleKind::Spark)
+                .filter(|p| (p.at[0] - to[0]).abs() < 0.5 && (p.at[1] - to[1]).abs() < 0.5)
+                .map(|p| p.at)
+                .collect::<Vec<_>>()
+        };
+        let staggered = |at: [f32; 2], id: u64| {
+            let [dx, dy] = crowd_stagger(id);
+            [at[0] + dx, at[1] + dy]
+        };
+        assert_eq!(sparks_at([20., 4.5]), vec![staggered([20., 4.5], live); 3]);
+        assert_eq!(sparks_at([14., 2.5]), vec![staggered([14., 2.5], dead); 3]);
+        assert_eq!(sparks_at([9., 6.5]), vec![[9., 6.5]; 3]);
+        let body = staggered([14., 2.5 + 0.22], dead);
+        let near = |at: [f32; 2]| (at[0] - body[0]).abs() < 1e-4 && (at[1] - body[1]).abs() < 1e-4;
+        assert_eq!(
+            frame
+                .particles
+                .iter()
+                .filter(|p| p.kind == ParticleKind::Dust && near(p.at))
+                .count(),
+            3
+        );
     }
 }
