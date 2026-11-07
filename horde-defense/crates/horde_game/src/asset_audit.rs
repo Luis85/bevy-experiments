@@ -598,6 +598,111 @@ fn credits_never_lists_an_archived_path_as_shipped() {
     assert!(problems.is_empty(), "{problems:#?}");
 }
 
+/// The clip stems a Python generator renders: the `CLIPS` names of
+/// `generate_audio.py`, and the `LOOPS` and `CUES` keys of
+/// `generate_atmosphere_audio.py`, whose `OWNED` is exactly those two sets.
+fn python_owned_stems(generator: &str) -> BTreeSet<String> {
+    let source = std::fs::read_to_string(workspace_root().join(generator))
+        .expect("read generator")
+        .replace("\r\n", "\n");
+    // The keys of a one-line `NAME = {"key": value, ...}` literal.
+    let dict_keys = |name: &str| -> Vec<String> {
+        let line = source
+            .lines()
+            .find(|line| line.starts_with(&format!("{name} = {{")))
+            .unwrap_or_else(|| panic!("{generator} has no {name} literal"));
+        let parts: Vec<&str> = line.split('"').collect();
+        (1..parts.len())
+            .step_by(2)
+            .filter(|&i| parts.get(i + 1).is_some_and(|next| next.starts_with(':')))
+            .map(|i| parts[i].to_owned())
+            .collect()
+    };
+    let stems: Vec<String> = match generator {
+        "scripts/generate_audio.py" => source
+            .split_once("\nCLIPS=[\n")
+            .and_then(|(_, rest)| rest.split_once("\n]"))
+            .unwrap_or_else(|| panic!("{generator} has no CLIPS list"))
+            .0
+            .lines()
+            .map(|row| {
+                row.trim()
+                    .strip_prefix("('")
+                    .and_then(|rest| rest.split_once('\''))
+                    .unwrap_or_else(|| panic!("{generator}: CLIPS row {row:?}"))
+                    .0
+                    .to_owned()
+            })
+            .collect(),
+        "scripts/generate_atmosphere_audio.py" => {
+            const OWNED: &str =
+                "OWNED = {**{name: ASSETS for name in LOOPS}, **{name: ARCHIVE for name in CUES}}";
+            assert!(
+                source.lines().any(|line| line == OWNED),
+                "{generator}: OWNED is no longer LOOPS and CUES"
+            );
+            dict_keys("LOOPS")
+                .into_iter()
+                .chain(dict_keys("CUES"))
+                .collect()
+        }
+        other => panic!("{other} is not a Python audio generator"),
+    };
+    let owned: BTreeSet<String> = stems.iter().cloned().collect();
+    assert_eq!(
+        owned.len(),
+        stems.len(),
+        "{generator}: duplicate owned clips"
+    );
+    assert!(!owned.is_empty(), "{generator} owns no clip");
+    owned
+}
+
+/// Whether the Python `generator` owns the clip `stem`.
+fn generator_owns(generator: &str, stem: &str) -> bool {
+    python_owned_stems(generator).contains(stem)
+}
+
+/// Each Python generator owns exactly the clips its owned set declares.
+/// `generate_atmosphere_audio.py` quotes every `generate_audio.py` stem in
+/// `ORIGINAL` (clips it hashes, never renders), so quoting is not owning.
+#[test]
+fn python_generators_own_only_their_declared_clips() {
+    let audio = "scripts/generate_audio.py";
+    let atmosphere = "scripts/generate_atmosphere_audio.py";
+    let audio_clips = [
+        "shot",
+        "reload",
+        "melee",
+        "damage",
+        "boss",
+        "ambience",
+        "incoming",
+        "ready",
+        "structure",
+    ];
+    let atmosphere_clips = [
+        "ambient_wind",
+        "ambient_urban",
+        "ambient_nature",
+        "ambient_rain",
+        "ambient_cold",
+        "npc_shot",
+        "turret_shot",
+        "trap",
+        "armor",
+    ];
+    for (owner, other, clips) in [
+        (audio, atmosphere, audio_clips),
+        (atmosphere, audio, atmosphere_clips),
+    ] {
+        for stem in clips {
+            assert!(generator_owns(owner, stem), "{owner} owns {stem}");
+            assert!(!generator_owns(other, stem), "{other} does not own {stem}");
+        }
+    }
+}
+
 #[test]
 fn python_manifests_name_only_owned_files() {
     let file_names = |records: &[Record]| -> BTreeSet<String> {
@@ -629,15 +734,24 @@ fn python_manifests_name_only_owned_files() {
             record.generator
         );
         // The named generator lists the clip among its owned files.
-        let source = std::fs::read_to_string(workspace_root().join(&record.generator))
-            .expect("read generator");
         let stem = record.text("file").expect("file").trim_end_matches(".wav");
         assert!(
-            source.contains(&format!("\"{stem}\"")) || source.contains(&format!("'{stem}'")),
+            generator_owns(&record.generator, stem),
             "{} does not own {stem}",
             record.generator
         );
     }
+    // Every owned clip has a record, and no clip has two owners.
+    let [audio, atmosphere] = PYTHON_GENERATORS.map(python_owned_stems);
+    assert!(audio.is_disjoint(&atmosphere), "{audio:?} / {atmosphere:?}");
+    let recorded: BTreeSet<String> = file_names(&shipped)
+        .union(&file_names(&archived))
+        .map(|file| file.trim_end_matches(".wav").to_owned())
+        .collect();
+    assert_eq!(
+        audio.union(&atmosphere).cloned().collect::<BTreeSet<_>>(),
+        recorded
+    );
     let originals = |manifest: &str| -> BTreeSet<String> {
         read_json(manifest)["preserved_originals"]
             .as_object()
