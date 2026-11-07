@@ -347,7 +347,9 @@ impl EnemyVisualCatalog {
     /// over sprites of art height / figure height in lanes (boss art uses the
     /// larger of the boss height and its own pack height; archetype scale is
     /// ignored), and the survivor's 806 px / 0.87.
-    /// Sheets sample NEAREST, so the camera clamps magnification against it.
+    /// Sheets sample NEAREST; the uniform zoom-to-fit camera does not clamp
+    /// against this (user camera ruling, `art::camera::fit_field`), so it is a
+    /// measurement for the sheet-upscale human check only.
     #[cfg_attr(not(test), allow(dead_code))]
     pub fn crisp_lane_px(&self) -> f32 {
         let bosses = [BossKind::Breacher, BossKind::Caller, BossKind::SiegeBrute]
