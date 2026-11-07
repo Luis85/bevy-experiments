@@ -529,9 +529,13 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
     // cause is W1-69 (enemies never block each other), whose re-bless clause
     // names this replay. With this pin, any further drift in the replayed
     // combat, retreat, buy or equip fails the test, not only the sale.
+    // W2-05 (per-archetype telemetry, class T) moved the pin from
+    // 81559980e3a904d7: the report now carries the archetype maps. With those
+    // three maps removed the replayed state digests to 81559980e3a904d7
+    // again, so no combat moved.
     assert_eq!(
         hex(replay(without_sale).unwrap().digest),
-        "81559980e3a904d7",
+        "0da44f5dc0a31d2c",
         "the replay of the recording up to its sale is pinned"
     );
     // Only compatibility warnings, never a format or seed mismatch. A content

@@ -1,7 +1,7 @@
 //! Combat telemetry schema (W1-27): the per-archetype maps, elite counters,
 //! hazard damage and boss phase ticks on `CombatTelemetry` (schema v7 §3.12).
-//! Nothing writes them yet (W2, enemy-balance), so these tests stage the
-//! values as a save would, on the live attempt and on the frozen report.
+//! These tests stage the values as a save would, on the live attempt and on
+//! the frozen report; `tests/archetype_telemetry.rs` covers the W2-05 writer.
 mod support;
 use horde_core::{
     command::Command,

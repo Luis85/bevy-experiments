@@ -363,9 +363,15 @@ impl Game {
             auto_sold_coins: 0,
             level_grant_coins: 0,
             milestone_coins: 0,
-            elite_kills: 0,
-            boss_ttk_ticks: None,
-            boss_rank: Default::default(),
+            // The record's bounds: elite kills at most `kills`, the boss
+            // time-to-kill at most `duration_ticks`.
+            elite_kills: a.telemetry.elites_killed.min(a.kills),
+            boss_ttk_ticks: a
+                .telemetry
+                .boss_arrival_tick
+                .zip(a.telemetry.boss_defeat_tick)
+                .map(|(arrived, fell)| fell.saturating_sub(arrived).min(a.tick)),
+            boss_rank: a.progression.boss_rank,
         };
         if self.worker {
             self.pending_runs.push(record);
@@ -394,7 +400,7 @@ impl Game {
             loot_by_quality: Default::default(),
             auto_sold: Default::default(),
             progression_rewards: Default::default(),
-            boss_rank: Default::default(),
+            boss_rank: a.progression.boss_rank,
             cause,
             tip: if outcome == Outcome::Victory {
                 "Spend retained rewards, review your loadout, then secure the next sector.".into()

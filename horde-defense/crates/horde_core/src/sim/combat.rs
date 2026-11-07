@@ -274,6 +274,13 @@ impl Game {
             if structure.is_none() && damage > 0 {
                 a.last_damage_lane = Some(lane);
                 a.telemetry.damage_by_lane[lane as usize] += damage as u64;
+                // Personal hit points and the NPC injury resolver both land
+                // here; bosses and unresolved legacy enemies are not counted.
+                let e = &a.enemies[n];
+                if let Some(r) = e.resolved.as_ref().filter(|_| !e.boss) {
+                    a.telemetry
+                        .count_archetype_damage_taken(&r.archetype_id, damage as u64);
+                }
             }
             if structure.is_some() {
                 a.telemetry.structure_damage_taken += damage.max(0) as u64;
@@ -349,6 +356,9 @@ impl Game {
                 .kill_xp
                 .saturating_add(self.campaign.reward(coins, xp, a.mode));
             a.telemetry.kills_by_kind[e.kind] += 1;
+            if let Some(r) = e.resolved.as_ref().filter(|_| !e.boss) {
+                a.telemetry.count_archetype_kill(&r.archetype_id);
+            }
             if e.boss {
                 a.telemetry.boss_defeat_tick = Some(a.tick);
             }

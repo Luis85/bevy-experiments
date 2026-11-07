@@ -218,6 +218,10 @@ impl Game {
             boss_state: None,
         });
         a.telemetry.spawned += 1;
+        // Bosses carry no resolved snapshot, so only ordinary spawns count.
+        if let Some(r) = a.enemies.last().and_then(|e| e.resolved.as_ref()) {
+            a.telemetry.count_archetype_spawn(&r.archetype_id);
+        }
         a.telemetry.peak_enemies = a.telemetry.peak_enemies.max(a.enemies.len());
         a.event_with(
             if boss {

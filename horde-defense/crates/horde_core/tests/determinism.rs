@@ -115,11 +115,38 @@ const TRACE_RULESET: u32 = 2;
 
 /// Provisional `(GOLDEN, GAMEPLAY_TRACE)` digests, in `GOLDEN` order, set by
 /// a digest-moving commit until the wave's re-bless folds them (ruling P3).
-const PROVISIONAL: Option<([u64; 6], [u64; 6])> = None;
+///
+/// W2-05: all six GOLDEN digests move (class T); every GAMEPLAY_TRACE digest
+/// is unchanged.
+const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
+    [
+        0x5d42_79d7_93e2_f0d1,
+        0xd535_7bf0_445b_435d,
+        0xd564_5019_1d33_e79f,
+        0xe97f_7da1_4530_0c9e,
+        0x8a35_a5da_223e_47f2,
+        0x85d6_8c44_26f3_8c6a,
+    ],
+    [
+        0xa6ca_a6de_7fd9_2b1a,
+        0x2966_10f8_ded8_a91f,
+        0x5cc8_bde4_faf0_9763,
+        0x20c2_f0bd_5405_15c4,
+        0x46a2_adc6_720f_8678,
+        0x9d76_78e4_3c2f_560f,
+    ],
+));
 
 /// Why `PROVISIONAL` moved: `(commit tag, class, reason)`, one per moving
 /// commit. Empty exactly when `PROVISIONAL` is None.
-const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
+const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[(
+    "W2-05",
+    MoveClass::T,
+    "telemetry population, no gameplay change: the attempt telemetry now \
+     carries spawned_by_archetype and kills_by_archetype (and \
+     damage_taken_by_archetype once a hostile wounds the defender); outcome, \
+     trace, items and the telemetry-stripped payload are unchanged",
+)];
 
 /// The ledger rules: provisional digests carry causes, every cause names its
 /// commit and reason, and causes never outlive the provisional pin.

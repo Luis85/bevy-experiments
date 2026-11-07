@@ -6,7 +6,8 @@
 //! - the v6 fixture, migrated, decodes into the v7 types and re-encodes to the
 //!   very same JSON (no field lost, renamed or written at its default);
 //! - the default game and every GOLDEN run write no v7 key, so the v7 schema
-//!   fields move no digest;
+//!   fields move no digest (the keys a wave-2 writer populates, listed with
+//!   their commit, are the only exception);
 //! - every v7 field keeps a non-default value through a save round trip;
 //! - one v6-shaped object per touched type decodes and re-encodes unchanged;
 //! - `support::V7_SAVED_KEYS` lists exactly the fields the types serialize
@@ -642,15 +643,40 @@ fn v6_payload_round_trips_unchanged_through_v7_types() {
     );
 }
 
+/// The v7 keys a GOLDEN run may write once a wave-2 writer populates them,
+/// each with the commit whose provisional GOLDEN move (`tests/determinism.rs`,
+/// ruling P3) names it. W2-05 is the per-archetype telemetry writer, class T.
+const WRITTEN_V7_KEYS: [(&str, &str); 6] = [
+    ("W2-05", "/attempt/telemetry/spawned_by_archetype"),
+    ("W2-05", "/attempt/telemetry/kills_by_archetype"),
+    ("W2-05", "/attempt/telemetry/damage_taken_by_archetype"),
+    ("W2-05", "/last_result/telemetry/spawned_by_archetype"),
+    ("W2-05", "/last_result/telemetry/kills_by_archetype"),
+    ("W2-05", "/last_result/telemetry/damage_taken_by_archetype"),
+];
+
+/// Whether `path` is one of [`WRITTEN_V7_KEYS`] or lies below one.
+fn written_by_a_writer(path: &str) -> bool {
+    WRITTEN_V7_KEYS.iter().any(|(_, key)| {
+        path == *key
+            || path
+                .strip_prefix(key)
+                .is_some_and(|rest| rest.starts_with('/'))
+    })
+}
+
 /// The v7 schema fields move no digest (schema-v7.md section 12): the
 /// default game and every GOLDEN run, live and after a withdrawal settles it
 /// into a report, write no registry key and no key path the v6 build did not
-/// write.
+/// write, apart from the keys a wave-2 writer populates ([`WRITTEN_V7_KEYS`]).
 #[test]
 fn default_and_golden_games_serialize_no_v7_key() {
     let v6_paths = game_key_paths(&v6_payload());
     let check = |game: &Game, what: &str| {
-        let paths = game_key_paths(&as_saved(game));
+        let paths: BTreeSet<String> = game_key_paths(&as_saved(game))
+            .into_iter()
+            .filter(|path| !written_by_a_writer(path))
+            .collect();
         let v7 = v7_paths_in(&paths);
         assert!(v7.is_empty(), "{what} wrote v7 keys: {v7:?}");
         let unknown: Vec<&String> = paths.difference(&v6_paths).collect();

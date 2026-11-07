@@ -91,3 +91,51 @@ impl Default for CombatTelemetry {
         }
     }
 }
+impl CombatTelemetry {
+    /// Counts one non-boss spawn of a resolved archetype (W2-05). A key the
+    /// map does not hold yet is added only while the map is below its key
+    /// limit.
+    pub(crate) fn count_archetype_spawn(&mut self, archetype: &str) {
+        if let Some(n) = archetype_entry(&mut self.spawned_by_archetype, archetype) {
+            *n = n.saturating_add(1);
+        }
+    }
+    /// Counts one non-boss kill of a resolved archetype, only while its kills
+    /// are below its counted spawns (the schema v7 §3.12 writer obligation):
+    /// an attempt resumed from a save made before the maps were written has
+    /// living enemies whose spawns were never counted.
+    pub(crate) fn count_archetype_kill(&mut self, archetype: &str) {
+        let spawned = self
+            .spawned_by_archetype
+            .get(archetype)
+            .copied()
+            .unwrap_or(0);
+        let killed = self.kills_by_archetype.get(archetype).copied().unwrap_or(0);
+        if killed < spawned
+            && let Some(n) = archetype_entry(&mut self.kills_by_archetype, archetype)
+        {
+            *n += 1;
+        }
+    }
+    /// Adds damage the defender took from a non-boss resolved archetype.
+    pub(crate) fn count_archetype_damage_taken(&mut self, archetype: &str, damage: u64) {
+        if damage == 0 {
+            return;
+        }
+        if let Some(n) = archetype_entry(&mut self.damage_taken_by_archetype, archetype) {
+            *n = n.saturating_add(damage);
+        }
+    }
+}
+
+/// The counter for `archetype`, inserted at zero while the map is below
+/// [`MAX_TELEMETRY_ARCHETYPES`] keys; None once a new key would exceed it.
+fn archetype_entry<'m, V: Default>(
+    map: &'m mut BTreeMap<String, V>,
+    archetype: &str,
+) -> Option<&'m mut V> {
+    if !map.contains_key(archetype) && map.len() >= MAX_TELEMETRY_ARCHETYPES {
+        return None;
+    }
+    Some(map.entry(archetype.to_owned()).or_default())
+}
