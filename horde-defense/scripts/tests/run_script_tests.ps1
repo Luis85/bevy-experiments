@@ -104,22 +104,32 @@ public static class LastLightNativeHelper {
             Console.WriteLine("broken\tStill\tfalse\tfalse\tfalse\t\t\t1");
             Console.WriteLine("unscaled\tStill\tfalse\tfalse\tfalse\t\t\t1");
             Console.WriteLine("rescaled\tStill\tfalse\tfalse\tfalse\t\t\t1");
+            Console.WriteLine("clamped\tStill\tfalse\tfalse\tfalse\t\t\t1");
             return 0;
         }
-        // A capture_review still: a PNG header at twice the requested width (Windows scale 2) plus a sidecar per scene.
+        // A capture_review still: a PNG header at twice the requested size (Windows scale 2) plus a sidecar per scene.
         // battle passes every check, construction moves the arena at small size, max-lanes misses the pre-zoom arena
         // at small size and has 3 HUD rows, menu writes no sidecar, broken writes one that is not JSON, unscaled
-        // ignores the requested reduced effects and UI scale, and rescaled ignores only the UI scale.
+        // ignores the requested reduced effects and UI scale, and rescaled ignores only the UI scale. clamped echoes
+        // the request but its window did not open at the requested size: the OS clamped the large height to 850, and
+        // the small size fell back to launch.rs DEFAULT_WINDOW 1440x900.
         string capture = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_CAPTURE");
         if (args.Length == 0 && !String.IsNullOrEmpty(capture)) {
             string scene = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN");
-            int width = int.Parse(Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SIZE").Split('x')[0]);
+            string[] requested = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SIZE").Split('x');
+            int width = int.Parse(requested[0]);
+            int height = int.Parse(requested[1]);
             bool small = width == 1050;
+            if (scene == "clamped") {
+                if (small) { width = 1440; height = 900; } else { height = 850; }
+            }
             byte[] png = new byte[24];
             byte[] head = new byte[] { 137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82 };
             Array.Copy(head, png, head.Length);
             int pixels = width * 2;
             png[16] = (byte)(pixels >> 24); png[17] = (byte)(pixels >> 16); png[18] = (byte)(pixels >> 8); png[19] = (byte)pixels;
+            int rows = height * 2;
+            png[20] = (byte)(rows >> 24); png[21] = (byte)(rows >> 16); png[22] = (byte)(rows >> 8); png[23] = (byte)rows;
             Directory.CreateDirectory(Path.GetDirectoryName(capture));
             File.WriteAllBytes(capture, png);
             // Every sidecar echoes the requested reduced-effects mode and UI scale, except unscaled, which always
@@ -136,6 +146,7 @@ public static class LastLightNativeHelper {
             }
             if (scene == "unscaled") { sidecar = "{\"reduced_effects\":false,\"ui_scale\":1.0,\"screen\":\"Menu\"}"; }
             if (scene == "rescaled") { sidecar = "{" + reducedEcho + ",\"ui_scale\":1.0,\"screen\":\"Menu\"}"; }
+            if (scene == "clamped") { sidecar = "{" + echo + "\"screen\":\"Menu\"}"; }
             if (scene == "broken") { sidecar = "{not json"; }
             if (sidecar != null) { File.WriteAllText(Path.ChangeExtension(capture, ".json"), sidecar); }
             return 0;
@@ -604,7 +615,11 @@ try {
             'sidecar_present small battle pass', 'sidecar_present small broken fail', 'sidecar_present small construction pass',
             'sidecar_present small max-lanes pass', 'sidecar_present small menu fail',
             'sidecar_echoes_request large battle pass', 'sidecar_echoes_request large construction pass', 'sidecar_echoes_request large max-lanes pass',
-            'sidecar_echoes_request small battle pass', 'sidecar_echoes_request small construction pass', 'sidecar_echoes_request small max-lanes pass'
+            'sidecar_echoes_request small battle pass', 'sidecar_echoes_request small construction pass', 'sidecar_echoes_request small max-lanes pass',
+            'window_matches_request large battle pass', 'window_matches_request large broken pass', 'window_matches_request large construction pass',
+            'window_matches_request large max-lanes pass', 'window_matches_request large menu pass',
+            'window_matches_request small battle pass', 'window_matches_request small broken pass', 'window_matches_request small construction pass',
+            'window_matches_request small max-lanes pass', 'window_matches_request small menu pass'
         ) | Sort-Object
         Assert-Equal ($expected -join "`n") ($rows -join "`n") 'sidecar check rows'
         $details = @{}
@@ -660,6 +675,34 @@ try {
         Assert-Equal 'reduced_effects false (requested false), ui_scale 1 (requested 1.35)' $details['sidecar_echoes_request small rescaled'] 'small detail'
         $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: sidecar_echoes_request *' })
         Assert-Equal 1 $failLines.Count "one FAIL line for the small still; $log"
+    }
+
+    Test-Case 'capture_review fails a still that was not drawn at the requested window size' {
+        # The OS can clamp the window (a work-area clamp on the height) and launch.rs opens DEFAULT_WINDOW 1440x900 when
+        # LASTLIGHT_REVIEW_SIZE is malformed. Either way the still is not evidence for its nominal size, though its
+        # sidecar echoes the request and its relative checks would agree with themselves.
+        $out = Join-Path $temporary 'captures-clamped'
+        $review = Join-Path $scriptsDirectory 'capture_review.ps1'
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $review, '-NoBuild', '-Executable', $helper,
+            '-Scenes', 'battle,clamped', '-Modes', 'normal', '-OutputDirectory', $out)
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-review-clamped') -TimeoutSeconds 300
+        $log = 'out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err)
+        Assert-Equal 1 $r.ExitCode "a still at the wrong window size exits 1; $log"
+        $report = Get-Content -Raw -LiteralPath (Join-Path $out 'captures.json') | ConvertFrom-Json
+        Assert-Equal 2.0 $report.windows_scale 'windows_scale from the first capture'
+        $rows = @($report.sidecar_checks | Where-Object { $_.check -eq 'window_matches_request' } | ForEach-Object { "$($_.size) $($_.scene) $($_.result)" } | Sort-Object)
+        $expected = @('large battle pass', 'large clamped fail', 'small battle pass', 'small clamped fail') | Sort-Object
+        Assert-Equal ($expected -join "`n") ($rows -join "`n") 'window rows'
+        $details = @{}
+        foreach ($row in @($report.sidecar_checks)) { $details["$($row.check) $($row.size) $($row.scene)"] = $row.detail }
+        Assert-Equal 'PNG 2880x1700 at windows_scale 2, requested 1440x900 (2880x1800)' $details['window_matches_request large clamped'] 'clamped detail'
+        Assert-Equal 'PNG 2880x1800 at windows_scale 2, requested 1050x700 (2100x1400)' $details['window_matches_request small clamped'] 'fallback detail'
+        Assert-Equal 'PNG 2100x1400 at windows_scale 2, requested 1050x700 (2100x1400)' $details['window_matches_request small battle'] 'pass detail'
+        $large = @($report.captures | Where-Object { $_.scene -eq 'clamped' -and $_.size -eq 'large' })
+        Assert-Equal 2880 $large[0].width_physical 'PNG width recorded'
+        Assert-Equal 1700 $large[0].height_physical 'PNG height recorded'
+        $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: window_matches_request *' })
+        Assert-Equal 2 $failLines.Count "one FAIL line per wrong-size still; $log"
     }
 
     Test-Case 'capture_review and capture_motion resolve a relative -Executable against the workspace' {

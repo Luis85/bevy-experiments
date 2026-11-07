@@ -7,7 +7,10 @@
 #   scenes.tsv                     the binary's --list-scenes output
 #   tools/                         cargo, --list-scenes and --version logs
 #   captures.json                  version 1, UTF-8 without BOM, with the sidecar_checks rows
-# Sidecar checks (a 'fail' row fails the run): every capture has a sidecar; every sidecar echoes the requested
+# Sidecar checks (a 'fail' row fails the run): every PNG is the requested window size (1440x900 large, 1050x700
+# small) times windows_scale, within 1 px each way, windows_scale being the first capture's width over its request
+# (window_matches_request; the OS can clamp the window, and launch.rs opens 1440x900 for a malformed size); every
+# capture has a sidecar; every sidecar echoes the requested
 # reduced_effects (mode reduced) and ui_scale (1.0 large, 1.35 small, within 0.001); battle stills at small size report
 # hud_rows <= 2 ('pending' while the build reports null, until ux-flow W3); construction keeps the battle's
 # arena_rect at the same size and mode; max-lanes (17x30) keeps the pre-zoom arena, canvas inset 24/124/24/84.
@@ -42,13 +45,15 @@ function Split-ListArgument([string[]]$Values) {
     return $items.ToArray()
 }
 
-function Get-PngWidth([string]$Path) {
-    # Width from the IHDR chunk: bytes 16-19, big-endian.
+function Get-PngSize([string]$Path) {
+    # Width and height from the IHDR chunk: bytes 16-19 and 20-23, big-endian. Null when the header is short.
     $stream = [IO.File]::OpenRead($Path)
     try {
         $header = New-Object byte[] 24
         if ($stream.Read($header, 0, 24) -ne 24) { return $null }
-        return ([int]$header[16] -shl 24) -bor ([int]$header[17] -shl 16) -bor ([int]$header[18] -shl 8) -bor [int]$header[19]
+        $width = ([int]$header[16] -shl 24) -bor ([int]$header[17] -shl 16) -bor ([int]$header[18] -shl 8) -bor [int]$header[19]
+        $height = ([int]$header[20] -shl 24) -bor ([int]$header[21] -shl 16) -bor ([int]$header[22] -shl 8) -bor [int]$header[23]
+        return @($width, $height)
     }
     finally { $stream.Dispose() }
 }
@@ -86,13 +91,30 @@ function New-SidecarCheck([string]$Check, [string]$Mode, [string]$Size, [string]
     return [ordered]@{ check = $Check; mode = $Mode; size = $Size; scene = $Scene; result = $Result; detail = $Detail }
 }
 
-function Test-CaptureSidecars($Entries, [string]$Root) {
-    # Reads every successful capture's sidecar and returns the check rows (result pass, fail or pending).
+function Test-CaptureWindowSize($Entry, $Size, $WindowsScale) {
+    # The capture-review evidence is judged per size, so a still that did not open at the size it asked for (the OS
+    # clamped the window, or launch.rs ignored a malformed LASTLIGHT_REVIEW_SIZE and opened 1440x900) is not evidence
+    # for that size. measure_performance.ps1 (Test-WindowSize) and capture_motion.ps1 check their reports the same way.
+    $requested = "$($Size.Width)x$($Size.Height)"
+    if ($null -eq $Entry.width_physical -or $null -eq $Entry.height_physical -or $null -eq $WindowsScale -or [double]$WindowsScale -le 0) {
+        return (New-SidecarCheck 'window_matches_request' $Entry.mode $Entry.size $Entry.scene 'fail' "PNG size unknown (no readable IHDR), requested $requested")
+    }
+    $wantWidth = [double]$Size.Width * [double]$WindowsScale
+    $wantHeight = [double]$Size.Height * [double]$WindowsScale
+    $same = [Math]::Abs([double]$Entry.width_physical - $wantWidth) -le 1 -and [Math]::Abs([double]$Entry.height_physical - $wantHeight) -le 1
+    $detail = "PNG $($Entry.width_physical)x$($Entry.height_physical) at windows_scale $(Format-Fact ([double]$WindowsScale)), requested $requested ($(Format-Fact $wantWidth)x$(Format-Fact $wantHeight))"
+    return (New-SidecarCheck 'window_matches_request' $Entry.mode $Entry.size $Entry.scene $(if ($same) { 'pass' } else { 'fail' }) $detail)
+}
+
+function Test-CaptureSidecars($Entries, [string]$Root, $Sizes, $WindowsScale) {
+    # Checks every successful capture's PNG size and sidecar and returns the check rows (result pass, fail or pending).
     $rows = New-Object System.Collections.Generic.List[object]
     $facts = @{}
     $scales = @{}
     foreach ($entry in $Entries) {
         if ($null -ne $entry.error -or $null -eq $entry.sha256) { continue }
+        $size = @($Sizes | Where-Object { $_.Name -eq $entry.size })
+        if ($size.Count -gt 0) { $rows.Add((Test-CaptureWindowSize $entry $size[0] $WindowsScale)) }
         if ($null -eq $entry.sidecar) {
             $rows.Add((New-SidecarCheck 'sidecar_present' $entry.mode $entry.size $entry.scene 'fail' 'no sidecar beside the PNG'))
             continue
@@ -212,8 +234,8 @@ try {
     if ($sceneList.Count + $smallList.Count -eq 0) { throw 'No scenes to capture' }
 
     $sizes = @(
-        @{ Name = 'large'; Size = '1440x900'; Width = 1440; Scale = 1.0; Suffix = ''; Scenes = $sceneList },
-        @{ Name = 'small'; Size = '1050x700'; Width = 1050; Scale = 1.35; Suffix = '-small'; Scenes = $smallList }
+        @{ Name = 'large'; Size = '1440x900'; Width = 1440; Height = 900; Scale = 1.0; Suffix = ''; Scenes = $sceneList },
+        @{ Name = 'small'; Size = '1050x700'; Width = 1050; Height = 700; Scale = 1.35; Suffix = '-small'; Scenes = $smallList }
     )
     $windowsScale = $null
     foreach ($mode in $modeList) {
@@ -240,9 +262,11 @@ try {
                 }
                 catch { $problem = $_.Exception.Message }
                 $hasPng = Test-Path -LiteralPath $png -PathType Leaf
-                if ($hasPng -and $null -eq $windowsScale -and $null -eq $problem) {
-                    $width = Get-PngWidth $png
-                    if ($width) { $windowsScale = [Math]::Round($width / $size.Width, 3) }
+                $pngSize = $null
+                if ($hasPng) { $pngSize = Get-PngSize $png }
+                # windows_scale comes from the first successful capture; window_matches_request holds every later one to it.
+                if ($null -ne $pngSize -and $pngSize[0] -gt 0 -and $null -eq $windowsScale -and $null -eq $problem) {
+                    $windowsScale = [Math]::Round($pngSize[0] / $size.Width, 3)
                 }
                 $entry = [ordered]@{
                     scene               = $scene
@@ -253,6 +277,8 @@ try {
                     exit_code           = $(if ($null -ne $result) { $result.ExitCode } else { $null })
                     seconds             = $(if ($null -ne $result) { $result.Seconds } else { $null })
                     bytes               = $(if ($hasPng) { (Get-Item -LiteralPath $png).Length } else { $null })
+                    width_physical      = $(if ($null -ne $pngSize) { $pngSize[0] } else { $null })
+                    height_physical     = $(if ($null -ne $pngSize) { $pngSize[1] } else { $null })
                     sha256              = $(if ($hasPng) { Get-FileSha256 -Path $png } else { $null })
                     out_log             = "$mode/$stem.out.txt"
                     err_log             = "$mode/$stem.err.txt"
@@ -279,7 +305,9 @@ finally {
         $pair = @($entries | Where-Object { $_.mode -eq 'normal' -and $_.scene -eq $entry.scene -and $_.size -eq $entry.size -and $null -ne $_.sha256 })
         if ($pair.Count -gt 0) { $entry.identical_to_normal = ($pair[0].sha256 -eq $entry.sha256) }
     }
-    $sidecarChecks = @(Test-CaptureSidecars $entries.ToArray() $destination)
+    $checkSizes = $(if (Get-Variable -Name sizes -ErrorAction SilentlyContinue) { $sizes } else { @() })
+    $checkScale = $(if (Get-Variable -Name windowsScale -ErrorAction SilentlyContinue) { $windowsScale } else { $null })
+    $sidecarChecks = @(Test-CaptureSidecars $entries.ToArray() $destination $checkSizes $checkScale)
     foreach ($row in $sidecarChecks) {
         $line = "$($row.check) $($row.mode)/$($row.size)/$($row.scene) - $($row.detail)"
         if ($row.result -eq 'fail') {
@@ -287,7 +315,7 @@ finally {
             Write-Warning "Sidecar check failed: $line"
         }
         elseif ($row.result -eq 'pending') { Write-Output "pend $line" }
-        elseif ($row.check -ne 'sidecar_present') { Write-Output "ok   $line" }
+        elseif ($row.check -notin @('sidecar_present', 'window_matches_request')) { Write-Output "ok   $line" }
     }
     $playerLogsUnchanged = ((Get-LogListing $playerLogs) -eq $playerLogsBefore)
     if (-not $playerLogsUnchanged) { Write-Warning "The player log folder changed during the run: $playerLogs" }
