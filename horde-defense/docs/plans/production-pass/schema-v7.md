@@ -412,3 +412,5 @@ The 13 existing keys and `bindings: [String; 8]` are unchanged.
 | 3 | 0 | 0 | unchanged | 3 | UI only |
 | 4 | **G** balance moves, re-blessed once (W4-08) | **G** | unchanged; a trap charges_per_rank pin move would be re-blessed in W4-08 with its reason (none expected) | 4 | PROGRESSED_GOLDEN (4 runs) and PROGRESSED_TRACE plus V7_CONTINUATION pinned at the close |
 | 5-7 | 0 | 0 (PROGRESSED 0/4) | unchanged | 4 | Any core move means stop and ask the user |
+
+**As run (annotation, 7 November 2026, W1 review):** W1-69 (user decision 2026-11-06, enemies overlap) re-blessed GOLDEN 1/6 and GAMEPLAY_TRACE 3/6, class G; V1-V6 continuation, V6_DROP_TRACE_FNV and save_v7.json pins unchanged; see plan §6. The wave-1 row above is unchanged.
