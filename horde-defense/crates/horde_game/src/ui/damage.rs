@@ -162,6 +162,13 @@ impl Stream {
                 continue;
             }
             self.active.retain(|old| old.target != next.target);
+            // A steady aim misses through the same point every shot (core
+            // shots are deterministic): its MISS refreshes in place instead
+            // of stacking one per shot (W1 review).
+            if matches!(next.target, Target::Volley(..)) {
+                self.active
+                    .retain(|old| !(old.kind == Kind::Miss && old.at == next.at));
+            }
             next.started = now;
             self.active.push(next);
         }
@@ -757,32 +764,30 @@ mod tests {
             );
         }
     }
-    /// CF-1-12: every pellet of a shotgun shot that strikes nothing is its
-    /// own core Miss, and each made its own MISS at the field edge, a column
-    /// of six per shot. One shot now shows one MISS (at its first pellet's
-    /// edge point), and the next shot its own; reduced effects share the
-    /// stream, so they show the same.
-    #[test]
-    fn a_shotgun_volley_that_misses_with_every_pellet_shows_one_miss() {
+    /// Fires one shot per entry of `aims` (a y offset from the defender at
+    /// the field's right edge) from a `pellets`-pellet weapon into open
+    /// ground, observing the stream 0.2 s apart: the MISS bubbles alive after
+    /// each shot.
+    fn misses_per_shot(pellets: u32, aims: &[f32]) -> Vec<usize> {
         let mut game = fixture();
         {
             let a = game.attempt_mut().unwrap();
             a.enemies.clear();
             a.events.clear();
-            a.profile.weapon.pellets = 6;
-            a.profile.weapon.spread_radians = 0.4;
-            a.ammo = a.magazine.max(2);
+            a.profile.weapon.pellets = pellets;
+            a.profile.weapon.spread_radians = if pellets > 1 { 0.4 } else { 0.0 };
+            a.ammo = a.magazine.max(3);
         }
         game.set_paused(false);
         let mut stream = Stream::default();
         let mut misses_per_shot = Vec::new();
-        for shot in 0..2 {
+        for (shot, &dy) in aims.iter().enumerate() {
             let before = game.attempt().unwrap().events.len();
             let mut ticks = 0;
             while game.attempt().unwrap().events.len() == before {
                 let aim = {
                     let a = game.attempt().unwrap();
-                    [a.width_yards, a.defender_position()[1] + 0.3]
+                    [a.width_yards, a.defender_position()[1] + dy]
                 };
                 game.tick(horde_core::sim::Input {
                     aim,
@@ -793,14 +798,14 @@ mod tests {
                 assert!(ticks < 120, "shot {shot} never fired");
             }
             let a = game.attempt().unwrap();
-            let pellets = a
+            let missed = a
                 .events
                 .iter()
                 .skip(before)
                 .filter(|e| e.kind == EventKind::Miss)
                 .count();
-            assert_eq!(pellets, 6, "shot {shot}: every pellet misses");
-            stream.observe(a, 10.0 + f64::from(shot) * 0.2, true, false);
+            assert_eq!(missed, pellets as usize, "shot {shot}: every pellet misses");
+            stream.observe(a, 10.0 + shot as f64 * 0.2, true, false);
             misses_per_shot.push(
                 stream
                     .active
@@ -809,7 +814,28 @@ mod tests {
                     .count(),
             );
         }
-        assert_eq!(misses_per_shot, [1, 2], "one MISS per shot");
+        misses_per_shot
+    }
+    /// CF-1-12: every pellet of a shotgun shot that strikes nothing is its
+    /// own core Miss, and each made its own MISS at the field edge, a column
+    /// of six per shot. One shot now shows one MISS (at its first pellet's
+    /// edge point), and the next shot at another aim its own; reduced
+    /// effects share the stream, so they show the same.
+    #[test]
+    fn a_shotgun_volley_that_misses_with_every_pellet_shows_one_miss() {
+        assert_eq!(
+            misses_per_shot(6, &[0.3, -0.3]),
+            [1, 2],
+            "one MISS per shot"
+        );
+    }
+    /// W1 review: core shots are deterministic, so a steady aim misses
+    /// through the same edge point every shot. Its MISS refreshes in place
+    /// (one label), not a rising column of one per shot.
+    #[test]
+    fn steady_aim_misses_refresh_one_miss_instead_of_stacking() {
+        assert_eq!(misses_per_shot(1, &[0.3, 0.3]), [1, 1], "single projectile");
+        assert_eq!(misses_per_shot(6, &[0.3, 0.3]), [1, 1], "shotgun");
     }
     /// W1 review: the zoom raises the enemy health bar (0.41 lane heights
     /// over the feet) past a fixed lift, so on a 2.5x field a fresh number
