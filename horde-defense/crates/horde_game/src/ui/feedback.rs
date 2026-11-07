@@ -63,12 +63,14 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
         if working {
             ui.spinner();
         }
+        let details = visible && !working && (critical || text.chars().count() > 95);
         let buttons = if visible && !working {
-            if critical || text.chars().count() > 95 {
-                120.0
+            let labels: &[&str] = if details {
+                &["Details", "Dismiss"]
             } else {
-                65.0
-            }
+                &["Dismiss"]
+            };
+            small_buttons_width(ui, labels)
         } else {
             0.0
         };
@@ -95,7 +97,7 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
             .on_hover_text(&text);
         });
         if visible && !working {
-            if (critical || text.chars().count() > 95) && ui.small_button("Details").clicked() {
+            if details && ui.small_button("Details").clicked() {
                 f.status.feedback.details = text.clone();
                 f.status.feedback.details_open = true;
             }
@@ -121,6 +123,21 @@ pub(super) fn status_line(ui: &mut egui::Ui, f: &mut UiCtx) {
             });
     }
     f.status.feedback.details_open = open;
+}
+/// The drawn width of a row of small buttons, spacing included, measured by
+/// laying them out in an invisible, disabled probe beside the row: no fixed
+/// reservation can follow the font, the UI scale and the button style.
+fn small_buttons_width(ui: &mut egui::Ui, labels: &[&str]) -> f32 {
+    let mut probe = ui.new_child(
+        egui::UiBuilder::new()
+            .id_salt("feedback_button_probe")
+            .layout(egui::Layout::left_to_right(egui::Align::Center))
+            .invisible(),
+    );
+    for label in labels {
+        let _ = probe.small_button(*label);
+    }
+    probe.min_rect().width()
 }
 pub(super) fn overlay_owns_keyboard(ctx: &egui::Context, f: &mut UiCtx) -> bool {
     if f.status.feedback.details_open {
