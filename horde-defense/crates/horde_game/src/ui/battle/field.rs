@@ -170,8 +170,14 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                         .stroke(Stroke::new(1., TEXT))
                         .inner_margin(10)
                         .show(ui, |ui| {
+                            // The frame fills its whole layout rect (margin
+                            // and stroke are 11 pt a side): the cues, the
+                            // callout occluder and the hover refusal all
+                            // treat that rect as covered.
                             ui.set_width(panel.width() - 22.0);
+                            ui.set_min_height(panel.height() - 22.0);
                             egui::ScrollArea::vertical()
+                                .auto_shrink([false, false])
                                 .max_height(panel.height() - 24.0)
                                 .show(ui, |ui| construction_controls(ui, f, view));
                         });

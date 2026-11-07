@@ -41,7 +41,7 @@ pub(super) const PANEL_TOP_GAP: f32 = 8.0;
 /// The construction panel's shortest size.
 pub(super) const PANEL_MIN_HEIGHT: f32 = 180.0;
 /// The construction panel's black fill alpha.
-pub(super) const PANEL_FILL_ALPHA: u8 = 235;
+pub(in crate::ui) const PANEL_FILL_ALPHA: u8 = 235;
 /// How far left of the construction panel an INCOMING chevron's centre sits.
 pub(super) const CHEVRON_GAP: f32 = 10.0;
 /// The INCOMING chevron's width and height.

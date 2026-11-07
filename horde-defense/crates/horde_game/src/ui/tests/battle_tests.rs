@@ -1020,6 +1020,56 @@ fn construction_panel_keeps_plan_buttons() {
     }
 }
 
+/// Pin: the painted construction panel fills `layout.construction_panel`, the
+/// rect the INCOMING cues, the callout occluder and the hover refusal all
+/// treat as covered. A frame that shrank to its content left lanes visible
+/// below it at 1440x900 while they were still cued and refused as hidden.
+#[test]
+fn construction_panel_paints_its_whole_layout_rect() {
+    fn panel_fills(shape: &egui::epaint::Shape, out: &mut Vec<Rect>) {
+        match shape {
+            egui::epaint::Shape::Rect(rect)
+                if rect.fill == Color32::from_black_alpha(battle::PANEL_FILL_ALPHA) =>
+            {
+                out.push(rect.rect);
+            }
+            egui::epaint::Shape::Vec(shapes) => {
+                shapes.iter().for_each(|shape| panel_fills(shape, out));
+            }
+            _ => {}
+        }
+    }
+    for size in target_sizes() {
+        let mut fixture = fresh_battle(Mode::Personal, true);
+        let h = Harness::new();
+        let f = &mut fixture.frontend;
+        f.battle.construction = true;
+        let output = h.frame_size(f, View::Battle, vec![], size);
+        let panel = field_layout(&h, f).construction_panel;
+        let mut fills = Vec::new();
+        for clipped in &output.shapes {
+            panel_fills(&clipped.shape, &mut fills);
+        }
+        let painted = fills
+            .into_iter()
+            .find(|rect| rect.intersects(panel))
+            .unwrap_or_else(|| panic!("{size:?}: no panel fill painted"));
+        assert!(
+            (painted.min - panel.min).length() < 0.5 && (painted.max - panel.max).length() < 0.5,
+            "{size:?}: painted panel {painted:?}, layout rect {panel:?}"
+        );
+        // A bottom-lane enemy under the panel is cued, so the panel must
+        // really cover that lane.
+        let field = field_layout(&h, f).field.rect;
+        let lanes = f32::from(f.game.attempt().unwrap().lane_count);
+        let bottom = field.top() + (lanes - 0.5) * field.height() / lanes;
+        assert!(
+            painted.y_range().contains(bottom),
+            "{size:?}: bottom lane centre {bottom} outside the painted panel {painted:?}"
+        );
+    }
+}
+
 /// Pin: a pointer over the construction overlay neither hovers nor aims the
 /// field under it.
 #[test]
