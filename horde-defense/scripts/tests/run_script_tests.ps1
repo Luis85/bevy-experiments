@@ -102,11 +102,13 @@ public static class LastLightNativeHelper {
             Console.WriteLine("construction\tStill\tfalse\tfalse\ttrue\t\t\t0");
             Console.WriteLine("max-lanes\tStill\tfalse\tfalse\tfalse\t\t\t1");
             Console.WriteLine("broken\tStill\tfalse\tfalse\tfalse\t\t\t1");
+            Console.WriteLine("unscaled\tStill\tfalse\tfalse\tfalse\t\t\t1");
             return 0;
         }
         // A capture_review still: a PNG header at twice the requested width (Windows scale 2) plus a sidecar per scene.
         // battle passes every check, construction moves the arena at small size, max-lanes misses the pre-zoom arena
-        // at small size and has 3 HUD rows, menu writes no sidecar and broken writes one that is not JSON.
+        // at small size and has 3 HUD rows, menu writes no sidecar, broken writes one that is not JSON and unscaled
+        // ignores the requested reduced effects and UI scale.
         string capture = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_CAPTURE");
         if (args.Length == 0 && !String.IsNullOrEmpty(capture)) {
             string scene = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN");
@@ -119,13 +121,18 @@ public static class LastLightNativeHelper {
             png[16] = (byte)(pixels >> 24); png[17] = (byte)(pixels >> 16); png[18] = (byte)(pixels >> 8); png[19] = (byte)pixels;
             Directory.CreateDirectory(Path.GetDirectoryName(capture));
             File.WriteAllBytes(capture, png);
+            // Every sidecar echoes the requested reduced-effects mode and UI scale, except unscaled, which always
+            // reports normal effects at scale 1 (the review overrides did not take).
+            string echo = "\"reduced_effects\":" + (Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_REDUCED") == "1" ? "true" : "false")
+                + ",\"ui_scale\":" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCALE") + ",";
             string sidecar = null;
-            if (scene == "battle") { sidecar = "{\"screen\":\"Battle\",\"hud_rows\":2,\"arena_rect\":[10,20,30,40]}"; }
-            if (scene == "construction") { sidecar = "{\"screen\":\"Battle\",\"hud_rows\":null,\"arena_rect\":" + (small ? "[11,20,30,40]" : "[10,20,30,40]") + "}"; }
+            if (scene == "battle") { sidecar = "{" + echo + "\"screen\":\"Battle\",\"hud_rows\":2,\"arena_rect\":[10,20,30,40]}"; }
+            if (scene == "construction") { sidecar = "{" + echo + "\"screen\":\"Battle\",\"hud_rows\":null,\"arena_rect\":" + (small ? "[11,20,30,40]" : "[10,20,30,40]") + "}"; }
             if (scene == "max-lanes") {
-                sidecar = "{\"screen\":\"Battle\",\"hud_rows\":3,\"lanes\":17,\"width_yards\":30,\"canvas_rect\":[0,0,1440,900],\"arena_rect\":"
+                sidecar = "{" + echo + "\"screen\":\"Battle\",\"hud_rows\":3,\"lanes\":17,\"width_yards\":30,\"canvas_rect\":[0,0,1440,900],\"arena_rect\":"
                     + (small ? "[0,0,1440,900]" : "[24,124,1416,816]") + "}";
             }
+            if (scene == "unscaled") { sidecar = "{\"reduced_effects\":false,\"ui_scale\":1.0,\"screen\":\"Menu\"}"; }
             if (scene == "broken") { sidecar = "{not json"; }
             if (sidecar != null) { File.WriteAllText(Path.ChangeExtension(capture, ".json"), sidecar); }
             return 0;
@@ -536,7 +543,9 @@ try {
             'sidecar_present large battle pass', 'sidecar_present large broken fail', 'sidecar_present large construction pass',
             'sidecar_present large max-lanes pass', 'sidecar_present large menu fail',
             'sidecar_present small battle pass', 'sidecar_present small broken fail', 'sidecar_present small construction pass',
-            'sidecar_present small max-lanes pass', 'sidecar_present small menu fail'
+            'sidecar_present small max-lanes pass', 'sidecar_present small menu fail',
+            'sidecar_echoes_request large battle pass', 'sidecar_echoes_request large construction pass', 'sidecar_echoes_request large max-lanes pass',
+            'sidecar_echoes_request small battle pass', 'sidecar_echoes_request small construction pass', 'sidecar_echoes_request small max-lanes pass'
         ) | Sort-Object
         Assert-Equal ($expected -join "`n") ($rows -join "`n") 'sidecar check rows'
         $details = @{}
@@ -547,6 +556,31 @@ try {
         Assert-Equal 'arena [0, 0, 1440, 900], pre-zoom arena [24, 124, 1416, 816], 17x30' $details['max_lanes_keeps_pre_zoom_arena small max-lanes'] 'pre-zoom detail'
         $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: *' })
         Assert-Equal 7 $failLines.Count "one FAIL line per failed row; $log"
+    }
+
+    Test-Case 'capture_review fails a sidecar that does not echo the requested reduced effects and UI scale' {
+        # A still drawn without the LASTLIGHT_REVIEW_REDUCED or LASTLIGHT_REVIEW_SCALE override is not reduced-effects
+        # or small-size evidence, even when its PNG looks plausible.
+        $out = Join-Path $temporary 'captures-echo'
+        $review = Join-Path $scriptsDirectory 'capture_review.ps1'
+        $arguments = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $review, '-NoBuild', '-Executable', $helper,
+            '-Scenes', 'battle,unscaled', '-Modes', 'reduced', '-OutputDirectory', $out)
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $arguments -LogStem (Join-Path $temporary 'logs\capture-review-echo') -TimeoutSeconds 300
+        $log = 'out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err)
+        Assert-Equal 1 $r.ExitCode "a sidecar that ignores the request exits 1; $log"
+        $report = Get-Content -Raw -LiteralPath (Join-Path $out 'captures.json') | ConvertFrom-Json
+        $rows = @($report.sidecar_checks | Where-Object { $_.check -eq 'sidecar_echoes_request' } | ForEach-Object { "$($_.mode) $($_.size) $($_.scene) $($_.result)" } | Sort-Object)
+        $expected = @(
+            'reduced large battle pass', 'reduced large unscaled fail', 'reduced small battle pass', 'reduced small unscaled fail'
+        ) | Sort-Object
+        Assert-Equal ($expected -join "`n") ($rows -join "`n") 'echo rows'
+        $details = @{}
+        foreach ($row in @($report.sidecar_checks)) { $details["$($row.check) $($row.size) $($row.scene)"] = $row.detail }
+        Assert-Equal 'reduced_effects false (requested true), ui_scale 1 (requested 1)' $details['sidecar_echoes_request large unscaled'] 'large detail'
+        Assert-Equal 'reduced_effects false (requested true), ui_scale 1 (requested 1.35)' $details['sidecar_echoes_request small unscaled'] 'small detail'
+        Assert-Equal 'reduced_effects true (requested true), ui_scale 1.35 (requested 1.35)' $details['sidecar_echoes_request small battle'] 'pass detail'
+        $failLines = @((Read-Log $r.Out) -split "`r?`n" | Where-Object { $_ -like 'FAIL Sidecar check failed: sidecar_echoes_request *' })
+        Assert-Equal 2 $failLines.Count "one FAIL line per unechoed still; $log"
     }
 
     Test-Case 'capture_review and capture_motion resolve a relative -Executable against the workspace' {

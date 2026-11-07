@@ -7,7 +7,8 @@
 #   scenes.tsv                     the binary's --list-scenes output
 #   tools/                         cargo, --list-scenes and --version logs
 #   captures.json                  version 1, UTF-8 without BOM, with the sidecar_checks rows
-# Sidecar checks (a 'fail' row fails the run): every capture has a sidecar; battle stills at small size report
+# Sidecar checks (a 'fail' row fails the run): every capture has a sidecar; every sidecar echoes the requested
+# reduced_effects (mode reduced) and ui_scale (1.0 large, 1.35 small, within 0.001); battle stills at small size report
 # hud_rows <= 2 ('pending' while the build reports null, until ux-flow W3); construction keeps the battle's
 # arena_rect at the same size and mode; max-lanes (17x30) keeps the pre-zoom arena, canvas inset 24/124/24/84.
 # -Scenes defaults to every Still the binary lists; -SmallScenes defaults to -Scenes. List parameters accept
@@ -63,6 +64,13 @@ function Format-Rect($Rect) {
     return '[' + ((@($Rect) | ForEach-Object { ([double]$_).ToString('0.###', [Globalization.CultureInfo]::InvariantCulture) }) -join ', ') + ']'
 }
 
+function Format-Fact($Value) {
+    if ($null -eq $Value) { return 'null' }
+    if ($Value -is [bool]) { return $Value.ToString().ToLowerInvariant() }
+    if ($Value -is [ValueType]) { return ([double]$Value).ToString('0.###', [Globalization.CultureInfo]::InvariantCulture) }
+    return [string]$Value
+}
+
 function Test-RectEqual($Left, $Right, [double]$Tolerance) {
     if ($null -eq $Left -or $null -eq $Right) { return $false }
     $a = @($Left)
@@ -82,6 +90,7 @@ function Test-CaptureSidecars($Entries, [string]$Root) {
     # Reads every successful capture's sidecar and returns the check rows (result pass, fail or pending).
     $rows = New-Object System.Collections.Generic.List[object]
     $facts = @{}
+    $scales = @{}
     foreach ($entry in $Entries) {
         if ($null -ne $entry.error -or $null -eq $entry.sha256) { continue }
         if ($null -eq $entry.sidecar) {
@@ -89,6 +98,7 @@ function Test-CaptureSidecars($Entries, [string]$Root) {
             continue
         }
         try {
+            $scales["$($entry.mode)|$($entry.size)|$($entry.scene)"] = [double]$entry.scale
             $facts["$($entry.mode)|$($entry.size)|$($entry.scene)"] = [IO.File]::ReadAllText((Join-Path $Root $entry.sidecar)) | ConvertFrom-Json
             $rows.Add((New-SidecarCheck 'sidecar_present' $entry.mode $entry.size $entry.scene 'pass' $entry.sidecar))
         }
@@ -99,6 +109,15 @@ function Test-CaptureSidecars($Entries, [string]$Root) {
     foreach ($key in @($facts.Keys | Sort-Object)) {
         $mode, $size, $scene = $key -split '\|', 3
         $fact = $facts[$key]
+        # The still was drawn as requested: a sidecar that does not echo the reduced-effects mode and UI scale means the
+        # review override did not take, so a reduced still is not reduced-effects evidence (the capture_motion rule).
+        $wantReduced = $mode -eq 'reduced'
+        $wantScale = $scales[$key]
+        $reduced = $fact.reduced_effects
+        $scale = $fact.ui_scale
+        $echoes = $reduced -is [bool] -and $reduced -eq $wantReduced -and $scale -is [ValueType] -and $scale -isnot [bool] -and [Math]::Abs([double]$scale - $wantScale) -le 0.001
+        $detail = "reduced_effects $(Format-Fact $reduced) (requested $(Format-Fact $wantReduced)), ui_scale $(Format-Fact $scale) (requested $(Format-Fact $wantScale))"
+        $rows.Add((New-SidecarCheck 'sidecar_echoes_request' $mode $size $scene $(if ($echoes) { 'pass' } else { 'fail' }) $detail))
         if ($fact.screen -eq 'Battle' -and $size -eq 'small') {
             if ($null -eq $fact.hud_rows) { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'pending' 'hud_rows is null until ux-flow measures the bar (C-10, wave 3)')) }
             elseif ([int]$fact.hud_rows -le 2) { $rows.Add((New-SidecarCheck 'hud_rows_at_most_2' $mode $size $scene 'pass' "hud_rows $($fact.hud_rows)")) }
