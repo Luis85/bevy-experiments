@@ -1,6 +1,7 @@
 //! Read-only inspection of authoritative battlefield state. No rolls or simulation
 //! mutations are performed when an object is hovered or inspected.
 use crate::art::{AMBER, GREEN, MUTED, RED};
+use crate::battle_view::crowd_stagger;
 use bevy_egui::egui::{self, Response, RichText};
 use horde_core::{
     content::{Mode, StructureKind, content},
@@ -19,8 +20,11 @@ pub fn target_at(attempt: &Attempt, aim: [f32; 2]) -> Option<Target<'_>> {
         .enemies
         .iter()
         .filter_map(|enemy| {
-            let dx = (enemy.x - aim[0]) / if enemy.boss { 0.8 } else { 0.55 };
-            let dy = (enemy.y() - aim[1]) / 0.43;
+            // Hit-test where the body is drawn: a crowd shares one sim spot
+            // since W1-69 and only the presentation stagger draws it apart.
+            let [sx, sy] = crowd_stagger(enemy.id);
+            let dx = (enemy.x + sx - aim[0]) / if enemy.boss { 0.8 } else { 0.55 };
+            let dy = (enemy.y() + sy - aim[1]) / 0.43;
             let distance = dx * dx + dy * dy;
             (distance <= 1.0).then_some((enemy, distance))
         })
@@ -238,5 +242,34 @@ mod tests {
         assert!(target_at(&attempt, [7.0, 1.5]).is_none());
         assert!(target_at(&attempt, [f32::NAN, 0.5]).is_none());
         assert_eq!(serde_json::to_value(&attempt).unwrap(), before);
+    }
+
+    /// Since W1-69 a crowd at the line shares one sim spot and only the
+    /// presentation stagger draws it apart; hovering each drawn body must
+    /// inspect that body, not always the lowest id (W1 review).
+    #[test]
+    fn hovering_a_staggered_crowd_inspects_the_drawn_body() {
+        use horde_core::sim::DEFENSE_LINE;
+        let mut game = Game::default();
+        game.campaign_mut().choose_start_country("DEU").unwrap();
+        game.deploy_country_stage(0, Mode::Personal).unwrap();
+        let mut attempt = game.attempt_slot_mut().take().unwrap();
+        for _ in 0..3 {
+            game.spawn_enemy(&mut attempt, EnemyKind::Runner, 0, false);
+        }
+        for enemy in &mut attempt.enemies {
+            enemy.x = DEFENSE_LINE;
+            enemy.pass_offset = 0.0;
+        }
+        let ids: Vec<u64> = attempt.enemies.iter().map(|e| e.id).collect();
+        assert_eq!(ids.len(), 3);
+        for enemy in &attempt.enemies {
+            let [sx, sy] = crowd_stagger(enemy.id);
+            let aim = [enemy.x + sx, enemy.y() + sy];
+            let Some(Target::Enemy(hit)) = target_at(&attempt, aim) else {
+                panic!("no hostile under the drawn body of #{}", enemy.id);
+            };
+            assert_eq!(hit.id, enemy.id, "hovered the drawn body of #{}", enemy.id);
+        }
     }
 }
