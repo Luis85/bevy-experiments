@@ -122,7 +122,7 @@ Open (W1-61 review, 2026-11-07; W1-68's VSync-off half is closed by W1-61): one 
 
 W1-69 done_when evidence (2026-11-06): enemies never block each other, the user's decision of 2026-11-06 (plan §2.2). In core, `sim/movement.rs` lost the lane queue (the stop 0.65 yd behind the body in front, `EnemyPhase::Queued`) and the speed-difference passing offsets. Each enemy stops only at the defense line or the face of a live non-trap structure in its lane, and attacks there. `Queued` stays for old saves (`a_saved_queued_enemy_resolves_on_the_next_tick`), and a saved `pass_offset` eases back to 0 at the old rate. The commit pins the rule in `enemies_in_one_lane_never_block_each_other` and `enemies_still_stop_at_structures`. `tests/overtaking.rs` and the simulation.rs hit-stop test were rewritten for the new rule. Presentation-only changes:
 - a static per-id crowd stagger, R2 sequence, at most 0.15 yd behind the feet and 0.12 lane across;
-- lanes painted far to near, then by id;
+- lanes painted far to near, then by id (drawn-feet tie-break since bb78430);
 - one contact band per lane and one windup ring per stack;
 - prop hit outlines moved to the readout pass, so struck walls no longer split the props pass. With every wall struck, the progressed peak drew 51 primitives against the gate of 48; the pin is `struck_structures_add_no_primitives`.
 
