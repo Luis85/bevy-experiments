@@ -255,15 +255,22 @@ pub(super) fn apply_reduced_override(
 
 /// Explicit automated-motion fixtures use a separate temporary profile.
 /// This changes startup state only; fixed systems still own every tick. The
-/// stress fixture keeps its staged disclaimer (no gameplay claim) instead of
-/// the generic live-motion note.
+/// synthetic and copied perf fixtures keep their staged disclaimer (no
+/// gameplay or FPS claim) instead of the generic live-motion note; the peak
+/// fixture, staged paused, says it runs live.
 pub(super) fn apply_motion_override(f: &mut FrontendParts, config: &crate::launch::LaunchConfig) {
     if config.scenario.is_some() && !config.practice && config.motion_review() {
         f.game.set_paused(false);
         f.battle.set_construction(false);
-        if !matches!(config.scenario.as_deref(), Some("stress" | "fx-stress")) {
-            f.status.message =
-                "Live motion review · progress is isolated from your campaign".into();
+        match config.scenario.as_deref() {
+            Some("stress" | "fx-stress" | "progressed-peak" | "max-lanes" | "npc-stutter") => {}
+            Some("peak") => {
+                f.status.message = "Live peak-render fixture · no simulation FPS claim".into();
+            }
+            _ => {
+                f.status.message =
+                    "Live motion review · progress is isolated from your campaign".into();
+            }
         }
     }
 }

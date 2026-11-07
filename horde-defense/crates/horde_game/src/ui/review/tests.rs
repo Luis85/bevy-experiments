@@ -602,6 +602,51 @@ fn stress_disclaimer_survives_the_motion_launch() {
         "Synthetic stress fixture · 400 drawn + 3 expeditions · perf headroom, not a gameplay claim"
     );
 }
+/// Every synthetic or copied perf fixture keeps its claim disclaimer under
+/// motion, as stress does; the peak fixture, live here, drops its "Paused".
+/// An ordinary scene still gets the generic live-motion note.
+#[cfg(feature = "review")]
+#[test]
+fn synthetic_disclaimers_survive_the_motion_launch() {
+    let maximum = "Synthetic maximum-rank fixture · authored population cap plus boss · no gameplay or FPS claim";
+    for (scene, message) in [
+        ("peak", "Live peak-render fixture · no simulation FPS claim"),
+        ("progressed-peak", maximum),
+        ("max-lanes", maximum),
+        (
+            "battle",
+            "Live motion review · progress is isolated from your campaign",
+        ),
+    ] {
+        let vars = [
+            ("LASTLIGHT_REVIEW_SCREEN", scene),
+            ("LASTLIGHT_REVIEW_MOTION", "1"),
+        ];
+        let config = LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
+            vars.iter()
+                .find(|(key, _)| *key == name)
+                .map(|(_, value)| (*value).into())
+        })
+        .expect("valid launch");
+        let f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
+        assert!(!f.game.global_paused(), "{scene}: motion review runs live");
+        assert_eq!(f.status.message, message, "{scene}");
+    }
+    // npc-stutter stages from a copied save; its staged note is what counts.
+    let mut f = crate::ui::test_support::test_frontend();
+    let config = LaunchConfig {
+        scenario: Some("npc-stutter".into()),
+        review: Some(ReviewOptions {
+            motion: true,
+            ..ReviewOptions::default()
+        }),
+        ..LaunchConfig::default()
+    };
+    let staged_note = "Copied checkpoint/resumed NPC battle · isolated performance review";
+    f.status.message = staged_note.into();
+    apply_motion_override(&mut f, &config);
+    assert_eq!(f.status.message, staged_note);
+}
 #[test]
 fn workshop_names_still_reach_the_workshop() {
     for scene in ["model-parity-x", "model-workshop"] {
