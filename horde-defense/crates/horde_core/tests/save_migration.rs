@@ -994,6 +994,137 @@ fn v6_items_keep_stats_and_value() {
     }
 }
 
+/// The bundled enemy catalogue, as the build ships it (no `LASTLIGHT_ENEMIES`
+/// override).
+const ENEMY_CATALOG_JSON: &str = include_str!("../enemy_catalog.json");
+/// The bundled content catalogue (no `LASTLIGHT_CONTENT` override).
+const CONTENT_JSON: &str = include_str!("../content.json");
+
+/// The 11 archetypes the V1-V6 encounters can spawn, in catalogue order.
+const FROZEN_ARCHETYPES: [&str; 11] = [
+    "shambler",
+    "runner",
+    "brute",
+    "armored",
+    "demolisher",
+    "breacher-pack",
+    "caller-pack",
+    "siege-pack",
+    "skitter",
+    "plated-runner",
+    "hungry-shambler",
+];
+/// Wave tiers 0..=4 of `enemy_catalog.json`; new content enters at tier 5.
+const FROZEN_WAVE_TIERS: std::ops::RangeInclusive<usize> = 0..=4;
+
+/// FNV-1a of [`frozen_catalogue_table`] on the bundled catalogues, recorded
+/// at the wave-1 close (W2-53, parent af530f0). Design-save-determinism
+/// invariant 3: these are the only catalogue records a saved V1-V6 encounter
+/// ticks, so they are append-only (ISO-3). A move means a frozen record was
+/// edited: fix the edit. A content change meant to reach legacy attempts
+/// (Ruling R4) re-blesses the continuation pins it moves in that wave's
+/// GOLDEN re-bless with a written reason; there is no `rules_revision`.
+const FROZEN_CATALOGUE_FNV: u64 = 0x51a3_36a7_df99_eb22;
+
+/// One line per frozen record, as the catalogues resolve it: each frozen
+/// archetype's `ResolvedEnemy`, each frozen wave tier's entries (sorted by
+/// archetype id, the order `EnemyCatalog` keeps) and each of the 5 content
+/// levels. Records are serialized through their types, so a new field at its
+/// skipped neutral default writes nothing. Wave entries come from the authored
+/// JSON rather than `wave_pool`, so an entry locked behind any boss still
+/// counts. Panics when either catalogue fails to load.
+fn frozen_catalogue_table(enemy_json: &str, content_json: &str) -> String {
+    use horde_core::enemy_catalog::{EnemyCatalog, WeightedEnemy};
+    let catalog = EnemyCatalog::from_json_str(enemy_json).expect("the enemy catalogue loads");
+    let content =
+        horde_core::content::Content::from_json_str(content_json).expect("the content loads");
+    let mut table = String::new();
+    for id in FROZEN_ARCHETYPES {
+        let enemy = catalog.resolve(id).unwrap();
+        table.push_str(&format!(
+            "archetype {id} {}\n",
+            serde_json::to_string(&enemy).unwrap()
+        ));
+    }
+    let authored: serde_json::Value = serde_json::from_str(enemy_json).unwrap();
+    let waves = authored["waves"].as_array().expect("a waves array");
+    for tier in FROZEN_WAVE_TIERS {
+        let wave = waves
+            .iter()
+            .find(|wave| wave["level"].as_u64() == Some(tier as u64))
+            .unwrap_or_else(|| panic!("wave tier {tier} exists"));
+        let mut entries: Vec<WeightedEnemy> =
+            serde_json::from_value(wave["entries"].clone()).unwrap();
+        entries.sort_by(|a, b| a.archetype_id.cmp(&b.archetype_id));
+        table.push_str(&format!(
+            "wave {tier} {}\n",
+            serde_json::to_string(&entries).unwrap()
+        ));
+    }
+    assert_eq!(content.levels.len(), 5, "the 5 content levels");
+    for (index, level) in content.levels.iter().enumerate() {
+        table.push_str(&format!(
+            "level {index} {}\n",
+            serde_json::to_string(level).unwrap()
+        ));
+    }
+    table
+}
+
+/// The bundled enemy catalogue with `edit` applied to its authored JSON.
+fn edited_enemy_catalog(edit: impl FnOnce(&mut serde_json::Value)) -> String {
+    let mut authored: serde_json::Value = serde_json::from_str(ENEMY_CATALOG_JSON).unwrap();
+    edit(&mut authored);
+    serde_json::to_string(&authored).unwrap()
+}
+
+#[test]
+fn legacy_catalogue_records_that_tick_saved_encounters_are_frozen() {
+    let table = frozen_catalogue_table(ENEMY_CATALOG_JSON, CONTENT_JSON);
+    assert_eq!(
+        table.lines().count(),
+        FROZEN_ARCHETYPES.len() + FROZEN_WAVE_TIERS.count() + 5
+    );
+    assert_eq!(
+        support::fnv1a(table.as_bytes()),
+        FROZEN_CATALOGUE_FNV,
+        "a frozen catalogue record moved (append-only, ISO-3):\n{table}"
+    );
+
+    // Appending an archetype and the next wave tier leaves the table as is.
+    let appended = edited_enemy_catalog(|authored| {
+        let mut archetype = authored["archetypes"][0].clone();
+        archetype["id"] = "frozen-guard-probe".into();
+        archetype["name"] = "Frozen Guard Probe".into();
+        authored["archetypes"]
+            .as_array_mut()
+            .unwrap()
+            .push(archetype);
+        let waves = authored["waves"].as_array_mut().unwrap();
+        let mut wave = waves[0].clone();
+        wave["level"] = waves.len().into();
+        wave["entries"] = serde_json::json!([{"archetype_id": "frozen-guard-probe", "weight": 9}]);
+        waves.push(wave);
+    });
+    assert_eq!(
+        frozen_catalogue_table(&appended, CONTENT_JSON),
+        table,
+        "appended records are not frozen"
+    );
+
+    // Editing a frozen wave tier or a frozen archetype's component moves it.
+    let reweighted = edited_enemy_catalog(|authored| {
+        let entry = &mut authored["waves"][4]["entries"][0]["weight"];
+        *entry = (entry.as_u64().unwrap() + 1).into();
+    });
+    assert_ne!(frozen_catalogue_table(&reweighted, CONTENT_JSON), table);
+    let tougher = edited_enemy_catalog(|authored| {
+        let health = &mut authored["bodies"][0]["health"];
+        *health = (health.as_i64().unwrap() + 1).into();
+    });
+    assert_ne!(frozen_catalogue_table(&tougher, CONTENT_JSON), table);
+}
+
 /// The v6 fixture through the SAVE_VERSION 7 migration: the auto-sell rule
 /// is off (the serde default), no attempt tracks drops or has a drop tier
 /// (a pre-v7 legacy loot path), no expedition has a pending sale, nothing
