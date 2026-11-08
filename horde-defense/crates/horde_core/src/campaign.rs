@@ -30,7 +30,7 @@ pub use progression::{BodyAttribute, NodePayment, Npc, NpcCreation, NpcTraining,
 pub(crate) use sale::SalePlan;
 pub use sale::{SaleBlock, SaleOrigin, SaleQuote, SaleRefs, SaleResolution};
 pub use tree_view::{NodePath, NodeState, PreviewStat, Requirement, RequirementKind, StatDelta};
-pub use view::{NodeStatus, OfferPreview, UpgradeFocus};
+pub use view::{FeatureUnlock, NodeStatus, OfferPreview, UpgradeFocus};
 pub use world::Placement;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
