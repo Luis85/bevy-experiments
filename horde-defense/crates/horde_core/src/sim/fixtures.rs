@@ -25,7 +25,9 @@ pub fn peak_render_fixture() -> Result<Game, String> {
             .items
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.slot == slot && item.tier <= g.campaign.unlocked())
+            .filter(|(_, item)| {
+                item.slot == slot && item.purchasable() && item.tier <= g.campaign.unlocked()
+            })
             .max_by_key(|(_, item)| item.tier)
             .map(|(n, _)| n)
             .ok_or("Missing fixture equipment")?;
@@ -115,7 +117,7 @@ pub fn maximum_progression_render_fixture() -> Result<Game, String> {
             .items
             .iter()
             .enumerate()
-            .filter(|(_, i)| i.slot == slot && i.tier > 0 && i.tier <= g.campaign.unlocked())
+            .filter(|(_, i)| i.slot == slot && i.purchasable() && i.tier <= g.campaign.unlocked())
             .max_by_key(|(_, i)| i.tier)
             .map(|(n, _)| n)
             .ok_or("Missing maximum fixture equipment")?;
@@ -507,7 +509,7 @@ mod stress {
             return Err(format!("The stress fixture already owns {owned} items"));
         }
         let pool: Vec<usize> = (0..content().items.len())
-            .filter(|&n| content().items[n].tier > 0)
+            .filter(|&n| content().items[n].purchasable())
             .collect();
         for n in 0..items - owned {
             g.campaign

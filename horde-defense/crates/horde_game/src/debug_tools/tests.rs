@@ -314,7 +314,9 @@ fn cheapest_outfit(game: &Game) -> (horde_core::content::ItemDefId, u64) {
         .items
         .iter()
         .enumerate()
-        .filter(|(_, item)| item.tier == 1 && item.slot == horde_core::content::Slot::Outfit)
+        .filter(|(_, item)| {
+            item.tier == 1 && item.purchasable() && item.slot == horde_core::content::Slot::Outfit
+        })
         .map(|(n, item)| (item.id.clone(), game.campaign().buy_price(n).unwrap()))
         .min_by_key(|(id, price)| (*price, id.as_str().to_owned()))
         .unwrap()
@@ -540,10 +542,13 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
     // replayed deploys take the drop_tier Some path, so a drop of an
     // Uncommon-base item rolls its quality relative to that base. With
     // drop_quality returning the absolute roll the replayed state digests to
-    // dfcb186697a88f45 again, so no combat moved.
+    // dfcb186697a88f45 again, so no combat moved. W2-08 (39 loot-only items,
+    // class C) moved it from 3894ac12174eb3f7: the replayed deploys' drops
+    // pick from the larger catalogue. With the Some path limited to the 29
+    // v1 definitions the replayed state digests to 3894ac12174eb3f7 again.
     assert_eq!(
         hex(replay(without_sale).unwrap().digest),
-        "3894ac12174eb3f7",
+        "fa528d88f6639802",
         "the replay of the recording up to its sale is pinned"
     );
     // Only compatibility warnings, never a format or seed mismatch. A content

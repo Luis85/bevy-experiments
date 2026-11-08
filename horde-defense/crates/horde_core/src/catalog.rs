@@ -315,10 +315,12 @@ mod tests {
     fn content_fingerprint_is_deterministic_and_covers_item_ids() {
         assert_eq!(content_fingerprint(), content_fingerprint());
         assert_ne!(content_fingerprint(), 0xcbf29ce484222325);
-        // Pinned: equals the fingerprint inside the checked-in v2/v3 save
-        // fixtures. Changing authored ids changes it on purpose; update this
+        // Pinned. Changing authored ids changes it on purpose; update this
         // (and review save compatibility) only when the ids really change.
-        assert_eq!(content_fingerprint(), 13_545_676_443_720_933_061);
+        // The checked-in v2/v3 save fixtures hold the value before W2-08
+        // appended the 39 loot-only item ids (13_545_676_443_720_933_061);
+        // they still load and only log the catalogue drift.
+        assert_eq!(content_fingerprint(), 10_534_622_978_645_713_211);
     }
 
     #[test]

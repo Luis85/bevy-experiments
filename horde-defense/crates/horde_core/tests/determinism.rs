@@ -120,11 +120,13 @@ const TRACE_RULESET: u32 = 2;
 /// is unchanged.
 /// W2-06: all six GOLDEN digests move again (class F); every GAMEPLAY_TRACE
 /// digest is unchanged.
+/// W2-08: the 0x1a571167 Personal GOLDEN digest moves (class C); the other
+/// five and every GAMEPLAY_TRACE digest are unchanged.
 const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
     [
         0xbed5_e271_4b65_90fe,
         0xcffe_0be4_463d_46d6,
-        0x3368_f180_97f7_fb5e,
+        0x9b93_9ce6_3999_e64a,
         0x97d9_3e67_bd2b_ed2f,
         0x7be5_c84d_229d_8d71,
         0x6dce_bbed_cc75_82c9,
@@ -158,6 +160,15 @@ const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
          in drop_ids (the one drop of 0x1a571167 Personal); outcome, trace and \
          items are unchanged, only the key paths and the saved values of the \
          new keys move",
+    ),
+    (
+        "W2-08",
+        MoveClass::C,
+        "the 39 loot_only items (29-67) join the drop pool of attempts deployed \
+         from v7 on: the one drop of 0x1a571167 Personal now picks from 18 \
+         tier-1 definitions instead of 12, so the owned item moves; the pick is \
+         still one a.rng draw, so outcome and trace are unchanged, and the other \
+         five runs drop nothing",
     ),
 ];
 

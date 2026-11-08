@@ -179,13 +179,14 @@ impl Campaign {
         })
     }
 
-    /// Every purchasable (non-starter, unlocked tier) catalogue offer in order.
+    /// Every purchasable (non-starter, not loot-only, unlocked tier)
+    /// catalogue offer in order.
     pub fn shop_offers(&self) -> Vec<OfferPreview> {
         content()
             .items
             .iter()
             .enumerate()
-            .filter(|(_, item)| item.tier > 0 && item.tier <= self.unlocked())
+            .filter(|(_, item)| item.purchasable() && item.tier <= self.unlocked())
             .map(|(index, _)| self.shop_offer(index).expect("catalogue definition exists"))
             .collect()
     }
@@ -446,7 +447,7 @@ mod tests {
         assert!(!offers.is_empty());
         for offer in &offers {
             let authored = &content().items[offer.definition];
-            assert!(authored.tier > 0 && authored.tier <= c.unlocked());
+            assert!(authored.purchasable() && authored.tier <= c.unlocked());
             assert_eq!(Ok(offer.price), c.buy_price(offer.definition));
             assert_eq!(offer.level, c.shop_item_level());
             assert_eq!(
@@ -469,6 +470,50 @@ mod tests {
         c.first_clears.clear();
         assert!(!c.shop_offer(later).unwrap().tier_unlocked);
         assert!(c.shop_offer(usize::MAX).is_err());
+    }
+
+    #[test]
+    fn loot_only_items_are_never_offered_bought_or_recommended() {
+        let loot_only: Vec<usize> = (0..content().items.len())
+            .filter(|&n| content().items[n].loot_only)
+            .collect();
+        assert_eq!(loot_only, (29..68).collect::<Vec<_>>());
+        let mut c = started();
+        c.first_clears = content().levels[..3].iter().map(|l| l.id.clone()).collect();
+        assert_eq!(c.unlocked(), 4);
+        c.coins = 1_000_000;
+        // The shop keeps its 24 rows: every unlocked purchasable definition.
+        let offers = c.shop_offers();
+        assert_eq!(offers.len(), 24);
+        assert!(
+            offers
+                .iter()
+                .all(|o| content().items[o.definition].purchasable())
+        );
+        let loot = "This equipment is only recovered as loot";
+        for &n in &loot_only {
+            assert_eq!(c.shop_offer(n).map(|o| o.definition), Err(loot.into()));
+            assert_eq!(c.buy_price(n), Err(loot.into()));
+            let (coins, owned) = (c.coins, c.items.len());
+            assert_eq!(c.buy_item(n), Err(loot.into()));
+            assert_eq!((c.coins, c.items.len()), (coins, owned));
+        }
+        // Mara wears a padded vest and a shop-level Marksman rifle (tier 1),
+        // so the recommender looks for the cheapest better ranged weapon:
+        // the loot-only Duty pistol (60) would undercut the Patrol rifle
+        // (120).
+        for kind in crate::content::StructureKind::ALL {
+            c.blueprints[kind] = true;
+        }
+        let level = c.shop_item_level();
+        for definition in [6, 4] {
+            let id = c.add_item_at_level(definition, level).unwrap();
+            c.equip(Mode::Npc, id).unwrap();
+        }
+        assert_eq!(
+            c.recommendation(Mode::Npc).action,
+            RecommendationAction::BuyEquipment(8)
+        );
     }
 
     #[test]

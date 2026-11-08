@@ -41,13 +41,15 @@ impl Campaign {
     pub fn can_use_weapon(&self, mode: Mode, definition: usize) -> bool {
         self.weapon_access(mode, definition).is_ok()
     }
+    /// The shop price of `definition` at the shop item level. A loot-only
+    /// definition has none: it is never sold.
     pub fn buy_price(&self, definition: usize) -> Result<u64, String> {
+        let def = content().items.get(definition).ok_or("Unknown equipment")?;
+        if def.loot_only {
+            return Err(crate::content::LOOT_ONLY_REASON.into());
+        }
         Ok(crate::progression::price(
-            content()
-                .items
-                .get(definition)
-                .ok_or("Unknown equipment")?
-                .buy_value,
+            def.buy_value,
             self.shop_item_level(),
         ))
     }

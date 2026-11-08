@@ -87,7 +87,7 @@ fn buy_gear(g: &mut Game, mode: Mode) {
             .enumerate()
             .filter(|(n, item)| {
                 item.slot == slot
-                    && item.tier > 0
+                    && item.purchasable()
                     && item.tier <= g.campaign().unlocked()
                     && g.campaign().can_use_weapon(mode, *n)
             })
@@ -228,7 +228,7 @@ fn outfit_recruit(g: &mut Game, recruit: u64) {
             .enumerate()
             .filter(|(n, item)| {
                 item.slot == slot
-                    && item.tier > 0
+                    && item.purchasable()
                     && item.tier <= g.campaign().unlocked()
                     && g.campaign().can_use_weapon(Mode::Npc, *n)
             })

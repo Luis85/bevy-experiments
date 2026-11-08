@@ -215,8 +215,12 @@ pub struct ItemDefinition {
     pub personal: PersonalProfile,
     pub npc: NpcProfile,
 }
+/// Why a loot-only definition is never offered or bought.
+pub const LOOT_ONLY_REASON: &str = "This equipment is only recovered as loot";
 impl ItemDefinition {
-    /// Sold in the shop: a non-starter tier that is not loot-only.
+    /// Sold in the shop: a non-starter tier that is not loot-only. The shop
+    /// rows, the buy preflight, the recommender and the smoke and fixture
+    /// buyers all filter on it.
     pub fn purchasable(&self) -> bool {
         self.tier > 0 && !self.loot_only
     }
@@ -722,14 +726,21 @@ mod tests {
     }
     #[test]
     fn loot_only_items_need_a_drop_tier_and_are_never_purchasable() {
-        // No authored item is loot-only yet: purchasable is today's tier gate.
-        for item in &content().items {
-            assert!(!item.loot_only, "{}", item.id);
-            assert_eq!(item.purchasable(), item.tier > 0, "{}", item.id);
+        // Exactly the 39 appended items (29-67, W2-08) are loot-only; the
+        // v1 rows keep the key skipped at false and their tier gate.
+        for (index, item) in content().items.iter().enumerate() {
+            assert_eq!(item.loot_only, index >= 29, "{}", item.id);
+            assert_eq!(
+                item.purchasable(),
+                item.tier > 0 && index < 29,
+                "{}",
+                item.id
+            );
         }
         assert_eq!(content().max_drop_tier(), 4);
-        let text = serde_json::to_string(content()).unwrap();
-        assert!(!text.contains("loot_only"), "skipped while false");
+        let row = |n: usize| serde_json::to_string(&content().items[n]).unwrap();
+        assert!(!row(5).contains("loot_only"), "skipped while false");
+        assert!(row(29).contains(r#""loot_only":true"#));
         let mut data = content().clone();
         data.items[5].loot_only = true;
         assert!(!data.items[5].purchasable());
@@ -818,5 +829,260 @@ mod tests {
             assert_eq!(content().items[n].slot, slot);
             assert_eq!(content().items[n].tier, 0);
         }
+    }
+
+    /// Every catalogue id in order: the 29 v1 definitions (save format v1
+    /// stored `definition: n` against this order) and the 39 `loot_only`
+    /// items appended at indices 29-67 (design-loot-economy §5).
+    const CATALOGUE_IDS: [&str; 68] = [
+        "service_carbine",
+        "crowbar",
+        "work_jacket",
+        "field_webbing",
+        "marksman_rifle",
+        "fire_axe",
+        "padded_vest",
+        "first_aid_rig",
+        "patrol_rifle",
+        "forged_machete",
+        "scavenged_ballistic_vest",
+        "rangefinder",
+        "longwatch_rifle",
+        "breach_hammer",
+        "riot_armor",
+        "survival_harness",
+        "checkpoint_rifle",
+        "tempered_saber",
+        "fortress_armor",
+        "veteran_kit",
+        "worn_service_pistol",
+        "compact_service_pistol",
+        "compact_smg",
+        "pump_shotgun",
+        "patrol_rifle_tier1",
+        "scout_marksman_rifle",
+        "belt_fed_machine_gun",
+        "heavy_revolver",
+        "double_barrel_shotgun",
+        "field_hatchet",
+        "pipe_wrench",
+        "canvas_coat",
+        "leather_jacket",
+        "ammo_pouch",
+        "signal_radio",
+        "duty_pistol",
+        "patrol_smg",
+        "riot_shotgun",
+        "designated_marksman_rifle",
+        "squad_machine_gun",
+        "reinforced_axe",
+        "sledgehammer",
+        "kevlar_jacket",
+        "plated_vest",
+        "medic_satchel",
+        "scout_satchel",
+        "match_pistol",
+        "suppressed_smg",
+        "combat_shotgun",
+        "precision_marksman_rifle",
+        "general_purpose_machine_gun",
+        "war_machete",
+        "breaching_axe",
+        "tactical_vest",
+        "ceramic_plate_carrier",
+        "trauma_kit",
+        "command_radio",
+        "custom_pistol",
+        "elite_smg",
+        "auto_shotgun",
+        "longshot_marksman_rifle",
+        "heavy_machine_gun",
+        "officer_saber",
+        "demolition_hammer",
+        "bastion_armor",
+        "reactive_vest",
+        "quartermaster_rig",
+        "expedition_satchel",
+    ];
+    fn catalogue_order(data: &Content) -> Result<(), String> {
+        let ids: Vec<&str> = data.items.iter().map(|item| item.id.as_str()).collect();
+        if ids != CATALOGUE_IDS {
+            return Err(format!("catalogue ids moved: {ids:?}"));
+        }
+        for (index, item) in data.items.iter().enumerate() {
+            if item.loot_only != (index >= 29) {
+                return Err(format!("{} loot_only {}", item.id, item.loot_only));
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn appended_ids_keep_v1_order() {
+        // Ids never change and content is append-only (ISO-3): the v1 prefix
+        // keeps its order and exactly the appended items are loot-only.
+        assert_eq!(catalogue_order(content()), Ok(()));
+        // Mutation proof: swapping two appended ids, or dropping the
+        // loot-only flag from one appended item, fails the pin.
+        let mut swapped = content().clone();
+        swapped.items.swap(35, 36);
+        assert!(catalogue_order(&swapped).is_err());
+        let mut flagged = content().clone();
+        flagged.items[29].loot_only = false;
+        assert!(catalogue_order(&flagged).is_err());
+    }
+    #[test]
+    fn every_tier_1_to_4_has_one_ranged_per_class_and_three_per_other_slot() {
+        // The drop pool (index 4 on, never NPC issue) of every tier offers
+        // each weapon class and at least three items of every other slot.
+        let droppable = |tier: usize| {
+            content()
+                .items
+                .iter()
+                .skip(4)
+                .filter(move |item| !item.npc_only && item.tier == tier)
+        };
+        for tier in 1..=4 {
+            for class in crate::weapons::WeaponClass::ALL {
+                assert!(
+                    droppable(tier).any(|item| item.slot == Slot::Ranged
+                        && crate::weapons::WeaponSpec::from_item(item).class == class),
+                    "tier {tier} has no {class:?}"
+                );
+            }
+            for slot in [Slot::Melee, Slot::Outfit, Slot::Accessory] {
+                assert!(
+                    droppable(tier).filter(|item| item.slot == slot).count() >= 3,
+                    "tier {tier} has under three {slot:?} items"
+                );
+            }
+        }
+        // Droppable definitions per drop tier (today 12 / 16 / 20 / 24).
+        let pool =
+            |drop_tier: usize| -> usize { (1..=drop_tier).map(|t| droppable(t).count()).sum() };
+        assert_eq!([1, 2, 3, 4].map(pool), [18, 33, 48, 63]);
+        assert_eq!(content().max_drop_tier(), 4);
+    }
+    #[test]
+    fn loot_only_ranged_items_are_their_exemplar_at_the_tier_quality() {
+        use crate::quality::Quality;
+        // (index, exemplar, Personal damage, NPC dice, NPC adds, sell, buy):
+        // `quality::apply(exemplar, B_T)` with B_T Rare / Epic / Legendary
+        // for tiers 2 / 3 / 4; sell = round(exemplar sell x {36, 56, 80} / 23)
+        // and buy = round(exemplar buy x {120, 220, 340} / 70). The JSON
+        // holds what `apply` returns: Squad machine gun is 33, since 25 x
+        // 1.3 is 32.5 in f32 and rounds away from zero (the design table
+        // rounded it down to 32).
+        let rows: [(usize, usize, i32, u8, i32, u64, u64); 15] = [
+            (35, 21, 26, 2, 3, 17, 60),
+            (36, 22, 21, 3, 3, 28, 94),
+            (37, 23, 13, 5, 5, 31, 103),
+            (38, 25, 108, 7, 9, 44, 146),
+            (39, 26, 33, 5, 5, 49, 163),
+            (46, 21, 31, 2, 5, 27, 110),
+            (47, 22, 25, 3, 6, 44, 173),
+            (48, 23, 16, 5, 10, 49, 189),
+            (49, 25, 129, 7, 15, 68, 267),
+            (50, 26, 39, 5, 10, 75, 299),
+            (57, 21, 38, 2, 8, 38, 170),
+            (58, 22, 30, 3, 9, 63, 267),
+            (59, 23, 19, 5, 16, 70, 291),
+            (60, 25, 158, 7, 24, 97, 413),
+            (61, 26, 48, 5, 16, 108, 461),
+        ];
+        for (index, exemplar, damage, dice, adds, sell, buy) in rows {
+            let item = &content().items[index];
+            let (base, rarity, sell_ratio, buy_ratio) = match item.tier {
+                2 => (Quality::Rare, "Rare", 36.0, 120.0),
+                3 => (Quality::Epic, "Exceptional", 56.0, 220.0),
+                4 => (Quality::Legendary, "Masterwork", 80.0, 340.0),
+                tier => panic!("{} at tier {tier}", item.id),
+            };
+            let from = &content().items[exemplar];
+            let mut expected = crate::quality::apply(from.clone(), Some(base));
+            expected.id = item.id.clone();
+            expected.name = item.name.clone();
+            expected.tier = item.tier;
+            expected.rarity = rarity.into();
+            expected.base_quality = base;
+            expected.loot_only = true;
+            expected.sell_value = (from.sell_value as f64 * sell_ratio / 23.0).round() as u64;
+            expected.buy_value = (from.buy_value as f64 * buy_ratio / 70.0).round() as u64;
+            assert_eq!(item, &expected, "{}", item.id);
+            assert_eq!(
+                (
+                    item.personal.damage,
+                    item.npc.damage_dice,
+                    item.npc.damage_add,
+                    item.sell_value,
+                    item.buy_value
+                ),
+                (damage, dice, adds, sell, buy),
+                "{}",
+                item.id
+            );
+        }
+    }
+    #[test]
+    fn loot_only_non_ranged_items_are_sidegrades_of_their_slot_anchor() {
+        // Each copies its anchor (the lowest-index item of its slot and tier)
+        // in quality, rarity and price, and is Pareto non-dominated against
+        // it: better in one stat, worse in another.
+        let stats = |item: &ItemDefinition| {
+            let p = &item.personal;
+            let mut values = vec![
+                p.melee_damage as f32,
+                p.armor as f32,
+                p.health as f32,
+                p.stamina as f32,
+                p.weak_bonus,
+                item.npc.armor as f32,
+                item.npc.accuracy as f32,
+            ];
+            if item.slot == Slot::Melee {
+                values.push(crate::campaign::mean_basic_damage(crate::rules::Damage {
+                    dice: item.npc.damage_dice,
+                    adds: item.npc.damage_add,
+                    kind: item.npc.damage_kind,
+                }));
+            }
+            values
+        };
+        let mut count = 0;
+        for item in content()
+            .items
+            .iter()
+            .filter(|i| i.loot_only && i.slot != Slot::Ranged)
+        {
+            let anchor = content()
+                .items
+                .iter()
+                .skip(4)
+                .find(|a| a.slot == item.slot && a.tier == item.tier)
+                .unwrap();
+            assert!(!anchor.loot_only, "{}", item.id);
+            assert_eq!(
+                (
+                    item.base_quality,
+                    &item.rarity,
+                    item.sell_value,
+                    item.buy_value
+                ),
+                (
+                    anchor.base_quality,
+                    &anchor.rarity,
+                    anchor.sell_value,
+                    anchor.buy_value
+                ),
+                "{}",
+                item.id
+            );
+            let (mine, theirs) = (stats(item), stats(anchor));
+            let better = mine.iter().zip(&theirs).any(|(m, t)| m > t);
+            let worse = mine.iter().zip(&theirs).any(|(m, t)| m < t);
+            assert!(better && worse, "{} against {}", item.id, anchor.id);
+            assert!(!item.visual_style.is_empty(), "{}", item.id);
+            count += 1;
+        }
+        assert_eq!(count, 24);
     }
 }

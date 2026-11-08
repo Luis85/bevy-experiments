@@ -2154,11 +2154,14 @@ fn mode_owner_digest() -> u64 {
 
 /// Pin: the mode-owner deploy, tick and finish paths are byte-identical to
 /// the pre-takeover code (the digest was recorded on its parent commit).
+/// Re-recorded at W2-08 (content, class C): the 39 loot-only items join the
+/// drop pool of attempts deployed from v7 on, so the drops these runs bank
+/// change definition; the takeover code did not move.
 #[test]
 fn mode_owner_paths_are_byte_identical() {
     assert_eq!(mode_owner_digest(), MODE_OWNER_DIGEST);
 }
-const MODE_OWNER_DIGEST: u64 = 18_168_043_942_658_564_673;
+const MODE_OWNER_DIGEST: u64 = 15_363_764_850_570_338_604;
 
 /// Pin: Mara's `attempts` count moves exactly as the legacy
 /// `finish_attempt` moved it: one per finished Mara run of any outcome,

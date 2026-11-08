@@ -2,6 +2,11 @@
 
 use super::*;
 
+/// The catalogue prefix a pre-v7 attempt's drop pool reads: the 29 v1
+/// definitions. The loot-only items appended at 29-67 (W2-08) and any later
+/// appends only reach attempts deployed from v7 on (`drop_tier` Some).
+const LEGACY_DROP_DEFINITIONS: usize = 29;
+
 /// Hazard (blast and spit) damage `raw` after the survivor's
 /// `hazard_damage_multiplier`, applied before armor and Brace. Personal
 /// defenders only, like the class-perk and penetration folds: Mara and
@@ -329,13 +334,14 @@ impl Game {
             }
         }
     }
-    /// Today's drop pool (catalogue index 4 on, tiers 1 to the encounter
-    /// template's level + 1) and its uniform pick (exactly one `a.rng`
-    /// draw). None when the pool is empty, which draws nothing.
-    fn legacy_drop_definition(a: &mut Attempt) -> Option<usize> {
+    /// The uniform drop pick over the first `definitions` catalogue entries
+    /// (index 4 on, tiers 1 to the encounter template's level + 1): exactly
+    /// one `a.rng` draw. None when the pool is empty, which draws nothing.
+    fn uniform_drop_definition(a: &mut Attempt, definitions: usize) -> Option<usize> {
         let available: Vec<usize> = content()
             .items
             .iter()
+            .take(definitions)
             .enumerate()
             .filter(|(n, i)| *n >= 4 && i.tier > 0 && i.tier <= a.level + 1)
             .map(|(n, _)| n)
@@ -344,6 +350,12 @@ impl Game {
             return None;
         }
         Some(available[a.rng.below(available.len() as u64) as usize])
+    }
+    /// The pre-v7 drop pool: only the [`LEGACY_DROP_DEFINITIONS`] v1
+    /// definitions, so an attempt deployed before v7 never draws an appended
+    /// item and keeps its picks byte-identical (ruling E11).
+    fn legacy_drop_definition(a: &mut Attempt) -> Option<usize> {
+        Self::uniform_drop_definition(a, LEGACY_DROP_DEFINITIONS)
     }
     /// The legacy drop: [`Self::legacy_drop_definition`] and the absolute
     /// quality roll (keyed, no `a.rng`).
@@ -472,11 +484,15 @@ impl Game {
                     if let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
                         self.bank_drop(a, &e, definition, quality);
                     }
-                } else if let Some(definition) = Self::legacy_drop_definition(a) {
-                    // The Some path keeps today's pool and pick until the
-                    // weighted DropTable (W2-09) replaces them, and rolls its
-                    // quality relative to the item's base (decision 7). The
-                    // elite floor arrives with the elite drop split (W2-35).
+                } else if let Some(definition) =
+                    Self::uniform_drop_definition(a, content().items.len())
+                {
+                    // The Some path draws from the whole catalogue, the
+                    // loot-only items included (W2-08), with today's uniform
+                    // pick until the weighted DropTable (W2-09) replaces it,
+                    // and rolls its quality relative to the item's base
+                    // (decision 7). The elite floor arrives with the elite
+                    // drop split (W2-35).
                     let quality = crate::loot::drop_quality(
                         content().items[definition].base_quality,
                         self.seed,

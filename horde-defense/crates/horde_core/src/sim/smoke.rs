@@ -201,7 +201,7 @@ pub(crate) fn smoke_buy_gear(g: &mut Game, mode: Mode) -> Result<(), String> {
         .iter()
         .enumerate()
         .filter(|(definition, item)| {
-            item.tier > 0
+            item.purchasable()
                 && item.tier <= g.campaign.unlocked()
                 && g.campaign
                     .buy_price(*definition)

@@ -986,7 +986,7 @@ mod tests {
         for frontier in 1..=5 {
             for slot in Slot::ALL {
                 assert!(content().items.iter().any(|i| i.slot == slot
-                    && i.tier > 0
+                    && i.purchasable()
                     && i.tier <= frontier
                     && i.buy_value <= 350));
             }

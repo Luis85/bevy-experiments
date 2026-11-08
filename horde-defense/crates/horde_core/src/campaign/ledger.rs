@@ -35,6 +35,9 @@ impl Campaign {
         if def.tier == 0 {
             return Err("Protected starter equipment is already owned".into());
         }
+        if !def.purchasable() {
+            return Err(crate::content::LOOT_ONLY_REASON.into());
+        }
         if def.tier > self.unlocked() {
             return Err("Clear more stages to unlock this equipment tier".into());
         }
