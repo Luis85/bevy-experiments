@@ -168,7 +168,7 @@ pub fn smoke_prepare(g: &mut Game, mode: Mode) -> Result<(), String> {
     smoke_buy_gear(g, mode)?;
     if mode == Mode::Npc {
         while g.campaign.npc.unspent < 4
-            && g.campaign.coins >= 25
+            && g.campaign.coins >= g.campaign.npc_training_price()
             && g.campaign.npc.awarded < g.campaign.allowance()
         {
             g.campaign.buy_training_point()?;

@@ -88,8 +88,9 @@ connected island routes, malformed content rejection, and save round trips.
 `strategy_config` in the same JSON defines the progressive control expansion:
 recruitment after one liberated country, parallel deployments after two, grand
 strategy after four. Defaults permit four parallel battles, twelve roster
-members and three guards per country, with a 100-coin recruitment cost. Outbreak
-checks occur every 600 simulated seconds with a 35% configured chance and a
+members and three guards per country, with a 100-coin recruitment base cost
+that scales with the threat rank (see STRATEGY.md). Outbreak checks occur every
+600 simulated seconds with a 35% configured chance and a
 420-second response window. Guard suppression is configured at 30 percentage
 points per assigned guard; the strategy module resolves staffing and threats.
 All thresholds, timing, costs, limits and probabilities are editable data.

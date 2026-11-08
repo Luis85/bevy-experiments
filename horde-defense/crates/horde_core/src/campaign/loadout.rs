@@ -647,7 +647,7 @@ impl Campaign {
             );
         }
         if mode == Mode::Npc && self.npc.awarded < self.allowance() {
-            return make("Fund Mara's next training point".into(),"Training is immediate in camp. Four Guns points buy another skill level; earned objectives are claimed first.".into(),RecommendationAction::BuyTraining,25);
+            return make("Fund Mara's next training point".into(),"Training is immediate in camp. Four Guns points buy another skill level; earned objectives are claimed first.".into(),RecommendationAction::BuyTraining,self.npc_training_price());
         }
         let detail=self.world.active_country().map_or_else(||"Choose an unlocked country on the map.".to_owned(),|country|format!("{}: defense {} of {}. Earlier cleared defenses remain replayable; rewards are banked immediately.",country.name,self.world.next_stage()+1,country.level_count()));
         make(

@@ -282,7 +282,7 @@ impl StrategyState {
         let country = world()
             .country(country_id)
             .ok_or("Unknown recruitment country")?;
-        let price = world().strategy_config.recruit_cost;
+        let price = campaign.recruit_price();
         if campaign.coins < price {
             return Err(format!("Recruitment requires {price} coins"));
         }

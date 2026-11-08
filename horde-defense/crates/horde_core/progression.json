@@ -73,5 +73,12 @@
   "max_lanes": 17,
   "population_global_cap": 224,
   "threat_guard_rank": 10000,
-  "victory_player_xp": 120
+  "victory_player_xp": 120,
+  "rewards": {
+    "camp_prices": {
+      "npc_training_base": 25,
+      "per_rank": 0.1,
+      "max_multiplier": 6.0
+    }
+  }
 }

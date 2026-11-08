@@ -190,8 +190,18 @@ pub(super) fn survivor(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
     chrome::section(ui, "Training");
     ui.horizontal_wrapped(|ui| {
-        if ui.add_enabled(f.game.campaign().coins >= 25 && n.awarded < f.game.campaign().allowance(), egui::Button::new("Buy 1 training CP · 25 coins")).on_disabled_hover_text("Requires 25 coins and room in the campaign advancement allowance. Clear new stages to raise the allowance.").clicked() { f.dispatch(Command::BuyNpcPoint, "Training point awarded."); }
-        if ui.button("Change Mara's equipment").clicked() { f.campaign.mode = Mode::Npc; f.open_preparation(Tab::Armory); }
+        let buy = super::camp_prices::training_point(f.game.campaign(), &n);
+        if ui
+            .add_enabled(buy.enabled, egui::Button::new(buy.label))
+            .on_disabled_hover_text(buy.disabled_hover)
+            .clicked()
+        {
+            f.dispatch(Command::BuyNpcPoint, "Training point awarded.");
+        }
+        if ui.button("Change Mara's equipment").clicked() {
+            f.campaign.mode = Mode::Npc;
+            f.open_preparation(Tab::Armory);
+        }
     });
     muted(
         ui,

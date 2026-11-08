@@ -205,6 +205,7 @@ mod menu;
 use self::menu::menu;
 mod briefing;
 mod camp;
+mod camp_prices;
 mod chrome;
 mod navigation;
 use self::camp::camp;

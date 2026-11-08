@@ -766,13 +766,30 @@ impl Campaign {
         let allowance = self.allowance();
         self.npc.claim_objectives(allowance);
     }
+    /// Coins for one paid NPC training point (Mara or a recruit), scaled by
+    /// threat: `camp_price(camp_prices.npc_training_base, progression_rank)`,
+    /// 25 / 30 / 50 / 75 / 150 at rank 0 / 1 / 10 / 20 / 50+.
+    pub fn npc_training_price(&self) -> u64 {
+        let base = crate::progression::catalog()
+            .rewards
+            .camp_prices
+            .npc_training_base;
+        crate::progression::camp_price(base, self.progression_rank())
+    }
+    /// Coins to recruit one survivor, scaled by threat from the world's
+    /// `recruit_cost` base: 100 / 110 / 200 / 300 / 600 at rank 0 / 1 / 10 /
+    /// 20 / 50+.
+    pub fn recruit_price(&self) -> u64 {
+        let base = crate::world::world().strategy_config.recruit_cost;
+        crate::progression::camp_price(base, self.progression_rank())
+    }
     pub fn buy_training_point(&mut self) -> Result<(), String> {
         self.preparation()?;
         self.claim_objectives();
         if self.npc.awarded >= self.allowance() {
             return Err("Advancement allowance reached; clear a new stage".into());
         }
-        self.spend(25)?;
+        self.spend(self.npc_training_price())?;
         self.award_npc_points(1);
         Ok(())
     }

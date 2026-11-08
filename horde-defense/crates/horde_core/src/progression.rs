@@ -519,11 +519,21 @@ mod tests {
 
     #[test]
     fn progression_rewards_reject_unsorted_milestones() {
-        // The shipped catalogue has no rewards block: every reward is neutral
-        // and nothing new is written back.
-        assert_eq!(catalog().rewards, ProgressionRewardCatalog::default());
-        let shipped = serde_json::to_string(catalog()).unwrap();
-        assert!(!shipped.contains("rewards"), "skipped at default");
+        // The shipped rewards block authors only the camp prices (W2-18): no
+        // level grant and no milestones yet.
+        assert_eq!(
+            catalog().rewards,
+            ProgressionRewardCatalog {
+                camp_prices: authored().camp_prices,
+                ..ProgressionRewardCatalog::default()
+            }
+        );
+        let neutral = ProgressionCatalog {
+            rewards: ProgressionRewardCatalog::default(),
+            ..catalog().clone()
+        };
+        let neutral = serde_json::to_string(&neutral).unwrap();
+        assert!(!neutral.contains("rewards"), "skipped at default");
         // The authored block validates and round-trips.
         let catalog = with_rewards(authored());
         catalog.validate().unwrap();
@@ -584,15 +594,35 @@ mod tests {
     }
 
     #[test]
-    fn level_grant_and_camp_price_read_neutral_values_today() {
-        // Shipped (neutral) values: no grant, flat legacy prices.
+    fn level_grant_is_neutral_and_camp_price_ships_the_design_table() {
+        // Shipped values: no grant yet; camp prices follow the design table
+        // (W2-18).
         for level in [0, 1, 2, 6, 12, 50] {
             assert_eq!(level_grant(level), 0, "level {level}");
         }
+        let shipped =
+            [0, 1, 10, 20, 50, 1000].map(|rank| [camp_price(25, rank), camp_price(100, rank)]);
+        assert_eq!(
+            shipped,
+            [
+                [25, 100],
+                [30, 110],
+                [50, 200],
+                [75, 300],
+                [150, 600],
+                [150, 600]
+            ]
+        );
+        // The neutral block keeps every price flat and exact.
+        let neutral = ProgressionRewardCatalog::default();
         for rank in [0, 1, 10, 20, 50, 1000] {
-            assert_eq!(camp_price(25, rank), 25, "rank {rank}");
-            assert_eq!(camp_price(100, rank), 100, "rank {rank}");
-            assert_eq!(camp_price(27, rank), 27, "rank {rank}: neutral is exact");
+            assert_eq!(neutral.camp_price(25, rank), 25, "rank {rank}");
+            assert_eq!(neutral.camp_price(100, rank), 100, "rank {rank}");
+            assert_eq!(
+                neutral.camp_price(27, rank),
+                27,
+                "rank {rank}: neutral is exact"
+            );
         }
         // The authored values give the design tables.
         let rewards = authored();

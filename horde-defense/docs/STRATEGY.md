@@ -4,7 +4,7 @@
 
 ## Configuration and identity
 
-`world.json` contains `strategy_config`: recruitment after 1 liberated country, parallel operations after 2, grand strategy after 4, up to 4 parallel deployments, 12 recruits, and 3 guards per country. A recruit costs 100 shared coins. These defaults are intentionally configurable rather than hard-coded progression gates in the UI.
+`world.json` contains `strategy_config`: recruitment after 1 liberated country, parallel operations after 2, grand strategy after 4, up to 4 parallel deployments, 12 recruits, and 3 guards per country. A recruit costs `Campaign::recruit_price()` shared coins: the `recruit_cost` base of 100 scaled by the threat rank (100 / 110 / 200 / 300 / 600 at rank 0 / 1 / 10 / 20 / 50 and above, see PROGRESSION.md). These defaults are intentionally configurable rather than hard-coded progression gates in the UI.
 
 Recruitment requires a currently liberated country and records that country as the survivor's origin. Each recruit has a persistent ID and name, a full independent `Npc` record, character-point awards/investments, loadout references, objectives, tactical policy and deployment history. Recruitment grants a genuinely new protected starter set with four new globally unique armory IDs. It never creates a second reference to an already deployed rifle as a substitute for ownership.
 
