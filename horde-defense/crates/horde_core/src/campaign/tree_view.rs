@@ -577,11 +577,22 @@ impl Campaign {
         deltas
     }
 
+    /// Whether the survivor owns a non-npc_only Ranged item of `class`.
+    /// Mara's starter guns are not the survivor's.
+    fn survivor_owns_gun_of(&self, class: crate::weapons::WeaponClass) -> bool {
+        self.items.iter().any(|item| {
+            item.definition().slot == crate::content::Slot::Ranged
+                && !item.definition().npc_only
+                && !self.npc.loadout.contains(&item.id)
+                && crate::weapons::WeaponSpec::from_item(item.definition()).class == class
+        })
+    }
+
     /// How much `node` would do for `mode` right now: 2 when an effect acts
     /// at once, 1 for an incremental body rank (or a marginal ordnance
-    /// cooldown), 0 when nothing can act yet (a weapon class without its
-    /// gun, construction or structure upgrades without a blueprint, a
-    /// personal effect for Mara).
+    /// cooldown), 0 when nothing can act yet (a weapon class or class perk
+    /// without its gun, construction or structure upgrades without a
+    /// blueprint, a personal effect for Mara).
     fn node_value(&self, node: &SkillNode, mode: Mode) -> u8 {
         let personal = mode == Mode::Personal;
         let any_blueprint = self.blueprints.iter().any(|owned| *owned);
@@ -620,16 +631,12 @@ impl Campaign {
                         0
                     }
                 }
-                SkillEffect::WeaponTraining(class) => {
-                    // Mara's starter guns are not the survivor's.
-                    let owned = self.items.iter().any(|item| {
-                        item.definition().slot == crate::content::Slot::Ranged
-                            && !item.definition().npc_only
-                            && !self.npc.loadout.contains(&item.id)
-                            && crate::weapons::WeaponSpec::from_item(item.definition()).class
-                                == *class
-                    });
-                    if personal && owned { 2 } else { 0 }
+                SkillEffect::WeaponTraining(class) | SkillEffect::ClassModifier { class, .. } => {
+                    if personal && self.survivor_owns_gun_of(*class) {
+                        2
+                    } else {
+                        0
+                    }
                 }
                 _ => {
                     if personal {
@@ -1522,6 +1529,59 @@ mod tests {
             !c.node_helps_now("body_vitality_1", Mode::Personal),
             "a rank, not a step"
         );
+    }
+
+    /// Design progression-tree §5 "Recommender": a class perk acts now only
+    /// with an owned, non-npc_only Ranged item of its class that is not one
+    /// of Mara's guns, and never for Mara. No shipped node authors a perk
+    /// yet (W2-41), so the node is injected.
+    #[test]
+    fn class_modifier_node_acts_now_only_with_owned_class_weapon() {
+        use crate::weapons::{WeaponClass, WeaponSpec};
+        let perk_node = |class| SkillNode {
+            effects: vec![SkillEffect::ClassModifier {
+                class,
+                stat: ClassStat::Damage,
+                value: 1.2,
+            }],
+            ..skills().node("steady_hands").unwrap().clone()
+        };
+        let mut c = started();
+        let class_of =
+            |c: &Campaign, id: u64| WeaponSpec::from_item(c.item(id).unwrap().definition()).class;
+        let survivor_gun = class_of(&c, c.player.loadout[crate::content::Slot::Ranged.index()]);
+        let mara_gun = class_of(&c, c.npc.loadout[crate::content::Slot::Ranged.index()]);
+        assert_eq!(c.node_value(&perk_node(survivor_gun), Mode::Personal), 2);
+        assert_eq!(
+            c.node_value(&perk_node(survivor_gun), Mode::Npc),
+            0,
+            "personal-only perk"
+        );
+        assert_ne!(mara_gun, survivor_gun, "the fixture separates the two guns");
+        assert_eq!(
+            c.node_value(&perk_node(mara_gun), Mode::Personal),
+            0,
+            "Mara's starter gun is not the survivor's"
+        );
+        assert_eq!(
+            c.node_value(&perk_node(WeaponClass::Rifle), Mode::Personal),
+            0
+        );
+        let rifle = crate::content::content()
+            .items
+            .iter()
+            .position(|i| {
+                i.slot == crate::content::Slot::Ranged
+                    && !i.npc_only
+                    && WeaponSpec::from_item(i).class == WeaponClass::Rifle
+            })
+            .unwrap();
+        c.add_item(rifle).unwrap();
+        assert_eq!(
+            c.node_value(&perk_node(WeaponClass::Rifle), Mode::Personal),
+            2
+        );
+        assert_eq!(c.node_value(&perk_node(WeaponClass::Rifle), Mode::Npc), 0);
     }
 
     #[test]

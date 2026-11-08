@@ -90,7 +90,9 @@ The Personal profile folds the equipped weapon's class perk after the generic
 modifiers: damage × multiplier (rounded, 1–100,000), reload × multiplier (at
 least 0.65 s), shot interval × multiplier (at least 0.08 s) and weak-spot bonus
 + addition (at most 1). A perk on another class, or any perk in NPC mode, leaves
-the profile untouched. `ArmorPenetration` (1–20) adds enemy armor ignored by
+the profile untouched, and the recommender counts a perk as acting now only
+while the survivor owns a non-NPC gun of its class (Mara's guns do not count).
+`ArmorPenetration` (1–20) adds enemy armor ignored by
 personal shots: the shot meets `max(0, armor − penetration)`, while melee,
 ordnance and turrets meet full armor. `HazardDamageMultiplier` (0.5–1) scales
 hazard damage taken: `round(raw × multiplier)`, and `raw` unchanged at 1.0. The
