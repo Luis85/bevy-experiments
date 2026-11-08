@@ -368,9 +368,10 @@ fn country_modifiers_and_replayed_clears_preserve_local_progress() {
     let a = g.attempt().unwrap();
     assert_eq!(a.country_id.as_deref(), Some(id.as_str()));
     let country = horde_core::world::world().country(&id).unwrap();
+    // The start clamp: the start country deploys at its effective difficulty.
     assert_eq!(
         a.modifiers.enemy_health,
-        country.modifiers.enemy_health * country.difficulty
+        country.modifiers.enemy_health * country.effective_difficulty(&g.campaign().world)
     );
     g.set_paused(false);
     enemy(&mut g, 5, 25.0, true);

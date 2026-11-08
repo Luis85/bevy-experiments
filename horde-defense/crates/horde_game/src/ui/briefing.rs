@@ -100,7 +100,10 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
     ));
     ui.label(format!(
         "{} build supply · {:.2}× regional difficulty",
-        forecast.supply, country.difficulty
+        forecast.supply,
+        f.game
+            .effective_country_difficulty(&country.id)
+            .unwrap_or(country.difficulty)
     ));
     ui.label(format!(
         "Threat rank {} · arrival groups {} · population cap {} (+ boss) · new gear Lv {}",

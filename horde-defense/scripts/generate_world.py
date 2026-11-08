@@ -57,9 +57,38 @@ def render(world):
     return (json.dumps(world, indent=2, ensure_ascii=False) + '\n').encode('utf-8')
 
 
-def difficulty(code):
-    # A stable authored regional variation unrelated to economic or social rank.
-    return round(0.94 + (sum(code.encode()) % 15) / 100, 2)
+FNV_OFFSET = 0xcbf29ce484222325
+FNV_PRIME = 0x100000001b3
+# Difficulty bands in hundredths by stage count (design-enemy-balance section 8,
+# ruling W-10): up to 3 stages, 4 to 9, and 10 or more.
+BANDS = ((3, 85, 115), (9, 100, 135), (None, 120, 160))
+
+
+def fnv1a64(text):
+    """FNV-1a 64 of the UTF-8 bytes of `text` (horde_core::hash::fnv1a)."""
+    value = FNV_OFFSET
+    for byte in text.encode('utf-8'):
+        value = ((value ^ byte) * FNV_PRIME) & 0xffffffffffffffff
+    return value
+
+
+def band(stages):
+    """The (lo, hi) difficulty band, in hundredths, for a country with `stages` stages."""
+    for most, lo, hi in BANDS:
+        if most is None or stages <= most:
+            return lo, hi
+
+
+def difficulty(country, world):
+    """An authored game value from the country's size alone, never from national traits.
+
+    The band follows the stage count, which population already sets; within the
+    band a stable hash of the id picks the value, in whole hundredths:
+    (lo + fnv1a64('difficulty:' + id) % (hi - lo + 1)) / 100. The game clamps the
+    campaign's start country to [0.95, 1.05] (Country::effective_difficulty).
+    """
+    lo, hi = band(stage_count(country, world))
+    return (lo + fnv1a64('difficulty:' + country['id']) % (hi - lo + 1)) / 100
 
 
 def stage_count(country, world):
@@ -77,7 +106,7 @@ def from_existing(world):
     """The committed catalogue with only `difficulty` recomputed."""
     out = copy.deepcopy(world)
     for country in out['countries']:
-        country['difficulty'] = difficulty(country['id'])
+        country['difficulty'] = difficulty(country, out)
     return out
 
 
@@ -167,7 +196,7 @@ def build_countries(raws):
         if mods['reward']>1:boosts.append(f"Salvage value +{round((mods['reward']-1)*100)}%")
         # A distinct label and original local operation name for every region; avoid
         # suggesting these game conditions describe actual national characteristics.
-        countries.append(dict(id=code,name=p.get('NAME_LONG') or p['ADMIN'],population=max(0,round(p['POP_EST'])),population_year=p['POP_YEAR'],polygons=[[[round(x,4),round(y,4)] for x,y in ring] for ring in rings(coarse.get(code,f))],center=[round(lon,4),round(lat,4)],neighbors=sorted(neighbor[code]),sea_neighbors=sorted(seas[code]),biome=biome,culture=f"{p['SUBREGION']} / {words[biome]}",region=p['SUBREGION'],kind=p['TYPE'],difficulty=difficulty(code),modifiers=mods,boosts=boosts,buffs=buffs,debuffs=debuffs,level_override=None))
+        countries.append(dict(id=code,name=p.get('NAME_LONG') or p['ADMIN'],population=max(0,round(p['POP_EST'])),population_year=p['POP_YEAR'],polygons=[[[round(x,4),round(y,4)] for x,y in ring] for ring in rings(coarse.get(code,f))],center=[round(lon,4),round(lat,4)],neighbors=sorted(neighbor[code]),sea_neighbors=sorted(seas[code]),biome=biome,culture=f"{p['SUBREGION']} / {words[biome]}",region=p['SUBREGION'],kind=p['TYPE'],difficulty=None,modifiers=mods,boosts=boosts,buffs=buffs,debuffs=debuffs,level_override=None))
     links = sum(len(v) for v in neighbor.values())//2
     routes = sum(len(v) for v in seas.values())//2
     return countries, links, routes
@@ -188,6 +217,8 @@ def rebuild(world, raws, allow_source_drift=False, allow_stage_count_change=Fals
     out = copy.deepcopy(world)
     out['sources'] = sources
     out['countries'] = countries
+    for country in countries:
+        country['difficulty'] = difficulty(country, out)
     before = {country['id']: stage_count(country, world) for country in world.get('countries', [])}
     after = {country['id']: stage_count(country, out) for country in countries}
     changed = [f"{code} {before.get(code, 'absent')} -> {after.get(code, 'absent')}"
@@ -282,7 +313,22 @@ def self_test():
     got = render({'a': [1, {'b': 'é'}], 'c': 1.0})
     case('writer emits indent-2 UTF-8 with one trailing newline', got == expected, repr(got[:60]))
 
+    case('fnv1a64 matches the FNV-1a 64 test vectors', fnv1a64('') == 0xcbf29ce484222325
+         and fnv1a64('a') == 0xaf63dc4c8601ec8c and fnv1a64('foobar') == 0x85944171f73967e8)
+    bands = {stages: band(stages) for stages in (1, 3, 4, 9, 10, 24)}
+    case('the bands are 85-115 to 3 stages, 100-135 to 9, 120-160 from 10',
+         bands == {1: (85, 115), 3: (85, 115), 4: (100, 135), 9: (100, 135), 10: (120, 160), 24: (120, 160)}, bands)
+
     committed = WORLD.read_bytes()
+    committed_world = json.loads(committed.decode('utf-8'))
+    examples = {country['id']: country['difficulty'] for country in committed_world['countries']
+                if country['id'] in ('LUX', 'DEU', 'BEL', 'USA', 'CHN', 'AUT', 'BGD')}
+    case('the committed difficulties are the design examples',
+         examples == {'LUX': 0.92, 'DEU': 1.04, 'BEL': 0.97, 'USA': 1.27, 'CHN': 1.52, 'AUT': 0.85, 'BGD': 1.6}, examples)
+    outside = [country['id'] for country in committed_world['countries']
+               if not band(stage_count(country, committed_world))[0] <= round(country['difficulty'] * 100)
+               <= band(stage_count(country, committed_world))[1]]
+    case('every committed difficulty lies in its stage-count band', not outside, outside)
     case('the committed world.json is in the writer form', render(json.loads(committed.decode('utf-8'))) == committed,
          'render(load(world.json)) differs from its bytes')
 
@@ -346,6 +392,11 @@ def self_test():
         stages = {country['id']: stage_count(country, rebuilt) for country in rebuilt['countries']}
         case('--rebuild builds the synthetic countries', ids == ['FRA', 'DEU', 'ISL'] and stages == {'FRA': 7, 'DEU': 9, 'ISL': 3}
              and rebuilt['countries'][2]['sea_neighbors'] != [], f'{ids} {stages}')
+        values = {country['id']: country['difficulty'] for country in rebuilt['countries']}
+        case('--rebuild sets each difficulty from its stage-count band',
+             values == {country['id']: difficulty(country, rebuilt) for country in rebuilt['countries']}
+             and all(band(stages[code])[0] <= round(value * 100) <= band(stages[code])[1] for code, value in values.items()),
+             values)
 
         rebuilt['countries'][1]['level_override'] = 5
         world.write_bytes(render(rebuilt))

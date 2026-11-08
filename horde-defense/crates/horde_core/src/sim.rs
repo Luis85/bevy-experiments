@@ -1456,6 +1456,15 @@ impl Game {
     pub fn take_settlement_issues(&mut self) -> Vec<SettlementIssue> {
         std::mem::take(&mut self.settlement_issues)
     }
+    /// The difficulty country `id` is deployed at in this campaign: the
+    /// start clamp for the start country, else the raw value
+    /// (`Country::effective_difficulty`). `None` outside the catalogue.
+    /// Pure: no mutation, no RNG.
+    pub fn effective_country_difficulty(&self, id: &str) -> Option<f32> {
+        crate::world::world()
+            .country(id)
+            .map(|c| c.effective_difficulty(&self.campaign.world))
+    }
     /// The single public sale-eligibility read (LE-1): what selling `id` pays
     /// now, or the first guard that blocks it. Pure: no mutation, no RNG.
     pub fn sale_eligibility(&self, id: u64) -> Result<SaleQuote, SaleBlock> {

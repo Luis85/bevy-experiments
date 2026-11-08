@@ -47,9 +47,24 @@ real-world prosperity, conflict, safety, or assessments of national populations.
 
 Modifiers have concrete gameplay fields: enemy health, enemy speed, reward
 multiplier, additive build supply, personal weapon damage and NPC attack skill.
-The starting country does not change these values. Entry difficulty therefore
-remains visible before committing. Encounter templates provide the five
-battlefield roles; a country can contain more local stages than templates.
+The starting country does not change these values. Encounter templates provide
+the five battlefield roles; a country can contain more local stages than
+templates.
+
+Country difficulty spans 0.85-1.60 in whole hundredths. The band follows the
+country's size alone, through the stage count that population already sets,
+never national traits: up to 3 stages 0.85-1.15, 4-9 stages 1.00-1.35, and 10
+or more 1.20-1.60. Within its band a stable hash picks the value,
+`(lo + fnv1a64("difficulty:" + id) % (hi - lo + 1)) / 100`, so Luxembourg is
+0.92, Germany 1.04, Austria 0.85 and Bangladesh 1.60 (242 countries, 50
+distinct values, mean 1.049). A deployment multiplies enemy health and reward
+by the difficulty and enemy speed by its square root. The campaign's start
+country plays clamped to 0.95-1.05 (`Country::effective_difficulty`, shown by
+`Game::effective_country_difficulty` on the map and the briefing), so no first
+defense opens far easier or harder than the rest; before a start is chosen
+every country shows its clamped value. Every other country plays its raw value,
+and the front order, the recommended start and pacing read the raw value too.
+The clamp is derived, never saved.
 
 ## Unlock and clear contract
 

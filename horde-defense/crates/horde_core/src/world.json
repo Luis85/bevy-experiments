@@ -329,7 +329,7 @@
       "culture": "Southern Asia / mountain service passes",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.1,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -586,7 +586,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Country",
-      "difficulty": 1.05,
+      "difficulty": 1.06,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -728,7 +728,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -1099,7 +1099,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Dependency",
-      "difficulty": 0.94,
+      "difficulty": 0.88,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -1217,7 +1217,7 @@
       "culture": "Southern Europe / mountain service passes",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -1565,7 +1565,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -1632,7 +1632,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 1.02,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -4333,7 +4333,7 @@
       "culture": "Antarctica / winter timber depots",
       "region": "Antarctica",
       "kind": "Indeterminate",
-      "difficulty": 0.98,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -4468,7 +4468,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.12,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -4999,7 +4999,7 @@
       "culture": "South America / reclaimed rail yards",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -5119,7 +5119,7 @@
       "culture": "Western Asia / mountain service passes",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.1,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -5204,7 +5204,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Country",
-      "difficulty": 1.02,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -5267,7 +5267,7 @@
       "culture": "Australia and New Zealand / overgrown market roads",
       "region": "Australia and New Zealand",
       "kind": "Dependency",
-      "difficulty": 1.0,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -6278,7 +6278,7 @@
       "culture": "Australia and New Zealand / sun-bleached service roads",
       "region": "Australia and New Zealand",
       "kind": "Country",
-      "difficulty": 1.02,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -6475,7 +6475,7 @@
       "culture": "Western Europe / mountain service passes",
       "region": "Western Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.85,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -6700,7 +6700,7 @@
       "culture": "Western Asia / reclaimed rail yards",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -6791,7 +6791,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -6978,7 +6978,7 @@
       "culture": "Southern Asia / reclaimed rail yards",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.6,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -7053,7 +7053,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -7278,7 +7278,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -7386,7 +7386,7 @@
       "culture": "Western Europe / reclaimed rail yards",
       "region": "Western Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 0.97,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -7504,7 +7504,7 @@
       "culture": "Central America / overgrown market roads",
       "region": "Central America",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 1.06,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -7648,7 +7648,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 0.93,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -7725,7 +7725,7 @@
       "culture": "Northern America / reclaimed rail yards",
       "region": "Northern America",
       "kind": "Dependency",
-      "difficulty": 0.97,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -7815,7 +7815,7 @@
       "culture": "Southern Asia / mountain service passes",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 1.12,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -8102,7 +8102,7 @@
       "culture": "South America / mountain service passes",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -8239,7 +8239,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 0.86,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -8438,7 +8438,7 @@
       "culture": "Southern Africa / sun-bleached service roads",
       "region": "Southern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -9301,7 +9301,7 @@
       "culture": "South America / overgrown market roads",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 1.22,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -9412,7 +9412,7 @@
       "culture": "Seven seas (open ocean) / overgrown market roads",
       "region": "Seven seas (open ocean)",
       "kind": "Disputed",
-      "difficulty": 1.05,
+      "difficulty": 0.93,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -9553,7 +9553,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 1.07,
+      "difficulty": 1.12,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -9626,7 +9626,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -9783,7 +9783,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.07,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -9981,7 +9981,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -10076,7 +10076,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -10481,7 +10481,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -10592,7 +10592,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -10882,7 +10882,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -14157,7 +14157,7 @@
       "culture": "Northern America / winter timber depots",
       "region": "Northern America",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 1.12,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -14350,7 +14350,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 1.02,
+      "difficulty": 0.98,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -14644,7 +14644,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 1.06,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -14922,7 +14922,7 @@
       "culture": "Middle Africa / sun-bleached service roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.92,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -15427,7 +15427,7 @@
       "culture": "South America / reclaimed rail yards",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 0.97,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -16445,7 +16445,7 @@
       "culture": "Eastern Asia / reclaimed rail yards",
       "region": "Eastern Asia",
       "kind": "Country",
-      "difficulty": 1.01,
+      "difficulty": 1.52,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -16886,7 +16886,7 @@
       "culture": "South America / overgrown market roads",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -17073,7 +17073,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.07,
+      "difficulty": 0.94,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -17162,7 +17162,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Dependency",
-      "difficulty": 1.05,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -17348,7 +17348,7 @@
       "culture": "Central America / overgrown market roads",
       "region": "Central America",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 0.98,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -17565,7 +17565,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -17776,7 +17776,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereignty",
-      "difficulty": 1.02,
+      "difficulty": 0.95,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -17861,7 +17861,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Country",
-      "difficulty": 1.08,
+      "difficulty": 0.88,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -17965,7 +17965,7 @@
       "culture": "Western Asia / reclaimed rail yards",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -18145,7 +18145,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 0.99,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -18686,7 +18686,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 1.16,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -18825,7 +18825,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Country",
-      "difficulty": 1.05,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -18930,7 +18930,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -19015,7 +19015,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 0.89,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -19163,7 +19163,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.07,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -19251,7 +19251,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 0.87,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -19425,7 +19425,7 @@
       "culture": "South America / overgrown market roads",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.07,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -19645,7 +19645,7 @@
       "culture": "Northern Africa / sun-bleached service roads",
       "region": "Northern Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 1.59,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -19768,7 +19768,7 @@
       "culture": "Central America / overgrown market roads",
       "region": "Central America",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -19841,7 +19841,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.05,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -19996,7 +19996,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -20114,7 +20114,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.12,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -20399,7 +20399,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 1.31,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -20484,7 +20484,7 @@
       "culture": "South America / reclaimed rail yards",
       "region": "South America",
       "kind": "Disputed",
-      "difficulty": 1.05,
+      "difficulty": 0.94,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -20783,7 +20783,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Dependency",
-      "difficulty": 1.0,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -21032,7 +21032,7 @@
       "culture": "Micronesia / overgrown market roads",
       "region": "Micronesia",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 0.94,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -21171,7 +21171,7 @@
       "culture": "Melanesia / overgrown market roads",
       "region": "Melanesia",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -21377,7 +21377,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Country",
-      "difficulty": 1.05,
+      "difficulty": 1.15,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -21734,7 +21734,7 @@
       "culture": "Western Europe / reclaimed rail yards",
       "region": "Western Europe",
       "kind": "Country",
-      "difficulty": 1.01,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -22555,7 +22555,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Dependency",
-      "difficulty": 1.08,
+      "difficulty": 1.15,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -22636,7 +22636,7 @@
       "culture": "Seven seas (open ocean) / reclaimed rail yards",
       "region": "Seven seas (open ocean)",
       "kind": "Dependency",
-      "difficulty": 1.03,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -22799,7 +22799,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 0.86,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -22907,7 +22907,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -23047,7 +23047,7 @@
       "culture": "Western Asia / mountain service passes",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.0,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -23330,7 +23330,7 @@
       "culture": "Western Europe / reclaimed rail yards",
       "region": "Western Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -23469,7 +23469,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.07,
+      "difficulty": 1.16,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -23734,7 +23734,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -24301,7 +24301,7 @@
       "culture": "Northern America / winter timber depots",
       "region": "Northern America",
       "kind": "Country",
-      "difficulty": 0.98,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -24384,7 +24384,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 0.86,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -24477,7 +24477,7 @@
       "culture": "Micronesia / overgrown market roads",
       "region": "Micronesia",
       "kind": "Dependency",
-      "difficulty": 1.02,
+      "difficulty": 0.87,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -24732,7 +24732,7 @@
       "culture": "Northern Europe / reclaimed rail yards",
       "region": "Northern Europe",
       "kind": "Country",
-      "difficulty": 1.0,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -25054,7 +25054,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -25172,7 +25172,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -25375,7 +25375,7 @@
       "culture": "South America / overgrown market roads",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -25505,7 +25505,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 1.05,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -25610,7 +25610,7 @@
       "culture": "Seven seas (open ocean) / reclaimed rail yards",
       "region": "Seven seas (open ocean)",
       "kind": "Dependency",
-      "difficulty": 1.01,
+      "difficulty": 0.89,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -25877,7 +25877,7 @@
       "culture": "Central America / overgrown market roads",
       "region": "Central America",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -26078,7 +26078,7 @@
       "culture": "Eastern Asia / overgrown market roads",
       "region": "Eastern Asia",
       "kind": "Country",
-      "difficulty": 1.02,
+      "difficulty": 1.12,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -26253,7 +26253,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 0.94,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -26376,7 +26376,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 0.95,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -26972,7 +26972,7 @@
       "culture": "Southern Asia / overgrown market roads",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.3,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -27159,7 +27159,7 @@
       "culture": "Seven seas (open ocean) / overgrown market roads",
       "region": "Seven seas (open ocean)",
       "kind": "Dependency",
-      "difficulty": 1.01,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -28232,7 +28232,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.37,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -28583,7 +28583,7 @@
       "culture": "Southern Asia / reclaimed rail yards",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.05,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -28745,7 +28745,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.32,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -28841,7 +28841,7 @@
       "culture": "Northern Europe / reclaimed rail yards",
       "region": "Northern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -28940,7 +28940,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Country",
-      "difficulty": 0.97,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -29091,7 +29091,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Disputed",
-      "difficulty": 1.07,
+      "difficulty": 0.97,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -29493,7 +29493,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -29718,7 +29718,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 1.0,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -29807,7 +29807,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -30114,7 +30114,7 @@
       "culture": "Eastern Asia / reclaimed rail yards",
       "region": "Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 1.54,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -30191,7 +30191,7 @@
       "culture": "Northern Europe / reclaimed rail yards",
       "region": "Northern Europe",
       "kind": "Country",
-      "difficulty": 1.01,
+      "difficulty": 1.15,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -30308,7 +30308,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -30802,7 +30802,7 @@
       "culture": "Central Asia / sun-bleached service roads",
       "region": "Central Asia",
       "kind": "Sovereignty",
-      "difficulty": 0.99,
+      "difficulty": 1.05,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -30996,7 +30996,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.16,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -31923,7 +31923,7 @@
       "culture": "Micronesia / overgrown market roads",
       "region": "Micronesia",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -32051,7 +32051,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Disputed",
-      "difficulty": 1.05,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -32125,7 +32125,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -32310,7 +32310,7 @@
       "culture": "Central Asia / mountain service passes",
       "region": "Central Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -32505,7 +32505,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 0.86,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -32637,7 +32637,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.96,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -32725,7 +32725,7 @@
       "culture": "Western Asia / reclaimed rail yards",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -32812,7 +32812,7 @@
       "culture": "Southern Africa / mountain service passes",
       "region": "Southern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.07,
+      "difficulty": 0.85,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -32965,7 +32965,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -33235,7 +33235,7 @@
       "culture": "Northern Africa / sun-bleached service roads",
       "region": "Northern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -33338,7 +33338,7 @@
       "culture": "Western Europe / mountain service passes",
       "region": "Western Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -33460,7 +33460,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -33533,7 +33533,7 @@
       "culture": "Western Europe / reclaimed rail yards",
       "region": "Western Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.92,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -33606,7 +33606,7 @@
       "culture": "Eastern Asia / overgrown market roads",
       "region": "Eastern Asia",
       "kind": "Country",
-      "difficulty": 1.08,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -33847,7 +33847,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.86,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -34299,7 +34299,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -34434,7 +34434,7 @@
       "culture": "Southern Asia / overgrown market roads",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.87,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -34785,7 +34785,7 @@
       "culture": "Western Africa / sun-bleached service roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 0.89,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -34895,7 +34895,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 0.98,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -35130,7 +35130,7 @@
       "culture": "Micronesia / overgrown market roads",
       "region": "Micronesia",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -35330,7 +35330,7 @@
       "culture": "Western Africa / sun-bleached service roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 0.89,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -35452,7 +35452,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 0.88,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -36175,7 +36175,7 @@
       "culture": "Central America / reclaimed rail yards",
       "region": "Central America",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.5,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -36321,7 +36321,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 0.98,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -36386,7 +36386,7 @@
       "culture": "Western Europe / reclaimed rail yards",
       "region": "Western Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.07,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -36724,7 +36724,7 @@
       "culture": "Eastern Asia / sun-bleached service roads",
       "region": "Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 1.07,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -36842,7 +36842,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -36913,7 +36913,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 0.96,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -37207,7 +37207,7 @@
       "culture": "Northern Africa / sun-bleached service roads",
       "region": "Northern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.22,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -37575,7 +37575,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 1.16,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -37900,7 +37900,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -38120,7 +38120,7 @@
       "culture": "Southern Africa / sun-bleached service roads",
       "region": "Southern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -38200,7 +38200,7 @@
       "culture": "Micronesia / overgrown market roads",
       "region": "Micronesia",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -38334,7 +38334,7 @@
       "culture": "Southern Asia / mountain service passes",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -38438,7 +38438,7 @@
       "culture": "Western Europe / reclaimed rail yards",
       "region": "Western Europe",
       "kind": "Country",
-      "difficulty": 1.06,
+      "difficulty": 1.12,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -38531,7 +38531,7 @@
       "culture": "Melanesia / overgrown market roads",
       "region": "Melanesia",
       "kind": "Dependency",
-      "difficulty": 1.05,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -38842,7 +38842,7 @@
       "culture": "Australia and New Zealand / reclaimed rail yards",
       "region": "Australia and New Zealand",
       "kind": "Country",
-      "difficulty": 0.98,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -39088,7 +39088,7 @@
       "culture": "Central America / overgrown market roads",
       "region": "Central America",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 0.97,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -39367,7 +39367,7 @@
       "culture": "Western Africa / sun-bleached service roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -39644,7 +39644,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 1.37,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -39723,7 +39723,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Dependency",
-      "difficulty": 1.05,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -39870,7 +39870,7 @@
       "culture": "Australia and New Zealand / reclaimed rail yards",
       "region": "Australia and New Zealand",
       "kind": "Dependency",
-      "difficulty": 1.07,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -40103,7 +40103,7 @@
       "culture": "Eastern Asia / reclaimed rail yards",
       "region": "Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -40216,7 +40216,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -40317,7 +40317,7 @@
       "culture": "Western Asia / reclaimed rail yards",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.92,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -40550,7 +40550,7 @@
       "culture": "Micronesia / overgrown market roads",
       "region": "Micronesia",
       "kind": "Dependency",
-      "difficulty": 1.04,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -40951,7 +40951,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -41186,7 +41186,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -41496,7 +41496,7 @@
       "culture": "Southern Asia / reclaimed rail yards",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.33,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -41623,7 +41623,7 @@
       "culture": "Micronesia / overgrown market roads",
       "region": "Micronesia",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 1.0,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -41702,7 +41702,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Indeterminate",
-      "difficulty": 1.01,
+      "difficulty": 0.88,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -42324,7 +42324,7 @@
       "culture": "Melanesia / overgrown market roads",
       "region": "Melanesia",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 0.87,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -42848,7 +42848,7 @@
       "culture": "South America / mountain service passes",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -43347,7 +43347,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 1.53,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -43426,7 +43426,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Dependency",
-      "difficulty": 0.94,
+      "difficulty": 0.92,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -43653,7 +43653,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -43822,7 +43822,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -43978,7 +43978,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.03,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -44219,7 +44219,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.88,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -44456,7 +44456,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -44677,7 +44677,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.98,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -47253,7 +47253,7 @@
       "culture": "Eastern Europe / winter timber depots",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.23,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -47355,7 +47355,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.92,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -47444,7 +47444,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 1.03,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -47561,7 +47561,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Dependency",
-      "difficulty": 1.02,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -47688,7 +47688,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -47775,7 +47775,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.07,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -47847,7 +47847,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 0.96,
+      "difficulty": 0.97,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -47988,7 +47988,7 @@
       "culture": "Northern America / reclaimed rail yards",
       "region": "Northern America",
       "kind": "Dependency",
-      "difficulty": 0.94,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -48229,7 +48229,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.06,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -48384,7 +48384,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 0.89,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -48453,7 +48453,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.96,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -48803,7 +48803,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.17,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -49025,7 +49025,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -49100,7 +49100,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -49227,7 +49227,7 @@
       "culture": "Southern Asia / reclaimed rail yards",
       "region": "Southern Asia",
       "kind": "Indeterminate",
-      "difficulty": 1.07,
+      "difficulty": 0.92,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -49353,7 +49353,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.97,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -49432,7 +49432,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.85,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -49506,7 +49506,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Country",
-      "difficulty": 1.02,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -49683,7 +49683,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 1.13,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -49795,7 +49795,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 0.92,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -49992,7 +49992,7 @@
       "culture": "Melanesia / overgrown market roads",
       "region": "Melanesia",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 1.0,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -50186,7 +50186,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -50333,7 +50333,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.07,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -50709,7 +50709,7 @@
       "culture": "Southern Africa / reclaimed rail yards",
       "region": "Southern Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 1.31,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -51002,7 +51002,7 @@
       "culture": "Seven seas (open ocean) / winter timber depots",
       "region": "Seven seas (open ocean)",
       "kind": "Dependency",
-      "difficulty": 1.06,
+      "difficulty": 0.91,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -51124,7 +51124,7 @@
       "culture": "Eastern Asia / reclaimed rail yards",
       "region": "Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.26,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -51418,7 +51418,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -51665,7 +51665,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 1.14,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -51746,7 +51746,7 @@
       "culture": "Southern Asia / overgrown market roads",
       "region": "Southern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 1.15,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -52117,7 +52117,7 @@
       "culture": "Northern Africa / sun-bleached service roads",
       "region": "Northern Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.98,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -52265,7 +52265,7 @@
       "culture": "South America / overgrown market roads",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -52467,7 +52467,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 0.87,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -52610,7 +52610,7 @@
       "culture": "Western Europe / mountain service passes",
       "region": "Western Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.07,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -52896,7 +52896,7 @@
       "culture": "Middle Africa / overgrown market roads",
       "region": "Middle Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 0.85,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -52977,7 +52977,7 @@
       "culture": "Eastern Asia / reclaimed rail yards",
       "region": "Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 0.9,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -53181,7 +53181,7 @@
       "culture": "Central Asia / mountain service passes",
       "region": "Central Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 0.94,
       "modifiers": {
         "enemy_health": 1.15,
         "enemy_speed": 0.9,
@@ -53483,7 +53483,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.09,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -53614,7 +53614,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -53733,7 +53733,7 @@
       "culture": "Western Africa / overgrown market roads",
       "region": "Western Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.03,
+      "difficulty": 1.05,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -53908,7 +53908,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 1.15,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -53983,7 +53983,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 1.1,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -54149,7 +54149,7 @@
       "culture": "Northern Africa / sun-bleached service roads",
       "region": "Northern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.01,
+      "difficulty": 0.97,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -54472,7 +54472,7 @@
       "culture": "Western Asia / reclaimed rail yards",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.25,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -54728,7 +54728,7 @@
       "culture": "Central Asia / sun-bleached service roads",
       "region": "Central Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -54894,7 +54894,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 1.0,
+      "difficulty": 0.98,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -54977,7 +54977,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 1.11,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -55134,7 +55134,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.05,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -55553,7 +55553,7 @@
       "culture": "Eastern Europe / reclaimed rail yards",
       "region": "Eastern Europe",
       "kind": "Sovereign country",
-      "difficulty": 0.96,
+      "difficulty": 1.04,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -55679,7 +55679,7 @@
       "culture": "Western Asia / sun-bleached service roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.95,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -55955,7 +55955,7 @@
       "culture": "Northern Europe / winter timber depots",
       "region": "Northern Europe",
       "kind": "Country",
-      "difficulty": 1.03,
+      "difficulty": 1.35,
       "modifiers": {
         "enemy_health": 1.1,
         "enemy_speed": 0.85,
@@ -56213,7 +56213,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.08,
+      "difficulty": 1.27,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -56338,7 +56338,7 @@
       "culture": "Caribbean / overgrown market roads",
       "region": "Caribbean",
       "kind": "Dependency",
-      "difficulty": 0.95,
+      "difficulty": 1.02,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -58191,7 +58191,7 @@
       "culture": "Northern America / reclaimed rail yards",
       "region": "Northern America",
       "kind": "Country",
-      "difficulty": 1.02,
+      "difficulty": 1.27,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -58313,7 +58313,7 @@
       "culture": "South America / reclaimed rail yards",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 0.96,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -58570,7 +58570,7 @@
       "culture": "Central Asia / sun-bleached service roads",
       "region": "Central Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 1.01,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -58668,7 +58668,7 @@
       "culture": "Melanesia / overgrown market roads",
       "region": "Melanesia",
       "kind": "Sovereign country",
-      "difficulty": 0.94,
+      "difficulty": 1.15,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -58733,7 +58733,7 @@
       "culture": "Southern Europe / reclaimed rail yards",
       "region": "Southern Europe",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 1.05,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,
@@ -59140,7 +59140,7 @@
       "culture": "South America / overgrown market roads",
       "region": "South America",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.06,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -59359,7 +59359,7 @@
       "culture": "South-Eastern Asia / overgrown market roads",
       "region": "South-Eastern Asia",
       "kind": "Sovereign country",
-      "difficulty": 0.95,
+      "difficulty": 1.53,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -59472,7 +59472,7 @@
       "culture": "Polynesia / overgrown market roads",
       "region": "Polynesia",
       "kind": "Dependency",
-      "difficulty": 1.02,
+      "difficulty": 0.94,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -59627,7 +59627,7 @@
       "culture": "Northern Africa / sun-bleached service roads",
       "region": "Northern Africa",
       "kind": "Indeterminate",
-      "difficulty": 1.08,
+      "difficulty": 1.06,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.1,
@@ -59846,7 +59846,7 @@
       "culture": "Western Asia / overgrown market roads",
       "region": "Western Asia",
       "kind": "Sovereign country",
-      "difficulty": 1.04,
+      "difficulty": 0.94,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -60137,7 +60137,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.02,
+      "difficulty": 1.08,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -60329,7 +60329,7 @@
       "culture": "Eastern Africa / overgrown market roads",
       "region": "Eastern Africa",
       "kind": "Sovereign country",
-      "difficulty": 1.0,
+      "difficulty": 0.95,
       "modifiers": {
         "enemy_health": 0.95,
         "enemy_speed": 1.15,
@@ -60415,7 +60415,7 @@
       "culture": "Southern Africa / reclaimed rail yards",
       "region": "Southern Africa",
       "kind": "Sovereign country",
-      "difficulty": 0.99,
+      "difficulty": 0.98,
       "modifiers": {
         "enemy_health": 1.0,
         "enemy_speed": 1.0,

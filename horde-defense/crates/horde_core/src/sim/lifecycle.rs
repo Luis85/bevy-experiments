@@ -196,10 +196,12 @@ impl Game {
         )?;
         let (lane_count, width_yards) = self.campaign.arena_geometry();
         let mut modifiers = country.map_or_else(Modifiers::default, |c| {
+            // The start clamp (design-enemy-balance §8).
+            let difficulty = c.effective_difficulty(&self.campaign.world);
             let mut m = c.modifiers;
-            m.enemy_health *= c.difficulty;
-            m.enemy_speed *= c.difficulty.sqrt();
-            m.reward *= c.difficulty;
+            m.enemy_health *= difficulty;
+            m.enemy_speed *= difficulty.sqrt();
+            m.reward *= difficulty;
             m
         });
         modifiers.enemy_health *= progression.enemy_health * balance.enemy_health;

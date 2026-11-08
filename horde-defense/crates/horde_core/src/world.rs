@@ -144,6 +144,9 @@ fn default_stage_themes() -> Vec<StageThemeDefinition> {
 fn stable_hash(text: &str) -> u64 {
     crate::hash::fnv1a(text.as_bytes())
 }
+/// The start clamp: the campaign's start country plays its difficulty
+/// inside this window (`Country::effective_difficulty`).
+pub const START_DIFFICULTY_CLAMP: (f32, f32) = (0.95, 1.05);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Country {
     pub id: String,
@@ -199,6 +202,25 @@ impl Country {
             lighting: theme.lighting.clone(),
             props: theme.props.clone(),
             variation,
+        }
+    }
+    /// The difficulty a deployment here is played at: the campaign's start
+    /// country is clamped to [`START_DIFFICULTY_CLAMP`], so no start opens
+    /// far easier or harder than the rest (design-enemy-balance §8). Before
+    /// a start is chosen every country is a candidate start and reads
+    /// clamped, so the start picker shows the value the first defense
+    /// plays. Every other country plays its raw `difficulty`. Derived,
+    /// never saved.
+    pub fn effective_difficulty(&self, progress: &WorldProgress) -> f32 {
+        if progress
+            .start
+            .as_deref()
+            .is_none_or(|start| start == self.id)
+        {
+            let (lo, hi) = START_DIFFICULTY_CLAMP;
+            self.difficulty.clamp(lo, hi)
+        } else {
+            self.difficulty
         }
     }
     pub fn level_count(&self) -> usize {

@@ -561,11 +561,23 @@ fn fx_view_keeps_only_events_within_painter_lifetime() {
 /// The progressed-peak fixture after `ticks` unpaused ticks, with the
 /// interpolation snapshot of the tick before and the given blend fraction.
 fn live_peak(ticks: usize, fraction: f32) -> (Game, ActorInterpolation) {
+    live_peak_until(ticks, fraction, |_| false)
+}
+
+/// `live_peak`, stopping early on the first tick where `until` holds.
+fn live_peak_until(
+    max_ticks: usize,
+    fraction: f32,
+    until: impl Fn(&horde_core::sim::Attempt) -> bool,
+) -> (Game, ActorInterpolation) {
     let mut game = horde_core::sim::maximum_progression_render_fixture().expect("fixture");
     game.set_paused(false);
     game.attempt_mut().unwrap().paused = false;
     let mut blend = ActorInterpolation::default();
-    for _ in 0..ticks {
+    for _ in 0..max_ticks {
+        if until(game.attempt().unwrap()) {
+            break;
+        }
         blend.record([(None, game.attempt().unwrap())]);
         game.tick(Input::default());
     }
@@ -578,7 +590,13 @@ fn live_peak(ticks: usize, fraction: f32) -> (Game, ActorInterpolation) {
 /// per actor (W1-67): poses and positions line up with `a.enemies`.
 #[test]
 fn field_view_reads_poses_and_blended_positions_without_id_lookups() {
-    let (game, blend) = live_peak(120, 0.5);
+    // Run until a body is collapsing rather than for a fixed tick count: the
+    // kill times move with the fixture's balance (W2-39 put its USA start at
+    // the clamped difficulty 1.05, and no body is collapsing at tick 120 any
+    // more).
+    let (game, blend) = live_peak_until(600, 0.5, |a| {
+        !SceneAnimation::sample(a, false).deaths.is_empty()
+    });
     let a = game.attempt().unwrap();
     assert!(a.enemies.len() > 100, "a crowded progressed peak");
     assert!(!a.structures.is_empty());

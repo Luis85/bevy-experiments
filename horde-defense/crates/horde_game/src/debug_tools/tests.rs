@@ -6,7 +6,7 @@ use crate::{
 };
 use horde_core::{
     campaign::SaleBlock,
-    command::{Command, CommandError},
+    command::{Command, CommandError, CommandOutcome},
     content::{Mode, StructureKind},
     sim::Input,
 };
@@ -470,8 +470,11 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
         .collect();
     let [
         ..,
-        Command::BuyItem(_),
-        Command::Equip { id: equipped, .. },
+        Command::BuyItem(bought),
+        Command::Equip {
+            mode: equip_mode,
+            id: equipped,
+        },
         Command::SellItem(sold),
     ] = commands.as_slice()
     else {
@@ -510,17 +513,44 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
         "ruleset 2 refuses the equipped sale"
     );
     assert!(!report.matches_recording());
-    // Ruleset 2 refuses the sale as a typed SaleBlocked rejection that
-    // changes nothing, so the item stays owned.
+    // Ruleset 2 refuses a sale as a typed SaleBlocked rejection that changes
+    // nothing. Since W2-39 the replayed defender falls before the recorded
+    // withdrawal: Germany, the recording's start, plays difficulty 1.04
+    // instead of 1.06 (the stage-count bands of design-enemy-balance §8,
+    // content), so the defeat pays 23 coins, the recorded buy of a 60-coin
+    // padded vest is refused for want of coins, and the recorded Equip and
+    // SellItem name an item that was never bought.
     let mut again = game.clone();
     assert_eq!(
         again.apply(&Command::SellItem(sold)),
-        Err(CommandError::SaleBlocked(SaleBlock::EquippedPersonal))
+        Err(CommandError::SaleBlocked(SaleBlock::Unknown))
     );
     assert_eq!(again.state_digest(), report.digest);
     assert!(
-        game.campaign().item(sold).is_some(),
-        "the sold item is kept"
+        game.campaign().item(sold).is_none(),
+        "the recorded buy was refused"
+    );
+    // The recorded buy, equip and sale on that state, with the coins the
+    // buy needs: ruleset 2 refuses the equipped sale and keeps the item.
+    again.campaign_mut().coins += 1_000;
+    let Ok(CommandOutcome::Id(vest)) = again.apply(&Command::BuyItem(bought.clone())) else {
+        panic!("the recorded {bought} can be bought with coins in hand");
+    };
+    again
+        .apply(&Command::Equip {
+            mode: *equip_mode,
+            id: vest,
+        })
+        .unwrap();
+    let before = again.state_digest();
+    assert_eq!(
+        again.apply(&Command::SellItem(vest)),
+        Err(CommandError::SaleBlocked(SaleBlock::EquippedPersonal))
+    );
+    assert_eq!(again.state_digest(), before);
+    assert!(
+        again.campaign().item(vest).is_some(),
+        "the equipped item is kept"
     );
     // The play before the sale is pinned here, because the recorded End
     // digest cannot vouch for it. Rebuilding the ruleset 1 sale legally
@@ -546,9 +576,14 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
     // class C) moved it from 3894ac12174eb3f7: the replayed deploys' drops
     // pick from the larger catalogue. With the Some path limited to the 29
     // v1 definitions the replayed state digests to 3894ac12174eb3f7 again.
+    // W2-39 (difficulty bands and the start clamp, class C) moved it from
+    // fa528d88f6639802: the replayed Germany start plays difficulty 1.04
+    // instead of 1.06, so the combat, its defeat and the refused buy differ.
+    // With the parent world.json and the raw difficulty in the deploy terms
+    // the replayed state digests to fa528d88f6639802 again.
     assert_eq!(
         hex(replay(without_sale).unwrap().digest),
-        "fa528d88f6639802",
+        "711acf17d72357c2",
         "the replay of the recording up to its sale is pinned"
     );
     // Only compatibility warnings, never a format or seed mismatch. A content

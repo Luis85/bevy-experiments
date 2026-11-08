@@ -16,7 +16,7 @@ Kill identities are recorded in the active attempt ledger. A single boss transac
 
 ## Geographical campaigns
 
-A deployment records the selected country ID and local stage, then rotates through the five authored encounter templates using `stage % 5`. Its saved effective modifiers combine the country's authored boosts/debuffs with difficulty: enemy health and rewards multiply by difficulty; enemy speed multiplies by its square root. Enemy health includes bosses in both combat modes. Build supply and the declared personal-damage and NPC-skill modifiers also apply. Completing an earlier local stage cannot advance a different frontier stage. A country clears only when every population-derived local stage is complete.
+A deployment records the selected country ID and local stage, then rotates through the five authored encounter templates using `stage % 5`. Its saved effective modifiers combine the country's authored boosts/debuffs with its effective difficulty (the start country is clamped to 0.95-1.05; WORLD.md): enemy health and rewards multiply by difficulty; enemy speed multiplies by its square root. Enemy health includes bosses in both combat modes. Build supply and the declared personal-damage and NPC-skill modifiers also apply. Completing an earlier local stage cannot advance a different frontier stage. A country clears only when every population-derived local stage is complete.
 
 ## Concurrent deployments
 

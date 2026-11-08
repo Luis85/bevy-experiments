@@ -197,7 +197,10 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
     let cleared = f.game.campaign().world.completed(&country.id);
     ui.label(format!(
         "{} defenses · {:.2}× difficulty",
-        levels, country.difficulty
+        levels,
+        f.game
+            .effective_country_difficulty(&country.id)
+            .unwrap_or(country.difficulty)
     ));
     if f.game.campaign().world.start.is_some() {
         progress(
