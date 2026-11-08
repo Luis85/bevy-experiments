@@ -171,5 +171,43 @@ fn counter_nodes_open_no_later_than_their_archetypes() {
             node.id,
             node.minimum_victories
         );
+        // Design §5 footnote: the gate is the largest milestone at or below
+        // that rank, not merely any rank below it.
+        let largest = MILESTONES
+            .iter()
+            .rev()
+            .copied()
+            .find(|milestone| *milestone <= u64::from(first));
+        assert_eq!(
+            Some(node.minimum_victories),
+            largest,
+            "{}: gate V{} is not the largest milestone at or below rank {first} ({ranks:?})",
+            node.id,
+            node.minimum_victories
+        );
+    }
+}
+
+/// A body attribute rank or a structure rank: ladders open no milestone.
+fn is_ladder(id: &str) -> bool {
+    id.starts_with("body_")
+        || ["trap_rank_", "wall_rank_", "turret_rank_"]
+            .iter()
+            .any(|prefix| id.starts_with(prefix))
+}
+
+#[test]
+fn every_milestone_rank_opens_a_new_non_ladder_node() {
+    for milestone in MILESTONES {
+        let opened: Vec<&str> = skills()
+            .nodes
+            .iter()
+            .filter(|node| node.minimum_victories == milestone && !is_ladder(&node.id))
+            .map(|node| node.id.as_str())
+            .collect();
+        assert!(
+            !opened.is_empty(),
+            "victory {milestone} opens no new non-ladder node"
+        );
     }
 }
