@@ -13,8 +13,8 @@ const LEGACY_DROP_DEFINITIONS: usize = 29;
 /// defenders only, like the class-perk and penetration folds: Mara and
 /// recruits (NPC mode) take `raw`. The neutral 1.0 returns `raw` untouched
 /// (no float round trip).
-// The exploder's fuse on a Personal defender (W2-29) is the first consumer;
-// the reach attack joins with the hazard seam (W2-30).
+// Consumers: the exploder's fuse on a Personal defender (W2-29) and a
+// spitter's spit on it (the hazard seam, W2-30).
 pub(crate) fn hazard_scaled(a: &Attempt, raw: i32) -> i32 {
     let m = a.profile.modifiers.hazard_damage_multiplier;
     if a.mode != Mode::Personal || m == 1.0 {
@@ -409,6 +409,11 @@ impl Game {
             } else if let Some(s) = structure {
                 a.structures[s].hp -= damage;
             } else {
+                // A spit is hazard damage (the counter seam, W2-30); a melee
+                // strike is not.
+                if spit.is_some() {
+                    damage = hazard_scaled(a, damage);
+                }
                 damage = (damage - a.profile.personal.armor).max(0);
                 if a.statuses.active(StatusId::Brace) {
                     damage /= 2;
@@ -437,6 +442,9 @@ impl Game {
             if structure.is_none() && damage > 0 {
                 a.last_damage_lane = Some(lane);
                 a.telemetry.damage_by_lane[lane as usize] += damage as u64;
+                if spit.is_some() {
+                    a.telemetry.hazard_damage_taken += damage as u64;
+                }
                 // Personal hit points and the NPC injury resolver both land
                 // here; bosses and unresolved legacy enemies are not counted.
                 let e = &a.enemies[n];
@@ -652,12 +660,14 @@ impl Game {
         targets.sort_unstable();
         for (id, n) in targets {
             if a.mode == Mode::Personal {
-                let damage = (blast.damage - enemy_armor(a, &a.enemies[n])).max(0);
+                let damage =
+                    (blast.damage - enemy_armor_vs(a, &a.enemies[n], HitSource::Area)).max(0);
                 a.enemies[n].apply_damage(damage, Mode::Personal);
             } else {
                 let e = &a.enemies[n];
                 let dodge = e.injury.dodge(enemy_dodge(a, e));
-                let (armor, ht, target) = (enemy_armor(a, e), enemy_ht(a, e), enemy_name(a, e));
+                let armor = enemy_armor_vs(a, e, HitSource::Area);
+                let (ht, target) = (enemy_ht(a, e), enemy_name(a, e));
                 let result = rules::resolve_blast(
                     &mut a.rng,
                     Damage {

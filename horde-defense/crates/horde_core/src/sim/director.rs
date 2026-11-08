@@ -143,8 +143,31 @@ impl Game {
         {
             return Err("Defeat this boss before its ordinary variant joins the horde".into());
         }
-        self.spawn_resolved_enemy(a, resolved, lane, false);
+        self.spawn_pick(a, resolved, lane);
         Ok(())
+    }
+    /// One weighted pick of `resolved` in `lane`: `group_size` members (a
+    /// sprinter pack, W2-30), each behind the last at the lane's tail, so at
+    /// `spawn_x + 0.65k`. The pick draws nothing more than one member would,
+    /// and each member respects the cap; a member past it is a skipped spawn.
+    pub(super) fn spawn_pick(
+        &mut self,
+        a: &mut Attempt,
+        resolved: crate::enemy_catalog::ResolvedEnemy,
+        lane: u8,
+    ) {
+        if resolved.group_size <= 1 {
+            self.spawn_resolved_enemy(a, resolved, lane, false);
+            return;
+        }
+        // The first member is the pick the caller made room for.
+        for member in 0..resolved.group_size {
+            if member > 0 && a.enemies.iter().filter(|e| !e.boss).count() >= a.enemy_cap() {
+                a.telemetry.skipped_spawns += 1;
+                continue;
+            }
+            self.spawn_resolved_enemy(a, resolved.clone(), lane, false);
+        }
     }
     fn spawn_resolved_enemy(
         &mut self,

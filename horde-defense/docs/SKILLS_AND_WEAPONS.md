@@ -93,12 +93,13 @@ least 0.65 s), shot interval × multiplier (at least 0.08 s) and weak-spot bonus
 the profile untouched, and the recommender counts a perk as acting now only
 while the survivor owns a non-NPC gun of its class (Mara's guns do not count).
 `ArmorPenetration` (1–20) adds enemy armor ignored by
-personal shots: the shot meets `max(0, armor − penetration)`, while melee,
+personal shots: the shot meets `max(0, armor + ranged armor − penetration)`
+(a shield-bearer's ranged armor counts only out of contact), while melee,
 ordnance and turrets meet full armor. `HazardDamageMultiplier` (0.5–1) scales
 hazard damage the survivor takes: `round(raw × multiplier)`, and `raw`
-unchanged at 1.0; Mara and recruits in NPC battles take `raw`. The
-blast and spit paths that apply it before armor and Brace arrive with those
-enemies. A node may also
+unchanged at 1.0; Mara and recruits in NPC battles take `raw`. An
+exploder's fuse and a spitter's spit on the survivor apply it before armor and
+Brace, and that damage counts as `hazard_damage_taken`. A node may also
 list `counters`, the enemy archetype ids it is authored to answer (at most 8
 distinct ids of lowercase letters, digits, `-` or `_`); no rule reads them.
 

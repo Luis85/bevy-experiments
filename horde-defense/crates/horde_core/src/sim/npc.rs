@@ -252,7 +252,15 @@ impl Game {
             damage,
             armor_divisor: 1,
         };
-        let armor = enemy_armor(a, e);
+        let armor = enemy_armor_vs(
+            a,
+            e,
+            if melee {
+                HitSource::Melee
+            } else {
+                HitSource::Shot
+            },
+        );
         let dodge = e.injury.dodge(enemy_dodge(a, e));
         let ht = enemy_ht(a, e);
         let point = [e.x, e.y()];

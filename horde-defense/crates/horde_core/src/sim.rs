@@ -5,6 +5,8 @@ mod country;
 mod death_effect_tests;
 mod defense;
 mod director;
+#[cfg(test)]
+mod enemy_trait_tests;
 mod events;
 mod fixtures;
 mod journey;
@@ -260,14 +262,28 @@ impl Enemy {
     pub fn critically_wounded(&self, mode: Mode) -> bool {
         self.condition(mode) == EnemyCondition::Critical
     }
+    /// Hits never interrupt a stagger-immune hostile (the juggernaut, W2-30):
+    /// no hit-stop, prone, stun or dropped weapon. Bosses fight with their
+    /// level's stats and are never immune.
+    fn stagger_immune(&self) -> bool {
+        !self.boss && self.resolved.as_ref().is_some_and(|r| r.stagger_immune)
+    }
     fn apply_damage(&mut self, damage: i32, mode: Mode) {
+        let immune = self.stagger_immune();
         if mode == Mode::Personal {
             self.hp -= damage;
         } else {
             // The rules resolver has already applied NPC injury exactly once.
             self.hp = self.injury.hp;
+            if immune {
+                // Ruling W-7: the injury rolls are unchanged (the same draw
+                // count); only their stagger is cleared after every injury.
+                self.injury.stunned = false;
+                self.injury.prone = false;
+                self.injury.weapon_dropped = false;
+            }
         }
-        if damage > 0 {
+        if damage > 0 && !immune {
             self.statuses
                 .refresh(StatusId::HitStop, ENEMY_HIT_STOP_TICKS);
         }
@@ -1812,6 +1828,45 @@ impl Attempt {
         }
         Some(structure.map_or(self.defender_position(), |s| [s.x(), s.y()]))
     }
+}
+/// What struck a hostile, for the armor it meets (design enemy-balance §4
+/// "Shield-bearer").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HitSource {
+    /// The defender's gunfire (Personal shots, NPC shooting).
+    Shot,
+    /// A turret's shot.
+    Turret,
+    /// The defender's melee strike and sweep.
+    Melee,
+    /// Grenades and blasts: ordnance impacts and death bursts.
+    Area,
+    /// A trap.
+    Trap,
+    /// A Molotov's fire zone.
+    Fire,
+}
+impl HitSource {
+    /// Shots and turret fire meet ranged armor; nothing else does.
+    fn ranged(self) -> bool {
+        matches!(self, Self::Shot | Self::Turret)
+    }
+}
+/// The armor `e` meets from `source`: its armor, plus its ranged armor
+/// (`ranged_armor` Personal, `npc_ranged_armor` NPC) against shots and turret
+/// fire while it is not in contact at the line. Bosses carry none.
+fn enemy_armor_vs(a: &Attempt, e: &Enemy, source: HitSource) -> i32 {
+    let armor = enemy_armor(a, e);
+    if !source.ranged() || e.boss || e.contact() {
+        return armor;
+    }
+    let profile = enemy_profile(e);
+    armor
+        + if a.mode == Mode::Personal {
+            profile.ranged_armor
+        } else {
+            profile.npc_ranged_armor
+        }
 }
 fn enemy_armor(a: &Attempt, e: &Enemy) -> i32 {
     if e.boss {
