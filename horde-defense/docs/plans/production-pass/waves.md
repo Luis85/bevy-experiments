@@ -484,6 +484,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `elite_only_drop_uses_keyed_pick_and_draws_no_rng`
   - `split_child_kill_takes_the_drop_draw_and_never_drops`
   - `elite_drop_quality_is_at_least_uncommon_and_boss_drop_has_no_floor`
+- Note (W2-29 review, 2026-11-08): the split-child half of ruling E8 already landed in W2-29. In `combat.rs` reap a split child takes and discards the 3% roll and never drops (`drop = e.boss || (!e.split_child && (rolled || kills % 20 == 0))`), and `npc_split_children_use_own_npc_stats_and_draw_no_rng` checks it. So `split_child_kill_takes_the_drop_draw_and_never_drops` passes on W2-35's parent. Treat it as a characterisation pin and record a mutation proof instead of fail-first evidence (for example, drop `!e.split_child &&` from the drop expression and watch the pin fail). W2-35 keeps only the elite/normal split, the keyed ELITE_PICK and the Uncommon floor.
 - Deps: W2-33.
 
 **W2-36 · enemy-balance · Bosses**
