@@ -681,3 +681,7 @@ Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that tou
 ### Rulings owned by this remit
 
 P1, P6, E3, E9, W-4, W-5, W-6, W-7, W-9, W-10, W-15, R21
+
+### Writer notes (wave 2)
+
+- **W2-26, boss phase bonus.** Section 6's transition count and schema-v7 §3.10 give Hard one boss phase at r ≤ 4 (and two on a Capstone). W2-26's pin `neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_depth_0` forbids a `boss_phases` key at ranks 0-4 on every preset. W2-26 followed the pin: `ProgressionSnapshot::fold_extras` adds `extras.boss_phase_bonus` only past rank 4, capped at 2. W2-36 adds only the `(r > 4)` and `rank.extra_transitions` terms, because the bonus is already added and adding it again would count it twice. Whether Hard at r ≤ 4 gets its phase is open in plan §2.5. Until it is ruled, the section 6 table's "Hard, 1 at r ≤ 4" row does not hold.
