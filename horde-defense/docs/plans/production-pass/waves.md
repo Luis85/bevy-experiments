@@ -341,6 +341,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Deps: W2-12.
 
 **W2-20 · campaign-defenders · `RecruitAs`, two-archetype keyed offer, origin trait**
+- Files: also adds `DefenderCard.archetype: Option<Archetype>` (design-campaign-defenders §1.5, deferred from W2-12).
 - Fail-first:
   - `recruit_offer_has_two_distinct_archetypes_and_recruit_as_applies_the_choice`
   - `legacy_recruit_equals_first_offer`
@@ -351,6 +352,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Deps: W2-18.
 
 **W2-21 · campaign-defenders · `defender_power`, `service_record`, containments writer**
+- Files: also adds `DefenderOption.power: DefenderPower` to `available_defenders` (design-campaign-defenders §1.4, deferred from W2-12).
 - Fail-first:
   - `fresh_starter_power_is_100_at_threat_zero_in_both_models`
   - `defender_power_drops_as_threat_rises`

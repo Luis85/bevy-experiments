@@ -132,6 +132,20 @@ impl Game {
             })
             .collect()
     }
+    /// The items `defender` carries into a defense: the player's or Mara's
+    /// loadout, or a recruit's own; None for a recruit not on the roster.
+    pub fn defender_loadout(&self, defender: DefenderId) -> Option<[u64; 4]> {
+        match defender {
+            DefenderId::Player => Some(self.campaign.player.loadout),
+            DefenderId::Mara => Some(self.campaign.npc.loadout),
+            DefenderId::Recruit(id) => self
+                .strategy
+                .roster
+                .iter()
+                .find(|r| r.id == id)
+                .map(|r| r.npc.loadout),
+        }
+    }
     /// The card for `defender`, or None for a recruit not on the roster.
     pub fn defender_card(&self, defender: DefenderId) -> Option<DefenderCard> {
         let campaign = &self.campaign;

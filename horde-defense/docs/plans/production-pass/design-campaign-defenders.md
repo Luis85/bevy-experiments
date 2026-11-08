@@ -199,6 +199,8 @@ On success it stores `Some(id)`.
 - `origin: Option<OriginInfo { country_id, country_name, origin_trait }>`;
 - `mode`, `level: u8` (`Npc::advancement_level`), `level_cap: u8` (`Campaign::advancement_cap_level`).
 
+*As built (W2-12):* `level` and `level_cap` are `u32`, because the player's card carries `player.level` (u32) and `player_level_cap()`; a survivor's u8 values widen. `archetype` is added by W2-20 with the `Archetype` type, and `DefenderOption.power` by W2-21 with `defender_power`. `defender_loadout` returns `Option<[u64; 4]>`, None for a recruit not on the roster (loot-economy keeps everything for an unresolvable recruit).
+
 **Other accessors:**
 - `Game::active_defender() -> Option<DefenderCard>`: the live main attempt.
 - `Attempt::defender_appearance()` = `profile.appearance`.

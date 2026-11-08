@@ -19,7 +19,8 @@
 //! releases it and its items; and (W2-12) the saved next defender with
 //! `SetNextDefender` and `BeginDefense`, the defender-aware continue, retry
 //! and repeat, the dispatch reset, and the `available_defenders`,
-//! `defender_card`, `active_defender` and `battle_defender_card` reads.
+//! `defender_card`, `defender_loadout`, `active_defender`,
+//! `battle_defender_card` and `continue_blocker` reads.
 mod support;
 use horde_core::{
     campaign::{Campaign, Npc, NpcTraining},
@@ -2878,6 +2879,34 @@ fn available_defenders_lists_player_mara_recruits_with_blockers() {
             option.card.id
         );
     }
+}
+
+/// The items each defender would carry (design §1.4; Briefing reads
+/// `defender_loadout(next_defender())`).
+#[test]
+fn defender_loadout_names_each_defenders_items() {
+    let (mut g, id) = takeover_ready();
+    let before = serde_json::to_value(&g).unwrap();
+    assert_eq!(
+        g.defender_loadout(DefenderId::Player),
+        Some(g.campaign().player.loadout)
+    );
+    assert_eq!(
+        g.defender_loadout(DefenderId::Mara),
+        Some(g.campaign().npc.loadout)
+    );
+    assert_eq!(
+        g.defender_loadout(DefenderId::Recruit(id)),
+        Some(roster_npc(&g, id).loadout),
+        "the recruit's own items, not Mara's"
+    );
+    assert_eq!(g.defender_loadout(DefenderId::Recruit(99)), None);
+    assert_eq!(serde_json::to_value(&g).unwrap(), before, "pure");
+    apply_ok(&mut g, Command::SetNextDefender(DefenderId::Recruit(id)));
+    assert_eq!(
+        g.defender_loadout(g.next_defender()),
+        Some(roster_npc(&g, id).loadout)
+    );
 }
 
 #[test]
