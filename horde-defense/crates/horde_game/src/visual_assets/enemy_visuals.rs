@@ -3,7 +3,9 @@
 //! visual variant needs only a data entry for the sprite it names.
 //!
 //! Schema 2 adds the optional `elite_tells` table (a default tell plus per-affix
-//! tells); a schema 1 file still loads and gets [`BUILTIN_ELITE_TELL`].
+//! tells); a schema 1 file still loads and gets [`BUILTIN_ELITE_TELL`]. Each
+//! affix tell must name an affix in core's elite table
+//! (`EnemyCatalog::elite_affix_ids`).
 use horde_core::{
     content::{BossKind, EnemyKind},
     enemy_catalog::{VisualSprite, enemy_catalog},
@@ -184,13 +186,18 @@ pub struct EnemyVisualCatalog {
 }
 impl EnemyVisualCatalog {
     pub fn from_json(text: &str) -> Result<Self, String> {
+        let affixes: Vec<&str> = enemy_catalog().elite_affix_ids().collect();
+        Self::from_json_against(text, &affixes)
+    }
+    /// [`Self::from_json`] against an explicit elite affix table.
+    fn from_json_against(text: &str, known_affixes: &[&str]) -> Result<Self, String> {
         let file: File =
             serde_json::from_str(text).map_err(|e| format!("Invalid enemy visuals: {e}"))?;
-        let catalog = Self::compile(file)?;
+        let catalog = Self::compile(file, known_affixes)?;
         catalog.validate_coverage()?;
         Ok(catalog)
     }
-    fn compile(file: File) -> Result<Self, String> {
+    fn compile(file: File, known_affixes: &[&str]) -> Result<Self, String> {
         let (elite_default, elite_affixes) = match (file.schema_version, file.elite_tells) {
             (1, None) | (2, None) => (BUILTIN_ELITE_TELL, Vec::new()),
             (1, Some(_)) => {
@@ -212,6 +219,12 @@ impl EnemyVisualCatalog {
                         .any(|known| known.affix == entry.affix)
                     {
                         return Err(format!("Enemy visuals repeat affix tell {}", entry.affix));
+                    }
+                    if !known_affixes.contains(&entry.affix.as_str()) {
+                        return Err(format!(
+                            "Enemy visuals name unknown elite affix {:?}; core's elite table has {known_affixes:?}",
+                            entry.affix
+                        ));
                     }
                     validate_tell(&entry.affix, &entry.tell)?;
                 }
@@ -653,6 +666,36 @@ mod tests {
         assert!(compile(v1).is_ok());
     }
 
+    /// W2-34 (design vfx-lighting §7): an affix tell must name an affix in
+    /// core's elite table (`EnemyCatalog::elite_affix_ids`); every id the
+    /// table authors is accepted.
+    #[test]
+    fn v2_unknown_affix_rejected() {
+        let tell = bundled()["elite_tells"]["default"].clone();
+        let entry = |id: &str| serde_json::json!({ "affix": id, "tell": tell.clone() });
+        let core: Vec<&str> = enemy_catalog().elite_affix_ids().collect();
+        assert_eq!(
+            core,
+            ["hardened", "frenzied", "vicious", "shielded", "volatile"]
+        );
+        let mut every = bundled();
+        every["elite_tells"]["affixes"] = core.iter().map(|id| entry(id)).collect();
+        let catalog = compile(every).unwrap();
+        for id in &core {
+            assert!(catalog.elite_affixes.iter().any(|known| known.affix == *id));
+        }
+        for unknown in ["cursed", "Hardened", "volatile "] {
+            let mut value = bundled();
+            value["elite_tells"]["affixes"] =
+                serde_json::json!([entry("volatile"), entry(unknown)]);
+            let err = compile(value).unwrap_err();
+            assert!(
+                err.contains("unknown elite affix") && err.contains(unknown),
+                "{unknown}: {err}"
+            );
+        }
+    }
+
     #[test]
     fn elite_tell_bounds_rejected() {
         type Edit = fn(&mut serde_json::Value);
@@ -661,14 +704,24 @@ mod tests {
             "ring_px": 1, "glow": 0.0, "pulse_hz": 0.0
         });
         let affix = |id: &str| serde_json::json!({ "affix": id, "tell": tell.clone() });
+        // Core's table has 5 affixes, so the 16-tell cap is checked against
+        // a wider synthetic table.
+        let ids: Vec<String> = (0..17).map(|i| format!("a{i}")).collect();
+        let wide: Vec<&str> = ids.iter().map(String::as_str).collect();
+        let against = |value: serde_json::Value| {
+            EnemyVisualCatalog::from_json_against(&value.to_string(), &wide)
+        };
         // The bounds themselves are accepted.
         let mut edge = bundled();
         edge["elite_tells"]["default"]["ring_px"] = 4.into();
-        edge["elite_tells"]["affixes"] = (0..16).map(|i| affix(&format!("a{i}"))).collect();
-        let edge = compile(edge).unwrap();
+        edge["elite_tells"]["affixes"] = ids[..16].iter().map(|id| affix(id)).collect();
+        let edge = against(edge).unwrap();
         assert_eq!(edge.elite_tell(None).ring_px, 4);
         assert_eq!(edge.elite_tell(Some("a15")).marker, TellMarker::Shield);
-        let cases: [(&str, Edit); 14] = [
+        let mut over = bundled();
+        over["elite_tells"]["affixes"] = ids.iter().map(|id| affix(id)).collect();
+        assert!(against(over).unwrap_err().contains("at most 16"));
+        let cases: [(&str, Edit); 13] = [
             ("ring 0", |v| {
                 v["elite_tells"]["default"]["ring_px"] = 0.into()
             }),
@@ -696,7 +749,8 @@ mod tests {
             ("affix out of range", |v| {
                 let mut bad = v["elite_tells"]["default"].clone();
                 bad["pulse_hz"] = 3.into();
-                v["elite_tells"]["affixes"] = serde_json::json!([{ "affix": "x", "tell": bad }]);
+                v["elite_tells"]["affixes"] =
+                    serde_json::json!([{ "affix": "volatile", "tell": bad }]);
             }),
             ("blank affix id", |v| {
                 let tell = v["elite_tells"]["default"].clone();
@@ -708,18 +762,12 @@ mod tests {
             ("unknown affix tell field", |v| {
                 let tell = v["elite_tells"]["default"].clone();
                 v["elite_tells"]["affixes"] =
-                    serde_json::json!([{ "affix": "x", "tell": tell, "note": "" }]);
+                    serde_json::json!([{ "affix": "volatile", "tell": tell, "note": "" }]);
             }),
             ("duplicate affix", |v| {
                 let tell = v["elite_tells"]["default"].clone();
-                let entry = serde_json::json!({ "affix": "x", "tell": tell });
+                let entry = serde_json::json!({ "affix": "hardened", "tell": tell });
                 v["elite_tells"]["affixes"] = serde_json::json!([entry.clone(), entry]);
-            }),
-            ("17 affixes", |v| {
-                let tell = v["elite_tells"]["default"].clone();
-                v["elite_tells"]["affixes"] = (0..17)
-                    .map(|i| serde_json::json!({ "affix": format!("a{i}"), "tell": tell }))
-                    .collect();
             }),
         ];
         for (name, edit) in cases {
