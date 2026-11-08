@@ -455,3 +455,68 @@ fn npc_spitter_uses_range_penalty_and_dodge() {
         "some spit hit and the defender rolled a dodge"
     );
 }
+
+#[test]
+fn spit_target_is_where_the_winding_spit_lands() {
+    // W2-28: the accessor behind the ranged windup's aim line names the point
+    // the next Spit event carries: the intercepting wall, then the defender
+    // once the wall falls. A melee windup at the line or at a wall face, and
+    // an advancing spitter, aim at nothing.
+    let reach = 4.0;
+    let stop = DEFENSE_LINE + reach;
+    let mut g = field(12.0);
+    g.set_paused(true);
+    g.place(StructureKind::Wall, 5, 0).unwrap();
+    g.place(StructureKind::Wall, 7, 4).unwrap();
+    g.set_paused(false);
+    let mut a = g.attempt.take().unwrap();
+    a.structures[0].hp = 100;
+    a.structures[0].max_hp = 100;
+    a.structures[1].hp = 1_000_000;
+    a.structures[1].max_hp = 1_000_000;
+    let near_wall = a.structures[0].id;
+    let far_face = a.structures[1].x() + a.structures[1].blocking_radius();
+    let spitter = spawn_spitter(&mut g, &mut a, reach, 5, stop + 1.0);
+    let melee = spawn_spitter(&mut g, &mut a, reach, 7, far_face + 1.0);
+    g.spawn_enemy(&mut a, EnemyKind::Runner, 2, false);
+    a.enemies.last_mut().unwrap().x = DEFENSE_LINE + 0.5;
+    let runner = a.enemies.last().unwrap().id;
+    g.attempt = Some(a);
+    let (mut seen, mut aimed, mut spits) = (0, None, Vec::new());
+    let (mut advancing, mut melee_windups, mut runner_windups) = (0, 0, 0);
+    for _ in 0..3600 {
+        g.tick(Input::default());
+        let a = g.attempt.as_ref().expect("the defender cannot fall");
+        for ev in new_events(a, &mut seen) {
+            if ev.kind == EventKind::Spit && ev.actor_id == Some(spitter) {
+                assert_eq!(Some(ev.to), aimed, "the spit lands where it aimed");
+                spits.push(ev.target_id);
+            }
+        }
+        let s = find(a, spitter);
+        if s.attack_phase == EnemyPhase::Windup {
+            aimed = a.spit_target(s);
+            assert!(aimed.is_some(), "a stationed spitter's windup aims");
+        } else if s.contact_since.is_none() {
+            assert_eq!(a.spit_target(s), None, "an advancing spitter aims");
+            advancing += 1;
+        }
+        for (id, windups) in [(melee, &mut melee_windups), (runner, &mut runner_windups)] {
+            if let Some(e) = a.enemies.iter().find(|e| e.id == id)
+                && e.attack_phase == EnemyPhase::Windup
+            {
+                assert_eq!(a.spit_target(e), None, "a melee windup aims");
+                *windups += 1;
+            }
+        }
+        if spits.contains(&None) && melee_windups > 0 && runner_windups > 0 {
+            break;
+        }
+    }
+    assert!(
+        spits.contains(&Some(near_wall)),
+        "the wall drew spit: {spits:?}"
+    );
+    assert!(spits.contains(&None), "then the defender: {spits:?}");
+    assert!(advancing > 0 && melee_windups > 0 && runner_windups > 0);
+}

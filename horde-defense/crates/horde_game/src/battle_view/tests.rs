@@ -1005,3 +1005,102 @@ fn impact_marks_and_tracer_ends_land_on_the_drawn_hostile() {
     assert_eq!(to(10), [40., 6.5], "a miss into open ground");
     assert_eq!(to(11), [12., 3.5], "an explosion");
 }
+
+/// W2-28 pin (ruling W-13, audio AUD-15): the windup cue's visual twin. On
+/// the frame a Windup event is published, the hostile it names draws its
+/// windup (ring and bar), in normal and reduced effects, whether it winds up
+/// at the line, at a wall face or at a spitter's station, and every view's
+/// aim line target is the core's `spit_target`.
+#[test]
+fn every_windup_event_has_a_windup_view_in_the_same_frame() {
+    use horde_core::sim::{DEFENSE_LINE, EventKind};
+    let mut game = fixture();
+    game.campaign_mut().legacy_features = true;
+    game.campaign_mut().blueprints = KindMap::filled(true);
+    let a = game.attempt_mut().unwrap();
+    (a.max_hp, a.hp) = (1_000_000, 1_000_000);
+    game.set_paused(true);
+    game.place(StructureKind::Wall, 1, 0).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    for (lane, x) in [(0, 6.0), (3, 2.5), (6, 9.0), (1, 12.0)] {
+        game.spawn_enemy(&mut a, EnemyKind::Shambler, lane, false);
+        a.enemies.last_mut().unwrap().x = x;
+    }
+    let mut spitters = Vec::new();
+    for (lane, x) in [(5, 8.0), (1, 9.0)] {
+        game.spawn_enemy(&mut a, EnemyKind::Runner, lane, false);
+        let e = a.enemies.last_mut().unwrap();
+        let mut profile = horde_core::enemy_catalog::resolve_kind(EnemyKind::Runner);
+        profile.archetype_id = "test-spitter".into();
+        profile.reach = 4.0;
+        profile.validate().unwrap();
+        e.resolved = Some(profile);
+        e.x = x;
+        spitters.push(e.id);
+    }
+    *game.attempt_slot_mut() = Some(a);
+    game.set_paused(false);
+    let (mut seen, mut windups, mut ranged, mut cancelled) = (0, 0, 0, 0);
+    for _ in 0..2400 {
+        game.tick(Input::default());
+        let Some(a) = game.attempt() else {
+            break;
+        };
+        let fresh: Vec<_> = a
+            .events
+            .iter()
+            .filter(|e| e.seq >= seen && e.kind == EventKind::Windup)
+            .cloned()
+            .collect();
+        seen = a.events.back().map_or(seen, |e| e.seq + 1);
+        if fresh.is_empty() {
+            continue;
+        }
+        for reduced in [false, true] {
+            let view = BattleViewModel::build(
+                a,
+                SceneAnimation::sample(a, reduced),
+                SceneBlend::NONE,
+                reduced,
+            );
+            for event in &fresh {
+                assert_eq!(event.tick, a.tick, "published this frame");
+                let id = event.actor_id.expect("a windup names its hostile");
+                let e = a.enemies.iter().find(|e| e.id == id).unwrap();
+                let drawn = view.enemies.iter().find(|v| v.id == id);
+                let drawn = drawn.unwrap_or_else(|| panic!("reduced {reduced}: {id} is drawn"));
+                // The one exception: the wall it wound up at fell later in
+                // the same tick, which released the hostile (combat.rs, the
+                // structure-loss sweep) before any frame drew the windup.
+                let released = event
+                    .target_id
+                    .is_some_and(|wall| a.structures.iter().all(|s| s.id != wall));
+                if released {
+                    assert!(e.contact_since.is_none() && drawn.windup.is_none());
+                    assert!(a.events.iter().any(|lost| {
+                        lost.kind == EventKind::StructureLost && lost.tick == a.tick
+                    }));
+                    cancelled += usize::from(!reduced);
+                    continue;
+                }
+                assert!(
+                    drawn.windup.is_some(),
+                    "reduced {reduced}: tick {} windup of {id} at {} has no windup view",
+                    a.tick,
+                    e.x
+                );
+                assert_eq!(drawn.aim_target, a.spit_target(e), "reduced {reduced}");
+                if !reduced {
+                    windups += 1;
+                    ranged += usize::from(spitters.contains(&id) && e.x > DEFENSE_LINE + 0.01);
+                }
+            }
+        }
+    }
+    assert!(windups >= 8, "{windups} windups checked");
+    assert!(ranged >= 2, "{ranged} ranged windups checked");
+    assert!(
+        cancelled <= 2,
+        "{cancelled} windups released by a falling wall"
+    );
+}

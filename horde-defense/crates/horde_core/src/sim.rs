@@ -1780,6 +1780,25 @@ fn spit_range(a: &Attempt, e: &Enemy, structure: Option<&Structure>) -> Option<f
     };
     (e.x > face + 0.01).then(|| (e.x - at[0]).hypot(e.y() - at[1]))
 }
+impl Attempt {
+    /// Where the strike `e` has in hand lands when it is a spit (W2-28, the
+    /// aim line that is the visual twin of a ranged windup): the centre of
+    /// the wall it targets, else the defender, the point its `Spit` event
+    /// carries. None for a hostile out of contact, a melee strike (no reach,
+    /// or at the line or a structure's face) and from the far half, where
+    /// the resolution guard never lets a spit fly.
+    pub fn spit_target(&self, e: &Enemy) -> Option<[f32; 2]> {
+        e.contact_since?;
+        let structure = e
+            .target_structure
+            .and_then(|id| self.structures.iter().find(|s| s.id == id));
+        spit_range(self, e, structure)?;
+        if e.x > self.width_yards * 0.5 + 0.01 {
+            return None;
+        }
+        Some(structure.map_or(self.defender_position(), |s| [s.x(), s.y()]))
+    }
+}
 fn enemy_armor(a: &Attempt, e: &Enemy) -> i32 {
     if e.boss {
         if e.exposed_at(a.tick) { 0 } else { e.armor }

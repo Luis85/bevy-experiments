@@ -6,8 +6,9 @@
 //! ring per stack), one
 //! shadow mesh, one sprite mesh in the view's painter order (lane feet, x
 //! descending, id; hostiles at their crowd-staggered spot) with each hit flash
-//! right after its sprite, the overlay (outline, stun and windup rings,
-//! health and windup bars), then the callout text. Rejected enemy art keeps
+//! right after its sprite, the overlay (a ranged windup's dashed aim line,
+//! outline, stun and windup rings, health and windup bars), then the callout
+//! text. Rejected enemy art keeps
 //! the per-enemy procedural figure path.
 use super::super::{AMBER, ArenaProjection, GREEN, RED, bar, figure, line, soft_shadow};
 use super::batch::{FieldMeshes, MeshBuilder};
@@ -133,6 +134,11 @@ pub(super) fn paint(
                 }
             }
             _ => figures.push((painted_at, e)),
+        }
+        if let Some(to) = e.aim_target {
+            for [a, b] in aim_dashes(at, arena.world(to[0], to[1]), sy) {
+                layers.overlay.line(a, b, AIM_WIDTH, RED);
+            }
         }
         overlay(&mut layers.overlay, sy, e, at, outlines);
         match e.health {
@@ -277,6 +283,33 @@ pub(super) fn windup_rings(view: &BattleViewModel) -> Vec<bool> {
         .collect()
 }
 
+/// Lead, dash and gap of an aim line, in lane heights.
+const AIM_LEAD: f32 = 0.25;
+const AIM_DASH: f32 = 0.16;
+const AIM_GAP: f32 = 0.1;
+/// Width of an aim line's dashes, in points.
+const AIM_WIDTH: f32 = 1.5;
+
+/// The dashes of a ranged windup's aim line (W2-28) from the spitter's feet
+/// at `from` to its target at `to`: it starts [`AIM_LEAD`] lanes clear of
+/// the body and ends on the target, the last dash cut short there. Static
+/// (no march or pulse), so reduced effects draw the same line.
+pub(super) fn aim_dashes(from: Pos2, to: Pos2, sy: f32) -> Vec<[Pos2; 2]> {
+    let length = from.distance(to);
+    let direction = (to - from) / length.max(f32::EPSILON);
+    let (dash, step) = (sy * AIM_DASH, sy * (AIM_DASH + AIM_GAP));
+    let mut dashes = Vec::new();
+    let mut at = sy * AIM_LEAD;
+    while at < length && dash > 0.0 {
+        dashes.push([
+            from + direction * at,
+            from + direction * (at + dash).min(length),
+        ]);
+        at += step;
+    }
+    dashes
+}
+
 /// How far over its feet, in lane heights, a hostile's health bar is centred.
 pub(crate) const HEALTH_BAR_LIFT: f32 = 0.41;
 /// The windup ground ring under the feet at `at`; the contact bands are drawn
@@ -362,6 +395,11 @@ fn enemy(
             progress,
             RED,
         );
+    }
+    if let Some(to) = e.aim_target {
+        for dash in aim_dashes(at, arena.world(to[0], to[1]), sy) {
+            p.line_segment(dash, Stroke::new(AIM_WIDTH, RED));
+        }
     }
     soft_shadow(
         p,

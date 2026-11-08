@@ -1543,3 +1543,161 @@ fn boss_label_at_the_field_edge_stays_inside_the_clip() {
         );
     }
 }
+
+/// Paints `view` of `game`'s attempt and tessellates the arena's primitives.
+fn view_primitives(
+    game: &Game,
+    view: &BattleViewModel,
+    textures: ArtTextures,
+    reduced: bool,
+) -> Vec<ClippedPrimitive> {
+    let a = game.attempt().expect("fixture battle");
+    let ctx = egui::Context::default();
+    let mut output = ctx.run_ui(Default::default(), |ui| {
+        let painter = ui.painter().with_clip_rect(arena());
+        let options = RenderOptions {
+            reduced,
+            ..options(textures)
+        };
+        battlefield(&painter, arena(), view, a, [10.0, 5.0], options);
+    });
+    output.textures_delta.clear();
+    ctx.tessellate(output.shapes, output.pixels_per_point)
+        .into_iter()
+        .filter(|primitive| primitive.clip_rect == arena())
+        .collect()
+}
+
+/// W2-28 (ruling W-13): the visual twin of a ranged windup. A spitter
+/// stationed behind a wall aims a dashed line at the wall, one with a clear
+/// lane at the defender; a melee windup draws none. The line is static, so
+/// reduced effects draw the same line.
+#[test]
+fn spitter_windup_draws_aim_line_to_wall_or_defender() {
+    use horde_core::{
+        content::{EnemyKind, Mode, StructureKind},
+        enemy_catalog::resolve_kind,
+        sim::{DEFENSE_LINE, EnemyPhase, Input},
+    };
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(horde_core::balance::BalanceSettings::legacy())
+        .unwrap();
+    game.campaign_mut().attempts = 1;
+    game.campaign_mut().legacy_features = true;
+    game.campaign_mut().blueprints = horde_core::kind_map::KindMap::filled(true);
+    game.deploy(0, Mode::Personal).unwrap();
+    a_mut(&mut game).width_yards = 12.0;
+    a_mut(&mut game).max_hp = 1_000_000;
+    a_mut(&mut game).hp = 1_000_000;
+    game.set_paused(true);
+    game.place(StructureKind::Wall, 5, 0).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    let placed = &mut a.structures[0];
+    (placed.hp, placed.max_hp) = (1_000_000, 1_000_000);
+    let wall = (placed.id, [placed.x(), placed.y()]);
+    let reach = 4.0;
+    let mut spitters = Vec::new();
+    for lane in [5, 2] {
+        game.spawn_enemy(&mut a, EnemyKind::Runner, lane, false);
+        let e = a.enemies.last_mut().unwrap();
+        let mut profile = resolve_kind(EnemyKind::Runner);
+        profile.archetype_id = "test-spitter".into();
+        profile.reach = reach;
+        profile.validate().unwrap();
+        e.resolved = Some(profile);
+        e.x = DEFENSE_LINE + reach + 0.5;
+        spitters.push(e.id);
+    }
+    game.spawn_enemy(&mut a, EnemyKind::Runner, 8, false);
+    a.enemies.last_mut().unwrap().x = DEFENSE_LINE + 0.3;
+    let melee = a.enemies.last().unwrap().id;
+    *game.attempt_slot_mut() = Some(a);
+    game.set_paused(false);
+    let ids = [spitters[0], spitters[1], melee];
+    let winding = |game: &Game, id: u64| {
+        game.attempt()
+            .unwrap()
+            .enemies
+            .iter()
+            .any(|e| e.id == id && e.attack_phase == EnemyPhase::Windup)
+    };
+    for _ in 0..600 {
+        if ids.iter().all(|&id| winding(&game, id)) {
+            break;
+        }
+        game.tick(Input::default());
+    }
+    let a = game.attempt().unwrap();
+    for id in ids {
+        assert!(winding(&game, id), "{id} winds up: {:?}", a.enemies);
+    }
+    let first = a.enemies.iter().find(|e| e.id == spitters[0]).unwrap();
+    assert_eq!(first.target_structure, Some(wall.0), "the wall intercepts");
+    let projection = super::super::ArenaProjection::for_attempt(arena(), a);
+    let sy = projection.lane_height();
+    for reduced in [false, true] {
+        let view = BattleViewModel::build(
+            a,
+            SceneAnimation::sample(a, reduced),
+            SceneBlend::NONE,
+            reduced,
+        );
+        let aim = |id: u64| {
+            let e = view.enemies.iter().find(|e| e.id == id).unwrap();
+            assert!(
+                e.windup.is_some(),
+                "reduced {reduced}: {id} shows its windup"
+            );
+            e.aim_target
+        };
+        assert_eq!(
+            aim(spitters[0]),
+            Some(wall.1),
+            "reduced {reduced}: at the wall"
+        );
+        assert_eq!(
+            aim(spitters[1]),
+            Some(a.defender_position()),
+            "reduced {reduced}: at the defender"
+        );
+        assert_eq!(aim(melee), None, "reduced {reduced}: a melee windup aims");
+        // The batched overlay draws each aim line as its dashes, one 4-vertex
+        // quad apiece, and nothing else.
+        let dashes: usize = view
+            .enemies
+            .iter()
+            .filter_map(|e| {
+                let [x, y] = e.drawn();
+                let to = e.aim_target?;
+                Some(
+                    enemies::aim_dashes(projection.world(x, y), projection.world(to[0], to[1]), sy)
+                        .len(),
+                )
+            })
+            .sum();
+        assert!(
+            dashes >= 16,
+            "reduced {reduced}: two dashed lines, {dashes} dashes"
+        );
+        let mut unaimed = view.clone();
+        for e in &mut unaimed.enemies {
+            e.aim_target = None;
+        }
+        assert_eq!(
+            vertices(&view_primitives(&game, &view, textures(), reduced)),
+            vertices(&view_primitives(&game, &unaimed, textures(), reduced)) + 4 * dashes,
+            "reduced {reduced}: the aim lines paint as dashes"
+        );
+        // The rejected-art path draws them too.
+        let rejected = ArtTextures {
+            enemy_art_rejected: true,
+            ..textures()
+        };
+        assert!(
+            vertices(&view_primitives(&game, &view, rejected, reduced))
+                > vertices(&view_primitives(&game, &unaimed, rejected, reduced)),
+            "reduced {reduced}: the rejected-art path draws the aim lines"
+        );
+    }
+}

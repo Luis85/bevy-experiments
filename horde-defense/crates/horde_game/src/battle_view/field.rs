@@ -93,6 +93,11 @@ pub struct EnemyView {
     pub phase: f32,
     pub contact: Option<ContactView>,
     pub windup: Option<f32>,
+    /// Where a ranged windup's spit lands, in world yards and lanes
+    /// (`Attempt::spit_target`): the painters draw a dashed aim line to it
+    /// from the drawn feet (W2-28). None for a melee windup and out of
+    /// windup.
+    pub aim_target: Option<[f32; 2]>,
     pub hit_flash: Option<f32>,
     pub stunned: bool,
     pub health: HealthView,
@@ -620,6 +625,9 @@ fn enemy_view(
         phase,
         contact,
         windup: (e.attack_phase == EnemyPhase::Windup).then_some(pose.windup),
+        aim_target: (e.attack_phase == EnemyPhase::Windup)
+            .then(|| a.spit_target(e))
+            .flatten(),
         hit_flash: (e.hit_stop_remaining() > 0).then(|| {
             (e.hit_stop_remaining() as f32 / horde_core::sim::ENEMY_HIT_STOP_TICKS as f32).sqrt()
         }),
