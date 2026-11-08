@@ -339,16 +339,27 @@ fn ranks_zero_to_four_lines() -> String {
 /// of W2-32 (the knee sits at rank 4 and rows 0-4 are frozen), apart from
 /// the one key W2-33 adds on purpose: elites roll from rank 3 (design
 /// enemy-balance §5), so ranks 3 and 4 write `elite_rate_bp` (200 and 265
-/// bp on Normal, times the preset's percent). With that key cut out the
-/// lines hash to the W2-32 value, and the key is pinned on its own.
+/// bp on Normal, times the preset's percent). W2-36 adds the other: a
+/// Capstone boss gains one phase transition on every preset (ruling W-9,
+/// design enemy-balance §6), so the Capstone lines, and only they, write
+/// `boss_phases` 1. With both keys cut out the lines hash to the W2-32
+/// value, and the keys are pinned on their own.
 #[test]
 fn ranks_zero_to_four_snapshot_pinned() {
     let lines = ranks_zero_to_four_lines();
     assert_eq!(lines.lines().count(), 5 * (1 + 5 * 2 * 4));
     const KEY: &str = ",\"elite_rate_bp\":";
+    const PHASES: &str = ",\"boss_phases\":1";
     let mut rates = BTreeSet::new();
     let mut stripped = String::new();
+    let mut capstones = 0;
     for line in lines.lines() {
+        let capstone = line.contains("\"boss_rank\":\"Capstone\"");
+        assert_eq!(line.contains(PHASES), capstone, "{line}");
+        assert_eq!(line.matches("boss_phases").count(), usize::from(capstone));
+        capstones += usize::from(capstone);
+        let owned = line.replacen(PHASES, "", 1);
+        let line = owned.as_str();
         // The JSON object, after the front position's Debug braces.
         let json = &line[line.find("{\"").unwrap()..];
         let value: Value = serde_json::from_str(json).unwrap();
@@ -372,6 +383,11 @@ fn ranks_zero_to_four_snapshot_pinned() {
     // and Custom from Hard 150%.
     let expected = [(3, 100), (3, 200), (3, 300), (4, 132), (4, 265), (4, 397)];
     assert_eq!(rates, BTreeSet::from(expected));
+    assert_eq!(
+        capstones,
+        5 * 5 * 2,
+        "a Capstone front per rank, preset and mode"
+    );
     assert_eq!(
         support::fnv1a(stripped.as_bytes()),
         RANKS_ZERO_TO_FOUR_FNV,

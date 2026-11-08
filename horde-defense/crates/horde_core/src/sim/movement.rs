@@ -50,9 +50,15 @@ impl Game {
                         blocker = Some(s.id);
                     }
                 }
-                let speed = if e.boss { 0.6 } else { enemy_profile(e).speed };
+                let speed = if e.boss {
+                    boss_speed(e)
+                } else {
+                    enemy_profile(e).speed
+                };
                 let injury = &a.enemies[n].injury;
+                // A boss holding after a phase transition stands still.
                 let slow = if a.enemies[n].statuses.active(StatusId::HitStop)
+                    || a.enemies[n].boss_held(a.tick)
                     || (a.mode == Mode::Npc && (injury.prone || injury.stunned))
                 {
                     0.0

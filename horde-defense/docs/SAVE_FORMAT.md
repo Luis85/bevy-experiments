@@ -177,8 +177,9 @@ id (1-64 bytes of `[a-z0-9_.-]`), archetype kills summing above the owner's
 phase ticks. v6 telemetry loads with them empty. Since W2-05 the spawn
 director, the reap and the defender-damage paths write the three archetype
 maps; since W2-33 the spawn director and the reap write the elite counters
-(an elite kill only while `elites_killed` is below `elites_spawned`). The
-boss phase ticks are not written yet. Because an attempt resumed from an
+(an elite kill only while `elites_killed` is below `elites_spawned`); since
+W2-36 each boss phase transition appends its tick to `boss_phase_ticks`.
+Because an attempt resumed from an
 older save has living enemies whose spawns were never counted, the writer
 counts a kill in `kills_by_archetype` only while that archetype's kills are
 below its `spawned_by_archetype` count. Otherwise the save could not load
@@ -212,6 +213,9 @@ non-neutral value yet (enemy-balance, wave 2).
   speed 1–2, armor 0.25–1, call interval and siege recovery 0.3–1, hold at
   most 180 ticks), a non-zero `hold_until` before any transition was
   entered, or a `hold_until` more than `hold_ticks` past the attempt tick.
+  Since W2-36 a boss spawned while the snapshot's `boss_phases` is above 0
+  carries `boss_state` (its kind's catalogue profile, `entered` 0); a boss
+  without it behaves as before.
 - `attempt.progression` may carry `elite_rate_bp` (0–10000, and 0 below
   rank 3), `front_ramp` (1–2, absent at exactly 1.0), `boss_rank` (`Sector`, `Regional` or
   `Capstone`; absent at `Sector`), `boss_phases` (0–2),

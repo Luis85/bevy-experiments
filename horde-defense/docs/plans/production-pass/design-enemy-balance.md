@@ -326,7 +326,9 @@ All mechanics are deterministic. `a.rng` is drawn only when an effect triggers, 
 |---|---|---|
 | Easy / Normal, r ≤ 4 | 0 | 1 |
 | Easy / Normal, r > 4 | 1 | 2 |
-| Hard | 1 at r ≤ 4, 2 above | 2 |
+| Hard | 0 at r ≤ 4, 2 above (W2-36, see below) | 1 at r ≤ 4, 2 above |
+
+W2-36 amended the Hard row on the plan §2.5 default (the W2-26 pin reading): `boss_phase_bonus` counts only past rank 4, so Hard at r ≤ 4 has Normal's count. The original row read "1 at r ≤ 4, 2 above" and Capstone 2.
 
 - Smoke (ranks 0-4, no country) and the first-victory fights are unchanged on Normal.
 
@@ -715,3 +717,11 @@ P1, P6, E3, E9, W-4, W-5, W-6, W-7, W-9, W-10, W-15, R21
   - Telemetry: the spawn counts `elites_spawned` and the reap counts `elites_killed`, only while it is below `elites_spawned` (the archetype-map rule), so `RunRecord.elite_kills` is populated.
   - The shared health guard is `sim::encounter_health_bound`, used by deploy and save validation. It counts the largest baked elite (precomputed at catalogue load) only when the snapshot's `elite_rate_bp` is above 0, and the boss with `boss_health_multiplier`, so every encounter without elites gets exactly the old bound.
   - Ranks 3 and 4 now write `elite_rate_bp`, so the W2-26 and W2-32 rank 0-4 pins were amended on purpose: `neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_depth_0` and enemy_schema's legacy-key test expect the key from rank 3, and `ranks_zero_to_four_snapshot_pinned` pins the rates on their own and hashes the lines without that key to the unchanged W2-32 value.
+- **W2-36, bosses.** The phase table, transitions, hold and touch points are as section 6 gives them. The readings W2-36 took:
+  - The transition count is three terms in three places: `ProgressionCatalog::snapshot` writes the rank term `(r > 4)`, the existing `fold_extras` adds Hard's `boss_phase_bonus` past rank 4, and `Campaign::progression_for` adds `BossRank::extra_transitions()` (Capstone 1) after stamping the boss rank, all capped at `MAX_BOSS_PHASES` (2). Hard at ranks 0-4 follows the plan §2.5 default (the W2-26 pin reading): Normal's count, 0 on a Sector or Regional stage and 1 on a Capstone (`hard_ranks_zero_to_four_have_normals_phase_count`); schema-v7 §3.10 and the section 6 table are amended to match. A one-stage country's only stage is its Capstone, so from W2-36 it writes `boss_phases` 1 at ranks 0-4; the W2-26 and W2-32 rank 0-4 pins pin that key on its own.
+  - `enemy_catalog.json` `boss_phases` is a list of `{ boss, name, speed_mult, armor_mult, call_interval_mult, siege_recovery_mult, hold_ticks }` records, every field written (the saved `BossPhaseProfile` has no defaults). Absent means no phases; a partial table, a duplicate kind, an unknown key or a profile out of bounds is rejected at load.
+  - `place_enemy` snapshots the profile into `boss_state` only when the snapshot's `boss_phases` is above 0, so every boss of ranks 0-4 off a Capstone, every legacy boss and every boss of a catalogue without the table keeps None and behaves as before.
+  - A transition is entered at the start of every `reap` (every damage step reaps), so it follows the hit that crossed the threshold; it compares `hp × 100 <= max_hp × threshold` on `Enemy.hp` in both modes (the NPC copy of the injury hit points). "At most one per tick": a boss whose `hold_until` equals this tick plus `hold_ticks` entered this tick. A boss dropped below 25% in one blow enters phase 1 on that tick and phase 2 on the next, restarting the hold.
+  - The hold covers ticks `entry .. entry + hold_ticks` (`BossState::held(tick) = tick < hold_until`): movement treats the boss as slowed to 0, and `enemy_attacks` neither counts down nor strikes, while the NPC turn bookkeeping (shock, consciousness, stun recovery) still runs.
+  - The multipliers read `mult^entered`, exactly 1.0 before the first transition. Speed scales `BOSS_BASE_SPEED` (0.6, the movement.rs literal; sim.rs:1201 no longer had one). Armor scales `enemy_armor_vs` for a boss on every hit source, `round(armor × m)` after exposure (so an exposed boss stays at 0). The call interval and siege recovery scale their integer ticks, `round(ticks × m)` (540 and 144 ticks for 0.6), not the seconds, so f32 rounding never adds a tick.
+  - `BossPhase` uses the event's `value` for the transition number and `duration_ticks` for the hold, `actor_id` the boss; the combat log notes "<boss> enters phase n: <name>". The visual twin is W2-37.

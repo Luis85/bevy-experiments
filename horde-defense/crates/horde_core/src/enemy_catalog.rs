@@ -383,6 +383,9 @@ pub struct EnemyCatalog {
     /// The largest health any elite can spawn with, (Personal, NPC); 0
     /// without affixes.
     elite_maximum_health: (i32, i32),
+    /// One phase profile per boss kind, in authored order; empty means no
+    /// boss phases.
+    boss_phases: Vec<(BossKind, crate::sim::BossPhaseProfile)>,
 }
 
 impl EnemyCatalog {
@@ -397,6 +400,15 @@ impl EnemyCatalog {
     /// not eligible.
     pub fn elite_eligible(&self, id: &str) -> bool {
         self.resolved.contains_key(id) && !self.elite_ineligible.contains(id)
+    }
+
+    /// The phase profile of `kind`'s boss (design enemy-balance §6, one
+    /// per kind); None when the catalogue authors no phases.
+    pub fn boss_phase(&self, kind: BossKind) -> Option<&crate::sim::BossPhaseProfile> {
+        self.boss_phases
+            .iter()
+            .find(|(boss, _)| *boss == kind)
+            .map(|(_, profile)| profile)
     }
 
     /// The authored elite affix ids, in table order.
@@ -702,6 +714,50 @@ struct AuthoredCatalog {
     /// See [`EliteAffix`]; absent means no elites.
     #[serde(default)]
     elite_affixes: Vec<EliteAffix>,
+    /// See [`AuthoredBossPhase`]; absent means no boss phases.
+    #[serde(default)]
+    boss_phases: Vec<AuthoredBossPhase>,
+}
+
+/// One boss kind's phase profile as authored: exactly one per
+/// [`BossKind`] when the table is present (design enemy-balance §6).
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct AuthoredBossPhase {
+    boss: BossKind,
+    name: String,
+    speed_mult: f32,
+    armor_mult: f32,
+    call_interval_mult: f32,
+    siege_recovery_mult: f32,
+    hold_ticks: u32,
+}
+
+/// Every profile within its bounds, and either no table or exactly one
+/// profile for each boss kind.
+fn check_boss_phases(
+    authored: Vec<AuthoredBossPhase>,
+) -> Result<Vec<(BossKind, crate::sim::BossPhaseProfile)>, String> {
+    const KINDS: [BossKind; 3] = [BossKind::Breacher, BossKind::Caller, BossKind::SiegeBrute];
+    let mut phases: Vec<(BossKind, crate::sim::BossPhaseProfile)> = Vec::new();
+    for phase in authored {
+        let profile = crate::sim::BossPhaseProfile {
+            name: phase.name,
+            speed_mult: phase.speed_mult,
+            armor_mult: phase.armor_mult,
+            call_interval_mult: phase.call_interval_mult,
+            siege_recovery_mult: phase.siege_recovery_mult,
+            hold_ticks: phase.hold_ticks,
+        };
+        if !profile.valid() || phases.iter().any(|(boss, _)| *boss == phase.boss) {
+            return Err(format!("Invalid or duplicate boss phase: {:?}", phase.boss));
+        }
+        phases.push((phase.boss, profile));
+    }
+    if !phases.is_empty() && phases.len() != KINDS.len() {
+        return Err("Boss phases need exactly one profile per boss kind".into());
+    }
+    Ok(phases)
 }
 
 /// A catalogue id: 1-64 bytes of `[a-z0-9_.-]`. Saved per-archetype
@@ -969,6 +1025,7 @@ impl AuthoredCatalog {
             &resolved,
             &elite_ineligible,
         )?;
+        let boss_phases = check_boss_phases(self.boss_phases)?;
         Ok(EnemyCatalog {
             resolved,
             defaults,
@@ -977,6 +1034,7 @@ impl AuthoredCatalog {
             elite_base: self.elite_base,
             elite_affixes: self.elite_affixes,
             elite_maximum_health,
+            boss_phases,
         })
     }
 }
@@ -1428,5 +1486,57 @@ mod tests {
         let legacy = parse(&data).unwrap();
         assert_eq!(legacy.elite_affix_ids().count(), 0);
         assert_eq!(legacy.elite_profile(&shambler, 7), None);
+    }
+
+    /// Design enemy-balance §6: one phase profile per boss kind, within the
+    /// profile bounds, and none without the table.
+    #[test]
+    fn boss_phase_table_has_one_bounded_profile_per_boss_kind() {
+        let catalog = parse(&authored()).unwrap();
+        let row = |kind| {
+            let p = catalog.boss_phase(kind).expect("a profile per kind");
+            (
+                p.name.as_str(),
+                p.speed_mult,
+                p.armor_mult,
+                p.call_interval_mult,
+                p.siege_recovery_mult,
+                p.hold_ticks,
+            )
+        };
+        assert_eq!(row(BossKind::Breacher), ("Breach", 1.4, 0.6, 1.0, 1.0, 90));
+        assert_eq!(row(BossKind::Caller), ("Chorus", 1.0, 1.0, 0.6, 1.0, 90));
+        assert_eq!(
+            row(BossKind::SiegeBrute),
+            ("Enrage", 1.2, 1.0, 1.0, 0.6, 90)
+        );
+        let rows: [(&str, serde_json::Value); 7] = [
+            ("/boss_phases/0/name", "".into()),
+            ("/boss_phases/0/name", "x".repeat(41).into()),
+            ("/boss_phases/0/speed_mult", 2.1.into()),
+            ("/boss_phases/0/armor_mult", 0.2.into()),
+            ("/boss_phases/1/call_interval_mult", 0.25.into()),
+            ("/boss_phases/2/siege_recovery_mult", 1.1.into()),
+            ("/boss_phases/2/hold_ticks", 181.into()),
+        ];
+        for (pointer, value) in rows {
+            let mut data = authored();
+            *data.pointer_mut(pointer).unwrap() = value;
+            assert!(parse(&data).is_err(), "accepted {pointer}");
+        }
+        let mut data = authored();
+        data["boss_phases"][1]["boss"] = "Breacher".into();
+        assert!(parse(&data).is_err(), "accepted a duplicate kind");
+        let mut data = authored();
+        data["boss_phases"].as_array_mut().unwrap().pop();
+        assert!(parse(&data).is_err(), "accepted a missing kind");
+        let mut data = authored();
+        data["boss_phases"][0]["phases"] = 3.into();
+        assert!(parse(&data).is_err(), "accepted an unknown key");
+        // Without the table no boss phases.
+        let mut data = authored();
+        data.as_object_mut().unwrap().remove("boss_phases");
+        let legacy = parse(&data).unwrap();
+        assert!(legacy.boss_phase(BossKind::Caller).is_none());
     }
 }

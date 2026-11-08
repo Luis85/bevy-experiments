@@ -58,6 +58,15 @@ impl FrontPosition {
         self.boss_rank() == BossRank::Regional
     }
 }
+impl BossRank {
+    /// The boss phase transitions this rank adds (ruling W-9): one on a
+    /// Capstone, none otherwise.
+    pub fn extra_transitions(self) -> u8 {
+        u8::from(self == BossRank::Capstone)
+    }
+}
+/// The most phase transitions one boss may enter (schema v7 §3.10).
+pub const MAX_BOSS_PHASES: u8 = 2;
 /// Boss scaling starts above this rank: the boss damage rank term and the
 /// boss phase gate (design enemy-balance §6, ruling W-6) ...
 const BOSS_SCALING_FROM_RANK: u32 = 4;
@@ -531,6 +540,10 @@ impl ProgressionCatalog {
             boss_armor_multiplier: self.boss_armor_multiplier(rank),
             npc_boss_armor_add: self.npc_boss_armor_add(rank),
             elite_rate_bp: self.elite.bp(rank),
+            // The rank term of the transition count (design enemy-balance
+            // §6): one transition past rank 4. The preset bonus and the
+            // boss-rank term are folded in at deploy.
+            boss_phases: u8::from(rank > BOSS_SCALING_FROM_RANK),
             // The other enemy-side fields stay neutral until their wave-2
             // writers.
             ..ProgressionSnapshot::default()
@@ -617,10 +630,11 @@ impl ProgressionSnapshot {
     /// E3), in integer math: the elite rate scales by `elite_rate_pct`
     /// (at most 10000 bp), and past the rank-4 phase gate the boss gains
     /// `boss_phase_bonus` transitions (at most 2). Normal's extras (100,
-    /// 100, 0) change nothing, and ranks 0-4 gain no phase on any preset
-    /// (the rank and Capstone phase terms arrive with the boss phases,
-    /// W2-36). The front-ramp percent is folded with the front position in
-    /// `Campaign::progression_for`.
+    /// 100, 0) change nothing, and the bonus adds no phase at ranks 0-4 on
+    /// any preset (plan §2.5, the W2-26 pin reading). The rank term is the
+    /// rank snapshot's; the front-ramp percent and the boss-rank term
+    /// ([`BossRank::extra_transitions`]) are folded with the front position
+    /// in `Campaign::progression_for`.
     pub fn fold_extras(&mut self, extras: crate::balance::PresetExtras) {
         if self.elite_rate_bp != 0 && extras.elite_rate_pct != 100 {
             let scaled = u64::from(self.elite_rate_bp) * u64::from(extras.elite_rate_pct) / 100;
@@ -630,7 +644,7 @@ impl ProgressionSnapshot {
             self.boss_phases = self
                 .boss_phases
                 .saturating_add(extras.boss_phase_bonus)
-                .min(2);
+                .min(MAX_BOSS_PHASES);
         }
     }
     pub fn validate(&self) -> Result<(), String> {
@@ -666,7 +680,7 @@ impl ProgressionSnapshot {
             || self.elite_rate_bp > 10_000
             || (self.rank < 3 && self.elite_rate_bp != 0)
             || !finite(self.front_ramp, 1.0, 2.0)
-            || self.boss_phases > 2
+            || self.boss_phases > MAX_BOSS_PHASES
             || !finite(self.boss_armor_multiplier, 1.0, 4.0)
             || !(0..=20).contains(&self.npc_boss_armor_add)
             || !finite(self.boss_health_multiplier, 1.0, 2.0)

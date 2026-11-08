@@ -481,7 +481,9 @@ fn boss_damage_multiplier_is_exactly_one_through_rank_4() {
 /// round-trip byte-identically. Depth 0 here means no country or stage 0
 /// of a multi-stage front. A one-stage front is also at depth 0, but its
 /// only stage is its Capstone (ruling W-9), so it adds exactly the
-/// `boss_rank` key; that exception is pinned below, not skipped.
+/// `boss_rank` key and, since W2-36, the Capstone's one boss phase
+/// transition (`boss_phases` 1, design enemy-balance §6); that exception is
+/// pinned below, not skipped.
 #[test]
 fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_depth_0() {
     let expected: BTreeSet<String> = SNAPSHOT_KEYS.into_iter().map(String::from).collect();
@@ -505,6 +507,7 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
     }
     let mut capstone = expected.clone();
     capstone.insert("boss_rank".into());
+    capstone.insert("boss_phases".into());
     for (name, c) in every_preset() {
         for mode in MODES {
             for rank in 0..=4 {
@@ -516,7 +519,7 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
                     "{name} {mode:?} rank {rank} one stage"
                 );
                 assert!(
-                    text.contains("\"boss_rank\":\"Capstone\""),
+                    text.contains("\"boss_rank\":\"Capstone\",\"boss_phases\":1"),
                     "{name} {mode:?} rank {rank}: {text}"
                 );
                 let restored: ProgressionSnapshot = serde_json::from_str(&text).unwrap();
@@ -596,12 +599,16 @@ fn preset_extras_fold_into_the_snapshot() {
     capped.fold_extras(extras(300, 0));
     assert_eq!(capped.elite_rate_bp, 10_000);
     // On the bundled catalogue the shipped presets fold into the deploy
-    // snapshot: Hard's bonus past rank 4, nothing below.
+    // snapshot: past rank 4 the rank term gives one transition (W2-36) and
+    // Hard's bonus a second; nothing at ranks 0-4.
     for rank in [0, 4, 5, 20] {
         let hard = at(&on(BalancePreset::Hard), Mode::Personal, rank, None);
-        assert_eq!(hard.boss_phases, u8::from(rank > 4), "rank {rank}");
+        assert_eq!(hard.boss_phases, 2 * u8::from(rank > 4), "rank {rank}");
         for preset in [BalancePreset::Easy, BalancePreset::Normal] {
-            assert_eq!(at(&on(preset), Mode::Personal, rank, None).boss_phases, 0);
+            assert_eq!(
+                at(&on(preset), Mode::Personal, rank, None).boss_phases,
+                u8::from(rank > 4)
+            );
         }
     }
 }

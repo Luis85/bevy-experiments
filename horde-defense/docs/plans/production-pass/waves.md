@@ -504,6 +504,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 **W2-37 · vfx-lighting · Visual twin for BossPhase**
 - Files: `BattleView.boss_phase`; the "PHASE n - NAME" label and a ring for the whole hold (static ring in reduced mode).
 - Fail-first: `boss_phase_hold_shows_phase_label_and_ring_for_90_ticks` (normal and reduced).
+- Note (W2-36, 2026-11-08): the saved `Event` of kind `BossPhase` carries the transition number in `value`, the hold in `duration_ticks` (90) and the boss in `actor_id`; `SimEvent::BossPhase { boss_id, kind, phase, lane, at }` is unchanged. The live state is `Enemy.boss_state` (`entered`, `hold_until`, `profile.name`; `BossState::held(tick)`), so the hold left is `hold_until - tick`. horde_game still maps `SimEvent::BossPhase` to no cue (`runner/runtime.rs`).
 - Deps: W2-36.
 
 **W2-38 · enemy-balance · generate_world.py commit A (writer only)**

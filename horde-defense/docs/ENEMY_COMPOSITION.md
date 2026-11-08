@@ -211,6 +211,42 @@ save validation) counts the largest elite whenever the snapshot rolls elites.
 Telemetry counts `elites_spawned` and `elites_killed` (never more kills than
 spawns); a finished run's record copies the kills into `elite_kills`.
 
+## Boss phases
+
+Bosses gain phases, not new kinds (W2-36, design enemy-balance §6).
+`boss_phases` holds exactly one profile per `BossKind` (absent means no
+phases; a partial or duplicate table is rejected at load):
+
+| boss | name | speed | armor | call interval | siege recovery | hold |
+| --- | --- | --- | --- | --- | --- | --- |
+| Breacher | Breach | ×1.4 | ×0.6 | – | – | 90 ticks |
+| Caller | Chorus | – | – | ×0.6 | – | 90 ticks |
+| SiegeBrute | Enrage | ×1.2 | – | – | ×0.6 | 90 ticks |
+
+Bounds: name 1–40 bytes, speed ×1–2, armor ×0.25–1, call interval and siege
+recovery ×0.3–1, hold 0–180 ticks.
+
+The deploy snapshot freezes how many transitions the boss may enter:
+`boss_phases = min(2, (rank > 4) + boss_phase_bonus + rank term)`, where the
+preset bonus (Hard 1) applies only past rank 4 and a Capstone stage adds one.
+Easy and Normal: 0 through rank 4 (1 on a Capstone), then 1 (2 on a
+Capstone); Hard: Normal's count through rank 4, then 2. The boss copies its
+kind's profile into `Enemy.boss_state` at spawn, so a later catalogue edit
+never reaches an in-flight boss, and a boss without phases (every legacy
+boss) carries none.
+
+Transition n enters when the boss's hit points fall to `BOSS_PHASE_THRESHOLDS
+[n - 1]` percent of its maximum (50, then 25), at most one per tick. It
+applies each multiplier to the power n, clamped at the bounds (speed at most
+2, armor at least 0.25, interval and recovery at least 0.3): speed scales
+`BOSS_BASE_SPEED` (0.6 yd/s), armor scales every hit after the rank armor and
+before exposure (an exposed boss still has 0), the Caller's next call comes
+after `round(interval ticks × m)` and the Siege Brute's recovery after
+`round(recovery ticks × m)`. For the hold the boss neither moves nor counts
+down or strikes its attack. Each transition publishes `BossPhase` (value n,
+lasting the hold) and records its tick in `telemetry.boss_phase_ticks`. It
+draws no RNG.
+
 ## Validation limits
 
 JSON input is capped at 4 MiB. Each component/archetype table and the template

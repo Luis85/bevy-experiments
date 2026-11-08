@@ -431,7 +431,7 @@ fn legacy_resolved_enemy_and_snapshot_serialize_byte_identically() {
         // W2-26: the boss damage rank term is written from rank 5 on; W2-32:
         // so is the Personal boss armor term, and the NPC boss armor add from
         // rank 12 (one per 8 ranks above 4); W2-33: the elite rate from
-        // rank 3.
+        // rank 3; W2-36: the boss phase transition from rank 5.
         let mut expected = legacy.clone();
         if rank >= 3 {
             expected.insert("elite_rate_bp".into());
@@ -439,6 +439,7 @@ fn legacy_resolved_enemy_and_snapshot_serialize_byte_identically() {
         if rank > 4 {
             expected.insert("boss_damage_multiplier".into());
             expected.insert("boss_armor_multiplier".into());
+            expected.insert("boss_phases".into());
         }
         if rank >= 12 {
             expected.insert("npc_boss_armor_add".into());

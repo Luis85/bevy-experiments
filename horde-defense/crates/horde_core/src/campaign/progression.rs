@@ -611,6 +611,11 @@ impl Campaign {
             result.arrival_multiplier = (result.arrival_multiplier * ramp).min(8.0);
         }
         result.boss_rank = front.map_or_else(Default::default, |f| f.boss_rank());
+        // A Capstone boss gains a transition (ruling W-9), at most two.
+        result.boss_phases = result
+            .boss_phases
+            .saturating_add(result.boss_rank.extra_transitions())
+            .min(crate::progression::MAX_BOSS_PHASES);
         Ok(result)
     }
     /// The next deploy's rank snapshot, before any front position (the

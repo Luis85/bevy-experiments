@@ -93,7 +93,14 @@ impl Game {
                 ));
             }
             if a.tick >= a.caller_tick {
-                a.caller_tick = a.tick + u64::from(seconds(level.boss_timing.call_interval));
+                let m = a
+                    .enemies
+                    .iter()
+                    .find(|e| e.boss)
+                    .and_then(|e| e.boss_state.as_ref())
+                    .map_or(1.0, BossState::call_interval_mult);
+                a.caller_tick =
+                    a.tick + u64::from(phase_ticks(seconds(level.boss_timing.call_interval), m));
                 for l in a.caller_lanes.take().unwrap_or([0, a.lane_count / 2]) {
                     if a.enemies.iter().filter(|e| !e.boss).count() < a.enemy_cap() {
                         self.spawn_enemy(a, EnemyKind::Runner, l, false);
@@ -300,7 +307,21 @@ impl Game {
             statuses: Statuses::default(),
             resolved: (!boss).then_some(resolved),
             split_child: split_at.is_some(),
-            boss_state: None,
+            // Snapshotted at spawn like `boss_timing`: the frozen transition
+            // count and the current catalogue's profile for the level's boss.
+            boss_state: boss
+                .then_some(a.progression.boss_phases)
+                .filter(|&transitions| transitions > 0)
+                .and_then(|transitions| {
+                    crate::enemy_catalog::enemy_catalog()
+                        .boss_phase(level.boss)
+                        .map(|profile| BossState {
+                            profile: profile.clone(),
+                            transitions,
+                            entered: 0,
+                            hold_until: 0,
+                        })
+                }),
         });
         a.telemetry.spawned += 1;
         if elite {

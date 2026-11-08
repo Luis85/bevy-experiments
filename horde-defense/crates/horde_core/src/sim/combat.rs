@@ -101,6 +101,61 @@ fn split_child_profile(archetype_id: &str) -> crate::enemy_catalog::ResolvedEnem
         .unwrap_or_else(|| crate::enemy_catalog::resolve_kind(EnemyKind::Runner))
 }
 
+/// Enters the living boss's next phase when its hit points are at or below
+/// that transition's threshold (design enemy-balance §6): at most one
+/// transition per tick and never past the transitions frozen at spawn. It
+/// starts the hold, publishes `BossPhase` (value = the transition number,
+/// lasting the hold) and records the tick in the telemetry. Draws no RNG.
+fn enter_boss_phase(a: &mut Attempt) {
+    let mode = a.mode;
+    let tick = a.tick;
+    let Some(e) = a
+        .enemies
+        .iter_mut()
+        .find(|e| e.boss && e.condition(mode) != EnemyCondition::Defeated)
+    else {
+        return;
+    };
+    let Some(state) = e.boss_state.as_mut() else {
+        return;
+    };
+    // `hold_until` is only written on entry, so this is this tick's entry.
+    let entered_this_tick =
+        state.entered > 0 && state.hold_until == tick + u64::from(state.profile.hold_ticks);
+    if state.entered >= state.transitions || entered_this_tick {
+        return;
+    }
+    let threshold = BOSS_PHASE_THRESHOLDS[usize::from(state.entered).min(1)];
+    if i64::from(e.hp) * 100 > i64::from(e.max_hp) * i64::from(threshold) {
+        return;
+    }
+    state.entered += 1;
+    state.hold_until = tick + u64::from(state.profile.hold_ticks);
+    let (phase, hold, name) = (
+        state.entered,
+        state.profile.hold_ticks,
+        state.profile.name.clone(),
+    );
+    let (id, lane, point) = (e.id, e.lane, [e.x, e.y()]);
+    if a.telemetry.boss_phase_ticks.len() < telemetry::MAX_BOSS_PHASE_TICKS {
+        a.telemetry.boss_phase_ticks.push(tick);
+    }
+    a.event_with(
+        EventKind::BossPhase,
+        point,
+        point,
+        i32::from(phase),
+        EventMetadata {
+            actor_id: Some(id),
+            lane: Some(lane),
+            duration_ticks: hold,
+            ..Default::default()
+        },
+    );
+    let boss_name = content().levels[a.level].boss_name.clone();
+    a.note(format!("{boss_name} enters phase {phase}: {name}"));
+}
+
 /// Removes every structure a strike or blast destroyed and releases the
 /// hostiles that targeted it.
 fn remove_destroyed_structures(a: &mut Attempt) {
@@ -139,7 +194,10 @@ impl Game {
             {
                 continue;
             }
-            if a.enemies[n].contact_since.is_some_and(|tick| a.tick > tick) {
+            // A boss holding after a phase transition neither counts down
+            // nor strikes; its NPC turn bookkeeping still runs.
+            let held = a.enemies[n].boss_held(a.tick);
+            if !held && a.enemies[n].contact_since.is_some_and(|tick| a.tick > tick) {
                 a.enemies[n].attack_left = a.enemies[n].attack_left.saturating_sub(1);
                 if a.enemies[n].attack_phase == EnemyPhase::Recovery
                     && a.enemies[n].attack_left == 0
@@ -195,6 +253,9 @@ impl Game {
                     a.enemies[n].ready_turns -= 1;
                     continue;
                 }
+            }
+            if held {
+                continue;
             }
             let e = &a.enemies[n];
             let Some(contact_tick) = e.contact_since else {
@@ -271,7 +332,13 @@ impl Game {
                 EnemyPhase::Windup
             };
             a.enemies[n].attack_left = if siege {
-                seconds(content().levels[a.level].boss_timing.siege_recovery)
+                phase_ticks(
+                    seconds(content().levels[a.level].boss_timing.siege_recovery),
+                    a.enemies[n]
+                        .boss_state
+                        .as_ref()
+                        .map_or(1.0, BossState::siege_recovery_mult),
+                )
             } else if a.mode == Mode::Personal {
                 seconds(d.windup)
             } else {
@@ -839,6 +906,9 @@ impl Game {
         }
     }
     pub(super) fn reap(&mut self, a: &mut Attempt) {
+        // Every damage step reaps, so a boss enters its phase right after
+        // the hit that crossed the threshold.
+        enter_boss_phase(a);
         // A hostile a death burst defeated this tick waits for the next.
         let (burst_tick, held) = &a.burst_victims;
         let defeated: Vec<usize> = a

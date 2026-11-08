@@ -1,4 +1,6 @@
 mod auto_sell;
+#[cfg(test)]
+mod boss_phase_tests;
 mod combat;
 #[cfg(test)]
 mod composition_tests;
@@ -211,6 +213,35 @@ pub struct BossState {
     pub hold_until: u64,
 }
 impl BossState {
+    /// `base` to the power of the transitions entered, clamped by `bound`.
+    /// Exactly 1.0 before the first transition.
+    fn factor(&self, base: f32, bound: impl Fn(f32) -> f32) -> f32 {
+        if self.entered == 0 {
+            return 1.0;
+        }
+        bound(base.powi(i32::from(self.entered)))
+    }
+    /// The speed multiplier after the transitions entered, at most 2.
+    pub fn speed_mult(&self) -> f32 {
+        self.factor(self.profile.speed_mult, |m| m.min(2.0))
+    }
+    /// The armor multiplier after the transitions entered, at least 0.25.
+    pub fn armor_mult(&self) -> f32 {
+        self.factor(self.profile.armor_mult, |m| m.max(0.25))
+    }
+    /// The Caller's call-interval multiplier, at least 0.3.
+    pub fn call_interval_mult(&self) -> f32 {
+        self.factor(self.profile.call_interval_mult, |m| m.max(0.3))
+    }
+    /// The Siege Brute's recovery multiplier, at least 0.3.
+    pub fn siege_recovery_mult(&self) -> f32 {
+        self.factor(self.profile.siege_recovery_mult, |m| m.max(0.3))
+    }
+    /// Whether the boss holds at `tick`: it neither moves nor counts down
+    /// its attack for `hold_ticks` from the tick it entered a phase.
+    pub fn held(&self, tick: u64) -> bool {
+        tick < self.hold_until
+    }
     /// Valid in an attempt at `tick`: a hold began at or before `tick`, so it
     /// ends at most `hold_ticks` later, and a boss that entered no transition
     /// holds nothing.
@@ -295,6 +326,11 @@ impl Enemy {
     /// Movement steps still held by hit-stop; 0 when the enemy may move.
     pub fn hit_stop_remaining(&self) -> u32 {
         self.statuses.remaining(StatusId::HitStop)
+    }
+    /// A phased boss holding after a transition at `tick` (see
+    /// [`BossState::held`]); never a regular enemy or a boss without phases.
+    pub fn boss_held(&self, tick: u64) -> bool {
+        self.boss_state.as_ref().is_some_and(|s| s.held(tick))
     }
     pub fn y(&self) -> f32 {
         self.lane as f32 + 0.5 + self.pass_offset
@@ -1811,6 +1847,30 @@ fn enemy_profile(e: &Enemy) -> &crate::enemy_catalog::ResolvedEnemy {
 fn enemy_reach(e: &Enemy) -> f32 {
     if e.boss { 0.0 } else { enemy_profile(e).reach }
 }
+/// Every boss walks at this many yards a second before its phases.
+pub const BOSS_BASE_SPEED: f32 = 0.6;
+/// The boss phase thresholds, in percent of its maximum hit points:
+/// transition n enters at or below `BOSS_PHASE_THRESHOLDS[n - 1]` (design
+/// enemy-balance §6).
+pub const BOSS_PHASE_THRESHOLDS: [i32; 2] = [50, 25];
+/// A boss's walking speed in yards a second before encounter modifiers:
+/// [`BOSS_BASE_SPEED`] times its phase speed multiplier (exactly the base
+/// before its first transition and for a boss without phases).
+pub fn boss_speed(boss: &Enemy) -> f32 {
+    match &boss.boss_state {
+        Some(state) if state.entered > 0 => BOSS_BASE_SPEED * state.speed_mult(),
+        _ => BOSS_BASE_SPEED,
+    }
+}
+/// `ticks` scaled by a phase multiplier `m`, rounded; exactly `ticks` at
+/// 1.0.
+fn phase_ticks(ticks: u32, m: f32) -> u32 {
+    if m == 1.0 {
+        ticks
+    } else {
+        (ticks as f32 * m).round() as u32
+    }
+}
 /// Where an enemy with `reach` stops on a `width`-yard field (design
 /// enemy-balance §4, W2-27): `clamp(DEFENSE_LINE + reach, DEFENSE_LINE,
 /// width / 2)`, so no enemy stations in the far half (acceptance G6.6).
@@ -1884,10 +1944,20 @@ impl HitSource {
 }
 /// The armor `e` meets from `source`: its armor, plus its ranged armor
 /// (`ranged_armor` Personal, `npc_ranged_armor` NPC) against shots and turret
-/// fire while it is not in contact at the line. Bosses carry none.
+/// fire while it is not in contact at the line. Bosses carry none; a boss's
+/// armor is scaled by its phase `armor_mult` (design enemy-balance §6), on
+/// top of the rank armor it spawned with, and exposure still drops it to 0.
 fn enemy_armor_vs(a: &Attempt, e: &Enemy, source: HitSource) -> i32 {
     let armor = enemy_armor(a, e);
-    if !source.ranged() || e.boss || e.contact() {
+    if e.boss {
+        let m = e.boss_state.as_ref().map_or(1.0, BossState::armor_mult);
+        return if m == 1.0 {
+            armor
+        } else {
+            (armor as f32 * m).round() as i32
+        };
+    }
+    if !source.ranged() || e.contact() {
         return armor;
     }
     let profile = enemy_profile(e);

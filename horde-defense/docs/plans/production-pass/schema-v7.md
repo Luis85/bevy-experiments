@@ -156,7 +156,7 @@ The 11 existing archetypes serialize nothing new. An unknown affix id or split t
 | `elite_rate_bp` | u32 0..=10000; 0 when rank < 3 | 0 | `min(10000, elite_bp(r) * extras.elite_rate_pct / 100)`; elite_bp: 0 below 3, 200 at 3, linear to 1500 at 23, then flat |
 | `front_ramp` | f32 1..=2 (already folded into enemy_health and arrival) | 1.0 (`is_one_f32`) | `1 + front_ramp_max * (front_ramp_pct/100) * depth`; the literal 1.0 when depth == 0, pct 0 or no country |
 | `boss_rank` | BossRank | Sector | `FrontPosition::boss_rank()`: Capstone if stage+1 == count, else Regional if (stage+1)%6 == 0, else Sector |
-| `boss_phases` | u8 0..=2 | 0 | `min(2, (r>4) as u8 + boss_phase_bonus + rank.extra_transitions)` |
+| `boss_phases` | u8 0..=2 | 0 | `min(2, (r>4) as u8 + boss_phase_bonus + rank.extra_transitions)`, with `boss_phase_bonus` counted only when r > 4 (amended by W2-36 on the plan §2.5 default, the W2-26 pin reading: Hard at r ≤ 4 has Normal's count, 0 on a Sector or Regional stage and 1 on a Capstone; `hard_ranks_zero_to_four_have_normals_phase_count`) |
 | `boss_armor_multiplier` | f32 1..=4 | 1.0 | EB rank formula (W2) × rank factor (W4) |
 | `npc_boss_armor_add` | i32 0..=20 | 0 | EB (W2); Capstone +2 (W4) |
 | `boss_health_multiplier` | f32 1..=2 | 1.0 | Regional 1.2, Capstone 1.4 (W4) |

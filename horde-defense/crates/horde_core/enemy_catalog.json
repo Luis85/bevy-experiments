@@ -1719,5 +1719,34 @@
         }
       }
     }
+  ],
+  "boss_phases": [
+    {
+      "boss": "Breacher",
+      "name": "Breach",
+      "speed_mult": 1.4,
+      "armor_mult": 0.6,
+      "call_interval_mult": 1.0,
+      "siege_recovery_mult": 1.0,
+      "hold_ticks": 90
+    },
+    {
+      "boss": "Caller",
+      "name": "Chorus",
+      "speed_mult": 1.0,
+      "armor_mult": 1.0,
+      "call_interval_mult": 0.6,
+      "siege_recovery_mult": 1.0,
+      "hold_ticks": 90
+    },
+    {
+      "boss": "SiegeBrute",
+      "name": "Enrage",
+      "speed_mult": 1.2,
+      "armor_mult": 1.0,
+      "call_interval_mult": 1.0,
+      "siege_recovery_mult": 0.6,
+      "hold_ticks": 90
+    }
   ]
 }
