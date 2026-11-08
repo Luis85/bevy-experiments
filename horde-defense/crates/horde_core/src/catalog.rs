@@ -285,9 +285,14 @@ pub fn init_catalogs() -> Result<CatalogReport, ContentError> {
     crate::content::install()?;
     crate::world::install()?;
     crate::skill_catalog::install()?;
-    crate::enemy_catalog::install()?;
+    let enemies = crate::enemy_catalog::install()?;
     crate::ordnance::install()?;
-    crate::progression::install()?;
+    crate::progression::install()?
+        .check_wave_tiers(enemies)
+        .map_err(|message| ContentError::Invalid {
+            catalog: "progression",
+            message,
+        })?;
     crate::quality::install()?;
     crate::balance::install()?;
     Ok(CatalogReport {
@@ -319,8 +324,10 @@ mod tests {
         // (and review save compatibility) only when the ids really change.
         // The checked-in v2/v3 save fixtures hold the value before W2-08
         // appended the 39 loot-only item ids (13_545_676_443_720_933_061);
-        // they still load and only log the catalogue drift.
-        assert_eq!(content_fingerprint(), 10_534_622_978_645_713_211);
+        // they still load and only log the catalogue drift. W2-31 appended
+        // the 7 composition archetype ids (10_534_622_978_645_713_211
+        // before it).
+        assert_eq!(content_fingerprint(), 12_142_090_777_039_725_619);
     }
 
     #[test]

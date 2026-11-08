@@ -47,6 +47,49 @@
       "health": 184,
       "npc_hp": 24,
       "npc_ht": 13
+    },
+    {
+      "id": "exploder",
+      "health": 40,
+      "npc_hp": 10,
+      "npc_ht": 10
+    },
+    {
+      "id": "splitter",
+      "health": 130,
+      "npc_hp": 18,
+      "npc_ht": 12
+    },
+    {
+      "id": "splitter-brood",
+      "health": 14,
+      "npc_hp": 5,
+      "npc_ht": 9
+    },
+    {
+      "id": "spitter",
+      "health": 30,
+      "npc_hp": 8,
+      "npc_ht": 10
+    },
+    {
+      "id": "shield-bearer",
+      "health": 80,
+      "npc_hp": 12,
+      "npc_ht": 11
+    },
+    {
+      "id": "sprinter",
+      "health": 16,
+      "npc_hp": 6,
+      "npc_ht": 9
+    },
+    {
+      "id": "juggernaut",
+      "health": 420,
+      "npc_hp": 30,
+      "npc_ht": 14,
+      "stagger_immune": true
     }
   ],
   "movements": [
@@ -85,6 +128,34 @@
     {
       "id": "restless",
       "speed": 0.64
+    },
+    {
+      "id": "exploder",
+      "speed": 0.42
+    },
+    {
+      "id": "splitter",
+      "speed": 0.33
+    },
+    {
+      "id": "splitter-brood",
+      "speed": 1.0
+    },
+    {
+      "id": "spitter",
+      "speed": 0.55
+    },
+    {
+      "id": "shield-bearer",
+      "speed": 0.4
+    },
+    {
+      "id": "sprinter",
+      "speed": 1.45
+    },
+    {
+      "id": "juggernaut",
+      "speed": 0.24
     }
   ],
   "attacks": [
@@ -159,6 +230,70 @@
       "npc_damage_dice": 2,
       "npc_damage_add": 2,
       "structure_damage_multiplier": 2
+    },
+    {
+      "id": "exploder",
+      "damage": 1,
+      "windup": 1.5,
+      "npc_skill": 9,
+      "npc_damage_dice": 1,
+      "npc_damage_add": 0,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "splitter",
+      "damage": 12,
+      "windup": 1.8,
+      "npc_skill": 11,
+      "npc_damage_dice": 2,
+      "npc_damage_add": 0,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "splitter-brood",
+      "damage": 3,
+      "windup": 0.8,
+      "npc_skill": 9,
+      "npc_damage_dice": 1,
+      "npc_damage_add": -2,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "spitter",
+      "damage": 6,
+      "windup": 1.6,
+      "npc_skill": 11,
+      "npc_damage_dice": 1,
+      "npc_damage_add": 1,
+      "structure_damage_multiplier": 1,
+      "reach": 4.0
+    },
+    {
+      "id": "shield-bearer",
+      "damage": 8,
+      "windup": 1.4,
+      "npc_skill": 11,
+      "npc_damage_dice": 1,
+      "npc_damage_add": 2,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "sprinter",
+      "damage": 3,
+      "windup": 0.8,
+      "npc_skill": 10,
+      "npc_damage_dice": 1,
+      "npc_damage_add": -1,
+      "structure_damage_multiplier": 1
+    },
+    {
+      "id": "juggernaut",
+      "damage": 22,
+      "windup": 2.2,
+      "npc_skill": 12,
+      "npc_damage_dice": 3,
+      "npc_damage_add": 2,
+      "structure_damage_multiplier": 3
     }
   ],
   "defenses": [
@@ -217,6 +352,57 @@
       "npc_armor": 4,
       "npc_dodge": 6,
       "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "exploder",
+      "armor": 0,
+      "npc_armor": 0,
+      "npc_dodge": 6,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "splitter",
+      "armor": 2,
+      "npc_armor": 2,
+      "npc_dodge": 6,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "splitter-brood",
+      "armor": 0,
+      "npc_armor": 0,
+      "npc_dodge": 8,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "spitter",
+      "armor": 0,
+      "npc_armor": 0,
+      "npc_dodge": 8,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "shield-bearer",
+      "armor": 6,
+      "npc_armor": 3,
+      "npc_dodge": 7,
+      "contact_armor_fraction": 0.5,
+      "ranged_armor": 14,
+      "npc_ranged_armor": 4
+    },
+    {
+      "id": "sprinter",
+      "armor": 0,
+      "npc_armor": 0,
+      "npc_dodge": 9,
+      "contact_armor_fraction": 1.0
+    },
+    {
+      "id": "juggernaut",
+      "armor": 6,
+      "npc_armor": 5,
+      "npc_dodge": 5,
+      "contact_armor_fraction": 1.0
     }
   ],
   "rewards": [
@@ -259,6 +445,41 @@
       "id": "siege-pack",
       "coins": 15,
       "xp": 10
+    },
+    {
+      "id": "exploder",
+      "coins": 3,
+      "xp": 2
+    },
+    {
+      "id": "splitter",
+      "coins": 9,
+      "xp": 6
+    },
+    {
+      "id": "splitter-brood",
+      "coins": 1,
+      "xp": 1
+    },
+    {
+      "id": "spitter",
+      "coins": 5,
+      "xp": 3
+    },
+    {
+      "id": "shield-bearer",
+      "coins": 8,
+      "xp": 5
+    },
+    {
+      "id": "sprinter",
+      "coins": 2,
+      "xp": 1
+    },
+    {
+      "id": "juggernaut",
+      "coins": 20,
+      "xp": 12
     }
   ],
   "visuals": [
@@ -382,6 +603,83 @@
         1.0
       ],
       "scale": 0.96
+    },
+    {
+      "id": "exploder",
+      "sprite": "Shambler",
+      "tint": [
+        0.72,
+        0.9,
+        0.5,
+        1.0
+      ],
+      "scale": 1.15
+    },
+    {
+      "id": "splitter",
+      "sprite": "Brute",
+      "tint": [
+        0.85,
+        0.78,
+        0.9,
+        1.0
+      ],
+      "scale": 1.05
+    },
+    {
+      "id": "splitter-brood",
+      "sprite": "Runner",
+      "tint": [
+        0.85,
+        0.78,
+        0.9,
+        1.0
+      ],
+      "scale": 0.6
+    },
+    {
+      "id": "spitter",
+      "sprite": "Runner",
+      "tint": [
+        0.6,
+        0.9,
+        0.85,
+        1.0
+      ],
+      "scale": 0.95
+    },
+    {
+      "id": "shield-bearer",
+      "sprite": "Armored",
+      "tint": [
+        0.8,
+        0.85,
+        0.95,
+        1.0
+      ],
+      "scale": 1.05
+    },
+    {
+      "id": "sprinter",
+      "sprite": "Runner",
+      "tint": [
+        1.0,
+        0.85,
+        0.7,
+        1.0
+      ],
+      "scale": 0.85
+    },
+    {
+      "id": "juggernaut",
+      "sprite": "Brute",
+      "tint": [
+        0.7,
+        0.7,
+        0.75,
+        1.0
+      ],
+      "scale": 1.4
     }
   ],
   "archetypes": [
@@ -520,6 +818,134 @@
       "reward": "shambler",
       "visual": "hungry-shambler",
       "unlocked_by": null
+    },
+    {
+      "id": "exploder",
+      "name": "Bloater",
+      "base_enemy_kind": "Shambler",
+      "target_urgency": -4.0,
+      "body": "exploder",
+      "movement": "exploder",
+      "attack": "exploder",
+      "defense": "exploder",
+      "reward": "exploder",
+      "visual": "exploder",
+      "unlocked_by": null,
+      "death_effect": {
+        "Burst": {
+          "radius": 1.6,
+          "damage": 30,
+          "structure_damage": 40,
+          "npc_dice": 3,
+          "npc_add": 0,
+          "fuse": true
+        }
+      },
+      "tags": [
+        "volatile",
+        "hazard"
+      ]
+    },
+    {
+      "id": "splitter",
+      "name": "Brood husk",
+      "base_enemy_kind": "Brute",
+      "body": "splitter",
+      "movement": "splitter",
+      "attack": "splitter",
+      "defense": "splitter",
+      "reward": "splitter",
+      "visual": "splitter",
+      "unlocked_by": null,
+      "death_effect": {
+        "Split": {
+          "archetype_id": "splitter-brood",
+          "count": 3
+        }
+      },
+      "tags": [
+        "splitting"
+      ]
+    },
+    {
+      "id": "splitter-brood",
+      "name": "Broodling",
+      "base_enemy_kind": "Runner",
+      "body": "splitter-brood",
+      "movement": "splitter-brood",
+      "attack": "splitter-brood",
+      "defense": "splitter-brood",
+      "reward": "splitter-brood",
+      "visual": "splitter-brood",
+      "unlocked_by": null,
+      "elite_eligible": false,
+      "tags": [
+        "swarm",
+        "brood"
+      ]
+    },
+    {
+      "id": "spitter",
+      "name": "Spitter",
+      "base_enemy_kind": "Runner",
+      "target_urgency": -2.0,
+      "body": "spitter",
+      "movement": "spitter",
+      "attack": "spitter",
+      "defense": "spitter",
+      "reward": "spitter",
+      "visual": "spitter",
+      "unlocked_by": null,
+      "tags": [
+        "ranged",
+        "hazard"
+      ]
+    },
+    {
+      "id": "shield-bearer",
+      "name": "Riot shield",
+      "base_enemy_kind": "Armored",
+      "body": "shield-bearer",
+      "movement": "shield-bearer",
+      "attack": "shield-bearer",
+      "defense": "shield-bearer",
+      "reward": "shield-bearer",
+      "visual": "shield-bearer",
+      "unlocked_by": null,
+      "tags": [
+        "shielded"
+      ]
+    },
+    {
+      "id": "sprinter",
+      "name": "Sprinter pack",
+      "base_enemy_kind": "Runner",
+      "body": "sprinter",
+      "movement": "sprinter",
+      "attack": "sprinter",
+      "defense": "sprinter",
+      "reward": "sprinter",
+      "visual": "sprinter",
+      "unlocked_by": null,
+      "group_size": 4,
+      "tags": [
+        "swarm"
+      ]
+    },
+    {
+      "id": "juggernaut",
+      "name": "Juggernaut",
+      "base_enemy_kind": "Demolisher",
+      "body": "juggernaut",
+      "movement": "juggernaut",
+      "attack": "juggernaut",
+      "defense": "juggernaut",
+      "reward": "juggernaut",
+      "visual": "juggernaut",
+      "unlocked_by": null,
+      "tags": [
+        "heavy"
+      ]
     }
   ],
   "defaults": [
@@ -746,6 +1172,493 @@
         },
         {
           "archetype_id": "siege-pack",
+          "weight": 10
+        }
+      ]
+    },
+    {
+      "level": 5,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 12
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 25
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 20
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 15
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 8
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 16
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 12
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "sprinter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "spitter",
+          "weight": 8
+        }
+      ]
+    },
+    {
+      "level": 6,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 20
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 20
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 15
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 6
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 16
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 12
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "sprinter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "spitter",
+          "weight": 8
+        },
+        {
+          "archetype_id": "exploder",
+          "weight": 10
+        },
+        {
+          "archetype_id": "shield-bearer",
+          "weight": 8
+        }
+      ]
+    },
+    {
+      "level": 7,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 20
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 20
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 15
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 6
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 16
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 12
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "sprinter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "spitter",
+          "weight": 8
+        },
+        {
+          "archetype_id": "exploder",
+          "weight": 10
+        },
+        {
+          "archetype_id": "shield-bearer",
+          "weight": 8
+        },
+        {
+          "archetype_id": "splitter",
+          "weight": 8
+        },
+        {
+          "archetype_id": "juggernaut",
+          "weight": 3
+        }
+      ]
+    },
+    {
+      "level": 8,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 20
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 22
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 15
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 6
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 18
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "sprinter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "spitter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "exploder",
+          "weight": 10
+        },
+        {
+          "archetype_id": "shield-bearer",
+          "weight": 8
+        },
+        {
+          "archetype_id": "splitter",
+          "weight": 8
+        },
+        {
+          "archetype_id": "juggernaut",
+          "weight": 4
+        }
+      ]
+    },
+    {
+      "level": 9,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 18
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 22
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 15
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 6
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 18
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "sprinter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "spitter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "exploder",
+          "weight": 12
+        },
+        {
+          "archetype_id": "shield-bearer",
+          "weight": 12
+        },
+        {
+          "archetype_id": "splitter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "juggernaut",
+          "weight": 6
+        }
+      ]
+    },
+    {
+      "level": 10,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 8
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 18
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 20
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 22
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 18
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 6
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 18
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "sprinter",
+          "weight": 14
+        },
+        {
+          "archetype_id": "spitter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "exploder",
+          "weight": 12
+        },
+        {
+          "archetype_id": "shield-bearer",
+          "weight": 12
+        },
+        {
+          "archetype_id": "splitter",
+          "weight": 10
+        },
+        {
+          "archetype_id": "juggernaut",
+          "weight": 8
+        }
+      ]
+    },
+    {
+      "level": 11,
+      "entries": [
+        {
+          "archetype_id": "shambler",
+          "weight": 8
+        },
+        {
+          "archetype_id": "runner",
+          "weight": 16
+        },
+        {
+          "archetype_id": "brute",
+          "weight": 24
+        },
+        {
+          "archetype_id": "armored",
+          "weight": 22
+        },
+        {
+          "archetype_id": "demolisher",
+          "weight": 18
+        },
+        {
+          "archetype_id": "skitter",
+          "weight": 6
+        },
+        {
+          "archetype_id": "plated-runner",
+          "weight": 18
+        },
+        {
+          "archetype_id": "hungry-shambler",
+          "weight": 10
+        },
+        {
+          "archetype_id": "breacher-pack",
+          "weight": 14
+        },
+        {
+          "archetype_id": "caller-pack",
+          "weight": 12
+        },
+        {
+          "archetype_id": "siege-pack",
+          "weight": 10
+        },
+        {
+          "archetype_id": "sprinter",
+          "weight": 14
+        },
+        {
+          "archetype_id": "spitter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "exploder",
+          "weight": 12
+        },
+        {
+          "archetype_id": "shield-bearer",
+          "weight": 14
+        },
+        {
+          "archetype_id": "splitter",
+          "weight": 12
+        },
+        {
+          "archetype_id": "juggernaut",
           "weight": 10
         }
       ]

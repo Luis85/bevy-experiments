@@ -516,6 +516,65 @@ mod tests {
         assert!(!catalog.get(VisualSprite::Caller).unwrap().is_walk());
     }
 
+    /// W2-31 (design enemy-balance §4 "Records"): the 7 appended archetypes
+    /// need no new art. Each draws a walk sprite one of the 11 earlier
+    /// archetypes already draws, with the design table's tint and scale.
+    #[test]
+    fn every_new_archetype_uses_an_existing_visual_sprite() {
+        const EARLIER: [&str; 11] = [
+            "shambler",
+            "runner",
+            "brute",
+            "armored",
+            "demolisher",
+            "breacher-pack",
+            "caller-pack",
+            "siege-pack",
+            "skitter",
+            "plated-runner",
+            "hungry-shambler",
+        ];
+        let new: [(&str, VisualSprite, [f32; 3], f32); 7] = [
+            ("exploder", VisualSprite::Shambler, [0.72, 0.9, 0.5], 1.15),
+            ("splitter", VisualSprite::Brute, [0.85, 0.78, 0.9], 1.05),
+            (
+                "splitter-brood",
+                VisualSprite::Runner,
+                [0.85, 0.78, 0.9],
+                0.6,
+            ),
+            ("spitter", VisualSprite::Runner, [0.6, 0.9, 0.85], 0.95),
+            (
+                "shield-bearer",
+                VisualSprite::Armored,
+                [0.8, 0.85, 0.95],
+                1.05,
+            ),
+            ("sprinter", VisualSprite::Runner, [1.0, 0.85, 0.7], 0.85),
+            ("juggernaut", VisualSprite::Brute, [0.7, 0.7, 0.75], 1.4),
+        ];
+        let art = EnemyVisualCatalog::from_json(BUNDLED).unwrap();
+        let existing: Vec<VisualSprite> = EARLIER
+            .iter()
+            .map(|id| enemy_catalog().resolve(id).unwrap().visual.sprite)
+            .collect();
+        for (id, sprite, [r, g, b], scale) in new {
+            let visual = enemy_catalog().resolve(id).unwrap().visual;
+            assert_eq!(visual.sprite, sprite, "{id}");
+            assert!(
+                existing.contains(&sprite),
+                "{id}: {sprite:?} is existing art"
+            );
+            assert!(art.get(sprite).is_some_and(EnemySprite::is_walk), "{id}");
+            assert_eq!(visual.tint, [r, g, b, 1.0], "{id}");
+            assert_eq!(visual.scale, scale, "{id}");
+        }
+        assert_eq!(
+            enemy_catalog().archetype_ids().count(),
+            EARLIER.len() + new.len()
+        );
+    }
+
     #[test]
     fn v2_with_default_elite_tell_parses() {
         let mut value = bundled();

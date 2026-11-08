@@ -3,9 +3,11 @@
 Ordinary enemies are authored in `crates/horde_core/enemy_catalog.json`. The
 five `EnemyKind` values remain legacy categories and visual fallbacks; they do
 not limit how many archetypes the director can select. The shipped catalogue
-contains the five original profiles, three component mixes, and three ordinary
-boss-derived variants. Actual timed boss encounters retain their separate level
-definitions and mechanics.
+contains the five original profiles, three component mixes, three ordinary
+boss-derived variants and, since W2-31, the seven composition archetypes of the
+production pass: `exploder`, `splitter` and its child `splitter-brood`,
+`spitter`, `shield-bearer`, `sprinter` and `juggernaut`. Actual timed boss
+encounters retain their separate level definitions and mechanics.
 
 Set `LASTLIGHT_ENEMIES` to a JSON file before starting the application to replace
 the entire catalogue. `enemy_catalog()` loads and validates it once; malformed
@@ -66,6 +68,26 @@ otherwise 0), so older catalogues keep their targeting; the shipped Runner-tagge
 archetypes author −3 explicitly. It is a resolved, saved snapshot field like the
 others.
 
+The composition fields (W2-31; design enemy-balance §4) are optional, default
+to the legacy behaviour and are skipped in a snapshot at that default, so the
+11 earlier archetypes serialize nothing new:
+
+| Where | Field | Default | Bound |
+| --- | --- | --- | --- |
+| `attacks` | `reach` (yards past the line; the spitter's ranged stop) | 0 | finite 0–12 |
+| `defenses` | `ranged_armor`, `npc_ranged_armor` (against shots and turrets out of contact) | 0 | 0–1000, 0–100 |
+| `bodies` | `stagger_immune` | false | – |
+| archetype | `death_effect`: `{"Burst": {radius, damage, structure_damage, npc_dice, npc_add, fuse}}` or `{"Split": {archetype_id, count}}` | none | radius (0, 3], damage 1–10000, structure damage 0–10000, dice 1–20, add −30–100; count 1–4 |
+| archetype | `group_size` (members per weighted pick) | 1 | 1–6 |
+| archetype | `tags` (perk targeting only, never numbers) | [] | at most 8 unique ids |
+| archetype | `elite_eligible` (catalogue only, never snapshotted) | true | – |
+
+A split target is checked at load: it must exist, must not be the splitter
+itself, needs no boss unlock, and has no death effect and no group of its own.
+The exploder authors attack damage 1, the bound's minimum: its fuse replaces
+the attack with its burst, so the value is never read (the design table's 0 is
+outside the attack bound).
+
 Component IDs are local to their table. Archetype IDs are persistent identities;
 keep them stable when rebalancing. Components contain values, not references to
 other components: inheritance and reference cycles are unsupported. Every record
@@ -119,9 +141,18 @@ default. Both resolve their numbers from the catalogue's `defaults`.
 ## Waves and boss unlocks
 
 Each `waves` record has a contiguous zero-based `level` and positive-weight
-`entries` containing `archetype_id` and `weight`. Shipped templates correspond to
-the five encounter templates; larger level indexes cycle through the authored
-templates. Entries are normalized to stable archetype-ID order, so moving JSON
+`entries` containing `archetype_id` and `weight`. The catalogue ships 12 wave
+tiers (0–11). Tiers 0–4 correspond to the five encounter templates and are
+frozen (append-only; `waves_0_to_4_byte_identical`). Tiers 5–11 (W2-31) each
+inherit the previous tier and change a few weights, so the mean hit points per
+pick (`EnemyCatalog::mean_pool_health`, counting group members and split
+children) never fall; the composition archetypes appear only from tier 5 on,
+and `splitter-brood` only as a split child. The director reads tier
+`max(level, snapshot wave_tier)`; larger indexes still cycle through the
+authored tiers, so the strict startup load (`init_catalogs`) rejects a
+progression pressure floor whose `wave_tier` is not below
+`EnemyCatalog::wave_count()` (`ProgressionCatalog::check_wave_tiers`).
+Entries are normalized to stable archetype-ID order, so moving JSON
 records does not change weighted selection ordering.
 
 `wave_pool(level, unlocked_bosses)` excludes an archetype with `unlocked_by` until

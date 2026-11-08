@@ -225,9 +225,63 @@ pub struct EnemyCatalog {
     resolved: BTreeMap<String, ResolvedEnemy>,
     defaults: KindMap<EnemyKind, String>,
     waves: Vec<Vec<WeightedEnemy>>,
+    /// Archetypes authored `elite_eligible: false` (catalogue only).
+    elite_ineligible: BTreeSet<String>,
 }
 
 impl EnemyCatalog {
+    /// The number of authored wave tiers; `wave_pool` levels at or past it
+    /// wrap, so every progression floor's tier must be below it (checked by
+    /// [`crate::progression::ProgressionCatalog::check_wave_tiers`]).
+    pub fn wave_count(&self) -> usize {
+        self.waves.len()
+    }
+
+    /// Whether a director wave spawn of `id` may roll elite. Unknown ids are
+    /// not eligible.
+    pub fn elite_eligible(&self, id: &str) -> bool {
+        self.resolved.contains_key(id) && !self.elite_ineligible.contains(id)
+    }
+
+    /// The weighted mean hit points one pick from `wave_pool(tier, unlocked)`
+    /// brings in `mode` (Personal health, NPC hit points). A pick counts
+    /// every group member and every split child it will release. Pure: no
+    /// RNG, no rank scaling.
+    pub fn mean_pool_health(
+        &self,
+        tier: usize,
+        unlocked: &[BossKind],
+        mode: crate::content::Mode,
+    ) -> f32 {
+        let hp = |enemy: &ResolvedEnemy| {
+            f64::from(if mode == crate::content::Mode::Personal {
+                enemy.health
+            } else {
+                enemy.npc_hp
+            })
+        };
+        let pick = |enemy: &ResolvedEnemy| {
+            let children = match &enemy.death_effect {
+                Some(DeathEffect::Split {
+                    archetype_id,
+                    count,
+                }) => self
+                    .resolved
+                    .get(archetype_id)
+                    .map_or(0.0, |child| f64::from(*count) * hp(child)),
+                _ => 0.0,
+            };
+            f64::from(enemy.group_size) * hp(enemy) + children
+        };
+        let pool = self.wave_pool(tier, unlocked);
+        let weight: f64 = pool.iter().map(|entry| f64::from(entry.weight)).sum();
+        let total: f64 = pool
+            .iter()
+            .map(|entry| f64::from(entry.weight) * pick(&self.resolved[&entry.archetype_id]))
+            .sum();
+        (total / weight) as f32
+    }
+
     pub(crate) fn maximum_health(&self, mode: crate::content::Mode) -> i32 {
         self.resolved
             .values()
@@ -334,6 +388,9 @@ struct Body {
     health: i32,
     npc_hp: i32,
     npc_ht: i32,
+    /// See [`ResolvedEnemy::stagger_immune`].
+    #[serde(default)]
+    stagger_immune: bool,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -352,6 +409,9 @@ struct Attack {
     npc_skill: i32,
     npc_damage_dice: u8,
     npc_damage_add: i32,
+    /// See [`ResolvedEnemy::reach`].
+    #[serde(default)]
+    reach: f32,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -362,6 +422,12 @@ struct Defense {
     armor: i32,
     npc_armor: i32,
     npc_dodge: i32,
+    /// See [`ResolvedEnemy::ranged_armor`].
+    #[serde(default)]
+    ranged_armor: i32,
+    /// See [`ResolvedEnemy::npc_ranged_armor`].
+    #[serde(default)]
+    npc_ranged_armor: i32,
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -394,6 +460,22 @@ struct Archetype {
     /// See [`ResolvedEnemy::target_urgency`]; defaults from `base_enemy_kind`.
     #[serde(default)]
     target_urgency: Option<f32>,
+    /// See [`ResolvedEnemy::death_effect`].
+    #[serde(default)]
+    death_effect: Option<DeathEffect>,
+    /// See [`ResolvedEnemy::group_size`].
+    #[serde(default = "crate::schema::one_u8")]
+    group_size: u8,
+    /// See [`ResolvedEnemy::tags`].
+    #[serde(default)]
+    tags: Vec<String>,
+    /// Whether a director wave spawn may roll elite; catalogue only, never
+    /// snapshotted (see [`EnemyCatalog::elite_eligible`]).
+    #[serde(default = "elite_eligible_default")]
+    elite_eligible: bool,
+}
+fn elite_eligible_default() -> bool {
+    true
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -486,6 +568,7 @@ impl AuthoredCatalog {
                 || !(1..=20).contains(&a.npc_damage_dice)
                 || !(-30..=100).contains(&a.npc_damage_add)
                 || !(1..=8).contains(&a.structure_damage_multiplier)
+                || !finite_range(a.reach, 0.0, 12.0)
             {
                 return Err(format!("Invalid attack component: {}", a.id));
             }
@@ -495,6 +578,8 @@ impl AuthoredCatalog {
                 || !(0..=100).contains(&d.npc_armor)
                 || !(0..=20).contains(&d.npc_dodge)
                 || !finite_range(d.contact_armor_fraction, 0.0, 1.0)
+                || !(0..=1000).contains(&d.ranged_armor)
+                || !(0..=100).contains(&d.npc_ranged_armor)
             {
                 return Err(format!("Invalid defense component: {}", d.id));
             }
@@ -512,7 +597,9 @@ impl AuthoredCatalog {
             }
         }
         let mut resolved = BTreeMap::new();
-        for (id, a) in archetypes {
+        let mut elite_ineligible = BTreeSet::new();
+        for (id, a) in &archetypes {
+            let id = *id;
             let b = component(&bodies, &a.body)?;
             let m = component(&movements, &a.movement)?;
             let attack = component(&attacks, &a.attack)?;
@@ -548,18 +635,39 @@ impl AuthoredCatalog {
                     scale: v.scale,
                 },
                 unlocked_by: a.unlocked_by,
-                // Authored keys for these land with the content (wave 2).
-                reach: 0.0,
-                ranged_armor: 0,
-                npc_ranged_armor: 0,
-                stagger_immune: false,
-                group_size: 1,
-                death_effect: None,
-                tags: Vec::new(),
+                reach: attack.reach,
+                ranged_armor: d.ranged_armor,
+                npc_ranged_armor: d.npc_ranged_armor,
+                stagger_immune: b.stagger_immune,
+                group_size: a.group_size,
+                death_effect: a.death_effect.clone(),
+                tags: a.tags.clone(),
                 elite: None,
             };
             enemy.validate()?;
+            if !a.elite_eligible {
+                elite_ineligible.insert(id.to_owned());
+            }
             resolved.insert(id.to_owned(), enemy);
+        }
+        // A split target is checked at load (depth 1): it exists, is not the
+        // splitter itself, needs no boss unlock, has no death effect of its
+        // own and spawns alone.
+        for enemy in resolved.values() {
+            if let Some(DeathEffect::Split { archetype_id, .. }) = &enemy.death_effect {
+                let valid = archetype_id != &enemy.archetype_id
+                    && resolved.get(archetype_id).is_some_and(|child| {
+                        child.unlocked_by.is_none()
+                            && child.death_effect.is_none()
+                            && child.group_size == 1
+                    });
+                if !valid {
+                    return Err(format!(
+                        "Invalid split target {archetype_id} of {}",
+                        enemy.archetype_id
+                    ));
+                }
+            }
         }
         let mut defaults = KindMap::<EnemyKind, String>::default();
         for default in self.defaults {
@@ -615,6 +723,7 @@ impl AuthoredCatalog {
             resolved,
             defaults,
             waves,
+            elite_ineligible,
         })
     }
 }
@@ -652,7 +761,8 @@ mod tests {
             pool.windows(2)
                 .all(|p| p[0].archetype_id < p[1].archetype_id)
         );
-        assert_eq!(pool, catalog.wave_pool(5, &[]));
+        // Levels past the 12 authored tiers (W2-31) wrap.
+        assert_eq!(pool, catalog.wave_pool(12, &[]));
     }
 
     #[test]
@@ -684,13 +794,14 @@ mod tests {
     #[test]
     fn target_urgency_is_authored_data_with_a_legacy_category_default() {
         let catalog = parse(&authored()).unwrap();
+        // The W2-31 exploder (-4) and spitter (-2) author their own urgency.
+        let authored_urgency = [("exploder", -4.0), ("spitter", -2.0)];
         for id in catalog.archetype_ids() {
             let enemy = catalog.resolve(id).unwrap();
-            let expected = if enemy.kind == EnemyKind::Runner {
-                -3.0
-            } else {
-                0.0
-            };
+            let expected = authored_urgency
+                .iter()
+                .find(|(own, _)| *own == id)
+                .map_or(legacy_target_urgency(enemy.kind), |(_, urgency)| *urgency);
             assert_eq!(enemy.target_urgency, expected, "{id}");
         }
         // Catalogues authored before the field keep the category's behaviour.
@@ -700,7 +811,9 @@ mod tests {
         }
         let legacy = parse(&legacy).unwrap();
         for id in catalog.archetype_ids() {
-            assert_eq!(legacy.resolve(id), catalog.resolve(id));
+            if authored_urgency.iter().all(|(own, _)| *own != id) {
+                assert_eq!(legacy.resolve(id), catalog.resolve(id));
+            }
         }
         // A data-only variant can reprioritise without a code change.
         let mut data = authored();
@@ -797,6 +910,127 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    /// W2-31: the composition fields resolve into the snapshot, are bounded
+    /// at load, and a split target is checked at depth 1.
+    #[test]
+    fn composition_fields_resolve_and_reject_out_of_bounds_or_bad_split_targets() {
+        let catalog = parse(&authored()).unwrap();
+        let spitter = catalog.resolve("spitter").unwrap();
+        assert_eq!(spitter.reach, 4.0);
+        assert_eq!(spitter.tags, ["ranged", "hazard"]);
+        let shield = catalog.resolve("shield-bearer").unwrap();
+        assert_eq!((shield.ranged_armor, shield.npc_ranged_armor), (14, 4));
+        assert!(catalog.resolve("juggernaut").unwrap().stagger_immune);
+        assert_eq!(
+            catalog
+                .resolve("juggernaut")
+                .unwrap()
+                .structure_damage_multiplier,
+            3
+        );
+        assert_eq!(catalog.resolve("sprinter").unwrap().group_size, 4);
+        assert_eq!(
+            catalog.resolve("splitter").unwrap().death_effect,
+            Some(DeathEffect::Split {
+                archetype_id: "splitter-brood".into(),
+                count: 3
+            })
+        );
+        assert!(matches!(
+            catalog.resolve("exploder").unwrap().death_effect,
+            Some(DeathEffect::Burst { fuse: true, .. })
+        ));
+        assert!(!catalog.elite_eligible("splitter-brood"));
+        assert!(catalog.elite_eligible("shambler") && !catalog.elite_eligible("missing"));
+
+        let index = |table: &str, id: &str| {
+            authored()[table]
+                .as_array()
+                .unwrap()
+                .iter()
+                .position(|v| v["id"] == id)
+                .unwrap()
+        };
+        let splitter = index("archetypes", "splitter");
+        let mutations: Vec<(String, serde_json::Value)> = vec![
+            (
+                format!("/attacks/{}/reach", index("attacks", "spitter")),
+                12.5.into(),
+            ),
+            (
+                format!(
+                    "/defenses/{}/ranged_armor",
+                    index("defenses", "shield-bearer")
+                ),
+                1001.into(),
+            ),
+            (
+                format!(
+                    "/defenses/{}/npc_ranged_armor",
+                    index("defenses", "shield-bearer")
+                ),
+                101.into(),
+            ),
+            (
+                format!("/archetypes/{}/group_size", index("archetypes", "sprinter")),
+                7.into(),
+            ),
+            (
+                format!("/archetypes/{}/group_size", index("archetypes", "sprinter")),
+                0.into(),
+            ),
+            (
+                format!("/archetypes/{}/tags/0", index("archetypes", "spitter")),
+                "Bad Tag".into(),
+            ),
+            (
+                format!("/archetypes/{splitter}/death_effect/Split/count"),
+                5.into(),
+            ),
+            // Split targets: missing, itself, with a death effect of its own,
+            // in a group, and behind a boss unlock.
+            (
+                format!("/archetypes/{splitter}/death_effect/Split/archetype_id"),
+                "missing".into(),
+            ),
+            (
+                format!("/archetypes/{splitter}/death_effect/Split/archetype_id"),
+                "splitter".into(),
+            ),
+            (
+                format!("/archetypes/{splitter}/death_effect/Split/archetype_id"),
+                "exploder".into(),
+            ),
+            (
+                format!("/archetypes/{splitter}/death_effect/Split/archetype_id"),
+                "sprinter".into(),
+            ),
+            (
+                format!("/archetypes/{splitter}/death_effect/Split/archetype_id"),
+                "caller-pack".into(),
+            ),
+            (
+                format!(
+                    "/archetypes/{}/death_effect/Burst/radius",
+                    index("archetypes", "exploder")
+                ),
+                3.5.into(),
+            ),
+        ];
+        for (pointer, value) in mutations {
+            let mut data = authored();
+            *data.pointer_mut(&pointer).unwrap() = value;
+            assert!(parse(&data).is_err(), "accepted {pointer}");
+        }
+        // An unused component is bounded too.
+        let mut data = authored();
+        let mut unused = data["bodies"][0].clone();
+        unused["id"] = "unused-body".into();
+        unused["stagger_immune"] = "yes".into();
+        data["bodies"].as_array_mut().unwrap().push(unused);
+        assert!(parse(&data).is_err());
     }
 
     #[test]

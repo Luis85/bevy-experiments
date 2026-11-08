@@ -399,14 +399,30 @@ fn stage_enemies(g: &mut Game) {
 #[test]
 fn legacy_resolved_enemy_and_snapshot_serialize_byte_identically() {
     let expected: BTreeSet<String> = RESOLVED_KEYS.into_iter().map(String::from).collect();
+    // The 11 archetypes before W2-31 serialize no new key; the composition
+    // records it appended author them and round-trip byte-identically too.
+    const COMPOSITION: [&str; 7] = [
+        "exploder",
+        "splitter",
+        "splitter-brood",
+        "spitter",
+        "shield-bearer",
+        "sprinter",
+        "juggernaut",
+    ];
+    assert_eq!(
+        enemy_catalog().archetype_ids().count(),
+        11 + COMPOSITION.len()
+    );
     for id in enemy_catalog().archetype_ids() {
         let enemy = enemy_catalog().resolve(id).unwrap();
         let text = serde_json::to_string(&enemy).unwrap();
-        assert_eq!(
-            keys(&serde_json::from_str(&text).unwrap()),
-            expected,
-            "{id}"
-        );
+        let saved = keys(&serde_json::from_str(&text).unwrap());
+        if COMPOSITION.contains(&id) {
+            assert!(saved.is_superset(&expected), "{id}");
+        } else {
+            assert_eq!(saved, expected, "{id}");
+        }
         let restored: ResolvedEnemy = serde_json::from_str(&text).unwrap();
         assert_eq!(serde_json::to_string(&restored).unwrap(), text, "{id}");
     }

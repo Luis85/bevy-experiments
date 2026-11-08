@@ -1,5 +1,7 @@
 mod auto_sell;
 mod combat;
+#[cfg(test)]
+mod composition_tests;
 mod country;
 #[cfg(test)]
 mod death_effect_tests;

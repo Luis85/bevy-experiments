@@ -248,6 +248,27 @@ impl ProgressionCatalog {
             Self::from_json_str,
         )
     }
+    /// The load-time cross-check against the enemy catalogue: every pressure
+    /// floor's `wave_tier` names an authored wave tier. `wave_pool` wraps a
+    /// level past the last tier silently, so a floor above it would field an
+    /// early tier's composition; [`MAX_WAVE_TIER`] alone does not catch it.
+    pub fn check_wave_tiers(
+        &self,
+        enemies: &crate::enemy_catalog::EnemyCatalog,
+    ) -> Result<(), String> {
+        match self
+            .pressure_floors
+            .iter()
+            .find(|floor| floor.wave_tier >= enemies.wave_count())
+        {
+            Some(floor) => Err(format!(
+                "Pressure floor wave tier {} has no enemy wave tier (the catalogue has {})",
+                floor.wave_tier,
+                enemies.wave_count()
+            )),
+            None => Ok(()),
+        }
+    }
     pub fn validate(&self) -> Result<(), String> {
         if !(1..=10_000).contains(&self.threat_guard_rank)
             || self.max_rank > self.threat_guard_rank
