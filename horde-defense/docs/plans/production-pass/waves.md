@@ -615,9 +615,9 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Done: evidence in `target/perf/w2-50/`. VALIDATION.md and plan 9.4 record the attribution, the fix, or that the repeats did not reproduce it, and the sample-932 tail's outcome; both §2.5 rows are answered. No gate is moved without that ruling.
 - Deps: none; W2-47 depends on it.
 - **Result (2026-11-08, measured at ddea5a6, recorded in 8efd9ff; plan 9.4, VALIDATION.md "Gate 3 in the shipped default configuration").** Attribution only: no fix, no test and no gate move. **Done is not yet met:** both §2.5 rows await the orchestrator or user answer, and W2-47 does not start its re-gate until they are answered.
-  - 20 repeats per size of the shipped default configuration ran, unattended and locked. They did not reproduce the stress-on-r2 episode.
+  - 28 repeats per size of the shipped default configuration ran, unattended and locked: 14 per size with the display on throughout (12 held on, 8 of them added in the W2-50 review) and 14 display-off or crossing a transition. None reproduced the stress-on-r2 episode.
   - The episode's time is the swap-chain acquire (about three vblanks per frame, 6-8 ms in-process). Its 4-6 ms outside the update is winit input dispatch in frames carrying window input events, during user activity. The cause of the slowed presentation is not named.
-  - Driver stalls and the sample-932 tail come from the display being off (Modern Standby on the idle timeout). 513 of 516 stalls were display-off or within 5 s of a transition, and holding the display on removed them (8 runs, 0 stalls).
+  - Driver stalls and the sample-932 tail come from the display being off (Modern Standby on the idle timeout). 518 of 521 stalls were display-off or within 5 s of a transition, and holding the display on removed them (24 runs, 0 stalls).
   - Both §2.5 rows now carry the evidence and a recommendation. Their defaults stand until the orchestrator or the user answers them (episode open, tail gated). Still to rule: close the stress-on-r2 episode as environmental or keep it open for a supervised pointer-input repro; and accept or reject the harness ruling (hold the display on, display-off runs invalid) together with the sample-932 tail's outcome.
 
 **W2-51 · perf-architecture · Apply the W1-51 egui gate re-derivation decision, before the W2-47 re-gate**
