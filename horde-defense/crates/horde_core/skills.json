@@ -4084,7 +4084,7 @@
     {
       "id": "shotgun_pump_drill",
       "name": "Pump drill",
-      "description": "Your shotguns fire 20% faster (time between shots ×0.80) and reload 20% faster (×0.80). Personal play only.",
+      "description": "Your shotguns: time between shots ×0.80, about 25% more shots, and reloads take 20% less time (×0.80). Personal play only.",
       "price": 800,
       "prerequisites": [
         "shotgun_training"
@@ -4211,7 +4211,7 @@
     {
       "id": "pistol_double_tap",
       "name": "Double tap",
-      "description": "Your pistols fire 20% faster (time between shots ×0.80). Personal play only.",
+      "description": "Your pistols: time between shots ×0.80, about 25% more shots. Personal play only.",
       "price": 1200,
       "prerequisites": [
         "quick_reload"
@@ -4237,7 +4237,7 @@
     {
       "id": "smg_spray_control",
       "name": "Spray control",
-      "description": "Your SMGs reload 30% faster (×0.70). Personal play only.",
+      "description": "Your SMGs: reloads take 30% less time (×0.70). Personal play only.",
       "price": 1200,
       "prerequisites": [
         "smg_training"
@@ -4292,7 +4292,7 @@
     {
       "id": "mg_belt_feeder",
       "name": "Belt feeder",
-      "description": "Your machine guns reload 40% faster (×0.60): a 5.1 s belt change takes about 3.1 s. Personal play only.",
+      "description": "Your machine guns: reloads take 40% less time (×0.60), so a 5.1 s belt change takes about 3.1 s. Personal play only.",
       "price": 1500,
       "prerequisites": [
         "machine_gun_training"
