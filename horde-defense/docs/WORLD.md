@@ -70,14 +70,26 @@ they are not claims about international borders or maritime jurisdiction.
 To reproduce the catalogue with only Python's standard library:
 
 ```powershell
-python scripts/generate_world.py
+python -I -B scripts/generate_world.py --check
+python -I -B scripts/generate_world.py
+python -I -B scripts/generate_world.py --rebuild --download
 ```
 
-Or supply downloaded 110m and 50m source files as the two positional arguments.
-The generator computes adjacency before simplifying display coordinates, checks
+The default (`--from-existing`) is offline: it loads the committed
+`world.json`, recomputes only each country's `difficulty` and writes the file
+back as indented UTF-8 JSON; every other key, `stage_themes` and
+`strategy_config` included, is carried over unchanged. `--check` writes nothing
+and exits 1 when the output differs from the committed bytes. `--rebuild`
+rebuilds the countries from the Natural Earth 110m and 50m files, given as two
+positional paths or fetched with `--download`. It refuses source bytes that do
+not match the sha256 pins in `sources` (exit 3; `--allow-source-drift` accepts
+and re-pins them) and any change to a country's stage count (exit 4;
+`--allow-stage-count-change`), and it keeps the top-level configuration and
+each `level_override`. `--self-test` exercises every mode on throwaway files.
+The rebuild computes adjacency before simplifying display coordinates, checks
 connectivity during generation, and emits stable sorted IDs and neighbors.
-Do not rerun it to discard intentional hand-authored content changes without
-reviewing the resulting diff.
+Change `difficulty` only through the generator, and review the diff of any
+regeneration before committing it.
 
 Tests cover source catalogue completeness, microstate presence, configuration
 and overrides, arbitrary starting countries, neighbor gating, replay safety,
