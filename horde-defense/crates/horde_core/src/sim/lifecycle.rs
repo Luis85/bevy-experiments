@@ -163,9 +163,12 @@ impl Game {
             None => self.campaign.npc.loadout,
         };
         self.campaign.validate_loadout(loadout)?;
-        // The inputs defender_power reads (one shared helper, so the power
-        // number cannot drift from what deploys): the mode owners fight
-        // with Mara's npc record, as `Campaign::profile` always has.
+        // The inputs defender_power reads (one shared helper): the mode
+        // owners fight with Mara's npc record, as `Campaign::profile` always
+        // has. The power number is the rank-only reading (no front
+        // position), so it equals what deploys on stage 0 or without a
+        // country; deploying passes the stage's position, so a deeper stage
+        // also carries the front ramp.
         let character = match &takeover {
             Some((_, npc)) => npc,
             None => &self.campaign.npc,

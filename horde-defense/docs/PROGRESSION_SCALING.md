@@ -12,7 +12,7 @@ Characters have a configurable maximum level, shipped at **50**. Each victory gr
 
 Fresh geometry is now controlled by the selected next-run balance settings: Normal starts at **3 lanes / 12 yards** and adds two lanes/two yards every three character levels, capped at 17 lanes / 30 yards. `Attempt.lane_count` and `width_yards` freeze at deployment. Legacy checkpoints and explicit `BalanceSettings::legacy()` retain their former 11-lane / 30-yard profile. See [BALANCE_AND_RUN_STATS.md](BALANCE_AND_RUN_STATS.md) for presets, advanced controls, shared build geometry, DPS and persistent run records.
 
-`Attempt.progression` freezes rank, simultaneous batch size, item level, population allowance, pressure floors, supply bonus and all encounter multipliers. The authoritative `Attempt.arrival_rate()`, `boss_time()`, `enemy_cap()` and `defender_position()` include the frozen arena values. UI and tooling must use those methods instead of the raw template values.
+`Attempt.progression` freezes rank, simultaneous batch size, item level, population allowance, pressure floors, supply bonus and all encounter multipliers. The encounter has two axes: the threat rank, and the stage's depth on its country's front (`FrontPosition`, `stage/(count − 1)`). Deploying a country stage multiplies the rank's enemy health and arrival by the front ramp (`front_ramp_max` below), stamps the stage's boss rank (Sector, Regional on every sixth stage, Capstone on the final stage) and freezes both in the snapshot. The briefing forecast (`deployment_progression`, `next_victory_progression`) and the defender power number are the rank-only reading, which equals stage 0 of any front. The authoritative `Attempt.arrival_rate()`, `boss_time()`, `enemy_cap()` and `defender_position()` include the frozen arena values. UI and tooling must use those methods instead of the raw template values.
 
 | JSON setting | Shipped value / rule |
 | --- | --- |
@@ -30,6 +30,8 @@ Fresh geometry is now controlled by the selected next-run balance settings: Norm
 | `reward_per_rank` | `1 + .03 * min(victories,50)` |
 | `fortification_per_rank` | `1 + .025 * min(victories,50)` |
 | `supply_per_rank`, `max_supply_bonus` | Renewed construction supply bonus `min(40, min(victories,50))` |
+| `front_ramp_max` | 0..=0.5, shipped .18 (missing key: 0, no ramp). Enemy health and arrival × `1 + front_ramp_max × front_ramp_pct/100 × stage/(count − 1)`, at most 2; `front_ramp_pct` is the preset's extra (Easy 75, Normal 100, Hard 150). Stage 0, a one-stage country and a deployment without a country stay at exactly 1 |
+| `boss_damage_per_rank` | 0..=0.05, shipped .01 (missing key: 0). Boss multiplier `clamp(1 + boss_damage_per_rank × (min(victories,50) − 4), 1, 4)`, exactly 1 through rank 4. Personal boss contact damage is multiplied by it before rounding; NPC boss attacks gain `floor((m − 1) × 6)` additional basic damage. Regular enemies never read it |
 
 The NPC arrival adapter accounts for the discrete attack/defense/Ready/Aim procedures. It does not accelerate NPC turns, change attack rolls, or grant player skills to NPCs. Personal damage scales directly; NPC hostile attack damage receives `floor((enemy_damage − 1) × 6)` authored additional basic damage. Existing armor, active defense and injury stages still resolve normally.
 
