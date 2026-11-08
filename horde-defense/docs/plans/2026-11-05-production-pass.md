@@ -839,7 +839,7 @@ W2-01 20-seed baseline (2026-11-07, pacing harness v2 on the post-W1-69 rules): 
 
 W2-08 (loot-only drops) moved that default one-seed output: it is now `target/production-after/w2-08/pacing.txt` (sha256 547f7b4e...cb2e4d3c). The before/after rows are in §9.6, "W2-08 moved the default pacing output", and whether it becomes the wave-2 baseline is open in §2.5.
 
-W2-26 (the in-country front ramp) moved it again: the latest default output is `target/production-after/w2-26/pacing.txt` (sha256 2849040d...59b68bcb). The rows are in §9.6, "W2-26 moved the default pacing output".
+W2-26 (the in-country front ramp) moved it again: the latest default output is `target/production-after/w2-26/pacing.txt` (sha256 2849040d...59b68bcb). The rows and the W2-26 20-seed acceptance (goal-6 LUX and start-country lines) are in §9.6, "W2-26 moved the default pacing output".
 
 W2-03 goal-5 "before" (2026-11-07, post-W1-69 rules): `cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture`, output in `target/production-before/pacing_targets_goal5_before.txt` (not committed; the sweep took about 62 s). Tier windows are the "about 4 / 8 / 12" target with one run either side (3-5, 7-9, 11-13). `goal5_first_victory_run_2_to_4` PASS: 3 [2, 5] 20/20. `goal5_tiers_affordable_3_5_7_9_11_13` FAIL: tier 1 3 [3, 3] passes; tier 2 5 [5, 6] and tier 3 7 [6, 7] are early. `goal5_tree_outlasts_second_liberation` PASS: Liberation(2) 17 [16, 18] 20/20, tree exhausted 25 [24, 26] 20/20, median 37 [33, 41] nodes bought after Liberation(2). `goal5_unlock_order_fortifications_mara_operations` FAIL: Fortifications 3 [2, 5], Mara 14 [13, 15], Operations open 14 [13, 15]. Every seed keeps Fortifications <= Mara <= Operations, but the Mara and Operations medians are equal. Both failures are wave-4 work (W4-p).
 
@@ -892,6 +892,16 @@ The W2-08 commit reports that the 20-seed release acceptance (`pacing_targets --
 | Country operations unlocked | 25 / 103 → 26 / 108 | 26 / 107 → 26 / 105 | 19 / 76 (unchanged) |
 | Defeats in 60 runs (runs) | 7 (1, 2, 3, 4, 6, 7, 11) → 8 (1, 2, 3, 4, 6, 7, 11, 12) | 8 (1, 2, 3, 4, 5, 7, 13, 14) → 8 (1, 2, 3, 4, 5, 7, 10, 11) | 3 (1, 2, 5) → 3 (1, 2, 4) |
 | Coins over 60 runs | 253,389 → 271,241 | 247,914 → 268,254 | 299,150 → 325,826 |
+
+W2-26 20-seed release acceptance (2026-11-08): `cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture --test-threads 1`, run on the parent `f8812aa` (exported tree, own target directory) and at W2-26 (`target/production-after/w2-26/pacing_targets.txt`, not committed). Parent → W2-26:
+- `goal6_lux_easy_at_most_6_runs` PASS → PASS: Liberation(1) Easy 4 [4, 4] → 4 [4, 4].
+- `goal6_lux_hard_at_most_1_5x_normal` FAIL → PASS: Normal 5 [5, 6] → 6 [6, 7], Hard 8 [8, 8] → 9 [8, 11]. Hard is now exactly at the 1.5x limit (9 ≤ 9). This check passed at W2-04 (Normal 6, Hard 8) and already failed on the parent: a commit after W2-04 and up to `f8812aa` moved LUX Normal from 6 to 5, and that move is not recorded. W2-26 makes it pass again, with no margin.
+- `goal6_clamped_starts_first_victory_runs_2_to_4` PASS → PASS: AUT 3 [3, 4] → 3 [3, 4], BGD 3 [2, 5] → 3 [2, 5], no run-1 victory.
+- `goal6_archetype_coverage` PASS → PASS (11 of 11).
+- Still failing, as at W2-04 (wave-4 work): `goal6_defeat_rate_windows` (36 → 34 of 39 windows outside 10-25%, highest 14.5% → 18.5% at offset 0), `goal6_no_15_streak_after_run_10` (every seed still has a 46-50 win streak from run 11), `goal6_boss_ttk_median_20_60_s` (6.4 s [p25 5.9, p90 32.8] → 7.3 s [p25 6.5, p90 30.4]).
+- Goal 5: `goal5_first_victory_run_2_to_4` PASS, 3 [2, 5] unchanged. `goal5_tree_outlasts_second_liberation` PASS: Liberation(2) 17 [16, 18] → 18 [17, 19], tree exhausted 25 [24, 26] unchanged. `goal5_tiers_affordable_3_5_7_9_11_13` and `goal5_unlock_order_fortifications_mara_operations` still FAIL (tier 3 7 → 6; Mara and Operations both 14 → 15).
+
+W4 tuning keeps `front_ramp_max` within [0.17, 0.25] (ruling W-5). Raising it widens the Hard/Normal gap, and the Hard limit now has no margin.
 
 ### 9.3 Audio
 
