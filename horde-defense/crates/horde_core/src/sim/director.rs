@@ -232,12 +232,12 @@ impl Game {
             attack_left: 0,
             armor: if a.mode == Mode::Npc {
                 if boss {
-                    level.boss_npc_armor
+                    level.boss_npc_armor + a.progression.npc_boss_armor_add
                 } else {
                     d.npc_armor
                 }
             } else if boss {
-                level.boss_armor
+                boss_armor(level.boss_armor, a.progression.boss_armor_multiplier)
             } else {
                 d.armor
             },
@@ -281,4 +281,12 @@ impl Game {
             },
         );
     }
+}
+/// The Personal boss armor scaled by the snapshot's rank multiplier,
+/// rounded; the literal 1.0 keeps the level's armor exactly.
+fn boss_armor(armor: i32, multiplier: f32) -> i32 {
+    if multiplier == 1.0 {
+        return armor;
+    }
+    (armor as f32 * multiplier).round() as i32
 }

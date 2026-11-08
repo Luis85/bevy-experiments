@@ -22,8 +22,9 @@ Fresh geometry is now controlled by the selected next-run balance settings: Norm
 | `batch_rank_step`, `max_batch` | `min(4, 1 + floor(min(victories,50) / 3))` enemies in each group |
 | `item_level_rank_step`, `max_item_level` | `min(30, 1 + floor(victories / 2))`; victory 52 offers level 27, victory 58 reaches level 30 |
 | `population_base`, `population_per_rank`, `population_cap`, `population_global_cap` | Base `min(145,72 + 2 * min(victories,50))`; scale by `lane_count / 11`, round up, then cap at 224 ordinary actors, plus one reserved boss |
-| `health_per_rank` | `1 + .015 * victories`, continuing past 50 |
-| `damage_per_rank` | `1 + .008 * victories`, continuing past 50 |
+| `health_per_rank`, `health_per_rank_late` | `1 + .015 * min(victories, 4) + .04 * max(victories − 4, 0)`, continuing past 50 |
+| `damage_per_rank`, `damage_per_rank_late` | `1 + .008 * min(victories, 4) + .018 * max(victories − 4, 0)`, continuing past 50 |
+| `growth_knee_rank` | 4: the rank where health and damage switch to the `_late` slopes (each 0..=0.25), so shop gear stays within about 5-15% of enemy health from rank 4 to 58. Missing knee and late keys keep one slope (`1 + .015 * victories`, `1 + .008 * victories`) |
 | `speed_per_rank` | `1 + .002 * min(victories,50)` |
 | `arrival_per_rank` | `1 + .01 * min(victories,50)` |
 | `npc_arrival_factor` | Additional `.9` multiplier for NPC encounter arrivals |
@@ -32,6 +33,8 @@ Fresh geometry is now controlled by the selected next-run balance settings: Norm
 | `supply_per_rank`, `max_supply_bonus` | Renewed construction supply bonus `min(40, min(victories,50))` |
 | `front_ramp_max` | 0..=0.5, shipped .18 (missing key: 0, no ramp). Enemy health and arrival × `1 + front_ramp_max × front_ramp_pct/100 × stage/(count − 1)`, at most 2; `front_ramp_pct` is the preset's extra (Easy 75, Normal 100, Hard 150). Stage 0, a one-stage country and a deployment without a country stay at exactly 1 |
 | `boss_damage_per_rank` | 0..=0.05, shipped .01 (missing key: 0). Boss multiplier `clamp(1 + boss_damage_per_rank × (min(victories,50) − 4), 1, 4)`, exactly 1 through rank 4. Personal boss contact damage is multiplied by it before rounding; NPC boss attacks gain `floor((m − 1) × 6)` additional basic damage. Regular enemies never read it |
+| `boss_armor_per_rank` | 0..=0.05, shipped .02 (missing key: 0). A Personal boss spawns with `round(boss_armor × clamp(1 + boss_armor_per_rank × (min(victories,50) − 4), 1, 4))`, exactly the template armor through rank 4. Exposure still drops it to 0 |
+| `npc_boss_armor_rank_step` | 0..=100, shipped 8 (missing key or 0: none). An NPC boss spawns with `boss_npc_armor + min((victories − 4) / step, 20)` armor, the template armor through rank 11 |
 
 The NPC arrival adapter accounts for the discrete attack/defense/Ready/Aim procedures. It does not accelerate NPC turns, change attack rolls, or grant player skills to NPCs. Personal damage scales directly; NPC hostile attack damage receives `floor((enemy_damage − 1) × 6)` authored additional basic damage. Existing armor, active defense and injury stages still resolve normally.
 
@@ -47,7 +50,9 @@ Spawn credits count groups. Each tick adds `arrival_rate / (60 × batch_size)`, 
 | 1 | .35 | 1.40 | 180 s | 3,000 | 43 | 1 |
 | 2 | .38 | 1.52 | 210 s | 4,000 | 51 | 2 |
 | 3 | .41 | 1.64 | 210 s | 5,200 | 59 | 3 |
-| 4+ | .44 | 1.76 | 240 s | 6,800 | 67 | 4 |
+| 4 | .44 | 1.76 | 240 s | 6,800 | 67 | 4 |
+| 5-28 | `.44 + .0025 × (r − 4)` | `1.76 + .01 × (r − 4)` | 240 s | `6,800 + 600 × (r − 4)` | `67 + 2 × (r − 4)` | 4 at rank 5, 5 at 6-7, 6 at 8-9, 7 at 10-12, 8 at 13-15, 9 at 16-19, 10 at 20-27, 11 at 28 |
+| 28+ | .50 | 2.00 | 240 s | 21,200 | 115 | 11 |
 
 For each field, the encounter uses the greater of the template value and the frozen floor before applying rank multipliers. The weighted composition uses the greater of the template index and the composition floor. Thus defense six does not return to introductory enemies, a 180-second timer or the original boss health. New countries retain the same global victory threat. Authored country difficulty, buffs and biome modifiers still apply, so geographical variations remain meaningful.
 

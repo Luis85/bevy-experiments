@@ -121,6 +121,25 @@ pub struct ProgressionCatalog {
     /// keeps bosses at the shared enemy damage scaling.
     #[serde(default, skip_serializing_if = "crate::schema::is_zero_f32")]
     pub boss_damage_per_rank: f32,
+    /// The growth knee (design enemy-balance §2): enemy health and damage
+    /// grow by `health_per_rank` and `damage_per_rank` up to this rank and
+    /// by the `_late` slopes past it. Absent (`u32::MAX`) keeps one slope.
+    #[serde(default = "no_growth_knee", skip_serializing_if = "is_no_growth_knee")]
+    pub growth_knee_rank: u32,
+    /// Enemy health growth per threat rank past the knee (0..=0.25).
+    #[serde(default, skip_serializing_if = "crate::schema::is_zero_f32")]
+    pub health_per_rank_late: f32,
+    /// Enemy damage growth per threat rank past the knee (0..=0.25).
+    #[serde(default, skip_serializing_if = "crate::schema::is_zero_f32")]
+    pub damage_per_rank_late: f32,
+    /// Personal boss armor growth per threat rank above 4 (0..=0.05).
+    /// Absent (0) keeps the level's boss armor.
+    #[serde(default, skip_serializing_if = "crate::schema::is_zero_f32")]
+    pub boss_armor_per_rank: f32,
+    /// NPC bosses gain 1 armor per this many threat ranks above 4
+    /// (0..=100). Absent (0) keeps the level's NPC boss armor.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub npc_boss_armor_rank_step: u32,
     /// Level-up grant, rank milestones and camp prices. Absent means the
     /// neutral block: no grant, no milestones, flat camp prices.
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
@@ -228,6 +247,12 @@ pub fn level_grant(level: u32) -> u64 {
 pub fn camp_price(base: u64, rank: u32) -> u64 {
     catalog().rewards.camp_price(base, rank)
 }
+fn no_growth_knee() -> u32 {
+    u32::MAX
+}
+fn is_no_growth_knee(rank: &u32) -> bool {
+    *rank == u32::MAX
+}
 fn finite(v: f32, min: f32, max: f32) -> bool {
     v.is_finite() && (min..=max).contains(&v)
 }
@@ -306,6 +331,8 @@ impl ProgressionCatalog {
                 self.arrival_per_rank,
                 self.reward_per_rank,
                 self.fortification_per_rank,
+                self.health_per_rank_late,
+                self.damage_per_rank_late,
             ]
             .into_iter()
             .any(|v| !finite(v, 0.0, 0.25))
@@ -321,6 +348,8 @@ impl ProgressionCatalog {
             || !(0..=2).contains(&self.gear.npc_damage_add_per_level)
             || !finite(self.front_ramp_max, 0.0, 0.5)
             || !finite(self.boss_damage_per_rank, 0.0, 0.05)
+            || !finite(self.boss_armor_per_rank, 0.0, 0.05)
+            || self.npc_boss_armor_rank_step > 100
         {
             return Err("Invalid bounded progression configuration".into());
         }
@@ -384,10 +413,43 @@ impl ProgressionCatalog {
         }
         (1.0 + self.boss_damage_per_rank * steps as f32).clamp(1.0, 4.0)
     }
+    /// `1 + early × min(rank, knee) + late × (rank - knee)` past the knee:
+    /// the enemy health and damage growth (design enemy-balance §2). Up to
+    /// the knee, or with no late slope, it is the single legacy slope bit
+    /// for bit.
+    fn growth(&self, rank: u32, early: f32, late: f32) -> f32 {
+        let knee = self.growth_knee_rank;
+        let value = 1.0 + rank.min(knee) as f32 * early;
+        if rank <= knee || late == 0.0 {
+            return value;
+        }
+        value + (rank - knee) as f32 * late
+    }
+    /// The Personal boss armor multiplier at threat `rank`:
+    /// `1 + boss_armor_per_rank × (min(rank, 50) - 4)`, clamped to 1..=4
+    /// (design enemy-balance §2, "Boss armor"; the boss-rank factor arrives
+    /// in wave 4). The literal 1.0 through rank 4 and without the key.
+    pub fn boss_armor_multiplier(&self, rank: u32) -> f32 {
+        let steps = rank
+            .min(BOSS_SCALING_TO_RANK)
+            .saturating_sub(BOSS_SCALING_FROM_RANK);
+        if steps == 0 || self.boss_armor_per_rank <= 0.0 {
+            return 1.0;
+        }
+        (1.0 + self.boss_armor_per_rank * steps as f32).clamp(1.0, 4.0)
+    }
+    /// The NPC boss armor added at threat `rank`: one per
+    /// `npc_boss_armor_rank_step` ranks above 4, at most 20. 0 through rank
+    /// 4 and without the key.
+    pub fn npc_boss_armor_add(&self, rank: u32) -> i32 {
+        if self.npc_boss_armor_rank_step == 0 {
+            return 0;
+        }
+        (rank.saturating_sub(BOSS_SCALING_FROM_RANK) / self.npc_boss_armor_rank_step).min(20) as i32
+    }
     pub fn snapshot(&self, rank: u32) -> ProgressionSnapshot {
         let bounded = rank.min(self.max_rank);
         let n = bounded as f32;
-        let threat = rank as f32;
         let floor = &self.pressure_floors[(rank as usize).min(self.pressure_floors.len() - 1)];
         ProgressionSnapshot {
             enemy_cap: (self.population_base + bounded as usize * self.population_per_rank)
@@ -395,8 +457,8 @@ impl ProgressionCatalog {
             rank,
             batch_size: (1 + bounded / self.batch_rank_step).min(self.max_batch),
             item_level: (1 + rank / self.item_level_rank_step).min(self.max_item_level),
-            enemy_health: 1.0 + threat * self.health_per_rank,
-            enemy_damage: 1.0 + threat * self.damage_per_rank,
+            enemy_health: self.growth(rank, self.health_per_rank, self.health_per_rank_late),
+            enemy_damage: self.growth(rank, self.damage_per_rank, self.damage_per_rank_late),
             enemy_speed: (1.0 + n * self.speed_per_rank).min(4.0),
             arrival_multiplier: (1.0 + n * self.arrival_per_rank).min(4.0),
             reward_multiplier: (1.0 + n * self.reward_per_rank).min(8.0),
@@ -411,6 +473,8 @@ impl ProgressionCatalog {
             wave_tier: floor.wave_tier,
             boss_time_floor: floor.boss_time,
             boss_damage_multiplier: self.boss_damage_multiplier(rank),
+            boss_armor_multiplier: self.boss_armor_multiplier(rank),
+            npc_boss_armor_add: self.npc_boss_armor_add(rank),
             // The other enemy-side fields stay neutral until their wave-2
             // writers.
             ..ProgressionSnapshot::default()

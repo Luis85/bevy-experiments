@@ -14,6 +14,11 @@
   "max_supply_bonus": 40,
   "front_ramp_max": 0.18,
   "boss_damage_per_rank": 0.01,
+  "growth_knee_rank": 4,
+  "health_per_rank_late": 0.04,
+  "damage_per_rank_late": 0.018,
+  "boss_armor_per_rank": 0.02,
+  "npc_boss_armor_rank_step": 8,
   "pressure_floors": [
     {
       "start_rate": 0.0,
@@ -53,6 +58,198 @@
       "boss_health": 6800,
       "npc_boss_health": 67,
       "wave_tier": 4,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4425,
+      "rate_cap": 1.77,
+      "boss_health": 7400,
+      "npc_boss_health": 69,
+      "wave_tier": 4,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.445,
+      "rate_cap": 1.78,
+      "boss_health": 8000,
+      "npc_boss_health": 71,
+      "wave_tier": 5,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4475,
+      "rate_cap": 1.79,
+      "boss_health": 8600,
+      "npc_boss_health": 73,
+      "wave_tier": 5,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.45,
+      "rate_cap": 1.8,
+      "boss_health": 9200,
+      "npc_boss_health": 75,
+      "wave_tier": 6,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4525,
+      "rate_cap": 1.81,
+      "boss_health": 9800,
+      "npc_boss_health": 77,
+      "wave_tier": 6,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.455,
+      "rate_cap": 1.82,
+      "boss_health": 10400,
+      "npc_boss_health": 79,
+      "wave_tier": 7,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4575,
+      "rate_cap": 1.83,
+      "boss_health": 11000,
+      "npc_boss_health": 81,
+      "wave_tier": 7,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.46,
+      "rate_cap": 1.84,
+      "boss_health": 11600,
+      "npc_boss_health": 83,
+      "wave_tier": 7,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4625,
+      "rate_cap": 1.85,
+      "boss_health": 12200,
+      "npc_boss_health": 85,
+      "wave_tier": 8,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.465,
+      "rate_cap": 1.86,
+      "boss_health": 12800,
+      "npc_boss_health": 87,
+      "wave_tier": 8,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4675,
+      "rate_cap": 1.87,
+      "boss_health": 13400,
+      "npc_boss_health": 89,
+      "wave_tier": 8,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.47,
+      "rate_cap": 1.88,
+      "boss_health": 14000,
+      "npc_boss_health": 91,
+      "wave_tier": 9,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4725,
+      "rate_cap": 1.89,
+      "boss_health": 14600,
+      "npc_boss_health": 93,
+      "wave_tier": 9,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.475,
+      "rate_cap": 1.9,
+      "boss_health": 15200,
+      "npc_boss_health": 95,
+      "wave_tier": 9,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4775,
+      "rate_cap": 1.91,
+      "boss_health": 15800,
+      "npc_boss_health": 97,
+      "wave_tier": 9,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.48,
+      "rate_cap": 1.92,
+      "boss_health": 16400,
+      "npc_boss_health": 99,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4825,
+      "rate_cap": 1.93,
+      "boss_health": 17000,
+      "npc_boss_health": 101,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.485,
+      "rate_cap": 1.94,
+      "boss_health": 17600,
+      "npc_boss_health": 103,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4875,
+      "rate_cap": 1.95,
+      "boss_health": 18200,
+      "npc_boss_health": 105,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.49,
+      "rate_cap": 1.96,
+      "boss_health": 18800,
+      "npc_boss_health": 107,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4925,
+      "rate_cap": 1.97,
+      "boss_health": 19400,
+      "npc_boss_health": 109,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.495,
+      "rate_cap": 1.98,
+      "boss_health": 20000,
+      "npc_boss_health": 111,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.4975,
+      "rate_cap": 1.99,
+      "boss_health": 20600,
+      "npc_boss_health": 113,
+      "wave_tier": 10,
+      "boss_time": 240
+    },
+    {
+      "start_rate": 0.5,
+      "rate_cap": 2.0,
+      "boss_health": 21200,
+      "npc_boss_health": 115,
+      "wave_tier": 11,
       "boss_time": 240
     }
   ],

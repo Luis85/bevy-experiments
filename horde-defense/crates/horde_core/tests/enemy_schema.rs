@@ -428,10 +428,16 @@ fn legacy_resolved_enemy_and_snapshot_serialize_byte_identically() {
     }
     let legacy: BTreeSet<String> = SNAPSHOT_KEYS.into_iter().map(String::from).collect();
     for rank in 0..=60 {
-        // W2-26: the boss damage rank term is written from rank 5 on.
+        // W2-26: the boss damage rank term is written from rank 5 on; W2-32:
+        // so is the Personal boss armor term, and the NPC boss armor add from
+        // rank 12 (one per 8 ranks above 4).
         let mut expected = legacy.clone();
         if rank > 4 {
             expected.insert("boss_damage_multiplier".into());
+            expected.insert("boss_armor_multiplier".into());
+        }
+        if rank >= 12 {
+            expected.insert("npc_boss_armor_add".into());
         }
         let text = serde_json::to_string(&catalog().snapshot(rank)).unwrap();
         assert_eq!(
