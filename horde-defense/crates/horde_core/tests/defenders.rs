@@ -25,17 +25,19 @@
 //! `SelectCountry` with the pure `outbreak_plan` and `country_choice_preview`
 //! reads; and (W2-21) the pure `defender_power` on the deploy's shared
 //! inputs, the derived `service_record` and the `Recruit.containments`
-//! writer.
+//! writer; and (W2-44) the core `Slot::label` and `DamageKind::label` that
+//! replace the slot and damage-kind `Debug` names.
 mod support;
 use horde_core::{
     campaign::{Campaign, Npc, NpcTraining},
     command::{Command, CommandError, CommandOutcome, MAX_RECALL_PERCENT, NpcTactics},
-    content::{Mode, Policy, content},
+    content::{Mode, Policy, Slot, content},
     defenders::{
         DefenderBlocker, DefenderId, DefenderOption, DefenderRole, DefenderSeat, GuardDuty,
         MAX_ADVANCEMENT_LEVEL, OriginTrait, PowerBand, RECRUIT_IDENTITIES, ServiceRecord,
         recruit_identity, resolve,
     },
+    rules::DamageKind,
     sim::{
         DeploymentInputs, ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError,
     },
@@ -189,6 +191,8 @@ fn labels_are_human_over_all() {
     let mut labels: Vec<String> = Vec::new();
     labels.extend(Policy::ALL.iter().map(|p| p.label().to_string()));
     labels.extend(RecruitStatus::ALL.iter().map(|s| s.label().to_string()));
+    labels.extend(Slot::ALL.iter().map(|s| s.label().to_string()));
+    labels.extend(DamageKind::ALL.iter().map(|k| k.label().to_string()));
     for t in OriginTrait::ALL {
         labels.push(t.label().into());
         labels.push(t.blurb().into());
@@ -214,6 +218,20 @@ fn labels_are_human_over_all() {
         assert!(is_human(label), "not a player-facing label: {label:?}");
     }
     assert_eq!(Policy::BossFocus.label(), "Boss focus");
+    let slots: Vec<_> = Slot::ALL.iter().map(|s| s.label()).collect();
+    assert_eq!(slots, ["Ranged", "Melee", "Outfit", "Accessory"]);
+    let kinds: Vec<_> = DamageKind::ALL.iter().map(|k| k.label()).collect();
+    assert_eq!(
+        kinds,
+        [
+            "Crushing",
+            "Cutting",
+            "Piercing",
+            "Impaling",
+            "Small piercing",
+            "Large piercing"
+        ]
+    );
     let locked = DefenderBlocker::Locked {
         node_id: node.id.clone(),
     }

@@ -245,6 +245,27 @@ pub enum DamageKind {
     SmallPiercing,
     LargePiercing,
 }
+impl DamageKind {
+    pub const ALL: [Self; 6] = [
+        Self::Crushing,
+        Self::Cutting,
+        Self::Piercing,
+        Self::Impaling,
+        Self::SmallPiercing,
+        Self::LargePiercing,
+    ];
+    /// Player-facing damage-kind name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Crushing => "Crushing",
+            Self::Cutting => "Cutting",
+            Self::Piercing => "Piercing",
+            Self::Impaling => "Impaling",
+            Self::SmallPiercing => "Small piercing",
+            Self::LargePiercing => "Large piercing",
+        }
+    }
+}
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Damage {
     pub dice: u8,

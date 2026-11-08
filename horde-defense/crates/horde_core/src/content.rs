@@ -21,6 +21,15 @@ impl Slot {
     pub fn index(self) -> usize {
         self as usize
     }
+    /// Player-facing slot name.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Ranged => "Ranged",
+            Self::Melee => "Melee",
+            Self::Outfit => "Outfit",
+            Self::Accessory => "Accessory",
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum EnemyKind {
