@@ -4,7 +4,8 @@
 use super::*;
 use crate::command::CommandError;
 use crate::defenders::{
-    DefenderBlocker, DefenderCard, DefenderOption, DefenderRole, OriginInfo, OriginTrait,
+    DefenderBlocker, DefenderCard, DefenderOption, DefenderRole, GuardDuty, OriginInfo,
+    OriginTrait, ServiceRecord,
 };
 use crate::skill_catalog::{CampaignFeature, SkillEffect, skills};
 
@@ -108,14 +109,18 @@ impl Game {
     /// Every defender the player can choose from, in order: the player,
     /// Mara (listed even while locked), then the roster by id. Each row
     /// carries `SetNextDefender`'s verdict between defenses (a live defense
-    /// rejects every choice with `DefenseInProgress`) and marks the next
-    /// defender.
+    /// rejects every choice with `DefenseInProgress`), marks the next
+    /// defender, and gives its power at [`Self::next_threat`] (held at the
+    /// highest supported threat, where a deploy would be rejected).
     pub fn available_defenders(&self) -> Vec<DefenderOption> {
         let mut ids = vec![DefenderId::Player, DefenderId::Mara];
         let mut recruits: Vec<_> = self.strategy.roster.iter().map(|r| r.id).collect();
         recruits.sort_unstable();
         ids.extend(recruits.into_iter().map(DefenderId::Recruit));
         let next = self.next_defender();
+        let threat = self
+            .next_threat()
+            .min(crate::progression::catalog().threat_guard_rank);
         ids.into_iter()
             .filter_map(|id| {
                 let card = self.defender_card(id)?;
@@ -128,9 +133,104 @@ impl Game {
                     card,
                     selectable,
                     selected: id == next,
+                    power: self.defender_power(id, threat).ok()?,
                 })
             })
             .collect()
+    }
+    /// The selectable defender with the highest power at the next threat;
+    /// on a tie the earlier in [`Self::available_defenders`] order, so the
+    /// player (always selectable) is the fallback.
+    pub(crate) fn recommended_defender(&self) -> DefenderId {
+        let mut best: Option<(DefenderId, u16)> = None;
+        for option in self.available_defenders() {
+            if option.selectable.is_ok() && best.is_none_or(|(_, top)| option.power.rating > top) {
+                best = Some((option.card.id, option.power.rating));
+            }
+        }
+        best.map_or(DefenderId::Player, |(id, _)| id)
+    }
+    /// Recruit `recruit_id`'s service history (design 1.10), derived on
+    /// every read from the run history, the recruit's own counters, its
+    /// live guard assignment and the saved containments. Pure.
+    pub fn service_record(&self, recruit_id: u64) -> Result<ServiceRecord, CommandError> {
+        let recruit = self
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == recruit_id)
+            .ok_or(CommandError::UnknownSurvivor)?;
+        let mut record = ServiceRecord {
+            recruit_id,
+            deployments: 0,
+            takeovers: 0,
+            expeditions: 0,
+            victories: 0,
+            defeats: 0,
+            withdrawals: 0,
+            kills: 0,
+            coins: 0,
+            stages_cleared: 0,
+            liberations: 0,
+            countries: Vec::new(),
+            last_outcome: None,
+            npc_attempts: recruit.npc.attempts,
+            npc_victories: recruit.npc.victories,
+            guard: self
+                .strategy
+                .guards
+                .iter()
+                .find(|g| g.recruit_id == recruit_id)
+                .map(|g| GuardDuty {
+                    country_id: g.country_id.clone(),
+                    duty_ticks: g.duty_ticks,
+                }),
+            containments: recruit.containments,
+        };
+        let mut expeditions = BTreeSet::new();
+        let mut stages = BTreeSet::new();
+        let bump = |n: &mut u32| *n = n.saturating_add(1);
+        for run in self
+            .campaign
+            .run_history
+            .iter()
+            .filter(|r| r.recruit_id == Some(recruit_id))
+        {
+            bump(&mut record.deployments);
+            match run.worker_id {
+                None => bump(&mut record.takeovers),
+                Some(battle) => {
+                    expeditions.insert(battle);
+                }
+            }
+            match run.outcome {
+                Outcome::Victory => {
+                    bump(&mut record.victories);
+                    stages.insert((run.country_id.as_deref(), run.stage));
+                    let liberated = run
+                        .country_id
+                        .as_deref()
+                        .and_then(|id| crate::world::world().country(id))
+                        .is_some_and(|c| run.stage + 1 == c.level_count());
+                    if liberated {
+                        bump(&mut record.liberations);
+                    }
+                }
+                Outcome::Defeat => bump(&mut record.defeats),
+                Outcome::Withdrawal => bump(&mut record.withdrawals),
+            }
+            record.kills = record.kills.saturating_add(u64::from(run.kills));
+            record.coins = record.coins.saturating_add(run.coins);
+            if let Some(country) = &run.country_id
+                && !record.countries.contains(country)
+            {
+                record.countries.push(country.clone());
+            }
+            record.last_outcome = Some(run.outcome);
+        }
+        record.expeditions = u32::try_from(expeditions.len()).unwrap_or(u32::MAX);
+        record.stages_cleared = u32::try_from(stages.len()).unwrap_or(u32::MAX);
+        Ok(record)
     }
     /// The items `defender` carries into a defense: the player's or Mara's
     /// loadout, or a recruit's own; None for a recruit not on the roster.

@@ -347,14 +347,100 @@ pub struct DefenderCard {
 
 /// One row of `Game::available_defenders`: the card, whether
 /// `SetNextDefender` would accept it between defenses (or the typed reason
-/// it would not), and whether it is the next defender. A live defense does
-/// not change `selectable`, but rejects every choice with
-/// `CommandError::DefenseInProgress`.
-#[derive(Clone, Debug, PartialEq, Eq)]
+/// it would not), whether it is the next defender, and its power at the
+/// next threat. A live defense does not change `selectable`, but rejects
+/// every choice with `CommandError::DefenseInProgress`.
+#[derive(Clone, Debug, PartialEq)]
 pub struct DefenderOption {
     pub card: DefenderCard,
     pub selectable: Result<(), DefenderBlocker>,
     pub selected: bool,
+    pub power: DefenderPower,
+}
+
+/// How a defender's [`DefenderPower::rating`] compares with a fresh starter
+/// (100): Weak below 85, Even from 85 to 115, Strong above 115.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum PowerBand {
+    Weak,
+    Even,
+    Strong,
+}
+impl PowerBand {
+    pub fn for_rating(rating: u16) -> Self {
+        match rating {
+            0..=84 => Self::Weak,
+            85..=115 => Self::Even,
+            _ => Self::Strong,
+        }
+    }
+    /// Plain player-facing text.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Weak => "Weak",
+            Self::Even => "Even",
+            Self::Strong => "Strong",
+        }
+    }
+}
+
+/// A comparable strength for any defender against a given victory threat
+/// (`Game::defender_power`, CD11). Analytic, from the inputs a deploy uses:
+/// the expected kill rate against the reference enemy and the expected time
+/// the defender survives its arrivals, in the defender's own combat model.
+/// `rating` is the geometric mean of both against a fresh starter's at
+/// threat 0 (exactly 100 in either model), clamped to 1..=999. Derived on
+/// every read; never saved.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DefenderPower {
+    pub defender: DefenderId,
+    pub threat: u32,
+    pub kills_per_min: f32,
+    pub survival_s: f32,
+    pub rating: u16,
+    pub band: PowerBand,
+}
+
+/// A recruit's live guard duty, as its service record shows it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GuardDuty {
+    pub country_id: String,
+    pub duty_ticks: u64,
+}
+
+/// A recruit's service history (`Game::service_record`, design 1.10).
+/// Derived from the run history (each record's `recruit_id`), the recruit's
+/// own counters, its live guard assignment and the saved
+/// `Recruit.containments`; never saved itself. Runs recorded before the
+/// history named their recruit are not counted ("since records began").
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ServiceRecord {
+    pub recruit_id: u64,
+    /// Every recorded run the recruit defended.
+    pub deployments: u32,
+    /// Runs defending the main run (no expedition).
+    pub takeovers: u32,
+    /// Distinct expeditions the recruit's runs came from.
+    pub expeditions: u32,
+    pub victories: u32,
+    pub defeats: u32,
+    pub withdrawals: u32,
+    pub kills: u64,
+    pub coins: u64,
+    /// Distinct country stages won.
+    pub stages_cleared: u32,
+    /// Victories on a country's final stage.
+    pub liberations: u32,
+    /// The countries fought in, in the order first fought.
+    pub countries: Vec<String>,
+    pub last_outcome: Option<crate::sim::Outcome>,
+    /// The recruit's own attempt and victory counters (guard wins included).
+    pub npc_attempts: u64,
+    pub npc_victories: u64,
+    /// The live guard assignment, if the recruit is guarding.
+    pub guard: Option<GuardDuty>,
+    /// Outbreaks the recruit contained while guarding.
+    pub containments: u32,
 }
 
 /// The HUD form of a defender name: its first word in upper case.

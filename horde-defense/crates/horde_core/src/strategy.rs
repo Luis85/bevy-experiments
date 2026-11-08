@@ -834,6 +834,8 @@ impl StrategyState {
                     outbreak.outcome = OutbreakOutcome::Contained;
                     guard.victories += 1;
                     recruit.npc.victories += 1;
+                    // Kept on the recruit: the guard assignment goes.
+                    recruit.containments = recruit.containments.saturating_add(1);
                     contained.insert(country.clone());
                     notes.push(format!(
                         "{} contained the outbreak in {}",
@@ -856,6 +858,18 @@ impl StrategyState {
                     if outbreak.strength == 0 {
                         outbreak.outcome = OutbreakOutcome::Contained;
                         contained.insert(outbreak.country_id.clone());
+                        // The last group fell to the garrison's wounds:
+                        // every guard of the country contained it.
+                        for guard in &self.guards {
+                            if guard.country_id != outbreak.country_id {
+                                continue;
+                            }
+                            if let Some(r) =
+                                self.roster.iter_mut().find(|r| r.id == guard.recruit_id)
+                            {
+                                r.containments = r.containments.saturating_add(1);
+                            }
+                        }
                     }
                 }
                 continue;

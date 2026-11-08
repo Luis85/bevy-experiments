@@ -560,7 +560,7 @@ impl Campaign {
     pub fn lane_count_after_victory(&self) -> u8 {
         self.balance_settings.geometry(self.level_after_victory()).0
     }
-    fn progression_for(
+    pub(crate) fn progression_for(
         &self,
         mode: Mode,
         rank: u32,

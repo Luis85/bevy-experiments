@@ -14,6 +14,7 @@ mod npc;
 mod pacing;
 mod parallel;
 mod persistence;
+mod power;
 mod recruitment;
 mod smoke;
 mod structures;
@@ -47,6 +48,7 @@ pub use pacing::{
 pub use parallel::SettlementIssue;
 pub(crate) use parallel::UNKNOWN_EXPEDITION;
 pub use persistence::{RULESET_VERSION, SaveError};
+pub use power::DeploymentInputs;
 pub use smoke::{desktop_smoke, smoke, smoke_input, smoke_prepare, smoke_seed};
 pub use telemetry::CombatTelemetry;
 

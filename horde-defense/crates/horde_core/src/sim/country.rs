@@ -26,6 +26,9 @@ pub struct OutbreakPlan {
     pub guard_capacity: usize,
     /// The recruits `AssignGuard` would accept for this country now, by id.
     pub eligible_guards: Vec<u64>,
+    /// The selectable defender with the highest power at the next threat
+    /// (`Game::defender_power`), the player on a tie.
+    pub recommended_defender: DefenderId,
 }
 
 /// What choosing a country means before it is chosen
@@ -88,6 +91,7 @@ impl Game {
                 .collect(),
             guard_capacity: world().strategy_config.max_guards_per_country,
             eligible_guards: self.strategy.eligible_guards(&self.campaign, country_id),
+            recommended_defender: self.recommended_defender(),
         })
     }
     /// What choosing `country_id` means, or None for an unknown country.

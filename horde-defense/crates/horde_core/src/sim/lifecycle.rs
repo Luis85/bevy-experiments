@@ -163,18 +163,31 @@ impl Game {
             None => self.campaign.npc.loadout,
         };
         self.campaign.validate_loadout(loadout)?;
-        let mut profile = match &takeover {
-            Some((_, npc)) => self.campaign.profile_for_loadout(mode, loadout, npc),
-            None => self.campaign.profile(mode),
+        // The inputs defender_power reads (one shared helper, so the power
+        // number cannot drift from what deploys): the mode owners fight
+        // with Mara's npc record, as `Campaign::profile` always has.
+        let character = match &takeover {
+            Some((_, npc)) => npc,
+            None => &self.campaign.npc,
         };
+        let super::power::DeploymentInputs {
+            mut profile,
+            snapshot: progression,
+            balance,
+            ..
+        } = super::power::deployment_inputs_for(
+            &self.campaign,
+            defender,
+            loadout,
+            character,
+            self.campaign.progression_rank(),
+        )?;
         let country = if country_stage.is_some() {
             self.campaign.world.active_country()
         } else {
             None
         };
         let (lane_count, width_yards) = self.campaign.arena_geometry();
-        let balance = self.campaign.balance_settings.clone();
-        let progression = self.campaign.deployment_progression(mode)?;
         let mut modifiers = country.map_or_else(Modifiers::default, |c| {
             let mut m = c.modifiers;
             m.enemy_health *= c.difficulty;
@@ -185,37 +198,6 @@ impl Game {
         modifiers.enemy_health *= progression.enemy_health * balance.enemy_health;
         modifiers.enemy_speed *= progression.enemy_speed * balance.enemy_speed;
         modifiers.reward *= progression.reward_multiplier * balance.reward;
-        profile.personal.damage = (profile.personal.damage as f32 * balance.player_damage)
-            .round()
-            .max(1.0) as i32;
-        profile.personal.melee_damage = (profile.personal.melee_damage as f32
-            * balance.player_damage)
-            .round()
-            .max(1.0) as i32;
-        profile.personal.health = (profile.personal.health as f32 * balance.defender_health)
-            .round()
-            .max(1.0) as i32;
-        profile.max_hp = (profile.max_hp as f32 * balance.defender_health)
-            .round()
-            .max(1.0) as i32;
-        let expected = crate::campaign::mean_basic_damage(Damage {
-            dice: profile.npc.damage_dice,
-            adds: profile.npc.damage_add,
-            kind: profile.npc.damage_kind,
-        });
-        profile.npc.damage_add = (profile.npc.damage_add as f32
-            + expected * (balance.player_damage - 1.0))
-            .round()
-            .clamp(-30.0, 1_000_000.0) as i32;
-        let expected = crate::campaign::mean_basic_damage(Damage {
-            dice: profile.npc_melee_damage_dice,
-            adds: profile.npc_melee_damage_add,
-            kind: profile.npc_melee_kind,
-        });
-        profile.npc_melee_damage_add = (profile.npc_melee_damage_add as f32
-            + expected * (balance.player_damage - 1.0))
-            .round()
-            .clamp(-30.0, 1_000_000.0) as i32;
         let boss_base = if mode == Mode::Npc {
             content().levels[level]
                 .boss_npc_hp

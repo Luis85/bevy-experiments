@@ -283,7 +283,7 @@ It never deploys, and `next_attempt_id` is unchanged. `EnterCountry` keeps its l
 
 **`Game::country_choice_preview(id) -> CountryChoicePreview { stage_count, checkpoints, companion_after_liberation }`.**
 
-*As built (W2-19, `sim/country.rs`):* `CommandError::CountryLocked(String)` follows schema-v7 §6 (an unknown id is locked too), and `SelectCountry` is appended after `AcknowledgeOutcomes`. `outbreak_plan` returns None without an active outbreak; `guards` lists the guarding recruit ids in assignment order, and `eligible_guards` is `assign_guard`'s own verdict (`StrategyState::eligible_guards`), so a full garrison lists nobody. `country_choice_preview` returns None for an unknown id; `companion_after_liberation: bool` is true while Mara is not in camp and liberating the country meets the "Meet Mara" node's `minimum_liberated`. Two fields wait for their inputs: `OutbreakPlan.recommended_defender` is added by W2-21 with `defender_power`, and `CountryChoicePreview.checkpoints` by W4-02 from `Country::regional_checkpoints()` (W2-26, ruling P6).
+*As built (W2-19, `sim/country.rs`):* `CommandError::CountryLocked(String)` follows schema-v7 §6 (an unknown id is locked too), and `SelectCountry` is appended after `AcknowledgeOutcomes`. `outbreak_plan` returns None without an active outbreak; `guards` lists the guarding recruit ids in assignment order, and `eligible_guards` is `assign_guard`'s own verdict (`StrategyState::eligible_guards`), so a full garrison lists nobody. `country_choice_preview` returns None for an unknown id; `companion_after_liberation: bool` is true while Mara is not in camp and liberating the country meets the "Meet Mara" node's `minimum_liberated`. Two fields wait for their inputs: `OutbreakPlan.recommended_defender` is added by W2-21 with `defender_power` (landed, see 1.11), and `CountryChoicePreview.checkpoints` by W4-02 from `Country::regional_checkpoints()` (W2-26, ruling P6).
 
 ### 1.9 Expedition settlement and notices (CD7, CD8)
 
@@ -327,6 +327,8 @@ Other sources:
 
 Records before v7 are labelled "since records began". If perf-architecture compacts `run_history`, it must keep per-recruit summaries.
 
+*As built (W2-21, `sim/defense.rs`, types in `defenders.rs`):* `ServiceRecord { recruit_id, deployments, takeovers, expeditions, victories, defeats, withdrawals, kills, coins, stages_cleared, liberations, countries, last_outcome, npc_attempts, npc_victories, guard: Option<GuardDuty { country_id, duty_ticks }>, containments }`, `UnknownSurvivor` for an id not on the roster. `stages_cleared` counts distinct (country, stage) victories, `liberations` every victory on a country's final stage, and `countries` lists the countries fought in, in first-fought order. `Recruit.containments` is credited at both places a guarded outbreak becomes Contained: the guard whose hit defeats the last group (the strategy.rs:776 site), and every guard of the country when that group instead falls to its wounds on its own turn. A deployment's containment (`resolve_outbreak`) credits nobody.
+
 ### 1.11 defender_power (CD11)
 
 **Signature.** `Game::defender_power(defender, next_threat: u32) -> Result<DefenderPower { defender, threat, kills_per_min, survival_s, rating: u16, band: PowerBand }, CommandError>`. It is pure: no RNG, no mutation. `Game::next_threat()` = `campaign.progression_rank()`.
@@ -350,6 +352,8 @@ Records before v7 are labelled "since records began". If perf-architecture compa
 **Rating.** `round(100·sqrt((kill/kill_ref)·(surv/surv_ref)))`, clamped to 1..=999. The refs are the same formula for `Campaign::default()` at threat 0 per mode, in a OnceLock, so a fresh starter scores exactly 100 in both models. Bands: Weak below 85, Even 85-115, Strong above 115.
 
 **Cost.** Recorded in release, not asserted.
+
+*As built (W2-21, `sim/power.rs`):* the shared helper is `deployment_inputs_for(campaign, defender, loadout, character, threat)`, public as `Game::deployment_inputs(defender, threat) -> Result<DeploymentInputs { defender, threat, profile, snapshot, max_hp, balance }, CommandError>`. It takes no level or stage: power is country-free, so the inputs stop before the country's modifiers (`personal_damage`, `npc_skill`), which `deploy_as` still applies after it; on a country whose modifiers leave the defender alone the deployed attempt's profile is exactly `profile`. A recruit's profile carries its identity appearance. `enemy_health` and `enemy_damage` are the snapshot's times the balance preset's, and `arrival` is the snapshot's times `spawn_rate` (and `npc_spawn_rate` for Npc), as the battle applies them; the NPC kill rate divides by the Shambler's `npc_hp`. A defender the reference enemy cannot hurt survives 3,600 s. `UnknownSurvivor` for a recruit not on the roster and `Rejected` past `threat_guard_rank`. `DefenderOption.power` is read at `next_threat()` held at `threat_guard_rank`, and `OutbreakPlan.recommended_defender` is the selectable option with the highest rating, the earlier row on a tie (the player, always selectable, is the fallback).
 
 ### 1.12 Regional checkpoints (decision 13): derived, no reward
 

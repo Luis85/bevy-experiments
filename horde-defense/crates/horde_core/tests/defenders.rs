@@ -23,18 +23,24 @@
 //! `battle_defender_card` and `continue_blocker` reads; and (W2-13) the live
 //! `SetRecruitTactics` for a Ready or Defending recruit; and (W2-19)
 //! `SelectCountry` with the pure `outbreak_plan` and `country_choice_preview`
-//! reads.
+//! reads; and (W2-21) the pure `defender_power` on the deploy's shared
+//! inputs, the derived `service_record` and the `Recruit.containments`
+//! writer.
 mod support;
 use horde_core::{
     campaign::{Campaign, Npc, NpcTraining},
     command::{Command, CommandError, CommandOutcome, MAX_RECALL_PERCENT, NpcTactics},
     content::{Mode, Policy, content},
     defenders::{
-        DefenderBlocker, DefenderId, DefenderOption, DefenderRole, DefenderSeat,
-        MAX_ADVANCEMENT_LEVEL, OriginTrait, RECRUIT_IDENTITIES, recruit_identity, resolve,
+        DefenderBlocker, DefenderId, DefenderOption, DefenderRole, DefenderSeat, GuardDuty,
+        MAX_ADVANCEMENT_LEVEL, OriginTrait, PowerBand, RECRUIT_IDENTITIES, ServiceRecord,
+        recruit_identity, resolve,
     },
-    sim::{ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError},
+    sim::{
+        DeploymentInputs, ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError,
+    },
     skill_catalog::skills,
+    stats::RunRecord,
     strategy::{OutbreakOutcome, RecruitStatus},
     survivors::Appearance,
     world::world,
@@ -3517,4 +3523,455 @@ fn country_choice_preview_names_stage_count_and_mara_timing() {
     assert!(g.campaign().npc_available());
     let preview = g.country_choice_preview(&open_front(&g)).unwrap();
     assert!(!preview.companion_after_liberation);
+}
+
+// ---------------------------------------------------------------------------
+// W2-21: the pure defender_power read (design 1.11) on the inputs a deploy
+// uses, the derived service_record (1.10) and the Recruit.containments
+// writer at the guard-containment site.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn fresh_starter_power_is_100_at_threat_zero_in_both_models() {
+    let g = Game::default();
+    assert_eq!(g.next_threat(), 0, "a fresh campaign faces threat 0");
+    for (defender, mode) in [
+        (DefenderId::Player, Mode::Personal),
+        (DefenderId::Mara, Mode::Npc),
+    ] {
+        assert_eq!(defender.mode(), mode);
+        let power = g.defender_power(defender, 0).unwrap();
+        assert_eq!(power.defender, defender);
+        assert_eq!(power.threat, 0);
+        assert_eq!(power.rating, 100, "{defender:?}: {power:?}");
+        assert_eq!(power.band, PowerBand::Even);
+        assert!(
+            power.kills_per_min.is_finite() && power.kills_per_min > 0.0,
+            "{power:?}"
+        );
+        assert!(
+            power.survival_s.is_finite() && power.survival_s > 0.0,
+            "{power:?}"
+        );
+    }
+    // Every row of the picker carries the power at the next threat, Mara's
+    // included while she is still locked.
+    for option in g.available_defenders() {
+        assert_eq!(
+            option.power,
+            g.defender_power(option.card.id, g.next_threat()).unwrap()
+        );
+    }
+    // Bands: Weak below 85, Even 85-115, Strong above 115.
+    for (rating, band) in [
+        (1, PowerBand::Weak),
+        (84, PowerBand::Weak),
+        (85, PowerBand::Even),
+        (115, PowerBand::Even),
+        (116, PowerBand::Strong),
+        (999, PowerBand::Strong),
+    ] {
+        assert_eq!(PowerBand::for_rating(rating), band, "{rating}");
+        assert!(is_human(band.label()));
+    }
+}
+
+#[test]
+fn defender_power_drops_as_threat_rises() {
+    let (g, id) = takeover_ready();
+    for defender in [
+        DefenderId::Player,
+        DefenderId::Mara,
+        DefenderId::Recruit(id),
+    ] {
+        let powers: Vec<_> = (0..=40)
+            .map(|threat| g.defender_power(defender, threat).unwrap())
+            .collect();
+        for pair in powers.windows(2) {
+            let (low, high) = (&pair[0], &pair[1]);
+            assert!(
+                high.kills_per_min <= low.kills_per_min
+                    && high.survival_s <= low.survival_s
+                    && high.rating <= low.rating,
+                "{defender:?}: {low:?} then {high:?}"
+            );
+            assert_eq!(high.band, PowerBand::for_rating(high.rating));
+        }
+        assert!(
+            powers[40].rating < powers[0].rating,
+            "{defender:?}: {} at threat 0, {} at threat 40",
+            powers[0].rating,
+            powers[40].rating
+        );
+    }
+}
+
+#[test]
+fn defender_power_is_pure() {
+    let (mut g, id) = takeover_ready();
+    let (mut outbreak, country) = outbreak_game();
+    let home = outbreak.campaign().world.cleared[0].clone();
+    recruit(&mut outbreak, &home);
+    advance(&mut g, 90);
+    take_over(&mut g, id);
+    advance(&mut g, 30);
+    let guard = horde_core::progression::catalog().threat_guard_rank;
+    for game in [&g, &outbreak] {
+        let before = serde_json::to_value(game).unwrap();
+        let twin = game.clone();
+        let mut ids = vec![DefenderId::Player, DefenderId::Mara];
+        ids.extend(
+            game.strategy()
+                .roster
+                .iter()
+                .map(|r| DefenderId::Recruit(r.id)),
+        );
+        for defender in ids {
+            for threat in [0, 7, game.next_threat(), guard] {
+                let power = game.defender_power(defender, threat);
+                assert!(power.is_ok(), "{defender:?} at {threat}: {power:?}");
+                assert_eq!(power, game.defender_power(defender, threat));
+                assert_eq!(power, twin.defender_power(defender, threat));
+            }
+            assert!(matches!(
+                game.defender_power(defender, guard + 1),
+                Err(CommandError::Rejected(_))
+            ));
+        }
+        assert_eq!(
+            game.defender_power(DefenderId::Recruit(99), 0),
+            Err(CommandError::UnknownSurvivor)
+        );
+        let _ = game.available_defenders();
+        let _ = game.outbreak_plan(&country);
+        assert_eq!(serde_json::to_value(game).unwrap(), before, "pure");
+    }
+}
+
+#[test]
+fn outbreak_plan_recommends_the_strongest_selectable_defender() {
+    let (mut g, country) = outbreak_game();
+    let home = g.campaign().world.cleared[0].clone();
+    let hardy = recruit(&mut g, &home);
+    let hardier = recruit(&mut g, &home);
+    // Hardier than everyone else: the hardier one is guarding, so the
+    // other is the strongest defender that can be chosen.
+    roster_npc_mut(&mut g, hardy).ht += 10;
+    roster_npc_mut(&mut g, hardier).ht += 16;
+    apply_ok(
+        &mut g,
+        Command::AssignGuard {
+            id: hardier,
+            country: country.clone(),
+        },
+    );
+    let options = g.available_defenders();
+    let rating = |id| {
+        options
+            .iter()
+            .find(|o| o.card.id == id)
+            .unwrap()
+            .power
+            .rating
+    };
+    assert!(rating(DefenderId::Recruit(hardier)) > rating(DefenderId::Recruit(hardy)));
+    for other in [DefenderId::Player, DefenderId::Mara] {
+        assert!(
+            rating(DefenderId::Recruit(hardy)) > rating(other),
+            "{other:?}"
+        );
+    }
+    let plan = g.outbreak_plan(&country).unwrap();
+    assert_eq!(plan.recommended_defender, DefenderId::Recruit(hardy));
+    // On a tie the earlier row wins, so the player is the fallback.
+    let fresh = outbreak_game().0;
+    let top = fresh
+        .available_defenders()
+        .into_iter()
+        .filter(|o| o.selectable.is_ok())
+        .map(|o| o.power.rating)
+        .max()
+        .unwrap();
+    let first = fresh
+        .available_defenders()
+        .into_iter()
+        .find(|o| o.selectable.is_ok() && o.power.rating == top)
+        .unwrap();
+    assert_eq!(
+        fresh.outbreak_plan(&country).unwrap().recommended_defender,
+        first.card.id
+    );
+}
+
+/// A liberated country whose modifiers leave the defender's profile alone,
+/// so a deployed attempt's profile is exactly the deploy's shared inputs.
+fn profile_neutral_country(g: &Game) -> String {
+    g.campaign()
+        .world
+        .cleared
+        .iter()
+        .find(|id| {
+            let m = world().country(id).unwrap().modifiers;
+            m.personal_damage == 1.0 && m.npc_skill == 0
+        })
+        .expect("a liberated profile-neutral country")
+        .clone()
+}
+
+#[test]
+fn defender_power_inputs_match_the_deployed_attempt() {
+    let (mut g, id) = takeover_ready();
+    // The recruit's own record differs from Mara's beyond its loadout.
+    roster_npc_mut(&mut g, id).ht += 2;
+    // Off-default balance and a raised threat, so both scale the inputs.
+    let balance = &mut g.campaign_mut().balance_settings;
+    balance.player_damage = 1.3;
+    balance.defender_health = 0.8;
+    balance.enemy_health = 1.2;
+    balance.enemy_damage = 1.1;
+    g.campaign_mut().victories += 9;
+    let country = profile_neutral_country(&g);
+    apply_ok(&mut g, Command::SelectCountry(country));
+    let threat = g.next_threat();
+    assert!(threat > 0);
+    for defender in [
+        DefenderId::Player,
+        DefenderId::Mara,
+        DefenderId::Recruit(id),
+    ] {
+        let mut deployed = g.clone();
+        let inputs = deployed.deployment_inputs(defender, threat).unwrap();
+        let power = deployed.defender_power(defender, threat).unwrap();
+        assert_eq!(inputs.defender, defender);
+        assert_eq!(inputs.threat, threat);
+        assert_eq!(inputs.power(), power, "{defender:?}");
+        deployed
+            .deploy_country_stage_as(0, defender)
+            .unwrap_or_else(|e| panic!("{defender:?}: {e}"));
+        let a = deployed.attempt().unwrap();
+        assert_eq!(a.defender(), defender);
+        assert_eq!(a.profile, inputs.profile, "{defender:?} profile");
+        assert_eq!(a.max_hp, inputs.max_hp, "{defender:?} max_hp");
+        assert_eq!(a.progression, inputs.snapshot, "{defender:?} snapshot");
+        assert_eq!(a.balance, inputs.balance, "{defender:?} balance");
+        // The power read from the deployed attempt's own inputs is the same.
+        let from_attempt = DeploymentInputs {
+            defender: a.defender(),
+            threat,
+            profile: a.profile.clone(),
+            snapshot: a.progression.clone(),
+            max_hp: a.max_hp,
+            balance: a.balance.clone(),
+        };
+        assert_eq!(from_attempt.power(), power, "{defender:?}");
+    }
+}
+
+/// Recruit `id`'s saved containment count.
+fn containments(g: &Game, id: u64) -> u32 {
+    g.strategy()
+        .roster
+        .iter()
+        .find(|r| r.id == id)
+        .unwrap()
+        .containments
+}
+
+/// A guarded outbreak with one infected group left, contained under
+/// strategy seed `seed`. Returns the game, the guard, an idle recruit, and
+/// whether the guard's own hit ended it (it is credited with a victory);
+/// otherwise the group fell to its wounds on its own turn.
+fn contained_by_guard(seed: u64) -> (Game, u64, u64, bool) {
+    let (mut g, country) = outbreak_game();
+    let home = g.campaign().world.cleared[0].clone();
+    let guard = recruit(&mut g, &home);
+    let idle = recruit(&mut g, &home);
+    apply_ok(
+        &mut g,
+        Command::AssignGuard {
+            id: guard,
+            country: country.clone(),
+        },
+    );
+    let outcome = |g: &Game| {
+        g.strategy()
+            .outbreaks
+            .iter()
+            .find(|o| o.country_id == country)
+            .unwrap()
+            .outcome
+    };
+    let strategy = g.staging().strategy();
+    strategy.rng = horde_core::rules::Rng::new(seed);
+    strategy
+        .outbreaks
+        .iter_mut()
+        .find(|o| o.country_id == country)
+        .unwrap()
+        .strength = 1;
+    let victories = roster_npc(&g, guard).victories;
+    let mut turns = 0;
+    while outcome(&g) == OutbreakOutcome::Active {
+        assert_eq!(status(&g, guard), RecruitStatus::Guarding, "seed {seed}");
+        advance(&mut g, 60);
+        turns += 1;
+        assert!(turns < 400, "seed {seed}: the guard never contained it");
+    }
+    assert_eq!(outcome(&g), OutbreakOutcome::Contained, "seed {seed}");
+    let hit = roster_npc(&g, guard).victories > victories;
+    (g, guard, idle, hit)
+}
+
+#[test]
+fn guard_containment_increments_recruit_containments_and_survives_guard_removal() {
+    // Both places a guarded outbreak becomes Contained credit the guard:
+    // its own decisive hit, and the last group falling to its wounds.
+    let mut sites = BTreeSet::new();
+    for seed in 1..=24 {
+        let (mut g, guard, idle, hit) = contained_by_guard(seed);
+        sites.insert(hit);
+        assert_eq!(containments(&g, guard), 1, "seed {seed} (hit {hit})");
+        assert_eq!(containments(&g, idle), 0, "only the guard is credited");
+        // The guard assignment goes; the recruit's containment stays.
+        if status(&g, guard) == RecruitStatus::Guarding {
+            apply_ok(&mut g, Command::ReleaseGuard(guard));
+        }
+        assert!(g.strategy().guards.iter().all(|a| a.recruit_id != guard));
+        assert_eq!(containments(&g, guard), 1);
+        assert_eq!(g.service_record(guard).unwrap().containments, 1);
+        let loaded = reload(&g);
+        assert_eq!(containments(&loaded, guard), 1);
+        assert_eq!(loaded.service_record(guard).unwrap().containments, 1);
+    }
+    assert_eq!(
+        sites,
+        BTreeSet::from([false, true]),
+        "the seeds reach both containment sites"
+    );
+}
+
+/// A copy of `template` with the fields a service record reads.
+#[allow(clippy::too_many_arguments)]
+fn service_run(
+    template: &RunRecord,
+    recruit_id: Option<u64>,
+    worker_id: Option<u64>,
+    outcome: Outcome,
+    country: &str,
+    stage: usize,
+    kills: u32,
+    coins: u64,
+) -> RunRecord {
+    let mut record = template.clone();
+    record.recruit_id = recruit_id;
+    record.worker_id = worker_id;
+    record.outcome = outcome;
+    record.country_id = Some(country.into());
+    record.country_name = world().country(country).unwrap().name.clone();
+    record.stage = stage;
+    record.kills = kills;
+    record.coins = coins;
+    record
+}
+
+#[test]
+fn service_record_is_derived_from_run_history_and_containments() {
+    let (mut g, id) = takeover_ready();
+    let home = g.campaign().world.cleared[0].clone();
+    let other = recruit(&mut g, &home);
+    take_over(&mut g, id);
+    win_main(&mut g);
+    let record = g.service_record(id).unwrap();
+    let won = g.campaign().run_history.last().unwrap().clone();
+    assert_eq!((won.recruit_id, won.worker_id), (Some(id), None));
+    assert_eq!(record.recruit_id, id);
+    assert_eq!(
+        (record.deployments, record.takeovers, record.expeditions),
+        (1, 1, 0)
+    );
+    assert_eq!(
+        (record.victories, record.defeats, record.withdrawals),
+        (1, 0, 0)
+    );
+    assert_eq!(record.kills, u64::from(won.kills));
+    assert_eq!(record.coins, won.coins);
+    assert_eq!(record.last_outcome, Some(Outcome::Victory));
+    assert_eq!(record.npc_attempts, roster_npc(&g, id).attempts);
+    assert_eq!(record.npc_victories, roster_npc(&g, id).victories);
+    assert_eq!(record.containments, 0);
+    assert_eq!(record.guard, None);
+
+    // A history of expeditions and takeovers, beside other defenders' runs.
+    let cleared = g.campaign().world.cleared.clone();
+    let (a, b, c) = (&cleared[0], &cleared[1], &cleared[2]);
+    let final_b = world().country(b).unwrap().level_count() - 1;
+    assert!(final_b > 0);
+    let history = vec![
+        service_run(&won, Some(id), None, Outcome::Victory, a, 0, 10, 5),
+        service_run(&won, Some(id), Some(7), Outcome::Victory, a, 0, 4, 3),
+        service_run(&won, None, None, Outcome::Victory, b, final_b, 50, 50),
+        service_run(&won, Some(id), Some(7), Outcome::Victory, b, final_b, 6, 2),
+        service_run(&won, Some(id), Some(8), Outcome::Defeat, b, 0, 1, 0),
+        service_run(&won, Some(other), Some(9), Outcome::Defeat, c, 0, 9, 9),
+        service_run(&won, Some(id), None, Outcome::Withdrawal, c, 0, 0, 0),
+        service_run(&won, Some(other), None, Outcome::Victory, c, 0, 9, 9),
+    ];
+    g.staging().campaign().run_history = std::sync::Arc::new(history);
+    g.staging()
+        .strategy()
+        .roster
+        .iter_mut()
+        .find(|r| r.id == id)
+        .unwrap()
+        .containments = 2;
+    let guarded = cleared[3].clone();
+    apply_ok(
+        &mut g,
+        Command::AssignGuard {
+            id,
+            country: guarded.clone(),
+        },
+    );
+    advance(&mut g, 120);
+    let duty_ticks = g
+        .strategy()
+        .guards
+        .iter()
+        .find(|a| a.recruit_id == id)
+        .unwrap()
+        .duty_ticks;
+    let before = serde_json::to_value(&g).unwrap();
+    let record = g.service_record(id).unwrap();
+    assert_eq!(serde_json::to_value(&g).unwrap(), before, "pure");
+    assert_eq!(
+        record,
+        ServiceRecord {
+            recruit_id: id,
+            deployments: 5,
+            takeovers: 2,
+            expeditions: 2,
+            victories: 3,
+            defeats: 1,
+            withdrawals: 1,
+            kills: 21,
+            coins: 10,
+            stages_cleared: 2,
+            liberations: 1,
+            countries: vec![a.clone(), b.clone(), c.clone()],
+            last_outcome: Some(Outcome::Withdrawal),
+            npc_attempts: roster_npc(&g, id).attempts,
+            npc_victories: roster_npc(&g, id).victories,
+            guard: Some(GuardDuty {
+                country_id: guarded,
+                duty_ticks,
+            }),
+            containments: 2,
+        }
+    );
+    // The other recruit sees only its own runs; an unknown id is typed.
+    let theirs = g.service_record(other).unwrap();
+    assert_eq!((theirs.deployments, theirs.takeovers), (2, 1));
+    assert_eq!(theirs.countries, vec![c.clone()]);
+    assert_eq!(theirs.last_outcome, Some(Outcome::Victory));
+    assert_eq!(g.service_record(99), Err(CommandError::UnknownSurvivor));
 }
