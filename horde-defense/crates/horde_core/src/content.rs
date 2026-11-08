@@ -616,12 +616,15 @@ impl Content {
                 return Err(format!("Loot-only item needs a drop tier: {}", i.name));
             }
         }
+        // The opening shop sells a tier-1 item for every slot; a loot-only
+        // item never counts, since it is never offered (W2-08). A purchasable
+        // tier-1 item from index 4 on is also in the tier-1 drop pool.
         for slot in Slot::ALL {
             if !self
                 .items
                 .iter()
                 .skip(4)
-                .any(|item| item.slot == slot && item.tier == 1)
+                .any(|item| item.slot == slot && item.tier == 1 && item.purchasable())
             {
                 return Err(format!(
                     "Missing guaranteed opening shop/loot profile for {:?}",
@@ -741,12 +744,24 @@ mod tests {
         let row = |n: usize| serde_json::to_string(&content().items[n]).unwrap();
         assert!(!row(5).contains("loot_only"), "skipped while false");
         assert!(row(29).contains(r#""loot_only":true"#));
+        // A loot-only item beside a purchasable tier-1 item of its slot
+        // validates and round-trips (tier-1 Ranged keeps 4 and 22-28).
         let mut data = content().clone();
-        data.items[5].loot_only = true;
-        assert!(!data.items[5].purchasable());
+        data.items[21].loot_only = true;
+        assert!(!data.items[21].purchasable());
         assert!(data.validate().is_ok());
         let text = serde_json::to_string(&data).unwrap();
-        assert_eq!(Content::from_json(&text).unwrap().items[5], data.items[5]);
+        assert_eq!(Content::from_json(&text).unwrap().items[21], data.items[21]);
+        // The opening shop needs a purchasable tier-1 item per slot: with
+        // fire_axe (5) loot-only, every tier-1 Melee (5, 29, 30) is loot-only,
+        // so the shop would offer no Melee. Validation refuses it at load.
+        let mut data = content().clone();
+        data.items[5].loot_only = true;
+        assert!([5, 29, 30].iter().all(|&n| data.items[n].loot_only));
+        match data.validate() {
+            Err(error) => assert!(error.contains("Missing guaranteed opening shop"), "{error}"),
+            Ok(()) => panic!("a slot with no purchasable tier-1 item validated"),
+        }
         // Loot-only gear must be droppable: tier 1..=4, never a starter and
         // never NPC-only (the drop pool skips both). Each row keeps the
         // per-slot tier-1 guarantee, so only the loot-only rule can fire:
