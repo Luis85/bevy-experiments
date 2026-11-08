@@ -446,29 +446,8 @@ impl StrategyState {
         id: u64,
         country_id: &str,
     ) -> Result<(), String> {
-        if !self.grand_strategy_unlocked(campaign) {
-            return Err("Liberate more countries to unlock strategic garrisons".into());
-        }
-        if !campaign.world.cleared.iter().any(|c| c == country_id) {
-            return Err("Guards protect fully liberated countries".into());
-        }
-        if self
-            .guards
-            .iter()
-            .filter(|g| g.country_id == country_id)
-            .count()
-            >= world().strategy_config.max_guards_per_country
-        {
-            return Err("Country garrison is at capacity".into());
-        }
-        let r = self
-            .roster
-            .iter_mut()
-            .find(|r| r.id == id)
-            .ok_or("Unknown survivor")?;
-        if r.status != RecruitStatus::Ready {
-            return Err("Survivor is already on duty".into());
-        }
+        let n = self.guard_verdict(campaign, id, country_id)?;
+        let r = &mut self.roster[n];
         campaign.reserve_external(r.npc.loadout)?;
         let rifle = item_definition(campaign, &r.npc, Slot::Ranged);
         let profile = campaign.profile_for_loadout(Mode::Npc, r.npc.loadout, &r.npc);
@@ -487,6 +466,54 @@ impl StrategyState {
         let name = r.name.clone();
         self.note(format!("{} assigned to guard {}", name, country_id));
         Ok(())
+    }
+    /// `assign_guard`'s verdict without the assignment, in its order:
+    /// garrisons unlocked, the country liberated, room in its garrison, a
+    /// known Ready recruit whose items no other deployment holds. Returns
+    /// the recruit's roster index.
+    fn guard_verdict(
+        &self,
+        campaign: &Campaign,
+        id: u64,
+        country_id: &str,
+    ) -> Result<usize, String> {
+        if !self.grand_strategy_unlocked(campaign) {
+            return Err("Liberate more countries to unlock strategic garrisons".into());
+        }
+        if !campaign.world.cleared.iter().any(|c| c == country_id) {
+            return Err("Guards protect fully liberated countries".into());
+        }
+        if self
+            .guards
+            .iter()
+            .filter(|g| g.country_id == country_id)
+            .count()
+            >= world().strategy_config.max_guards_per_country
+        {
+            return Err("Country garrison is at capacity".into());
+        }
+        let n = self
+            .roster
+            .iter()
+            .position(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        if self.roster[n].status != RecruitStatus::Ready {
+            return Err("Survivor is already on duty".into());
+        }
+        campaign.check_external(self.roster[n].npc.loadout)?;
+        Ok(n)
+    }
+    /// The roster recruits, by id, that `assign_guard` would accept for
+    /// `country_id` now. Pure.
+    pub fn eligible_guards(&self, campaign: &Campaign, country_id: &str) -> Vec<u64> {
+        let mut ids: Vec<u64> = self
+            .roster
+            .iter()
+            .map(|r| r.id)
+            .filter(|id| self.guard_verdict(campaign, *id, country_id).is_ok())
+            .collect();
+        ids.sort_unstable();
+        ids
     }
     pub fn release_guard(&mut self, campaign: &mut Campaign, id: u64) -> Result<(), String> {
         let n = self

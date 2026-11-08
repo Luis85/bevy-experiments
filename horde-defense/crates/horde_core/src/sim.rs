@@ -1,5 +1,6 @@
 mod auto_sell;
 mod combat;
+mod country;
 mod defense;
 mod director;
 mod events;
@@ -17,6 +18,7 @@ mod smoke;
 mod structures;
 mod telemetry;
 pub use auto_sell::{AutoSellPreview, AutoSellScope};
+pub use country::{CountryChoicePreview, OutbreakPlan};
 pub use events::{Actor, BattleId, DetonationTrigger, SimEvent, SimEventRecord, Strike};
 #[cfg(any(test, feature = "test-support", feature = "review"))]
 pub use fixtures::{

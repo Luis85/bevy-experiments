@@ -9,7 +9,7 @@ use crate::defenders::{
 use crate::skill_catalog::{CampaignFeature, SkillEffect, skills};
 
 /// The upgrade node that unlocks `feature` (the first in catalogue order).
-fn feature_node(feature: CampaignFeature) -> String {
+pub(super) fn feature_node(feature: CampaignFeature) -> String {
     skills()
         .nodes
         .iter()

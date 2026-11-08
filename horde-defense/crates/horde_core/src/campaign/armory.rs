@@ -307,6 +307,13 @@ impl Campaign {
                 .is_some_and(|loadout| loadout.contains(&id))
     }
     pub fn reserve_external(&mut self, loadout: [u64; 4]) -> Result<(), String> {
+        self.check_external(loadout)?;
+        self.reserved_items.extend(loadout);
+        Ok(())
+    }
+    /// `reserve_external`'s verdict without the reservation: the loadout is
+    /// valid and none of its items is held by another deployment.
+    pub(crate) fn check_external(&self, loadout: [u64; 4]) -> Result<(), String> {
         self.validate_loadout(loadout)?;
         let main = self.main_run_loadout();
         if loadout.iter().any(|id| {
@@ -314,7 +321,6 @@ impl Campaign {
         }) {
             return Err("A unique item is already reserved by another deployment".into());
         }
-        self.reserved_items.extend(loadout);
         Ok(())
     }
     pub fn release_external(&mut self, loadout: [u64; 4]) {

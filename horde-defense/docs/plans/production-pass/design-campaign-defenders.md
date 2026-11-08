@@ -281,6 +281,8 @@ It never deploys, and `next_attempt_id` is unchanged. `EnterCountry` keeps its l
 
 **`Game::country_choice_preview(id) -> CountryChoicePreview { stage_count, checkpoints, companion_after_liberation }`.**
 
+*As built (W2-19, `sim/country.rs`):* `CommandError::CountryLocked(String)` follows schema-v7 §6 (an unknown id is locked too), and `SelectCountry` is appended after `AcknowledgeOutcomes`. `outbreak_plan` returns None without an active outbreak; `guards` lists the guarding recruit ids in assignment order, and `eligible_guards` is `assign_guard`'s own verdict (`StrategyState::eligible_guards`), so a full garrison lists nobody. `country_choice_preview` returns None for an unknown id; `companion_after_liberation: bool` is true while Mara is not in camp and liberating the country meets the "Meet Mara" node's `minimum_liberated`. Two fields wait for their inputs: `OutbreakPlan.recommended_defender` is added by W2-21 with `defender_power`, and `CountryChoicePreview.checkpoints` by W4-02 from `Country::regional_checkpoints()` (W2-26, ruling P6).
+
 ### 1.9 Expedition settlement and notices (CD7, CD8)
 
 **Summary record.**

@@ -352,7 +352,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Deps: W2-18.
 
 **W2-21 · campaign-defenders · `defender_power`, `service_record`, containments writer**
-- Files: also adds `DefenderOption.power: DefenderPower` to `available_defenders` (design-campaign-defenders §1.4, deferred from W2-12).
+- Files: also adds `DefenderOption.power: DefenderPower` to `available_defenders` (design-campaign-defenders §1.4, deferred from W2-12), and `OutbreakPlan.recommended_defender: DefenderId`, the highest-power selectable defender (§1.8, deferred from W2-19).
 - Fail-first:
   - `fresh_starter_power_is_100_at_threat_zero_in_both_models`
   - `defender_power_drops_as_threat_rises`
@@ -854,7 +854,7 @@ Wave-3 exit:
 | Id | Owner | Title | Fail-first / gate | Deps |
 |---|---|---|---|---|
 | W4-01 | enemy-balance | Regional and Capstone boss multipliers: Regional HP and reward x1.2; Capstone HP x1.4, armor x1.25, NPC armor +2, reward x1.4, damage x1.10 | `regional_boss_health_and_reward_are_1_2x_sector_at_equal_rank`, `boss_damage_capstone_factor_is_1_10` | W2 |
-| W4-02 | campaign-defenders | Regional checkpoint presentation lines: briefing "Regional checkpoint - boss +20% health, +20% reward" and "Final stand"; world panel "N checkpoints"; Results "Regional checkpoint secured" | `briefing_names_regional_checkpoint_on_checkpoint_stage` | W4-01 |
+| W4-02 | campaign-defenders | Regional checkpoint presentation lines: briefing "Regional checkpoint - boss +20% health, +20% reward" and "Final stand"; world panel "N checkpoints", read from `CountryChoicePreview.checkpoints`, which this commit adds from `Country::regional_checkpoints()` (design-campaign-defenders §1.8, deferred from W2-19; P6); Results "Regional checkpoint secured" | `briefing_names_regional_checkpoint_on_checkpoint_stage` | W4-01 |
 | W4-03 | progression-tree | Effect retunes: steady_hands, hardened, quick_throw, combat_reload; shrapnel_trap `charges_per_rank` 1 | `hardened_leaves_runner_contact_damaging`, `trap_mastery_1_adds_a_trap_charge`, `steady_hands_..._at_most_40_percent`; pacing and smoke before/after | W2 |
 | W4-04..n | enemy-balance | Tuning loop, one lever per commit, in this order: health_per_rank_late, boss_health slope, front_ramp_max ∈ [0.17, 0.25], affixes, capstone HP | Ignored `pacing_targets` goal6_* in release; each commit records pacing and smoke before/after and its provisional cause G | W4-01 |
 | W4-p | progression-tree | Repricing, tree-quality rules and the blueprint price fix (one green commit), then the calibration loop | `no_valued_node_is_dominated_at_its_reference_states`, `cheap_nodes_stay_within_twice_branch_value_per_coin`, `tier_costs_sit_in_design_bands`, goal5_* (release) | W4-03, EB loop |

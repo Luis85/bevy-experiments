@@ -166,6 +166,11 @@ pub enum Command {
         battles: Vec<u64>,
         folded: u32,
     },
+    /// Makes the country the active one between defenses, never deploying:
+    /// `BeginDefense` starts its defense. A liberated country (an active
+    /// outbreak's included) answers `CountryLiberated`. `EnterCountry` keeps
+    /// its recorded meaning, select and deploy at once.
+    SelectCountry(String),
 }
 
 impl Command {
@@ -244,6 +249,10 @@ pub enum CommandError {
         count: u32,
         coins: u64,
     },
+    /// The campaign has no starting country yet; `ChooseStart` chooses it.
+    StartNotChosen,
+    /// The country cannot be entered yet (or is not on the map).
+    CountryLocked(String),
 }
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -276,6 +285,10 @@ impl fmt::Display for CommandError {
                     f,
                     "The stash changed: auto-sell would now sell {count} {items} for {coins} {unit}"
                 )
+            }
+            Self::StartNotChosen => f.write_str("Choose a starting country first"),
+            Self::CountryLocked(_) => {
+                f.write_str("Liberate a neighboring country to reach this one")
             }
         }
     }
@@ -575,6 +588,7 @@ impl Game {
                 self.acknowledge_outcomes(battles, *folded);
                 Applied
             }
+            Command::SelectCountry(id) => self.select_country(id)?,
         };
         // Only a dispatch that succeeded takes the next defender away.
         if let Some(id) = leaving {

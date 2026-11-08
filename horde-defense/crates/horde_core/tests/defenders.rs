@@ -21,7 +21,9 @@
 //! and repeat, the dispatch reset, and the `available_defenders`,
 //! `defender_card`, `defender_loadout`, `active_defender`,
 //! `battle_defender_card` and `continue_blocker` reads; and (W2-13) the live
-//! `SetRecruitTactics` for a Ready or Defending recruit.
+//! `SetRecruitTactics` for a Ready or Defending recruit; and (W2-19)
+//! `SelectCountry` with the pure `outbreak_plan` and `country_choice_preview`
+//! reads.
 mod support;
 use horde_core::{
     campaign::{Campaign, Npc, NpcTraining},
@@ -33,7 +35,7 @@ use horde_core::{
     },
     sim::{ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError},
     skill_catalog::skills,
-    strategy::RecruitStatus,
+    strategy::{OutbreakOutcome, RecruitStatus},
     survivors::Appearance,
     world::world,
 };
@@ -3220,4 +3222,299 @@ fn mid_battle_tactics_change_takes_effect_next_turn_deterministically() {
             .is_none_or(|_| without_identity(&unchanged) != without_identity(&g));
     }
     assert!(diverged, "the new tactics change the battle");
+}
+
+// ---------------------------------------------------------------------------
+// W2-19: SelectCountry chooses a country without deploying (CD6), and the
+// pure outbreak_plan and country_choice_preview reads behind "Plan response"
+// and the country dossier.
+// ---------------------------------------------------------------------------
+
+/// A country the strategic game can enter but has not liberated.
+fn open_front(g: &Game) -> String {
+    world()
+        .countries
+        .iter()
+        .find(|c| {
+            g.campaign().world.can_enter(&c.id) && !g.campaign().world.cleared.contains(&c.id)
+        })
+        .expect("an open front")
+        .id
+        .clone()
+}
+
+/// A catalogue country the strategic game cannot enter yet.
+fn locked_country(g: &Game) -> String {
+    world()
+        .countries
+        .iter()
+        .find(|c| !g.campaign().world.can_enter(&c.id))
+        .expect("a locked country")
+        .id
+        .clone()
+}
+
+/// `g` as it would be had only `world.active` moved to `id` (the country is
+/// also remembered as unlocked, as entering it always did).
+fn only_selected(g: &Game, id: &str) -> serde_json::Value {
+    let mut expected = g.clone();
+    let world = &mut expected.campaign_mut().world;
+    world.active = Some(id.into());
+    if !world.unlocked.iter().any(|c| c == id) {
+        world.unlocked.push(id.into());
+    }
+    serde_json::to_value(&expected).unwrap()
+}
+
+#[test]
+fn select_country_never_creates_an_attempt() {
+    let g = strategic_game();
+    let front = open_front(&g);
+    let liberated = g.campaign().world.cleared[1].clone();
+    for (country, outcome) in [
+        (front.clone(), CommandOutcome::Applied),
+        (liberated, CommandOutcome::CountryLiberated),
+    ] {
+        let mut selected = g.clone();
+        let expected = only_selected(&g, &country);
+        assert_eq!(
+            selected.apply(&Command::SelectCountry(country.clone())),
+            Ok(outcome),
+            "{country}"
+        );
+        assert!(selected.attempt().is_none(), "{country}: no attempt");
+        assert_eq!(selected.next_attempt_id(), g.next_attempt_id());
+        assert_eq!(
+            selected.campaign().world.active_country().unwrap().id,
+            country
+        );
+        assert_eq!(
+            serde_json::to_value(&selected).unwrap(),
+            expected,
+            "{country}"
+        );
+        // Reselecting is idempotent.
+        assert_eq!(
+            selected.apply(&Command::SelectCountry(country.clone())),
+            Ok(outcome)
+        );
+        assert_eq!(serde_json::to_value(&selected).unwrap(), expected);
+    }
+    // The frozen legacy EnterCountry still deploys at once.
+    let mut entered = g.clone();
+    entered.apply(&Command::EnterCountry(front)).unwrap();
+    assert!(entered.attempt().is_some());
+    assert_eq!(entered.next_attempt_id(), g.next_attempt_id() + 1);
+}
+
+#[test]
+fn select_country_typed_rejections_leave_state_unchanged() {
+    fn rejects(g: &mut Game, country: &str, error: CommandError) {
+        let before = serde_json::to_value(&*g).unwrap();
+        assert_eq!(
+            g.apply(&Command::SelectCountry(country.into())),
+            Err(error.clone()),
+            "{country}"
+        );
+        assert_eq!(serde_json::to_value(&*g).unwrap(), before, "{country}");
+        assert!(is_human(&error.to_string()), "{error}");
+    }
+    // No starting country: SelectCountry never chooses the start.
+    let mut fresh = Game::default();
+    rejects(&mut fresh, "DEU", CommandError::StartNotChosen);
+    fresh
+        .apply(&Command::ChooseSurvivor(
+            horde_core::survivors::SurvivorId::Rook,
+        ))
+        .unwrap();
+    rejects(&mut fresh, "DEU", CommandError::StartNotChosen);
+
+    let mut g = strategic_game();
+    let locked = locked_country(&g);
+    rejects(&mut g, &locked, CommandError::CountryLocked(locked.clone()));
+    rejects(
+        &mut g,
+        "NOT_A_COUNTRY",
+        CommandError::CountryLocked("NOT_A_COUNTRY".into()),
+    );
+
+    // A live defense refuses every selection, checked first.
+    let liberated = g.campaign().world.cleared[1].clone();
+    let front = open_front(&g);
+    g.deploy_country_stage(0, Mode::Personal).unwrap();
+    for country in [liberated, locked, front] {
+        rejects(&mut g, &country, CommandError::DefenseInProgress);
+    }
+}
+
+/// A strategic game with an active outbreak in its second liberated country,
+/// returning the game and that country.
+fn outbreak_game() -> (Game, String) {
+    let mut g = strategic_game();
+    let country = g.campaign().world.cleared[1].clone();
+    g.with_strategy(|s, c| s.trigger_outbreak(c, &country))
+        .unwrap();
+    (g, country)
+}
+
+#[test]
+fn outbreak_plan_targets_final_stage_and_lists_ready_guards() {
+    let (mut g, country) = outbreak_game();
+    let home = g.campaign().world.cleared[0].clone();
+    let guard = recruit(&mut g, &home);
+    let away = recruit(&mut g, &home);
+    let ready = recruit(&mut g, &home);
+    apply_ok(
+        &mut g,
+        Command::AssignGuard {
+            id: guard,
+            country: country.clone(),
+        },
+    );
+    apply_ok(
+        &mut g,
+        Command::DeploySurvivor {
+            id: away,
+            country: home.clone(),
+            stage: 0,
+        },
+    );
+    advance(&mut g, 30);
+    let before = serde_json::to_value(&g).unwrap();
+    let plan = g
+        .outbreak_plan(&country)
+        .expect("an active outbreak has a plan");
+    assert_eq!(
+        serde_json::to_value(&g).unwrap(),
+        before,
+        "outbreak_plan is pure"
+    );
+    let definition = world().country(&country).unwrap();
+    let outbreak = g
+        .strategy()
+        .outbreaks
+        .iter()
+        .find(|o| o.country_id == country)
+        .unwrap();
+    assert_eq!(plan.country_id, country);
+    assert_eq!(plan.country_name, definition.name);
+    assert_eq!(plan.stage, definition.level_count() - 1, "the final stage");
+    assert_eq!(plan.ticks_left, outbreak.deadline_tick - g.strategy().tick);
+    assert!(
+        plan.ticks_left > 0 && plan.ticks_left < world().strategy_config.outbreak_duration_ticks,
+        "the clock ran: {}",
+        plan.ticks_left
+    );
+    assert_eq!(plan.strength, outbreak.strength);
+    assert_eq!(plan.guards, vec![guard]);
+    assert_eq!(
+        plan.guard_capacity,
+        world().strategy_config.max_guards_per_country
+    );
+    // Only the Ready recruit can still be assigned: the guard is on duty and
+    // the other is away on an expedition.
+    assert_eq!(status(&g, away), RecruitStatus::Deployed);
+    assert_eq!(plan.eligible_guards, vec![ready]);
+    for id in &plan.eligible_guards {
+        let mut assigned = g.clone();
+        apply_ok(
+            &mut assigned,
+            Command::AssignGuard {
+                id: *id,
+                country: country.clone(),
+            },
+        );
+    }
+    // A full garrison lists nobody.
+    let mut full = g.clone();
+    let extra = recruit(&mut full, &home);
+    for id in [ready, extra] {
+        apply_ok(
+            &mut full,
+            Command::AssignGuard {
+                id,
+                country: country.clone(),
+            },
+        );
+    }
+    let fourth = recruit(&mut full, &home);
+    let plan = full.outbreak_plan(&country).unwrap();
+    assert_eq!(plan.guards, vec![guard, ready, extra]);
+    assert!(
+        plan.eligible_guards.is_empty(),
+        "recruit {fourth} cannot join a full garrison"
+    );
+    // No active outbreak, or no such country: no plan.
+    assert!(g.outbreak_plan(&home).is_none());
+    assert!(g.outbreak_plan("NOT_A_COUNTRY").is_none());
+}
+
+#[test]
+fn begin_defense_from_plan_replays_final_stage_and_contains_the_outbreak() {
+    let (mut g, country) = outbreak_game();
+    let attempts = g.next_attempt_id();
+    // "Plan response": select the country, read the plan, then begin.
+    assert_eq!(
+        g.apply(&Command::SelectCountry(country.clone())),
+        Ok(CommandOutcome::CountryLiberated),
+        "an outbreak country is still liberated"
+    );
+    assert!(g.attempt().is_none());
+    assert_eq!(g.next_attempt_id(), attempts);
+    let plan = g.outbreak_plan(&country).unwrap();
+    apply_ok(&mut g, Command::BeginDefense { stage: plan.stage });
+    let a = g.attempt().expect("BeginDefense deploys");
+    assert_eq!(a.country_id.as_deref(), Some(country.as_str()));
+    assert_eq!(a.stage, plan.stage);
+    assert_eq!(a.defender(), DefenderId::Player);
+    assert!(!g.global_paused());
+    assert_eq!(g.next_attempt_id(), attempts + 1);
+    // The player's boss falls on the next tick.
+    enemy(&mut g, 0, 20.0, true);
+    let a = g.attempt_mut().unwrap();
+    a.boss_spawned = true;
+    a.enemies.last_mut().unwrap().hp = 0;
+    advance(&mut g, 1);
+    let report = g.last_result().expect("the defense ended");
+    assert_eq!(report.outcome, Outcome::Victory);
+    assert_eq!(report.stage, plan.stage);
+    let outbreak = g
+        .strategy()
+        .outbreaks
+        .iter()
+        .find(|o| o.country_id == country)
+        .unwrap();
+    assert_eq!(outbreak.outcome, OutbreakOutcome::Contained);
+    assert_eq!(g.strategy().active_outbreaks(), 0);
+    assert!(g.outbreak_plan(&country).is_none());
+    assert!(g.campaign().world.cleared.contains(&country));
+}
+
+#[test]
+fn country_choice_preview_names_stage_count_and_mara_timing() {
+    // A fresh campaign at the start choice: Mara can be met once the first
+    // country is liberated.
+    let mut fresh = Game::default();
+    fresh
+        .apply(&Command::ChooseSurvivor(
+            horde_core::survivors::SurvivorId::Rook,
+        ))
+        .unwrap();
+    let before = serde_json::to_value(&fresh).unwrap();
+    for country in &world().countries {
+        let preview = fresh.country_choice_preview(&country.id).unwrap();
+        assert_eq!(preview.stage_count, country.level_count(), "{}", country.id);
+        assert!(preview.companion_after_liberation, "{}", country.id);
+    }
+    assert_eq!(
+        serde_json::to_value(&fresh).unwrap(),
+        before,
+        "the preview is pure"
+    );
+    assert!(fresh.country_choice_preview("NOT_A_COUNTRY").is_none());
+    // With Mara already in camp the dossier has no Mara line.
+    let g = strategic_game();
+    assert!(g.campaign().npc_available());
+    let preview = g.country_choice_preview(&open_front(&g)).unwrap();
+    assert!(!preview.companion_after_liberation);
 }
