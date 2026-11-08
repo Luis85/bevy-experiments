@@ -4,6 +4,9 @@
 //! is no lane queue and no overtaking, bodies overlap. Each enemy walks until
 //! it reaches `DEFENSE_LINE` or the face of a live non-trap structure in its
 //! lane (structures are barricades, not traffic) and attacks from there.
+//! An enemy with `reach` (the spitter, W2-27) stops instead at
+//! `ranged_stop`, short of the line and never in the far half, unless a
+//! structure's face lies ahead of that stop; followers walk through it.
 //! `EnemyPhase::Queued` is never assigned; a saved one resolves to Advance or
 //! contact on the next step.
 
@@ -31,7 +34,10 @@ impl Game {
                     continue;
                 }
                 let previous_target = e.target_structure;
-                let mut stop = DEFENSE_LINE;
+                // A ranged enemy stations at its clamped stop; a live
+                // structure whose face lies ahead of it is met in melee.
+                let station = ranged_stop(a.width_yards, enemy_reach(e));
+                let mut stop = station;
                 let mut blocker = None;
                 for s in &a.structures {
                     if s.lane == lane
@@ -69,11 +75,19 @@ impl Game {
                     .max(stop.min(a.enemies[n].x));
                 a.enemies[n].statuses.tick();
                 let blocked = a.enemies[n].x <= stop + 0.01;
-                a.enemies[n].target_structure = if blocked { blocker } else { None };
-                // `stop` is the line or a structure face, so every blocked
-                // enemy is in contact.
+                // `stop` is the line, a structure face or a spitter's station.
+                // A stationed spitter spits at the nearest wall between it
+                // and the line, else at the defender; reach 0 never stations.
+                let target = if !blocked {
+                    None
+                } else if blocker.is_none() && station > DEFENSE_LINE {
+                    spit_wall(a, lane, a.enemies[n].x)
+                } else {
+                    blocker
+                };
+                a.enemies[n].target_structure = target;
                 if blocked {
-                    if a.enemies[n].contact_since.is_none() || previous_target != blocker {
+                    if a.enemies[n].contact_since.is_none() || previous_target != target {
                         a.enemies[n].contact_since = Some(a.tick);
                         let duration = seconds(enemy_profile(&a.enemies[n]).windup);
                         a.enemies[n].attack_left = duration;
@@ -83,7 +97,7 @@ impl Game {
                         let point = [enemy.x, enemy.y()];
                         let meta = EventMetadata {
                             actor_id: Some(enemy.id),
-                            target_id: blocker,
+                            target_id: target,
                             lane: Some(lane),
                             duration_ticks: duration,
                             ..Default::default()
@@ -92,7 +106,7 @@ impl Game {
                         a.event_with(
                             EventKind::Windup,
                             point,
-                            if blocker.is_none() {
+                            if target.is_none() {
                                 a.defender_position()
                             } else {
                                 point

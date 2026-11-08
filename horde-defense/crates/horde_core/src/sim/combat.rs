@@ -113,6 +113,14 @@ impl Game {
             let structure = e
                 .target_structure
                 .and_then(|id| a.structures.iter().position(|s| s.id == id));
+            // A spitter's strike from its station (W2-27) takes the existing
+            // attack path; Some carries the yards to its target.
+            let spit = spit_range(a, e, structure.map(|s| &a.structures[s]));
+            if spit.is_some() && e.x > a.width_yards * 0.5 + 0.01 {
+                // The far-half guard (acceptance G6.6): `ranged_stop` never
+                // stations a spitter there, so valid play never reaches it.
+                continue;
+            }
             let actor_id = e.id;
             let target_id = e.target_structure;
             let meta = EventMetadata {
@@ -170,7 +178,7 @@ impl Game {
                     },
                 );
             }
-            if structure.is_none() {
+            if structure.is_none() && spit.is_none() {
                 a.telemetry.contact_attacks += 1;
             }
             if a.mode == Mode::Npc {
@@ -186,7 +194,10 @@ impl Game {
                     1
                 };
                 let mut attack = Attack {
-                    skill: if boss { l.boss_npc_skill } else { d.npc_skill } - turn_shock,
+                    // A spit is a ranged attack: the range penalty applies
+                    // and the defender may still dodge it.
+                    skill: if boss { l.boss_npc_skill } else { d.npc_skill } - turn_shock
+                        + spit.map_or(0, rules::range_penalty),
                     damage: Damage {
                         dice: (if boss {
                             l.boss_npc_damage_dice
@@ -291,6 +302,9 @@ impl Game {
             let point = structure.map_or(a.defender_position(), |s| {
                 [a.structures[s].x(), a.structures[s].y()]
             });
+            if spit.is_some() {
+                a.event_with(EventKind::Spit, origin, point, damage.max(0), meta);
+            }
             if a.mode == Mode::Personal {
                 a.event_with(
                     if damage > 0 {

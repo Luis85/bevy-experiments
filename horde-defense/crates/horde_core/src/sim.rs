@@ -19,6 +19,8 @@ mod persistence;
 mod power;
 mod recruitment;
 mod smoke;
+#[cfg(test)]
+mod spitter_tests;
 mod structures;
 mod telemetry;
 pub use auto_sell::{AutoSellPreview, AutoSellScope};
@@ -1743,6 +1745,40 @@ fn enemy_profile(e: &Enemy) -> &crate::enemy_catalog::ResolvedEnemy {
     e.resolved
         .as_ref()
         .unwrap_or_else(|| crate::enemy_catalog::enemy_catalog().default_profile(e.kind))
+}
+/// Yards beyond the defense line `e` attacks from; 0 is melee. Bosses fight
+/// with their level's stats and never reach.
+fn enemy_reach(e: &Enemy) -> f32 {
+    if e.boss { 0.0 } else { enemy_profile(e).reach }
+}
+/// Where an enemy with `reach` stops on a `width`-yard field (design
+/// enemy-balance §4, W2-27): `clamp(DEFENSE_LINE + reach, DEFENSE_LINE,
+/// width / 2)`, so no enemy stations in the far half (acceptance G6.6).
+/// Reach 0 is exactly the defense line.
+pub(crate) fn ranged_stop(width: f32, reach: f32) -> f32 {
+    (DEFENSE_LINE + reach).min(0.5 * width).max(DEFENSE_LINE)
+}
+/// The live non-trap structure nearest a spitter stationed at `x` in `lane`,
+/// between it and the line (walls intercept spit); ties go to the lower id.
+fn spit_wall(a: &Attempt, lane: u8, x: f32) -> Option<u64> {
+    a.structures
+        .iter()
+        .filter(|s| s.lane == lane && s.kind != StructureKind::Trap && s.hp > 0 && s.x() <= x)
+        .max_by(|s, t| s.x().total_cmp(&t.x()).then(t.id.cmp(&s.id)))
+        .map(|s| s.id)
+}
+/// The yards a spit from `e` at `structure` (None: the defender) travels, or
+/// None when the attack is a melee strike: no reach, or in contact at the
+/// line or at the structure's face.
+fn spit_range(a: &Attempt, e: &Enemy, structure: Option<&Structure>) -> Option<f32> {
+    if enemy_reach(e) == 0.0 {
+        return None;
+    }
+    let (face, at) = match structure {
+        Some(s) => (s.x() + s.blocking_radius(), [s.x(), s.y()]),
+        None => (DEFENSE_LINE, a.defender_position()),
+    };
+    (e.x > face + 0.01).then(|| (e.x - at[0]).hypot(e.y() - at[1]))
 }
 fn enemy_armor(a: &Attempt, e: &Enemy) -> i32 {
     if e.boss {
