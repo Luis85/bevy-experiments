@@ -114,6 +114,20 @@ impl NpcTraining {
         Self::HitPoints,
         Self::Fatigue,
     ];
+    /// The rows a survivor can train, in display order. IQ, HP and FP keep
+    /// their variants and serde names (old saves name them), but
+    /// `Game::apply` rejects them with `CommandError::TrainingUnsupported`.
+    pub const TRAINABLE: [Self; 5] = [
+        Self::Strength,
+        Self::Dexterity,
+        Self::Health,
+        Self::Guns,
+        Self::Melee,
+    ];
+    /// Whether this row is in [`Self::TRAINABLE`].
+    pub fn is_trainable(self) -> bool {
+        Self::TRAINABLE.contains(&self)
+    }
 }
 
 impl StableKind for NpcTraining {

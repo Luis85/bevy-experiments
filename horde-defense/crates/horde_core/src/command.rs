@@ -265,6 +265,9 @@ pub enum CommandError {
     ArchetypeNotOffered(String),
     /// The country offers no recruit now; the blocker says why.
     RecruitUnavailable(RecruitBlocker),
+    /// The row is not trainable (IQ, HP or FP; see `NpcTraining::TRAINABLE`);
+    /// nothing changed.
+    TrainingUnsupported(NpcTraining),
 }
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -306,10 +309,26 @@ impl fmt::Display for CommandError {
                 f.write_str("This country's survivors do not offer that archetype")
             }
             Self::RecruitUnavailable(blocker) => write!(f, "{blocker}"),
+            Self::TrainingUnsupported(training) => f.write_str(match training {
+                NpcTraining::Intelligence => "IQ cannot be trained",
+                NpcTraining::HitPoints => "HP cannot be trained on its own; train ST instead",
+                NpcTraining::Fatigue => "FP cannot be trained on its own; train HT instead",
+                _ => "This attribute cannot be trained",
+            }),
         }
     }
 }
 impl std::error::Error for CommandError {}
+
+/// The typed training verdict `TrainNpc` and `TrainRecruit` check before the
+/// campaign is reached.
+fn trainable(training: NpcTraining) -> Result<(), CommandError> {
+    if training.is_trainable() {
+        Ok(())
+    } else {
+        Err(CommandError::TrainingUnsupported(training))
+    }
+}
 impl From<String> for CommandError {
     fn from(message: String) -> Self {
         Self::Rejected(message)
@@ -488,6 +507,7 @@ impl Game {
                 Applied
             }
             Command::TrainNpc(training) => {
+                trainable(*training)?;
                 self.campaign.train_npc(*training)?;
                 Applied
             }
@@ -510,6 +530,7 @@ impl Game {
                 Applied
             }
             Command::TrainRecruit { id, training } => {
+                trainable(*training)?;
                 self.strategy
                     .train_recruit(&mut self.campaign, *id, *training)?;
                 Applied
