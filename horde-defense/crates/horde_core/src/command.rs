@@ -810,6 +810,29 @@ mod tests {
         assert_eq!(game.campaign.coins, price + 7);
     }
     #[test]
+    fn buy_item_command_refuses_every_loot_only_definition() {
+        // The command path horde_game's armory and the debug recordings use:
+        // a loot-only definition (29-67, W2-08) is Rejected with the loot
+        // reason before the tier and coin checks, and nothing changes.
+        let mut game = Game::default();
+        game.campaign.coins = 1_000_000;
+        let before = snapshot(&game);
+        let items = &crate::content::content().items;
+        let loot_only: Vec<usize> = (0..items.len()).filter(|&n| items[n].loot_only).collect();
+        assert_eq!(loot_only, (29..68).collect::<Vec<_>>());
+        for n in loot_only {
+            assert_eq!(
+                game.apply(&Command::BuyItem(crate::content::ItemDefId::at(n))),
+                Err(CommandError::Rejected(
+                    crate::content::LOOT_ONLY_REASON.into()
+                )),
+                "{}",
+                items[n].id
+            );
+            assert_eq!(snapshot(&game), before, "{}", items[n].id);
+        }
+    }
+    #[test]
     fn worker_commands_target_only_active_expeditions() {
         let mut game = strategic_game();
         let country = game.campaign.world.cleared[0].clone();
