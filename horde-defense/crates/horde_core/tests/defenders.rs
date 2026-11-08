@@ -2668,6 +2668,97 @@ fn every_entry_point_gives_a_blocked_recruit_the_same_reason() {
     assert_eq!(g.clone().retry(), Err(expected.to_string()), "retry");
 }
 
+/// `continue_blocker` is `ContinueJourney`'s own refusal, read without a
+/// change, so Results can disable Continue and say why.
+#[test]
+fn continue_blocker_matches_continue_journey_without_a_change() {
+    let unavailable = |blocker| CommandError::DefenderUnavailable {
+        defender: DefenderId::Recruit(1),
+        blocker,
+    };
+    let (mut ready, id) = takeover_ready();
+    assert_eq!(id, 1);
+    apply_ok(
+        &mut ready,
+        Command::Deploy {
+            stage: 0,
+            mode: Mode::Personal,
+        },
+    );
+    apply_ok(&mut ready, Command::Withdraw);
+    let country = ready.campaign().world.cleared[0].clone();
+
+    let mut rows: Vec<(&str, Game, Option<CommandError>)> = Vec::new();
+    let mut guarding = ready.clone();
+    apply_ok(
+        &mut guarding,
+        Command::AssignGuard {
+            id,
+            country: country.clone(),
+        },
+    );
+    guarding.staging().campaign().next_defender = Some(DefenderId::Recruit(id));
+    rows.push((
+        "guarding next defender",
+        guarding,
+        Some(unavailable(DefenderBlocker::Guarding {
+            country_id: country,
+        })),
+    ));
+    let mut locked = ready.clone();
+    locked.staging().campaign().next_defender = Some(DefenderId::Recruit(id));
+    locked.campaign_mut().legacy_features = false;
+    rows.push((
+        "Recruitment locked",
+        locked.clone(),
+        Some(unavailable(DefenderBlocker::Locked {
+            node_id: "recruitment_network".into(),
+        })),
+    ));
+    let mut live = ready.clone();
+    live.deploy_country_stage(0, Mode::Personal).unwrap();
+    rows.push((
+        "live defense",
+        live,
+        Some(CommandError::Rejected(
+            "Finish the current round before continuing".into(),
+        )),
+    ));
+    rows.push((
+        "no journey",
+        Game::default(),
+        Some(CommandError::Rejected(
+            "Choose a country to begin a journey".into(),
+        )),
+    ));
+    // Controls: a defender who can defend, and a liberation (which deploys
+    // nobody, so the blocked next defender does not stop it).
+    rows.push(("ready recruit", ready.clone(), None));
+    let mut won = ready.clone();
+    won.deploy_country_stage(0, Mode::Npc).unwrap();
+    won.set_paused(false);
+    win_main(&mut won);
+    won.staging().campaign().next_defender = Some(DefenderId::Recruit(id));
+    won.campaign_mut().legacy_features = false;
+    rows.push(("liberation", won, None));
+
+    for (label, g, expected) in rows {
+        let before = serde_json::to_value(&g).unwrap();
+        assert_eq!(g.continue_blocker(), expected, "{label}");
+        assert_eq!(serde_json::to_value(&g).unwrap(), before, "{label}: pure");
+        let mut applied = g.clone();
+        let result = applied.apply(&Command::ContinueJourney);
+        assert_eq!(result.clone().err(), expected, "{label}: apply");
+        if result.is_err() {
+            assert_eq!(
+                serde_json::to_value(&applied).unwrap(),
+                before,
+                "{label}: refused without a change"
+            );
+        }
+    }
+}
+
 #[test]
 fn new_defender_commands_round_trip_serde() {
     let rows = [
