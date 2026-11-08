@@ -1701,3 +1701,164 @@ fn spitter_windup_draws_aim_line_to_wall_or_defender() {
         );
     }
 }
+
+/// W2-37 (ruling W-13, audio AUD-15): the visual twin of `BossPhase`. A
+/// boss that crosses half its hit points enters its phase and holds for 90
+/// ticks; on every frame of the hold the view carries the phase and the
+/// painters draw "PHASE 1 - BREACH" over the boss and a ring at its feet,
+/// in normal and reduced effects and on the rejected-art path. The ring
+/// breathes in normal effects and is static in reduced; the frame the hold
+/// ends draws neither.
+#[test]
+fn boss_phase_hold_shows_phase_label_and_ring_for_90_ticks() {
+    use crate::battle_view::BossPhaseView;
+    use horde_core::{
+        balance::BalanceSettings,
+        content::{EnemyKind, Mode},
+        sim::{EventKind, Input},
+    };
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings::legacy())
+        .unwrap();
+    game.deploy(0, Mode::Personal).unwrap();
+    let mut a = game.attempt_slot_mut().take().unwrap();
+    a.enemies.clear();
+    (a.max_hp, a.hp) = (1_000_000, 1_000_000);
+    // One transition frozen at spawn, the level's Breacher profile.
+    a.progression.boss_phases = 1;
+    game.spawn_enemy(&mut a, EnemyKind::Brute, 4, true);
+    let boss = a.enemies.last_mut().expect("a boss");
+    let id = boss.id;
+    boss.x = a.width_yards * 0.6;
+    boss.hp = boss.max_hp / 2;
+    let hold = boss
+        .boss_state
+        .as_ref()
+        .expect("a phased boss")
+        .profile
+        .hold_ticks;
+    assert_eq!(hold, 90, "the shipped hold");
+    *game.attempt_slot_mut() = Some(a);
+    game.tick(Input::default());
+    let a = game.attempt().unwrap();
+    let entry = a
+        .events
+        .iter()
+        .find(|e| e.kind == EventKind::BossPhase && e.actor_id == Some(id))
+        .expect("the boss enters its phase on the first tick");
+    assert_eq!((entry.value, entry.duration_ticks), (1, hold));
+    let (entered, hold_until) = (entry.tick, entry.tick + u64::from(hold));
+    let projection = super::super::ArenaProjection::for_attempt(arena(), a);
+    let sy = projection.lane_height();
+    let label = "PHASE 1 - BREACH";
+    let texts = |view: &BattleViewModel, rejected: bool, reduced: bool| -> Vec<String> {
+        let textures = ArtTextures {
+            enemy_art_rejected: rejected,
+            ..textures()
+        };
+        painted(|p| {
+            enemies::paint(p, projection, view, textures, false, reduced, rig_shadow());
+        })
+        .into_iter()
+        .filter_map(|shape| match shape {
+            egui::Shape::Text(text) => Some(text.galley.text().to_owned()),
+            _ => None,
+        })
+        .collect()
+    };
+    let mut rings = [Vec::new(), Vec::new()];
+    let mut frames = [0, 0];
+    for frame in 0..hold {
+        if frame > 0 {
+            game.tick(Input::default());
+        }
+        let a = game.attempt().unwrap();
+        assert_eq!(a.tick, entered + u64::from(frame), "one frame per tick");
+        let held = a
+            .enemies
+            .iter()
+            .find(|e| e.id == id)
+            .expect("the boss lives");
+        assert!(held.boss_held(a.tick), "tick {}: the boss holds", a.tick);
+        for reduced in [false, true] {
+            let view = BattleViewModel::build(
+                a,
+                SceneAnimation::sample(a, reduced),
+                SceneBlend::NONE,
+                reduced,
+            );
+            let phase = view.boss_phase.clone();
+            assert_eq!(
+                phase,
+                Some(BossPhaseView {
+                    boss_id: id,
+                    transition: 1,
+                    name: "Breach".into(),
+                    hold_left_ticks: hold_until - a.tick,
+                }),
+                "reduced {reduced}: tick {} of the hold",
+                a.tick
+            );
+            let phase = phase.unwrap();
+            assert_eq!(phase.label(), label);
+            let unphased = BattleViewModel {
+                boss_phase: None,
+                ..view.clone()
+            };
+            // The painters draw a pure function of the view: painting the
+            // first, middle and last frames of the hold keeps the test fast.
+            let painting = [0, hold / 2, hold - 1].contains(&frame);
+            for rejected in [false, true].into_iter().filter(|_| painting) {
+                assert!(
+                    texts(&view, rejected, reduced).iter().any(|t| t == label),
+                    "reduced {reduced}, rejected {rejected}: tick {} draws {label:?}",
+                    a.tick
+                );
+                assert!(
+                    !texts(&unphased, rejected, reduced)
+                        .iter()
+                        .any(|t| t == label)
+                );
+                let art = ArtTextures {
+                    enemy_art_rejected: rejected,
+                    ..textures()
+                };
+                assert!(
+                    vertices(&view_primitives(&game, &view, art, reduced))
+                        > vertices(&view_primitives(&game, &unphased, art, reduced)),
+                    "reduced {reduced}, rejected {rejected}: tick {} draws the ring",
+                    a.tick
+                );
+            }
+            let ring = enemies::phase_ring(sy, phase.hold_left_ticks, reduced);
+            assert!(ring.x > sy * 0.4 && ring.y > 0.0, "a ring around the boss");
+            rings[usize::from(reduced)].push(ring);
+            frames[usize::from(reduced)] += 1;
+        }
+    }
+    assert_eq!(frames, [90, 90], "the whole hold, normal and reduced");
+    let [normal, reduced] = &rings;
+    assert!(
+        reduced.iter().all(|r| *r == reduced[0]),
+        "the reduced ring is static: {reduced:?}"
+    );
+    assert!(
+        normal.iter().any(|r| *r != normal[0]),
+        "the normal ring breathes"
+    );
+    // The hold is over: no phase, no label, no ring.
+    game.tick(Input::default());
+    let a = game.attempt().unwrap();
+    assert_eq!(a.tick, hold_until);
+    for reduced in [false, true] {
+        let view = BattleViewModel::build(
+            a,
+            SceneAnimation::sample(a, reduced),
+            SceneBlend::NONE,
+            reduced,
+        );
+        assert_eq!(view.boss_phase, None, "reduced {reduced}: the hold ended");
+        assert!(!texts(&view, false, reduced).iter().any(|t| t == label));
+    }
+}

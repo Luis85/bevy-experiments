@@ -1,19 +1,19 @@
 //! Bodies and live hostiles: sprite, shadow, contact and windup gauges, impact
-//! light, health and boss callouts.
+//! light, health and boss callouts, and a holding boss's phase ring and label.
 //!
 //! Hostiles paint as layered meshes ([`super::batch::FieldMeshes`]) whatever
-//! their number: the underlay (one contact band per lane, one windup ground
-//! ring per stack), one
+//! their number: the underlay (one contact band per lane, a holding boss's
+//! phase ring, one windup ground ring per stack), one
 //! shadow mesh, one sprite mesh in the view's painter order (lane feet, x
 //! descending, id; hostiles at their crowd-staggered spot) with each hit flash
 //! right after its sprite, the overlay (a ranged windup's dashed aim line,
 //! outline, stun and windup rings, health and windup bars), then the callout
-//! text. Rejected enemy art keeps
+//! text, a holding boss's "PHASE n - NAME" last. Rejected enemy art keeps
 //! the per-enemy procedural figure path.
 use super::super::{AMBER, ArenaProjection, GREEN, RED, bar, figure, line, soft_shadow};
 use super::batch::{FieldMeshes, MeshBuilder};
 use crate::{
-    battle_view::{BattleViewModel, ContactView, EnemyView, HealthView},
+    battle_view::{BattleViewModel, BossPhaseView, ContactView, EnemyView, HealthView},
     visual_assets::{self, Actor, ArtTextures, HitFlash},
 };
 use bevy_egui::egui::{
@@ -64,14 +64,33 @@ pub(super) fn paint(
     reduced: bool,
     rig_shadow: RigShadow,
 ) -> HostilesDrawn {
+    let sy = arena.lane_height();
+    // A holding boss's phase (W2-37): its ring under the bodies, its label
+    // with the callouts.
+    let phase = holding_boss(view).map(|(boss, phase)| {
+        let [x, y] = boss.drawn();
+        let (ring, label) = phase_anchors(arena.world(x, y), sy, boss.height.pixels(sy));
+        let radii = phase_ring(sy, phase.hold_left_ticks, reduced);
+        (ring, radii, label, phase.label())
+    });
     if textures.enemy_art_rejected {
         for (lane, contact) in lane_contacts(view) {
             let (band, gauge) = contact_band(arena, view, lane, contact);
             p.rect_filled(band, 0.0, RED.gamma_multiply(0.18));
             line(p, gauge[0], gauge[1], 3.0, gauge_color(contact));
         }
+        if let Some((ring, radii, ..)) = &phase {
+            p.add(egui::Shape::ellipse_stroke(
+                *ring,
+                *radii,
+                Stroke::new(PHASE_RING_WIDTH, AMBER),
+            ));
+        }
         for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
             enemy(p, arena, e, ring, textures, outlines, reduced);
+        }
+        if let Some((.., at, text)) = &phase {
+            callout(p, *at, Align2::CENTER_BOTTOM, text, 10.0);
         }
         return HostilesDrawn::default();
     }
@@ -79,7 +98,6 @@ pub(super) fn paint(
         rig_shadow: true,
         ..Default::default()
     };
-    let sy = arena.lane_height();
     let masks = visual_assets::flash_masks(p.ctx());
     let mut layers = FieldMeshes::new(textures, view.enemies.len());
     let mut figures = Vec::new();
@@ -93,6 +111,11 @@ pub(super) fn paint(
         layers
             .underlay
             .line(gauge[0], gauge[1], 3.0, gauge_color(contact));
+    }
+    if let Some((ring, radii, ..)) = &phase {
+        layers
+            .underlay
+            .ring(*ring, *radii, PHASE_RING_WIDTH, RING_SEGMENTS, AMBER);
     }
     for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
         let [x, y] = e.drawn();
@@ -178,6 +201,9 @@ pub(super) fn paint(
     layers.overlay.paint(p);
     for (at, align, text, size) in labels {
         callout(p, at, align, text, size);
+    }
+    if let Some((.., at, text)) = &phase {
+        callout(p, *at, Align2::CENTER_BOTTOM, text, 10.0);
     }
     drawn
 }
@@ -308,6 +334,43 @@ pub(super) fn aim_dashes(from: Pos2, to: Pos2, sy: f32) -> Vec<[Pos2; 2]> {
         at += step;
     }
     dashes
+}
+
+/// Radii of a holding boss's phase ring (W2-37) when `hold_left_ticks` of
+/// its hold remain: a slow breath in normal effects, fixed in reduced.
+pub(super) fn phase_ring(sy: f32, hold_left_ticks: u64, reduced: bool) -> Vec2 {
+    let breath = if reduced {
+        0.0
+    } else {
+        let turn = (hold_left_ticks % PHASE_BREATH_TICKS) as f32 / PHASE_BREATH_TICKS as f32;
+        PHASE_BREATH * (turn * std::f32::consts::TAU).sin()
+    };
+    vec2(sy * 0.55, sy * 0.2) * (1.0 + breath)
+}
+/// Ticks of one breath of the phase ring: two over the shipped 90-tick hold.
+const PHASE_BREATH_TICKS: u64 = 45;
+/// How far the phase ring breathes either way, as a fraction of its radii.
+const PHASE_BREATH: f32 = 0.08;
+/// Width of the phase ring, in points.
+const PHASE_RING_WIDTH: f32 = 2.5;
+/// How far over the boss's name callout the phase label sits, in points.
+const PHASE_LABEL_GAP: f32 = 7.0;
+
+/// Where a holding boss drawn at `at` with figure height `figure_height`
+/// rings its feet (on its shadow), and where its phase label's bottom edge
+/// sits (just over its name callout).
+fn phase_anchors(at: Pos2, sy: f32, figure_height: f32) -> (Pos2, Pos2) {
+    (
+        at + vec2(0., figure_height * 0.48),
+        at + vec2(0.0, -sy * 0.7 - PHASE_LABEL_GAP),
+    )
+}
+
+/// The holding boss of `view` and its phase, when the boss is drawn.
+fn holding_boss(view: &BattleViewModel) -> Option<(&EnemyView, &BossPhaseView)> {
+    let phase = view.boss_phase.as_ref()?;
+    let boss = view.enemies.iter().find(|e| e.id == phase.boss_id)?;
+    Some((boss, phase))
 }
 
 /// How far over its feet, in lane heights, a hostile's health bar is centred.

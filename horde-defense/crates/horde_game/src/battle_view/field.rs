@@ -346,6 +346,46 @@ pub struct FxView {
     pub actor_id: Option<u64>,
     pub target_id: Option<u64>,
 }
+/// A phased boss holding after a transition (W2-37, ruling W-13): the
+/// visual twin of the `BossPhase` event. The painters draw the
+/// [`BossPhaseView::label`] over the boss `boss_id` and a ring at its feet
+/// on every frame of the hold, the ring static in reduced effects.
+#[derive(Clone, Debug, PartialEq)]
+pub struct BossPhaseView {
+    /// The holding boss, so the painters find its drawn body.
+    pub boss_id: u64,
+    /// The transition entered, 1 or 2 (the event's `value`).
+    pub transition: u8,
+    /// The phase profile's name (`BossPhaseProfile::name`).
+    pub name: String,
+    /// Ticks of the hold still to run, `hold_until - tick`: from the
+    /// profile's `hold_ticks` (90) on the entry tick down to 1.
+    pub hold_left_ticks: u64,
+}
+impl BossPhaseView {
+    /// "PHASE n - NAME", the name in capitals like the boss callouts.
+    pub fn label(&self) -> String {
+        format!("PHASE {} - {}", self.transition, self.name.to_uppercase())
+    }
+    /// The phase of `a`'s living boss while it holds at `a.tick`
+    /// ([`Enemy::boss_held`]); None outside a hold and for a boss without
+    /// phases.
+    fn of(a: &Attempt) -> Option<Self> {
+        a.enemies
+            .iter()
+            .filter(|e| e.boss && e.condition(a.mode) != EnemyCondition::Defeated)
+            .find_map(|e| {
+                let state = e.boss_state.as_ref().filter(|s| s.held(a.tick))?;
+                Some(Self {
+                    boss_id: e.id,
+                    transition: state.entered,
+                    name: state.profile.name.clone(),
+                    hold_left_ticks: state.hold_until - a.tick,
+                })
+            })
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct DefenderView {
     pub position: [f32; 2],
@@ -373,6 +413,8 @@ pub struct BattleViewModel {
     pub fx: Vec<FxView>,
     pub particles: Vec<Particle>,
     pub defender: DefenderView,
+    /// The boss holding in a phase transition this tick, if any (W2-37).
+    pub boss_phase: Option<BossPhaseView>,
 }
 impl BattleViewModel {
     /// The field view of `a`. `motion` is consumed: its particles move into
@@ -514,6 +556,7 @@ impl BattleViewModel {
                 position: a.defender_position(),
                 pose: motion.defender,
             },
+            boss_phase: BossPhaseView::of(a),
         }
     }
     pub fn structure(&self, id: u64) -> Option<&StructureView> {
