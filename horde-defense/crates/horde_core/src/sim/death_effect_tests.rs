@@ -543,6 +543,65 @@ fn save_rejects_a_defeated_hostile_beside_a_defender_fuse() {
 }
 
 #[test]
+fn start_of_tick_reap_frees_a_burst_victims_slot_before_the_director() {
+    // NPC mode, the field at cap with a burst victim held: the next tick's
+    // first reap pays the victim before the director runs, so the director
+    // fills the freed slot that tick. Mutation proof: without the
+    // start-of-tick reap (sim.rs, before advance_ordnance) the first NPC-mode
+    // reap follows the director, which sees the field full and spawns nothing.
+    let mut g = game(Mode::Npc);
+    let mut a = g.attempt.take().unwrap();
+    let cap = a.enemy_cap();
+    let source = place(
+        &mut g,
+        &mut a,
+        EnemyKind::Shambler,
+        Some(chain_exploder()),
+        5,
+        9.0,
+    );
+    let victim = place(
+        &mut g,
+        &mut a,
+        EnemyKind::Shambler,
+        Some(chain_exploder()),
+        5,
+        10.0,
+    );
+    while a.enemies.len() < cap {
+        let lane = (a.enemies.len() % 3) as u8;
+        place(&mut g, &mut a, EnemyKind::Runner, None, lane, 13.0);
+    }
+    defeat(&mut a, source);
+    g.reap(&mut a);
+    assert!(
+        find(&a, victim).is_some_and(|e| enemy_defeated(&a, e)),
+        "held"
+    );
+    place(&mut g, &mut a, EnemyKind::Runner, None, 0, 13.0);
+    assert_eq!(a.enemies.iter().filter(|e| !e.boss).count(), cap);
+    let mut seen = a.events.back().map_or(0, |ev| ev.seq + 1);
+    g.attempt = Some(a);
+    // The held victim saves in NPC mode too (hp tracks the injury state).
+    let loaded = save_round_trip(&g);
+    assert!(find(loaded.attempt.as_ref().unwrap(), victim).is_some());
+    // The director spawns a batch next tick.
+    g.attempt.as_mut().unwrap().spawn_credit = 1.0;
+    g.tick(Input::default());
+    let a = g.attempt.as_ref().unwrap();
+    let fresh = new_events(a, &mut seen);
+    let kill = fresh
+        .iter()
+        .find(|ev| ev.kind == EventKind::Kill && ev.actor_id == Some(victim))
+        .expect("the victim is reaped this tick");
+    let spawn = fresh
+        .iter()
+        .find(|ev| ev.kind == EventKind::Spawn)
+        .expect("the director fills the freed slot");
+    assert!(kill.seq < spawn.seq, "the reap precedes the director");
+}
+
+#[test]
 fn splitter_at_cap_minus_one_spawns_exactly_one_child_and_saves() {
     let mut g = game(Mode::Personal);
     let mut a = g.attempt.take().unwrap();
