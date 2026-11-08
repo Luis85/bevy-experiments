@@ -20,11 +20,12 @@
 //! `SetNextDefender` and `BeginDefense`, the defender-aware continue, retry
 //! and repeat, the dispatch reset, and the `available_defenders`,
 //! `defender_card`, `defender_loadout`, `active_defender`,
-//! `battle_defender_card` and `continue_blocker` reads.
+//! `battle_defender_card` and `continue_blocker` reads; and (W2-13) the live
+//! `SetRecruitTactics` for a Ready or Defending recruit.
 mod support;
 use horde_core::{
     campaign::{Campaign, Npc, NpcTraining},
-    command::{Command, CommandError, CommandOutcome},
+    command::{Command, CommandError, CommandOutcome, MAX_RECALL_PERCENT, NpcTactics},
     content::{Mode, Policy, content},
     defenders::{
         DefenderBlocker, DefenderId, DefenderOption, DefenderRole, DefenderSeat,
@@ -2975,4 +2976,238 @@ fn defender_cards_name_each_defender() {
     assert_eq!(g.battle_defender_card(battle + 100), None);
     assert!(g.active_defender().is_none());
     assert_eq!(serde_json::to_value(&g).unwrap(), before, "pure");
+}
+
+// W2-13: `SetRecruitTactics` (D12). Live tactics for a recruit: a Ready
+// recruit's roster npc, or the Defending recruit's roster npc mid-battle,
+// which is the battle's npc (D6), so the change acts at its next npc turn.
+// Guarding and expedition recruits refuse it; `SetNpcPolicy` still edits
+// Mara and `SetRecruitPolicy` stays Ready-only.
+// ---------------------------------------------------------------------------
+
+/// The five tactics fields of `npc`, as one command payload.
+fn tactics_of(npc: &Npc) -> NpcTactics {
+    NpcTactics {
+        policy: npc.policy,
+        prefer_aim: npc.prefer_aim,
+        early_reload: npc.early_reload,
+        allow_risk: npc.allow_risk,
+        recall_percent: npc.recall_percent,
+    }
+}
+
+/// Tactics that differ from `npc`'s in every field but the recall
+/// threshold, which is `recall_percent`.
+fn other_tactics(npc: &Npc, recall_percent: u32) -> NpcTactics {
+    NpcTactics {
+        policy: *Policy::ALL.iter().find(|p| **p != npc.policy).unwrap(),
+        prefer_aim: !npc.prefer_aim,
+        early_reload: !npc.early_reload,
+        allow_risk: !npc.allow_risk,
+        recall_percent,
+    }
+}
+
+/// `g` with recruit `id`'s roster tactics written directly: the only change
+/// an accepted `SetRecruitTactics` may make.
+fn with_roster_tactics(g: &Game, id: u64, t: &NpcTactics) -> serde_json::Value {
+    let mut expected = g.clone();
+    let npc = roster_npc_mut(&mut expected, id);
+    npc.policy = t.policy;
+    npc.prefer_aim = t.prefer_aim;
+    npc.early_reload = t.early_reload;
+    npc.allow_risk = t.allow_risk;
+    npc.recall_percent = t.recall_percent;
+    serde_json::to_value(&expected).unwrap()
+}
+
+#[test]
+fn set_recruit_tactics_edits_ready_and_defending_only() {
+    let (ready, id) = takeover_ready();
+    let country = ready.campaign().world.cleared[0].clone();
+    let current = roster_npc(&ready, id).clone();
+    let wanted = other_tactics(&current, MAX_RECALL_PERCENT);
+    assert_ne!(wanted.recall_percent, current.recall_percent);
+    let set = |tactics: NpcTactics| Command::SetRecruitTactics { id, tactics };
+
+    // The command is appended data with a stable serde shape.
+    let command = set(wanted.clone());
+    let shape = serde_json::to_value(&command).unwrap();
+    assert_eq!(shape["SetRecruitTactics"]["id"], json!(id));
+    assert_eq!(
+        shape["SetRecruitTactics"]["tactics"],
+        serde_json::to_value(&wanted).unwrap()
+    );
+    let text = serde_json::to_string(&command).unwrap();
+    assert_eq!(serde_json::from_str::<Command>(&text).unwrap(), command);
+
+    let mut defending = ready.clone();
+    take_over(&mut defending, id);
+    for (label, g) in [("Ready", ready.clone()), ("Defending", defending)] {
+        let mara = g.campaign().npc.clone();
+        let expected = with_roster_tactics(&g, id, &wanted);
+        let mut edited = g.clone();
+        assert_eq!(
+            edited.apply(&set(wanted.clone())),
+            Ok(CommandOutcome::Applied),
+            "{label}"
+        );
+        assert_eq!(serde_json::to_value(&edited).unwrap(), expected, "{label}");
+        assert_eq!(tactics_of(roster_npc(&edited, id)), wanted, "{label}");
+        assert_eq!(edited.campaign().npc, mara, "{label}: Mara is untouched");
+        let loaded = reload(&edited);
+        assert_eq!(tactics_of(roster_npc(&loaded, id)), wanted, "{label}");
+
+        // A threshold above the cap is refused, with no change.
+        let before = serde_json::to_value(&g).unwrap();
+        let mut over = g.clone();
+        let mut high = wanted.clone();
+        high.recall_percent = MAX_RECALL_PERCENT + 1;
+        assert_eq!(
+            over.apply(&set(high)),
+            Err(CommandError::RecallThresholdOutOfRange(
+                MAX_RECALL_PERCENT + 1
+            )),
+            "{label}"
+        );
+        assert_eq!(serde_json::to_value(&over).unwrap(), before, "{label}");
+    }
+
+    // On the main run, SetNpcPolicy still edits Mara and SetRecruitPolicy
+    // stays Ready-only.
+    let mut live = ready.clone();
+    take_over(&mut live, id);
+    let mara_wanted = other_tactics(&live.campaign().npc, 30);
+    apply_ok(&mut live, Command::SetNpcPolicy(mara_wanted.clone()));
+    assert_eq!(tactics_of(&live.campaign().npc), mara_wanted);
+    assert_eq!(roster_npc(&live, id), &current, "the recruit is untouched");
+    let before = serde_json::to_value(&live).unwrap();
+    assert_eq!(
+        live.apply(&Command::SetRecruitPolicy {
+            id,
+            policy: wanted.policy,
+        }),
+        Err(CommandError::DefenderUnavailable {
+            defender: DefenderId::Recruit(id),
+            blocker: DefenderBlocker::Defending,
+        })
+    );
+    assert_eq!(serde_json::to_value(&live).unwrap(), before);
+
+    // Guarding and expedition recruits, and unknown ids, are refused with
+    // no change.
+    let mut guarding = ready.clone();
+    apply_ok(
+        &mut guarding,
+        Command::AssignGuard {
+            id,
+            country: country.clone(),
+        },
+    );
+    let mut away = ready.clone();
+    away.deploy_survivor(id, &country, 0).unwrap();
+    assert_eq!(status(&away, id), RecruitStatus::Deployed);
+    let rows = [
+        ("Guarding", guarding, id, CommandError::RecruitNotReady),
+        ("on an expedition", away, id, CommandError::RecruitNotReady),
+        ("unknown", ready.clone(), 99, CommandError::UnknownSurvivor),
+    ];
+    for (label, mut g, target, error) in rows {
+        let before = serde_json::to_value(&g).unwrap();
+        assert_eq!(
+            g.apply(&Command::SetRecruitTactics {
+                id: target,
+                tactics: wanted.clone(),
+            }),
+            Err(error),
+            "{label}"
+        );
+        assert_eq!(serde_json::to_value(&g).unwrap(), before, "{label}");
+    }
+}
+
+#[test]
+fn mid_battle_tactics_change_takes_effect_next_turn_deterministically() {
+    // A recall threshold raised between npc turns acts at the next turn,
+    // not before it.
+    let (mut g, id) = takeover_ready();
+    roster_npc_mut(&mut g, id).recall_percent = 0;
+    take_over(&mut g, id);
+    advance(&mut g, 90);
+    g.attempt_mut().unwrap().hp = 1;
+    let tick = g.attempt().unwrap().tick;
+    assert_ne!(tick % 60, 0, "the change lands between npc turns");
+    let mut untouched = g.clone();
+    let raised = NpcTactics {
+        recall_percent: 50,
+        ..tactics_of(roster_npc(&g, id))
+    };
+    apply_ok(
+        &mut g,
+        Command::SetRecruitTactics {
+            id,
+            tactics: raised,
+        },
+    );
+    let to_turn = (60 - tick % 60) as u32;
+    advance(&mut g, to_turn - 1);
+    assert!(g.attempt().is_some(), "no recall before the next npc turn");
+    advance(&mut g, 1);
+    assert!(g.attempt().is_none(), "recalled at the next npc turn");
+    let report = g.last_result().unwrap();
+    assert_eq!(report.outcome, Outcome::Withdrawal);
+    assert_eq!(
+        report.cause,
+        "Survivor recalled at the configured health threshold"
+    );
+    assert_eq!(report.defender(), DefenderId::Recruit(id));
+    assert_eq!(status(&g, id), RecruitStatus::Ready);
+    advance(&mut untouched, to_turn);
+    assert!(
+        untouched.attempt().is_some(),
+        "without the change the recruit holds"
+    );
+
+    // A policy change mid-battle plays exactly like the same change made to
+    // Mara through SetNpcPolicy, and replays and reloads identically.
+    let (mut g, id) = takeover_ready();
+    let mut twin = mara_as_recruit(&g, id);
+    take_over(&mut g, id);
+    for game in [&mut g, &mut twin] {
+        enemy(game, 0, 30.0, false);
+        enemy(game, 2, 45.0, false);
+        advance(game, 90);
+    }
+    let changed = other_tactics(roster_npc(&g, id), roster_npc(&g, id).recall_percent);
+    let mut unchanged = g.clone();
+    let mut replay = g.clone();
+    for game in [&mut g, &mut replay] {
+        apply_ok(
+            game,
+            Command::SetRecruitTactics {
+                id,
+                tactics: changed.clone(),
+            },
+        );
+    }
+    apply_ok(&mut twin, Command::SetNpcPolicy(changed.clone()));
+    let mut loaded = reload(&g);
+    let mut diverged = false;
+    for step in 0..30 {
+        for game in [&mut g, &mut twin, &mut replay, &mut loaded, &mut unchanged] {
+            advance(game, 60);
+        }
+        if g.attempt().is_none() {
+            assert!(twin.attempt().is_none(), "both runs end together");
+            break;
+        }
+        assert_eq!(without_identity(&g), without_identity(&twin), "step {step}");
+        let state = serde_json::to_value(&g).unwrap();
+        assert_eq!(serde_json::to_value(&replay).unwrap(), state, "step {step}");
+        assert_eq!(serde_json::to_value(&loaded).unwrap(), state, "step {step}");
+        diverged |= unchanged
+            .attempt()
+            .is_none_or(|_| without_identity(&unchanged) != without_identity(&g));
+    }
+    assert!(diverged, "the new tactics change the battle");
 }

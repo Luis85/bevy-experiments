@@ -2,7 +2,7 @@
 //! frontends: every domain rule a player intent must satisfy lives here or in
 //! the campaign/strategy/sim methods it calls, never in a frontend.
 use crate::balance::BalanceSettings;
-use crate::campaign::{AutoSellRule, NpcTraining, SaleBlock};
+use crate::campaign::{AutoSellRule, Npc, NpcTraining, SaleBlock};
 use crate::content::{ItemDefId, Mode, Policy, StructureKind};
 use crate::defenders::{DefenderBlocker, DefenderId};
 use crate::quality::Quality;
@@ -23,6 +23,16 @@ pub struct NpcTactics {
     pub early_reload: bool,
     pub allow_risk: bool,
     pub recall_percent: u32,
+}
+impl NpcTactics {
+    /// Writes the five tactics fields onto `npc`; nothing else changes.
+    fn write_to(&self, npc: &mut Npc) {
+        npc.policy = self.policy;
+        npc.prefer_aim = self.prefer_aim;
+        npc.early_reload = self.early_reload;
+        npc.allow_risk = self.allow_risk;
+        npc.recall_percent = self.recall_percent;
+    }
 }
 
 /// A player intent against the authoritative game. Pure data so frontends can
@@ -141,6 +151,13 @@ pub enum Command {
     /// `Deploy`'s unpause, and clears the choice on success.
     BeginDefense {
         stage: usize,
+    },
+    /// Sets a recruit's tactics: a Ready recruit in camp, or the recruit
+    /// Defending the main run, whose next npc turn uses them. `SetNpcPolicy`
+    /// always edits Mara.
+    SetRecruitTactics {
+        id: u64,
+        tactics: NpcTactics,
     },
 }
 
@@ -448,12 +465,7 @@ impl Game {
                         tactics.recall_percent,
                     ));
                 }
-                let npc = &mut self.campaign.npc;
-                npc.policy = tactics.policy;
-                npc.prefer_aim = tactics.prefer_aim;
-                npc.early_reload = tactics.early_reload;
-                npc.allow_risk = tactics.allow_risk;
-                npc.recall_percent = tactics.recall_percent;
+                tactics.write_to(&mut self.campaign.npc);
                 Applied
             }
             Command::Recruit(country) => Id(self.strategy.recruit(&mut self.campaign, country)?),
@@ -527,6 +539,29 @@ impl Game {
             }
             Command::BeginDefense { stage } => {
                 self.begin_defense(*stage)?;
+                Applied
+            }
+            // Ruling D12: a Defending recruit's roster npc is the main run's
+            // npc (D6), so the change acts at its next npc turn.
+            Command::SetRecruitTactics { id, tactics } => {
+                if tactics.recall_percent > MAX_RECALL_PERCENT {
+                    return Err(CommandError::RecallThresholdOutOfRange(
+                        tactics.recall_percent,
+                    ));
+                }
+                let recruit = self
+                    .strategy
+                    .roster
+                    .iter_mut()
+                    .find(|r| r.id == *id)
+                    .ok_or(CommandError::UnknownSurvivor)?;
+                if !matches!(
+                    recruit.status,
+                    RecruitStatus::Ready | RecruitStatus::Defending
+                ) {
+                    return Err(CommandError::RecruitNotReady);
+                }
+                tactics.write_to(&mut recruit.npc);
                 Applied
             }
         };
