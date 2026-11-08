@@ -508,3 +508,4 @@ R11, P2, P5, D13, E4, E5, E8, E10, E11, E14, E15, S17
 ### Writer notes (wave 2)
 
 - **W2-08, item 39.** `squad_machine_gun` has Personal damage 33, not the 32 in the section 5 tier-2 table. The JSON holds what `quality::apply(items[26], Some(Rare))` returns: 25 x 1.3 is 32.5 in f32, which rounds away from zero. `loot_only_ranged_items_are_their_exemplar_at_the_tier_quality` pins 33.
+- **W2-08, pacing.** "Digest moves" above says smoke and pacing stay byte-identical across the loot series. Smoke did; the default `pacing 60 --runs` output did not, because `recommended_node` reads owned drops and the larger drop pool changes which item drops. The rows and the new output (`target/production-after/w2-08/pacing.txt`) are in plan §9.6; whether it replaces the w1-69 baseline is open in plan §2.5, so "Digest moves" and ruling W-1's pin wording are not amended here.

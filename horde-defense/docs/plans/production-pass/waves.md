@@ -221,6 +221,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `loot_only_items_are_never_offered_bought_or_recommended`
 - Pin: `appended_ids_keep_v1_order`.
 - Done: provisional cause C.
+- Pacing (W2-08 review, 2026-11-08): the default `pacing 60 --runs` output moved (`recommended_node` reads owned drops), so it no longer equals the W2-01 pin's `w1-69/pacing.txt`. The rows and `target/production-after/w2-08/pacing.txt` are in plan §9.6; the re-baseline is an open plan §2.5 item, and W2-01's pin wording stays until it is ruled.
 - Deps: W2-07, W2-53 (the frozen-catalogue guard lands before the first wave-2 catalogue edit).
 
 **W2-09 · loot-economy · L4: weighted single-draw DropTable**
