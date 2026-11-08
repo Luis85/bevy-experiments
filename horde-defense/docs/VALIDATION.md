@@ -970,7 +970,7 @@ One VSync-on stress repeat with pipelining (`head-ab-playtest-vsync/stress-on-r2
 | `c1-on-r3` | `-Pipelined on -Repeat 3` | 6 | 0 | 0 |
 | `d1-default-r1` | default, `-Repeat 1` | 2 | 0 | 0 |
 
-No harness variable brings the stalls in. They come and go with time. The last driver stall in the W1-61 evidence fell in the VSync-on A/B at about 22:22 UTC; none followed in the 54 acceptance runs from 22:32 or in these 18 runs. W1-68 saw the same thing: 4-14 per stress run at 18:09, then 0 in 66 probes. So the A/B on arm stands for the default. The acceptance pass's 0 driver stalls shows a stall-free hour, not that the stall is gone; on another hour the same passes would exclude stalls under the ruling. Caveats: the discriminating pass ran the W1-61 review binary (it differs only in the stall rule) and had no CPU-load sampler.
+No harness variable brings the stalls in. They come and go with time. The last driver stall in the W1-61 evidence fell in the VSync-on A/B at about 22:22 UTC; none followed in the 54 acceptance runs from 22:32 or in these 18 runs. W1-68 saw the same thing: 4-14 per stress run at 18:09, then 0 in 66 probes. So the A/B on arm stands for the default. The acceptance pass's 0 driver stalls shows a stall-free hour, not that the stall is gone; on another hour the same passes would exclude stalls under the ruling. Caveats: the discriminating pass ran the W1-61 review binary (it differs only in the stall rule) and had no CPU-load sampler. (W2-50, 2026-11-08: the stalls come from the display being off, not from the hour; see "Gate 3 in the shipped default configuration" below.)
 
 ## Goal-1 acceptance re-run at HEAD — 7 November 2026 (W1 review)
 
