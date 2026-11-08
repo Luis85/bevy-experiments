@@ -1038,6 +1038,70 @@ This is a pass of the three gates, not a clean gate 3 on HEAD: the 867f786 stres
 
 **Shipped smoke** (`acc-playtest-novsync/shipped`): 2.72, 1.25 and 1.26 s, median 1.26 s. The cold first run is again the slow one. Low latency was not re-run. The numbers are in `PERF_BUDGET.json` `acceptance` (the first re-run under `acceptance.w1_review_867f786`, W1-61 under `acceptance.w1_61`) and plan 9.1 / 9.4.
 
+## Gate 3 in the shipped default configuration — 8 November 2026 (W2-50)
+
+W2-50 owns two open gate-3 items: the W1-61 `head-ab-playtest-vsync/stress-on-r2` episode and the 867f786 sample-932 stall tail (plan §2.5). No gate, threshold or rule was changed. Evidence: `target/perf/w2-50/` (not committed). It holds the reports and summaries, a 5 s CPU-load sampler (`<run>.load.tsv`) and a 1 s `nvidia-smi` sampler (`<run>.gpu.csv`) beside every invocation, the Kernel-Power 506/507 export, the generated tables (`w2-50-repeats.md`, `w2-50-hold.md`, `w1-evidence-display-state*.md`) and the driver scripts (`tools/`).
+
+**Conditions.**
+- Commit ddea5a6 (clean tree). Playtest executable `2de00a0b…`. RTX 1000 Ada, Vulkan, mains, power plan Balanced, 1440x900 @ 1.0 and 1050x700 @ 1.35.
+- The shipped default configuration: `measure_performance.ps1 -Scene stress -Profile playtest -Pipelined on -Repeat 1`, VSync on (Fifo), stress normal, 180 warmup and 1,800 frames. This is the W1-61 A/B harness, one invocation per repeat.
+- 2026-11-08, 22:32-23:10 UTC. No other horde-defense.exe and no other cargo command ran. CPU load during the measured runs was at most 61% (100% and 90% samples fell in the first invocation's cargo build).
+- Every run was valid at its first attempt.
+
+**Runs.** There were 20 invocations, so 20 repeats per size, 40 reports in all:
+- `stress-on-r1..r12`: 12 plain repeats.
+- `stress-on-pointer-r1..r4`: meant to move the pointer over the window. The lock screen was in front (`GetForegroundWindow` returned LockApp, `SendInput` returned 0), so no move was made. These 4 are plain repeats too.
+- `stress-on-hold-r1..r4`: the same harness with a display-required power request (`SetThreadExecutionState(ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED)`) held by the driver process.
+
+The machine was unattended. Windows' Kernel-Power log shows that Modern Standby (display off) was entered on the idle timeout (event 506) and left on input (event 507) several times during the plain runs: 22:37:53-22:39:29, 22:39:59-22:53:06, 22:54:00-22:56:16 and 22:57:08-22:58:28 UTC. Only `r1` and `r2` ran with the display on throughout. `w2-50-repeats.md` places every listed frame on that timeline. Each instant is estimated from the report's file time; "transition" means within 5 s of a 506/507 event.
+
+**Per repeat** (`w2-50-repeats.md`, `w2-50-hold.md`; all VSync on, outside driver stalls):
+
+| Runs | Display | Frames > 50 ms (worst) | Frames > 33 ms | p99 interval ms | Mean FPS | Driver stalls | covered_95_named / frames > 50 ms | min named_coverage | max_outside_update_ms |
+|---|---|---|---|---|---|---|---|---|---|
+| r1-r12 normal | on in r1, r2; off or transition in r3-r12 | 0 | 0-1 | 17.41-18.92 | 59.85-60.03 | 0-6 (34) | all | ≥ 0.998 | 0.85 |
+| r1-r12 small | on in r1; transition in r2; off in r3-r12 | 0 | 0-1 | 19.70-20.18 | 59.93-60.05 | 0-6 (34) | all | ≥ 0.998 | 0.77 |
+| pointer r1-r4 normal | off, with transitions in r1 and r3 | 1 (r1, r3) | 0-2 | 17.64-18.14 | 59.58-60.06 | 3-5 (16) | 3 of 4 (r1), all | 0.932 | 15.81 |
+| pointer r1-r4 small | r1 transition; r2 off; r3 on; r4 off, ending in a transition | 1 (r1) | 0-1 | 19.90-20.11 | 58.42-60.01 | 0-7 (11) | 7 of 8 (r1), all | 0.000 | 818.71 |
+| hold r1-r4 normal | on (held) | 0 | 0 | 17.66-18.14 | 60.00 | 0 | - | - | 0.00 |
+| hold r1-r4 small | on (held) | 0 | 0 | 19.71-20.20 | 59.99-60.00 | 0 | - | - | 0.00 |
+
+Every frame over 33 ms outside driver stalls (all 6 are in `longest_frames`; window events are 0 in every W2-50 frame and run):
+
+| Run | Sample | ms | Acquire share | Named coverage | Outside update ms | Display | Reading |
+|---|---|---|---|---|---|---|---|
+| pointer-r1 normal | 602 | 234.0 | 0.847 | 0.932 | 15.8 | transition (22:53:06, display on) | second frame of a two-frame stall (s601 291.7 ms excluded); the 15.8 ms the main thread spent outside App::update after s601 falls in its window, so named coverage misses 0.95 |
+| pointer-r3 normal | 1481 | 65.9 | 0.660 | 0.951 | 3.2 | transition (22:56:16, display on) | stall tail like sample 932: two frames after a 277 ms stall, present wait 52.9 ms, of which only 43.5 ms overlaps a hand-off, because the main thread ran two schedules (16.2 ms) in the window |
+| pointer-r1 small | 1345 | 819.0 | 0.000 | 0.000 | 818.7 | transition (4 s before the 22:54:00 display-off) | the render thread waited 815 ms in acquire while the main thread sat outside App::update the whole time, never in a hand-off, so the rule sees no acquire wait |
+| r4 normal | 1393 | 37.3 | 0.000 | 0.321 | 25.4 | transition (4 s before 22:39:59) | two frames after a 917 ms stall: the main thread waited outside the update |
+| pointer-r3 normal | 1480 | 39.1 | 0.000 | 0.736 | 10.3 | transition (22:56:16) | between the 277 ms stall and s1481 |
+| r1 small | 628 | 45.2 | 0.855 | 0.989 | 0.4 | on | one three-vblank acquire, the episode's per-frame signature; isolated |
+
+**The driver stall is the display being off.** `w1-evidence-display-state*.md` puts the W1-61 and W1-review evidence on the same Kernel-Power timeline:
+- W1-61's VSync-off A/B ran 21:57-22:15 UTC on 2026-11-06, in a display-off interval (21:33:17-22:17:09). So did the first VSync-on A/B progressed-peak runs (22:15-22:17). Every one of their stalls is display-off.
+- The user woke the laptop by touchpad at 22:17:09. The display then stayed on through 2026-11-07 09:08, which covers the acceptance passes (22:32 onwards) and the discriminating pass (23:10-23:16). That is the "stall-free hour" of "The acceptance passes and the A/B disagree on driver stalls" above.
+- On 2026-11-07 the display went off at 17:18:23, during the 867f786 re-run. The passes before it (dev VSync-on progressed-peak, dev -VsyncOff) had 0 stalls; every pass after it had stalls, and attempt 2 (17:42-17:56) ran with the display off throughout.
+
+Across those 180 reports (the W1-61 A/B, the W1-61 playtest acceptance, and every pass of both 7 November re-runs except the extra dev VSync-on peak pass) and W2-50's 40, 516 frames were classed as driver stalls:
+- 513 were display-off frames or fell within 5 s of a display power transition.
+- The 3 others are the 116, 52 and 53 ms frames of `stress-on-r2`.
+- No stall of the 500 ms or 1,000 ms class (wgpu's acquire timeout) occurred with the display on.
+
+The perturbation proof is the hold arm. Before it, the lock-screen idle timeout turned the display off four times in 7 minutes. With the display-required request held, no 506 event fired from 23:04:46 to 23:10:06. The 8 runs had 0 driver stalls and 0 frames over 33 ms, against 95 stalls in the 32 runs before them. So the excluded stalls are environmental, as the ruling assumed. They come from unattended evidence passes on which Windows turns the panel off, not from the game. Frames still run at a 16.7 ms median then, but the swap-chain acquire stalls for about 500 or 1,000 ms at a time.
+
+**Sample 932 (867f786 re-run).** It fell at about 17:26:44 UTC, with the display off since 17:18:23. It is a display-off stall tail. W2-50 found the same class again (pointer-r3 s1481, share 0.660), plus two other ways a stall escapes the rule at a display power transition:
+- the main thread outside the update for 15.8 ms in a stall's second frame (named coverage 0.932);
+- the main thread outside the update for all of an 819 ms acquire (acquire share 0).
+
+Counting the whole present wait toward the share would catch s1481 (52.9 / 65.9 = 0.80) but neither of the other two. With the display held on, none of these frames occurs. The rule is unchanged and sample 932 stays gated (the §2.5 default). The decision is the user's. W2-50's recommendation is to keep the `driver_stall` rule and instead hold the display on during perf passes and treat a run that overlaps a display-off interval as invalid evidence. That is a harness change to evidence validity and needs its own ruling (plan §2.5).
+
+**The `stress-on-r2` episode is not reproduced.** None of the 20 repeats per size, with the display on or off, had a stretch of 47-67 ms frames. The longest run of slow frames outside a stall transition was one isolated 45.2 ms frame (r1 small s628). What the evidence attributes:
+- The time is held by the swap-chain acquire on the render thread. present_wait was 41.8-64.1 ms per frame, so the frame waited about three vblanks. In-process work was 6-8 ms (main 3.2-5.0, render 2.5-3.4), with no asset, audio or texture-upload events.
+- The 4-6 ms outside App::update that kept named coverage at 0.89-0.94 comes only in frames that carry window input events (21-52 per frame). Frames of the episode without events had 0.4 ms outside the update and named coverage 0.99 (s971, s1081, s1288, s1301, s1319, 47.2-48.1 ms). So that residual is winit dispatching input, not the cause of the slow cadence.
+- `stress-on-r2` is the only report on the branch with sustained window input: 4.74 events per frame on average and 52 at most. Every other W1-61 VSync-on stress report has a mean of 0.00-0.01, and every W2-50 report has 0. It ran at 22:22 UTC, 5 minutes after the user woke the laptop (Kernel-Power 507, "Input Touchpad", 22:17:09), with the display on.
+
+The episode therefore coincides with someone using the machine during the run. Input alone is not enough: `progressed-peak-on-r3` (22:18, 7.65 events per frame, 22 at most) stayed at 60 FPS. What made the compositor present on every third vblank for those 400 frames is not named, and the W2-50 runs had no input, because the session was locked. A supervised reproduction, with the session unlocked and pointer movement over the window during `-Scene stress -Profile playtest -Pipelined on` runs, is the remaining step. Until the §2.5 row is answered, the episode stays open (the default). Gate 3 is not claimed clean in the shipped default configuration.
+
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 
 W1-49 is done when `battlefield_paint` does not grow over the stress run, and the perf design asks for `settled_corpses_drawn` in stress. Neither number had been written down: the W1-49 commits had only headless cache tests.
