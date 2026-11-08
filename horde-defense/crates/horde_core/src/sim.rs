@@ -1,6 +1,8 @@
 mod auto_sell;
 mod combat;
 mod country;
+#[cfg(test)]
+mod death_effect_tests;
 mod defense;
 mod director;
 mod events;
@@ -544,6 +546,12 @@ pub struct Attempt {
     event_seq: u64,
     #[serde(skip)]
     emitted: Vec<SimEventRecord>,
+    /// Never saved: the tick of the latest death burst (W2-29) and the
+    /// hostiles it defeated, which `reap` leaves on the field until the next
+    /// tick. A save lands between ticks, when the hold has already lapsed,
+    /// so a resumed attempt reaps them exactly as an uninterrupted one.
+    #[serde(skip)]
+    burst_victims: (u64, Vec<u64>),
 }
 impl Attempt {
     /// The defender holding this attempt's line: the mode owner unless a
@@ -1155,6 +1163,7 @@ impl Attempt {
             caller_lanes,
             event_seq,
             emitted: _,
+            burst_victims: _,
         } = self;
         Attempt {
             width_yards: *width_yards,
@@ -1232,6 +1241,7 @@ impl Attempt {
             caller_lanes: *caller_lanes,
             event_seq: *event_seq,
             emitted: Vec::new(),
+            burst_victims: Default::default(),
         }
     }
 }
@@ -1626,6 +1636,10 @@ impl Game {
         a.melee_cooldown = a.melee_cooldown.saturating_sub(1);
         a.melee_commit = a.melee_commit.saturating_sub(1);
         a.statuses.tick();
+        // Hostiles a death burst defeated last tick (W2-29) are reaped before
+        // anything acts; without one this finds nothing and draws nothing.
+        // A boss among them is a victory at this tick's first boss check.
+        self.reap(&mut a);
         if a.mode == Mode::Personal {
             self.advance_ordnance(&mut a);
             self.reap(&mut a);

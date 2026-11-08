@@ -363,6 +363,30 @@ impl AttackResult {
         )
     }
 }
+impl AttackResult {
+    /// The log line of a [`resolve_blast`] result, which has no attack roll.
+    pub fn blast_explanation(&self) -> String {
+        let defense = match (self.defense_roll, self.defense) {
+            (Some(roll), Some(target)) => format!(
+                "dodge roll {roll} vs {target} ({})",
+                if self.defended { "avoided" } else { "failed" }
+            ),
+            _ => "no defense".into(),
+        };
+        format!(
+            "blast; {defense}; damage {} - DR {} = {}; injury {}{}",
+            self.basic_damage,
+            self.effective_dr,
+            self.penetration,
+            self.injury,
+            if self.conditions.is_empty() {
+                String::new()
+            } else {
+                format!("; {}", self.conditions.join(", "))
+            }
+        )
+    }
+}
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct InjuryState {
     pub max_hp: i32,
@@ -537,6 +561,75 @@ pub fn resolve_attack(
 /// consciousness, knockdown or mortality checks. Uses the same attack procedure.
 pub fn resolve_object_attack(rng: &mut Rng, attack: Attack, dr: i32) -> AttackResult {
     resolve_attack_roll(rng, attack, None, dr, true)
+}
+/// An area blast (an exploder's fuse or death burst, ruling W-7): no attack
+/// roll. With `defense` Some the target may still dodge, with one 3d6
+/// defense roll, and a dodged blast does nothing more. Otherwise the damage
+/// roll, protection, wounding, `injury_scale` (exactly 1.0 is the identity,
+/// with no float round trip) and the target's injury checks, as for a hit.
+/// Invalid damage or a terminal target draws nothing and has no effect.
+pub fn resolve_blast(
+    rng: &mut Rng,
+    damage: Damage,
+    defense: Option<i32>,
+    dr: i32,
+    injury_scale: f32,
+    target: &mut InjuryState,
+    ht: i32,
+) -> AttackResult {
+    let mut result = resolve_blast_roll(rng, damage, defense, dr, !target.terminal());
+    if injury_scale != 1.0 && result.injury > 0 {
+        result.injury = (result.injury as f32 * injury_scale).round().max(0.0) as i32;
+    }
+    result.conditions = target.apply_injury(result.injury, rng, ht);
+    result
+}
+/// A blast against a scenario object: no attack roll, no defense and no
+/// biological checks; the same damage roll and protection as
+/// [`resolve_blast`].
+pub fn resolve_object_blast(rng: &mut Rng, damage: Damage, dr: i32) -> AttackResult {
+    resolve_blast_roll(rng, damage, None, dr, true)
+}
+fn resolve_blast_roll(
+    rng: &mut Rng,
+    damage: Damage,
+    defense: Option<i32>,
+    dr: i32,
+    target_eligible: bool,
+) -> AttackResult {
+    let legal = damage.valid() && target_eligible;
+    let defense = if legal { defense } else { None };
+    let defense_roll = defense.map(|_| rng.roll3d6());
+    let defended = defense
+        .zip(defense_roll)
+        .is_some_and(|(score, die)| defense_succeeds(score, die));
+    let hit = legal && !defended;
+    let basic_damage = if hit { damage.roll(rng) } else { 0 };
+    let effective_dr = dr.max(0);
+    let penetration = if hit {
+        (basic_damage - effective_dr).max(0)
+    } else {
+        0
+    };
+    AttackResult {
+        effective_skill: 0,
+        attack_roll: 0,
+        outcome: if legal {
+            RollOutcome::Success
+        } else {
+            RollOutcome::Failure
+        },
+        defense_roll,
+        defense,
+        defended,
+        hit,
+        basic_damage,
+        effective_dr,
+        penetration,
+        injury: damage.injury(penetration),
+        requires_ready: false,
+        conditions: vec![],
+    }
 }
 fn resolve_attack_roll(
     rng: &mut Rng,
@@ -909,6 +1002,80 @@ mod tests {
             rescale_swing(strength_adjusted_swing(crowbar, 13).unwrap(), 13, 7),
             strength_adjusted_swing(crowbar, 7)
         );
+    }
+    #[test]
+    fn resolve_blast_draws_defense_only_when_dodged() {
+        // Ruling W-7: a blast has no attack roll. Without a defense it draws
+        // only the damage dice; with one it draws one 3d6 defense roll, and a
+        // dodged blast draws nothing more and does nothing.
+        let damage = Damage {
+            dice: 2,
+            adds: 1,
+            kind: DamageKind::Crushing,
+        };
+        for seed in [seed_with_roll(3), seed_with_roll(11), seed_with_roll(18)] {
+            // No defense: the damage dice, nothing else (the injury is too
+            // small for a major wound or a death check).
+            let mut rng = Rng::new(seed);
+            let mut expected = Rng::new(seed);
+            let rolled = damage.roll(&mut expected);
+            let mut target = InjuryState::new(100, 10);
+            let result = resolve_blast(&mut rng, damage, None, 2, 1.0, &mut target, 10);
+            assert_eq!(rng, expected, "seed {seed}: only the damage dice");
+            assert_eq!(result.defense_roll, None);
+            assert!(result.hit && !result.defended);
+            assert_eq!(result.attack_roll, 0, "no attack roll");
+            assert_eq!(result.basic_damage, rolled);
+            assert_eq!(result.penetration, rolled - 2);
+            assert_eq!(result.injury, rolled - 2);
+            assert_eq!(target.hp, 100 - result.injury);
+            // A defense: exactly one 3d6, then the damage dice unless dodged.
+            let mut rng = Rng::new(seed);
+            let mut expected = Rng::new(seed);
+            let die = expected.roll3d6();
+            let dodged = defense_succeeds(9, die);
+            let rolled = if dodged {
+                0
+            } else {
+                damage.roll(&mut expected)
+            };
+            let mut target = InjuryState::new(100, 10);
+            let result = resolve_blast(&mut rng, damage, Some(9), 0, 1.0, &mut target, 10);
+            assert_eq!(rng, expected, "seed {seed}: one defense roll");
+            assert_eq!(result.defense_roll, Some(die));
+            assert_eq!(result.defense, Some(9));
+            assert_eq!(result.defended, dodged);
+            assert_eq!(result.hit, !dodged);
+            assert_eq!(result.basic_damage, rolled);
+            assert_eq!(target.hp, 100 - rolled);
+            if dodged {
+                assert_eq!(target, InjuryState::new(100, 10), "a dodge does nothing");
+            }
+        }
+        // The scale is applied to the injury; 1.0 is the identity.
+        let seed = seed_with_roll(18);
+        let mut full = InjuryState::new(100, 10);
+        let whole = resolve_blast(&mut Rng::new(seed), damage, None, 0, 1.0, &mut full, 10);
+        let mut half = InjuryState::new(100, 10);
+        let scaled = resolve_blast(&mut Rng::new(seed), damage, None, 0, 0.5, &mut half, 10);
+        assert_eq!(scaled.injury, (whole.injury as f32 * 0.5).round() as i32);
+        assert_eq!(half.hp, 100 - scaled.injury);
+        // An object blast never rolls a defense or a biological check.
+        let mut rng = Rng::new(seed);
+        let mut expected = Rng::new(seed);
+        let rolled = damage.roll(&mut expected);
+        let result = resolve_object_blast(&mut rng, damage, 3);
+        assert_eq!(rng, expected);
+        assert_eq!(result.defense_roll, None);
+        assert_eq!(result.injury, (rolled - 3).max(0));
+        assert!(result.conditions.is_empty());
+        // A terminal target or invalid damage draws nothing.
+        let mut rng = Rng::new(seed);
+        let mut dead = InjuryState::new(10, 10);
+        dead.unconscious = true;
+        let result = resolve_blast(&mut rng, damage, Some(9), 0, 1.0, &mut dead, 10);
+        assert_eq!(rng, Rng::new(seed));
+        assert!(!result.hit && result.injury == 0);
     }
     #[test]
     fn attack_explanations_present_defense_values_without_option_syntax() {

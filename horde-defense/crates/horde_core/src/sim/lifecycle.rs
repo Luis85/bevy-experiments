@@ -360,6 +360,7 @@ impl Game {
             caller_lanes: None,
             event_seq: self.next_event_seq,
             emitted: Vec::new(),
+            burst_victims: Default::default(),
         };
         if let Some((recruit, _)) = takeover {
             super::parallel::stamp_recruit_defender(&mut a, recruit);

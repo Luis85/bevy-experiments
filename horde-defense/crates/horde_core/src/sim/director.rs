@@ -153,6 +153,20 @@ impl Game {
         lane: u8,
         boss: bool,
     ) {
+        self.place_enemy(a, resolved, lane, boss, None);
+    }
+    /// Materialises one hostile in `lane` within the caps. `split_at` Some
+    /// places a splitter's child at that x (W2-29): marked `split_child`,
+    /// counted as a spawn, and announced by the parent's `Split` event
+    /// instead of a `Spawn` at the field edge. No combat draw either way.
+    pub(super) fn place_enemy(
+        &mut self,
+        a: &mut Attempt,
+        resolved: crate::enemy_catalog::ResolvedEnemy,
+        lane: u8,
+        boss: bool,
+        split_at: Option<f32>,
+    ) {
         let kind = resolved.kind;
         let d = &resolved;
         let level = &content().levels[a.level];
@@ -162,11 +176,12 @@ impl Game {
             return;
         }
         let lane = lane.min(a.lane_count - 1);
-        let spawn_x = a
-            .enemies
-            .iter()
-            .filter(|e| e.lane == lane)
-            .fold(a.width_yards + 0.7, |tail, e| tail.max(e.x + 0.65));
+        let spawn_x = split_at.unwrap_or_else(|| {
+            a.enemies
+                .iter()
+                .filter(|e| e.lane == lane)
+                .fold(a.width_yards + 0.7, |tail, e| tail.max(e.x + 0.65))
+        });
         let base_hp = if a.mode == Mode::Personal {
             if boss {
                 level.boss_health.max(a.progression.boss_health_floor)
@@ -214,7 +229,7 @@ impl Game {
             windup_total: 0,
             statuses: Statuses::default(),
             resolved: (!boss).then_some(resolved),
-            split_child: false,
+            split_child: split_at.is_some(),
             boss_state: None,
         });
         a.telemetry.spawned += 1;
@@ -223,6 +238,9 @@ impl Game {
             a.telemetry.count_archetype_spawn(&r.archetype_id);
         }
         a.telemetry.peak_enemies = a.telemetry.peak_enemies.max(a.enemies.len());
+        if split_at.is_some() {
+            return;
+        }
         a.event_with(
             if boss {
                 EventKind::Boss

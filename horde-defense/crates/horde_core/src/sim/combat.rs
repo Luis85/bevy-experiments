@@ -1,6 +1,7 @@
 //! Enemy attack resolution, damage application and corpse reaping.
 
 use super::*;
+use crate::enemy_catalog::DeathEffect;
 
 /// The catalogue prefix a pre-v7 attempt's drop pool reads: the 29 v1
 /// definitions. The loot-only items appended at 29-67 (W2-08) and any later
@@ -12,9 +13,8 @@ const LEGACY_DROP_DEFINITIONS: usize = 29;
 /// defenders only, like the class-perk and penetration folds: Mara and
 /// recruits (NPC mode) take `raw`. The neutral 1.0 returns `raw` untouched
 /// (no float round trip).
-// The burst and reach-attack paths (enemy-balance, W2-29/W2-30) are the
-// consumers; until they land only the tests read it.
-#[cfg_attr(not(test), expect(dead_code, reason = "consumed from W2-29"))]
+// The exploder's fuse on a Personal defender (W2-29) is the first consumer;
+// the reach attack joins with the hazard seam (W2-30).
 pub(crate) fn hazard_scaled(a: &Attempt, raw: i32) -> i32 {
     let m = a.profile.modifiers.hazard_damage_multiplier;
     if a.mode != Mode::Personal || m == 1.0 {
@@ -24,8 +24,114 @@ pub(crate) fn hazard_scaled(a: &Attempt, raw: i32) -> i32 {
     }
 }
 
+/// An exploder's blast (design enemy-balance §4 "Exploder", ruling W-7),
+/// copied out of its [`DeathEffect::Burst`].
+#[derive(Clone, Copy, Debug)]
+struct Blast {
+    radius: f32,
+    damage: i32,
+    structure_damage: i32,
+    npc_dice: u8,
+    npc_add: i32,
+}
+
+/// The blast `e` carries and whether it also detonates on contact (`fuse`).
+/// Bosses fight with their level's stats and never burst.
+fn blast_of(e: &Enemy) -> Option<(Blast, bool)> {
+    if e.boss {
+        return None;
+    }
+    match e.resolved.as_ref()?.death_effect.as_ref()? {
+        DeathEffect::Burst {
+            radius,
+            damage,
+            structure_damage,
+            npc_dice,
+            npc_add,
+            fuse,
+        } => Some((
+            Blast {
+                radius: *radius,
+                damage: *damage,
+                structure_damage: *structure_damage,
+                npc_dice: *npc_dice,
+                npc_add: *npc_add,
+            },
+            *fuse,
+        )),
+        DeathEffect::Split { .. } => None,
+    }
+}
+
+/// A `Detonation` event's value: the radius in hundredths of a yard.
+fn blast_value(radius: f32) -> i32 {
+    (radius * 100.0).round() as i32
+}
+
+/// A death effect collected while reaping, applied after the reap loop.
+enum DeathAct {
+    Burst {
+        name: String,
+        lane: u8,
+        at: [f32; 2],
+        blast: Blast,
+    },
+    Split {
+        lane: u8,
+        x: f32,
+        archetype_id: String,
+        count: u8,
+    },
+}
+
+/// The profile a split child of `archetype_id` spawns with: the current
+/// catalogue's record at split time, else the Runner default. A record that
+/// could not be a child (a death effect or group of its own, an unlock or
+/// an elite mark) also falls back, so a child never splits.
+fn split_child_profile(archetype_id: &str) -> crate::enemy_catalog::ResolvedEnemy {
+    crate::enemy_catalog::enemy_catalog()
+        .resolve(archetype_id)
+        .ok()
+        .filter(|r| {
+            r.death_effect.is_none()
+                && r.group_size == 1
+                && r.unlocked_by.is_none()
+                && r.elite.is_none()
+        })
+        .unwrap_or_else(|| crate::enemy_catalog::resolve_kind(EnemyKind::Runner))
+}
+
+/// Removes every structure a strike or blast destroyed and releases the
+/// hostiles that targeted it.
+fn remove_destroyed_structures(a: &mut Attempt) {
+    let destroyed: Vec<_> = a
+        .structures
+        .iter()
+        .filter(|s| s.hp <= 0)
+        .map(|s| [s.x(), s.y()])
+        .collect();
+    for point in destroyed {
+        a.telemetry.structure_losses += 1;
+        a.event(EventKind::StructureLost, point, point, 0);
+    }
+    a.structures.retain(|s| s.hp > 0);
+    for e in &mut a.enemies {
+        if e.target_structure
+            .is_some_and(|id| !a.structures.iter().any(|s| s.id == id))
+        {
+            e.target_structure = None;
+            e.contact_since = None;
+            e.attack_left = 0;
+            e.attack_phase = EnemyPhase::Advance;
+            e.windup_total = 0;
+        }
+    }
+}
+
 impl Game {
     pub(super) fn enemy_attacks(&mut self, a: &mut Attempt) {
+        // Exploders that detonated on contact this pass, removed after it.
+        let mut fused = Vec::new();
         for n in 0..a.enemies.len() {
             let e = &a.enemies[n];
             if (a.mode == Mode::Personal && e.hp <= 0)
@@ -119,6 +225,16 @@ impl Game {
             if spit.is_some() && e.x > a.width_yards * 0.5 + 0.01 {
                 // The far-half guard (acceptance G6.6): `ranged_stop` never
                 // stations a spitter there, so valid play never reaches it.
+                continue;
+            }
+            if let Some((blast, true)) = blast_of(e) {
+                // Its windup completed in contact: the exploder detonates
+                // instead of attacking and leaves the field without reward.
+                fused.push(e.id);
+                self.detonate_fuse(a, n, structure, blast);
+                if a.mode == Mode::Npc && a.injury.terminal() {
+                    break;
+                }
                 continue;
             }
             let actor_id = e.id;
@@ -336,28 +452,280 @@ impl Game {
                 break;
             }
         }
-        let destroyed: Vec<_> = a
-            .structures
-            .iter()
-            .filter(|s| s.hp <= 0)
-            .map(|s| [s.x(), s.y()])
-            .collect();
-        for point in destroyed {
-            a.telemetry.structure_losses += 1;
-            a.event(EventKind::StructureLost, point, point, 0);
+        if !fused.is_empty() {
+            // The ledger keeps a fused id from ever paying; it leaves no
+            // corpse and no Kill event.
+            a.reward_ledger.extend(fused.iter().copied());
+            a.enemies.retain(|e| !fused.contains(&e.id));
         }
-        a.structures.retain(|s| s.hp > 0);
-        for e in &mut a.enemies {
-            if e.target_structure
-                .is_some_and(|id| !a.structures.iter().any(|s| s.id == id))
-            {
-                e.target_structure = None;
-                e.contact_since = None;
-                e.attack_left = 0;
-                e.attack_phase = EnemyPhase::Advance;
-                e.windup_total = 0;
+        remove_destroyed_structures(a);
+    }
+    /// The NPC damage of `blast` with the threat terms an enemy attack's
+    /// damage carries (the rank's enemy damage and the balance setting).
+    fn npc_blast_damage(a: &Attempt, blast: Blast) -> Damage {
+        let mut damage = Damage {
+            dice: blast.npc_dice,
+            adds: blast.npc_add + ((a.progression.enemy_damage - 1.0) * 6.0).floor() as i32,
+            kind: DamageKind::Crushing,
+        };
+        let expected = crate::campaign::mean_basic_damage(damage);
+        damage.adds = (damage.adds as f32 + expected * (a.balance.enemy_damage - 1.0))
+            .round()
+            .clamp(-30.0, 1_000_000.0) as i32;
+        damage
+    }
+    /// The exploder at `n` detonates on its target: the defender, or the
+    /// structure at index `structure`. Flat `structure_damage` also hits the
+    /// other structures within the radius; other hostiles are not hit.
+    fn detonate_fuse(&mut self, a: &mut Attempt, n: usize, structure: Option<usize>, blast: Blast) {
+        let e = &a.enemies[n];
+        let (id, lane, origin, name) = (e.id, e.lane, [e.x, e.y()], enemy_name(a, e));
+        let archetype = e.resolved.as_ref().map(|r| r.archetype_id.clone());
+        let target_id = structure.map(|s| a.structures[s].id);
+        let to = structure.map_or(a.defender_position(), |s| {
+            [a.structures[s].x(), a.structures[s].y()]
+        });
+        let meta = EventMetadata {
+            actor_id: Some(id),
+            target_id,
+            lane: Some(lane),
+            ..Default::default()
+        };
+        a.event_with(
+            EventKind::Detonation,
+            origin,
+            to,
+            blast_value(blast.radius),
+            EventMetadata {
+                duration_ticks: 30,
+                detonation: Some(DetonationTrigger::Fuse { target_id, to }),
+                ..meta
+            },
+        );
+        let damage = if a.mode == Mode::Npc {
+            let hit = Self::npc_blast_damage(a, blast);
+            if let Some(s) = structure {
+                let protection = content().structure(a.structures[s].kind).npc.armor;
+                let result = rules::resolve_object_blast(&mut a.rng, hit, protection);
+                let damage = result.injury * 5;
+                a.structures[s].hp -= damage;
+                let mut feedback = result.clone();
+                feedback.injury = damage;
+                a.resolution_event(&feedback, origin, to, meta, false);
+                a.resolved(
+                    Some(id),
+                    target_id,
+                    &result,
+                    format!(
+                        "{name} detonates at a structure in lane {}: {}",
+                        lane + 1,
+                        result.blast_explanation()
+                    ),
+                );
+                damage
+            } else {
+                let dodge = a
+                    .injury
+                    .dodge((a.profile.stats.dx + a.profile.stats.ht) / 4 + 3)
+                    + a.defense_bonus;
+                // Scale 1.0: the hazard multiplier is the Personal
+                // survivor's perk (`hazard_scaled`), never Mara's or a
+                // recruit's (W2-24 review).
+                let result = rules::resolve_blast(
+                    &mut a.rng,
+                    hit,
+                    Some(dodge),
+                    a.profile.npc.armor,
+                    1.0,
+                    &mut a.injury,
+                    a.profile.stats.ht,
+                );
+                if result.defense_roll.is_some() || result.injury > 0 {
+                    a.aim_target = None;
+                    a.aim_seconds = 0;
+                }
+                a.hp = a.injury.hp;
+                a.resolution_event(&result, origin, to, meta, false);
+                a.resolved(
+                    Some(id),
+                    None,
+                    &result,
+                    format!(
+                        "{name} detonates against the survivor from lane {}: {}",
+                        lane + 1,
+                        result.blast_explanation()
+                    ),
+                );
+                result.injury
+            }
+        } else {
+            let raw = (blast.damage as f32 * a.progression.enemy_damage * a.balance.enemy_damage)
+                .round() as i32;
+            let damage = if let Some(s) = structure {
+                a.structures[s].hp -= raw;
+                raw
+            } else {
+                let mut damage = (hazard_scaled(a, raw) - a.profile.personal.armor).max(0);
+                if a.statuses.active(StatusId::Brace) {
+                    damage /= 2;
+                }
+                a.hp -= damage;
+                damage
+            };
+            a.event_with(
+                if damage > 0 {
+                    EventKind::Damage
+                } else {
+                    EventKind::Armor
+                },
+                origin,
+                to,
+                damage,
+                meta,
+            );
+            damage
+        };
+        if structure.is_some() {
+            a.telemetry.structure_damage_taken += damage.max(0) as u64;
+        } else if damage > 0 {
+            a.last_damage_lane = Some(lane);
+            a.telemetry.damage_by_lane[lane as usize] += damage as u64;
+            a.telemetry.hazard_damage_taken += damage as u64;
+            if let Some(archetype) = archetype {
+                a.telemetry
+                    .count_archetype_damage_taken(&archetype, damage as u64);
             }
         }
+        Self::blast_structures(a, origin, blast, target_id);
+    }
+    /// Flat `structure_damage` on every live structure within the radius of
+    /// `at`, except `spared` (a fuse's target, which took the blast itself).
+    fn blast_structures(a: &mut Attempt, at: [f32; 2], blast: Blast, spared: Option<u64>) {
+        if blast.structure_damage == 0 {
+            return;
+        }
+        for s in &mut a.structures {
+            if s.hp > 0
+                && Some(s.id) != spared
+                && (s.x() - at[0]).hypot(s.y() - at[1]) <= blast.radius
+            {
+                s.hp -= blast.structure_damage;
+                a.telemetry.structure_damage_taken += blast.structure_damage as u64;
+            }
+        }
+    }
+    /// A dying exploder's burst (ruling W-7): every other live hostile within
+    /// the radius in ascending id, and flat `structure_damage` on the
+    /// structures there; never the defender. A hostile the burst defeats
+    /// stays on the field until the next tick's reap, so a chain advances
+    /// one link per tick and ends (each exploder bursts once).
+    fn death_burst(
+        &mut self,
+        a: &mut Attempt,
+        source: u64,
+        name: &str,
+        (lane, at): (u8, [f32; 2]),
+        blast: Blast,
+    ) {
+        a.event_with(
+            EventKind::Detonation,
+            at,
+            at,
+            blast_value(blast.radius),
+            EventMetadata {
+                actor_id: Some(source),
+                lane: Some(lane),
+                duration_ticks: 30,
+                detonation: Some(DetonationTrigger::Death),
+                ..Default::default()
+            },
+        );
+        let mut targets: Vec<(u64, usize)> = a
+            .enemies
+            .iter()
+            .enumerate()
+            .filter(|(_, e)| {
+                !enemy_defeated(a, e) && (e.x - at[0]).hypot(e.y() - at[1]) <= blast.radius
+            })
+            .map(|(n, e)| (e.id, n))
+            .collect();
+        targets.sort_unstable();
+        for (id, n) in targets {
+            if a.mode == Mode::Personal {
+                let damage = (blast.damage - enemy_armor(a, &a.enemies[n])).max(0);
+                a.enemies[n].apply_damage(damage, Mode::Personal);
+            } else {
+                let e = &a.enemies[n];
+                let dodge = e.injury.dodge(enemy_dodge(a, e));
+                let (armor, ht, target) = (enemy_armor(a, e), enemy_ht(a, e), enemy_name(a, e));
+                let result = rules::resolve_blast(
+                    &mut a.rng,
+                    Damage {
+                        dice: blast.npc_dice,
+                        adds: blast.npc_add,
+                        kind: DamageKind::Crushing,
+                    },
+                    Some(dodge),
+                    armor,
+                    1.0,
+                    &mut a.enemies[n].injury,
+                    ht,
+                );
+                a.enemies[n].apply_damage(result.injury, Mode::Npc);
+                a.resolved(
+                    Some(source),
+                    Some(id),
+                    &result,
+                    format!(
+                        "{name} bursts on {target} in lane {}: {}",
+                        a.enemies[n].lane + 1,
+                        result.blast_explanation()
+                    ),
+                );
+            }
+            if enemy_defeated(a, &a.enemies[n]) {
+                if a.burst_victims.0 != a.tick {
+                    a.burst_victims = (a.tick, Vec::new());
+                }
+                a.burst_victims.1.push(id);
+            }
+        }
+        Self::blast_structures(a, at, blast, None);
+    }
+    /// A splitter's children: `min(count, enemy_cap - regular hostiles)` of
+    /// [`split_child_profile`] at `max(x, DEFENSE_LINE) + 0.35k` in its lane,
+    /// with their own stats and no combat draw.
+    fn split(
+        &mut self,
+        a: &mut Attempt,
+        parent: u64,
+        (lane, x): (u8, f32),
+        target: &str,
+        count: u8,
+    ) {
+        let regular = a.enemies.iter().filter(|e| !e.boss).count();
+        let spawned = usize::from(count).min(a.enemy_cap().saturating_sub(regular));
+        if spawned == 0 {
+            return;
+        }
+        let profile = split_child_profile(target);
+        for k in 0..spawned {
+            let at = x.max(DEFENSE_LINE) + 0.35 * k as f32;
+            self.place_enemy(a, profile.clone(), lane, false, Some(at));
+        }
+        let at = [x, lane as f32 + 0.5];
+        a.event_with(
+            EventKind::Split,
+            at,
+            at,
+            spawned as i32,
+            EventMetadata {
+                actor_id: Some(parent),
+                lane: Some(lane),
+                duration_ticks: 30,
+                ..Default::default()
+            },
+        );
     }
     /// The uniform drop pick over `available` catalogue indices: exactly one
     /// `a.rng` draw. None when the pool is empty, which draws nothing.
@@ -446,23 +814,55 @@ impl Game {
         }
     }
     pub(super) fn reap(&mut self, a: &mut Attempt) {
+        // A hostile a death burst defeated this tick waits for the next.
+        let (burst_tick, held) = &a.burst_victims;
         let defeated: Vec<usize> = a
             .enemies
             .iter()
             .enumerate()
             .filter(|(_, e)| {
-                if a.mode == Mode::Personal {
+                (if a.mode == Mode::Personal {
                     e.hp <= 0
                 } else {
                     e.injury.terminal()
-                }
+                }) && !(*burst_tick == a.tick && held.contains(&e.id))
             })
             .map(|(n, _)| n)
             .collect();
+        let mut effects = Vec::new();
         for n in defeated.into_iter().rev() {
             let e = a.enemies.remove(n);
             if !a.reward_ledger.insert(e.id) {
                 continue;
+            }
+            if let Some((blast, _)) = blast_of(&e) {
+                effects.push((
+                    e.id,
+                    DeathAct::Burst {
+                        name: enemy_name(a, &e),
+                        lane: e.lane,
+                        at: [e.x, e.y()],
+                        blast,
+                    },
+                ));
+            } else if let Some(DeathEffect::Split {
+                archetype_id,
+                count,
+            }) = e
+                .resolved
+                .as_ref()
+                .filter(|_| !e.boss && !e.split_child)
+                .and_then(|r| r.death_effect.as_ref())
+            {
+                effects.push((
+                    e.id,
+                    DeathAct::Split {
+                        lane: e.lane,
+                        x: e.x,
+                        archetype_id: archetype_id.clone(),
+                        count: *count,
+                    },
+                ));
             }
             a.corpses.push(CorpseRecord {
                 id: e.id,
@@ -508,7 +908,10 @@ impl Game {
                     ..Default::default()
                 },
             );
-            let drop = e.boss || a.rng.below(100) < 3 || a.kills.is_multiple_of(20);
+            // A split child takes and discards the 3% roll and never drops
+            // (ruling E8), so it draws what any other kill draws.
+            let rolled = !e.boss && a.rng.below(100) < 3;
+            let drop = e.boss || (!e.split_child && (rolled || a.kills.is_multiple_of(20)));
             if drop {
                 if a.drop_tier.is_none() {
                     // An attempt deployed before v7 (ruling E11): today's
@@ -553,5 +956,27 @@ impl Game {
                 ));
             }
         }
+        if effects.is_empty() {
+            return;
+        }
+        // After the loop, in ascending id of the hostile that died.
+        effects.sort_unstable_by_key(|(id, _)| *id);
+        for (id, act) in effects {
+            match act {
+                DeathAct::Burst {
+                    name,
+                    lane,
+                    at,
+                    blast,
+                } => self.death_burst(a, id, &name, (lane, at), blast),
+                DeathAct::Split {
+                    lane,
+                    x,
+                    archetype_id,
+                    count,
+                } => self.split(a, id, (lane, x), &archetype_id, count),
+            }
+        }
+        remove_destroyed_structures(a);
     }
 }

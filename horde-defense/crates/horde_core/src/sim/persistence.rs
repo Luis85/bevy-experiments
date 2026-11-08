@@ -482,6 +482,19 @@ fn validate_progression_ledgers(campaign: &crate::campaign::Campaign) -> Result<
     }
     Ok(())
 }
+/// A defeated hostile a save may hold (W2-29): one a death burst defeated on
+/// the save's tick, which the next tick's first reap removes. It lies within
+/// the radius of a `Detonation` the attempt published on that tick (the
+/// window keeps the radius in hundredths). Every other defeated hostile is
+/// reaped before the tick ends, so it never reaches a save.
+fn burst_victim(a: &Attempt, e: &Enemy) -> bool {
+    a.events.iter().any(|ev| {
+        ev.kind == EventKind::Detonation
+            && ev.tick == a.tick
+            && ev.target_id.is_none()
+            && (e.x - ev.from[0]).hypot(e.y() - ev.from[1]) <= ev.value as f32 / 100.0 + 0.01
+    })
+}
 /// Combat telemetry bounds (schema v7 §3.12) for an attempt or report with
 /// `kills` kills: each per-archetype map holds at most 256 catalogue-id keys,
 /// the archetype kills sum to at most `kills`, no archetype has more kills
@@ -744,7 +757,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
                     .validate(&[(StatusId::HitStop, ENEMY_HIT_STOP_TICKS)])
                     .is_err()
                 || !e.boss_timing.validate()
-                || enemy_defeated(a, e)
+                || (enemy_defeated(a, e) && !burst_victim(a, e))
                 || (a.mode == Mode::Npc && e.hp != e.injury.hp)
                 || e.target_structure.is_some_and(|id| {
                     !a.structures

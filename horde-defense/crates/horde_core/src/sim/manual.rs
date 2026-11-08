@@ -33,7 +33,12 @@ impl Game {
             );
         }
         let lane = input.aim[1].floor().clamp(0.0, f32::from(a.lane_count - 1)) as u8;
-        let target = a.enemies.iter().position(|e| e.lane == lane && e.contact());
+        // A hostile a death burst defeated waits on the field for its reap
+        // (W2-29); a strike never lands on it.
+        let target = a
+            .enemies
+            .iter()
+            .position(|e| e.lane == lane && e.contact() && !enemy_defeated(a, e));
         if input.melee
             && a.melee_cooldown == 0
             && a.melee_commit == 0
@@ -71,7 +76,9 @@ impl Game {
                     .enemies
                     .iter()
                     .enumerate()
-                    .filter(|(_, e)| e.contact() && e.lane.abs_diff(lane) == 1)
+                    .filter(|(_, e)| {
+                        e.contact() && e.lane.abs_diff(lane) == 1 && !enemy_defeated(a, e)
+                    })
                     .map(|(n, _)| n)
                     .collect();
                 for n in targets {
