@@ -2617,6 +2617,44 @@ fn retry_and_repeat_redeploy_the_reports_recruit() {
     }
 }
 
+/// One verdict per defender: a guarding recruit with Recruitment locked is
+/// refused for the same first reason by `SetNextDefender`, `BeginDefense`,
+/// `ContinueJourney` and retry (repeats share retry's redeploy).
+#[test]
+fn every_entry_point_gives_a_blocked_recruit_the_same_reason() {
+    let (mut g, id) = takeover_ready();
+    take_over(&mut g, id);
+    apply_ok(&mut g, Command::Withdraw);
+    assert_eq!(g.last_result().unwrap().defender(), DefenderId::Recruit(id));
+    let country = g.campaign().world.cleared[0].clone();
+    apply_ok(&mut g, Command::AssignGuard { id, country });
+    g.campaign_mut().legacy_features = false;
+    let expected = CommandError::DefenderUnavailable {
+        defender: DefenderId::Recruit(id),
+        blocker: DefenderBlocker::Locked {
+            node_id: "recruitment_network".into(),
+        },
+    };
+    assert_eq!(
+        g.clone()
+            .apply(&Command::SetNextDefender(DefenderId::Recruit(id))),
+        Err(expected.clone()),
+        "SetNextDefender"
+    );
+    g.staging().campaign().next_defender = Some(DefenderId::Recruit(id));
+    assert_eq!(
+        g.clone().apply(&Command::BeginDefense { stage: 0 }),
+        Err(expected.clone()),
+        "BeginDefense"
+    );
+    assert_eq!(
+        g.clone().apply(&Command::ContinueJourney),
+        Err(expected.clone()),
+        "ContinueJourney"
+    );
+    assert_eq!(g.clone().retry(), Err(expected.to_string()), "retry");
+}
+
 #[test]
 fn new_defender_commands_round_trip_serde() {
     let rows = [

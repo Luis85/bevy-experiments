@@ -76,23 +76,21 @@ impl Game {
         }
     }
     /// The takeover preflight (ruling D8): recruit `id` can defend the main
-    /// run now. No mutation; returns the recruit's npc.
+    /// run now. The unknown, lock and duty checks are the selection verdict
+    /// ([`Self::defender_selectable`]), so every entry point gives a recruit
+    /// the same first reason. No mutation; returns the recruit's npc.
     fn takeover_preflight(&self, id: u64) -> Result<Npc, String> {
         if self.worker {
             return Err("An expedition cannot hand its defense to another survivor".into());
         }
+        self.defender_selectable(DefenderId::Recruit(id))
+            .map_err(|error| error.to_string())?;
         let recruit = self
             .strategy
             .roster
             .iter()
             .find(|r| r.id == id)
             .ok_or("Unknown survivor")?;
-        if let Some(blocker) = self.duty_blocker(id, recruit.status) {
-            return Err(blocker.label());
-        }
-        if !self.strategy.recruitment_unlocked(&self.campaign) {
-            return Err("Unlock recruitment before a survivor can defend".into());
-        }
         self.campaign.preparation()?;
         let npc = &recruit.npc;
         self.campaign.validate_loadout(npc.loadout)?;
