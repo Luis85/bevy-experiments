@@ -36,7 +36,7 @@ and sound consume authoritative ordnance state rather than resolving damage.
 
 ## Skills and visual assets
 
-The skill catalog contains 169 nodes in one global connected tree, including personal body, weapons/abilities, fortifications and feature access. A pan/zoom node canvas and selected-detail purchase
+The skill catalog contains 177 nodes in one global connected tree, including personal body, weapons/abilities, fortifications and feature access. A pan/zoom node canvas and selected-detail purchase
 panel show actual prerequisite edges, prices, effects and learned state.
 Fortifications show real blueprint milestones and sequential ranks. Wider
 windows place details beside the graph; compact layouts place them above it.

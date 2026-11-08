@@ -531,6 +531,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `counters_name_catalog_archetypes`
   - `counter_nodes_open_no_later_than_their_archetypes`
 - Note: if `big_game_rounds` replaces `blast_discipline`, R5's serde-defaulted `heavy_target_damage_multiplier` lands here.
+- Note (W2-41, 2026-11-08): the burst and reach paths had landed (W2-27, W2-29), so `blast_discipline` shipped and the fallback did not. The counters name the catalogue id `sprinter` (design §5 wrote "sprinter-swarm"). The gate rule of design §5's footnote, applied to every node with counters against the W2-31/W2-32 tiers (sprinter and spitter from rank 6, exploder and shield-bearer from rank 8, splitter and juggernaut from rank 10), moved shield_breaker and blast_discipline V10 to V5, smg_spray_control V15 to V10 and mg_belt_feeder V20 to V5; `counter_nodes_open_no_later_than_their_archetypes` rejects the table's gates. Prices are the table's, for W4-p to fit.
 - Deps: W2-31, W2-25.
 
 **W2-42 · progression-tree · W2-I: profiles needing other remits' commands**

@@ -1,7 +1,7 @@
 # Skills, weapons and ordnance
 
 This is the authoring contract for the current personal-combat progression. The
-shipped skill catalog contains **169 nodes in one connected DAG**. Seven labels—Foundations, Body development, Firearms, Survival, Ordnance, Fortification, Companions and world—focus the camera within that whole tree; they do not filter it into separate purchase screens. Mara and recruits retain their independent NPC training
+shipped skill catalog contains **177 nodes in one connected DAG**. Seven labels—Foundations, Body development, Firearms, Survival, Ordnance, Fortification, Companions and world—focus the camera within that whole tree; they do not filter it into separate purchase screens. Mara and recruits retain their independent NPC training
 and combat profiles.
 
 ## Content files and startup overrides
@@ -71,8 +71,7 @@ variant. The combined multiplier kernel is also bounded
 to 0.01–100. Additive/multiplier effects stack in catalog order, so preserve that order when a
 numerically identical replay matters.
 
-Three effect kinds carry the per-class perks and counters (no shipped node
-grants them yet, so every profile is unchanged):
+Three effect kinds carry the per-class perks and counters:
 
 ```json
 [
@@ -102,6 +101,27 @@ exploder's fuse and a spitter's spit on the survivor apply it before armor and
 Brace, and that damage counts as `hazard_damage_taken`. A node may also
 list `counters`, the enemy archetype ids it is authored to answer (at most 8
 distinct ids of lowercase letters, digits, `-` or `_`); no rule reads them.
+
+The decision-19 weapon-mastery nodes are appended as catalogue entries 170-177
+(the first 169 ids are pinned by `tests/progression_tree.rs`). Each is
+milestone gated and every perk acts in Personal play only; prices are
+provisional until the wave-4 fit.
+
+| Id | Effect | Prerequisite | Gate | Price | Counters |
+| --- | --- | --- | --- | --- | --- |
+| `shotgun_pump_drill` | Shotgun cadence ×0.8, reload ×0.8 | `shotgun_training` | 5 victories | 800 | sprinter |
+| `marksman_steady_aim` | Marksman damage ×1.15, weak-spot +0.15 | `marksman_training` | 5 victories | 800 | shield-bearer, juggernaut |
+| `shield_breaker` | Armor penetration 4 | `stopping_power` | 5 victories | 1,000 | shield-bearer, juggernaut |
+| `blast_discipline` | Hazard damage ×0.6 | `hardened` | 5 victories | 1,000 | exploder, spitter |
+| `pistol_double_tap` | Pistol cadence ×0.8 | `quick_reload` | 15 victories | 1,200 | – |
+| `smg_spray_control` | SMG reload ×0.7 | `smg_training` | 10 victories | 1,200 | splitter |
+| `rifle_breath_control` | Rifle damage ×1.15 | `rifle_training` | 20 victories | 1,500 | – |
+| `mg_belt_feeder` | Machine gun reload ×0.6 | `machine_gun_training` | 5 victories | 1,500 | sprinter, splitter |
+
+A node with counters opens no later than the first threat rank at which any
+archetype it counters has spawn weight (sprinter and spitter from rank 6,
+exploder and shield-bearer from rank 8, splitter and juggernaut from rank 10):
+its gate is the largest of 5/10/15/20 at or below that rank.
 
 Additional tagged effects encode target ownership/rank, not repeated additive rank bonuses:
 

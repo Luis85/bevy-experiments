@@ -1000,7 +1000,8 @@ mod tests {
                 "{row}"
             );
         }
-        // The shipped catalogue authors none of these yet.
+        // The shipped catalogue authors each of them since the decision-19
+        // nodes (W2-41, tests/progression_tree.rs).
         let shipped = serde_json::to_string(skills()).unwrap();
         for key in [
             "ClassModifier",
@@ -1008,7 +1009,7 @@ mod tests {
             "HazardDamage",
             "counters",
         ] {
-            assert!(!shipped.contains(key), "{key}");
+            assert!(shipped.contains(key), "{key}");
         }
     }
 

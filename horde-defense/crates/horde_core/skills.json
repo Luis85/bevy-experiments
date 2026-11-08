@@ -4080,6 +4080,244 @@
           "value": "Operations"
         }
       ]
+    },
+    {
+      "id": "shotgun_pump_drill",
+      "name": "Pump drill",
+      "description": "Your shotguns fire 20% faster (time between shots ×0.80) and reload 20% faster (×0.80). Personal play only.",
+      "price": 800,
+      "prerequisites": [
+        "shotgun_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1780,
+        190
+      ],
+      "icon": "firearm",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "Shotgun",
+            "stat": "Cadence",
+            "value": 0.8
+          }
+        },
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "Shotgun",
+            "stat": "Reload",
+            "value": 0.8
+          }
+        }
+      ],
+      "counters": [
+        "sprinter"
+      ]
+    },
+    {
+      "id": "marksman_steady_aim",
+      "name": "Steady aim",
+      "description": "Your marksman rifles deal 15% more damage (×1.15) and +15% weak-spot damage. Personal play only.",
+      "price": 800,
+      "prerequisites": [
+        "marksman_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -940,
+        760
+      ],
+      "icon": "pierce",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "Marksman",
+            "stat": "Damage",
+            "value": 1.15
+          }
+        },
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "Marksman",
+            "stat": "WeakBonus",
+            "value": 0.15
+          }
+        }
+      ],
+      "counters": [
+        "shield-bearer",
+        "juggernaut"
+      ]
+    },
+    {
+      "id": "shield_breaker",
+      "name": "Shield breaker",
+      "description": "Your personal shots ignore 4 enemy armor, shield-bearer ranged armor included. Melee, ordnance and turrets meet full armor.",
+      "price": 1000,
+      "prerequisites": [
+        "stopping_power"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1500,
+        760
+      ],
+      "icon": "pierce",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "ArmorPenetration",
+          "value": 4
+        }
+      ],
+      "counters": [
+        "shield-bearer",
+        "juggernaut"
+      ]
+    },
+    {
+      "id": "blast_discipline",
+      "name": "Blast discipline",
+      "description": "Take 40% less damage from exploder fuses and spitter spit (×0.60), before armor and Brace. Personal play only.",
+      "price": 1000,
+      "prerequisites": [
+        "hardened"
+      ],
+      "branch": "Survival",
+      "position": [
+        260,
+        380
+      ],
+      "icon": "brace",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "HazardDamageMultiplier",
+          "value": 0.6
+        }
+      ],
+      "counters": [
+        "exploder",
+        "spitter"
+      ]
+    },
+    {
+      "id": "pistol_double_tap",
+      "name": "Double tap",
+      "description": "Your pistols fire 20% faster (time between shots ×0.80). Personal play only.",
+      "price": 1200,
+      "prerequisites": [
+        "quick_reload"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1780,
+        0
+      ],
+      "icon": "pistol",
+      "minimum_victories": 15,
+      "effects": [
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "Pistol",
+            "stat": "Cadence",
+            "value": 0.8
+          }
+        }
+      ]
+    },
+    {
+      "id": "smg_spray_control",
+      "name": "Spray control",
+      "description": "Your SMGs reload 30% faster (×0.70). Personal play only.",
+      "price": 1200,
+      "prerequisites": [
+        "smg_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -660,
+        0
+      ],
+      "icon": "reload",
+      "minimum_victories": 10,
+      "effects": [
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "Smg",
+            "stat": "Reload",
+            "value": 0.7
+          }
+        }
+      ],
+      "counters": [
+        "splitter"
+      ]
+    },
+    {
+      "id": "rifle_breath_control",
+      "name": "Breath control",
+      "description": "Your rifles deal 15% more damage (×1.15). Personal play only.",
+      "price": 1500,
+      "prerequisites": [
+        "rifle_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -1780,
+        380
+      ],
+      "icon": "firearm",
+      "minimum_victories": 20,
+      "effects": [
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "Rifle",
+            "stat": "Damage",
+            "value": 1.15
+          }
+        }
+      ]
+    },
+    {
+      "id": "mg_belt_feeder",
+      "name": "Belt feeder",
+      "description": "Your machine guns reload 40% faster (×0.60): a 5.1 s belt change takes about 3.1 s. Personal play only.",
+      "price": 1500,
+      "prerequisites": [
+        "machine_gun_training"
+      ],
+      "branch": "Firearms",
+      "position": [
+        -660,
+        380
+      ],
+      "icon": "reload",
+      "minimum_victories": 5,
+      "effects": [
+        {
+          "kind": "ClassModifier",
+          "value": {
+            "class": "MachineGun",
+            "stat": "Reload",
+            "value": 0.6
+          }
+        }
+      ],
+      "counters": [
+        "sprinter",
+        "splitter"
+      ]
     }
   ]
 }

@@ -8,7 +8,7 @@ In a packaged Windows folder, use Play Lastlight.cmd (or its optional process-lo
 
 Journey upgrades is the main between-round destination. The complete tree shares earned coins and actual requirements; Equipment and Run analysis are direct, with map/stats and progressively learned advanced routes under More. Main and worker outcomes are distinct; workers do not force the main screen away. The old management-first body/skills/fortification purchase tabs are superseded.
 
-The pixel field retains compact corner status, direct combat actions, focused resource reticle and actual geometry. Journey upgrades shows all 169 nodes in one graph; Branch focus changes camera/selection only. Purchase requires the named learned parents, victories/liberations and Coins or explicitly eligible legacy CP. Fresh body ranks are bought here, not on Character. Settings keeps its durable named return.
+The pixel field retains compact corner status, direct combat actions, focused resource reticle and actual geometry. Journey upgrades shows all 177 nodes in one graph; Branch focus changes camera/selection only. Purchase requires the named learned parents, victories/liberations and Coins or explicitly eligible legacy CP. Fresh body ranks are bought here, not on Character. Settings keeps its durable named return.
 
 On a damaging hit, look for a brief enemy flash and approximately 0.10-second movement halt. Compare it with a miss or fully absorbed attack. Pause during an impact and save/resume: clocks and the remaining halt must stay coherent. Reduced effects substitutes a quiet impact tint. This is a movement reaction, not an extra attack roll or automatic defense cancellation.
 

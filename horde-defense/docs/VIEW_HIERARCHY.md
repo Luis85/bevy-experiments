@@ -74,7 +74,7 @@ The latest primary route is New game confirmation when needed → survivor → c
     - `settings-gameplay`
     - `settings-profile`
 
-One connected 169-node DAG has one innate stable pistol_training root and seven camera-focus labels. Personal body development, weapon/ability progression, fortification blueprints/ranks and advanced feature access use the same preflight/payment/detail. Branch focus does not split/filter the tree. Every settled main round returns here; parallel worker orchestration remains separate.
+One connected 177-node DAG has one innate stable pistol_training root and seven camera-focus labels. Personal body development, weapon/ability progression, fortification blueprints/ranks and advanced feature access use the same preflight/payment/detail. Branch focus does not split/filter the tree. Every settled main round returns here; parallel worker orchestration remains separate.
 
 Fresh profiles use coins for personal body nodes and do not mint personal CP from XP. Legacy body allocations remain ownership floors; eligible old CP uses the conserved graph-payment ledger. NPC training retains its separate pinned rules budget. Proficiency never creates an item. Feature nodes and existing liberation milestones progressively disclose companions, construction, recruitment, parallel fields and operations; old capabilities remain compatible.
 

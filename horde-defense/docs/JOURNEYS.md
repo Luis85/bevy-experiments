@@ -20,7 +20,7 @@ The Results screen is the single Journey upgrades home after a main victory, def
 
 ## One connected personal tree
 
-The current authored `skills.json` contains 169 nodes in one connected DAG rooted at stable `pistol_training` (displayed as Survivor foundations). The seven branch labels—Foundations, Body development, Firearms, Survival, Ordnance, Fortification, Companions and world—are camera-focus/navigation chips with owned/total counts, not separate filtered trees. All 32 prior node IDs remain available.
+The current authored `skills.json` contains 177 nodes in one connected DAG rooted at stable `pistol_training` (displayed as Survivor foundations). The seven branch labels—Foundations, Body development, Firearms, Survival, Ordnance, Fortification, Companions and world—are camera-focus/navigation chips with owned/total counts, not separate filtered trees. All 32 prior node IDs remain available.
 
 Selection/focus only inspects. `can_purchase_node` checks preparation/reservations, ownership, every prerequisite, `minimum_victories`, `minimum_liberated` and payment. `node_payment` returns Coins or eligible LegacyBodyPoints; `purchase_node` preflights before consuming either. Prices, requirements and errors come from that same kernel.
 

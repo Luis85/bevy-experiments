@@ -326,8 +326,9 @@ mod tests {
         // appended the 39 loot-only item ids (13_545_676_443_720_933_061);
         // they still load and only log the catalogue drift. W2-31 appended
         // the 7 composition archetype ids (10_534_622_978_645_713_211
-        // before it).
-        assert_eq!(content_fingerprint(), 12_142_090_777_039_725_619);
+        // before it). W2-41 appended the 8 decision-19 skill ids
+        // (12_142_090_777_039_725_619 before it).
+        assert_eq!(content_fingerprint(), 14_783_571_662_001_117_631);
     }
 
     #[test]
