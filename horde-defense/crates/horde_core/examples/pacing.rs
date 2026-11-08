@@ -11,7 +11,9 @@
 //! - `--csv` prints one CSV row per run instead of the table.
 //! - `--fit-tiers a,b,c` adds, per tier `d`, the median coins earned by run
 //!   `a`, `b`, `c`… divided by the tier's cost.
-//! - `--values` prints the tree value table (a stub until it lands).
+//! - `--values` prints the tree value table instead (CSV: one row per skill
+//!   node with its axis, dominance group and ln gain at both reference
+//!   ranks; `horde_core::campaign::tree_value`). It plays no run.
 //! - `--out PATH` writes the output to PATH (UTF-8, no BOM, LF) instead of
 //!   stdout, so PowerShell's `>` is never needed.
 //!
@@ -305,7 +307,7 @@ fn main() {
         }
     };
     let text = if args.values {
-        "The tree value table is not implemented yet (--values is a stub).\n".to_owned()
+        horde_core::campaign::tree_value::value_table()
     } else {
         let profiles = selected(&args);
         let seeds = args.seeds.unwrap_or(1);

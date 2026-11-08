@@ -14,6 +14,7 @@ mod ledger;
 mod loadout;
 mod progression;
 mod sale;
+pub mod tree_value;
 mod tree_view;
 mod view;
 mod world;
