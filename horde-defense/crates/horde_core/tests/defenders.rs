@@ -2324,6 +2324,19 @@ fn set_next_defender_typed_rejections_leave_state_unchanged() {
             DefenderBlocker::OnExpedition { battle },
         ),
     ));
+    let mut broken = ready.clone();
+    roster_npc_mut(&mut broken, id).loadout[0] = 999_999;
+    rows.push((
+        "recruit with an invalid loadout",
+        broken,
+        DefenderId::Recruit(id),
+        unavailable(
+            DefenderId::Recruit(id),
+            DefenderBlocker::InvalidLoadout {
+                reason: "Preset references sold equipment".into(),
+            },
+        ),
+    ));
     rows.push((
         "unknown recruit",
         ready.clone(),

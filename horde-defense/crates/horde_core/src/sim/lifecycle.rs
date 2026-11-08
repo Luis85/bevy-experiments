@@ -76,9 +76,9 @@ impl Game {
         }
     }
     /// The takeover preflight (ruling D8): recruit `id` can defend the main
-    /// run now. The unknown, lock and duty checks are the selection verdict
-    /// ([`Self::defender_selectable`]), so every entry point gives a recruit
-    /// the same first reason. No mutation; returns the recruit's npc.
+    /// run now. The unknown, lock, duty and loadout checks are the selection
+    /// verdict ([`Self::defender_selectable`]), so every entry point gives a
+    /// recruit the same first reason. No mutation; returns the recruit's npc.
     fn takeover_preflight(&self, id: u64) -> Result<Npc, String> {
         if self.worker {
             return Err("An expedition cannot hand its defense to another survivor".into());
@@ -92,7 +92,11 @@ impl Game {
             .find(|r| r.id == id)
             .ok_or("Unknown survivor")?;
         self.campaign.preparation()?;
-        let npc = &recruit.npc;
+        Ok(recruit.npc.clone())
+    }
+    /// The loadout part of a recruit's verdict: `npc`'s items exist, fit
+    /// their slots and are usable by a survivor defender. No mutation.
+    pub(super) fn recruit_loadout_check(&self, npc: &Npc) -> Result<(), String> {
         self.campaign.validate_loadout(npc.loadout)?;
         for item in npc.loadout {
             let item = self.campaign.item(item).ok_or("Missing equipment")?;
@@ -100,7 +104,7 @@ impl Game {
                 .weapon_access(Mode::Npc, item.definition_index())
                 .map_err(str::to_owned)?;
         }
-        Ok(npc.clone())
+        Ok(())
     }
     /// The takeover commit: the recruit's loadout and the main run are
     /// reserved and the recruit is Defending, or nothing changed.

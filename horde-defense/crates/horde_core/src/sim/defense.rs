@@ -33,7 +33,8 @@ impl Game {
     }
     /// The typed reason `defender` cannot be chosen or sent into the next
     /// defense, ignoring any defense in progress: Mara needs Companion, a
-    /// recruit needs Recruitment and must be in camp. No mutation.
+    /// recruit needs Recruitment, must be in camp and must carry a loadout
+    /// it can deploy with (in that order). No mutation.
     pub(crate) fn defender_selectable(&self, defender: DefenderId) -> Result<(), CommandError> {
         let blocker = match defender {
             DefenderId::Player => None,
@@ -47,12 +48,16 @@ impl Game {
                     .iter()
                     .find(|r| r.id == id)
                     .ok_or(CommandError::UnknownSurvivor)?;
-                if self.strategy.recruitment_unlocked(&self.campaign) {
-                    self.duty_blocker(id, recruit.status)
-                } else {
+                if !self.strategy.recruitment_unlocked(&self.campaign) {
                     Some(DefenderBlocker::Locked {
                         node_id: feature_node(CampaignFeature::Recruitment),
                     })
+                } else if let Some(blocker) = self.duty_blocker(id, recruit.status) {
+                    Some(blocker)
+                } else {
+                    self.recruit_loadout_check(&recruit.npc)
+                        .err()
+                        .map(|reason| DefenderBlocker::InvalidLoadout { reason })
                 }
             }
         };
