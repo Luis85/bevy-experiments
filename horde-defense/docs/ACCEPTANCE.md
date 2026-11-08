@@ -9,7 +9,7 @@ This maps the supplied GDD's 34 criteria to implementation and regression eviden
 | AC03 | Geometric personal rays from the fixed origin; `starter_can_hit_all_eleven_contact_and_approach_lanes` covers every lane at x=1.5,14,29 | Aim feel and silhouette readability. |
 | AC04 | Same contact predicate and one-yard NPC adapter; `melee_contact_eligibility_and_exclusive_recovery` | Human understanding of shared contact across outer lanes. |
 | AC05 | Contact records entry tick and starts windup; `enemies_keep_lanes_and_contact_has_a_windup` | Visible attack-source cues must be checked in play. |
-| AC06 | Defeated enemies are removed before further actions; per-attempt reward-ID ledger; `kills_pay_once_and_results_never_pay_again` | None beyond regression execution. |
+| AC06 | Defeated enemies are removed before further actions; the one exception (W2-29) is a death burst's victims, which stay non-acting and non-targetable until the next tick's first reap pays them, and a save in between may hold them; per-attempt reward-ID ledger; `kills_pay_once_and_results_never_pay_again`, `chain_bursts_resolve_one_tick_later_and_terminate` | None beyond regression execution. |
 | AC07 | Authored growing envelope, live cap, skipped overflow without debt; `spawn_capacity_skips_without_a_deferred_burst` and content envelope test | Representative peak performance remains unmeasured. |
 | AC08 | Timer spawns boss; clear follows terminal boss defeat; `boss_timer_is_not_victory_and_boss_transaction_is_atomic` | Boss announcement/exposure legibility in play. |
 | AC09 | Boss exposure changes protection for supported ordinary attacks; every boss has an NPC profile | Seeded campaign clearability and actual player counterplay remain balance checks. |
