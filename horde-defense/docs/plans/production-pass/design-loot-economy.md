@@ -504,3 +504,7 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 ### Rulings owned by this remit
 
 R11, P2, P5, D13, E4, E5, E8, E10, E11, E14, E15, S17
+
+### Writer notes (wave 2)
+
+- **W2-08, item 39.** `squad_machine_gun` has Personal damage 33, not the 32 in the section 5 tier-2 table. The JSON holds what `quality::apply(items[26], Some(Rare))` returns: 25 x 1.3 is 32.5 in f32, which rounds away from zero. `loot_only_ranged_items_are_their_exemplar_at_the_tier_quality` pins 33.
