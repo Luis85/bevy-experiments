@@ -477,7 +477,10 @@ fn boss_damage_multiplier_is_exactly_one_through_rank_4() {
 
 /// Pin: ranks 0-4 at depth 0 serialize only the legacy snapshot keys on
 /// every preset (no ramp, no boss rank, no boss damage, no extras), and
-/// round-trip byte-identically.
+/// round-trip byte-identically. Depth 0 here means no country or stage 0
+/// of a multi-stage front. A one-stage front is also at depth 0, but its
+/// only stage is its Capstone (ruling W-9), so it adds exactly the
+/// `boss_rank` key; that exception is pinned below, not skipped.
 #[test]
 fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_depth_0() {
     let expected: BTreeSet<String> = SNAPSHOT_KEYS.into_iter().map(String::from).collect();
@@ -496,6 +499,27 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
                     let restored: ProgressionSnapshot = serde_json::from_str(&text).unwrap();
                     assert_eq!(serde_json::to_string(&restored).unwrap(), text);
                 }
+            }
+        }
+    }
+    let mut capstone = expected.clone();
+    capstone.insert("boss_rank".into());
+    for (name, c) in every_preset() {
+        for mode in MODES {
+            for rank in 0..=4 {
+                let snapshot = at(&c, mode, rank, front(0, 1));
+                let text = serde_json::to_string(&snapshot).unwrap();
+                assert_eq!(
+                    keys(&text),
+                    capstone,
+                    "{name} {mode:?} rank {rank} one stage"
+                );
+                assert!(
+                    text.contains("\"boss_rank\":\"Capstone\""),
+                    "{name} {mode:?} rank {rank}: {text}"
+                );
+                let restored: ProgressionSnapshot = serde_json::from_str(&text).unwrap();
+                assert_eq!(serde_json::to_string(&restored).unwrap(), text);
             }
         }
     }
