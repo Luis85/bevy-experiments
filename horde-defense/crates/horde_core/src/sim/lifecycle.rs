@@ -170,6 +170,11 @@ impl Game {
             Some((_, npc)) => npc,
             None => &self.campaign.npc,
         };
+        let country = if country_stage.is_some() {
+            self.campaign.world.active_country()
+        } else {
+            None
+        };
         let super::power::DeploymentInputs {
             mut profile,
             snapshot: progression,
@@ -181,12 +186,11 @@ impl Game {
             loadout,
             character,
             self.campaign.progression_rank(),
+            // Axis 2: the stage's place on the country's front.
+            country
+                .zip(country_stage)
+                .map(|(c, stage)| c.front_position(stage)),
         )?;
-        let country = if country_stage.is_some() {
-            self.campaign.world.active_country()
-        } else {
-            None
-        };
         let (lane_count, width_yards) = self.campaign.arena_geometry();
         let mut modifiers = country.map_or_else(Modifiers::default, |c| {
             let mut m = c.modifiers;

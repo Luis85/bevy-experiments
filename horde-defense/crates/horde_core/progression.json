@@ -12,6 +12,8 @@
   "fortification_per_rank": 0.025,
   "supply_per_rank": 1,
   "max_supply_bonus": 40,
+  "front_ramp_max": 0.18,
+  "boss_damage_per_rank": 0.01,
   "pressure_floors": [
     {
       "start_rate": 0.0,

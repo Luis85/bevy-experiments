@@ -214,6 +214,20 @@ impl Country {
             config.max_levels.max(config.min_levels) as u64,
         ) as usize
     }
+    /// Where `stage` sits on this country's front (axis 2 of the threat).
+    pub fn front_position(&self, stage: usize) -> crate::progression::FrontPosition {
+        crate::progression::FrontPosition {
+            stage: u32::try_from(stage).unwrap_or(u32::MAX),
+            count: u32::try_from(self.level_count()).unwrap_or(u32::MAX),
+        }
+    }
+    /// The 0-based stages with a Regional boss: every sixth stage short of
+    /// the Capstone (at most 3 for 24 stages). Derived, never saved.
+    pub fn regional_checkpoints(&self) -> Vec<usize> {
+        (0..self.level_count())
+            .filter(|stage| self.front_position(*stage).is_checkpoint())
+            .collect()
+    }
 }
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Source {

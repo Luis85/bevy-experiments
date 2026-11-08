@@ -410,8 +410,13 @@ fn legacy_resolved_enemy_and_snapshot_serialize_byte_identically() {
         let restored: ResolvedEnemy = serde_json::from_str(&text).unwrap();
         assert_eq!(serde_json::to_string(&restored).unwrap(), text, "{id}");
     }
-    let expected: BTreeSet<String> = SNAPSHOT_KEYS.into_iter().map(String::from).collect();
+    let legacy: BTreeSet<String> = SNAPSHOT_KEYS.into_iter().map(String::from).collect();
     for rank in 0..=60 {
+        // W2-26: the boss damage rank term is written from rank 5 on.
+        let mut expected = legacy.clone();
+        if rank > 4 {
+            expected.insert("boss_damage_multiplier".into());
+        }
         let text = serde_json::to_string(&catalog().snapshot(rank)).unwrap();
         assert_eq!(
             keys(&serde_json::from_str(&text).unwrap()),

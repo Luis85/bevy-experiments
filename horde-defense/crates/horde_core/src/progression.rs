@@ -20,6 +20,49 @@ pub enum BossRank {
     Regional,
     Capstone,
 }
+/// A stage's place on its country's front: axis 2 of the threat (design
+/// enemy-balance §1, ruling W-9). Derived from the attempt's stage and the
+/// country's stage count at deploy and never saved; only the snapshot's
+/// `front_ramp` and `boss_rank` copies are.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FrontPosition {
+    /// 0-based stage on the front.
+    pub stage: u32,
+    /// The country's stage count.
+    pub count: u32,
+}
+impl FrontPosition {
+    /// A regional checkpoint every this many stages.
+    pub const CHECKPOINT_EVERY: u32 = 6;
+    /// `stage / (count - 1)` in 0..=1, or 0 on a front of one stage.
+    pub fn depth(self) -> f32 {
+        if self.count <= 1 {
+            return 0.0;
+        }
+        self.stage.min(self.count - 1) as f32 / (self.count - 1) as f32
+    }
+    /// Capstone on the final stage, else Regional on every sixth stage,
+    /// else Sector.
+    pub fn boss_rank(self) -> BossRank {
+        let ordinal = self.stage.saturating_add(1);
+        if ordinal == self.count {
+            BossRank::Capstone
+        } else if ordinal.is_multiple_of(Self::CHECKPOINT_EVERY) {
+            BossRank::Regional
+        } else {
+            BossRank::Sector
+        }
+    }
+    /// A regional checkpoint stage (a Regional boss).
+    pub fn is_checkpoint(self) -> bool {
+        self.boss_rank() == BossRank::Regional
+    }
+}
+/// Boss scaling starts above this rank: the boss damage rank term and the
+/// boss phase gate (design enemy-balance §6, ruling W-6) ...
+const BOSS_SCALING_FROM_RANK: u32 = 4;
+/// ... and the rank term stops growing at this one.
+const BOSS_SCALING_TO_RANK: u32 = 50;
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct GearScaling {
@@ -70,6 +113,14 @@ pub struct ProgressionCatalog {
     pub max_supply_bonus: u32,
     pub pressure_floors: Vec<PressureFloor>,
     pub gear: GearScaling,
+    /// The front ramp at a country's final stage before the preset's
+    /// percent (0..=0.5). Absent (0) keeps every stage of a front equal.
+    #[serde(default, skip_serializing_if = "crate::schema::is_zero_f32")]
+    pub front_ramp_max: f32,
+    /// Boss damage growth per threat rank above 4 (0..=0.05). Absent (0)
+    /// keeps bosses at the shared enemy damage scaling.
+    #[serde(default, skip_serializing_if = "crate::schema::is_zero_f32")]
+    pub boss_damage_per_rank: f32,
     /// Level-up grant, rank milestones and camp prices. Absent means the
     /// neutral block: no grant, no milestones, flat camp prices.
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
@@ -247,6 +298,8 @@ impl ProgressionCatalog {
             .into_iter()
             .any(|v| !finite(v, 0.0, 1.0))
             || !(0..=2).contains(&self.gear.npc_damage_add_per_level)
+            || !finite(self.front_ramp_max, 0.0, 0.5)
+            || !finite(self.boss_damage_per_rank, 0.0, 0.05)
         {
             return Err("Invalid bounded progression configuration".into());
         }
@@ -284,6 +337,32 @@ impl ProgressionCatalog {
             .div_ceil(usize::from(self.base_lanes))
             .min(self.population_global_cap)
     }
+    /// The front ramp of a stage at `front` with the preset's
+    /// `front_ramp_pct`: `1 + front_ramp_max × pct/100 × depth`, at most 2
+    /// (ruling W-5). None, the literal neutral 1.0, without a country, at
+    /// depth 0, at percent 0 or with no ramp in the catalogue.
+    pub fn front_ramp(&self, front_ramp_pct: u16, front: Option<FrontPosition>) -> Option<f32> {
+        let front = front?;
+        if front.stage == 0 || front.count <= 1 || front_ramp_pct == 0 || self.front_ramp_max <= 0.0
+        {
+            return None;
+        }
+        let ramp = 1.0 + self.front_ramp_max * (f32::from(front_ramp_pct) / 100.0) * front.depth();
+        Some(ramp.min(2.0))
+    }
+    /// The boss damage multiplier at threat `rank`:
+    /// `1 + boss_damage_per_rank × (min(rank, 50) - 4)`, clamped to 1..=4
+    /// (ruling W-6; the boss-rank factor arrives in wave 4). The literal 1.0
+    /// through rank 4 and without the catalogue key.
+    pub fn boss_damage_multiplier(&self, rank: u32) -> f32 {
+        let steps = rank
+            .min(BOSS_SCALING_TO_RANK)
+            .saturating_sub(BOSS_SCALING_FROM_RANK);
+        if steps == 0 || self.boss_damage_per_rank <= 0.0 {
+            return 1.0;
+        }
+        (1.0 + self.boss_damage_per_rank * steps as f32).clamp(1.0, 4.0)
+    }
     pub fn snapshot(&self, rank: u32) -> ProgressionSnapshot {
         let bounded = rank.min(self.max_rank);
         let n = bounded as f32;
@@ -310,7 +389,9 @@ impl ProgressionCatalog {
             npc_boss_health_floor: floor.npc_boss_health,
             wave_tier: floor.wave_tier,
             boss_time_floor: floor.boss_time,
-            // The enemy-side fields stay neutral until their wave-2 writers.
+            boss_damage_multiplier: self.boss_damage_multiplier(rank),
+            // The other enemy-side fields stay neutral until their wave-2
+            // writers.
             ..ProgressionSnapshot::default()
         }
     }
@@ -391,6 +472,26 @@ impl Default for ProgressionSnapshot {
     }
 }
 impl ProgressionSnapshot {
+    /// Folds a preset's catalogue extras into this rank snapshot (ruling
+    /// E3), in integer math: the elite rate scales by `elite_rate_pct`
+    /// (at most 10000 bp), and past the rank-4 phase gate the boss gains
+    /// `boss_phase_bonus` transitions (at most 2). Normal's extras (100,
+    /// 100, 0) change nothing, and ranks 0-4 gain no phase on any preset
+    /// (the rank and Capstone phase terms arrive with the boss phases,
+    /// W2-36). The front-ramp percent is folded with the front position in
+    /// `Campaign::progression_for`.
+    pub fn fold_extras(&mut self, extras: crate::balance::PresetExtras) {
+        if self.elite_rate_bp != 0 && extras.elite_rate_pct != 100 {
+            let scaled = u64::from(self.elite_rate_bp) * u64::from(extras.elite_rate_pct) / 100;
+            self.elite_rate_bp = scaled.min(10_000) as u32;
+        }
+        if self.rank > BOSS_SCALING_FROM_RANK && extras.boss_phase_bonus != 0 {
+            self.boss_phases = self
+                .boss_phases
+                .saturating_add(extras.boss_phase_bonus)
+                .min(2);
+        }
+    }
     pub fn validate(&self) -> Result<(), String> {
         if self.enemy_cap > GAMEPLAY_ENEMY_CAP {
             return Err(format!(

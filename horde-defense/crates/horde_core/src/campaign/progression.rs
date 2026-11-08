@@ -574,11 +574,19 @@ impl Campaign {
     pub fn lane_count_after_victory(&self) -> u8 {
         self.balance_settings.geometry(self.level_after_victory()).0
     }
-    pub(crate) fn progression_for(
+    /// The two-axis encounter snapshot a deploy freezes (design
+    /// enemy-balance §1 and §3): threat `rank` scaled by the balance
+    /// settings for `lanes` in `mode`, with the preset's extras folded in
+    /// and, on a country stage at `front`, the front ramp folded into enemy
+    /// health and arrival and the stage's boss rank stamped. `front` None
+    /// (no country: GOLDEN and smoke) keeps the literal neutral ramp and a
+    /// Sector boss. Pure.
+    pub fn progression_for(
         &self,
         mode: Mode,
         rank: u32,
         lanes: u8,
+        front: Option<crate::progression::FrontPosition>,
     ) -> Result<crate::progression::ProgressionSnapshot, String> {
         let cfg = crate::progression::catalog();
         if rank > cfg.threat_guard_rank {
@@ -593,15 +601,28 @@ impl Campaign {
         if mode == Mode::Npc {
             result.arrival_multiplier *= cfg.npc_arrival_factor;
         }
+        let extras = self.balance_extras();
+        result.fold_extras(extras);
+        // The neutral ramp writes nothing and multiplies nothing, so a stage
+        // without one is the rank's snapshot bit for bit.
+        if let Some(ramp) = cfg.front_ramp(extras.front_ramp_pct, front) {
+            result.front_ramp = ramp;
+            result.enemy_health = (result.enemy_health * ramp).min(4096.0);
+            result.arrival_multiplier = (result.arrival_multiplier * ramp).min(8.0);
+        }
+        result.boss_rank = front.map_or_else(Default::default, |f| f.boss_rank());
         Ok(result)
     }
+    /// The next deploy's rank snapshot, before any front position (the
+    /// briefing's rank-only forecast).
     pub fn deployment_progression(
         &self,
         mode: Mode,
     ) -> Result<crate::progression::ProgressionSnapshot, String> {
-        self.progression_for(mode, self.progression_rank(), self.lane_count())
+        self.progression_for(mode, self.progression_rank(), self.lane_count(), None)
     }
     /// Preview includes known completion XP only, not unearned future kill XP.
+    /// Rank-only, like [`Self::deployment_progression`].
     pub fn next_victory_progression(
         &self,
         mode: Mode,
@@ -610,6 +631,7 @@ impl Campaign {
             mode,
             self.progression_rank().saturating_add(1),
             self.lane_count_after_victory(),
+            None,
         )
     }
     pub fn shop_item_level(&self) -> u32 {

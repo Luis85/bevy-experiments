@@ -126,8 +126,13 @@ impl Game {
             } else {
                 d.damage
             };
-            damage = (damage as f32 * a.progression.enemy_damage * a.balance.enemy_damage).round()
-                as i32;
+            let mut scaled = damage as f32 * a.progression.enemy_damage * a.balance.enemy_damage;
+            if e.boss {
+                // The boss rank term (ruling W-6); the literal 1.0 through
+                // rank 4, and regular enemies never read it.
+                scaled *= a.progression.boss_damage_multiplier;
+            }
+            damage = scaled.round() as i32;
             if structure.is_some() {
                 damage *= if e.boss && content().levels[a.level].boss == BossKind::SiegeBrute {
                     2
@@ -194,7 +199,13 @@ impl Game {
                         } else {
                             d.npc_damage_add
                         }) * i32::from(demolition)
-                            + ((a.progression.enemy_damage - 1.0) * 6.0).floor() as i32,
+                            + ((a.progression.enemy_damage - 1.0) * 6.0).floor() as i32
+                            + if boss {
+                                // The boss rank term (ruling W-6).
+                                ((a.progression.boss_damage_multiplier - 1.0) * 6.0).floor() as i32
+                            } else {
+                                0
+                            },
                         kind: DamageKind::Crushing,
                     },
                     armor_divisor: 1,

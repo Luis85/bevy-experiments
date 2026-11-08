@@ -21,7 +21,8 @@ const MAX_SURVIVAL_S: f32 = 3_600.0;
 /// health, the progression snapshot and the balance settings. A deploy at the
 /// next threat ([`Game::next_threat`]) copies these into the attempt; on a
 /// country whose modifiers leave the defender alone the attempt's profile is
-/// exactly `profile`.
+/// exactly `profile`. The snapshot is the rank's, before the stage's front
+/// position: a deploy on stage 0 of a multi-stage front freezes exactly it.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DeploymentInputs {
     pub defender: DefenderId,
@@ -32,7 +33,8 @@ pub struct DeploymentInputs {
     pub balance: BalanceSettings,
 }
 
-/// The inputs for `defender` (`character` wearing `loadout`) in `campaign`.
+/// The inputs for `defender` (`character` wearing `loadout`) in `campaign`,
+/// on the stage at `front` (None: no country, or the rank-only reading).
 /// Shared by [`Game::deploy_as`] and [`Game::deployment_inputs`].
 pub(super) fn deployment_inputs_for(
     campaign: &Campaign,
@@ -40,9 +42,10 @@ pub(super) fn deployment_inputs_for(
     loadout: [u64; 4],
     character: &Npc,
     threat: u32,
+    front: Option<crate::progression::FrontPosition>,
 ) -> Result<DeploymentInputs, String> {
     let mode = defender.mode();
-    let snapshot = campaign.progression_for(mode, threat, campaign.lane_count())?;
+    let snapshot = campaign.progression_for(mode, threat, campaign.lane_count(), front)?;
     let mut profile = campaign.profile_for_loadout(mode, loadout, character);
     if let Some(id) = defender.recruit() {
         profile.appearance = recruit_identity(id).1;
@@ -190,7 +193,7 @@ fn reference(mode: Mode) -> (f32, f32) {
         ]
         .map(|(defender, loadout)| {
             let (kill_rate, survival_s) =
-                deployment_inputs_for(&campaign, defender, loadout, &campaign.npc, 0)
+                deployment_inputs_for(&campaign, defender, loadout, &campaign.npc, 0, None)
                     .expect("threat 0 is always supported")
                     .model();
             (
@@ -229,7 +232,7 @@ impl Game {
                 (recruit.npc.loadout, &recruit.npc)
             }
         };
-        deployment_inputs_for(&self.campaign, defender, loadout, character, threat)
+        deployment_inputs_for(&self.campaign, defender, loadout, character, threat, None)
             .map_err(CommandError::Rejected)
     }
     /// `defender`'s power against victory threat `next_threat` (normally
