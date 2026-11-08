@@ -334,28 +334,36 @@ impl Game {
             }
         }
     }
-    /// The uniform drop pick over the first `definitions` catalogue entries
-    /// (index 4 on, tiers 1 to the encounter template's level + 1): exactly
-    /// one `a.rng` draw. None when the pool is empty, which draws nothing.
-    fn uniform_drop_definition(a: &mut Attempt, definitions: usize) -> Option<usize> {
-        let available: Vec<usize> = content()
-            .items
-            .iter()
-            .take(definitions)
-            .enumerate()
-            .filter(|(n, i)| *n >= 4 && i.tier > 0 && i.tier <= a.level + 1)
-            .map(|(n, _)| n)
-            .collect();
+    /// The uniform drop pick over `available` catalogue indices: exactly one
+    /// `a.rng` draw. None when the pool is empty, which draws nothing.
+    fn uniform_drop_pick(a: &mut Attempt, available: &[usize]) -> Option<usize> {
         if available.is_empty() {
             return None;
         }
         Some(available[a.rng.below(available.len() as u64) as usize])
     }
+    /// The v7 drop pick (`drop_tier` Some): uniform over
+    /// [`crate::content::Content::drop_pool`] at the encounter template's
+    /// level + 1, the pool the content pins count.
+    fn uniform_drop_definition(a: &mut Attempt) -> Option<usize> {
+        let available = content().drop_pool(a.level + 1);
+        Self::uniform_drop_pick(a, &available)
+    }
     /// The pre-v7 drop pool: only the [`LEGACY_DROP_DEFINITIONS`] v1
-    /// definitions, so an attempt deployed before v7 never draws an appended
-    /// item and keeps its picks byte-identical (ruling E11).
+    /// definitions (index 4 on, tiers 1 to the template's level + 1), so an
+    /// attempt deployed before v7 never draws an appended item and keeps its
+    /// picks byte-identical (ruling E11). The filter is verbatim, with no
+    /// NPC-issue term.
     fn legacy_drop_definition(a: &mut Attempt) -> Option<usize> {
-        Self::uniform_drop_definition(a, LEGACY_DROP_DEFINITIONS)
+        let available: Vec<usize> = content()
+            .items
+            .iter()
+            .take(LEGACY_DROP_DEFINITIONS)
+            .enumerate()
+            .filter(|(n, i)| *n >= 4 && i.tier > 0 && i.tier <= a.level + 1)
+            .map(|(n, _)| n)
+            .collect();
+        Self::uniform_drop_pick(a, &available)
     }
     /// The legacy drop: [`Self::legacy_drop_definition`] and the absolute
     /// quality roll (keyed, no `a.rng`).
@@ -484,10 +492,8 @@ impl Game {
                     if let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
                         self.bank_drop(a, &e, definition, quality);
                     }
-                } else if let Some(definition) =
-                    Self::uniform_drop_definition(a, content().items.len())
-                {
-                    // The Some path draws from the whole catalogue, the
+                } else if let Some(definition) = Self::uniform_drop_definition(a) {
+                    // The Some path draws from `Content::drop_pool`, the
                     // loot-only items included (W2-08), with today's uniform
                     // pick until the weighted DropTable (W2-09) replaces it,
                     // and rolls its quality relative to the item's base

@@ -400,6 +400,19 @@ impl Content {
             .max()
             .unwrap_or(0)
     }
+    /// The v7 drop pool (`drop_tier` Some): ascending catalogue indices from
+    /// 4 on whose tier lies in `1..=max_tier`, loot-only items included and
+    /// NPC issue never (design-loot-economy section 3). The legacy pool
+    /// (`drop_tier` None, ruling E11) stays combat.rs's verbatim filter over
+    /// the 29 v1 definitions.
+    pub fn drop_pool(&self, max_tier: usize) -> Vec<usize> {
+        self.items
+            .iter()
+            .enumerate()
+            .filter(|(n, i)| *n >= 4 && !i.npc_only && (1..=max_tier).contains(&i.tier))
+            .map(|(n, _)| n)
+            .collect()
+    }
     /// Catalogue position of a level ID (five levels; a scan is cheapest).
     pub fn level_index(&self, id: &str) -> Option<usize> {
         self.levels.iter().position(|level| level.id == id)
@@ -947,14 +960,16 @@ mod tests {
     }
     #[test]
     fn every_tier_1_to_4_has_one_ranged_per_class_and_three_per_other_slot() {
-        // The drop pool (index 4 on, never NPC issue) of every tier offers
-        // each weapon class and at least three items of every other slot.
+        // The drop pool the Some path draws from (`Content::drop_pool`: index
+        // 4 on, never NPC issue) offers, at every tier, each weapon class and
+        // at least three items of every other slot.
+        let items = &content().items;
         let droppable = |tier: usize| {
             content()
-                .items
-                .iter()
-                .skip(4)
-                .filter(move |item| !item.npc_only && item.tier == tier)
+                .drop_pool(tier)
+                .into_iter()
+                .map(|n| &items[n])
+                .filter(move |item| item.tier == tier)
         };
         for tier in 1..=4 {
             for class in crate::weapons::WeaponClass::ALL {
@@ -971,11 +986,24 @@ mod tests {
                 );
             }
         }
-        // Droppable definitions per drop tier (today 12 / 16 / 20 / 24).
-        let pool =
-            |drop_tier: usize| -> usize { (1..=drop_tier).map(|t| droppable(t).count()).sum() };
+        // Droppable definitions per drop tier (12 / 16 / 20 / 24 before
+        // W2-08), counted on the pool itself.
+        let pool = |drop_tier: usize| content().drop_pool(drop_tier).len();
         assert_eq!([1, 2, 3, 4].map(pool), [18, 33, 48, 63]);
         assert_eq!(content().max_drop_tier(), 4);
+        // The pool skips NPC issue and starters: an NPC-only tier-1 item
+        // from index 4 on leaves it, and tier 0 never enters.
+        let mut edited = content().clone();
+        edited.items[29].npc_only = true;
+        let tier1 = edited.drop_pool(1);
+        assert_eq!(tier1.len(), 17);
+        assert!(!tier1.contains(&29));
+        assert!(
+            content()
+                .drop_pool(4)
+                .iter()
+                .all(|&n| n >= 4 && items[n].tier > 0)
+        );
     }
     #[test]
     fn loot_only_ranged_items_are_their_exemplar_at_the_tier_quality() {
