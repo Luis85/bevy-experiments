@@ -369,7 +369,11 @@ fn latest_tick_of(latest: &[(u64, u64)], id: u64) -> Option<u64> {
 }
 
 fn enemy_pose(a: &Attempt, e: &Enemy, reduced: bool, pulses: &EnemyPulses) -> ActorPose {
-    let moving = e.attack_phase == EnemyPhase::Advance && !e.injury.prone && !e.injury.stunned;
+    // A boss holding after a phase transition stands still in the core.
+    let moving = e.attack_phase == EnemyPhase::Advance
+        && !e.injury.prone
+        && !e.injury.stunned
+        && !e.boss_held(a.tick);
     let base_frame_ticks = match e.kind {
         EnemyKind::Runner => 7,
         EnemyKind::Brute => 22,
@@ -1317,5 +1321,57 @@ mod tests {
                 .count(),
             3
         );
+    }
+    /// W2-36 review (design enemy-balance §6): a boss holding after a phase
+    /// transition stands still in the core, so it does not walk in place:
+    /// its Advance pose is the standing pose for the whole hold, normal and
+    /// reduced, and its walk resumes when the hold ends.
+    #[test]
+    fn held_boss_does_not_walk_in_place() {
+        let mut game = fixture();
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        game.spawn_enemy(&mut a, EnemyKind::Brute, 4, true);
+        let boss = a.enemies.iter_mut().find(|e| e.boss).unwrap();
+        let id = boss.id;
+        boss.x = 20.;
+        boss.attack_phase = EnemyPhase::Advance;
+        boss.boss_state = Some(horde_core::sim::BossState {
+            profile: horde_core::sim::BossPhaseProfile {
+                name: "Breach".into(),
+                speed_mult: 1.4,
+                armor_mult: 0.6,
+                call_interval_mult: 1.0,
+                siege_recovery_mult: 1.0,
+                hold_ticks: 90,
+            },
+            transitions: 1,
+            entered: 1,
+            hold_until: 190,
+        });
+        *game.attempt_slot_mut() = Some(a);
+        let a = game.attempt_mut().unwrap();
+        for reduced in [false, true] {
+            a.tick = 100;
+            let standing = pose(&SceneAnimation::sample(a, reduced), id);
+            assert!(!standing.moving, "reduced {reduced}: held at 100");
+            for tick in 101..190 {
+                a.tick = tick;
+                assert_eq!(
+                    pose(&SceneAnimation::sample(a, reduced), id),
+                    standing,
+                    "reduced {reduced}: the held boss keeps its pose at {tick}"
+                );
+            }
+            a.tick = 190;
+            assert!(pose(&SceneAnimation::sample(a, reduced), id).moving);
+        }
+        // Normal effects: the walk cycle runs again after the hold.
+        let frames: std::collections::BTreeSet<u8> = (190..290)
+            .map(|tick| {
+                a.tick = tick;
+                pose(&SceneAnimation::sample(a, false), id).frame
+            })
+            .collect();
+        assert!(frames.len() > 1, "the boss walks after its hold");
     }
 }
