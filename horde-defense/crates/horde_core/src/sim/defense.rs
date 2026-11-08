@@ -155,6 +155,7 @@ impl Game {
             hud_name: crate::defenders::hud_name(&npc.name),
             appearance,
             role,
+            archetype: crate::defenders::Archetype::from_creation(&npc.creation),
             origin,
             mode: Mode::Npc,
             level: u32::from(npc.advancement_level()),
@@ -173,6 +174,7 @@ impl Game {
                         .selected_survivor
                         .map_or(crate::survivors::Appearance::Male, |s| s.appearance()),
                     role: DefenderRole::Survivor,
+                    archetype: None,
                     origin: None,
                     mode: Mode::Personal,
                     level: campaign.player.level,

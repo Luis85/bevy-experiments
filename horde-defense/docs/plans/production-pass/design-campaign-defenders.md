@@ -243,6 +243,8 @@ There is no RNG draw, and the two are always distinct.
 - `Campaign::recruit_price()` today returns world.json recruit_cost 100; progression-tree owns its scaling.
 - runner/apply.rs `confirms_purchase` (:103-116) adds RecruitAs.
 
+*As built (W2-20, `sim/recruitment.rs`, types in `defenders.rs`):* the command and error follow schema-v7 §6 row 8: `Command::RecruitAs { country: String, archetype: String }`, appended after `SelectCountry`, takes the archetype by `Archetype::id()` (the `NpcCreation.archetype` name), and `CommandError::ArchetypeNotOffered(String)` carries the rejected text (an unknown name is not offered either), with `RecruitUnavailable(RecruitBlocker)` beside it. The second archetype is keyed as ruling E7 says, not with `world::stable_hash`: `ALL[(first + 1 + keyed(game.seed, next_recruit_id, fnv1a(country), RECRUIT_OFFER) % 3) % 4]`, so `StrategyState::recruit_offer_for` takes the seed. The blockers are checked in today's order (NeedsNode while the Recruitment feature is missing; NotLiberated for a country that is not cleared or unknown, or below `recruitment_unlock_freed`; RosterFull; DefenseInProgress while `campaign.reserved` is set; NeedCoins), and their labels keep today's texts where one existed. `Command::Recruit` now answers with the same typed errors. `StrategyState::recruit` keeps its string API and recruits the rotation archetype through `recruit_as`. `DefenderCard.archetype` is `Archetype::from_creation(&npc.creation)` for Mara and recruits and None for the player.
+
 ### 1.7 Recruit progression (CD5, decision "10 levels by the 6th liberation")
 
 - `Campaign::advancement_cap_level() -> u8 = max(1 + first_clears.len(), min(10, 1 + ceil(3·L/2)))`, with `L = liberated_count()` as a high-water count.

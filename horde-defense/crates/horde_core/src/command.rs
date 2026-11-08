@@ -4,7 +4,7 @@
 use crate::balance::BalanceSettings;
 use crate::campaign::{AutoSellRule, Npc, NpcTraining, SaleBlock};
 use crate::content::{ItemDefId, Mode, Policy, StructureKind};
-use crate::defenders::{DefenderBlocker, DefenderId};
+use crate::defenders::{DefenderBlocker, DefenderId, RecruitBlocker};
 use crate::quality::Quality;
 use crate::sim::{Game, JourneyContinuation};
 use crate::strategy::RecruitStatus;
@@ -171,6 +171,13 @@ pub enum Command {
     /// outbreak's included) answers `CountryLiberated`. `EnterCountry` keeps
     /// its recorded meaning, select and deploy at once.
     SelectCountry(String),
+    /// Recruits from a liberated country as one of the two archetypes
+    /// `Game::recruit_offer` names, by its `Archetype::id`. `Recruit` keeps
+    /// taking the first offer.
+    RecruitAs {
+        country: String,
+        archetype: String,
+    },
 }
 
 impl Command {
@@ -253,6 +260,11 @@ pub enum CommandError {
     StartNotChosen,
     /// The country cannot be entered yet (or is not on the map).
     CountryLocked(String),
+    /// `RecruitAs` named an archetype the country does not offer (this
+    /// text, unknown names included); nothing changed.
+    ArchetypeNotOffered(String),
+    /// The country offers no recruit now; the blocker says why.
+    RecruitUnavailable(RecruitBlocker),
 }
 impl fmt::Display for CommandError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -290,6 +302,10 @@ impl fmt::Display for CommandError {
             Self::CountryLocked(_) => {
                 f.write_str("Liberate a neighboring country to reach this one")
             }
+            Self::ArchetypeNotOffered(_) => {
+                f.write_str("This country's survivors do not offer that archetype")
+            }
+            Self::RecruitUnavailable(blocker) => write!(f, "{blocker}"),
         }
     }
 }
@@ -488,7 +504,7 @@ impl Game {
                 tactics.write_to(&mut self.campaign.npc);
                 Applied
             }
-            Command::Recruit(country) => Id(self.strategy.recruit(&mut self.campaign, country)?),
+            Command::Recruit(country) => Id(self.recruit_first_offer(country)?),
             Command::EquipRecruit { id, item } => {
                 self.strategy.equip_recruit(&self.campaign, *id, *item)?;
                 Applied
@@ -589,6 +605,7 @@ impl Game {
                 Applied
             }
             Command::SelectCountry(id) => self.select_country(id)?,
+            Command::RecruitAs { country, archetype } => Id(self.recruit_as(country, archetype)?),
         };
         // Only a dispatch that succeeded takes the next defender away.
         if let Some(id) = leaving {

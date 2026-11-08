@@ -14,6 +14,7 @@ mod npc;
 mod pacing;
 mod parallel;
 mod persistence;
+mod recruitment;
 mod smoke;
 mod structures;
 mod telemetry;

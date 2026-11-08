@@ -1,7 +1,8 @@
 //! Persistent late-campaign recruitment, garrisons and seeded plague pressure.
 //! The caller advances this clock only while the global simulation is running.
-use crate::campaign::{Campaign, Npc, NpcCreation, NpcTraining, SaleRefs};
+use crate::campaign::{Campaign, Npc, NpcTraining, SaleRefs};
 use crate::content::{Mode, Slot, content};
+use crate::defenders::Archetype;
 use crate::rules::{self, Attack, Damage, DamageKind, InjuryState, Rng};
 use crate::world::world;
 use serde::{Deserialize, Serialize};
@@ -266,7 +267,40 @@ impl StrategyState {
         campaign.has_feature(crate::skill_catalog::CampaignFeature::Operations)
             && self.progress(campaign) >= world().strategy_config.strategy_unlock_freed
     }
+    /// The two archetypes the next recruit from `country_id` may join as
+    /// (decision 15, ruling E7): first today's rotation, then one of the
+    /// other three keyed on `seed`, the next recruit id and the country.
+    /// Always distinct; draws no RNG.
+    pub fn recruit_offer_for(&self, seed: u64, country_id: &str) -> [Archetype; 2] {
+        let first = Archetype::rotation(self.next_recruit_id);
+        let key = crate::hash::keyed(
+            seed,
+            self.next_recruit_id,
+            crate::hash::fnv1a(country_id.as_bytes()),
+            crate::hash::tags::RECRUIT_OFFER,
+        );
+        let len = Archetype::ALL.len();
+        let step = 1 + (key % (len as u64 - 1)) as usize;
+        [first, Archetype::ALL[(first.index() + step) % len]]
+    }
+    /// Recruits the rotation archetype, as every recruit joined before the
+    /// choice existed (`Command::Recruit` takes the same first offer).
     pub fn recruit(&mut self, campaign: &mut Campaign, country_id: &str) -> Result<u64, String> {
+        self.recruit_as(
+            campaign,
+            country_id,
+            Archetype::rotation(self.next_recruit_id),
+        )
+    }
+    /// Recruits a survivor from a liberated country as `archetype`: its
+    /// creation, starting stats and default policy. `Game::recruit_offer`
+    /// decides which archetypes a country offers.
+    pub fn recruit_as(
+        &mut self,
+        campaign: &mut Campaign,
+        country_id: &str,
+        archetype: Archetype,
+    ) -> Result<u64, String> {
         if !self.recruitment_unlocked(campaign) {
             return Err("Liberate your first country to recruit local survivors".into());
         }
@@ -295,28 +329,18 @@ impl StrategyState {
         campaign.coins -= price;
         let id = self.next_recruit_id;
         self.next_recruit_id = next_id;
-        let (base_name, _) = crate::defenders::recruit_identity(id);
-        let name = if id <= crate::defenders::RECRUIT_IDENTITIES.len() as u64 {
-            base_name.to_string()
-        } else {
-            format!("{base_name} {id}")
-        };
+        let name = crate::defenders::recruit_name(id);
         let mut npc = Campaign::default().npc;
         npc.name = name.clone();
         npc.loadout = loadout;
-        npc.creation = NpcCreation::archetype(((id - 1) % 4) as usize);
+        npc.creation = archetype.creation();
         npc.st = npc.creation.st;
         npc.dx = npc.creation.dx;
         npc.iq = npc.creation.iq;
         npc.ht = npc.creation.ht;
         npc.guns = npc.creation.guns;
         npc.melee = npc.creation.melee;
-        npc.policy = match (id - 1) % 4 {
-            0 => crate::content::Policy::Marksman,
-            1 => crate::content::Policy::Guardian,
-            2 => crate::content::Policy::Balanced,
-            _ => crate::content::Policy::BossFocus,
-        };
+        npc.policy = archetype.default_policy();
         self.roster.push(Recruit {
             id,
             name: name.clone(),

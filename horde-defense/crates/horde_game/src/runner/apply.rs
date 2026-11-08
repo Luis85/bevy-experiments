@@ -115,6 +115,7 @@ fn confirms_purchase(command: &Command) -> bool {
             | Command::BuyRecruitPoint(_)
             | Command::TrainRecruit { .. }
             | Command::Recruit(_)
+            | Command::RecruitAs { .. }
     )
 }
 /// Settlement runs inside ticks and recalls; its failures become one notice.

@@ -7,7 +7,8 @@
 //! their meaning. [`resolve`] joins the two. Display names come from the live
 //! records (`npc.name`, the survivor name), never from this module, except the
 //! recruit identity table used when a recruit joins.
-use crate::content::Mode;
+use crate::campaign::NpcCreation;
+use crate::content::{Mode, Policy};
 use crate::survivors::Appearance;
 use serde::{Deserialize, Serialize};
 
@@ -104,6 +105,159 @@ pub fn recruit_identity(id: u64) -> (&'static str, Appearance) {
     RECRUIT_IDENTITIES[(id.saturating_sub(1) % len) as usize]
 }
 
+/// The name recruit `id` joins with: the table name, with the id added once
+/// the table has been used up.
+pub fn recruit_name(id: u64) -> String {
+    let (name, _) = recruit_identity(id);
+    if id <= RECRUIT_IDENTITIES.len() as u64 {
+        name.to_string()
+    } else {
+        format!("{name} {id}")
+    }
+}
+
+/// A survivor defender's creation template. Its [`Self::id`] is the
+/// `NpcCreation.archetype` name and the `Command::RecruitAs` archetype text.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Archetype {
+    Marksman,
+    Guardian,
+    Scout,
+    Steadfast,
+}
+impl Archetype {
+    /// In rotation order: recruit `id` is offered `ALL[(id - 1) % 4]` first.
+    pub const ALL: [Self; 4] = [Self::Marksman, Self::Guardian, Self::Scout, Self::Steadfast];
+    pub(crate) fn index(self) -> usize {
+        match self {
+            Self::Marksman => 0,
+            Self::Guardian => 1,
+            Self::Scout => 2,
+            Self::Steadfast => 3,
+        }
+    }
+    /// The rotation archetype of recruit `id`: what every recruit joined as
+    /// before the choice existed.
+    pub fn rotation(id: u64) -> Self {
+        Self::ALL[(id.saturating_sub(1) % Self::ALL.len() as u64) as usize]
+    }
+    /// The stable name: `NpcCreation.archetype` and the `RecruitAs` text.
+    pub fn id(self) -> &'static str {
+        match self {
+            Self::Marksman => "Marksman",
+            Self::Guardian => "Guardian",
+            Self::Scout => "Scout",
+            Self::Steadfast => "Steadfast",
+        }
+    }
+    /// Player-facing name (the same words as [`Self::id`]).
+    pub fn label(self) -> &'static str {
+        self.id()
+    }
+    /// The archetype named exactly `id`, or None.
+    pub fn from_id(id: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|a| a.id() == id)
+    }
+    /// The archetype a creation was made from, or None for a custom one.
+    pub fn from_creation(creation: &NpcCreation) -> Option<Self> {
+        Self::from_id(&creation.archetype)
+    }
+    /// The starting attributes and skills.
+    pub fn creation(self) -> NpcCreation {
+        NpcCreation::archetype(self.index())
+    }
+    /// The tactics policy a recruit of this archetype starts with.
+    pub fn default_policy(self) -> Policy {
+        match self {
+            Self::Marksman => Policy::Marksman,
+            Self::Guardian => Policy::Guardian,
+            Self::Scout => Policy::Balanced,
+            Self::Steadfast => Policy::BossFocus,
+        }
+    }
+}
+
+/// One archetype a recruit offer lets the player pick, with the policy and
+/// stats the recruit would start with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ArchetypeChoice {
+    pub archetype: Archetype,
+    pub policy: Policy,
+    pub st: i32,
+    pub dx: i32,
+    pub ht: i32,
+    pub guns: i32,
+    pub melee: i32,
+}
+impl ArchetypeChoice {
+    pub fn of(archetype: Archetype) -> Self {
+        let c = archetype.creation();
+        Self {
+            archetype,
+            policy: archetype.default_policy(),
+            st: c.st,
+            dx: c.dx,
+            ht: c.ht,
+            guns: c.guns,
+            melee: c.melee,
+        }
+    }
+}
+
+/// The next recruit a liberated country offers (`Game::recruit_offer`).
+/// Derived on every read; never saved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RecruitOffer {
+    pub country_id: String,
+    pub country_name: String,
+    /// What recruiting costs now (`Campaign::recruit_price`).
+    pub price: u64,
+    pub name: String,
+    pub appearance: Appearance,
+    pub origin_trait: OriginTrait,
+    /// Two distinct archetypes; `Command::Recruit` takes the first.
+    pub archetypes: [ArchetypeChoice; 2],
+}
+
+/// Why a country offers no recruit right now, in the order it is checked.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum RecruitBlocker {
+    /// The upgrade node that unlocks recruitment is not owned.
+    NeedsNode {
+        id: String,
+        name: String,
+        price: u64,
+    },
+    /// Recruits join only from a fully liberated country.
+    NotLiberated,
+    RosterFull,
+    /// Recruiting costs this many coins, more than the camp holds.
+    NeedCoins(u64),
+    /// A defender is out on the main defense.
+    DefenseInProgress,
+}
+impl RecruitBlocker {
+    /// Plain player-facing text.
+    pub fn label(&self) -> String {
+        match self {
+            Self::NeedsNode { name, price, .. } => {
+                format!("Unlock {name} ({price} coins) to recruit survivors")
+            }
+            Self::NotLiberated => "Recruit in a fully liberated country".into(),
+            Self::RosterFull => "Survivor roster is full".into(),
+            Self::NeedCoins(price) => format!("Recruitment requires {price} coins"),
+            Self::DefenseInProgress => {
+                "Return the active defender to camp before recruiting".into()
+            }
+        }
+    }
+}
+impl std::fmt::Display for RecruitBlocker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.label())
+    }
+}
+
 /// Why a defender cannot be chosen or deployed right now.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum DefenderBlocker {
@@ -178,6 +332,9 @@ pub struct DefenderCard {
     pub hud_name: String,
     pub appearance: Appearance,
     pub role: DefenderRole,
+    /// A survivor defender's creation archetype; None for the player and
+    /// for a custom creation.
+    pub archetype: Option<Archetype>,
     /// Some for a recruit only.
     pub origin: Option<OriginInfo>,
     /// The rule set the defender fights under.
