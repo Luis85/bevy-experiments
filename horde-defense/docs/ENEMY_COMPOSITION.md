@@ -240,7 +240,8 @@ Transition n enters when the boss's hit points fall to `BOSS_PHASE_THRESHOLDS
 applies each multiplier to the power n, clamped at the bounds (speed at most
 2, armor at least 0.25, interval and recovery at least 0.3): speed scales
 `BOSS_BASE_SPEED` (0.6 yd/s), armor scales every hit after the rank armor and
-before exposure (an exposed boss still has 0), the Caller's next call comes
+after exposure (an exposed boss still has 0; the inspector's protection
+shows the scaled armor), the Caller's next call comes
 after `round(interval ticks × m)` and the Siege Brute's recovery after
 `round(recovery ticks × m)`. For the hold the boss neither moves nor counts
 down or strikes its attack. Each transition publishes `BossPhase` (value n,
