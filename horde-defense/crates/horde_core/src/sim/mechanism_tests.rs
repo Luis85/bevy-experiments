@@ -191,6 +191,17 @@ fn hazard_scaled_is_identity_at_one_and_scales_at_point_six() {
     for (raw, scaled) in [(0, 0), (1, 1), (5, 3), (7, 4), (10, 6), (30, 18), (40, 24)] {
         assert_eq!(combat::hazard_scaled(a, raw), scaled, "{raw} at 0.6");
     }
+    // Personal only, like the class-perk and penetration folds: Mara and
+    // recruits take raw hazard damage even when the profile carries the
+    // player's multiplier.
+    let mut g = legacy_game();
+    g.campaign.attempts = 1;
+    g.deploy(0, Mode::Npc).unwrap();
+    let a = g.attempt.as_mut().unwrap();
+    a.profile.modifiers.hazard_damage_multiplier = 0.6;
+    for raw in [0, 1, 5, 7, 30, 40] {
+        assert_eq!(combat::hazard_scaled(a, raw), raw, "NPC defender at 0.6");
+    }
 }
 
 fn trap_charges_after_placement(definition: &StructureDefinition, rank: u32) -> u32 {

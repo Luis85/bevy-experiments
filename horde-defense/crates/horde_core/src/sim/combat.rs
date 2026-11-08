@@ -2,15 +2,17 @@
 
 use super::*;
 
-/// Hazard (blast and spit) damage `raw` after the defender's
-/// `hazard_damage_multiplier`, applied before armor and Brace. The neutral
-/// 1.0 returns `raw` untouched (no float round trip).
+/// Hazard (blast and spit) damage `raw` after the survivor's
+/// `hazard_damage_multiplier`, applied before armor and Brace. Personal
+/// defenders only, like the class-perk and penetration folds: Mara and
+/// recruits (NPC mode) take `raw`. The neutral 1.0 returns `raw` untouched
+/// (no float round trip).
 // The burst and reach-attack paths (enemy-balance, W2-29/W2-30) are the
 // consumers; until they land only the tests read it.
 #[cfg_attr(not(test), expect(dead_code, reason = "consumed from W2-29"))]
 pub(crate) fn hazard_scaled(a: &Attempt, raw: i32) -> i32 {
     let m = a.profile.modifiers.hazard_damage_multiplier;
-    if m == 1.0 {
+    if a.mode != Mode::Personal || m == 1.0 {
         raw
     } else {
         (raw as f32 * m).round() as i32

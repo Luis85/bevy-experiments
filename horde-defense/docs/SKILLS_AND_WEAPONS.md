@@ -95,7 +95,8 @@ while the survivor owns a non-NPC gun of its class (Mara's guns do not count).
 `ArmorPenetration` (1–20) adds enemy armor ignored by
 personal shots: the shot meets `max(0, armor − penetration)`, while melee,
 ordnance and turrets meet full armor. `HazardDamageMultiplier` (0.5–1) scales
-hazard damage taken: `round(raw × multiplier)`, and `raw` unchanged at 1.0. The
+hazard damage the survivor takes: `round(raw × multiplier)`, and `raw`
+unchanged at 1.0; Mara and recruits in NPC battles take `raw`. The
 blast and spit paths that apply it before armor and Brace arrive with those
 enemies. A node may also
 list `counters`, the enemy archetype ids it is authored to answer (at most 8
