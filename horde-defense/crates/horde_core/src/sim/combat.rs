@@ -753,10 +753,19 @@ impl Game {
     }
     /// The v7 drop pick (`drop_tier` Some): uniform over
     /// [`crate::content::Content::drop_pool`] at the encounter template's
-    /// level + 1, the pool the content pins count.
-    fn uniform_drop_definition(a: &mut Attempt) -> Option<usize> {
+    /// level + 1, the pool the content pins count, the loot-only items
+    /// included (W2-08), until the weighted DropTable (W2-09) replaces it.
+    /// A `normal` drop takes exactly one `a.rng` draw, as today; an
+    /// elite-only drop (ruling E8) picks with the keyed ELITE_PICK hash and
+    /// draws nothing, so elite status never changes the combat RNG.
+    fn drop_definition(&self, a: &mut Attempt, e: &Enemy, normal: bool) -> Option<usize> {
         let available = content().drop_pool(a.level + 1);
-        Self::uniform_drop_pick(a, &available)
+        if normal {
+            return Self::uniform_drop_pick(a, &available);
+        }
+        let len = u64::try_from(available.len()).ok().filter(|len| *len > 0)?;
+        let key = crate::hash::keyed(self.seed, a.id, e.id, crate::hash::tags::ELITE_PICK);
+        Some(available[(key % len) as usize])
     }
     /// The pre-v7 drop pool: only the [`LEGACY_DROP_DEFINITIONS`] v1
     /// definitions (index 4 on, tiers 1 to the template's level + 1), so an
@@ -929,35 +938,36 @@ impl Game {
                 },
             );
             // A split child takes and discards the 3% roll and never drops
-            // (ruling E8), so it draws what any other kill draws.
+            // (ruling E8), so it draws what any other kill draws. Elite
+            // status never changes the draws either: an elite always drops,
+            // but only the normal term reads the combat RNG for its pick.
             let rolled = !e.boss && a.rng.below(100) < 3;
-            let drop = e.boss || (!e.split_child && (rolled || a.kills.is_multiple_of(20)));
-            if drop {
-                if a.drop_tier.is_none() {
-                    // An attempt deployed before v7 (ruling E11): today's
-                    // drop, verbatim, pinned by V6_DROP_TRACE_FNV. It records
-                    // no drop id, so settlement never auto-sells it.
-                    if let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
-                        self.bank_drop(a, &e, definition, quality);
-                    }
-                } else if let Some(definition) = Self::uniform_drop_definition(a) {
-                    // The Some path draws from `Content::drop_pool`, the
-                    // loot-only items included (W2-08), with today's uniform
-                    // pick until the weighted DropTable (W2-09) replaces it,
-                    // and rolls its quality relative to the item's base
-                    // (decision 7). The elite floor arrives with the elite
-                    // drop split (W2-35).
-                    let quality = crate::loot::drop_quality(
-                        content().items[definition].base_quality,
-                        self.seed,
-                        a.id,
-                        e.id,
-                        a.progression.rank,
-                        false,
-                    );
-                    if let Some(item_id) = self.bank_drop(a, &e, definition, quality) {
-                        self.record_drop(a, item_id);
-                    }
+            let normal = e.boss || (!e.split_child && (rolled || a.kills.is_multiple_of(20)));
+            let elite =
+                !e.boss && !e.split_child && e.resolved.as_ref().is_some_and(|r| r.elite.is_some());
+            if a.drop_tier.is_none() {
+                // An attempt deployed before v7 (ruling E11): today's drop,
+                // verbatim, pinned by V6_DROP_TRACE_FNV, with no elite term.
+                // It records no drop id, so settlement never auto-sells it.
+                if normal && let Some((definition, quality)) = self.legacy_drop_pick(a, &e) {
+                    self.bank_drop(a, &e, definition, quality);
+                }
+            } else if (normal || elite)
+                && let Some(definition) = self.drop_definition(a, &e, normal)
+            {
+                // The Some path rolls its quality relative to the item's
+                // base (decision 7); an elite's drop is never below
+                // `ELITE_QUALITY_FLOOR`, a boss's has no floor.
+                let quality = crate::loot::drop_quality(
+                    content().items[definition].base_quality,
+                    self.seed,
+                    a.id,
+                    e.id,
+                    a.progression.rank,
+                    elite,
+                );
+                if let Some(item_id) = self.bank_drop(a, &e, definition, quality) {
+                    self.record_drop(a, item_id);
                 }
             }
             if a.mode == Mode::Npc {

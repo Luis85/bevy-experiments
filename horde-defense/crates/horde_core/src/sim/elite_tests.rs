@@ -1,10 +1,12 @@
 //! W2-33 (design enemy-balance §5 "Elites", ruling E7, acceptance G6.3 and
 //! G6.5): the keyed ELITE and AFFIX spawn rolls, their rate by rank and
-//! preset, and their isolation from the combat RNG.
+//! preset, and their isolation from the combat RNG. W2-35 (design
+//! loot-economy §3-§4, ruling E8): the elite forced drop.
 
 use super::*;
 use crate::balance::{BalancePreset, BalanceSettings};
 use crate::campaign::Campaign;
+use crate::enemy_catalog::ResolvedEnemy;
 
 /// A game with an unpaused attempt in `mode` at threat `rank` on Normal,
 /// whose director only spawns when a test hands it credit and whose
@@ -303,4 +305,272 @@ fn elite_kills_are_counted_and_pay_the_baked_reward() {
     a.enemies[0].hp = 0;
     g.reap(&mut a);
     assert_eq!(a.telemetry.elites_killed, 1);
+}
+
+// W2-35 (design loot-economy §3-§4, ruling E8): the elite forced drop.
+
+/// A shambler profile and its elite twin.
+fn shambler_pair() -> (ResolvedEnemy, ResolvedEnemy) {
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    let plain = catalog.resolve("shambler").unwrap();
+    let elite = catalog.elite_profile(&plain, 0).unwrap();
+    assert!(plain.elite.is_none() && elite.elite.is_some());
+    (plain, elite)
+}
+
+/// Places `profile` in lane 5 (a split child at x 7 when `split`), defeats
+/// it, sets the kill count and the combat RNG, reaps it and returns its id.
+fn kill(
+    g: &mut Game,
+    a: &mut Attempt,
+    profile: &ResolvedEnemy,
+    split: bool,
+    kills: u32,
+    rng: Rng,
+) -> u64 {
+    a.enemies.clear();
+    if split {
+        g.place_enemy(a, profile.clone(), 5, false, director::Arrival::Split(7.0));
+    } else {
+        g.spawn_pick(a, profile.clone(), 5);
+    }
+    let mode = a.mode;
+    let e = a.enemies.last_mut().expect("placed");
+    assert_eq!(e.split_child, split);
+    if mode == Mode::Personal {
+        e.hp = 0;
+    } else {
+        e.injury.unconscious = true;
+    }
+    let id = e.id;
+    a.kills = kills;
+    a.rng = rng;
+    g.reap(a);
+    assert!(a.enemies.is_empty(), "the hostile was reaped");
+    id
+}
+
+/// The `skip`-th seeded combat RNG whose next `below(100)` hits (`< 3`) or
+/// misses the 3% drop roll.
+fn drop_rng(hit: bool, skip: usize) -> Rng {
+    (1..)
+        .map(Rng::new)
+        .filter(|rng| (rng.clone().below(100) < 3) == hit)
+        .nth(skip)
+        .unwrap()
+}
+
+/// The combat RNG after the draws a kill should take: the 3% roll, then
+/// one uniform pick over a pool of `pool` when the normal drop fires.
+fn after_draws(mut rng: Rng, pool: Option<usize>) -> Rng {
+    rng.below(100);
+    if let Some(len) = pool {
+        rng.below(len as u64);
+    }
+    rng
+}
+
+/// The definition index a loot event names.
+fn definition_of(event: &crate::quality::LootEvent) -> usize {
+    event.definition.index().expect("a catalogue item")
+}
+
+#[test]
+fn elite_status_never_changes_combat_rng_draw_count() {
+    let (plain, elite) = shambler_pair();
+    for mode in [Mode::Personal, Mode::Npc] {
+        let mut gp = game_at(mode, 13);
+        let mut ge = game_at(mode, 13);
+        let mut ap = gp.attempt.take().unwrap();
+        let mut ae = ge.attempt.take().unwrap();
+        assert!(
+            ap.drop_tier.is_some(),
+            "a wave-2 deploy is on the Some path"
+        );
+        let pool = content().drop_pool(ap.level + 1).len();
+        for kills in 0..42u32 {
+            for hit in [false, true] {
+                let rng = drop_rng(hit, kills as usize);
+                let normal = hit || (kills + 1).is_multiple_of(20);
+                let (plain_loot, elite_loot) = (ap.loot, ae.loot);
+                kill(&mut gp, &mut ap, &plain, false, kills, rng);
+                kill(&mut ge, &mut ae, &elite, false, kills, rng);
+                let label = format!("{mode:?} kills {kills} hit {hit}");
+                assert_eq!(ap.rng, after_draws(rng, normal.then_some(pool)), "{label}");
+                assert_eq!(ae.rng, ap.rng, "{label}: the elite draws the same");
+                assert_eq!(ap.loot - plain_loot, u32::from(normal), "{label}");
+                assert_eq!(ae.loot - elite_loot, 1, "{label}: an elite always drops");
+            }
+        }
+    }
+}
+
+#[test]
+fn elite_only_drop_uses_keyed_pick_and_draws_no_rng() {
+    let (_, elite) = shambler_pair();
+    for mode in [Mode::Personal, Mode::Npc] {
+        let mut g = game_at(mode, 13);
+        let mut a = g.attempt.take().unwrap();
+        let pool = content().drop_pool(a.level + 1);
+        let mut picked = BTreeSet::new();
+        for n in 0..40usize {
+            let rng = drop_rng(false, n);
+            let loot = a.loot;
+            let id = kill(&mut g, &mut a, &elite, false, 0, rng);
+            assert_eq!(a.loot, loot + 1, "{mode:?} {n}: the elite term alone drops");
+            assert_eq!(
+                a.rng,
+                after_draws(rng, None),
+                "{mode:?} {n}: only the 3% roll"
+            );
+            let key = crate::hash::keyed(g.seed, a.id, id, crate::hash::tags::ELITE_PICK);
+            let event = a.loot_events.last().unwrap();
+            let definition = pool[(key % pool.len() as u64) as usize];
+            assert_eq!(definition_of(event), definition, "{mode:?} {n}");
+            assert_eq!(a.drop_ids.last(), Some(&event.item_id), "{mode:?} {n}");
+            picked.insert(definition);
+        }
+        assert!(
+            picked.len() > 5,
+            "{mode:?}: the keyed pick spreads: {picked:?}"
+        );
+        // The legacy path (drop_tier None, ruling E11) knows no elites.
+        a.drop_tier = None;
+        let rng = drop_rng(false, 0);
+        let loot = a.loot;
+        kill(&mut g, &mut a, &elite, false, 0, rng);
+        assert_eq!(a.loot, loot, "{mode:?}: no elite drop before v7");
+        assert_eq!(a.rng, after_draws(rng, None), "{mode:?}");
+    }
+}
+
+/// Characterisation pin (W2-29 landed the split-child rule; ruling E8): a
+/// split child, elite or not, takes and discards the 3% roll and never
+/// drops, even on a hit or on the every-20th kill.
+#[test]
+fn split_child_kill_takes_the_drop_draw_and_never_drops() {
+    let (plain, elite) = shambler_pair();
+    for mode in [Mode::Personal, Mode::Npc] {
+        let mut g = game_at(mode, 13);
+        let mut a = g.attempt.take().unwrap();
+        for profile in [&plain, &elite] {
+            for (kills, hit) in [(0, false), (0, true), (19, false), (39, true)] {
+                let rng = drop_rng(hit, 3);
+                let loot = a.loot;
+                kill(&mut g, &mut a, profile, true, kills, rng);
+                let label = format!(
+                    "{mode:?} elite {} kills {kills} hit {hit}",
+                    profile.elite.is_some()
+                );
+                assert_eq!(a.kills, kills + 1, "{label}");
+                assert_eq!(a.loot, loot, "{label}: a split child never drops");
+                assert_eq!(a.rng, after_draws(rng, None), "{label}: only the 3% roll");
+            }
+        }
+    }
+}
+
+#[test]
+fn elite_drop_quality_is_at_least_uncommon_and_boss_drop_has_no_floor() {
+    use crate::quality::Quality;
+    let (_, elite) = shambler_pair();
+    let mut g = game_at(Mode::Personal, 13);
+    let mut a = g.attempt.take().unwrap();
+    let rank = a.progression.rank;
+    let mut elite_qualities = BTreeSet::new();
+    for n in 0..300usize {
+        // An elite-only drop and an elite that also fires the normal drop
+        // (the every-20th kill) both carry the floor.
+        let kills = if n % 2 == 0 { 0 } else { 19 };
+        let loot = a.loot;
+        let id = kill(&mut g, &mut a, &elite, false, kills, drop_rng(false, n));
+        assert_eq!(a.loot, loot + 1, "{n}: an elite always drops");
+        let event = a.loot_events.last().unwrap();
+        let base = content().items[definition_of(event)].base_quality;
+        assert!(
+            event.quality >= Quality::Uncommon,
+            "{n}: {:?}",
+            event.quality
+        );
+        assert_eq!(
+            event.quality,
+            crate::loot::drop_quality(base, g.seed, a.id, id, rank, true),
+            "{n}"
+        );
+        elite_qualities.insert(event.quality);
+    }
+    assert!(elite_qualities.len() >= 2, "{elite_qualities:?}");
+    let mut boss_qualities = BTreeSet::new();
+    for n in 0..300u32 {
+        a.enemies.clear();
+        g.spawn_enemy(&mut a, EnemyKind::Brute, 5, true);
+        let e = a.enemies.last_mut().unwrap();
+        assert!(e.boss);
+        e.hp = 0;
+        let id = e.id;
+        let loot = a.loot;
+        g.reap(&mut a);
+        assert_eq!(a.loot, loot + 1, "{n}: a boss always drops");
+        let event = a.loot_events.last().unwrap();
+        let base = content().items[definition_of(event)].base_quality;
+        assert_eq!(
+            event.quality,
+            crate::loot::drop_quality(base, g.seed, a.id, id, rank, false),
+            "{n}"
+        );
+        boss_qualities.insert(event.quality);
+    }
+    assert!(
+        boss_qualities.iter().any(|q| *q < Quality::Uncommon),
+        "a boss drop has no floor: {boss_qualities:?}"
+    );
+}
+
+/// Acceptance G6.3: every elite a director wave fields drops one item of
+/// Uncommon or better when it falls, whatever its archetype and affix.
+#[test]
+fn every_elite_kill_drops_uncommon_or_better() {
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    for mode in [Mode::Personal, Mode::Npc] {
+        let mut g = game_at(mode, 23);
+        let mut a = g.attempt.take().unwrap();
+        a.progression.elite_rate_bp = 10_000;
+        let mut affixes = BTreeSet::new();
+        let mut kills = 0;
+        for archetype in catalog
+            .archetype_ids()
+            .filter(|id| catalog.elite_eligible(id))
+        {
+            for n in 0..8usize {
+                a.enemies.clear();
+                if g.spawn_archetype_as(&mut a, archetype, (n % 5) as u8, director::Arrival::Wave)
+                    .is_err()
+                {
+                    break; // a boss variant not yet unlocked
+                }
+                a.enemies.truncate(1);
+                let e = &mut a.enemies[0];
+                let affix = e.resolved.as_ref().and_then(|r| r.elite.as_ref());
+                affixes.insert(affix.expect("rate 10000 makes it elite").affix_id.clone());
+                if mode == Mode::Personal {
+                    e.hp = 0;
+                } else {
+                    e.injury.unconscious = true;
+                }
+                a.kills = 0;
+                a.rng = drop_rng(false, n);
+                let loot = a.loot;
+                g.reap(&mut a);
+                assert_eq!(a.loot, loot + 1, "{mode:?} {archetype} {n}");
+                let quality = a.loot_events.last().unwrap().quality;
+                assert!(
+                    quality >= crate::quality::Quality::Uncommon,
+                    "{mode:?} {archetype} {n}: {quality:?}"
+                );
+                kills += 1;
+            }
+        }
+        assert!(kills >= 40, "{mode:?}: {kills} elite kills");
+        assert_eq!(affixes.len(), 5, "{mode:?}: every affix fell: {affixes:?}");
+    }
 }

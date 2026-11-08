@@ -6,7 +6,10 @@
 //! `V6_DROP_TRACE_FNV`) and never records `drop_ids`. Only a root attempt on
 //! the Some path records its drops. A Some-path drop rolls its quality
 //! relative to the item's base quality ([`drop_quality`], decision 7); the
-//! legacy path keeps the absolute roll.
+//! legacy path keeps the absolute roll. On the Some path an elite always
+//! drops (ruling E8): an elite-only drop picks with the keyed ELITE_PICK
+//! hash instead of the combat RNG, and its quality is never below
+//! [`ELITE_QUALITY_FLOOR`].
 use crate::content::content;
 use crate::quality::{self, Quality};
 

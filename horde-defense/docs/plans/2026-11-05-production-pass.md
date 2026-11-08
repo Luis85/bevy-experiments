@@ -951,6 +951,8 @@ W2-33 20-seed release acceptance (2026-11-08): `cargo test --locked --release -p
 - PASS, moved: `goal5_tree_outlasts_second_liberation` (Liberation(2) 18 [17, 19] → 18 [17, 20], tree exhausted 25 [24, 26] → 25 [24, 27], nodes bought after it 22 → 16), `goal6_boss_ttk_median_20_60_s` (29.4 s [p25 24.7, p90 37.6] over 1,071 kills → 29.4 s [p25 24.2, p90 37.6] over 1,075).
 - Still failing (wave-4 work): `goal6_defeat_rate_windows` (34 of 39 windows outside 10-25%; highest 20.0% → 19.0% at offset 0), `goal6_no_15_streak_after_run_10` (every seed still has a 46-50 win streak from run 11), `goal5_tiers_affordable_3_5_7_9_11_13` (unchanged) and `goal5_unlock_order_fortifications_mara_operations` (Mara and Operations both 15 [14, 16] → 15 [14, 17]).
 
+**W2-35 moved neither pacing nor smoke (2026-11-08).** The elite forced drop (ruling E8) adds one item per elite kill on the `drop_tier` Some path, picked by the keyed ELITE_PICK hash when only the elite term fires, so the combat RNG draws exactly what it drew before and the fights do not change. The pacing profiles never equip recovered loot (`equip_drops` is false), so `cargo run --locked --release -p horde_core --example pacing -- 60 --runs` at W2-35 (`target/production-after/w2-35/pacing.txt`, not committed) is byte-identical to `w2-33/pacing.txt` (sha256 774449b7...af118054), and `--smoke` (`w2-35/smoke.txt`) equals `w2-33/smoke.txt`. W2-34 touched only horde_game, so W2-33's evidence is the parent's. The stash growth from forced elite drops (design-loot-economy "Risks" item 3) is measured in wave 4.
+
 ### 9.3 Audio
 
 | Measure | Before (A6-04) | After (A6-17) | Gate |
