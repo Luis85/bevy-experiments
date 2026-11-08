@@ -888,11 +888,21 @@ fn defender_fields_serialize_only_when_set() {
         ("personal report", &personal),
         ("mara report", &mara),
         ("live expedition", &expedition),
-        ("settled expedition", &settled),
     ] {
         let saved = serde_json::to_value(game).unwrap();
         assert_eq!(defender_schema_keys(&saved), Vec::<String>::new(), "{name}");
     }
+    // W2-15: settlement writes the settled expedition's outcome notice, and
+    // only that field.
+    let saved = serde_json::to_value(&settled).unwrap();
+    assert_eq!(defender_schema_keys(&saved), ["battles[0].summary"]);
+    assert_eq!(
+        battle(&settled, live).summary,
+        Some(ExpeditionSummary {
+            outcome: Some(Outcome::Withdrawal),
+            ..ExpeditionSummary::default()
+        })
+    );
 
     let summary = ExpeditionSummary {
         outcome: Some(Outcome::Withdrawal),

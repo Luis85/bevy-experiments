@@ -985,6 +985,24 @@ impl ExpeditionSummary {
     /// The most newly opened fronts one notice lists (save validation bound).
     pub const MAX_FRONTS: usize = 32;
 }
+/// One settled expedition the player has not acknowledged yet: who went
+/// where, and its saved [`ExpeditionSummary`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExpeditionNotice {
+    pub battle: u64,
+    pub recruit_id: u64,
+    pub recruit_name: String,
+    pub country_id: String,
+    pub country_name: String,
+    pub summary: ExpeditionSummary,
+}
+/// [`Game::unacknowledged_outcomes`]: the pending notices, oldest first, and
+/// how many unacknowledged outcomes pruning folded into one count.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct OutcomeNotices {
+    pub notices: Vec<ExpeditionNotice>,
+    pub folded: u32,
+}
 impl Default for Game {
     fn default() -> Self {
         Self {

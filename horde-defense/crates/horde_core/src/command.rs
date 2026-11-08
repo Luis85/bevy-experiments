@@ -159,6 +159,13 @@ pub enum Command {
         id: u64,
         tactics: NpcTactics,
     },
+    /// Marks the named settled expeditions' outcome notices seen and takes
+    /// `folded` off the folded-outcome count. Idempotent: unknown, live and
+    /// already acknowledged ids are ignored and the count saturates at 0.
+    AcknowledgeOutcomes {
+        battles: Vec<u64>,
+        folded: u32,
+    },
 }
 
 impl Command {
@@ -562,6 +569,10 @@ impl Game {
                     return Err(CommandError::RecruitNotReady);
                 }
                 tactics.write_to(&mut recruit.npc);
+                Applied
+            }
+            Command::AcknowledgeOutcomes { battles, folded } => {
+                self.acknowledge_outcomes(battles, *folded);
                 Applied
             }
         };

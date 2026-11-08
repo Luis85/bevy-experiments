@@ -3,6 +3,8 @@ use super::*;
 
 /// Single source for the unknown-expedition message shared with `command`.
 pub(crate) const UNKNOWN_EXPEDITION: &str = "No active expedition with that ID";
+/// The most battles, live and settled, a game keeps (save validation bound).
+pub(crate) const MAX_BATTLES: usize = 32;
 
 /// Seats recruit `recruit_id` on a freshly deployed attempt: the saved seat
 /// names the recruit and the profile takes the recruit's identity-table
@@ -85,6 +87,68 @@ impl std::fmt::Display for SettlementIssue {
 }
 
 impl Game {
+    /// The settled expeditions the player has not acknowledged, oldest first,
+    /// and the count pruning folded (Ruling D10). Battles settled before save
+    /// version 7 carry no summary and are never announced. Pure: no RNG, no
+    /// mutation.
+    pub fn unacknowledged_outcomes(&self) -> OutcomeNotices {
+        let notices = self
+            .battles
+            .iter()
+            .filter(|b| b.settled)
+            .filter_map(|b| {
+                let summary = b.summary.as_ref().filter(|s| !s.acknowledged)?;
+                Some(ExpeditionNotice {
+                    battle: b.id,
+                    recruit_id: b.recruit_id,
+                    recruit_name: b.game.campaign.npc.name.clone(),
+                    country_id: b.country_id.clone(),
+                    country_name: crate::world::world()
+                        .country(&b.country_id)
+                        .map_or_else(|| b.country_id.clone(), |c| c.name.clone()),
+                    summary: summary.clone(),
+                })
+            })
+            .collect();
+        OutcomeNotices {
+            notices,
+            folded: self.strategy.folded_outcomes,
+        }
+    }
+    /// `Command::AcknowledgeOutcomes`: marks the named settled expeditions'
+    /// notices seen and takes `folded` off the folded count (saturating).
+    /// Unknown, live, legacy and already acknowledged ids are ignored.
+    pub(crate) fn acknowledge_outcomes(&mut self, battles: &[u64], folded: u32) {
+        for b in self.battles.iter_mut().filter(|b| b.settled) {
+            if let Some(summary) = b.summary.as_mut().filter(|_| battles.contains(&b.id)) {
+                summary.acknowledged = true;
+            }
+        }
+        self.strategy.folded_outcomes = self.strategy.folded_outcomes.saturating_sub(folded);
+    }
+    /// Keeps the battle list at its cap by dropping settled battles, oldest
+    /// first: a legacy (summary-less) or acknowledged one when there is one,
+    /// otherwise an unacknowledged one, whose notice is folded into
+    /// `folded_outcomes` so no outcome goes uncounted. Live battles stay.
+    fn prune_settled_battles(&mut self) {
+        while self.battles.len() > MAX_BATTLES {
+            let quiet = self
+                .battles
+                .iter()
+                .position(|b| b.settled && b.summary.as_ref().is_none_or(|s| s.acknowledged));
+            let Some(n) = quiet.or_else(|| self.battles.iter().position(|b| b.settled)) else {
+                break;
+            };
+            if self
+                .battles
+                .remove(n)
+                .summary
+                .is_some_and(|s| !s.acknowledged)
+            {
+                self.strategy.folded_outcomes = self.strategy.folded_outcomes.saturating_add(1);
+            }
+        }
+    }
     /// Each expedition owns its actual serialized battle; shared earnings are
     /// transferred by monotonic settlement cursors, never by rerunning events.
     pub fn deploy_survivor(
@@ -170,13 +234,7 @@ impl Game {
             summary: None,
             pending_auto_sell: Vec::new(),
         });
-        while self.battles.len() > 32 {
-            if let Some(n) = self.battles.iter().position(|b| b.settled) {
-                self.battles.remove(n);
-            } else {
-                break;
-            }
-        }
+        self.prune_settled_battles();
         Ok(id)
     }
     pub fn deploy_country_operation(
@@ -239,42 +297,57 @@ impl Game {
                 .saturating_sub(battle.synced_coins);
             self.campaign.reward(coins, 0, Mode::Npc);
             battle.synced_coins = battle.game.campaign.coins;
+            let mut stored = 0u32;
             for item in battle.game.campaign.items[battle.synced_item_index..]
                 .iter()
                 .filter(|item| item.id >= battle.synced_item_id)
             {
-                if let Err(error) = self.campaign.add_item_with_quality(
+                match self.campaign.add_item_with_quality(
                     item.definition_index(),
                     item.level,
                     item.quality,
                 ) {
-                    self.settlement_issues.push(SettlementIssue::LootLost {
+                    Ok(_) => stored = stored.saturating_add(1),
+                    Err(error) => self.settlement_issues.push(SettlementIssue::LootLost {
                         battle: battle.id,
                         definition: item.definition.clone(),
                         level: item.level,
                         error,
-                    });
+                    }),
                 }
             }
             battle.synced_item_id = battle.game.campaign.next_item_id;
             battle.synced_item_index = battle.game.campaign.items.len();
+            // The saved summary counts what this pass committed, so an
+            // operation settled over several passes or a save/load is counted
+            // once (Ruling D10). A v6 in-flight battle starts counting here.
+            if coins > 0 || stored > 0 {
+                let summary = battle.summary.get_or_insert_with(Default::default);
+                summary.coins = summary.coins.saturating_add(coins);
+                summary.loot_count = summary.loot_count.saturating_add(stored);
+            }
             let had_pending = !battle.game.pending_runs.is_empty();
             for mut record in std::mem::take(&mut battle.game.pending_runs) {
                 if record.outcome == Outcome::Victory {
                     record.completion_xp = self.campaign.completion_xp_preview();
                     self.campaign.first_clear(record.template, Mode::Personal);
+                    let summary = battle.summary.get_or_insert_with(Default::default);
+                    summary.stages_cleared = summary.stages_cleared.saturating_add(1);
                     if let Some(country) = &record.country_id {
-                        if let Err(error) = self
+                        match self
                             .campaign
                             .record_country_stage_clear_in(country, record.stage)
                         {
-                            self.settlement_issues
-                                .push(SettlementIssue::StageClearRejected {
-                                    battle: battle.id,
-                                    country: country.clone(),
-                                    stage: record.stage,
-                                    error,
-                                });
+                            Ok(freed) => summary.liberated |= freed,
+                            Err(error) => {
+                                self.settlement_issues
+                                    .push(SettlementIssue::StageClearRejected {
+                                        battle: battle.id,
+                                        country: country.clone(),
+                                        stage: record.stage,
+                                        error,
+                                    });
+                            }
                         }
                         self.strategy.resolve_outbreak(country);
                     }
@@ -294,20 +367,32 @@ impl Game {
             if let Some(report) = &mut battle.game.last_result
                 && report.outcome == Outcome::Victory
             {
-                if !had_pending {
+                // The record-less path (a worker report without a pending
+                // run) credits only a victory whose record is not already in
+                // the history: a second pass over the same report is a no-op.
+                let committed = !had_pending
+                    && self.campaign.run_history.iter().any(|r| {
+                        r.worker_id == Some(battle.id) && r.attempt_id == report.attempt_id
+                    });
+                if !had_pending && !committed {
                     report.completion_xp = self.campaign.completion_xp_preview();
                     self.campaign.first_clear(report.level, Mode::Personal);
-                    if let Err(error) = self
+                    let summary = battle.summary.get_or_insert_with(Default::default);
+                    summary.stages_cleared = summary.stages_cleared.saturating_add(1);
+                    match self
                         .campaign
                         .record_country_stage_clear_in(&battle.country_id, battle.stage)
                     {
-                        self.settlement_issues
-                            .push(SettlementIssue::StageClearRejected {
-                                battle: battle.id,
-                                country: battle.country_id.clone(),
-                                stage: battle.stage,
-                                error,
-                            });
+                        Ok(freed) => summary.liberated |= freed,
+                        Err(error) => {
+                            self.settlement_issues
+                                .push(SettlementIssue::StageClearRejected {
+                                    battle: battle.id,
+                                    country: battle.country_id.clone(),
+                                    stage: battle.stage,
+                                    error,
+                                });
+                        }
                     }
                     self.strategy.resolve_outbreak(&battle.country_id);
                 }
@@ -371,6 +456,20 @@ impl Game {
                     });
             }
             battle.settled = true;
+            // The single settled transition finalises the notice: the final
+            // outcome and, for a liberation, the fronts it opened.
+            let summary = battle.summary.get_or_insert_with(Default::default);
+            summary.outcome = battle.game.last_result.as_ref().map(|r| r.outcome);
+            if summary.liberated {
+                summary.fronts = self
+                    .campaign
+                    .world
+                    .fronts_opened_by(&battle.country_id)
+                    .into_iter()
+                    .take(ExpeditionSummary::MAX_FRONTS)
+                    .map(|c| c.id.clone())
+                    .collect();
+            }
             // Completed reports retain the deployed loadout, not a second copy
             // of the entire shared stash or its presets for every past battle.
             battle.game.campaign.player.loadout = [1, 2, 3, 4];

@@ -281,15 +281,9 @@ impl UiCtx<'_> {
                     if let Some(first) = fronts.first() {
                         self.campaign.selected_country = first.id.clone();
                     }
-                    self.status.message = match (self.game.last_result(), fronts.len()) {
-                        (Some(r), 0) => format!("{} liberated.", r.country_name),
-                        (Some(r), n) => format!(
-                            "{} liberated · {n} new {} open on the map.",
-                            r.country_name,
-                            if n == 1 { "front" } else { "fronts" }
-                        ),
-                        (None, _) => String::new(),
-                    };
+                    self.status.message = self.game.last_result().map_or_else(String::new, |r| {
+                        horde_core::world::liberation_line(&r.country_name, fronts.len())
+                    });
                     self.open_campaign();
                 } else {
                     self.start_battle();

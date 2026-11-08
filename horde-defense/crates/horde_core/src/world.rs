@@ -443,6 +443,16 @@ pub fn world() -> &'static WorldContent {
         WorldContent::from_json_str(include_str!("world.json"))
     })
 }
+/// The one liberation wording, shared by the main run's ContinueJourney
+/// notice and expedition notices: "Belgium liberated · 2 new fronts open on
+/// the map.", or "Belgium liberated." when no front opened.
+pub fn liberation_line(country_name: &str, fronts: usize) -> String {
+    match fronts {
+        0 => format!("{country_name} liberated."),
+        1 => format!("{country_name} liberated · 1 new front open on the map."),
+        n => format!("{country_name} liberated · {n} new fronts open on the map."),
+    }
+}
 /// The installed world's countries by id with their stage counts, built once
 /// (country ids are unique, `WorldContent::validate`).
 static COUNTRY_INDEX: OnceLock<HashMap<&'static str, usize>> = OnceLock::new();

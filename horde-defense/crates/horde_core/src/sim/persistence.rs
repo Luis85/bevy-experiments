@@ -553,7 +553,7 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
     }
     if depth > 1
         || game.worker != (depth == 1)
-        || game.battles.len() > 32
+        || game.battles.len() > super::parallel::MAX_BATTLES
         || (depth == 1 && !game.battles.is_empty())
     {
         return Err("Invalid expedition tree".into());
