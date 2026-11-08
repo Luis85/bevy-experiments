@@ -501,6 +501,35 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
     }
 }
 
+/// Pin: the country-stage render fixtures (and the practice scenes built
+/// on them) carry their stage's front ramp since W2-26. Both deploy stage
+/// 4 of the active country on Normal, so the ramp is
+/// `1 + 0.18 x 4 / (count - 1)`; peak's USA front (24 stages) gives
+/// about 1.031 on enemy health and arrival.
+#[test]
+fn render_fixtures_carry_their_stage_front_ramp() {
+    let fixtures = [
+        ("peak", horde_core::sim::peak_render_fixture().unwrap()),
+        (
+            "progressed-peak",
+            horde_core::sim::maximum_progression_render_fixture().unwrap(),
+        ),
+    ];
+    for (name, g) in fixtures {
+        let country = g.campaign().world.active_country().unwrap();
+        let count = country.level_count() as f32;
+        let progression = &g.attempt().unwrap().progression;
+        let ramp = 1.0 + 0.18 * 4.0 / (count - 1.0);
+        assert!(
+            (progression.front_ramp - ramp).abs() < 1e-6,
+            "{name} on {}: {} (expected {ramp})",
+            country.id,
+            progression.front_ramp
+        );
+        assert_eq!(progression.boss_rank, BossRank::Sector, "{name}");
+    }
+}
+
 /// The extras fold (ruling E3): the elite rate scales by the preset's
 /// integer percent (capped at 10000 bp) and the phase bonus adds past the
 /// rank-4 phase gate (capped at 2); Normal's extras change nothing.
