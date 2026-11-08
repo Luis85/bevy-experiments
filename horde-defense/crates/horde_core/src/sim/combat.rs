@@ -721,7 +721,13 @@ impl Game {
         let profile = split_child_profile(target);
         for k in 0..spawned {
             let at = x.max(DEFENSE_LINE) + 0.35 * k as f32;
-            self.place_enemy(a, profile.clone(), lane, false, Some(at));
+            self.place_enemy(
+                a,
+                profile.clone(),
+                lane,
+                false,
+                director::Arrival::Split(at),
+            );
         }
         let at = [x, lane as f32 + 0.5];
         a.event_with(
@@ -901,6 +907,10 @@ impl Game {
             a.telemetry.kills_by_kind[e.kind] += 1;
             if let Some(r) = e.resolved.as_ref().filter(|_| !e.boss) {
                 a.telemetry.count_archetype_kill(&r.archetype_id);
+                // Like the archetype kills, only while below the spawns.
+                if r.elite.is_some() && a.telemetry.elites_killed < a.telemetry.elites_spawned {
+                    a.telemetry.elites_killed += 1;
+                }
             }
             if e.boss {
                 a.telemetry.boss_defeat_tick = Some(a.tick);

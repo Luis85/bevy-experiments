@@ -279,5 +279,11 @@
       "per_rank": 0.1,
       "max_multiplier": 6.0
     }
+  },
+  "elite": {
+    "min_rank": 3,
+    "start_bp": 200,
+    "end_rank": 23,
+    "end_bp": 1500
   }
 }

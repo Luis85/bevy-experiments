@@ -140,10 +140,64 @@ pub struct ProgressionCatalog {
     /// (0..=100). Absent (0) keeps the level's NPC boss armor.
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub npc_boss_armor_rank_step: u32,
+    /// The elite spawn curve (design enemy-balance §2 "Elite curve").
+    /// Absent (the zero curve) means no elites at any rank.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub elite: EliteCurve,
     /// Level-up grant, rank milestones and camp prices. Absent means the
     /// neutral block: no grant, no milestones, flat camp prices.
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub rewards: ProgressionRewardCatalog,
+}
+/// The elite spawn chance by threat rank, in basis points (design
+/// enemy-balance §2 "Elite curve"): 0 below `min_rank`, `start_bp` at it,
+/// linear to `end_bp` at `end_rank`, then held. The zero curve (`end_bp`
+/// 0, the serde default) fields no elites, so a legacy override keeps none.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct EliteCurve {
+    pub min_rank: u32,
+    pub start_bp: u32,
+    pub end_rank: u32,
+    pub end_bp: u32,
+}
+/// Elites never spawn below this threat rank (schema v7 §3.10).
+pub const ELITE_MIN_RANK: u32 = 3;
+impl EliteCurve {
+    /// The curve is the zero curve, or starts at rank 3 or later with a
+    /// positive rate, ends later, never falls, stays within 10000 bp and
+    /// rises by a whole number of basis points per rank.
+    fn validate(&self) -> Result<(), String> {
+        if *self == Self::default() {
+            return Ok(());
+        }
+        let ranks = self.end_rank.saturating_sub(self.min_rank);
+        if self.min_rank < ELITE_MIN_RANK
+            || self.end_rank > 10_000
+            || ranks == 0
+            || self.start_bp == 0
+            || self.end_bp < self.start_bp
+            || self.end_bp > 10_000
+            || !(self.end_bp - self.start_bp).is_multiple_of(ranks)
+        {
+            return Err("Invalid elite curve: it must be linear from rank 3 or later".into());
+        }
+        Ok(())
+    }
+    /// The elite chance in basis points at threat `rank`.
+    pub fn bp(&self, rank: u32) -> u32 {
+        if self.end_bp == 0 || rank < self.min_rank {
+            return 0;
+        }
+        let step = (self.end_bp - self.start_bp) / (self.end_rank - self.min_rank);
+        self.start_bp + step * (rank.min(self.end_rank) - self.min_rank)
+    }
+}
+/// The elite spawn chance in basis points at threat `rank`, before the
+/// preset's `elite_rate_pct` (design enemy-balance §2): with the shipped
+/// curve 0 below rank 3, else `200 + 65 x (min(rank, 23) - 3)`.
+pub fn elite_bp(cfg: &ProgressionCatalog, rank: u32) -> u32 {
+    cfg.elite.bp(rank)
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
@@ -374,6 +428,7 @@ impl ProgressionCatalog {
         }) {
             return Err("Progression pressure floors must be monotone".into());
         }
+        self.elite.validate()?;
         self.rewards.validate()
     }
     pub fn lanes_for_level(&self, level: u32) -> u8 {
@@ -475,6 +530,7 @@ impl ProgressionCatalog {
             boss_damage_multiplier: self.boss_damage_multiplier(rank),
             boss_armor_multiplier: self.boss_armor_multiplier(rank),
             npc_boss_armor_add: self.npc_boss_armor_add(rank),
+            elite_rate_bp: self.elite.bp(rank),
             // The other enemy-side fields stay neutral until their wave-2
             // writers.
             ..ProgressionSnapshot::default()
@@ -834,5 +890,65 @@ mod tests {
             assert_eq!(xp_to_advance_from(level), player.next_level_xp(), "{level}");
         }
         assert_eq!([1, 2, 3].map(xp_to_advance_from), [20, 35, 57]);
+    }
+
+    /// W2-33 (design enemy-balance §2 "Elite curve", acceptance G6.3): 0
+    /// below rank 3, 200 bp at 3, linear (+65 a rank) to 1500 at 23, then
+    /// held; the snapshot writes it; a catalogue without the block has no
+    /// elites; validation keeps the curve linear and bounded.
+    #[test]
+    fn elite_bp_pins() {
+        let cfg = catalog();
+        assert_eq!(
+            cfg.elite,
+            EliteCurve {
+                min_rank: 3,
+                start_bp: 200,
+                end_rank: 23,
+                end_bp: 1500
+            }
+        );
+        let pins = [0, 1, 2, 3, 4, 13, 22, 23, 24, 50, 1000, u32::MAX].map(|r| elite_bp(cfg, r));
+        assert_eq!(
+            pins,
+            [0, 0, 0, 200, 265, 850, 1435, 1500, 1500, 1500, 1500, 1500]
+        );
+        for rank in 3..=23 {
+            assert_eq!(elite_bp(cfg, rank), 200 + 65 * (rank - 3), "rank {rank}");
+        }
+        for rank in [0, 2, 3, 13, 23, 60] {
+            assert_eq!(cfg.snapshot(rank).elite_rate_bp, elite_bp(cfg, rank));
+        }
+        // A legacy override without the block: no elites at any rank.
+        let mut legacy = serde_json::to_value(cfg).unwrap();
+        legacy.as_object_mut().unwrap().remove("elite");
+        let legacy = ProgressionCatalog::from_json(&legacy.to_string()).unwrap();
+        assert_eq!(legacy.elite, EliteCurve::default());
+        for rank in [0, 3, 13, 23, 1000] {
+            assert_eq!(elite_bp(&legacy, rank), 0, "legacy rank {rank}");
+            assert_eq!(legacy.snapshot(rank).elite_rate_bp, 0);
+        }
+        // Validation: linear, starting at rank 3 or later, bounded.
+        let edit = |change: &dyn Fn(&mut EliteCurve)| {
+            let mut c = cfg.clone();
+            change(&mut c.elite);
+            c.validate()
+        };
+        type Edit<'a> = &'a dyn Fn(&mut EliteCurve);
+        let rows: [(&str, Edit); 7] = [
+            ("not linear", &|e| e.end_bp = 1501),
+            ("below rank 3", &|e| e.min_rank = 2),
+            ("end before start", &|e| e.end_rank = 3),
+            ("falling", &|e| e.start_bp = 1600),
+            ("above 10000 bp", &|e| e.end_bp = 10_200),
+            ("zero start", &|e| e.start_bp = 0),
+            ("start without end", &|e| e.end_bp = 0),
+        ];
+        let passed: Vec<&str> = rows
+            .into_iter()
+            .filter_map(|(row, change)| edit(change).is_ok().then_some(row))
+            .collect();
+        assert_eq!(passed, Vec::<&str>::new(), "rows that validated");
+        edit(&|e| *e = EliteCurve::default()).unwrap();
     }
 }

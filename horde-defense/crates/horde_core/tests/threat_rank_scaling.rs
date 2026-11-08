@@ -12,6 +12,7 @@ use horde_core::progression::{FrontPosition, ProgressionCatalog, catalog};
 use horde_core::sim::DEFENSE_LINE;
 use horde_core::world::world;
 use serde_json::Value;
+use std::collections::BTreeSet;
 
 const MODES: [Mode; 2] = [Mode::Personal, Mode::Npc];
 
@@ -335,13 +336,44 @@ fn ranks_zero_to_four_lines() -> String {
 }
 
 /// Pin: every rank 0-4 snapshot serializes byte for byte as on the parent
-/// of W2-32 (the knee sits at rank 4 and rows 0-4 are frozen).
+/// of W2-32 (the knee sits at rank 4 and rows 0-4 are frozen), apart from
+/// the one key W2-33 adds on purpose: elites roll from rank 3 (design
+/// enemy-balance §5), so ranks 3 and 4 write `elite_rate_bp` (200 and 265
+/// bp on Normal, times the preset's percent). With that key cut out the
+/// lines hash to the W2-32 value, and the key is pinned on its own.
 #[test]
 fn ranks_zero_to_four_snapshot_pinned() {
     let lines = ranks_zero_to_four_lines();
     assert_eq!(lines.lines().count(), 5 * (1 + 5 * 2 * 4));
+    const KEY: &str = ",\"elite_rate_bp\":";
+    let mut rates = BTreeSet::new();
+    let mut stripped = String::new();
+    for line in lines.lines() {
+        // The JSON object, after the front position's Debug braces.
+        let json = &line[line.find("{\"").unwrap()..];
+        let value: Value = serde_json::from_str(json).unwrap();
+        let rank = value["rank"].as_u64().unwrap();
+        match line.find(KEY) {
+            Some(start) => {
+                let rest = &line[start + KEY.len()..];
+                let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+                rates.insert((rank, rest[..digits].parse::<u32>().unwrap()));
+                stripped.push_str(&line[..start]);
+                stripped.push_str(&rest[digits..]);
+            }
+            None => {
+                assert!(rank < 3, "rank {rank} without an elite rate: {line}");
+                stripped.push_str(line);
+            }
+        }
+        stripped.push('\n');
+    }
+    // Easy 50%, Normal (the catalogue and the legacy balance) 100%, Hard
+    // and Custom from Hard 150%.
+    let expected = [(3, 100), (3, 200), (3, 300), (4, 132), (4, 265), (4, 397)];
+    assert_eq!(rates, BTreeSet::from(expected));
     assert_eq!(
-        support::fnv1a(lines.as_bytes()),
+        support::fnv1a(stripped.as_bytes()),
         RANKS_ZERO_TO_FOUR_FNV,
         "a rank 0-4 snapshot moved:\n{lines}"
     );

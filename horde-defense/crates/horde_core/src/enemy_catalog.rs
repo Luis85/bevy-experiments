@@ -163,6 +163,115 @@ pub struct EliteMark {
 /// The most authored tags one archetype may carry.
 pub const MAX_ENEMY_TAGS: usize = 8;
 const MAX_ELITE_NAME_BYTES: usize = 60;
+/// The most authored elite affixes.
+pub const MAX_ELITE_AFFIXES: usize = 16;
+const MAX_AFFIX_NAME_BYTES: usize = 24;
+
+/// What every elite gains before its affix (design enemy-balance §5 "Base
+/// multipliers"). The neutral default (all 1) is what a catalogue without
+/// the key gets; it fields no elites anyway, because it has no affixes.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct EliteBase {
+    /// Health and NPC hit points, 1..=4.
+    pub health: f32,
+    /// Coin reward factor, 1..=10.
+    pub reward: u32,
+    /// Experience factor, 1..=10.
+    pub xp: u32,
+    /// Visual scale, 1..=1.5.
+    pub scale: f32,
+}
+impl Default for EliteBase {
+    fn default() -> Self {
+        Self {
+            health: 1.0,
+            reward: 1,
+            xp: 1,
+            scale: 1.0,
+        }
+    }
+}
+
+/// One elite affix (design enemy-balance §5 "Affixes"): a weighted pick
+/// whose stats are baked into the spawn snapshot by
+/// [`ResolvedEnemy::with_affix`]. Multipliers default to 1 and additions
+/// to 0. Personal reads the multipliers and the Personal armor terms; NPC
+/// battles read the `npc_` additions.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EliteAffix {
+    pub id: String,
+    /// Display word, prefixed to the archetype's name in the mark.
+    pub name: String,
+    /// Pick weight, 1..=10000.
+    pub weight: u32,
+    /// Personal health, 1..=4.
+    #[serde(default = "one_multiplier")]
+    pub health: f32,
+    /// Personal damage, 1..=4.
+    #[serde(default = "one_multiplier")]
+    pub damage: f32,
+    /// Speed, 1..=2.
+    #[serde(default = "one_multiplier")]
+    pub speed: f32,
+    /// Windup, 0.5..=1.
+    #[serde(default = "one_multiplier")]
+    pub windup: f32,
+    /// Personal armor added, 0..=100.
+    #[serde(default)]
+    pub armor: i32,
+    /// Personal ranged armor added, 0..=100.
+    #[serde(default)]
+    pub ranged_armor: i32,
+    /// NPC hit points added, 0..=100.
+    #[serde(default)]
+    pub npc_hp: i32,
+    /// NPC armor added, 0..=20.
+    #[serde(default)]
+    pub npc_armor: i32,
+    /// NPC skill added, 0..=10.
+    #[serde(default)]
+    pub npc_skill: i32,
+    /// NPC dodge added, 0..=10.
+    #[serde(default)]
+    pub npc_dodge: i32,
+    /// NPC damage added, 0..=20.
+    #[serde(default)]
+    pub npc_damage_add: i32,
+    /// NPC ranged armor added, 0..=20.
+    #[serde(default)]
+    pub npc_ranged_armor: i32,
+    /// A death effect the affix adds; offered only to archetypes without
+    /// one of their own.
+    #[serde(default)]
+    pub death_effect: Option<DeathEffect>,
+}
+impl EliteAffix {
+    fn valid(&self) -> bool {
+        valid_id(&self.id)
+            && !self.name.trim().is_empty()
+            && self.name.len() <= MAX_AFFIX_NAME_BYTES
+            && (1..=10_000).contains(&self.weight)
+            && finite_range(self.health, 1.0, 4.0)
+            && finite_range(self.damage, 1.0, 4.0)
+            && finite_range(self.speed, 1.0, 2.0)
+            && finite_range(self.windup, 0.5, 1.0)
+            && (0..=100).contains(&self.armor)
+            && (0..=100).contains(&self.ranged_armor)
+            && (0..=100).contains(&self.npc_hp)
+            && (0..=20).contains(&self.npc_armor)
+            && (0..=10).contains(&self.npc_skill)
+            && (0..=10).contains(&self.npc_dodge)
+            && (0..=20).contains(&self.npc_damage_add)
+            && (0..=20).contains(&self.npc_ranged_armor)
+            && self.death_effect.as_ref().is_none_or(DeathEffect::valid)
+    }
+    /// Whether `base` may roll this affix: never a second death effect.
+    fn offered_to(&self, base: &ResolvedEnemy) -> bool {
+        self.death_effect.is_none() || base.death_effect.is_none()
+    }
+}
 
 impl ResolvedEnemy {
     /// Validate saved snapshots without consulting the current catalogue.
@@ -210,6 +319,47 @@ impl ResolvedEnemy {
         }
         Ok(())
     }
+
+    /// This profile as an elite with `affix` (design enemy-balance §5
+    /// "Bake"): the base multipliers and the affix are baked into the
+    /// stats, so every sim read of the snapshot is unchanged, and `elite`
+    /// marks it. Personal health is `round(health x base x affix)`, NPC hit
+    /// points `round(npc_hp x base) + npc_hp add`; reward and xp multiply,
+    /// the visual scales, and the affix's death effect is added. The mark
+    /// names "<affix> <archetype>", or the affix alone past 60 bytes.
+    pub fn with_affix(&self, base: &EliteBase, affix: &EliteAffix) -> ResolvedEnemy {
+        let scaled = |value: i32, factor: f32| (value as f32 * factor).round().max(1.0) as i32;
+        let full = format!("{} {}", affix.name, self.name);
+        let name = if full.len() <= MAX_ELITE_NAME_BYTES {
+            full
+        } else {
+            affix.name.clone()
+        };
+        let mut elite = self.clone();
+        elite.health = scaled(self.health, base.health * affix.health);
+        elite.npc_hp = scaled(self.npc_hp, base.health) + affix.npc_hp;
+        elite.reward = self.reward.saturating_mul(u64::from(base.reward));
+        elite.xp = self.xp.saturating_mul(u64::from(base.xp));
+        elite.visual.scale = self.visual.scale * base.scale;
+        elite.damage = scaled(self.damage, affix.damage);
+        elite.speed = self.speed * affix.speed;
+        elite.windup = self.windup * affix.windup;
+        elite.armor += affix.armor;
+        elite.ranged_armor += affix.ranged_armor;
+        elite.npc_armor += affix.npc_armor;
+        elite.npc_skill += affix.npc_skill;
+        elite.npc_dodge += affix.npc_dodge;
+        elite.npc_damage_add += affix.npc_damage_add;
+        elite.npc_ranged_armor += affix.npc_ranged_armor;
+        if affix.death_effect.is_some() {
+            elite.death_effect = affix.death_effect.clone();
+        }
+        elite.elite = Some(EliteMark {
+            affix_id: affix.id.clone(),
+            name,
+        });
+        elite
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -227,6 +377,12 @@ pub struct EnemyCatalog {
     waves: Vec<Vec<WeightedEnemy>>,
     /// Archetypes authored `elite_eligible: false` (catalogue only).
     elite_ineligible: BTreeSet<String>,
+    elite_base: EliteBase,
+    /// Authored order; empty means no elites.
+    elite_affixes: Vec<EliteAffix>,
+    /// The largest health any elite can spawn with, (Personal, NPC); 0
+    /// without affixes.
+    elite_maximum_health: (i32, i32),
 }
 
 impl EnemyCatalog {
@@ -241,6 +397,45 @@ impl EnemyCatalog {
     /// not eligible.
     pub fn elite_eligible(&self, id: &str) -> bool {
         self.resolved.contains_key(id) && !self.elite_ineligible.contains(id)
+    }
+
+    /// The authored elite affix ids, in table order.
+    pub fn elite_affix_ids(&self) -> impl Iterator<Item = &str> {
+        self.elite_affixes.iter().map(|affix| affix.id.as_str())
+    }
+
+    /// `base` as an elite with the affix `key` picks (design enemy-balance
+    /// §5 "Roll"): `key` modulo the weight of the affixes offered to it, in
+    /// table order. None when nothing is offered or `base` is already an
+    /// elite. Pure: the caller supplies the keyed AFFIX hash.
+    pub fn elite_profile(&self, base: &ResolvedEnemy, key: u64) -> Option<ResolvedEnemy> {
+        if base.elite.is_some() {
+            return None;
+        }
+        let offered = || self.elite_affixes.iter().filter(|a| a.offered_to(base));
+        let total: u64 = offered().map(|a| u64::from(a.weight)).sum();
+        if total == 0 {
+            return None;
+        }
+        let mut roll = key % total;
+        for affix in offered() {
+            if roll < u64::from(affix.weight) {
+                return Some(base.with_affix(&self.elite_base, affix));
+            }
+            roll -= u64::from(affix.weight);
+        }
+        None
+    }
+
+    /// The largest health an elite of this catalogue can spawn with in
+    /// `mode` (Personal health, NPC hit points), before encounter
+    /// modifiers; 0 without affixes.
+    pub(crate) fn maximum_elite_health(&self, mode: crate::content::Mode) -> i32 {
+        if mode == crate::content::Mode::Personal {
+            self.elite_maximum_health.0
+        } else {
+            self.elite_maximum_health.1
+        }
     }
 
     /// The weighted mean hit points one pick from `wave_pool(tier, unlocked)`
@@ -501,6 +696,12 @@ struct AuthoredCatalog {
     archetypes: Vec<Archetype>,
     defaults: Vec<KindDefault>,
     waves: Vec<Wave>,
+    /// See [`EliteBase`]; absent is neutral.
+    #[serde(default)]
+    elite_base: EliteBase,
+    /// See [`EliteAffix`]; absent means no elites.
+    #[serde(default)]
+    elite_affixes: Vec<EliteAffix>,
 }
 
 /// A catalogue id: 1-64 bytes of `[a-z0-9_.-]`. Saved per-archetype
@@ -535,6 +736,49 @@ fn component<'a, T>(table: &BTreeMap<&str, &'a T>, id: &str) -> Result<&'a T, St
         .get(id)
         .copied()
         .ok_or_else(|| format!("Unknown enemy component reference: {id}"))
+}
+
+/// The elite tables are bounded, the affix ids unique, and every eligible
+/// archetype x offered affix pair passes [`ResolvedEnemy::validate`] (design
+/// enemy-balance §5: there are no runtime clamps). Returns the largest
+/// elite (Personal, NPC) health.
+fn check_elites(
+    base: &EliteBase,
+    affixes: &[EliteAffix],
+    resolved: &BTreeMap<String, ResolvedEnemy>,
+    ineligible: &BTreeSet<String>,
+) -> Result<(i32, i32), String> {
+    if !finite_range(base.health, 1.0, 4.0)
+        || !(1..=10).contains(&base.reward)
+        || !(1..=10).contains(&base.xp)
+        || !finite_range(base.scale, 1.0, 1.5)
+    {
+        return Err("Invalid elite base multipliers".into());
+    }
+    if affixes.len() > MAX_ELITE_AFFIXES {
+        return Err(format!("At most {MAX_ELITE_AFFIXES} elite affixes"));
+    }
+    let mut ids = BTreeSet::new();
+    let mut maximum = (0, 0);
+    for affix in affixes {
+        if !affix.valid() || !ids.insert(affix.id.as_str()) {
+            return Err(format!("Invalid or duplicate elite affix: {}", affix.id));
+        }
+        for enemy in resolved.values() {
+            if ineligible.contains(&enemy.archetype_id) || !affix.offered_to(enemy) {
+                continue;
+            }
+            let elite = enemy.with_affix(base, affix);
+            elite.validate().map_err(|error| {
+                format!(
+                    "Elite affix {} breaks {}: {error}",
+                    affix.id, enemy.archetype_id
+                )
+            })?;
+            maximum = (maximum.0.max(elite.health), maximum.1.max(elite.npc_hp));
+        }
+    }
+    Ok(maximum)
 }
 
 impl AuthoredCatalog {
@@ -719,11 +963,20 @@ impl AuthoredCatalog {
                 .sort_by(|a, b| a.archetype_id.cmp(&b.archetype_id));
             waves.push(wave.entries);
         }
+        let elite_maximum_health = check_elites(
+            &self.elite_base,
+            &self.elite_affixes,
+            &resolved,
+            &elite_ineligible,
+        )?;
         Ok(EnemyCatalog {
             resolved,
             defaults,
             waves,
             elite_ineligible,
+            elite_base: self.elite_base,
+            elite_affixes: self.elite_affixes,
+            elite_maximum_health,
         })
     }
 }
@@ -1060,5 +1313,120 @@ mod tests {
         let mut invalid = restored;
         invalid.speed = f32::NAN;
         assert!(invalid.validate().is_err());
+    }
+
+    /// W2-33 (design enemy-balance §5 "Base multipliers", "Affixes" and
+    /// "Bake"): the shipped elite table, the stats one affix bakes into a
+    /// spawn snapshot, and the load-time check of every archetype x affix
+    /// pair.
+    #[test]
+    fn elite_affixes_bake_the_design_table_into_the_spawn_snapshot() {
+        let catalog = parse(&authored()).unwrap();
+        assert_eq!(
+            catalog.elite_affix_ids().collect::<Vec<_>>(),
+            ["hardened", "frenzied", "vicious", "shielded", "volatile"]
+        );
+        let shambler = catalog.resolve("shambler").unwrap();
+        let bake = |id: &str| {
+            let affix = catalog.elite_affixes.iter().find(|a| a.id == id).unwrap();
+            shambler.with_affix(&catalog.elite_base, affix)
+        };
+        // Base: health x1.5 in both modes, reward x4, xp x3, scale x1.15.
+        let hardened = bake("hardened");
+        assert_eq!(
+            hardened.elite,
+            Some(EliteMark {
+                affix_id: "hardened".into(),
+                name: "Hardened Shambler".into()
+            })
+        );
+        assert_eq!((hardened.health, hardened.npc_hp), (77, 18));
+        assert_eq!((hardened.armor, hardened.npc_armor), (4, 2));
+        assert_eq!((hardened.reward, hardened.xp), (12, 6));
+        assert_eq!(hardened.visual.scale, 1.15);
+        assert_eq!(hardened.name, shambler.name, "the record keeps its name");
+        let frenzied = bake("frenzied");
+        assert_eq!((frenzied.health, frenzied.npc_hp), (48, 14));
+        assert_eq!(frenzied.speed, 0.47 * 1.3);
+        assert_eq!(frenzied.windup, 1.25 * 0.75);
+        assert_eq!((frenzied.npc_skill, frenzied.npc_dodge), (11, 8));
+        let vicious = bake("vicious");
+        assert_eq!((vicious.damage, vicious.npc_damage_add), (8, 3));
+        let shielded = bake("shielded");
+        assert_eq!((shielded.ranged_armor, shielded.npc_ranged_armor), (10, 3));
+        let volatile = bake("volatile");
+        assert_eq!((volatile.health, volatile.npc_hp), (58, 14));
+        assert_eq!(
+            volatile.death_effect,
+            Some(DeathEffect::Burst {
+                radius: 1.4,
+                damage: 24,
+                structure_damage: 30,
+                npc_dice: 2,
+                npc_add: 0,
+                fuse: false
+            })
+        );
+        // The pick is keyed: the key modulo the eligible weight (30, 25,
+        // 20, 15, 10), and volatile is never offered to an archetype that
+        // already has a death effect.
+        let affix_of = |id: &str, key: u64| {
+            catalog
+                .elite_profile(&catalog.resolve(id).unwrap(), key)
+                .and_then(|p| p.elite)
+                .map(|m| m.affix_id)
+        };
+        let picks = [0, 29, 30, 54, 55, 74, 75, 89, 90, 99, 100].map(|k| affix_of("shambler", k));
+        let expect = [
+            "hardened", "hardened", "frenzied", "frenzied", "vicious", "vicious", "shielded",
+            "shielded", "volatile", "volatile", "hardened",
+        ];
+        assert_eq!(picks, expect.map(|a| Some(a.to_owned())));
+        for id in ["exploder", "splitter"] {
+            let offered: BTreeSet<String> = (0..90).filter_map(|k| affix_of(id, k)).collect();
+            assert!(!offered.contains("volatile"), "{id}");
+            assert_eq!(affix_of(id, 89), Some("shielded".into()), "{id}: out of 90");
+        }
+        assert_eq!(catalog.elite_profile(&hardened, 0), None, "never twice");
+        // Every eligible archetype x affix pair validates at load, or the
+        // load is rejected: a windup affix of .5 takes the 0.8 s sprinter
+        // below the 0.5 s bound.
+        let mut data = authored();
+        data["elite_affixes"][1]["windup"] = 0.5.into();
+        let error = parse(&data).unwrap_err();
+        assert!(error.contains("frenzied"), "{error}");
+        // The splitter brood is not eligible, so it is not checked.
+        let mut data = authored();
+        data["elite_affixes"][0]["armor"] = 1000.into();
+        assert!(parse(&data).is_err(), "armor above the bound");
+        let rows: [(&str, serde_json::Value); 8] = [
+            ("/elite_base/health", 0.9.into()),
+            ("/elite_base/reward", 0.into()),
+            ("/elite_affixes/0/weight", 0.into()),
+            ("/elite_affixes/0/health", 4.5.into()),
+            ("/elite_affixes/1/speed", 2.5.into()),
+            ("/elite_affixes/2/damage", 0.5.into()),
+            ("/elite_affixes/3/id", "Shielded!".into()),
+            ("/elite_affixes/4/name", " ".into()),
+        ];
+        for (pointer, value) in rows {
+            let mut data = authored();
+            *data.pointer_mut(pointer).unwrap() = value;
+            assert!(parse(&data).is_err(), "accepted {pointer}");
+        }
+        let mut data = authored();
+        let duplicate = data["elite_affixes"][0].clone();
+        data["elite_affixes"]
+            .as_array_mut()
+            .unwrap()
+            .push(duplicate);
+        assert!(parse(&data).is_err(), "accepted a duplicate affix");
+        // Without the tables there are no elites.
+        let mut data = authored();
+        data.as_object_mut().unwrap().remove("elite_affixes");
+        data.as_object_mut().unwrap().remove("elite_base");
+        let legacy = parse(&data).unwrap();
+        assert_eq!(legacy.elite_affix_ids().count(), 0);
+        assert_eq!(legacy.elite_profile(&shambler, 7), None);
     }
 }

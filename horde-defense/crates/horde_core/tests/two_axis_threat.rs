@@ -476,7 +476,8 @@ fn boss_damage_multiplier_is_exactly_one_through_rank_4() {
 }
 
 /// Pin: ranks 0-4 at depth 0 serialize only the legacy snapshot keys on
-/// every preset (no ramp, no boss rank, no boss damage, no extras), and
+/// every preset (no ramp, no boss rank, no boss damage, no extras), plus
+/// the elite rate from rank 3 (W2-33, design enemy-balance §5), and
 /// round-trip byte-identically. Depth 0 here means no country or stage 0
 /// of a multi-stage front. A one-stage front is also at depth 0, but its
 /// only stage is its Capstone (ruling W-9), so it adds exactly the
@@ -493,7 +494,7 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
                     let text = serde_json::to_string(&at(&c, mode, rank, position)).unwrap();
                     assert_eq!(
                         keys(&text),
-                        expected,
+                        with_elites(&expected, rank),
                         "{name} {mode:?} rank {rank} {position:?}"
                     );
                     let restored: ProgressionSnapshot = serde_json::from_str(&text).unwrap();
@@ -511,7 +512,7 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
                 let text = serde_json::to_string(&snapshot).unwrap();
                 assert_eq!(
                     keys(&text),
-                    capstone,
+                    with_elites(&capstone, rank),
                     "{name} {mode:?} rank {rank} one stage"
                 );
                 assert!(
@@ -523,6 +524,15 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
             }
         }
     }
+}
+
+/// `keys` plus `elite_rate_bp` from rank 3, where elites start (W2-33).
+fn with_elites(keys: &BTreeSet<String>, rank: u32) -> BTreeSet<String> {
+    let mut keys = keys.clone();
+    if rank >= 3 {
+        keys.insert("elite_rate_bp".into());
+    }
+    keys
 }
 
 /// Pin: the country-stage render fixtures (and the practice scenes built

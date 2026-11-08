@@ -205,18 +205,9 @@ impl Game {
         modifiers.enemy_health *= progression.enemy_health * balance.enemy_health;
         modifiers.enemy_speed *= progression.enemy_speed * balance.enemy_speed;
         modifiers.reward *= progression.reward_multiplier * balance.reward;
-        let boss_base = if mode == Mode::Npc {
-            content().levels[level]
-                .boss_npc_hp
-                .max(progression.npc_boss_health_floor)
-        } else {
-            content().levels[level]
-                .boss_health
-                .max(progression.boss_health_floor)
-        };
-        let maximum_base =
-            boss_base.max(crate::enemy_catalog::enemy_catalog().maximum_health(mode));
-        if maximum_base as f32 * modifiers.enemy_health > 10_000_000.0 {
+        if encounter_health_bound(&content().levels[level], mode, &progression, &modifiers)
+            > MAX_ENCOUNTER_HEALTH
+        {
             return Err("Encounter health exceeds supported numerical safety bounds".into());
         }
         profile.personal.damage = (profile.personal.damage as f32 * modifiers.personal_damage)

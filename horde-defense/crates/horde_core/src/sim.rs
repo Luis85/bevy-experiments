@@ -8,6 +8,8 @@ mod death_effect_tests;
 mod defense;
 mod director;
 #[cfg(test)]
+mod elite_tests;
+#[cfg(test)]
 mod enemy_trait_tests;
 mod events;
 mod fixtures;
@@ -1772,6 +1774,32 @@ fn choose_lane(a: &mut Attempt) -> u8 {
         a.lane_history.remove(0);
     }
     lane
+}
+/// The most hit points one hostile of a supported encounter may spawn with.
+const MAX_ENCOUNTER_HEALTH: f32 = 10_000_000.0;
+/// The largest hit points one hostile of an encounter on `level` in `mode`
+/// can spawn with (design enemy-balance §5 "Health guard"): the boss (its
+/// floor and `boss_health_multiplier`) or the largest catalogue record,
+/// and the largest elite when the snapshot rolls elites, times the
+/// encounter's health modifier (the front ramp is already inside it). The
+/// one guard of deploy and save validation.
+fn encounter_health_bound(
+    level: &crate::content::LevelDefinition,
+    mode: Mode,
+    progression: &crate::progression::ProgressionSnapshot,
+    modifiers: &Modifiers,
+) -> f32 {
+    let boss = if mode == Mode::Npc {
+        level.boss_npc_hp.max(progression.npc_boss_health_floor)
+    } else {
+        level.boss_health.max(progression.boss_health_floor)
+    };
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    let mut regular = catalog.maximum_health(mode);
+    if progression.elite_rate_bp > 0 {
+        regular = regular.max(catalog.maximum_elite_health(mode));
+    }
+    (boss as f32 * progression.boss_health_multiplier).max(regular as f32) * modifiers.enemy_health
 }
 fn enemy_profile(e: &Enemy) -> &crate::enemy_catalog::ResolvedEnemy {
     e.resolved

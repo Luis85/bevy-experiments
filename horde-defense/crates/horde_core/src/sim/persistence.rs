@@ -616,14 +616,8 @@ pub(super) fn validate_game(game: &Game, depth: usize) -> Result<(), String> {
         }
         a.progression.validate()?;
         let level = content().levels.get(a.level).ok_or("Invalid saved level")?;
-        let boss_base = if a.mode == Mode::Npc {
-            level.boss_npc_hp.max(a.progression.npc_boss_health_floor)
-        } else {
-            level.boss_health.max(a.progression.boss_health_floor)
-        };
-        if boss_base.max(crate::enemy_catalog::enemy_catalog().maximum_health(a.mode)) as f32
-            * a.modifiers.enemy_health
-            > 10_000_000.0
+        if encounter_health_bound(level, a.mode, &a.progression, &a.modifiers)
+            > MAX_ENCOUNTER_HEALTH
         {
             return Err("Saved encounter exceeds supported health numerical bounds".into());
         }

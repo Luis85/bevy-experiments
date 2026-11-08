@@ -171,6 +171,46 @@ Pool construction consumes no RNG. The simulation sums the returned weights,
 draws once from its existing serialized RNG, and resolves the chosen ID. Spawn
 rates, live enemy limits and timed bosses remain encounter/director settings.
 
+## Elites
+
+Director wave spawns may roll elite (W2-33, design enemy-balance §5). Bosses,
+Caller summons, split children, staged spawns (`Game::spawn_archetype`) and
+archetypes authored `elite_eligible: false` never do. The roll is a keyed hash
+that never reads the combat RNG: `keyed(seed, attempt id, enemy id, ELITE) %
+10000 < snapshot.elite_rate_bp` (see PROGRESSION_SCALING.md for the rate). Each
+member of a group rolls on its own id. An elite picks its affix with a second
+keyed hash, `keyed(.., AFFIX)` modulo the weight of the affixes offered to it,
+in table order.
+
+`elite_base` multiplies every elite: health ×1.5 (Personal health and NPC hit
+points), reward ×4, xp ×3, visual scale ×1.15. `elite_affixes` (append-only,
+at most 16; absent means no elites):
+
+| id | weight | Personal | NPC |
+| --- | --- | --- | --- |
+| hardened | 30 | health ×1.6, armor +4 | hit points +4, armor +2 |
+| frenzied | 25 | speed ×1.3, windup ×0.75 | skill +2, dodge +1 |
+| vicious | 20 | damage ×1.5 | damage add +3 |
+| shielded | 15 | ranged armor +10 | ranged armor +3 |
+| volatile | 10 | health ×1.2 and a death burst (1.4 yd, 24 damage, 30 structure damage, NPC 2d+0, no fuse) | the same burst |
+
+`volatile` is offered only to archetypes without a death effect of their own.
+`ResolvedEnemy::with_affix` bakes the stats into the spawn snapshot (Personal
+health `round(health × 1.5 × affix)`, NPC hit points `round(npc_hp × 1.5) +
+add`) and sets `elite: { affix_id, name }`, the name being "<Affix>
+<archetype name>" (the affix alone past 60 bytes). Every simulation read goes
+through the snapshot, so nothing else changes; the spawn publishes the usual
+`Spawn` event. Affix bounds: health and damage ×1–4, speed ×1–2, windup
+×0.5–1, armor and ranged armor +0–100, NPC hit points +0–100, NPC armor, damage
+add and ranged armor +0–20, NPC skill and dodge +0–10, weight 1–10000, base
+health ×1–4, reward and xp ×1–10, scale ×1–1.5. Every eligible archetype ×
+offered affix pair must pass `ResolvedEnemy::validate` at load, or the load is
+rejected; there are no runtime clamps. The encounter health guard (deploy and
+save validation) counts the largest elite whenever the snapshot rolls elites.
+
+Telemetry counts `elites_spawned` and `elites_killed` (never more kills than
+spawns); a finished run's record copies the kills into `elite_kills`.
+
 ## Validation limits
 
 JSON input is capped at 4 MiB. Each component/archetype table and the template

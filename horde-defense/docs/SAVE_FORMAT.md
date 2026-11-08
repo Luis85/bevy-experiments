@@ -176,11 +176,13 @@ id (1-64 bytes of `[a-z0-9_.-]`), archetype kills summing above the owner's
 `kills`, an archetype with more kills than spawns, or more than two boss
 phase ticks. v6 telemetry loads with them empty. Since W2-05 the spawn
 director, the reap and the defender-damage paths write the three archetype
-maps; the elite counters, hazard damage and boss phase ticks are not written
-yet. Because an attempt resumed from an older save has living enemies whose
-spawns were never counted, the writer counts a kill in `kills_by_archetype`
-only while that archetype's kills are below its `spawned_by_archetype` count.
-Otherwise the save could not load again. A finished run's record copies
+maps; since W2-33 the spawn director and the reap write the elite counters
+(an elite kill only while `elites_killed` is below `elites_spawned`). The
+boss phase ticks are not written yet. Because an attempt resumed from an
+older save has living enemies whose spawns were never counted, the writer
+counts a kill in `kills_by_archetype` only while that archetype's kills are
+below its `spawned_by_archetype` count. Otherwise the save could not load
+again. A finished run's record copies
 `elites_killed` into `elite_kills`, the boss defeat tick minus its arrival
 tick into `boss_ttk_ticks`, and the encounter's boss rank into `boss_rank`
 (the report's `boss_rank` too).

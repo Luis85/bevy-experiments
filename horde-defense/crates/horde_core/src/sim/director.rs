@@ -52,7 +52,7 @@ impl Game {
                     let mut roll = a.rng.below(total);
                     for entry in &pool {
                         if roll < u64::from(entry.weight) {
-                            self.spawn_archetype(a, &entry.archetype_id, lane)
+                            self.spawn_archetype_as(a, &entry.archetype_id, lane, Arrival::Wave)
                                 .expect("validated eligible wave archetype");
                             break;
                         }
@@ -133,9 +133,20 @@ impl Game {
     }
     pub fn spawn_enemy(&mut self, a: &mut Attempt, kind: EnemyKind, lane: u8, boss: bool) {
         let resolved = crate::enemy_catalog::resolve_kind(kind);
-        self.spawn_resolved_enemy(a, resolved, lane, boss);
+        self.place_enemy(a, resolved, lane, boss, Arrival::Plain);
     }
+    /// Spawns one pick of archetype `id` in `lane`, never as an elite (only
+    /// the director's wave picks roll elite).
     pub fn spawn_archetype(&mut self, a: &mut Attempt, id: &str, lane: u8) -> Result<(), String> {
+        self.spawn_archetype_as(a, id, lane, Arrival::Plain)
+    }
+    pub(super) fn spawn_archetype_as(
+        &mut self,
+        a: &mut Attempt,
+        id: &str,
+        lane: u8,
+        arrival: Arrival,
+    ) -> Result<(), String> {
         let resolved = crate::enemy_catalog::enemy_catalog().resolve(id)?;
         if resolved
             .unlocked_by
@@ -143,21 +154,33 @@ impl Game {
         {
             return Err("Defeat this boss before its ordinary variant joins the horde".into());
         }
-        self.spawn_pick(a, resolved, lane);
+        self.spawn_group(a, resolved, lane, arrival);
         Ok(())
     }
-    /// One weighted pick of `resolved` in `lane`: `group_size` members (a
-    /// sprinter pack, W2-30), each behind the last at the lane's tail, so at
-    /// `spawn_x + 0.65k`. The pick draws nothing more than one member would,
-    /// and each member respects the cap; a member past it is a skipped spawn.
+    /// A staged (never elite) pick of `resolved` in `lane`, for tests.
+    #[cfg(test)]
     pub(super) fn spawn_pick(
         &mut self,
         a: &mut Attempt,
         resolved: crate::enemy_catalog::ResolvedEnemy,
         lane: u8,
     ) {
+        self.spawn_group(a, resolved, lane, Arrival::Plain);
+    }
+    /// One weighted pick of `resolved` in `lane`: `group_size` members (a
+    /// sprinter pack, W2-30), each behind the last at the lane's tail, so at
+    /// `spawn_x + 0.65k`. The pick draws nothing more than one member would,
+    /// and each member respects the cap; a member past it is a skipped spawn.
+    /// Each member of a wave pick rolls elite on its own id.
+    fn spawn_group(
+        &mut self,
+        a: &mut Attempt,
+        resolved: crate::enemy_catalog::ResolvedEnemy,
+        lane: u8,
+        arrival: Arrival,
+    ) {
         if resolved.group_size <= 1 {
-            self.spawn_resolved_enemy(a, resolved, lane, false);
+            self.place_enemy(a, resolved, lane, false, arrival);
             return;
         }
         // The first member is the pick the caller made room for.
@@ -166,38 +189,62 @@ impl Game {
                 a.telemetry.skipped_spawns += 1;
                 continue;
             }
-            self.spawn_resolved_enemy(a, resolved.clone(), lane, false);
+            self.place_enemy(a, resolved.clone(), lane, false, arrival);
         }
     }
-    fn spawn_resolved_enemy(
-        &mut self,
-        a: &mut Attempt,
+    /// A director wave spawn of `resolved` as hostile `id`, made elite when
+    /// the keyed ELITE roll lands under the snapshot's rate (design
+    /// enemy-balance §5, ruling E7). The affix is the keyed AFFIX pick. No
+    /// combat RNG is read, and an ineligible archetype or a zero rate
+    /// returns the profile unchanged.
+    fn roll_elite(
+        &self,
+        a: &Attempt,
         resolved: crate::enemy_catalog::ResolvedEnemy,
-        lane: u8,
-        boss: bool,
-    ) {
-        self.place_enemy(a, resolved, lane, boss, None);
+        id: u64,
+    ) -> crate::enemy_catalog::ResolvedEnemy {
+        let catalog = crate::enemy_catalog::enemy_catalog();
+        let rate = a.progression.elite_rate_bp;
+        if rate == 0
+            || !catalog.elite_eligible(&resolved.archetype_id)
+            || !rolls_elite(self.seed, a.id, id, rate)
+        {
+            return resolved;
+        }
+        let key = crate::hash::keyed(self.seed, a.id, id, crate::hash::tags::AFFIX);
+        catalog.elite_profile(&resolved, key).unwrap_or(resolved)
     }
-    /// Materialises one hostile in `lane` within the caps. `split_at` Some
-    /// places a splitter's child at that x (W2-29): marked `split_child`,
-    /// counted as a spawn, and announced by the parent's `Split` event
-    /// instead of a `Spawn` at the field edge. No combat draw either way.
+    /// Materialises one hostile in `lane` within the caps. A wave
+    /// `arrival` may roll elite (bosses never do). A split arrival places a
+    /// splitter's child at that x (W2-29): marked `split_child`, counted as
+    /// a spawn, and announced by the parent's `Split` event instead of a
+    /// `Spawn` at the field edge. No combat draw either way.
     pub(super) fn place_enemy(
         &mut self,
         a: &mut Attempt,
         resolved: crate::enemy_catalog::ResolvedEnemy,
         lane: u8,
         boss: bool,
-        split_at: Option<f32>,
+        arrival: Arrival,
     ) {
-        let kind = resolved.kind;
-        let d = &resolved;
         let level = &content().levels[a.level];
         if (boss && a.enemies.iter().any(|e| e.boss))
             || (!boss && a.enemies.iter().filter(|e| !e.boss).count() >= a.enemy_cap())
         {
             return;
         }
+        let resolved = if arrival == Arrival::Wave && !boss {
+            self.roll_elite(a, resolved, a.next_id)
+        } else {
+            resolved
+        };
+        let elite = resolved.elite.is_some();
+        let kind = resolved.kind;
+        let d = &resolved;
+        let split_at = match arrival {
+            Arrival::Split(x) => Some(x),
+            Arrival::Wave | Arrival::Plain => None,
+        };
         let lane = lane.min(a.lane_count - 1);
         let spawn_x = split_at.unwrap_or_else(|| {
             a.enemies
@@ -256,6 +303,9 @@ impl Game {
             boss_state: None,
         });
         a.telemetry.spawned += 1;
+        if elite {
+            a.telemetry.elites_spawned = a.telemetry.elites_spawned.saturating_add(1);
+        }
         // Bosses carry no resolved snapshot, so only ordinary spawns count.
         if let Some(r) = a.enemies.last().and_then(|e| e.resolved.as_ref()) {
             a.telemetry.count_archetype_spawn(&r.archetype_id);
@@ -282,6 +332,24 @@ impl Game {
         );
     }
 }
+/// How a hostile enters the field.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(super) enum Arrival {
+    /// A director wave pick: it may roll elite.
+    Wave,
+    /// Any other spawn (bosses, Caller summons, staged spawns): never elite.
+    Plain,
+    /// A splitter's child at this x: never elite, never announced.
+    Split(f32),
+}
+
+/// The keyed elite roll of hostile `enemy` in attempt `attempt` (ruling E7):
+/// `keyed(seed, attempt, enemy, ELITE) % 10000 < rate_bp`. Stateless, so it
+/// never draws the combat RNG.
+pub(super) fn rolls_elite(seed: u64, attempt: u64, enemy: u64, rate_bp: u32) -> bool {
+    crate::hash::keyed(seed, attempt, enemy, crate::hash::tags::ELITE) % 10_000 < u64::from(rate_bp)
+}
+
 /// The Personal boss armor scaled by the snapshot's rank multiplier,
 /// rounded; the literal 1.0 keeps the level's armor exactly.
 fn boss_armor(armor: i32, multiplier: f32) -> i32 {
