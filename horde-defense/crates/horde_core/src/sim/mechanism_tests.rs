@@ -204,6 +204,44 @@ fn hazard_scaled_is_identity_at_one_and_scales_at_point_six() {
     }
 }
 
+/// The class perk multiplies the profile the generic modifiers already
+/// built, so a perk never scales a `damage_add` before its multiplier.
+#[test]
+fn class_modifier_folds_after_the_generic_modifiers() {
+    let game = Game::default();
+    let campaign = &game.campaign;
+    let generic = SkillModifiers {
+        damage_add: 3,
+        damage_multiplier: 1.2,
+        reload_multiplier: 0.9,
+        ..SkillModifiers::default()
+    };
+    let generic_only = profile_with(campaign, Mode::Personal, generic.clone());
+    let base = profile_with(campaign, Mode::Personal, SkillModifiers::default());
+    assert_eq!(
+        generic_only.personal.damage,
+        ((base.personal.damage + 3) as f32 * 1.2).round() as i32
+    );
+    let mut both = generic;
+    both.class_modifiers.insert(
+        base.weapon.class,
+        ClassModifiers {
+            damage_multiplier: 1.5,
+            reload_multiplier: 0.8,
+            ..ClassModifiers::default()
+        },
+    );
+    let p = profile_with(campaign, Mode::Personal, both);
+    assert_eq!(
+        p.personal.damage,
+        (generic_only.personal.damage as f32 * 1.5).round() as i32
+    );
+    assert_eq!(
+        p.personal.reload,
+        (generic_only.personal.reload * 0.8).max(0.65)
+    );
+}
+
 fn trap_charges_after_placement(definition: &StructureDefinition, rank: u32) -> u32 {
     let mut g = trap_game();
     g.campaign.structure_upgrades[StructureKind::Trap] = rank;
