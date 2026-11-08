@@ -211,6 +211,17 @@ impl Campaign {
         loadout: [u64; 4],
         character: &Npc,
     ) -> DefenderProfile {
+        self.profile_with_modifiers(mode, loadout, character, self.modifiers())
+    }
+    /// [`Self::profile_for_loadout`] under explicit skill `modifiers` (the
+    /// owned nodes' fold in play; tests inject perks no node authors yet).
+    pub(crate) fn profile_with_modifiers(
+        &self,
+        mode: Mode,
+        loadout: [u64; 4],
+        character: &Npc,
+        modifiers: SkillModifiers,
+    ) -> DefenderProfile {
         let equipment = |slot: Slot| {
             let definition = self
                 .item(loadout[slot.index()])
@@ -225,7 +236,6 @@ impl Campaign {
             )
         };
         let weapon = WeaponSpec::from_item(&equipment(Slot::Ranged));
-        let modifiers = self.modifiers();
         let mut personal = equipment(Slot::Ranged).personal.clone();
         let mut npc = equipment(Slot::Ranged).npc.clone();
         let melee = equipment(Slot::Melee);
@@ -268,6 +278,16 @@ impl Campaign {
             personal.stamina += modifiers.stamina_add;
             personal.armor += modifiers.armor_add;
             personal.melee_damage += modifiers.melee_add;
+            // Class perks fold after the generic modifiers and only for the
+            // equipped weapon's class; without a perk nothing is touched.
+            if let Some(perk) = modifiers.class_modifiers.get(&weapon.class) {
+                personal.damage = (personal.damage as f32 * perk.damage_multiplier)
+                    .round()
+                    .clamp(1.0, 100_000.0) as i32;
+                personal.reload = (personal.reload * perk.reload_multiplier).max(0.65);
+                personal.cadence = (personal.cadence * perk.cadence_multiplier).max(0.08);
+                personal.weak_bonus = (personal.weak_bonus + perk.weak_bonus_add).min(1.0);
+            }
         }
         let is_personal = mode == Mode::Personal;
         DefenderProfile {

@@ -8,6 +8,8 @@ mod fixtures;
 mod journey;
 mod lifecycle;
 mod manual;
+#[cfg(test)]
+mod mechanism_tests;
 mod migrations;
 mod movement;
 mod npc;
@@ -1505,9 +1507,19 @@ impl Game {
         Ok(())
     }
     pub fn place(&mut self, kind: StructureKind, lane: u8, column: u8) -> Result<(), String> {
+        self.place_definition(content().structure(kind), lane, column)
+    }
+    /// [`Self::place`] from an explicit definition (the catalogue's in play;
+    /// tests place authored values the catalogue does not ship yet).
+    fn place_definition(
+        &mut self,
+        d: &crate::content::StructureDefinition,
+        lane: u8,
+        column: u8,
+    ) -> Result<(), String> {
+        let kind = d.kind;
         self.preview_placement(kind, lane, column)?;
         let a = self.attempt.as_mut().expect("preview checked attempt");
-        let d = content().structure(kind);
         a.supply -= d.supply;
         let id = a.next_id;
         a.next_id += 1;
@@ -1524,7 +1536,7 @@ impl Game {
             hp: durability,
             max_hp: durability,
             cooldown: 0,
-            charges: d.charges,
+            charges: d.charges_at_rank(self.campaign.structure_upgrades[kind]),
             cost: d.supply,
             ready_turns: 0,
         });

@@ -320,7 +320,7 @@ pub struct StructureDefinition {
     pub cooldown: f32,
     pub charges: u32,
     /// Extra trap charges per structure mastery rank (traps only; 0 elsewhere).
-    /// Absent means 0. Not yet read by placement (W2).
+    /// Absent means 0. Placement reads it through [`Self::charges_at_rank`].
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub charges_per_rank: u32,
     pub blueprint_price: u64,
@@ -328,6 +328,15 @@ pub struct StructureDefinition {
     pub npc: NpcProfile,
     #[serde(default = "default_structure_npc_skill")]
     pub npc_skill: i32,
+}
+impl StructureDefinition {
+    /// Charges a structure placed at structure mastery `rank` starts with:
+    /// `charges + charges_per_rank × rank` (ruling E12). Unchanged at every
+    /// rank while `charges_per_rank` is 0, as every shipped structure is.
+    pub fn charges_at_rank(&self, rank: u32) -> u32 {
+        self.charges
+            .saturating_add(self.charges_per_rank.saturating_mul(rank))
+    }
 }
 fn default_structure_npc_skill() -> i32 {
     15
@@ -514,10 +523,7 @@ impl Content {
                     && (d.charges == 0 || d.charges > 1000 || d.damage == 0))
                 // Rank 10 (the StructureRank bound) stays within the trap limit.
                 || (d.kind != StructureKind::Trap && d.charges_per_rank != 0)
-                || (d.kind == StructureKind::Trap
-                    && d.charges
-                        .saturating_add(d.charges_per_rank.saturating_mul(10))
-                        > 1000)
+                || (d.kind == StructureKind::Trap && d.charges_at_rank(10) > 1000)
                 || (d.kind == StructureKind::Turret && (d.range <= 0.0 || d.damage == 0))
             {
                 return Err(format!("Invalid structure profile: {}", d.name));

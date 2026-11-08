@@ -171,7 +171,11 @@ impl Game {
                         1.0
                     })
                 .round() as i32;
-                let damage = (raw - enemy_armor(a, &a.enemies[n])).max(0);
+                // Penetration lowers the armor of personal shots only, never
+                // below zero (melee, ordnance and turrets ignore it).
+                let armor =
+                    (enemy_armor(a, &a.enemies[n]) - a.profile.modifiers.armor_penetration).max(0);
+                let damage = (raw - armor).max(0);
                 let impact = impacts.entry(a.enemies[n].id).or_insert((n, 0, false));
                 impact.1 = impact.1.saturating_add(damage);
                 impact.2 |= weak;
