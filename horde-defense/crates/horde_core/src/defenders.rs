@@ -150,6 +150,62 @@ impl std::fmt::Display for DefenderBlocker {
     }
 }
 
+/// What a defender is to the campaign: the player's own survivor, the
+/// companion Mara, or a roster recruit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DefenderRole {
+    Survivor,
+    Companion,
+    Recruit,
+}
+
+/// Where a recruit comes from: the country it joined in and the flavour
+/// trait of that country's biome.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct OriginInfo {
+    pub country_id: String,
+    pub country_name: String,
+    pub origin_trait: OriginTrait,
+}
+
+/// A defender as the frontend names and draws it (`Game::defender_card`).
+/// Derived from the live records on every read; never saved.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DefenderCard {
+    pub id: DefenderId,
+    pub name: String,
+    /// The first word of the name, upper case (ROOK, MARA, ALEX).
+    pub hud_name: String,
+    pub appearance: Appearance,
+    pub role: DefenderRole,
+    /// Some for a recruit only.
+    pub origin: Option<OriginInfo>,
+    /// The rule set the defender fights under.
+    pub mode: Mode,
+    /// The player's level, or a survivor defender's advancement level.
+    pub level: u32,
+    /// The highest `level` the campaign allows right now.
+    pub level_cap: u32,
+}
+
+/// One row of `Game::available_defenders`: the card, whether
+/// `SetNextDefender` would accept it now (or the typed reason it would not),
+/// and whether it is the next defender.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DefenderOption {
+    pub card: DefenderCard,
+    pub selectable: Result<(), DefenderBlocker>,
+    pub selected: bool,
+}
+
+/// The HUD form of a defender name: its first word in upper case.
+pub fn hud_name(name: &str) -> String {
+    name.split_whitespace()
+        .next()
+        .unwrap_or(name)
+        .to_uppercase()
+}
+
 /// Flavour from a recruit's home biome. Text only, with no stat effect.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum OriginTrait {

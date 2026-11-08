@@ -245,7 +245,7 @@ impl StrategyState {
         }
         campaign.sell_unprotected(&self.sale_refs())
     }
-    fn note(&mut self, text: String) {
+    pub(crate) fn note(&mut self, text: String) {
         self.log.push(text);
         if self.log.len() > 80 {
             self.log.remove(0);

@@ -1,5 +1,6 @@
 mod auto_sell;
 mod combat;
+mod defense;
 mod director;
 mod events;
 mod fixtures;

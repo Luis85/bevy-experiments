@@ -16,15 +16,18 @@
 //! with the indexed `liberated_count`; and (W2-11) the takeover core: a
 //! Ready recruit deploys on the main run with its own loadout, tactics and
 //! identity, progresses and is credited on its roster entry, and finish
-//! releases it and its items.
+//! releases it and its items; and (W2-12) the saved next defender with
+//! `SetNextDefender` and `BeginDefense`, the defender-aware continue, retry
+//! and repeat, the dispatch reset, and the `available_defenders`,
+//! `defender_card`, `active_defender` and `battle_defender_card` reads.
 mod support;
 use horde_core::{
     campaign::{Campaign, Npc, NpcTraining},
-    command::{Command, CommandError},
+    command::{Command, CommandError, CommandOutcome},
     content::{Mode, Policy, content},
     defenders::{
-        DefenderBlocker, DefenderId, DefenderSeat, MAX_ADVANCEMENT_LEVEL, OriginTrait,
-        RECRUIT_IDENTITIES, recruit_identity, resolve,
+        DefenderBlocker, DefenderId, DefenderRole, DefenderSeat, MAX_ADVANCEMENT_LEVEL,
+        OriginTrait, RECRUIT_IDENTITIES, recruit_identity, resolve,
     },
     sim::{ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError},
     skill_catalog::skills,
@@ -2159,4 +2162,627 @@ fn mara_finish_matches_legacy_attempt_counting() {
         0,
         "Mara never counts a worker run"
     );
+}
+
+// ---------------------------------------------------------------------------
+// W2-12: choosing the next defender (D9). `Campaign.next_defender` is saved;
+// `Game::next_defender()` falls back to the last report's defender.
+// `SetNextDefender` and `BeginDefense` are appended commands; `Deploy` keeps
+// its recorded mode-owner meaning. Dispatching the chosen recruit elsewhere
+// hands the next defense back to the player with a note.
+// ---------------------------------------------------------------------------
+
+/// The strategic note a dispatch leaves when it takes the next defender.
+fn left_note(name: &str) -> String {
+    format!("{name} left the next defense; you will defend next.")
+}
+
+fn apply_ok(g: &mut Game, command: Command) {
+    g.apply(&command)
+        .unwrap_or_else(|e| panic!("{command:?}: {e}"));
+}
+
+/// A front the recruit can open a country operation on.
+fn operation_front(g: &Game) -> String {
+    world()
+        .countries
+        .iter()
+        .find(|c| {
+            g.campaign().world.can_enter(&c.id)
+                && !g.campaign().world.cleared.contains(&c.id)
+                && c.level_count() > 1
+        })
+        .expect("an enterable front")
+        .id
+        .clone()
+}
+
+#[test]
+fn next_defender_persists_through_save_load_and_continue_deploys_it() {
+    let (mut g, id) = takeover_ready();
+    apply_ok(
+        &mut g,
+        Command::Deploy {
+            stage: 0,
+            mode: Mode::Personal,
+        },
+    );
+    apply_ok(&mut g, Command::Withdraw);
+    assert_eq!(
+        g.next_defender(),
+        DefenderId::Player,
+        "the report's defender"
+    );
+    assert_eq!(
+        g.apply(&Command::SetNextDefender(DefenderId::Recruit(id))),
+        Ok(CommandOutcome::Applied)
+    );
+    assert_eq!(g.campaign().next_defender, Some(DefenderId::Recruit(id)));
+    let saved = serde_json::to_value(&g).unwrap();
+    assert_eq!(saved["campaign"]["next_defender"], json!({"Recruit": id}));
+
+    let mut g = reload(&g);
+    assert_eq!(g.campaign().next_defender, Some(DefenderId::Recruit(id)));
+    assert_eq!(g.next_defender(), DefenderId::Recruit(id));
+    assert_eq!(
+        g.apply(&Command::ContinueJourney),
+        Ok(CommandOutcome::Applied)
+    );
+    let a = g.attempt().expect("continue deployed");
+    assert_eq!(a.defender(), DefenderId::Recruit(id));
+    assert_eq!(a.profile.appearance, recruit_identity(id).1);
+    assert!(!a.paused && !g.global_paused(), "continue unpauses");
+    assert_eq!(status(&g, id), RecruitStatus::Defending);
+    assert_eq!(g.campaign().next_defender, None, "cleared on success");
+    assert!(
+        serde_json::to_value(&g).unwrap()["campaign"]
+            .get("next_defender")
+            .is_none(),
+        "None is not written"
+    );
+    apply_ok(&mut g, Command::Withdraw);
+    assert_eq!(
+        g.next_defender(),
+        DefenderId::Recruit(id),
+        "None falls back to the recruit's report"
+    );
+    reload(&g);
+}
+
+#[test]
+fn set_next_defender_typed_rejections_leave_state_unchanged() {
+    let unavailable = |defender, blocker| CommandError::DefenderUnavailable { defender, blocker };
+    let (ready, id) = takeover_ready();
+    let country = ready.campaign().world.cleared[0].clone();
+    let mut rows: Vec<(&str, Game, DefenderId, CommandError)> = Vec::new();
+
+    let mut live = ready.clone();
+    live.deploy_country_stage(0, Mode::Personal).unwrap();
+    for defender in [
+        DefenderId::Player,
+        DefenderId::Mara,
+        DefenderId::Recruit(id),
+    ] {
+        rows.push((
+            "live defense",
+            live.clone(),
+            defender,
+            CommandError::DefenseInProgress,
+        ));
+    }
+    rows.push((
+        "Mara before Companion",
+        Game::default(),
+        DefenderId::Mara,
+        unavailable(
+            DefenderId::Mara,
+            DefenderBlocker::Locked {
+                node_id: "companion_contact".into(),
+            },
+        ),
+    ));
+    let mut locked = ready.clone();
+    locked.campaign_mut().legacy_features = false;
+    rows.push((
+        "recruit before Recruitment",
+        locked,
+        DefenderId::Recruit(id),
+        unavailable(
+            DefenderId::Recruit(id),
+            DefenderBlocker::Locked {
+                node_id: "recruitment_network".into(),
+            },
+        ),
+    ));
+    let mut guarding = ready.clone();
+    apply_ok(
+        &mut guarding,
+        Command::AssignGuard {
+            id,
+            country: country.clone(),
+        },
+    );
+    rows.push((
+        "guarding recruit",
+        guarding,
+        DefenderId::Recruit(id),
+        unavailable(
+            DefenderId::Recruit(id),
+            DefenderBlocker::Guarding {
+                country_id: country.clone(),
+            },
+        ),
+    ));
+    let mut away = ready.clone();
+    let battle = away.deploy_survivor(id, &country, 0).unwrap();
+    rows.push((
+        "recruit on an expedition",
+        away,
+        DefenderId::Recruit(id),
+        unavailable(
+            DefenderId::Recruit(id),
+            DefenderBlocker::OnExpedition { battle },
+        ),
+    ));
+    rows.push((
+        "unknown recruit",
+        ready.clone(),
+        DefenderId::Recruit(99),
+        CommandError::UnknownSurvivor,
+    ));
+
+    for (label, mut g, defender, error) in rows {
+        let before = serde_json::to_value(&g).unwrap();
+        assert_eq!(
+            g.apply(&Command::SetNextDefender(defender)),
+            Err(error.clone()),
+            "{label}"
+        );
+        assert_eq!(serde_json::to_value(&g).unwrap(), before, "{label}");
+        // BeginDefense rejects the same blocked defender without a change.
+        if !matches!(error, CommandError::DefenseInProgress) {
+            g.staging().campaign().next_defender = Some(defender);
+            let staged = serde_json::to_value(&g).unwrap();
+            assert_eq!(
+                g.apply(&Command::BeginDefense { stage: 0 }),
+                Err(error),
+                "{label}: BeginDefense"
+            );
+            assert_eq!(serde_json::to_value(&g).unwrap(), staged, "{label}");
+        }
+    }
+    // Control: between defenses each of them is accepted.
+    for defender in [
+        DefenderId::Player,
+        DefenderId::Mara,
+        DefenderId::Recruit(id),
+    ] {
+        let mut g = ready.clone();
+        assert_eq!(
+            g.apply(&Command::SetNextDefender(defender)),
+            Ok(CommandOutcome::Applied),
+            "{defender:?}"
+        );
+        assert_eq!(g.campaign().next_defender, Some(defender));
+    }
+}
+
+#[test]
+fn begin_defense_for_mara_matches_legacy_deploy_digest() {
+    let (base, _) = takeover_ready();
+    for (defender, mode) in [
+        (DefenderId::Mara, Mode::Npc),
+        (DefenderId::Player, Mode::Personal),
+    ] {
+        let mut legacy = base.clone();
+        apply_ok(&mut legacy, Command::Deploy { stage: 0, mode });
+        let mut chosen = base.clone();
+        apply_ok(&mut chosen, Command::SetNextDefender(defender));
+        assert_eq!(
+            chosen.apply(&Command::BeginDefense { stage: 0 }),
+            Ok(CommandOutcome::Applied)
+        );
+        assert_eq!(chosen.campaign().next_defender, None, "{defender:?}");
+        assert_eq!(chosen.state_digest(), legacy.state_digest(), "{defender:?}");
+        enemy(&mut legacy, 1, 40.0, false);
+        enemy(&mut chosen, 1, 40.0, false);
+        advance(&mut legacy, 600);
+        advance(&mut chosen, 600);
+        assert_eq!(chosen.state_digest(), legacy.state_digest(), "{defender:?}");
+    }
+    // With nothing chosen and no report, BeginDefense is the player's deploy.
+    let mut legacy = base.clone();
+    apply_ok(
+        &mut legacy,
+        Command::Deploy {
+            stage: 0,
+            mode: Mode::Personal,
+        },
+    );
+    let mut fallback = base.clone();
+    apply_ok(&mut fallback, Command::BeginDefense { stage: 0 });
+    assert_eq!(fallback.state_digest(), legacy.state_digest());
+}
+
+#[test]
+fn deploy_command_stays_player_or_mara_with_next_defender_set() {
+    let (mut g, id) = takeover_ready();
+    apply_ok(&mut g, Command::SetNextDefender(DefenderId::Recruit(id)));
+    for (mode, defender) in [
+        (Mode::Npc, DefenderId::Mara),
+        (Mode::Personal, DefenderId::Player),
+    ] {
+        apply_ok(&mut g, Command::Deploy { stage: 0, mode });
+        assert_eq!(g.attempt().unwrap().defender(), defender, "{mode:?}");
+        assert_eq!(status(&g, id), RecruitStatus::Ready, "{mode:?}");
+        assert_eq!(g.campaign().reserved_recruit, None, "{mode:?}");
+        assert_eq!(
+            g.campaign().next_defender,
+            Some(DefenderId::Recruit(id)),
+            "Deploy never touches next_defender ({mode:?})"
+        );
+        apply_ok(&mut g, Command::Withdraw);
+        assert_eq!(g.campaign().next_defender, Some(DefenderId::Recruit(id)));
+        assert_eq!(g.next_defender(), DefenderId::Recruit(id));
+    }
+}
+
+#[test]
+fn dispatching_the_next_defender_resets_it_to_player_with_note() {
+    let (ready, id) = takeover_ready();
+    let country = ready.campaign().world.cleared[0].clone();
+    let front = operation_front(&ready);
+    let name = roster_npc(&ready, id).name.clone();
+    let dispatches = |id: u64| {
+        [
+            Command::AssignGuard {
+                id,
+                country: country.clone(),
+            },
+            Command::DeploySurvivor {
+                id,
+                country: country.clone(),
+                stage: 0,
+            },
+            Command::CountryOperation {
+                id,
+                country: front.clone(),
+            },
+        ]
+    };
+    for command in dispatches(id) {
+        let mut g = ready.clone();
+        apply_ok(&mut g, Command::SetNextDefender(DefenderId::Recruit(id)));
+        apply_ok(&mut g, command.clone());
+        assert_eq!(
+            g.campaign().next_defender,
+            Some(DefenderId::Player),
+            "{command:?}"
+        );
+        assert_eq!(g.next_defender(), DefenderId::Player, "{command:?}");
+        assert_eq!(
+            g.strategy().log.last(),
+            Some(&left_note(&name)),
+            "{command:?}"
+        );
+        reload(&g);
+    }
+
+    // The fallback counts: the last report's recruit is the next defender.
+    let mut g = ready.clone();
+    take_over(&mut g, id);
+    apply_ok(&mut g, Command::Withdraw);
+    assert_eq!(
+        (g.campaign().next_defender, g.next_defender()),
+        (None, DefenderId::Recruit(id))
+    );
+    apply_ok(&mut g, dispatches(id)[0].clone());
+    assert_eq!(g.campaign().next_defender, Some(DefenderId::Player));
+    assert_eq!(g.strategy().log.last(), Some(&left_note(&name)));
+
+    // Dispatching any other recruit leaves the choice and adds no note.
+    let mut g = ready.clone();
+    let other = recruit(&mut g, &country);
+    apply_ok(&mut g, Command::SetNextDefender(DefenderId::Recruit(id)));
+    for command in dispatches(other).into_iter().take(2) {
+        let mut g = g.clone();
+        let log = g.strategy().log.len();
+        apply_ok(&mut g, command.clone());
+        assert_eq!(
+            g.campaign().next_defender,
+            Some(DefenderId::Recruit(id)),
+            "{command:?}"
+        );
+        assert!(
+            !g.strategy().log[log.saturating_sub(1)..]
+                .iter()
+                .any(|line| line.contains("left the next defense")),
+            "{command:?}"
+        );
+    }
+}
+
+#[test]
+fn recruit_on_main_run_cannot_be_dispatched_trained_or_equipped() {
+    let (mut g, id) = takeover_ready();
+    let country = g.campaign().world.cleared[0].clone();
+    let front = operation_front(&g);
+    let spare = g.campaign_mut().add_item(4).unwrap();
+    apply_ok(&mut g, Command::BuyRecruitPoint(id));
+    apply_ok(&mut g, Command::SetNextDefender(DefenderId::Recruit(id)));
+    apply_ok(&mut g, Command::BeginDefense { stage: 0 });
+    assert_eq!(g.attempt().unwrap().defender(), DefenderId::Recruit(id));
+    assert_eq!(status(&g, id), RecruitStatus::Defending);
+    let before = serde_json::to_value(&g).unwrap();
+    let commands = [
+        Command::AssignGuard {
+            id,
+            country: country.clone(),
+        },
+        Command::DeploySurvivor {
+            id,
+            country: country.clone(),
+            stage: 0,
+        },
+        Command::CountryOperation { id, country: front },
+        Command::TrainRecruit {
+            id,
+            training: NpcTraining::Guns,
+        },
+        Command::EquipRecruit { id, item: spare },
+        Command::BuyRecruitPoint(id),
+    ];
+    for command in &commands {
+        assert_eq!(
+            g.apply(command),
+            Err(CommandError::DefenderUnavailable {
+                defender: DefenderId::Recruit(id),
+                blocker: DefenderBlocker::Defending,
+            }),
+            "{command:?}"
+        );
+        assert_eq!(serde_json::to_value(&g).unwrap(), before, "{command:?}");
+    }
+    assert_eq!(
+        g.apply(&Command::SetNextDefender(DefenderId::Player)),
+        Err(CommandError::DefenseInProgress)
+    );
+    assert_eq!(
+        g.apply(&Command::BeginDefense { stage: 0 }),
+        Err(CommandError::Rejected(
+            "Finish or recall the active deployment first".into()
+        ))
+    );
+    assert_eq!(serde_json::to_value(&g).unwrap(), before);
+}
+
+const FIXTURE_V6: &str = include_str!("fixtures/save_v6.json");
+
+#[test]
+fn migrated_v6_continues_with_mara() {
+    let mut g = Game::decode_save_generation(FIXTURE_V6.as_bytes()).expect("v6 fixture loads");
+    assert_eq!(g.campaign().next_defender, None);
+    // The live Personal defense ends; the settled Mara report it followed is
+    // the one the next run repeats.
+    let report = g.last_result().cloned().expect("a settled report");
+    assert_eq!(report.defender(), DefenderId::Mara);
+    g.withdraw();
+    *g.staging().last_result() = Some(report);
+    assert_eq!(g.next_defender(), DefenderId::Mara);
+
+    let mut retried = g.clone();
+    retried.retry().expect("retry");
+    let mut repeated = g.clone();
+    repeated.start_repeat(2).expect("repeat");
+    for (label, run) in [("retry", &retried), ("repeat", &repeated)] {
+        let a = run.attempt().unwrap_or_else(|| panic!("{label} deployed"));
+        assert_eq!(a.defender(), DefenderId::Mara, "{label}");
+        assert_eq!(
+            (a.country_id.as_deref(), a.stage),
+            (Some("HUN"), 2),
+            "{label} replays the reported stage"
+        );
+        let card = run.active_defender().expect("a live defense");
+        assert_eq!(card.id, DefenderId::Mara, "{label}");
+        assert_eq!(card.name, run.campaign().npc.name, "{label}");
+        assert_eq!(card.role, DefenderRole::Companion, "{label}");
+        assert_eq!(run.campaign().next_defender, None, "{label}");
+    }
+}
+
+#[test]
+fn retry_and_repeat_redeploy_the_reports_recruit() {
+    let (mut g, id) = takeover_ready();
+    take_over(&mut g, id);
+    win_main(&mut g);
+    assert_eq!(g.last_result().unwrap().defender(), DefenderId::Recruit(id));
+    // A Mara choice for the next defense does not redirect a retry or repeat.
+    apply_ok(&mut g, Command::SetNextDefender(DefenderId::Mara));
+    let mut retried = g.clone();
+    retried.retry().expect("retry");
+    let mut repeated = g.clone();
+    repeated.start_repeat(2).expect("repeat");
+    for (label, run) in [("retry", &retried), ("repeat", &repeated)] {
+        assert_eq!(
+            run.attempt().unwrap().defender(),
+            DefenderId::Recruit(id),
+            "{label}"
+        );
+        assert_eq!(status(run, id), RecruitStatus::Defending, "{label}");
+        assert_eq!(
+            run.campaign().next_defender,
+            Some(DefenderId::Mara),
+            "{label} keeps the choice"
+        );
+    }
+}
+
+#[test]
+fn new_defender_commands_round_trip_serde() {
+    let rows = [
+        (
+            Command::SetNextDefender(DefenderId::Player),
+            json!({"SetNextDefender": "Player"}),
+        ),
+        (
+            Command::SetNextDefender(DefenderId::Mara),
+            json!({"SetNextDefender": "Mara"}),
+        ),
+        (
+            Command::SetNextDefender(DefenderId::Recruit(3)),
+            json!({"SetNextDefender": {"Recruit": 3}}),
+        ),
+        (
+            Command::BeginDefense { stage: 2 },
+            json!({"BeginDefense": {"stage": 2}}),
+        ),
+    ];
+    for (command, shape) in rows {
+        assert_eq!(serde_json::to_value(&command).unwrap(), shape);
+        let json = serde_json::to_string(&command).unwrap();
+        assert_eq!(serde_json::from_str::<Command>(&json).unwrap(), command);
+    }
+}
+
+#[test]
+fn available_defenders_lists_player_mara_recruits_with_blockers() {
+    let fresh = Game::default();
+    let list = fresh.available_defenders();
+    let ids: Vec<_> = list.iter().map(|o| o.card.id).collect();
+    assert_eq!(ids, [DefenderId::Player, DefenderId::Mara]);
+    assert_eq!(list[0].selectable, Ok(()));
+    assert!(list[0].selected, "the player defends a fresh campaign");
+    assert_eq!(
+        list[1].selectable,
+        Err(DefenderBlocker::Locked {
+            node_id: "companion_contact".into()
+        }),
+        "Mara is listed, locked, before Companion"
+    );
+    assert!(!list[1].selected);
+
+    let (mut g, ready) = takeover_ready();
+    let country = g.campaign().world.cleared[0].clone();
+    let guard = recruit(&mut g, &country);
+    let away = recruit(&mut g, &country);
+    apply_ok(
+        &mut g,
+        Command::AssignGuard {
+            id: guard,
+            country: country.clone(),
+        },
+    );
+    let battle = g.deploy_survivor(away, &country, 0).unwrap();
+    apply_ok(&mut g, Command::SetNextDefender(DefenderId::Recruit(ready)));
+    let before = serde_json::to_value(&g).unwrap();
+    let list = g.available_defenders();
+    assert_eq!(serde_json::to_value(&g).unwrap(), before, "pure");
+    let rows: Vec<_> = list
+        .iter()
+        .map(|o| (o.card.id, o.selectable.clone(), o.selected))
+        .collect();
+    assert_eq!(
+        rows,
+        [
+            (DefenderId::Player, Ok(()), false),
+            (DefenderId::Mara, Ok(()), false),
+            (DefenderId::Recruit(ready), Ok(()), true),
+            (
+                DefenderId::Recruit(guard),
+                Err(DefenderBlocker::Guarding {
+                    country_id: country.clone()
+                }),
+                false
+            ),
+            (
+                DefenderId::Recruit(away),
+                Err(DefenderBlocker::OnExpedition { battle }),
+                false
+            ),
+        ]
+    );
+    // Selectable means SetNextDefender accepts it, and a blocker is the
+    // command's own typed rejection.
+    for option in &list {
+        let mut probe = g.clone();
+        let result = probe.apply(&Command::SetNextDefender(option.card.id));
+        match &option.selectable {
+            Ok(()) => assert_eq!(result, Ok(CommandOutcome::Applied)),
+            Err(blocker) => assert_eq!(
+                result,
+                Err(CommandError::DefenderUnavailable {
+                    defender: option.card.id,
+                    blocker: blocker.clone(),
+                })
+            ),
+        }
+    }
+}
+
+#[test]
+fn defender_cards_name_each_defender() {
+    let (mut g, id) = takeover_ready();
+    let before = serde_json::to_value(&g).unwrap();
+    let player = g.defender_card(DefenderId::Player).unwrap();
+    let survivor = g
+        .campaign()
+        .selected_survivor
+        .unwrap_or(horde_core::survivors::SurvivorId::Rook);
+    assert_eq!(player.name, survivor.name());
+    assert_eq!(player.hud_name, survivor.name().to_uppercase());
+    assert_eq!(player.appearance, survivor.appearance());
+    assert_eq!(
+        (player.role, player.mode, player.origin.clone()),
+        (DefenderRole::Survivor, Mode::Personal, None)
+    );
+    assert_eq!(player.level, g.campaign().player.level);
+
+    let mara = g.defender_card(DefenderId::Mara).unwrap();
+    assert_eq!(
+        (mara.name.as_str(), mara.hud_name.as_str()),
+        ("Mara Vale", "MARA")
+    );
+    assert_eq!(
+        (mara.appearance, mara.role, mara.mode),
+        (Appearance::Female, DefenderRole::Companion, Mode::Npc)
+    );
+    assert_eq!(mara.level, u32::from(g.campaign().npc.advancement_level()));
+    assert_eq!(
+        mara.level_cap,
+        u32::from(g.campaign().advancement_cap_level())
+    );
+
+    let card = g.defender_card(DefenderId::Recruit(id)).unwrap();
+    let r = g.strategy().roster.iter().find(|r| r.id == id).unwrap();
+    assert_eq!(
+        (card.name.as_str(), card.hud_name.as_str()),
+        ("Alex Rowan", "ALEX")
+    );
+    assert_eq!(
+        (card.appearance, card.role, card.mode),
+        (Appearance::Male, DefenderRole::Recruit, Mode::Npc)
+    );
+    let origin = card.origin.clone().expect("recruits have an origin");
+    let home = world().country(&r.origin).unwrap();
+    assert_eq!(
+        (origin.country_id.as_str(), origin.country_name.as_str()),
+        (home.id.as_str(), home.name.as_str())
+    );
+    assert_eq!(origin.origin_trait, OriginTrait::for_biome(&home.biome));
+    assert_eq!(card.level, u32::from(r.npc.advancement_level()));
+    assert!(g.defender_card(DefenderId::Recruit(99)).is_none());
+    assert!(g.active_defender().is_none(), "no live defense");
+    assert_eq!(serde_json::to_value(&g).unwrap(), before, "pure");
+
+    // The live main attempt and an expedition name their recruit.
+    take_over(&mut g, id);
+    assert_eq!(g.active_defender(), Some(card.clone()));
+    apply_ok(&mut g, Command::Withdraw);
+    let country = g.campaign().world.cleared[0].clone();
+    let battle = g.deploy_survivor(id, &country, 0).unwrap();
+    let before = serde_json::to_value(&g).unwrap();
+    assert_eq!(g.battle_defender_card(battle), Some(card));
+    assert_eq!(g.battle_defender_card(battle + 100), None);
+    assert!(g.active_defender().is_none());
+    assert_eq!(serde_json::to_value(&g).unwrap(), before, "pure");
 }

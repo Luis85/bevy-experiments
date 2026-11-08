@@ -134,9 +134,27 @@ pub enum Command {
         expect_count: u32,
         expect_coins: u64,
     },
+    /// Chooses who defends next (only between defenses). `BeginDefense` and
+    /// `ContinueJourney` deploy the choice; `Deploy` never reads it.
+    SetNextDefender(DefenderId),
+    /// Deploys [`Game::next_defender`] on the active country's `stage`, with
+    /// `Deploy`'s unpause, and clears the choice on success.
+    BeginDefense {
+        stage: usize,
+    },
 }
 
 impl Command {
+    /// The roster recruit this command sends away from camp. Dispatching the
+    /// next defender hands the next defense back to the player.
+    fn dispatched_recruit(&self) -> Option<u64> {
+        match self {
+            Self::AssignGuard { id, .. }
+            | Self::DeploySurvivor { id, .. }
+            | Self::CountryOperation { id, .. } => Some(*id),
+            _ => None,
+        }
+    }
     /// The roster recruit this command acts on, for the commands a recruit
     /// defending the main run must refuse (see [`Game::apply`]).
     fn defender_gated_recruit(&self) -> Option<u64> {
@@ -257,8 +275,11 @@ impl Game {
         if let Some(id) = command.defender_gated_recruit() {
             self.reject_defending_recruit(id)?;
         }
-        Ok(match command {
-            Command::ContinueJourney => match self.continue_journey()? {
+        let leaving = command
+            .dispatched_recruit()
+            .filter(|id| self.next_defender() == DefenderId::Recruit(*id));
+        let outcome = match command {
+            Command::ContinueJourney => match self.continue_next_defense()? {
                 JourneyContinuation::Deployed => Applied,
                 JourneyContinuation::CountryLiberated => CommandOutcome::CountryLiberated,
             },
@@ -306,6 +327,8 @@ impl Game {
                     Applied
                 }
             }
+            // Frozen meaning: Personal is the player and Npc is Mara; the
+            // chosen next defender is neither read nor cleared.
             Command::Deploy { stage, mode } => {
                 self.deploy_country_stage(*stage, *mode)?;
                 self.set_paused(false);
@@ -498,7 +521,20 @@ impl Game {
                     .game;
                 Amount(u64::from(worker.salvage(*structure)?))
             }
-        })
+            Command::SetNextDefender(defender) => {
+                self.set_next_defender(*defender)?;
+                Applied
+            }
+            Command::BeginDefense { stage } => {
+                self.begin_defense(*stage)?;
+                Applied
+            }
+        };
+        // Only a dispatch that succeeded takes the next defender away.
+        if let Some(id) = leaving {
+            self.next_defender_dispatched(id);
+        }
+        Ok(outcome)
     }
 }
 

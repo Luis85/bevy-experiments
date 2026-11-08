@@ -53,19 +53,9 @@ impl Game {
             npc.claim_objectives(allowance);
         }
     }
-    /// The takeover preflight (ruling D8): recruit `id` can defend the main
-    /// run now. No mutation; returns the recruit's npc.
-    fn takeover_preflight(&self, id: u64) -> Result<Npc, String> {
-        if self.worker {
-            return Err("An expedition cannot hand its defense to another survivor".into());
-        }
-        let recruit = self
-            .strategy
-            .roster
-            .iter()
-            .find(|r| r.id == id)
-            .ok_or("Unknown survivor")?;
-        let blocker = match recruit.status {
+    /// Why recruit `id` with `status` is away from camp, or None when Ready.
+    pub(super) fn duty_blocker(&self, id: u64, status: RecruitStatus) -> Option<DefenderBlocker> {
+        match status {
             RecruitStatus::Ready => None,
             RecruitStatus::Guarding => Some(DefenderBlocker::Guarding {
                 country_id: self
@@ -83,8 +73,21 @@ impl Game {
                     .map_or(0, |b| b.id),
             }),
             RecruitStatus::Defending => Some(DefenderBlocker::Defending),
-        };
-        if let Some(blocker) = blocker {
+        }
+    }
+    /// The takeover preflight (ruling D8): recruit `id` can defend the main
+    /// run now. No mutation; returns the recruit's npc.
+    fn takeover_preflight(&self, id: u64) -> Result<Npc, String> {
+        if self.worker {
+            return Err("An expedition cannot hand its defense to another survivor".into());
+        }
+        let recruit = self
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        if let Some(blocker) = self.duty_blocker(id, recruit.status) {
             return Err(blocker.label());
         }
         if !self.strategy.recruitment_unlocked(&self.campaign) {
@@ -403,12 +406,14 @@ impl Game {
         let r = self.last_result.clone().ok_or("No previous deployment")?;
         self.deploy_report(&r)
     }
+    /// Deploys the reported run again with the defender who fought it
+    /// (retry and repeats; the chosen next defender is not read).
     fn deploy_report(&mut self, r: &Report) -> Result<(), String> {
         if let Some(country) = &r.country_id {
             self.campaign.enter_country(country)?;
-            self.deploy_country_stage(r.stage, r.mode)
+            self.deploy_country_stage_as(r.stage, r.defender())
         } else {
-            self.deploy(r.level, r.mode)
+            self.deploy_as(r.level, r.defender(), None)
         }
     }
     pub fn withdraw(&mut self) {
