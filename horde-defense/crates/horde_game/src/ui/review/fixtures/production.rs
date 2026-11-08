@@ -2,17 +2,21 @@
 //!
 //! Every recipe stages feature state through `Game::apply(&Command)`; the
 //! `staging()` seam appears only inside the `entitle_*` helpers (the start
-//! country, coins, experience, earlier stage clears and inventory grants).
-//! Ticking the simulation is play, not staging. Each recipe leaves the game
-//! paused on its screen and returns before the matrix's shared progression.
+//! country, coins, experience, earlier stage clears and inventory grants);
+//! `repo_checks::production_fixtures_stage_features_through_commands`
+//! enforces it. Ticking the simulation is play, not staging. Each recipe
+//! leaves the game paused on its screen and returns before the matrix's
+//! shared progression.
 use crate::runner::{RuntimeNotice, SaveIntent};
 use crate::ui::{FrontendParts, Screen, Tab};
 use horde_core::{
-    campaign::{NodePayment, Player},
+    campaign::{AutoSellRule, NodePayment, Player},
     command::{Command, CommandOutcome},
     content::{Mode, Slot, StructureKind, content},
+    defenders::DefenderId,
+    quality::Quality,
     sim::{Actor, Input, Outcome, SimEvent},
-    skill_catalog::{SkillEffect, skills},
+    skill_catalog::{CampaignFeature, SkillEffect, skills},
     weapons::{WeaponClass, WeaponSpec},
     world::{Country, StageTheme, world},
 };
@@ -141,10 +145,20 @@ fn entitle_item(f: &mut FrontendParts, id: &str) -> u64 {
         .iter()
         .position(|item| item.id.as_str() == id)
         .unwrap_or_else(|| panic!("catalogue item {id}"));
+    entitle_found(f, definition, 1, None)
+}
+/// One owned copy of catalogue item `definition` at `level` and `quality`
+/// (None is shop stock); returns the owned item id.
+fn entitle_found(
+    f: &mut FrontendParts,
+    definition: usize,
+    level: u32,
+    quality: Option<Quality>,
+) -> u64 {
     f.game
         .staging()
         .campaign()
-        .add_item(definition)
+        .add_item_with_quality(definition, level, quality)
         .expect("explicit review inventory grant")
 }
 
@@ -374,4 +388,76 @@ fn prepare_operations_observer(f: &mut FrontendParts) {
         "a live expedition to observe"
     );
     pause(f);
+}
+
+// ----- wave-2 staging helpers (design-qa-captures, Wave 2) -----
+//
+// Core-only: they stage the game state of a wave-3 scene and leave the
+// screen alone. Wave 3 registers the scenes, which open their screens on top.
+
+/// The equipment-autosell state: one level-4 tier-1 Ranged drop of every
+/// quality (as quality-armory stages them), then the rule "sell below
+/// Uncommon" stored through `Command::SetAutoSell`. Returns each drop's id
+/// with its quality, in `Quality::ALL` order.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the equipment-autosell scene registers in wave 3")
+)]
+pub(in crate::ui::review) fn stage_equipment_autosell(
+    f: &mut FrontendParts,
+) -> Vec<(Quality, u64)> {
+    entitle_start(f, "DEU");
+    let definition = content()
+        .items
+        .iter()
+        .position(|item| item.slot == Slot::Ranged && item.tier == 1)
+        .expect("a tier-1 ranged item");
+    // Level 4, as quality-armory stages them.
+    let drops = Quality::ALL
+        .into_iter()
+        .map(|quality| (quality, entitle_found(f, definition, 4, Some(quality))))
+        .collect();
+    command(
+        f,
+        Command::SetAutoSell(AutoSellRule {
+            enabled: true,
+            sell_below: Quality::Uncommon,
+            ..AutoSellRule::default()
+        }),
+    );
+    drops
+}
+
+/// The briefing-recruit state: Germany liberated through its entitled stage
+/// clears, the Recruitment node bought, one recruit taken through
+/// `Command::Recruit` and chosen through `Command::SetNextDefender`. Returns
+/// the recruit's id.
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "the briefing-recruit scene registers in wave 3")
+)]
+pub(in crate::ui::review) fn stage_briefing_recruit(f: &mut FrontendParts) -> u64 {
+    entitle_start(f, "DEU");
+    let stages = world().country("DEU").expect("Germany").level_count();
+    entitle_clears(f, stages);
+    let recruitment = skills()
+        .nodes
+        .iter()
+        .find(|node| {
+            node.effects.iter().any(|effect| {
+                matches!(
+                    effect,
+                    SkillEffect::FeatureUnlock(CampaignFeature::Recruitment)
+                )
+            })
+        })
+        .map(|node| node.id.clone())
+        .expect("a Recruitment node");
+    learn(f, &recruitment);
+    entitle_coins(f, f.game.campaign().recruit_price());
+    let CommandOutcome::Id(id) = command(f, Command::Recruit("DEU".into())) else {
+        panic!("Recruit answers the recruit's id");
+    };
+    command(f, Command::SetNextDefender(DefenderId::Recruit(id)));
+    id
 }

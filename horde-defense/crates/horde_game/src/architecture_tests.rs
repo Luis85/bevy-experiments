@@ -85,8 +85,9 @@ fn is_identifier(c: char) -> bool {
 }
 
 /// `text` with comments and string or char literal contents replaced by spaces.
-/// Newlines are kept, so line numbers survive; lifetimes stay code.
-fn blank_comments_and_strings(text: &str) -> Vec<char> {
+/// Newlines are kept, so line numbers survive; lifetimes stay code. The
+/// repo check on the production review recipes reads source the same way.
+pub(crate) fn blank_comments_and_strings(text: &str) -> Vec<char> {
     let chars: Vec<char> = text.chars().collect();
     let blank = |c: char| if c == '\n' { '\n' } else { ' ' };
     let mut out = Vec::with_capacity(chars.len());

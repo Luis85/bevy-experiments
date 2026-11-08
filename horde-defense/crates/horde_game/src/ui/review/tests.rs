@@ -1126,3 +1126,96 @@ fn fx_stress_aliases_the_stress_fixture() {
     );
     assert_eq!(fx.game.battles().len(), stress.game.battles().len());
 }
+
+// ----- Wave-2 staging helpers (design-qa-captures Wave 2, W2-46) -----
+
+/// A frontend as the matrix leaves it before a scene's own staging: a fresh
+/// game with its survivor chosen.
+fn unstaged_frontend() -> FrontendParts {
+    let mut f = crate::ui::test_support::test_frontend();
+    f.game = Game::default();
+    f.game
+        .campaign_mut()
+        .choose_survivor(SurvivorId::Rook)
+        .unwrap();
+    f
+}
+
+#[test]
+fn equipment_autosell_rule_counts_only_below_uncommon_in_core() {
+    use horde_core::{campaign::AutoSellRule, quality::Quality, sim::AutoSellScope};
+    let mut f = unstaged_frontend();
+    let staged = fixtures::production::stage_equipment_autosell(&mut f);
+    let qualities: Vec<Quality> = staged.iter().map(|(quality, _)| *quality).collect();
+    assert_eq!(qualities, Quality::ALL, "one drop of every quality");
+    let rule = f.game.campaign().auto_sell;
+    assert_eq!(
+        rule,
+        AutoSellRule {
+            enabled: true,
+            sell_below: Quality::Uncommon,
+            ..AutoSellRule::default()
+        },
+        "the rule was stored through SetAutoSell"
+    );
+    for (quality, id) in &staged {
+        let item = f
+            .game
+            .campaign()
+            .item(*id)
+            .expect("the staged drop is owned");
+        assert_eq!(item.quality, Some(*quality));
+    }
+    // Decision 6: strictly below Uncommon, so the Poor and the Common drop
+    // of the six. (design-qa-captures reads "1 of 6"; the core rule sells 2.)
+    let below: Vec<u64> = staged
+        .iter()
+        .filter(|(quality, _)| *quality < Quality::Uncommon)
+        .map(|(_, id)| *id)
+        .collect();
+    assert_eq!(below.len(), 2, "Poor and Common");
+    let preview = f.game.auto_sell_preview(&rule, AutoSellScope::Stash);
+    assert_eq!(preview.ids, below, "{preview:?}");
+    assert_eq!(preview.count, 2);
+    for quality in Quality::ALL {
+        let expected = u32::from(quality < Quality::Uncommon);
+        assert_eq!(preview.by_quality[quality], expected, "{quality:?}");
+    }
+    assert_eq!((preview.kept_upgrades, preview.blocked), (0, 0));
+    assert!(f.game.attempt().is_none(), "staged in camp");
+}
+
+#[test]
+fn briefing_recruit_staging_sets_next_defender_through_command() {
+    use horde_core::{defenders::DefenderId, strategy::RecruitStatus};
+    let mut f = unstaged_frontend();
+    let id = fixtures::production::stage_briefing_recruit(&mut f);
+    let recruit = f
+        .game
+        .strategy()
+        .roster
+        .iter()
+        .find(|r| r.id == id)
+        .expect("the staged recruit is on the roster");
+    assert_eq!(recruit.status, RecruitStatus::Ready);
+    assert_eq!(
+        f.game.campaign().next_defender,
+        Some(DefenderId::Recruit(id))
+    );
+    assert_eq!(f.game.next_defender(), DefenderId::Recruit(id));
+    assert!(f.game.attempt().is_none(), "chosen between defenses");
+    let options = f.game.available_defenders();
+    let selected: Vec<DefenderId> = options
+        .iter()
+        .filter(|option| option.selected)
+        .map(|option| option.card.id)
+        .collect();
+    assert_eq!(selected, [DefenderId::Recruit(id)]);
+    assert!(
+        options
+            .iter()
+            .find(|option| option.card.id == DefenderId::Recruit(id))
+            .is_some_and(|option| option.selectable.is_ok()),
+        "the recruit can defend next"
+    );
+}

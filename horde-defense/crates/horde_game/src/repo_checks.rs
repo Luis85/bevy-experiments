@@ -14,6 +14,11 @@
 //!
 //! `root_helper_line_is_unannotated` pins that root helper line (ISO-1): README.md
 //! and docs/VALIDATION.md each carry it once, byte-identical to 3d492cd.
+//!
+//! `production_fixtures_stage_features_through_commands` keeps the production
+//! review recipes honest (ISO-5, design-qa-captures 1.8): in
+//! `ui/review/fixtures/production.rs` the staging seams appear only inside
+//! `entitle_*` helpers, so every feature is staged through `Game::apply`.
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.
@@ -860,5 +865,144 @@ fn doc_lint_skips_ignored_folders_and_reports_non_utf8() {
     assert_eq!(
         lint_markdown_file(&workspace, "docs/bad.md"),
         ["docs/bad.md: not UTF-8; save it as UTF-8"]
+    );
+}
+
+/// The production review recipes (design-qa-captures 1.8 and Wave 2).
+const PRODUCTION_FIXTURES: &str = "src/ui/review/fixtures/production.rs";
+/// The test-support seams that change game state without `Game::apply`: the
+/// staging handle and the `Game` `*_mut` accessors.
+const STAGING_SEAMS: &[&str] = &[
+    "staging()",
+    "campaign_mut(",
+    "strategy_mut(",
+    "attempt_mut(",
+    "attempt_slot_mut(",
+    "last_result_mut(",
+    "battles_mut(",
+    "pending_runs_mut(",
+    "game_mut(",
+];
+/// The helpers that may use a staging seam: entitlements (the start country,
+/// coins, experience, earlier stage clears and inventory grants).
+const ENTITLEMENT_PREFIX: &str = "entitle_";
+
+/// Every [`STAGING_SEAMS`] use in `text` (Rust source) whose innermost
+/// enclosing `fn` is not an [`ENTITLEMENT_PREFIX`] helper, as
+/// `name:line: reason`. Comments and string contents are not code. A closure
+/// belongs to the `fn` it is written in.
+fn staging_outside_entitlements(name: &str, text: &str) -> Vec<String> {
+    let chars = crate::architecture_tests::blank_comments_and_strings(text);
+    let starts_word =
+        |at: usize| at == 0 || !(chars[at - 1].is_alphanumeric() || chars[at - 1] == '_');
+    let word_at = |at: usize| -> String {
+        chars[at..]
+            .iter()
+            .take_while(|c| c.is_alphanumeric() || **c == '_')
+            .collect()
+    };
+    let mut violations = Vec::new();
+    // (fn name, brace depth outside its body)
+    let mut functions: Vec<(String, usize)> = Vec::new();
+    let mut pending: Option<String> = None;
+    let mut depth = 0usize;
+    let mut line = 1;
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '\n' => line += 1,
+            '{' => {
+                if let Some(function) = pending.take() {
+                    functions.push((function, depth));
+                }
+                depth += 1;
+            }
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if functions.last().is_some_and(|(_, outer)| *outer == depth) {
+                    functions.pop();
+                }
+            }
+            // A body-less declaration (a trait method).
+            ';' => pending = None,
+            _ if starts_word(i) && word_at(i) == "fn" => {
+                let mut j = i + 2;
+                while chars.get(j).is_some_and(|c| c.is_whitespace()) {
+                    j += 1;
+                }
+                if j > i + 2 {
+                    pending = Some(word_at(j));
+                }
+            }
+            _ => {}
+        }
+        if starts_word(i) {
+            for seam in STAGING_SEAMS {
+                let matches = seam
+                    .chars()
+                    .enumerate()
+                    .all(|(n, c)| chars.get(i + n) == Some(&c));
+                if !matches {
+                    continue;
+                }
+                let place = match functions.last() {
+                    Some((function, _)) if function.starts_with(ENTITLEMENT_PREFIX) => continue,
+                    Some((function, _)) => format!("in fn {function}"),
+                    None => "outside any fn".to_owned(),
+                };
+                violations.push(format!(
+                    "{name}:{line}: `{seam}` {place}; stage feature state through \
+                     Game::apply(&Command), or entitle it in an `{ENTITLEMENT_PREFIX}*` helper"
+                ));
+            }
+        }
+        i += 1;
+    }
+    violations
+}
+
+#[test]
+fn production_fixtures_stage_features_through_commands() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(PRODUCTION_FIXTURES);
+    let text = std::fs::read_to_string(&path)
+        .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
+    assert!(
+        text.contains("fn entitle_"),
+        "{PRODUCTION_FIXTURES} has no entitle_* helpers; update this check"
+    );
+    assert_eq!(
+        staging_outside_entitlements(PRODUCTION_FIXTURES, &text),
+        Vec::<String>::new(),
+        "ISO-5: production review recipes stage feature state through Game::apply(&Command)"
+    );
+
+    let sample = "\
+// f.game.staging() in a comment
+fn entitle_coins(f: &mut F) {
+    f.game.staging().campaign().reward(1);
+    let again = |f: &mut F| f.game.staging();
+}
+fn prepare_x(f: &mut F) {
+    let s = \"staging()\";
+    f.game
+        .staging()
+        .campaign();
+    if s.is_empty() { f.game.campaign_mut().coins = 1; }
+    fn entitle_inner(f: &mut F) { f.game.staging(); }
+    f.game.my_campaign_mut();
+}
+fn prepare_y(f: &mut F) -> impl Fn() { f.game.staging_count(); }
+f.game.staging();
+";
+    assert_eq!(
+        staging_outside_entitlements("x.rs", sample),
+        [
+            "x.rs:9: `staging()` in fn prepare_x; stage feature state through \
+             Game::apply(&Command), or entitle it in an `entitle_*` helper",
+            "x.rs:11: `campaign_mut(` in fn prepare_x; stage feature state through \
+             Game::apply(&Command), or entitle it in an `entitle_*` helper",
+            "x.rs:16: `staging()` outside any fn; stage feature state through \
+             Game::apply(&Command), or entitle it in an `entitle_*` helper",
+        ]
     );
 }
