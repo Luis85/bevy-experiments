@@ -252,6 +252,69 @@ fn boss_crossing_50_percent_enters_phase_once_with_90_tick_hold_event_and_surviv
 
 /// A Caller in phase 1 calls its reinforcements after `call_interval ×
 /// 0.6`: 540 ticks instead of 900.
+/// Design enemy-balance §6: for its 90-tick hold a boss in contact at the
+/// line neither counts down its attack nor strikes, then resumes on the
+/// tick the hold ends. The phase enters on tick 150, so the hold spans the
+/// NPC turn at 180 and ends on the turn at 240.
+#[test]
+fn held_boss_neither_counts_down_nor_strikes() {
+    for mode in [Mode::Personal, Mode::Npc] {
+        // Some(n): a windup with n ticks left; None: ready to strike now.
+        for windup_left in [Some(30), None] {
+            let mut g = boss_game(mode, 0, BalancePreset::Normal, 10, BossRank::Sector);
+            let max_hp = boss(&g).max_hp;
+            let a = g.attempt.as_mut().unwrap();
+            a.tick = 149;
+            let e = a.enemies.iter_mut().find(|e| e.boss).unwrap();
+            e.x = DEFENSE_LINE;
+            e.contact_since = Some(148);
+            e.attack_phase = EnemyPhase::Windup;
+            e.attack_left = windup_left.unwrap_or(0);
+            e.windup_total = 60;
+            set_boss_hp(&mut g, max_hp / 2);
+            let strikes = |g: &Game| g.attempt.as_ref().unwrap().telemetry.contact_attacks;
+            // The defender's health: hit points, or NPC injury hit points.
+            let health = |g: &Game| {
+                let a = g.attempt.as_ref().unwrap();
+                if mode == Mode::Npc { a.injury.hp } else { a.hp }
+            };
+            let before = (strikes(&g), health(&g));
+            let label = format!("{mode:?} {windup_left:?}");
+            for tick in 150..240 {
+                g.tick(Input::default());
+                let a = g.attempt.as_ref().unwrap();
+                assert_eq!(a.tick, tick);
+                let e = boss(&g);
+                let state = e.boss_state.as_ref().unwrap();
+                assert_eq!((state.entered, state.hold_until), (1, 240), "{label}");
+                assert!(e.boss_held(tick), "{label}: held at {tick}");
+                assert_eq!(
+                    (e.attack_phase, e.attack_left, e.x),
+                    (EnemyPhase::Windup, windup_left.unwrap_or(0), DEFENSE_LINE),
+                    "{label}: no countdown at {tick}"
+                );
+                assert_eq!(
+                    (strikes(&g), health(&g)),
+                    before,
+                    "{label}: no strike at {tick}"
+                );
+            }
+            // Tick 240 ends the hold: the windup counts down, or the ready
+            // boss strikes (on the NPC turn at 240 as well).
+            g.tick(Input::default());
+            let e = boss(&g);
+            assert!(!e.boss_held(240), "{label}");
+            match windup_left {
+                Some(left) => {
+                    assert_eq!(e.attack_left, left - 1, "{label}: counts down");
+                    assert_eq!(strikes(&g), before.0, "{label}");
+                }
+                None => assert_eq!(strikes(&g), before.0 + 1, "{label}: strikes"),
+            }
+        }
+    }
+}
+
 #[test]
 fn caller_phase_shortens_interval() {
     for mode in [Mode::Personal, Mode::Npc] {
