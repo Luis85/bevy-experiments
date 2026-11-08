@@ -483,17 +483,37 @@ fn validate_progression_ledgers(campaign: &crate::campaign::Campaign) -> Result<
     Ok(())
 }
 /// A defeated hostile a save may hold (W2-29): one a death burst defeated on
-/// the save's tick, which the next tick's first reap removes. It lies within
-/// the radius of a `Detonation` the attempt published on that tick (the
-/// window keeps the radius in hundredths). Every other defeated hostile is
-/// reaped before the tick ends, so it never reaches a save.
+/// the save's tick, which the next tick's first reap removes. Every other
+/// defeated hostile is reaped before the tick ends, so it never reaches a
+/// save.
+///
+/// A burst's source was reaped on that tick, so it left a corpse there; a
+/// fuse leaves none. The victim lies within the radius of the source's
+/// death-burst `Detonation` (published `at, at`, the radius in hundredths),
+/// which tells it from a defender fuse (also untargeted, but `to` is the
+/// defender). The window is a ring of [`MAX_EVENTS`]: when it is full and its
+/// oldest event is from the save's tick, that tick may have evicted the
+/// Detonation, and the bound falls back to the source's corpse: any corpse of
+/// that tick within the schema's largest radius.
 fn burst_victim(a: &Attempt, e: &Enemy) -> bool {
-    a.events.iter().any(|ev| {
+    let within = |at: [f32; 2], radius: f32| (e.x - at[0]).hypot(e.y() - at[1]) <= radius + 0.01;
+    let corpse_now = |id: u64| a.corpses.iter().any(|c| c.id == id && c.tick == a.tick);
+    let burst = a.events.iter().any(|ev| {
         ev.kind == EventKind::Detonation
             && ev.tick == a.tick
             && ev.target_id.is_none()
-            && (e.x - ev.from[0]).hypot(e.y() - ev.from[1]) <= ev.value as f32 / 100.0 + 0.01
-    })
+            && ev.from == ev.to
+            && ev.actor_id.is_some_and(corpse_now)
+            && within(ev.from, ev.value as f32 / 100.0)
+    });
+    let evicted =
+        a.events.len() == MAX_EVENTS && a.events.front().is_some_and(|ev| ev.tick == a.tick);
+    let near_corpse = || {
+        a.corpses
+            .iter()
+            .any(|c| c.tick == a.tick && within(c.at, crate::enemy_catalog::MAX_BURST_RADIUS))
+    };
+    burst || (evicted && near_corpse())
 }
 /// Combat telemetry bounds (schema v7 §3.12) for an attempt or report with
 /// `kills` kills: each per-archetype map holds at most 256 catalogue-id keys,

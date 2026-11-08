@@ -373,13 +373,28 @@ fn npc_split_children_use_own_npc_stats_and_draw_no_rng() {
     );
 }
 
-#[test]
-fn chain_bursts_resolve_one_tick_later_and_terminate() {
-    let mut g = game(Mode::Personal);
+/// A chain exploder: a burst no NPC-mode victim dodges (dodge 0) and that
+/// always defeats it, so both modes chain the same way.
+fn chain_exploder() -> ResolvedEnemy {
+    let mut p = exploder(DeathEffect::Burst {
+        radius: 1.6,
+        damage: 10_000,
+        structure_damage: 40,
+        npc_dice: 20,
+        npc_add: 100,
+        fuse: false,
+    });
+    p.npc_dodge = 0;
+    p.validate().unwrap();
+    p
+}
+
+/// A game in `mode` with three chain exploders in lane 5 at x 8, 9 and 10
+/// (each inside the next one's radius, the first and last 2 yards apart),
+/// the first defeated, and an untouched bystander far away in lane 1.
+fn chain_field(mode: Mode) -> (Game, Vec<u64>, u64) {
+    let mut g = game(mode);
     let mut a = g.attempt.take().unwrap();
-    let blast = exploder(burst(false, 10_000));
-    // Each exploder stands inside the next one's radius, the first and the
-    // last 2 yards apart (outside it), and a bystander far away.
     let ids: Vec<u64> = [8.0, 9.0, 10.0]
         .into_iter()
         .map(|x| {
@@ -387,7 +402,7 @@ fn chain_bursts_resolve_one_tick_later_and_terminate() {
                 &mut g,
                 &mut a,
                 EnemyKind::Shambler,
-                Some(blast.clone()),
+                Some(chain_exploder()),
                 5,
                 x,
             )
@@ -396,41 +411,135 @@ fn chain_bursts_resolve_one_tick_later_and_terminate() {
     let bystander = place(&mut g, &mut a, EnemyKind::Brute, None, 1, 12.0);
     defeat(&mut a, ids[0]);
     g.attempt = Some(a);
-    let mut seen = 0;
-    let mut detonations = Vec::new();
-    let start = g.attempt.as_ref().unwrap().tick;
-    for step in 1..=60u64 {
-        g.tick(Input::default());
-        let a = g.attempt.as_ref().expect("the defender holds");
-        for ev in new_events(a, &mut seen) {
-            if ev.kind == EventKind::Detonation {
-                detonations.push((ev.actor_id.unwrap(), ev.tick - start));
+    (g, ids, bystander)
+}
+
+fn save_round_trip(g: &Game) -> Game {
+    let json = g.to_save_json().expect("the save is valid");
+    Game::from_payload(serde_json::from_str(&json).unwrap(), SAVE_VERSION).unwrap()
+}
+
+#[test]
+fn chain_bursts_resolve_one_tick_later_and_terminate() {
+    for mode in [Mode::Personal, Mode::Npc] {
+        let (mut g, ids, bystander) = chain_field(mode);
+        let mut seen = 0;
+        let mut detonations = Vec::new();
+        let start = g.attempt.as_ref().unwrap().tick;
+        // Short of the first NPC turn, so the NPC never shoots the bystander.
+        for step in 1..=30u64 {
+            g.tick(Input::default());
+            let a = g.attempt.as_ref().expect("the defender holds");
+            for ev in new_events(a, &mut seen) {
+                if ev.kind == EventKind::Detonation {
+                    detonations.push((ev.actor_id.unwrap(), ev.tick - start));
+                }
             }
-        }
-        if step <= 3 {
+            if step > 3 {
+                continue;
+            }
             // Link `step` burst this tick; its victim waits for the next.
             let k = step as usize - 1;
-            assert_eq!(a.kills, step as u32, "tick {step}");
-            assert!(find(a, ids[k]).is_none(), "tick {step}: reaped");
-            if let Some(next) = ids.get(k + 1) {
-                let victim = find(a, *next).expect("reaped next tick, not now");
-                assert!(victim.hp <= 0, "tick {step}: killed by the burst");
-                // The save between the burst and the reap is valid.
-                let json = g.to_save_json().expect("a mid-chain save is valid");
-                let value = serde_json::from_str(&json).unwrap();
-                let loaded = Game::from_payload(value, crate::sim::SAVE_VERSION).unwrap();
-                assert!(find(loaded.attempt.as_ref().unwrap(), *next).is_some());
-            }
+            assert_eq!(a.kills, step as u32, "{mode:?} tick {step}");
+            assert!(find(a, ids[k]).is_none(), "{mode:?} tick {step}: reaped");
+            let Some(next) = ids.get(k + 1).copied() else {
+                continue;
+            };
+            let victim = find(a, next).expect("reaped next tick, not now");
+            assert!(
+                enemy_defeated(a, victim),
+                "{mode:?} tick {step}: defeated by the burst"
+            );
+            // The save between the burst and the reap is valid.
+            let loaded = save_round_trip(&g);
+            assert!(find(loaded.attempt.as_ref().unwrap(), next).is_some());
+            // A defeated hostile outside the burst's radius on its tick is not.
+            let held = g.attempt.clone();
+            defeat(g.attempt.as_mut().unwrap(), bystander);
+            assert!(
+                g.to_save_json().is_err(),
+                "{mode:?} tick {step}: a defeated hostile outside the radius"
+            );
+            g.attempt = held;
+        }
+        assert_eq!(
+            detonations,
+            [(ids[0], 1), (ids[1], 2), (ids[2], 3)],
+            "{mode:?}: one link per tick; each exploder bursts once and the chain ends"
+        );
+        let a = g.attempt.as_ref().unwrap();
+        assert_eq!(a.kills, 3);
+        assert!(find(a, bystander).is_some_and(|e| e.hp == e.max_hp));
+    }
+}
+
+#[test]
+fn burst_victim_save_survives_a_full_event_window() {
+    // The presentation window is a 512-event ring: a crowded tick can evict
+    // the burst's Detonation before the save. Its held victim still saves.
+    for mode in [Mode::Personal, Mode::Npc] {
+        let (mut g, ids, _) = chain_field(mode);
+        g.tick(Input::default());
+        let a = g.attempt.as_mut().unwrap();
+        assert!(find(a, ids[1]).is_some_and(|e| enemy_defeated(a, e)));
+        for _ in 0..MAX_EVENTS {
+            a.event(EventKind::Kill, [1.0, 0.5], [1.0, 0.5], 0);
+        }
+        assert!(
+            a.events.iter().all(|ev| ev.kind != EventKind::Detonation),
+            "{mode:?}: the burst's Detonation left the window"
+        );
+        let loaded = save_round_trip(&g);
+        assert!(find(loaded.attempt.as_ref().unwrap(), ids[1]).is_some());
+    }
+}
+
+#[test]
+fn save_rejects_a_defeated_hostile_beside_a_defender_fuse() {
+    // A fuse on the defender publishes a Detonation with no target, like a
+    // death burst, but it never hits a hostile: a defeated one beside it is
+    // invalid.
+    let mut g = game(Mode::Personal);
+    let mut a = g.attempt.take().unwrap();
+    a.spawn_credit = -1.0e9;
+    let fuse = place(
+        &mut g,
+        &mut a,
+        EnemyKind::Shambler,
+        Some(exploder(burst(true, 30))),
+        5,
+        DEFENSE_LINE,
+    );
+    let bystander = place(
+        &mut g,
+        &mut a,
+        EnemyKind::Brute,
+        None,
+        5,
+        DEFENSE_LINE + 0.5,
+    );
+    g.attempt = Some(a);
+    let mut seen = 0;
+    let mut fused = false;
+    for _ in 0..900 {
+        g.tick(Input::default());
+        let a = g.attempt.as_ref().unwrap();
+        fused = new_events(a, &mut seen).iter().any(|ev| {
+            ev.kind == EventKind::Detonation && ev.actor_id == Some(fuse) && ev.target_id.is_none()
+        });
+        if fused {
+            break;
         }
     }
-    assert_eq!(
-        detonations,
-        [(ids[0], 1), (ids[1], 2), (ids[2], 3)],
-        "one link per tick; each exploder bursts once and the chain ends"
+    assert!(fused, "the fuse detonated on the defender");
+    // A saved spawn credit lies in [0, 1).
+    g.attempt.as_mut().unwrap().spawn_credit = 0.0;
+    assert!(g.to_save_json().is_ok(), "the fuse tick itself saves");
+    defeat(g.attempt.as_mut().unwrap(), bystander);
+    assert!(
+        g.to_save_json().is_err(),
+        "a defeated hostile beside a defender fuse"
     );
-    let a = g.attempt.as_ref().unwrap();
-    assert_eq!(a.kills, 3);
-    assert!(find(a, bystander).is_some_and(|e| e.hp == e.max_hp));
 }
 
 #[test]

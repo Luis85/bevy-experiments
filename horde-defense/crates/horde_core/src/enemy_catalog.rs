@@ -103,6 +103,9 @@ pub struct ResolvedEnemy {
     pub elite: Option<EliteMark>,
 }
 
+/// The largest death-burst radius in yards (schema v7 §3.9).
+pub const MAX_BURST_RADIUS: f32 = 3.0;
+
 /// What an archetype does when it dies (schema v7 §3.9). Saved inside the
 /// spawn snapshot, so a split target need not exist in the current catalogue.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -135,7 +138,7 @@ impl DeathEffect {
             } => {
                 radius.is_finite()
                     && *radius > 0.0
-                    && *radius <= 3.0
+                    && *radius <= MAX_BURST_RADIUS
                     && (1..=10_000).contains(damage)
                     && (0..=10_000).contains(structure_damage)
                     && (1..=20).contains(npc_dice)
