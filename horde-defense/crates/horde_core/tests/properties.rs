@@ -4,7 +4,7 @@
 mod support;
 use horde_core::content::Mode;
 use horde_core::rules::Rng;
-use horde_core::sim::{BattleId, Game, Input, SimEventRecord, smoke_input};
+use horde_core::sim::{BattleId, Game, Input, Outcome, SimEventRecord, smoke_input};
 use std::collections::BTreeMap;
 use support::{advance, enemy, game, strategic_game};
 
@@ -189,6 +189,119 @@ fn settling_twice_changes_nothing() {
         assert_eq!(settled, again, "seed {seed}: second settlement pass paid");
         assert!(g.take_settlement_issues().is_empty(), "seed {seed}");
     }
+}
+
+/// The victories the run history records (main runs and settled worker
+/// stages alike).
+fn committed_victories(g: &Game) -> u64 {
+    g.campaign()
+        .run_history
+        .iter()
+        .filter(|r| r.outcome == Outcome::Victory)
+        .count() as u64
+}
+
+/// Deploys the main run in `mode` on the start country's first stage and
+/// checks it freezes the rank of the committed victories so far.
+fn deploy_at_committed_rank(g: &mut Game, mode: Mode, seed: u64, step: u32) {
+    g.deploy_country_stage(0, mode)
+        .unwrap_or_else(|e| panic!("seed {seed} step {step}: {e}"));
+    g.set_paused(false);
+    assert_eq!(
+        u64::from(g.attempt().unwrap().progression.rank),
+        committed_victories(g),
+        "seed {seed} step {step}: deploy rank"
+    );
+}
+
+/// W2-40 (design enemy-balance §10, acceptance G6.9): over random sequences
+/// of victories, defeats, withdrawals and npc retreats by the player and
+/// Mara, and of worker expeditions that win or are recalled, the threat rank
+/// equals the committed victories after every step.
+#[test]
+fn threat_rank_equals_committed_victories() {
+    let mut seen = [0u32; 6];
+    for seed in SEEDS {
+        let mut rng = Rng::new(seed);
+        let mut g = strategic_game();
+        g.set_seed(seed);
+        let home = g.campaign().world.cleared[0].clone();
+        let recruit = g
+            .with_strategy(|strategy, campaign| strategy.recruit(campaign, &home))
+            .unwrap();
+        for step in 0..8 {
+            let action = rng.below(6) as usize;
+            match action {
+                0 | 1 => {
+                    let mode = if action == 0 {
+                        Mode::Personal
+                    } else {
+                        Mode::Npc
+                    };
+                    deploy_at_committed_rank(&mut g, mode, seed, step);
+                    enemy(&mut g, 5, 20.0, true);
+                    let a = g.attempt_mut().unwrap();
+                    a.boss_spawned = true;
+                    let boss = a.enemies.last_mut().unwrap();
+                    boss.hp = 0;
+                    boss.injury.unconscious = true;
+                    advance(&mut g, 1);
+                }
+                2 => {
+                    deploy_at_committed_rank(&mut g, Mode::Personal, seed, step);
+                    g.attempt_mut().unwrap().hp = 0;
+                    advance(&mut g, 1);
+                }
+                3 => {
+                    let mode = if seed.is_multiple_of(2) {
+                        Mode::Personal
+                    } else {
+                        Mode::Npc
+                    };
+                    deploy_at_committed_rank(&mut g, mode, seed, step);
+                    advance(&mut g, 1 + rng.below(30) as u32);
+                    g.withdraw();
+                }
+                4 => {
+                    deploy_at_committed_rank(&mut g, Mode::Npc, seed, step);
+                    g.attempt_mut().unwrap().injury.unconscious = true;
+                    advance(&mut g, 1);
+                }
+                _ => {
+                    let battle = g
+                        .deploy_survivor(recruit, &home, 0)
+                        .unwrap_or_else(|e| panic!("seed {seed} step {step}: {e}"));
+                    let b = g.battles_mut().iter_mut().find(|b| b.id == battle).unwrap();
+                    if rng.below(2) == 0 {
+                        enemy(b.game_mut(), 5, 20.0, true);
+                        let a = b.game_mut().attempt_mut().unwrap();
+                        a.boss_spawned = true;
+                        a.enemies.last_mut().unwrap().injury.unconscious = true;
+                        advance(&mut g, 1);
+                    } else {
+                        g.recall_survivor(battle).unwrap();
+                    }
+                    assert!(
+                        g.battles().iter().all(|b| b.settled),
+                        "seed {seed} step {step}: settled"
+                    );
+                }
+            }
+            seen[action] += 1;
+            assert!(g.attempt().is_none(), "seed {seed} step {step}: finished");
+            assert_eq!(
+                u64::from(g.campaign().progression_rank()),
+                committed_victories(&g),
+                "seed {seed} step {step} (action {action}): rank"
+            );
+            assert_eq!(
+                g.campaign().victories,
+                committed_victories(&g),
+                "seed {seed} step {step} (action {action}): victories"
+            );
+        }
+    }
+    assert!(seen.iter().all(|n| *n > 0), "every action ran: {seen:?}");
 }
 
 #[test]
