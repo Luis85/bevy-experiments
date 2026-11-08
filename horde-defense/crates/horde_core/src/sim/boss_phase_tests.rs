@@ -355,11 +355,14 @@ fn phase_armor_and_siege_recovery_follow_the_profile() {
         let e = e.clone();
         assert_eq!(enemy_armor_vs(a, &e, HitSource::Shot), 6, "{mode:?}: × 0.6");
         assert_eq!(enemy_armor_vs(a, &e, HitSource::Melee), 6, "{mode:?}");
+        // The inspector's protection is the armor hits meet.
+        assert_eq!(a.enemy_protection(&e), 6, "{mode:?}: protection");
         // Exposed after its 7 s delay: still 0.
         let mut exposed = a.clone();
         exposed.tick = tick + 7 * 60;
         assert!(e.exposed_at(exposed.tick));
         assert_eq!(enemy_armor_vs(&exposed, &e, HitSource::Shot), 0, "{mode:?}");
+        assert_eq!(exposed.enemy_protection(&e), 0, "{mode:?}");
     }
     let recovery = |enter: bool| {
         let mut g = boss_game(

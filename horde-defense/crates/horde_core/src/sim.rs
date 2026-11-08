@@ -1944,20 +1944,11 @@ impl HitSource {
 }
 /// The armor `e` meets from `source`: its armor, plus its ranged armor
 /// (`ranged_armor` Personal, `npc_ranged_armor` NPC) against shots and turret
-/// fire while it is not in contact at the line. Bosses carry none; a boss's
-/// armor is scaled by its phase `armor_mult` (design enemy-balance §6), on
-/// top of the rank armor it spawned with, and exposure still drops it to 0.
+/// fire while it is not in contact at the line. Bosses carry none (their
+/// phase armor is in [`enemy_armor`]).
 fn enemy_armor_vs(a: &Attempt, e: &Enemy, source: HitSource) -> i32 {
     let armor = enemy_armor(a, e);
-    if e.boss {
-        let m = e.boss_state.as_ref().map_or(1.0, BossState::armor_mult);
-        return if m == 1.0 {
-            armor
-        } else {
-            (armor as f32 * m).round() as i32
-        };
-    }
-    if !source.ranged() || e.contact() {
+    if e.boss || !source.ranged() || e.contact() {
         return armor;
     }
     let profile = enemy_profile(e);
@@ -1968,13 +1959,30 @@ fn enemy_armor_vs(a: &Attempt, e: &Enemy, source: HitSource) -> i32 {
             profile.npc_ranged_armor
         }
 }
+/// The armor `e` has before any ranged armor, which the inspector shows as
+/// its protection. A boss's is the rank armor it spawned with, scaled by its
+/// phase `armor_mult` (design enemy-balance §6), and 0 while it is exposed.
 fn enemy_armor(a: &Attempt, e: &Enemy) -> i32 {
     if e.boss {
-        if e.exposed_at(a.tick) { 0 } else { e.armor }
+        if e.exposed_at(a.tick) {
+            0
+        } else {
+            boss_phase_armor(e)
+        }
     } else if e.contact() {
         (e.armor as f32 * enemy_profile(e).contact_armor_fraction).floor() as i32
     } else {
         e.armor
+    }
+}
+/// A boss's spawn armor scaled by its phase `armor_mult` and rounded; its
+/// armor exactly before the first transition and without phases.
+fn boss_phase_armor(e: &Enemy) -> i32 {
+    let m = e.boss_state.as_ref().map_or(1.0, BossState::armor_mult);
+    if m == 1.0 {
+        e.armor
+    } else {
+        (e.armor as f32 * m).round() as i32
     }
 }
 fn enemy_defeated(a: &Attempt, e: &Enemy) -> bool {
