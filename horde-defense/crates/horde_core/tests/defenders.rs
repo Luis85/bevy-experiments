@@ -26,8 +26,8 @@ use horde_core::{
     command::{Command, CommandError, CommandOutcome},
     content::{Mode, Policy, content},
     defenders::{
-        DefenderBlocker, DefenderId, DefenderRole, DefenderSeat, MAX_ADVANCEMENT_LEVEL,
-        OriginTrait, RECRUIT_IDENTITIES, recruit_identity, resolve,
+        DefenderBlocker, DefenderId, DefenderOption, DefenderRole, DefenderSeat,
+        MAX_ADVANCEMENT_LEVEL, OriginTrait, RECRUIT_IDENTITIES, recruit_identity, resolve,
     },
     sim::{ExpeditionSummary, Game, Outcome, ParallelBattle, SAVE_VERSION, SaveError},
     skill_catalog::skills,
@@ -2858,6 +2858,25 @@ fn available_defenders_lists_player_mara_recruits_with_blockers() {
                 })
             ),
         }
+    }
+    // During a defense the rows keep the between-defenses verdict, while
+    // every SetNextDefender is DefenseInProgress (the documented contract).
+    let mut live = g.clone();
+    live.deploy_country_stage(0, Mode::Personal).unwrap();
+    let verdicts = |list: &[DefenderOption]| -> Vec<_> {
+        list.iter()
+            .map(|o| (o.card.id, o.selectable.clone()))
+            .collect()
+    };
+    assert_eq!(verdicts(&live.available_defenders()), verdicts(&list));
+    for option in &list {
+        assert_eq!(
+            live.clone()
+                .apply(&Command::SetNextDefender(option.card.id)),
+            Err(CommandError::DefenseInProgress),
+            "{:?}",
+            option.card.id
+        );
     }
 }
 

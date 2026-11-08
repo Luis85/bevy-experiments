@@ -107,7 +107,9 @@ impl Game {
     }
     /// Every defender the player can choose from, in order: the player,
     /// Mara (listed even while locked), then the roster by id. Each row
-    /// carries `SetNextDefender`'s own verdict and marks the next defender.
+    /// carries `SetNextDefender`'s verdict between defenses (a live defense
+    /// rejects every choice with `DefenseInProgress`) and marks the next
+    /// defender.
     pub fn available_defenders(&self) -> Vec<DefenderOption> {
         let mut ids = vec![DefenderId::Player, DefenderId::Mara];
         let mut recruits: Vec<_> = self.strategy.roster.iter().map(|r| r.id).collect();
