@@ -1,14 +1,145 @@
 //! Attempt lifecycle: deployment, retry, withdrawal, settlement and repeat runs.
 
 use super::*;
+use crate::campaign::Npc;
+use crate::defenders::DefenderBlocker;
+use crate::strategy::RecruitStatus;
+use tracing::warn;
 
 impl Game {
-    pub(super) fn deploy_internal(
+    /// The recruit holding `seat` on this game's main run, or None for the
+    /// mode owner. Inside a worker the seat names the expedition's recruit,
+    /// whose npc is the worker's own `campaign.npc` copy, so this is None.
+    fn seat_recruit(&self, seat: DefenderSeat) -> Option<u64> {
+        match seat {
+            DefenderSeat::Recruit(id) if !self.worker => Some(id),
+            _ => None,
+        }
+    }
+    /// The npc that fights from `seat` (ruling D6): Mara (or a worker's
+    /// recruit copy) for the mode owner, and the roster entry for a recruit
+    /// defending the main run. A seat naming no roster recruit (invalid
+    /// state that save validation rejects) reads Mara's tactics.
+    pub fn defender_npc(&self, seat: DefenderSeat) -> &Npc {
+        self.seat_recruit(seat)
+            .and_then(|id| self.strategy.roster.iter().find(|r| r.id == id))
+            .map_or(&self.campaign.npc, |r| &r.npc)
+    }
+    /// The npc [`Self::defender_npc`] names, for crediting; None for a seat
+    /// naming no roster recruit, which is never credited to Mara instead.
+    pub(crate) fn defender_npc_mut(&mut self, seat: DefenderSeat) -> Option<&mut Npc> {
+        match self.seat_recruit(seat) {
+            None => Some(&mut self.campaign.npc),
+            Some(id) => self
+                .strategy
+                .roster
+                .iter_mut()
+                .find(|r| r.id == id)
+                .map(|r| &mut r.npc),
+        }
+    }
+    /// Combat progress for the npc in `seat`: the mode owner's path is
+    /// `Campaign::record_npc_progress` unchanged; a defending recruit's
+    /// roster entry accrues the same and claims against the same allowance.
+    pub(super) fn record_defender_progress(&mut self, seat: DefenderSeat, hits: u64, ticks: u64) {
+        if self.seat_recruit(seat).is_none() {
+            self.campaign.record_npc_progress(hits, ticks);
+            return;
+        }
+        let allowance = self.campaign.allowance();
+        if let Some(npc) = self.defender_npc_mut(seat) {
+            npc.successful_hits = npc.successful_hits.saturating_add(hits);
+            npc.combat_ticks = npc.combat_ticks.saturating_add(ticks);
+            npc.claim_objectives(allowance);
+        }
+    }
+    /// The takeover preflight (ruling D8): recruit `id` can defend the main
+    /// run now. No mutation; returns the recruit's npc.
+    fn takeover_preflight(&self, id: u64) -> Result<Npc, String> {
+        if self.worker {
+            return Err("An expedition cannot hand its defense to another survivor".into());
+        }
+        let recruit = self
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == id)
+            .ok_or("Unknown survivor")?;
+        let blocker = match recruit.status {
+            RecruitStatus::Ready => None,
+            RecruitStatus::Guarding => Some(DefenderBlocker::Guarding {
+                country_id: self
+                    .strategy
+                    .guards
+                    .iter()
+                    .find(|g| g.recruit_id == id)
+                    .map_or_else(String::new, |g| g.country_id.clone()),
+            }),
+            RecruitStatus::Deployed => Some(DefenderBlocker::OnExpedition {
+                battle: self
+                    .battles
+                    .iter()
+                    .find(|b| !b.settled && b.recruit_id == id)
+                    .map_or(0, |b| b.id),
+            }),
+            RecruitStatus::Defending => Some(DefenderBlocker::Defending),
+        };
+        if let Some(blocker) = blocker {
+            return Err(blocker.label());
+        }
+        if !self.strategy.recruitment_unlocked(&self.campaign) {
+            return Err("Unlock recruitment before a survivor can defend".into());
+        }
+        self.campaign.preparation()?;
+        let npc = &recruit.npc;
+        self.campaign.validate_loadout(npc.loadout)?;
+        for item in npc.loadout {
+            let item = self.campaign.item(item).ok_or("Missing equipment")?;
+            self.campaign
+                .weapon_access(Mode::Npc, item.definition_index())
+                .map_err(str::to_owned)?;
+        }
+        Ok(npc.clone())
+    }
+    /// The takeover commit: the recruit's loadout and the main run are
+    /// reserved and the recruit is Defending, or nothing changed.
+    fn reserve_takeover(&mut self, id: u64, loadout: [u64; 4]) -> Result<(), String> {
+        self.campaign.reserve_takeover(id, loadout)?;
+        if let Err(error) = self.strategy.reserve_defender(id) {
+            self.campaign.release_takeover(loadout);
+            self.campaign.reserved = None;
+            return Err(error);
+        }
+        Ok(())
+    }
+    /// Returns the defending recruit `id` to the roster and frees its items.
+    /// The roster entry is the battle's npc, so nothing is copied back.
+    fn release_takeover(&mut self, id: u64) {
+        let loadout = self
+            .strategy
+            .roster
+            .iter()
+            .find(|r| r.id == id)
+            .map(|r| r.npc.loadout);
+        match loadout {
+            Some(loadout) => self.campaign.release_takeover(loadout),
+            None => self.campaign.reserved_recruit = None,
+        }
+        if let Err(error) = self.strategy.release_defender(id) {
+            warn!(recruit = id, %error, "takeover release found no defending recruit");
+        }
+    }
+    /// Deploys `defender` on catalogue `level` (`country_stage` for a country
+    /// front). The mode owners deploy as they always have; a recruit passes
+    /// the takeover preflight first and is committed in place of the mode
+    /// owner's reservation (ruling D8).
+    pub(super) fn deploy_as(
         &mut self,
         level: usize,
-        mode: Mode,
+        defender: DefenderId,
         country_stage: Option<usize>,
     ) -> Result<(), String> {
+        let mode = defender.mode();
         if self.attempt.is_some() {
             return Err("Finish or recall the active deployment first".into());
         }
@@ -17,12 +148,20 @@ impl Game {
         {
             return Err("This stage is not unlocked".into());
         }
-        self.campaign.validate_loadout(if mode == Mode::Personal {
-            self.campaign.player.loadout
-        } else {
-            self.campaign.npc.loadout
-        })?;
-        let mut profile = self.campaign.profile(mode);
+        let takeover = match defender.recruit() {
+            Some(id) => Some((id, self.takeover_preflight(id)?)),
+            None => None,
+        };
+        let loadout = match &takeover {
+            Some((_, npc)) => npc.loadout,
+            None if mode == Mode::Personal => self.campaign.player.loadout,
+            None => self.campaign.npc.loadout,
+        };
+        self.campaign.validate_loadout(loadout)?;
+        let mut profile = match &takeover {
+            Some((_, npc)) => self.campaign.profile_for_loadout(mode, loadout, npc),
+            None => self.campaign.profile(mode),
+        };
         let country = if country_stage.is_some() {
             self.campaign.world.active_country()
         } else {
@@ -118,14 +257,12 @@ impl Game {
         let layout = country
             .map(|c| self.campaign.layout_for(&c.id).to_vec())
             .unwrap_or_default();
-        self.campaign.reserve(mode)?;
+        match &takeover {
+            Some((recruit, _)) => self.reserve_takeover(*recruit, loadout)?,
+            None => self.campaign.reserve(mode)?,
+        }
         let id = self.next_attempt_id;
         self.next_attempt_id += 1;
-        let loadout = if mode == Mode::Personal {
-            self.campaign.player.loadout
-        } else {
-            self.campaign.npc.loadout
-        };
         let gear_snapshot = crate::content::Slot::ALL
             .into_iter()
             .map(|slot| {
@@ -145,7 +282,7 @@ impl Game {
                 }
             })
             .collect();
-        let a = Attempt {
+        let mut a = Attempt {
             width_yards,
             balance,
             dps: crate::stats::DpsTracker::new(),
@@ -230,6 +367,9 @@ impl Game {
             event_seq: self.next_event_seq,
             emitted: Vec::new(),
         };
+        if let Some((recruit, _)) = takeover {
+            super::parallel::stamp_recruit_defender(&mut a, recruit);
+        }
         info_span!("battle", attempt = id, mode = ?mode, seed = self.seed).in_scope(|| {
             info!(
                 worker = self.worker,
@@ -299,7 +439,25 @@ impl Game {
         } else {
             0
         };
-        let first_clear = outcome == Outcome::Victory && self.campaign.first_clear(a.level, a.mode);
+        // Finish order for a takeover (ruling D8): victory credit, the npc
+        // attempts count, the takeover release, then the run record and the
+        // report, both naming the recruit.
+        let takeover = if a.mode == Mode::Npc {
+            self.seat_recruit(a.seat)
+        } else {
+            None
+        };
+        let first_clear = outcome == Outcome::Victory
+            && match takeover {
+                None => self.campaign.first_clear(a.level, a.mode),
+                Some(id) => {
+                    let first = self.campaign.commit_victory(a.level);
+                    if let Some(r) = self.strategy.roster.iter_mut().find(|r| r.id == id) {
+                        self.campaign.credit_npc_victory(&mut r.npc, a.level);
+                    }
+                    first
+                }
+            };
         let country_freed = if outcome == Outcome::Victory && a.country_id.is_some() {
             self.campaign
                 .record_country_stage_clear(a.stage)
@@ -312,18 +470,28 @@ impl Game {
         {
             self.strategy.resolve_outbreak(country);
         }
+        // An npc run (the main run reserved for Npc) counts one attempt on
+        // the npc that fought it: Mara, a worker's recruit copy or the
+        // defending recruit's roster entry.
+        let npc_run = self.campaign.reserved == Some(Mode::Npc);
         self.campaign.finish_attempt();
+        if npc_run && let Some(npc) = self.defender_npc_mut(a.seat) {
+            npc.attempts += 1;
+        }
+        if let Some(id) = takeover {
+            self.release_takeover(id);
+        }
         let record = crate::stats::RunRecord {
             id: 0,
             attempt_id: a.id,
             worker_id: None,
-            recruit_id: None,
+            recruit_id: takeover,
             outcome,
             mode: a.mode,
             country_id: a.country_id.clone(),
             country_name: a.country_name.clone(),
             defender_name: if a.mode == Mode::Npc {
-                self.campaign.npc.name.clone()
+                self.defender_npc(a.seat).name.clone()
             } else {
                 self.campaign
                     .selected_survivor

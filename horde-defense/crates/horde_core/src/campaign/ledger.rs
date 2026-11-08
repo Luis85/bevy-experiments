@@ -73,10 +73,10 @@ impl Campaign {
         let plan = self.plan_batch(refs, SaleOrigin::Player, self.owned_item_ids());
         self.execute_plan(&plan)
     }
+    /// Ends the main run's reservation and counts the attempt. The npc's own
+    /// attempt count belongs to whoever fought (Mara or a recruit), so
+    /// `Game::finish` bumps it through the attempt's seat (ruling D8).
     pub fn finish_attempt(&mut self) {
-        if self.reserved == Some(Mode::Npc) {
-            self.npc.attempts += 1;
-        }
         self.reserved = None;
         self.attempts += 1;
     }

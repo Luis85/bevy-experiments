@@ -208,8 +208,8 @@ impl<'a> Staging<'a> {
     /// takeover: the recruit becomes Defending, its loadout joins
     /// `reserved_items`, `reserved_recruit` names it, and the attempt takes
     /// the recruit seat and identity appearance. The frozen combat profile
-    /// stays the one the Npc deploy built; wave 2's takeover deploy builds it
-    /// from the recruit. Fails without a change when there is no such
+    /// stays the one the Npc deploy built; the takeover deploy
+    /// (`Game::deploy_country_stage_as`) builds it from the recruit. Fails without a change when there is no such
     /// attempt or the recruit is unknown, not Ready, or holds reserved items.
     #[cfg(any(test, feature = "test-support"))]
     pub fn stage_takeover(self, recruit_id: u64) -> Result<(), String> {

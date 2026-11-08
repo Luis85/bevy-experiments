@@ -320,4 +320,30 @@ impl Campaign {
     pub fn release_external(&mut self, loadout: [u64; 4]) {
         self.reserved_items.retain(|id| !loadout.contains(id));
     }
+    /// Reserves the main run for recruit `recruit_id` defending it with
+    /// `loadout` (ruling D8): the items join `reserved_items`, the run is an
+    /// Npc run and `reserved_recruit` names the recruit, so Mara's idle
+    /// loadout stays free. Nothing changes on an error.
+    pub(crate) fn reserve_takeover(
+        &mut self,
+        recruit_id: u64,
+        loadout: [u64; 4],
+    ) -> Result<(), String> {
+        self.preparation()?;
+        for id in loadout {
+            let item = self.item(id).ok_or("Missing equipment")?;
+            self.weapon_access(Mode::Npc, item.definition_index())
+                .map_err(str::to_owned)?;
+        }
+        self.reserve_external(loadout)?;
+        self.reserved = Some(Mode::Npc);
+        self.reserved_recruit = Some(recruit_id);
+        Ok(())
+    }
+    /// Frees a takeover's items and its recruit marker. The run reservation
+    /// itself ends in `finish_attempt`.
+    pub(crate) fn release_takeover(&mut self, loadout: [u64; 4]) {
+        self.release_external(loadout);
+        self.reserved_recruit = None;
+    }
 }

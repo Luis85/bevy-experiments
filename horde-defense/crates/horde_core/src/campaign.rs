@@ -271,7 +271,7 @@ fn unedited_custom_choice(
 }
 
 impl Campaign {
-    fn preparation(&self) -> Result<(), String> {
+    pub(crate) fn preparation(&self) -> Result<(), String> {
         if self.reserved.is_some() {
             Err("Return to camp before changing equipment or progression".into())
         } else {

@@ -1407,10 +1407,22 @@ impl Game {
     pub fn sell_unprotected(&mut self) -> Result<u64, crate::command::CommandError> {
         self.sell_extras()
     }
+    /// Deploys the mode owner (the player or Mara) on catalogue `level`.
     pub fn deploy(&mut self, level: usize, mode: Mode) -> Result<(), String> {
-        self.deploy_internal(level, mode, None)
+        self.deploy_as(level, DefenderId::from_mode(mode), None)
     }
+    /// Deploys the mode owner on the active country's `stage`.
     pub fn deploy_country_stage(&mut self, stage: usize, mode: Mode) -> Result<(), String> {
+        self.deploy_country_stage_as(stage, DefenderId::from_mode(mode))
+    }
+    /// Deploys `defender` on the active country's `stage`. A recruit takes
+    /// the main run over with its own loadout, tactics and identity
+    /// (rulings D6, D8); the player and Mara deploy as their mode owner.
+    pub fn deploy_country_stage_as(
+        &mut self,
+        stage: usize,
+        defender: DefenderId,
+    ) -> Result<(), String> {
         let country = self
             .campaign
             .world
@@ -1419,7 +1431,7 @@ impl Game {
         if stage >= country.level_count() || stage > self.campaign.world.next_stage() {
             return Err("Secure the preceding country stage first".into());
         }
-        self.deploy_internal(stage % content().levels.len(), mode, Some(stage))
+        self.deploy_as(stage % content().levels.len(), defender, Some(stage))
     }
     /// Pauses or resumes the whole game. `Command::SetPaused` is the player's
     /// path; the runtime also calls this directly as pause plumbing (pausing on
@@ -1613,10 +1625,11 @@ impl Game {
             self.finish(a, Outcome::Victory, "The sector boss was defeated".into());
             return;
         }
+        let recall_percent = self.defender_npc(a.seat).recall_percent;
         if a.mode == Mode::Npc
             && a.tick.is_multiple_of(60)
-            && self.campaign.npc.recall_percent > 0
-            && a.hp * 100 <= a.max_hp * self.campaign.npc.recall_percent as i32
+            && recall_percent > 0
+            && a.hp * 100 <= a.max_hp * recall_percent as i32
         {
             self.finish(
                 a,
@@ -1626,7 +1639,7 @@ impl Game {
             return;
         }
         if a.mode == Mode::Npc && a.tick.is_multiple_of(60) {
-            self.campaign.record_npc_progress(0, 60);
+            self.record_defender_progress(a.seat, 0, 60);
             self.npc_turn(&mut a);
             debug!(
                 maneuver = ?a.maneuver,

@@ -13,10 +13,13 @@
 //! the D7 seat, Defending and reservation validation, the expedition summary
 //! bounds and the test-support `stage_takeover` seam; and (W2-10) the
 //! liberation-based advancement allowance (10 levels by the 6th liberation)
-//! with the indexed `liberated_count`.
+//! with the indexed `liberated_count`; and (W2-11) the takeover core: a
+//! Ready recruit deploys on the main run with its own loadout, tactics and
+//! identity, progresses and is credited on its roster entry, and finish
+//! releases it and its items.
 mod support;
 use horde_core::{
-    campaign::{Campaign, NpcTraining},
+    campaign::{Campaign, Npc, NpcTraining},
     command::{Command, CommandError},
     content::{Mode, Policy, content},
     defenders::{
@@ -30,6 +33,7 @@ use horde_core::{
     world::world,
 };
 use serde_json::json;
+use std::collections::BTreeSet;
 use support::{advance, enemy, strategic_game};
 
 #[test]
@@ -1616,4 +1620,543 @@ fn liberated_count_matches_full_scan() {
     assert_eq!(Campaign::default().liberated_count(), 0);
     let all = allowance_campaign(&country_ids(|_| true, countries.len()), 0);
     assert_eq!(all.liberated_count(), full_scan_liberated(&all));
+}
+
+// ---------------------------------------------------------------------------
+// W2-11: the takeover core (D6 + D8). A Ready recruit defends the main run
+// with its own loadout, tactics and identity. Its roster entry is the
+// battle's npc, so progress and credit land there, and finish releases it.
+// ---------------------------------------------------------------------------
+
+/// Recruit 1 (Alex Rowan, a Male identity) carrying a bought rifle Mara does
+/// not hold, in a strategic game between defenses.
+fn takeover_ready() -> (Game, u64) {
+    let (mut g, _, id) = game_with_alex();
+    let rifle = g.campaign_mut().add_item(4).unwrap();
+    g.apply(&Command::EquipRecruit { id, item: rifle }).unwrap();
+    assert_ne!(
+        roster_npc(&g, id).loadout,
+        g.campaign().npc.loadout,
+        "the recruit's loadout differs from Mara's"
+    );
+    (g, id)
+}
+
+fn roster_npc(g: &Game, id: u64) -> &Npc {
+    &g.strategy().roster.iter().find(|r| r.id == id).unwrap().npc
+}
+
+fn roster_npc_mut(g: &mut Game, id: u64) -> &mut Npc {
+    &mut g
+        .staging()
+        .strategy()
+        .roster
+        .iter_mut()
+        .find(|r| r.id == id)
+        .unwrap()
+        .npc
+}
+
+/// Deploys recruit `id` on the active country's first stage, unpaused.
+fn take_over(g: &mut Game, id: u64) {
+    g.deploy_country_stage_as(0, DefenderId::Recruit(id))
+        .unwrap_or_else(|e| panic!("takeover deploy: {e}"));
+    g.set_paused(false);
+}
+
+/// The same game with Mara replaced by a copy of recruit `id` and deployed
+/// as Mara: what the takeover must equal in battle.
+fn mara_as_recruit(g: &Game, id: u64) -> Game {
+    let mut twin = g.clone();
+    twin.campaign_mut().npc = roster_npc(g, id).clone();
+    twin.deploy_country_stage(0, Mode::Npc).unwrap();
+    twin.set_paused(false);
+    twin
+}
+
+/// An attempt's saved form without the seat and the stamped appearance,
+/// the only two fields a takeover adds to a Mara deploy of the same npc.
+fn without_identity(g: &Game) -> serde_json::Value {
+    let mut value = serde_json::to_value(g.attempt().expect("live attempt")).unwrap();
+    value.as_object_mut().unwrap().remove("defender");
+    value["profile"]["appearance"] = serde_json::Value::Null;
+    value
+}
+
+/// Saves and loads through validation.
+fn reload(g: &Game) -> Game {
+    let payload = g
+        .to_save_json()
+        .unwrap_or_else(|e| panic!("the save does not validate: {e}"));
+    Game::from_payload(serde_json::from_str(&payload).unwrap(), SAVE_VERSION)
+        .unwrap_or_else(|e| panic!("the save does not load: {e}"))
+}
+
+/// Ends the main run in victory on the next tick.
+fn win_main(g: &mut Game) {
+    enemy(g, 0, 20.0, true);
+    let a = g.attempt_mut().unwrap();
+    a.boss_spawned = true;
+    a.enemies.last_mut().unwrap().injury.unconscious = true;
+    advance(g, 1);
+    assert_eq!(g.last_result().unwrap().outcome, Outcome::Victory);
+}
+
+/// The Mara fields a takeover must never touch.
+fn mara_ledger(g: &Game) -> (u64, u64, u64, u64, BTreeSet<String>) {
+    let npc = &g.campaign().npc;
+    (
+        npc.attempts,
+        npc.victories,
+        npc.successful_hits,
+        npc.combat_ticks,
+        npc.first_clears.clone(),
+    )
+}
+
+#[test]
+fn recruit_takeover_deploys_with_recruit_loadout_and_identity() {
+    let (mut g, id) = takeover_ready();
+    let mara = g.campaign().npc.clone();
+    let recruit = roster_npc(&g, id).clone();
+    let twin = mara_as_recruit(&g, id);
+    take_over(&mut g, id);
+
+    let a = g.attempt().unwrap();
+    assert_eq!(a.defender(), DefenderId::Recruit(id));
+    assert_eq!(a.mode, Mode::Npc);
+    assert_eq!(a.profile.appearance, recruit_identity(id).1);
+    assert_eq!(
+        twin.attempt().unwrap().profile.appearance,
+        Appearance::Female
+    );
+    assert_eq!(
+        without_identity(&g),
+        without_identity(&twin),
+        "the takeover deploys exactly what Mara would with the recruit's npc and loadout"
+    );
+    let names: Vec<_> = a.gear_snapshot.iter().map(|r| r.name.clone()).collect();
+    let expected: Vec<_> = recruit
+        .loadout
+        .iter()
+        .map(|item| g.campaign().item(*item).unwrap().definition().name.clone())
+        .collect();
+    assert_eq!(
+        names, expected,
+        "the gear snapshot is the recruit's loadout"
+    );
+
+    assert_eq!(status(&g, id), RecruitStatus::Defending);
+    let c = g.campaign();
+    assert_eq!(c.reserved, Some(Mode::Npc));
+    assert_eq!(c.reserved_recruit, Some(id));
+    for item in recruit.loadout {
+        assert!(c.item_reserved(item), "recruit item {item}");
+    }
+    for item in mara.loadout {
+        assert!(!c.item_reserved(item), "Mara's idle item {item}");
+    }
+    assert_eq!(c.npc, mara, "Mara is untouched");
+    let saved = serde_json::to_value(&g).unwrap();
+    assert_eq!(saved["attempt"]["defender"], json!({"Recruit": id}));
+    let loaded = reload(&g);
+    assert_eq!(
+        loaded.attempt().unwrap().defender(),
+        DefenderId::Recruit(id)
+    );
+}
+
+#[test]
+fn takeover_preflight_rejects_without_a_change() {
+    let (mut g, id) = takeover_ready();
+    let country = g.campaign().world.cleared[0].clone();
+    let guard = recruit(&mut g, &country);
+    g.apply(&Command::AssignGuard { id: guard, country })
+        .unwrap();
+    let before = serde_json::to_value(&g).unwrap();
+    for defender in [DefenderId::Recruit(99), DefenderId::Recruit(guard)] {
+        let mut attempt = g.clone();
+        assert!(
+            attempt.deploy_country_stage_as(0, defender).is_err(),
+            "{defender:?}"
+        );
+        assert_eq!(
+            serde_json::to_value(&attempt).unwrap(),
+            before,
+            "{defender:?}"
+        );
+    }
+    // A defense in progress blocks a second one, also for the recruit.
+    let mut live = g.clone();
+    live.deploy_country_stage(0, Mode::Npc).unwrap();
+    let held = serde_json::to_value(&live).unwrap();
+    assert!(
+        live.deploy_country_stage_as(0, DefenderId::Recruit(id))
+            .is_err()
+    );
+    assert_eq!(serde_json::to_value(&live).unwrap(), held);
+    // Mode owners keep their mode-based deploy.
+    let mut mara = g.clone();
+    mara.deploy_country_stage_as(0, DefenderId::Mara).unwrap();
+    let mut legacy = g.clone();
+    legacy.deploy_country_stage(0, Mode::Npc).unwrap();
+    assert_eq!(
+        serde_json::to_value(&mara).unwrap(),
+        serde_json::to_value(&legacy).unwrap()
+    );
+}
+
+#[test]
+fn takeover_uses_recruit_recall_not_maras() {
+    for (recruit_recall, mara_recall, recalled) in [(50, 0, true), (0, 50, false)] {
+        let (mut g, id) = takeover_ready();
+        g.campaign_mut().npc.recall_percent = mara_recall;
+        roster_npc_mut(&mut g, id).recall_percent = recruit_recall;
+        take_over(&mut g, id);
+        g.attempt_mut().unwrap().hp = 1;
+        advance(&mut g, 60);
+        let label = format!("recruit {recruit_recall}%, Mara {mara_recall}%");
+        if recalled {
+            assert!(g.attempt().is_none(), "{label}");
+            let report = g.last_result().unwrap();
+            assert_eq!(report.outcome, Outcome::Withdrawal, "{label}");
+            assert_eq!(
+                report.cause, "Survivor recalled at the configured health threshold",
+                "{label}"
+            );
+            assert_eq!(report.defender(), DefenderId::Recruit(id), "{label}");
+        } else {
+            assert!(
+                g.attempt().is_some(),
+                "{label}: Mara's threshold is not the recruit's"
+            );
+        }
+    }
+}
+
+#[test]
+fn takeover_battle_follows_the_recruits_tactics_tick_for_tick() {
+    let (mut g, id) = takeover_ready();
+    // Mara's tactics differ from the recruit's in every field.
+    let mara = &mut g.campaign_mut().npc;
+    mara.policy = Policy::Guardian;
+    mara.prefer_aim = false;
+    mara.early_reload = true;
+    mara.allow_risk = true;
+    let r = roster_npc_mut(&mut g, id);
+    r.policy = Policy::Marksman;
+    r.prefer_aim = true;
+    r.early_reload = false;
+    r.allow_risk = false;
+    let mut twin = mara_as_recruit(&g, id);
+    take_over(&mut g, id);
+    enemy(&mut g, 0, 30.0, false);
+    enemy(&mut twin, 0, 30.0, false);
+    for step in 0..30 {
+        advance(&mut g, 60);
+        advance(&mut twin, 60);
+        let (Some(_), Some(_)) = (g.attempt(), twin.attempt()) else {
+            panic!("both runs end together at step {step}");
+        };
+        assert_eq!(without_identity(&g), without_identity(&twin), "step {step}");
+    }
+}
+
+#[test]
+fn takeover_progress_accrues_to_roster_recruit_only() {
+    let (mut g, id) = takeover_ready();
+    // One npc turn short of the combat-time objective.
+    roster_npc_mut(&mut g, id).combat_ticks = 7200 - 60;
+    let mara = mara_ledger(&g);
+    let mara_awarded = g.campaign().npc.awarded;
+    let mut twin = mara_as_recruit(&g, id);
+    take_over(&mut g, id);
+    enemy(&mut g, 0, 30.0, false);
+    enemy(&mut twin, 0, 30.0, false);
+    advance(&mut g, 1200);
+    advance(&mut twin, 1200);
+    let (recruit, twin_npc) = (roster_npc(&g, id), &twin.campaign().npc);
+    assert!(recruit.combat_ticks >= 7200, "{}", recruit.combat_ticks);
+    assert!(
+        recruit.objectives_claimed[1],
+        "the recruit claims its objective"
+    );
+    assert!(g.attempt().unwrap().hits > 0, "the run lands hits");
+    assert_eq!(
+        (
+            recruit.successful_hits,
+            recruit.combat_ticks,
+            recruit.objectives_claimed,
+            recruit.awarded,
+            recruit.unspent,
+        ),
+        (
+            twin_npc.successful_hits,
+            twin_npc.combat_ticks,
+            twin_npc.objectives_claimed,
+            twin_npc.awarded,
+            twin_npc.unspent,
+        ),
+        "the recruit progresses exactly as Mara would in its place"
+    );
+    assert_eq!(mara_ledger(&g), mara, "Mara gains nothing");
+    assert_eq!(g.campaign().npc.awarded, mara_awarded);
+    // The progress is saved on the roster entry and survives a reload.
+    assert_eq!(roster_npc(&reload(&g), id), roster_npc(&g, id));
+}
+
+#[test]
+fn takeover_victory_credits_recruit_not_mara() {
+    let (mut g, id) = takeover_ready();
+    let mara = mara_ledger(&g);
+    let victories = g.campaign().victories;
+    let player = (g.campaign().player.level, g.campaign().player.xp);
+    let mut twin = mara_as_recruit(&g, id);
+    take_over(&mut g, id);
+    advance(&mut g, 120);
+    advance(&mut twin, 120);
+    win_main(&mut g);
+    win_main(&mut twin);
+
+    let report = g.last_result().unwrap();
+    assert!(report.first_clear);
+    assert_eq!(report.defender(), DefenderId::Recruit(id));
+    assert!(report.completion_xp > 0);
+    let level_id = content().levels[report.level].id.clone();
+    let recruit = roster_npc(&g, id);
+    assert!(recruit.first_clears.contains(&level_id));
+    assert_eq!(
+        recruit,
+        &twin.campaign().npc,
+        "the recruit is credited exactly as Mara would be in its place"
+    );
+    assert_eq!(recruit.victories, 1);
+    assert_eq!(recruit.attempts, 1);
+    assert_eq!(mara_ledger(&g), mara, "Mara is not credited");
+    // The player's completion credit is the same for every defender.
+    let c = g.campaign();
+    assert_eq!(c.victories, victories + 1);
+    assert_ne!((c.player.level, c.player.xp), player);
+    assert_eq!(
+        (c.player.level, c.player.xp),
+        (twin.campaign().player.level, twin.campaign().player.xp)
+    );
+    assert!(c.first_clears.contains(&level_id));
+    let record = c.run_history.last().unwrap();
+    assert_eq!(record.recruit_id, Some(id));
+    assert_eq!(record.worker_id, None);
+    assert_eq!(record.mode, Mode::Npc);
+    assert_eq!(record.defender_name, recruit_identity(id).0);
+    assert_eq!(
+        twin.campaign().run_history.last().unwrap().recruit_id,
+        None,
+        "a Mara record names no recruit"
+    );
+    assert_eq!(status(&g, id), RecruitStatus::Ready);
+    reload(&g);
+}
+
+#[test]
+fn takeover_defeat_and_withdraw_return_recruit_ready_and_release_items() {
+    for outcome in [Outcome::Defeat, Outcome::Withdrawal] {
+        let (mut g, id) = takeover_ready();
+        let mara = mara_ledger(&g);
+        let loadout = roster_npc(&g, id).loadout;
+        let attempts = g.campaign().attempts;
+        take_over(&mut g, id);
+        advance(&mut g, 120);
+        if outcome == Outcome::Defeat {
+            g.attempt_mut().unwrap().injury.unconscious = true;
+            advance(&mut g, 1);
+        } else {
+            g.apply(&Command::Withdraw).unwrap();
+        }
+        let label = format!("{outcome:?}");
+        assert!(g.attempt().is_none(), "{label}");
+        let report = g.last_result().unwrap();
+        assert_eq!(report.outcome, outcome, "{label}");
+        assert_eq!(report.defender(), DefenderId::Recruit(id), "{label}");
+        assert_eq!(status(&g, id), RecruitStatus::Ready, "{label}");
+        let c = g.campaign();
+        assert_eq!(c.reserved, None, "{label}");
+        assert_eq!(c.reserved_recruit, None, "{label}");
+        for item in loadout {
+            assert!(!c.item_reserved(item), "{label}: item {item} released");
+        }
+        assert!(c.reserved_items.is_empty(), "{label}");
+        assert_eq!(c.attempts, attempts + 1, "{label}");
+        assert_eq!(roster_npc(&g, id).attempts, 1, "{label}");
+        assert_eq!(roster_npc(&g, id).victories, 0, "{label}");
+        assert_eq!(mara_ledger(&g), mara, "{label}: Mara is untouched");
+        let record = c.run_history.last().unwrap();
+        assert_eq!(
+            (record.recruit_id, record.outcome),
+            (Some(id), outcome),
+            "{label}"
+        );
+        reload(&g);
+        // Released for real: the recruit can be re-equipped and defends again.
+        let mut again = g.clone();
+        let spare = again.campaign_mut().add_item(4).unwrap();
+        again
+            .apply(&Command::EquipRecruit { id, item: spare })
+            .unwrap_or_else(|e| panic!("{label}: {e}"));
+        take_over(&mut again, id);
+        assert_eq!(status(&again, id), RecruitStatus::Defending, "{label}");
+    }
+}
+
+#[test]
+fn takeover_save_reload_mid_battle_continues_identically() {
+    let (mut g, id) = takeover_ready();
+    take_over(&mut g, id);
+    enemy(&mut g, 1, 40.0, false);
+    advance(&mut g, 900);
+    assert!(g.attempt().is_some());
+    let mut loaded = reload(&g);
+    assert_eq!(
+        serde_json::to_value(&loaded).unwrap(),
+        serde_json::to_value(&g).unwrap()
+    );
+    for step in 0..40 {
+        advance(&mut g, 60);
+        advance(&mut loaded, 60);
+        assert_eq!(
+            serde_json::to_value(&loaded).unwrap(),
+            serde_json::to_value(&g).unwrap(),
+            "step {step}"
+        );
+    }
+    g.apply(&Command::Withdraw).unwrap();
+    loaded.apply(&Command::Withdraw).unwrap();
+    assert_eq!(
+        serde_json::to_value(&loaded).unwrap(),
+        serde_json::to_value(&g).unwrap()
+    );
+    assert_eq!(status(&loaded, id), RecruitStatus::Ready);
+}
+
+const FIXTURE_V7: &str = include_str!("fixtures/save_v7.json");
+
+#[test]
+fn v7_fixture_withdraw_returns_defending_recruit_ready_and_releases_items() {
+    let mut g = Game::decode_save_generation(FIXTURE_V7.as_bytes()).expect("v7 fixture loads");
+    let id = 1;
+    assert_eq!(g.attempt().unwrap().defender(), DefenderId::Recruit(id));
+    assert_eq!(status(&g, id), RecruitStatus::Defending);
+    let loadout = roster_npc(&g, id).loadout;
+    assert!(loadout.iter().all(|item| g.campaign().item_reserved(*item)));
+    let mara = mara_ledger(&g);
+    let attempts = roster_npc(&g, id).attempts;
+    let records = g.campaign().run_history.len();
+    let mut expedition_items: Vec<u64> = g
+        .battles()
+        .iter()
+        .filter(|b| !b.settled)
+        .flat_map(|b| b.loadout)
+        .collect();
+    expedition_items.sort_unstable();
+
+    g.apply(&Command::Withdraw).unwrap();
+    assert!(g.attempt().is_none());
+    assert_eq!(g.last_result().unwrap().defender(), DefenderId::Recruit(id));
+    assert_eq!(status(&g, id), RecruitStatus::Ready);
+    let c = g.campaign();
+    assert_eq!((c.reserved, c.reserved_recruit), (None, None));
+    for item in loadout {
+        assert!(!c.item_reserved(item), "item {item} released");
+    }
+    let mut still = c.reserved_items.clone();
+    still.sort_unstable();
+    assert_eq!(
+        still, expedition_items,
+        "only the live expedition keeps its items"
+    );
+    assert_eq!(roster_npc(&g, id).attempts, attempts + 1);
+    assert_eq!(mara_ledger(&g), mara, "Mara is untouched");
+    assert_eq!(c.run_history.len(), records + 1);
+    let record = c.run_history.last().unwrap();
+    assert_eq!((record.recruit_id, record.worker_id), (Some(id), None));
+    assert_eq!(record.defender_name, roster_npc(&g, id).name);
+    reload(&g);
+}
+
+/// One digest over mode-owner runs that reach every finish path: a Mara
+/// victory, a Mara recall, a Mara defeat and a Personal withdrawal.
+fn mode_owner_digest() -> u64 {
+    let mut digest = support::fnv1a(b"mode-owner");
+    let mut fold = |name: &str, g: &Game| {
+        assert!(g.attempt().is_none(), "{name} finished");
+        digest = support::fnv1a_extend(digest, name.as_bytes());
+        digest = support::fnv1a_extend(digest, &g.state_digest().to_le_bytes());
+    };
+    let mut victory = support::smoke_run(1, Mode::Npc, 900, |_| {});
+    win_main(&mut victory);
+    fold("mara victory", &victory);
+
+    let mut recall = support::smoke_run(2, Mode::Npc, 600, |_| {});
+    recall.campaign_mut().npc.recall_percent = 50;
+    recall.attempt_mut().unwrap().hp = 1;
+    advance(&mut recall, 60);
+    fold("mara recall", &recall);
+
+    let mut defeat = support::smoke_run(3, Mode::Npc, 600, |_| {});
+    defeat.attempt_mut().unwrap().injury.unconscious = true;
+    advance(&mut defeat, 1);
+    fold("mara defeat", &defeat);
+
+    let mut personal = support::smoke_run(1, Mode::Personal, 900, |_| {});
+    personal.apply(&Command::Withdraw).unwrap();
+    fold("personal withdrawal", &personal);
+    digest
+}
+
+/// Pin: the mode-owner deploy, tick and finish paths are byte-identical to
+/// the pre-takeover code (the digest was recorded on its parent commit).
+#[test]
+fn mode_owner_paths_are_byte_identical() {
+    assert_eq!(mode_owner_digest(), MODE_OWNER_DIGEST);
+}
+const MODE_OWNER_DIGEST: u64 = 18_168_043_942_658_564_673;
+
+/// Pin: Mara's `attempts` count moves exactly as the legacy
+/// `finish_attempt` moved it: one per finished Mara run of any outcome,
+/// none for a Personal run, and a worker's run counts on the worker's copy,
+/// which settlement hands back to the recruit.
+#[test]
+fn mara_finish_matches_legacy_attempt_counting() {
+    let mut g = support::game(Mode::Npc);
+    assert_eq!(g.campaign().npc.attempts, 0);
+    g.apply(&Command::Withdraw).unwrap();
+    assert_eq!(g.campaign().npc.attempts, 1, "withdrawal");
+    g.deploy(0, Mode::Npc).unwrap();
+    g.set_paused(false);
+    g.attempt_mut().unwrap().injury.unconscious = true;
+    advance(&mut g, 1);
+    assert_eq!(g.last_result().unwrap().outcome, Outcome::Defeat);
+    assert_eq!(g.campaign().npc.attempts, 2, "defeat");
+    g.deploy(0, Mode::Npc).unwrap();
+    g.set_paused(false);
+    win_main(&mut g);
+    assert_eq!(g.campaign().npc.attempts, 3, "victory");
+    g.deploy(0, Mode::Personal).unwrap();
+    g.apply(&Command::Withdraw).unwrap();
+    assert_eq!(g.campaign().npc.attempts, 3, "a Personal run");
+    assert_eq!(g.campaign().attempts, 1 + 4);
+
+    let (mut g, country, id) = game_with_alex();
+    let b = g.deploy_survivor(id, &country, 0).unwrap();
+    win_stage(&mut g, b);
+    assert!(battle(&g, b).settled);
+    assert_eq!(battle(&g, b).game().campaign().npc.attempts, 1);
+    assert_eq!(
+        roster_npc(&g, id).attempts,
+        1,
+        "settled back to the recruit"
+    );
+    assert_eq!(
+        g.campaign().npc.attempts,
+        0,
+        "Mara never counts a worker run"
+    );
 }

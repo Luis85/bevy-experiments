@@ -32,6 +32,9 @@ impl Campaign {
         unlocked.dedup();
         unlocked
     }
+    /// A victory on catalogue `level` by the mode owner: the campaign
+    /// victory, and for Npc Mara's credit. True when it was the level's
+    /// first clear.
     pub fn first_clear(&mut self, level: usize, mode: Mode) -> bool {
         let Some(id) = content().levels.get(level).map(|l| l.id.clone()) else {
             return false;
@@ -52,6 +55,23 @@ impl Campaign {
         }
         self.claim_objectives();
         first
+    }
+    /// The campaign side of a victory on `level`, whoever defended: the
+    /// player's completion XP, the boss, the first clear, the victory count
+    /// and Mara's objective claims. True when it was the first clear.
+    pub(crate) fn commit_victory(&mut self, level: usize) -> bool {
+        self.first_clear(level, Mode::Personal)
+    }
+    /// The defender side of a victory on `level` for an npc other than
+    /// Mara (a recruit defending the main run): its victory, first clear and
+    /// objective claims against the campaign allowance.
+    pub(crate) fn credit_npc_victory(&self, npc: &mut Npc, level: usize) {
+        let Some(level) = content().levels.get(level) else {
+            return;
+        };
+        npc.victories += 1;
+        npc.first_clears.insert(level.id.clone());
+        npc.claim_objectives(self.allowance());
     }
     pub fn blueprint_available(&self, kind: StructureKind) -> bool {
         if self.legacy_features {

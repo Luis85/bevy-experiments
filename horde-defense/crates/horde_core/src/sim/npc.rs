@@ -69,7 +69,7 @@ impl Game {
             a.injury.clear_shock();
             return;
         }
-        let policy = self.campaign.npc.policy;
+        let policy = self.defender_npc(a.seat).policy;
         let target = select_npc_target(a, policy);
         let Some(target) = target else {
             a.decision = "Do Nothing · watching the approach".into();
@@ -99,7 +99,7 @@ impl Game {
             return;
         }
         if (a.ammo == 0
-            || (self.campaign.npc.early_reload && a.ammo <= a.magazine / 4 && !imminent))
+            || (self.defender_npc(a.seat).early_reload && a.ammo <= a.magazine / 4 && !imminent))
             && !melee
         {
             a.maneuver = NpcManeuver::Reload;
@@ -122,7 +122,11 @@ impl Game {
         if !melee {
             // This preference limits action selection, never the dice. Even a
             // risk-taking policy cannot make an illegal skill-below-3 attack.
-            let minimum_skill = if self.campaign.npc.allow_risk { 3 } else { 8 };
+            let minimum_skill = if self.defender_npc(a.seat).allow_risk {
+                3
+            } else {
+                8
+            };
             let aimed_seconds = if a.aim_target == Some(id) {
                 a.aim_seconds
             } else {
@@ -178,7 +182,7 @@ impl Game {
             + a.profile.npc.skill_bonus
             + rules::range_penalty(current_range)
             < 14;
-        let prefer_aim = self.campaign.npc.prefer_aim
+        let prefer_aim = self.defender_npc(a.seat).prefer_aim
             && (policy == Policy::Marksman || (!imminent && !contact))
             && (policy == Policy::Marksman || useful_aim);
         let desired_aim = if policy == Policy::Marksman && !imminent {
@@ -269,7 +273,7 @@ impl Game {
         if result.hit {
             a.hits += 1;
             if !melee {
-                self.campaign.record_npc_progress(1, 0);
+                self.record_defender_progress(a.seat, 1, 0);
             }
         }
         if result.requires_ready {
