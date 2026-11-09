@@ -361,11 +361,12 @@ fn drop_rng(hit: bool, skip: usize) -> Rng {
 }
 
 /// The combat RNG after the draws a kill should take: the 3% roll, then
-/// one uniform pick over a pool of `pool` when the normal drop fires.
-fn after_draws(mut rng: Rng, pool: Option<usize>) -> Rng {
+/// one weighted pick, `below(total)` over a DropTable of total `total`, when
+/// the normal drop fires (W2-09; the uniform pick drew `below(len)`).
+fn after_draws(mut rng: Rng, total: Option<u64>) -> Rng {
     rng.below(100);
-    if let Some(len) = pool {
-        rng.below(len as u64);
+    if let Some(total) = total {
+        rng.below(total);
     }
     rng
 }
@@ -387,7 +388,7 @@ fn elite_status_never_changes_combat_rng_draw_count() {
             ap.drop_tier.is_some(),
             "a wave-2 deploy is on the Some path"
         );
-        let pool = content().drop_pool(ap.level + 1).len();
+        let pool = crate::loot::DropTable::for_attempt(&ap).total();
         for kills in 0..42u32 {
             for hit in [false, true] {
                 let rng = drop_rng(hit, kills as usize);
@@ -411,7 +412,7 @@ fn elite_only_drop_uses_keyed_pick_and_draws_no_rng() {
     for mode in [Mode::Personal, Mode::Npc] {
         let mut g = game_at(mode, 13);
         let mut a = g.attempt.take().unwrap();
-        let pool = content().drop_pool(a.level + 1);
+        let table = crate::loot::DropTable::for_attempt(&a);
         let mut picked = BTreeSet::new();
         for n in 0..40usize {
             let rng = drop_rng(false, n);
@@ -425,7 +426,7 @@ fn elite_only_drop_uses_keyed_pick_and_draws_no_rng() {
             );
             let key = crate::hash::keyed(g.seed, a.id, id, crate::hash::tags::ELITE_PICK);
             let event = a.loot_events.last().unwrap();
-            let definition = pool[(key % pool.len() as u64) as usize];
+            let definition = table.pick(key % table.total());
             assert_eq!(definition_of(event), definition, "{mode:?} {n}");
             assert_eq!(a.drop_ids.last(), Some(&event.item_id), "{mode:?} {n}");
             picked.insert(definition);

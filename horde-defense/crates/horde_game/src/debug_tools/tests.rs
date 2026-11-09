@@ -580,10 +580,15 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
     // fa528d88f6639802: the replayed Germany start plays difficulty 1.04
     // instead of 1.06, so the combat, its defeat and the refused buy differ.
     // With the parent world.json and the raw difficulty in the deploy terms
-    // the replayed state digests to fa528d88f6639802 again.
+    // the replayed state digests to fa528d88f6639802 again. W2-09 (the
+    // weighted DropTable, class G) moved it from 711acf17d72357c2: the
+    // replayed deploys' drops are picked by drop-tier and trained-class
+    // weight with the same one draw. With neutral weights (DROP_TIER_WEIGHTS
+    // and TRAINED_CLASS_WEIGHT all 1) the replayed state digests to
+    // 711acf17d72357c2 again.
     assert_eq!(
         hex(replay(without_sale).unwrap().digest),
-        "711acf17d72357c2",
+        "0e558e53029c6c41",
         "the replay of the recording up to its sale is pinned"
     );
     // Only compatibility warnings, never a format or seed mismatch. A content

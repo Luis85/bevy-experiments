@@ -124,11 +124,13 @@ const TRACE_RULESET: u32 = 2;
 /// five and every GAMEPLAY_TRACE digest are unchanged.
 /// W2-52: the three Personal GOLDEN digests move (class F); the three Npc
 /// digests and every GAMEPLAY_TRACE digest are unchanged.
+/// W2-09: the 0x1a571167 Personal GOLDEN digest moves (class G, the weighted
+/// pick); the other five and every GAMEPLAY_TRACE digest are unchanged.
 const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
     [
         0x2906_db6e_ab9e_16c6,
         0xcffe_0be4_463d_46d6,
-        0x9478_7e77_fcc1_084a,
+        0x4b76_d4cf_c208_5d5e,
         0x97d9_3e67_bd2b_ed2f,
         0xc0f5_736b_ba39_4b29,
         0x6dce_bbed_cc75_82c9,
@@ -180,6 +182,11 @@ const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
          player.level_grant_paid at the level, so the three Personal runs \
          (level 1 -> 2) now save level_grant_paid 2; outcome, trace and items \
          are unchanged, and the Npc runs level no player",
+    ),
+    (
+        "W2-09",
+        MoveClass::G,
+        "the weighted single-draw DropTable (plan LE-5) replaces the uniform          pick: the one drop of 0x1a571167 Personal (drop tier 1) now weighs a          trained Ranged class x3, so the same one a.rng draw lands on another          definition and the owned item moves; outcome and trace are unchanged          (support::classify labels the anatomy C, items only), the other five          runs drop nothing, and neutral weights restore the old digest",
     ),
 ];
 

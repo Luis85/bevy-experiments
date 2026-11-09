@@ -10,6 +10,8 @@ mod death_effect_tests;
 mod defense;
 mod director;
 #[cfg(test)]
+mod drop_table_tests;
+#[cfg(test)]
 mod elite_tests;
 #[cfg(test)]
 mod enemy_trait_tests;

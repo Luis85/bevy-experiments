@@ -2160,11 +2160,15 @@ fn mode_owner_digest() -> u64 {
 /// Re-recorded at W2-52 (format, class F): a player level-up keeps the
 /// neutral `level_grant_paid` ledger at the level, so the runs that level
 /// the player now save it; the takeover code did not move.
+/// Re-recorded at W2-09 (gameplay, class G): the weighted DropTable picks
+/// the drops these runs bank (same one draw, other definitions); with
+/// neutral weights the old digest returns, and the takeover code did not
+/// move.
 #[test]
 fn mode_owner_paths_are_byte_identical() {
     assert_eq!(mode_owner_digest(), MODE_OWNER_DIGEST);
 }
-const MODE_OWNER_DIGEST: u64 = 17_352_768_058_746_973_511;
+const MODE_OWNER_DIGEST: u64 = 9_781_996_419_595_183_472;
 
 /// Pin: Mara's `attempts` count moves exactly as the legacy
 /// `finish_attempt` moved it: one per finished Mara run of any outcome,

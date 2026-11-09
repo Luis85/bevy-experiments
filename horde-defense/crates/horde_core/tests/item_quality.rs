@@ -2,7 +2,7 @@ mod support;
 use horde_core::{
     campaign::Campaign,
     content::{EnemyKind, ItemDefId, Mode, content},
-    loot::{ELITE_QUALITY_FLOOR, drop_quality},
+    loot::{DropTable, ELITE_QUALITY_FLOOR, drop_quality},
     quality::{Quality, QualityCatalog, catalog},
     rules::Rng,
     sim::{Game, Input},
@@ -142,15 +142,14 @@ fn guaranteed_drop_game_with(rng_seed: u64) -> Game {
     g
 }
 
-/// Today's level-0 drop pool (catalogue index 4 on, tier 1), in index order.
-fn tier_one_pool() -> Vec<usize> {
-    content()
-        .items
-        .iter()
-        .enumerate()
-        .filter(|(n, item)| *n >= 4 && item.tier > 0 && item.tier <= 1)
-        .map(|(n, _)| n)
-        .collect()
+/// The weighted drop table of a fresh level-0 Personal attempt (drop tier
+/// 1). W2-09: the Some path picks from it with one `below(total)` draw; this
+/// helper replaced the uniform tier-1 pool these tests drew from before.
+fn tier_one_table() -> DropTable {
+    let g = guaranteed_drop_game_with(1);
+    let table = DropTable::for_attempt(g.attempt().unwrap());
+    assert!(table.total() > 0);
+    table
 }
 
 /// The relative outcome by hand: the absolute tier read as a step from
@@ -282,12 +281,12 @@ fn roll_relative_with_common_base_and_no_floor_equals_roll() {
 fn drop_quality_consumes_no_combat_rng() {
     // A wave-2 (drop_tier Some) drop of an Uncommon-base tier-1 item, so the
     // relative outcome differs from the absolute roll.
-    let pool = tier_one_pool();
+    let table = tier_one_table();
     let rng_seed = (1..100_000u64)
         .find(|seed| {
             let mut rng = Rng::new(*seed);
             rng.below(100) < 3
-                && content().items[pool[rng.below(pool.len() as u64) as usize]].base_quality
+                && content().items[table.pick(rng.below(table.total()))].base_quality
                     == Quality::Uncommon
         })
         .unwrap();
@@ -297,7 +296,7 @@ fn drop_quality_consumes_no_combat_rng() {
     let (seed, attempt, enemy, rank) = (g.seed(), a.id, a.enemies[0].id, a.progression.rank);
     let mut expected_rng = a.rng;
     assert!(expected_rng.below(100) < 3);
-    let definition = pool[expected_rng.below(pool.len() as u64) as usize];
+    let definition = table.pick(expected_rng.below(table.total()));
     let base = content().items[definition].base_quality;
     let expected = shifted_by_hand(base, catalog().roll(seed, attempt, enemy, rank));
     assert_eq!(
@@ -328,8 +327,9 @@ fn drop_quality_uses_a_purpose_counter_without_extra_combat_rng_and_checkpoint_r
     let enemy = a.enemies[0].id;
     let mut expected_rng = a.rng;
     assert!(expected_rng.below(100) < 3);
-    let pool = tier_one_pool();
-    let definition = pool[expected_rng.below(pool.len() as u64) as usize];
+    // W2-09: the pick is the weighted DropTable's, one below(total) draw.
+    let table = tier_one_table();
+    let definition = table.pick(expected_rng.below(table.total()));
     // W2-07: a fresh deploy takes the drop_tier Some path, whose quality is
     // the relative roll on the picked item's base (decision 7), not the
     // absolute roll this test pinned before.

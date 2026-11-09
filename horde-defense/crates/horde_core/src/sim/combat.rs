@@ -818,21 +818,24 @@ impl Game {
         }
         Some(available[a.rng.below(available.len() as u64) as usize])
     }
-    /// The v7 drop pick (`drop_tier` Some): uniform over
-    /// [`crate::content::Content::drop_pool`] at the encounter template's
-    /// level + 1, the pool the content pins count, the loot-only items
-    /// included (W2-08), until the weighted DropTable (W2-09) replaces it.
-    /// A `normal` drop takes exactly one `a.rng` draw, as today; an
+    /// The v7 drop pick (`drop_tier` Some): the weighted
+    /// [`crate::loot::DropTable`] at the attempt's frozen drop tier, the
+    /// loot-only items included (W2-08). A `normal` drop takes exactly one
+    /// `a.rng.below(total)` draw, as the uniform pick took one; an
     /// elite-only drop (ruling E8) picks with the keyed ELITE_PICK hash and
-    /// draws nothing, so elite status never changes the combat RNG.
+    /// draws nothing, so elite status never changes the combat RNG. An
+    /// empty table draws nothing.
     fn drop_definition(&self, a: &mut Attempt, e: &Enemy, normal: bool) -> Option<usize> {
-        let available = content().drop_pool(a.level + 1);
-        if normal {
-            return Self::uniform_drop_pick(a, &available);
+        let table = crate::loot::DropTable::for_attempt(a);
+        if table.total() == 0 {
+            return None;
         }
-        let len = u64::try_from(available.len()).ok().filter(|len| *len > 0)?;
-        let key = crate::hash::keyed(self.seed, a.id, e.id, crate::hash::tags::ELITE_PICK);
-        Some(available[(key % len) as usize])
+        let roll = if normal {
+            a.rng.below(table.total())
+        } else {
+            crate::hash::keyed(self.seed, a.id, e.id, crate::hash::tags::ELITE_PICK) % table.total()
+        };
+        Some(table.pick(roll))
     }
     /// The pre-v7 drop pool: only the [`LEGACY_DROP_DEFINITIONS`] v1
     /// definitions (index 4 on, tiers 1 to the template's level + 1), so an
