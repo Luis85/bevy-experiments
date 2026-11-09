@@ -15,7 +15,7 @@ use crate::command::CommandError;
 pub enum SaleOrigin {
     /// A player command or preview: nothing sells while a defender is deployed.
     Player,
-    /// A settlement drain (wave-2 auto-sell): skips only the in-battle guard.
+    /// A settlement drain (auto-sell): skips only the in-battle guard.
     Settlement,
 }
 
@@ -196,6 +196,36 @@ impl Campaign {
             }
         }
         plan
+    }
+    /// A settlement drain's plan (overflow policy "keep the item"): the
+    /// eligible subset of `ids` under [`SaleOrigin::Settlement`], in order,
+    /// where an item whose coins would push the wallet past `u64::MAX` is
+    /// skipped and counted instead of failing the batch. The plan always
+    /// fits the wallet, so [`Self::execute_plan`] accepts it. Pure.
+    pub(crate) fn plan_settlement(
+        &self,
+        refs: &SaleRefs,
+        ids: impl IntoIterator<Item = u64>,
+    ) -> (SalePlan, u32) {
+        let mut plan = SalePlan::default();
+        let mut kept_on_overflow = 0u32;
+        for id in ids {
+            let Ok(quote) = self.sale_eligibility_for(id, SaleOrigin::Settlement, refs) else {
+                continue;
+            };
+            match plan
+                .coins
+                .checked_add(quote.coins)
+                .filter(|total| self.coins.checked_add(*total).is_some())
+            {
+                Some(total) => {
+                    plan.ids.push(id);
+                    plan.coins = total;
+                }
+                None => kept_on_overflow = kept_on_overflow.saturating_add(1),
+            }
+        }
+        (plan, kept_on_overflow)
     }
     /// Every owned item id, in inventory order.
     pub(crate) fn owned_item_ids(&self) -> Vec<u64> {

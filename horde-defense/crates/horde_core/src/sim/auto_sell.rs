@@ -1,12 +1,16 @@
-//! Stash auto-sell (LE, W1-23): the pure [`Game::auto_sell_preview`] read
-//! and the two commands behind the Equipment Auto-sell panel.
-//! `SetAutoSell` stores the rule; `ApplyAutoSellToStash` sells what the
-//! stored rule matches in the stash right now, for exactly the quote the
-//! player confirmed. Every sale goes through `Game::plan_sale` and
-//! `Campaign::execute_plan`, so the preview, the quote and the coins paid
-//! are one plan. The settlement hooks (H1, W-a) arrive in wave 2.
+//! Auto-sell (LE). Stash auto-sell (W1-23): the pure
+//! [`Game::auto_sell_preview`] read and the two commands behind the
+//! Equipment Auto-sell panel. `SetAutoSell` stores the rule;
+//! `ApplyAutoSellToStash` sells what the stored rule matches in the stash
+//! right now, for exactly the quote the player confirmed. Main-run
+//! settlement, hook H1 (W2-14): [`Game::settle_auto_sell`] sells this run's
+//! drops when the rule is enabled. Every sale goes through a `Campaign`
+//! plan and `Campaign::execute_plan`, so the preview, the quote and the
+//! coins paid are one plan. The worker hook (W-a) arrives with W2-16.
 use super::*;
-use crate::campaign::{AutoSellRule, UpgradeJudge};
+use crate::campaign::{
+    AutoSellRule, AutoSoldLine, AutoSoldReceipt, MAX_AUTO_SOLD_LINES, UpgradeJudge,
+};
 use crate::command::CommandError;
 use crate::quality::Quality;
 
@@ -79,6 +83,83 @@ impl Game {
         preview.coins = plan.coins;
         preview.ids = plan.ids;
         preview
+    }
+    /// Hook H1 (loot-economy §7; rulings D13, E2, E5, E15): the main run's
+    /// settlement sale of this run's `drops`, called by `finish` after the
+    /// attempt ends and the takeover release, before the run record and the
+    /// report. Nothing happens in a worker or with the rule off. Candidates,
+    /// in ascending id order: still owned, a quality (never quality None)
+    /// strictly below `sell_below`, a selected slot, no settlement-origin
+    /// sale guard (every roster loadout stays guarded, the defending
+    /// recruit's included) and, with `keep_upgrades`, no upgrade for
+    /// `defender`, the defender who ran the battle. An item that would
+    /// overflow the wallet is kept and counted. Returns the receipt: exact
+    /// totals and the [`MAX_AUTO_SOLD_LINES`] sales with the highest coins
+    /// (ties to the lower id). No RNG and no event.
+    pub(super) fn settle_auto_sell(
+        &mut self,
+        drops: &[u64],
+        defender: DefenderId,
+    ) -> AutoSoldReceipt {
+        let rule = self.campaign.auto_sell;
+        if self.worker || !rule.enabled {
+            return AutoSoldReceipt::default();
+        }
+        let judge = UpgradeJudge::Defender(defender);
+        let mut ids = drops.to_vec();
+        ids.sort_unstable();
+        ids.dedup();
+        let candidates: Vec<u64> = ids
+            .into_iter()
+            .filter(|&id| {
+                let Some(item) = self.campaign.item(id) else {
+                    return false;
+                };
+                item.quality
+                    .is_some_and(|quality| quality < rule.sell_below)
+                    && rule.slots[item.definition().slot.index()]
+                    && !(rule.keep_upgrades
+                        && self.campaign.is_upgrade_for(id, &judge, &self.strategy))
+            })
+            .collect();
+        let (plan, kept_on_overflow) = self
+            .campaign
+            .plan_settlement(&self.strategy.sale_refs(), candidates);
+        let mut receipt = AutoSoldReceipt {
+            kept_on_overflow,
+            ..AutoSoldReceipt::default()
+        };
+        let mut lines = Vec::with_capacity(plan.ids.len());
+        for &id in &plan.ids {
+            let item = self.campaign.item(id).expect("planned items are owned");
+            let quality = item.quality.expect("candidates have a quality");
+            let coins = self
+                .campaign
+                .item_sale_value(id)
+                .expect("planned items are owned");
+            receipt.by_quality[quality] += 1;
+            lines.push((
+                id,
+                AutoSoldLine {
+                    definition: item.definition.clone(),
+                    level: item.level,
+                    quality,
+                    coins,
+                },
+            ));
+        }
+        lines.sort_by(|(a_id, a), (b_id, b)| b.coins.cmp(&a.coins).then(a_id.cmp(b_id)));
+        receipt.lines = lines
+            .into_iter()
+            .take(MAX_AUTO_SOLD_LINES)
+            .map(|(_, line)| line)
+            .collect();
+        receipt.count = u32::try_from(plan.ids.len()).unwrap_or(u32::MAX);
+        receipt.coins = self
+            .campaign
+            .execute_plan(&plan)
+            .expect("a settlement plan fits the wallet");
+        receipt
     }
     /// `Command::SetAutoSell`: stores a valid rule, in or out of battle.
     pub(crate) fn set_auto_sell(&mut self, rule: AutoSellRule) -> Result<(), CommandError> {
