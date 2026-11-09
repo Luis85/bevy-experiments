@@ -139,7 +139,8 @@ report), and at the end of an expedition settlement pass that credited a
 victory while no main run is live (otherwise the main run's finish pays it).
 It pays the grants above `level_grant_paid` and sets it to the level, then
 every reached, unclaimed milestone: its coins and an item of the authored
-quality at the shop item level, picked by a keyed hash of the game seed and
+quality, or the definition's base quality if higher, at the shop item level,
+picked by a keyed hash of the game seed and
 the rank (no RNG draw). A worker game never pays, so an expedition victory is
 paid once, by the parent. A frozen rank 5/10/15/20 that the progression rank
 reached but the catalogue authors no reward for is claimed unpaid, the same
@@ -153,7 +154,9 @@ authored, so a player level-up whose grants are all 0 sets
 W2-52), unpaid and with no receipt, the same as migration step (c); level 1
 writes nothing. A save made before W2-52 can therefore hold a
 `level_grant_paid` below the level, owing zero-coin grants, which the next
-settlement marks paid.
+settlement marks paid: the next main-run finish, or the next expedition pass
+that credits a victory while no main run is live (a pass that credits none
+does not settle).
 
 The receipts of what settlement paid are optional and absent at their
 default. `last_result.progression_rewards` (root or expedition report) holds
