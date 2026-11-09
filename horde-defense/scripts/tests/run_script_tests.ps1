@@ -11,6 +11,9 @@ $workspace = Split-Path -Parent $scriptsDirectory
 $nativeLibrary = Join-Path $scriptsDirectory 'lib\Native.ps1'
 if (-not (Test-Path -LiteralPath $nativeLibrary)) { throw "FAIL: missing $nativeLibrary" }
 . $nativeLibrary
+# The display hold and the Kernel-Power 506/507 check (R27). Each case dot-sources it into its own scope and shims the
+# functions it calls.
+$displayLibrary = Join-Path $scriptsDirectory 'lib\DisplayPower.ps1'
 
 $script:failures = New-Object System.Collections.Generic.List[string]
 $script:passed = 0
@@ -153,6 +156,9 @@ public static class LastLightNativeHelper {
         }
         string report = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_REPORT");
         if (args.Length == 0 && !String.IsNullOrEmpty(report)) {
+            // HORDE_FAKE_EXIT makes the run fail with that exit code before it writes a report.
+            string failWith = Environment.GetEnvironmentVariable("HORDE_FAKE_EXIT");
+            if (!String.IsNullOrEmpty(failWith)) { return int.Parse(failWith); }
             int unfocused = 0;
             string once = Environment.GetEnvironmentVariable("HORDE_FAKE_UNFOCUSED_ONCE");
             if (!String.IsNullOrEmpty(once) && File.Exists(once)) { File.Delete(once); unfocused = 3; }
@@ -432,6 +438,91 @@ try {
         Assert-Equal 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad' (Get-FileSha256 -Path $path) 'sha256'
     }
 
+    Test-Case 'Enter-DisplayHold requests the display and Exit-DisplayHold releases it once (R27)' {
+        . $displayLibrary
+        $script:executionStates = New-Object System.Collections.Generic.List[string]
+        function Set-ThreadExecutionState([uint32]$Flags) {
+            $script:executionStates.Add('0x' + $Flags.ToString('X8'))
+            if ($Flags -eq [uint32]2147483648) { return [uint32]2147483651 }
+            return [uint32]2147483648
+        }
+        $hold = Enter-DisplayHold
+        Assert-True $hold.Held 'the hold is held'
+        Assert-Equal 'ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED' $hold.Request 'request'
+        Assert-Equal '0x80000003' ($script:executionStates -join ',') 'ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED'
+        Assert-True (-not $hold.Released) 'released before Exit-DisplayHold'
+        Exit-DisplayHold $hold
+        Exit-DisplayHold $hold
+        Assert-Equal '0x80000003,0x80000000' ($script:executionStates -join ',') 'one release with ES_CONTINUOUS alone'
+        Assert-True $hold.Released 'released'
+        Assert-Equal '0x80000003' $hold.ReleasedFrom 'the release replaced the held state'
+        function Set-ThreadExecutionState([uint32]$Flags) { return [uint32]0 }
+        $threw = $null
+        try { Enter-DisplayHold | Out-Null } catch { $threw = $_.Exception.Message }
+        Assert-True ($threw -match 'refused') "a refused request did not throw: $threw"
+    }
+
+    Test-Case 'Get-DisplayPowerEvent queries Kernel-Power 506/507 in the run window and reads no match as none (R27)' {
+        . $displayLibrary
+        $script:eventFilters = New-Object System.Collections.Generic.List[object]
+        $script:eventMode = 'two'
+        function Get-WinEvent {
+            [CmdletBinding()]
+            param([hashtable]$FilterHashtable)
+            $script:eventFilters.Add($FilterHashtable)
+            if ($script:eventMode -eq 'two') {
+                $at = $FilterHashtable.StartTime
+                return @(
+                    [pscustomobject]@{ Id = 507; TimeCreated = $at.AddSeconds(20) },
+                    [pscustomobject]@{ Id = 506; TimeCreated = $at.AddSeconds(5) }
+                )
+            }
+            if ($script:eventMode -eq 'none') {
+                Write-Error -Message 'No events were found that match the specified selection criteria.' -ErrorId 'NoMatchingEventsFound' -Category ObjectNotFound
+                return
+            }
+            Write-Error -Message 'The specified channel could not be found.' -ErrorId 'NoChannel' -Category ObjectNotFound
+        }
+        $start = New-Object DateTime 2026, 11, 9, 10, 0, 0, ([DateTimeKind]::Utc)
+        $end = $start.AddMinutes(1)
+        $events = @(Get-DisplayPowerEvent -Start $start -End $end)
+        $filter = $script:eventFilters[0]
+        Assert-Equal 'System' $filter.LogName 'log'
+        Assert-Equal 'Microsoft-Windows-Kernel-Power' $filter.ProviderName 'provider'
+        Assert-Equal '506,507' (@($filter.Id) -join ',') 'event ids'
+        Assert-True ($filter.StartTime -eq $start -and $filter.EndTime -eq $end) 'the run window'
+        Assert-Equal '506 2026-11-09T10:00:05.000Z,507 2026-11-09T10:00:20.000Z' (@($events | ForEach-Object { "$($_.Id) $($_.TimeUtc)" }) -join ',') 'oldest first, UTC'
+        $script:eventMode = 'none'
+        Assert-Equal 0 @(Get-DisplayPowerEvent -Start $start -End $end).Count 'no match is no event'
+        $script:eventMode = 'broken'
+        $threw = $null
+        try { Get-DisplayPowerEvent -Start $start -End $end | Out-Null } catch { $threw = $_.Exception.Message }
+        Assert-True ($threw -match 'channel') "an unreadable log did not throw: $threw"
+    }
+
+    Test-Case 'Test-DisplayPower makes a run with a 506/507 event or an unreadable log invalid and keeps one without valid (R27)' {
+        . $displayLibrary
+        $script:displayEvents = @()
+        function Get-DisplayPowerEvent([DateTime]$Start, [DateTime]$End) {
+            if ($script:displayEvents -eq 'throw') { throw 'access denied' }
+            $script:displayEvents
+        }
+        $start = [DateTime]::Now
+        $quiet = Test-DisplayPower -Start $start -End $start.AddSeconds(30)
+        Assert-Equal 0 @($quiet.Problems).Count 'a run without an event is valid'
+        Assert-Equal 0 @($quiet.Events).Count 'no events'
+        $script:displayEvents = @(
+            [pscustomobject]@{ Id = 506; TimeUtc = '2026-11-09T10:00:05.000Z' },
+            [pscustomobject]@{ Id = 507; TimeUtc = '2026-11-09T10:00:20.000Z' }
+        )
+        $dark = Test-DisplayPower -Start $start -End $start.AddSeconds(30)
+        Assert-Equal 'display off during the run (Kernel-Power 506 at 2026-11-09T10:00:05.000Z, 507 at 2026-11-09T10:00:20.000Z)' (@($dark.Problems) -join '; ') 'overlap problem'
+        Assert-Equal 2 @($dark.Events).Count 'both events kept'
+        $script:displayEvents = 'throw'
+        $unknown = Test-DisplayPower -Start $start -End $start.AddSeconds(30)
+        Assert-Equal 'display power unknown (Kernel-Power 506/507 unreadable: access denied)' (@($unknown.Problems) -join '; ') 'unreadable log'
+    }
+
     Test-Case 'Resolve-Tool finds applications only' {
         Assert-True ((Resolve-Tool 'cmd') -match '\\cmd\.exe$') 'cmd'
         $threw = $false
@@ -620,6 +711,105 @@ try {
             Assert-Equal 'peak-small.json: window 1440x850 (2880x1700 physical at windows_scale 2), requested 1050x700' $problems[1] 'small problems'
         }
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_WINDOW', $null, 'Process') }
+    }
+
+    # R27: measure_performance.ps1 holds the display on and treats a run that overlaps a Kernel-Power 506/507 event as
+    # invalid evidence. The wrapper runs it in one process with Get-WinEvent shimmed, the one system call behind
+    # Get-DisplayPowerEvent: -Once fires a 506 inside the first run queried only, -Always inside every run, neither
+    # answers 'no events' as the real cmdlet does. Every query's filter goes to the call log.
+    $displayWrapper = Join-Path $temporary 'measure-display.ps1'
+    $displayWrapperSource = @(
+        '#requires -Version 5.1',
+        'param([string]$Measure, [string]$CallLog, [string]$Once, [switch]$Always, [string]$OutputDirectory)',
+        '$ErrorActionPreference = ''Stop''',
+        'function Get-WinEvent {',
+        '    [CmdletBinding()]',
+        '    param([hashtable]$FilterHashtable)',
+        '    $f = $FilterHashtable',
+        '    $ordered = [int]($f.StartTime -lt $f.EndTime)',
+        '    [IO.File]::AppendAllText($CallLog, (''{0}|{1}|{2}|{3}'' -f $f.LogName, $f.ProviderName, (@($f.Id) -join '',''), $ordered) + "`n")',
+        '    $fire = [bool]$Always',
+        '    if (-not $fire -and $Once -and (Test-Path -LiteralPath $Once)) { Remove-Item -LiteralPath $Once -Force; $fire = $true }',
+        '    if ($fire) { return [pscustomobject]@{ Id = 506; TimeCreated = $f.StartTime.AddTicks([long](($f.EndTime - $f.StartTime).Ticks / 2)) } }',
+        '    Write-Error -Message ''No events were found that match the specified selection criteria.'' -ErrorId ''NoMatchingEventsFound'' -Category ObjectNotFound',
+        '}',
+        '& $Measure -Scene peak -NoBuild -OutputDirectory $OutputDirectory',
+        'exit $LASTEXITCODE'
+    ) -join "`n"
+    Write-Utf8NoBom -Path $displayWrapper -Text $displayWrapperSource
+    function Invoke-DisplayMeasure([string]$Name, [string[]]$Extra = @()) {
+        $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $displayWrapper, '-Measure', $measure,
+            '-CallLog', (Join-Path $temporary "$Name.calls.txt"), '-OutputDirectory', (Join-Path $temporary $Name)) + $Extra
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\$Name") -TimeoutSeconds 300
+        $calls = @((Read-Log (Join-Path $temporary "$Name.calls.txt")) -split "`n" | Where-Object { $_ })
+        $summaryPath = Join-Path $temporary "$Name\summary.json"
+        $summary = $null
+        if (Test-Path -LiteralPath $summaryPath) { $summary = Get-Content -Raw -LiteralPath $summaryPath | ConvertFrom-Json }
+        return [pscustomobject]@{ Result = $r; Calls = $calls; Summary = $summary; Log = ('out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err)) }
+    }
+    $kernelPowerQuery = 'System|Microsoft-Windows-Kernel-Power|506,507|1'
+
+    Test-Case 'measure_performance holds the display on and keeps a run without a 506/507 event valid (R27)' {
+        $displayTarget = Join-Path $temporary 'perf-display-target'
+        New-FakeTarget $displayTarget
+        $env:CARGO_TARGET_DIR = $displayTarget
+        $m = Invoke-DisplayMeasure 'perf-display-quiet'
+        Assert-Equal 0 $m.Result.ExitCode "exit code; $($m.Log)"
+        Assert-Equal "$kernelPowerQuery`n$kernelPowerQuery" ($m.Calls -join "`n") 'one Kernel-Power query per run, over its own window'
+        $hold = $m.Summary.display_hold
+        Assert-True ($null -ne $hold) 'summary.json has no display_hold'
+        Assert-Equal 'ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED' $hold.request 'hold request'
+        Assert-Equal $true $hold.held 'held'
+        Assert-Equal $true $hold.released 'released at the end'
+        Assert-Equal '0x80000003' $hold.released_from 'the hold was in effect until its release'
+        foreach ($run in @($m.Summary.runs)) {
+            Assert-Equal 1 $run.attempts "$($run.file) attempts"
+            Assert-Equal $true $run.display_held "$($run.file) display_held"
+            Assert-Equal 0 @($run.display_power_events).Count "$($run.file) display_power_events"
+        }
+        $md = Read-Log (Join-Path $temporary 'perf-display-quiet\summary.md')
+        Assert-True ($md -match 'Display held on') 'summary.md names the display hold'
+        Assert-True ($md -match '\| held \|') 'summary.md display column'
+    }
+
+    Test-Case 'measure_performance marks a run that overlaps a 506/507 event invalid and reruns it (R27)' {
+        $displayTarget = Join-Path $temporary 'perf-display-target'
+        $env:CARGO_TARGET_DIR = $displayTarget
+        $once = Join-Path $temporary 'display-off-once'
+        Write-Utf8NoBom -Path $once -Text 'x'
+        $m = Invoke-DisplayMeasure 'perf-display-once' @('-Once', $once)
+        Assert-Equal 0 $m.Result.ExitCode "a valid rerun passes; $($m.Log)"
+        Assert-Equal 3 $m.Calls.Count 'queries: the first run twice, the second once'
+        $first = @($m.Summary.runs)[0]
+        Assert-Equal 2 $first.attempts 'the overlapping run was rerun'
+        Assert-True $first.valid 'the rerun is valid'
+        Assert-True (@($first.rejected_attempts)[0] -like 'display off during the run (Kernel-Power 506 at *)') "rejected attempt: $(@($first.rejected_attempts) -join '; ')"
+        Assert-Equal '1:506' (@($first.display_power_events | ForEach-Object { "$($_.attempt):$($_.id)" }) -join ',') 'the event is recorded with its attempt'
+        Assert-True (Test-Path -LiteralPath (Join-Path $temporary 'perf-display-once\peak-normal.invalid.json')) 'the rejected report was not kept'
+        Assert-Equal 1 @($m.Summary.runs)[1].attempts 'the second run was not rerun'
+
+        $m = Invoke-DisplayMeasure 'perf-display-always' @('-Always')
+        Assert-Equal 2 $m.Result.ExitCode "invalid twice is invalid evidence; $($m.Log)"
+        Assert-Equal 4 $m.Calls.Count 'two attempts per run'
+        foreach ($run in @($m.Summary.runs)) {
+            Assert-Equal 2 $run.attempts "$($run.file) attempts"
+            Assert-True (@($run.problems)[0] -like 'display off during the run (Kernel-Power 506 at *)') "$($run.file) problems: $(@($run.problems) -join '; ')"
+            Assert-Equal '1:506,2:506' (@($run.display_power_events | ForEach-Object { "$($_.attempt):$($_.id)" }) -join ',') "$($run.file) events"
+        }
+    }
+
+    Test-Case 'measure_performance releases the display hold when a run throws (R27)' {
+        $displayTarget = Join-Path $temporary 'perf-display-target'
+        $env:CARGO_TARGET_DIR = $displayTarget
+        try {
+            $env:HORDE_FAKE_EXIT = '4'
+            $m = Invoke-DisplayMeasure 'perf-display-throws'
+            Assert-Equal 3 $m.Result.ExitCode "a failed run is a run failure; $($m.Log)"
+            Assert-True ($m.Summary.failure -match 'exit code 4') "failure: $($m.Summary.failure)"
+            Assert-Equal $true $m.Summary.display_hold.released 'released after the throw'
+            Assert-Equal '0x80000003' $m.Summary.display_hold.released_from 'the hold was in effect until its release'
+        }
+        finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_EXIT', $null, 'Process') }
     }
 
     Test-Case 'capture_review reports every sidecar check row and fails the run on a failed one' {

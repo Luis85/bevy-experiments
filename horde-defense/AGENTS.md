@@ -13,7 +13,8 @@ Performance evidence: powershell -NoProfile -ExecutionPolicy Bypass -File script
 -Scene all|peak|progressed-peak|stress -Profile dev|playtest [-VsyncOff] [-Pipelined default|on|off] [-Repeat 3]
 [-ShippedSmoke] [-SaveClone] [-NoBuild] builds the review exe, runs every scene at both sizes and compares the
 frame reports with docs/PERF_BUDGET.json; -SelfTest checks the fixtures only. Exit codes: 0 pass, 1 over budget,
-2 invalid evidence (a run invalid twice, or a gated metric missing), 3 build or run failure. Acceptance (W1-61) is
+2 invalid evidence (a run invalid twice, or a gated metric missing), 3 build or run failure. The script holds the display on for
+its whole run, and a run that overlaps a Kernel-Power 506/507 display-off event is invalid (R27). Acceptance (W1-61) is
 dev with VSync on (interface gates) plus -VsyncOff in dev and playtest (CPU p99), each -Repeat 3; frames over
 50 ms leave out driver stalls (PERF_BUDGET.json driver_stall, user ruling). Evidence lands in
 <target>/perf/<stamp>-<profile>[-novsync]/summary.json and summary.md. Keep the machine quiet, the window

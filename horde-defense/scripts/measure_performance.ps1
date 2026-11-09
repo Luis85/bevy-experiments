@@ -33,8 +33,13 @@
 # LASTLIGHT_SAVE_DIR, and writes <scene>-<size>[-rN].json. A run is valid only when the report is version 3, met its
 # sample target, is not paused, had no unfocused sample frame, and echoes the requested present mode, pipelined state,
 # scene, profile, (with -Adapter) adapter and window size (width_physical and height_physical over windows_scale within
-# 1 px of sizes.<size>.size, ui_scale at sizes.<size>.scale). An invalid run is rerun once (the rejected report is kept as
-# <stem>.invalid.json).
+# 1 px of sizes.<size>.size, ui_scale at sizes.<size>.scale). A run that overlaps a display-off interval (a System log
+# Kernel-Power event 506 or 507 between its start and end, or a log that cannot be read) is invalid too (R27, plan 2.4).
+# An invalid run is rerun once (the rejected report is kept as <stem>.invalid.json).
+# Display: the script holds the display on for its whole run (SetThreadExecutionState with ES_CONTINUOUS |
+# ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED, scripts/lib/DisplayPower.ps1), released in the finally block before the
+# summary is written. The summary records the hold and every run's 506/507 events (W2-50: driver stalls and their tails
+# come from Windows turning the display off during unattended passes).
 # Budget compare: repeats by median, frames_over_50ms and egui texture uploads by the worst repeat. frames_over_50ms and
 # egui.texture_uploads.count (against egui.texture_uploads_after_warmup_max, every scene, W1-64) always; frames_over_50ms
 # counts the frames outside driver stalls (driver_stalls.outside.frames_over_50ms: W1-61 user ruling 'Exclude driver
@@ -99,6 +104,7 @@ if ($Frames -ne 0 -and $Frames -lt 300) { throw '-Frames is 0 (budget default) o
 [int]$Repeat = ConvertTo-BoundedInt 'Repeat' $Repeat 1 20
 [int]$TimeoutSeconds = ConvertTo-BoundedInt 'TimeoutSeconds' $TimeoutSeconds 1 86400
 . (Join-Path $PSScriptRoot 'lib\Native.ps1')
+. (Join-Path $PSScriptRoot 'lib\DisplayPower.ps1')
 $workspace = Split-Path -Parent $PSScriptRoot
 $budgetPath = Join-Path $workspace 'docs\PERF_BUDGET.json'
 $invariant = [Globalization.CultureInfo]::InvariantCulture
@@ -686,11 +692,14 @@ $shipped = $null
 $saveCloneReport = $null
 $saveCloneCheck = $null
 $cpuName = $null
+$displayHold = $null
 $saved = Reset-LastlightEnv
 $savedAdapter = [Environment]::GetEnvironmentVariable('WGPU_ADAPTER_NAME', 'Process')
 # Bevy honours any WGPU_ADAPTER_NAME it inherits: only -Adapter (an informational run) may steer the GPU.
 [Environment]::SetEnvironmentVariable('WGPU_ADAPTER_NAME', $null, 'Process')
 try {
+    # R27: the idle timeout must not turn the display off during the evidence; released first in the finally block.
+    $displayHold = Enter-DisplayHold
     if ($ShippedSmoke) {
         # One CARGO_TARGET_DIR: the shipped and review playtest builds share an exe path, so copy the shipped one out first.
         Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense', '--profile', 'playtest', '--no-default-features') -LogStem (Join-Path $tools 'cargo-shipped') | Out-Null
@@ -764,16 +773,28 @@ try {
                     if ($VsyncOff) { $env:LASTLIGHT_PERF_PRESENT_MODE = 'autonovsync' }
                     if ($Pipelined -eq 'on') { $env:LASTLIGHT_PERF_PIPELINED = '1' }
                     elseif ($Pipelined -eq 'off') { $env:LASTLIGHT_PERF_PIPELINED = '0' }
+                    $attemptStart = [DateTime]::Now
                     $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $destination "logs\$attemptStem") -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace -RemoveReviewProfile
+                    $attemptEnd = [DateTime]::Now
                     if ($result.ExitCode -ne 0) { throw "Run $attemptStem failed with exit code $($result.ExitCode); see $($result.Err)" }
                     if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) { throw "Run $attemptStem wrote no report; see $($result.Err)" }
                     $report = Read-JsonFile $reportPath
-                    [pscustomobject]@{ Report = $report; Problems = (Test-PerfReport $report $sceneName $expect $sizeBudget $sizeName); Seconds = $result.Seconds }
+                    # R27: a Kernel-Power 506/507 event inside the run makes it invalid evidence, rerun like any other.
+                    $display = Test-DisplayPower -Start $attemptStart -End $attemptEnd
+                    # Test-PerfReport writes its array as one object, so it is assigned before it is joined.
+                    $reportProblems = Test-PerfReport $report $sceneName $expect $sizeBudget $sizeName
+                    $problems = @($reportProblems) + @($display.Problems)
+                    [pscustomobject]@{ Report = $report; Problems = $problems; Seconds = $result.Seconds; Attempt = $Number; DisplayEvents = @($display.Events) }
                 }
                 $runs.Add([pscustomobject]@{
                         Scene = $sceneName; Size = $sizeName; Repeat = $repeatIndex; File = "$stem.json"
                         Report = $outcome.Result.Report; Problems = $outcome.Result.Problems; Seconds = $outcome.Result.Seconds
                         Attempts = $outcome.Attempts; Rejected = @($outcome.Rejected | ForEach-Object { @($_.Problems) -join '; ' })
+                        DisplayHeld = [bool]($null -ne $displayHold -and $displayHold.Held)
+                        DisplayEvents = @(@($outcome.Rejected) + @($outcome.Result) | ForEach-Object {
+                                $attempt = $_.Attempt
+                                @($_.DisplayEvents) | ForEach-Object { [ordered]@{ attempt = $attempt; id = $_.Id; time_utc = $_.TimeUtc } }
+                            })
                     })
                 $state = 'ok  '
                 if (@($outcome.Result.Problems).Count -gt 0) { $state = 'BAD ' }
@@ -811,6 +832,8 @@ catch {
     Write-Output "FAIL $failure"
 }
 finally {
+    # Released before anything else here can throw, so a failed run never leaves the display held (R27).
+    Exit-DisplayHold $displayHold
     Restore-LastlightEnv -Saved $saved
     [Environment]::SetEnvironmentVariable('WGPU_ADAPTER_NAME', $savedAdapter, 'Process')
     if ($null -eq $verdict -and $runs.Count -gt 0) { $verdict = Measure-PerfBudget $runs.ToArray() $context $budget @($saveCloneCheck) }
@@ -832,17 +855,26 @@ finally {
                 pipelined_rendering = (Get-Field $r @('present', 'pipelined_rendering'))
                 sample_frames = (Get-Field $r @('sample_frames'))
                 peak_visible_enemies = (Get-Field $r @('peak_visible_enemies'))
+                display_held = $_.DisplayHeld
+                display_power_events = @($_.DisplayEvents)
             }
         })
     $checks = @()
     if ($null -ne $verdict) { $checks = @($verdict.Checks) }
     $exeHash = $null
     if ($exe -and (Test-Path -LiteralPath $exe -PathType Leaf)) { $exeHash = Get-FileSha256 -Path $exe }
+    $holdRecord = $null
+    if ($null -ne $displayHold) {
+        $holdRecord = [ordered]@{
+            request = $displayHold.Request; held = $displayHold.Held; set_utc = $displayHold.SetUtc
+            released = $displayHold.Released; released_utc = $displayHold.ReleasedUtc; released_from = $displayHold.ReleasedFrom
+        }
+    }
     $summary = [ordered]@{
         version = 1; started_utc = $startedUtc; finished_utc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
         exit_code = $exitCode; verdict = (Get-ExitLabel $exitCode); failure = $failure
         profile = $Profile; vsync_off = [bool]$VsyncOff; present_mode = $expect.PresentMode; pipelined = $Pipelined
-        power_plan = $context.PowerPlan
+        power_plan = $context.PowerPlan; display_hold = $holdRecord
         adapter = $(if ($Adapter) { $Adapter } else { $null }); informational = [bool]$Adapter; no_budget = [bool]$NoBudget
         repeat = $Repeat; warmup_frames = $Warmup; frames = $(if ($Frames -gt 0) { $Frames } else { 'budget' })
         scenes = $sceneNames; sizes = $sizeNames; cargo_target_dir = $target
@@ -867,14 +899,22 @@ finally {
     $md.Add("- CPU $cpuName; power plan $(if ($context.PowerPlan) { $context.PowerPlan } else { 'unknown' }); started $startedUtc")
     if ($null -ne $shipped) { $md.Add("- Shipped --smoke median $(Format-Number $shipped.median_seconds) s over 3 runs") }
     if ($saveCloneReport) { $md.Add("- Save clone report: $saveCloneReport") }
+    if ($null -ne $holdRecord) {
+        $md.Add("- Display held on ($($holdRecord.request)) from $($holdRecord.set_utc) to $(if ($holdRecord.released) { "$($holdRecord.released_utc), released from $($holdRecord.released_from)" } else { 'the end (not released)' }); a run with a Kernel-Power 506/507 event is invalid (R27)")
+    }
+    else { $md.Add('- Display not held (the run failed before the hold)') }
     $md.Add('')
     $md.Add('Frames > 50 ms: every frame, then (driver stalls: frame ms at acquire share). The gate counts the frames outside the driver stalls (W1-61 user ruling).')
     $md.Add('')
-    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Adapter | Frames > 50 ms | egui texture uploads | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
-    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Adapter | Display | Frames > 50 ms | egui texture uploads | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
+    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
     foreach ($row in $rows) {
         $stalls = @($row.driver_stalls | ForEach-Object { "$(Format-Number $_.frame_ms) ms at $(Format-Number $_.acquire_share)" }) -join ', '
-        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.adapter) | $($row.frames_over_50ms) ($($row.frames_over_50ms_driver_stall)$(if ($stalls) { ': ' + $stalls })) | $($row.egui_texture_uploads) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
+        $displayCell = 'not held'
+        if ($row.display_held) { $displayCell = 'held' }
+        $powerEvents = @($row.display_power_events | ForEach-Object { "$($_.id) at $($_.time_utc) (attempt $($_.attempt))" }) -join ', '
+        if ($powerEvents) { $displayCell += "; $powerEvents" }
+        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.adapter) | $displayCell | $($row.frames_over_50ms) ($($row.frames_over_50ms_driver_stall)$(if ($stalls) { ': ' + $stalls })) | $($row.egui_texture_uploads) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
     }
     $md.Add('')
     $md.Add('## Budget checks')

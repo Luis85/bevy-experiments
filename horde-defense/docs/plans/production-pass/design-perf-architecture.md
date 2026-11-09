@@ -317,6 +317,7 @@ The JSON:
 - Env: LASTLIGHT_PERF_ACTIVE_ONLY=1, LASTLIGHT_PERF_NPC_SPEED=1, LASTLIGHT_PERF_PROFILE=<Profile>, and a fresh LASTLIGHT_SAVE_DIR.
 - Outputs: `<scene>-normal[-rN].json` and `<scene>-small[-rN].json`, plus summary.json and summary.md.
 - A run is invalid unless all of these hold: version == 3, completed_sample_target, !paused, unfocused_sample_frames == 0, and the requested present mode and pipelined state are echoed back. An invalid run is rerun once automatically; if it is still invalid, exit 2.
+- Display (R27, plan §2.4, 2026-11-09): the script holds the display on for its whole run (`SetThreadExecutionState` with ES_CONTINUOUS | ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED, `scripts/lib/DisplayPower.ps1`), released in the finally block before the summary is written. A run that overlaps a display-off interval (a System log Kernel-Power event 506 or 507 between its start and end, or a log that cannot be read) is invalid too, and is rerun like the other invalid runs. summary.json records the hold (`display_hold`) and every run's events (`display_held`, `display_power_events`); summary.md has a Display column. The `driver_stall` rule is unchanged.
 
 ### Budget compare
 - Repeats are compared by median; frames_over_50ms by worst repeat.
