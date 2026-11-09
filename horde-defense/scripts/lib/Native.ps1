@@ -77,6 +77,9 @@ function Invoke-Native {
     # On timeout the whole process tree is killed (taskkill /T, which also stops cargo's rustc children) and it
     # throws a message naming the PID. -RemoveReviewProfile deletes the review build's per-PID profile once the
     # process has exited or been killed, so a hung capture does not leak one.
+    # -Sample runs a scriptblock beside the process (R30, the per-run load sampler): once right after the start, then
+    # every -SampleMilliseconds until the exit or the timeout. It runs in this function's scope chain, so it reaches the
+    # caller's state through $script: or a variable name this function does not use (such as $process, $watch or $left).
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
@@ -84,7 +87,9 @@ function Invoke-Native {
         [Parameter(Mandatory = $true)][string]$LogStem,
         [int]$TimeoutSeconds = 300,
         [string]$WorkingDirectory,
-        [switch]$RemoveReviewProfile
+        [switch]$RemoveReviewProfile,
+        [scriptblock]$Sample,
+        [ValidateRange(100, 600000)][int]$SampleMilliseconds = 5000
     )
     $LogStem = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($LogStem)
     $logDirectory = Split-Path -Parent $LogStem
@@ -123,7 +128,17 @@ function Invoke-Native {
             $process.StandardOutput.BaseStream.CopyToAsync($outFile),
             $process.StandardError.BaseStream.CopyToAsync($errFile)
         )
-        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+        $exited = $false
+        if ($null -eq $Sample) { $exited = $process.WaitForExit($TimeoutSeconds * 1000) }
+        else {
+            while ($true) {
+                & $Sample | Out-Null
+                $left = [long]$TimeoutSeconds * 1000 - $watch.ElapsedMilliseconds
+                if ($left -le 0) { break }
+                if ($process.WaitForExit([int][Math]::Min($left, [long]$SampleMilliseconds))) { $exited = $true; break }
+            }
+        }
+        if (-not $exited) {
             $kill = @{
                 FilePath               = (Resolve-Tool 'taskkill')
                 ArgumentList           = "/PID $($process.Id) /T /F"

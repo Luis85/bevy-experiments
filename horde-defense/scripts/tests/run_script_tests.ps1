@@ -14,6 +14,8 @@ if (-not (Test-Path -LiteralPath $nativeLibrary)) { throw "FAIL: missing $native
 # The display hold and the Kernel-Power 506/507 check (R27). Each case dot-sources it into its own scope and shims the
 # functions it calls.
 $displayLibrary = Join-Path $scriptsDirectory 'lib\DisplayPower.ps1'
+# The quiet window and the per-run load check (R30): the same pattern, with Get-CimInstance and Start-Sleep shimmed.
+$machineLibrary = Join-Path $scriptsDirectory 'lib\MachineLoad.ps1'
 
 $script:failures = New-Object System.Collections.Generic.List[string]
 $script:passed = 0
@@ -524,6 +526,162 @@ try {
         Assert-Equal 'display power unknown (Kernel-Power 506/507 unreadable: access denied)' (@($unknown.Problems) -join '; ') 'unreadable log'
     }
 
+    # R30: the process and load queries are Get-CimInstance calls, shimmed here; the quiet window's waits are Start-Sleep.
+    Test-Case 'Get-ForeignBuildProcess finds cargo, rustc and cargo-nextest outside the pass''s own process tree (R30)' {
+        . $machineLibrary
+        $script:cimQueries = New-Object System.Collections.Generic.List[string]
+        function Get-CimInstance {
+            [CmdletBinding()]
+            param([Parameter(Position = 0)][string]$ClassName, [string[]]$Property)
+            $script:cimQueries.Add("$ClassName|$(@($Property) -join ',')")
+            if ($ClassName -ne 'Win32_Process') { throw "unexpected class $ClassName" }
+            @(
+                [pscustomobject]@{ ProcessId = 100; ParentProcessId = 4; Name = 'explorer.exe' },
+                [pscustomobject]@{ ProcessId = 300; ParentProcessId = 4; Name = 'cargo-nextest.exe' },
+                [pscustomobject]@{ ProcessId = 200; ParentProcessId = 4; Name = 'CARGO.EXE' },
+                [pscustomobject]@{ ProcessId = 201; ParentProcessId = 200; Name = 'rustc.exe' },
+                [pscustomobject]@{ ProcessId = 400; ParentProcessId = 4; Name = 'powershell.exe' },
+                [pscustomobject]@{ ProcessId = 401; ParentProcessId = 400; Name = 'cargo.exe' },
+                [pscustomobject]@{ ProcessId = 402; ParentProcessId = 401; Name = 'rustc.exe' },
+                [pscustomobject]@{ ProcessId = 403; ParentProcessId = 402; Name = 'link.exe' },
+                [pscustomobject]@{ ProcessId = 500; ParentProcessId = 4; Name = 'Code.exe' }
+            )
+        }
+        $found = @(Get-ForeignBuildProcess -RootId 400)
+        Assert-Equal 'CARGO.EXE 200,rustc.exe 201,cargo-nextest.exe 300' (@($found | ForEach-Object { "$($_.Name) $($_.ProcessId)" }) -join ',') 'foreign build processes, by id; the pass''s own tree (400-403) is ignored'
+        Assert-Equal 'Win32_Process|ProcessId,ParentProcessId,Name' $script:cimQueries[0] 'one process table query'
+        Assert-Equal 'CARGO.EXE (200), rustc.exe (201), cargo-nextest.exe (300)' (Format-BuildProcess $found) 'formatted'
+        Assert-Equal 0 @(Get-ForeignBuildProcess -RootId 4).Count 'every process below the root is its own'
+    }
+
+    Test-Case 'Get-CpuLoadPercent averages LoadPercentage and reads a failed query as unknown (R30)' {
+        . $machineLibrary
+        $script:cimQueries = New-Object System.Collections.Generic.List[string]
+        $script:loadMode = 'two'
+        function Get-CimInstance {
+            [CmdletBinding()]
+            param([Parameter(Position = 0)][string]$ClassName, [string[]]$Property)
+            $script:cimQueries.Add("$ClassName|$(@($Property) -join ',')")
+            if ($script:loadMode -eq 'two') { return @([pscustomobject]@{ LoadPercentage = 30 }, [pscustomobject]@{ LoadPercentage = 41 }) }
+            if ($script:loadMode -eq 'null') { return [pscustomobject]@{ LoadPercentage = $null } }
+            Write-Error -Message 'Invalid class' -Category InvalidOperation
+        }
+        Assert-Equal 35.5 (Get-CpuLoadPercent) 'the mean over both processors'
+        Assert-Equal 'Win32_Processor|LoadPercentage' $script:cimQueries[0] 'the load query'
+        $script:loadMode = 'null'
+        Assert-True ($null -eq (Get-CpuLoadPercent)) 'no LoadPercentage is unknown'
+        $script:loadMode = 'broken'
+        Assert-True ($null -eq (Get-CpuLoadPercent)) 'a failed query is unknown'
+    }
+
+    # Wait-QuietMachine over scripted samples: each sample takes the next load and the next process list.
+    function Set-QuietScript([object[]]$Loads, [object[]]$Builds = @()) {
+        $script:quietLoads = New-Object System.Collections.Generic.Queue[object]
+        foreach ($load in $Loads) { $script:quietLoads.Enqueue($load) }
+        $script:quietBuilds = New-Object System.Collections.Generic.Queue[object]
+        foreach ($build in $Builds) { $script:quietBuilds.Enqueue($build) }
+        $script:quietSleeps = New-Object System.Collections.Generic.List[int]
+        $script:quietLog = New-Object System.Collections.Generic.List[string]
+    }
+    $quietShims = {
+        function Start-Sleep { param([int]$Seconds) $script:quietSleeps.Add($Seconds) }
+        function Get-CpuLoadPercent { if ($script:quietLoads.Count -gt 1) { $script:quietLoads.Dequeue() } else { $script:quietLoads.Peek() } }
+        function Get-ForeignBuildProcess([int]$RootId) {
+            $next = 'none'
+            if ($script:quietBuilds.Count -gt 0) { $next = $script:quietBuilds.Dequeue() }
+            if ($next -eq 'cargo') {
+                @([pscustomobject]@{ ProcessId = 4242; ParentProcessId = 4; Name = 'cargo.exe' }, [pscustomobject]@{ ProcessId = 4243; ParentProcessId = 4242; Name = 'rustc.exe' })
+            }
+        }
+    }
+
+    Test-Case 'Wait-QuietMachine starts once the mean load over 60 s of 5 s samples is under 35% (R30: a quiet start)' {
+        . $machineLibrary
+        . $quietShims
+        # One sample above 35% does not hold the start: the rule is the mean over the window.
+        Set-QuietScript (@(43.0) + @(30.0) * 12)
+        $wait = Wait-QuietMachine -TimeoutMinutes 240 -OnLog { param($Line) $script:quietLog.Add($Line) }
+        Assert-True $wait.Quiet 'quiet'
+        Assert-True (-not $wait.TimedOut) 'not timed out'
+        Assert-Equal 13 $wait.Samples '13 samples span 60 s'
+        Assert-Equal '5,5,5,5,5,5,5,5,5,5,5,5' ($script:quietSleeps -join ',') '12 waits of 5 s'
+        Assert-Equal 31.0 $wait.MeanPercent 'mean over the window'
+        Assert-Equal 43.0 $wait.MaxPercent 'max over the window'
+        Assert-Equal 0 @($wait.WaitedFor).Count 'it waited for nothing outside its own window'
+        Assert-Equal 'quiet window: sampling the CPU load for 60 s|quiet window: quiet after 13 samples (60 s): mean CPU load 31% over 60 s (under 35%), max 43%, no foreign build process' ($script:quietLog -join '|') 'log'
+        Assert-Equal ($script:quietLog -join '|') (@($wait.Log) -join '|') 'the result keeps the log'
+    }
+
+    Test-Case 'Wait-QuietMachine waits out a foreign build and a loaded CPU, then starts (R30: waiting then starting)' {
+        . $machineLibrary
+        . $quietShims
+        # Samples 1-3 see a foreign cargo build; 4-16 fill the window at 60%; from 17 on the load is 10%, and the mean of
+        # the last 13 falls under 35% at the 7th of them (sample 23).
+        Set-QuietScript (@(5.0) * 3 + @(60.0) * 13 + @(10.0)) @('cargo', 'cargo', 'cargo')
+        $wait = Wait-QuietMachine -TimeoutMinutes 240 -OnLog { param($Line) $script:quietLog.Add($Line) }
+        Assert-True $wait.Quiet 'quiet'
+        Assert-Equal 23 $wait.Samples 'samples'
+        Assert-Equal 22 $script:quietSleeps.Count 'waits'
+        Assert-Equal 'build processes: cargo.exe, rustc.exe|mean CPU load' (@($wait.WaitedFor) -join '|') 'what it waited for'
+        $expected = @(
+            'quiet window: waiting for build processes: cargo.exe (4242), rustc.exe (4243)',
+            'quiet window: sampling the CPU load for 60 s',
+            'quiet window: waiting for the mean CPU load to fall under 35% (60% over 60 s)',
+            'quiet window: quiet after 23 samples (110 s): mean CPU load 33.0769% over 60 s (under 35%), max 60%, no foreign build process'
+        )
+        Assert-Equal ($expected -join '|') ($script:quietLog -join '|') 'log'
+    }
+
+    Test-Case 'Wait-QuietMachine times out after QuietTimeoutMinutes and says what it waited for (R30: a timeout)' {
+        . $machineLibrary
+        . $quietShims
+        Set-QuietScript @(50.0)
+        $wait = Wait-QuietMachine -TimeoutMinutes 1 -OnLog { param($Line) $script:quietLog.Add($Line) }
+        Assert-True (-not $wait.Quiet) 'not quiet'
+        Assert-True $wait.TimedOut 'timed out'
+        Assert-Equal 13 $wait.Samples 'a 1-minute timeout is 13 samples'
+        Assert-Equal 12 $script:quietSleeps.Count 'waits'
+        Assert-Equal 'mean CPU load' (@($wait.WaitedFor) -join '|') 'what it waited for'
+        Assert-Equal 'quiet window: timed out after 1 min (13 samples): still waiting for the mean CPU load to fall under 35% (50% over 60 s)' $script:quietLog[$script:quietLog.Count - 1] 'last log line'
+        Set-QuietScript @($null)
+        $wait = Wait-QuietMachine -TimeoutMinutes 1
+        Assert-True $wait.TimedOut 'an unreadable load never counts as quiet'
+        Assert-Equal 'readable CPU load' (@($wait.WaitedFor) -join '|') 'unreadable load'
+    }
+
+    Test-Case 'Test-RunLoad makes a run with a load sample of 90% or more invalid (R30)' {
+        . $machineLibrary
+        $calm = Test-RunLoad -Samples @(12.0, 40.0, 89.0)
+        Assert-Equal 0 @($calm.Problems).Count 'under 90% is valid'
+        Assert-Equal 3 $calm.Samples 'samples'
+        Assert-Equal 47.0 $calm.Mean 'mean'
+        Assert-Equal 89.0 $calm.Max 'max'
+        $loaded = Test-RunLoad -Samples @(12.0, 90.0)
+        Assert-Equal 'CPU load 90% during the run (a sample at 90% or more is invalid evidence; samples 12, 90)' (@($loaded.Problems) -join '; ') '90% is invalid'
+        $unknown = Test-RunLoad -Samples @(12.0, $null)
+        Assert-Equal 'CPU load unknown in 1 of 2 samples' (@($unknown.Problems) -join '; ') 'an unreadable sample'
+        $none = Test-RunLoad -Samples @()
+        Assert-Equal 'CPU load unknown (no sample)' (@($none.Problems) -join '; ') 'no sample'
+        Assert-True ($null -eq $none.Mean -and $null -eq $none.Max) 'no mean or max without samples'
+    }
+
+    Test-Case 'Invoke-Native -Sample runs the sampler at the start and every interval until the exit (R30)' {
+        $script:sampleWatch = [Diagnostics.Stopwatch]::StartNew()
+        $script:sampleTimes = New-Object System.Collections.Generic.List[double]
+        $r = Invoke-Native -FilePath $helper -Arguments @('sleep', '2') -LogStem (Join-Path $temporary 'logs\sampled') -TimeoutSeconds 30 -Sample { $script:sampleTimes.Add($script:sampleWatch.Elapsed.TotalSeconds) } -SampleMilliseconds 500
+        Assert-Equal 0 $r.ExitCode 'exit code'
+        Assert-True ($script:sampleTimes.Count -ge 4 -and $script:sampleTimes.Count -le 6) "samples over 2 s at 500 ms: $($script:sampleTimes -join ', ')"
+        Assert-True ($script:sampleTimes[0] -lt 0.4) "the first sample is at the start: $($script:sampleTimes[0])"
+        $script:sampleTimes.Clear()
+        $message = $null
+        try {
+            Invoke-Native -FilePath $helper -Arguments @('sleep', '30') -LogStem (Join-Path $temporary 'logs\sampled-hung') -TimeoutSeconds 1 -Sample { $script:sampleTimes.Add(0) } -SampleMilliseconds 400 | Out-Null
+        }
+        catch { $message = $_.Exception.Message }
+        Assert-True ($message -match 'Timed out after 1 s') "a sampled run still times out: $message"
+        Assert-True ($script:sampleTimes.Count -ge 2 -and $script:sampleTimes.Count -le 4) "samples before the timeout: $($script:sampleTimes.Count)"
+    }
+
     Test-Case 'Resolve-Tool finds applications only' {
         Assert-True ((Resolve-Tool 'cmd') -match '\\cmd\.exe$') 'cmd'
         $threw = $false
@@ -549,6 +707,124 @@ try {
         New-Item -ItemType Directory -Force -Path (Join-Path $Target 'debug') | Out-Null
         Copy-Item -LiteralPath $helper -Destination (Join-Path $Target 'debug\horde-defense.exe')
     }
+
+    # R27: measure_performance.ps1 holds the display on and treats a run that overlaps a Kernel-Power 506/507 event as
+    # invalid evidence. R30: it waits for a quiet machine first and samples the CPU load beside every run. The wrapper
+    # runs a script under test in one process with the system queries behind those checks shimmed:
+    # - Get-WinEvent (behind Get-DisplayPowerEvent): -ShimOnce fires a 506 inside the first run queried only,
+    #   -ShimAlways inside every run, neither answers 'no events' as the real cmdlet does. Every query's filter goes to
+    #   -ShimCallLog.
+    # - Get-CimInstance Win32_Processor LoadPercentage and Win32_Process (behind Get-CpuLoadPercent and
+    #   Get-ForeignBuildProcess): -ShimLoad and -ShimProcesses are comma lists, 'vxN' repeats v N times and the last entry
+    #   repeats for ever. A load 'x' fails the query. A process entry 'cargo' adds a foreign cargo.exe 4242 with its
+    #   rustc.exe 4243, 'child' a cargo.exe 4244 and rustc.exe 4245 below the wrapper's own process, 'none' neither.
+    # - Start-Sleep (the quiet window's 5 s waits) returns at once.
+    # Every load, process and sleep call goes to -ShimMachineLog. The arguments after the shim's own go to the script as
+    # -Name value pairs (a -Name followed by another -Name, or last, is a switch).
+    $shimWrapper = Join-Path $temporary 'shimmed.ps1'
+    $shimWrapperSource = @(
+        '#requires -Version 5.1',
+        'param([string]$ShimScript, [string]$ShimCallLog, [string]$ShimOnce, [switch]$ShimAlways, [string]$ShimMachineLog,',
+        '    [string]$ShimLoad = ''10'', [string]$ShimProcesses = ''none'', [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest)',
+        '$ErrorActionPreference = ''Stop''',
+        'function Expand-ShimList([string]$Text) {',
+        '    $list = New-Object System.Collections.Generic.List[string]',
+        '    foreach ($token in ($Text -split '','')) {',
+        '        $count = 1',
+        '        if ($token -match ''^(.+)x(\d+)$'') { $token = $Matches[1]; $count = [int]$Matches[2] }',
+        '        for ($i = 0; $i -lt $count; $i++) { $list.Add($token) }',
+        '    }',
+        '    return , $list',
+        '}',
+        '$global:ShimState = @{ CallLog = $ShimCallLog; Once = $ShimOnce; Always = [bool]$ShimAlways; MachineLog = $ShimMachineLog',
+        '    Load = (Expand-ShimList $ShimLoad); Processes = (Expand-ShimList $ShimProcesses) }',
+        'function Get-ShimNext([string]$Key) {',
+        '    $list = $global:ShimState[$Key]',
+        '    $value = $list[0]',
+        '    if ($list.Count -gt 1) { $list.RemoveAt(0) }',
+        '    return $value',
+        '}',
+        'function Write-ShimMachineLog([string]$Line) {',
+        '    if ($global:ShimState.MachineLog) { [IO.File]::AppendAllText($global:ShimState.MachineLog, $Line + "`n") }',
+        '}',
+        'function Get-WinEvent {',
+        '    [CmdletBinding()]',
+        '    param([hashtable]$FilterHashtable)',
+        '    $f = $FilterHashtable',
+        '    $ordered = [int]($f.StartTime -lt $f.EndTime)',
+        '    if ($global:ShimState.CallLog) {',
+        '        [IO.File]::AppendAllText($global:ShimState.CallLog, (''{0}|{1}|{2}|{3}'' -f $f.LogName, $f.ProviderName, (@($f.Id) -join '',''), $ordered) + "`n")',
+        '    }',
+        '    $fire = $global:ShimState.Always',
+        '    $once = $global:ShimState.Once',
+        '    if (-not $fire -and $once -and (Test-Path -LiteralPath $once)) { Remove-Item -LiteralPath $once -Force; $fire = $true }',
+        '    if ($fire) { return [pscustomobject]@{ Id = 506; TimeCreated = $f.StartTime.AddTicks([long](($f.EndTime - $f.StartTime).Ticks / 2)) } }',
+        '    Write-Error -Message ''No events were found that match the specified selection criteria.'' -ErrorId ''NoMatchingEventsFound'' -Category ObjectNotFound',
+        '}',
+        'function Get-CimInstance {',
+        '    [CmdletBinding()]',
+        '    param([Parameter(Position = 0)][string]$ClassName, [string[]]$Property)',
+        '    if ($ClassName -eq ''Win32_Processor'' -and @($Property) -contains ''LoadPercentage'') {',
+        '        $value = Get-ShimNext ''Load''',
+        '        Write-ShimMachineLog "load|$value"',
+        '        if ($value -eq ''x'') { Write-Error -Message ''Invalid query'' -Category InvalidOperation; return }',
+        '        return [pscustomobject]@{ LoadPercentage = [int]$value; Name = ''Fake CPU'' }',
+        '    }',
+        '    if ($ClassName -eq ''Win32_Processor'') { return [pscustomobject]@{ Name = ''Fake CPU''; LoadPercentage = 0 } }',
+        '    if ($ClassName -eq ''Win32_Process'') {',
+        '        $value = Get-ShimNext ''Processes''',
+        '        Write-ShimMachineLog "ps|$value"',
+        '        $table = @([pscustomobject]@{ ProcessId = $PID; ParentProcessId = 4; Name = ''powershell.exe'' })',
+        '        if ($value -eq ''cargo'') {',
+        '            $table += [pscustomobject]@{ ProcessId = 4242; ParentProcessId = 4; Name = ''cargo.exe'' }',
+        '            $table += [pscustomobject]@{ ProcessId = 4243; ParentProcessId = 4242; Name = ''rustc.exe'' }',
+        '        }',
+        '        if ($value -eq ''child'') {',
+        '            $table += [pscustomobject]@{ ProcessId = 4244; ParentProcessId = $PID; Name = ''cargo.exe'' }',
+        '            $table += [pscustomobject]@{ ProcessId = 4245; ParentProcessId = 4244; Name = ''rustc.exe'' }',
+        '        }',
+        '        return $table',
+        '    }',
+        '    throw "unshimmed Get-CimInstance $ClassName"',
+        '}',
+        'function Start-Sleep {',
+        '    param([int]$Seconds, [int]$Milliseconds)',
+        '    Write-ShimMachineLog "sleep|$Seconds"',
+        '}',
+        '$named = @{}',
+        'for ($i = 0; $i -lt $Rest.Count; $i++) {',
+        '    if ($Rest[$i] -notmatch ''^-([A-Za-z][A-Za-z0-9]*)$'') { throw "not a -Name argument: $($Rest[$i])" }',
+        '    $key = $Matches[1]',
+        '    if ($i + 1 -lt $Rest.Count -and $Rest[$i + 1] -notmatch ''^-[A-Za-z]'') { $named[$key] = $Rest[$i + 1]; $i += 1 }',
+        '    else { $named[$key] = $true }',
+        '}',
+        '& $ShimScript @named',
+        'exit $LASTEXITCODE'
+    ) -join "`n"
+    Write-Utf8NoBom -Path $shimWrapper -Text $shimWrapperSource
+    function Invoke-Shimmed([string]$Script, [string]$Name, [string[]]$Arguments, [string[]]$Shim = @()) {
+        # Runs $Script under the shims with $Arguments; the machine log is <temp>\<Name>.machine.txt.
+        $machineLog = Join-Path $temporary "$Name.machine.txt"
+        $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $shimWrapper, '-ShimScript', $Script,
+            '-ShimMachineLog', $machineLog) + $Shim + $Arguments
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\$Name") -TimeoutSeconds 300
+        $machine = @((Read-Log $machineLog) -split "`n" | Where-Object { $_ })
+        return [pscustomobject]@{ Result = $r; Machine = $machine; Log = ('out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err)) }
+    }
+    function Invoke-ShimMeasure([string[]]$Arguments, [string]$Stem, [string[]]$Shim = @()) {
+        # measure_performance.ps1 on a quiet shimmed machine (load 10%, no foreign build) unless $Shim says otherwise.
+        return (Invoke-Shimmed $measure $Stem $Arguments $Shim).Result
+    }
+    function Invoke-DisplayMeasure([string]$Name, [string[]]$Extra = @()) {
+        $shim = @('-ShimCallLog', (Join-Path $temporary "$Name.calls.txt")) + $Extra
+        $m = Invoke-Shimmed $measure $Name @('-Scene', 'peak', '-NoBuild', '-OutputDirectory', (Join-Path $temporary $Name)) $shim
+        $calls = @((Read-Log (Join-Path $temporary "$Name.calls.txt")) -split "`n" | Where-Object { $_ })
+        $summaryPath = Join-Path $temporary "$Name\summary.json"
+        $summary = $null
+        if (Test-Path -LiteralPath $summaryPath) { $summary = Get-Content -Raw -LiteralPath $summaryPath | ConvertFrom-Json }
+        return [pscustomobject]@{ Result = $m.Result; Calls = $calls; Summary = $summary; Machine = $m.Machine; Log = $m.Log }
+    }
+    $kernelPowerQuery = 'System|Microsoft-Windows-Kernel-Power|506,507|1'
 
     Test-Case 'measure_performance -SelfTest reports the expected exit code for every fixture under redirect' {
         $r = Invoke-Measure @('-SelfTest') 'measure-selftest'
@@ -597,7 +873,7 @@ try {
             $env:HORDE_FAKE_UNFOCUSED_ONCE = $once
             $env:CARGO_TARGET_DIR = $relative
             $out = Join-Path $temporary 'perf-relative'
-            $r = Invoke-Measure @('-Scene', 'all', '-Profile', 'dev', '-NoBuild', '-NoBudget', '-OutputDirectory', $out) 'measure-relative'
+            $r = Invoke-ShimMeasure @('-Scene', 'all', '-Profile', 'dev', '-NoBuild', '-NoBudget', '-OutputDirectory', $out) 'measure-relative'
             Assert-Equal 0 $r.ExitCode ("exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
             $reports = @(Get-ChildItem -LiteralPath $out -Filter '*.json' -File | Where-Object { $_.Name -ne 'summary.json' -and $_.Name -notlike '*.invalid.json' } | ForEach-Object { $_.Name } | Sort-Object)
             Assert-Equal 'peak-normal.json,peak-small.json,progressed-peak-normal.json,progressed-peak-small.json,stress-normal.json,stress-small.json' ($reports -join ',') 'v3 reports'
@@ -624,7 +900,7 @@ try {
             $env:HORDE_FAKE_UNFOCUSED_ALWAYS = '1'
             $env:CARGO_TARGET_DIR = $rooted
             $out = Join-Path $temporary 'perf-rooted'
-            $r = Invoke-Measure @('-Scene', 'peak', '-VsyncOff', '-Pipelined', 'off', '-NoBuild', '-OutputDirectory', $out) 'measure-rooted'
+            $r = Invoke-ShimMeasure @('-Scene', 'peak', '-VsyncOff', '-Pipelined', 'off', '-NoBuild', '-OutputDirectory', $out) 'measure-rooted'
             Assert-Equal 2 $r.ExitCode ("exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
             $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
             Assert-Equal $rooted $summary.cargo_target_dir 'resolved target'
@@ -648,7 +924,7 @@ try {
             $env:CARGO_TARGET_DIR = $adapterTarget
             $env:HORDE_FAKE_ADAPTER = 'NVIDIA GeForce RTX 4070 Laptop GPU'
             $out = Join-Path $temporary 'perf-adapter-other'
-            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-Adapter', 'Intel(R) Arc(TM) Graphics', '-OutputDirectory', $out) 'measure-adapter-other'
+            $r = Invoke-ShimMeasure @('-Scene', 'peak', '-NoBuild', '-Adapter', 'Intel(R) Arc(TM) Graphics', '-OutputDirectory', $out) 'measure-adapter-other'
             Assert-Equal 2 $r.ExitCode ("another adapter: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
             $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
             Assert-Equal 2 @($summary.runs).Count 'one run per size'
@@ -662,7 +938,7 @@ try {
             # Bevy matches a lowercased substring of the adapter name.
             $env:HORDE_FAKE_ADAPTER = 'Intel(R) Arc(TM) Graphics'
             $out = Join-Path $temporary 'perf-adapter-same'
-            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-Adapter', 'intel(r) arc', '-OutputDirectory', $out) 'measure-adapter-same'
+            $r = Invoke-ShimMeasure @('-Scene', 'peak', '-NoBuild', '-Adapter', 'intel(r) arc', '-OutputDirectory', $out) 'measure-adapter-same'
             Assert-Equal 0 $r.ExitCode ("matching adapter: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
             $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
             foreach ($run in @($summary.runs)) {
@@ -683,7 +959,7 @@ try {
             $env:CARGO_TARGET_DIR = $inheritTarget
             $env:WGPU_ADAPTER_NAME = 'intel'
             $out = Join-Path $temporary 'perf-inherit'
-            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-OutputDirectory', $out) 'measure-inherit'
+            $r = Invoke-ShimMeasure @('-Scene', 'peak', '-NoBuild', '-OutputDirectory', $out) 'measure-inherit'
             Assert-Equal 0 $r.ExitCode ("inherited adapter: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
             $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
             Assert-Equal $null $summary.adapter 'summary adapter'
@@ -704,7 +980,7 @@ try {
             $env:CARGO_TARGET_DIR = $sizeTarget
             $env:HORDE_FAKE_WINDOW = '2880x1700'
             $out = Join-Path $temporary 'perf-size-clamped'
-            $r = Invoke-Measure @('-Scene', 'peak', '-NoBuild', '-OutputDirectory', $out) 'measure-size-clamped'
+            $r = Invoke-ShimMeasure @('-Scene', 'peak', '-NoBuild', '-OutputDirectory', $out) 'measure-size-clamped'
             Assert-Equal 2 $r.ExitCode ("clamped window: exit code; out: " + (Read-Log $r.Out) + " err: " + (Read-Log $r.Err))
             $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
             $problems = @($summary.runs | ForEach-Object { "$($_.file): $(@($_.problems) -join '; ')" })
@@ -715,41 +991,6 @@ try {
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_WINDOW', $null, 'Process') }
     }
 
-    # R27: measure_performance.ps1 holds the display on and treats a run that overlaps a Kernel-Power 506/507 event as
-    # invalid evidence. The wrapper runs it in one process with Get-WinEvent shimmed, the one system call behind
-    # Get-DisplayPowerEvent: -Once fires a 506 inside the first run queried only, -Always inside every run, neither
-    # answers 'no events' as the real cmdlet does. Every query's filter goes to the call log.
-    $displayWrapper = Join-Path $temporary 'measure-display.ps1'
-    $displayWrapperSource = @(
-        '#requires -Version 5.1',
-        'param([string]$Measure, [string]$CallLog, [string]$Once, [switch]$Always, [string]$OutputDirectory)',
-        '$ErrorActionPreference = ''Stop''',
-        'function Get-WinEvent {',
-        '    [CmdletBinding()]',
-        '    param([hashtable]$FilterHashtable)',
-        '    $f = $FilterHashtable',
-        '    $ordered = [int]($f.StartTime -lt $f.EndTime)',
-        '    [IO.File]::AppendAllText($CallLog, (''{0}|{1}|{2}|{3}'' -f $f.LogName, $f.ProviderName, (@($f.Id) -join '',''), $ordered) + "`n")',
-        '    $fire = [bool]$Always',
-        '    if (-not $fire -and $Once -and (Test-Path -LiteralPath $Once)) { Remove-Item -LiteralPath $Once -Force; $fire = $true }',
-        '    if ($fire) { return [pscustomobject]@{ Id = 506; TimeCreated = $f.StartTime.AddTicks([long](($f.EndTime - $f.StartTime).Ticks / 2)) } }',
-        '    Write-Error -Message ''No events were found that match the specified selection criteria.'' -ErrorId ''NoMatchingEventsFound'' -Category ObjectNotFound',
-        '}',
-        '& $Measure -Scene peak -NoBuild -OutputDirectory $OutputDirectory',
-        'exit $LASTEXITCODE'
-    ) -join "`n"
-    Write-Utf8NoBom -Path $displayWrapper -Text $displayWrapperSource
-    function Invoke-DisplayMeasure([string]$Name, [string[]]$Extra = @()) {
-        $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $displayWrapper, '-Measure', $measure,
-            '-CallLog', (Join-Path $temporary "$Name.calls.txt"), '-OutputDirectory', (Join-Path $temporary $Name)) + $Extra
-        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\$Name") -TimeoutSeconds 300
-        $calls = @((Read-Log (Join-Path $temporary "$Name.calls.txt")) -split "`n" | Where-Object { $_ })
-        $summaryPath = Join-Path $temporary "$Name\summary.json"
-        $summary = $null
-        if (Test-Path -LiteralPath $summaryPath) { $summary = Get-Content -Raw -LiteralPath $summaryPath | ConvertFrom-Json }
-        return [pscustomobject]@{ Result = $r; Calls = $calls; Summary = $summary; Log = ('out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err)) }
-    }
-    $kernelPowerQuery = 'System|Microsoft-Windows-Kernel-Power|506,507|1'
 
     Test-Case 'measure_performance holds the display on and keeps a run without a 506/507 event valid (R27)' {
         $displayTarget = Join-Path $temporary 'perf-display-target'
@@ -779,7 +1020,7 @@ try {
         $env:CARGO_TARGET_DIR = $displayTarget
         $once = Join-Path $temporary 'display-off-once'
         Write-Utf8NoBom -Path $once -Text 'x'
-        $m = Invoke-DisplayMeasure 'perf-display-once' @('-Once', $once)
+        $m = Invoke-DisplayMeasure 'perf-display-once' @('-ShimOnce', $once)
         Assert-Equal 0 $m.Result.ExitCode "a valid rerun passes; $($m.Log)"
         Assert-Equal 3 $m.Calls.Count 'queries: the first run twice, the second once'
         $first = @($m.Summary.runs)[0]
@@ -790,7 +1031,7 @@ try {
         Assert-True (Test-Path -LiteralPath (Join-Path $temporary 'perf-display-once\peak-normal.invalid.json')) 'the rejected report was not kept'
         Assert-Equal 1 @($m.Summary.runs)[1].attempts 'the second run was not rerun'
 
-        $m = Invoke-DisplayMeasure 'perf-display-always' @('-Always')
+        $m = Invoke-DisplayMeasure 'perf-display-always' @('-ShimAlways')
         Assert-Equal 2 $m.Result.ExitCode "invalid twice is invalid evidence; $($m.Log)"
         Assert-Equal 4 $m.Calls.Count 'two attempts per run'
         foreach ($run in @($m.Summary.runs)) {
@@ -812,6 +1053,110 @@ try {
             Assert-Equal '0x80000003' $m.Summary.display_hold.released_from 'the hold was in effect until its release'
         }
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_EXIT', $null, 'Process') }
+    }
+
+    # R30: the quiet window before the runs and the load sampler beside each run, on the shimmed machine.
+    function Invoke-LoadMeasure([string]$Name, [string[]]$Shim, [string[]]$Extra = @()) {
+        $loadTarget = Join-Path $temporary 'perf-load-target'
+        if (-not (Test-Path -LiteralPath $loadTarget)) { New-FakeTarget $loadTarget }
+        $env:CARGO_TARGET_DIR = $loadTarget
+        $out = Join-Path $temporary $Name
+        $m = Invoke-Shimmed $measure $Name (@('-Scene', 'peak', '-NoBuild', '-OutputDirectory', $out) + $Extra) $Shim
+        $summary = $null
+        if (Test-Path -LiteralPath (Join-Path $out 'summary.json')) { $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json }
+        $m | Add-Member -NotePropertyName Summary -NotePropertyValue $summary
+        $m | Add-Member -NotePropertyName Markdown -NotePropertyValue (Read-Log (Join-Path $out 'summary.md'))
+        return $m
+    }
+
+    Test-Case 'measure_performance waits for a quiet window before the runs and records the load of every run (R30: a quiet start)' {
+        $m = Invoke-LoadMeasure 'perf-quiet-start' @('-ShimLoad', '20')
+        Assert-Equal 0 $m.Result.ExitCode "exit code; $($m.Log)"
+        $loads = @($m.Machine | Where-Object { $_ -like 'load|*' })
+        Assert-Equal 15 $loads.Count "13 quiet-window samples and one per run; $($m.Machine -join ' ')"
+        Assert-Equal 12 @($m.Machine | Where-Object { $_ -eq 'sleep|5' }).Count 'the window waited 12 times 5 s'
+        Assert-Equal 13 @($m.Machine | Where-Object { $_ -like 'ps|*' }).Count 'one process query per window sample'
+        $quiet = $m.Summary.quiet_window
+        Assert-Equal $true $quiet.enabled 'quiet window on by default'
+        Assert-Equal 240 $quiet.timeout_minutes 'default timeout'
+        Assert-Equal 35 $quiet.quiet_below_percent 'threshold'
+        Assert-Equal 90 $quiet.invalid_at_percent 'run threshold'
+        Assert-Equal 1 @($quiet.waits).Count 'one wait, before the runs'
+        $wait = @($quiet.waits)[0]
+        Assert-Equal 'runs' $wait.before 'before'
+        Assert-Equal $true $wait.quiet 'quiet'
+        Assert-Equal 13 $wait.samples 'samples'
+        Assert-Equal 20 $wait.mean_percent 'window mean'
+        foreach ($run in @($m.Summary.runs)) {
+            Assert-Equal 1 $run.attempts "$($run.file) attempts"
+            Assert-Equal 1 $run.load_samples "$($run.file) load samples"
+            Assert-Equal 20 $run.load_mean_percent "$($run.file) load mean"
+            Assert-Equal 20 $run.load_max_percent "$($run.file) load max"
+        }
+        Assert-True ((Read-Log $m.Result.Out) -match 'quiet window: quiet after 13 samples') "the log says it started; $($m.Log)"
+        Assert-True ($m.Markdown -match 'Quiet window') 'summary.md names the quiet window'
+        Assert-True ($m.Markdown -match '\| 20 / 20 \|') 'summary.md load column'
+    }
+
+    Test-Case 'measure_performance waits out a foreign build, ignores its own children, then starts (R30: waiting then starting)' {
+        $m = Invoke-LoadMeasure 'perf-quiet-wait' @('-ShimLoad', '20', '-ShimProcesses', 'cargox3,childx2,none')
+        Assert-Equal 0 $m.Result.ExitCode "exit code; $($m.Log)"
+        $wait = @($m.Summary.quiet_window.waits)[0]
+        Assert-Equal $true $wait.quiet 'quiet'
+        Assert-Equal 16 $wait.samples 'three samples with the foreign build, then 13 quiet ones (its own cargo does not count)'
+        Assert-Equal 'build processes: cargo.exe, rustc.exe' (@($wait.waited_for) -join '|') 'what it waited for'
+        $out = Read-Log $m.Result.Out
+        Assert-True ($out -match 'quiet window: waiting for build processes: cargo\.exe \(4242\), rustc\.exe \(4243\)') "the log names the foreign build; $($m.Log)"
+        Assert-True (-not ($out -match '4244')) 'its own cargo is never named'
+    }
+
+    Test-Case 'measure_performance exits 2 when the quiet window times out (R30: a timeout)' {
+        $m = Invoke-LoadMeasure 'perf-quiet-timeout' @('-ShimLoad', '50') @('-QuietTimeoutMinutes', '1')
+        Assert-Equal 2 $m.Result.ExitCode "a timed-out window is invalid evidence; $($m.Log)"
+        Assert-Equal 13 @($m.Machine | Where-Object { $_ -like 'load|*' }).Count 'a 1-minute timeout is 13 samples, and no run started'
+        Assert-Equal 'invalid evidence' $m.Summary.verdict 'verdict'
+        Assert-True ($m.Summary.failure -match '^quiet window timed out after 1 min') "failure: $($m.Summary.failure)"
+        Assert-Equal 0 @($m.Summary.runs).Count 'no runs'
+        $wait = @($m.Summary.quiet_window.waits)[0]
+        Assert-Equal $true $wait.timed_out 'timed out'
+        Assert-Equal 'mean CPU load' (@($wait.waited_for) -join '|') 'what it waited for'
+        Assert-Equal $true $m.Summary.display_hold.released 'the display hold is released'
+        Assert-True ((Read-Log $m.Result.Out) -match 'INVALID quiet window timed out') "stdout; $($m.Log)"
+    }
+
+    Test-Case 'measure_performance marks a run with a 90% load sample invalid and reruns it (R30)' {
+        $m = Invoke-LoadMeasure 'perf-load-once' @('-ShimLoad', '95,10') @('-NoWaitQuiet')
+        Assert-Equal 0 $m.Result.ExitCode "a valid rerun passes; $($m.Log)"
+        Assert-Equal 0 @($m.Machine | Where-Object { $_ -like 'sleep|*' -or $_ -like 'ps|*' }).Count '-NoWaitQuiet skips the window'
+        Assert-Equal $false $m.Summary.quiet_window.enabled 'the window is off'
+        $first = @($m.Summary.runs)[0]
+        Assert-Equal 2 $first.attempts 'the loaded run was rerun'
+        Assert-True $first.valid 'the rerun is valid'
+        Assert-Equal 'CPU load 95% during the run (a sample at 90% or more is invalid evidence; samples 95)' (@($first.rejected_attempts) -join '; ') 'rejected attempt'
+        Assert-Equal 10 $first.load_max_percent 'the kept attempt''s load'
+        Assert-Equal '1:95,2:10' (@($first.load_attempts | ForEach-Object { "$($_.attempt):$($_.max_percent)" }) -join ',') 'every attempt''s load'
+        Assert-Equal 1 @($m.Summary.runs)[1].attempts 'the second run was not rerun'
+
+        $m = Invoke-LoadMeasure 'perf-load-always' @('-ShimLoad', '95') @('-NoWaitQuiet')
+        Assert-Equal 2 $m.Result.ExitCode "invalid twice is invalid evidence; $($m.Log)"
+        foreach ($run in @($m.Summary.runs)) {
+            Assert-Equal 2 $run.attempts "$($run.file) attempts"
+            Assert-Equal 'CPU load 95% during the run (a sample at 90% or more is invalid evidence; samples 95)' (@($run.problems) -join '; ') "$($run.file) problems"
+        }
+    }
+
+    Test-Case 'measure_performance accepts -WaitQuiet and rejects bad quiet-window arguments with exit 3 (R30)' {
+        $m = Invoke-LoadMeasure 'perf-quiet-explicit' @() @('-WaitQuiet', '-QuietTimeoutMinutes', '5')
+        Assert-Equal 0 $m.Result.ExitCode "explicit -WaitQuiet; $($m.Log)"
+        Assert-Equal 5 $m.Summary.quiet_window.timeout_minutes 'timeout'
+        $cases = @(@('-QuietTimeoutMinutes', '0'), @('-QuietTimeoutMinutes', 'x'), @('-QuietTimeoutMinutes', '1441'), @('-WaitQuiet', '-NoWaitQuiet'))
+        $index = 0
+        foreach ($arguments in $cases) {
+            $index += 1
+            $r = Invoke-Measure ($arguments + @('-NoBuild', '-OutputDirectory', (Join-Path $temporary "perf-quiet-bad-$index"))) "measure-quiet-bad-$index"
+            Assert-Equal 3 $r.ExitCode ("$($arguments -join ' '): exit code; out: " + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $temporary "perf-quiet-bad-$index"))) "$($arguments -join ' '): created its output directory"
+        }
     }
 
     Test-Case 'capture_review reports every sidecar check row and fails the run on a failed one' {

@@ -28,6 +28,9 @@
 #                                            and only then builds the review variant
 #   -SelfTest                                evaluates scripts/fixtures/perf/*.json, the rerun rule and the power plan
 #                                            names; no build
+#   -WaitQuiet | -NoWaitQuiet                the R30 quiet window before the measurements: on by default (-WaitQuiet
+#                                            may be given), -NoWaitQuiet skips it
+#   -QuietTimeoutMinutes N                   1..1440, default 240; a quiet window that times out exits 2
 # <target> is CARGO_TARGET_DIR (relative values are joined to the workspace), else <workspace>/target.
 # Every run sets LASTLIGHT_PERF_ACTIVE_ONLY=1, LASTLIGHT_PERF_NPC_SPEED=1, LASTLIGHT_PERF_PROFILE=<profile> and a fresh
 # LASTLIGHT_SAVE_DIR, and writes <scene>-<size>[-rN].json. A run is valid only when the report is version 3, met its
@@ -40,6 +43,13 @@
 # ES_SYSTEM_REQUIRED | ES_DISPLAY_REQUIRED, scripts/lib/DisplayPower.ps1), released in the finally block before the
 # summary is written. The summary records the hold and every run's 506/507 events (W2-50: driver stalls and their tails
 # come from Windows turning the display off during unattended passes).
+# Machine load (R30, plan 2.4; scripts/lib/MachineLoad.ps1): after each build and before what it measures (the runs, the
+# -ShippedSmoke timing, the -SaveClone example) the script waits for a quiet window: no foreign cargo, rustc,
+# cargo-nextest or other build or test process (its own process tree is ignored), and a mean CPU load
+# (Win32_Processor.LoadPercentage, 5 s samples) under 35% over the last 60 s. It logs what it waited for, and a window that
+# has not come after -QuietTimeoutMinutes is invalid evidence (exit 2). A 5 s load sampler runs beside every run: a run
+# with a sample of 90% or more, or one that could not be read, is invalid and rerun like the others. The summary records
+# every wait and each run's load samples, mean and max. Gates are unchanged.
 # Budget compare: repeats by median, frames_over_50ms, egui texture uploads and the battlefield counts by the worst repeat.
 # frames_over_50ms, egui.texture_uploads.count (against egui.texture_uploads_after_warmup_max, every scene, W1-64) and the
 # battlefield painter's egui.battlefield_primitives.max and egui.battlefield_vertices.max (against
@@ -74,6 +84,9 @@ param(
     [switch]$ShippedSmoke,
     [switch]$SelfTest,
     [string]$TimeoutSeconds = '900',
+    [switch]$WaitQuiet,
+    [switch]$NoWaitQuiet,
+    [string]$QuietTimeoutMinutes = '240',
     [Parameter(ValueFromRemainingArguments = $true)][string[]]$Unexpected
 )
 $ErrorActionPreference = 'Stop'
@@ -106,8 +119,12 @@ if ($Frames -ne 0 -and $Frames -lt 300) { throw '-Frames is 0 (budget default) o
 [int]$Warmup = ConvertTo-BoundedInt 'Warmup' $Warmup -1 600
 [int]$Repeat = ConvertTo-BoundedInt 'Repeat' $Repeat 1 20
 [int]$TimeoutSeconds = ConvertTo-BoundedInt 'TimeoutSeconds' $TimeoutSeconds 1 86400
+if ($WaitQuiet -and $NoWaitQuiet) { throw '-WaitQuiet and -NoWaitQuiet exclude each other' }
+[int]$QuietTimeoutMinutes = ConvertTo-BoundedInt 'QuietTimeoutMinutes' $QuietTimeoutMinutes 1 1440
+$script:waitQuiet = -not $NoWaitQuiet
 . (Join-Path $PSScriptRoot 'lib\Native.ps1')
 . (Join-Path $PSScriptRoot 'lib\DisplayPower.ps1')
+. (Join-Path $PSScriptRoot 'lib\MachineLoad.ps1')
 $workspace = Split-Path -Parent $PSScriptRoot
 $budgetPath = Join-Path $workspace 'docs\PERF_BUDGET.json'
 $invariant = [Globalization.CultureInfo]::InvariantCulture
@@ -664,6 +681,23 @@ function Invoke-SelfTest {
     else { Write-Output 'SELFTEST PASS' }
 }
 
+function Invoke-QuietWindow([string]$Before) {
+    # R30: waits for a quiet machine before the measurement named by $Before (Wait-QuietMachine, lib/MachineLoad.ps1)
+    # and records the wait. A wait that times out is invalid evidence: it sets $script:quietFailure and throws.
+    if (-not $script:waitQuiet) { return }
+    Write-Output "quiet window before the $Before (timeout $QuietTimeoutMinutes min)"
+    $wait = Wait-QuietMachine -TimeoutMinutes $QuietTimeoutMinutes -OnLog { param($Line) Write-Host $Line }
+    $script:quietWaits.Add([ordered]@{
+            before = $Before; quiet = $wait.Quiet; timed_out = $wait.TimedOut; samples = $wait.Samples; seconds = $wait.Seconds
+            mean_percent = $wait.MeanPercent; max_percent = $wait.MaxPercent; waited_for = @($wait.WaitedFor); log = @($wait.Log)
+        })
+    if ($wait.TimedOut) {
+        $last = @($wait.Log)[-1] -replace '^quiet window: timed out after \d+ min ', ''
+        $script:quietFailure = "quiet window timed out after $QuietTimeoutMinutes min before the $Before $last"
+        throw $script:quietFailure
+    }
+}
+
 if ($SelfTest) {
     $script:selfTestExit = 1
     Invoke-SelfTest
@@ -697,6 +731,9 @@ New-Item -ItemType Directory -Force -Path $destination | Out-Null
 $tools = Join-Path $destination 'tools'
 
 $runs = New-Object System.Collections.Generic.List[object]
+$script:quietWaits = New-Object System.Collections.Generic.List[object]
+$script:quietFailure = $null
+$loadRule = Get-MachineLoadRule
 $exitCode = 3
 $failure = $null
 $verdict = $null
@@ -721,6 +758,7 @@ try {
         New-Item -ItemType Directory -Force -Path $shippedDirectory | Out-Null
         $shippedExe = Join-Path $shippedDirectory 'horde-defense.exe'
         Copy-Item -LiteralPath (Get-HordeExecutable -Profile playtest -Workspace $workspace) -Destination $shippedExe
+        Invoke-QuietWindow 'shipped smoke'
         $seconds = New-Object System.Collections.Generic.List[double]
         foreach ($index in 1..3) {
             $env:LASTLIGHT_SAVE_DIR = Join-Path $destination "saves\shipped-smoke-$index"
@@ -755,6 +793,8 @@ try {
     }
     $cpuName = (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
     if ($Adapter) { $env:WGPU_ADAPTER_NAME = $Adapter }
+    # R30: after the build, before the first run.
+    Invoke-QuietWindow 'runs'
 
     foreach ($sceneName in $sceneNames) {
         $sceneFrames = $Frames
@@ -787,18 +827,23 @@ try {
                     if ($VsyncOff) { $env:LASTLIGHT_PERF_PRESENT_MODE = 'autonovsync' }
                     if ($Pipelined -eq 'on') { $env:LASTLIGHT_PERF_PIPELINED = '1' }
                     elseif ($Pipelined -eq 'off') { $env:LASTLIGHT_PERF_PIPELINED = '0' }
+                    # R30: a load sample right after the start and every 5 s until the exit.
+                    $runLoadSamples = New-Object System.Collections.Generic.List[object]
                     $attemptStart = [DateTime]::Now
-                    $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $destination "logs\$attemptStem") -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace -RemoveReviewProfile
+                    $result = Invoke-Native -FilePath $exe -LogStem (Join-Path $destination "logs\$attemptStem") -TimeoutSeconds $TimeoutSeconds -WorkingDirectory $workspace -RemoveReviewProfile `
+                        -Sample { $runLoadSamples.Add((Get-CpuLoadPercent)) } -SampleMilliseconds ($loadRule.IntervalSeconds * 1000)
                     $attemptEnd = [DateTime]::Now
                     if ($result.ExitCode -ne 0) { throw "Run $attemptStem failed with exit code $($result.ExitCode); see $($result.Err)" }
                     if (-not (Test-Path -LiteralPath $reportPath -PathType Leaf)) { throw "Run $attemptStem wrote no report; see $($result.Err)" }
                     $report = Read-JsonFile $reportPath
                     # R27: a Kernel-Power 506/507 event inside the run makes it invalid evidence, rerun like any other.
                     $display = Test-DisplayPower -Start $attemptStart -End $attemptEnd
+                    # R30: a load sample of 90% or more (or an unreadable one) makes the run invalid, rerun like any other.
+                    $load = Test-RunLoad -Samples $runLoadSamples.ToArray()
                     # Test-PerfReport writes its array as one object, so it is assigned before it is joined.
                     $reportProblems = Test-PerfReport $report $sceneName $expect $sizeBudget $sizeName
-                    $problems = @($reportProblems) + @($display.Problems)
-                    [pscustomobject]@{ Report = $report; Problems = $problems; Seconds = $result.Seconds; Attempt = $Number; DisplayEvents = @($display.Events) }
+                    $problems = @($reportProblems) + @($display.Problems) + @($load.Problems)
+                    [pscustomobject]@{ Report = $report; Problems = $problems; Seconds = $result.Seconds; Attempt = $Number; DisplayEvents = @($display.Events); Load = $load }
                 }
                 $runs.Add([pscustomobject]@{
                         Scene = $sceneName; Size = $sizeName; Repeat = $repeatIndex; File = "$stem.json"
@@ -808,6 +853,10 @@ try {
                         DisplayEvents = @(@($outcome.Rejected) + @($outcome.Result) | ForEach-Object {
                                 $attempt = $_.Attempt
                                 @($_.DisplayEvents) | ForEach-Object { [ordered]@{ attempt = $attempt; id = $_.Id; time_utc = $_.TimeUtc } }
+                            })
+                        Load = $outcome.Result.Load
+                        LoadAttempts = @(@($outcome.Rejected) + @($outcome.Result) | ForEach-Object {
+                                [ordered]@{ attempt = $_.Attempt; samples = $_.Load.Samples; mean_percent = $_.Load.Mean; max_percent = $_.Load.Max }
                             })
                     })
                 $state = 'ok  '
@@ -825,6 +874,7 @@ try {
         $cloneDirectory = 'debug'
         if ($Profile -eq 'playtest') { $cloneArguments += @('--profile', 'playtest'); $cloneDirectory = 'playtest' }
         Invoke-Cargo -Arguments $cloneArguments -LogStem (Join-Path $tools 'cargo-save-clone') | Out-Null
+        Invoke-QuietWindow 'save clone'
         $cloneExe = Join-Path $target "$cloneDirectory\examples\save_clone.exe"
         $clonePath = Join-Path $destination 'save-clone.json'
         $env:LASTLIGHT_BENCH_CPU = $cpuName
@@ -842,8 +892,15 @@ try {
 }
 catch {
     $failure = $_.Exception.Message
-    $exitCode = 3
-    Write-Output "FAIL $failure"
+    if ($script:quietFailure) {
+        # R30: no quiet window within -QuietTimeoutMinutes is invalid evidence, not a run failure.
+        $exitCode = 2
+        Write-Output "INVALID $failure"
+    }
+    else {
+        $exitCode = 3
+        Write-Output "FAIL $failure"
+    }
 }
 finally {
     # Released before anything else here can throw, so a failed run never leaves the display held (R27).
@@ -875,6 +932,8 @@ finally {
                 peak_visible_enemies = (Get-Field $r @('peak_visible_enemies'))
                 display_held = $_.DisplayHeld
                 display_power_events = @($_.DisplayEvents)
+                load_samples = $_.Load.Samples; load_mean_percent = $_.Load.Mean; load_max_percent = $_.Load.Max
+                load_attempts = @($_.LoadAttempts)
             }
         })
     $checks = @()
@@ -888,11 +947,16 @@ finally {
             released = $displayHold.Released; released_utc = $displayHold.ReleasedUtc; released_from = $displayHold.ReleasedFrom
         }
     }
+    $quietRecord = [ordered]@{
+        enabled = [bool]$script:waitQuiet; timeout_minutes = $QuietTimeoutMinutes; interval_seconds = $loadRule.IntervalSeconds
+        window_seconds = $loadRule.WindowSeconds; quiet_below_percent = $loadRule.QuietBelowPercent
+        invalid_at_percent = $loadRule.InvalidAtPercent; waits = @($script:quietWaits.ToArray())
+    }
     $summary = [ordered]@{
         version = 1; started_utc = $startedUtc; finished_utc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
         exit_code = $exitCode; verdict = (Get-ExitLabel $exitCode); failure = $failure
         profile = $Profile; vsync_off = [bool]$VsyncOff; present_mode = $expect.PresentMode; pipelined = $Pipelined
-        power_plan = $context.PowerPlan; display_hold = $holdRecord
+        power_plan = $context.PowerPlan; display_hold = $holdRecord; quiet_window = $quietRecord
         adapter = $(if ($Adapter) { $Adapter } else { $null }); informational = [bool]$Adapter; no_budget = [bool]$NoBudget
         repeat = $Repeat; warmup_frames = $Warmup; frames = $(if ($Frames -gt 0) { $Frames } else { 'budget' })
         scenes = $sceneNames; sizes = $sizeNames; cargo_target_dir = $target
@@ -921,18 +985,28 @@ finally {
         $md.Add("- Display held on ($($holdRecord.request)) from $($holdRecord.set_utc) to $(if ($holdRecord.released) { "$($holdRecord.released_utc), released from $($holdRecord.released_from)" } else { 'the end (not released)' }); a run with a Kernel-Power 506/507 event is invalid (R27)")
     }
     else { $md.Add('- Display not held (the run failed before the hold)') }
+    if (-not $script:waitQuiet) { $md.Add('- Quiet window off (-NoWaitQuiet); each run still samples the CPU load (R30)') }
+    elseif ($script:quietWaits.Count -eq 0) { $md.Add('- Quiet window not reached (the run failed before it)') }
+    foreach ($wait in $script:quietWaits) {
+        $held = @($wait.waited_for) -join '; '
+        if (-not $held) { $held = 'nothing' }
+        $outcomeText = 'quiet'
+        if ($wait.timed_out) { $outcomeText = "timed out after $QuietTimeoutMinutes min" }
+        $md.Add("- Quiet window before the $($wait.before) (R30): $outcomeText after $($wait.samples) samples ($($wait.seconds) s), mean CPU load $(Format-Number $wait.mean_percent)%, max $(Format-Number $wait.max_percent)% over the last $($loadRule.WindowSeconds) s; waited for $held")
+    }
+    $md.Add("- A run with a CPU load sample of $($loadRule.InvalidAtPercent)% or more is invalid (R30)")
     $md.Add('')
     $md.Add('Frames > 50 ms: every frame, then (driver stalls: frame ms at acquire share). The gate counts the frames outside the driver stalls (W1-61 user ruling).')
     $md.Add('')
-    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Adapter | Display | Frames > 50 ms | egui texture uploads | Battlefield primitives / vertices (max) | Mean FPS / p99 interval ms outside stalls | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
-    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
+    $md.Add('| Scene | Size | Repeat | Attempts | Valid | Adapter | Display | CPU load mean / max % | Frames > 50 ms | egui texture uploads | Battlefield primitives / vertices (max) | Mean FPS / p99 interval ms outside stalls | cpu_frame p99 ms | interface_draw mean ms | interface_total mean ms | Present | Pipelined | Problems |')
+    $md.Add('|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|')
     foreach ($row in $rows) {
         $stalls = @($row.driver_stalls | ForEach-Object { "$(Format-Number $_.frame_ms) ms at $(Format-Number $_.acquire_share)" }) -join ', '
         $displayCell = 'not held'
         if ($row.display_held) { $displayCell = 'held' }
         $powerEvents = @($row.display_power_events | ForEach-Object { "$($_.id) at $($_.time_utc) (attempt $($_.attempt))" }) -join ', '
         if ($powerEvents) { $displayCell += "; $powerEvents" }
-        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.adapter) | $displayCell | $($row.frames_over_50ms) ($($row.frames_over_50ms_driver_stall)$(if ($stalls) { ': ' + $stalls })) | $($row.egui_texture_uploads) | $($row.battlefield_primitives_max) / $($row.battlefield_vertices_max) | $(Format-Number $row.mean_fps_outside_stalls) / $(Format-Number $row.p99_frame_ms_outside_stalls) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
+        $md.Add("| $($row.scene) | $($row.size) | $($row.repeat) | $($row.attempts) | $($row.valid) | $($row.adapter) | $displayCell | $(Format-Number $row.load_mean_percent) / $(Format-Number $row.load_max_percent) | $($row.frames_over_50ms) ($($row.frames_over_50ms_driver_stall)$(if ($stalls) { ': ' + $stalls })) | $($row.egui_texture_uploads) | $($row.battlefield_primitives_max) / $($row.battlefield_vertices_max) | $(Format-Number $row.mean_fps_outside_stalls) / $(Format-Number $row.p99_frame_ms_outside_stalls) | $(Format-Number $row.cpu_frame_p99_ms) | $(Format-Number $row.interface_draw_mean_ms) | $(Format-Number $row.interface_total_mean_ms) | $($row.present_mode) | $($row.pipelined_rendering) | $(@($row.problems) -join '; ') |")
     }
     $md.Add('')
     $md.Add('## Budget checks')
