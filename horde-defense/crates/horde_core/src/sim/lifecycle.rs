@@ -115,6 +115,7 @@ impl Game {
             self.campaign.reserved = None;
             return Err(error);
         }
+        self.unqueue_reserved(loadout);
         Ok(())
     }
     /// Returns the defending recruit `id` to the roster and frees its items.

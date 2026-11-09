@@ -13,6 +13,7 @@ use horde_core::{
     campaign::AutoSellRule,
     command::Command,
     content::Mode,
+    defenders::DefenderId,
     quality::Quality,
     sim::{Game, ParallelBattle, SAVE_VERSION},
     stats::RunRecord,
@@ -464,6 +465,65 @@ fn v6_inflight_attempt_and_expedition_sell_nothing_after_enabling_rule() {
         new.iter().all(|id| !owned(&v7, *id)),
         "the contrast expedition's drops sell"
     );
+}
+
+/// Schema v7 §3.6: a queue is disjoint from `reserved_items`. A queued drop
+/// is an ordinary stash item while its expedition runs, so the player may
+/// equip it on another Ready recruit and send that recruit on duty: as a
+/// guard, on a second expedition or defending the main run. The reservation
+/// takes the drop out of the queue, so every save stays valid and the
+/// deployed item is never sold; the rest of the queue still sells.
+#[test]
+fn queued_drop_reserved_by_another_deployment_keeps_the_save_valid() {
+    let (mut g, b) = expedition(sell_rule());
+    let country = g.campaign().world.cleared[0].clone();
+    let second = g
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    worker_drop(&mut g, b, 5, Quality::Poor);
+    worker_drop(&mut g, b, 6, Quality::Common);
+    advance(&mut g, 1);
+    let queued = pending(&g, b);
+    assert_eq!(queued.len(), 2);
+    let (taken, sold) = (queued[0], queued[1]);
+    g.apply(&Command::EquipRecruit {
+        id: second,
+        item: taken,
+    })
+    .unwrap();
+    for duty in ["guard", "expedition", "takeover"] {
+        let mut g = g.clone();
+        match duty {
+            "guard" => {
+                g.apply(&Command::AssignGuard {
+                    id: second,
+                    country: country.clone(),
+                })
+                .unwrap();
+            }
+            "expedition" => {
+                g.deploy_survivor(second, &country, 0).unwrap();
+            }
+            _ => g
+                .deploy_country_stage_as(0, DefenderId::Recruit(second))
+                .unwrap(),
+        }
+        assert!(g.campaign().item_reserved(taken), "{duty}");
+        let mut g = reload(&g);
+        assert_eq!(pending(&g, b), [sold], "{duty}: the reserved drop leaves");
+        let paid = value(&g, sold);
+        g.recall_survivor(b).unwrap();
+        assert!(g.take_settlement_issues().is_empty(), "{duty}");
+        assert!(owned(&g, taken), "{duty}: the deployed drop is never sold");
+        assert!(!owned(&g, sold), "{duty}: the rest of the queue sells");
+        let runs = records(&g, b);
+        assert_eq!(
+            (runs[0].auto_sold_count, runs[0].auto_sold_coins),
+            (1, paid),
+            "{duty}"
+        );
+        reload(&g);
+    }
 }
 
 /// Ruling D13: `keep_upgrades` judges an expedition's drops against the

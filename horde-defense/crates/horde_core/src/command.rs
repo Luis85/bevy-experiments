@@ -555,6 +555,10 @@ impl Game {
             Command::AssignGuard { id, country } => {
                 self.strategy
                     .assign_guard(&mut self.campaign, *id, country)?;
+                if let Some(r) = self.strategy.roster.iter().find(|r| r.id == *id) {
+                    let loadout = r.npc.loadout;
+                    self.unqueue_reserved(loadout);
+                }
                 Applied
             }
             Command::ReleaseGuard(id) => {

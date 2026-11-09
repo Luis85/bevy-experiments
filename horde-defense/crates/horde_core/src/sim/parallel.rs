@@ -214,6 +214,7 @@ impl Game {
             self.campaign.release_external(npc.loadout);
             return Err(error);
         }
+        self.unqueue_reserved(npc.loadout);
         self.next_attempt_id += 1;
         let id = self.next_attempt_id;
         let first_item = worker.campaign.next_item_id;
@@ -266,6 +267,17 @@ impl Game {
             .expect("new operation exists")
             .country_operation = true;
         Ok(id)
+    }
+    /// Keeps schema v7 §3.6's "`pending_auto_sell` disjoint from
+    /// `reserved_items`": a queued drop the player equips on a recruit and
+    /// sends on duty (guard, expedition or main-run takeover) leaves every
+    /// queue once that `loadout` is reserved. A sale guard would keep it
+    /// anyway, and it is not queued again on release, like any rule change
+    /// (never retroactive). Call after the reservation is committed.
+    pub(crate) fn unqueue_reserved(&mut self, loadout: [u64; 4]) {
+        for battle in self.battles.iter_mut().filter(|b| !b.settled) {
+            battle.pending_auto_sell.retain(|id| !loadout.contains(id));
+        }
     }
     pub fn recall_survivor(&mut self, battle_id: u64) -> Result<(), String> {
         let legacy = self.legacy_expeditions();
