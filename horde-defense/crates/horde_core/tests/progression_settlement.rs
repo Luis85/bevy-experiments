@@ -18,10 +18,11 @@ use horde_core::{
     },
     quality::Quality,
     sim::{
-        Game, MilestoneReward, Outcome, ParallelBattle, ProgressionRewards, SAVE_VERSION,
+        Game, Input, MilestoneReward, Outcome, ParallelBattle, ProgressionRewards, SAVE_VERSION,
         SettlementIssue,
     },
     stats::RunRecord,
+    world::world,
 };
 use support::{advance, enemy, strategic_game};
 
@@ -485,4 +486,77 @@ fn milestone_item_loss_keeps_the_coins_and_the_claim() {
         "{issues:?}"
     );
     assert!(g.take_settlement_issues().is_empty(), "reported once");
+}
+
+/// Pin (W2-22 review): the record-less path (a legacy worker report whose
+/// run never reached `pending_runs`) settles the victory it credits, but it
+/// appends no run record, and a country operation that redeploys its next
+/// stage in the same pass replaces that report. The receipt then has no
+/// home: the coins and the ledger land once, and no report or record names
+/// them. The frozen v7 schema has no other slot for it.
+#[test]
+fn record_less_operation_redeploy_pays_the_grant_without_a_receipt() {
+    let _rewards = authored(Vec::new());
+    let mut g = strategic_game();
+    let next = g.campaign().player.next_level_xp();
+    g.campaign_mut().player.xp = next - 1;
+    let home = g.campaign().world.cleared[0].clone();
+    let recruit = g
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &home))
+        .unwrap();
+    let country = world()
+        .countries
+        .iter()
+        .find(|c| {
+            g.campaign().world.can_enter(&c.id)
+                && !g.campaign().world.cleared.contains(&c.id)
+                && c.level_count() > 1
+        })
+        .unwrap()
+        .id
+        .clone();
+    let op = g.deploy_country_operation(recruit, &country).unwrap();
+    // The worker finishes its stage on its own, and its record is dropped,
+    // as a legacy worker never queued one.
+    let w = worker(&mut g, op);
+    enemy(w, 5, 20.0, true);
+    let a = w.attempt_mut().unwrap();
+    a.boss_spawned = true;
+    a.enemies[0].injury.unconscious = true;
+    w.tick(Input::default());
+    assert_eq!(w.last_result().unwrap().outcome, Outcome::Victory);
+    w.pending_runs_mut().clear();
+    let (level, paid) = ledger(&g);
+    assert_eq!(paid, 0);
+    let runs = g.campaign().run_history.len();
+    let coins = g.campaign().coins;
+    let earned = battle(&g, op).game().campaign().coins;
+
+    advance(&mut g, 1);
+    assert!(g.take_settlement_issues().is_empty());
+    let b = battle(&g, op);
+    assert!(!b.settled && b.stage == 1, "the operation redeployed");
+    let (new_level, paid) = ledger(&g);
+    assert!(
+        new_level > level,
+        "the record-less credit levelled the parent"
+    );
+    assert_eq!(paid, new_level, "the pass settled the ledger");
+    let owed: u64 = (level.max(1) + 1..=new_level).map(level_grant).sum();
+    assert!(owed > 0);
+    assert_eq!(g.campaign().coins, coins + earned + owed);
+    assert_eq!(g.campaign().run_history.len(), runs, "no record");
+    assert!(
+        b.game()
+            .last_result()
+            .is_none_or(|report| report.progression_rewards.is_empty()),
+        "the redeploy replaced the report"
+    );
+
+    let coins = g.campaign().coins;
+    advance(&mut g, 3);
+    let mut g = reload(&g);
+    advance(&mut g, 3);
+    assert_eq!(g.campaign().coins, coins, "paid exactly once");
+    assert_eq!(ledger(&g), (new_level, new_level));
 }

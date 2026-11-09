@@ -587,7 +587,10 @@ impl Game {
     /// Settles progression at the end of a pass that credited battle
     /// `battle`'s victory and stamps a non-empty receipt on that battle's
     /// report (when it is still the credited one) and on its run record
-    /// `attempt` (None on the record-less path).
+    /// `attempt` (None on the record-less path). The record-less path appends
+    /// no record, so when that battle is a country operation that redeployed
+    /// its next stage in the same pass, its report is gone too and the
+    /// receipt is dropped: the coins, the item and the ledgers still land.
     fn stamp_expedition_rewards(&mut self, battle: u64, attempt: Option<u64>) {
         let rewards = self.settle_progression_rewards();
         if rewards.is_empty() {
