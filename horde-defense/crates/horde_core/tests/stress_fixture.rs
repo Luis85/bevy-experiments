@@ -3,8 +3,11 @@
 //! authored cap, and only then raised to `STRESS_ENEMY_CAP` through
 //! `Attempt::stage_review_enemy_cap`, which leaves it unsaveable by
 //! construction. The production cap stays `GAMEPLAY_ENEMY_CAP`.
+use std::collections::BTreeSet;
+
 use horde_core::{
     content::Mode,
+    enemy_catalog::enemy_catalog,
     progression::GAMEPLAY_ENEMY_CAP,
     sim::{
         Game, Input, ParallelBattle, SAVE_VERSION, STRESS_ENEMY_CAP, SaveError, save_clone_fixture,
@@ -101,7 +104,8 @@ fn stress_render_fixture_validates_at_authored_cap_before_staging() {
         .country(a.country_id.as_deref().expect("country stage"))
         .unwrap();
     assert_eq!(country.stage_theme(a.stage).lighting, "night");
-    assert_eq!(a.progression.wave_tier, 4);
+    // The last authored wave tier since W2-47 (wave 1 held it at 4).
+    assert_eq!(a.progression.wave_tier, 11);
     assert!(a.structures.len() >= 4);
     assert!(a.ordnance.fire_zones.is_empty());
     assert_eq!(a.corpses.len(), 1500);
@@ -135,6 +139,44 @@ fn stress_render_fixture_validates_at_authored_cap_before_staging() {
             .collect()
     };
     assert_eq!(digests(&staged), digests(&base));
+}
+
+/// W2-47: the stress crowd follows the wave-2 content. Both the authored
+/// stage and the staged 400 draw every catalogue archetype (the W2-29 to
+/// W2-31 records among them), at least one elite (W2-33), the last authored
+/// wave tier, and a boss with its phase state (W2-36), so the perf re-gate
+/// measures the new sprites, elite rims and phase ring.
+#[test]
+fn stress_render_fixture_includes_every_catalog_archetype_and_an_elite() {
+    let catalog = enemy_catalog();
+    let every: BTreeSet<&str> = catalog.archetype_ids().collect();
+    for (name, g) in [
+        ("authored", stress_authored_fixture().unwrap()),
+        ("staged", stress_render_fixture().unwrap()),
+    ] {
+        let a = g.attempt().unwrap();
+        let drawn: BTreeSet<&str> = a
+            .enemies
+            .iter()
+            .filter_map(|e| e.resolved.as_ref())
+            .map(|r| r.archetype_id.as_str())
+            .collect();
+        assert_eq!(drawn, every, "{name}: archetypes drawn");
+        let elites = a
+            .enemies
+            .iter()
+            .filter(|e| e.resolved.as_ref().is_some_and(|r| r.elite.is_some()))
+            .count();
+        assert!(elites > 0, "{name}: no elite among {}", a.enemies.len());
+        assert!(a.progression.elite_rate_bp > 0, "{name}: elite rate");
+        assert_eq!(
+            a.progression.wave_tier,
+            catalog.wave_count() - 1,
+            "{name}: wave tier"
+        );
+        let boss = a.enemies.iter().find(|e| e.boss).expect("boss");
+        assert!(boss.boss_state.is_some(), "{name}: the boss has no phases");
+    }
 }
 
 /// Serialized form, for comparing parts of two games.

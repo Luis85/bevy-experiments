@@ -255,6 +255,7 @@ pub use stress::{
 /// without `review` or `test-support`.
 #[cfg(any(test, feature = "test-support", feature = "review"))]
 mod stress {
+    use super::super::director::Arrival;
     use super::*;
 
     /// Most regular enemies the review-only stress scene keeps alive; with its
@@ -266,8 +267,12 @@ mod stress {
     const STASH_ITEMS: usize = 1200;
     const CORPSES: usize = 1500;
     const RUN_RECORDS: usize = 150;
-    /// Wave 1 holds the composition tier at 4; W2-47 follows enemy-balance's bound.
-    const WAVE_TIER: usize = 4;
+    /// The composition tier of the main field: the last authored wave
+    /// (enemy-balance §11, tier 11 since W2-31), so the director's refills
+    /// draw the wave-2 pool (W2-47; wave 1 held it at 4).
+    fn wave_tier() -> usize {
+        crate::enemy_catalog::enemy_catalog().wave_count() - 1
+    }
     /// Expeditions fielded beside the main battle, and the hostiles carried by
     /// the two that are not at their own cap.
     const EXPEDITIONS: usize = 3;
@@ -312,13 +317,15 @@ mod stress {
         let lanes = usize::from(a.lane_count);
         let authored = a.enemies.iter().filter(|e| !e.boss).count();
         let gap = (a.width_yards - 8.0) / (authored.div_ceil(lanes).max(2) - 1) as f32;
+        let crowd = crowd_profiles(&g)?;
         for n in 0..STRESS_ENEMY_CAP - authored {
             let lane = ((n + lanes / 2) % lanes) as u8;
-            g.spawn_enemy(
+            g.place_enemy(
                 &mut a,
-                EnemyKind::ALL[n % EnemyKind::ALL.len()],
+                crowd[n % crowd.len()].clone(),
                 lane,
                 false,
+                Arrival::Wave,
             );
             a.enemies.last_mut().expect("within the raised cap").x =
                 (5.0 + gap * 0.5 + (n / lanes) as f32 * gap).min(a.width_yards - 1.5);
@@ -407,10 +414,11 @@ mod stress {
             }
         }
         let mut a = g.attempt.take().expect("stress field deployed");
-        a.progression.wave_tier = WAVE_TIER;
+        a.progression.wave_tier = wave_tier();
         let cap = a.enemy_cap();
-        fill_field(&mut g, &mut a, cap, true);
-        stage_corpses(&mut a, CORPSES);
+        let crowd = crowd_profiles(&g)?;
+        fill_field(&mut g, &mut a, &crowd, Arrival::Wave, cap, true);
+        stage_corpses(&mut a, &crowd, CORPSES);
         a.events.clear();
         g.attempt = Some(a);
 
@@ -437,6 +445,13 @@ mod stress {
         if deployed < EXPEDITIONS {
             return Err("The stress fixture could not deploy its expeditions".into());
         }
+        // The expeditions are simulated, not drawn: they keep the wave-1
+        // crowd of the five legacy kinds as plain spawns, so they carry the
+        // same simulation load (and still fight on past tick 300) as before.
+        let legacy: Vec<_> = EnemyKind::ALL
+            .into_iter()
+            .map(crate::enemy_catalog::resolve_kind)
+            .collect();
         for (n, battle) in g.battles.iter_mut().enumerate() {
             let worker = &mut battle.game;
             let mut a = worker.attempt.take().ok_or("Expedition without a battle")?;
@@ -445,7 +460,7 @@ mod stress {
             } else {
                 (EXPEDITION_CROWD.min(a.enemy_cap()), false)
             };
-            fill_field(worker, &mut a, count, boss);
+            fill_field(worker, &mut a, &legacy, Arrival::Plain, count, boss);
             a.events.clear();
             worker.attempt = Some(a);
         }
@@ -455,10 +470,42 @@ mod stress {
         Ok(g)
     }
 
-    /// Spreads `count` regular hostiles over the field ahead of its blockers
-    /// and, with `boss`, moves the clock to the boss arrival and fields it at
-    /// the far edge.
-    fn fill_field(g: &mut Game, a: &mut Attempt, count: usize, boss: bool) {
+    /// One profile per catalogue archetype, in stable id order (W2-47): the
+    /// stress crowd cycles them, so every sprite, death effect and trait the
+    /// catalogue authors is drawn. Errs on an archetype whose boss the
+    /// fixture's campaign has not defeated, so the crowd stays one that a
+    /// field of this campaign could hold.
+    fn crowd_profiles(g: &Game) -> Result<Vec<crate::enemy_catalog::ResolvedEnemy>, String> {
+        let catalog = crate::enemy_catalog::enemy_catalog();
+        let unlocked = g.campaign.unlocked_bosses();
+        catalog
+            .archetype_ids()
+            .map(|id| {
+                let profile = catalog.resolve(id)?;
+                match profile.unlocked_by {
+                    Some(boss) if !unlocked.contains(&boss) => Err(format!(
+                        "The stress fixture has not unlocked the {id} archetype"
+                    )),
+                    _ => Ok(profile),
+                }
+            })
+            .collect()
+    }
+
+    /// Spreads `count` regular hostiles over the field ahead of its blockers,
+    /// cycling the `crowd` profiles one member per pick. As
+    /// [`Arrival::Wave`] picks each rolls elite at the field's own snapshot
+    /// rate (the keyed roll, no combat RNG), an elite carrying its baked
+    /// affix. With `boss` it moves the clock to the boss arrival and fields
+    /// the boss, with the phase state its snapshot grants, at the far edge.
+    fn fill_field(
+        g: &mut Game,
+        a: &mut Attempt,
+        crowd: &[crate::enemy_catalog::ResolvedEnemy],
+        arrival: Arrival,
+        count: usize,
+        boss: bool,
+    ) {
         if boss {
             a.tick = u64::from(seconds(a.boss_time()));
         }
@@ -466,7 +513,7 @@ mod stress {
         let gap = (a.width_yards - 8.0) / (count.div_ceil(lanes).max(2) - 1) as f32;
         for n in 0..count {
             let lane = (n % lanes) as u8;
-            g.spawn_enemy(a, EnemyKind::ALL[n % EnemyKind::ALL.len()], lane, false);
+            g.place_enemy(a, crowd[n % crowd.len()].clone(), lane, false, arrival);
             a.enemies.last_mut().expect("within cap").x = 5.0 + (n / lanes) as f32 * gap;
         }
         if boss {
@@ -479,24 +526,25 @@ mod stress {
     }
 
     /// `count` settled corpses with fresh actor ids, recorded in the reward
-    /// ledger (as a kill records them) at ascending ticks up to now.
-    fn stage_corpses(a: &mut Attempt, count: usize) {
+    /// ledger (as a kill records them) at ascending ticks up to now, cycling
+    /// the `crowd` archetypes' kinds and visuals.
+    fn stage_corpses(a: &mut Attempt, crowd: &[crate::enemy_catalog::ResolvedEnemy], count: usize) {
         let lanes = f32::from(a.lane_count);
         let span = a.width_yards - 2.0 - DEFENSE_LINE;
         for n in 0..count {
             let id = a.next_id;
             a.next_id += 1;
             a.reward_ledger.insert(id);
-            let kind = EnemyKind::ALL[n % EnemyKind::ALL.len()];
+            let profile = &crowd[n % crowd.len()];
             a.corpses.push(CorpseRecord {
                 id,
-                kind,
+                kind: profile.kind,
                 boss_kind: None,
                 at: [
                     DEFENSE_LINE + 0.5 + (n * 37 % 1000) as f32 / 1000.0 * span,
                     0.5 + (n * 61 % 1000) as f32 / 1000.0 * (lanes - 1.0),
                 ],
-                visual: Some(crate::enemy_catalog::resolve_kind(kind).visual),
+                visual: Some(profile.visual.clone()),
                 tick: a.tick * n as u64 / count as u64,
             });
         }
