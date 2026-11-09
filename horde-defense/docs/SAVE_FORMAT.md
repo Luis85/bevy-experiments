@@ -132,18 +132,28 @@ the operation-chain sync. Loading rejects, in any game, a `level_grant_paid`
 above the player's `level`, more than 64 claims, or a claim above the
 campaign's progression rank.
 
-Wave 1 has no milestone rewards, so every victory claims the frozen ranks
-5/10/15/20 that the progression rank has reached
-(`Campaign::claim_neutral_milestones`), unpaid and with no receipt, the same
-as migration step (d). A wave-1 save can therefore hold claims that were
-never paid. W2-22 replaces this with `settle_progression_rewards`.
+The ledgers are paid by `Game::settle_progression_rewards` (W2-22), in the
+root game only: when a main run finishes (after the main-run auto-sell, so a
+milestone item is never auto-sold, and before the run record and the
+report), and at the end of an expedition settlement pass that credited a
+victory while no main run is live (otherwise the main run's finish pays it).
+It pays the grants above `level_grant_paid` and sets it to the level, then
+every reached, unclaimed milestone: its coins and an item of the authored
+quality at the shop item level, picked by a keyed hash of the game seed and
+the rank (no RNG draw). A worker game never pays, so an expedition victory is
+paid once, by the parent. A frozen rank 5/10/15/20 that the progression rank
+reached but the catalogue authors no reward for is claimed unpaid, the same
+as migration step (d). Wave 1 claimed those ranks at every victory instead
+(`Campaign::claim_neutral_milestones`, removed in W2-22), so a wave-1 save
+can hold claims that were never paid.
 
 The level grant is likewise 0 coins at every level until a grant is
 authored, so a player level-up whose grants are all 0 sets
-`level_grant_paid` to the new level (`Campaign::pay_neutral_level_grants`,
+`level_grant_paid` to the new level at once (`Campaign::pay_neutral_level_grants`,
 W2-52), unpaid and with no receipt, the same as migration step (c); level 1
 writes nothing. A save made before W2-52 can therefore hold a
-`level_grant_paid` below the level, owing zero-coin grants.
+`level_grant_paid` below the level, owing zero-coin grants, which the next
+settlement marks paid.
 
 The receipts of what settlement paid are optional and absent at their
 default. `last_result.progression_rewards` (root or expedition report) holds

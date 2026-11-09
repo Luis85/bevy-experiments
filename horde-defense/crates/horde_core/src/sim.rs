@@ -29,6 +29,7 @@ mod pacing;
 mod parallel;
 mod persistence;
 mod power;
+mod progression_rewards;
 mod recruitment;
 mod smoke;
 #[cfg(test)]
@@ -961,6 +962,27 @@ impl ProgressionRewards {
     /// Nothing was paid; the serde skip predicate.
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
+    }
+    /// Adds a later settlement's receipt for the same report: the level
+    /// ranges join, the coins add (saturating) and the milestones append
+    /// (each rank is claimed once, so they stay in ascending order).
+    pub(crate) fn absorb(&mut self, later: Self) {
+        if later.level_coins > 0 {
+            self.level_from = if self.level_coins > 0 {
+                self.level_from.min(later.level_from)
+            } else {
+                later.level_from
+            };
+            self.level_to = self.level_to.max(later.level_to);
+            self.level_coins = self.level_coins.saturating_add(later.level_coins);
+        }
+        self.milestones.extend(later.milestones);
+    }
+    /// The coins of every milestone in the receipt (saturating).
+    pub(crate) fn milestone_coins(&self) -> u64 {
+        self.milestones
+            .iter()
+            .fold(0, |sum, m| sum.saturating_add(m.coins))
     }
 }
 /// One paid rank milestone: its coins and the item granted with it. The

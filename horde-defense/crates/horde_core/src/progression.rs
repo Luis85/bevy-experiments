@@ -302,13 +302,53 @@ impl ProgressionRewardCatalog {
 pub fn xp_to_advance_from(level: u32) -> u64 {
     (20.0 + 15.0 * (level.saturating_sub(1) as f64).powf(1.3)).round() as u64
 }
-/// [`ProgressionRewardCatalog::level_grant`] over the installed catalogue.
-pub fn level_grant(level: u32) -> u64 {
-    catalog().rewards.level_grant(level)
+/// The reward block progression settlement pays from: the installed
+/// catalogue's `rewards`, or, in a `test-support` build, the calling thread's
+/// [`override_rewards`] block.
+pub fn rewards() -> &'static ProgressionRewardCatalog {
+    #[cfg(feature = "test-support")]
+    if let Some(rewards) = REWARDS_OVERRIDE.with(std::cell::Cell::get) {
+        return rewards;
+    }
+    &catalog().rewards
 }
-/// [`ProgressionRewardCatalog::camp_price`] over the installed catalogue.
+#[cfg(feature = "test-support")]
+thread_local! {
+    static REWARDS_OVERRIDE: std::cell::Cell<Option<&'static ProgressionRewardCatalog>> =
+        const { std::cell::Cell::new(None) };
+}
+/// Test-support only: [`rewards`] answers `rewards` on the calling thread
+/// until the guard drops, so a test can author a level grant or milestones
+/// without touching the shared catalogue. Panics on an invalid block.
+#[cfg(feature = "test-support")]
+pub fn override_rewards(rewards: ProgressionRewardCatalog) -> RewardsOverride {
+    if let Err(error) = rewards.validate() {
+        panic!("override_rewards: {error}");
+    }
+    let rewards: &'static ProgressionRewardCatalog = Box::leak(Box::new(rewards));
+    RewardsOverride {
+        previous: REWARDS_OVERRIDE.with(|cell| cell.replace(Some(rewards))),
+    }
+}
+/// Restores the previous [`rewards`] answer when dropped.
+#[cfg(feature = "test-support")]
+#[must_use = "the override ends when the guard drops"]
+pub struct RewardsOverride {
+    previous: Option<&'static ProgressionRewardCatalog>,
+}
+#[cfg(feature = "test-support")]
+impl Drop for RewardsOverride {
+    fn drop(&mut self) {
+        REWARDS_OVERRIDE.with(|cell| cell.set(self.previous));
+    }
+}
+/// [`ProgressionRewardCatalog::level_grant`] over [`rewards`].
+pub fn level_grant(level: u32) -> u64 {
+    rewards().level_grant(level)
+}
+/// [`ProgressionRewardCatalog::camp_price`] over [`rewards`].
 pub fn camp_price(base: u64, rank: u32) -> u64 {
-    catalog().rewards.camp_price(base, rank)
+    rewards().camp_price(base, rank)
 }
 fn no_growth_knee() -> u32 {
     u32::MAX

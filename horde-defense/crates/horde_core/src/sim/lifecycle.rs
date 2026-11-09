@@ -432,6 +432,7 @@ impl Game {
         };
         // Finish order for a takeover (ruling D8): victory credit, the npc
         // attempts count, the takeover release, the main-run auto-sell (H1,
+        // ruling E2), the progression settlement (grants and milestones,
         // ruling E2), then the run record and the report, both naming the
         // recruit.
         let takeover = if a.mode == Mode::Npc {
@@ -478,6 +479,9 @@ impl Game {
         // from them, judged for the defender who ran the battle.
         let drops = std::mem::take(&mut a.drop_ids);
         let auto_sold = self.settle_auto_sell(&drops, a.defender());
+        // Progression settlement (W2-C, ruling E2): after H1, so auto-sell
+        // never sees a milestone item; nothing in a worker.
+        let progression_rewards = self.settle_progression_rewards();
         let record = crate::stats::RunRecord {
             id: 0,
             attempt_id: a.id,
@@ -531,8 +535,8 @@ impl Game {
             legacy: a.gear_snapshot.is_empty(),
             auto_sold_count: auto_sold.count,
             auto_sold_coins: auto_sold.coins,
-            level_grant_coins: 0,
-            milestone_coins: 0,
+            level_grant_coins: progression_rewards.level_coins,
+            milestone_coins: progression_rewards.milestone_coins(),
             // The record's bounds: elite kills at most `kills`, the boss
             // time-to-kill at most `duration_ticks`.
             elite_kills: a.telemetry.elites_killed.min(a.kills),
@@ -570,7 +574,7 @@ impl Game {
             drop_ids: drops,
             loot_by_quality: a.loot_quality_counts.clone(),
             auto_sold,
-            progression_rewards: Default::default(),
+            progression_rewards,
             boss_rank: a.progression.boss_rank,
             cause,
             tip: if outcome == Outcome::Victory {

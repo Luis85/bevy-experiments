@@ -40,10 +40,6 @@ pub(crate) fn keyed(seed: u64, a: u64, b: u64, tag: u64) -> u64 {
 }
 
 /// Purpose tags for [`keyed`]: big-endian ASCII, append-only, never reused.
-#[allow(
-    dead_code,
-    reason = "ELITE..MILESTONE gain their first users in wave 2"
-)]
 pub(crate) mod tags {
     pub(crate) const QUALITY: u64 = u64::from_be_bytes(*b"QUALITY\x01");
     pub(crate) const ELITE: u64 = u64::from_be_bytes(*b"ELITE\0\0\x01");

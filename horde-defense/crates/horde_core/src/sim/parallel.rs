@@ -320,7 +320,16 @@ impl Game {
     /// parent. Every stored drop is queued for auto-sale (hook W-a) unless the
     /// battle is in `legacy`; the queue is drained at the pass's last run
     /// record and by a final sweep before the battle settles.
+    ///
+    /// A pass that credits an expedition victory ends with the progression
+    /// settlement (W2-C, ruling E2) when no main attempt is live; otherwise
+    /// the main run's finish settles what the victory raised. Its receipt goes
+    /// on the last credited battle's report and on the run record the pass
+    /// appended for it.
     fn settle_parallel(&mut self, legacy: &[u64]) {
+        // The last victory this pass credited: (battle, its record's attempt
+        // id, or None on the record-less path).
+        let mut credited: Option<(u64, Option<u64>)> = None;
         for battle in &mut self.battles {
             if battle.settled {
                 continue;
@@ -374,6 +383,7 @@ impl Game {
                 if record.outcome == Outcome::Victory {
                     record.completion_xp = self.campaign.completion_xp_preview();
                     self.campaign.first_clear(record.template, Mode::Personal);
+                    credited = Some((battle.id, Some(record.attempt_id)));
                     let summary = battle.summary.get_or_insert_with(Default::default);
                     summary.stages_cleared = summary.stages_cleared.saturating_add(1);
                     if let Some(country) = &record.country_id {
@@ -430,6 +440,7 @@ impl Game {
                 if !had_pending && !committed {
                     report.completion_xp = self.campaign.completion_xp_preview();
                     self.campaign.first_clear(report.level, Mode::Personal);
+                    credited = Some((battle.id, None));
                     let summary = battle.summary.get_or_insert_with(Default::default);
                     summary.stages_cleared = summary.stages_cleared.saturating_add(1);
                     match self
@@ -547,6 +558,41 @@ impl Game {
                 .retain(|item| item.id <= 4 || keep.contains(&item.id));
             battle.game.campaign.items.shrink_to_fit();
             battle.synced_item_index = battle.game.campaign.items.len();
+        }
+        if self.attempt.is_none()
+            && let Some((battle, attempt)) = credited
+        {
+            self.stamp_expedition_rewards(battle, attempt);
+        }
+    }
+    /// Settles progression at the end of a pass that credited battle
+    /// `battle`'s victory and stamps a non-empty receipt on that battle's
+    /// report (when it is still the credited one) and on its run record
+    /// `attempt` (None on the record-less path).
+    fn stamp_expedition_rewards(&mut self, battle: u64, attempt: Option<u64>) {
+        let rewards = self.settle_progression_rewards();
+        if rewards.is_empty() {
+            return;
+        }
+        if let Some(attempt) = attempt
+            && let Some(record) = std::sync::Arc::make_mut(&mut self.campaign.run_history)
+                .iter_mut()
+                .rev()
+                .find(|r| r.worker_id == Some(battle) && r.attempt_id == attempt)
+        {
+            record.level_grant_coins = record.level_grant_coins.saturating_add(rewards.level_coins);
+            record.milestone_coins = record
+                .milestone_coins
+                .saturating_add(rewards.milestone_coins());
+        }
+        if let Some(report) = self
+            .battles
+            .iter_mut()
+            .find(|b| b.id == battle)
+            .and_then(|b| b.game.last_result.as_mut())
+            .filter(|report| attempt.is_none_or(|attempt| report.attempt_id == attempt))
+        {
+            report.progression_rewards.absorb(rewards);
         }
     }
 }

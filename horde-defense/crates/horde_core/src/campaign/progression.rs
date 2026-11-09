@@ -502,20 +502,35 @@ impl Campaign {
         };
         u32::try_from(victories).unwrap_or(u32::MAX)
     }
-    /// Wave-1 shim, removed by W2-22's settle_progression_rewards: while the
-    /// catalogue authors no milestones nothing is owed, so every frozen v7
-    /// milestone the rank reached is claimed, and a native v7 save owes no
-    /// backlog (as migration step (d)).
-    pub(super) fn claim_neutral_milestones(&mut self) {
-        if !crate::progression::catalog().rewards.milestones.is_empty() {
-            return;
+    /// The item definition a rank `rank` milestone grants in a game with
+    /// `seed` (design-progression-tree §7, ruling E7): a Ranged definition
+    /// that is not NPC-only, of a weapon class the campaign is trained in
+    /// (Pistol when it is trained in none), at tier `min(unlocked(), 4)`, or
+    /// the highest lower tier from 1 up that has one. The pick is
+    /// `keyed(seed, rank, 0, MILESTONE)` over the candidates in catalogue
+    /// order, so it draws no RNG. None when no tier has a candidate.
+    pub fn milestone_item_definition(&self, seed: u64, rank: u32) -> Option<usize> {
+        let mut classes = self.modifiers().weapon_classes;
+        if classes.is_empty() {
+            classes.insert(WeaponClass::Pistol);
         }
-        let rank = self.progression_rank();
-        self.milestones_claimed.extend(
-            crate::sim::V7_MILESTONE_RANKS
-                .into_iter()
-                .filter(|milestone| *milestone <= rank),
-        );
+        let items = &content().items;
+        let key = crate::hash::keyed(seed, u64::from(rank), 0, crate::hash::tags::MILESTONE);
+        let top = self.unlocked().min(4);
+        (1..=top).rev().find_map(|tier| {
+            let candidates: Vec<usize> = items
+                .iter()
+                .enumerate()
+                .filter(|(_, item)| {
+                    item.tier == tier
+                        && item.slot == Slot::Ranged
+                        && !item.npc_only
+                        && classes.contains(&WeaponSpec::from_item(item).class)
+                })
+                .map(|(index, _)| index)
+                .collect();
+            (!candidates.is_empty()).then(|| candidates[(key % candidates.len() as u64) as usize])
+        })
     }
     fn legacy_clear_rank(&self) -> u32 {
         let mut cleared = self.world.clear_high_water.clone();
@@ -773,10 +788,12 @@ impl Campaign {
         self.pay_neutral_level_grants();
         credited
     }
-    /// Shim (W2-52, R16), inert once a grant is authored and removed by
-    /// W2-22's settle_progression_rewards: a level-up whose grant is 0 coins
-    /// owes nothing, so the ledger follows the level and a native v7 save
-    /// owes no backlog (as migration step (c); level 1 writes nothing).
+    /// Shim (W2-52, R16), inert once a grant is authored: a level-up whose
+    /// grant is 0 coins owes nothing, so the ledger follows the level and a
+    /// native v7 save owes no backlog (as migration step (c); level 1 writes
+    /// nothing). `Game::settle_progression_rewards` (W2-22) pays the ledger
+    /// at settlement; this shim keeps it current mid-battle and in workers
+    /// while no grant is authored, which the GOLDEN mid-run states pin.
     fn pay_neutral_level_grants(&mut self) {
         let player = &mut self.player;
         let mut owed = player.level_grant_paid.max(1).saturating_add(1)..=player.level;
@@ -824,10 +841,7 @@ impl Campaign {
     /// threat: `camp_price(camp_prices.npc_training_base, progression_rank)`,
     /// 25 / 30 / 50 / 75 / 150 at rank 0 / 1 / 10 / 20 / 50+.
     pub fn npc_training_price(&self) -> u64 {
-        let base = crate::progression::catalog()
-            .rewards
-            .camp_prices
-            .npc_training_base;
+        let base = crate::progression::rewards().camp_prices.npc_training_base;
         crate::progression::camp_price(base, self.progression_rank())
     }
     /// Coins to recruit one survivor, scaled by threat from the world's

@@ -1,9 +1,10 @@
 //! Progression receipts (W1-25): `Report.progression_rewards`, the
 //! `RunRecord.level_grant_coins` / `milestone_coins` totals and the
 //! transient `SettlementIssue::MilestoneItemLost`, beside the W1-24 ledgers
-//! `Player.level_grant_paid` and `Campaign.milestones_claimed`. Nothing
-//! writes a non-default receipt yet (W2), so these tests stage the values as
-//! a save would.
+//! `Player.level_grant_paid` and `Campaign.milestones_claimed`. The shipped
+//! catalogue authors no grant or milestone, so settlement (W2-22,
+//! tests/progression_settlement.rs) writes no receipt, and these tests stage
+//! the values as a save would.
 mod support;
 use horde_core::{
     campaign::Player,
@@ -308,15 +309,24 @@ fn milestone_item_lost_names_rank_and_item() {
     );
 }
 
-/// While the catalogue authors no milestones, every frozen v7 milestone a
-/// victory reaches is claimed, so W2-22 pays a native v7 save no backlog,
-/// like a migrated v6 save (step (d)).
+/// While the catalogue authors no milestones, settlement claims every frozen
+/// v7 milestone the rank reached, unpaid (W2-22, which replaces the wave-1
+/// `claim_neutral_milestones`), so authoring them later pays a native v7
+/// save no backlog, like a migrated v6 save (step (d)). A victory credit
+/// alone claims nothing; the run's finish does.
 #[test]
 fn neutral_victories_claim_the_reached_milestones() {
     let mut game = Game::default();
     for _ in 0..12 {
         game.campaign_mut().first_clear(0, Mode::Personal);
     }
+    assert!(game.campaign().milestones_claimed.is_empty());
+    game.campaign_mut().attempts = 1;
+    game.deploy(0, Mode::Personal).unwrap();
+    let coins = game.campaign().coins;
+    game.apply(&Command::Withdraw).unwrap();
+    assert_eq!(game.campaign().coins, coins, "nothing is paid");
+    assert!(game.last_result().unwrap().progression_rewards.is_empty());
     let campaign = game.campaign();
     assert_eq!(campaign.progression_rank(), 12);
     assert_eq!(campaign.milestones_claimed, [5, 10].into());
