@@ -9,19 +9,72 @@
 //! coins paid are one plan. Expedition settlement, hook W-a (W2-16):
 //! [`drain_expedition_sale`] sells an expedition's queued drops at its run
 //! record, and once more as a final sweep before it is marked settled.
+//! Results (W2-17): the pure [`Game::results_loot`] view of the reported
+//! run's loot and the last-run preview scope.
 use super::*;
 use crate::campaign::{
     AutoSellRule, AutoSoldLine, AutoSoldReceipt, MAX_AUTO_SOLD_LINES, UpgradeJudge,
 };
-use crate::command::CommandError;
+use crate::command::{Command, CommandError};
+use crate::content::{ItemDefId, Slot};
 use crate::quality::Quality;
-use crate::strategy::StrategyState;
+use crate::strategy::{RecruitStatus, StrategyState};
+use std::collections::BTreeSet;
 
 /// Which items a preview considers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AutoSellScope {
     /// Every owned item: the panel's "Would sell N now" and the stash apply.
     Stash,
+    /// The reported run's drops still owned (W2-17): the panel's "would
+    /// have sold N" and its raise-the-threshold hint. Empty without a
+    /// report, and in a worker, whose ids are its own.
+    LastRun,
+}
+
+/// One of the reported run's drops still in the stash.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct KeptDrop {
+    pub item_id: u64,
+    pub definition: ItemDefId,
+    /// None only for an item without a rolled quality.
+    pub quality: Option<Quality>,
+    pub level: u32,
+}
+
+/// A kept drop that beats what the reported run's defender wears in its
+/// slot by more than [`crate::campaign::UPGRADE_MARGIN`], and the command
+/// that equips it on that defender.
+#[derive(Clone, Debug, PartialEq)]
+pub struct UpgradeOffer {
+    pub item_id: u64,
+    pub slot: Slot,
+    /// The slot-score gain ([`Campaign::upgrade_gain`]).
+    pub gain: f32,
+    /// `Equip` for the player (Personal) or Mara (Npc), `EquipRecruit` for a
+    /// recruit.
+    pub command: Command,
+}
+
+/// The Results loot block's view of the reported run (loot-economy §8):
+/// what dropped, what is still in the stash, what would upgrade the
+/// defender who fought it and what settlement auto-sold.
+#[derive(Clone, Debug, PartialEq)]
+pub struct ResultsLoot {
+    pub attempt_id: u64,
+    /// Every drop the run banked (`Report::loot`).
+    pub total: u32,
+    pub by_quality: KindMap<Quality, u32>,
+    /// The run's drops still owned, in ascending id order (drop order).
+    /// Empty for a worker's report: its ids are worker-local, never the
+    /// stash's.
+    pub kept: Vec<KeptDrop>,
+    /// At most one offer a slot (the largest gain, the earliest drop on a
+    /// tie), largest gain first; the Results row shows the first two.
+    /// Empty for a worker's report, and while the defender cannot change
+    /// equipment (in battle, or a recruit away from camp).
+    pub upgrades: Vec<UpgradeOffer>,
+    pub auto_sold: AutoSoldReceipt,
 }
 
 /// What a rule would sell now. `ids` (ascending) are exactly the items a
@@ -42,18 +95,25 @@ pub struct AutoSellPreview {
 }
 
 impl Game {
-    /// What `rule` would sell from `scope` now, ignoring `rule.enabled`.
+    /// What `rule` would sell from `scope` now, ignoring `rule.enabled`; the
+    /// last-run scope only narrows which owned items are considered.
     /// Candidates, in ascending id order: a quality (never quality-None shop
     /// stock or starters) strictly below `sell_below`, a selected slot, no
     /// player-origin sale guard, and, with `keep_upgrades`, no upgrade for
     /// any defender ([`UpgradeJudge::AnyDefender`]). Pure: no mutation, no
     /// RNG.
     pub fn auto_sell_preview(&self, rule: &AutoSellRule, scope: AutoSellScope) -> AutoSellPreview {
-        let AutoSellScope::Stash = scope;
+        let last_run: Option<BTreeSet<u64>> = match scope {
+            AutoSellScope::Stash => None,
+            AutoSellScope::LastRun => Some(self.reported_drops().iter().copied().collect()),
+        };
         let refs = self.strategy.sale_refs();
         let mut preview = AutoSellPreview::default();
         let mut candidates = Vec::new();
         for item in &self.campaign.items {
+            if last_run.as_ref().is_some_and(|ids| !ids.contains(&item.id)) {
+                continue;
+            }
             let Some(quality) = item.quality else {
                 continue;
             };
@@ -86,6 +146,94 @@ impl Game {
         preview.coins = plan.coins;
         preview.ids = plan.ids;
         preview
+    }
+    /// The reported run's drop ids when they are this game's stash ids: none
+    /// without a report, and none in a worker, whose ids are worker-local.
+    fn reported_drops(&self) -> &[u64] {
+        match &self.last_result {
+            Some(report) if !self.worker => &report.drop_ids,
+            _ => &[],
+        }
+    }
+    /// The Results loot view of the reported run (loot-economy §8; W2-17),
+    /// or None without a report. Totals and the receipt come from the
+    /// saved report; `kept` lists its drops still owned; `upgrades` judges
+    /// them for the defender who fought the run ([`Report::defender`]) by
+    /// [`Campaign::defender_upgrade_gain`], keeping the best offer a slot.
+    /// Offers need the defender free to change equipment (no defense in
+    /// progress, a recruit Ready in camp) and an unreserved item. A worker's
+    /// report has neither kept drops nor offers. Pure: no mutation, no RNG.
+    pub fn results_loot(&self) -> Option<ResultsLoot> {
+        let report = self.last_result.as_ref()?;
+        // One pass over the stash, not a lookup per drop.
+        let drops: BTreeSet<u64> = self.reported_drops().iter().copied().collect();
+        let mut kept: Vec<KeptDrop> = self
+            .campaign
+            .items
+            .iter()
+            .filter(|item| drops.contains(&item.id))
+            .map(|item| KeptDrop {
+                item_id: item.id,
+                definition: item.definition.clone(),
+                quality: item.quality,
+                level: item.level,
+            })
+            .collect();
+        kept.sort_unstable_by_key(|drop| drop.item_id);
+        let defender = report.defender();
+        let mut best: [Option<UpgradeOffer>; 4] = Default::default();
+        if self.can_change_equipment(defender) {
+            for drop in &kept {
+                if self.campaign.item_reserved(drop.item_id) {
+                    continue;
+                }
+                let Some(gain) =
+                    self.campaign
+                        .defender_upgrade_gain(drop.item_id, defender, &self.strategy)
+                else {
+                    continue;
+                };
+                let Some(slot) = drop.definition.definition().map(|d| d.slot) else {
+                    continue;
+                };
+                let held = &mut best[slot.index()];
+                if held.as_ref().is_none_or(|offer| gain > offer.gain) {
+                    *held = Some(UpgradeOffer {
+                        item_id: drop.item_id,
+                        slot,
+                        gain,
+                        command: equip_command(defender, drop.item_id),
+                    });
+                }
+            }
+        }
+        let mut upgrades: Vec<UpgradeOffer> = best.into_iter().flatten().collect();
+        upgrades.sort_by(|a, b| {
+            b.gain
+                .total_cmp(&a.gain)
+                .then(a.slot.index().cmp(&b.slot.index()))
+        });
+        Some(ResultsLoot {
+            attempt_id: report.attempt_id,
+            total: report.loot,
+            by_quality: report.loot_by_quality.clone(),
+            kept,
+            upgrades,
+            auto_sold: report.auto_sold.clone(),
+        })
+    }
+    /// Whether `defender`'s equip command can apply now: no defense in
+    /// progress, and a recruit on the roster and Ready in camp.
+    fn can_change_equipment(&self, defender: DefenderId) -> bool {
+        self.campaign.reserved.is_none()
+            && match defender {
+                DefenderId::Player | DefenderId::Mara => true,
+                DefenderId::Recruit(id) => self
+                    .strategy
+                    .roster
+                    .iter()
+                    .any(|r| r.id == id && r.status == RecruitStatus::Ready),
+            }
     }
     /// Hook H1 (loot-economy §7; rulings D13, E2, E5, E15): the main run's
     /// settlement sale of this run's `drops`, called by `finish` after the
@@ -147,6 +295,24 @@ impl Game {
         };
         let coins = self.campaign.execute_plan(&plan)?;
         Ok((preview.count, coins))
+    }
+}
+
+/// The command that equips item `id` on `defender`.
+fn equip_command(defender: DefenderId, id: u64) -> Command {
+    match defender {
+        DefenderId::Player => Command::Equip {
+            mode: Mode::Personal,
+            id,
+        },
+        DefenderId::Mara => Command::Equip {
+            mode: Mode::Npc,
+            id,
+        },
+        DefenderId::Recruit(recruit) => Command::EquipRecruit {
+            id: recruit,
+            item: id,
+        },
     }
 }
 

@@ -35,7 +35,7 @@ mod smoke;
 mod spitter_tests;
 mod structures;
 mod telemetry;
-pub use auto_sell::{AutoSellPreview, AutoSellScope};
+pub use auto_sell::{AutoSellPreview, AutoSellScope, KeptDrop, ResultsLoot, UpgradeOffer};
 pub use country::{CountryChoicePreview, OutbreakPlan};
 pub use events::{Actor, BattleId, DetonationTrigger, SimEvent, SimEventRecord, Strike};
 #[cfg(any(test, feature = "test-support", feature = "review"))]

@@ -7,16 +7,17 @@
 //! applies, quality-None items are never sold, `keep_upgrades` keeps a drop
 //! that would upgrade the defender who ran the battle, an item that would
 //! overflow the wallet is kept, and no RNG is consumed. The run record and
-//! the report carry one bounded receipt with exact totals.
+//! the report carry one bounded receipt with exact totals. W2-17 adds the
+//! pure Results read, `Game::results_loot`, and the last-run preview scope.
 mod support;
 use horde_core::{
     campaign::{AutoSellRule, AutoSoldLine, MAX_AUTO_SOLD_LINES, UpgradeJudge},
     command::Command,
-    content::Mode,
+    content::{Mode, Slot},
     defenders::DefenderId,
     kind_map::KindMap,
     quality::Quality,
-    sim::{Game, Input, Report, SAVE_VERSION},
+    sim::{AutoSellPreview, AutoSellScope, Game, Input, Report, SAVE_VERSION},
     stats::RunRecord,
     strategy::RecruitStatus,
 };
@@ -573,4 +574,236 @@ fn fifty_sales_one_receipt_12_lines_exact_totals() {
     );
     let loaded = reload(&g);
     assert_eq!(loaded.last_result().unwrap().auto_sold, *receipt);
+}
+
+// ---------------------------------------------------------------------------
+// `Game::results_loot` (W2-17, loot-economy §8): the Results view-model of
+// the reported run's loot, read from the saved report and the live stash.
+
+/// `defender` holds the judged game's first stage and finds a Common and an
+/// Uncommon fire axe, a Common padded vest, a Common marksman rifle and a
+/// Poor accessory; the enabled rule sells Poor only. Returns the settled
+/// game and the drops in drop order.
+fn settled_results_run(mut g: Game, defender: DefenderId) -> (Game, [u64; 5]) {
+    g.deploy_country_stage_as(0, defender).unwrap();
+    let drops = [
+        drop_item(&mut g, 5, Quality::Common),
+        drop_item(&mut g, 5, Quality::Uncommon),
+        drop_item(&mut g, 6, Quality::Common),
+        drop_item(&mut g, 4, Quality::Common),
+        drop_item(&mut g, 7, Quality::Poor),
+    ];
+    set_rule(
+        &mut g,
+        AutoSellRule {
+            sell_below: Quality::Common,
+            ..sell_rule()
+        },
+    );
+    settle(&mut g);
+    (g, drops)
+}
+
+#[test]
+fn results_loot_survives_reload_and_offers_upgrades_for_defender() {
+    let (g, recruit) = judged_game();
+    let (mut g, [axe, better_axe, vest, rifle, poor]) =
+        settled_results_run(g, DefenderId::Recruit(recruit));
+    let report = g.last_result().unwrap().clone();
+    let loot = g.results_loot().expect("a reported run has a loot view");
+    assert_eq!(loot.attempt_id, report.attempt_id);
+    assert_eq!(loot.total, 5);
+    assert_eq!(loot.total, report.loot);
+    assert_eq!(loot.by_quality, report.loot_by_quality);
+    assert_eq!(loot.by_quality[Quality::Common], 3);
+    assert_eq!(loot.by_quality[Quality::Uncommon], 1);
+    assert_eq!(loot.by_quality[Quality::Poor], 1);
+    // The Poor accessory was auto-sold; the four kept drops are listed in
+    // drop order with what the Results row shows.
+    assert!(!owned(&g, poor));
+    assert_eq!(loot.auto_sold, report.auto_sold);
+    assert_eq!(loot.auto_sold.count, 1);
+    let kept: Vec<u64> = loot.kept.iter().map(|k| k.item_id).collect();
+    assert_eq!(kept, [axe, better_axe, vest, rifle]);
+    for k in &loot.kept {
+        let item = g.campaign().item(k.item_id).unwrap();
+        assert_eq!(k.definition, item.definition);
+        assert_eq!(k.quality, item.quality);
+        assert_eq!(k.level, item.level);
+    }
+    // Upgrades are judged for the recruit who defended, at most one a slot
+    // (the best), highest gain first: the Uncommon axe beats the Common
+    // one, the vest beats the work jacket, and the marksman rifle (Mara's
+    // upgrade) is no upgrade over the recruit's tier-4 rifle.
+    let mut slots: Vec<(Slot, u64)> = loot.upgrades.iter().map(|u| (u.slot, u.item_id)).collect();
+    slots.sort_by_key(|(slot, _)| slot.index());
+    assert_eq!(slots, [(Slot::Melee, better_axe), (Slot::Outfit, vest)]);
+    assert!(
+        loot.upgrades
+            .windows(2)
+            .all(|pair| pair[0].gain >= pair[1].gain)
+    );
+    let r = g
+        .strategy()
+        .roster
+        .iter()
+        .find(|r| r.id == recruit)
+        .unwrap();
+    for offer in &loot.upgrades {
+        assert!(offer.gain > 0.0);
+        assert_eq!(
+            Some(offer.gain),
+            g.campaign()
+                .upgrade_gain(Mode::Npc, r.npc.loadout, &r.npc, offer.item_id)
+        );
+        assert_eq!(
+            offer.command,
+            Command::EquipRecruit {
+                id: recruit,
+                item: offer.item_id
+            }
+        );
+    }
+    // A save and load reads back the same view.
+    assert_eq!(reload(&g).results_loot(), Some(loot.clone()));
+    // The offer's command equips it, and the slot is no longer offered: the
+    // Common axe is no upgrade over the Uncommon one.
+    let melee = loot
+        .upgrades
+        .iter()
+        .find(|u| u.slot == Slot::Melee)
+        .unwrap();
+    g.apply(&melee.command).unwrap();
+    let offered = |g: &Game| -> Vec<u64> {
+        g.results_loot()
+            .unwrap()
+            .upgrades
+            .iter()
+            .map(|u| u.item_id)
+            .collect()
+    };
+    assert_eq!(g.results_loot().unwrap().kept, loot.kept);
+    assert_eq!(offered(&g), [vest]);
+    // A recruit away on an expedition cannot change equipment, so nothing
+    // is offered until it is back.
+    let country = g.campaign().world.cleared[0].clone();
+    let b = g.deploy_survivor(recruit, &country, 0).unwrap();
+    assert_eq!(offered(&g), Vec::<u64>::new());
+    g.recall_survivor(b).unwrap();
+    assert_eq!(offered(&g), [vest]);
+
+    // The same drops after Mara's run are judged for Mara: the marksman
+    // rifle beats her carbine, the axes and the vest do not beat her tier-4
+    // gear, and the offer equips her (Npc) loadout.
+    let (g, _) = judged_game();
+    let (g, [.., rifle, _]) = settled_results_run(g, DefenderId::Mara);
+    let loot = g.results_loot().unwrap();
+    assert_eq!(loot.kept.len(), 4);
+    assert_eq!(loot.upgrades.len(), 1);
+    assert_eq!(loot.upgrades[0].slot, Slot::Ranged);
+    assert_eq!(loot.upgrades[0].item_id, rifle);
+    assert_eq!(
+        loot.upgrades[0].command,
+        Command::Equip {
+            mode: Mode::Npc,
+            id: rifle
+        }
+    );
+    assert_eq!(reload(&g).results_loot(), Some(loot));
+    // No reported run, no loot view.
+    assert_eq!(strategic_game().results_loot(), None);
+}
+
+#[test]
+fn previews_and_results_loot_do_not_mutate_game() {
+    let (g, recruit) = judged_game();
+    let (mut g, _) = settled_results_run(g, DefenderId::Recruit(recruit));
+    // Earlier finds in the stash, one of them locked.
+    let stash = found(&mut g, 9, Quality::Poor);
+    g.campaign_mut().set_lock(stash, true).unwrap();
+    found(&mut g, 10, Quality::Common);
+    let rules = [
+        AutoSellRule::default(),
+        AutoSellRule {
+            sell_below: Quality::Legendary,
+            ..sell_rule()
+        },
+        AutoSellRule {
+            keep_upgrades: true,
+            sell_below: Quality::Rare,
+            ..sell_rule()
+        },
+    ];
+    let mut deployed = g.clone();
+    deployed.deploy_country_stage(0, Mode::Personal).unwrap();
+    for g in [g, deployed] {
+        let before = serde_json::to_value(&g).unwrap();
+        let digest = g.state_digest();
+        let strategy_rng = g.strategy().rng.state;
+        let attempt_rng = g.attempt().map(|a| a.rng.state);
+        for rule in &rules {
+            for scope in [AutoSellScope::Stash, AutoSellScope::LastRun] {
+                let _ = g.auto_sell_preview(rule, scope);
+            }
+        }
+        let _ = g.results_loot();
+        let _ = g.results_loot();
+        assert_eq!(serde_json::to_value(&g).unwrap(), before);
+        assert_eq!(g.state_digest(), digest);
+        assert_eq!(g.strategy().rng.state, strategy_rng);
+        assert_eq!(g.attempt().map(|a| a.rng.state), attempt_rng);
+    }
+}
+
+#[test]
+fn last_run_preview_considers_only_the_reported_runs_kept_drops() {
+    let mut g = strategic_game();
+    // A find from before the run stays out of the last-run scope.
+    let earlier = found(&mut g, 9, Quality::Poor);
+    g.deploy_country_stage(0, Mode::Personal).unwrap();
+    let poor = drop_item(&mut g, 5, Quality::Poor);
+    let common = drop_item(&mut g, 6, Quality::Common);
+    let rare = drop_item(&mut g, 10, Quality::Rare);
+    let locked = drop_item(&mut g, 7, Quality::Poor);
+    // The rule is off at settlement, so every drop is kept.
+    let (report, _) = settle(&mut g);
+    assert!(report.auto_sold.is_empty());
+    g.campaign_mut().set_lock(locked, true).unwrap();
+    let rule = AutoSellRule {
+        sell_below: Quality::Uncommon,
+        ..sell_rule()
+    };
+    let last = g.auto_sell_preview(&rule, AutoSellScope::LastRun);
+    assert_eq!(last.ids, [poor, common]);
+    assert_eq!(last.coins, value(&g, poor) + value(&g, common));
+    assert_eq!(last.blocked, 1, "the locked drop");
+    let stash = g.auto_sell_preview(&rule, AutoSellScope::Stash);
+    assert_eq!(stash.ids, [earlier, poor, common]);
+    // The panel's "raise the threshold" hint reads this: once the Poor drop
+    // is gone the last run has nothing below Common, but more below
+    // Legendary.
+    g.apply(&Command::SellItem(poor)).unwrap();
+    let narrow = AutoSellRule {
+        sell_below: Quality::Common,
+        ..sell_rule()
+    };
+    assert_eq!(
+        g.auto_sell_preview(&narrow, AutoSellScope::LastRun).count,
+        0
+    );
+    let wider = AutoSellRule {
+        sell_below: Quality::Legendary,
+        ..sell_rule()
+    };
+    assert_eq!(
+        g.auto_sell_preview(&wider, AutoSellScope::LastRun).ids,
+        [common, rare]
+    );
+    // No reported run, no last-run scope.
+    g.deploy_country_stage(0, Mode::Personal).unwrap();
+    assert!(g.last_result().is_none());
+    assert_eq!(
+        g.auto_sell_preview(&wider, AutoSellScope::LastRun),
+        AutoSellPreview::default()
+    );
 }

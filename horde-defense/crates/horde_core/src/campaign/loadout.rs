@@ -440,6 +440,27 @@ impl Campaign {
         let after = slot_score(mode, &self.loadout_metrics(mode, after, npc), slot);
         (after > before + UPGRADE_MARGIN).then_some(after - before)
     }
+    /// [`Self::upgrade_gain`] of owned item `id` for `defender`'s own
+    /// loadout: the player under Personal rules, Mara and a roster recruit
+    /// under Npc rules with their own NPC record. None for a recruit missing
+    /// from `strategy`'s roster.
+    pub fn defender_upgrade_gain(
+        &self,
+        id: u64,
+        defender: DefenderId,
+        strategy: &crate::strategy::StrategyState,
+    ) -> Option<f32> {
+        match defender {
+            DefenderId::Player => {
+                self.upgrade_gain(Mode::Personal, self.player.loadout, &self.npc, id)
+            }
+            DefenderId::Mara => self.upgrade_gain(Mode::Npc, self.npc.loadout, &self.npc, id),
+            DefenderId::Recruit(recruit) => {
+                let r = strategy.roster.iter().find(|r| r.id == recruit)?;
+                self.upgrade_gain(Mode::Npc, r.npc.loadout, &r.npc, id)
+            }
+        }
+    }
     /// Whether owned item `id` is an upgrade for `judge` by
     /// [`Self::upgrade_gain`]. The player is judged under Personal rules, Mara
     /// and recruits under Npc rules with their own loadout and NPC record. A
@@ -452,20 +473,10 @@ impl Campaign {
         strategy: &crate::strategy::StrategyState,
     ) -> bool {
         let defender = |defender: DefenderId| match defender {
-            DefenderId::Player => self
-                .upgrade_gain(Mode::Personal, self.player.loadout, &self.npc, id)
-                .is_some(),
-            DefenderId::Mara => self
-                .upgrade_gain(Mode::Npc, self.npc.loadout, &self.npc, id)
-                .is_some(),
-            DefenderId::Recruit(recruit) => strategy
-                .roster
-                .iter()
-                .find(|r| r.id == recruit)
-                .is_none_or(|r| {
-                    self.upgrade_gain(Mode::Npc, r.npc.loadout, &r.npc, id)
-                        .is_some()
-                }),
+            DefenderId::Recruit(recruit) if !strategy.roster.iter().any(|r| r.id == recruit) => {
+                true
+            }
+            defender => self.defender_upgrade_gain(id, defender, strategy).is_some(),
         };
         match judge {
             UpgradeJudge::Defender(id) => defender(*id),

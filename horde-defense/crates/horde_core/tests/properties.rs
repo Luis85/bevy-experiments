@@ -2,9 +2,13 @@
 //! Each property loops a fixed seed range with short runs so the whole file
 //! stays fast; a failing seed is named in the assertion message.
 mod support;
-use horde_core::content::Mode;
+use horde_core::campaign::AutoSellRule;
+use horde_core::command::{Command, CommandError, CommandOutcome};
+use horde_core::content::{Mode, content};
+use horde_core::defenders::DefenderId;
+use horde_core::quality::Quality;
 use horde_core::rules::Rng;
-use horde_core::sim::{BattleId, Game, Input, Outcome, SimEventRecord, smoke_input};
+use horde_core::sim::{AutoSellScope, BattleId, Game, Input, Outcome, SimEventRecord, smoke_input};
 use std::collections::BTreeMap;
 use support::{advance, enemy, game, strategic_game};
 
@@ -367,5 +371,389 @@ fn event_sequence_numbers_strictly_increase_per_battle() {
             previous.is_some(),
             "seed {seed}: root battle emitted events"
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Sale guards (W2-17; acceptance G4.1 and G4.5, ruling R11).
+
+/// The generated stash cases: every fifth one runs the same sale path.
+const SALE_CASES: u64 = 500;
+
+fn new_id(outcome: CommandOutcome) -> u64 {
+    match outcome {
+        CommandOutcome::Id(id) => id,
+        other => panic!("expected an id, got {other:?}"),
+    }
+}
+
+/// Every guard [`guard`] names.
+const GUARDS: [&str; 9] = [
+    "reserved",
+    "protected",
+    "locked",
+    "favourite",
+    "npc-issue",
+    "player",
+    "mara",
+    "preset",
+    "recruit",
+];
+
+/// Why owned item `id` must survive every sale, if it must, read straight
+/// from the saved state rather than through the sale rule: reserved by a
+/// deployment or a country guard; protected, locked, favourite or
+/// NPC-issue; or in the player's, Mara's, a preset's or any roster
+/// recruit's loadout.
+fn guard(g: &Game, id: u64) -> Option<&'static str> {
+    let c = g.campaign();
+    let item = c.item(id).expect("an owned item");
+    let roster = || {
+        g.strategy()
+            .roster
+            .iter()
+            .any(|r| r.npc.loadout.contains(&id))
+    };
+    [
+        c.item_reserved(id),
+        item.protected,
+        item.locked,
+        item.favorite,
+        item.definition().npc_only,
+        c.player.loadout.contains(&id),
+        c.npc.loadout.contains(&id),
+        c.presets.iter().any(|p| p.loadout.contains(&id)),
+        roster(),
+    ]
+    .into_iter()
+    .zip(GUARDS)
+    .find_map(|(held, why)| held.then_some(why))
+}
+
+/// A random rule: any valid threshold, slots, `keep_upgrades` and
+/// `apply_to_npc_runs`, enabled.
+fn random_rule(rng: &mut Rng) -> AutoSellRule {
+    AutoSellRule {
+        enabled: true,
+        sell_below: Quality::ALL[1 + rng.below(4) as usize],
+        slots: std::array::from_fn(|_| rng.below(4) != 0),
+        keep_upgrades: rng.below(2) == 0,
+        apply_to_npc_runs: true,
+    }
+}
+
+/// A random ascending subset of `ids`.
+fn subset(rng: &mut Rng, ids: &[u64]) -> Vec<u64> {
+    ids.iter().copied().filter(|_| rng.below(3) != 0).collect()
+}
+
+/// A strategic game whose stash holds 4 to 12 random finds and shop items
+/// (any catalogue gear, NPC-issue copies included) besides the starters,
+/// each given a random guard: none, locked, favourite, equipped by the
+/// player or Mara, saved in a preset, or carried by an idle recruit or by a
+/// recruit that may be guarding a country. Returns the game and its idle
+/// recruit.
+fn guarded_stash(rng: &mut Rng) -> (Game, u64) {
+    let mut g = strategic_game();
+    let countries = g.campaign().world.cleared.clone();
+    let idle = new_id(g.apply(&Command::Recruit(countries[1].clone())).unwrap());
+    let guard = new_id(g.apply(&Command::Recruit(countries[2].clone())).unwrap());
+    let definitions = content().items.len() as u64;
+    for n in 0..4 + rng.below(9) {
+        let definition = if rng.below(12) == 0 {
+            0
+        } else {
+            (4 + rng.below(definitions - 4)) as usize
+        };
+        let level = 1 + rng.below(3) as u32;
+        let quality = match rng.below(6) {
+            0 => None,
+            q => Some(Quality::ALL[q as usize - 1]),
+        };
+        let id = g
+            .campaign_mut()
+            .add_item_with_quality(definition, level, quality)
+            .unwrap();
+        let slot = g.campaign().item(id).unwrap().definition().slot.index();
+        // A guard the rules refuse (an untrained weapon class, say) leaves
+        // the item unguarded, which the property covers just the same.
+        let _ = match rng.below(10) {
+            3 => g.apply(&Command::Lock { id, locked: true }),
+            4 => g.apply(&Command::Favorite { id, favorite: true }),
+            5 => g.apply(&Command::Equip {
+                mode: Mode::Personal,
+                id,
+            }),
+            6 => g.apply(&Command::Equip {
+                mode: Mode::Npc,
+                id,
+            }),
+            7 => {
+                let worn = g.campaign().player.loadout[slot];
+                let _ = g.apply(&Command::Equip {
+                    mode: Mode::Personal,
+                    id,
+                });
+                let _ = g.apply(&Command::SavePreset {
+                    name: format!("Preset {n}"),
+                    mode: Mode::Personal,
+                });
+                g.apply(&Command::Equip {
+                    mode: Mode::Personal,
+                    id: worn,
+                })
+            }
+            8 => g.apply(&Command::EquipRecruit { id: idle, item: id }),
+            9 => g.apply(&Command::EquipRecruit {
+                id: guard,
+                item: id,
+            }),
+            _ => Ok(CommandOutcome::Applied),
+        };
+    }
+    if rng.below(2) == 0 {
+        g.apply(&Command::AssignGuard {
+            id: guard,
+            country: countries[2].clone(),
+        })
+        .unwrap();
+    }
+    (g, idle)
+}
+
+/// Every sale path (strict SellItem, SellUnprotected, the stash apply, the
+/// main run's settlement hook H1 and an expedition's hook W-a with its final
+/// sweep) over [`SALE_CASES`] generated stashes: no guarded item is ever
+/// sold, and the coins realised equal the quote (the per-item eligibility,
+/// the sell-extras quote, the stash preview or the receipt).
+#[test]
+fn sale_paths_never_sell_guarded_items() {
+    // How often each path met each guard, and how many items it sold: the
+    // property is only as good as its coverage.
+    let mut met: BTreeMap<(u64, &str), u32> = BTreeMap::new();
+    let mut sold_by_path = [0u32; 5];
+    for case in 0..SALE_CASES {
+        let mut rng = Rng::new(0x5A1E_0000 + case);
+        let (mut g, idle) = guarded_stash(&mut rng);
+        let mut owned: Vec<u64> = g.campaign().items.iter().map(|item| item.id).collect();
+        owned.sort_unstable();
+        let guards: BTreeMap<u64, &str> = owned
+            .iter()
+            .filter_map(|id| guard(&g, *id).map(|why| (*id, why)))
+            .collect();
+        // The items the path may sell: the whole stash, or the run's drops
+        // or the expedition's queue.
+        let mut exposed = owned.clone();
+        let value: BTreeMap<u64, u64> = owned
+            .iter()
+            .map(|id| (*id, g.campaign().item_sale_value(*id).unwrap()))
+            .collect();
+        let wallet = g.campaign().coins;
+        let path = case % 5;
+        let paid = match path {
+            // Strict SellItem in a random order: it sells exactly what the
+            // eligibility read accepts, for the quoted coins.
+            0 => {
+                let mut order = owned.clone();
+                for i in (1..order.len()).rev() {
+                    order.swap(i, rng.below(i as u64 + 1) as usize);
+                }
+                let mut paid = 0;
+                for id in order {
+                    let quote = g.sale_eligibility(id);
+                    let before = g.campaign().coins;
+                    let result = g.apply(&Command::SellItem(id));
+                    match quote {
+                        Ok(quote) => {
+                            assert_eq!(
+                                result,
+                                Ok(CommandOutcome::Amount(quote.coins)),
+                                "case {case}"
+                            );
+                            assert_eq!(g.campaign().coins, before + quote.coins, "case {case}");
+                            assert_eq!(quote.coins, value[&id], "case {case}");
+                            paid += quote.coins;
+                        }
+                        Err(block) => {
+                            assert_eq!(
+                                result,
+                                Err(CommandError::SaleBlocked(block)),
+                                "case {case}"
+                            );
+                            assert!(g.campaign().item(id).is_some(), "case {case}");
+                        }
+                    }
+                }
+                paid
+            }
+            // SellUnprotected pays exactly the sell-extras quote.
+            1 => {
+                let quote = g.sell_extras_quote();
+                match g.apply(&Command::SellUnprotected) {
+                    Ok(outcome) => {
+                        assert_eq!(outcome, CommandOutcome::Amount(quote), "case {case}")
+                    }
+                    Err(e) => assert_eq!(quote, 0, "case {case}: {e}"),
+                }
+                quote
+            }
+            // The stash apply sells exactly the confirmed preview.
+            2 => {
+                let rule = random_rule(&mut rng);
+                g.apply(&Command::SetAutoSell(rule)).unwrap();
+                let preview = g.auto_sell_preview(&rule, AutoSellScope::Stash);
+                let result = g.apply(&Command::ApplyAutoSellToStash {
+                    expect_count: preview.count,
+                    expect_coins: preview.coins,
+                });
+                if preview.count == 0 {
+                    assert_eq!(result, Err(CommandError::NothingToSell), "case {case}");
+                } else {
+                    assert_eq!(
+                        result,
+                        Ok(CommandOutcome::Sold {
+                            count: preview.count,
+                            coins: preview.coins
+                        }),
+                        "case {case}"
+                    );
+                }
+                let sold: Vec<u64> = owned
+                    .iter()
+                    .copied()
+                    .filter(|id| g.campaign().item(*id).is_none())
+                    .collect();
+                assert_eq!(sold, preview.ids, "case {case}");
+                preview.coins
+            }
+            // Hook H1: a main run (the player, Mara or the idle recruit)
+            // lists a random part of the stash as its drops and settles.
+            3 => {
+                let defender = [
+                    DefenderId::Player,
+                    DefenderId::Mara,
+                    DefenderId::Recruit(idle),
+                ][rng.below(3) as usize];
+                if g.deploy_country_stage_as(0, defender).is_err() {
+                    g.deploy_country_stage_as(0, DefenderId::Player).unwrap();
+                }
+                let rule = random_rule(&mut rng);
+                g.apply(&Command::SetAutoSell(rule)).unwrap();
+                let drops = subset(&mut rng, &owned);
+                exposed.clone_from(&drops);
+                for &id in &drops {
+                    let quality = g.campaign().item(id).unwrap().quality;
+                    let a = g.attempt_mut().unwrap();
+                    a.drop_ids.push(id);
+                    a.loot += 1;
+                    if let Some(quality) = quality {
+                        a.loot_quality_counts[quality] += 1;
+                    }
+                }
+                g.apply(&Command::Withdraw).unwrap();
+                let report = g.last_result().unwrap();
+                assert_eq!(report.drop_ids, drops, "case {case}");
+                let receipt = &report.auto_sold;
+                let record = g.campaign().run_history.last().unwrap();
+                assert_eq!(
+                    (record.auto_sold_count, record.auto_sold_coins),
+                    (receipt.count, receipt.coins),
+                    "case {case}"
+                );
+                receipt.coins
+            }
+            // Hook W-a: an expedition's queue (any unreserved part of the
+            // stash) drains at its recall, through the final sweep.
+            _ => {
+                let countries = g.campaign().world.cleared.clone();
+                let runner = new_id(g.apply(&Command::Recruit(countries[3].clone())).unwrap());
+                let b = g.deploy_survivor(runner, &countries[0], 0).unwrap();
+                let rule = random_rule(&mut rng);
+                g.apply(&Command::SetAutoSell(rule)).unwrap();
+                let free: Vec<u64> = owned
+                    .iter()
+                    .copied()
+                    .filter(|id| !g.campaign().item_reserved(*id))
+                    .collect();
+                let queue = subset(&mut rng, &free);
+                exposed.clone_from(&queue);
+                let qualities: Vec<Option<Quality>> = queue
+                    .iter()
+                    .map(|id| g.campaign().item(*id).unwrap().quality)
+                    .collect();
+                let wallet = g.campaign().coins;
+                let battle = g.battles_mut().iter_mut().find(|x| x.id == b).unwrap();
+                // The queue stands for drops this expedition's attempt
+                // banked, so its loot counts them.
+                let a = battle.game_mut().attempt_mut().unwrap();
+                a.loot += queue.len() as u32;
+                for quality in qualities.into_iter().flatten() {
+                    a.loot_quality_counts[quality] += 1;
+                }
+                battle.pending_auto_sell = queue;
+                let earned = battle.game().campaign().coins;
+                g.recall_survivor(b).unwrap();
+                assert!(g.take_settlement_issues().is_empty(), "case {case}");
+                let battle = g.battles().iter().find(|x| x.id == b).unwrap();
+                assert!(
+                    battle.settled && battle.pending_auto_sell.is_empty(),
+                    "case {case}"
+                );
+                let earned = battle.game().campaign().coins - earned;
+                let receipt = &battle.game().last_result().unwrap().auto_sold;
+                assert_eq!(
+                    g.campaign().coins,
+                    wallet + earned + receipt.coins,
+                    "case {case}"
+                );
+                receipt.coins
+            }
+        };
+        // Nothing guarded was sold, and the coins sold items realised equal
+        // what the path quoted and paid.
+        let sold: Vec<u64> = owned
+            .iter()
+            .copied()
+            .filter(|id| g.campaign().item(*id).is_none())
+            .collect();
+        for id in &sold {
+            assert!(
+                exposed.contains(id),
+                "case {case} path {path}: sold item {id} it was not given"
+            );
+            if let Some(why) = guards.get(id) {
+                panic!("case {case} path {path}: sold item {id}, guarded as {why}");
+            }
+        }
+        let realised: u64 = sold.iter().map(|id| value[id]).sum();
+        assert_eq!(
+            realised, paid,
+            "case {case} path {path}: quote and coins differ"
+        );
+        if path != 4 {
+            assert_eq!(g.campaign().coins, wallet + paid, "case {case} path {path}");
+        }
+        g.to_save_json()
+            .unwrap_or_else(|e| panic!("case {case} path {path}: the save does not validate: {e}"));
+        for id in &exposed {
+            if let Some(why) = guards.get(id) {
+                *met.entry((path, why)).or_default() += 1;
+            }
+        }
+        sold_by_path[path as usize] += sold.len() as u32;
+    }
+    // Every path sold something and met every guard it can be offered (an
+    // expedition's queue never holds a reserved item, schema v7 §3.6).
+    for path in 0..5 {
+        assert!(sold_by_path[path as usize] > 0, "path {path} sold nothing");
+        for why in GUARDS {
+            if path == 4 && why == "reserved" {
+                continue;
+            }
+            assert!(
+                met.get(&(path, why)).is_some_and(|n| *n > 0),
+                "path {path} never met a {why} item"
+            );
+        }
     }
 }

@@ -603,3 +603,52 @@ fn expedition_keep_upgrades_judges_the_expedition_loadout() {
     );
     assert_eq!(records(&g, b)[0].auto_sold_count, 1);
 }
+
+/// `Game::results_loot` on an expedition's report (W2-17, loot-economy §8):
+/// the worker's item ids are its own, not the stash's, so the view carries
+/// the loot totals and the receipt but no kept drop and no upgrade offer.
+#[test]
+fn worker_report_results_loot_has_no_kept_or_upgrades() {
+    let (mut g, b) = expedition(sell_rule());
+    // An Uncommon fire axe (kept) beats the recruit's crowbar; the Poor vest sells.
+    worker_drop(&mut g, b, 5, Quality::Uncommon);
+    worker_drop(&mut g, b, 6, Quality::Poor);
+    advance(&mut g, 1);
+    let queued = pending(&g, b);
+    g.recall_survivor(b).unwrap();
+    assert!(owned(&g, queued[0]) && !owned(&g, queued[1]));
+    let report = battle(&g, b).game().last_result().unwrap().clone();
+    let loot = battle(&g, b)
+        .game()
+        .results_loot()
+        .expect("the expedition reported its run");
+    assert_eq!(loot.attempt_id, report.attempt_id);
+    assert_eq!(loot.total, 2);
+    assert_eq!(loot.by_quality, report.loot_by_quality);
+    assert_eq!(loot.by_quality[Quality::Uncommon], 1);
+    assert_eq!(loot.by_quality[Quality::Poor], 1);
+    assert_eq!(loot.auto_sold, report.auto_sold);
+    assert_eq!(loot.auto_sold.count, 1);
+    assert!(loot.kept.is_empty(), "worker ids are not stash ids");
+    assert!(loot.upgrades.is_empty());
+    // Even a worker report that names drop ids the worker owns lists none:
+    // those items are worker-local copies, never the player's stash.
+    let local: Vec<u64> = battle(&g, b)
+        .game()
+        .campaign()
+        .items
+        .iter()
+        .map(|item| item.id)
+        .take(2)
+        .collect();
+    assert!(!local.is_empty());
+    worker(&mut g, b)
+        .last_result_mut()
+        .as_mut()
+        .unwrap()
+        .drop_ids = local;
+    let loot = battle(&g, b).game().results_loot().unwrap();
+    assert!(loot.kept.is_empty() && loot.upgrades.is_empty());
+    // The parent's own view is its main run's, not the expedition's.
+    assert_eq!(g.results_loot(), None);
+}
