@@ -148,15 +148,22 @@ as migration step (d). Wave 1 claimed those ranks at every victory instead
 (`Campaign::claim_neutral_milestones`, removed in W2-22), so a wave-1 save
 can hold claims that were never paid.
 
-The level grant is likewise 0 coins at every level until a grant is
-authored, so a player level-up whose grants are all 0 sets
+The shipped catalogue authors the level grant and the four milestones since
+W2-54 (`round(0.25 × the XP to reach the level)`: 5 coins at level 2, 77
+over levels 2-6; ranks 5 and 10 pay 500 and 1000 coins with an Uncommon
+item, 15 and 20 pay 1500 and 2000 with a Rare item). For a catalogue that
+authors no grant, a player level-up whose grants are all 0 sets
 `level_grant_paid` to the new level at once (`Campaign::pay_neutral_level_grants`,
 W2-52), unpaid and with no receipt, the same as migration step (c); level 1
-writes nothing. A save made before W2-52 can therefore hold a
-`level_grant_paid` below the level, owing zero-coin grants, which the next
-settlement marks paid: the next main-run finish, or the next expedition pass
-that credits a victory while no main run is live (a pass that credits none
-does not settle).
+writes nothing. With the shipped grant that shim is inert: a level-up leaves
+the ledger owed until the next settlement pays it. Before W2-54 the shipped
+grant was 0 coins at every level, so a save made from W2-52 on can hold a
+`level_grant_paid` at its level whose grants were never paid; they stay
+unpaid, like a migrated v6 save's. A native v7 save made before W2-52 can
+hold a `level_grant_paid` below the level; from W2-54 on the next settlement
+pays those grants at the shipped values: the next main-run finish, or the
+next expedition pass that credits a victory while no main run is live (a
+pass that credits none does not settle).
 
 The receipts of what settlement paid are optional and absent at their
 default. `last_result.progression_rewards` (root or expedition report) holds

@@ -788,7 +788,8 @@ mod tests {
         }
     }
 
-    /// The design's authored values (wave 2 ships them in progression.json).
+    /// The design's authored values, which progression.json ships (W2-18
+    /// the camp prices, W2-54 the level grant and the milestones).
     fn authored() -> ProgressionRewardCatalog {
         ProgressionRewardCatalog {
             level_grant_xp_fraction: 0.25,
@@ -815,15 +816,9 @@ mod tests {
 
     #[test]
     fn progression_rewards_reject_unsorted_milestones() {
-        // The shipped rewards block authors only the camp prices (W2-18): no
-        // level grant and no milestones yet.
-        assert_eq!(
-            catalog().rewards,
-            ProgressionRewardCatalog {
-                camp_prices: authored().camp_prices,
-                ..ProgressionRewardCatalog::default()
-            }
-        );
+        // The shipped rewards block is the design's: the camp prices (W2-18),
+        // the level grant and the four milestones (W2-54).
+        assert_eq!(catalog().rewards, authored());
         let neutral = ProgressionCatalog {
             rewards: ProgressionRewardCatalog::default(),
             ..catalog().clone()
@@ -889,12 +884,35 @@ mod tests {
         .unwrap();
     }
 
+    /// W2-54 (decision 14, PT7, PT8; R32): the shipped `progression.json`
+    /// authors the design's level grant (§6, fraction 0.25) and the four
+    /// rank milestones (§7), with the W2-18 camp prices unchanged.
     #[test]
-    fn level_grant_is_neutral_and_camp_price_ships_the_design_table() {
-        // Shipped values: no grant yet; camp prices follow the design table
-        // (W2-18).
+    fn shipped_catalogue_authors_the_design_grant_and_milestones() {
+        assert_eq!(level_grant(2), 5);
+        let shipped = &catalog().rewards;
+        assert_eq!(shipped.level_grant_xp_fraction, 0.25);
+        assert_eq!(
+            shipped.milestones,
+            [
+                milestone(5, 500, Quality::Uncommon),
+                milestone(10, 1000, Quality::Uncommon),
+                milestone(15, 1500, Quality::Rare),
+                milestone(20, 2000, Quality::Rare),
+            ]
+        );
+        assert_eq!(*shipped, authored());
+        assert_eq!((2..=6).map(level_grant).sum::<u64>(), 77, "run 1 (L1->6)");
+    }
+
+    #[test]
+    fn level_grant_and_camp_price_ship_the_design_tables() {
+        // Shipped values: the level grant (W2-54) and the camp prices
+        // (W2-18) follow the design tables; the neutral block pays no grant.
+        let neutral = ProgressionRewardCatalog::default();
         for level in [0, 1, 2, 6, 12, 50] {
-            assert_eq!(level_grant(level), 0, "level {level}");
+            assert_eq!(level_grant(level), authored().level_grant(level), "{level}");
+            assert_eq!(neutral.level_grant(level), 0, "neutral level {level}");
         }
         let shipped =
             [0, 1, 10, 20, 50, 1000].map(|rank| [camp_price(25, rank), camp_price(100, rank)]);
@@ -910,7 +928,6 @@ mod tests {
             ]
         );
         // The neutral block keeps every price flat and exact.
-        let neutral = ProgressionRewardCatalog::default();
         for rank in [0, 1, 10, 20, 50, 1000] {
             assert_eq!(neutral.camp_price(25, rank), 25, "rank {rank}");
             assert_eq!(neutral.camp_price(100, rank), 100, "rank {rank}");

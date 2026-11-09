@@ -85,7 +85,7 @@
 | AC | Criterion | Proof | Wave |
 |---|---|---|---|
 | G5.1 | Lower Steady hands and Hardened; raise Trap mastery 1 and Quick throw | `steady_hands_..._at_most_40_percent_per_shotgun_trigger`, `hardened_leaves_runner_contact_damaging`, `trap_mastery_1_adds_a_trap_charge`, `quick_throw_adds_throws_per_deployment` | 4 |
-| G5.2 | Milestones at ranks 5/10/15/20 and the level-up coin grant (decision 14) | `level_grant_is_paid_once_at_root_finish`, `milestone_paid_once_per_rank_across_save_reload`, `worker_victory_level_up_pays_the_grant_once_in_the_parent...`, `v6_save_migrates_level_grant_paid_to_level_and_claims_reached_milestones` | 1, 2 |
+| G5.2 | Milestones at ranks 5/10/15/20 and the level-up coin grant (decision 14) | `level_grant_is_paid_once_at_root_finish`, `milestone_paid_once_per_rank_across_save_reload`, `worker_victory_level_up_pays_the_grant_once_in_the_parent...`, `v6_save_migrates_level_grant_paid_to_level_and_claims_reached_milestones`; the shipped values: `shipped_catalogue_authors_the_design_grant_and_milestones` (W2-54) | 1, 2 |
 | G5.3 | Up to 8 new append-only nodes (user: yes, ≤ 8) | `skill_catalog_is_append_only_with_eight_weapon_mastery_nodes` (len 177, FNV of the first 169), `counters_name_catalog_archetypes` | 2 |
 | G5.4 | Remove the disabled IQ/HP/FP rows | `npc_trainable_rows_exclude_iq_hp_fp`, `training_lists_have_no_iq_hp_fp_text` | 2, 3 |
 | G5.5 | Mara training and recruit cost scale with threat; the UI reads core prices (R10) | `recruit_and_training_prices_scale_with_threat`, `camp_price_labels_follow_core_price_at_rank_10`, `ui_has_no_literal_camp_prices_or_mara_mapping` | 2, 3 |

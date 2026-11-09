@@ -135,15 +135,15 @@ fn boss_timer_is_not_victory_and_boss_transaction_is_atomic() {
     let r = g.last_result().unwrap();
     assert_eq!(r.outcome, Outcome::Victory);
     assert!(r.first_clear);
-    assert_eq!(
-        g.campaign().coins - before,
-        content().levels[0].boss_reward + content().levels[0].completion_bonus
-    );
+    // W2-54: the finish also pays, once, the shipped level grants the
+    // victory XP raised (the report's progression receipt).
+    let receipt = &r.progression_rewards;
+    let settled = receipt.level_coins + receipt.milestones.iter().map(|m| m.coins).sum::<u64>();
+    assert!(settled > 0, "the victory levelled the player");
+    let payout = content().levels[0].boss_reward + content().levels[0].completion_bonus;
+    assert_eq!(g.campaign().coins - before, payout + settled);
     advance(&mut g, 10);
-    assert_eq!(
-        g.campaign().coins - before,
-        content().levels[0].boss_reward + content().levels[0].completion_bonus
-    );
+    assert_eq!(g.campaign().coins - before, payout + settled);
 }
 #[test]
 fn construction_bounds_invalid_spend_salvage_and_blocking() {
@@ -307,8 +307,16 @@ fn parallel_rewards_and_unique_loot_settle_exactly_once() {
         .iter()
         .map(|b| (payout as f32 * b.game().attempt().unwrap().modifiers.reward).round() as u64)
         .sum();
+    let records = g.campaign().run_history.len();
     advance(&mut g, 1);
-    assert_eq!(g.campaign().coins - coins, expected_payout);
+    // W2-54: the idle pass that credited the victories also pays, once, the
+    // shipped level grants they raised (the run records' receipts).
+    let settled: u64 = g.campaign().run_history[records..]
+        .iter()
+        .map(|r| r.level_grant_coins + r.milestone_coins)
+        .sum();
+    assert!(settled > 0, "the victories levelled the player");
+    assert_eq!(g.campaign().coins - coins, expected_payout + settled);
     assert_eq!(g.campaign().items.len(), items + 2);
     let ids: std::collections::BTreeSet<_> = g.campaign().items.iter().map(|i| i.id).collect();
     assert_eq!(ids.len(), g.campaign().items.len());

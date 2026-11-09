@@ -667,6 +667,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Digest: sets `PROVISIONAL` for the three Personal state digests with a `PROVISIONAL_CAUSES` row as `support::classify` assigns (P3): the grant makes the W2-52 shim inert. `GAMEPLAY_TRACE`, V1-V6 and `V6_DROP_TRACE` do not move. W2-49 folds them.
 - Done: smoke and pacing before/after recorded in plan §9.6 (R28); decision 14, PT7 and PT8 closed.
 - Deps: W2-22; W2-49 depends on it.
+- **Done is met (2026-11-09).** `progression.json` authors the grant and the four milestones. `PROVISIONAL` takes the three Personal GOLDEN digests with a ("W2-54", F) cause, the same values the W2-22 review measured; the Npc digests, `GAMEPLAY_TRACE`, V1-V6 and `V6_DROP_TRACE` do not move. The moved pins were updated with a reason each: the `schema_v7` guard (two `WRITTEN_V7_KEYS` rows, under R32), `MODE_OWNER_DIGEST` (a neutral-rewards probe restores the W2-09 value), the three coin pins (now read the settlement receipt; 270 -> 298 in the arena route), and the neutral pins in `progression.rs` and `progression_schema.rs` (the W2-52 and W2-22 neutral tests run under a neutral `override_rewards`, and the W2-52 test checks that the shim is inert with the shipped grant). Pacing and smoke moved on purpose (plan §9.2 and §9.6, "W2-54 moved the default pacing output and smoke"), and so did the 20-seed acceptance (AUT clamped start now passes; the tier windows come earlier, which is W4-p's).
 
 Wave-2 exit:
 - One re-bless with reasons.

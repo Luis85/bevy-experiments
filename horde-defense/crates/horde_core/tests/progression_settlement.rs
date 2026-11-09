@@ -5,8 +5,9 @@
 //! at the root only: in `finish()` after the H1 auto-sell and before the run
 //! record and the report, and at the end of `settle_parallel` when no main
 //! attempt is live. It never pays mid-battle or in a worker. The shipped
-//! catalogue authors no grant and no milestone yet, so these tests author
-//! the design values on their own thread (`override_rewards`).
+//! catalogue authors the design values (W2-54); these tests still author
+//! the block they need on their own thread (`override_rewards`), so they do
+//! not follow later catalogue edits.
 mod support;
 use horde_core::{
     campaign::AutoSellRule,

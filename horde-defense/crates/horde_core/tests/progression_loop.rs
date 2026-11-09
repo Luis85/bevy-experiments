@@ -105,9 +105,14 @@ fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loo
                     report.coins >= 60,
                     "Every attempt must bank a meaningful guaranteed purchase budget"
                 );
+                // W2-54: the finish also pays the shipped level grants and
+                // milestones once, listed on the report's receipt.
+                let receipt = &report.progression_rewards;
+                let settled =
+                    receipt.level_coins + receipt.milestones.iter().map(|m| m.coins).sum::<u64>();
                 assert_eq!(
                     game.campaign().coins,
-                    banked_before + report.coins,
+                    banked_before + report.coins + settled,
                     "Rewards bank once and survive defeat"
                 );
                 assert_eq!(

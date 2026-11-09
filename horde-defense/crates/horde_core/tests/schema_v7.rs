@@ -649,8 +649,12 @@ fn v6_payload_round_trips_unchanged_through_v7_types() {
 /// W2-06 is the drop tracking writer (the frozen drop tier, the root drop
 /// list and the report's loot fields), class F. W2-52 is the neutral
 /// level-grant ledger (a Personal level-up keeps `level_grant_paid` at the
-/// level), class F.
-const WRITTEN_V7_KEYS: [(&str, &str); 11] = [
+/// level), class F. W2-54 authors the level grant in `progression.json`
+/// (R32, which accepted this guard's update with the §2.5 default), so a
+/// Personal GOLDEN run that levels 1 -> 2 owes the 5-coin grant and its
+/// withdrawal pays it: the run record's `level_grant_coins` and the report's
+/// receipt.
+const WRITTEN_V7_KEYS: [(&str, &str); 13] = [
     ("W2-05", "/attempt/telemetry/spawned_by_archetype"),
     ("W2-05", "/attempt/telemetry/kills_by_archetype"),
     ("W2-05", "/attempt/telemetry/damage_taken_by_archetype"),
@@ -662,6 +666,8 @@ const WRITTEN_V7_KEYS: [(&str, &str); 11] = [
     ("W2-06", "/last_result/drop_ids"),
     ("W2-06", "/last_result/loot_by_quality"),
     ("W2-52", "/campaign/player/level_grant_paid"),
+    ("W2-54", "/campaign/run_history/level_grant_coins"),
+    ("W2-54", "/last_result/progression_rewards"),
 ];
 
 /// Whether `path` is one of [`WRITTEN_V7_KEYS`] or lies below one.

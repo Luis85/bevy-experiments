@@ -126,13 +126,16 @@ const TRACE_RULESET: u32 = 2;
 /// digests and every GAMEPLAY_TRACE digest are unchanged.
 /// W2-09: the 0x1a571167 Personal GOLDEN digest moves (class G, the weighted
 /// pick); the other five and every GAMEPLAY_TRACE digest are unchanged.
+/// W2-54: the three Personal GOLDEN digests move (class F, the authored
+/// level grant makes the W2-52 shim inert); the three Npc digests and every
+/// GAMEPLAY_TRACE digest are unchanged.
 const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
     [
-        0x2906_db6e_ab9e_16c6,
+        0xbed5_e271_4b65_90fe,
         0xcffe_0be4_463d_46d6,
-        0x4b76_d4cf_c208_5d5e,
+        0x3368_f180_97f7_fb5e,
         0x97d9_3e67_bd2b_ed2f,
-        0xc0f5_736b_ba39_4b29,
+        0x7be5_c84d_229d_8d71,
         0x6dce_bbed_cc75_82c9,
     ],
     [
@@ -187,6 +190,16 @@ const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
         "W2-09",
         MoveClass::G,
         "the weighted single-draw DropTable (plan LE-5) replaces the uniform          pick: the one drop of 0x1a571167 Personal (drop tier 1) now weighs a          trained Ranged class x3, so the same one a.rng draw lands on another          definition and the owned item moves; outcome and trace are unchanged          (support::classify labels the anatomy C, items only), the other five          runs drop nothing, and neutral weights restore the old digest",
+    ),
+    (
+        "W2-54",
+        MoveClass::F,
+        "progression.json authors the level grant (0.25) and the four rank \
+         milestones (R32): a non-zero grant makes the W2-52 shim inert, so \
+         the three Personal runs (level 1 -> 2, still live at tick 1800) owe \
+         the grant again and save no level_grant_paid; outcome, trace and \
+         items are unchanged, the Npc runs level no player, and rank 0 \
+         reaches no milestone",
     ),
 ];
 

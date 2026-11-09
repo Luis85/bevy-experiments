@@ -1,15 +1,17 @@
 //! Progression receipts (W1-25): `Report.progression_rewards`, the
 //! `RunRecord.level_grant_coins` / `milestone_coins` totals and the
 //! transient `SettlementIssue::MilestoneItemLost`, beside the W1-24 ledgers
-//! `Player.level_grant_paid` and `Campaign.milestones_claimed`. The shipped
-//! catalogue authors no grant or milestone, so settlement (W2-22,
-//! tests/progression_settlement.rs) writes no receipt, and these tests stage
-//! the values as a save would.
+//! `Player.level_grant_paid` and `Campaign.milestones_claimed`. Settlement
+//! (W2-22, tests/progression_settlement.rs) pays the shipped grant and
+//! milestones (W2-54); these tests stage the receipts as a save would.
 mod support;
 use horde_core::{
     campaign::Player,
     command::Command,
     content::{ItemDefId, Mode},
+    progression::{
+        ProgressionRewardCatalog, RewardsOverride, catalog, level_grant, override_rewards,
+    },
     sim::{Game, MilestoneReward, ProgressionRewards, SAVE_VERSION, SaveError, SettlementIssue},
 };
 use serde_json::{Value, json};
@@ -309,6 +311,17 @@ fn milestone_item_lost_names_rank_and_item() {
     );
 }
 
+/// A reward block that authors no level grant and no milestone, for this
+/// thread. The shipped catalogue authors both since W2-54; the neutral
+/// paths below still cover a catalogue that authors none.
+fn neutral_rewards() -> RewardsOverride {
+    override_rewards(ProgressionRewardCatalog {
+        level_grant_xp_fraction: 0.0,
+        milestones: Vec::new(),
+        ..catalog().rewards.clone()
+    })
+}
+
 /// While the catalogue authors no milestones, settlement claims every frozen
 /// v7 milestone the rank reached, unpaid (W2-22, which replaces the wave-1
 /// `claim_neutral_milestones`), so authoring them later pays a native v7
@@ -316,6 +329,7 @@ fn milestone_item_lost_names_rank_and_item() {
 /// alone claims nothing; the run's finish does.
 #[test]
 fn neutral_victories_claim_the_reached_milestones() {
+    let _neutral = neutral_rewards();
     let mut game = Game::default();
     for _ in 0..12 {
         game.campaign_mut().first_clear(0, Mode::Personal);
@@ -338,13 +352,31 @@ fn neutral_victories_claim_the_reached_milestones() {
 /// authors no grant), a level-up owes nothing, so the ledger follows the
 /// level and W2-22 pays a native v7 save no backlog, like a migrated v6 save
 /// (step (c)). It covers mid-run kill XP, victory XP and a played Personal
-/// run; an Npc reward levels no player and moves no ledger.
+/// run; an Npc reward levels no player and moves no ledger. With the shipped
+/// grant (W2-54) the shim is inert: a level-up leaves the ledger owed and the
+/// run's finish pays it.
 #[test]
 fn neutral_level_ups_keep_the_grant_ledger_paid() {
-    let cap = horde_core::progression::catalog().player_level_cap;
+    {
+        let mut game = Game::default();
+        game.campaign_mut().reward(0, 60, Mode::Personal);
+        let player = &game.campaign().player;
+        assert!(player.level >= 2, "kill XP levelled the player");
+        assert_eq!(player.level_grant_paid, 0, "the shipped grant is owed");
+        let (level, coins) = (player.level, game.campaign().coins);
+        game.campaign_mut().attempts = 1;
+        game.deploy(0, Mode::Personal).unwrap();
+        game.apply(&Command::Withdraw).unwrap();
+        let owed: u64 = (2..=level).map(level_grant).sum();
+        assert!(owed > 0);
+        assert_eq!(game.campaign().coins, coins + owed, "the finish pays it");
+        assert_eq!(game.campaign().player.level_grant_paid, level);
+    }
+    let _neutral = neutral_rewards();
+    let cap = catalog().player_level_cap;
     assert!(
-        (2..=cap).all(|level| horde_core::progression::level_grant(level) == 0),
-        "the shipped catalogue authors no level grant"
+        (2..=cap).all(|level| level_grant(level) == 0),
+        "the neutral block authors no level grant"
     );
     let ledger = |game: &Game| {
         let player = &game.campaign().player;

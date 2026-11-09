@@ -274,6 +274,29 @@
   "threat_guard_rank": 10000,
   "victory_player_xp": 120,
   "rewards": {
+    "level_grant_xp_fraction": 0.25,
+    "milestones": [
+      {
+        "rank": 5,
+        "coins": 500,
+        "item_quality": "Uncommon"
+      },
+      {
+        "rank": 10,
+        "coins": 1000,
+        "item_quality": "Uncommon"
+      },
+      {
+        "rank": 15,
+        "coins": 1500,
+        "item_quality": "Rare"
+      },
+      {
+        "rank": 20,
+        "coins": 2000,
+        "item_quality": "Rare"
+      }
+    ],
     "camp_prices": {
       "npc_training_base": 25,
       "per_rank": 0.1,
