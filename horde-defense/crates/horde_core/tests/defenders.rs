@@ -815,6 +815,45 @@ fn country_operation_sync_copies_the_progression_ledgers() {
     Game::from_payload(serde_json::to_value(&g).unwrap(), SAVE_VERSION).unwrap();
 }
 
+/// The op-chain sync copies the ledgers as the pass's settlement leaves
+/// them (ruling E1): a stage victory that takes the campaign to rank 5 is
+/// claimed at the end of the pass, after the next stage is deployed, and the
+/// continuing worker still receives the claim.
+#[test]
+fn country_operation_sync_copies_the_ledgers_the_settlement_wrote() {
+    let (mut g, _, id) = game_with_alex();
+    let country = world()
+        .countries
+        .iter()
+        .find(|c| {
+            g.campaign().world.can_enter(&c.id)
+                && !g.campaign().world.cleared.contains(&c.id)
+                && c.level_count() > 1
+        })
+        .unwrap()
+        .clone();
+    let operation = g.deploy_country_operation(id, &country.id).unwrap();
+    let c = g.campaign_mut();
+    c.victories = 4;
+    c.milestones_claimed.clear();
+    win_stage(&mut g, operation);
+    assert!(g.take_settlement_issues().is_empty());
+    let b = battle(&g, operation);
+    assert!(!b.settled && b.stage == 1, "the operation continues");
+    let (parent, worker) = (g.campaign(), b.game().campaign());
+    assert_eq!(parent.progression_rank(), 5);
+    assert_eq!(
+        parent.milestones_claimed,
+        [5].into(),
+        "the pass claimed rank 5"
+    );
+    assert_eq!(worker.milestones_claimed, parent.milestones_claimed);
+    assert_eq!(
+        worker.player.level_grant_paid,
+        parent.player.level_grant_paid
+    );
+}
+
 #[test]
 fn worker_battle_seat_mismatch_is_invalid() {
     let (mut g, country, id) = game_with_alex();

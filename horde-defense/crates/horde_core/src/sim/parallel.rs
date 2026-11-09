@@ -330,6 +330,9 @@ impl Game {
         // The last victory this pass credited: (battle, its record's attempt
         // id, or None on the record-less path).
         let mut credited: Option<(u64, Option<u64>)> = None;
+        // The country operations this pass redeployed: their op-chain sync
+        // ran before the settlement below, so it is refreshed after it.
+        let mut redeployed = Vec::new();
         for battle in &mut self.battles {
             if battle.settled {
                 continue;
@@ -505,6 +508,7 @@ impl Game {
                         }
                         battle.stage = next;
                         battle.game.set_paused(false);
+                        redeployed.push(battle.id);
                         continue;
                     }
                 }
@@ -563,6 +567,21 @@ impl Game {
             && let Some((battle, attempt)) = credited
         {
             self.stamp_expedition_rewards(battle, attempt);
+        }
+        // Ruling E1: the op-chain sync copies both ledgers as this pass's
+        // settlement left them, so a continuing worker never lags a claim or
+        // a grant the pass just settled.
+        for battle in self
+            .battles
+            .iter_mut()
+            .filter(|b| redeployed.contains(&b.id))
+        {
+            battle.game.campaign.player.level_grant_paid = self.campaign.player.level_grant_paid;
+            battle
+                .game
+                .campaign
+                .milestones_claimed
+                .clone_from(&self.campaign.milestones_claimed);
         }
     }
     /// Settles progression at the end of a pass that credited battle
