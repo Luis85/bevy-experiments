@@ -323,3 +323,42 @@ fn neutral_victories_claim_the_reached_milestones() {
     let loaded = load(serde_json::to_value(&game).unwrap()).unwrap();
     assert_eq!(loaded.campaign().milestones_claimed, [5, 10].into());
 }
+
+/// W2-52 (R16): while every level-up grant is 0 coins (the catalogue
+/// authors no grant), a level-up owes nothing, so the ledger follows the
+/// level and W2-22 pays a native v7 save no backlog, like a migrated v6 save
+/// (step (c)). It covers mid-run kill XP, victory XP and a played Personal
+/// run; an Npc reward levels no player and moves no ledger.
+#[test]
+fn neutral_level_ups_keep_the_grant_ledger_paid() {
+    let cap = horde_core::progression::catalog().player_level_cap;
+    assert!(
+        (2..=cap).all(|level| horde_core::progression::level_grant(level) == 0),
+        "the shipped catalogue authors no level grant"
+    );
+    let ledger = |game: &Game| {
+        let player = &game.campaign().player;
+        (player.level, player.level_grant_paid)
+    };
+    let mut game = Game::default();
+    assert_eq!(ledger(&game), (1, 0));
+    game.campaign_mut().reward(0, 10_000, Mode::Npc);
+    assert_eq!(ledger(&game), (1, 0), "an Npc reward levels no player");
+    game.campaign_mut().reward(0, 60, Mode::Personal);
+    let (level, paid) = ledger(&game);
+    assert!(level >= 2, "kill XP levelled the player");
+    assert_eq!(paid, level, "kill XP level-up");
+    for _ in 0..3 {
+        game.campaign_mut().first_clear(0, Mode::Personal);
+    }
+    let (level, paid) = ledger(&game);
+    assert!(level > 2, "victory XP levelled the player");
+    assert_eq!(paid, level, "victory level-up");
+    let loaded = load(serde_json::to_value(&game).unwrap()).unwrap();
+    assert_eq!(ledger(&loaded), (level, level), "the ledger is saved");
+
+    let run = support::smoke_run(1, Mode::Personal, 1800, |_| {});
+    let (level, paid) = ledger(&run);
+    assert!(level >= 2, "the seed-1 Personal run levels up");
+    assert_eq!(paid, level, "a played Personal run");
+}

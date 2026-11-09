@@ -122,13 +122,15 @@ const TRACE_RULESET: u32 = 2;
 /// digest is unchanged.
 /// W2-08: the 0x1a571167 Personal GOLDEN digest moves (class C); the other
 /// five and every GAMEPLAY_TRACE digest are unchanged.
+/// W2-52: the three Personal GOLDEN digests move (class F); the three Npc
+/// digests and every GAMEPLAY_TRACE digest are unchanged.
 const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
     [
-        0xbed5_e271_4b65_90fe,
+        0x2906_db6e_ab9e_16c6,
         0xcffe_0be4_463d_46d6,
-        0x9b93_9ce6_3999_e64a,
+        0x9478_7e77_fcc1_084a,
         0x97d9_3e67_bd2b_ed2f,
-        0x7be5_c84d_229d_8d71,
+        0xc0f5_736b_ba39_4b29,
         0x6dce_bbed_cc75_82c9,
     ],
     [
@@ -169,6 +171,15 @@ const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
          tier-1 definitions instead of 12, so the owned item moves; the pick is \
          still one a.rng draw, so outcome and trace are unchanged, and the other \
          five runs drop nothing",
+    ),
+    (
+        "W2-52",
+        MoveClass::F,
+        "neutral level-up grant ledger (R16), no gameplay change: while every \
+         level grant is 0 coins a Personal level-up keeps \
+         player.level_grant_paid at the level, so the three Personal runs \
+         (level 1 -> 2) now save level_grant_paid 2; outcome, trace and items \
+         are unchanged, and the Npc runs level no player",
     ),
 ];
 

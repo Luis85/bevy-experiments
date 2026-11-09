@@ -2157,11 +2157,14 @@ fn mode_owner_digest() -> u64 {
 /// Re-recorded at W2-08 (content, class C): the 39 loot-only items join the
 /// drop pool of attempts deployed from v7 on, so the drops these runs bank
 /// change definition; the takeover code did not move.
+/// Re-recorded at W2-52 (format, class F): a player level-up keeps the
+/// neutral `level_grant_paid` ledger at the level, so the runs that level
+/// the player now save it; the takeover code did not move.
 #[test]
 fn mode_owner_paths_are_byte_identical() {
     assert_eq!(mode_owner_digest(), MODE_OWNER_DIGEST);
 }
-const MODE_OWNER_DIGEST: u64 = 15_363_764_850_570_338_604;
+const MODE_OWNER_DIGEST: u64 = 17_352_768_058_746_973_511;
 
 /// Pin: Mara's `attempts` count moves exactly as the legacy
 /// `finish_attempt` moved it: one per finished Mara run of any outcome,

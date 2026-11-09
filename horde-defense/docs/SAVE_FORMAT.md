@@ -138,6 +138,13 @@ Wave 1 has no milestone rewards, so every victory claims the frozen ranks
 as migration step (d). A wave-1 save can therefore hold claims that were
 never paid. W2-22 replaces this with `settle_progression_rewards`.
 
+The level grant is likewise 0 coins at every level until a grant is
+authored, so a player level-up whose grants are all 0 sets
+`level_grant_paid` to the new level (`Campaign::pay_neutral_level_grants`,
+W2-52), unpaid and with no receipt, the same as migration step (c); level 1
+writes nothing. A save made before W2-52 can therefore hold a
+`level_grant_paid` below the level, owing zero-coin grants.
+
 The receipts of what settlement paid are optional and absent at their
 default. `last_result.progression_rewards` (root or expedition report) holds
 `level_from`, `level_to`, `level_coins` and up to four `milestones`, each

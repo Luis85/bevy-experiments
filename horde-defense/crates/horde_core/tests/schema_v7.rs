@@ -647,8 +647,10 @@ fn v6_payload_round_trips_unchanged_through_v7_types() {
 /// each with the commit whose provisional GOLDEN move (`tests/determinism.rs`,
 /// ruling P3) names it. W2-05 is the per-archetype telemetry writer, class T;
 /// W2-06 is the drop tracking writer (the frozen drop tier, the root drop
-/// list and the report's loot fields), class F.
-const WRITTEN_V7_KEYS: [(&str, &str); 10] = [
+/// list and the report's loot fields), class F. W2-52 is the neutral
+/// level-grant ledger (a Personal level-up keeps `level_grant_paid` at the
+/// level), class F.
+const WRITTEN_V7_KEYS: [(&str, &str); 11] = [
     ("W2-05", "/attempt/telemetry/spawned_by_archetype"),
     ("W2-05", "/attempt/telemetry/kills_by_archetype"),
     ("W2-05", "/attempt/telemetry/damage_taken_by_archetype"),
@@ -659,6 +661,7 @@ const WRITTEN_V7_KEYS: [(&str, &str); 10] = [
     ("W2-06", "/attempt/drop_ids"),
     ("W2-06", "/last_result/drop_ids"),
     ("W2-06", "/last_result/loot_by_quality"),
+    ("W2-52", "/campaign/player/level_grant_paid"),
 ];
 
 /// Whether `path` is one of [`WRITTEN_V7_KEYS`] or lies below one.

@@ -769,7 +769,20 @@ impl Campaign {
         Ok(())
     }
     pub(super) fn award_player_xp(&mut self, xp: u64) -> u64 {
-        Self::award_xp_to(&mut self.player, xp, self.legacy_features)
+        let credited = Self::award_xp_to(&mut self.player, xp, self.legacy_features);
+        self.pay_neutral_level_grants();
+        credited
+    }
+    /// Shim (W2-52, R16), inert once a grant is authored and removed by
+    /// W2-22's settle_progression_rewards: a level-up whose grant is 0 coins
+    /// owes nothing, so the ledger follows the level and a native v7 save
+    /// owes no backlog (as migration step (c); level 1 writes nothing).
+    fn pay_neutral_level_grants(&mut self) {
+        let player = &mut self.player;
+        let mut owed = player.level_grant_paid.max(1).saturating_add(1)..=player.level;
+        if !owed.is_empty() && owed.all(|level| crate::progression::level_grant(level) == 0) {
+            player.level_grant_paid = player.level;
+        }
     }
     fn award_xp_to(player: &mut Player, mut xp: u64, legacy_points: bool) -> u64 {
         let mut credited = 0;
