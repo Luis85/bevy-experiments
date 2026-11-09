@@ -8,7 +8,11 @@
 //! milestone statistics over seeds ([`MilestoneStats`]). Other remits add
 //! registry rows and evaluators on this API. The goal-5 evaluators (W2-03)
 //! live in [`targets`], the goal-6 rows' evaluators (W2-04) in [`goal6`].
+//! The plans that sell, farm or hand the main run to a recruit (W2-42) act
+//! only through `Game::apply`.
 mod goal6;
+#[cfg(test)]
+mod plan_tests;
 mod targets;
 pub use goal6::{
     DefeatWindow, GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT,
@@ -48,26 +52,63 @@ pub enum PacingSpend {
     /// Buy gear first, then learn recommended nodes with what is left.
     GearFirst,
 }
-/// What the scripted player does with spare items. Further variants
-/// (manual and automatic selling) arrive with the profiles that use them.
+/// What the scripted player does with spare items.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacingSell {
     /// Never sells.
     Never,
+    /// Sells every item `SellUnprotected` would in camp, before spending.
+    /// The coins reach the wallet; like any sale outside settlement they
+    /// are not part of `cumulative_coins`.
+    ManualExtras,
+    /// Stores the default auto-sell rule, enabled (Poor and Common drops,
+    /// every slot, upgrades kept), before the first run, so settlement
+    /// sells each run's matching drops (hook H1).
+    Auto,
 }
-/// Who defends the main run. Further variants (Mara or a recruit taking
-/// over) arrive with the profiles that use them.
+/// Who defends the main run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacingDefender {
     /// The chosen survivor defends every run.
     Survivor,
+    /// Recruits once the roster is empty and a liberated country offers a
+    /// recruit (the first offer), then sends the lowest-id recruit that can
+    /// defend into every run. The survivor defends otherwise, and retries
+    /// every stage a recruit lost, so the journey keeps moving.
+    RecruitWhenReady,
 }
-/// Whether the scripted player replays stages to farm. Further variants
-/// arrive with the profiles that use them.
+/// Whether the scripted player replays stages to farm.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PacingFarm {
     /// Always continues the journey.
     None,
+    /// After this many lost runs (defeats or withdrawals) in a row on the
+    /// country's frontier stage, replays the stage before it once, then
+    /// returns to the frontier.
+    ReplayAfterDefeats(u32),
+}
+/// Where the next run of a country goes under a farm plan.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FarmStep {
+    /// `ContinueJourney` as usual.
+    Continue,
+    /// Replay this cleared stage.
+    Replay(usize),
+    /// Back to this frontier stage after a replay.
+    Frontier(usize),
+}
+/// The farm plan's next step: `frontier` is the active country's next
+/// stage, `defeats` the frontier defeats in a row since the last replay,
+/// and `replayed` whether the last run was a replay.
+fn farm_step(farm: PacingFarm, frontier: usize, defeats: u32, replayed: bool) -> FarmStep {
+    match farm {
+        PacingFarm::None => FarmStep::Continue,
+        PacingFarm::ReplayAfterDefeats(_) if replayed => FarmStep::Frontier(frontier),
+        PacingFarm::ReplayAfterDefeats(n) if n > 0 && defeats >= n && frontier > 0 => {
+            FarmStep::Replay(frontier - 1)
+        }
+        PacingFarm::ReplayAfterDefeats(_) => FarmStep::Continue,
+    }
 }
 /// The camp plan a profile follows besides aim and spend.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -142,20 +183,23 @@ const GOAL6_PLAYER: PacingProfile = PacingProfile {
     plan: PacingPlan::SOLO,
     stop_after: None,
 };
+/// The acceptance profile, which the W2-42 rows vary by one plan option,
+/// preset or run limit each.
+const EXPERT_DEU: PacingProfile = PacingProfile {
+    id: "expert-deu",
+    name: "expert, tree first, Germany",
+    seed: 0x1A571167,
+    country: "DEU",
+    aim: PacingAim::Expert,
+    spend: PacingSpend::Recommended,
+    max_runs: 60,
+    difficulty: BalancePreset::Normal,
+    plan: PacingPlan::SOLO,
+    stop_after: None,
+};
 /// Every named profile. Ids are stable and unique; rows are appended.
-const REGISTRY: [PacingProfile; 8] = [
-    PacingProfile {
-        id: "expert-deu",
-        name: "expert, tree first, Germany",
-        seed: 0x1A571167,
-        country: "DEU",
-        aim: PacingAim::Expert,
-        spend: PacingSpend::Recommended,
-        max_runs: 60,
-        difficulty: BalancePreset::Normal,
-        plan: PacingPlan::SOLO,
-        stop_after: None,
-    },
+const REGISTRY: [PacingProfile; 15] = [
+    EXPERT_DEU,
     PacingProfile {
         id: "novice-deu",
         name: "novice, tree first, Germany",
@@ -221,6 +265,69 @@ const REGISTRY: [PacingProfile; 8] = [
         stop_after: Some(Milestone::FirstVictory),
         ..GOAL6_PLAYER
     },
+    // W2-42 (W2-I): the rows that need other remits' commands. Each varies
+    // the acceptance profile by one option, so its table column reads
+    // against expert-deu's.
+    PacingProfile {
+        id: "manual-sell",
+        name: "expert, tree first, Germany, sells extras",
+        plan: PacingPlan {
+            sell: PacingSell::ManualExtras,
+            ..PacingPlan::SOLO
+        },
+        ..EXPERT_DEU
+    },
+    PacingProfile {
+        id: "auto-sell",
+        name: "expert, tree first, Germany, auto-sell",
+        plan: PacingPlan {
+            sell: PacingSell::Auto,
+            ..PacingPlan::SOLO
+        },
+        ..EXPERT_DEU
+    },
+    // A Luxembourg start is liberated within a few runs (lux-normal), so a
+    // recruit takes over early enough to measure.
+    PacingProfile {
+        id: "takeover",
+        name: "expert, tree first, Luxembourg, recruit takes over",
+        country: "LUX",
+        plan: PacingPlan {
+            defender: PacingDefender::RecruitWhenReady,
+            ..PacingPlan::SOLO
+        },
+        ..EXPERT_DEU
+    },
+    // The novice loses often enough on the frontier to farm.
+    PacingProfile {
+        id: "farm",
+        name: "novice, tree first, Germany, farms after 2 defeats",
+        aim: PacingAim::Novice,
+        plan: PacingPlan {
+            farm: PacingFarm::ReplayAfterDefeats(2),
+            ..PacingPlan::SOLO
+        },
+        ..EXPERT_DEU
+    },
+    PacingProfile {
+        id: "easy",
+        name: "expert, tree first, Germany, Easy",
+        difficulty: BalancePreset::Easy,
+        ..EXPERT_DEU
+    },
+    PacingProfile {
+        id: "hard",
+        name: "expert, tree first, Germany, Hard",
+        difficulty: BalancePreset::Hard,
+        ..EXPERT_DEU
+    },
+    // Informational: 5 seeds (design-progression-tree §11).
+    PacingProfile {
+        id: "long",
+        name: "expert, tree first, Germany, 150 runs",
+        max_runs: 150,
+        ..EXPERT_DEU
+    },
 ];
 /// Every registered profile, in registry order.
 pub fn pacing_registry() -> &'static [PacingProfile] {
@@ -272,8 +379,8 @@ pub struct PacingRun {
     pub kills: u32,
     /// Nodes learned in camp before this run.
     pub learned: Vec<String>,
-    /// Coins spent in camp before this run, by purpose. Training and
-    /// recruiting stay 0 until a plan trains or recruits.
+    /// Coins spent in camp before this run, by purpose. Training stays 0
+    /// until a plan trains; recruiting is paid only by a takeover plan.
     pub spent_tree: u64,
     pub spent_gear: u64,
     pub spent_training: u64,
@@ -543,6 +650,66 @@ fn reached(milestones: &mut Vec<(Milestone, usize, f32)>, m: Milestone, run: usi
         milestones.push((m, run, minutes));
     }
 }
+/// The camp sale of `sell`, before spending: `ManualExtras` sells what
+/// `SellUnprotected` would (nothing is `Ok(0)`); the other plans sell
+/// nothing in camp.
+fn camp_sale(g: &mut Game, sell: PacingSell) -> Result<(), String> {
+    if sell == PacingSell::ManualExtras {
+        g.apply(&Command::SellUnprotected)
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+/// A takeover plan's recruiting: while the roster is empty, recruits the
+/// first offer of the first liberated country (in liberation order) that
+/// offers one. Returns the coins paid.
+fn recruit_when_ready(g: &mut Game) -> Result<u64, String> {
+    if !g.strategy.roster.is_empty() {
+        return Ok(0);
+    }
+    let Some(country) = g
+        .campaign
+        .world
+        .cleared
+        .iter()
+        .find(|c| g.recruit_offer(c).is_ok())
+        .cloned()
+    else {
+        return Ok(0);
+    };
+    let before = g.campaign.coins;
+    g.apply(&Command::Recruit(country))
+        .map_err(|e| e.to_string())?;
+    Ok(before.saturating_sub(g.campaign.coins))
+}
+/// Who a takeover plan sends next: the survivor retries a stage a recruit
+/// lost; otherwise the lowest-id recruit that can defend now, or else the
+/// survivor.
+fn takeover_defender(g: &Game) -> DefenderId {
+    if g.last_result.as_ref().is_some_and(|r| {
+        matches!(r.defender(), DefenderId::Recruit(_)) && r.outcome != Outcome::Victory
+    }) {
+        return DefenderId::Player;
+    }
+    let mut ids: Vec<u64> = g.strategy.roster.iter().map(|r| r.id).collect();
+    ids.sort_unstable();
+    ids.into_iter()
+        .map(DefenderId::Recruit)
+        .find(|d| g.defender_selectable(*d).is_ok())
+        .unwrap_or(DefenderId::Player)
+}
+/// Deploys on the active country's `stage` through a command: the survivor
+/// with `Deploy`, a takeover plan's next defender with `BeginDefense`.
+fn deploy_stage(g: &mut Game, defender: PacingDefender, stage: usize) -> Result<(), String> {
+    let command = match defender {
+        PacingDefender::Survivor => Command::Deploy {
+            stage,
+            mode: Mode::Personal,
+        },
+        PacingDefender::RecruitWhenReady => Command::BeginDefense { stage },
+    };
+    g.apply(&command).map(|_| ()).map_err(|e| e.to_string())
+}
 /// Plays `profile` at its own seed (seed index 0) and records milestones.
 pub fn simulate_pacing(profile: &PacingProfile) -> Result<PacingReport, String> {
     simulate_pacing_seed(profile, 0)
@@ -577,13 +744,30 @@ pub fn simulate_pacing_seed(
         .map_err(|e| e.to_string())?;
     }
     g.campaign.choose_start_country(profile.country)?;
+    let plan = profile.plan;
+    if plan.sell == PacingSell::Auto {
+        g.apply(&Command::SetAutoSell(crate::campaign::AutoSellRule {
+            enabled: true,
+            ..crate::campaign::AutoSellRule::default()
+        }))
+        .map_err(|e| e.to_string())?;
+    }
     let depths = node_depths();
     let max_depth = depths.values().copied().max().unwrap_or(0);
     let mut runs = Vec::new();
     let mut milestones: Vec<(Milestone, usize, f32)> = Vec::new();
     let mut earned = 0u64;
     let mut minutes = 0.0f32;
+    // The farm plan's frontier defeats in a row and whether the last run
+    // was a replay.
+    let mut defeats = 0u32;
+    let mut replayed = false;
     for index in 0..profile.max_runs {
+        camp_sale(&mut g, plan.sell)?;
+        let spent_recruit = match plan.defender {
+            PacingDefender::Survivor => 0,
+            PacingDefender::RecruitWhenReady => recruit_when_ready(&mut g)?,
+        };
         let before_tree = g.campaign.coins;
         let (learned, spent_tree, spent_gear) = match profile.spend {
             PacingSpend::Recommended => {
@@ -624,8 +808,26 @@ pub fn simulate_pacing_seed(
         if g.operations_available() {
             reached(&mut milestones, Milestone::OperationsOpen, index, minutes);
         }
+        if plan.defender == PacingDefender::RecruitWhenReady {
+            let defender = takeover_defender(&g);
+            if g.next_defender() != defender {
+                g.apply(&Command::SetNextDefender(defender))
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        let step = if index == 0 {
+            FarmStep::Continue
+        } else {
+            farm_step(plan.farm, g.campaign.world.next_stage(), defeats, replayed)
+        };
         if index == 0 {
-            g.deploy_country_stage(0, Mode::Personal)?;
+            if plan.defender == PacingDefender::Survivor {
+                g.deploy_country_stage(0, Mode::Personal)?;
+            } else {
+                deploy_stage(&mut g, plan.defender, 0)?;
+            }
+        } else if let FarmStep::Replay(stage) | FarmStep::Frontier(stage) = step {
+            deploy_stage(&mut g, plan.defender, stage)?;
         } else {
             match g.continue_journey()? {
                 JourneyContinuation::Deployed => {}
@@ -643,7 +845,11 @@ pub fn simulate_pacing_seed(
                         .clone();
                     g.campaign.enter_country(&next)?;
                     let stage = g.campaign.world.next_stage();
-                    g.deploy_country_stage(stage, Mode::Personal)?;
+                    if plan.defender == PacingDefender::Survivor {
+                        g.deploy_country_stage(stage, Mode::Personal)?;
+                    } else {
+                        deploy_stage(&mut g, plan.defender, stage)?;
+                    }
                 }
             }
         }
@@ -670,6 +876,12 @@ pub fn simulate_pacing_seed(
             .sum();
         earned += r.coins + level_grant_coins + milestone_coins + r.auto_sold.coins;
         minutes += r.elapsed / 60.0;
+        replayed = matches!(step, FarmStep::Replay(_));
+        if replayed || r.outcome == Outcome::Victory {
+            defeats = 0;
+        } else {
+            defeats += 1;
+        }
         let run = index + 1;
         if r.outcome == Outcome::Victory {
             reached(&mut milestones, Milestone::FirstVictory, run, minutes);
@@ -727,7 +939,7 @@ pub fn simulate_pacing_seed(
             spent_tree,
             spent_gear,
             spent_training: 0,
-            spent_recruit: 0,
+            spent_recruit,
             auto_sold_count: r.auto_sold.count,
             auto_sold_coins: r.auto_sold.coins,
             nodes_owned,

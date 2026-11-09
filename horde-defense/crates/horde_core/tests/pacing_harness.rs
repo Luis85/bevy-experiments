@@ -8,11 +8,12 @@ use horde_core::sim::{
     GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT, GOAL6_LUX_EASY_MAX_RUNS,
     GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS, GOAL6_START_PROFILE_IDS,
     GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, LEGACY_PROFILE_IDS, Milestone,
-    MilestoneStats, Outcome, PacingAim, PacingProfile, PacingReport, PacingRun, PacingSpend,
-    archetype_coverage, boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows,
-    defeat_windows, longest_win_streak, max_win_streak, median_run_within, node_retired,
-    nodes_left, pacing_registry, pacing_seed, pacing_sweep_with_threads, runs_to_liberate,
-    simulate_pacing, tier_affordable_runs, tree_exhausted, tree_outlasts_liberation, unlock_order,
+    MilestoneStats, Outcome, PacingAim, PacingDefender, PacingFarm, PacingPlan, PacingProfile,
+    PacingReport, PacingRun, PacingSell, PacingSpend, archetype_coverage, boss_ttk_median_s, by_id,
+    clamped_start_first_victory, defeat_rate_windows, defeat_windows, longest_win_streak,
+    max_win_streak, median_run_within, node_retired, nodes_left, pacing_registry, pacing_seed,
+    pacing_sweep_with_threads, runs_to_liberate, simulate_pacing, tier_affordable_runs,
+    tree_exhausted, tree_outlasts_liberation, unlock_order,
 };
 use horde_core::skill_catalog::{CampaignFeature, SkillNode, skills};
 use std::collections::{BTreeMap, BTreeSet};
@@ -723,4 +724,223 @@ fn boss_ttk_coverage_and_clamped_starts_on_synthetic_runs() {
         clamped_start_first_victory(&late, GOAL6_CLAMPED_FIRST_VICTORY).expect_err("median run 5");
     assert!(err.contains("BGD start"), "{err}");
     assert!(err.contains("median run 5, outside runs 2-4"), "{err}");
+}
+
+// W2-42 (W2-I): the profiles that need other remits' commands. The
+// auto-sell and takeover rows play the real game, each kept short.
+
+#[test]
+fn auto_sell_profile_records_auto_sold_coins() {
+    let profile = PacingProfile {
+        max_runs: 3,
+        ..by_id("auto-sell").expect("auto-sell is registered")
+    };
+    let report = simulate_pacing(&profile).expect("profile runs");
+    let count: u32 = report.runs.iter().map(|r| r.auto_sold_count).sum();
+    let coins: u64 = report.runs.iter().map(|r| r.auto_sold_coins).sum();
+    assert!(
+        count > 0 && coins > 0,
+        "auto-sold {count} items for {coins}"
+    );
+    // `earned` counts the auto-sold coins with the run, grant and milestone
+    // coins (design-progression-tree §11).
+    let mut earned = 0;
+    for run in &report.runs {
+        earned += run.coins + run.level_grant_coins + run.milestone_coins + run.auto_sold_coins;
+        assert_eq!(run.cumulative_coins, earned, "run {}", run.index);
+    }
+    // The same player without the rule sells nothing, and the rule acts only
+    // at settlement: run 1 is the same fight.
+    let default = simulate_pacing(&PacingProfile {
+        max_runs: 3,
+        ..by_id(DEFAULT_PROFILE_ID).expect("registered")
+    })
+    .expect("profile runs");
+    assert!(
+        default
+            .runs
+            .iter()
+            .all(|r| r.auto_sold_count == 0 && r.auto_sold_coins == 0)
+    );
+    let (a, b) = (&report.runs[0], &default.runs[0]);
+    assert_eq!(
+        (a.outcome, a.kills, a.coins, a.elapsed),
+        (b.outcome, b.kills, b.coins, b.elapsed)
+    );
+}
+
+#[test]
+fn takeover_profile_records_first_takeover() {
+    let profile = PacingProfile {
+        max_runs: 20,
+        stop_after: Some(Milestone::FirstTakeover),
+        ..by_id("takeover").expect("takeover is registered")
+    };
+    let report = simulate_pacing(&profile).expect("profile runs");
+    let (run, _) = report
+        .milestone(Milestone::FirstTakeover)
+        .expect("a recruit defends the main run inside 20 runs");
+    assert_eq!(report.runs.len(), run, "the profile stops at the takeover");
+    assert!(
+        matches!(report.runs[run - 1].defender, DefenderId::Recruit(_)),
+        "{:?}",
+        report.runs[run - 1].defender
+    );
+    assert!(
+        report.runs[..run - 1]
+            .iter()
+            .all(|r| r.defender == DefenderId::Player)
+    );
+    // Recruiting needs a liberated country and is paid in camp.
+    let (liberated, _) = report
+        .milestone(Milestone::Liberation(1))
+        .expect("a country is liberated before the takeover");
+    assert!(liberated < run, "liberated {liberated}, took over {run}");
+    let spent: u64 = report.runs.iter().map(|r| r.spent_recruit).sum();
+    assert!(spent > 0, "the recruit was paid for");
+}
+
+#[test]
+fn w2_42_rows_vary_the_acceptance_profile_by_one_option() {
+    let expert = by_id(DEFAULT_PROFILE_ID).expect("registered");
+    let row = |id: &str| by_id(id).unwrap_or_else(|| panic!("{id} is registered"));
+    let plan = |p: PacingPlan| PacingProfile {
+        id: expert.id,
+        name: expert.name,
+        plan: p,
+        ..expert
+    };
+    let same = |id: &str, expected: PacingProfile| {
+        let p = row(id);
+        assert_eq!(
+            PacingProfile {
+                id: expert.id,
+                name: expert.name,
+                ..p
+            },
+            expected,
+            "{id}"
+        );
+    };
+    same(
+        "manual-sell",
+        plan(PacingPlan {
+            sell: PacingSell::ManualExtras,
+            ..PacingPlan::SOLO
+        }),
+    );
+    same(
+        "auto-sell",
+        plan(PacingPlan {
+            sell: PacingSell::Auto,
+            ..PacingPlan::SOLO
+        }),
+    );
+    same(
+        "takeover",
+        PacingProfile {
+            country: "LUX",
+            ..plan(PacingPlan {
+                defender: PacingDefender::RecruitWhenReady,
+                ..PacingPlan::SOLO
+            })
+        },
+    );
+    same(
+        "farm",
+        PacingProfile {
+            aim: PacingAim::Novice,
+            ..plan(PacingPlan {
+                farm: PacingFarm::ReplayAfterDefeats(2),
+                ..PacingPlan::SOLO
+            })
+        },
+    );
+    same(
+        "easy",
+        PacingProfile {
+            difficulty: BalancePreset::Easy,
+            ..expert
+        },
+    );
+    same(
+        "hard",
+        PacingProfile {
+            difficulty: BalancePreset::Hard,
+            ..expert
+        },
+    );
+    same(
+        "long",
+        PacingProfile {
+            max_runs: 150,
+            ..expert
+        },
+    );
+    // Every registered plan is implemented: a zero-run profile is accepted.
+    for p in pacing_registry() {
+        let report = simulate_pacing(&PacingProfile { max_runs: 0, ..*p });
+        assert!(report.is_ok(), "{}: {report:?}", p.id);
+    }
+}
+
+#[test]
+fn takeover_survivor_retries_a_stage_the_recruit_lost() {
+    let profile = PacingProfile {
+        max_runs: 12,
+        ..by_id("takeover").expect("registered")
+    };
+    let report = simulate_pacing(&profile).expect("profile runs");
+    let lost: Vec<usize> = report
+        .runs
+        .windows(2)
+        .filter(|w| {
+            matches!(w[0].defender, DefenderId::Recruit(_)) && w[0].outcome != Outcome::Victory
+        })
+        .map(|w| {
+            assert_eq!(w[1].defender, DefenderId::Player, "run {}", w[1].index);
+            assert_eq!((&w[1].country, w[1].stage), (&w[0].country, w[0].stage));
+            w[0].index
+        })
+        .collect();
+    assert!(!lost.is_empty(), "a recruit loses inside 12 runs");
+    // After the survivor's win the recruit defends again.
+    let back = report.runs.windows(2).any(|w| {
+        w[0].defender == DefenderId::Player
+            && w[0].outcome == Outcome::Victory
+            && matches!(w[1].defender, DefenderId::Recruit(_))
+    });
+    assert!(back, "the recruit takes over again after a survivor win");
+}
+
+#[test]
+fn farm_profile_replays_the_previous_stage_after_two_frontier_defeats() {
+    let profile = PacingProfile {
+        max_runs: 20,
+        ..by_id("farm").expect("registered")
+    };
+    let report = simulate_pacing(&profile).expect("profile runs");
+    let runs = &report.runs;
+    let mut replays = 0;
+    for i in 2..runs.len() {
+        let (before, run) = (&runs[i - 1], &runs[i]);
+        if run.country != before.country || run.stage >= before.stage {
+            continue;
+        }
+        replays += 1;
+        assert_eq!(
+            run.stage + 1,
+            before.stage,
+            "run {} replays one back",
+            run.index
+        );
+        for lost in [&runs[i - 2], before] {
+            assert_ne!(lost.outcome, Outcome::Victory, "run {}", lost.index);
+            assert_eq!(lost.stage, before.stage, "run {}", lost.index);
+        }
+        if let Some(next) = runs.get(i + 1) {
+            assert_eq!(next.stage, before.stage, "run {} returns", next.index);
+        }
+    }
+    assert!(replays > 0, "the novice farms inside 20 runs");
 }

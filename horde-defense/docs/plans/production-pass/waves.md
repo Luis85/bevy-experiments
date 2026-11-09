@@ -542,6 +542,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Fail-first:
   - `auto_sell_profile_records_auto_sold_coins`
   - `takeover_profile_records_first_takeover`
+- Note (W2-42, 2026-11-09): each row varies expert-deu by one option; `takeover` starts in Luxembourg (first liberation by run 5) and `farm` uses the novice aim (replay after 2 frontier defeats). The takeover plan gives every stage a recruit lost back to the survivor. Manual-sale coins are not in `cumulative_coins` (design §11 counts auto-sold coins only). The equip-drops profile of acceptance G5.6 has no wave-2 row and stays unimplemented. The default pacing output does not move (plan §9.6).
 - Deps: W2-14, W2-12, W2-20.
 
 **W2-43 · campaign-defenders · Strategy rows and evaluators on PT's API**
