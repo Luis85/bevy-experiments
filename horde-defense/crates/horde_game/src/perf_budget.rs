@@ -801,6 +801,122 @@ mod tests {
         }
     }
 
+    /// W2-47, ruling R29: `baseline.v3` is re-measured on the egui_pass and
+    /// present_wait spans of review commit 7abb0ab, on the renderer W1-37
+    /// measured (the same commit, only the two probe spans moved), so the
+    /// interface_total anti-shift guard compares like spans with every run
+    /// from 7abb0ab on. The W1-37 values stay verbatim under
+    /// `baseline.v3.previous`, measured under the same conditions. Every
+    /// re-measured median is in `measured_interface_total_mean_ms`, and
+    /// `interface_total_mean_ms` (what the script gates) equals it, except
+    /// that under R22 a gated cell never loosens: one measured above the
+    /// previous value keeps that value and is listed in `kept_previous`.
+    #[test]
+    fn perf_budget_v3_baseline_is_re_measured_on_the_7abb0ab_spans() {
+        let json = budget();
+        assert_eq!(
+            json.pointer("/baseline/v3/spans"),
+            Some(&"7abb0ab".into()),
+            "baseline.v3 names the probe spans it was measured on"
+        );
+        let previous = object(&json, "/baseline/v3/previous");
+        assert_eq!(
+            json.pointer("/baseline/v3/commit"),
+            previous.get("commit"),
+            "the re-measure keeps the W1-37 renderer"
+        );
+        assert_eq!(
+            previous.get("evidence"),
+            Some(&"target/perf/w1-37/dev-vsync-b".into())
+        );
+        for (size, mean) in [("normal", 4.6447), ("small", 4.5895)] {
+            assert_eq!(
+                number(
+                    &json,
+                    &format!(
+                        "/baseline/v3/previous/interface_total_mean_ms/progressed-peak/{size}"
+                    )
+                ),
+                mean,
+                "previous keeps the W1-37 progressed-peak {size} value"
+            );
+        }
+        for key in [
+            "profile",
+            "vsync",
+            "present_mode",
+            "pipelined",
+            "power_plan",
+        ] {
+            assert_eq!(
+                json.pointer(&format!("/baseline/v3/{key}")),
+                previous.get(key),
+                "{key}: the re-measure ran under the W1-37 conditions"
+            );
+        }
+        let evidence = json
+            .pointer("/baseline/v3/evidence")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        assert!(
+            evidence.starts_with("target/perf/w2-47/"),
+            "baseline.v3.evidence is the W2-47 re-measure: {evidence:?}"
+        );
+        assert_eq!(
+            keys(object(&json, "/baseline/v3/runs")),
+            keys(object(&json, "/baseline/v3/previous/runs")),
+            "every profile and VSync state is re-measured"
+        );
+        for (name, run) in object(&json, "/baseline/v3/runs") {
+            let paths: Vec<&str> = match run.get("evidence") {
+                Some(Value::String(path)) => vec![path.as_str()],
+                Some(Value::Array(paths)) => paths.iter().filter_map(Value::as_str).collect(),
+                _ => Vec::new(),
+            };
+            assert!(
+                !paths.is_empty()
+                    && paths
+                        .iter()
+                        .all(|path| path.starts_with("target/perf/w2-47/")),
+                "runs/{name}: evidence from the W2-47 re-measure: {paths:?}"
+            );
+        }
+        // The re-measured medians are recorded as measured; the gate reads
+        // interface_total_mean_ms, which is the re-measure except where a
+        // gated cell would loosen, and those cells are listed.
+        let mut kept = BTreeSet::new();
+        for (scene, gates) in object(&json, "/scenes") {
+            let gated =
+                gates.get("interface_total_not_above_baseline_v3") == Some(&Value::Bool(true));
+            for size in keys(object(&json, "/sizes")) {
+                let path = format!("interface_total_mean_ms/{scene}/{size}");
+                let now = number(&json, &format!("/baseline/v3/{path}"));
+                let measured = number(&json, &format!("/baseline/v3/measured_{path}"));
+                let before = number(&json, &format!("/baseline/v3/previous/{path}"));
+                if gated && measured > before {
+                    kept.insert(path.clone());
+                    assert_eq!(now, before, "{path}: R22 keeps the previous gate value");
+                } else {
+                    assert_eq!(now, measured, "{path}: the re-measured median");
+                }
+                if gated {
+                    assert!(
+                        now <= before,
+                        "{path}: {now} loosens the gate above {before}"
+                    );
+                }
+            }
+        }
+        let listed: BTreeSet<String> = json
+            .pointer("/baseline/v3/kept_previous")
+            .and_then(Value::as_array)
+            .expect("baseline.v3.kept_previous lists the cells R22 kept")
+            .iter()
+            .filter_map(|cell| cell.as_str().map(str::to_owned))
+            .collect();
+        assert_eq!(listed, kept, "baseline.v3.kept_previous");
+    }
+
     const VALIDATION: &str = include_str!("../../../docs/VALIDATION.md");
 
     /// W1-61, the user ruling on gate 3 ("Exclude driver stalls"): the
