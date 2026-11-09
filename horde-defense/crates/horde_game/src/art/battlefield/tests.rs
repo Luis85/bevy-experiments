@@ -303,6 +303,37 @@ fn battlefield_primitives_are_independent_of_enemy_count() {
     );
 }
 
+/// W2-47: with the rig sheet loaded (as in a live run), fire-zone flames are
+/// rig-sheet quads. Painting each zone's ground and then its flames
+/// alternated untextured and textured runs per zone, so the stress scene's
+/// three zones cost six primitives and the live battlefield drew 25, over
+/// `BATTLEFIELD_PRIMITIVES_MAX` (the frame report's live battlefield count;
+/// the headless gates have no rig sheet). Every zone's ground, then every
+/// zone's flames, costs the same for one zone or three.
+#[test]
+fn fire_zones_cost_the_same_primitives_for_one_zone_or_three() {
+    use crate::visual_assets::{RigAtlas, RigSheet};
+    let mut textures = textures();
+    textures.rig = Some(RigSheet {
+        texture: TextureId::User(7),
+        atlas: RigAtlas::grid([1024.0, 1024.0]),
+    });
+    let three = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    assert_eq!(three.attempt().unwrap().ordnance.fire_zones.len(), 3);
+    let mut one = horde_core::sim::stress_render_fixture().expect("stress fixture");
+    one.attempt_mut().unwrap().ordnance.fire_zones.truncate(1);
+    let at_three = battlefield_primitives(&three, textures).len();
+    let at_one = battlefield_primitives(&one, textures).len();
+    assert_eq!(
+        at_three, at_one,
+        "three fire zones paint {at_three} primitives, one paints {at_one}"
+    );
+    assert!(
+        at_three <= crate::perf_budget::BATTLEFIELD_PRIMITIVES_MAX,
+        "stress with the rig sheet paints {at_three} primitives"
+    );
+}
+
 /// The peak view with alternating walker and standing sprites (so the actor
 /// layer crosses sheets enemy by enemy) and every third hostile flashing.
 /// Two visible hostiles share one spot, as a crowd does at a wall or the line

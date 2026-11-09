@@ -56,6 +56,24 @@ impl RigAtlas {
             cells,
         }
     }
+    /// Uniform 4x4 cells over a `size` sheet: a stand-in rig sheet for
+    /// headless painter tests that need the ordnance icons textured.
+    #[cfg(test)]
+    pub(crate) fn grid(size: [f32; 2]) -> Self {
+        let [width, height] = size;
+        Self {
+            size,
+            cells: std::array::from_fn(|index| {
+                let (column, row) = ((index % 4) as f32, (index / 4) as f32);
+                [
+                    column * width / 4.,
+                    row * height / 4.,
+                    (column + 1.) * width / 4.,
+                    (row + 1.) * height / 4.,
+                ]
+            }),
+        }
+    }
 }
 #[derive(Clone, Copy, Debug)]
 pub struct WalkSheet {

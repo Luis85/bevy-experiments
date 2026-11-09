@@ -15,6 +15,9 @@ pub(super) fn fire_zones(
     textures: ArtTextures,
 ) {
     let unit = vec2(arena.yard_width(), arena.lane_height());
+    // Two passes (every zone's ground, then every zone's flames), so the
+    // rig-sheet flames form one textured run however many zones burn: one
+    // pass per zone alternated untextured and textured runs (W2-47).
     for zone in &view.fire_zones {
         let at = arena.world(zone.center[0], zone.center[1]);
         let radii = unit * zone.radius;
@@ -32,6 +35,11 @@ pub(super) fn fire_zones(
                 C::from_rgba_unmultiplied(229, 136, 58, (fade * 125.) as u8),
             ),
         ));
+    }
+    for zone in &view.fire_zones {
+        let at = arena.world(zone.center[0], zone.center[1]);
+        let radii = unit * zone.radius;
+        let fade = (zone.ticks_left as f32 / 45.).min(1.);
         // The authoritative radius remains readable; small pixel flames stay
         // sparse enough that hostiles and contact windups remain legible.
         let count = if reduced { 9 } else { 21 };
