@@ -268,24 +268,47 @@ impl Game {
         Ok(id)
     }
     pub fn recall_survivor(&mut self, battle_id: u64) -> Result<(), String> {
+        let legacy = self.legacy_expeditions();
         let battle = self
             .active_battle_mut(battle_id)
             .ok_or_else(|| UNKNOWN_EXPEDITION.to_string())?;
         battle.game.withdraw();
         self.forward_expedition_events();
-        self.settle_parallel();
+        self.settle_parallel(&legacy);
         Ok(())
     }
     pub(super) fn tick_parallel(&mut self) {
+        let legacy = self.legacy_expeditions();
         for battle in &mut self.battles {
             if !battle.settled {
                 battle.game.tick(Input::default());
             }
         }
         self.forward_expedition_events();
-        self.settle_parallel();
+        self.settle_parallel(&legacy);
     }
-    fn settle_parallel(&mut self) {
+    /// The live expeditions whose current attempt was deployed before v7
+    /// (no drop tier, ruling E11): settlement never queues their drops for
+    /// auto-sale. Read before the workers step, because an attempt that ends
+    /// in that step is gone when settlement stores its last drops.
+    fn legacy_expeditions(&self) -> Vec<u64> {
+        self.battles
+            .iter()
+            .filter(|b| {
+                !b.settled
+                    && b.game
+                        .attempt
+                        .as_ref()
+                        .is_some_and(|a| a.drop_tier.is_none())
+            })
+            .map(|b| b.id)
+            .collect()
+    }
+    /// Commits each live expedition's new coins, loot and run records to the
+    /// parent. Every stored drop is queued for auto-sale (hook W-a) unless the
+    /// battle is in `legacy`; the queue is drained at the pass's last run
+    /// record and by a final sweep before the battle settles.
+    fn settle_parallel(&mut self, legacy: &[u64]) {
         for battle in &mut self.battles {
             if battle.settled {
                 continue;
@@ -298,6 +321,7 @@ impl Game {
             self.campaign.reward(coins, 0, Mode::Npc);
             battle.synced_coins = battle.game.campaign.coins;
             let mut stored = 0u32;
+            let queue = !legacy.contains(&battle.id);
             for item in battle.game.campaign.items[battle.synced_item_index..]
                 .iter()
                 .filter(|item| item.id >= battle.synced_item_id)
@@ -307,7 +331,12 @@ impl Game {
                     item.level,
                     item.quality,
                 ) {
-                    Ok(_) => stored = stored.saturating_add(1),
+                    Ok(id) => {
+                        stored = stored.saturating_add(1);
+                        if queue {
+                            battle.pending_auto_sell.push(id);
+                        }
+                    }
                     Err(error) => self.settlement_issues.push(SettlementIssue::LootLost {
                         battle: battle.id,
                         definition: item.definition.clone(),
@@ -327,7 +356,9 @@ impl Game {
                 summary.loot_count = summary.loot_count.saturating_add(stored);
             }
             let had_pending = !battle.game.pending_runs.is_empty();
-            for mut record in std::mem::take(&mut battle.game.pending_runs) {
+            let runs = std::mem::take(&mut battle.game.pending_runs);
+            let last_run = runs.len().checked_sub(1);
+            for (n, mut record) in runs.into_iter().enumerate() {
                 if record.outcome == Outcome::Victory {
                     record.completion_xp = self.campaign.completion_xp_preview();
                     self.campaign.first_clear(record.template, Mode::Personal);
@@ -352,10 +383,20 @@ impl Game {
                         self.strategy.resolve_outbreak(country);
                     }
                 }
+                // Hook W-a: the pass's last record drains the queue, so
+                // each stage's drops are sold once, on its own record.
+                let auto_sold = if Some(n) == last_run {
+                    auto_sell::drain_expedition_sale(&mut self.campaign, &self.strategy, battle)
+                } else {
+                    Default::default()
+                };
+                record.auto_sold_count = auto_sold.count;
+                record.auto_sold_coins = auto_sold.coins;
                 if let Some(report) = &mut battle.game.last_result
                     && report.attempt_id == record.attempt_id
                 {
                     report.completion_xp = record.completion_xp;
+                    report.auto_sold = auto_sold;
                 }
                 record.worker_id = Some(battle.id);
                 record.recruit_id = Some(battle.recruit_id);
@@ -454,6 +495,17 @@ impl Game {
                         recruit: battle.recruit_id,
                         error,
                     });
+            }
+            // The final sweep (hook W-a): whatever no record drained, such as
+            // the record-less legacy path's drops, sells under the same gate
+            // and its receipt goes to the worker's report. A settled battle
+            // holds no queue.
+            let swept =
+                auto_sell::drain_expedition_sale(&mut self.campaign, &self.strategy, battle);
+            if !swept.is_empty()
+                && let Some(report) = &mut battle.game.last_result
+            {
+                report.auto_sold.absorb(swept);
             }
             battle.settled = true;
             // The single settled transition finalises the notice: the final

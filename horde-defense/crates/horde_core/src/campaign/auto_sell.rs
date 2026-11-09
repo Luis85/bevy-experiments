@@ -76,6 +76,21 @@ impl AutoSoldReceipt {
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
+    /// Adds a later settlement sale of the same run (the expedition's final
+    /// sweep): totals stay exact and the [`MAX_AUTO_SOLD_LINES`] lines with
+    /// the highest coins are kept, this receipt's first on a tie.
+    pub fn absorb(&mut self, other: AutoSoldReceipt) {
+        self.count = self.count.saturating_add(other.count);
+        self.coins = self.coins.saturating_add(other.coins);
+        for quality in Quality::ALL {
+            self.by_quality[quality] =
+                self.by_quality[quality].saturating_add(other.by_quality[quality]);
+        }
+        self.kept_on_overflow = self.kept_on_overflow.saturating_add(other.kept_on_overflow);
+        self.lines.extend(other.lines);
+        self.lines.sort_by_key(|line| std::cmp::Reverse(line.coins));
+        self.lines.truncate(MAX_AUTO_SOLD_LINES);
+    }
     /// Bounds against the run's `loot` (schema v7 §3.4).
     pub fn validate(&self, loot: u32) -> Result<(), String> {
         let quality_sum: u64 = self.by_quality.values().map(|n| u64::from(*n)).sum();
@@ -170,6 +185,28 @@ mod tests {
         let mut unknown = receipt(1);
         unknown.lines[0].definition = ItemDefId("no_such_item".into());
         assert!(unknown.validate(1).is_err());
+    }
+
+    #[test]
+    fn absorb_keeps_exact_totals_and_the_dearest_lines() {
+        let mut first = receipt(10);
+        first.kept_on_overflow = 1;
+        let mut swept = receipt(5);
+        swept.by_quality[Quality::Poor] = 4;
+        swept.by_quality[Quality::Common] = 1;
+        swept.lines[0].coins = 9;
+        swept.coins += 7;
+        first.absorb(swept);
+        assert_eq!((first.count, first.coins), (15, 37));
+        assert_eq!(first.by_quality[Quality::Poor], 14);
+        assert_eq!(first.by_quality[Quality::Common], 1);
+        assert_eq!(first.kept_on_overflow, 1);
+        assert_eq!(first.lines.len(), MAX_AUTO_SOLD_LINES);
+        assert_eq!(first.lines[0].coins, 9, "the dearest line leads");
+        assert!(first.validate(16).is_ok());
+        let mut empty = AutoSoldReceipt::default();
+        empty.absorb(receipt(2));
+        assert_eq!(empty, receipt(2));
     }
 
     #[test]
