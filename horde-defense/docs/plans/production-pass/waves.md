@@ -233,6 +233,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `definition_pick_consumes_exactly_one_draw`
 - Done: TRACE unchanged (the gate). Provisional GOLDEN cause G only if moved.
 - Deps: W2-08.
+- **R33 (2026-11-09, orchestrator ruling; plan §2.4).** W2-09 moved the 0x1a571167 Personal GOLDEN digest, and its provisional cause stays class G, as this row and plan §6 say. `support::classify` labels the move C because outcome and trace are unchanged, but the change is a gameplay mechanic (the weighted drop pick). W2-49 records both labels in its reason table. The pacing test it turned red, `goal6_clamped_starts_first_victory_runs_2_to_4` (the AUT start's first victory 3 -> 5; plan §9.6), is owned by the wave-4 tuning loop (W4-04..n).
 
 **W2-10 · campaign-defenders · `liberated_count` rewrite and the 10-level allowance**
 - Fail-first:
@@ -376,6 +377,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `settle_parallel_defers_rewards_while_main_attempt_is_live`
 - Done: GOLDEN unchanged; smoke and pacing before/after recorded.
 - Deps: W2-14, W2-16.
+- **R32 (2026-11-09, orchestrator ruling; plan §2.4).** Both §2.5 items this row opened keep their defaults. W2-54 authors the level grant and the rank milestones before W2-49. The `settle_parallel` narrowing stays: settlement runs only on an idle pass that credited a victory.
 
 **W2-23 · progression-tree · W2-E `NpcTraining::TRAINABLE` and `TrainingUnsupported`**
 - Fail-first:
@@ -588,6 +590,9 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - R26 closes the stress-on-r2 episode (the first R18 item) as environmental. Gate 3 in the shipped default configuration can be claimed once this re-gate passes.
   - R27 keeps the `driver_stall` rule. The re-gate runs on the R27 `measure_performance.ps1`, which holds the display on for the whole run and treats a run that overlaps a Kernel-Power 506/507 event as invalid evidence (rerun once, exit 2 if invalid twice). Its summary records the display hold and the 506/507 events per run.
   - R29: `PERF_BUDGET.json baseline.v3` is re-measured here on the 7abb0ab egui_pass and present_wait spans, before any interface_total re-gate (this one, then W5-11 and W7-09). The old values stay under a previous key. Under R22 the gates only tighten: where the re-measured baseline would loosen a gate, the old gate value stays.
+- **Answered 2026-11-09 (R30 and R31, user decisions; plan §2.4):**
+  - R30: every pass of this re-gate waits for a quiet machine first. No foreign cargo, rustc, cargo-nextest or other build or test process may run (the pass's own children are ignored), and the mean CPU load (`Win32_Processor.LoadPercentage`, sampled every 5 s) must have stayed under 35% for 60 s. `measure_performance.ps1 -WaitQuiet [-QuietTimeoutMinutes N]` is on by default with a 240-minute timeout, logs what it waited for, and exits 2 on a timeout. A 5 s load sampler runs beside every run, and a run with any sample of 90% or more is invalid evidence, rerun once (exit 2 if invalid twice); the summary records the load mean and max per run. Gates are unchanged.
+  - R31 answers this row's "interface_total re-gate needs a tolerance" item. The interface_total re-gate is an interleaved A/B against the wave-1-close executable: in one sitting, A (sources at ab03da9) and B (HEAD) alternate, 5 pairs per size (normal and small), on progressed-peak, dev, VSync on, the default pipelined state. Per size, B's median interface_total must be at most 1.05 × A's median. `scripts/ab_interface_total.ps1` runs it, with the R30 quiet window and load validity. R29 still holds: `baseline.v3` is re-measured on the 7abb0ab spans and recorded, but the interface_total gate decision is the A/B, not the absolute baseline.
 
 **W2-48 · save-determinism · RNG isolation and legacy guards, plus behaviour tests on the v6/v7 fixtures**
 - Fail-first:
@@ -607,6 +612,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Steps: fold PROVISIONAL into GOLDEN; write a per-digest reason table (classes F/T/C/G with anatomy diffs); `RULESET_VERSION` 3 and `TRACE_RULESET`; smoke and pacing after in `target/production-after-wave2/`.
 - R15 (wave-1 close): W1-69 did not bump the ruleset, so the 2 -> 3 bump names both W1-69 (no lane queue) and the wave-2 change, in the commit body, the reason table and VALIDATION.md. Until this commit a recording made before W1-69 replays without a ruleset warning.
 - R16: it also folds the three Personal GOLDEN state digests that W2-52 moves.
+- R33 (2026-11-09): the reason table records both labels where they differ. W2-09's row is class G (the weighted drop pick is a gameplay mechanic), and the table also names `support::classify`'s C (outcome and trace unchanged, items only).
 - Fail-first: `envelopes_carry_version_ruleset_and_fingerprint` asserts 3.
 - Done: PROVISIONAL None; V1-V6 unchanged.
 - Deps: W2-48, W2-52, W2-54.
@@ -654,8 +660,8 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Done: no digest move; V1-V6 pins unchanged. A later wave-2 or wave-4 commit that moves this pin edited a frozen (append-only, ISO-3) record: fix the edit. If a content-driven change is meant to reach legacy attempts (Ruling R4), the continuation pins it moves are re-blessed in that wave's GOLDEN re-bless with a written reason. There is no `rules_revision` field (R4).
 - Deps: W1 close; W2-08 and W2-26 depend on it.
 
-**W2-54 · progression-tree · Author the level grant and the rank milestones, before the W2-49 re-bless (pending the §2.5 item)**
-- Slot: before W2-49; the id is appended so no id changes. W2-22 shipped only the settlement writer on the neutral `progression.json` (W2-22 review), so decision 14, PT7 and PT8 have no shipped value until this row. It runs as written only under the §2.5 item's default; another answer rewrites it.
+**W2-54 · progression-tree · Author the level grant and the rank milestones, before the W2-49 re-bless**
+- Slot: before W2-49; the id is appended so no id changes. W2-22 shipped only the settlement writer on the neutral `progression.json` (W2-22 review), so decision 14, PT7 and PT8 have no shipped value until this row. R32 (2026-11-09, orchestrator ruling; plan §2.4) accepted the §2.5 item's default, so this row runs as written.
 - Files: `crates/horde_core/progression.json` `rewards.level_grant_xp_fraction` 0.25 and the four design-progression-tree §7 milestones (rank 5 500 coins Uncommon, 10 1000 Uncommon, 15 1500 Rare, 20 2000 Rare); the pins the values move, each with its reason (the §2.5 item lists them; the `schema_v7` guard with save-determinism's agreement).
 - Fail-first: `shipped_catalogue_authors_the_design_grant_and_milestones` (`level_grant(2) == 5`, the four milestones as listed).
 - Digest: sets `PROVISIONAL` for the three Personal state digests with a `PROVISIONAL_CAUSES` row as `support::classify` assigns (P3): the grant makes the W2-52 shim inert. `GAMEPLAY_TRACE`, V1-V6 and `V6_DROP_TRACE` do not move. W2-49 folds them.
@@ -893,7 +899,7 @@ Wave-3 exit:
 | W4-01 | enemy-balance | Regional and Capstone boss multipliers: Regional HP and reward x1.2; Capstone HP x1.4, armor x1.25, NPC armor +2, reward x1.4, damage x1.10 | `regional_boss_health_and_reward_are_1_2x_sector_at_equal_rank`, `boss_damage_capstone_factor_is_1_10` | W2 |
 | W4-02 | campaign-defenders | Regional checkpoint presentation lines: briefing "Regional checkpoint - boss +20% health, +20% reward" and "Final stand"; world panel "N checkpoints", read from `CountryChoicePreview.checkpoints`, which this commit adds from `Country::regional_checkpoints()` (design-campaign-defenders §1.8, deferred from W2-19; P6); Results "Regional checkpoint secured" | `briefing_names_regional_checkpoint_on_checkpoint_stage` | W4-01 |
 | W4-03 | progression-tree | Effect retunes: steady_hands, hardened, quick_throw, combat_reload; shrapnel_trap `charges_per_rank` 1 | `hardened_leaves_runner_contact_damaging`, `trap_mastery_1_adds_a_trap_charge`, `steady_hands_..._at_most_40_percent`; pacing and smoke before/after | W2 |
-| W4-04..n | enemy-balance | Tuning loop, one lever per commit, in this order: health_per_rank_late, boss_health slope, front_ramp_max ∈ [0.17, 0.25], affixes, capstone HP | Ignored `pacing_targets` goal6_* in release; each commit records pacing and smoke before/after and its provisional cause G | W4-01 |
+| W4-04..n | enemy-balance | Tuning loop, one lever per commit, in this order: health_per_rank_late, boss_health slope, front_ramp_max ∈ [0.17, 0.25], affixes, capstone HP | Ignored `pacing_targets` goal6_* in release; each commit records pacing and smoke before/after and its provisional cause G. Owns `goal6_clamped_starts_first_victory_runs_2_to_4`, red since W2-09 (the AUT start's first victory 3 -> 5; R33) | W4-01 |
 | W4-p | progression-tree | Repricing, tree-quality rules and the blueprint price fix (one green commit), then the calibration loop | `no_valued_node_is_dominated_at_its_reference_states`, `cheap_nodes_stay_within_twice_branch_value_per_coin`, `tier_costs_sit_in_design_bands`, goal5_* (release) | W4-03, EB loop |
 | W4-l | loot-economy | Auto-sell pacing gate and stash-growth measurement | `auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3`, `stash_growth_reported_for_150_runs` | W4-p |
 | W4-c | campaign-defenders | Goal-3 strategy acceptance (20 seeds) | `strategy_profile_reports_liberations_2_4_10_and_coins_per_minute`, `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs`, `fewer_than_five_outbreak_reopens_over_ten_liberations` | W4-l |

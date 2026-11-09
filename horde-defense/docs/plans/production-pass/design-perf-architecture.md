@@ -325,6 +325,7 @@ The JSON:
 - The battlefield egui gates are checked always (W2-47, R18), worst repeat: frame report `egui.battlefield_primitives.max` against `egui.battlefield_primitives_max` in every scene, and `egui.battlefield_vertices.max` against `egui.battlefield_vertices_max.<scene>` where the scene has one. The counts are the paint jobs clipped to the clip the battlefield painter drew with (`ui/battle/field.rs` records it, `egui_probe` counts them), as the headless gates count them. A report without them is invalid evidence.
 - cpu_frame p99 only with -VsyncOff.
 - interface_draw and interface_total only when the profile and vsync match the baseline (dev, VSync on).
+- interface_total re-gates (R31, plan §2.4, 2026-11-09; W2-47, then W5-11 and W7-09): the gate decision is an interleaved A/B against the wave-1-close executable, not the absolute `baseline.v3`. In one sitting A (ab03da9 sources) and B (HEAD) alternate, 5 pairs per size, on progressed-peak, dev, VSync on, the default pipelined state; per size, B's median interface_total must be at most 1.05 × A's median. `scripts/ab_interface_total.ps1` runs it with the R30 quiet window and load validity. `baseline.v3` is still re-measured on the 7abb0ab spans and recorded (R29).
 
 Exit codes: 0 pass, 1 over budget, 2 invalid evidence, 3 build or run failure. `-SelfTest` runs `scripts/fixtures/perf/{within-budget,over-budget,unfocused}.json` and must give 0, 1 and 2.
 
@@ -393,7 +394,7 @@ Only measure_performance adopts Native.ps1 in this remit. capture_review, captur
 | Stress | 400 drawn via STAGED_ENEMY_CAP_MAX (B, 2 of 3 judges) + 3 workers (A) + fixtures-local corpse staging (A) | unvalidated fixture (autosave errors); synthetic views (no sim cost); refactoring combat.rs record_corpse (touches the traced sim path). A's 225-drawn path is kept as the fallback |
 | Normal play records nothing | PerfProbe resource absent (B) + recorded mutation check (A) | static atomics + lock (flaky across test threads) |
 | Render-world | extract wrapper + Render schedule − present wait (B) | ExtractCommands..PostCleanup only (misses extract); gap timing (counts the channel wait) |
-| Interface gate | v2 draw ≤1.129/≤1.030 against wave 0 + interface_total ≤ baseline_v3 (A anti-shift guard) | B's extra −30% on the total (beyond the brief); A's switch to 0.70×v3 on drift (moves the goalpost) |
+| Interface gate | v2 draw ≤1.129/≤1.030 against wave 0 + interface_total ≤ baseline_v3 (A anti-shift guard); from the W2-47 re-gate on, interface_total is decided by an interleaved A/B against the wave-1-close executable, B ≤ 1.05 × A per size (R31) | B's extra −30% on the total (beyond the brief); A's switch to 0.70×v3 on drift (moves the goalpost) |
 | Once per pass | BattleFrame {screen, hud, field} (B) | temp-data cache (hidden); a Bevy-system resource (ordering, SceneCache in ctx) |
 | Enemy batching | packed atlas, one actors mesh, exact feet order incl. flashes (B) | per-texture runs (flash reordering; primitives grow with mixed-sheet wave-2 art); Mesh2d (projection/clip/observer rewrite) |
 | Shadows | procedural 128x64 LINEAR texture quad (A) | B's 12-segment fan (changes the look, builds vertices inside the gated draw); ellipses (cost) |
@@ -594,6 +595,22 @@ Orchestrator rulings R12-R23, recorded verbatim in plan §2.4. The ones that tou
 - **Ruling:** Pending human checks stay pending; fix the integrated-GPU check so it names how to select the adapter this machine actually has, or marks it not possible on this machine.
 - **Supersedes in this spec:** Nothing in the protocol. The check stays pending and names `-Adapter "Intel(R) Arc(TM) Pro Graphics"`, the adapter W1-68 ran on this machine.
 
+### Wave-2 rulings (2026-11-09)
+
+User decisions R30 and R31, recorded in plan §2.4.
+
+#### R30. Quiet window and load validity
+
+- **Owner / wave:** perf-architecture, wave 2 (W2-47 and every later perf pass).
+- **Ruling:** A perf pass starts only when no foreign cargo, rustc, cargo-nextest or other build or test process is running (the pass's own children are ignored) and the mean CPU load (`Win32_Processor.LoadPercentage`, sampled every 5 s) has stayed under 35% for 60 s: a `measure_performance.ps1` pre-flight, `-WaitQuiet [-QuietTimeoutMinutes N]`, on by default with a 240-minute timeout, which logs what it waited for and exits 2 on a timeout. A 5 s load sampler runs beside every run; a run with any sample of 90% or more is invalid evidence, rerun like the other invalid runs (exit 2 if invalid twice). The summary records the load mean and max per run. The process and load queries sit behind shimmable functions (the `DisplayPower.ps1` pattern). Gates are unchanged.
+- **Supersedes in this spec:** "Keep the machine quiet" as an operator instruction only: the script now checks it, and the hand-run 5 s samplers of W1-61 to W2-50 are built in.
+
+#### R31. interface_total by interleaved A/B
+
+- **Owner / wave:** perf-architecture, wave 2 (W2-47), then W5-11 and W7-09.
+- **Ruling:** The interface_total re-gate is an interleaved A/B against the wave-1-close executable. In one sitting, alternate A (sources at ab03da9) and B (HEAD), 5 pairs per size (normal and small), with the gate's scene, profile and flags. Per size, B's median interface_total must be at most 1.05 × A's median. `scripts/ab_interface_total.ps1` builds A from `git archive ab03da9 horde-defense` with the same CARGO_TARGET_DIR, uses the R30 quiet window and load validity, and self-tests its pass / fail / invalid-pair decision. R29 still holds (re-measure and record `baseline.v3`), but the A/B decides the gate.
+- **Supersedes in this spec:** "interface_total ≤ baseline_v3" as the re-gate decision (§13 Interface gate): the absolute baseline compares runs on different days and machine states, and the re-gate needed a tolerance (W2-47).
+
 ### Rulings owned by this remit
 
-S3, W-11, W-12, R18, R19, R22, R23
+S3, W-11, W-12, R18, R19, R22, R23, R30, R31
