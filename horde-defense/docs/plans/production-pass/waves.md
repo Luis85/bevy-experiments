@@ -607,7 +607,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - R16: it also folds the three Personal GOLDEN state digests that W2-52 moves.
 - Fail-first: `envelopes_carry_version_ruleset_and_fingerprint` asserts 3.
 - Done: PROVISIONAL None; V1-V6 unchanged.
-- Deps: W2-48, W2-52.
+- Deps: W2-48, W2-52, W2-54.
 
 **W2-50 · perf-architecture · The gate-3 episode in the shipped default configuration, before the W2-47 re-gate**
 - Slot: before W2-47; the id is appended so no id changes. W1-61's A/B repeat `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2` (playtest, pipelined on, VSync on, stress normal: the shipped default configuration) ran about 400 frames of 47-67 ms. Outside driver stalls it had 6 frames over 50 ms (exit 1), 407 over 33 ms, a p99 of 47.1 ms and 46.3 FPS. It is not a driver stall under the user ruling (named coverage 0.89-0.94) and is not attributed (4-6 ms per frame outside App::update). Plan 9.4 and §2.5; VALIDATION.md W1-61.
@@ -651,6 +651,14 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Fail-first (characterisation pin): `legacy_catalogue_records_that_tick_saved_encounters_are_frozen`. It pins the FNV-1a of the catalogue records that V1-V6 encounters tick (design-save-determinism invariant 3): the 11 existing archetype resolutions, wave tiers 0..=4 of `enemy_catalog.json` and the 5 `content.json` levels, as the bundled catalogue resolves them. Appended records, tiers 5 and up, and new fields at their skipped neutral default do not move it. Mutation proof: change one value of a tier-0..=4 wave and one existing archetype's resolved health; each fails the pin.
 - Done: no digest move; V1-V6 pins unchanged. A later wave-2 or wave-4 commit that moves this pin edited a frozen (append-only, ISO-3) record: fix the edit. If a content-driven change is meant to reach legacy attempts (Ruling R4), the continuation pins it moves are re-blessed in that wave's GOLDEN re-bless with a written reason. There is no `rules_revision` field (R4).
 - Deps: W1 close; W2-08 and W2-26 depend on it.
+
+**W2-54 · progression-tree · Author the level grant and the rank milestones, before the W2-49 re-bless (pending the §2.5 item)**
+- Slot: before W2-49; the id is appended so no id changes. W2-22 shipped only the settlement writer on the neutral `progression.json` (W2-22 review), so decision 14, PT7 and PT8 have no shipped value until this row. It runs as written only under the §2.5 item's default; another answer rewrites it.
+- Files: `crates/horde_core/progression.json` `rewards.level_grant_xp_fraction` 0.25 and the four design-progression-tree §7 milestones (rank 5 500 coins Uncommon, 10 1000 Uncommon, 15 1500 Rare, 20 2000 Rare); the pins the values move, each with its reason (the §2.5 item lists them; the `schema_v7` guard with save-determinism's agreement).
+- Fail-first: `shipped_catalogue_authors_the_design_grant_and_milestones` (`level_grant(2) == 5`, the four milestones as listed).
+- Digest: sets `PROVISIONAL` for the three Personal state digests with a `PROVISIONAL_CAUSES` row as `support::classify` assigns (P3): the grant makes the W2-52 shim inert. `GAMEPLAY_TRACE`, V1-V6 and `V6_DROP_TRACE` do not move. W2-49 folds them.
+- Done: smoke and pacing before/after recorded in plan §9.6 (R28); decision 14, PT7 and PT8 closed.
+- Deps: W2-22; W2-49 depends on it.
 
 Wave-2 exit:
 - One re-bless with reasons.
