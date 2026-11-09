@@ -9,10 +9,13 @@
 //! registry rows and evaluators on this API. The goal-5 evaluators (W2-03)
 //! live in [`targets`], the goal-6 rows' evaluators (W2-04) in [`goal6`].
 //! The plans that sell, farm or hand the main run to a recruit (W2-42) act
-//! only through `Game::apply`.
+//! only through `Game::apply`. The strategy rows and their goal-3
+//! evaluators (W2-43, ruling P7) live in [`strategy`]: a plan with a
+//! [`StrategyPlan`] is played by a bot that acts only through commands.
 mod goal6;
 #[cfg(test)]
 mod plan_tests;
+mod strategy;
 mod targets;
 pub use goal6::{
     DefeatWindow, GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT,
@@ -20,6 +23,15 @@ pub use goal6::{
     GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS,
     RunsToLiberate, archetype_coverage, boss_ttk_median_s, clamped_start_first_victory,
     defeat_rate_windows, defeat_windows, longest_win_streak, max_win_streak, runs_to_liberate,
+};
+pub use strategy::{
+    DEU_THREE_STAGE_NEIGHBOURS, GOAL3_LIBERATIONS, GOAL3_NEIGHBOURS_FREED,
+    GOAL3_PARALLEL_OVER_SOLO, GOAL3_REOPEN_LIMIT, GOAL3_REOPEN_WINDOW, Overrun, PacingParallel,
+    PacingRoute, STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS, StrategyPlan, StrategyReport,
+    StrategyRun, StrategyStep, StrategyTrace, StrategyUnlock, liberations_and_coins_per_minute,
+    outbreak_reopens, parallel_frees_neighbours, reopens_over_liberations, replay_strategy,
+    runs_to_free_neighbours, simulate_strategy, simulate_strategy_seed, simulate_strategy_traced,
+    strategy_sweep, strategy_table,
 };
 pub use targets::{
     GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, UNLOCK_ORDER, median_run_within, tier_affordable_runs,
@@ -122,6 +134,9 @@ pub struct PacingPlan {
     /// Train Mara and recruits in camp. Not implemented yet:
     /// [`simulate_pacing`] rejects a plan that sets it.
     pub train_companions: bool,
+    /// The strategy layer (W2-43): recruits, expeditions, guards and camp
+    /// time, played by the command-only strategy bot. None is the solo loop.
+    pub strategy: Option<StrategyPlan>,
 }
 impl PacingPlan {
     /// The survivor alone, never selling, farming or training: the plan of
@@ -132,6 +147,7 @@ impl PacingPlan {
         defender: PacingDefender::Survivor,
         farm: PacingFarm::None,
         train_companions: false,
+        strategy: None,
     };
     fn unsupported(&self) -> Option<&'static str> {
         if self.equip_drops {
@@ -198,7 +214,7 @@ const EXPERT_DEU: PacingProfile = PacingProfile {
     stop_after: None,
 };
 /// Every named profile. Ids are stable and unique; rows are appended.
-const REGISTRY: [PacingProfile; 15] = [
+const REGISTRY: [PacingProfile; 18] = [
     EXPERT_DEU,
     PacingProfile {
         id: "novice-deu",
@@ -326,6 +342,43 @@ const REGISTRY: [PacingProfile; 15] = [
         id: "long",
         name: "expert, tree first, Germany, 150 runs",
         max_runs: 150,
+        ..EXPERT_DEU
+    },
+    // W2-43 (design-campaign-defenders 1.13): the strategy rows. S1 plays
+    // the whole strategy layer from Luxembourg; S2a and S2b free Germany's
+    // 3-stage neighbours alone and with expeditions.
+    PacingProfile {
+        id: "strategy",
+        name: "strategy, novice, gear first, Luxembourg",
+        seed: 2026,
+        country: "LUX",
+        aim: PacingAim::Novice,
+        spend: PacingSpend::GearFirst,
+        max_runs: 120,
+        plan: PacingPlan {
+            strategy: Some(StrategyPlan::S1),
+            ..PacingPlan::SOLO
+        },
+        ..EXPERT_DEU
+    },
+    PacingProfile {
+        id: "neighbours-solo",
+        name: "neighbours solo, Germany",
+        plan: PacingPlan {
+            strategy: Some(StrategyPlan::NEIGHBOURS_SOLO),
+            ..PacingPlan::SOLO
+        },
+        stop_after: Some(Milestone::Liberation(1 + GOAL3_NEIGHBOURS_FREED as u32)),
+        ..EXPERT_DEU
+    },
+    PacingProfile {
+        id: "neighbours-parallel",
+        name: "neighbours parallel, Germany",
+        plan: PacingPlan {
+            strategy: Some(StrategyPlan::NEIGHBOURS_PARALLEL),
+            ..PacingPlan::SOLO
+        },
+        stop_after: Some(Milestone::Liberation(1 + GOAL3_NEIGHBOURS_FREED as u32)),
         ..EXPERT_DEU
     },
 ];
@@ -608,22 +661,32 @@ fn pacing_input(g: &Game, aim: PacingAim, held: &mut [f32; 2]) -> Input {
         }
     }
 }
-/// Places every owned structure kind across the lanes while supply lasts,
-/// traps nearest the line, as a player who bought fortifications would.
-fn build_owned_structures(g: &mut Game) {
+/// Every placement a player who bought fortifications tries, in order: each
+/// owned structure kind across the lanes, traps nearest the line.
+fn structure_placements(g: &Game) -> Vec<(StructureKind, u8, u8)> {
+    let lanes = g.attempt.as_ref().map_or(0, |a| a.lane_count);
+    let mut out = Vec::new();
     for (column, kind) in [
         (0, StructureKind::Trap),
         (1, StructureKind::Wall),
         (2, StructureKind::Turret),
     ] {
-        if !g.campaign.blueprints[kind] {
-            continue;
+        if g.campaign.blueprints[kind] {
+            out.extend(
+                construction_lane_order(lanes)
+                    .into_iter()
+                    .map(|lane| (kind, lane, column)),
+            );
         }
-        let lanes = g.attempt.as_ref().map_or(0, |a| a.lane_count);
-        for lane in construction_lane_order(lanes) {
-            // Rejections (supply, an occupied cell) just skip the cell.
-            let _ = g.place(kind, lane, column);
-        }
+    }
+    out
+}
+/// Places every owned structure kind across the lanes while supply lasts,
+/// traps nearest the line, as a player who bought fortifications would.
+fn build_owned_structures(g: &mut Game) {
+    for (kind, lane, column) in structure_placements(g) {
+        // Rejections (supply, an occupied cell) just skip the cell.
+        let _ = g.place(kind, lane, column);
     }
 }
 /// Per-archetype telemetry of one report.
@@ -714,27 +777,43 @@ fn deploy_stage(g: &mut Game, defender: PacingDefender, stage: usize) -> Result<
 pub fn simulate_pacing(profile: &PacingProfile) -> Result<PacingReport, String> {
     simulate_pacing_seed(profile, 0)
 }
-/// Plays `profile` at seed index `seed_index` from a fresh profile. Index
-/// 0 is the profile's own game seed with the default strategy RNG; later
-/// indices vary both through [`pacing_seed`].
+/// The fresh game seed index `seed_index` of `profile` starts from, before
+/// any command: the game seed [`pacing_seed`] gives, and the strategy RNG
+/// `Rng::new(seed ^ "PLAGUE")` for every later index, or for every index
+/// when the plan seeds the strategy RNG (W2-43). Index 0 of a plan that
+/// does not keeps the default strategy RNG, so one seed reproduces the
+/// pre-v2 table. No per-journey seed ships (design-campaign-defenders 1.13).
+pub fn pacing_start(profile: &PacingProfile, seed_index: usize) -> Game {
+    let seed = pacing_seed(profile.seed, seed_index);
+    let mut g = Game {
+        seed,
+        ..Game::default()
+    };
+    let seeded = profile.plan.strategy.is_some_and(|s| s.seed_strategy);
+    if seed_index > 0 || seeded {
+        g.strategy = crate::strategy::StrategyState::seeded(seed);
+    }
+    g
+}
+/// Plays `profile` at seed index `seed_index` from a fresh profile
+/// ([`pacing_start`]). A plan with a [`StrategyPlan`] is played by the
+/// strategy bot ([`simulate_strategy_seed`]); this returns its runs and
+/// milestones.
 pub fn simulate_pacing_seed(
     profile: &PacingProfile,
     seed_index: usize,
 ) -> Result<PacingReport, String> {
+    if profile.plan.strategy.is_some() {
+        return simulate_strategy_seed(profile, seed_index).map(|r| r.pacing);
+    }
     if let Some(option) = profile.plan.unsupported() {
         return Err(format!(
             "Pacing plan option {option} is not implemented yet ({})",
             profile.id
         ));
     }
-    let seed = pacing_seed(profile.seed, seed_index);
-    let mut g = Game {
-        seed,
-        ..Game::default()
-    };
-    if seed_index > 0 {
-        g.strategy = crate::strategy::StrategyState::seeded(seed);
-    }
+    let mut g = pacing_start(profile, seed_index);
+    let seed = g.seed;
     g.campaign
         .choose_survivor(crate::survivors::SurvivorId::Rook)?;
     if g.campaign.balance_settings.preset != profile.difficulty {
@@ -752,12 +831,7 @@ pub fn simulate_pacing_seed(
         }))
         .map_err(|e| e.to_string())?;
     }
-    let depths = node_depths();
-    let max_depth = depths.values().copied().max().unwrap_or(0);
-    let mut runs = Vec::new();
-    let mut milestones: Vec<(Milestone, usize, f32)> = Vec::new();
-    let mut earned = 0u64;
-    let mut minutes = 0.0f32;
+    let mut book = RunBook::new();
     // The farm plan's frontier defeats in a row and whether the last run
     // was a replay.
     let mut defeats = 0u32;
@@ -791,23 +865,7 @@ pub fn simulate_pacing_seed(
                 )
             }
         };
-        for d in 1..=max_depth {
-            let mut tier = skills().nodes.iter().filter(|n| depths[&n.id] == d);
-            if tier.clone().any(|n| g.campaign.has_node(&n.id)) {
-                reached(&mut milestones, Milestone::TierFirstNode(d), index, minutes);
-            }
-            if tier.all(|n| g.campaign.has_node(&n.id)) {
-                reached(&mut milestones, Milestone::TierOwned(d), index, minutes);
-            }
-        }
-        for f in CampaignFeature::ALL {
-            if g.campaign.has_feature(f) {
-                reached(&mut milestones, Milestone::Feature(f), index, minutes);
-            }
-        }
-        if g.operations_available() {
-            reached(&mut milestones, Milestone::OperationsOpen, index, minutes);
-        }
+        book.camp(&g, index);
         if plan.defender == PacingDefender::RecruitWhenReady {
             let defender = takeover_defender(&g);
             if g.next_defender() != defender {
@@ -866,6 +924,107 @@ pub fn simulate_pacing_seed(
         if g.attempt.is_some() {
             g.withdraw();
         }
+        let outcome = book.record(
+            &g,
+            index,
+            seed,
+            CampSpend {
+                learned,
+                spent_tree,
+                spent_gear,
+                spent_recruit,
+            },
+        )?;
+        replayed = matches!(step, FarmStep::Replay(_));
+        if replayed || outcome == Outcome::Victory {
+            defeats = 0;
+        } else {
+            defeats += 1;
+        }
+        if book.stopped(profile.stop_after) {
+            break;
+        }
+    }
+    Ok(book.report(profile, seed_index, seed))
+}
+/// What one camp spent before a run, for its [`PacingRun`].
+#[derive(Clone, Debug, Default)]
+struct CampSpend {
+    learned: Vec<String>,
+    spent_tree: u64,
+    spent_gear: u64,
+    spent_recruit: u64,
+}
+/// The bookkeeping every plan shares (split out of the solo loop by W2-43
+/// for the strategy bot): the runs, the milestones, the coins earned and
+/// the battle minutes so far.
+struct RunBook {
+    depths: BTreeMap<String, usize>,
+    max_depth: usize,
+    runs: Vec<PacingRun>,
+    milestones: Vec<(Milestone, usize, f32)>,
+    earned: u64,
+    minutes: f32,
+}
+impl RunBook {
+    fn new() -> Self {
+        let depths = node_depths();
+        let max_depth = depths.values().copied().max().unwrap_or(0);
+        Self {
+            depths,
+            max_depth,
+            runs: Vec::new(),
+            milestones: Vec::new(),
+            earned: 0,
+            minutes: 0.0,
+        }
+    }
+    /// The camp milestones, checked in camp after spending, before run
+    /// `index + 1`: they count `index` runs completed.
+    fn camp(&mut self, g: &Game, index: usize) {
+        let minutes = self.minutes;
+        for d in 1..=self.max_depth {
+            let mut tier = skills().nodes.iter().filter(|n| self.depths[&n.id] == d);
+            if tier.clone().any(|n| g.campaign.has_node(&n.id)) {
+                reached(
+                    &mut self.milestones,
+                    Milestone::TierFirstNode(d),
+                    index,
+                    minutes,
+                );
+            }
+            if tier.all(|n| g.campaign.has_node(&n.id)) {
+                reached(
+                    &mut self.milestones,
+                    Milestone::TierOwned(d),
+                    index,
+                    minutes,
+                );
+            }
+        }
+        for f in CampaignFeature::ALL {
+            if g.campaign.has_feature(f) {
+                reached(&mut self.milestones, Milestone::Feature(f), index, minutes);
+            }
+        }
+        if g.operations_available() {
+            reached(
+                &mut self.milestones,
+                Milestone::OperationsOpen,
+                index,
+                minutes,
+            );
+        }
+    }
+    /// Records run `index + 1` from its settled report and checks the
+    /// post-run milestones. Returns the run's outcome.
+    fn record(
+        &mut self,
+        g: &Game,
+        index: usize,
+        seed: u64,
+        spend: CampSpend,
+    ) -> Result<Outcome, String> {
         let r = g.last_result.as_ref().ok_or("Run did not settle")?;
         let level_grant_coins = r.progression_rewards.level_coins;
         let milestone_coins: u64 = r
@@ -874,25 +1033,19 @@ pub fn simulate_pacing_seed(
             .iter()
             .map(|m| m.coins)
             .sum();
-        earned += r.coins + level_grant_coins + milestone_coins + r.auto_sold.coins;
-        minutes += r.elapsed / 60.0;
-        replayed = matches!(step, FarmStep::Replay(_));
-        if replayed || r.outcome == Outcome::Victory {
-            defeats = 0;
-        } else {
-            defeats += 1;
-        }
-        let run = index + 1;
+        self.earned += r.coins + level_grant_coins + milestone_coins + r.auto_sold.coins;
+        self.minutes += r.elapsed / 60.0;
+        let (run, minutes, milestones) = (index + 1, self.minutes, &mut self.milestones);
         if r.outcome == Outcome::Victory {
-            reached(&mut milestones, Milestone::FirstVictory, run, minutes);
+            reached(milestones, Milestone::FirstVictory, run, minutes);
         }
         let liberated = g.campaign.world.cleared.len() as u32;
         for n in 1..=liberated {
-            reached(&mut milestones, Milestone::Liberation(n), run, minutes);
+            reached(milestones, Milestone::Liberation(n), run, minutes);
         }
-        for d in 1..=max_depth {
-            if earned >= tier_cost(d) {
-                reached(&mut milestones, Milestone::TierAffordable(d), run, minutes);
+        for d in 1..=self.max_depth {
+            if self.earned >= tier_cost(d) {
+                reached(milestones, Milestone::TierAffordable(d), run, minutes);
             }
         }
         let nodes_owned = skills()
@@ -906,18 +1059,18 @@ pub fn simulate_pacing_seed(
             node_retired,
         );
         if left == 0 {
-            reached(&mut milestones, Milestone::TreeExhausted, run, minutes);
+            reached(milestones, Milestone::TreeExhausted, run, minutes);
         }
         let rank = g.campaign.progression_rank();
         for n in 1..=rank {
-            reached(&mut milestones, Milestone::Rank(n), run, minutes);
+            reached(milestones, Milestone::Rank(n), run, minutes);
         }
         let defender = r.defender();
         if matches!(defender, DefenderId::Recruit(_)) {
-            reached(&mut milestones, Milestone::FirstTakeover, run, minutes);
+            reached(milestones, Milestone::FirstTakeover, run, minutes);
         }
         let t = &r.telemetry;
-        runs.push(PacingRun {
+        self.runs.push(PacingRun {
             index: run,
             seed,
             difficulty: g.campaign.balance_settings.preset,
@@ -929,17 +1082,17 @@ pub fn simulate_pacing_seed(
             coins: r.coins,
             level_grant_coins,
             milestone_coins,
-            cumulative_coins: earned,
+            cumulative_coins: self.earned,
             rank,
             level: g.campaign.player.level,
             lanes: r.lane_count,
             defender,
             kills: r.kills,
-            learned,
-            spent_tree,
-            spent_gear,
+            learned: spend.learned,
+            spent_tree: spend.spent_tree,
+            spent_gear: spend.spent_gear,
             spent_training: 0,
-            spent_recruit,
+            spent_recruit: spend.spent_recruit,
             auto_sold_count: r.auto_sold.count,
             auto_sold_coins: r.auto_sold.coins,
             nodes_owned,
@@ -953,21 +1106,22 @@ pub fn simulate_pacing_seed(
                 }),
             archetypes: archetype_runs(t),
         });
-        if profile
-            .stop_after
-            .is_some_and(|m| milestones.iter().any(|(k, ..)| *k == m))
-        {
-            break;
+        Ok(r.outcome)
+    }
+    /// The profile's stop milestone has been reached.
+    fn stopped(&self, stop_after: Option<Milestone>) -> bool {
+        stop_after.is_some_and(|m| self.milestones.iter().any(|(k, ..)| *k == m))
+    }
+    fn report(mut self, profile: &PacingProfile, seed_index: usize, seed: u64) -> PacingReport {
+        self.milestones.sort_by_key(|(m, ..)| *m);
+        PacingReport {
+            profile: *profile,
+            seed_index,
+            seed,
+            runs: self.runs,
+            milestones: self.milestones,
         }
     }
-    milestones.sort_by_key(|(m, ..)| *m);
-    Ok(PacingReport {
-        profile: *profile,
-        seed_index,
-        seed,
-        runs,
-        milestones,
-    })
 }
 /// Plays every profile at seed indices `0..seeds` on all available cores.
 /// Reports are ordered by (profile position, seed index), whatever the
@@ -983,12 +1137,22 @@ pub fn pacing_sweep_with_threads(
     seeds: usize,
     threads: usize,
 ) -> Result<Vec<PacingReport>, String> {
+    sweep_with_threads(profiles, seeds, threads, simulate_pacing_seed)
+}
+/// Runs `play` for every (profile, seed index) job on at most `threads`
+/// threads; results come back in (profile position, seed index) order.
+fn sweep_with_threads<T: Send>(
+    profiles: &[PacingProfile],
+    seeds: usize,
+    threads: usize,
+    play: fn(&PacingProfile, usize) -> Result<T, String>,
+) -> Result<Vec<T>, String> {
     let jobs: Vec<(usize, usize)> = (0..profiles.len())
         .flat_map(|p| (0..seeds).map(move |s| (p, s)))
         .collect();
     let next = AtomicUsize::new(0);
     let threads = threads.clamp(1, jobs.len().max(1));
-    let mut done: Vec<(usize, Result<PacingReport, String>)> = std::thread::scope(|scope| {
+    let mut done: Vec<(usize, Result<T, String>)> = std::thread::scope(|scope| {
         let workers: Vec<_> = (0..threads)
             .map(|_| {
                 scope.spawn(|| {
@@ -998,7 +1162,7 @@ pub fn pacing_sweep_with_threads(
                         let Some(&(p, s)) = jobs.get(job) else {
                             break;
                         };
-                        out.push((job, simulate_pacing_seed(&profiles[p], s)));
+                        out.push((job, play(&profiles[p], s)));
                     }
                     out
                 })

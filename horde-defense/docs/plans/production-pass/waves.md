@@ -552,6 +552,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `strategy_bot_acts_only_through_commands`
 - Pin: `solo_plan_is_todays_profile`.
 - Done: `target/production-before/strategy-pacing.txt`.
+- Note (W2-43, 2026-11-09): the rows are `strategy` (S1), `neighbours-solo` (S2a) and `neighbours-parallel` (S2b) on `PacingPlan.strategy` (design-campaign-defenders 1.13, "As built"). The 20-seed table (`pacing --strategy --seeds 20`, sha256 85b7ace5...0b474ad6, not committed) is in plan §9.6, "W2-43 strategy pacing before tuning". G3.10 reports, G3.12 passes (no overrun in any seed), and G3.11 fails at 9 / 9 runs: no expedition cleared a stage in any seed (S1 settles a median 367, S2b 18), because the bot sends recruits on their starter loadout. That is W4-c's input. The default `pacing 60 --runs` output does not move.
 - Deps: W2-42, W2-15.
 
 **W2-44 · ux-flow · Core labels (`Slot::label`, `DamageKind::label`)**

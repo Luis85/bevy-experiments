@@ -14,6 +14,9 @@
 //! - `--values` prints the tree value table instead (CSV: one row per skill
 //!   node with its axis, dominance group and ln gain at both reference
 //!   ranks; `horde_core::campaign::tree_value`). It plays no run.
+//! - `--strategy` plays the strategy rows (W2-43: strategy, neighbours-solo,
+//!   neighbours-parallel) and prints the goal-3 table (`median [p90]` over
+//!   `--seeds`) and the three goal-3 verdicts instead.
 //! - `--out PATH` writes the output to PATH (UTF-8, no BOM, LF) instead of
 //!   stdout, so PowerShell's `>` is never needed.
 //!
@@ -22,14 +25,17 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 use horde_core::defenders::DefenderId;
 use horde_core::sim::{
-    LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingProfile, PacingReport, by_id,
-    median_earned_after, pacing_archetype_ids, pacing_registry, pacing_sweep, tier_cost,
+    LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingProfile, PacingReport,
+    STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS, StrategyReport, by_id,
+    liberations_and_coins_per_minute, median_earned_after, outbreak_reopens, pacing_archetype_ids,
+    pacing_registry, pacing_sweep, parallel_frees_neighbours, strategy_sweep, strategy_table,
+    tier_cost,
 };
 use horde_core::skill_catalog::CampaignFeature;
 use std::fmt::Write as _;
 
 const USAGE: &str = "usage: pacing [max_runs] [--runs] [--csv] [--out PATH] \
-[--profile ID|all]... [--seeds N] [--fit-tiers a,b,c] [--values]";
+[--profile ID|all]... [--seeds N] [--fit-tiers a,b,c] [--values] [--strategy]";
 
 #[derive(Default)]
 struct Args {
@@ -41,6 +47,7 @@ struct Args {
     seeds: Option<usize>,
     fit_tiers: Vec<usize>,
     values: bool,
+    strategy: bool,
 }
 
 fn parse(args: &[String]) -> Result<Args, String> {
@@ -56,6 +63,7 @@ fn parse(args: &[String]) -> Result<Args, String> {
             "--runs" => out.list_runs = true,
             "--csv" => out.csv = true,
             "--values" => out.values = true,
+            "--strategy" => out.strategy = true,
             "--out" => out.out = Some(value("--out")?),
             "--profile" => {
                 let id = value("--profile")?;
@@ -90,7 +98,66 @@ fn parse(args: &[String]) -> Result<Args, String> {
     if out.csv && (out.list_runs || !out.fit_tiers.is_empty()) {
         return Err("--csv prints runs only; drop --runs and --fit-tiers".to_owned());
     }
+    if out.strategy
+        && (out.csv
+            || out.list_runs
+            || out.values
+            || !out.profiles.is_empty()
+            || !out.fit_tiers.is_empty())
+    {
+        return Err(
+            "--strategy prints the goal-3 table only; it takes max_runs, --seeds and --out"
+                .to_owned(),
+        );
+    }
     Ok(out)
+}
+
+/// The goal-3 table of the strategy rows and the three acceptance verdicts.
+fn strategy_text(args: &Args) -> String {
+    let seeds = args.seeds.unwrap_or(1);
+    let profiles: Vec<PacingProfile> = STRATEGY_PROFILE_IDS
+        .iter()
+        .filter_map(|id| by_id(id))
+        .map(|p| PacingProfile {
+            max_runs: args.max_runs.unwrap_or(p.max_runs),
+            ..p
+        })
+        .collect();
+    let reports = strategy_sweep(&profiles, seeds).expect("strategy profiles run");
+    let row = |id: &str| -> Vec<StrategyReport> {
+        reports
+            .iter()
+            .filter(|r| r.pacing.profile.id == id)
+            .cloned()
+            .collect()
+    };
+    let mut s = strategy_table(&reports);
+    s.push('\n');
+    for (name, verdict) in [
+        (
+            "G3.10 liberations 2/4/10 and coins per minute",
+            liberations_and_coins_per_minute(&row(STRATEGY_PROFILE_ID)),
+        ),
+        (
+            "G3.11 parallel frees 3-stage neighbours within 2/3 of solo runs",
+            parallel_frees_neighbours(&row(STRATEGY_PROFILE_IDS[1]), &row(STRATEGY_PROFILE_IDS[2])),
+        ),
+        (
+            "G3.12 fewer than 5 outbreak reopens over 10 liberations",
+            outbreak_reopens(&row(STRATEGY_PROFILE_ID)),
+        ),
+    ] {
+        match verdict {
+            Ok(summary) => {
+                let _ = writeln!(s, "{name}: PASS {summary}");
+            }
+            Err(reason) => {
+                let _ = writeln!(s, "{name}: FAIL {reason}");
+            }
+        }
+    }
+    s
 }
 
 fn selected(args: &Args) -> Vec<PacingProfile> {
@@ -308,6 +375,8 @@ fn main() {
     };
     let text = if args.values {
         horde_core::campaign::tree_value::value_table()
+    } else if args.strategy {
+        strategy_text(&args)
     } else {
         let profiles = selected(&args);
         let seeds = args.seeds.unwrap_or(1);

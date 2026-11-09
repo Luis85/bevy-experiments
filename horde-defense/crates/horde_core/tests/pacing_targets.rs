@@ -1,6 +1,6 @@
-//! Pacing acceptance: goal 5 (W2-03) and goal 6 (W2-04). Release only:
-//! every test is `#[ignore = "release-only"]`. From horde-defense/, after
-//! the debug builds:
+//! Pacing acceptance: goal 5 (W2-03), goal 6 (W2-04) and goal 3 (W2-43).
+//! Release only: every test is `#[ignore = "release-only"]`. From
+//! horde-defense/, after the debug builds:
 //!
 //! ```text
 //! cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture
@@ -8,21 +8,23 @@
 //!
 //! The acceptance sweep is expert-deu (Normal, 60 runs) over 20 seeds. The
 //! goal-6 rows (lux-easy, lux-normal, lux-hard, start-aut, start-bgd) are a
-//! second sweep over the same 20 seeds. Each sweep runs once per test binary
-//! (a `OnceLock` cache) and every test reads it. Each test prints its
-//! summary line (PASS or FAIL) and fails with the reasons. The evaluators
-//! are pinned on synthetic reports in `tests/pacing_harness.rs`, which runs
-//! in the normal suite.
+//! second sweep over the same 20 seeds, and the strategy rows (strategy,
+//! neighbours-solo, neighbours-parallel) a third. Each sweep runs once per
+//! test binary (a `OnceLock` cache) and every test reads it. Each test
+//! prints its summary line (PASS or FAIL) and fails with the reasons. The
+//! evaluators are pinned on synthetic reports in `tests/pacing_harness.rs`
+//! and `tests/strategy_pacing.rs`, which run in the normal suite.
 #![allow(clippy::print_stdout)] // the acceptance prints its summary lines
 use horde_core::balance::BalancePreset;
 use horde_core::sim::{
     DEFAULT_PROFILE_ID, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, GOAL6_CLAMPED_FIRST_VICTORY,
     GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
     GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_WINDOW_RUNS, Milestone, PacingProfile,
-    PacingReport, RunsToLiberate, archetype_coverage, boss_ttk_median_s, by_id,
-    clamped_start_first_victory, defeat_rate_windows, max_win_streak, median_run_within,
-    pacing_archetype_ids, pacing_sweep, runs_to_liberate, tier_affordable_runs,
-    tree_outlasts_liberation, unlock_order,
+    PacingReport, RunsToLiberate, STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS, StrategyReport,
+    archetype_coverage, boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows,
+    liberations_and_coins_per_minute, max_win_streak, median_run_within, outbreak_reopens,
+    pacing_archetype_ids, pacing_sweep, parallel_frees_neighbours, runs_to_liberate,
+    strategy_sweep, tier_affordable_runs, tree_outlasts_liberation, unlock_order,
 };
 use std::sync::OnceLock;
 
@@ -191,5 +193,61 @@ fn goal6_clamped_starts_first_victory_runs_2_to_4() {
         "goal6_clamped_starts_first_victory_runs_2_to_4",
         GOAL6_START_PROFILE_IDS
             .map(|id| clamped_start_first_victory(&row(id), GOAL6_CLAMPED_FIRST_VICTORY)),
+    );
+}
+
+// Goal 3 (W2-43, design-campaign-defenders 1.13): the strategy rows, a third
+// sweep over the same 20 seeds. W4-c makes them pass.
+
+/// The strategy rows' sweep, played once and shared.
+fn strategy() -> &'static [StrategyReport] {
+    static SWEEP: OnceLock<Vec<StrategyReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        let profiles: Vec<PacingProfile> = STRATEGY_PROFILE_IDS
+            .iter()
+            .map(|id| by_id(id).unwrap_or_else(|| panic!("{id} is registered")))
+            .collect();
+        strategy_sweep(&profiles, SEEDS).expect("the strategy sweep runs")
+    })
+}
+
+/// The reports of one strategy row.
+fn strategy_row(id: &str) -> Vec<StrategyReport> {
+    let reports: Vec<StrategyReport> = strategy()
+        .iter()
+        .filter(|r| r.pacing.profile.id == id)
+        .cloned()
+        .collect();
+    assert_eq!(reports.len(), SEEDS, "{id}");
+    reports
+}
+
+#[test]
+#[ignore = "release-only"]
+fn strategy_profile_reports_liberations_2_4_10_and_coins_per_minute() {
+    check(
+        "strategy_profile_reports_liberations_2_4_10_and_coins_per_minute",
+        liberations_and_coins_per_minute(&strategy_row(STRATEGY_PROFILE_ID)),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs() {
+    check(
+        "parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs",
+        parallel_frees_neighbours(
+            &strategy_row(STRATEGY_PROFILE_IDS[1]),
+            &strategy_row(STRATEGY_PROFILE_IDS[2]),
+        ),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn fewer_than_five_outbreak_reopens_over_ten_liberations() {
+    check(
+        "fewer_than_five_outbreak_reopens_over_ten_liberations",
+        outbreak_reopens(&strategy_row(STRATEGY_PROFILE_ID)),
     );
 }
