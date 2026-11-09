@@ -35,13 +35,19 @@ function Enter-DisplayHold {
     return [pscustomobject]@{
         Request = 'ES_CONTINUOUS|ES_SYSTEM_REQUIRED|ES_DISPLAY_REQUIRED'; Held = $true
         SetUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ'); Released = $false; ReleasedUtc = $null; ReleasedFrom = $null
+        Previous = [uint32]$previous
     }
 }
 
 function Exit-DisplayHold($Hold) {
-    # Clears the request (ES_CONTINUOUS alone). ReleasedFrom is the state the release replaced, 0x80000003 while held.
+    # Restores the state the hold replaced (with ES_CONTINUOUS): ES_CONTINUOUS alone for a plain hold, so the request is
+    # cleared, and the outer request for a hold inside another one on the same thread (R31: the A/B sitting holds the
+    # display around each measure_performance pass, which runs in its process). ReleasedFrom is the state the release
+    # replaced, 0x80000003 while held.
     if ($null -eq $Hold -or -not $Hold.Held -or $Hold.Released) { return }
-    $previous = Set-ThreadExecutionState ([uint32]2147483648)
+    $restore = [uint32]2147483648
+    if ($null -ne $Hold.PSObject.Properties['Previous']) { $restore = [uint32]($restore -bor [uint32]$Hold.Previous) }
+    $previous = Set-ThreadExecutionState $restore
     $Hold.Released = $true
     $Hold.ReleasedUtc = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
     $Hold.ReleasedFrom = '0x' + ([uint32]$previous).ToString('X8')

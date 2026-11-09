@@ -16,6 +16,8 @@ if (-not (Test-Path -LiteralPath $nativeLibrary)) { throw "FAIL: missing $native
 $displayLibrary = Join-Path $scriptsDirectory 'lib\DisplayPower.ps1'
 # The quiet window and the per-run load check (R30): the same pattern, with Get-CimInstance and Start-Sleep shimmed.
 $machineLibrary = Join-Path $scriptsDirectory 'lib\MachineLoad.ps1'
+# The interface_total A/B decision (R31), with fixture runs.
+$abLibrary = Join-Path $scriptsDirectory 'lib\AbInterfaceTotal.ps1'
 
 $script:failures = New-Object System.Collections.Generic.List[string]
 $script:passed = 0
@@ -180,6 +182,17 @@ public static class LastLightNativeHelper {
             string[] physical = String.IsNullOrEmpty(window)
                 ? new string[] { (int.Parse(size[0]) * 2).ToString(), (int.Parse(size[1]) * 2).ToString() }
                 : window.Split('x');
+            // HORDE_FAKE_INTERFACE_TOTAL ("exe-a=2.0;exe-b=2.1") sets the interface_total mean by the folder above the
+            // exe's debug folder, so the two A/B arms (<out>\exe-a\debug, <out>\exe-b\debug) report their own; else 1.0.
+            string interfaceTotal = "1.0";
+            string totals = Environment.GetEnvironmentVariable("HORDE_FAKE_INTERFACE_TOTAL");
+            if (!String.IsNullOrEmpty(totals)) {
+                string arm = Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName)));
+                foreach (string entry in totals.Split(';')) {
+                    string[] pair = entry.Split('=');
+                    if (pair.Length == 2 && pair[0] == arm) { interfaceTotal = pair[1]; }
+                }
+            }
             File.WriteAllText(report, "{\"version\":3,\"scene\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN")
                 + "\",\"width_physical\":" + physical[0] + ",\"height_physical\":" + physical[1]
                 + ",\"windows_scale\":2.0,\"ui_scale\":" + Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCALE")
@@ -188,7 +201,7 @@ public static class LastLightNativeHelper {
                 + ",\"completed_sample_target\":true,\"paused\":false,\"unfocused_sample_frames\":" + unfocused
                 + ",\"frames_over_50ms\":0,\"frames_over_50ms_driver_stall\":0,\"driver_stalls\":{\"frames\":[],\"outside\":{\"frames_over_50ms\":0}}"
                 + ",\"work_mean_ms\":[0.4,0.0,1.0]"
-                + ",\"phases\":{\"cpu_frame_ms\":{\"mean\":4.0,\"p50\":4.0,\"p95\":4.5,\"p99\":5.0,\"max\":6.0},\"interface_total_ms\":{\"mean\":1.0,\"p50\":1.0,\"p95\":1.2,\"p99\":1.3,\"max\":1.5}}"
+                + ",\"phases\":{\"cpu_frame_ms\":{\"mean\":4.0,\"p50\":4.0,\"p95\":4.5,\"p99\":5.0,\"max\":6.0},\"interface_total_ms\":{\"mean\":" + interfaceTotal + ",\"p50\":1.0,\"p95\":1.2,\"p99\":1.3,\"max\":1.5}}"
                 + ",\"egui\":{\"texture_uploads\":{\"count\":0,\"bytes\":0,\"frames\":0}"
                 + ",\"battlefield_primitives\":{\"mean\":19.0,\"max\":19},\"battlefield_vertices\":{\"mean\":30000.0,\"max\":32000}}"
                 + ",\"present\":{\"requested_mode\":\"" + mode + "\",\"pipelined_rendering\":" + pipelined + "}"
@@ -682,6 +695,101 @@ try {
         Assert-True ($script:sampleTimes.Count -ge 2 -and $script:sampleTimes.Count -le 4) "samples before the timeout: $($script:sampleTimes.Count)"
     }
 
+    Test-Case 'Exit-DisplayHold restores an outer hold it did not create (R31: the A/B sitting holds the display around each pass)' {
+        . $displayLibrary
+        # The shim keeps a thread state as Windows does and returns the state each call replaced.
+        $script:threadState = [uint32]2147483648
+        $script:executionStates = New-Object System.Collections.Generic.List[string]
+        function Set-ThreadExecutionState([uint32]$Flags) {
+            $previous = $script:threadState
+            $script:threadState = $Flags
+            $script:executionStates.Add('0x' + $Flags.ToString('X8'))
+            return $previous
+        }
+        $outer = Enter-DisplayHold
+        $inner = Enter-DisplayHold
+        Exit-DisplayHold $inner
+        Assert-Equal '0x80000003' ('0x' + $script:threadState.ToString('X8')) 'the inner release keeps the outer hold'
+        Assert-Equal '0x80000003' $inner.ReleasedFrom 'the inner release replaced the held state'
+        Exit-DisplayHold $outer
+        Assert-Equal '0x80000000' ('0x' + $script:threadState.ToString('X8')) 'the outer release clears it'
+        Assert-Equal '0x80000003,0x80000003,0x80000003,0x80000000' ($script:executionStates -join ',') 'requests'
+    }
+
+    # R31 fixtures: one A/B run per pair, arm and size, as ConvertTo-AbRun returns them.
+    function New-AbRun([int]$Pair, [string]$Arm, [string]$Size, $Value, [string[]]$Problems = @()) {
+        [pscustomobject]@{ Pair = $Pair; Arm = $Arm; Size = $Size; Value = $Value; Valid = ($Problems.Count -eq 0); Problems = $Problems; File = "$Size.json" }
+    }
+    function New-AbSitting([double[]]$A, [double[]]$B, [string]$Size) {
+        for ($i = 0; $i -lt $A.Count; $i++) {
+            New-AbRun ($i + 1) 'A' $Size $A[$i]
+            New-AbRun ($i + 1) 'B' $Size $B[$i]
+        }
+    }
+    function Format-AbCheck($Verdict) {
+        @($Verdict.Checks | ForEach-Object { "$($_.size) $($_.status) $($_.a_median) $($_.b_median)" }) -join '|'
+    }
+
+    Test-Case 'Measure-AbInterfaceTotal passes when B''s median is at most 1.05 x A''s per size, at the limit too (R31: pass)' {
+        . $abLibrary
+        $runs = @(New-AbSitting @(2.0, 2.1, 1.9, 2.0, 2.2) @(2.1, 2.0, 2.05, 2.1, 2.0) 'normal') +
+            @(New-AbSitting @(1.8, 1.8, 1.8, 1.8, 1.8) @(1.89, 1.80, 1.89, 1.95, 1.70) 'small')
+        $verdict = Measure-AbInterfaceTotal $runs @('normal', 'small') 5 1.05
+        Assert-Equal 0 $verdict.ExitCode 'exit code'
+        Assert-Equal 'normal pass 2 2.05|small pass 1.8 1.89' (Format-AbCheck $verdict) 'medians; small sits at 1.05 x A'
+        $normal = @($verdict.Checks)[0]
+        Assert-Equal '2|2.1|1.9|2|2.2' (@($normal.a_values | ForEach-Object { "$_" }) -join '|') 'A values in pair order'
+        Assert-True ([Math]::Abs($normal.limit - 2.1) -lt 1e-9) "limit $($normal.limit)"
+        Assert-True ([Math]::Abs($normal.ratio - 1.025) -lt 1e-9) "ratio $($normal.ratio)"
+        Assert-Equal 5 (Get-AbRule).Pairs 'the gate is 5 pairs'
+        Assert-Equal 1.05 (Get-AbRule).Tolerance 'the gate tolerance'
+        Assert-Equal 'ab03da9' (Get-AbRule).Commit 'A is the wave-1 close'
+    }
+
+    Test-Case 'Measure-AbInterfaceTotal fails when B''s median is above 1.05 x A''s (R31: fail)' {
+        . $abLibrary
+        $runs = @(New-AbSitting @(2.0, 2.1, 1.9, 2.0, 2.2) @(2.2, 2.3, 2.1, 2.25, 2.2) 'normal') +
+            @(New-AbSitting @(1.8, 1.8, 1.8, 1.8, 1.8) @(1.8, 1.8, 1.8, 1.8, 1.8) 'small')
+        $verdict = Measure-AbInterfaceTotal $runs @('normal', 'small') 5 1.05
+        Assert-Equal 1 $verdict.ExitCode 'exit code'
+        Assert-Equal 'normal over 2 2.2|small pass 1.8 1.8' (Format-AbCheck $verdict) 'normal is over'
+    }
+
+    Test-Case 'Measure-AbInterfaceTotal makes a size with an invalid or missing pair invalid evidence (R31: invalid pair)' {
+        . $abLibrary
+        $normal = @(New-AbSitting @(2.0, 2.0, 2.0, 2.0, 2.0) @(2.0, 2.0, 2.0, 2.0, 2.0) 'normal' | Where-Object { -not ($_.Pair -eq 3 -and $_.Arm -eq 'B') })
+        $normal += New-AbRun 3 'B' 'normal' 2.0 @('CPU load 95% during the run (a sample at 90% or more is invalid evidence; samples 95)')
+        # small is over, but an invalid size makes the whole A/B invalid evidence.
+        $small = @(New-AbSitting @(1.8, 1.8, 1.8, 1.8, 1.8) @(2.5, 2.5, 2.5, 2.5, 2.5) 'small')
+        $verdict = Measure-AbInterfaceTotal ($normal + $small) @('normal', 'small') 5 1.05
+        Assert-Equal 2 $verdict.ExitCode 'exit code'
+        Assert-Equal 'normal invalid  |small over 1.8 2.5' (Format-AbCheck $verdict) 'statuses'
+        Assert-Equal 'pair 3: B invalid (CPU load 95% during the run (a sample at 90% or more is invalid evidence; samples 95))' @($verdict.Checks)[0].note 'the invalid pair is named'
+        $short = @(New-AbSitting @(2.0, 2.0, 2.0, 2.0) @(2.0, 2.0, 2.0, 2.0) 'normal') + @(New-AbSitting @(1.8, 1.8, 1.8, 1.8, 1.8) @(1.8, 1.8, 1.8, 1.8, 1.8) 'small')
+        $verdict = Measure-AbInterfaceTotal $short @('normal', 'small') 5 1.05
+        Assert-Equal 2 $verdict.ExitCode 'a missing pair'
+        Assert-Equal 'pair 5: A missing, B missing' @($verdict.Checks)[0].note 'the missing pair is named'
+    }
+
+    Test-Case 'ConvertTo-AbRun reads a measure_performance summary and rejects another present mode or pipelined state (R31)' {
+        . $abLibrary
+        $summary = @'
+{"runs":[
+ {"size":"normal","file":"progressed-peak-normal.json","valid":true,"problems":[],"interface_total_mean_ms":2.0,"present_mode":"Fifo","pipelined_rendering":true},
+ {"size":"small","file":"progressed-peak-small.json","valid":false,"problems":["unfocused_sample_frames 2, expected 0"],"interface_total_mean_ms":1.9,"present_mode":"Fifo","pipelined_rendering":true}
+]}
+'@ | ConvertFrom-Json
+        $runs = @(ConvertTo-AbRun $summary 2 'B' 'Fifo' $true)
+        Assert-Equal 'normal 2 B True 2|small 2 B False 1.9' (@($runs | ForEach-Object { "$($_.Size) $($_.Pair) $($_.Arm) $($_.Valid) $($_.Value)" }) -join '|') 'runs'
+        Assert-Equal 'unfocused_sample_frames 2, expected 0' (@($runs[1].Problems) -join '; ') 'measure_performance problems carry over'
+        $other = @'
+{"runs":[{"size":"normal","file":"x.json","valid":true,"problems":[],"interface_total_mean_ms":null,"present_mode":"AutoNoVsync","pipelined_rendering":false}]}
+'@ | ConvertFrom-Json
+        $run = @(ConvertTo-AbRun $other 1 'A' 'Fifo' $true)[0]
+        Assert-True (-not $run.Valid) 'not the gate''s flags'
+        Assert-Equal "no interface_total_mean_ms; present mode 'AutoNoVsync', the gate's is 'Fifo'; pipelined_rendering 'False', the gate's is 'True'" (@($run.Problems) -join '; ') 'problems'
+    }
+
     Test-Case 'Resolve-Tool finds applications only' {
         Assert-True ((Resolve-Tool 'cmd') -match '\\cmd\.exe$') 'cmd'
         $threw = $false
@@ -1157,6 +1265,74 @@ try {
             Assert-Equal 3 $r.ExitCode ("$($arguments -join ' '): exit code; out: " + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
             Assert-True (-not (Test-Path -LiteralPath (Join-Path $temporary "perf-quiet-bad-$index"))) "$($arguments -join ' '): created its output directory"
         }
+    }
+
+    # R31: ab_interface_total.ps1 end to end on the shimmed machine, both arms copies of the fake game. The fake reports
+    # the interface_total mean HORDE_FAKE_INTERFACE_TOTAL gives its arm folder (exe-a or exe-b).
+    $abScript = Join-Path $scriptsDirectory 'ab_interface_total.ps1'
+    function Invoke-AbGate([string]$Name, [string]$Totals, [string[]]$Shim = @(), [string[]]$Extra = @()) {
+        $out = Join-Path $temporary $Name
+        $env:HORDE_FAKE_INTERFACE_TOTAL = $Totals
+        try {
+            $m = Invoke-Shimmed $abScript $Name (@('-NoBuild', '-ExecutableA', $helper, '-ExecutableB', $helper, '-Pairs', '2', '-OutputDirectory', $out) + $Extra) $Shim
+        }
+        finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_INTERFACE_TOTAL', $null, 'Process') }
+        $record = $null
+        if (Test-Path -LiteralPath (Join-Path $out 'ab.json')) { $record = Get-Content -Raw -LiteralPath (Join-Path $out 'ab.json') | ConvertFrom-Json }
+        $m | Add-Member -NotePropertyName Record -NotePropertyValue $record
+        $m | Add-Member -NotePropertyName Markdown -NotePropertyValue (Read-Log (Join-Path $out 'ab.md'))
+        return $m
+    }
+    function Format-AbRecord($Record) {
+        @($Record.checks | ForEach-Object { "$($_.size) $($_.status) $($_.a_median) $($_.b_median)" }) -join '|'
+    }
+
+    Test-Case 'ab_interface_total alternates A and B and passes B within 1.05 x A per size (R31: pass)' {
+        $m = Invoke-AbGate 'ab-pass' 'exe-a=2.0;exe-b=2.08'
+        Assert-Equal 0 $m.Result.ExitCode "exit code; $($m.Log)"
+        Assert-Equal 'pair-1-a,pair-1-b,pair-2-a,pair-2-b' (@($m.Record.order | ForEach-Object { $_.directory }) -join ',') 'A and B alternate'
+        Assert-Equal 'normal pass 2 2.08|small pass 2 2.08' (Format-AbRecord $m.Record) 'checks'
+        Assert-Equal 'progressed-peak dev Fifo True' "$($m.Record.scene) $($m.Record.profile) $($m.Record.present_mode) $($m.Record.pipelined)" 'the gate''s scene, profile and flags'
+        Assert-Equal 1.05 $m.Record.tolerance 'tolerance'
+        Assert-Equal 8 @($m.Record.runs | Where-Object { $_.valid }).Count 'two pairs at two sizes, every run valid'
+        Assert-Equal $true $m.Record.quiet_window.wait.quiet 'one quiet window before the sitting'
+        Assert-Equal 13 @($m.Machine | Where-Object { $_ -like 'ps|*' }).Count 'the measure passes skip their own window'
+        Assert-Equal 21 @($m.Machine | Where-Object { $_ -like 'load|*' }).Count '13 window samples and one per run'
+        Assert-Equal $true $m.Record.display_hold.released 'the sitting''s display hold is released'
+        Assert-True ($m.Markdown -match '\| normal \| 2, 2 \| 2.08, 2.08 \| 2 \| 2.08 \| 1.04 \| 2.1 \| pass \|') "ab.md check row; $($m.Markdown)"
+        foreach ($arm in @('a', 'b')) {
+            Assert-True (Test-Path -LiteralPath (Join-Path $temporary "ab-pass\pair-1-$arm\summary.json")) "pair 1 $arm keeps its measure_performance evidence"
+        }
+    }
+
+    Test-Case 'ab_interface_total fails when B''s median is above 1.05 x A''s (R31: fail)' {
+        $m = Invoke-AbGate 'ab-fail' 'exe-a=2.0;exe-b=2.2'
+        Assert-Equal 1 $m.Result.ExitCode "exit code; $($m.Log)"
+        Assert-Equal 'normal over 2 2.2|small over 2 2.2' (Format-AbRecord $m.Record) 'checks'
+        Assert-Equal 'B over 1.05 x A' $m.Record.verdict 'verdict'
+    }
+
+    Test-Case 'ab_interface_total makes a size with an invalid pair invalid evidence (R31: invalid pair)' {
+        # Load samples: 13 for the window, then pair 1 A normal and small, then B normal twice at 95% (invalid twice).
+        $m = Invoke-AbGate 'ab-invalid' 'exe-a=2.0;exe-b=2.0' @('-ShimLoad', '10x15,95,95,10')
+        Assert-Equal 2 $m.Result.ExitCode "exit code; $($m.Log)"
+        Assert-Equal 'normal invalid  |small pass 2 2' (Format-AbRecord $m.Record) 'checks'
+        Assert-True (@($m.Record.checks)[0].note -like 'pair 1: B invalid (CPU load 95% during the run*') "note: $(@($m.Record.checks)[0].note)"
+        Assert-Equal 'invalid evidence' $m.Record.verdict 'verdict'
+    }
+
+    Test-Case 'ab_interface_total exits 3 on bad arguments and 2 when the quiet window times out (R31)' {
+        $index = 0
+        foreach ($arguments in @(@('-Pairs', '0'), @('-Pairs', 'x'), @('-NoBuild'), @('-Bogus'))) {
+            $index += 1
+            $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $abScript) + $arguments
+            $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\ab-bad-$index") -TimeoutSeconds 120
+            Assert-Equal 3 $r.ExitCode ("$($arguments -join ' '): exit code; out: " + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+        }
+        $m = Invoke-AbGate 'ab-timeout' 'exe-a=2.0;exe-b=2.0' @('-ShimLoad', '50') @('-QuietTimeoutMinutes', '1')
+        Assert-Equal 2 $m.Result.ExitCode "exit code; $($m.Log)"
+        Assert-Equal 0 @($m.Record.order).Count 'no pair ran'
+        Assert-True ($m.Record.failure -match '^quiet window timed out after 1 min before the A/B') "failure: $($m.Record.failure)"
     }
 
     Test-Case 'capture_review reports every sidecar check row and fails the run on a failed one' {
