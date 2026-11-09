@@ -1,12 +1,14 @@
 //! Shared, recorded homestead work. The host orders `tick` after village vitals.
 mod agent;
 mod commands;
+mod crops;
 mod model;
 use super::{Villager, catalog, economy, geography, living};
 pub use agent::{affordances, describe, handle, observe, plot_json};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 pub use commands::HomesteadAct;
+pub use crops::{CropDef, crop_catalog, crop_definition};
 pub use model::{BuildMaterial, Cottage, CottageBuild, Crop, HomesteadPlot};
 use npc_framework::agent_io::AgentIoAppExt;
 use npc_framework::interaction::items::{self, entity_of};
@@ -255,6 +257,7 @@ fn finish_build(world: &mut World, actor: Entity, build: CottageBuild) {
     estate.cottage_built = true;
     estate.cottage_entity = Some(cottage);
     world.get_mut::<Villager>(actor).expect("owner").home = front_door(center);
+    super::colony::cottage_claimed(world, plot, me);
     record_effect(
         world,
         Some(me),

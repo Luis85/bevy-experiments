@@ -282,7 +282,13 @@ pub fn merchant_check(
         }
         check_trade(world, actor, trader, kind, n)
     } else {
-        if !catalog::wants_for(world, role, kind) {
+        let construction_demand = super::colony::construction_materials(world, trader)
+            .iter()
+            .any(|(material, quantity)| *material == kind && *quantity > 0);
+        let household_demand = super::colony::household_materials(world, trader)
+            .iter()
+            .any(|(material, quantity)| *material == kind && *quantity > 0);
+        if !catalog::wants_for(world, role, kind) && !construction_demand && !household_demand {
             return Err("this shop has no use for that good".into());
         }
         // Dynamic merchant stock is discoverable only while trading nearby.

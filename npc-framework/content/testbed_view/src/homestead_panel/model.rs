@@ -177,7 +177,9 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
                 rows.push(row);
             }
             if plots.is_empty() {
-                rows.push(Entry::note("no-plots", "Explore the southern house lane or northern gardens. Right-click ground to walk; plots appear after your hero discovers them."));
+                rows.push(Entry::note("no-plots", if testbed_content::village::colony::enabled(world) {
+                    "Explore the southern house lane or northern gardens. WASD walks; nearby plots appear here when you discover them."
+                } else {"Explore the southern house lane or northern gardens. Right-click ground to walk; plots appear after your hero discovers them."}));
                 explore(world, ready, &mut rows);
                 return rows;
             }
@@ -279,7 +281,15 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
             };
             let approach = position(&crop["position"]);
             let stage = crop["stage"].as_str().unwrap_or("unknown");
-            rows.push(Entry::note("crop-cost", format!("Seeds {} | Clean water {}. Plant one grain, water once, harvest three grain. Growth follows world time.", amount(catalog::GRAIN), amount(catalog::WATER))));
+            let crop_kind = crop["kind"].as_str().unwrap_or(catalog::GRAIN);
+            let definition = array(&obs["sections"]["homestead"]["crops"])
+                .iter()
+                .find(|definition| definition["kind"] == crop_kind)
+                .unwrap_or(&obs["sections"]["homestead"]["crop"]);
+            let yield_count = definition["yield_count"].as_u64().unwrap_or(3);
+            let yield_kind = definition["yield_kind"].as_str().unwrap_or(crop_kind);
+            rows.push(Entry::note("crop-cost", format!("Seeds {} | Clean water {}. One seed and one watering grow {yield_count} {}. Growth follows world time.", amount(crop_kind), amount(catalog::WATER), friendly(yield_kind))));
+            let harvest_label = format!("Harvest | {yield_count} {}", friendly(yield_kind));
             let (verb, label, enabled) = match stage {
                 "empty" => ("plant", "Plant grain | 1 seed", amount(catalog::GRAIN) > 0),
                 "needs_water" => (
@@ -287,7 +297,7 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
                     "Water crop | 1 clean water",
                     amount(catalog::WATER) > 0,
                 ),
-                "ready" => ("harvest", "Harvest | 3 grain", true),
+                "ready" => ("harvest", harvest_label.as_str(), true),
                 "growing" => {
                     let start = crop["watered_at"].as_u64().unwrap_or(0);
                     let end = crop["ready_at"].as_u64().unwrap_or(start);
@@ -297,7 +307,8 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
                     rows.push(Entry::note(
                         "crop-growing",
                         format!(
-                            "Grain growing | {}%. Keep exploring; the crop will wait when ready.",
+                            "{} growing | {}%. Keep exploring; the crop will wait when ready.",
+                            friendly(crop_kind),
                             progress.min(100)
                         ),
                     ));
@@ -329,14 +340,14 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
                 let kind = resource["kind"].as_str().unwrap_or("resource");
                 let position = player_actions::known_position(world, SimId(target));
                 let available = resource["remaining"].as_u64().is_none_or(|n| n > 0);
-                let label = format!("Gather {quantity} {}", friendly(kind));
+                let label = format!("Gather 1 {}", friendly(kind));
                 rows.push(Entry::button(
                     format!("gather-{target}"),
                     label.clone(),
                     work(
                         "gather",
                         Some(target),
-                        json!({"quantity":quantity}),
+                        json!({"quantity":1}),
                         position,
                         &label,
                     ),
@@ -479,7 +490,7 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
                         work(
                             verb,
                             Some(target),
-                            json!({"kind":kind,"quantity":quantity}),
+                            json!({"kind":kind,"quantity":quantity,"limit_price":offer["unit_price"]}),
                             None,
                             &label,
                         ),
@@ -579,5 +590,31 @@ pub(super) fn control_caption(control: &ControlState) -> &'static str {
         ControlState::Unavailable => {
             "This actor cannot play right now. Use New life if your hero has died."
         }
+    }
+}
+
+pub(super) fn player_control_caption(control: &ControlState) -> &'static str {
+    match control {
+        ControlState::Native => "WASD walks. Choose work, food or trade below.",
+        ControlState::Free => "Choose Play as hero to join the island.",
+        ControlState::Foreign { .. } => {
+            "Another player or AI controls this character. Release it before playing here."
+        }
+        ControlState::Unavailable => "This life has ended. Choose New life to return.",
+    }
+}
+pub(super) fn player_activity_caption(activity: &str) -> &'static str {
+    match activity {
+        "awaiting_arrival" => "ready to join",
+        "resting" => "resting",
+        "walking" => "walking",
+        "gathering" => "gathering",
+        "crafting" => "crafting",
+        "hunting" => "hunting",
+        "building" => "building",
+        "blocked" => "route blocked",
+        "working" => "working",
+        "dead" => "life ended",
+        _ => "ready to explore",
     }
 }

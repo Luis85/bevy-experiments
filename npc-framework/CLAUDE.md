@@ -34,8 +34,8 @@ Example content: the village (villagers with needs, a food economy) and the Acto
 | `crates/npc_view_helpers` | generic view: `VisualOf`, interpolation, panels, selection, screenshots, gizmos, `command_ui`, perf setup | `bevy`, kernel |
 | `content/village_content` / `village_view` | the villager: needs, places, actions, tree, commands, scenarios / models, animation, camera, F1 overlay | facade (+ `bevy` for the view) |
 | `content/testbed_content` / `testbed_view` | Actor Testbed, actor/world preset validation, optional world mechanics, explorer hosts/workspaces/settings / models, fog, standalone model preview, F5/F6, F7 notebooks + Map, landmark markers, prompt modal, RTS UI | facade (+ `bevy` for the view) |
-| `apps/village` / `apps/actor_testbed` | windowed demos (speed keys, BRP `npc/*` + `agent/*`); testbed explorer `--explorer-home` and standalone `--actor-editor` | facade + content + view |
-| `apps/game_menu` | launcher (`cargo run --locked -p game_menu`), structured Worlds editor, Actors launch, settings, actor/world New/Resume selection, tracked detached worlds, save/stop/handover/quit | `bevy` + `testbed_content` (no sim) |
+| `apps/village` / `apps/actor_testbed` | windowed hosts (speed keys, BRP `npc/*` + `agent/*`); actor_testbed library owns the single-window island frontend/session, explorer `--explorer-home` and standalone `--actor-editor` | facade + content + view |
+| `apps/game_menu` | normal entry dispatches into actor_testbed's host library; explicit `--developer-menu` retains Worlds/Actors editors, settings, AI explorer New/Resume, detached worlds and lifecycle tools | `bevy` + `testbed_content` + `actor_testbed` host library |
 | `apps/npcctl` | headless JSON CLI, explorer serve, registered/legacy agent + player notes/map clients, stdio MCP (never a renderer) | facade + content |
 | `apps/rts_units_demo` | portability proof: own units/map/physics, 10 Hz in host `FixedUpdate`, `--headless-ticks N` | facade + `bevy` only |
 | `xtask` | `cargo xtask verify`, architecture fitness and hook tests | tooling |
@@ -54,6 +54,36 @@ Capability crates depend on each other only per ADR 0012's whitelist; everything
 - [0021: performance domains and trace explorer](docs/adr/0021-performance-domains-and-trace-explorer.md).
 - [0022: island economy and permanent lives](docs/adr/0022-island-village-economy-and-permanent-lives.md).
 - [0023: host idle supervision for AI CLI sessions](docs/adr/0023-host-idle-supervision-for-ai-cli-sessions.md).
+- [0035: island colony showcase and ownership](docs/adr/0035-island-colony-showcase.md).
+- [0036: one-window island player flow](docs/adr/0036-one-window-island-player-flow.md).
+
+The normal entry showcases `island_colony` through title, New/Continue, play and pause
+in one process. The old launcher is explicit (`--developer-menu`). Read
+[`docs/architecture-island.md`](docs/architecture-island.md) before extending its
+mechanics: colony contexts own state and pure queries, resident actions own physical
+execution, production owns its plan, native control has one coordinator, and views
+submit recorded inputs. Local saves and launcher shutdown use an explicit persistent
+host lifecycle. Historical scenarios remain developer/replay fixtures.
+
+The host's `frontend` and `island::session` own screens, pause and file lifecycle;
+`testbed_view::player_hud` owns player presentation and submits shared actions.
+`FrontendGate` suppresses gameplay input and automatic view work while menus are
+open; it does not become simulation state. `village::player_journey` projects
+guidance from actor-scoped observations without rewards or persisted quest counters.
+Crop definitions belong to homestead content. A save/title transition clears stale
+navigation while preserving committed work and reservations. New game stages and
+validates a world, backs up the previous save and rolls back if writing fails.
+Inspector-first entry preserves `AwaitingArrival` until explicit character play.
+Inspector/editor transitions change presentation immediately, but defer native
+detach while accepted or active work still owns its reservations. Explicit Stop,
+NPC critical-need interruption and death keep their distinct cancellation rules.
+`village::discovery` exposes existing per-actor `SeenStatics` identities/positions
+for immovable island places through known/position providers; it must not expose
+unseen live stock, foreign plot state, moving actors or loose items. Presentation
+outcome trackers and death-panel dismissal are scoped to actor and host epoch.
+Hidden workspaces must not build observations only to discard them. Profile through
+the existing view tags; do not change authoritative scheduling based on UI visibility.
+See [player flow](docs/island-life.md) and ADR 0036 before changing these boundaries.
 
 ## Golden rules
 
@@ -136,6 +166,7 @@ Explorer and editor commands (folder arguments below are placeholders; use absol
 
 ```sh
 cargo run --locked -p game_menu
+cargo run --locked -p game_menu -- --developer-menu
 cargo run --locked -p actor_testbed -- --actor-editor --actors-dir DIR
 cargo run --locked -p actor_testbed -- --explorer-home DIR --agent NAME --world WORLD --preset rover --world-preset survival
 cargo run --locked -p npcctl -- serve --explorer-home DIR --agent NAME --resume
@@ -147,8 +178,13 @@ npcctl agent-token rotate --explorer-home DIR --agent NAME
 ```
 
 Read ID/TOKEN privately from the agent's `AGENTS.md`; never paste real credentials into documentation or logs.
+Normal `game_menu` play uses the configured agents folder's `local-island.world.json`,
+with no remote listener by default. Explicit `--front-end` forwards host flags such
+as `--island-save PATH`, `--island-rules PATH` and `--remote`. The title does not tick
+or overwrite the world; the pause menu provides Save game, Save and title, and Quit game.
+
 Explorer hosts also accept `--actors-dir DIR` and `--worlds-dir DIR`. Stop the active host before a manual
-resume. Menu Open/Stop and the window's F9/close dialog manage save and same-port handover automatically;
+resume. The developer menu's Open/Stop and explorer window's F9/close dialog manage save and same-port handover automatically;
 a failed save keeps the host alive. Menu Quit stops its started/adopted hosts, not unrelated processes.
 
 Live games serve BRP on `127.0.0.1:15702` (`npc/*`, `agent/*`, `world/state`; dev builds, or `--remote`). Change
@@ -187,5 +223,10 @@ Skills: `/add-mechanic`, `/add-unit-type`, `/verify-visual`, `/debug-desync`, `/
 - Guides: `docs/using-npc-framework.md` (integrating into a game), `docs/debugging.md` (every CLI subcommand,
   RPC method, journal kind, budget, recipes), `docs/rebaselining.md`, `docs/agent-experiments.md` (AI agents
   playing actors), `docs/adding-a-host-app.md` (a new windowed app in this workspace: the `deny.toml` step).
+- Island: `docs/island-life.md` (normal player flow), `docs/island-colony.md` (management/terrain),
+  `docs/island-ai-authoring.md` (routines and GOAP), `docs/architecture-island.md` (system ownership).
+- Research: `docs/research/2026-11-09-{experience,simulation,implementation}-research.md`
+  records source evidence, proposed changes and limits. These briefs are not a passing
+  test report or permission to broaden the task; use the corresponding validation note.
 - Specs: `docs/superpowers/specs/`. Research: `docs/research/` (best practices, agent-driven gamedev, Bevy 0.20).
 - Decisions: `docs/adr/`. History: `CHANGELOG.md`. Benchmarks: `bench/README.md`. Evidence notes: `docs/_notes/`.

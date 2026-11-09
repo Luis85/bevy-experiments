@@ -73,13 +73,21 @@ struct FarmAction(Action);
 struct FarmControl;
 #[derive(Component)]
 struct FarmLabel;
+#[derive(Component)]
+struct FarmTypography;
+#[derive(Resource)]
+struct FarmFont(Handle<Font>);
 
 pub(crate) fn plugin(app: &mut App) {
+    crate::panel_scroll::install(app);
     if !app.is_plugin_added::<bevy::ui_widgets::ButtonPlugin>() {
         app.add_plugins(bevy::ui_widgets::ButtonPlugin);
     }
     if !app.is_plugin_added::<bevy::ui_widgets::ScrollAreaPlugin>() {
         app.add_plugins(bevy::ui_widgets::ScrollAreaPlugin);
+    }
+    if testbed_content::village::colony::enabled(app.world()) {
+        app.add_systems(Startup, load_farm_font);
     }
     app.init_resource::<FarmState>()
         .init_resource::<NativeActions>()
@@ -93,11 +101,12 @@ pub(crate) fn plugin(app: &mut App) {
             (keys, shield)
                 .chain()
                 .in_set(ViewSystems::OverlayInput)
+                .run_if(not(crate::player_hud::enabled))
                 .run_if(not(crate::modal_open)),
         )
         .add_systems(
             Update,
-            (player_actions::tick, process, refresh, paint)
+            (player_actions::tick, process, refresh, typography, paint)
                 .chain()
                 .in_set(ViewSystems::Present),
         );
@@ -105,6 +114,7 @@ pub(crate) fn plugin(app: &mut App) {
 
 fn text(value: &str, size: f32, color: Color) -> impl Bundle {
     (
+        FarmTypography,
         Text::new(value),
         TextFont {
             font_size: FontSize::Px(size),
@@ -113,6 +123,31 @@ fn text(value: &str, size: f32, color: Color) -> impl Bundle {
         TextColor(color),
         TextLayout::default().with_linebreak(bevy::text::LineBreak::WordOrCharacter),
     )
+}
+fn load_farm_font(mut commands: Commands, fonts: Option<ResMut<Assets<Font>>>) {
+    if let Some(mut fonts) = fonts {
+        let font = Font::from_bytes(
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../assets/fonts/Barlow-Regular.ttf"
+            ))
+            .to_vec(),
+        );
+        commands.insert_resource(FarmFont(fonts.add(font)));
+    }
+}
+fn typography(font: Option<Res<FarmFont>>, mut texts: Query<&mut TextFont, With<FarmTypography>>) {
+    let Some(font) = font else { return };
+    for mut text in &mut texts {
+        if text.font != bevy::text::FontSource::Handle(font.0.clone()) {
+            text.font = font.0.clone().into();
+            if text.font_size == FontSize::Px(12.0) {
+                text.font_size = FontSize::Px(13.0);
+            } else if text.font_size == FontSize::Px(18.0) {
+                text.font_size = FontSize::Px(20.0);
+            }
+        }
+    }
 }
 fn button(world: &mut World, parent: Entity, label: &str, action: Action) -> Entity {
     let entity = world
@@ -252,20 +287,31 @@ fn spawn(world: &mut World) {
         .id();
     button(world, quantity, "Quantity -", Action::Quantity(-1));
     button(world, quantity, "Quantity +", Action::Quantity(1));
-    world.spawn((
-        ChildOf(root),
-        FarmBody,
-        ScrollArea,
-        Node {
-            flex_direction: FlexDirection::Column,
-            row_gap: px(6),
-            flex_grow: 1.0,
-            flex_shrink: 1.0,
-            min_height: px(0),
-            overflow: Overflow::scroll_y(),
-            ..default()
-        },
-    ));
+    let body = world
+        .spawn((
+            ChildOf(root),
+            FarmBody,
+            ScrollArea,
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(6),
+                flex_grow: 1.0,
+                flex_shrink: 1.0,
+                min_height: px(0),
+                overflow: Overflow::scroll_y(),
+                ..default()
+            },
+        ))
+        .id();
+    for control in crate::panel_scroll::attach(
+        world,
+        root,
+        body,
+        "Home & farm",
+        ["More above", "More below"],
+    ) {
+        world.entity_mut(control).insert(FarmControl);
+    }
     world.spawn((ChildOf(root), FarmMessage, text("", 12.0, GOLD)));
     world.spawn((
         ChildOf(root),
@@ -316,7 +362,14 @@ fn keys(
     mut state: ResMut<FarmState>,
     keyboard: Keyboard,
     mut commands: Commands,
+    experience: Option<Res<crate::PlayerExperience>>,
+    mode: Option<Res<crate::IslandMode>>,
 ) {
+    if experience.is_some_and(|experience| experience.enabled)
+        && mode.as_deref() == Some(&crate::IslandMode::Character)
+    {
+        return;
+    }
     let Keyboard {
         mut focus,
         controls,
@@ -386,6 +439,12 @@ fn shield(
 }
 
 fn process(world: &mut World) {
+    if crate::player_hud::enabled(world) {
+        let mut state = world.resource_mut::<FarmState>();
+        state.requests.clear();
+        state.open = false;
+        return;
+    }
     let requests = std::mem::take(&mut world.resource_mut::<FarmState>().requests);
     for request in requests {
         let mut result = Ok(());
@@ -417,12 +476,17 @@ fn process(world: &mut World) {
                 world.resource_mut::<FarmState>().quantity = quantity;
             }
             Action::Take => {
-                result = player_actions::take_control(world).map(|_| ());
+                result = if crate::island_control::available(world) {
+                    crate::island_control::request_mode(world, crate::IslandMode::Character)
+                } else {
+                    player_actions::take_control(world).map(|_| ())
+                };
                 if result.is_ok() {
                     world.resource_mut::<FarmState>().waiting_control = true;
-                    if let Some(id) = world
-                        .get_resource::<VillageState>()
-                        .map(|state| state.played)
+                    if !crate::island_control::available(world)
+                        && let Some(id) = world
+                            .get_resource::<VillageState>()
+                            .map(|state| state.played)
                     {
                         select_units(world, [id], false);
                         world.get_resource_or_init::<Selected>().0 = Some(id);
@@ -435,11 +499,18 @@ fn process(world: &mut World) {
                     }
                 }
             }
-            Action::Release => result = player_actions::release(world).map(|_| ()),
+            Action::Release => {
+                result = if crate::island_control::available(world) {
+                    crate::island_control::request_mode(world, crate::IslandMode::Inspector)
+                } else {
+                    player_actions::release(world).map(|_| ())
+                };
+            }
             Action::Stop => result = player_actions::stop(world).map(|_| ()),
             Action::Resume => {
                 if let Some(mut control) = world.get_resource_mut::<SimControl>() {
                     control.paused = false;
+                    control.multiplier = control.multiplier.max(1);
                 }
             }
             Action::Walk(pos) => result = player_actions::walk(world, pos).map(|_| ()),
@@ -492,8 +563,27 @@ fn set_text<M: Component>(world: &mut World, value: &str) {
         }
     }
 }
-fn refresh(world: &mut World) {
+pub(crate) fn set_open(world: &mut World, open: bool) {
+    if let Some(mut state) = world.get_resource_mut::<FarmState>() {
+        state.open = open;
+    }
+}
+
+pub(crate) fn refresh(world: &mut World) {
     if !geography::is_expanded(world) || !world.contains_resource::<VillageState>() {
+        return;
+    }
+    if crate::player_hud::enabled(world)
+        || world
+            .get_resource::<crate::FrontendGate>()
+            .is_some_and(|gate| gate.0)
+    {
+        for mut node in world
+            .query_filtered::<&mut Node, Or<(With<FarmRoot>, With<FarmLauncher>)>>()
+            .iter_mut(world)
+        {
+            node.display = Display::None;
+        }
         return;
     }
     let Ok(observation) = player_actions::observe(world) else {
@@ -536,10 +626,13 @@ fn refresh(world: &mut World) {
     }
     let paused = world
         .get_resource::<SimControl>()
-        .is_some_and(|control| control.paused);
+        .is_some_and(|control| control.is_stopped());
     let busy = observation["sections"]["village"]["activity"]["busy"] == true
         || world.resource::<NativeActions>().pending.is_some();
-    let ready = control == ControlState::Native && !busy && !paused;
+    let ready = control == ControlState::Native
+        && !busy
+        && !paused
+        && !crate::island_control::control_pending(world);
     let state = world.resource::<FarmState>();
     let (open, tab, plot, bed, quantity, waiting) = (
         state.open,
@@ -568,16 +661,32 @@ fn refresh(world: &mut World) {
             .as_u64()
             .map_or("?".into(), |n| (n / 1000).to_string())
     };
+    let colony = testbed_content::village::colony::enabled(world);
+    let activity = village["activity"]["kind"].as_str().unwrap_or("idle");
     let caption = format!(
         "{} | {} coins | {}\nFood {}% | Water {}% | Energy {}%\n{}{}",
         village["name"].as_str().unwrap_or("Hero"),
         village["coins"],
-        village["activity"]["kind"].as_str().unwrap_or("idle"),
+        if colony {
+            model::player_activity_caption(activity)
+        } else {
+            activity
+        },
         pct("hunger"),
         pct("thirst"),
         pct("energy"),
         if waiting {
-            "Waiting for the next world tick to take control."
+            if colony {
+                if paused {
+                    "Resume the world to start playing."
+                } else {
+                    "Getting ready to play."
+                }
+            } else {
+                "Waiting for the next world tick to take control."
+            }
+        } else if colony {
+            model::player_control_caption(&control)
         } else {
             model::control_caption(&control)
         },
@@ -605,7 +714,7 @@ fn refresh(world: &mut World) {
     let message = if matches!(tab, Tab::Land) {
         feedback
     } else {
-        format!("Gather / trade quantity: {quantity}\n{feedback}")
+        format!("Trade quantity: {quantity} · Gathering collects one item\n{feedback}")
     };
     set_text::<FarmMessage>(world, &message);
     let mut panels = world.query_filtered::<&mut Node, With<FarmRoot>>();
@@ -824,3 +933,25 @@ fn paint(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod pause_tests {
+    use super::*;
+    #[test]
+    fn resume_control_unfreezes_a_zero_multiplier_world() {
+        let mut world = World::new();
+        world.insert_resource(FarmState {
+            requests: vec![Action::Resume],
+            ..default()
+        });
+        world.insert_resource(SimControl {
+            paused: false,
+            multiplier: 0,
+            ..default()
+        });
+        process(&mut world);
+        let control = world.resource::<SimControl>();
+        assert!(!control.is_stopped());
+        assert_eq!(control.multiplier, 1);
+    }
+}

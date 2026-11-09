@@ -53,6 +53,8 @@ pub enum Job {
 pub struct Running {
     pub child: Child,
     pub job: Job,
+    /// Private loopback endpoint chosen for a local island's save/quit handshake.
+    pub island_port: Option<u16>,
     /// The child's stderr, when it was piped.
     stderr: Option<StderrTail>,
     /// An explorer window's stdout, when it was piped.
@@ -68,6 +70,7 @@ impl Running {
         Self {
             child,
             job,
+            island_port: None,
             stderr,
             stdout,
         }
@@ -426,6 +429,23 @@ pub fn start_game(world: &mut World, entry: Entry) {
         set_screen(world, Screen::Missing);
         return;
     };
+    let island_port = if matches!(entry, Entry::Island(_)) {
+        match std::net::TcpListener::bind(("127.0.0.1", 0)).and_then(|socket| socket.local_addr()) {
+            Ok(address) => {
+                args.extend(["--remote-port".into(), address.port().to_string()]);
+                Some(address.port())
+            }
+            Err(error) => {
+                world.insert_resource(MainNotice::error(format!(
+                    "Cannot prepare the island save/quit connection: {error}"
+                )));
+                set_screen(world, Screen::Main);
+                return;
+            }
+        }
+    } else {
+        None
+    };
     if entry.is_detached() {
         info!(
             "game_menu: starting {} {}",
@@ -454,7 +474,9 @@ pub fn start_game(world: &mut World, entry: Entry) {
     let spawner = world.get_resource::<Spawner>().cloned().unwrap_or_default();
     match (spawner.0)(cmd) {
         Ok(child) => {
-            world.insert_resource(Running::new(child, Job::Game(entry)));
+            let mut running = Running::new(child, Job::Game(entry));
+            running.island_port = island_port;
+            world.insert_resource(running);
             show_window(world, false);
             set_screen(world, Screen::Running);
         }

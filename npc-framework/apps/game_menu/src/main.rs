@@ -6,7 +6,7 @@
 //!
 //! ```text
 //! cargo run -p game_menu -- [--settings FILE] [--screen NAME] [--resume AGENT]
-//!     [--detached AGENT] [--screenshot PATH [--after-secs S]] [--worlds-page ai_scheduler]
+//!     [--detached AGENT] [--screenshot PATH [--after-secs S]] [--worlds-page ai_scheduler|resident_ai]
 //! ```
 //!
 //! Screens: Main (Explore with an AI agent, Actor Testbed, Village, RTS
@@ -48,6 +48,7 @@
 mod agent_history;
 mod detached;
 mod explorer;
+mod frontend_dispatch;
 mod launch;
 mod menu_input;
 mod paste;
@@ -70,8 +71,9 @@ use run::BuildTools;
 use screens::{Action, Screen, ScreensPlugin};
 use testbed_content::explorer::settings::Settings;
 
-const USAGE: &str = "usage: game_menu [--settings FILE] [--screen NAME] [--resume AGENT] \
-     [--detached AGENT] [--sessions AGENT] [--session-view metrics|logs] [--screenshot PATH [--after-secs S] [--capture-size WIDTHxHEIGHT] [--settings-focus ai_logs]] [--worlds-page ai_scheduler]";
+const USAGE: &str = "usage: game_menu [--settings FILE] [--front-end [actor host options]]
+       game_menu --developer-menu [--settings FILE] [--screen NAME] [--resume AGENT] \
+     [--detached AGENT] [--sessions AGENT] [--session-view metrics|logs] [--screenshot PATH [--after-secs S] [--capture-size WIDTHxHEIGHT] [--settings-focus ai_logs]] [--worlds-page ai_scheduler|resident_ai]";
 
 /// The settings in use.
 #[derive(Resource, Clone, Debug)]
@@ -166,6 +168,9 @@ fn parse_args() -> Args {
     };
     let mut it = std::env::args().skip(1);
     while let Some(flag) = it.next() {
+        if flag == "--developer-menu" {
+            continue;
+        }
         if matches!(flag.as_str(), "-h" | "--help") {
             usage("");
         }
@@ -229,7 +234,13 @@ fn parse_args() -> Args {
     args
 }
 
-fn main() {
+fn main() -> AppExit {
+    let raw: Vec<String> = std::env::args().skip(1).collect();
+    match frontend_dispatch::arguments(&raw) {
+        Ok(Some(args)) => return actor_testbed::run_from_args(args),
+        Ok(None) => {}
+        Err(error) => usage(&error),
+    }
     let args = parse_args();
     let exe_dir = std::env::current_exe()
         .ok()
@@ -310,7 +321,7 @@ fn main() {
     if args.settings_logs_focus {
         app.add_systems(Update, focus_logs_for_capture);
     }
-    app.run();
+    app.run()
 }
 
 fn focus_logs_for_capture(

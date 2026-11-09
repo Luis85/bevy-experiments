@@ -51,12 +51,42 @@ pub(crate) fn plugin(app: &mut App) {
         .init_resource::<HashCache>()
         .add_systems(Startup, (spawn_overlay, configure_gizmos))
         .add_systems(Update, toggle_overlay.in_set(ViewSystems::Input))
+        .add_systems(Update, colony_diagnostics.in_set(ViewSystems::Sync))
         .add_systems(
             Update,
             (update_hash, update_text, draw_markers)
                 .chain()
                 .in_set(ViewSystems::Present),
         );
+}
+#[allow(clippy::too_many_arguments)]
+fn colony_diagnostics(
+    terrain: Option<Res<testbed_content::village::terrain::TerrainState>>,
+    state: Res<OverlayState>,
+    paths: Option<ResMut<npc_framework::view_helpers::nav_gizmos::NavGizmos>>,
+    gate: Option<Res<crate::FrontendGate>>,
+    player: Option<Res<crate::PlayerExperience>>,
+    mode: Option<Res<crate::IslandMode>>,
+    panels: Option<Res<crate::TestbedPanels>>,
+    store: Option<ResMut<GizmoConfigStore>>,
+) {
+    let gated = gate.is_some_and(|gate| gate.0);
+    if terrain.is_some()
+        && let Some(mut paths) = paths
+    {
+        paths.enabled = state.visible && !gated;
+    }
+    if player.is_some_and(|player| player.enabled)
+        && let Some(mut store) = store
+    {
+        let (config, _) = store.config_mut::<DefaultGizmoConfigGroup>();
+        // Selection/order rings are useful diagnostics, not character decoration.
+        // Editor keeps its brush preview; F1/F6 explicitly restore diagnostics.
+        config.enabled = !gated
+            && (mode.as_deref() == Some(&crate::IslandMode::Editor)
+                || state.visible
+                || panels.is_some_and(|panels| panels.perception));
+    }
 }
 
 fn spawn_overlay(mut commands: Commands) {
@@ -412,11 +442,12 @@ fn update_text(
 fn draw_markers(
     mut gizmos: Gizmos,
     state: Res<OverlayState>,
+    gate: Option<Res<crate::FrontendGate>>,
     items: Query<(Entity, &SimPos), (With<Item>, Without<CarriedBy>, Without<Prop>)>,
     index: Option<Res<VisualIndex>>,
     looks: Query<&Fogged>,
 ) {
-    if !state.visible {
+    if !state.visible || gate.is_some_and(|gate| gate.0) {
         return;
     }
     let flat = Quat::from_rotation_arc(Vec3::Z, Vec3::Y);

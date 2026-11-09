@@ -4,7 +4,7 @@ use super::{VillageAct, Villager, ai, catalog, economy as econ, living};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
-use npc_framework::crafting::{Crafting, cancel_craft};
+use npc_framework::crafting::Crafting;
 use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -167,27 +167,86 @@ fn hungry(world: &World, actor: Entity, threshold: i32) -> bool {
         }
 }
 
+/// One colony warmth decision shared by the tree and its physical executor.
+/// A usable worn coat already restores warmth during ordinary activity.
+pub(super) fn warming_need(world: &World, actor: Entity) -> Option<super::colony::HomeHeating> {
+    let home = super::colony::home_heating(world, actor)?;
+    let threshold = super::policy::active(world).map_or_else(
+        || super::policy::IslandAiPolicy::default().recovery_threshold,
+        |policy| policy.recovery_threshold,
+    );
+    (home.cold
+        && !super::living::has_coat(world, actor)
+        && econ::need(world, actor, "Warmth") < threshold)
+        .then_some(home)
+}
+
+fn needs_hearth_fuel(world: &World, actor: Entity) -> bool {
+    warming_need(world, actor)
+        .is_some_and(|home| !home.heated && home.carried_fuel < home.fuel_required)
+}
+
+fn needs_recovery(world: &World, actor: Entity) -> bool {
+    let policy = super::policy::active(world);
+    econ::need(world, actor, "Energy") < policy.map_or(30_000, |policy| policy.recovery_threshold)
+        || (super::calendar(world).2
+            && econ::need(world, actor, "Energy")
+                < policy.map_or(85_000, |policy| policy.night_recovery_threshold))
+        || warming_need(world, actor)
+            .is_some_and(|home| home.heated || home.carried_fuel >= home.fuel_required)
+}
+
 pub fn register(app: &mut App) {
+    super::policy::register(app);
     app.register_sim_component::<LifeDecision>()
         .register_action(ACTION, start, stop)
         .register_cond("island_critical_thirst", |w, e| {
-            can_interrupt(w, e) && thirsty(w, e, CRITICAL_NEED)
+            can_interrupt(w, e)
+                && thirsty(
+                    w,
+                    e,
+                    super::policy::active(w).map_or(CRITICAL_NEED, |p| p.critical_need),
+                )
         })
         .register_cond("island_critical_hunger", |w, e| {
-            can_interrupt(w, e) && hungry(w, e, CRITICAL_NEED)
+            can_interrupt(w, e)
+                && hungry(
+                    w,
+                    e,
+                    super::policy::active(w).map_or(CRITICAL_NEED, |p| p.critical_need),
+                )
         })
         .register_cond("island_busy", busy)
         .register_cond("island_thirsty", |w, e| {
-            !busy(w, e) && thirsty(w, e, 55_000)
-        })
-        .register_cond("island_hungry", |w, e| !busy(w, e) && hungry(w, e, 50_000))
-        .register_cond("island_needs_recovery", |w, e| {
             !busy(w, e)
-                && (econ::need(w, e, "Energy") < 30_000
-                    || (super::calendar(w).2 && econ::need(w, e, "Energy") < 85_000))
+                && thirsty(
+                    w,
+                    e,
+                    super::policy::active(w).map_or(55_000, |p| p.thirst_threshold),
+                )
         })
-        .register_cond("island_night", |w, e| !busy(w, e) && super::calendar(w).2)
-        .register_tree(TREE, |b| {
+        .register_cond("island_hungry", |w, e| {
+            !busy(w, e)
+                && hungry(
+                    w,
+                    e,
+                    super::policy::active(w).map_or(50_000, |p| p.hunger_threshold),
+                )
+        })
+        .register_cond("island_needs_recovery", |w, e| {
+            !busy(w, e) && needs_recovery(w, e)
+        })
+        .register_cond("island_night", |w, e| {
+            !busy(w, e) && super::calendar(w).2 && !needs_hearth_fuel(w, e)
+        });
+    if super::policy::active(app.world()).is_some() {
+        app.register_cond("island_routine_0", |w, e| routine_passes(w, e, 0))
+            .register_cond("island_routine_1", |w, e| routine_passes(w, e, 1))
+            .register_cond("island_routine_2", |w, e| routine_passes(w, e, 2))
+            .register_cond("island_routine_3", |w, e| routine_passes(w, e, 3))
+            .register_tree(TREE, configured_tree);
+    } else {
+        app.register_tree(TREE, |b| {
             b.selector("Daily life", |b| {
                 // Each guard implies the leaf can start, even while working:
                 // a critical need cancels only work owned by an aborted life leaf.
@@ -221,10 +280,73 @@ pub fn register(app: &mut App) {
                 b.leaf("Profession", ACTION, "work");
             });
         });
+    }
+}
+
+fn routine_goal(world: &World, index: usize) -> Option<LifeGoal> {
+    use super::policy::RoutineGoal;
+    Some(match super::policy::active(world)?.routine.get(index)? {
+        RoutineGoal::Thirst => LifeGoal::Thirst,
+        RoutineGoal::Hunger => LifeGoal::Hunger,
+        RoutineGoal::Recovery => LifeGoal::Recovery,
+        RoutineGoal::Home => LifeGoal::Home,
+        RoutineGoal::Work => LifeGoal::Work,
+    })
+}
+
+fn routine_passes(world: &World, actor: Entity, index: usize) -> bool {
+    let Some(policy) = super::policy::active(world) else {
+        return false;
+    };
+    if busy(world, actor) || !living(world, actor) {
+        return false;
+    }
+    match routine_goal(world, index) {
+        Some(LifeGoal::Thirst) => thirsty(world, actor, policy.thirst_threshold),
+        Some(LifeGoal::Hunger) => hungry(world, actor, policy.hunger_threshold),
+        Some(LifeGoal::Recovery) => needs_recovery(world, actor),
+        Some(LifeGoal::Home) => super::calendar(world).2 && !needs_hearth_fuel(world, actor),
+        _ => false,
+    }
+}
+
+fn configured_tree(b: &mut TreeBuilder) {
+    b.selector("Configured daily life", |b| {
+        for (name, condition, goal) in [
+            ("Critical thirst", "island_critical_thirst", "thirst"),
+            ("Critical hunger", "island_critical_hunger", "hunger"),
+        ] {
+            b.guard(name, condition, Abort::LowerPriority, |b| {
+                b.leaf(name, ACTION, goal);
+            });
+        }
+        b.guard("Player orders", HAS_UNIT_ORDER, Abort::LowerPriority, |b| {
+            b.leaf("Execute orders", EXECUTE_ORDER_ACTION, ());
+        });
+        b.guard("Current activity", "island_busy", Abort::None, |b| {
+            b.leaf("Current activity", ACTION, "busy");
+        });
+        for (name, condition, goal) in [
+            ("Routine priority 1", "island_routine_0", "routine_0"),
+            ("Routine priority 2", "island_routine_1", "routine_1"),
+            ("Routine priority 3", "island_routine_2", "routine_2"),
+            ("Routine priority 4", "island_routine_3", "routine_3"),
+        ] {
+            b.guard(name, condition, Abort::LowerPriority, |b| {
+                b.leaf(name, ACTION, goal);
+            });
+        }
+        b.leaf("Goal-oriented profession", ACTION, "work");
+    });
 }
 
 fn start(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
-    let Some(goal) = param.as_name().and_then(LifeGoal::parse) else {
+    let Some(goal) = param.as_name().and_then(|name| {
+        name.strip_prefix("routine_")
+            .and_then(|index| index.parse::<usize>().ok())
+            .and_then(|index| routine_goal(world, index))
+            .or_else(|| LifeGoal::parse(name))
+    }) else {
         return Status::Failure;
     };
     if !living(world, actor)
@@ -234,7 +356,8 @@ fn start(world: &mut World, actor: Entity, param: &ParamValue) -> Status {
     {
         return Status::Failure;
     }
-    let reconsider_at = world.resource::<SimClock>().tick + DECISION_TICKS;
+    let reconsider_at = world.resource::<SimClock>().tick
+        + super::policy::active(world).map_or(DECISION_TICKS, |policy| policy.decision_ticks);
     world.entity_mut(actor).insert(LifeDecision {
         goal,
         reconsider_at,
@@ -251,13 +374,7 @@ fn stop(world: &mut World, actor: Entity, reason: StopReason) {
         world.entity_mut(actor).remove::<MoveIntent>();
         // Never cancel external queues here: takeover already owns their lifecycle.
         if decision.goal == LifeGoal::Work && !decision.pending {
-            world.entity_mut(actor).remove::<super::Gathering>();
-            cancel_craft(world, actor, "daily life interrupted");
-            super::hunting::cancel(world, actor, "daily life interrupted");
-            if super::needs_driven(world) {
-                npc_framework::interaction::cancel(world, actor, "daily life interrupted");
-                super::production::clear_intent(world, actor);
-            }
+            super::ai::cancel_owned_work(world, actor, "daily life interrupted");
         }
         if decision.goal == LifeGoal::Recovery && !decision.pending {
             let now = world.resource::<SimClock>().tick;
@@ -294,24 +411,28 @@ pub(super) fn advance(world: &mut World) {
             }
             match decision.goal {
                 LifeGoal::Thirst => {
+                    let threshold =
+                        super::policy::active(world).map_or(55_000, |p| p.thirst_threshold);
                     ai::satisfy(
                         world,
                         actor,
                         "Thirst",
                         catalog::WATER,
                         super::Role::WaterKeeper,
-                        55_000,
+                        threshold,
                         90_000,
                     );
                 }
                 LifeGoal::Hunger => {
+                    let threshold =
+                        super::policy::active(world).map_or(50_000, |p| p.hunger_threshold);
                     ai::satisfy(
                         world,
                         actor,
                         "Hunger",
                         "bread",
                         super::Role::Baker,
-                        50_000,
+                        threshold,
                         80_000,
                     );
                 }

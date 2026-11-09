@@ -23,6 +23,8 @@ pub enum Mismatch {
 /// Something the menu can launch.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Entry {
+    /// The single player-facing island, entered through one of its three modes.
+    Island(&'static str),
     Village,
     Testbed(&'static str),
     RtsDemo,
@@ -57,6 +59,7 @@ impl Entry {
     /// The name the Running screen and errors use ("Actor Testbed: doors").
     pub fn title(&self) -> String {
         match self {
+            Self::Island(mode) => format!("Island Village | {mode}"),
             Self::Village => "Village".into(),
             Self::Testbed(name) => format!("Actor Testbed: {name}"),
             Self::RtsDemo => "RTS units demo".into(),
@@ -116,6 +119,32 @@ pub fn command_for(entry: &Entry, settings: &Settings) -> (&'static str, Vec<Str
         args
     };
     match entry {
+        Entry::Island(mode) => {
+            let mut args = vec![
+                "--scenario".into(),
+                "island_colony".into(),
+                "--remote".into(),
+                "--no-render-remote".into(),
+                "--island-mode".into(),
+                (if *mode == "new" { "inspector" } else { *mode }).into(),
+                "--island-save".into(),
+                settings
+                    .agents_dir
+                    .join("local-island.world.json")
+                    .display()
+                    .to_string(),
+                "--island-rules".into(),
+                settings
+                    .worlds_dir()
+                    .join("island_colony.json")
+                    .display()
+                    .to_string(),
+            ];
+            if *mode == "new" {
+                args.push("--island-new".into());
+            }
+            ("actor_testbed", args)
+        }
         Entry::Village => ("village", Vec::new()),
         Entry::RtsDemo => ("rts_units_demo", Vec::new()),
         Entry::ActorEditor => (

@@ -547,68 +547,88 @@ pub(crate) fn back_button(parent: &mut ChildSpawnerCommands, screen: Screen, tab
 
 fn spawn_main(mut commands: Commands, settings: Res<AppSettings>, notice: Res<MainNotice>) {
     let explorer = launch::explorer_enabled(&settings.0);
-    let panel = ui::spawn_screen(&mut commands, DespawnOnExit(Screen::Main), "npc-framework");
+    let panel = ui::spawn_screen(&mut commands, DespawnOnExit(Screen::Main), "Island Village");
+    ui::scroll_panel(&mut commands, panel);
     commands.entity(panel).with_children(|p| {
-        p.spawn(ui::label("Pick something to play.", 16.0, ui::DIM));
-        let hint = explorer.as_ref().err().map(String::as_str);
-        let first = button(
+        p.spawn(ui::label(
+            "A living island. Twelve neighbours. An economy of their own.",
+            16.0,
+            ui::DIM,
+        ));
+        let inspect = button(
             p,
-            "Explore with an AI agent",
-            Some(hint.unwrap_or("an AI agent explores a world; you watch")),
-            explorer.is_ok(),
+            "Inspect the colony",
+            Some("Watch daily life, inspect production and manage the village"),
+            true,
             0,
-            Action::Go(Screen::Explorer),
+            Action::Launch(Entry::Island("inspector")),
         );
-        let testbed = button(
+        p.commands().entity(inspect).insert(AutoFocus);
+        button(
             p,
-            "Actor Testbed",
-            Some("every capability, one scenario each"),
+            "Join as a character",
+            Some("Gather, craft, trade and settle alongside the residents"),
             true,
             1,
-            Action::Go(Screen::Testbed),
+            Action::Launch(Entry::Island("character")),
         );
-        p.commands()
-            .entity(if explorer.is_ok() { first } else { testbed })
-            .insert(AutoFocus);
         button(
             p,
-            "Village",
-            Some("villagers with needs and a food economy"),
+            "Edit the landscape",
+            Some("Shape terrain, paint paths and plan the island"),
             true,
             2,
-            Action::Launch(Entry::Village),
+            Action::Launch(Entry::Island("editor")),
         );
+        let hint = explorer.as_ref().err().map(String::as_str);
         button(
             p,
-            "RTS units demo",
-            Some("a foreign host: its own units, map and physics"),
-            true,
+            "Explore with an AI agent",
+            Some(hint.unwrap_or("Create or resume a persistent world for your AI visitor")),
+            explorer.is_ok(),
             3,
-            Action::Launch(Entry::RtsDemo),
+            Action::Go(Screen::Explorer),
         );
+        ui::row(p, |tools| {
+            button(
+                tools,
+                "Actor presets",
+                None,
+                true,
+                4,
+                Action::Launch(Entry::ActorEditor),
+            );
+            button(
+                tools,
+                "World rules",
+                None,
+                true,
+                5,
+                Action::Go(Screen::Worlds),
+            );
+            button(
+                tools,
+                "Settings",
+                None,
+                true,
+                6,
+                Action::Go(Screen::Settings),
+            );
+        });
         button(
             p,
-            "Actors",
-            Some("create and edit actor presets with a 3D preview"),
+            "Start a fresh island",
+            Some("Use current world rules; keep a backup of the previous island"),
             true,
-            4,
-            Action::Launch(Entry::ActorEditor),
+            7,
+            Action::Launch(Entry::Island("new")),
         );
-        button(
-            p,
-            "Worlds",
-            Some("create and edit world rules for new agents"),
-            true,
-            5,
-            Action::Go(Screen::Worlds),
-        );
-        button(p, "Settings", None, true, 6, Action::Go(Screen::Settings));
         button(
             p,
             "Quit",
             Some("stops every world and window it started (they save first)"),
             true,
-            7,
+            8,
             Action::Quit,
         );
         if let Some(e) = &notice.0 {
@@ -625,6 +645,23 @@ fn spawn_testbed(mut commands: Commands) {
     );
     commands.entity(panel).with_children(|p| {
         p.spawn(ui::label("Pick a scenario.", 16.0, ui::DIM));
+        // Developer-only screen (--screen testbed); the main showcase remains the island.
+        button(
+            p,
+            "Legacy village fixture",
+            None,
+            true,
+            80,
+            Action::Launch(Entry::Village),
+        );
+        button(
+            p,
+            "RTS host proof",
+            None,
+            true,
+            81,
+            Action::Launch(Entry::RtsDemo),
+        );
         p.spawn((
             Node {
                 flex_direction: FlexDirection::Column,
@@ -1337,8 +1374,20 @@ pub(crate) mod tests {
         button_for(&mut app, |a| matches!(a, Action::SaveSettings));
         press(&mut app, back);
         assert_eq!(screen(&app), Screen::Main);
-        let testbed = button_for(&mut app, |a| matches!(a, Action::Go(Screen::Testbed)));
-        press(&mut app, testbed);
+        let mut actions = app.world_mut().query::<&Action>();
+        assert!(!actions.iter(app.world()).any(|a| matches!(
+            a,
+            Action::Go(Screen::Testbed) | Action::Launch(Entry::Village | Entry::RtsDemo)
+        )));
+        for mode in ["inspector", "character", "editor", "new"] {
+            button_for(
+                &mut app,
+                |a| matches!(a, Action::Launch(Entry::Island(value)) if *value == mode),
+            );
+        }
+        // Historical fixtures are still reachable through the explicit developer screen.
+        run::set_screen(app.world_mut(), Screen::Testbed);
+        app.update();
         assert_eq!(screen(&app), Screen::Testbed);
         let mut q = app.world_mut().query::<&Action>();
         let launches = q
@@ -1519,13 +1568,15 @@ pub(crate) mod tests {
     fn missing_game_shows_its_build_command() {
         let d = tmp("missing");
         let mut app = app_with_valid(&d);
-        let village = button_for(&mut app, |a| matches!(a, Action::Launch(Entry::Village)));
+        let village = button_for(&mut app, |a| {
+            matches!(a, Action::Launch(Entry::Island("inspector")))
+        });
         press(&mut app, village);
         app.update();
         assert_eq!(screen(&app), Screen::Missing);
         let missing = app.world().resource::<Missing>();
-        assert_eq!(missing.stem, "village");
-        assert_eq!(missing.command, "cargo build -p village");
+        assert_eq!(missing.stem, "actor_testbed");
+        assert_eq!(missing.command, "cargo build -p actor_testbed");
         // No cargo or workspace in this test: no Build button.
         let mut q = app.world_mut().query::<&Action>();
         assert!(!q.iter(app.world()).any(|a| matches!(a, Action::Build)));

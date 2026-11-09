@@ -3,6 +3,27 @@ use npc_framework::agent_io::control::{DetachController, ExternalController};
 use npc_framework::prelude::*;
 use testbed_content::village::{self, homestead};
 
+#[test]
+fn coherent_flow_hides_legacy_farm_controls_in_inspection_and_drops_hidden_requests() {
+    let mut app = fixture("island_colony");
+    app.insert_resource(crate::PlayerExperience { enabled: true });
+    app.world_mut().resource_mut::<FarmState>().open = true;
+    app.world_mut()
+        .resource_mut::<FarmState>()
+        .requests
+        .push(Action::Toggle);
+    process(app.world_mut());
+    refresh(app.world_mut());
+    assert!(!app.world().resource::<FarmState>().open);
+    assert!(app.world().resource::<FarmState>().requests.is_empty());
+    assert!(
+        app.world_mut()
+            .query_filtered::<&Node, Or<(With<FarmRoot>, With<FarmLauncher>)>>()
+            .iter(app.world())
+            .all(|node| node.display == Display::None)
+    );
+}
+
 fn fixture(scene: &str) -> App {
     let mut app = testbed_content::try_new_sim_app_with(7, scene, |app| {
         app.add_plugins((
@@ -38,7 +59,7 @@ fn fixture(scene: &str) -> App {
                 }
             },
         )
-        .add_plugins(plugin);
+        .add_plugins((plugin, crate::island_control::plugin));
     })
     .unwrap();
     app.update();
@@ -96,6 +117,57 @@ fn expanded_living_world_has_a_discoverable_native_farming_launcher() {
     assert!(
         texts(&mut app).contains("Home & farm"),
         "an expanded living island must offer native Home & farm controls"
+    );
+}
+
+#[test]
+fn colony_farm_and_ledger_share_pending_control_intent() {
+    let mut app = fixture("island_colony");
+    press(&mut app, &Action::Toggle);
+    app.world_mut().resource_mut::<SimControl>().paused = true;
+    press(&mut app, &Action::Take);
+    assert_eq!(
+        *app.world().resource::<crate::IslandMode>(),
+        crate::IslandMode::Character
+    );
+    assert!(crate::island_control::control_pending(app.world()));
+    crate::island_control::request_mode(app.world_mut(), crate::IslandMode::Inspector).unwrap();
+    app.world_mut().resource_mut::<SimControl>().paused = false;
+    run_ticks(app.world_mut(), 1);
+    app.update();
+    run_ticks(app.world_mut(), 1);
+    app.update();
+    assert_eq!(player_actions::control(app.world()), ControlState::Free);
+    assert_eq!(
+        *app.world().resource::<crate::IslandMode>(),
+        crate::IslandMode::Inspector
+    );
+    press(&mut app, &Action::Take);
+    run_ticks(app.world_mut(), 1);
+    app.update();
+    assert_eq!(player_actions::control(app.world()), ControlState::Native);
+    assert_eq!(
+        *app.world().resource::<crate::IslandMode>(),
+        crate::IslandMode::Character
+    );
+    press(&mut app, &Action::Release);
+    run_ticks(app.world_mut(), 1);
+    app.update();
+    assert_eq!(player_actions::control(app.world()), ControlState::Free);
+    assert_eq!(
+        *app.world().resource::<crate::IslandMode>(),
+        crate::IslandMode::Inspector
+    );
+    let arrivals = app
+        .world()
+        .resource::<npc_framework::kernel::commands::CommandLog>()
+        .entries
+        .iter()
+        .filter(|(_, _, command)| command.kind() == "JoinIsland")
+        .count();
+    assert_eq!(
+        arrivals, 1,
+        "F2 and ledger requests share the same mortal arrival"
     );
 }
 

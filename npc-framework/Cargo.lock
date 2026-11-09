@@ -3075,6 +3075,7 @@ dependencies = [
 name = "game_menu"
 version = "0.1.0"
 dependencies = [
+ "actor_testbed",
  "bevy",
  "serde",
  "serde_json",

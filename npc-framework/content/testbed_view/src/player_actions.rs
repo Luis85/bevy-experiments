@@ -1,5 +1,6 @@
 //! Trusted native input, using the shared scoped observations and recorded agent commands.
 //! Pending approaches and scheduler holds are presentation/host state, never simulation state.
+mod progress_feedback;
 use bevy::prelude::*;
 use npc_framework::agent_io::{
     api::{self, ActParams, ActStep},
@@ -41,6 +42,7 @@ pub(crate) struct PendingAction {
     started: u64,
     last_progress: u64,
     last_position: SimPos,
+    retargets: u8,
 }
 #[derive(Clone, Debug)]
 struct SchedulerHold {
@@ -56,6 +58,7 @@ struct RefusalWatch {
     seq: u64,
     commands: Vec<(u64, u32)>,
 }
+#[derive(Clone, Copy)]
 struct InputMark {
     actor: ActorStamp,
     event_seq: u64,
@@ -69,6 +72,8 @@ pub(crate) struct NativeActions {
     scheduler: Option<SchedulerHold>,
     auto_attempt: Option<(ActorStamp, u64)>,
     refusal: Option<RefusalWatch>,
+    progress: Option<progress_feedback::Watch>,
+    sales: Option<progress_feedback::Sales>,
 }
 fn actor(world: &World) -> Result<ActorStamp, String> {
     let state = world
@@ -78,6 +83,17 @@ fn actor(world: &World) -> Result<ActorStamp, String> {
         .get_resource::<SimIndex>()
         .and_then(|index| index.get(state.played))
         .ok_or("The hero is no longer present")?;
+    if world
+        .get::<testbed_content::village::colony::AwaitingArrival>(entity)
+        .is_some()
+    {
+        return Ok(ActorStamp {
+            id: state.played,
+            entity,
+            epoch: api::epoch(world),
+            life: state.life,
+        });
+    }
     let person = world
         .get::<Villager>(entity)
         .ok_or("The assigned actor is not a villager")?;
@@ -96,6 +112,37 @@ fn actor(world: &World) -> Result<ActorStamp, String> {
 }
 pub(crate) fn available(world: &World) -> bool {
     actor(world).is_ok()
+}
+pub(crate) fn clear_view(world: &mut World) {
+    if world.contains_resource::<NativeActions>() {
+        restore_scheduler(world);
+        *world.resource_mut::<NativeActions>() = NativeActions::default();
+        progress_feedback::reset_sales(world);
+    }
+}
+/// Explicit postmortem native action. It creates a new identity through the same
+/// recorded domain command, never revives a corpse or steals foreign control.
+pub(crate) fn begin_successor(world: &mut World) -> Result<Value, String> {
+    let id = world
+        .get_resource::<VillageState>()
+        .ok_or("There is no island life to continue")?
+        .played;
+    let entity = world
+        .resource::<SimIndex>()
+        .get(id)
+        .ok_or("The previous life is missing")?;
+    if world
+        .get::<ExternalController>(entity)
+        .is_some_and(|controller| controller.id != NATIVE_CONTROLLER)
+    {
+        return Err(
+            "Another controller owns this life; release it before choosing a successor".into(),
+        );
+    }
+    let command = testbed_content::village::VillageAct::new(id, "new_life");
+    let (tick, seq) =
+        submit(world, None, SimCommand::content(&command)).map_err(|error| error.to_string())?;
+    Ok(json!({"accepted":true,"applies_at":tick,"command_seq":seq}))
 }
 pub(crate) fn control(world: &World) -> ControlState {
     let Ok(actor) = actor(world) else {
@@ -157,7 +204,37 @@ pub(crate) fn known_position(world: &World, target: SimId) -> Option<SimPos> {
         .find_map(|provider| provider(world, &ctx, target))
 }
 fn feedback(world: &mut World, text: impl Into<String>) {
-    world.get_resource_or_init::<NativeActions>().feedback = Some(text.into());
+    let text = text.into();
+    let text = if testbed_content::village::colony::enabled(world) {
+        player_feedback(&text).into()
+    } else {
+        text
+    };
+    world.get_resource_or_init::<NativeActions>().feedback = Some(text);
+}
+fn player_feedback(text: &str) -> &str {
+    match text {
+        "Native control requested; it applies on the next simulation tick" => {
+            "Getting ready to play. Resume the world if it is paused."
+        }
+        "Stop requested; queued approach and work cancelled on the next tick" => {
+            "Stopping your current activity."
+        }
+        "Native control released on the next tick" => {
+            "Returning to inspection. The village keeps running."
+        }
+        "Action submitted" => "Your activity is queued.",
+        "Approach cancelled: hero, world or controller changed" => {
+            "The journey was cancelled because the active character changed."
+        }
+        "Approach interrupted; follow-up action cancelled" => {
+            "The journey was interrupted. Choose your next activity."
+        }
+        "Approach made no progress; stopped without performing the action" => {
+            "The route is blocked. Choose a nearby destination."
+        }
+        _ => text,
+    }
 }
 fn pause_scheduler(world: &mut World, actor: ActorStamp) {
     if world
@@ -217,6 +294,17 @@ pub(crate) fn take_control(world: &mut World) -> Result<Value, String> {
         pause_scheduler(world, actor);
         return Ok(json!({"accepted":true,"already_native":true}));
     }
+    if world
+        .get::<testbed_content::village::colony::AwaitingArrival>(actor.entity)
+        .is_some()
+    {
+        submit(
+            world,
+            None,
+            SimCommand::content(&testbed_content::village::colony::JoinIsland { unit: actor.id.0 }),
+        )
+        .map_err(|error| error.to_string())?;
+    }
     let (at, seq) = submit(
         world,
         None,
@@ -238,6 +326,7 @@ pub(crate) fn take_control(world: &mut World) -> Result<Value, String> {
 }
 fn shared_act(world: &mut World, actor: ActorStamp, request: ActStep) -> Result<Value, String> {
     let mark = mark_input(world, actor);
+    let target = request.target.map(SimId);
     if let Some(units) = request.args.as_ref().and_then(|args| args.get("units"))
         && units.as_array().is_some_and(|units| {
             units
@@ -261,15 +350,18 @@ fn shared_act(world: &mut World, actor: ActorStamp, request: ActStep) -> Result<
             ..default()
         },
     )
-    .map_err(|error| error.message)?;
+    .map_err(|error| progress_feedback::refusal(world, &error.message))?;
     if response.get("accepted").and_then(Value::as_bool) != Some(true) {
-        return Err(response
-            .get("message")
-            .and_then(Value::as_str)
-            .unwrap_or("The shared action was refused")
-            .into());
+        return Err(progress_feedback::refusal(
+            world,
+            response
+                .get("message")
+                .and_then(Value::as_str)
+                .unwrap_or("The shared action was refused"),
+        ));
     }
     watch_input(world, mark);
+    progress_feedback::track(world, actor, target, &response, mark.event_seq);
     Ok(response)
 }
 fn mark_input(world: &mut World, actor: ActorStamp) -> InputMark {
@@ -349,17 +441,22 @@ fn apply_refusal_feedback(world: &mut World, current: Option<ActorStamp>, native
         })
     });
     if let Some(reason) = message {
-        let lower = reason.to_lowercase();
-        let public = if lower.contains("control") {
-            "Action refused: control changed before it could apply".into()
-        } else if lower.contains("buyer has") || lower.contains("buyer cannot afford") {
-            "Action refused: the merchant cannot fulfill that trade now".into()
+        let public = if testbed_content::village::colony::enabled(world) {
+            progress_feedback::refusal(world, &reason)
         } else {
-            format!(
-                "Action refused: {}",
-                reason.chars().take(320).collect::<String>()
-            )
+            let lower = reason.to_lowercase();
+            if lower.contains("control") {
+                "Action refused: control changed before it could apply".into()
+            } else if lower.contains("buyer has") || lower.contains("buyer cannot afford") {
+                "Action refused: the merchant cannot fulfill that trade now".into()
+            } else {
+                format!(
+                    "Action refused: {}",
+                    reason.chars().take(320).collect::<String>()
+                )
+            }
         };
+        world.resource_mut::<NativeActions>().progress = None;
         feedback(world, public);
     }
     watch.seq = events::last_seq(world);
@@ -376,13 +473,15 @@ pub(crate) fn act(world: &mut World, request: ActStep) -> Result<Value, String> 
     let actor = native(world)?;
     world.get_resource_or_init::<NativeActions>().pending = None;
     let response = shared_act(world, actor, request)?;
-    feedback(
-        world,
-        response
-            .get("label")
-            .and_then(Value::as_str)
-            .unwrap_or("Action submitted"),
-    );
+    if !testbed_content::village::colony::enabled(world) {
+        feedback(
+            world,
+            response
+                .get("label")
+                .and_then(Value::as_str)
+                .unwrap_or("Action submitted"),
+        );
+    }
     Ok(response)
 }
 pub(crate) fn stop(world: &mut World) -> Result<Value, String> {
@@ -402,6 +501,133 @@ pub(crate) fn stop(world: &mut World) -> Result<Value, String> {
     );
     Ok(response)
 }
+/// A menu suspends navigation intent without abandoning committed physical work.
+/// The caller owns pause/save timing and waits for the returned recorded receipt.
+pub(crate) fn committed_work(world: &World) -> bool {
+    let Ok(actor) = native(world) else {
+        return false;
+    };
+    if matches!(
+        testbed_content::village::activity(world, actor.entity).0,
+        "building" | "crafting" | "gathering" | "hunting" | "resting"
+    ) {
+        return true;
+    }
+    if world
+        .get::<npc_framework::agent_io::control::ExternalQueue>(actor.entity)
+        .is_some_and(|queue| {
+            queue
+                .current
+                .as_ref()
+                .is_some_and(|action| action.item.verb.starts_with("craft:"))
+                || queue
+                    .pending
+                    .iter()
+                    .any(|action| action.verb.starts_with("craft:"))
+        })
+    {
+        return true;
+    }
+    // A button can commit a work request before its application tick. Treat
+    // those actor-owned requests like running work during a mode transition.
+    world
+        .get_resource::<npc_framework::kernel::commands::CommandQueue>()
+        .is_some_and(|queue| {
+            queue.pending.values().any(|command| {
+                if command.unit_in(world) != Some(actor.id) {
+                    return false;
+                }
+                let SimCommand::Content { kind, payload } = command else {
+                    return false;
+                };
+                let verb = payload.get("verb").and_then(Value::as_str).unwrap_or("");
+                match kind.as_str() {
+                    "Craft" => true,
+                    "VillageAct" => matches!(
+                        verb,
+                        "gather" | "hunt" | "rest" | "rest_home" | "rest_ground"
+                    ),
+                    "HomesteadAct" => verb == "build_cottage",
+                    "AgentAct" => {
+                        payload.get("controller").and_then(Value::as_str) == Some(NATIVE_CONTROLLER)
+                            && verb.starts_with("craft:")
+                    }
+                    _ => false,
+                }
+            })
+        })
+}
+
+pub(crate) fn prepare_suspend(world: &mut World) -> Result<Option<(u64, u32)>, String> {
+    let held = crate::island_control::clear_navigation_input(world);
+    let approach = world
+        .get_resource_or_init::<NativeActions>()
+        .pending
+        .take()
+        .is_some();
+    if let Some(receipt) = crate::island_control::pending_receipt(world) {
+        return Ok(Some(receipt));
+    }
+    if control(world) != ControlState::Native {
+        return Ok(None);
+    }
+    let actor = native(world)?;
+    let activity = testbed_content::village::activity(world, actor.entity).0;
+    // Activity is the domain-owned projection. Committed work owns its materials,
+    // reservations and completion; a host menu is not a cancellation command.
+    if committed_work(world) {
+        return Ok(None);
+    }
+    let ordered = world
+        .get::<OrderQueue>(actor.entity)
+        .is_some_and(OrderQueue::has_order);
+    let queued_navigation = world
+        .get_resource::<npc_framework::kernel::commands::CommandQueue>()
+        .is_some_and(|queue| {
+            queue.pending.values().any(|command| {
+                let SimCommand::Content { kind, payload } = command else {
+                    return false;
+                };
+                match kind.as_str() {
+                    "IssueOrder" => payload
+                        .to_typed::<npc_framework::command::IssueOrder>()
+                        .ok()
+                        .is_some_and(|order| {
+                            order.units.contains(&actor.id)
+                                && matches!(
+                                    order.order,
+                                    npc_framework::command::UnitOrder::Move { .. }
+                                )
+                        }),
+                    "AgentAct" => payload
+                        .to_typed::<npc_framework::agent_io::control::AgentAct>()
+                        .ok()
+                        .is_some_and(|action| {
+                            action.unit == actor.id.0
+                                && action.controller == NATIVE_CONTROLLER
+                                && action.verb == "execute_orders"
+                        }),
+                    _ => false,
+                }
+            })
+        });
+    if !held
+        && !approach
+        && !ordered
+        && !queued_navigation
+        && !matches!(activity, "walking" | "blocked")
+    {
+        return Ok(None);
+    }
+    stop(world)?;
+    world
+        .resource::<NativeActions>()
+        .refusal
+        .as_ref()
+        .and_then(|watch| watch.commands.last().copied())
+        .map(Some)
+        .ok_or_else(|| "The navigation stop did not produce a command receipt".into())
+}
 pub(crate) fn release(world: &mut World) -> Result<Value, String> {
     let actor = native(world)?;
     stop(world)?;
@@ -416,6 +642,10 @@ pub(crate) fn release(world: &mut World) -> Result<Value, String> {
     .map_err(|error| error.to_string())?;
     feedback(world, "Native control released on the next tick");
     Ok(json!({"accepted":true,"applies_at":at,"command_seq":seq}))
+}
+
+pub(crate) fn refusal_message(world: &World, reason: &str) -> String {
+    progress_feedback::refusal(world, reason)
 }
 
 pub(crate) fn walk(world: &mut World, pos: SimPos) -> Result<Value, String> {
@@ -441,7 +671,7 @@ pub(crate) fn walk(world: &mut World, pos: SimPos) -> Result<Value, String> {
             ..default()
         },
     )
-    .map_err(|error| error.message)?;
+    .map_err(|error| progress_feedback::refusal(world, &error.message))?;
     if response.get("accepted").and_then(Value::as_bool) != Some(true) {
         return Err(response
             .get("message")
@@ -450,7 +680,11 @@ pub(crate) fn walk(world: &mut World, pos: SimPos) -> Result<Value, String> {
             .into());
     }
     watch_input(world, mark);
-    feedback(world, "Walking to the chosen position");
+    if testbed_content::village::colony::enabled(world) {
+        progress_feedback::track(world, actor, None, &response, mark.event_seq);
+    } else {
+        feedback(world, "Walking to the chosen position");
+    }
     Ok(response)
 }
 pub(crate) fn walk_then_act(
@@ -486,12 +720,91 @@ pub(crate) fn walk_then_act(
         started: now,
         last_progress: now,
         last_position,
+        retargets: 0,
     });
     Ok(response)
 }
 
+/// A person may move while we approach. Retry only a currently sensed actor's
+/// observed position, with a bounded number of ordinary recorded walks.
+fn retarget_person(world: &mut World, pending: &PendingAction) -> bool {
+    const MAX_RETARGETS: u8 = 3;
+    if !matches!(
+        pending.action.verb.as_deref(),
+        Some("talk" | "buy" | "sell")
+    ) {
+        return false;
+    }
+    let Some(target) = pending.action.target else {
+        return false;
+    };
+    let position = observe(world).ok().and_then(|observation| {
+        observation
+            .pointer("/sections/perception/sensed")?
+            .as_array()?
+            .iter()
+            .find(|person| {
+                person["id"].as_u64() == Some(u64::from(target)) && person["kind"] == "actor"
+            })
+            .and_then(|person| {
+                let pos = person["pos"].as_array()?;
+                Some(SimPos::new(
+                    i32::try_from(pos.first()?.as_i64()?).ok()?,
+                    i32::try_from(pos.get(1)?.as_i64()?).ok()?,
+                ))
+            })
+    });
+    let Some(position) = position else {
+        feedback(
+            world,
+            "Your neighbour is out of sight. Find them again before continuing the conversation or trade.",
+        );
+        return true;
+    };
+    if world
+        .get::<SimPos>(pending.actor.entity)
+        .is_some_and(|here| here.dist2(position) <= 2_250_000)
+    {
+        return false; // A price, inventory or other refusal must keep its real reason.
+    }
+    if pending.retargets >= MAX_RETARGETS
+        || world
+            .resource::<SimClock>()
+            .tick
+            .saturating_sub(pending.started)
+            > 24_000
+    {
+        feedback(
+            world,
+            "Your neighbour keeps moving. Meet them at a workplace or try again when they stop.",
+        );
+        return true;
+    }
+    match walk_then_act(world, position, pending.action.clone()) {
+        Ok(_) => {
+            if let Some(next) = world.resource_mut::<NativeActions>().pending.as_mut() {
+                next.started = pending.started;
+                next.retargets = pending.retargets + 1;
+                next.label = pending.label.clone();
+            }
+            feedback(world, "Your neighbour moved. Walking closer to continue.");
+        }
+        Err(reason) => feedback(
+            world,
+            format!("Could not approach your neighbour: {reason}"),
+        ),
+    }
+    true
+}
+
 /// Call between simulation ticks (Update), before the native panel. No simulation tick is run here.
 pub(crate) fn tick(world: &mut World) {
+    if world
+        .get_resource::<crate::FrontendGate>()
+        .is_some_and(|gate| gate.0)
+    {
+        return;
+    }
     world.init_resource::<NativeActions>();
     // Native observation is deliberately read-only; keep its shared event buffer
     // fresh here even when no approach or remote tool call is in progress.
@@ -499,6 +812,7 @@ pub(crate) fn tick(world: &mut World) {
     let current = actor(world).ok();
     let native_now = control(world) == ControlState::Native;
     apply_refusal_feedback(world, current, native_now);
+    progress_feedback::update(world, current, native_now);
     let now = world
         .get_resource::<SimClock>()
         .map_or(0, |clock| clock.tick);
@@ -558,18 +872,21 @@ pub(crate) fn tick(world: &mut World) {
         }
         if let Some(status) = terminal {
             if status == "done" {
-                let result = shared_act(world, pending.actor, pending.action);
-                feedback(
-                    world,
-                    match result {
-                        Ok(value) => value
+                let result = shared_act(world, pending.actor, pending.action.clone());
+                if result.is_err() && retarget_person(world, &pending) {
+                    return;
+                }
+                match result {
+                    Ok(value) if !testbed_content::village::colony::enabled(world) => feedback(
+                        world,
+                        value
                             .get("label")
                             .and_then(Value::as_str)
-                            .unwrap_or("Action submitted")
-                            .into(),
-                        Err(reason) => format!("At destination: {reason}"),
-                    },
-                );
+                            .unwrap_or("Action submitted"),
+                    ),
+                    Err(reason) => feedback(world, format!("At destination: {reason}")),
+                    _ => {}
+                }
             } else {
                 feedback(
                     world,
@@ -960,6 +1277,248 @@ mod tests {
         assert!(
             !app.world().resource::<SchedulerPolicy>().enabled,
             "a later policy edit must not be overwritten"
+        );
+    }
+
+    #[test]
+    fn menu_suspension_keeps_committed_cottage_materials_and_native_ownership() {
+        let mut app = fixture();
+        claim_native(&mut app);
+        let actor = actor(app.world()).unwrap();
+        let (plot, entity) = homestead::plots(app.world())
+            .into_iter()
+            .find(|(_, entity)| {
+                homestead::definition(app.world(), *entity)
+                    .unwrap()
+                    .use_kind
+                    == "housing"
+            })
+            .unwrap();
+        // This fixture isolates menu persistence, not unaided material acquisition.
+        let door = *app.world().get::<SimPos>(entity).unwrap();
+        app.world_mut().entity_mut(actor.entity).insert(door);
+        homestead::HomesteadAct::new(actor.id, "claim_plot", plot)
+            .perform(app.world_mut())
+            .unwrap();
+        economy::grant(app.world_mut(), actor.entity, Item::new("plank").stack(8));
+        economy::grant(app.world_mut(), actor.entity, Item::new("log").stack(4));
+        submit(
+            app.world_mut(),
+            None,
+            SimCommand::content(&homestead::HomesteadAct::new(
+                actor.id,
+                "build_cottage",
+                plot,
+            )),
+        )
+        .unwrap();
+        assert_eq!(
+            prepare_suspend(app.world_mut()).unwrap(),
+            None,
+            "an accepted construction request must also survive the menu before its first tick"
+        );
+        run_ticks(app.world_mut(), 1);
+        let build = app
+            .world()
+            .get::<homestead::CottageBuild>(actor.entity)
+            .unwrap()
+            .clone();
+        assert!(!build.materials.is_empty());
+        let before = state_hash(app.world_mut());
+        assert_eq!(prepare_suspend(app.world_mut()).unwrap(), None);
+        assert_eq!(before, state_hash(app.world_mut()));
+        assert_eq!(
+            app.world().get::<homestead::CottageBuild>(actor.entity),
+            Some(&build)
+        );
+        assert_eq!(control(app.world()), ControlState::Native);
+        for material in &build.materials {
+            assert!(
+                app.world()
+                    .resource::<Reservations>()
+                    .holds(material.item, actor.id)
+            );
+        }
+    }
+
+    #[test]
+    fn menu_suspension_records_navigation_stop_without_detaching_native_control() {
+        let mut app = fixture();
+        claim_native(&mut app);
+        let actor = actor(app.world()).unwrap();
+        let start = *app.world().get::<SimPos>(actor.entity).unwrap();
+        walk(app.world_mut(), SimPos::new(start.x + 4000, start.z)).unwrap();
+        advance(&mut app, 3);
+        let before = state_hash(app.world_mut());
+        let receipt = prepare_suspend(app.world_mut())
+            .unwrap()
+            .expect("movement needs a recorded stop");
+        assert_eq!(before, state_hash(app.world_mut()));
+        assert!(
+            app.world()
+                .resource::<npc_framework::kernel::commands::CommandQueue>()
+                .pending
+                .contains_key(&receipt)
+        );
+        advance(&mut app, 2);
+        assert_eq!(control(app.world()), ControlState::Native);
+        assert!(app.world().get::<MoveIntent>(actor.entity).is_none());
+        assert!(
+            app.world()
+                .get::<OrderQueue>(actor.entity)
+                .is_none_or(|queue| !queue.has_order())
+        );
+    }
+
+    #[test]
+    fn restored_pre_tick_navigation_is_stopped_before_the_actor_moves() {
+        use npc_framework::kernel::snapshot;
+        let mut app = fixture();
+        claim_native(&mut app);
+        let actor = actor(app.world()).unwrap();
+        let start = *app.world().get::<SimPos>(actor.entity).unwrap();
+        walk(app.world_mut(), SimPos::new(start.x + 4000, start.z)).unwrap();
+        let saved = snapshot::save(app.world_mut()).unwrap();
+        let mut restored = testbed_content::new_sim_app(7, "living_village");
+        snapshot::load(restored.world_mut(), &saved, snapshot::LoadMode::Strict).unwrap();
+        assert!(restored.world().get_resource::<NativeActions>().is_none());
+        let receipt = prepare_suspend(restored.world_mut())
+            .unwrap()
+            .expect("saved pending movement is transient navigation");
+        assert!(
+            restored
+                .world()
+                .resource::<npc_framework::kernel::commands::CommandQueue>()
+                .pending
+                .contains_key(&receipt)
+        );
+        advance(&mut restored, 2);
+        let current = super::actor(restored.world()).unwrap();
+        assert_eq!(
+            *restored.world().get::<SimPos>(current.entity).unwrap(),
+            start
+        );
+        assert!(restored.world().get::<MoveIntent>(current.entity).is_none());
+        assert_eq!(control(restored.world()), ControlState::Native);
+    }
+
+    fn moving_neighbour_fixture(speed: i32, destination: i32) -> (App, ActorStamp, SimId) {
+        let mut app = fixture();
+        claim_native(&mut app);
+        let actor = actor(app.world()).unwrap();
+        let neighbour = app
+            .world()
+            .resource::<testbed_content::TestbedIds>()
+            .id("Bram");
+        let entity = app.world().resource::<SimIndex>().get(neighbour).unwrap();
+        // Initial placement isolates the approach race; all subsequent motion is
+        // the ordinary recorded order/motor path, not test teleporting a target.
+        app.world_mut()
+            .entity_mut(actor.entity)
+            .insert((SimPos::new(-1000, 0), Facing::new(1, 0)));
+        app.world_mut()
+            .entity_mut(entity)
+            .insert(SimPos::new(2000, 0));
+        app.world_mut()
+            .get_mut::<Villager>(entity)
+            .unwrap()
+            .base_speed = speed;
+        submit(
+            app.world_mut(),
+            None,
+            SimCommand::content(&AttachController {
+                unit: neighbour.0,
+                controller: "moving-neighbour".into(),
+                mode: ControlMode::Direct,
+                on_idle: IdlePolicy::Idle,
+                force: false,
+            }),
+        )
+        .unwrap();
+        advance(&mut app, 20);
+        assert!(
+            observe(app.world()).unwrap()["sections"]["perception"]["sensed"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|person| person["id"] == neighbour.0)
+        );
+        npc_framework::kernel::journal::set_journal(app.world_mut(), true, false);
+        walk_then_act(
+            app.world_mut(),
+            SimPos::new(2000, 0),
+            ActStep {
+                verb: Some("talk".into()),
+                target: Some(neighbour.0),
+                args: Some(json!({"text":"Hello, neighbour."})),
+                ..default()
+            },
+        )
+        .unwrap();
+        api::act(
+            app.world_mut(),
+            ActParams {
+                unit: neighbour.0,
+                controller: "moving-neighbour".into(),
+                steps: Some(vec![
+                    ActStep {
+                        verb: Some("order".into()),
+                        args: Some(json!({"order":{"type":"Move","pos":[destination,0]}})),
+                        ..default()
+                    },
+                    ActStep {
+                        verb: Some("execute_orders".into()),
+                        ..default()
+                    },
+                ]),
+                ..default()
+            },
+        )
+        .unwrap();
+        (app, actor, neighbour)
+    }
+
+    #[test]
+    fn conversation_reapproaches_a_sensed_moving_neighbour_with_bounded_recorded_walks() {
+        let (mut app, actor, neighbour) = moving_neighbour_fixture(70, 7000);
+        let mut retries = 0;
+        for _ in 0..350 {
+            advance(&mut app, 1);
+            if let Some(pending) = app.world().resource::<NativeActions>().pending.as_ref() {
+                retries = retries.max(pending.retargets);
+            } else {
+                break;
+            }
+        }
+        advance(&mut app, 2);
+        assert!((1..=3).contains(&retries));
+        assert!(app.world().resource::<NativeActions>().pending.is_none());
+        assert!(
+            app.world()
+                .resource::<npc_framework::kernel::journal::Journal>()
+                .entries
+                .iter()
+                .any(|entry| {
+                    entry.unit == Some(actor.id)
+                        && matches!(&entry.kind,JournalKind::Effect{effect,applied:true}
+                if effect.get("type").and_then(Value::as_str)==Some("VillageSpeech") && effect.get("target").and_then(Value::as_u64)==Some(u64::from(neighbour.0)))
+                }),
+            "the same requested conversation must occur after physical re-approach"
+        );
+    }
+
+    #[test]
+    fn conversation_stops_with_feedback_when_the_neighbour_leaves_sensed_knowledge() {
+        let (mut app, _, _) = moving_neighbour_fixture(600, 25000);
+        advance(&mut app, 150);
+        assert!(app.world().resource::<NativeActions>().pending.is_none());
+        assert!(
+            app.world()
+                .resource::<NativeActions>()
+                .feedback
+                .as_deref()
+                .unwrap_or("")
+                .contains("out of sight")
         );
     }
 

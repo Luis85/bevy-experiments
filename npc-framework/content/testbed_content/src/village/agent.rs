@@ -12,7 +12,16 @@ use serde_json::json;
 
 /// Read-only activity for both observers and the native operator view.
 pub fn activity(world: &World, entity: Entity) -> (&'static str, bool, &'static str) {
-    if !living(world, entity) {
+    if world
+        .get::<super::colony::AwaitingArrival>(entity)
+        .is_some()
+    {
+        (
+            "awaiting_arrival",
+            false,
+            "Use join_island or Take control to begin your life on the island.",
+        )
+    } else if !living(world, entity) {
         (
             "dead",
             false,
@@ -56,6 +65,16 @@ pub fn activity(world: &World, entity: Entity) -> (&'static str, bool, &'static 
             "crafting",
             true,
             "Wait for crafting to finish, or use stop_work to cancel.",
+        )
+    } else if world
+        .get::<npc_framework::interaction::Interacting>(entity)
+        .is_some()
+        && super::colony::enabled(world)
+    {
+        (
+            "working",
+            true,
+            "Wait for the interaction to finish, or use stop_work to cancel.",
         )
     } else if world.get::<MoveIntent>(entity).is_some()
         && matches!(
@@ -256,6 +275,31 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         value["needs"]["warmth"] = json!(econ::need(world, ctx.entity, "Warmth"));
         value["cold"] = json!(super::living::cold(world));
         value["wearing_warm_clothes"] = json!(super::living::has_coat(world, ctx.entity));
+    }
+    if super::colony::enabled(world) {
+        value["home_heating"] = json!(super::colony::home_heating(world, ctx.entity));
+    }
+    if super::colony::enabled(world)
+        && let Some(social) = world.get::<super::colony::SocialLife>(ctx.entity)
+    {
+        // A relationship value is the observer's own state. Names/roles are
+        // included only for identities already in their scoped knowledge; no
+        // unseen position, stock, health or private resident state is exposed.
+        let relationships: Vec<_> = known_targets(world, ctx)
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|id| *id != ctx.unit)
+            .filter_map(|id| {
+                let entity = entity_of(world, id)?;
+                let person = world.get::<Villager>(entity)?;
+                (person.role != Role::Visitor).then(|| {
+                    json!({"id":id,"name":person.name,
+                    "role":person.role,"affinity":social.affinity.get(&id).copied().unwrap_or(0)})
+                })
+            })
+            .collect();
+        value["social"] = json!({"morale":social.morale,"relationships":relationships,
+            "topics":super::speech::COLONY_TOPICS});
     }
     let mut section = Section::new(value).line(format!(
         "{} — life {}, {} coins, health {}/100000. Day {}, {:?}, {}.",

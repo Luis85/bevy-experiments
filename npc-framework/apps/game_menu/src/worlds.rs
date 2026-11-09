@@ -16,7 +16,7 @@ use testbed_content::worlds::{self, WorldPreset};
 use crate::screens::Screen;
 use crate::{AppSettings, ui};
 
-const PAGES: [&str; 8] = [
+const PAGES: [&str; 9] = [
     "Identity",
     "Hunger",
     "Thirst",
@@ -25,6 +25,7 @@ const PAGES: [&str; 8] = [
     "Environment",
     "Systems",
     "AI scheduler",
+    "Resident AI",
 ];
 const NEEDS: [&str; 4] = ["hunger", "thirst", "energy", "battery"];
 
@@ -32,17 +33,20 @@ const NEEDS: [&str; 4] = ["hunger", "thirst", "energy", "battery"];
 #[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ScreenshotPage {
     AiScheduler,
+    ResidentAi,
 }
 impl ScreenshotPage {
     pub fn from_name(name: &str) -> Result<Self, String> {
         match name {
             "ai_scheduler" => Ok(Self::AiScheduler),
-            _ => Err("--worlds-page supports only ai_scheduler".into()),
+            "resident_ai" => Ok(Self::ResidentAi),
+            _ => Err("--worlds-page supports ai_scheduler or resident_ai".into()),
         }
     }
     fn index(self) -> usize {
         match self {
             Self::AiScheduler => 7,
+            Self::ResidentAi => 8,
         }
     }
 }
@@ -94,6 +98,12 @@ impl Draft {
         value["scene"] = "explorer".into();
         value["economy"] = "fixed".into();
         value["island_geography"] = "compact".into();
+        value["colony"] = false.into();
+        if self.values.keys().any(|key| key.starts_with("island_ai.")) {
+            value["island_ai"] =
+                serde_json::to_value(testbed_content::village::policy::IslandAiPolicy::default())
+                    .expect("AI policy serializes");
+        }
         value["ai_scheduler"] = serde_json::to_value(worlds::plain_preset().ai_scheduler)
             .expect("scheduler policy serializes");
         value["ai_scheduler"]["events_enabled"] = true.into();
@@ -109,11 +119,21 @@ impl Draft {
                 match serde_json::from_str::<Value>(text) {
                     Ok(next)
                         if (slot.is_boolean() && next.is_boolean())
-                            || (slot.is_number() && next.as_i64().is_some()) =>
+                            || (slot.is_number() && next.as_i64().is_some())
+                            || (slot.is_array() && next.is_array()) =>
                     {
                         *slot = next
                     }
-                    _ => errors.push(format!("{key}: enter a whole number")),
+                    _ => errors.push(format!(
+                        "{key}: enter {}",
+                        if slot.is_array() {
+                            "a valid JSON list"
+                        } else if slot.is_boolean() {
+                            "true or false"
+                        } else {
+                            "a whole number"
+                        }
+                    )),
                 }
             }
         }
@@ -805,7 +825,7 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
     match editor.page {
         0 => {
             if d.text("scene") == "island_village" {
-                p.spawn(ui::label("Island village: nine residents, production and trade, seasons and permanent actor lives.",12.0,ui::DIM));
+                p.spawn(ui::label("Island village: resident production and trade, seasons and permanent actor lives.",12.0,ui::DIM));
             }
             field(
                 p,
@@ -969,6 +989,55 @@ fn page_fields(p: &mut ChildSpawnerCommands, editor: &WorldEditor) {
             }
             p.spawn(ui::label("Link an exact Codex/Claude CLI session with npcctl scheduler bind after the agent connects. Session IDs, programs and workspaces stay in operator-owned host settings, separate from the world preset.",12.0,ui::DIM));
         }
+        8 => {
+            if d.text("island_ai.routine").is_empty() {
+                p.spawn(ui::label("Select Island Village to edit its resident behavior tree and production planner. Legacy worlds keep their original AI.", 14.0, ui::DIM));
+                return;
+            }
+            p.spawn(ui::label("Emergency survival and player orders always come first. Routine goals run left to right; recovery precedes home, and work stays last. These rules are copied into new worlds.", 13.0, ui::DIM));
+            field(
+                p,
+                d,
+                "island_ai.routine",
+                "Routine order (JSON list: thirst, hunger, recovery, home, work)",
+                200,
+                true,
+            );
+            for (i, (key, label)) in [
+                ("decision_ticks", "Reconsider after (ticks, 1..300)"),
+                (
+                    "critical_need",
+                    "Emergency threshold (remaining need, 1..40000)",
+                ),
+                ("thirst_threshold", "Seek water below (remaining need)"),
+                ("hunger_threshold", "Seek food below (remaining need)"),
+                ("recovery_threshold", "Rest below (remaining energy)"),
+                (
+                    "night_recovery_threshold",
+                    "Rest at night below (remaining energy)",
+                ),
+                (
+                    "goap.max_expansions",
+                    "Planner search budget (8..512 states)",
+                ),
+                ("goap.max_steps", "Maximum plan length (1..24 actions)"),
+                ("goap.buy_cost", "Buying cost multiplier (1..100)"),
+                ("goap.gather_cost", "Gathering cost multiplier (1..100)"),
+                ("goap.craft_cost", "Crafting cost multiplier (1..100)"),
+            ]
+            .iter()
+            .enumerate()
+            {
+                field(
+                    p,
+                    d,
+                    &format!("island_ai.{key}"),
+                    label,
+                    201 + i as i32,
+                    false,
+                );
+            }
+        }
         _ => {}
     }
 }
@@ -1049,6 +1118,30 @@ fn refresh(
 mod tests {
     use super::*;
     use crate::screens::tests::{app, tmp};
+    #[test]
+    fn resident_ai_capture_opens_the_authored_policy_without_dirtying_it() {
+        let dir = tmp("resident-ai-capture");
+        let mut captured = app(&dir, &dir.join("agents"));
+        let presets = captured.world().resource::<AppSettings>().0.worlds_dir();
+        std::fs::create_dir_all(&presets).unwrap();
+        let path = presets.join("island_colony.json");
+        let preset = worlds::builtin_preset("island_colony").unwrap();
+        std::fs::write(&path, serde_json::to_string(&preset).unwrap()).unwrap();
+        captured.insert_resource(ScreenshotPage::from_name("resident_ai").unwrap());
+        captured
+            .world_mut()
+            .resource_mut::<NextState<Screen>>()
+            .set(Screen::Worlds);
+        captured.update();
+        captured.update();
+        let editor = captured.world().resource::<WorldEditor>();
+        assert_eq!(PAGES[editor.page], "Resident AI");
+        assert_eq!(editor.selected.as_ref(), Some(&path));
+        assert!(!editor.dirty());
+        assert_eq!(editor.draft.parse().unwrap(), preset);
+        assert_eq!(editor.draft.values, editor.baseline.values);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
     #[test]
     fn screenshot_page_opens_scheduler_without_editing_the_preset_or_dirtying_the_draft() {
         let dir = tmp("world-screenshot-page");
@@ -1196,6 +1289,28 @@ mod tests {
         draft
             .values
             .insert("needs.battery.low_speed_pct".into(), "-".into());
+        assert!(draft.parse().is_err());
+    }
+
+    #[test]
+    fn resident_ai_routine_is_editable_without_losing_colony_rules() {
+        let preset = worlds::builtin_preset("island_colony").unwrap();
+        let mut draft = Draft::new(&preset);
+        assert_eq!(draft.parse().unwrap(), preset);
+        draft.values.insert(
+            "island_ai.routine".into(),
+            r#"["hunger","thirst","recovery","home","work"]"#.into(),
+        );
+        let edited = draft.parse().unwrap();
+        assert!(edited.colony);
+        assert_eq!(
+            edited.island_ai.unwrap().routine[0],
+            testbed_content::village::policy::RoutineGoal::Hunger
+        );
+        draft.values.insert(
+            "island_ai.routine".into(),
+            r#"["hunger","hunger","recovery","home","work"]"#.into(),
+        );
         assert!(draft.parse().is_err());
     }
     #[test]

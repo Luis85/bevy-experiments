@@ -12,10 +12,12 @@ use testbed_content::village::{VillageState, Villager, geography, homestead};
 #[derive(Resource)]
 struct FarmAssets {
     cube: Handle<Mesh>,
+    round: Handle<Mesh>,
     soil: Handle<StandardMaterial>,
     green: Handle<StandardMaterial>,
     leaf: Handle<StandardMaterial>,
     ripe: Handle<StandardMaterial>,
+    berry: Handle<StandardMaterial>,
     water: Handle<StandardMaterial>,
     wood: Handle<StandardMaterial>,
     owners: [Handle<StandardMaterial>; 3],
@@ -46,11 +48,30 @@ impl BedStage {
         }
     }
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CropLook {
+    Grain,
+    Berries,
+}
+impl CropLook {
+    fn from_crop(crop: Option<&homestead::Crop>) -> Self {
+        if crop.is_some_and(|crop| crop.kind == testbed_content::village::catalog::BERRIES) {
+            Self::Berries
+        } else {
+            Self::Grain
+        }
+    }
+}
+struct BedVisual {
+    grain: [Entity; 4],
+    berries: [Entity; 4],
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct PlotSnapshot {
     owner: Option<SimId>,
     owner_name: String,
     stages: Vec<BedStage>,
+    kinds: Vec<CropLook>,
     cottage_built: bool,
 }
 #[derive(Component)]
@@ -61,7 +82,7 @@ struct FarmVisual {
     allowed: bool,
     details: Entity,
     owner_markers: [Entity; 3],
-    beds: Vec<[Entity; 4]>,
+    beds: Vec<BedVisual>,
     observed: Option<PlotSnapshot>,
     caption: String,
 }
@@ -164,10 +185,17 @@ fn prepare_assets(
     };
     commands.insert_resource(FarmAssets {
         cube: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
+        round: meshes.add(
+            Sphere::new(1.0)
+                .mesh()
+                .ico(1)
+                .expect("one subdivision crop mesh"),
+        ),
         soil: material(Color::srgb(0.40, 0.29, 0.18)),
         green: material(Color::srgb(0.25, 0.43, 0.20)),
         leaf: material(Color::srgb(0.50, 0.65, 0.28)),
         ripe: material(Color::srgb(0.84, 0.65, 0.24)),
+        berry: material(Color::srgb(0.72, 0.14, 0.28)),
         water: material(Color::srgb(0.29, 0.60, 0.72)),
         wood: material(Color::srgb(0.42, 0.32, 0.22)),
         owners: [
@@ -202,12 +230,27 @@ fn group(commands: &mut Commands, parent: Entity, position: Vec3) -> Entity {
         ))
         .id()
 }
+fn round_crop(
+    commands: &mut Commands,
+    parent: Entity,
+    assets: &FarmAssets,
+    material: Handle<StandardMaterial>,
+    position: Vec3,
+    scale: Vec3,
+) {
+    commands.spawn((
+        ChildOf(parent),
+        Mesh3d(assets.round.clone()),
+        MeshMaterial3d(material),
+        Transform::from_translation(position).with_scale(scale),
+    ));
+}
 fn bed_visual(
     commands: &mut Commands,
     parent: Entity,
     assets: &FarmAssets,
     position: Vec3,
-) -> [Entity; 4] {
+) -> BedVisual {
     let bed = commands
         .spawn((
             ChildOf(parent),
@@ -275,7 +318,59 @@ fn bed_visual(
             Vec3::new(0.15, 0.25, 0.13),
         );
     }
-    stages
+    let berries = std::array::from_fn(|_| group(commands, bed, Vec3::ZERO));
+    round_crop(
+        commands,
+        berries[1],
+        assets,
+        assets.leaf.clone(),
+        Vec3::new(0., 0.16, 0.),
+        Vec3::new(0.14, 0.08, 0.13),
+    );
+    cube(
+        commands,
+        berries[1],
+        assets,
+        assets.water.clone(),
+        Vec3::new(0.36, 0.25, 0.15),
+        Vec3::new(0.12, 0.20, 0.12),
+    );
+    for stage in [2, 3] {
+        let size = if stage == 2 { 0.24 } else { 0.30 };
+        for position in [
+            Vec3::new(-0.16, 0.23, 0.04),
+            Vec3::new(0.16, 0.23, 0.04),
+            Vec3::new(0., 0.33, -0.08),
+        ] {
+            round_crop(
+                commands,
+                berries[stage],
+                assets,
+                assets.green.clone(),
+                position,
+                Vec3::new(size, size * 0.7, size * 0.8),
+            );
+        }
+    }
+    for position in [
+        Vec3::new(-0.20, 0.37, 0.13),
+        Vec3::new(-0.04, 0.43, 0.18),
+        Vec3::new(0.16, 0.35, 0.14),
+        Vec3::new(0.19, 0.41, -0.05),
+    ] {
+        round_crop(
+            commands,
+            berries[3],
+            assets,
+            assets.berry.clone(),
+            position,
+            Vec3::splat(0.055),
+        );
+    }
+    BedVisual {
+        grain: stages,
+        berries,
+    }
 }
 fn spawn_roots(
     mut commands: Commands,
@@ -551,6 +646,11 @@ fn present(facts: FarmFacts, mut view: FarmPresentation) {
                     .iter()
                     .map(|crop| BedStage::from_crop(crop.as_ref(), facts.clock.tick))
                     .collect(),
+                kinds: plot
+                    .beds
+                    .iter()
+                    .map(|crop| CropLook::from_crop(crop.as_ref()))
+                    .collect(),
                 cottage_built: plot.cottage_built,
             };
             if visual.observed.as_ref() != Some(&snapshot) {
@@ -579,15 +679,31 @@ fn present(facts: FarmFacts, mut view: FarmPresentation) {
             for (index, marker) in visual.owner_markers.iter().enumerate() {
                 set_visible(&mut view.visibility, *marker, index == owner);
             }
-            for (index, stages) in visual.beds.iter().enumerate() {
+            for (index, bed) in visual.beds.iter().enumerate() {
                 let selected = snapshot
                     .stages
                     .get(index)
                     .copied()
                     .unwrap_or(BedStage::Empty)
                     .index();
-                for (stage, entity) in stages.iter().enumerate() {
-                    set_visible(&mut view.visibility, *entity, stage == selected);
+                let kind = snapshot
+                    .kinds
+                    .get(index)
+                    .copied()
+                    .unwrap_or(CropLook::Grain);
+                for (stage, entity) in bed.grain.iter().enumerate() {
+                    set_visible(
+                        &mut view.visibility,
+                        *entity,
+                        kind == CropLook::Grain && stage == selected,
+                    );
+                }
+                for (stage, entity) in bed.berries.iter().enumerate() {
+                    set_visible(
+                        &mut view.visibility,
+                        *entity,
+                        kind == CropLook::Berries && stage == selected,
+                    );
                 }
             }
         }
@@ -710,6 +826,7 @@ mod tests {
         let details = app.world_mut().spawn(Visibility::Hidden).id();
         let markers = std::array::from_fn(|_| app.world_mut().spawn(Visibility::Hidden).id());
         let stages = std::array::from_fn(|_| app.world_mut().spawn(Visibility::Hidden).id());
+        let berry_stages = std::array::from_fn(|_| app.world_mut().spawn(Visibility::Hidden).id());
         let root = app
             .world_mut()
             .spawn((
@@ -724,7 +841,10 @@ mod tests {
                     allowed: false,
                     details,
                     owner_markers: markers,
-                    beds: vec![stages],
+                    beds: vec![BedVisual {
+                        grain: stages,
+                        berries: berry_stages,
+                    }],
                     observed: None,
                     caption: definition.label.into(),
                 },
@@ -800,7 +920,57 @@ mod tests {
             Visibility::Hidden,
             "presentation must leave root visibility to the fog system"
         );
+        app.world_mut().get_mut::<HomesteadPlot>(sim).unwrap().beds[0]
+            .as_mut()
+            .unwrap()
+            .kind = testbed_content::village::catalog::BERRIES.into();
+        let berry_state = app.world().get::<HomesteadPlot>(sim).unwrap().clone();
+        app.update();
+        assert_eq!(
+            *app.world().get::<Visibility>(stages[3]).unwrap(),
+            Visibility::Hidden
+        );
+        assert_eq!(
+            *app.world().get::<Visibility>(berry_stages[3]).unwrap(),
+            Visibility::Inherited
+        );
+        assert_eq!(
+            app.world()
+                .get::<FarmVisual>(root)
+                .unwrap()
+                .observed
+                .as_ref()
+                .unwrap()
+                .kinds[0],
+            CropLook::Berries
+        );
+        assert_eq!(
+            app.world().get::<HomesteadPlot>(sim).unwrap(),
+            &berry_state,
+            "changing crop appearance never writes the crop"
+        );
         app.world_mut().get_mut::<HomesteadPlot>(sim).unwrap().owner = Some(SimId(2));
+        app.world_mut().get_mut::<HomesteadPlot>(sim).unwrap().beds[0]
+            .as_mut()
+            .unwrap()
+            .kind = testbed_content::village::catalog::GRAIN.into();
+        app.world_mut().resource_mut::<SimClock>().tick = 101;
+        app.update();
+        assert_eq!(
+            app.world()
+                .get::<FarmVisual>(root)
+                .unwrap()
+                .observed
+                .as_ref()
+                .unwrap()
+                .kinds[0],
+            CropLook::Berries,
+            "unseen foreign crop changes cannot replace remembered kinds"
+        );
+        assert_eq!(
+            *app.world().get::<Visibility>(berry_stages[3]).unwrap(),
+            Visibility::Inherited
+        );
         app.world_mut().get_mut::<Fogged>(root).unwrap().0 = Look::Hidden;
         app.world_mut().resource_mut::<SimClock>().tick = 0;
         app.update();

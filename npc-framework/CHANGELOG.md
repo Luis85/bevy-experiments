@@ -8,6 +8,53 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### One-window island life
+
+- Connect the title, named New game, Continue, play, pause, save and return to title
+  in one native host/window. Keep authoring and AI explorer tools behind the explicit
+  developer menu, and preserve the existing 3D style and permanent-life survival rules.
+- Add a shared player HUD and Pouch, Craft, Build, Garden, Trade, People and Explore workspaces,
+  with contextual actions, real ingredient counts, work feedback and cottage previews.
+- Project first-homestead guidance from the character's known world and possessions;
+  add face-to-face advice on homes, gardens, water and trade without granting rewards.
+- Define crops in homestead content, retaining grain and adding hardy berry beds to
+  Island Colony with real seeds, watering, growth and harvest; preserve saved crop kinds.
+- Stage and validate new worlds before replacement, back up previous saves, recover
+  from write failures and preserve committed work across title/continue transitions.
+- Keep host lifecycle, view input, actor-scoped projections and authoritative actions
+  separate; document the player flow and its ownership in ADR 0036.
+- Add inspector-first entry without visitor arrival, post-death spectating with later
+  successor choices, an Explore workspace, and selected-site/conversation controls
+  ahead of long selectors. Show speed and simulation-time estimates explicitly.
+- Retain learned immovable island destinations through existing per-actor discovery
+  data without disclosing unseen stock or moving residents. Filter conversation
+  targets to known residents and nearby contextual actions.
+- Preserve committed work during inspector/editor transitions by deferring native
+  detachment until it settles. Report requests, progress and actual outcomes with
+  actor/epoch-scoped feedback instead of exposing internal action names.
+- Expose own-home heating and fuel rules, share leisure-meeting eligibility between
+  planning and settlement, acknowledge active garden beds and distinguish planner
+  search limits from missing prerequisites.
+- Skip hidden legacy observations and unselected build-preview projections; attribute
+  island UI work in the existing profiler. Record research, bounded recovery checks
+  and the remaining authoring, demographic, ecology, terrain-undo and audio scope.
+
+### Island colony showcase
+
+- Make Island Village the launcher's showcase, with inspector, controllable character and
+  landscape editor modes sharing an atomic, locked local save.
+- Add opt-in JSON-authored resident routines and bounded GOAP planning over actual cash,
+  inventory, finite resources and registered production recipes; expose decisions in the ledger.
+- Add finite households, physical social relationships, civic food reserves, material-backed
+  resident housing commissions and real household heating fuel.
+- Add guarded, recorded terrain brushes with navigation updates, persistent height/surface
+  state, native previews, seasonal ground, lamps and village atmosphere.
+- Preserve legacy scenario registrations and protected replay/golden files.
+- Separate colony contexts, read-only construction intent, resident action execution,
+  native control coordination and UI projections; document ownership and extension seams.
+- Make persistent launcher shutdown require an acknowledged successful save, with explicit
+  refusal handling; validate restored content references before replacing any saved file.
+
 ### Native homestead play
 
 - Add Home & farm (F2): explicit human control, plot claiming, material-backed cottage building,

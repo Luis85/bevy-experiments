@@ -32,6 +32,8 @@ pub const TAN: &str = "village_tan";
 pub const SPIN: &str = "village_spin";
 pub const TAILOR: &str = "village_tailor";
 pub const FORGE_SPEAR: &str = "village_forge_spear";
+pub const SAW_LOG_COST: u32 = 1;
+pub const SAW_PLANK_YIELD: u32 = 4;
 // Four full exposed cold days at one wear/tick: thirteen actors need 3.25
 // replacements/day, below eight daily hides' four-coat material capacity.
 // Shelter lowers actual wear; this does not create extra prey or materials.
@@ -108,10 +110,10 @@ pub fn register(app: &mut App) {
             .duration(240)
             .output("bread", 4),
         RecipeDef::new(SAW)
-            .input("log", 1)
+            .input("log", SAW_LOG_COST)
             .station(SAW)
             .duration(160)
-            .output("plank", 4),
+            .output("plank", SAW_PLANK_YIELD),
         RecipeDef::new(CARVE)
             .input("plank", 2)
             .station(SAW)

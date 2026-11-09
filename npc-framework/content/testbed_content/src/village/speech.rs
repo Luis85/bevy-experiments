@@ -5,6 +5,7 @@ use bevy_ecs::prelude::*;
 use npc_framework::interaction::items::entity_of;
 use npc_framework::kernel::journal::Journal;
 use npc_framework::prelude::*;
+use serde::Serialize;
 use serde_json::{Value, json};
 
 pub const AUDIBLE_RADIUS_MM: i32 = 6000;
@@ -12,6 +13,53 @@ pub const MAX_SPEECH_CHARS: usize = 240;
 pub const MAX_SPEECH_BYTES: usize = 1024;
 pub const HEARD_WINDOW_TICKS: u64 = 1200;
 pub const MAX_HEARD_LINES: usize = 8;
+
+/// Authored public questions. The UI sends the declared text through ordinary
+/// `talk`; these are not commands, quest rewards or access to private facts.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+pub struct ConversationTopic {
+    pub id: &'static str,
+    pub label: &'static str,
+    pub text: &'static str,
+}
+pub const COLONY_TOPICS: &[ConversationTopic] = &[
+    ConversationTopic {
+        id: "home",
+        label: "Building a home",
+        text: "How can I build a home?",
+    },
+    ConversationTopic {
+        id: "garden",
+        label: "Growing crops",
+        text: "How do I start a garden?",
+    },
+    ConversationTopic {
+        id: "water",
+        label: "Finding water",
+        text: "Where can I get clean water?",
+    },
+    ConversationTopic {
+        id: "trade",
+        label: "Trading with neighbors",
+        text: "How can I earn coins here?",
+    },
+];
+
+fn public_topic_reply(world: &World, text: &str) -> Option<String> {
+    if !super::colony::enabled(world) {
+        return None;
+    }
+    let topic = COLONY_TOPICS
+        .iter()
+        .find(|topic| topic.text.eq_ignore_ascii_case(text.trim()))?;
+    Some(match topic.id {
+        "home" => format!("Look for a vacant plot along the southern house lane. A cottage needs {} planks and {} logs. Saw logs at the carpenter's workshop, then build at the plot door.",super::homestead::PLANK_COST,super::homestead::LOG_COST),
+        "garden" => "Plant grain for milling and trade, or hardy berries for food. Bring a seed or berry from your pack and water the bed once. Keep part of each harvest to plant again.".into(),
+        "water" => "The village well supplies clean water. Draw it from the source or buy carried water from the well keeper. Keep some in your pack; planted beds need water too.".into(),
+        "trade" => "Offer real surplus or trade with a resident who needs it. Prices and demand change. Coins arrive only after an actual sale; keep food, water and seed for yourself.".into(),
+        _ => return None,
+    })
+}
 
 pub fn validate_text(text: &str) -> Result<(), String> {
     if text.trim().is_empty()
@@ -112,7 +160,9 @@ pub(super) fn speak(world: &mut World, actor: SimId, target: Option<SimId>, text
             other => other,
         })
         .collect();
-    let offer = if person.role == Role::Innkeeper {
+    let offer = if let Some(reply) = public_topic_reply(world, text) {
+        reply
+    } else if person.role == Role::Innkeeper {
         format!("A bed costs {} coins.", catalog::BED_PRICE)
     } else if goods.is_empty() {
         "Welcome to the village.".into()

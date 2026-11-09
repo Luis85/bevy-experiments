@@ -50,13 +50,21 @@ pub fn plot_json(world: &World, plot: Entity, state_known: bool) -> Option<Value
             "planted_at":crop.map(|crop|crop.planted_at),"watered_at":crop.and_then(|crop|crop.watered_at),
             "ready_at":crop.and_then(|crop|crop.ready_at)})
     }).collect();
-    Some(
-        json!({"id":id,"kind":"homestead_plot","name":definition.label,"plot_id":estate.plot_id,
+    let mut value = json!({"id":id,"kind":"homestead_plot","name":definition.label,"plot_id":estate.plot_id,
         "position":center,"use_kind":definition.use_kind,"state_known":state_known,
         "owner":if state_known {estate.owner}else{None},"owner_name":if state_known {owner_name}else{None},
         "cottage_built":state_known.then_some(estate.cottage_built),"cottage_center":cottage_center(center),
-        "front_door":front_door(center),"beds":beds}),
-    )
+        "front_door":front_door(center),"beds":beds});
+    if super::super::colony::enabled(world) {
+        value["owner_alive"] = json!(if state_known {
+            estate
+                .owner
+                .map(|owner| entity_of(world, owner).is_some_and(|entity| living(world, entity)))
+        } else {
+            None
+        });
+    }
+    Some(value)
 }
 
 fn current(world: &World, ctx: &AgentCtx, id: SimId, plot: Entity) -> bool {
@@ -89,12 +97,20 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
     let building = world
         .get::<CottageBuild>(ctx.entity)
         .map(|build| json!({"plot":build.plot,"ends":build.ends}));
-    Some(Section::new(json!({"plots":rows,"building":building,
+    let mut value = json!({"plots":rows,"building":building,
         "cottage":{"inputs":[{"kind":"plank","count":PLANK_COST},{"kind":"log","count":LOG_COST}],"duration_ticks":BUILD_TICKS},
         "crop":{"seed_kind":catalog::GRAIN,"seed_count":SEED_COUNT,"water_kind":catalog::WATER,"water_count":WATER_COUNT,
             "growth_ticks":GROW_TICKS,"yield_kind":catalog::GRAIN,"yield_count":HARVEST_GRAIN},
-        "claim_limits":{"housing":MAX_HOUSING_PLOTS,"garden":MAX_GARDEN_PLOTS}}))
-        .line("Homesteads: claim one housing and one garden plot. A cottage costs 8 planks + 4 logs and 600 ticks; it changes your home without moving you. Plant one real grain seed, water once with one clean water, then harvest three grain after 6000 ticks. Use each advertised bed position and its bed index; all work requires reach. stop_work cancels construction without spending its reserved materials."))
+        "claim_limits":{"housing":MAX_HOUSING_PLOTS,"garden":MAX_GARDEN_PLOTS}});
+    if super::super::colony::enabled(world) {
+        value["crops"] = json!(crop_catalog(world));
+    }
+    let mut section = Section::new(value)
+        .line("Homesteads: claim one housing and one garden plot. A cottage costs 8 planks + 4 logs and 600 ticks; it changes your home without moving you. Plant one real grain seed, water once with one clean water, then harvest three grain after 6000 ticks. Use each advertised bed position and its bed index; all work requires reach. stop_work cancels construction without spending its reserved materials.");
+    if super::super::colony::enabled(world) {
+        section = section.line("Colony crop choices are declared in homestead.crops. Hardy berries consume one carried berry and one clean water, grow for 9000 ticks, and yield four edible/tradable berries. Choose plant.args.kind explicitly; omitted kind still means village_grain.");
+    }
+    Some(section)
 }
 
 fn checked(mut affordance: Affordance, result: Result<(), String>) -> Affordance {
@@ -165,23 +181,44 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
             for bed in 0..estate.beds.len() as u32 {
                 let mut command = HomesteadAct::new(ctx.unit, verb, id);
                 command.bed = bed;
-                candidates.push((bed, command.check(world)));
+                if verb == "plant" {
+                    for crop in crop_catalog(world) {
+                        command.kind = crop.kind.into();
+                        candidates.push((bed, crop.kind, command.check(world)));
+                    }
+                } else {
+                    candidates.push((bed, catalog::GRAIN, command.check(world)));
+                }
             }
             let selected = candidates
                 .iter()
-                .find(|(_, check)| check.is_ok())
-                .map_or(0, |(bed, _)| *bed);
-            let check = candidates
-                .iter()
-                .find(|(bed, _)| *bed == selected)
-                .map(|(_, check)| check.clone())
-                .unwrap_or_else(|| Err("this plot has no crop beds".into()));
+                .find(|(_, _, check)| check.is_ok())
+                .or_else(|| candidates.first());
+            let (bed, kind, check) = selected
+                .map(|(bed, kind, check)| (*bed, *kind, check.clone()))
+                .unwrap_or_else(|| (0, catalog::GRAIN, Err("this plot has no crop beds".into())));
+            let label = if super::super::colony::enabled(world) {
+                match verb {
+                    "plant" => "Plant a crop from your pack",
+                    "harvest" => "Harvest a mature crop",
+                    _ => label,
+                }
+            } else {
+                label
+            };
             let mut affordance=Affordance::new(verb,format!("{label} on {}; approach the chosen bed position",definition.label))
                 .target(id).arg("bed",&format!("0..{}; default 0. See homestead.plots[].beds[].position for exact approach coordinates",estate.beds.len().saturating_sub(1)));
             if verb == "plant" {
-                affordance = affordance.arg("kind", "village_grain; default village_grain");
+                let options = if super::super::colony::enabled(world) {
+                    format!(
+                        "village_grain or village_berries; default village_grain. Checked available choice: {kind}; pass kind explicitly for berries."
+                    )
+                } else {
+                    "village_grain; default village_grain".into()
+                };
+                affordance = affordance.arg("kind", &options);
             }
-            if let Some(pos) = bed_position(world, plot, selected) {
+            if let Some(pos) = bed_position(world, plot, bed) {
                 affordance.pos = Some((pos.x, pos.z));
             }
             result.push(checked(affordance, check));

@@ -3,21 +3,29 @@ mod agent;
 mod ai;
 pub mod behavior;
 pub mod catalog;
+pub mod colony;
 mod commands;
+mod discovery;
 pub mod economy;
 pub mod environment;
 pub mod geography;
+pub mod goap;
 pub use geography as geometry;
 pub mod homestead;
 pub mod host;
 pub mod hunting;
+pub mod integrity;
 pub mod living;
 pub mod market;
 mod model;
+pub mod player_journey;
+pub mod policy;
 pub mod production;
 pub mod public_feedback;
+pub mod routing;
 mod scheduler;
 pub mod speech;
+pub mod terrain;
 pub use agent::activity;
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -42,7 +50,8 @@ pub fn needs_driven(world: &World) -> bool {
 pub(crate) struct BirthPreset(pub String);
 
 pub fn intrinsic_action(verb: &str) -> bool {
-    homestead::VERBS.contains(&verb)
+    verb == "join_island"
+        || homestead::VERBS.contains(&verb)
         || matches!(
             verb,
             "buy"
@@ -79,6 +88,11 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
     app.world_mut().resource_mut::<SimConfig>().night_permille =
         if p.day_night.on { 300 } else { 0 };
     catalog::register(app);
+    if p.colony {
+        colony::register(app);
+        terrain::register(app);
+        discovery::register(app);
+    }
     if needs_driven(app.world()) {
         if geography::is_expanded(app.world()) {
             geography::register_living(app);
@@ -404,6 +418,14 @@ pub fn apply(world: &mut World, played: SimId) {
         world.insert_resource(ids);
         geography::append_boundary(world);
         homestead::spawn(world);
+        if world
+            .resource::<crate::world_runtime::ActiveWorld>()
+            .0
+            .colony
+        {
+            colony::spawn(world);
+            terrain::spawn(world);
+        }
         production::validate(world).expect("living production graph must be acyclic");
     }
 }
@@ -446,8 +468,16 @@ pub(crate) fn initialise_person(
         },
     ));
     living::prepare_person(world, e);
+    colony::participant_spawned(world, e);
 }
+/// Cross-context integration: civic demand changed, so its production owner
+/// invalidates the cached funded plan. Colony modules never mutate that plan.
+fn colony_demand_changed(world: &mut World) {
+    production::invalidate(world);
+}
+
 fn tick(world: &mut World) {
     ai::tick(world);
     homestead::tick(world);
+    colony::tick(world);
 }

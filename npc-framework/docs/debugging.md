@@ -1,5 +1,10 @@
 # Debugging, tracing and profiling
 
+The repository's Nextest configuration reserves all active test slots for two
+service-heavy CLI rehearsals with strict wall-clock budgets. It changes scheduling,
+not test selection or time limits. A full JUnit failure report is retained at
+`target/nextest/default/junit.xml`, in addition to `xtask`'s compact verdict.
+
 Everything a human or an AI agent needs to understand the sim is reachable as **JSON**: a headless CLI
 (`npcctl`), a localhost JSON-RPC interface on the running games (Bevy Remote Protocol, BRP), and a headless
 real-time session host for external agents. Debug tooling never changes sim results (ADR 0006): with the

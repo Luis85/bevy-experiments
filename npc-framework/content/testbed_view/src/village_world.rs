@@ -24,6 +24,9 @@ struct IslandMaterials {
 }
 #[derive(Component)]
 struct Windmill;
+/// Public ordering seam; projection implementation details remain private.
+#[derive(SystemSet, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct VillageProjectionSet;
 #[derive(Component)]
 struct Label {
     sim: SimId,
@@ -38,6 +41,8 @@ struct Labels(BTreeMap<SimId, (Entity, bool)>);
 struct StaticId(SimId);
 #[derive(Component)]
 struct ActorCaption(SimId);
+#[derive(Component)]
+struct WorldLabelText;
 /// Immutable scenery anchor, never part of the authoritative world.
 #[derive(Component)]
 struct SceneryAnchor(Vec3);
@@ -114,11 +119,14 @@ pub(crate) fn plugin(app: &mut App) {
     let default_camera = !app.world().contains_resource::<CameraStart>();
     if !app.world().contains_resource::<FollowHero>() {
         app.insert_resource(FollowHero {
-            enabled: default_camera,
+            enabled: default_camera && !testbed_content::village::colony::enabled(app.world()),
             ..default()
         });
     }
     if default_camera {
+        if testbed_content::village::colony::enabled(app.world()) {
+            app.insert_resource(crate::island_camera::AutoFrame);
+        }
         app.insert_resource(CameraStart(RtsCamera {
             focus: Vec3::ZERO,
             distance: if testbed_content::village::geometry::is_expanded(app.world()) {
@@ -157,8 +165,9 @@ pub(crate) fn plugin(app: &mut App) {
                 follow_hero,
                 actor_labels,
                 actor_captions,
+                label_typography,
                 bubbles,
-                project,
+                project.in_set(VillageProjectionSet),
                 weather,
                 corpse_pose,
             )
@@ -181,10 +190,13 @@ fn follow_hero(
             &UiGlobalTransform,
             Option<&Visibility>,
             Has<super::homestead_panel::FarmRoot>,
+            Has<super::player_hud::WorkspaceRoot>,
+            Has<super::player_hud::PlayerRoot>,
         ),
         Or<(
             With<super::village::Hud>,
             With<super::homestead_panel::FarmRoot>,
+            With<super::player_hud::PlayerRoot>,
         )>,
     >,
     manual: Option<Res<crate::camera::CameraManualIntent>>,
@@ -213,14 +225,15 @@ fn follow_hero(
     let changed_actor = follow.actor != Some(state.played);
     let panel_rects: Vec<_> = panels
         .iter()
-        .filter(|(node, size, _, visibility, _)| {
+        .filter(|(node, size, _, visibility, _, _, _)| {
             node.display != Display::None
                 && size.size().min_element() > 0.0
                 && visibility.is_none_or(|visibility| *visibility != Visibility::Hidden)
         })
-        .map(|(_, size, transform, _, farm)| {
+        .map(|(_, size, transform, _, farm, workspace, player)| {
             (
-                farm,
+                farm || workspace,
+                player,
                 Rect::from_center_size(
                     transform.translation * size.inverse_scale_factor(),
                     size.size() * size.inverse_scale_factor(),
@@ -230,10 +243,14 @@ fn follow_hero(
         .collect();
     let hud_rect = panel_rects
         .iter()
-        .find_map(|(farm, rect)| (!farm).then_some(*rect));
+        .find_map(|(farm, player, rect)| (!farm && !player).then_some(*rect));
     let farm_rect = panel_rects
         .iter()
-        .find_map(|(farm, rect)| (*farm).then_some(*rect));
+        .find_map(|(farm, player, rect)| (*farm && !player).then_some(*rect));
+    let player_rects: Vec<_> = panel_rects
+        .iter()
+        .filter_map(|(_, player, rect)| player.then_some(*rect))
+        .collect();
     for (projection, mut camera, mut transform) in &mut cameras {
         // The ordinary camera has already handled input. Preserve any real manual pan/focus;
         // zoom and orbit do not change focus, so they keep tracking the hero.
@@ -263,7 +280,11 @@ fn follow_hero(
                         projection,
                         &camera,
                         target,
-                        hero_screen_anchor(viewport, hud_rect, farm_rect),
+                        if player_rects.is_empty() {
+                            hero_screen_anchor(viewport, hud_rect, farm_rect)
+                        } else {
+                            player_screen_anchor(viewport, &player_rects)
+                        },
                     )
                 })
             })
@@ -279,6 +300,36 @@ fn follow_hero(
         follow.expected_focus = Some(camera.focus);
         follow.actor = Some(state.played);
     }
+}
+/// Center a player or preview in the largest rectangle left by every visible
+/// HUD panel, including wrapped header/toolbar and contextual feedback.
+pub(crate) fn player_screen_anchor(viewport: Rect, panels: &[Rect]) -> Vec2 {
+    let mut regions = vec![viewport.inflate(-12.0)];
+    for panel in panels {
+        let mut clear = Vec::new();
+        for region in regions {
+            let blocked = region.intersect(panel.inflate(12.0));
+            if blocked.is_empty() {
+                clear.push(region);
+                continue;
+            }
+            clear.extend(
+                [
+                    Rect::new(region.min.x, region.min.y, blocked.min.x, region.max.y),
+                    Rect::new(blocked.max.x, region.min.y, region.max.x, region.max.y),
+                    Rect::new(region.min.x, region.min.y, region.max.x, blocked.min.y),
+                    Rect::new(region.min.x, blocked.max.y, region.max.x, region.max.y),
+                ]
+                .into_iter()
+                .filter(|rect| rect.width() > 1.0 && rect.height() > 1.0),
+            );
+        }
+        regions = clear;
+    }
+    regions
+        .into_iter()
+        .max_by(|a, b| (a.width() * a.height()).total_cmp(&(b.width() * b.height())))
+        .map_or(viewport.center(), |area| area.center())
 }
 /// Frame the actor in the usable map, rather than behind a HUD occupying the viewport center.
 fn hero_play_area(viewport: Rect, hud: Option<Rect>) -> Rect {
@@ -308,7 +359,7 @@ fn hero_play_area(viewport: Rect, hud: Option<Rect>) -> Rect {
         below
     }
 }
-fn hero_screen_anchor(viewport: Rect, hud: Option<Rect>, farm: Option<Rect>) -> Vec2 {
+pub(crate) fn hero_screen_anchor(viewport: Rect, hud: Option<Rect>, farm: Option<Rect>) -> Vec2 {
     let area = if let Some(farm) = farm {
         // Keep the original spectator framing when the farm is closed. With
         // native controls open, choose a real clear region beside both panels.
@@ -351,7 +402,7 @@ fn hero_screen_anchor(viewport: Rect, hud: Option<Rect>, farm: Option<Rect>) -> 
 }
 /// Translation equivariance of a ground-plane ray gives a pixel-correct framing offset at any
 /// operator zoom/orbit. No world-space constant is introduced and no authoritative position moves.
-fn framed_focus(
+pub(crate) fn framed_focus(
     projection: &Camera,
     camera: &RtsCamera,
     actor: Vec3,
@@ -431,6 +482,7 @@ fn label(
         ))
         .with_children(|p| {
             let mut caption = p.spawn((
+                WorldLabelText,
                 native_text(text, 11.0),
                 TextLayout::default().with_linebreak(bevy::text::LineBreak::WordOrCharacter),
             ));
@@ -451,6 +503,7 @@ fn spawn(
     patches: Query<(Entity, &SimId, &SimPos, &ResourcePatch)>,
     mut index: ResMut<VisualIndex>,
     geography: Option<Res<testbed_content::village::geometry::Geography>>,
+    terrain: Option<Res<testbed_content::village::terrain::TerrainState>>,
 ) {
     let geography = geography
         .as_deref()
@@ -458,14 +511,21 @@ fn spawn(
     let radius = geography.radii_mm.0 as f32 / 1000.;
     let zradius = geography.radii_mm.1 as f32 / 1000.;
     let water = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.075, 0.32, 0.48),
-        perceptual_roughness: 0.24,
-        reflectance: 0.65,
+        base_color: if terrain.is_some() {
+            Color::srgb(0.055, 0.22, 0.29)
+        } else {
+            Color::srgb(0.075, 0.32, 0.48)
+        },
+        perceptual_roughness: if terrain.is_some() { 0.92 } else { 0.24 },
+        reflectance: if terrain.is_some() { 0.06 } else { 0.65 },
         ..default()
     });
     commands.spawn((
         Name::new("island surrounding water"),
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(160., 160.))),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(
+            if terrain.is_some() { 600. } else { 160. },
+            if terrain.is_some() { 600. } else { 160. },
+        ))),
         MeshMaterial3d(water),
         Transform::from_xyz(0., -0.13, 0.),
     ));
@@ -498,12 +558,14 @@ fn spawn(
             "island grassland",
         ),
     ] {
-        commands.spawn((
-            Name::new(name),
-            Mesh3d(meshes.add(Cylinder::new(radius, height))),
-            MeshMaterial3d(mat),
-            Transform::from_xyz(0., y, 0.).with_scale(Vec3::new(1., 1., zradius / radius)),
-        ));
+        if terrain.is_none() {
+            commands.spawn((
+                Name::new(name),
+                Mesh3d(meshes.add(Cylinder::new(radius, height))),
+                MeshMaterial3d(mat),
+                Transform::from_xyz(0., y, 0.).with_scale(Vec3::new(1., 1., zradius / radius)),
+            ));
+        }
     }
     let road = materials.add(StandardMaterial {
         base_color: Color::srgb(0.41, 0.32, 0.22),
@@ -511,6 +573,9 @@ fn spawn(
         ..default()
     });
     for path in geography.roads {
+        if terrain.is_some() {
+            continue;
+        }
         let (x, z, w, d) = (
             path.x as f32 / 1000.,
             path.z as f32 / 1000.,
@@ -533,7 +598,11 @@ fn spawn(
         ..default()
     });
     let stake = meshes.add(Cuboid::new(0.10, 0.55, 0.10));
-    let clearing = materials.add(Color::srgb(0.52, 0.43, 0.29));
+    let clearing = materials.add(if terrain.is_some() {
+        Color::srgb(0.45, 0.39, 0.26)
+    } else {
+        Color::srgb(0.52, 0.43, 0.29)
+    });
     for plot in geography.expansion_plots {
         let center = Vec3::new(plot.x as f32 / 1000., 0., plot.z as f32 / 1000.);
         let width = plot.width_mm as f32 / 1000.;
@@ -560,6 +629,21 @@ fn spawn(
                             Transform::from_xyz(x, 0.275, z),
                         ));
                     }
+                }
+                if terrain.is_some() {
+                    // Low survey rails distinguish an empty plot from a built foundation.
+                    for x in [-width * 0.5 + 0.2, width * 0.5 - 0.2] {
+                        parent.spawn((
+                            Mesh3d(meshes.add(Cuboid::new(0.035, 0.035, depth - 0.4))),
+                            MeshMaterial3d(wood.clone()),
+                            Transform::from_xyz(x, 0.32, 0.0),
+                        ));
+                    }
+                    parent.spawn((
+                        Mesh3d(meshes.add(Cuboid::new(width - 0.4, 0.035, 0.035))),
+                        MeshMaterial3d(wood.clone()),
+                        Transform::from_xyz(0.0, 0.32, depth * 0.5 - 0.2),
+                    ));
                 }
             });
     }
@@ -853,6 +937,20 @@ fn actor_labels(
         }
     }
 }
+fn label_typography(
+    colony: Option<Res<testbed_content::village::colony::ColonyState>>,
+    font: Option<Res<SpeechFont>>,
+    mut labels: Query<(&mut TextFont, Has<ActorCaption>), With<WorldLabelText>>,
+) {
+    if colony.is_none() {
+        return;
+    }
+    let Some(font) = font else { return };
+    for (mut text, actor) in &mut labels {
+        text.font = font.0.clone().into();
+        text.font_size = FontSize::Px(if actor { 13.0 } else { 12.0 });
+    }
+}
 fn caption_short(value: &str, limit: usize) -> String {
     let value = value.split_whitespace().collect::<Vec<_>>().join(" ");
     if value.chars().count() <= limit {
@@ -870,6 +968,26 @@ fn caption_short(value: &str, limit: usize) -> String {
 fn actor_caption(world: &World, entity: Entity) -> Option<String> {
     let person = world.get::<Villager>(entity)?;
     let (activity, _, _) = testbed_content::village::activity(world, entity);
+    if crate::player_hud::enabled(world)
+        && world
+            .get_resource::<VillageState>()
+            .is_some_and(|state| world.get::<SimId>(entity) == Some(&state.played))
+        && !world
+            .get_resource::<crate::OverlayState>()
+            .is_some_and(|state| state.visible)
+    {
+        let name = format!("{} · You", caption_short(&person.name, 24));
+        return Some(match activity {
+            "idle" => name,
+            "building" => format!("{name}\nBuilding your cottage"),
+            "walking" => format!("{name}\nWalking"),
+            "resting" => format!("{name}\nResting"),
+            "gathering" => format!("{name}\nGathering supplies"),
+            "crafting" => format!("{name}\nMaking something"),
+            "dead" => format!("{} · Remembered", caption_short(&person.name, 24)),
+            _ => name,
+        });
+    }
     let detail = match activity {
         "gathering" => world
             .get::<testbed_content::village::Gathering>(entity)
@@ -1386,6 +1504,9 @@ fn project(
     visible: Query<&Visibility>,
     state: Res<VillageState>,
     selected: Res<npc_framework::view_helpers::Selected>,
+    colony: Option<Res<testbed_content::village::colony::ColonyState>>,
+    mode: Option<Res<crate::IslandMode>>,
+    diagnostics: Option<Res<crate::OverlayState>>,
     vitality: Query<&Vitality>,
     mut labels: Query<(
         Entity,
@@ -1408,6 +1529,9 @@ fn project(
                 With<super::village::BookPanel>,
                 With<super::homestead_panel::FarmRoot>,
                 With<super::homestead_panel::FarmLauncher>,
+                With<super::colony_panel::LedgerRoot>,
+                With<super::player_hud::WorkspaceRoot>,
+                With<super::player_hud::JourneyRoot>,
             )>,
             Without<Label>,
         ),
@@ -1456,6 +1580,16 @@ fn project(
         let mut shown = visible
             .get(label.visual)
             .is_ok_and(|v| *v != Visibility::Hidden);
+        if colony.is_some() && !diagnostics.as_ref().is_some_and(|overlay| overlay.visible) {
+            let focused = selected.0 == Some(label.sim)
+                || (mode.as_deref() == Some(&crate::IslandMode::Character)
+                    && label.sim == state.played);
+            shown &= if let Some(bubble) = bubble {
+                bubble.kind == BubbleKind::Speech
+            } else {
+                focused || scenery.is_some()
+            };
+        }
         if (label.actor || bubble.is_some())
             && label.sim != state.played
             && selected.0 != Some(label.sim)
@@ -1558,6 +1692,7 @@ fn weather(
     mut colors: ResMut<IslandMaterials>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Option<Res<ViewAssets>>,
+    colony: Option<Res<testbed_content::village::colony::ColonyState>>,
 ) {
     let (_, season, _) =
         testbed_content::village::calendar_at(clock.tick, &config, market.is_some());
@@ -1587,16 +1722,35 @@ fn weather(
     let night = config.is_night(clock.tick);
     let phase = (clock.tick % config.day_length.max(1)) as f32 / config.day_length.max(1) as f32;
     for (mut light, mut transform) in &mut sun {
-        light.illuminance = if night { 700. } else { 10000. };
+        light.illuminance = if night {
+            if colony.is_some() { 2300.0 } else { 700.0 }
+        } else {
+            10000.
+        };
         light.color = if night {
-            Color::srgb(0.51, 0.65, 1.)
+            if colony.is_some() {
+                Color::srgb(0.64, 0.76, 1.0)
+            } else {
+                Color::srgb(0.51, 0.65, 1.)
+            }
         } else {
             Color::srgb(1., 0.96, 0.87)
         };
         *transform = Transform::from_xyz(phase.cos() * 16., 20., phase.sin() * 16.)
             .looking_at(Vec3::ZERO, Vec3::Y);
     }
-    ambient.brightness = if night { 140. } else { 650. };
+    ambient.brightness = if night {
+        if colony.is_some() { 420.0 } else { 140.0 }
+    } else {
+        650.
+    };
+    if colony.is_some() {
+        ambient.color = if night {
+            Color::srgb(0.67, 0.77, 1.0)
+        } else {
+            Color::srgb(0.9, 0.93, 1.0)
+        };
+    }
     sky.0 = if night {
         Color::srgb(0.055, 0.075, 0.14)
     } else {
@@ -1607,7 +1761,7 @@ fn weather(
             Quat::from_rotation_z((clock.tick % 480) as f32 * std::f32::consts::TAU / 480.0);
     }
 }
-fn corpse_pose(
+pub(crate) fn corpse_pose(
     people: Query<(&Vitality, &Villager)>,
     clock: Res<SimClock>,
     mut roots: Query<(&VisualOf, &mut Transform), With<crate::visuals::ActorVisual>>,

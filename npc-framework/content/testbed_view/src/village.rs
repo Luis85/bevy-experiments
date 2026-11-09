@@ -53,6 +53,10 @@ pub(crate) struct BookPanel;
 struct BookScroll;
 #[derive(Component)]
 struct BookText;
+#[derive(Component)]
+struct VillageTypography;
+#[derive(Resource)]
+struct ColonyHudFont(Handle<Font>);
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 enum Action {
     Books,
@@ -92,6 +96,10 @@ pub(crate) fn plugin(app: &mut App) {
     if !app.is_plugin_added::<bevy::ui_widgets::ScrollAreaPlugin>() {
         app.add_plugins(bevy::ui_widgets::ScrollAreaPlugin);
     }
+    if village::colony::enabled(app.world()) {
+        app.add_systems(Startup, load_colony_font)
+            .add_systems(Update, colony_typography.in_set(ViewSystems::Present));
+    }
     app.init_resource::<InputFocus>()
         .init_resource::<Reader>()
         .init_resource::<ObserverFeedback>()
@@ -114,6 +122,7 @@ fn background(world: &mut World) {
 }
 fn text(value: impl Into<String>, size: f32, color: Color) -> impl Bundle {
     (
+        VillageTypography,
         Text::new(value),
         TextFont {
             font_size: FontSize::Px(size),
@@ -121,6 +130,32 @@ fn text(value: impl Into<String>, size: f32, color: Color) -> impl Bundle {
         },
         TextColor(color),
     )
+}
+fn load_colony_font(mut commands: Commands, fonts: Option<ResMut<Assets<Font>>>) {
+    if let Some(mut fonts) = fonts {
+        let font = Font::from_bytes(
+            include_bytes!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../assets/fonts/Barlow-Regular.ttf"
+            ))
+            .to_vec(),
+        );
+        commands.insert_resource(ColonyHudFont(fonts.add(font)));
+    }
+}
+fn colony_typography(
+    font: Option<Res<ColonyHudFont>>,
+    mut text: Query<&mut TextFont, With<VillageTypography>>,
+) {
+    let Some(font) = font else { return };
+    for mut text in &mut text {
+        if text.font != bevy::text::FontSource::Handle(font.0.clone()) {
+            text.font = font.0.clone().into();
+            if text.font_size == FontSize::Px(12.0) {
+                text.font_size = FontSize::Px(13.0);
+            }
+        }
+    }
 }
 fn button(p: &mut ChildSpawnerCommands, label: &str, action: Action) {
     p.spawn((
@@ -143,6 +178,7 @@ fn button(p: &mut ChildSpawnerCommands, label: &str, action: Action) {
     .with_child(text(label, 12.0, TEXT));
 }
 fn spawn(mut commands: Commands, active: Option<Res<testbed_content::world_runtime::ActiveWorld>>) {
+    let colony = active.as_ref().is_some_and(|world| world.0.colony);
     commands
         .spawn((
             Name::new("village status"),
@@ -154,7 +190,7 @@ fn spawn(mut commands: Commands, active: Option<Res<testbed_content::world_runti
                 position_type: PositionType::Absolute,
                 right: px(12),
                 top: px(12),
-                width: px(370),
+                width: px(if colony { 300 } else { 370 }),
                 max_width: percent(94),
                 padding: UiRect::all(px(12)),
                 row_gap: px(8),
@@ -184,7 +220,9 @@ fn spawn(mut commands: Commands, active: Option<Res<testbed_content::world_runti
             })
             .with_children(|p| {
                 button(p, "Found diaries", Action::Books);
-                button(p, "AI scheduler", Action::Setup);
+                if !colony {
+                    button(p, "AI scheduler", Action::Setup);
+                }
                 button(p, "Follow hero", Action::FollowHero);
                 button(p, "New life", Action::NewLife);
             });
@@ -492,6 +530,104 @@ fn actor_outcome(entry: &JournalEntry, actor: SimId) -> Option<String> {
         .then(|| outcome(&entry.kind))
         .flatten()
 }
+
+/// Plain, bounded labels for player-facing results. Unknown registered action
+/// names remain generic rather than exposing protocol identifiers or arguments.
+pub(crate) fn player_action_label(verb: &str) -> &'static str {
+    match verb {
+        "stop_work" | "cancel" => "Stop",
+        "execute_orders" | "order" | "move" | "walk" => "Walking",
+        "buy" | "sell" | "offer_goods" | "withdraw_offer" => "Trade",
+        "gather" => "Gathering",
+        "hunt" => "Hunting",
+        "eat" => "Eating",
+        "drink" => "Drinking",
+        "rest" | "rest_home" | "rest_ground" => "Rest",
+        "talk" => "Conversation",
+        "claim_plot" => "Land claim",
+        "build_cottage" => "Building",
+        "plant" | "water_crop" | "harvest" => "Gardening",
+        _ => "Action",
+    }
+}
+
+fn player_outcome(entry: &JournalEntry, actor: SimId) -> Option<String> {
+    if matches!(entry.kind, JournalKind::Effect { .. }) {
+        return actor_outcome(entry, actor).map(|result| {
+            result
+                .replace(
+                    "New life arrived; enter_world and take_control",
+                    "A new life is ready. Choose Play character.",
+                )
+                .replace("; offers observed", "")
+        });
+    }
+    if entry.unit != Some(actor) {
+        return None;
+    }
+    match &entry.kind {
+        JournalKind::ExternalAction { verb, status, .. }
+            if matches!(
+                status.as_str(),
+                "done" | "failed" | "cancelled" | "rejected"
+            ) =>
+        {
+            if verb == "execute_orders" || verb == "order" {
+                return None;
+            }
+            let action = player_action_label(verb);
+            Some(match status.as_str() {
+                "done" if verb == "stop_work" => "Stopped. Choose your next activity.".into(),
+                "done" => format!("{action} finished."),
+                "cancelled" => format!("{action} cancelled."),
+                _ => format!("{action} could not finish. Choose another action."),
+            })
+        }
+        JournalKind::OrderDone { .. } => Some("Arrived at the destination.".into()),
+        JournalKind::OrderFailed { .. } => {
+            Some("The route is blocked. Choose a nearby destination.".into())
+        }
+        JournalKind::CraftDone { .. } => Some("Crafting finished. The goods are ready.".into()),
+        JournalKind::CraftFailed { .. } => {
+            Some("Crafting could not finish. Check your supplies and try again.".into())
+        }
+        JournalKind::Interacted { verb, outcome, .. } if outcome != "started" => Some(format!(
+            "{} {}.",
+            player_action_label(verb),
+            if outcome == "done" || outcome == "success" {
+                "finished"
+            } else {
+                "ended"
+            }
+        )),
+        JournalKind::ActionRejected { .. } => Some("That action is unavailable.".into()),
+        _ => None,
+    }
+}
+
+fn player_recovery(activity: &str, dead: bool, pending: bool, paused: bool) -> String {
+    if dead {
+        "This life has ended. Choose New life to return to the island.".into()
+    } else if pending && paused {
+        "Resume the world to start playing.".into()
+    } else if paused {
+        "World paused. Resume to walk, work and recover.".into()
+    } else if pending {
+        "Getting ready to play.".into()
+    } else {
+        match activity {
+            "blocked" => "The route is blocked. Choose Stop, then a nearby destination.",
+            "resting" => "Rest restores energy. Choose Stop when you are ready.",
+            "building" | "gathering" | "hunting" | "crafting" | "walking" | "working" => {
+                "Your activity is underway. Choose Stop to change it."
+            }
+            "awaiting_arrival" => "Choose Play character to join the island.",
+            _ => "WASD walks. F2 opens home, work and trade.",
+        }
+        .into()
+    }
+}
+
 fn observer_feedback(world: &mut World) {
     // Match the HUD's twice-per-second refresh, including while paused.
     if world.resource::<Reader>().refresh + world.resource::<Time<Real>>().delta_secs() < 0.5 {
@@ -502,7 +638,27 @@ fn observer_feedback(world: &mut World) {
         return;
     };
     let (activity, _, recovery) = village::activity(world, entity);
-    let activity = format!("Activity: {activity}");
+    let colony = village::colony::enabled(world);
+    let activity_name = activity;
+    let activity = if colony {
+        match activity {
+            "idle" => "Ready to explore",
+            "awaiting_arrival" => "Ready to join",
+            "resting" => "Resting",
+            "building" => "Building",
+            "gathering" => "Gathering",
+            "hunting" => "Hunting",
+            "crafting" => "Crafting",
+            "walking" => "Walking",
+            "blocked" => "Route blocked",
+            "working" => "Working",
+            "dead" => "Life ended",
+            _ => "On the island",
+        }
+        .into()
+    } else {
+        format!("Activity: {activity}")
+    };
     let dead = world
         .get::<Vitality>(entity)
         .is_some_and(|v| v.died_at.is_some());
@@ -516,7 +672,9 @@ fn observer_feedback(world: &mut World) {
                 && payload.get("unit").and_then(|v| v.as_u64()) == Some(u64::from(actor.0)))
         })
     });
-    let next = if dead {
+    let next = if colony {
+        player_recovery(activity_name, dead, pending, paused)
+    } else if dead {
         "Operator / AI: choose New life, then enter_world and take_control.".into()
     } else if pending && paused {
         "Control queued. Operator: resume the world to apply it.".into()
@@ -537,7 +695,12 @@ fn observer_feedback(world: &mut World) {
         .get_resource::<Journal>()
         .and_then(|j| {
             j.entries.iter().rev().find_map(|entry| {
-                actor_outcome(entry, actor).map(|mut result| {
+                (if colony {
+                    player_outcome(entry, actor)
+                } else {
+                    actor_outcome(entry, actor)
+                })
+                .map(|mut result| {
                     if let JournalKind::ActionRejected {
                         controller,
                         verb,
@@ -561,11 +724,21 @@ fn observer_feedback(world: &mut World) {
                             details.map(|details| details.message.as_str()),
                         );
                     }
-                    format!("Last (tick {}): {}", entry.tick, compact(&result, 120))
+                    if colony {
+                        compact(&result, 120)
+                    } else {
+                        format!("Last (tick {}): {}", entry.tick, compact(&result, 120))
+                    }
                 })
             })
         })
-        .unwrap_or_else(|| "Last action: none recorded yet".into());
+        .unwrap_or_else(|| {
+            if colony {
+                "Explore, meet your neighbours and choose a place to settle.".into()
+            } else {
+                "Last action: none recorded yet".into()
+            }
+        });
     *world.resource_mut::<ObserverFeedback>() = ObserverFeedback {
         activity,
         next,
@@ -574,7 +747,11 @@ fn observer_feedback(world: &mut World) {
 }
 fn public_refusal(world: &World, verb: &str, reason: &str, details: Option<&str>) -> String {
     let Some(verb) = super::village_world::public_verb(world, verb) else {
-        return "Action rejected; AI: observe and choose an available action".into();
+        return if village::colony::enabled(world) {
+            "That action is unavailable. Choose an activity in Home & farm.".into()
+        } else {
+            "Action rejected; AI: observe and choose an available action".into()
+        };
     };
     // Handler errors may echo unknown argument keys/values, affordance IDs or input text.
     // Only exact static scene guidance is suitable for a public stream HUD. Full diagnostics
@@ -605,6 +782,13 @@ fn public_refusal(world: &World, verb: &str, reason: &str, details: Option<&str>
         "read_only" | "not_controller" | "not_attached" => "control is unavailable",
         _ => "unavailable",
     };
+    if village::colony::enabled(world) {
+        return format!(
+            "{} is unavailable: {}. Choose another activity in Home & farm.",
+            player_action_label(verb),
+            static_guidance.unwrap_or(category)
+        );
+    }
     format!(
         "{verb} rejected: {}; AI: observe and retry",
         static_guidance.unwrap_or(category)
@@ -651,6 +835,7 @@ struct LiveData<'w, 's> {
     registry: Res<'w, npc_framework::needs::NeedRegistry>,
     feedback: Res<'w, ObserverFeedback>,
     market: Option<Res<'w, village::market::MarketState>>,
+    colony: Option<Res<'w, village::colony::ColonyState>>,
 }
 #[allow(clippy::too_many_arguments)]
 fn refresh(
@@ -681,7 +866,9 @@ fn refresh(
         registry,
         feedback,
         market,
+        colony,
     } = data;
+    let colony = colony.is_some();
     reader.refresh += time.delta_secs();
     if reader.last_actor != Some(state.played) {
         if reader.last_actor.is_some() {
@@ -831,42 +1018,66 @@ fn refresh(
             .map(|p| p.to_string())
             .unwrap_or_else(|| "n/a".into())
     };
-    let mut header = format!(
-        "Day {} | {} | {}\n{} | life {}\n{} coins | Health {}%\nFood {} | Water {} | Energy {}\nBread {} coins | Water {} | Bed {}\n{}\n{}\n{}\nLegacy scheduler: {}",
-        day + 1,
-        season,
-        if config.is_night(clock.tick) {
-            "Night"
-        } else {
-            "Day"
-        },
-        compact(&person.name, 40),
-        person.life,
-        wallet.coins,
-        vital.health / 1000,
-        reserve("Hunger"),
-        reserve("Thirst"),
-        reserve("Energy"),
-        price("bread"),
-        price(village::catalog::WATER),
-        village::catalog::BED_PRICE,
-        feedback.activity,
-        feedback.last_result,
-        feedback.next,
-        supervisor
-    );
-    if vital.died_at.is_some() {
-        header.push_str("\nPermanently dead. The village continues.\nYour dropped diary can be recovered by others.");
+    let mut header = if colony {
+        format!(
+            "Day {} · {} · {}\n{} · {} coins · Health {}%\nFood {} · Water {}\nEnergy {} · Warmth {}\n{}\n{}\n{}\nF2 home & farm · F7 notebook",
+            day + 1,
+            season,
+            if config.is_night(clock.tick) {
+                "Night"
+            } else {
+                "Daylight"
+            },
+            compact(&person.name, 24),
+            wallet.coins,
+            vital.health / 1000,
+            reserve("Hunger"),
+            reserve("Thirst"),
+            reserve("Energy"),
+            reserve("Warmth"),
+            feedback.activity,
+            feedback.last_result,
+            feedback.next,
+        )
     } else {
-        header.push_str("\nGather / craft > sell > buy > eat, drink, rest.\nDiary drops on death; private books stay private.");
-    }
-    if market.is_some() {
-        header.push_str(&format!(
-            "\nWarmth {} | Needs-driven market\nGather, hunt, craft or post goods for sale.",
-            reserve("Warmth")
-        ));
-    }
-    header.push_str("\nF1 controls | F7 notebook");
+        let mut header = format!(
+            "Day {} | {} | {}\n{} | life {}\n{} coins | Health {}%\nFood {} | Water {} | Energy {}\nBread {} coins | Water {} | Bed {}\n{}\n{}\n{}\nLegacy scheduler: {}",
+            day + 1,
+            season,
+            if config.is_night(clock.tick) {
+                "Night"
+            } else {
+                "Day"
+            },
+            compact(&person.name, 40),
+            person.life,
+            wallet.coins,
+            vital.health / 1000,
+            reserve("Hunger"),
+            reserve("Thirst"),
+            reserve("Energy"),
+            price("bread"),
+            price(village::catalog::WATER),
+            village::catalog::BED_PRICE,
+            feedback.activity,
+            feedback.last_result,
+            feedback.next,
+            supervisor
+        );
+        if vital.died_at.is_some() {
+            header.push_str("\nPermanently dead. The village continues.\nYour dropped diary can be recovered by others.");
+        } else {
+            header.push_str("\nGather / craft > sell > buy > eat, drink, rest.\nDiary drops on death; private books stay private.");
+        }
+        if market.is_some() {
+            header.push_str(&format!(
+                "\nWarmth {} | Needs-driven market\nGather, hunt, craft or post goods for sale.",
+                reserve("Warmth")
+            ));
+        }
+        header.push_str("\nF1 controls | F7 notebook");
+        header
+    };
     if session.is_some()
         && person.life > 1
         && vital.died_at.is_none()
@@ -879,7 +1090,7 @@ fn refresh(
     if let Some(error) = bridge.as_ref().and_then(|b| b.error.as_deref()) {
         header.push_str(&format!("\n{}", compact(error, 160)));
     }
-    if let Some(error) = status.as_ref().and_then(|b| b.error.as_deref()) {
+    if !colony && let Some(error) = status.as_ref().and_then(|b| b.error.as_deref()) {
         header.push_str(&format!("\nLegacy scheduler: {}", compact(error, 160)));
     }
     if !reader.message.is_empty() {
@@ -1046,6 +1257,66 @@ fn paint(
 mod tests {
     use super::*;
     use npc_framework::prelude::{spawn_sim, state_hash};
+    #[test]
+    fn colony_feedback_is_plain_read_only_and_does_not_echo_unknown_actions() {
+        let mut app = testbed_content::new_sim_app(7, "island_colony");
+        app.init_resource::<Time<Real>>()
+            .init_resource::<Reader>()
+            .init_resource::<ObserverFeedback>();
+        let actor = app.world().resource::<VillageState>().played;
+        submit(
+            app.world_mut(),
+            None,
+            SimCommand::content(&village::colony::JoinIsland { unit: actor.0 }),
+        )
+        .unwrap();
+        npc_framework::prelude::run_ticks(app.world_mut(), 1);
+        app.insert_resource(npc_framework::prelude::SimControl {
+            paused: false,
+            multiplier: 0,
+            ..default()
+        });
+        {
+            let mut journal = app.world_mut().resource_mut::<Journal>();
+            journal.enabled = true;
+            journal.push(
+                2,
+                Some(actor),
+                JournalKind::ExternalAction {
+                    handle: 1,
+                    verb: "stop_work".into(),
+                    status: "done".into(),
+                    latency_ticks: None,
+                },
+            );
+        }
+        let before = state_hash(app.world_mut());
+        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
+        observer_feedback(app.world_mut());
+        let feedback = app.world().resource::<ObserverFeedback>();
+        assert!(
+            feedback.next.contains("World paused"),
+            "zero speed is stopped even without the pause flag"
+        );
+        assert!(feedback.last_result.contains("Stopped"));
+        assert!(!feedback.last_result.contains("stop_work"));
+        assert!(!feedback.next.contains("AI:") && !feedback.next.contains("Operator:"));
+        assert_eq!(before, state_hash(app.world_mut()));
+        app.world_mut().resource_mut::<Journal>().push(
+            3,
+            Some(actor),
+            JournalKind::ActionRejected {
+                controller: "visitor".into(),
+                verb: "unknown-private-action".into(),
+                reason: "private-argument".into(),
+            },
+        );
+        app.world_mut().resource_mut::<Reader>().refresh = 1.0;
+        observer_feedback(app.world_mut());
+        let result = &app.world().resource::<ObserverFeedback>().last_result;
+        assert!(result.contains("Home & farm"));
+        assert!(!result.contains("unknown-private-action") && !result.contains("private-argument"));
+    }
     fn app() -> App {
         // Real hosts install the view before scenario entities / VillageState exist.
         let mut app = testbed_content::try_new_sim_app_with(3, "ai_village", |app| {

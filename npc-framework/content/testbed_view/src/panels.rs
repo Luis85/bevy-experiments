@@ -42,6 +42,7 @@ pub(crate) fn plugin(app: &mut App) {
     app.init_resource::<TestbedPanels>()
         .add_systems(Startup, spawn_panels)
         .add_systems(Update, toggle_panels.in_set(ViewSystems::Input))
+        .add_systems(Update, sync_panel_presentation.in_set(ViewSystems::Sync))
         .add_systems(
             Update,
             (sheet_text, perception_text, perception_gizmos).in_set(ViewSystems::Present),
@@ -87,13 +88,7 @@ fn spawn_panels(mut commands: Commands) {
         });
 }
 
-fn toggle_panels(
-    keys: Option<Res<ButtonInput<KeyCode>>>,
-    mut panels: ResMut<TestbedPanels>,
-    selected: Res<Selected>,
-    mut generic: Option<ResMut<PerceptionGizmos>>,
-    mut nodes: Query<(&mut Node, Has<SheetText>, Has<PerceptionText>)>,
-) {
+fn toggle_panels(keys: Option<Res<ButtonInput<KeyCode>>>, mut panels: ResMut<TestbedPanels>) {
     if let Some(keys) = keys {
         if keys.just_pressed(KeyCode::F5) {
             panels.sheet = !panels.sheet;
@@ -102,8 +97,18 @@ fn toggle_panels(
             panels.perception = !panels.perception;
         }
     }
+}
+/// Presentation must synchronize even when the host gates gameplay input.
+fn sync_panel_presentation(
+    panels: Res<TestbedPanels>,
+    selected: Res<Selected>,
+    gate: Option<Res<crate::FrontendGate>>,
+    mut generic: Option<ResMut<PerceptionGizmos>>,
+    mut nodes: Query<(&mut Node, Has<SheetText>, Has<PerceptionText>)>,
+) {
+    let visible = !gate.is_some_and(|gate| gate.0);
     for (mut node, sheet, perception) in &mut nodes {
-        let on = (sheet && panels.sheet) || (perception && panels.perception);
+        let on = visible && ((sheet && panels.sheet) || (perception && panels.perception));
         if !(sheet || perception) {
             continue;
         }
@@ -113,7 +118,7 @@ fn toggle_panels(
         }
     }
     if let Some(g) = generic.as_deref_mut() {
-        let want = panels.perception && selected.0.is_none();
+        let want = visible && panels.perception && selected.0.is_none();
         if g.enabled != want {
             g.enabled = want;
         }
@@ -388,6 +393,7 @@ const ARC_SEGMENTS: usize = 20;
 #[allow(clippy::too_many_arguments)]
 fn perception_gizmos(
     panels: Res<TestbedPanels>,
+    gate: Option<Res<crate::FrontendGate>>,
     selected: Res<Selected>,
     index: Option<Res<SimIndex>>,
     vis_index: Res<VisualIndex>,
@@ -401,7 +407,7 @@ fn perception_gizmos(
     positions: Query<&SimPos>,
     mut gizmos: Gizmos,
 ) {
-    if !panels.perception {
+    if !panels.perception || gate.is_some_and(|gate| gate.0) {
         return;
     }
     let Some((e, (pos, sensors, facing, memory))) = selected
@@ -490,5 +496,42 @@ fn perception_gizmos(
         let at = sim_to_world(n.pos) + lift;
         gizmos.circle(Isometry3d::new(at, flat), 0.6, css::ORANGE);
         gizmos.circle(Isometry3d::new(at, flat), 0.9, css::ORANGE);
+    }
+}
+
+#[cfg(test)]
+mod frontend_tests {
+    use super::*;
+    #[test]
+    fn gated_title_synchronizes_default_gizmos_and_preserves_explicit_f6_intent() {
+        let mut app = App::new();
+        app.init_resource::<TestbedPanels>()
+            .init_resource::<Selected>()
+            .init_resource::<PerceptionGizmos>()
+            .insert_resource(crate::FrontendGate(true))
+            .configure_sets(Update, (ViewSystems::Input, ViewSystems::Sync).chain())
+            .configure_sets(
+                Update,
+                ViewSystems::Input.run_if(crate::player_hud::gate_open),
+            )
+            .add_systems(Update, toggle_panels.in_set(ViewSystems::Input))
+            .add_systems(Update, sync_panel_presentation.in_set(ViewSystems::Sync));
+        app.update();
+        assert!(!app.world().resource::<PerceptionGizmos>().enabled);
+        app.world_mut().resource_mut::<TestbedPanels>().perception = true;
+        app.update();
+        assert!(
+            !app.world().resource::<PerceptionGizmos>().enabled,
+            "pause/title hides even explicitly enabled diagnostic rendering"
+        );
+        app.world_mut().resource_mut::<crate::FrontendGate>().0 = false;
+        app.update();
+        assert!(
+            app.world().resource::<PerceptionGizmos>().enabled,
+            "the F6 setting survives returning to gameplay"
+        );
+        app.world_mut().resource_mut::<TestbedPanels>().perception = false;
+        app.update();
+        assert!(!app.world().resource::<PerceptionGizmos>().enabled);
     }
 }

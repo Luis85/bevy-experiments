@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub const PLAIN_EXPLORER: &str = "plain_explorer";
-pub const BUILTIN_PRESETS: [(&str, &str); 6] = [
+pub const BUILTIN_PRESETS: [(&str, &str); 7] = [
     (
         PLAIN_EXPLORER,
         include_str!("../worlds/plain_explorer.json"),
@@ -29,11 +29,19 @@ pub const BUILTIN_PRESETS: [(&str, &str); 6] = [
         "living_homestead",
         include_str!("../worlds/living_homestead.json"),
     ),
+    (
+        "island_colony",
+        include_str!("../worlds/island_colony.json"),
+    ),
 ];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldPreset {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub colony: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub island_ai: Option<crate::village::policy::IslandAiPolicy>,
     #[serde(default, skip_serializing_if = "EconomyModel::is_fixed")]
     pub economy: EconomyModel,
     #[serde(default, skip_serializing_if = "IslandGeography::is_compact")]
@@ -54,6 +62,9 @@ pub struct WorldPreset {
     pub perception: PerceptionRulesSpec,
     pub systems: SystemsSpec,
     pub inhabitants: InhabitantsSpec,
+}
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 /// Opt-in content model; existing presets keep their exact fixed-economy shape.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -154,6 +165,21 @@ pub struct InhabitantsSpec {
 
 pub fn validate(p: &WorldPreset) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
+    if p.colony
+        && (p.scene != WorldScene::IslandVillage
+            || p.economy != EconomyModel::NeedsDriven
+            || p.island_geography != IslandGeography::Expanded)
+    {
+        errors.push("Colony simulation requires an expanded, needs-driven Island Village.".into());
+    }
+    if let Some(policy) = &p.island_ai {
+        if p.scene != WorldScene::IslandVillage || p.economy != EconomyModel::NeedsDriven {
+            errors.push("Island AI policy requires a needs-driven Island Village.".into());
+        }
+        if let Err(error) = policy.validate() {
+            errors.push(error);
+        }
+    }
     if p.island_geography == IslandGeography::Expanded
         && (p.scene != WorldScene::IslandVillage || p.economy != EconomyModel::NeedsDriven)
     {
@@ -272,10 +298,12 @@ pub fn install_builtins(dir: &Path) -> Result<(), String> {
             return Ok(());
         }
         // A new shipped scene is additive to existing installations; never replace a user's preset.
-        for (id, text) in BUILTIN_PRESETS
-            .iter()
-            .filter(|(id, _)| matches!(*id, "island_village" | "living_island"))
-        {
+        for (id, text) in BUILTIN_PRESETS.iter().filter(|(id, _)| {
+            matches!(
+                *id,
+                "island_village" | "living_island" | "living_homestead" | "island_colony"
+            )
+        }) {
             let path = dir.join(format!("{id}.json"));
             match std::fs::OpenOptions::new()
                 .write(true)

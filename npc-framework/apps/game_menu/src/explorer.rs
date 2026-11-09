@@ -196,7 +196,8 @@ fn world_choices(dir: &std::path::Path) -> WorldPicker {
         .collect();
     let selected = choices
         .iter()
-        .find(|p| p.id == "plain_explorer")
+        .find(|p| p.id == "island_colony")
+        .or_else(|| choices.iter().find(|p| p.id == "plain_explorer"))
         .or_else(|| choices.first())
         .map(|p| p.id.clone());
     WorldPicker { choices, selected }
@@ -1287,6 +1288,12 @@ mod tests {
         )
         .unwrap();
         open(&mut app, Screen::ExplorerNew);
+        assert!(texts(&mut app).contains(&"> Island Village".into()));
+        let plain = button_for(
+            &mut app,
+            |action| matches!(action, Action::PickWorld(id) if id == "plain_explorer"),
+        );
+        press(&mut app, plain);
         assert!(texts(&mut app).contains(&"> Plain explorer".into()));
         assert!(texts(&mut app).contains(&"> Human scout".into()));
         let name_entities: Vec<_> = app
@@ -1595,7 +1602,7 @@ mod tests {
                 world: "Gloomhollow".into(),
                 mode: RunMode::Window,
                 preset: "human".into(),
-                world_preset: "plain_explorer".into(),
+                world_preset: "island_colony".into(),
             }
         );
         let _ = std::fs::remove_dir_all(&d);

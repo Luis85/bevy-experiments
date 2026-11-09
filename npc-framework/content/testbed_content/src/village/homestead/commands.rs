@@ -152,6 +152,7 @@ impl HomesteadAct {
             if world.resource::<Reservations>().count(self.target) > 0 {
                 return Err("this estate has work in progress".into());
             }
+            super::super::colony::can_claim_cottage(world, plot, me)?;
             let owned = plots(world)
                 .into_iter()
                 .filter(|(_, other)| {
@@ -185,10 +186,9 @@ impl HomesteadAct {
                 if bed.is_some() {
                     return Err("this bed already contains a crop".into());
                 }
-                if self.kind != catalog::GRAIN {
-                    return Err("only village_grain can be planted in these hardy beds".into());
-                }
-                economy::selected(world, actor, catalog::GRAIN, SEED_COUNT).map(|_| ())
+                let crop = crop_definition(world, &self.kind)
+                    .ok_or("this crop is not available in this world's farm rules")?;
+                economy::selected(world, actor, crop.seed_kind, crop.seed_count).map(|_| ())
             }
             "water_crop" => {
                 let crop = estate
@@ -199,7 +199,10 @@ impl HomesteadAct {
                 if crop.watered_at.is_some() {
                     return Err("this crop is already watered".into());
                 }
-                economy::selected(world, actor, catalog::WATER, WATER_COUNT).map(|_| ())
+                let definition = crop_definition(world, &crop.kind)
+                    .ok_or("the planted crop is not supported by this world's farm rules")?;
+                economy::selected(world, actor, definition.water_kind, definition.water_count)
+                    .map(|_| ())
             }
             "harvest" => {
                 let crop = estate
@@ -213,10 +216,12 @@ impl HomesteadAct {
                 {
                     return Err("this crop is not mature; water it once and wait for growth".into());
                 }
+                let definition = crop_definition(world, &crop.kind)
+                    .ok_or("the planted crop is not supported by this world's farm rules")?;
                 economy::fit(
                     world,
                     actor,
-                    &[Item::new(catalog::GRAIN).stack(HARVEST_GRAIN)],
+                    &[Item::new(definition.yield_kind).stack(definition.yield_count)],
                 )
             }
             _ => Err("unknown homestead action".into()),
@@ -239,6 +244,7 @@ impl HomesteadAct {
                 if built {
                     let center = *world.get::<SimPos>(plot).expect("plot position");
                     world.get_mut::<Villager>(actor).expect("owner").home = front_door(center);
+                    super::super::colony::cottage_claimed(world, plot, me);
                 }
                 record_effect(
                     world,
@@ -283,10 +289,11 @@ impl HomesteadAct {
                 );
             }
             "plant" => {
-                economy::consume(world, actor, catalog::GRAIN, SEED_COUNT)?;
+                let definition = *crop_definition(world, &self.kind).expect("checked crop kind");
+                economy::consume(world, actor, definition.seed_kind, definition.seed_count)?;
                 world.get_mut::<HomesteadPlot>(plot).expect("plot").beds[self.bed as usize] =
                     Some(Crop {
-                        kind: catalog::GRAIN.into(),
+                        kind: definition.kind.into(),
                         planted_at: now,
                         watered_at: None,
                         ready_at: None,
@@ -296,12 +303,17 @@ impl HomesteadAct {
                     world,
                     Some(me),
                     "VillageCropPlanted",
-                    &json!({"plot":self.target,"bed":self.bed,"kind":catalog::GRAIN}),
+                    &json!({"plot":self.target,"bed":self.bed,"kind":definition.kind}),
                 );
             }
             "water_crop" => {
-                economy::consume(world, actor, catalog::WATER, WATER_COUNT)?;
-                let ready_at = now.saturating_add(u64::from(GROW_TICKS));
+                let kind = &world.get::<HomesteadPlot>(plot).expect("plot").beds[self.bed as usize]
+                    .as_ref()
+                    .expect("crop")
+                    .kind;
+                let definition = *crop_definition(world, kind).expect("checked crop kind");
+                economy::consume(world, actor, definition.water_kind, definition.water_count)?;
+                let ready_at = now.saturating_add(u64::from(definition.growth_ticks));
                 let mut estate = world.get_mut::<HomesteadPlot>(plot).expect("plot");
                 let crop = estate.beds[self.bed as usize].as_mut().expect("crop");
                 crop.watered_at = Some(now);
@@ -314,6 +326,11 @@ impl HomesteadAct {
                 );
             }
             "harvest" => {
+                let kind = &world.get::<HomesteadPlot>(plot).expect("plot").beds[self.bed as usize]
+                    .as_ref()
+                    .expect("crop")
+                    .kind;
+                let definition = *crop_definition(world, kind).expect("checked crop kind");
                 let announce = !world.get::<HomesteadPlot>(plot).expect("plot").beds
                     [self.bed as usize]
                     .as_ref()
@@ -328,14 +345,23 @@ impl HomesteadAct {
                         &json!({"plot":self.target,"bed":self.bed}),
                     );
                 }
-                economy::grant(world, actor, Item::new(catalog::GRAIN).stack(HARVEST_GRAIN));
-                economy::produce(world, catalog::GRAIN, HARVEST_GRAIN);
-                super::super::production::completed(world, me, catalog::GRAIN, HARVEST_GRAIN);
+                economy::grant(
+                    world,
+                    actor,
+                    Item::new(definition.yield_kind).stack(definition.yield_count),
+                );
+                economy::produce(world, definition.yield_kind, definition.yield_count);
+                super::super::production::completed(
+                    world,
+                    me,
+                    definition.yield_kind,
+                    definition.yield_count,
+                );
                 record_effect(
                     world,
                     Some(me),
                     "VillageCropHarvested",
-                    &json!({"plot":self.target,"bed":self.bed,"kind":catalog::GRAIN,"quantity":HARVEST_GRAIN}),
+                    &json!({"plot":self.target,"bed":self.bed,"kind":definition.yield_kind,"quantity":definition.yield_count}),
                 );
             }
             _ => unreachable!("checked homestead action"),

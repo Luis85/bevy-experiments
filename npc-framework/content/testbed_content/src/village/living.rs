@@ -166,6 +166,62 @@ pub fn has_coat(world: &World, actor: Entity) -> bool {
         .is_some_and(|durability| durability.current > 0)
 }
 
+/// Cold ticks in the next two simulation days. Future activity is unknown, so
+/// this conservatively assumes exposure outside already-scheduled sheltered
+/// rest. Day/night and season boundaries use the actual simulation calendar.
+pub fn clothing_lead_exposure(world: &World, actor: Entity) -> u64 {
+    let config = world.resource::<SimConfig>();
+    let now = world.resource::<SimClock>().tick;
+    let end = now.saturating_add(config.day_length.saturating_mul(2));
+    let mut exposure = cold_ticks(now, end, config);
+    if let Some(person) = world.get::<Villager>(actor)
+        && person.rest_rate >= super::HOME_REST_RATE
+        && person.resting_until > now
+    {
+        exposure = exposure.saturating_sub(cold_ticks(now, end.min(person.resting_until), config));
+    }
+    exposure
+}
+
+fn cold_ticks(start: u64, end: u64, config: &SimConfig) -> u64 {
+    let day = config.day_length.max(1);
+    let night_start = (u128::from(day) * u128::from(1000 - config.night_permille.min(1000)))
+        .div_ceil(1000) as u64;
+    let mut at = start;
+    let mut total = 0_u64;
+    while at < end {
+        let offset = at % day;
+        let span = (day - offset).min(end - at);
+        if super::calendar_at(at, config, true).1 == Season::Winter {
+            total = total.saturating_add(span);
+        } else {
+            total = total.saturating_add((offset + span).saturating_sub(offset.max(night_start)));
+        }
+        at += span;
+    }
+    total
+}
+
+/// Desired *carried* clothing, excluding the currently equipped coat. A single
+/// real spare covers an approaching replacement; ledger reservation credits it
+/// once instead of financing repeated coats. Existing worlds keep their policy.
+pub fn clothing_reserve_target(world: &World, actor: Entity) -> u32 {
+    if super::policy::active(world).is_none() {
+        let (day, season, _) = super::calendar(world);
+        let winter_soon = season == Season::Winter || ((day + 2) / super::DAYS_PER_SEASON) % 4 == 3;
+        return u32::from(
+            (winter_soon || economy::need(world, actor, "Warmth") < 80_000)
+                && !has_coat(world, actor),
+        );
+    }
+    let exposure = clothing_lead_exposure(world, actor);
+    let remaining = items::equipped_matching(world, actor, catalog::WARM_CLOTHES)
+        .and_then(|id| world.resource::<SimIndex>().get(id))
+        .and_then(|item| world.get::<Durability>(item))
+        .map_or(0, |durability| durability.current);
+    u32::from(exposure > 0 && u64::from(remaining) <= exposure)
+}
+
 fn change_need(world: &mut World, actor: Entity, name: &str, delta: i32) {
     let Some(id) = world.resource::<NeedRegistry>().id(name) else {
         return;
@@ -217,12 +273,13 @@ pub fn climate_tick(world: &mut World) {
                     .get::<Durability>(*item)
                     .is_some_and(|d| d.current > 0)
             });
+        let heated = sheltered && super::colony::home_heated(world, actor);
         change_need(
             world,
             actor,
             "Warmth",
             if sheltered {
-                100
+                if heated { 100 } else { 20 }
             } else if !cold {
                 10
             } else if coat.is_some() {

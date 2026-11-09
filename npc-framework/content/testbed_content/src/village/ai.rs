@@ -167,7 +167,7 @@ pub(super) fn can_forage(world: &World, actor: Entity, kind: &str) -> bool {
     gather_source(world, actor, kind).is_some()
 }
 
-fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<(SimId, Entity)> {
+pub(super) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<(SimId, Entity)> {
     if econ::fit(world, actor, &[Item::new(kind)]).is_err() {
         return None;
     }
@@ -238,10 +238,27 @@ fn living_work(world: &mut World, actor: Entity) {
         return;
     }
 
+    // A cold resident with no usable hearth fuel must procure it before the
+    // night-home branch can hold them indoors. Buying and finite gathering use
+    // the normal shared actions; no warmth, fuel or currency is granted here.
+    if let Some(home) = super::behavior::warming_need(world, actor)
+        && !home.heated
+        && home.carried_fuel < home.fuel_required
+        && (buy_market_input(world, actor, home.fuel_kind, home.fuel_required)
+            || gather_job(world, actor, home.fuel_kind))
+    {
+        return;
+    }
+
     let mut procure: Vec<_> = catalog::trade_kinds(world)
         .iter()
         .filter_map(|kind| {
-            let wanted = production::desired_stock(world, actor, kind);
+            let mut wanted = production::desired_stock(world, actor, kind);
+            if *kind == catalog::WARM_CLOTHES && super::policy::active(world).is_some() {
+                // Equipping a replacement can precede the next ledger refresh.
+                // A stale forecast must not buy another coat for the new one.
+                wanted = wanted.min(super::living::clothing_reserve_target(world, actor));
+            }
             if wanted <= econ::count(world, actor, kind) {
                 return None;
             }
@@ -267,6 +284,10 @@ fn living_work(world: &mut World, actor: Entity) {
         if buy_market_input(world, actor, kind, *wanted) {
             return;
         }
+    }
+
+    if construction_step(world, actor) || planned_work(world, actor) {
+        return;
     }
 
     // Candidate scores use the shared integer market and actual recipe costs.
@@ -392,7 +413,95 @@ fn living_work(world: &mut World, actor: Entity) {
         }
     }
     production::clear_intent(world, actor);
+    if let Some((_, meeting)) = super::colony::social_target(world, actor) {
+        travel(world, actor, meeting);
+        return;
+    }
     world.entity_mut(actor).remove::<MoveIntent>();
+}
+
+/// Execute the colony's read-only work request through the same movement and
+/// homestead actions as a player. Housing owns the request, never the mover.
+pub fn construction_step(world: &mut World, actor: Entity) -> bool {
+    use super::colony::ConstructionIntent;
+    let Some(intent) = super::colony::construction_intent(world, actor) else {
+        return false;
+    };
+    let ConstructionIntent::Build {
+        builder,
+        plot,
+        door,
+        claim_required,
+    } = intent
+    else {
+        return true;
+    };
+    super::production::intent(world, actor, "build_cottage", "cottage", "", Some(plot));
+    if !travel(world, actor, door) {
+        return true;
+    }
+    if claim_required
+        && super::homestead::HomesteadAct::new(builder, "claim_plot", plot)
+            .perform(world)
+            .is_err()
+    {
+        return false;
+    }
+    super::homestead::HomesteadAct::new(builder, "build_cottage", plot)
+        .perform(world)
+        .is_ok()
+}
+
+fn planned_work(world: &mut World, actor: Entity) -> bool {
+    use super::goap::PlanStep;
+    let Some(plan) = super::goap::plan(world, actor) else {
+        return false;
+    };
+    let Some(step) = plan.steps.first() else {
+        return false;
+    };
+    let previous = world.get::<super::production::JobIntent>(actor).cloned();
+    let started = match step {
+        PlanStep::Buy { kind, .. } => {
+            let wanted = super::production::purchase_target(world, actor, kind)
+                .max(econ::count(world, actor, kind).saturating_add(1));
+            buy_market_input(world, actor, kind, wanted)
+        }
+        PlanStep::Gather { kind, .. } => gather_job(world, actor, kind),
+        PlanStep::Craft {
+            recipe,
+            good,
+            target,
+        } => {
+            let Some(station) = entity_of(world, *target) else {
+                return false;
+            };
+            let Some(pos) = world.get::<SimPos>(station).copied() else {
+                return false;
+            };
+            super::production::intent(world, actor, "craft", good, recipe, Some(*target));
+            !travel(world, actor, pos)
+                || begin_craft(
+                    world,
+                    actor,
+                    recipe,
+                    Some(*target),
+                    CraftSource::Command,
+                    None,
+                )
+                .is_ok()
+        }
+    };
+    if started && previous.as_ref() != world.get::<super::production::JobIntent>(actor) {
+        let actor_id = world.get::<SimId>(actor).copied();
+        record_effect(
+            world,
+            actor_id,
+            "VillagePlanSelected",
+            &json!({"goal":plan.goal,"steps":plan.steps,"expanded":plan.expanded,"cost":plan.cost}),
+        );
+    }
+    started
 }
 fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) {
     let mut v = *world.get::<Vitality>(e).expect("vitality");
@@ -487,11 +596,18 @@ fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) 
     }
 }
 pub(crate) fn stop_work(world: &mut World, e: Entity, reason: &str) {
+    npc_framework::agent_io::control::cancel_all(world, e);
+    npc_framework::command::cancel_orders(world, e, reason);
+    cancel_owned_work(world, e, reason);
+}
+
+/// One teardown for resident work and full external stops. Emergency arbitration
+/// releases reservations and replans; it never resumes a stale action cursor.
+/// External queues remain the responsibility of `stop_work` / control ownership.
+pub(crate) fn cancel_owned_work(world: &mut World, e: Entity, reason: &str) {
     if world.get::<super::homestead::CottageBuild>(e).is_some() {
         super::homestead::cancel(world, e);
     }
-    npc_framework::agent_io::control::cancel_all(world, e);
-    npc_framework::command::cancel_orders(world, e, reason);
     cancel_craft(world, e, reason);
     super::hunting::cancel(world, e, reason);
     if super::needs_driven(world) {
@@ -583,6 +699,7 @@ pub(crate) fn travel(world: &mut World, e: Entity, pos: SimPos) -> bool {
     let here = world.get::<SimPos>(e).copied().unwrap_or_default();
     if here.dist2(pos) <= 640_000 {
         world.entity_mut(e).remove::<MoveIntent>();
+        super::routing::arrived(world, e);
         return true;
     }
     let speed = world
@@ -590,6 +707,7 @@ pub(crate) fn travel(world: &mut World, e: Entity, pos: SimPos) -> bool {
         .map_or(70, |c| c.speed_mm_per_tick);
     let mut intent = MoveIntent::to(pos, speed);
     intent.tolerance_mm = 600;
+    let intent = super::routing::intent(world, e, intent);
     if world.get::<MoveIntent>(e) != Some(&intent) {
         world.entity_mut(e).insert(intent);
     }
@@ -601,6 +719,7 @@ pub(crate) fn travel(world: &mut World, e: Entity, pos: SimPos) -> bool {
 fn approach_work(world: &mut World, actor: Entity, target: Entity) -> bool {
     if econ::near(world, actor, target) {
         world.entity_mut(actor).remove::<MoveIntent>();
+        super::routing::arrived(world, actor);
         return true;
     }
     let Some(pos) = world.get::<SimPos>(target).copied() else {
@@ -611,6 +730,7 @@ fn approach_work(world: &mut World, actor: Entity, target: Entity) -> bool {
         .map_or(70, |c| c.speed_mm_per_tick);
     let mut intent = MoveIntent::to(pos, speed);
     intent.tolerance_mm = 1500;
+    let intent = super::routing::intent(world, actor, intent);
     if world.get::<MoveIntent>(actor) != Some(&intent) {
         world.entity_mut(actor).insert(intent);
     }

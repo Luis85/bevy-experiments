@@ -1,0 +1,14 @@
+# These service-heavy integration tests have strict wall-clock contracts and
+# launch several real host/client/provider processes. Reserve the runner's slots
+# while either runs so unrelated simulations do not consume their time budget.
+# Test selection, assertions, retry policy and time limits remain unchanged.
+# https://nexte.st/docs/configuration/threads-required/
+[[profile.default.overrides]]
+filter = 'package(npcctl) & (test(/^closed_provider_failure_categories_survive_stop_without_leaking_structured_or_stderr_text$/) | test(/^registered_homestead_commons_build_crop_resume_food_and_income$/))'
+threads-required = "num-test-threads"
+
+# Preserve failure diagnostics outside xtask's deliberately short log tail.
+[profile.default.junit]
+path = "junit.xml"
+store-success-output = false
+store-failure-output = true

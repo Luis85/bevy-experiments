@@ -131,8 +131,13 @@ fn rts_camera(
     positions: Query<&SimPos>,
     mut cameras: Query<(&mut RtsCamera, &mut Transform)>,
     mut manual: ResMut<CameraManualIntent>,
+    mode: Option<Res<crate::IslandMode>>,
+    experience: Option<Res<crate::PlayerExperience>>,
+    terrain: Option<Res<testbed_content::village::terrain::TerrainState>>,
 ) {
     let dt = time.delta_secs();
+    let character = mode.as_deref() == Some(&crate::IslandMode::Character);
+    let player = character && experience.is_some_and(|experience| experience.enabled);
     let focus_target = selected_pos(selected.as_deref(), index.as_deref(), &positions);
     manual.serial = manual.serial.saturating_add(1);
     manual.active = keys.as_deref().is_some_and(|keys| {
@@ -147,12 +152,22 @@ fn rts_camera(
             KeyCode::ArrowRight,
         ]
         .into_iter()
-        .any(|key| keys.pressed(key))
-            || (keys.just_pressed(KeyCode::KeyF) && focus_target.is_some())
+        .any(|key| {
+            keys.pressed(key)
+                && (!character
+                    || matches!(
+                        key,
+                        KeyCode::ArrowUp
+                            | KeyCode::ArrowLeft
+                            | KeyCode::ArrowDown
+                            | KeyCode::ArrowRight
+                    ))
+        }) || (keys.just_pressed(KeyCode::KeyF) && focus_target.is_some())
     });
     for (mut rts, mut transform) in &mut cameras {
         if let Some(keys) = keys.as_deref() {
-            let pressed = |a: KeyCode, b: KeyCode| keys.pressed(a) || keys.pressed(b);
+            let pressed =
+                |a: KeyCode, b: KeyCode| (!character && keys.pressed(a)) || keys.pressed(b);
             let mut input = Vec2::ZERO;
             if pressed(KeyCode::KeyW, KeyCode::ArrowUp) {
                 input.y -= 1.0;
@@ -175,7 +190,7 @@ fn rts_camera(
             if keys.pressed(KeyCode::KeyQ) {
                 rts.yaw -= 1.5 * dt;
             }
-            if keys.pressed(KeyCode::KeyE) {
+            if keys.pressed(if player { KeyCode::KeyR } else { KeyCode::KeyE }) {
                 rts.yaw += 1.5 * dt;
             }
             if keys.pressed(KeyCode::PageUp) {
@@ -196,13 +211,20 @@ fn rts_camera(
                 MouseScrollUnit::Pixel => scroll.delta.y / 40.0,
             };
             if lines != 0.0 {
-                rts.distance =
-                    (rts.distance * 0.9f32.powf(lines)).clamp(MIN_DISTANCE, MAX_DISTANCE);
+                rts.distance = (rts.distance * 0.9f32.powf(lines)).clamp(
+                    MIN_DISTANCE,
+                    if terrain.is_some() {
+                        180.0
+                    } else {
+                        MAX_DISTANCE
+                    },
+                );
             }
         }
+        let pan_limit = if terrain.is_some() { 90.0 } else { PAN_LIMIT };
         rts.focus = rts
             .focus
-            .clamp(Vec3::splat(-PAN_LIMIT), Vec3::splat(PAN_LIMIT));
+            .clamp(Vec3::splat(-pan_limit), Vec3::splat(pan_limit));
         rts.focus.y = 0.0;
         let want = rts.transform();
         if *transform != want {

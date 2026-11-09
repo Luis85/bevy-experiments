@@ -3,7 +3,7 @@
 //! Procurement targets and additional production are different quantities. A
 //! round reserves personal goods first, then expands funded shortages in reverse
 //! recipe order. Each physical or committed output lot is credited only once.
-use super::{Role, Season, Villager, Wallet, catalog, economy as econ, market};
+use super::{Role, Villager, Wallet, catalog, economy as econ, market};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
 use bevy_reflect::Reflect;
@@ -232,6 +232,7 @@ pub fn job_summary(world: &World, actor: Entity) -> Option<String> {
         _ => "supplies",
     };
     Some(match job.verb.as_str() {
+        "build_cottage" => "Build a cottage".into(),
         "buy" => format!("Buy {good}"),
         "gather" => format!("Gather {good}"),
         "hunt" => "Hunt wildlife".into(),
@@ -483,17 +484,23 @@ struct MaterialBundle {
 }
 impl Builder<'_> {
     fn bundle(&self, actor: SimId, recipe: &RecipeDef, batches: u32) -> MaterialBundle {
+        self.bundle_inputs(
+            actor,
+            recipe
+                .inputs
+                .iter()
+                .map(|input| (input.key.as_str(), batches.saturating_mul(input.count))),
+        )
+    }
+    fn bundle_inputs<'a>(
+        &self,
+        actor: SimId,
+        inputs: impl IntoIterator<Item = (&'a str, u32)>,
+    ) -> MaterialBundle {
         let mut bundle = MaterialBundle::default();
         let mut used = Goods::new();
-        for input in &recipe.inputs {
-            self.expand_material(
-                actor,
-                &input.key,
-                batches.saturating_mul(input.count),
-                &mut used,
-                &mut bundle,
-                0,
-            );
+        for (kind, count) in inputs {
+            self.expand_material(actor, kind, count, &mut used, &mut bundle, 0);
         }
         bundle
     }
@@ -1034,7 +1041,13 @@ fn forecast_amount(world: &World, actor: Entity, need: &str) -> u64 {
     let decay = registry
         .id(need)
         .map_or(0, |id| registry.def(id).decay_per_tick.max(0) as u64);
-    let horizon = world.resource::<SimConfig>().day_length.saturating_mul(2);
+    let reserve_days = world
+        .get_resource::<super::colony::ColonyState>()
+        .map_or(2, |colony| colony.food_reserve_days.clamp(1, 4));
+    let horizon = world
+        .resource::<SimConfig>()
+        .day_length
+        .saturating_mul(u64::from(reserve_days));
     let depleted = (100_000 - econ::need(world, actor, need)).max(0) as u64;
     depleted.saturating_add(decay.saturating_mul(horizon))
 }
@@ -1043,7 +1056,6 @@ fn needed_materials(
     world: &World,
     people: &[(SimId, Entity, Role)],
     recipes: &[RecipeDef],
-    winter_soon: bool,
 ) -> BTreeSet<String> {
     let mut needed = BTreeSet::new();
     for (_, actor, role) in people {
@@ -1060,9 +1072,8 @@ fn needed_materials(
         if econ::count(world, *actor, catalog::WATER) < forecast(world, *actor, "Thirst", 90_000) {
             needed.insert(catalog::WATER.into());
         }
-        if (winter_soon || econ::need(world, *actor, "Warmth") < 80_000)
-            && !garment_equipped(world, *actor)
-            && econ::count(world, *actor, catalog::WARM_CLOTHES) == 0
+        if econ::count(world, *actor, catalog::WARM_CLOTHES)
+            < super::living::clothing_reserve_target(world, *actor)
         {
             needed.insert(catalog::WARM_CLOTHES.into());
         }
@@ -1071,6 +1082,16 @@ fn needed_materials(
                 if econ::count(world, *actor, kind) < count {
                     needed.insert(kind.into());
                 }
+            }
+        }
+        for (kind, quantity) in super::colony::construction_materials(world, *actor) {
+            if econ::count(world, *actor, kind) < quantity {
+                needed.insert(kind.into());
+            }
+        }
+        for (kind, quantity) in super::colony::household_materials(world, *actor) {
+            if econ::count(world, *actor, kind) < quantity {
+                needed.insert(kind.into());
             }
         }
     }
@@ -1200,8 +1221,6 @@ fn compute(world: &World) -> ProductionPlan {
             }
         }
     }
-    let (day, season, _) = super::calendar(world);
-    let winter_soon = season == Season::Winter || ((day + 2) / super::DAYS_PER_SEASON) % 4 == 3;
     let mut depths = BTreeMap::new();
     for kind in catalog::trade_kinds(world) {
         if depth(kind, &builder.recipes, &mut BTreeSet::new(), &mut depths).is_err() {
@@ -1227,8 +1246,48 @@ fn compute(world: &World) -> ProductionPlan {
             builder.request(*id, food, 1);
             critical.entry(*id).or_default().insert(food.into(), 1);
         }
+        if super::colony::enabled(world) {
+            let threshold = super::policy::active(world).map_or_else(
+                || super::policy::IslandAiPolicy::default().critical_need,
+                |policy| policy.critical_need,
+            );
+            if econ::need(world, *e, "Warmth") < threshold {
+                for (kind, quantity) in super::colony::household_materials(world, *e) {
+                    builder.request(*id, kind, quantity);
+                    critical
+                        .entry(*id)
+                        .or_default()
+                        .insert(kind.into(), quantity);
+                }
+            }
+        }
     }
-    let needed = needed_materials(world, &people, &builder.recipes, winter_soon);
+    // A recorded housing commission is a complete physical job. Protect its
+    // actual input bundle after urgent needs, before speculative comfort stock.
+    // Expanding all inputs together prevents the same owned log from backing
+    // both missing planks and the cottage's retained timber. The shared financier
+    // caps all missing ingredients by this actor's remaining real purse.
+    for (id, e, _) in &people {
+        let materials = super::colony::construction_materials(world, *e);
+        if materials.is_empty() {
+            continue;
+        }
+        let critical_need = super::policy::active(world).map_or_else(
+            || super::policy::IslandAiPolicy::default().critical_need,
+            |policy| policy.critical_need,
+        );
+        let clothing = super::living::clothing_reserve_target(world, *e);
+        if econ::need(world, *e, "Warmth") < critical_need && clothing > 0 {
+            builder.request(*id, catalog::WARM_CLOTHES, clothing);
+            critical
+                .entry(*id)
+                .or_default()
+                .insert(catalog::WARM_CLOTHES.into(), clothing);
+        }
+        let bundle = builder.bundle_inputs(*id, materials);
+        builder.finance_bundle(*id, bundle);
+    }
+    let needed = needed_materials(world, &people, &builder.recipes);
     builder.reserve_working_capital(&needed, &depths);
     for (id, e, role) in &people {
         let primary = food_preference(world, *e);
@@ -1269,14 +1328,27 @@ fn compute(world: &World) -> ProductionPlan {
         }
         let restoration = catalog::food_restore(primary).unwrap_or(80_000).max(1) as u64;
         builder.request(*id, primary, hunger.div_ceil(restoration).min(16) as u32);
-        if (winter_soon || econ::need(world, *e, "Warmth") < 80_000) && !garment_equipped(world, *e)
-        {
-            builder.request(*id, catalog::WARM_CLOTHES, 1);
-        }
+        builder.request(
+            *id,
+            catalog::WARM_CLOTHES,
+            super::living::clothing_reserve_target(world, *e).saturating_sub(
+                provisioned
+                    .and_then(|goods| goods.get(catalog::WARM_CLOTHES))
+                    .copied()
+                    .unwrap_or(0),
+            ),
+        );
         if *role == Role::Innkeeper {
             builder.request(*id, "log", 2);
             builder.request(*id, catalog::BOWL, 1);
             builder.request(*id, "hammer", 1);
+        }
+        for (kind, quantity) in super::colony::household_materials(world, *e) {
+            let urgent = provisioned
+                .and_then(|goods| goods.get(kind))
+                .copied()
+                .unwrap_or(0);
+            builder.request(*id, kind, quantity.saturating_sub(urgent));
         }
     }
     // Escrow is virtual allocation only. Release its actual cash for the
@@ -1297,6 +1369,13 @@ fn compute(world: &World) -> ProductionPlan {
         }
     }
     builder.plan
+}
+
+/// Explicit application-layer invalidation; only production owns its plan state.
+pub(super) fn invalidate(world: &mut World) {
+    if let Some(mut plan) = world.get_resource_mut::<ProductionPlan>() {
+        plan.refreshed_at = None;
+    }
 }
 
 pub fn refresh(world: &mut World) {
