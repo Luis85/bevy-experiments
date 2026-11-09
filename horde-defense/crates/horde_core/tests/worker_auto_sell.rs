@@ -526,6 +526,39 @@ fn queued_drop_reserved_by_another_deployment_keeps_the_save_valid() {
     }
 }
 
+/// The final sweep (loot-economy §7): a battle that settles with drops no
+/// run record drained (the record-less path) sells them under the same gate
+/// before it is marked settled. The receipt goes only to the worker's report.
+#[test]
+fn final_sweep_sells_a_queue_no_record_drained() {
+    let (mut g, b) = expedition(sell_rule());
+    worker_drop(&mut g, b, 5, Quality::Poor);
+    worker_drop(&mut g, b, 6, Quality::Common);
+    advance(&mut g, 1);
+    let queued = pending(&g, b);
+    assert_eq!(queued.len(), 2);
+    let paid: u64 = queued.iter().map(|id| value(&g, *id)).sum();
+    // The attempt ends without a record reaching the parent.
+    worker(&mut g, b).withdraw();
+    worker(&mut g, b).pending_runs_mut().clear();
+    let wallet = g.campaign().coins;
+    advance(&mut g, 1);
+    assert!(g.take_settlement_issues().is_empty());
+    assert!(battle(&g, b).settled);
+    assert!(pending(&g, b).is_empty(), "a settled battle holds no queue");
+    assert!(queued.iter().all(|id| !owned(&g, *id)), "the sweep sells");
+    assert_eq!(g.campaign().coins, wallet + paid);
+    assert!(records(&g, b).is_empty(), "no record carries the receipt");
+    let receipt = &battle(&g, b).game().last_result().unwrap().auto_sold;
+    assert_eq!((receipt.count, receipt.coins), (2, paid));
+    assert_eq!(receipt.by_quality[Quality::Poor], 1);
+    assert_eq!(receipt.by_quality[Quality::Common], 1);
+    let settled = ledgers(&g);
+    let mut g = reload(&g);
+    advance(&mut g, 3);
+    assert_eq!(ledgers(&g), settled);
+}
+
 /// Ruling D13: `keep_upgrades` judges an expedition's drops against the
 /// expedition's own loadout and NPC. Mara holds tier-4 melee and armor; the
 /// recruit keeps its starters except a tier-4 rifle. A Common fire axe and
