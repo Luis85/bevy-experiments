@@ -8,12 +8,14 @@
 //!   tessellates (bevy_egui output.rs:51);
 //! - shapes and texture uploads are counted from `EguiFullOutput` between the
 //!   two, before bevy_egui's texture update drains them; primitives,
-//!   vertices, indices and textured quads from `EguiRenderOutput::paint_jobs`.
+//!   vertices, indices and textured quads from `EguiRenderOutput::paint_jobs`,
+//!   and of those the battlefield painter's own (W2-47): the jobs clipped to
+//!   the clip it recorded this frame.
 use super::{EguiCount, Mark, PerfProbe};
 use bevy::prelude::*;
 use bevy_egui::{
     EguiFullOutput, EguiPostUpdateSet, EguiRenderOutput,
-    egui::{ClippedPrimitive, TextureId, TexturesDelta, epaint::Primitive},
+    egui::{ClippedPrimitive, Rect, TextureId, TexturesDelta, epaint::Primitive},
     run_egui_context_pass_loop_system,
 };
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -57,6 +59,31 @@ pub fn egui_counts(jobs: &[ClippedPrimitive]) -> EguiCounts {
             if mesh.texture_id != TextureId::default() {
                 counts.textured_quads += mesh.indices.len() as u64 / 6;
             }
+        }
+    }
+    counts
+}
+
+/// The battlefield painter's share of one frame's paint jobs (W2-47).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct BattlefieldCounts {
+    pub primitives: u64,
+    pub vertices: u64,
+}
+/// The paint jobs clipped to `clip`, the clip the battlefield painter drew
+/// with, and their mesh vertices: what the headless egui gates count
+/// (`art/battlefield/tests.rs`, `PERF_BUDGET.json` `egui`). Every other
+/// battle painter clips elsewhere (the effects clip, the canvas), except the
+/// pause banner, which a valid perf run never shows. None without a clip.
+pub fn battlefield_counts(jobs: &[ClippedPrimitive], clip: Option<Rect>) -> BattlefieldCounts {
+    let mut counts = BattlefieldCounts::default();
+    let Some(clip) = clip else {
+        return counts;
+    };
+    for job in jobs.iter().filter(|job| job.clip_rect == clip) {
+        counts.primitives += 1;
+        if let Primitive::Mesh(mesh) = &job.primitive {
+            counts.vertices += mesh.vertices.len() as u64;
         }
     }
     counts
@@ -110,8 +137,13 @@ fn end_pass(probe: Res<PerfProbe>, outputs: Query<&EguiFullOutput>) {
 }
 fn end_tessellate(probe: Res<PerfProbe>, outputs: Query<&EguiRenderOutput>) {
     probe.end_span(Mark::Tessellate, &probe.0.tessellate_ns);
+    let clip = probe.take_battlefield_clip();
     let mut total = EguiCounts::default();
+    let mut battlefield = BattlefieldCounts::default();
     for output in &outputs {
+        let field = battlefield_counts(&output.paint_jobs, clip);
+        battlefield.primitives += field.primitives;
+        battlefield.vertices += field.vertices;
         let counts = egui_counts(&output.paint_jobs);
         total.clipped_primitives += counts.clipped_primitives;
         total.mesh_vertices += counts.mesh_vertices;
@@ -122,13 +154,15 @@ fn end_tessellate(probe: Res<PerfProbe>, outputs: Query<&EguiRenderOutput>) {
     probe.set_egui(EguiCount::MeshVertices, total.mesh_vertices);
     probe.set_egui(EguiCount::MeshIndices, total.mesh_indices);
     probe.set_egui(EguiCount::TexturedQuads, total.textured_quads);
+    probe.set_egui(EguiCount::BattlefieldPrimitives, battlefield.primitives);
+    probe.set_egui(EguiCount::BattlefieldVertices, battlefield.vertices);
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use bevy_egui::egui::{
-        Color32, ColorImage, Rect, TextureOptions,
+        self, Color32, ColorImage, TextureOptions,
         epaint::{ImageDelta, Mesh},
         pos2,
     };
@@ -167,6 +201,41 @@ mod tests {
             }
         );
         assert_eq!(egui_counts(&[]), EguiCounts::default());
+    }
+
+    /// W2-47 (R18): the battlefield painter's own paint jobs are the ones
+    /// clipped to the arena clip it painted with, as the headless egui gates
+    /// count them (`art/battlefield/tests.rs`); a frame without a battlefield
+    /// counts none.
+    #[test]
+    fn battlefield_counts_take_only_the_battlefield_clip() {
+        let arena = Rect::from_min_size(pos2(24.0, 124.0), egui::vec2(1392.0, 692.0));
+        let clipped = |clip_rect, quads| ClippedPrimitive {
+            clip_rect,
+            ..quad_mesh(TextureId::User(5), quads)
+        };
+        let effects = arena.expand2(egui::vec2(0.0, 40.0));
+        let jobs = [
+            clipped(arena, 3),
+            clipped(Rect::EVERYTHING, 7),
+            clipped(arena, 2),
+            clipped(effects, 4),
+        ];
+        assert_eq!(
+            battlefield_counts(&jobs, Some(arena)),
+            BattlefieldCounts {
+                primitives: 2,
+                vertices: 4 * 5,
+            }
+        );
+        assert_eq!(
+            battlefield_counts(&jobs, None),
+            BattlefieldCounts::default()
+        );
+        assert_eq!(
+            battlefield_counts(&[], Some(arena)),
+            BattlefieldCounts::default()
+        );
     }
 
     #[test]

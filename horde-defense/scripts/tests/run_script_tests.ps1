@@ -187,7 +187,8 @@ public static class LastLightNativeHelper {
                 + ",\"frames_over_50ms\":0,\"frames_over_50ms_driver_stall\":0,\"driver_stalls\":{\"frames\":[],\"outside\":{\"frames_over_50ms\":0}}"
                 + ",\"work_mean_ms\":[0.4,0.0,1.0]"
                 + ",\"phases\":{\"cpu_frame_ms\":{\"mean\":4.0,\"p50\":4.0,\"p95\":4.5,\"p99\":5.0,\"max\":6.0},\"interface_total_ms\":{\"mean\":1.0,\"p50\":1.0,\"p95\":1.2,\"p99\":1.3,\"max\":1.5}}"
-                + ",\"egui\":{\"texture_uploads\":{\"count\":0,\"bytes\":0,\"frames\":0}}"
+                + ",\"egui\":{\"texture_uploads\":{\"count\":0,\"bytes\":0,\"frames\":0}"
+                + ",\"battlefield_primitives\":{\"mean\":19.0,\"max\":19},\"battlefield_vertices\":{\"mean\":30000.0,\"max\":32000}}"
                 + ",\"present\":{\"requested_mode\":\"" + mode + "\",\"pipelined_rendering\":" + pipelined + "}"
                 + ",\"build\":{\"profile_label\":\"" + Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PROFILE") + "\"}}");
             return 0;
@@ -558,6 +559,7 @@ try {
             'ok   vsync-on-within-budget -> 0', 'ok   over-interface-draw -> 1', 'ok   playtest-vsync-on -> 0',
             'ok   missing-metric -> 2', 'ok   missing-cpu-frame -> 2', 'ok   over-texture-uploads -> 1',
             'ok   missing-texture-uploads -> 2', 'ok   driver-stall -> 0', 'ok   missing-driver-stalls -> 2', 'ok   wrong-size -> 2',
+            'ok   over-battlefield-primitives -> 1', 'ok   over-battlefield-vertices -> 1', 'ok   missing-battlefield-counts -> 2',
             'ok   window size: a clamped height', 'ok   window size: no windows_scale',
             'ok   v3: v3 interface_total above the baseline -> 1',
             'ok   v3: v3 without a small value -> 2', 'ok   save clone: another fixture -> 2', 'ok   save clone: another worker count -> 2',

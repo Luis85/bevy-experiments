@@ -467,6 +467,35 @@ mod tests {
     /// registry's perf fixtures that run live (motion, no input save) are one
     /// set, so a scene can never be measured without a budget or gated
     /// without a staged fixture.
+    /// W2-47 (R18): the battlefield egui gates are live in every perf run,
+    /// not only headless. `measure_performance.ps1` compares each scene's
+    /// worst repeat of the frame report's battlefield maxima with
+    /// `egui.battlefield_primitives_max` and, where the scene has one, its
+    /// `egui.battlefield_vertices_max` entry; every scene of the budget has a
+    /// vertex gate or is a scene the headless measurement leaves ungated.
+    #[test]
+    fn measure_performance_gates_the_battlefield_primitives_and_vertices() {
+        for read in [
+            "Get-Field $Budget @('egui', 'battlefield_primitives_max')",
+            "Get-Field $Budget @('egui', 'battlefield_vertices_max', $first.Scene)",
+            "Get-Field $r @('egui', 'battlefield_primitives', 'max')",
+            "Get-Field $r @('egui', 'battlefield_vertices', 'max')",
+        ] {
+            assert!(
+                SCRIPT.contains(read),
+                "measure_performance.ps1 reads {read}"
+            );
+        }
+        let json = budget();
+        let scenes = keys(object(&json, "/scenes"));
+        for (scene, _) in BATTLEFIELD_VERTICES_MAX {
+            assert!(
+                scenes.contains(scene),
+                "{scene}: a vertex gate needs a perf scene"
+            );
+        }
+    }
+
     #[test]
     fn perf_scenes_agree_across_script_budget_and_review_matrix() {
         use crate::review_scenes::{LIST_HEADER, REVIEW_SCENES, SceneKind, list_lines};

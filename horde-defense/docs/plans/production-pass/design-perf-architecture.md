@@ -322,6 +322,7 @@ The JSON:
 ### Budget compare
 - Repeats are compared by median; frames_over_50ms by worst repeat.
 - frames_over_50ms is checked always.
+- The battlefield egui gates are checked always (W2-47, R18), worst repeat: frame report `egui.battlefield_primitives.max` against `egui.battlefield_primitives_max` in every scene, and `egui.battlefield_vertices.max` against `egui.battlefield_vertices_max.<scene>` where the scene has one. The counts are the paint jobs clipped to the clip the battlefield painter drew with (`ui/battle/field.rs` records it, `egui_probe` counts them), as the headless gates count them. A report without them is invalid evidence.
 - cpu_frame p99 only with -VsyncOff.
 - interface_draw and interface_total only when the profile and vsync match the baseline (dev, VSync on).
 

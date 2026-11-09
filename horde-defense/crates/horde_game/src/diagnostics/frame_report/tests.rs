@@ -168,6 +168,37 @@ fn egui_texture_uploads_total_the_sampled_frames() {
     assert_eq!(quiet["egui"]["texture_uploads"]["count"], 0);
 }
 
+/// W2-47 (R18): `egui.battlefield_primitives` and
+/// `egui.battlefield_vertices` report the battlefield painter's own paint
+/// jobs per sampled frame, as {mean, max}, so `measure_performance.ps1` can
+/// gate the worst frame against `PERF_BUDGET.json` `egui`.
+#[test]
+fn egui_battlefield_counts_report_mean_and_max() {
+    let mut frames = vec![
+        frame(16.7, 4.0, None),
+        frame(16.7, 4.0, None),
+        frame(16.7, 4.0, None),
+        frame(16.7, 4.0, None),
+    ];
+    for (frame, (primitives, vertices)) in
+        frames
+            .iter_mut()
+            .zip([(19, 40_000), (18, 38_000), (19, 42_000), (16, 36_000)])
+    {
+        frame.probe.egui[EguiCount::BattlefieldPrimitives as usize] = primitives;
+        frame.probe.egui[EguiCount::BattlefieldVertices as usize] = vertices;
+    }
+    let report = report_json(&ReportInput {
+        frames,
+        ..default()
+    });
+    let egui = &report["egui"];
+    assert_eq!(egui["battlefield_primitives"]["max"], 19);
+    assert_eq!(egui["battlefield_primitives"]["mean"], 18.0);
+    assert_eq!(egui["battlefield_vertices"]["max"], 42_000);
+    assert_eq!(egui["battlefield_vertices"]["mean"], 39_000.0);
+}
+
 #[test]
 fn cpu_frame_quantiles_are_per_sample_sums() {
     // Main and render world peak on alternate frames: the CPU frame never

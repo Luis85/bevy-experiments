@@ -174,6 +174,10 @@ struct EguiReport {
     textured_quads: CountStats,
     passes_per_frame: CountStats,
     texture_uploads: TextureUploadTotals,
+    /// The battlefield painter's own paint jobs and mesh vertices per frame
+    /// (W2-47), gated by `measure_performance.ps1` at their max.
+    battlefield_primitives: CountStats,
+    battlefield_vertices: CountStats,
 }
 /// Every egui texture upload over the sampled (post-warmup) frames: the
 /// `textures_delta.set` entries and their bytes, gated at
@@ -862,6 +866,8 @@ pub(super) fn build_report(input: &ReportInput) -> FrameReport {
             textured_quads: egui(4),
             passes_per_frame: egui(5),
             texture_uploads: texture_upload_totals(frames),
+            battlefield_primitives: egui(EguiCount::BattlefieldPrimitives as usize),
+            battlefield_vertices: egui(EguiCount::BattlefieldVertices as usize),
         },
         scene_load: SceneLoad {
             visible_enemies: scene(|f| f.visible_enemies),

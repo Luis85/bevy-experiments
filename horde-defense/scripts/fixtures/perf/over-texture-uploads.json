@@ -63,6 +63,14 @@
             "count": 0,
             "bytes": 0,
             "frames": 0
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 31800.0,
+            "max": 32675
           }
         },
         "present": {
@@ -125,6 +133,14 @@
             "count": 0,
             "bytes": 0,
             "frames": 0
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 26100.0,
+            "max": 26900
           }
         },
         "present": {
@@ -187,6 +203,14 @@
             "count": 0,
             "bytes": 0,
             "frames": 0
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 37600.0,
+            "max": 38819
           }
         },
         "present": {
@@ -249,6 +273,14 @@
             "count": 2,
             "bytes": 4194304,
             "frames": 1
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 37600.0,
+            "max": 38819
           }
         },
         "present": {
@@ -311,6 +343,14 @@
             "count": 0,
             "bytes": 0,
             "frames": 0
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 37600.0,
+            "max": 38819
           }
         },
         "present": {
@@ -373,6 +413,14 @@
             "count": 0,
             "bytes": 0,
             "frames": 0
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 30400.0,
+            "max": 31200
           }
         },
         "present": {
@@ -435,6 +483,14 @@
             "count": 0,
             "bytes": 0,
             "frames": 0
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 45900.0,
+            "max": 47435
           }
         },
         "present": {
@@ -497,6 +553,14 @@
             "count": 0,
             "bytes": 0,
             "frames": 0
+          },
+          "battlefield_primitives": {
+            "mean": 18.6,
+            "max": 19
+          },
+          "battlefield_vertices": {
+            "mean": 37200.0,
+            "max": 38100
           }
         },
         "present": {

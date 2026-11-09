@@ -77,8 +77,9 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 );
             }
             let paint = diagnostics::interface_span(perf, InterfaceSpan::BattlefieldPaint);
+            let field_painter = ui.painter_at(layout.arena);
             let drawn = art::battlefield(
-                &ui.painter_at(layout.arena),
+                &field_painter,
                 r,
                 &views.field,
                 a,
@@ -98,6 +99,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
             drop(paint);
             if let Some(perf) = perf {
                 perf.record_scene(drawn);
+                perf.record_battlefield_clip(field_painter.clip_rect());
             }
             art::world_atmosphere(ui.painter(), canvas);
             if hovered {

@@ -83,8 +83,12 @@ enum EguiCount {
     /// `textures_delta.set` entries and their bytes (W1-64).
     TextureUploads,
     TextureUploadBytes,
+    /// The battlefield painter's own paint jobs and their mesh vertices
+    /// (W2-47): those clipped to the clip it painted with.
+    BattlefieldPrimitives,
+    BattlefieldVertices,
 }
-const EGUI_COUNTS: usize = 8;
+const EGUI_COUNTS: usize = 10;
 /// The [`SceneDraw`] fields, in `record_scene` order.
 const SCENE_COUNTS: usize = 6;
 /// The [`FrameEvents`] fields, in `record_events` order.
@@ -148,7 +152,7 @@ pub struct FrameSample {
     /// `[battle_frame_build, battlefield_paint, backdrop]`.
     pub interface_ms: [f64; 3],
     /// `[shapes, clipped_primitives, mesh_vertices, mesh_indices, textured_quads, passes,
-    /// texture_uploads, texture_upload_bytes]`.
+    /// texture_uploads, texture_upload_bytes, battlefield_primitives, battlefield_vertices]`.
     pub egui: [u64; EGUI_COUNTS],
     pub scene: SceneDraw,
     /// First begin and the end of `Last`, wall clock in ms since the probe
@@ -191,6 +195,9 @@ pub struct PerfCounters {
     /// The latest completed render-world sample and its sequence number.
     render: Mutex<RenderSlot>,
     pipelined: AtomicBool,
+    /// The clip the main battlefield painter painted with this frame, taken
+    /// by the tessellation probe (W2-47); `None` when no battlefield drew.
+    battlefield_clip: Mutex<Option<bevy_egui::egui::Rect>>,
 }
 impl Default for PerfCounters {
     fn default() -> Self {
@@ -212,6 +219,7 @@ impl Default for PerfCounters {
             events: Default::default(),
             render: Mutex::new(RenderSlot::default()),
             pipelined: AtomicBool::new(false),
+            battlefield_clip: Mutex::new(None),
         }
     }
 }
@@ -280,6 +288,24 @@ impl PerfProbe {
         for (slot, count) in self.0.scene.iter().zip(counts) {
             slot.store(count as u64, Ordering::Relaxed);
         }
+    }
+    /// The clip rect the main battlefield painter drew with this pass
+    /// (W2-47); the last pass of a frame wins. The tessellation probe counts
+    /// the paint jobs clipped to it as `egui.battlefield_primitives` and
+    /// `egui.battlefield_vertices`.
+    pub fn record_battlefield_clip(&self, clip: bevy_egui::egui::Rect) {
+        if let Ok(mut slot) = self.0.battlefield_clip.lock() {
+            *slot = Some(clip);
+        }
+    }
+    /// Takes this frame's battlefield clip, so a frame without a battlefield
+    /// counts none.
+    fn take_battlefield_clip(&self) -> Option<bevy_egui::egui::Rect> {
+        self.0
+            .battlefield_clip
+            .lock()
+            .ok()
+            .and_then(|mut slot| slot.take())
     }
     /// This frame's window, image and audio events and new voices (W1-68).
     fn record_events(&self, events: FrameEvents) {
