@@ -1,8 +1,11 @@
 //! W2-48 (design-save-determinism §4-§5 and §11 "Wave 2: elites and RNG
 //! isolation; fixture behaviour tests"; plan EB14 and SD6): the legacy
 //! guards that keep the wave-2 systems away from encounters saved before
-//! them, and behaviour tests that play the checked-in v6 and v7 fixtures
-//! forward through the wave-2 rules.
+//! them, and behaviour tests that play the checked-in v6 fixture forward
+//! through the wave-2 rules. The frozen v7 fixture is only decoded, once, to
+//! show that the wave-2 snapshot marks the legacy check expects to be absent
+//! do appear in a v7 save (so that check is not vacuous); it is never played
+//! forward here.
 //!
 //! - A rank-0 deploy rolls no elite and fields only the archetypes the V1-V6
 //!   encounters could spawn (the new archetypes enter at wave tier 5).
