@@ -1356,6 +1356,79 @@ mod tests {
         assert!(s.readiness(&c, a).unwrap().summary.contains("Marksman"));
         assert!(s.validate(&c).is_ok());
     }
+    /// Ruling E7: the second offer is keyed on exactly the game seed, the
+    /// next recruit id and the country (`keyed(seed, next_recruit_id,
+    /// fnv1a(country), RECRUIT_OFFER)`). A recorded `RecruitAs` replays only
+    /// while that key holds, and no digest covers it, so each input is shown
+    /// to matter and the offers over a grid are pinned.
+    #[test]
+    fn recruit_offer_is_keyed_on_seed_next_recruit_id_and_country() {
+        let seeds = [0, 1, 7, 0xDEAD_BEEF_2026, u64::MAX];
+        let countries: Vec<&str> = world()
+            .countries
+            .iter()
+            .take(6)
+            .map(|c| c.id.as_str())
+            .collect();
+        let offer = |seed: u64, id: u64, country: &str| {
+            let s = StrategyState {
+                next_recruit_id: id,
+                ..StrategyState::default()
+            };
+            s.recruit_offer_for(seed, country)
+        };
+        let mut table = String::new();
+        for &seed in &seeds {
+            for id in 1..=8 {
+                for &country in &countries {
+                    let [first, second] = offer(seed, id, country);
+                    let key = crate::hash::keyed(
+                        seed,
+                        id,
+                        crate::hash::fnv1a(country.as_bytes()),
+                        crate::hash::tags::RECRUIT_OFFER,
+                    );
+                    let step = 1 + (key % 3) as usize;
+                    assert_eq!(first, Archetype::rotation(id));
+                    assert_eq!(
+                        second,
+                        Archetype::ALL[(first.index() + step) % 4],
+                        "seed {seed} id {id} {country}"
+                    );
+                    table.push_str(&format!(
+                        "{seed} {id} {country} {} {}\n",
+                        first.id(),
+                        second.id()
+                    ));
+                }
+            }
+        }
+        // Each key input changes some second offer with the others held
+        // (ids 1 and 5 share a rotation archetype).
+        let second = |seed, id, country| offer(seed, id, country)[1];
+        let base = countries[0];
+        assert!(
+            seeds[1..]
+                .iter()
+                .any(|&seed| second(seed, 1, base) != second(seeds[0], 1, base)),
+            "the seed keys the offer"
+        );
+        assert!(
+            (0..8u64).any(|n| second(1, 1 + 4 * (n + 1), base) != second(1, 1, base)),
+            "the next recruit id keys the offer"
+        );
+        assert!(
+            countries[1..]
+                .iter()
+                .any(|&country| second(1, 1, country) != second(1, 1, base)),
+            "the country keys the offer"
+        );
+        assert_eq!(
+            crate::hash::fnv1a(table.as_bytes()),
+            0xa2c5_0b35_466f_1d3f,
+            "recruit offers moved (ruling E7):\n{table}"
+        );
+    }
     #[test]
     fn readiness_summary_has_no_debug_names() {
         let mut c = liberated(1);
