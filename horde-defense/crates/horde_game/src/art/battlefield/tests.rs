@@ -235,12 +235,31 @@ fn assert_live_load_within_gates(scene: &str, size: &str, ticks: usize, load: &L
 /// (`PERF_BUDGET.json` `evidence.egui_measured.max_tick_by_scene`), running
 /// to the latest of them. On the W2-47 stress fixture the stress vertex
 /// maxima fall at ticks 1980 and 1700 (full corpse caps), past tick 420.
+///
+/// W2 review (tests): the run paints a subset of the measurement's even
+/// ticks that holds the recorded maximum ticks, so while the evidence is
+/// current its maxima and their first ticks equal the recorded
+/// `battlefield_primitives_by_scene`, `battlefield_vertices_by_scene` and
+/// `max_tick_by_scene` exactly. A fixture change that moves or changes a
+/// recorded maximum (as 787929f did, unnoticed) fails here until
+/// `measure_battlefield_egui_load` is re-run and the evidence updated.
 #[test]
 fn live_battlefield_runs_stay_within_the_egui_gates() {
     for scene in LIVE_GATED_SCENES {
         let plan = live_gate_plan(scene);
         let load = live_battlefield_load(scene, plan.ticks, &|tick| plan.paints(tick), arena());
         assert_live_load_within_gates(scene, "normal", plan.ticks, &load);
+        assert_eq!(
+            (
+                load.primitives_max,
+                load.primitives_max_tick,
+                load.vertices_max,
+                load.vertices_max_tick
+            ),
+            recorded_maxima(scene),
+            "{scene} normal: (primitives, tick, vertices, tick) no longer match PERF_BUDGET.json \
+             evidence.egui_measured; re-run measure_battlefield_egui_load"
+        );
     }
 }
 
@@ -272,28 +291,44 @@ fn live_gate_plan(scene: &str) -> LiveGatePlan {
     LiveGatePlan { ticks, maxima }
 }
 
+/// The count at `PERF_BUDGET.json` `evidence.egui_measured` + `/path`.
+fn recorded_count(path: &str) -> usize {
+    const BUDGET: &str = include_str!("../../../../../docs/PERF_BUDGET.json");
+    let json: serde_json::Value = serde_json::from_str(BUDGET).expect("PERF_BUDGET.json parses");
+    let path = format!("/evidence/egui_measured/{path}");
+    json.pointer(&path)
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|count| usize::try_from(count).ok())
+        .unwrap_or_else(|| panic!("PERF_BUDGET.json {path} is not a count"))
+}
+
 /// `PERF_BUDGET.json` `evidence.egui_measured.max_tick_by_scene` for `scene`:
 /// the ticks the full-length measurement first painted its primitive and
 /// vertex maxima at.
 fn recorded_max_ticks(scene: &str) -> Vec<usize> {
-    const BUDGET: &str = include_str!("../../../../../docs/PERF_BUDGET.json");
-    let json: serde_json::Value = serde_json::from_str(BUDGET).expect("PERF_BUDGET.json parses");
     ["primitives", "vertices"]
         .iter()
-        .map(|kind| {
-            let path = format!("/evidence/egui_measured/max_tick_by_scene/{scene}/{kind}");
-            json.pointer(&path)
-                .and_then(serde_json::Value::as_u64)
-                .and_then(|tick| usize::try_from(tick).ok())
-                .unwrap_or_else(|| panic!("PERF_BUDGET.json {path} is not a tick"))
-        })
+        .map(|kind| recorded_count(&format!("max_tick_by_scene/{scene}/{kind}")))
         .collect()
 }
 
-/// W2 review (perf-diagnostics): the live gate reaches every maximum the
-/// recorded measurement found, wherever the current fixtures put it. Since
-/// the W2-47 stress fixture the stress vertex maxima fall late in the run
-/// (tick 1980, and 1700 with full corpse caps), past the first 420 ticks.
+/// The full-length measurement's maxima for `scene` at the normal arena, as
+/// (primitives, first tick, vertices, first tick).
+fn recorded_maxima(scene: &str) -> (usize, usize, usize, usize) {
+    (
+        recorded_count(&format!("battlefield_primitives_by_scene/{scene}")),
+        recorded_count(&format!("max_tick_by_scene/{scene}/primitives")),
+        recorded_count(&format!("battlefield_vertices_by_scene/{scene}")),
+        recorded_count(&format!("max_tick_by_scene/{scene}/vertices")),
+    )
+}
+
+/// W2 review (perf-diagnostics): the live gate's plan paints every tick
+/// `max_tick_by_scene` records and runs to the latest of them. This pins
+/// only the plan builder; whether the recorded ticks are still where the
+/// current fixtures put their maxima is checked by
+/// `live_battlefield_runs_stay_within_the_egui_gates`, which requires its
+/// maxima and their ticks to equal the recorded evidence.
 #[test]
 fn live_battlefield_gate_paints_every_recorded_maximum_tick() {
     for scene in LIVE_GATED_SCENES {
