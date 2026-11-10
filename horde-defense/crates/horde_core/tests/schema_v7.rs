@@ -683,38 +683,92 @@ fn written_by_a_writer(path: &str) -> bool {
 /// The v7 schema fields move no digest (schema-v7.md section 12): the
 /// default game and every GOLDEN run, live and after a withdrawal settles it
 /// into a report, write no registry key and no key path the v6 build did not
-/// write, apart from the keys a wave-2 writer populates ([`WRITTEN_V7_KEYS`]).
+/// write, apart from the keys a wave-2 writer populates in a GOLDEN run
+/// ([`WRITTEN_V7_KEYS`]; the default game gets no exemption).
 #[test]
 fn default_and_golden_games_serialize_no_v7_key() {
     let v6_paths = game_key_paths(&v6_payload());
-    let check = |game: &Game, what: &str| {
-        let paths: BTreeSet<String> = game_key_paths(&as_saved(game))
-            .into_iter()
-            .filter(|path| !written_by_a_writer(path))
-            .collect();
-        let v7 = v7_paths_in(&paths);
+    let check = |game: &Game, what: &str, golden: bool| {
+        let (v7, unknown) = unexpected_keys(&as_saved(game), &v6_paths, golden);
         assert!(v7.is_empty(), "{what} wrote v7 keys: {v7:?}");
-        let unknown: Vec<&String> = paths.difference(&v6_paths).collect();
         assert!(
             unknown.is_empty(),
             "{what} wrote key paths the v6 build never wrote: {unknown:?}"
         );
     };
-    check(&Game::default(), "the default game");
+    check(&Game::default(), "the default game", false);
     let mut runs = 0;
     for seed in GOLDEN_SEEDS {
         for mode in [Mode::Personal, Mode::Npc] {
             let mut game = support::smoke_run(seed, mode, GOLDEN_TICKS, |_| {});
             let what = format!("GOLDEN seed {seed:#x} {mode:?}");
             assert!(game.attempt().is_some(), "{what} is live");
-            check(&game, &what);
+            check(&game, &what, true);
             game.apply(&Command::Withdraw).unwrap();
             assert!(game.last_result().is_some(), "{what} reported");
-            check(&game, &format!("{what} after a withdrawal"));
+            check(&game, &format!("{what} after a withdrawal"), true);
             runs += 1;
         }
     }
     assert_eq!(runs, 6);
+}
+
+/// The registry key paths and the key paths the v6 build never wrote that
+/// the saved game `saved` holds. `golden` exempts [`WRITTEN_V7_KEYS`]: only
+/// a GOLDEN run plays, so only it may hold what a wave-2 writer populates.
+fn unexpected_keys(
+    saved: &Value,
+    v6_paths: &BTreeSet<String>,
+    golden: bool,
+) -> (Vec<String>, Vec<String>) {
+    let paths: BTreeSet<String> = game_key_paths(saved)
+        .into_iter()
+        .filter(|path| !(golden && written_by_a_writer(path)))
+        .collect();
+    let v7 = v7_paths_in(&paths);
+    let unknown = paths.difference(v6_paths).cloned().collect();
+    (v7, unknown)
+}
+
+/// The default game is checked without the writer exemption: a default game
+/// that wrote a writer's key (the level-grant ledger, say) fails.
+#[test]
+fn the_default_game_check_does_not_exempt_writer_keys() {
+    let v6_paths = game_key_paths(&v6_payload());
+    let clean = as_saved(&Game::default());
+    assert_eq!(
+        unexpected_keys(&clean, &v6_paths, false),
+        (Vec::new(), Vec::new())
+    );
+    for (_, key) in WRITTEN_V7_KEYS {
+        let mut wrote = clean.clone();
+        let mut at = &mut wrote;
+        for part in key.trim_start_matches('/').split('/') {
+            // A missing (null) section becomes an object, and a list in the
+            // path is written with one element.
+            if at.is_null() {
+                *at = json!({});
+            }
+            if let Value::Array(list) = at {
+                if list.is_empty() {
+                    list.push(json!({}));
+                }
+                at = &mut list[0];
+            }
+            at = at
+                .as_object_mut()
+                .unwrap_or_else(|| panic!("{key}: {part} is under an object"))
+                .entry(part)
+                .or_insert(Value::Null);
+        }
+        *at = json!(1);
+        let reported = |golden: bool| {
+            let (v7, unknown) = unexpected_keys(&wrote, &v6_paths, golden);
+            v7.iter().chain(&unknown).any(|path| path == key)
+        };
+        assert!(reported(false), "a default game that wrote {key} passes");
+        assert!(!reported(true), "a GOLDEN run may write {key}");
+    }
 }
 
 /// Every registry field, set to a non-default sample in the root game and in
