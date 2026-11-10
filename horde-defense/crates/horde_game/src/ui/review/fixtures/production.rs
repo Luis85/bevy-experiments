@@ -1,9 +1,10 @@
 //! The production pass's wave-1 review scenes (design-qa-captures 1.8).
 //!
 //! Every recipe stages feature state through `Game::apply(&Command)`; the
-//! `staging()` seam appears only inside the `entitle_*` helpers (the start
-//! country, coins, experience, earlier stage clears and inventory grants);
-//! `repo_checks::production_fixtures_stage_features_through_commands`
+//! `staging()` seam and the other non-command `Game` mutators (`deploy`,
+//! `set_paused`, `sell_item`, ...) appear only inside top-level `entitle_*`
+//! helpers (the start country, coins, experience, earlier stage clears and
+//! inventory grants); `repo_checks::production_fixtures_stage_features_through_commands`
 //! enforces it. Ticking the simulation is play, not staging. Each recipe
 //! leaves the game paused on its screen and returns before the matrix's
 //! shared progression.

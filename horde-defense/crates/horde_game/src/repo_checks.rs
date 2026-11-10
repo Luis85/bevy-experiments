@@ -870,37 +870,70 @@ fn doc_lint_skips_ignored_folders_and_reports_non_utf8() {
 
 /// The production review recipes (design-qa-captures 1.8 and Wave 2).
 const PRODUCTION_FIXTURES: &str = "src/ui/review/fixtures/production.rs";
-/// The test-support seams that change game state without `Game::apply`: the
-/// staging handle and the `Game` `*_mut` accessors.
+/// The `Game` methods that change game state without `Game::apply`: the
+/// staging handle, the test-support `*_mut` accessors and setters, and the
+/// ungated mutators (deploying, pausing, placing, selling, salvaging,
+/// journeys, retries and repeats, expeditions, spawns). Ticking the
+/// simulation (`tick`, `drain_events`) is play, not staging.
 const STAGING_SEAMS: &[&str] = &[
-    "staging()",
-    "campaign_mut(",
-    "strategy_mut(",
-    "attempt_mut(",
-    "attempt_slot_mut(",
-    "last_result_mut(",
-    "battles_mut(",
-    "pending_runs_mut(",
-    "game_mut(",
+    "staging",
+    "campaign_mut",
+    "strategy_mut",
+    "attempt_mut",
+    "attempt_slot_mut",
+    "last_result_mut",
+    "battles_mut",
+    "pending_runs_mut",
+    "game_mut",
+    "with_strategy",
+    "set_seed",
+    "set_next_attempt_id",
+    "set_repeat_remaining",
+    "set_global_paused",
+    "stage_review_enemy_cap",
+    "sell_item",
+    "sell_extras",
+    "sell_unprotected",
+    "deploy",
+    "deploy_country_stage",
+    "deploy_country_stage_as",
+    "set_paused",
+    "place",
+    "save_country_layout",
+    "clear_country_layout",
+    "salvage",
+    "spawn_enemy",
+    "spawn_archetype",
+    "continue_journey",
+    "leave_journey",
+    "retry",
+    "withdraw",
+    "start_repeat",
+    "continue_repeat",
+    "deploy_survivor",
+    "deploy_country_operation",
+    "recall_survivor",
 ];
 /// The helpers that may use a staging seam: entitlements (the start country,
 /// coins, experience, earlier stage clears and inventory grants).
 const ENTITLEMENT_PREFIX: &str = "entitle_";
 
-/// Every [`STAGING_SEAMS`] use in `text` (Rust source) whose innermost
-/// enclosing `fn` is not an [`ENTITLEMENT_PREFIX`] helper, as
-/// `name:line: reason`. Comments and string contents are not code. A closure
-/// belongs to the `fn` it is written in.
+/// Every [`STAGING_SEAMS`] use in `text` (Rust source) outside an
+/// [`ENTITLEMENT_PREFIX`] helper, as `name:line: reason`. A use is a seam
+/// name reached through `.` and called (`f.game.staging()`), or named by a
+/// path (`Game::staging(&mut f.game)`, `Game::sell_item`). It is allowed only
+/// when every enclosing `fn` is an entitlement helper, so an `entitle_*` fn
+/// nested in a recipe exempts nothing. Comments and string contents are not
+/// code. A closure belongs to the `fn` it is written in.
 fn staging_outside_entitlements(name: &str, text: &str) -> Vec<String> {
     let chars = crate::architecture_tests::blank_comments_and_strings(text);
-    let starts_word =
-        |at: usize| at == 0 || !(chars[at - 1].is_alphanumeric() || chars[at - 1] == '_');
-    let word_at = |at: usize| -> String {
-        chars[at..]
-            .iter()
-            .take_while(|c| c.is_alphanumeric() || **c == '_')
-            .collect()
-    };
+    let is_word = |c: char| c.is_alphanumeric() || c == '_';
+    let starts_word = |at: usize| at == 0 || !is_word(chars[at - 1]);
+    let word_at =
+        |at: usize| -> String { chars[at..].iter().take_while(|c| is_word(**c)).collect() };
+    // The nearest non-whitespace chars before `at`, and the first from `at` on.
+    let before = |at: usize| chars[..at].iter().rev().filter(|c| !c.is_whitespace());
+    let after = |at: usize| chars[at..].iter().find(|c| !c.is_whitespace()).copied();
     let mut violations = Vec::new();
     // (fn name, brace depth outside its body)
     let mut functions: Vec<(String, usize)> = Vec::new();
@@ -936,24 +969,33 @@ fn staging_outside_entitlements(name: &str, text: &str) -> Vec<String> {
             }
             _ => {}
         }
-        if starts_word(i) {
-            for seam in STAGING_SEAMS {
-                let matches = seam
-                    .chars()
-                    .enumerate()
-                    .all(|(n, c)| chars.get(i + n) == Some(&c));
-                if !matches {
-                    continue;
-                }
-                let place = match functions.last() {
-                    Some((function, _)) if function.starts_with(ENTITLEMENT_PREFIX) => continue,
-                    Some((function, _)) => format!("in fn {function}"),
-                    None => "outside any fn".to_owned(),
+        if starts_word(i) && is_word(chars[i]) {
+            let word = word_at(i);
+            let mut prior = before(i);
+            let used = match (prior.next(), prior.next()) {
+                // A method call (or a turbofish one).
+                (Some('.'), _) => matches!(after(i + word.chars().count()), Some('(' | ':')),
+                // A path: UFCS or a function value.
+                (Some(':'), Some(':')) => true,
+                _ => false,
+            };
+            if used && STAGING_SEAMS.contains(&word.as_str()) {
+                // The innermost enclosing fn that is not an entitlement.
+                let recipe = functions
+                    .iter()
+                    .rev()
+                    .find(|(function, _)| !function.starts_with(ENTITLEMENT_PREFIX));
+                let place = match recipe {
+                    Some((function, _)) => Some(format!("in fn {function}")),
+                    None if functions.is_empty() => Some("outside any fn".to_owned()),
+                    None => None,
                 };
-                violations.push(format!(
-                    "{name}:{line}: `{seam}` {place}; stage feature state through \
-                     Game::apply(&Command), or entitle it in an `{ENTITLEMENT_PREFIX}*` helper"
-                ));
+                if let Some(place) = place {
+                    violations.push(format!(
+                        "{name}:{line}: `{word}` {place}; stage feature state through \
+                         Game::apply(&Command), or entitle it in an `{ENTITLEMENT_PREFIX}*` helper"
+                    ));
+                }
             }
         }
         i += 1;
@@ -990,19 +1032,35 @@ fn prepare_x(f: &mut F) {
     if s.is_empty() { f.game.campaign_mut().coins = 1; }
     fn entitle_inner(f: &mut F) { f.game.staging(); }
     f.game.my_campaign_mut();
+    Game::staging(&mut f.game).campaign();
+    f.game.deploy(0, Mode::Personal);
+    f.game . set_paused (false);
+    let sell = Game::sell_item;
+    let place = 1; f.game.place(kind, 0, place);
+    f.game.tick(Input::default());
+    fn deploy(x: u8) {}
 }
+fn entitle_start(f: &mut F) { f.game.deploy_country_stage(0, Mode::Personal); }
 fn prepare_y(f: &mut F) -> impl Fn() { f.game.staging_count(); }
 f.game.staging();
 ";
-    assert_eq!(
-        staging_outside_entitlements("x.rs", sample),
-        [
-            "x.rs:9: `staging()` in fn prepare_x; stage feature state through \
-             Game::apply(&Command), or entitle it in an `entitle_*` helper",
-            "x.rs:11: `campaign_mut(` in fn prepare_x; stage feature state through \
-             Game::apply(&Command), or entitle it in an `entitle_*` helper",
-            "x.rs:16: `staging()` outside any fn; stage feature state through \
-             Game::apply(&Command), or entitle it in an `entitle_*` helper",
-        ]
-    );
+    let rule = "stage feature state through Game::apply(&Command), or entitle it in an \
+                `entitle_*` helper";
+    let expected: Vec<String> = [
+        (9, "staging", "in fn prepare_x"),
+        (11, "campaign_mut", "in fn prepare_x"),
+        // A nested entitlement helper does not exempt its recipe.
+        (12, "staging", "in fn prepare_x"),
+        // The UFCS form, the ungated mutators and a path to one.
+        (14, "staging", "in fn prepare_x"),
+        (15, "deploy", "in fn prepare_x"),
+        (16, "set_paused", "in fn prepare_x"),
+        (17, "sell_item", "in fn prepare_x"),
+        (18, "place", "in fn prepare_x"),
+        (24, "staging", "outside any fn"),
+    ]
+    .into_iter()
+    .map(|(line, seam, place)| format!("x.rs:{line}: `{seam}` {place}; {rule}"))
+    .collect();
+    assert_eq!(staging_outside_entitlements("x.rs", sample), expected);
 }
