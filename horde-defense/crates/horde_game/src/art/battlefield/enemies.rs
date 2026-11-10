@@ -403,7 +403,7 @@ const PHASE_BREATH_TICKS: u64 = 45;
 /// How far the phase ring breathes either way, as a fraction of its radii.
 const PHASE_BREATH: f32 = 0.08;
 /// Width of the phase ring, in points.
-const PHASE_RING_WIDTH: f32 = 2.5;
+pub(super) const PHASE_RING_WIDTH: f32 = 2.5;
 /// How far over the boss's name callout the phase label sits, in points.
 pub(super) const PHASE_LABEL_GAP: f32 = 7.0;
 

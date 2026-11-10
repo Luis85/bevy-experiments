@@ -1867,6 +1867,7 @@ fn boss_phase_hold_shows_phase_label_and_ring_for_90_ticks() {
         .collect()
     };
     let mut rings = [Vec::new(), Vec::new()];
+    let mut painted_rings = [Vec::new(), Vec::new()];
     let mut frames = [0, 0];
     for frame in 0..hold {
         if frame > 0 {
@@ -1932,6 +1933,34 @@ fn boss_phase_hold_shows_phase_label_and_ring_for_90_ticks() {
             }
             let ring = enemies::phase_ring(sy, phase.hold_left_ticks, reduced);
             assert!(ring.x > sy * 0.4 && ring.y > 0.0, "a ring around the boss");
+            if painting {
+                // W2 review: the ring the battlefield paints is the one the
+                // pin checks. Rejected art strokes it as an ellipse.
+                let art = ArtTextures {
+                    enemy_art_rejected: true,
+                    ..textures()
+                };
+                let drawn: Vec<_> = painted(|p| {
+                    let options = RenderOptions {
+                        reduced,
+                        ..options(art)
+                    };
+                    battlefield(p, arena(), &view, a, [10.0, 5.0], options);
+                })
+                .into_iter()
+                .filter_map(|shape| match shape {
+                    egui::Shape::Ellipse(e)
+                        if e.stroke
+                            == Stroke::new(enemies::PHASE_RING_WIDTH, super::super::AMBER) =>
+                    {
+                        Some(e.radius)
+                    }
+                    _ => None,
+                })
+                .collect();
+                assert_eq!(drawn, [ring], "reduced {reduced}: tick {}", a.tick);
+                painted_rings[usize::from(reduced)].push(drawn[0]);
+            }
             rings[usize::from(reduced)].push(ring);
             frames[usize::from(reduced)] += 1;
         }
@@ -1945,6 +1974,17 @@ fn boss_phase_hold_shows_phase_label_and_ring_for_90_ticks() {
     assert!(
         normal.iter().any(|r| *r != normal[0]),
         "the normal ring breathes"
+    );
+    // On screen too, over the first, middle and last frames of the hold.
+    let [normal, reduced] = &painted_rings;
+    assert_eq!((normal.len(), reduced.len()), (3, 3));
+    assert!(
+        reduced.iter().all(|r| *r == reduced[0]),
+        "the painted reduced ring is static: {reduced:?}"
+    );
+    assert!(
+        normal.iter().any(|r| *r != normal[0]),
+        "the painted normal ring breathes: {normal:?}"
     );
     // The hold is over: no phase, no label, no ring.
     game.tick(Input::default());
