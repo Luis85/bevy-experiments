@@ -563,18 +563,47 @@ impl MilestoneStats {
     }
 }
 /// The lower median, over the reports that played run `run`, of the coins
-/// earned up to and including it; None when no report played it.
+/// earned up to and including it; None when no report played it. A seed
+/// that stopped earlier (`stop_after` or `max_runs`) is left out, so the
+/// median of a stopping row leans toward slow seeds; [`EarnedAfter`]
+/// also says how many seeds it covers.
 pub fn median_earned_after(reports: &[PacingReport], run: usize) -> Option<u64> {
-    let mut earned: Vec<u64> = reports
-        .iter()
-        .filter_map(|r| r.runs.iter().find(|x| x.index == run))
-        .map(|x| x.cumulative_coins)
-        .collect();
-    if earned.is_empty() {
-        return None;
+    EarnedAfter::of(reports, run).map(|e| e.median)
+}
+/// The coins earned up to and including one run, over the reports that
+/// played it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EarnedAfter {
+    /// The lower median over the `sampled` reports.
+    pub median: u64,
+    /// The reports that played the run.
+    pub sampled: usize,
+    /// Every report.
+    pub seeds: usize,
+}
+impl EarnedAfter {
+    /// None when no report played run `run`.
+    pub fn of(reports: &[PacingReport], run: usize) -> Option<Self> {
+        let mut earned: Vec<u64> = reports
+            .iter()
+            .filter_map(|r| r.runs.iter().find(|x| x.index == run))
+            .map(|x| x.cumulative_coins)
+            .collect();
+        if earned.is_empty() {
+            return None;
+        }
+        earned.sort_unstable();
+        Some(Self {
+            median: lower_quantile(&earned, 1, 2),
+            sampled: earned.len(),
+            seeds: reports.len(),
+        })
     }
-    earned.sort_unstable();
-    Some(lower_quantile(&earned, 1, 2))
+    /// Some seeds stopped before the run, so the median covers only the
+    /// slower ones.
+    pub fn partial(&self) -> bool {
+        self.sampled < self.seeds
+    }
 }
 /// Prerequisite depth of every node: the root is 0, its children 1.
 pub fn node_depths() -> BTreeMap<String, usize> {

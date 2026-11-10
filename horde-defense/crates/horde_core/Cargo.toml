@@ -30,3 +30,8 @@ horde_core = { path = ".", features = ["test-support"] }
 [[example]]
 name = "save_clone"
 test = true
+
+# The pacing table's argument parser and fit-tier cells run under `cargo test`.
+[[example]]
+name = "pacing"
+test = true

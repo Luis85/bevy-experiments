@@ -10,7 +10,9 @@
 //!   prints `median [p25, p75] reached/seeds` cells.
 //! - `--csv` prints one CSV row per run instead of the table.
 //! - `--fit-tiers a,b,c` adds, per tier `d`, the median coins earned by run
-//!   `a`, `b`, `c`… divided by the tier's cost.
+//!   `a`, `b`, `c`… divided by the tier's cost. The median covers the seeds
+//!   that played that run; a cell that misses some (a `stop_after` row, or
+//!   past `max_runs`) names its `n/m seeds` and a note follows the table.
 //! - `--values` prints the tree value table instead (CSV: one row per skill
 //!   node with its axis, dominance group and ln gain at both reference
 //!   ranks; `horde_core::campaign::tree_value`). It plays no run.
@@ -25,11 +27,10 @@
 #![allow(clippy::print_stdout, clippy::print_stderr)]
 use horde_core::defenders::DefenderId;
 use horde_core::sim::{
-    LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingProfile, PacingReport,
+    EarnedAfter, LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingProfile, PacingReport,
     STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS, StrategyReport, by_id,
-    liberations_and_coins_per_minute, median_earned_after, outbreak_reopens, pacing_archetype_ids,
-    pacing_registry, pacing_sweep, parallel_frees_neighbours, strategy_sweep, strategy_table,
-    tier_cost,
+    liberations_and_coins_per_minute, outbreak_reopens, pacing_archetype_ids, pacing_registry,
+    pacing_sweep, parallel_frees_neighbours, strategy_sweep, strategy_table, tier_cost,
 };
 use horde_core::skill_catalog::CampaignFeature;
 use std::fmt::Write as _;
@@ -275,6 +276,24 @@ fn run_list(reports: &[PacingReport], seeds: usize) -> String {
     s
 }
 
+/// Printed under the fit table when a cell covers fewer than every seed.
+const FIT_PARTIAL_NOTE: &str = "\nA cell with n/m seeds: only n of the m seeds played that run; \
+the others stopped earlier (stop_after or max_runs), so its median leans toward slow seeds.\n";
+
+/// One fit-table cell: median earned ÷ tier cost and the median, plus the
+/// seed count when some seeds did not play the run.
+fn fit_cell(earned: EarnedAfter, cost: u64) -> String {
+    let ratio = earned.median as f64 / cost as f64;
+    if earned.partial() {
+        format!(
+            " {ratio:.2} ({}, {}/{} seeds) |",
+            earned.median, earned.sampled, earned.seeds
+        )
+    } else {
+        format!(" {ratio:.2} ({}) |", earned.median)
+    }
+}
+
 fn fit_table(groups: &[&[PacingReport]], targets: &[usize]) -> String {
     let mut s = String::from("\n| Tier (target run, cost) |");
     for g in groups {
@@ -282,19 +301,24 @@ fn fit_table(groups: &[&[PacingReport]], targets: &[usize]) -> String {
     }
     s.push('\n');
     let _ = writeln!(s, "|---|{}", "---|".repeat(groups.len()));
+    let mut partial = false;
     for (i, run) in targets.iter().enumerate() {
         let tier = i + 1;
         let cost = tier_cost(tier);
         let _ = write!(s, "| Tier {tier} (run {run}, {cost} coins) |");
         for g in groups {
-            match median_earned_after(g, *run) {
+            match EarnedAfter::of(g, *run) {
                 Some(earned) if cost > 0 => {
-                    let _ = write!(s, " {:.2} ({earned}) |", earned as f64 / cost as f64);
+                    partial |= earned.partial();
+                    s.push_str(&fit_cell(earned, cost));
                 }
                 _ => s.push_str(" n/a |"),
             }
         }
         s.push('\n');
+    }
+    if partial {
+        s.push_str(FIT_PARTIAL_NOTE);
     }
     s
 }
@@ -404,5 +428,23 @@ fn main() {
             }
         }
         None => print!("{text}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fit_cell_names_the_seed_count_when_some_seeds_stopped() {
+        let all = EarnedAfter {
+            median: 1500,
+            sampled: 20,
+            seeds: 20,
+        };
+        assert_eq!(fit_cell(all, 1000), " 1.50 (1500) |");
+        let partial = EarnedAfter { sampled: 7, ..all };
+        assert_eq!(fit_cell(partial, 1000), " 1.50 (1500, 7/20 seeds) |");
+        assert!(FIT_PARTIAL_NOTE.contains("leans toward slow seeds"));
     }
 }

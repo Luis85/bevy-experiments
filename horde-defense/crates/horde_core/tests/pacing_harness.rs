@@ -5,16 +5,17 @@ use horde_core::balance::BalancePreset;
 use horde_core::content::{Mode, Slot, content};
 use horde_core::defenders::DefenderId;
 use horde_core::sim::{
-    ArchetypeRun, DEFAULT_PROFILE_ID, DefeatWindow, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS,
-    GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT, GOAL6_LUX_EASY_MAX_RUNS,
-    GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS, GOAL6_START_PROFILE_IDS,
-    GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, Game, LEGACY_PROFILE_IDS,
-    Milestone, MilestoneStats, Outcome, PacingAim, PacingDefender, PacingFarm, PacingPlan,
-    PacingProfile, PacingReport, PacingRun, PacingSell, PacingSpend, archetype_coverage,
-    boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows, defeat_windows,
-    equip_dropped_upgrades, longest_win_streak, max_win_streak, median_run_within, node_retired,
-    nodes_left, pacing_registry, pacing_seed, pacing_sweep_with_threads, runs_to_liberate,
-    simulate_pacing, tier_affordable_runs, tree_exhausted, tree_outlasts_liberation, unlock_order,
+    ArchetypeRun, DEFAULT_PROFILE_ID, DefeatWindow, EarnedAfter, GOAL5_FIRST_VICTORY,
+    GOAL5_TIER_WINDOWS, GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT,
+    GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
+    GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, Game,
+    LEGACY_PROFILE_IDS, Milestone, MilestoneStats, Outcome, PacingAim, PacingDefender, PacingFarm,
+    PacingPlan, PacingProfile, PacingReport, PacingRun, PacingSell, PacingSpend,
+    archetype_coverage, boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows,
+    defeat_windows, equip_dropped_upgrades, longest_win_streak, max_win_streak,
+    median_earned_after, median_run_within, node_retired, nodes_left, pacing_registry, pacing_seed,
+    pacing_sweep_with_threads, runs_to_liberate, simulate_pacing, tier_affordable_runs,
+    tree_exhausted, tree_outlasts_liberation, unlock_order,
 };
 use horde_core::skill_catalog::{CampaignFeature, SkillNode, skills};
 use horde_core::world::world;
@@ -595,6 +596,48 @@ fn summary_windows_and_per_seed_streaks_on_synthetic_runs() {
     assert!(err.contains("seed 1: 15-win streak from run 11"), "{err}");
     assert!(!err.contains("seed 0") && !err.contains("seed 2:"), "{err}");
     assert!(err.contains("median 14"), "{err}");
+}
+
+/// A seed that played `runs` runs, earning `per_run` coins in each.
+fn earning(seed_index: usize, runs: usize, per_run: u64) -> PacingReport {
+    PacingReport {
+        runs: (1..=runs)
+            .map(|i| PacingRun {
+                cumulative_coins: per_run * i as u64,
+                ..camp_run(i, 0)
+            })
+            .collect(),
+        ..seed_report(seed_index, &[], 0)
+    }
+}
+
+#[test]
+fn earned_after_counts_the_seeds_that_played_the_run() {
+    // Seed 0 is fast and stops after run 2 (a stop_after row); seeds 1 and
+    // 2 play to run 5. Run 5's median is over the two slow seeds only.
+    let reports = [earning(0, 2, 900), earning(1, 5, 100), earning(2, 5, 200)];
+    assert_eq!(
+        EarnedAfter::of(&reports, 1),
+        Some(EarnedAfter {
+            median: 200,
+            sampled: 3,
+            seeds: 3,
+        })
+    );
+    let late = EarnedAfter::of(&reports, 5).expect("two seeds played run 5");
+    assert_eq!(
+        late,
+        EarnedAfter {
+            median: 500,
+            sampled: 2,
+            seeds: 3,
+        }
+    );
+    assert!(late.partial(), "seed 0 stopped before run 5");
+    assert!(!EarnedAfter::of(&reports, 1).expect("all played").partial());
+    assert_eq!(median_earned_after(&reports, 5), Some(late.median));
+    assert_eq!(EarnedAfter::of(&reports, 6), None);
+    assert_eq!(EarnedAfter::of(&[], 1), None);
 }
 
 /// Synthetic liberation reports of `profile`: one seed per entry, None for
