@@ -4,10 +4,12 @@
 //! dedicated node with its body-ladder peer.
 use horde_core::campaign::Campaign;
 use horde_core::campaign::tree_value::{
-    DominanceGroup, ValueAxis, ZERO_GAIN, node_value, node_value_at, reference_ranks, value_table,
+    BENCHMARK_GUNS, DominanceGroup, ValueAxis, ZERO_GAIN, benchmark_classes, node_value,
+    node_value_at, reference_ranks, value_table,
 };
 use horde_core::content::Mode;
 use horde_core::skill_catalog::{SkillNode, skills};
+use horde_core::weapons::WeaponClass;
 
 fn node(id: &str) -> &'static SkillNode {
     skills().node(id).expect("shipped skill node")
@@ -79,6 +81,15 @@ fn dominance_groups_pair_vitality_with_health_add() {
     ] {
         assert_eq!(group(id), None, "{id}");
     }
+}
+
+#[test]
+fn every_benchmark_gun_is_benched_once_per_weapon_class() {
+    // A missing benchmark gun would leave its class perks measured on the
+    // other classes' guns, worth nothing and so dominated.
+    let classes = benchmark_classes();
+    assert_eq!(classes.len(), BENCHMARK_GUNS.len(), "{classes:?}");
+    assert_eq!(classes, WeaponClass::ALL);
 }
 
 #[test]

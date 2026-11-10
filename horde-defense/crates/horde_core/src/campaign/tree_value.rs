@@ -336,6 +336,17 @@ fn fold(node: &SkillNode, with_node: bool) -> SkillModifiers {
     modifiers
 }
 
+/// The weapon class of each [`BENCHMARK_GUNS`] entry, in order: the
+/// classes the firepower axis is measured on.
+///
+/// # Panics
+/// When a benchmark gun is missing from the content catalogue, is not a
+/// ranged item or cannot be owned, so a class perk is never silently valued
+/// on the other classes' guns.
+pub fn benchmark_classes() -> Vec<WeaponClass> {
+    bench().guns.iter().map(|(class, _)| *class).collect()
+}
+
 /// The fresh campaign every profile is derived from, with each benchmark
 /// gun owned: the starter loadout and one loadout per benchmark gun.
 struct Bench {
@@ -343,6 +354,7 @@ struct Bench {
     starter: [u64; 4],
     guns: Vec<(WeaponClass, [u64; 4])>,
 }
+/// The shared [`Bench`]. Panics as [`benchmark_classes`] documents.
 fn bench() -> &'static Bench {
     static BENCH: OnceLock<Bench> = OnceLock::new();
     BENCH.get_or_init(|| {
@@ -350,19 +362,23 @@ fn bench() -> &'static Bench {
         let starter = campaign.player.loadout;
         let mut guns = Vec::new();
         for id in BENCHMARK_GUNS {
-            let Some(index) = content().items.iter().position(|i| i.id.as_str() == id) else {
-                continue;
-            };
+            let index = content()
+                .items
+                .iter()
+                .position(|i| i.id.as_str() == id)
+                .unwrap_or_else(|| panic!("benchmark gun {id} is not in the content catalogue"));
             let definition = &content().items[index];
-            if definition.slot != Slot::Ranged {
-                continue;
-            }
+            assert!(
+                definition.slot == Slot::Ranged,
+                "benchmark gun {id} is not a ranged item"
+            );
             let class = WeaponSpec::from_item(definition).class;
-            if let Ok(item) = campaign.add_item(index) {
-                let mut loadout = starter;
-                loadout[Slot::Ranged.index()] = item;
-                guns.push((class, loadout));
-            }
+            let item = campaign
+                .add_item(index)
+                .unwrap_or_else(|e| panic!("benchmark gun {id} cannot be owned: {e}"));
+            let mut loadout = starter;
+            loadout[Slot::Ranged.index()] = item;
+            guns.push((class, loadout));
         }
         Bench {
             campaign,
@@ -383,8 +399,7 @@ impl Bench {
 }
 
 /// The loadouts a node's firepower is averaged over: its perk classes'
-/// benchmark guns, otherwise every benchmark gun (the starter loadout when
-/// the content has none).
+/// benchmark guns, otherwise every benchmark gun.
 fn guns_for(node: &SkillNode) -> Vec<[u64; 4]> {
     let bench = bench();
     let classes: BTreeSet<WeaponClass> = node
@@ -404,12 +419,7 @@ fn guns_for(node: &SkillNode) -> Vec<[u64; 4]> {
     if !perk.is_empty() {
         return perk;
     }
-    let all: Vec<_> = bench.guns.iter().map(|(_, loadout)| *loadout).collect();
-    if all.is_empty() {
-        vec![bench.starter]
-    } else {
-        all
-    }
+    bench.guns.iter().map(|(_, loadout)| *loadout).collect()
 }
 
 /// One wave-pool archetype at a reference rank, already scaled by the
