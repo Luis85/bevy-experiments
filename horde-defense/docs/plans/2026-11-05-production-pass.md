@@ -443,7 +443,7 @@ The headless loop test (`full_loop_new_game_to_recruit_defends`, W3-28) walks ne
 | EB6 | M | Reap has no death hook. | sim/combat.rs:308-368 | W2-29 |
 | EB7 | B | No elite system. | sim.rs:93-130; enemy_catalog.rs:49-77 | W2-33 |
 | EB8 | M | No affix catalogue. | enemy_catalog.rs:85 | W2-33 |
-| EB9 | M | Boss armor is constant; no phases; no capstone. | director.rs:195-205; sim/combat.rs:102-107 | W2-36, W4-01 |
+| EB9 | M | Boss armor is constant; no phases; no capstone. | director.rs:195-205; sim/combat.rs:102-107 | W2-32 (rank boss armor), W2-36 (phases, the Capstone transition), W4-01 (Capstone multipliers) |
 | EB10 | M | Hard cannot raise elite rate, ramp or phases; Custom normalisation loses the preset. | balance.rs:23-68; campaign.rs:196-208 | W1-29, W2-26 |
 | EB11 | M | Country difficulty spans only 0.94-1.08. | scripts/generate_world.py:99 | W2-38, W2-39 |
 | EB12 | m | The victory-to-threat guard is tested only for some paths. | campaign/world.rs:47 | W2-40 |
