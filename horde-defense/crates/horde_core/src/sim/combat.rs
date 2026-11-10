@@ -735,7 +735,7 @@ impl Game {
                 let dodge = e.injury.dodge(enemy_dodge(a, e));
                 let armor = enemy_armor_vs(a, e, HitSource::Area);
                 let (ht, target) = (enemy_ht(a, e), enemy_name(a, e));
-                let result = rules::resolve_blast(
+                let mut result = rules::resolve_blast(
                     &mut a.rng,
                     Damage {
                         dice: blast.npc_dice,
@@ -748,6 +748,7 @@ impl Game {
                     &mut a.enemies[n].injury,
                     ht,
                 );
+                a.enemies[n].log_hit(&mut result);
                 a.enemies[n].apply_damage(result.injury, Mode::Npc);
                 a.resolved(
                     Some(source),

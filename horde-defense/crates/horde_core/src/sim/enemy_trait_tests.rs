@@ -235,6 +235,12 @@ fn heavy(immune: bool) -> ResolvedEnemy {
 /// combat RNG `rng`, hits one 12-HP heavy (DR 0) beside it. Returns the RNG
 /// after the reap and the heavy.
 fn npc_burst_on_heavy(immune: bool, rng: Rng) -> (Rng, Enemy) {
+    let (rng, e, _) = npc_burst_on_heavy_logged(immune, rng);
+    (rng, e)
+}
+
+/// [`npc_burst_on_heavy`] plus the burst's rule-resolution log line.
+fn npc_burst_on_heavy_logged(immune: bool, rng: Rng) -> (Rng, Enemy, String) {
     let mut g = game(Mode::Npc);
     let mut a = g.attempt.take().unwrap();
     g.spawn_enemy(&mut a, EnemyKind::Shambler, 5, false);
@@ -257,7 +263,8 @@ fn npc_burst_on_heavy(immune: bool, rng: Rng) -> (Rng, Enemy) {
         "the exploder is reaped"
     );
     let e = a.enemies.iter().find(|e| e.id == target).unwrap().clone();
-    (a.rng, e)
+    let line = a.latest_resolution.clone().expect("the burst is logged");
+    (a.rng, e, line)
 }
 
 #[test]
@@ -305,6 +312,43 @@ fn npc_juggernaut_major_wound_clears_stagger_flags_and_matches_draw_count() {
         immune.injury
     );
     assert_eq!(immune.hit_stop_remaining(), 0, "no hit-stop");
+}
+
+/// W2 review: the log of a juggernaut's major wound matches its cleared
+/// stagger flags; it never reports the hostile stunned, knocked down or
+/// disarmed. The plain heavy's line is unchanged.
+#[test]
+fn npc_juggernaut_major_wound_log_reports_no_stagger() {
+    let rng = (1..)
+        .map(Rng::new)
+        .filter(|rng| {
+            let mut probe = *rng;
+            probe.below(100) >= 3
+        })
+        .find(|rng| {
+            let e = npc_burst_on_heavy(false, *rng).1;
+            e.injury.stunned && !e.injury.terminal()
+        })
+        .unwrap();
+    let (_, _, staggered) = npc_burst_on_heavy_logged(false, rng);
+    assert!(
+        staggered.contains("stunned, knocked down, weapon dropped"),
+        "{staggered}"
+    );
+    let (_, immune, line) = npc_burst_on_heavy_logged(true, rng);
+    assert!(!immune.injury.stunned, "{:?}", immune.injury);
+    for word in ["stunned", "knocked down", "weapon dropped"] {
+        assert!(!line.contains(word), "{word} in {line}");
+    }
+    assert!(
+        line.contains("major wound"),
+        "the wound is still logged: {line}"
+    );
+    assert_eq!(
+        line.replace("stagger immune", "stunned, knocked down, weapon dropped"),
+        staggered,
+        "only the stagger consequence differs"
+    );
 }
 
 #[test]

@@ -313,6 +313,14 @@ impl Enemy {
     fn stagger_immune(&self) -> bool {
         !self.boss && self.resolved.as_ref().is_some_and(|r| r.stagger_immune)
     }
+    /// Call on an NPC rules result against this hostile before its log line
+    /// is built: a stagger-immune hostile's major wound is logged without
+    /// the stagger [`Self::apply_damage`] clears (W2 review).
+    fn log_hit(&self, result: &mut rules::AttackResult) {
+        if self.stagger_immune() {
+            result.log_stagger_immune();
+        }
+    }
     fn apply_damage(&mut self, damage: i32, mode: Mode) {
         let immune = self.stagger_immune();
         if mode == Mode::Personal {

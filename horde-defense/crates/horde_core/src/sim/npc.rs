@@ -266,7 +266,7 @@ impl Game {
         let point = [e.x, e.y()];
         let target_name = enemy_name(a, e);
         a.maneuver = NpcManeuver::Attack;
-        let result = rules::resolve_attack(
+        let mut result = rules::resolve_attack(
             &mut a.rng,
             attack,
             Some(dodge),
@@ -274,6 +274,7 @@ impl Game {
             &mut a.enemies[target].injury,
             ht,
         );
+        a.enemies[target].log_hit(&mut result);
         if !melee {
             a.ammo -= 1;
             a.shots += 1;

@@ -363,7 +363,23 @@ impl AttackResult {
         )
     }
 }
+/// The stagger a failed major-wound HT roll logs (see
+/// [`InjuryState::apply_injury`]).
+const MAJOR_WOUND_STAGGER: &str = "stunned, knocked down, weapon dropped";
 impl AttackResult {
+    /// The log of a hit on a stagger-immune target (the juggernaut, W2-30),
+    /// whose stagger flags the simulation clears: a staggering major wound
+    /// reads "stagger immune" instead. Draws nothing; any other consequence,
+    /// unconsciousness included, is kept.
+    pub fn log_stagger_immune(&mut self) {
+        for c in &mut self.conditions {
+            if let Some(head) = c.strip_suffix(MAJOR_WOUND_STAGGER)
+                && head.starts_with("major wound ")
+            {
+                *c = format!("{head}stagger immune");
+            }
+        }
+    }
     /// The log line of a [`resolve_blast`] result, which has no attack roll.
     pub fn blast_explanation(&self) -> String {
         let defense = match (self.defense_roll, self.defense) {
@@ -530,9 +546,7 @@ impl InjuryState {
                 self.stunned = true;
                 self.prone = true;
                 self.weapon_dropped = true;
-                conditions.push(format!(
-                    "major wound {roll}/{ht}: stunned, knocked down, weapon dropped"
-                ));
+                conditions.push(format!("major wound {roll}/{ht}: {MAJOR_WOUND_STAGGER}"));
                 if roll - ht >= 5 || outcome == RollOutcome::CriticalFailure {
                     self.unconscious = true;
                     conditions.push("unconscious from major wound".into());

@@ -99,7 +99,7 @@ impl Game {
                 let dodge = e.injury.dodge(enemy_dodge(a, e));
                 let armor = enemy_armor_vs(a, e, hit);
                 let ht = enemy_ht(a, e);
-                let result = rules::resolve_attack(
+                let mut result = rules::resolve_attack(
                     &mut a.rng,
                     attack,
                     Some(dodge),
@@ -107,6 +107,7 @@ impl Game {
                     &mut a.enemies[target].injury,
                     ht,
                 );
+                a.enemies[target].log_hit(&mut result);
                 if result.requires_ready {
                     a.structures[n].ready_turns = 1;
                 }
