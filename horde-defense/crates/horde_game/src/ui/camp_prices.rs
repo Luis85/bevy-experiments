@@ -15,14 +15,16 @@ pub(super) struct PriceButton {
 }
 
 /// "Buy 1 training CP" for Mara or a recruit (`npc`): one point at the core
-/// training price, while the advancement allowance has room.
+/// training price, while the advancement allowance has room. The hover ends
+/// with the core `Campaign::allowance_raise_hint`.
 pub(super) fn training_point(campaign: &Campaign, npc: &Npc) -> PriceButton {
     let price = campaign.npc_training_price();
     PriceButton {
         label: format!("Buy 1 training CP · {price} coins"),
         enabled: campaign.coins >= price && npc.awarded < campaign.allowance(),
         disabled_hover: format!(
-            "Requires {price} coins and room in the campaign advancement allowance. Clear new stages to raise the allowance."
+            "Requires {price} coins and room in the campaign advancement allowance. {}",
+            campaign.allowance_raise_hint()
         ),
     }
 }
@@ -102,6 +104,17 @@ mod tests {
         assert!(!training_point(game.campaign(), &game.campaign().npc).enabled);
         let (game, _) = camp_at_rank_10(50);
         assert!(training_point(game.campaign(), &game.campaign().npc).enabled);
+    }
+
+    #[test]
+    fn training_hover_names_what_raises_the_allowance() {
+        // Two liberations raise the cap past the first clears (W2-10), so
+        // the hover reads the core hint rather than "clear new stages".
+        let (game, _) = camp_at_rank_10(1_000);
+        let campaign = game.campaign();
+        let hover = training_point(campaign, &campaign.npc).disabled_hover;
+        assert!(hover.ends_with(&campaign.allowance_raise_hint()), "{hover}");
+        assert!(hover.contains("Liberate a country"), "{hover}");
     }
 
     #[test]

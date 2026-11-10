@@ -750,6 +750,35 @@ mod tests {
         assert!(c.validate().is_ok());
     }
     #[test]
+    fn full_allowance_names_liberation_until_the_max_level() {
+        // W2-10: liberations raise the cap too (max(1 + first clears,
+        // 1 + ceil(3L/2))), so the rejection names them, and at the max
+        // level nothing raises it.
+        let mut c = Campaign {
+            coins: 1000,
+            ..Campaign::default()
+        };
+        for _ in 0..12 {
+            c.buy_training_point().unwrap();
+        }
+        let err = c.buy_training_point().unwrap_err();
+        assert!(err.contains("Liberate a country"), "{err}");
+        assert_eq!(
+            err,
+            format!(
+                "Advancement allowance reached. {}",
+                c.allowance_raise_hint()
+            )
+        );
+        let max = crate::defenders::MAX_ADVANCEMENT_LEVEL;
+        c.first_clears = (1..max).map(|i| format!("level_{i}")).collect();
+        assert_eq!(c.advancement_cap_level(), max);
+        c.npc.awarded = c.allowance();
+        let err = c.buy_training_point().unwrap_err();
+        assert!(err.contains("highest"), "{err}");
+        assert!(!err.contains("Liberate"), "{err}");
+    }
+    #[test]
     fn earned_objectives_precede_paid_training() {
         let mut c = Campaign {
             coins: 1000,
