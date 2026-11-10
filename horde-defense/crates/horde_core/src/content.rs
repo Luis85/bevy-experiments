@@ -630,15 +630,13 @@ impl Content {
             }
         }
         // The opening shop sells a tier-1 item for every slot; a loot-only
-        // item never counts, since it is never offered (W2-08). A purchasable
-        // tier-1 item from index 4 on is also in the tier-1 drop pool.
+        // item never counts, since it is never offered (W2-08), nor does NPC
+        // issue, which the drop pool skips. A purchasable non-NPC tier-1 item
+        // from index 4 on is also in the tier-1 drop pool.
         for slot in Slot::ALL {
-            if !self
-                .items
-                .iter()
-                .skip(4)
-                .any(|item| item.slot == slot && item.tier == 1 && item.purchasable())
-            {
+            if !self.items.iter().skip(4).any(|item| {
+                item.slot == slot && item.tier == 1 && item.purchasable() && !item.npc_only
+            }) {
                 return Err(format!(
                     "Missing guaranteed opening shop/loot profile for {:?}",
                     slot
@@ -774,6 +772,23 @@ mod tests {
         match data.validate() {
             Err(error) => assert!(error.contains("Missing guaranteed opening shop"), "{error}"),
             Ok(()) => panic!("a slot with no purchasable tier-1 item validated"),
+        }
+        // NPC issue is purchasable yet never in the drop pool, so it never
+        // counts: with fire_axe (5) NPC-only and the loot-only Melee (29, 30)
+        // moved to tier 2, the tier-1 drop pool holds no Melee.
+        let mut data = content().clone();
+        data.items[5].npc_only = true;
+        data.items[29].tier = 2;
+        data.items[30].tier = 2;
+        assert!(data.items[5].purchasable());
+        assert!(
+            data.drop_pool(1)
+                .iter()
+                .all(|&n| data.items[n].slot != Slot::Melee)
+        );
+        match data.validate() {
+            Err(error) => assert!(error.contains("Missing guaranteed opening shop"), "{error}"),
+            Ok(()) => panic!("an NPC-only tier-1 item counted toward the guarantee"),
         }
         // Loot-only gear must be droppable: tier 1..=4, never a starter and
         // never NPC-only (the drop pool skips both). Each row keeps the
