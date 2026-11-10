@@ -333,6 +333,41 @@
     "driver_stalls": { "acc-dev-vsync-progressed-peak": 15, "acc-dev-novsync": 48, "acc-playtest-novsync": 48 },
     "low_latency": { "evidence": "target/perf/w1-61/head-low-latency-playtest", "commit": "199d823", "requested_mode": "Mailbox", "source": "settings", "pipelined_rendering": false },
     "shipped_smoke_seconds": { "median": 1.257, "runs": [2.719, 1.245, 1.257], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w1-review2/acc-playtest-novsync/shipped" },
+    "w2_47": {
+      "note": "W2-47 re-gate on the wave-2 stress fixture (all 18 catalogue archetypes, elites, the last wave tier, the boss's phase state), 2026-11-09 22:25 to 2026-11-10 02:27 UTC; informational, the script never reads it, and perf_budget_records_the_w2_47_regate pins it. Every pass ran with the R27 display hold and the R30 quiet window and load check, on a machine shared with another session's cargo builds and tests. exit is measure_performance's exit over the scene groups kept: a group with an invalid run after the one rerun (a CPU load sample of 90% or more, or an unreadable one) was re-measured as a whole group, and the first invocation's exit is under invocations. The executables are HEAD's sources (the bin is unchanged since 0213760); the dev and playtest exes were rebuilt once after the A/B fix's cargo clean, so two hashes each. VALIDATION.md 'W2-47 re-gate on the wave-2 stress fixture'.",
+      "commit": "bd12d1c",
+      "passes": {
+        "dev-novsync": { "command": "-Scene all -Profile dev -VsyncOff -Repeat 3", "exit": 0, "evidence": ["target/perf/w2-47/gate-dev-novsync-b"], "invocations": { "gate-dev-novsync": 2, "gate-dev-novsync-b": 0 } },
+        "playtest-novsync": { "command": "-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke", "exit": 0, "evidence": ["target/perf/w2-47/gate-playtest-novsync"], "invocations": { "gate-playtest-novsync": 0 } },
+        "dev-vsync": { "command": "-Scene all -Profile dev -Repeat 3", "exit": 0, "evidence": ["target/perf/w2-47/gate-dev-vsync", "target/perf/w2-47/gate-dev-vsync-stress-b"], "invocations": { "gate-dev-vsync": 2, "gate-dev-vsync-stress-b": 0 } },
+        "playtest-vsync": { "command": "-Scene all -Profile playtest -Repeat 3", "exit": 0, "evidence": ["target/perf/w2-47/gate-playtest-vsync", "target/perf/w2-47/gate-playtest-vsync-progressed-peak-b"], "invocations": { "gate-playtest-vsync": 2, "gate-playtest-vsync-progressed-peak-b": 0 } }
+      },
+      "executables_sha256": { "dev": ["dc17010c", "79f0cbc8"], "playtest": ["ccd7c287", "8076c139"] },
+      "load_percent_max_during_runs": { "dev-novsync": 83, "playtest-novsync": 73, "dev-vsync": 69, "playtest-vsync": 73 },
+      "cpu_frame_p99_ms": {
+        "dev": { "progressed-peak": { "normal": 7.158, "small": 7.2073 }, "stress": { "normal": 8.4624, "small": 9.6467 } },
+        "playtest": { "progressed-peak": { "normal": 6.798, "small": 6.9808 }, "stress": { "normal": 7.6794, "small": 7.1732 } }
+      },
+      "interface_draw_mean_ms": { "progressed-peak": { "normal": 1.0264, "small": 0.9917 }, "peak": { "normal": 0.8162, "small": 0.7825 } },
+      "interface_total_mean_ms": { "progressed-peak": { "normal": 1.9663, "small": 1.7993 } },
+      "frames_over_50ms_worst": 0,
+      "frames_over_33ms_worst": 0,
+      "driver_stalls": 0,
+      "shipped_default_vsync_stress": { "evidence": "target/perf/w2-47/gate-playtest-vsync", "mean_fps": { "normal": 60.0001, "small": 60.0002 }, "p99_frame_ms": { "normal": 17.9966, "small": 19.5346 }, "frames_over_50ms_worst": 0, "frames_over_33ms_worst": 0 },
+      "interface_total_ab": {
+        "ruling": "R31",
+        "evidence": "target/perf/w2-47/ab-interface-total-c",
+        "invalid_attempts": { "ab-interface-total": "both arms ran ab03da9 (the A/B build bug, fixed in bd12d1c)", "ab-interface-total-b": "pairs 4-5 invalid on CPU load samples of 100%" },
+        "a_commit": "ab03da9",
+        "a_sha256": "5ce1c87a3354904dea4244dc72f8e6cd97f27b64427eac997c6d9b34dff6e465",
+        "b_sha256": "79f0cbc8cb5ceb0d8c8e094c4aed577fd2e6ffe300ce6caa4493044c7f77708b",
+        "pairs": 5,
+        "tolerance": 1.05,
+        "normal": { "a_median": 2.133, "b_median": 2.0523, "ratio": 0.9622 },
+        "small": { "a_median": 2.067, "b_median": 1.9915, "ratio": 0.9634 }
+      },
+      "shipped_smoke_seconds": { "median": 0.925, "runs": [2.605, 0.909, 0.925], "build": "--profile playtest --no-default-features", "evidence": "target/perf/w2-47/gate-playtest-novsync/shipped" }
+    },
     "w1_review_867f786": {
       "note": "First Goal-1 re-run in the W1 review (867f786, 2026-11-07 17:07-17:30 UTC), with two extra dev VSync-on passes (peak, stress). The stress pass exited 1 on one gated frame (stress normal r1, sample 932, 54.74 ms, acquire share 0.794, directly after three ~1,000 ms stalls; W2-50). VALIDATION.md 'Goal-1 acceptance re-run at HEAD'.",
       "commit": "867f786",

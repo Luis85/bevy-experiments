@@ -917,6 +917,90 @@ mod tests {
         assert_eq!(listed, kept, "baseline.v3.kept_previous");
     }
 
+    /// W2-47: the wave-2 re-gate on the new stress fixture is recorded in
+    /// `acceptance.w2_47`. Every pass it lists exited 0 (Done: dev and
+    /// playtest `-Scene stress -VsyncOff`), its cpu_frame p99 medians and
+    /// worst frames over 50 ms meet the live gates, and the R31 A/B ran two
+    /// different executables with B's median at most 1.05 x A's per size.
+    #[test]
+    fn perf_budget_records_the_w2_47_regate() {
+        let json = budget();
+        let path = "/acceptance/w2_47";
+        let commit = json
+            .pointer(&format!("{path}/commit"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        assert!(
+            commit.len() >= 7 && commit.chars().all(|c| c.is_ascii_hexdigit()),
+            "acceptance.w2_47.commit names the measured commit: {commit:?}"
+        );
+        let passes = object(&json, &format!("{path}/passes"));
+        for required in [
+            "dev-novsync",
+            "playtest-novsync",
+            "dev-vsync",
+            "playtest-vsync",
+        ] {
+            assert!(passes.contains_key(required), "passes/{required}");
+        }
+        for (name, pass) in passes {
+            assert_eq!(
+                pass.get("exit").and_then(Value::as_u64),
+                Some(0),
+                "passes/{name} exits 0"
+            );
+            let evidence = pass.get("evidence").and_then(Value::as_array);
+            assert!(
+                evidence.is_some_and(|paths| !paths.is_empty()
+                    && paths.iter().all(|p| p
+                        .as_str()
+                        .is_some_and(|p| p.starts_with("target/perf/w2-47/")))),
+                "passes/{name}: evidence under target/perf/w2-47/"
+            );
+        }
+        for profile in ["dev", "playtest"] {
+            for scene in CPU_GATED_SCENES {
+                for size in keys(object(&json, "/sizes")) {
+                    let p99 = number(
+                        &json,
+                        &format!("{path}/cpu_frame_p99_ms/{profile}/{scene}/{size}"),
+                    );
+                    assert!(
+                        p99 <= CPU_FRAME_P99_MS_MAX,
+                        "{profile} {scene} {size}: cpu_frame p99 {p99}"
+                    );
+                }
+            }
+        }
+        // The gate allows none, so at most the gate is exactly it.
+        assert_eq!(
+            whole(&json, &format!("{path}/frames_over_50ms_worst")),
+            FRAMES_OVER_50MS_MAX,
+            "frames over 50 ms outside driver stalls, worst repeat"
+        );
+        let ab = format!("{path}/interface_total_ab");
+        let sha = |arm: &str| {
+            json.pointer(&format!("{ab}/{arm}_sha256"))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_owned()
+        };
+        assert!(
+            sha("a").len() == 64 && sha("b").len() == 64 && sha("a") != sha("b"),
+            "the A/B measured two executables"
+        );
+        let tolerance = number(&json, &format!("{ab}/tolerance"));
+        assert_eq!(tolerance, 1.05, "R31");
+        for size in keys(object(&json, "/sizes")) {
+            let a = number(&json, &format!("{ab}/{size}/a_median"));
+            let b = number(&json, &format!("{ab}/{size}/b_median"));
+            assert!(
+                a > 0.0 && b <= tolerance * a,
+                "{size}: B {b} over {tolerance} x A {a}"
+            );
+        }
+    }
+
     const VALIDATION: &str = include_str!("../../../docs/VALIDATION.md");
 
     /// W1-61, the user ruling on gate 3 ("Exclude driver stalls"): the

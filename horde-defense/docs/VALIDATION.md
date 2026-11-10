@@ -1153,6 +1153,49 @@ The episode therefore coincides with someone using the machine during the run. I
 
 **Test.** `perf_budget_v3_baseline_is_re_measured_on_the_7abb0ab_spans` pins this: the spans marker, the same renderer commit as `previous`, the W1-37 values verbatim under `previous` under the same conditions, W2-47 evidence for the gate run and every `runs` state, and for each cell `interface_total_mean_ms` = the measured median, except a gated cell above the previous value, which keeps it and is listed in `kept_previous`.
 
+## W2-47 re-gate on the wave-2 stress fixture — 9-10 November 2026
+
+W2-47's Done is `-Scene stress -VsyncOff` (dev and playtest) exiting 0 on the new stress fixture (every catalogue archetype, elites, the last wave tier and the boss's phase state). The re-gate also covers the W1-61 gate passes, the R31 interface_total A/B and the R18 items. No gate, threshold or rule was changed. Evidence: `target/perf/w2-47/gate-*` and `ab-interface-total-*` (not committed); the numbers are in `PERF_BUDGET.json acceptance.w2_47`, which `perf_budget_records_the_w2_47_regate` pins.
+
+**Conditions.**
+- HEAD's sources (the bin is unchanged since 0213760; the passes ran at 43184d1 and bd12d1c, which change only tests, docs and scripts).
+- RTX 1000 Ada, Vulkan, mains, power plan Balanced, 1440x900 @ 1.0 and 1050x700 @ 1.35. 2026-11-09 22:25 to 2026-11-10 02:27 UTC.
+- Every pass held the display on (R27; no Kernel-Power 506/507 event fell in a kept run) and started after an R30 quiet window. Another session ran cargo builds, tests and cargo-nextest on this machine all night, so windows took up to 19 minutes and some runs were rejected on CPU load samples of 90-100% (or an unreadable sample). A scene group with an invalid run after the one rerun was re-measured as a whole group, as W1-37 did; the kept runs' load maxima were 69-83% per pass.
+- The dev and playtest exes were rebuilt once, after the A/B fix's `cargo clean`: dev `dc17010c…` then `79f0cbc8…`, playtest `ccd7c287…` then `8076c139…`, from the same sources.
+
+| Pass | Command | Exit | Invocations | Gate | normal | small | Limit |
+|---|---|---|---|---|---|---|---|
+| dev -VsyncOff | `-Scene all -Profile dev -VsyncOff -Repeat 3` | 0 | `gate-dev-novsync` 2, `gate-dev-novsync-b` 0 | cpu_frame p99 progressed-peak / stress (ms) | 7.16 / 8.46 | 7.21 / 9.65 | ≤ 10.0 |
+| playtest -VsyncOff | `-Scene all -Profile playtest -VsyncOff -Repeat 3 -ShippedSmoke` | 0 | `gate-playtest-novsync` 0 | cpu_frame p99 progressed-peak / stress (ms) | 6.80 / 7.68 | 6.98 / 7.17 | ≤ 10.0 |
+| dev VSync on | `-Scene all -Profile dev -Repeat 3` | 0 | `gate-dev-vsync` 2 (one stress run with an unreadable load sample), `gate-dev-vsync-stress-b` 0 | progressed-peak interface_draw mean (ms) | 1.0264 | 0.9917 | ≤ 1.129 / 1.030 |
+| | | | | peak interface_draw mean (ms) | 0.8162 | 0.7825 | ≤ 1.1904 / 1.0752 |
+| | | | | progressed-peak interface_total mean (ms) | 1.9663 | 1.7993 | ≤ 4.6447 / 4.5895 (baseline.v3, R22) |
+| playtest VSync on | `-Scene all -Profile playtest -Repeat 3` | 0 | `gate-playtest-vsync` 2 (progressed-peak small, 100% load three times), `gate-playtest-vsync-progressed-peak-b` 0 | frames over 50 ms, all scenes (worst) | 0 | 0 | 0 |
+
+- **Done is met.** `-Scene stress -VsyncOff` exits 0 in dev and playtest: dev stress 8.46 / 9.65 ms, playtest 7.68 / 7.17 ms. The first dev pass exited 2: four runs had CPU load samples of 90-100% during a foreign build, and the valid progressed-peak small repeats ran at 44-49% mean load (median p99 12.76 ms, over). Its valid repeats spread from 7.1 to 24.6 ms, against 6.3-11.2 ms per repeat (medians 6.4-9.6 ms) in the rerun, so the pass was rerun as a whole and passed.
+- Every pass had 0 frames over 50 ms and 0 over 33 ms outside driver stalls in every kept repeat, and 0 driver stalls: with the display held on, the stall class W2-50 attributed to display-off is gone.
+- The battlefield egui gates (live, W2-47) held in every pass: 18 / 19 / 21 primitives (peak / progressed-peak / stress) of 24, at most 38,524 progressed-peak vertices of 40,000 and 46,702 stress vertices of 61,098.
+- Against the W1 review attempt 2 (bee4236, wave-1 content): cpu_frame p99 dev stress rose from 7.30 / 7.28 to 8.46 / 9.65 ms and playtest from 6.43 / 6.28 to 7.68 / 7.17 ms; progressed-peak is about the same (dev 6.77 / 6.63 to 7.16 / 7.21). The new fixture draws 18 archetypes and 69 elites at the last wave tier. Dev stress small is 0.35 ms under the gate; W5-11 should watch it.
+- progressed-peak dev VSync-on interface_draw is 1.026 / 0.992 ms (W1 review 0.998 / 0.989), 9.1% / 3.7% under the gates.
+- Shipped smoke (`gate-playtest-novsync/shipped`): 2.61, 0.91 and 0.93 s, median 0.93 s (W1 review 1.26). The first, cold run is again the slow one.
+
+**interface_total A/B (R31).** `ab-interface-total-c` (2026-11-10 02:19-02:27 UTC), A `5ce1c87a…` (ab03da9) and B `79f0cbc8…` (HEAD), 5 pairs per size, every run valid:
+
+| Size | A median | B median | B / A | Limit |
+|---|---|---|---|---|
+| normal | 2.133 | 2.052 | 0.962 | ≤ 1.05 |
+| small | 2.067 | 1.992 | 0.963 | ≤ 1.05 |
+
+The two earlier sittings are not evidence: `ab-interface-total` measured A twice (the build bug in "The first A/B measured A twice" above), and `ab-interface-total-b` (the fixed script, its own builds) lost pairs 4 and 5 to 100% CPU load samples. `-c` reused `-b`'s two executables with `-NoBuild`. B's reports carry the battlefield counts and A's do not, so the arms are the ones named. interface_total on HEAD is 4% under the wave-1 close at both sizes, so the wave-2 content added no interface_total cost on the gate's scene.
+
+**Gate 3 in the shipped default configuration (R26).** R26 lets gate 3 be claimed in the shipped default configuration once this re-gate passes. It passes: `gate-playtest-vsync` stress (playtest, pipelined on, VSync on, the shipped default) ran at 60.00 FPS at both sizes with 0 frames over 50 ms and 0 over 33 ms outside driver stalls, 0 driver stalls, p99 intervals 18.00 / 19.53 ms. Every other VSync-on and VSync-off pass above also had 0 frames over 50 ms. Gate 3 is claimed for HEAD in dev and playtest, VSync on and off.
+
+**The R18 items.**
+- The sustained 15-20 FPS VSync-on stress episode: closed by R26 (environmental). None of the 17 valid VSync-on stress repeats here showed it.
+- The 1050x700@1.35 VSync-on p99 interval of 19.1-19.7 ms: measured, and it is not a property of the small size. In the 22:48-23:16 UTC passes the small size had 19.53-19.95 ms against the normal size's 17.61-18.72 ms. In the 01:27-02:18 UTC reruns it was 17.56 ms (dev stress) and 17.70 ms (playtest progressed-peak), against 17.54 / 17.48 ms at the normal size. The extra tail is in the swap-chain acquire, not in the process: dev stress small present_wait p99 16.2-16.6 ms in the wide runs and 13.4-13.5 ms in the narrow ones, while main and render-world CPU p99 stayed at 4.3-5.6 ms. Mean FPS was 60.00 throughout. What makes the presentation of the smaller-than-the-panel window wider at some hours is not named. It gates nothing: 17.7 ms is only the pipelined decision's threshold, and that decision stays as recorded.
+- The script-level battlefield primitive and vertex gates: landed earlier in W2-47 and held live in every pass (above).
+- The egui_probe/present_wait span ordering, including baseline.v3: re-measured (see "baseline.v3 on the 7abb0ab spans" above). No other span-ordering item is open.
+
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 
 W1-49 is done when `battlefield_paint` does not grow over the stress run, and the perf design asks for `settled_corpses_drawn` in stress. Neither number had been written down: the W1-49 commits had only headless cache tests.
