@@ -257,6 +257,8 @@ There is no RNG draw, and the two are always distinct.
 
 The value is never below the legacy `12 + 8·first_clears`, so v1-v6 ledgers still pass `validate_npc` (progression.rs:826). At L = 0 it equals the legacy value, so GOLDEN, smoke and the 3 solo pacing profiles cannot move.
 
+*As built (W2 review, 4b4dc4a):* the cap is `min(10, max(1 + first_clears, 1 + ceil(3L/2)))`, so it stops at level 10 (allowance 84) whatever the first clears. It is never below the legacy value up to 9 first clears, which covers today's 5-level catalogue (`allowance_stops_growing_at_the_max_level_whatever_the_first_clears`).
+
 `Npc::advancement_level() -> u8` = the smallest n in 1..=10 with `12 + 8(n−1) ≥ awarded`. The UI shows "Lv 4 · cap 7 · awarded/allowance CP".
 
 Performance: rewrite `liberated_count()` (progression.rs:407-422) over `world.cleared ∪ clear_high_water.keys()` through a `OnceLock` country-id index. `allowance()` runs every tick (strategy.rs:592), and the current function scans 242 countries. The result must be identical (test).
