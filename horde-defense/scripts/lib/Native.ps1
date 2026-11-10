@@ -79,7 +79,8 @@ function Invoke-Native {
     # process has exited or been killed, so a hung capture does not leak one.
     # -Sample runs a scriptblock beside the process (R30, the per-run load sampler): once right after the start, then
     # every -SampleMilliseconds until the exit or the timeout. It runs in this function's scope chain, so it reaches the
-    # caller's state through $script: or a variable name this function does not use (such as $process, $watch or $left).
+    # caller's state through $script: or a variable name this function does not itself use (not $process, $watch, $left
+    # or its other locals).
     [CmdletBinding()]
     param(
         [Parameter(Mandatory = $true)][string]$FilePath,
