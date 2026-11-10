@@ -137,10 +137,15 @@ struct LiveLoad {
 }
 
 /// Runs `scene`'s perf fixture unpaused for `ticks` ticks with no input and
-/// paints its battlefield in `rect` on every `stride`-th tick.
+/// paints its battlefield in `rect` on every tick `paint` selects.
 /// `stress-5000-corpses` is the stress fixture with both corpse draw caps
 /// full ([`stage_bodies`], which moves the attempt to tick 1,000,000 first).
-fn live_battlefield_load(scene: &str, ticks: usize, stride: usize, rect: Rect) -> LiveLoad {
+fn live_battlefield_load(
+    scene: &str,
+    ticks: usize,
+    paint: &dyn Fn(usize) -> bool,
+    rect: Rect,
+) -> LiveLoad {
     let mut game = match scene {
         "peak" => horde_core::sim::peak_render_fixture(),
         "progressed-peak" => horde_core::sim::maximum_progression_render_fixture(),
@@ -165,7 +170,7 @@ fn live_battlefield_load(scene: &str, ticks: usize, stride: usize, rect: Rect) -
         vertices_max_tick: 0,
     };
     for tick in 0..=ticks {
-        if tick % stride == 0 {
+        if paint(tick) {
             let primitives = battlefield_primitives_in(&game, textures(), rect);
             if primitives.len() > load.primitives_max {
                 (load.primitives_max, load.primitives_max_tick) = (primitives.len(), tick);
@@ -223,20 +228,83 @@ fn assert_live_load_within_gates(scene: &str, size: &str, ticks: usize, load: &L
 /// gated perf fixture's sim run, painted at the normal arena, stay within
 /// `BATTLEFIELD_PRIMITIVES_MAX` and the scene's vertex gate, so a live frame
 /// (event FX, not only the static fixture) that crosses a gate fails here.
-/// Every maximum the full-length `measure_battlefield_egui_load` records is
-/// first painted by tick 420, on an even tick (`PERF_BUDGET.json`
-/// `evidence.egui_measured.max_tick_by_scene`: stress primitives at tick 2,
-/// stress-5000-corpses vertices at tick 142). So these shorter runs paint
-/// every 2nd tick, the measurement's own stride, and reach every measured
-/// maximum (R22; the W1-51 runs painted every 10th tick, which misses those
-/// two).
+/// Each run paints every 2nd tick, the measurement's own stride, of the
+/// first 420 (R22; the W1-51 runs painted every 10th tick, which missed the
+/// stress primitive maximum at tick 2) and also the exact ticks the
+/// full-length `measure_battlefield_egui_load` first painted its maxima at
+/// (`PERF_BUDGET.json` `evidence.egui_measured.max_tick_by_scene`), running
+/// to the latest of them. On the W2-47 stress fixture the stress vertex
+/// maxima fall at ticks 1980 and 1700 (full corpse caps), past tick 420.
 #[test]
 fn live_battlefield_runs_stay_within_the_egui_gates() {
-    const LIVE_GATE_TICKS: usize = 420;
-    const LIVE_GATE_STRIDE: usize = 2;
-    for scene in ["progressed-peak", "stress", "stress-5000-corpses"] {
-        let load = live_battlefield_load(scene, LIVE_GATE_TICKS, LIVE_GATE_STRIDE, arena());
-        assert_live_load_within_gates(scene, "normal", LIVE_GATE_TICKS, &load);
+    for scene in LIVE_GATED_SCENES {
+        let plan = live_gate_plan(scene);
+        let load = live_battlefield_load(scene, plan.ticks, &|tick| plan.paints(tick), arena());
+        assert_live_load_within_gates(scene, "normal", plan.ticks, &load);
+    }
+}
+
+/// The perf scenes the live gate runs.
+const LIVE_GATED_SCENES: [&str; 3] = ["progressed-peak", "stress", "stress-5000-corpses"];
+/// The live gate paints every `LIVE_GATE_STRIDE`-th tick (the measurement's
+/// own stride) of the first `LIVE_GATE_TICKS`.
+const LIVE_GATE_TICKS: usize = 420;
+const LIVE_GATE_STRIDE: usize = 2;
+
+/// The ticks the live gate runs and paints for one scene: every 2nd tick of
+/// the first 420, plus each recorded maximum tick, running to the latest.
+struct LiveGatePlan {
+    ticks: usize,
+    maxima: Vec<usize>,
+}
+
+impl LiveGatePlan {
+    fn paints(&self, tick: usize) -> bool {
+        tick <= self.ticks
+            && ((tick <= LIVE_GATE_TICKS && tick.is_multiple_of(LIVE_GATE_STRIDE))
+                || self.maxima.contains(&tick))
+    }
+}
+
+fn live_gate_plan(scene: &str) -> LiveGatePlan {
+    let maxima = recorded_max_ticks(scene);
+    let ticks = maxima.iter().copied().fold(LIVE_GATE_TICKS, usize::max);
+    LiveGatePlan { ticks, maxima }
+}
+
+/// `PERF_BUDGET.json` `evidence.egui_measured.max_tick_by_scene` for `scene`:
+/// the ticks the full-length measurement first painted its primitive and
+/// vertex maxima at.
+fn recorded_max_ticks(scene: &str) -> Vec<usize> {
+    const BUDGET: &str = include_str!("../../../../../docs/PERF_BUDGET.json");
+    let json: serde_json::Value = serde_json::from_str(BUDGET).expect("PERF_BUDGET.json parses");
+    ["primitives", "vertices"]
+        .iter()
+        .map(|kind| {
+            let path = format!("/evidence/egui_measured/max_tick_by_scene/{scene}/{kind}");
+            json.pointer(&path)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|tick| usize::try_from(tick).ok())
+                .unwrap_or_else(|| panic!("PERF_BUDGET.json {path} is not a tick"))
+        })
+        .collect()
+}
+
+/// W2 review (perf-diagnostics): the live gate reaches every maximum the
+/// recorded measurement found, wherever the current fixtures put it. Since
+/// the W2-47 stress fixture the stress vertex maxima fall late in the run
+/// (tick 1980, and 1700 with full corpse caps), past the first 420 ticks.
+#[test]
+fn live_battlefield_gate_paints_every_recorded_maximum_tick() {
+    for scene in LIVE_GATED_SCENES {
+        let plan = live_gate_plan(scene);
+        for tick in recorded_max_ticks(scene) {
+            assert!(
+                plan.paints(tick),
+                "{scene}: the live gate (first {} ticks) never paints recorded maximum tick {tick}",
+                plan.ticks
+            );
+        }
     }
 }
 
@@ -257,7 +325,7 @@ fn measure_battlefield_egui_load() {
         ("stress-5000-corpses", 1980),
     ] {
         for (size, rect) in [("normal", arena()), ("small", small)] {
-            let load = live_battlefield_load(scene, ticks, 2, rect);
+            let load = live_battlefield_load(scene, ticks, &|tick| tick % 2 == 0, rect);
             println!(
                 "W1-51 {scene} {size}: ticks {} primitives {} (tick {}) vertices {} (tick {})",
                 load.ticks_run,

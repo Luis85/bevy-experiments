@@ -285,8 +285,8 @@
       }
     },
     "egui_measured": {
-      "note": "W1-51, with ruling R22 (wave-1 close, gates only tighten): each egui gate is min(W1-32 ceiling, ceil(measured max x factor), the gate it replaces in previous.gates); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn; that case starts from tick 1,000,000, the tick stage_bodies sets, not from the fixture schedule). These are the post-W1-69 maxima (normal arena; the small arena is lower in every case). Every run simulated all its ticks (780, 780, 1980, 1980) and every maximum was first painted by tick 420, on an even tick (max_tick_by_scene). live_battlefield_runs_stay_within_the_egui_gates gates the first 420 ticks of progressed-peak, stress and stress-5000-corpses at the normal arena, painted every 2nd tick, so it reaches every maximum here; the re-measure asserts full length and the gates. Re-derived: primitives 19 x 1.25 -> 24 (was 48); progressed-peak vertices stay at the 40000 ceiling; stress vertices 49502 x 1.25 = 61878 is above the 61098 it would replace, so the gate stays 61098. The same re-measure on a4328d4 (the W1 review head before the R12-R23 commits) gave identical maxima and ticks. Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
-      "commit": "4d599a5",
+      "note": "W1-51, with ruling R22 (wave-1 close, gates only tighten): each egui gate is min(W1-32 ceiling, ceil(measured max x factor), the gate it replaces in previous.gates); perf_budget.rs pins the rule. Battlefield painter only (its arena clip), headless, every 2nd tick of a sim run from each review fixture (warmup_frames + run.frames ticks), at the normal 1392x692 and small 729.8x310.5 arenas; stress also with 5000 corpse records (2048 settled + 64 collapsing drawn; that case starts from tick 1,000,000, the tick stage_bodies sets, not from the fixture schedule). W2 review (perf-diagnostics): re-measured at 776075c, on the W2-47 stress fixture (787929f: every catalogue archetype, elites, the last wave tier); the 4d599a5 post-W1-69 maxima are kept verbatim under w1_69. These are the maxima at the normal arena; the small arena is lower in every case (peak 27664, progressed-peak 33516, stress 46334, stress-5000-corpses 47645 vertices; 19 primitives each). Every run simulated all its ticks (780, 780, 1980, 1980) and every maximum was first painted on an even tick (max_tick_by_scene). On the new fixture the stress vertex maxima fall late (tick 1980, and 1700 with full corpse caps), no longer by tick 420. live_battlefield_runs_stay_within_the_egui_gates gates progressed-peak, stress and stress-5000-corpses at the normal arena, painted every 2nd tick of the first 420 and at each scene's recorded max_tick_by_scene ticks (R22: or the exact maxima ticks), running to the latest of them, so it reaches every maximum here; live_battlefield_gate_paints_every_recorded_maximum_tick pins that, and the re-measure asserts full length and the gates. Re-derived, no gate moves: primitives 19 x 1.25 -> 24; progressed-peak vertices 38524 x 1.25 stays at the 40000 ceiling; stress vertices 52325 x 1.25 = 65407 is above the 61098 it would replace, so the gate stays 61098. Re-measure: cargo test --locked -p horde-defense --bin horde-defense measure_battlefield_egui_load -- --ignored --nocapture",
+      "commit": "776075c",
       "factor": 1.25,
       "ceilings": {
         "battlefield_primitives_max": 48,
@@ -294,13 +294,27 @@
       },
       "battlefield_primitives_max": 19,
       "battlefield_primitives_by_scene": { "peak": 19, "progressed-peak": 19, "stress": 19, "stress-5000-corpses": 19 },
-      "battlefield_vertices_max": { "progressed-peak": 38819, "stress": 49502 },
-      "battlefield_vertices_by_scene": { "peak": 32675, "progressed-peak": 38819, "stress": 47435, "stress-5000-corpses": 49502 },
+      "battlefield_vertices_max": { "progressed-peak": 38524, "stress": 52325 },
+      "battlefield_vertices_by_scene": { "peak": 32624, "progressed-peak": 38524, "stress": 51014, "stress-5000-corpses": 52325 },
       "max_tick_by_scene": {
-        "peak": { "primitives": 120, "vertices": 120 },
-        "progressed-peak": { "primitives": 60, "vertices": 360 },
-        "stress": { "primitives": 2, "vertices": 300 },
-        "stress-5000-corpses": { "primitives": 2, "vertices": 142 }
+        "peak": { "primitives": 60, "vertices": 300 },
+        "progressed-peak": { "primitives": 60, "vertices": 300 },
+        "stress": { "primitives": 2, "vertices": 1980 },
+        "stress-5000-corpses": { "primitives": 2, "vertices": 1700 }
+      },
+      "w1_69": {
+        "note": "The post-W1-69 measurement at 4d599a5, on the wave-1 stress fixture, which egui_measured held until the W2 review re-measure. Its every maximum was first painted by tick 420, so the live gate then painted only the first 420 ticks.",
+        "commit": "4d599a5",
+        "battlefield_primitives_max": 19,
+        "battlefield_primitives_by_scene": { "peak": 19, "progressed-peak": 19, "stress": 19, "stress-5000-corpses": 19 },
+        "battlefield_vertices_max": { "progressed-peak": 38819, "stress": 49502 },
+        "battlefield_vertices_by_scene": { "peak": 32675, "progressed-peak": 38819, "stress": 47435, "stress-5000-corpses": 49502 },
+        "max_tick_by_scene": {
+          "peak": { "primitives": 120, "vertices": 120 },
+          "progressed-peak": { "primitives": 60, "vertices": 360 },
+          "stress": { "primitives": 2, "vertices": 300 },
+          "stress-5000-corpses": { "primitives": 2, "vertices": 142 }
+        }
       },
       "previous": {
         "note": "The W1-51 measurement at a93e340, before W1-64 to W1-69, and the gates derived from it, which were live until R22. Every maximum fell on a tick divisible by 20 then, so the live gate painted every 10th tick. Under R22 a re-derived gate is never above these.",
