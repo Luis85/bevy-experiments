@@ -25,12 +25,12 @@
 use super::targets::{run_cell, verdict};
 use super::{
     CampSpend, Milestone, PacingDefender, PacingFarm, PacingProfile, PacingReport, PacingSell,
-    PacingSpend, RunBook, lower_quantile, pacing_input, pacing_start, structure_placements,
-    sweep_with_threads,
+    PacingSpend, RunBook, buy_and_equip, lower_quantile, pacing_input, pacing_start,
+    structure_placements, sweep_with_threads,
 };
 use crate::balance::BalanceSettings;
 use crate::command::{Command, CommandError, CommandOutcome};
-use crate::content::{ItemDefId, Mode};
+use crate::content::Mode;
 use crate::defenders::DefenderId;
 use crate::sim::smoke::smoke_buy_gear_with;
 use crate::sim::{Game, Input, TICKS_PER_SECOND};
@@ -523,17 +523,9 @@ impl Bot<'_> {
     fn gear(&mut self) -> Result<(), String> {
         let (g, trace) = (&mut self.g, &mut self.trace);
         smoke_buy_gear_with(g, Mode::Personal, |g, definition| {
-            let buy = Command::BuyItem(ItemDefId::at(definition));
-            record(trace, StrategyStep::Command(buy.clone()));
-            let CommandOutcome::Id(id) = g.apply(&buy).map_err(|e| e.to_string())? else {
-                return Err("BuyItem answered without an item id".to_owned());
-            };
-            let equip = Command::Equip {
-                mode: Mode::Personal,
-                id,
-            };
-            record(trace, StrategyStep::Command(equip.clone()));
-            g.apply(&equip).map(|_| ()).map_err(|e| e.to_string())
+            buy_and_equip(g, definition, |command| {
+                record(trace, StrategyStep::Command(command.clone()));
+            })
         })
     }
     /// The profile's camp spending, through commands, in the solo order.

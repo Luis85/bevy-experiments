@@ -8,12 +8,18 @@
 //! milestone statistics over seeds ([`MilestoneStats`]). Other remits add
 //! registry rows and evaluators on this API. The goal-5 evaluators (W2-03)
 //! live in [`targets`], the goal-6 rows' evaluators (W2-04) in [`goal6`].
-//! The plans that sell, farm or hand the main run to a recruit (W2-42) take
-//! their own steps (equip, sell, recruit, next defender and the replay or
-//! frontier deploy) through `Game::apply`. Like every non-strategy plan,
-//! they still continue the journey with `Game::continue_journey` and enter
-//! the next country with `Campaign::enter_country` directly; routing those
-//! through commands would move pacing and need plan §9.6 rows (R28). The
+//! Every plan takes its camp steps through `Game::apply`: the difficulty
+//! (SetBalance), the survivor (ChooseSurvivor), the skill nodes
+//! (BuySkillNode) and the gear (BuyItem and Equip). The plans that sell,
+//! farm or hand the main run to a recruit (W2-42) also equip, sell, recruit,
+//! set the next defender and take the replay or frontier deploy through it.
+//! As built (W2 review), the non-strategy loop still calls the rest
+//! directly: `Campaign::choose_start_country` (ChooseStart would also deploy
+//! stage 0 and pause), `Game::continue_journey`, `Campaign::enter_country`,
+//! the Survivor plan's own `Game::deploy_country_stage` (Deploy would also
+//! unpause before the structures are placed), and the battle controls
+//! (`Game::place`, `set_paused`, `withdraw`). Routing those through
+//! commands could move pacing and would need plan §9.6 rows (R28). The
 //! strategy rows and their goal-3 evaluators (W2-43, ruling P7) live in
 //! [`strategy`]: a plan with a [`StrategyPlan`] is played by a bot that
 //! acts only through commands.
@@ -43,10 +49,11 @@ pub use targets::{
     tree_outlasts_liberation, unlock_order,
 };
 
-use super::smoke::smoke_buy_gear;
+use super::smoke::smoke_buy_gear_with;
 use super::*;
 use crate::balance::{BalancePreset, BalanceSettings};
-use crate::command::Command;
+use crate::command::{Command, CommandOutcome};
+use crate::content::ItemDefId;
 use crate::enemy_catalog::enemy_catalog;
 use crate::skill_catalog::{CampaignFeature, SkillNode, skills};
 use std::collections::BTreeMap;
@@ -677,10 +684,37 @@ fn learn_recommended(g: &mut Game) -> Result<Vec<String>, String> {
         if g.campaign.can_purchase_node(&id).is_err() {
             break;
         }
-        g.campaign.purchase_node(&id)?;
+        g.apply(&Command::BuySkillNode(id.clone()))
+            .map_err(|e| e.to_string())?;
         learned.push(id);
     }
     Ok(learned)
+}
+/// Buys catalogue item `definition` and equips it on the survivor through
+/// `BuyItem` and `Equip`, handing each command to `seen` before it is
+/// applied (the strategy bot records it).
+fn buy_and_equip(
+    g: &mut Game,
+    definition: usize,
+    mut seen: impl FnMut(&Command),
+) -> Result<(), String> {
+    let buy = Command::BuyItem(ItemDefId::at(definition));
+    seen(&buy);
+    let CommandOutcome::Id(id) = g.apply(&buy).map_err(|e| e.to_string())? else {
+        return Err("BuyItem answered without an item id".to_owned());
+    };
+    let equip = Command::Equip {
+        mode: Mode::Personal,
+        id,
+    };
+    seen(&equip);
+    g.apply(&equip).map(|_| ()).map_err(|e| e.to_string())
+}
+/// The smoke bot's gear choice for the survivor, bought through commands.
+fn buy_gear(g: &mut Game) -> Result<(), String> {
+    smoke_buy_gear_with(g, Mode::Personal, |g, definition| {
+        buy_and_equip(g, definition, |_| {})
+    })
 }
 fn pacing_input(g: &Game, aim: PacingAim, held: &mut [f32; 2]) -> Input {
     match aim {
@@ -897,8 +931,8 @@ pub fn simulate_pacing_seed(
     }
     let mut g = pacing_start(profile, seed_index);
     let seed = g.seed;
-    g.campaign
-        .choose_survivor(crate::survivors::SurvivorId::Rook)?;
+    g.apply(&Command::ChooseSurvivor(crate::survivors::SurvivorId::Rook))
+        .map_err(|e| e.to_string())?;
     if g.campaign.balance_settings.preset != profile.difficulty {
         g.apply(&Command::SetBalance(BalanceSettings::for_preset(
             profile.difficulty,
@@ -933,7 +967,7 @@ pub fn simulate_pacing_seed(
             PacingSpend::Recommended => {
                 let learned = learn_recommended(&mut g)?;
                 let before_gear = g.campaign.coins;
-                smoke_buy_gear(&mut g, Mode::Personal)?;
+                buy_gear(&mut g)?;
                 (
                     learned,
                     before_tree.saturating_sub(before_gear),
@@ -941,7 +975,7 @@ pub fn simulate_pacing_seed(
                 )
             }
             PacingSpend::GearFirst => {
-                smoke_buy_gear(&mut g, Mode::Personal)?;
+                buy_gear(&mut g)?;
                 let before_learn = g.campaign.coins;
                 let learned = learn_recommended(&mut g)?;
                 (
