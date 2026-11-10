@@ -2,7 +2,11 @@
 use super::{Screen, Tab, UiCtx, chrome, muted, primary};
 use crate::art::{self, AMBER, GREEN, RED};
 use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
-use horde_core::content::{Mode, content};
+use horde_core::{
+    content::{Mode, content},
+    sim::Game,
+    world::Country,
+};
 mod view;
 use view::BriefingView;
 
@@ -98,13 +102,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         "Boss: {} · arrives after {:.0}s",
         level.boss_name, forecast.boss_seconds
     ));
-    ui.label(format!(
-        "{} build supply · {:.2}× regional difficulty",
-        forecast.supply,
-        f.game
-            .effective_country_difficulty(&country.id)
-            .unwrap_or(country.difficulty)
-    ));
+    ui.label(supply_and_difficulty(f.game, country, forecast.supply));
     ui.label(format!(
         "Threat rank {} · arrival groups {} · population cap {} (+ boss) · new gear Lv {}",
         pressure.rank, pressure.batch_size, pressure.enemy_cap, pressure.item_level
@@ -147,6 +145,16 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
 }
 /// A briefing column heading; the loadout's carries its one action.
+/// "N build supply · D× regional difficulty" for a deployment in `country`,
+/// D the difficulty it plays at (`Game::effective_country_difficulty`, the
+/// start clamp included).
+fn supply_and_difficulty(game: &Game, country: &Country, supply: i64) -> String {
+    format!(
+        "{supply} build supply · {:.2}× regional difficulty",
+        game.effective_country_difficulty(&country.id)
+            .unwrap_or(country.difficulty)
+    )
+}
 fn heading(ui: &mut egui::Ui, title: &str) {
     ui.label(RichText::new(title).size(18.0).strong());
 }
@@ -281,4 +289,34 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             chrome::defender_name(f)
         ));
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use horde_core::{survivors::SurvivorId, world::world};
+
+    /// The briefing's supply line shows the difficulty the deployment plays
+    /// (`Game::effective_country_difficulty`): Bangladesh's raw 1.60 is
+    /// clamped to 1.05 as the start country (W2 review).
+    #[test]
+    fn briefing_difficulty_reads_the_effective_value() {
+        let mut game = Game::default();
+        game.campaign_mut()
+            .choose_survivor(SurvivorId::Rook)
+            .unwrap();
+        game.campaign_mut().choose_start_country("BGD").unwrap();
+        let bgd = world().country("BGD").unwrap();
+        assert_eq!(bgd.difficulty, 1.60);
+        assert_eq!(
+            supply_and_difficulty(&game, bgd, 9),
+            "9 build supply · 1.05× regional difficulty"
+        );
+        // A country beside the start keeps its raw value.
+        let aut = world().country("AUT").unwrap();
+        assert_eq!(
+            supply_and_difficulty(&game, aut, 9),
+            "9 build supply · 0.85× regional difficulty"
+        );
+    }
 }

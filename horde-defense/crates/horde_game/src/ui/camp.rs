@@ -9,7 +9,12 @@ use crate::{
     settings::Action,
 };
 use bevy_egui::egui::{self, Align, Layout, RichText, vec2};
-use horde_core::{command::Command, content::Mode, world::world};
+use horde_core::{
+    command::Command,
+    content::Mode,
+    sim::Game,
+    world::{Country, world},
+};
 
 pub(super) fn camp(root: &mut egui::Ui, f: &mut UiCtx) {
     camp_controls(root.ctx(), f);
@@ -195,13 +200,7 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
     ui.label(RichText::new(&country.name).size(23.0).strong());
     let levels = country.level_count();
     let cleared = f.game.campaign().world.completed(&country.id);
-    ui.label(format!(
-        "{} defenses · {:.2}× difficulty",
-        levels,
-        f.game
-            .effective_country_difficulty(&country.id)
-            .unwrap_or(country.difficulty)
-    ));
+    ui.label(defenses_and_difficulty(f.game, country));
     if f.game.campaign().world.start.is_some() {
         progress(
             ui,
@@ -226,6 +225,16 @@ fn country_summary(ui: &mut egui::Ui, f: &UiCtx) {
             ui.colored_label(RED, debuff);
         }
     });
+}
+/// "N defenses · D× difficulty" for `country`, D the difficulty it deploys
+/// at (`Game::effective_country_difficulty`, the start clamp included).
+fn defenses_and_difficulty(game: &Game, country: &Country) -> String {
+    format!(
+        "{} defenses · {:.2}× difficulty",
+        country.level_count(),
+        game.effective_country_difficulty(&country.id)
+            .unwrap_or(country.difficulty)
+    )
 }
 fn country_action(ui: &mut egui::Ui, f: &mut UiCtx) {
     let Some(country) = world().country(&f.campaign.selected_country) else {
@@ -379,5 +388,36 @@ fn time_controls(ui: &mut egui::Ui, f: &mut UiCtx) {
                 ui.selectable_value(&mut f.battle.speed, speed, format!("{speed}×"));
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The world summary shows the difficulty a country deploys at
+    /// (`Game::effective_country_difficulty`): before a start is chosen every
+    /// country is a candidate start, so Bangladesh's raw 1.60 reads as its
+    /// clamped 1.05, and after another start it reads raw (W2 review).
+    #[test]
+    fn country_summary_difficulty_reads_the_effective_value() {
+        let bgd = world().country("BGD").unwrap();
+        assert_eq!(bgd.difficulty, 1.60);
+        let levels = bgd.level_count();
+        let mut game = Game::default();
+        assert_eq!(
+            defenses_and_difficulty(&game, bgd),
+            format!("{levels} defenses · 1.05× difficulty")
+        );
+        game.campaign_mut().choose_start_country("AUT").unwrap();
+        assert_eq!(
+            defenses_and_difficulty(&game, bgd),
+            format!("{levels} defenses · 1.60× difficulty")
+        );
+        let aut = world().country("AUT").unwrap();
+        assert_eq!(
+            defenses_and_difficulty(&game, aut),
+            format!("{} defenses · 0.95× difficulty", aut.level_count())
+        );
     }
 }
