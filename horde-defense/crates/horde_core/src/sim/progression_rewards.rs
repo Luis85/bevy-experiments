@@ -25,7 +25,8 @@ impl Game {
     /// The receipt lists only coins paid and milestones authored. A worker
     /// pays nothing and returns the empty receipt: the parent settles its
     /// victories. Callers: `finish` after the H1 auto-sell, and the end of
-    /// `settle_parallel` when no main attempt is live.
+    /// a `settle_parallel` pass that credited an expedition victory while no
+    /// main attempt is live (`stamp_expedition_rewards`, R32).
     pub(crate) fn settle_progression_rewards(&mut self) -> ProgressionRewards {
         let mut receipt = ProgressionRewards::default();
         if self.worker {

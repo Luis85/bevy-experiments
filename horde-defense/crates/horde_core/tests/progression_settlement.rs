@@ -3,8 +3,9 @@
 //! `Game::settle_progression_rewards` pays the level-up grants above
 //! `Player.level_grant_paid` and the reached, unclaimed rank milestones once,
 //! at the root only: in `finish()` after the H1 auto-sell and before the run
-//! record and the report, and at the end of `settle_parallel` when no main
-//! attempt is live. It never pays mid-battle or in a worker. The shipped
+//! record and the report, and at the end of a `settle_parallel` pass that
+//! credited an expedition victory while no main attempt is live
+//! (`stamp_expedition_rewards`, R32). It never pays mid-battle or in a worker. The shipped
 //! catalogue authors the design values (W2-54); these tests still author
 //! the block they need on their own thread (`override_rewards`), so they do
 //! not follow later catalogue edits.
