@@ -1167,7 +1167,7 @@ fn equipment_autosell_rule_counts_only_below_uncommon_in_core() {
         assert_eq!(item.quality, Some(*quality));
     }
     // Decision 6: strictly below Uncommon, so the Poor and the Common drop
-    // of the six. (design-qa-captures reads "1 of 6"; the core rule sells 2.)
+    // of the six (design-qa-captures expects 2 since the W2 review).
     let below: Vec<u64> = staged
         .iter()
         .filter(|(quality, _)| *quality < Quality::Uncommon)
