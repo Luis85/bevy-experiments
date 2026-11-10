@@ -18,7 +18,11 @@
 //! `production_fixtures_stage_features_through_commands` keeps the production
 //! review recipes honest (ISO-5, design-qa-captures 1.8): in
 //! `ui/review/fixtures/production.rs` the staging seams appear only inside
-//! `entitle_*` helpers, so every feature is staged through `Game::apply`.
+//! `entitle_*` helpers, so its recipes stage features through `Game::apply`.
+//! It scans that file only: `prepare_operations_observer` reuses the shared
+//! `fixtures.rs` operations roster (`prepare_progression`,
+//! `prepare_operations`), which stages through `staging()` and
+//! `deploy_survivor`, as design-qa-captures' operations-observer row allows.
 use std::path::{Path, PathBuf};
 
 /// PowerShell 7 only, by decision; their port is a logged follow-up.

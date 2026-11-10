@@ -1,13 +1,18 @@
 //! The production pass's wave-1 review scenes (design-qa-captures 1.8).
 //!
-//! Every recipe stages feature state through `Game::apply(&Command)`; the
-//! `staging()` seam and the other non-command `Game` mutators (`deploy`,
-//! `set_paused`, `sell_item`, ...) appear only inside top-level `entitle_*`
-//! helpers (the start country, coins, experience, earlier stage clears and
-//! inventory grants); `repo_checks::production_fixtures_stage_features_through_commands`
-//! enforces it. Ticking the simulation is play, not staging. Each recipe
-//! leaves the game paused on its screen and returns before the matrix's
-//! shared progression.
+//! The recipes in this file stage feature state through
+//! `Game::apply(&Command)`; the `staging()` seam and the other non-command
+//! `Game` mutators (`deploy`, `set_paused`, `sell_item`, ...) appear here
+//! only inside top-level `entitle_*` helpers (the start country, coins,
+//! experience, earlier stage clears and inventory grants);
+//! `repo_checks::production_fixtures_stage_features_through_commands`
+//! enforces it for this file only. One exception, sanctioned by
+//! design-qa-captures (operations-observer row): `prepare_operations_observer`
+//! reuses the shared `fixtures::prepare_progression` and
+//! `fixtures::prepare_operations` roster, which stage through `staging()`
+//! and `deploy_survivor` in `fixtures.rs`, outside the check. Ticking the
+//! simulation is play, not staging. Each recipe leaves the game paused on its
+//! screen and returns before the matrix's shared progression.
 use crate::runner::{RuntimeNotice, SaveIntent};
 use crate::ui::{FrontendParts, Screen, Tab};
 use horde_core::{
