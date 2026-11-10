@@ -441,7 +441,10 @@ pub(super) fn event_sound(cues: &mut Vec<SoundCue>, event: &SimEvent) {
             Outcome::Defeat => SoundCue::Defeat,
             Outcome::Withdrawal => SoundCue::Retreat,
         }),
-        // Enemy-side events have no cues yet (audio adds them in wave 2).
+        // Enemy-side events have no cue until audio's exhaustive SimEvent
+        // mapping in wave 6 (A6-12). Their visual twins already exist: the
+        // W2-28 aim line for a ranged windup and the W2-37 phase label and
+        // ring for a boss phase.
         SimEvent::Spit(_)
         | SimEvent::Detonation { .. }
         | SimEvent::Split { .. }
