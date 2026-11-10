@@ -672,21 +672,26 @@ mod tests {
     #[test]
     fn v2_unknown_affix_rejected() {
         let core: Vec<&str> = enemy_catalog().elite_affix_ids().collect();
-        assert_affix_ids_checked_against(&core);
+        // W2 review (tests): the shipped loader, `from_json`, checks tells
+        // against core's table itself; nothing here hard-codes that table.
+        assert_affix_ids_checked_against(&core, &compile);
         // W2 review: the affix table is append-only content, so a sixth
         // affix must not break this presentation test.
         let mut appended = core.clone();
         appended.push("sixth");
-        assert_affix_ids_checked_against(&appended);
+        assert_affix_ids_checked_against(&appended, &|value| {
+            EnemyVisualCatalog::from_json_against(&value.to_string(), &appended)
+        });
     }
 
-    /// The affix check of `v2_unknown_affix_rejected` against `table`.
-    fn assert_affix_ids_checked_against(table: &[&str]) {
+    /// The affix check of `v2_unknown_affix_rejected`: `load` accepts a tell
+    /// for every id of `table` and rejects ids outside it.
+    fn assert_affix_ids_checked_against(
+        table: &[&str],
+        load: &dyn Fn(serde_json::Value) -> Result<EnemyVisualCatalog, String>,
+    ) {
         let tell = bundled()["elite_tells"]["default"].clone();
         let entry = |id: &str| serde_json::json!({ "affix": id, "tell": tell.clone() });
-        let load = |value: serde_json::Value| {
-            EnemyVisualCatalog::from_json_against(&value.to_string(), table)
-        };
         // Core pins its own table (enemy_catalog.rs); this check needs only
         // the shipped `volatile` it pairs with each unknown id.
         assert!(table.contains(&"volatile"), "{table:?}");
