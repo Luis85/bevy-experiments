@@ -231,10 +231,10 @@ pub enum RecruitBlocker {
     /// Recruits join only from a fully liberated country.
     NotLiberated,
     RosterFull,
-    /// Recruiting costs this many coins, more than the camp holds.
-    NeedCoins(u64),
     /// A defender is out on the main defense.
     DefenseInProgress,
+    /// Recruiting costs this many coins, more than the camp holds.
+    NeedCoins(u64),
 }
 impl RecruitBlocker {
     /// Plain player-facing text.
@@ -245,10 +245,10 @@ impl RecruitBlocker {
             }
             Self::NotLiberated => "Recruit in a fully liberated country".into(),
             Self::RosterFull => "Survivor roster is full".into(),
-            Self::NeedCoins(price) => format!("Recruitment requires {price} coins"),
             Self::DefenseInProgress => {
                 "Return the active defender to camp before recruiting".into()
             }
+            Self::NeedCoins(price) => format!("Recruitment requires {price} coins"),
         }
     }
 }
