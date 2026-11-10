@@ -13,7 +13,9 @@ Performance evidence: powershell -NoProfile -ExecutionPolicy Bypass -File script
 -Scene all|peak|progressed-peak|stress -Profile dev|playtest [-VsyncOff] [-Pipelined default|on|off] [-Repeat 3]
 [-ShippedSmoke] [-SaveClone] [-NoBuild] [-NoWaitQuiet] [-QuietTimeoutMinutes 240] builds the review exe, runs every scene at both sizes and compares the
 frame reports with docs/PERF_BUDGET.json; -SelfTest checks the fixtures only. Exit codes: 0 pass, 1 over budget,
-2 invalid evidence (a run invalid twice, or a gated metric missing), 3 build or run failure. The script holds the display on for
+2 invalid evidence (a run invalid twice, or a gated metric missing), 3 build or run failure. Invalid evidence outranks an over,
+but every valid gated over prints "VALID OVER: <scene> <size> <metric> <value> > <gate>" and is listed in summary.json
+valid_overs whatever the exit code; it stands and is never re-measured away (R34). The script holds the display on for
 its whole run, and a run that overlaps a Kernel-Power 506/507 display-off event is invalid (R27). Before it measures it waits for
 a quiet machine (no foreign cargo, rustc or cargo-nextest; mean CPU load under 35% over 60 s), logging what it waits for and
 exiting 2 after -QuietTimeoutMinutes, and a run with a CPU load sample of 90% or more is invalid (R30).

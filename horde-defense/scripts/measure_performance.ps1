@@ -65,6 +65,9 @@
 # (perf_budget.rs pins it), is invalid evidence (exit 2), never a pass or a skip.
 # Exit codes: 0 pass, 1 over budget, 2 invalid evidence, 3 build or run failure. summary.json and summary.md are
 # always written to the output directory once it exists.
+# Valid overs (R34, plan 2.4): invalid evidence still outranks an over budget (exit 2), but every gated over in a valid
+# scene and size (not under -NoBudget or -Adapter) prints "VALID OVER: <scene> <size> <metric> <value> > <gate>", and
+# summary.json lists them in a top-level valid_overs, whatever the exit code. A valid gated over may not be re-measured away.
 # Arguments are plain strings validated in the body: a binding failure (ValidateSet, ValidateRange, an [int] that does not
 # parse, an unknown or positional argument) would exit 1 under -File before the trap exists, and 1 means over budget.
 [CmdletBinding(PositionalBinding = $false)]
@@ -450,10 +453,22 @@ function Measure-PerfBudget($Runs, $Context, $Budget, $ExtraChecks = @()) {
     }
     $over = @($checks | Where-Object { $_.status -eq 'over' })
     $missing = @($checks | Where-Object { $_.status -eq 'invalid' })
+    $gated = -not $Context.NoBudget -and -not $Context.Informational
+    # R34: an over is only ever measured on a valid scene and size (an invalid one is skipped), so every gated over is a
+    # valid over, listed even when invalid evidence elsewhere sets exit 2.
+    $validOvers = @()
+    if ($gated) { $validOvers = $over }
     $exitCode = 0
     if ($invalid.Count -gt 0 -or $missing.Count -gt 0) { $exitCode = 2 }
-    elseif ($over.Count -gt 0 -and -not $Context.NoBudget -and -not $Context.Informational) { $exitCode = 1 }
-    return [pscustomobject]@{ ExitCode = $exitCode; Checks = $checks.ToArray(); Invalid = $invalid.Count; Over = $over.Count }
+    elseif ($over.Count -gt 0 -and $gated) { $exitCode = 1 }
+    return [pscustomobject]@{
+        ExitCode = $exitCode; Checks = $checks.ToArray(); Invalid = $invalid.Count; Over = $over.Count; ValidOvers = @($validOvers)
+    }
+}
+
+function Format-ValidOver($Check) {
+    # R34: the line a valid gated over prints, whatever the exit code.
+    return "VALID OVER: $($Check.scene) $($Check.size) $($Check.metric) $(Format-Number $Check.value) > $(Format-Number $Check.limit)"
 }
 
 function Get-ExitLabel([int]$Code) {
@@ -937,7 +952,9 @@ finally {
             }
         })
     $checks = @()
-    if ($null -ne $verdict) { $checks = @($verdict.Checks) }
+    $validOvers = @()
+    if ($null -ne $verdict) { $checks = @($verdict.Checks); $validOvers = @($verdict.ValidOvers) }
+    foreach ($o in $validOvers) { Write-Output (Format-ValidOver $o) }
     $exeHash = $null
     if ($exe -and (Test-Path -LiteralPath $exe -PathType Leaf)) { $exeHash = Get-FileSha256 -Path $exe }
     $holdRecord = $null
@@ -963,6 +980,9 @@ finally {
         executable = $exe; executable_sha256 = $exeHash; stamp = $stamp; cpu = $cpuName
         wgpu_backend = $(if ($env:WGPU_BACKEND) { $env:WGPU_BACKEND } else { $null })
         budget = 'docs/PERF_BUDGET.json'; budget_sha256 = (Get-FileSha256 -Path $budgetPath)
+        valid_overs = @($validOvers | ForEach-Object {
+                [ordered]@{ scene = $_.scene; size = $_.size; metric = $_.metric; aggregate = $_.aggregate; value = $_.value; limit = $_.limit }
+            })
         runs = $rows; checks = $checks; shipped_smoke = $shipped; save_clone = $saveCloneReport
     }
     Write-Utf8NoBom -Path (Join-Path $destination 'summary.json') -Text ($summary | ConvertTo-Json -Depth 8)
@@ -972,6 +992,7 @@ finally {
     $md.Add('')
     $md.Add("- Verdict: exit $exitCode ($(Get-ExitLabel $exitCode))")
     if ($failure) { $md.Add("- Failure: $failure") }
+    foreach ($o in $validOvers) { $md.Add("- $(Format-ValidOver $o) (R34: a valid gated over stands whatever the exit code)") }
     $vsyncLabel = 'on'
     if ($VsyncOff) { $vsyncLabel = 'off' }
     $md.Add("- Profile $Profile, VSync $vsyncLabel (requested $($expect.PresentMode)), pipelined $Pipelined, repeat $Repeat, warmup $Warmup")

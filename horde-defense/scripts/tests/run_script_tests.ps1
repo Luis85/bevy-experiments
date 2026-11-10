@@ -167,6 +167,9 @@ public static class LastLightNativeHelper {
             string once = Environment.GetEnvironmentVariable("HORDE_FAKE_UNFOCUSED_ONCE");
             if (!String.IsNullOrEmpty(once) && File.Exists(once)) { File.Delete(once); unfocused = 3; }
             if (Environment.GetEnvironmentVariable("HORDE_FAKE_UNFOCUSED_ALWAYS") == "1") { unfocused = 2; }
+            // HORDE_FAKE_UNFOCUSED_SCENE makes every run of that scene unfocused, so only its groups are invalid.
+            string screen = Environment.GetEnvironmentVariable("LASTLIGHT_REVIEW_SCREEN");
+            if (Environment.GetEnvironmentVariable("HORDE_FAKE_UNFOCUSED_SCENE") == screen) { unfocused = 2; }
             string mode = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PRESENT_MODE") == "autonovsync" ? "AutoNoVsync" : "Fifo";
             string pipelined = Environment.GetEnvironmentVariable("LASTLIGHT_PERF_PIPELINED") == "0" ? "false" : "true";
             // The adapter the renderer used: Bevy falls back to the default GPU when WGPU_ADAPTER_NAME matches none.
@@ -184,6 +187,16 @@ public static class LastLightNativeHelper {
                 : window.Split('x');
             // HORDE_FAKE_INTERFACE_TOTAL ("exe-a=2.0;exe-b=2.1") sets the interface_total mean by the folder above the
             // exe's debug folder, so the two A/B arms (<out>\exe-a\debug, <out>\exe-b\debug) report their own; else 1.0.
+            // HORDE_FAKE_CPU_P99 ("progressed-peak/small=12.7565") sets the cpu_frame p99 of one scene and size; else 5.0.
+            string sizeName = size[0] == "1050" ? "small" : "normal";
+            string cpuP99 = "5.0";
+            string p99s = Environment.GetEnvironmentVariable("HORDE_FAKE_CPU_P99");
+            if (!String.IsNullOrEmpty(p99s)) {
+                foreach (string entry in p99s.Split(';')) {
+                    string[] pair = entry.Split('=');
+                    if (pair.Length == 2 && pair[0] == screen + "/" + sizeName) { cpuP99 = pair[1]; }
+                }
+            }
             string interfaceTotal = "1.0";
             string totals = Environment.GetEnvironmentVariable("HORDE_FAKE_INTERFACE_TOTAL");
             if (!String.IsNullOrEmpty(totals)) {
@@ -201,7 +214,7 @@ public static class LastLightNativeHelper {
                 + ",\"completed_sample_target\":true,\"paused\":false,\"unfocused_sample_frames\":" + unfocused
                 + ",\"frames_over_50ms\":0,\"frames_over_50ms_driver_stall\":0,\"driver_stalls\":{\"frames\":[],\"outside\":{\"frames_over_50ms\":0}}"
                 + ",\"work_mean_ms\":[0.4,0.0,1.0]"
-                + ",\"phases\":{\"cpu_frame_ms\":{\"mean\":4.0,\"p50\":4.0,\"p95\":4.5,\"p99\":5.0,\"max\":6.0},\"interface_total_ms\":{\"mean\":" + interfaceTotal + ",\"p50\":1.0,\"p95\":1.2,\"p99\":1.3,\"max\":1.5}}"
+                + ",\"phases\":{\"cpu_frame_ms\":{\"mean\":4.0,\"p50\":4.0,\"p95\":4.5,\"p99\":" + cpuP99 + ",\"max\":6.0},\"interface_total_ms\":{\"mean\":" + interfaceTotal + ",\"p50\":1.0,\"p95\":1.2,\"p99\":1.3,\"max\":1.5}}"
                 + ",\"egui\":{\"texture_uploads\":{\"count\":0,\"bytes\":0,\"frames\":0}"
                 + ",\"battlefield_primitives\":{\"mean\":19.0,\"max\":19},\"battlefield_vertices\":{\"mean\":30000.0,\"max\":32000}}"
                 + ",\"present\":{\"requested_mode\":\"" + mode + "\",\"pipelined_rendering\":" + pipelined + "}"
@@ -1099,6 +1112,55 @@ try {
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_WINDOW', $null, 'Process') }
     }
 
+
+    Test-Case 'measure_performance names a valid gated over even when invalid evidence sets the exit code (R34)' {
+        # R34: invalid evidence still exits 2, but a valid gated over beside it is printed and listed in summary.json.
+        $overTarget = Join-Path $temporary 'perf-over-target'
+        try {
+            New-FakeTarget $overTarget
+            $env:CARGO_TARGET_DIR = $overTarget
+            $env:HORDE_FAKE_CPU_P99 = 'progressed-peak/small=12.7565'
+            $line = 'VALID OVER: progressed-peak small cpu_frame_p99_ms 12.7565 > 10'
+            $env:HORDE_FAKE_UNFOCUSED_SCENE = 'stress'
+            $out = Join-Path $temporary 'perf-over-masked'
+            $r = Invoke-ShimMeasure @('-Scene', 'all', '-VsyncOff', '-NoBuild', '-OutputDirectory', $out) 'measure-over-masked'
+            $log = 'out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err)
+            Assert-Equal 2 $r.ExitCode "invalid evidence keeps exit 2; $log"
+            Assert-True ((Read-Log $r.Out).Contains($line)) "no '$line'; $log"
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            Assert-Equal 2 @($summary.runs | Where-Object { -not $_.valid }).Count 'the two stress groups are invalid'
+            Assert-True (@($summary.PSObject.Properties.Name) -contains 'valid_overs') 'summary.json has no valid_overs'
+            $overs = @($summary.valid_overs)
+            Assert-Equal 1 $overs.Count 'one valid over'
+            Assert-Equal 'progressed-peak|small|cpu_frame_p99_ms|median' (@($overs[0].scene, $overs[0].size, $overs[0].metric, $overs[0].aggregate) -join '|') 'the valid over'
+            Assert-Equal 12.7565 ([double]$overs[0].value) 'the valid over value'
+            Assert-Equal 10.0 ([double]$overs[0].limit) 'the valid over gate'
+            Assert-True ((Read-Log (Join-Path $out 'summary.md')).Contains($line)) 'summary.md names the valid over'
+
+            # With no invalid run the same over exits 1 and is still named.
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_UNFOCUSED_SCENE', $null, 'Process')
+            $out = Join-Path $temporary 'perf-over-plain'
+            $r = Invoke-ShimMeasure @('-Scene', 'progressed-peak', '-VsyncOff', '-NoBuild', '-OutputDirectory', $out) 'measure-over-plain'
+            Assert-Equal 1 $r.ExitCode ('over budget; out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+            Assert-True ((Read-Log $r.Out).Contains($line)) "no '$line' on exit 1"
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            Assert-Equal 1 @($summary.valid_overs).Count 'one valid over on exit 1'
+
+            # A pass within the budget lists none.
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_CPU_P99', $null, 'Process')
+            $out = Join-Path $temporary 'perf-over-none'
+            $r = Invoke-ShimMeasure @('-Scene', 'progressed-peak', '-VsyncOff', '-NoBuild', '-OutputDirectory', $out) 'measure-over-none'
+            Assert-Equal 0 $r.ExitCode ('within budget; out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+            Assert-True (-not (Read-Log $r.Out).Contains('VALID OVER')) 'a VALID OVER line without an over'
+            $summary = Get-Content -Raw -LiteralPath (Join-Path $out 'summary.json') | ConvertFrom-Json
+            Assert-True (@($summary.PSObject.Properties.Name) -contains 'valid_overs') 'summary.json has no valid_overs when within budget'
+            Assert-Equal 0 @($summary.valid_overs).Count 'no valid over'
+        }
+        finally {
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_CPU_P99', $null, 'Process')
+            [Environment]::SetEnvironmentVariable('HORDE_FAKE_UNFOCUSED_SCENE', $null, 'Process')
+        }
+    }
 
     Test-Case 'measure_performance holds the display on and keeps a run without a 506/507 event valid (R27)' {
         $displayTarget = Join-Path $temporary 'perf-display-target'
