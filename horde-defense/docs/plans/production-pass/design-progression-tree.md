@@ -177,6 +177,7 @@ Each also needs: EffectCategory (Firearms; Survival for hazard), keywords (class
 - It is also called at the end of `settle_parallel` (parallel.rs:200-290) only when `self.attempt.is_none()`. Otherwise the next main finish settles it. A receipt paid from settle_parallel goes on the settled worker battle's Report and on the RunRecord just appended.
 - The grant is never paid mid-battle and never in a clone.
 - Takeover (decision 4): only player XP raises player.level, so a Mara or recruit win pays no player grant.
+  *As built (W2-22/W2-54; W2 review):* the completion XP of every victory goes to the player, whoever defended: `Campaign::first_clear` awards it for either mode, and `commit_victory` (the takeover path in `finish`) and the expedition credit in `settle_parallel` call `first_clear` as Personal. A Mara, takeover-recruit or expedition-recruit win can therefore level the player and pay the level grant, once, at the root settlement (`worker_victory_level_up_pays_the_grant_once_in_the_parent_and_never_in_the_worker`). Decision 4 (plan §2.1: the winning defender gets XP/CP, Personal `first_clear` XP unchanged) only keeps the defender's own XP and CP off the player. The line above is unchanged.
 
 ## 7. Rank milestones 5/10/15/20
 - **Content:** the section-5 gates. Results "Now open" lists the nodes (milestone_opened_nodes, tree_view.rs:665-687).
