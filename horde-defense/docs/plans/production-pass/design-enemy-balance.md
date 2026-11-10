@@ -413,8 +413,8 @@ W2-36 amended the Hard row on the plan §2.5 default (the W2-26 pin reading): `b
 | | `boss_rank` | `BossRank` |
 | `Report` | `boss_rank` | `BossRank` |
 
-- Bosses are keyed `boss:<BossKind>`.
-- progression-tree's `defender_damage_by_archetype` uses the same keys and bounds (single definition, owned by progression-tree).
+- Bosses are not keyed: schema-v7 §3.12 (final) excludes bosses and unresolved legacy enemies from every per-archetype map, and a `boss:<BossKind>` key would fail `valid_id` (`:` is not an id byte).
+- The third map is `damage_taken_by_archetype` (`BTreeMap<String,u64>`, the defender's damage taken per archetype). It uses the same keys and bounds; schema-v7 §3.12 is its single definition.
 
 **Pacing harness** (sim/pacing.rs):
 - `PacingProfile.preset`, plus `standard()` and `lux()` constructors.

@@ -146,7 +146,7 @@ Every field below follows the rules in §0. The authoritative list is the `saved
 **CombatTelemetry (`sim/telemetry.rs:5`).** It has no container default, so each new field takes a field-level default plus skip.
 - `spawned_by_archetype: BTreeMap<String, u32>`
 - `kills_by_archetype: BTreeMap<String, u32>`
-- `defender_damage_by_archetype: BTreeMap<String, u64>`
+- `damage_taken_by_archetype: BTreeMap<String, u64>` (shipped name; schema-v7 §3.12 is final and also adds `hazard_damage_taken: u64` and caps `boss_phase_ticks` at 2)
 - `elites_spawned: u32`
 - `elites_killed: u32`
 - `boss_phase_ticks: Vec<u64>`, at most 3
