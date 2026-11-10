@@ -144,8 +144,12 @@ fn stress_render_fixture_validates_at_authored_cap_before_staging() {
 /// W2-47: the stress crowd follows the wave-2 content. Both the authored
 /// stage and the staged 400 draw every catalogue archetype (the W2-29 to
 /// W2-31 records among them), at least one elite (W2-33), the last authored
-/// wave tier, and a boss with its phase state (W2-36), so the perf re-gate
-/// measures the new sprites, elite rims and phase ring.
+/// wave tier, and a boss that carries phase state (W2-36), so the perf
+/// re-gate measures the full wave-2 crowd. What that paints today: every
+/// archetype's existing sprite with its tint (the new archetypes need no new
+/// art); no elite tell, which W5-07 adds; and the phase ring only while a
+/// boss holds, which this test does not require (the boss spawns with
+/// `hold_until` 0).
 #[test]
 fn stress_render_fixture_includes_every_catalog_archetype_and_an_elite() {
     let catalog = enemy_catalog();
