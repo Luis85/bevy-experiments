@@ -81,6 +81,13 @@ Legend:
 |---|---|---|---|---|---|---|
 | `level_grant_paid` | u32 (0 and 1 are equivalent) | 0; skip 0 | ≤ level | (c): inserted = level only when level ≥ 2 (root and every `battles[*].game.campaign.player`). The op-chain level sync also copies it. | W2 (root finish / settle_parallel only, never in a worker) | none |
 
+**As cut (annotation, 10 November 2026, W2 review):** the row's writer and digest columns do not describe what shipped. Writers at HEAD:
+- `Game::settle_progression_rewards` (W2-22, `sim/progression_rewards.rs`), from `finish` and from the end of `settle_parallel` when no main attempt is live. It pays the owed grants and moves the ledger to the level, never in a worker. This is the row's writer.
+- `Campaign::pay_neutral_level_grants` (W2-52, 0475d14, `campaign/progression.rs`), called from `award_player_xp` on every player XP award: kill XP mid-attempt, victory XP through `first_clear`, and in a worker clone that levels its own copy. When every grant in `(level_grant_paid.max(1)+1)..=level` is 0 coins, it moves the ledger to the level without paying. It is inert under the shipped catalogue since W2-54 (0213760, `level_grant_xp_fraction` 0.25 makes every grant from level 2 on non-zero). It still writes under a catalogue that authors no grant, such as a neutral `override_rewards` block in tests.
+- The op-chain level sync (`sim/parallel.rs`) copies the parent's value into a continuing worker campaign, as the Mig column says.
+
+Digest: 0475d14 moved the three Personal GOLDEN digests (class F, each run levels 1 -> 2 and saved `level_grant_paid` 2). W2-54 made the shim inert and moved them again, so the field is no longer saved at tick 1800, and W2-49 folded both causes into GOLDEN (re-bless log in `tests/determinism.rs`). Under the shipped catalogue the field's net effect on GOLDEN at HEAD is none. The row above is unchanged.
+
 ### 3.3 Attempt (sim.rs:323)
 
 | Field (serde key) | Type | Default / skip | Validation | Mig | W | Digest |
