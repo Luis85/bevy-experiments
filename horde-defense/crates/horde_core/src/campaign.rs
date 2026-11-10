@@ -779,6 +779,34 @@ mod tests {
         assert!(!err.contains("Liberate"), "{err}");
     }
     #[test]
+    fn allowance_hint_names_only_what_raises_the_cap_now() {
+        // The cap is max(1 + first clears, 1 + ceil(3L/2)) (W2-10): past
+        // the first-clear floor only a liberation raises it, and past the
+        // liberation floor only a new clear does.
+        let mut c = Campaign::default();
+        c.choose_start_country("VAT").unwrap();
+        for stage in 0..3 {
+            c.record_country_stage_clear(stage).unwrap();
+        }
+        assert_eq!(c.liberated_count(), 1);
+        assert_eq!(c.advancement_cap_level(), 3);
+        assert_eq!(
+            c.allowance_raise_hint(),
+            "Liberate a country to raise the allowance."
+        );
+        c.first_clears = (1..=2).map(|i| format!("level_{i}")).collect();
+        assert_eq!(
+            c.allowance_raise_hint(),
+            "Liberate a country or clear a new stage to raise the allowance."
+        );
+        c.first_clears = (1..=4).map(|i| format!("level_{i}")).collect();
+        assert_eq!(c.advancement_cap_level(), 5);
+        assert_eq!(
+            c.allowance_raise_hint(),
+            "Clear a new stage to raise the allowance."
+        );
+    }
+    #[test]
     fn earned_objectives_precede_paid_training() {
         let mut c = Campaign {
             coins: 1000,

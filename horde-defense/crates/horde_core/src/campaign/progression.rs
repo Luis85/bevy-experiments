@@ -392,6 +392,16 @@ pub enum NodePayment {
     LegacyBodyPoints(u32),
 }
 
+/// The advancement cap level (CD5) for `clears` first clears and the
+/// high-water liberation count `liberations`:
+/// `min(10, max(1 + clears, 1 + ceil(3L/2)))`.
+fn cap_level_for(clears: u32, liberations: u32) -> u32 {
+    let max = u32::from(crate::defenders::MAX_ADVANCEMENT_LEVEL);
+    let by_liberation = (1 + (3 * liberations).div_ceil(2)).min(max);
+    let by_clears = (1 + clears).min(max);
+    by_clears.max(by_liberation)
+}
+
 impl Campaign {
     pub fn npc_available(&self) -> bool {
         self.has_feature(crate::skill_catalog::CampaignFeature::Companion)
@@ -404,22 +414,30 @@ impl Campaign {
     pub fn advancement_cap_level(&self) -> u8 {
         self.cap_level().min(u32::from(u8::MAX)) as u8
     }
-    /// What raises the advancement allowance now, as player text: a
-    /// liberation or a new stage clear (both raise the cap level since
-    /// W2-10) below the max level, nothing at it.
+    /// What raises the advancement allowance now, as player text, naming
+    /// only what would raise the cap level from here: a new stage clear
+    /// while the first-clear term carries the cap, a liberation while the
+    /// liberation term does (W2-10), both when they tie; nothing at the max
+    /// level.
     pub fn allowance_raise_hint(&self) -> String {
         let max = crate::defenders::MAX_ADVANCEMENT_LEVEL;
-        if self.cap_level() >= u32::from(max) {
-            format!("The allowance is at its highest, advancement level {max}.")
-        } else {
-            "Liberate a country or clear a new stage to raise the allowance.".to_owned()
+        let cap = self.cap_level();
+        if cap >= u32::from(max) {
+            return format!("The allowance is at its highest, advancement level {max}.");
         }
+        let clears = self.first_clears.len() as u32;
+        let liberations = self.liberated_count();
+        let clear_raises = cap_level_for(clears + 1, liberations) > cap;
+        let liberation_raises = cap_level_for(clears, liberations + 1) > cap;
+        match (liberation_raises, clear_raises) {
+            (true, false) => "Liberate a country to raise the allowance.",
+            (false, true) => "Clear a new stage to raise the allowance.",
+            _ => "Liberate a country or clear a new stage to raise the allowance.",
+        }
+        .to_owned()
     }
     fn cap_level(&self) -> u32 {
-        let max = u32::from(crate::defenders::MAX_ADVANCEMENT_LEVEL);
-        let by_liberation = (1 + (3 * self.liberated_count()).div_ceil(2)).min(max);
-        let by_clears = (1 + self.first_clears.len() as u32).min(max);
-        by_clears.max(by_liberation)
+        cap_level_for(self.first_clears.len() as u32, self.liberated_count())
     }
     /// Advancement points the campaign allows each survivor defender:
     /// 12 at level 1 and 8 more per level up to the cap level.
