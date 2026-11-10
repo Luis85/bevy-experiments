@@ -119,7 +119,10 @@ pub fn defeat_windows(reports: &[PacingReport], window: usize) -> Vec<DefeatWind
 
 /// G6.11: the pooled defeat rate of every [`defeat_windows`] window lies in
 /// [`GOAL6_DEFEAT_RATE_PCT`]. A seed that never wins fails and is named, and
-/// no full window at all is not a pass.
+/// no full window at all is not a pass. The summary names the seeds the
+/// lowest and highest windows pool and the range over every window, since
+/// tail windows pool only the seeds that play that long; no seed floor
+/// applies.
 pub fn defeat_rate_windows(reports: &[PacingReport], window: usize) -> Result<String, String> {
     if reports.is_empty() {
         return Err(no_reports());
@@ -153,13 +156,20 @@ pub fn defeat_rate_windows(reports: &[PacingReport], window: usize) -> Result<St
             highest = w;
         }
     }
-    let extremes = format!(
-        "lowest {:.1}% at offset {}, highest {:.1}% at offset {}",
-        lowest.rate_pct(),
-        lowest.offset,
-        highest.rate_pct(),
-        highest.offset
-    );
+    let pooled = |w: &DefeatWindow| {
+        format!(
+            "{:.1}% at offset {} over {} seed{}",
+            w.rate_pct(),
+            w.offset,
+            w.seeds,
+            if w.seeds == 1 { "" } else { "s" }
+        )
+    };
+    let extremes = format!("lowest {}, highest {}", pooled(lowest), pooled(highest));
+    // Tail windows pool only the seeds that play that long after their
+    // first victory; the range shows how thin the thinnest window is.
+    let fewest = windows.iter().map(|w| w.seeds).min().unwrap_or(0);
+    let most = windows.iter().map(|w| w.seeds).max().unwrap_or(0);
     let outside = windows.iter().filter(|w| !w.within(&pct)).count();
     if outside > 0 {
         problems.push(format!(
@@ -170,7 +180,7 @@ pub fn defeat_rate_windows(reports: &[PacingReport], window: usize) -> Result<St
         ));
     }
     let summary = format!(
-        "{} windows of {window} runs after the first victory over {winners} winning seeds: {extremes} (target {}-{}%)",
+        "{} windows of {window} runs after the first victory over {winners} winning seeds: {extremes}; windows pool {fewest}-{most} seeds (target {}-{}%)",
         windows.len(),
         pct.start(),
         pct.end()

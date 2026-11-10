@@ -537,12 +537,22 @@ fn summary_windows_and_per_seed_streaks_on_synthetic_runs() {
     assert_eq!(expected[0].rate_pct(), 15.0);
     let ok = defeat_rate_windows(&pooled, 10);
     assert!(ok.is_ok(), "{ok:?}");
+    // The summary names how many seeds the extreme windows pool, and the
+    // range over every window: the tail windows here are seed 1's alone.
+    let ok = ok.unwrap();
+    assert!(
+        ok.contains(
+            "lowest 10.0% at offset 11 over 1 seed, highest 15.0% at offset 0 over 2 seeds"
+        ),
+        "{ok}"
+    );
+    assert!(ok.contains("windows pool 1-2 seeds"), "{ok}");
     // Seed 1 without defeats: offsets 0-10 pool 2 / 20 (10%, inside), the
     // five windows only seed 1 reaches are 0%.
     let flawless = [seed0.clone(), outcome_report(expert, 1, &"V".repeat(26))];
     let err = defeat_rate_windows(&flawless, 10).expect_err("five windows at 0%");
     assert!(
-        err.contains("5 of 16 windows outside 10-25%: lowest 0.0% at offset 11"),
+        err.contains("5 of 16 windows outside 10-25%: lowest 0.0% at offset 11 over 1 seed"),
         "{err}"
     );
     // A seed that never wins fails and is named.
