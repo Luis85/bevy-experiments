@@ -3,7 +3,8 @@
 //! `presentation_never_reads_core_rng` keeps the frontend off the simulation's
 //! random streams. horde_game renders what horde_core decided; audio and VFX
 //! variation is keyed by `SimEventRecord.seq` or a frontend counter. A frontend
-//! read of `Attempt.rng`, a keyed roll or an extra `Game::tick` would let a
+//! read of `Attempt.rng`, a keyed roll (including the quality rolls
+//! `roll`, `roll_relative` and `loot::drop_quality`) or an extra `Game::tick` would let a
 //! renderer move GOLDEN and GAMEPLAY_TRACE.
 //!
 //! The scan reads `src/` as text. Comments and string contents are blanked and
@@ -46,6 +47,16 @@ const RULES: &[Rule] = &[
         needle: "catalog().roll(",
         allowed: &[],
         reason: "quality rolls are core-only; show the rolled Quality instead",
+    },
+    Rule {
+        needle: ".roll_relative(",
+        allowed: &[],
+        reason: "relative quality rolls are core-only; show the rolled Quality instead",
+    },
+    Rule {
+        needle: "drop_quality(",
+        allowed: &[],
+        reason: "loot::drop_quality decides a drop's quality and is core-only",
     },
     Rule {
         needle: ".tick(",
@@ -486,6 +497,23 @@ fn assert_scanner_catches_planted_reads() {
             "planted.rs",
             "let quote = matches!(c, '\\''|'\"'); let r = a.rng.below(2);\n",
             ".rng",
+        ),
+        // Every keyed quality roll is core-only, not just the absolute one:
+        // a widget previewing a drop's tier would decide it in presentation.
+        (
+            "planted.rs",
+            "let q = quality::catalog().roll(seed, a, e, rank);\n",
+            "catalog().roll(",
+        ),
+        (
+            "planted.rs",
+            "let q = quality::catalog().roll_relative(seed, a, e, rank, base, None);\n",
+            ".roll_relative(",
+        ),
+        (
+            "planted.rs",
+            "let q = horde_core::loot::drop_quality(seed, a, e, rank, base, elite);\n",
+            "drop_quality(",
         ),
     ];
     for (path, text, needle) in planted {
