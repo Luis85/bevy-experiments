@@ -13,9 +13,9 @@ use horde_core::sim::{
     PacingPlan, PacingProfile, PacingReport, PacingRun, PacingSell, PacingSpend,
     archetype_coverage, boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows,
     defeat_windows, equip_dropped_upgrades, longest_win_streak, max_win_streak,
-    median_earned_after, median_run_within, node_retired, nodes_left, pacing_registry, pacing_seed,
-    pacing_sweep_with_threads, runs_to_liberate, simulate_pacing, tier_affordable_runs,
-    tree_exhausted, tree_outlasts_liberation, unlock_order,
+    median_earned_after, median_run_within, node_depths, node_retired, nodes_left, pacing_registry,
+    pacing_seed, pacing_sweep_with_threads, runs_to_liberate, simulate_pacing,
+    tier_affordable_runs, tree_exhausted, tree_outlasts_liberation, unlock_order,
 };
 use horde_core::skill_catalog::{CampaignFeature, SkillNode, skills};
 use horde_core::world::world;
@@ -95,6 +95,51 @@ fn operations_open_is_the_first_camp_count_with_operations_available() {
     assert_eq!(Some(open), first_feature);
     // A camp milestone: checked before run `open + 1`, the last run played.
     assert_eq!(report.runs.len(), open + 1);
+}
+
+/// W2 review: `TierFirstNode(d)` and `TierOwned(d)` are camp milestones.
+/// Each counts the runs completed before the camp that first owns a node
+/// of depth `d` (every node of depth `d`), with the battle minutes of those
+/// runs, read from what each camp learned.
+#[test]
+fn tier_milestones_count_the_runs_before_the_camp_that_learns_them() {
+    let profile = PacingProfile {
+        max_runs: 8,
+        ..by_id(DEFAULT_PROFILE_ID).expect("registered")
+    };
+    let report = simulate_pacing(&profile).expect("profile runs");
+    let depths = node_depths();
+    let max_depth = depths.values().copied().max().expect("a tree");
+    let mut learned = BTreeSet::new();
+    let mut minutes = 0.0f32;
+    let (mut first, mut owned) = (BTreeMap::new(), BTreeMap::new());
+    for (before, run) in report.runs.iter().enumerate() {
+        learned.extend(run.learned.iter().map(String::as_str));
+        for d in 1..=max_depth {
+            let mut tier = depths.iter().filter(|(_, depth)| **depth == d);
+            if tier.clone().any(|(id, _)| learned.contains(id.as_str())) {
+                first.entry(d).or_insert((before, minutes));
+            }
+            if tier.all(|(id, _)| learned.contains(id.as_str())) {
+                owned.entry(d).or_insert((before, minutes));
+            }
+        }
+        minutes += run.elapsed / 60.0;
+    }
+    assert!(first.len() >= 2, "two tiers are entered: {first:?}");
+    assert!(!owned.is_empty(), "a tier is completed: {owned:?}");
+    for d in 1..=max_depth {
+        assert_eq!(
+            report.milestone(Milestone::TierFirstNode(d)),
+            first.get(&d).copied(),
+            "TierFirstNode({d})"
+        );
+        assert_eq!(
+            report.milestone(Milestone::TierOwned(d)),
+            owned.get(&d).copied(),
+            "TierOwned({d})"
+        );
+    }
 }
 
 #[test]
