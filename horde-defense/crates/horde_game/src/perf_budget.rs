@@ -940,8 +940,9 @@ mod tests {
     /// and an invocation's exit follows from what it recorded (invalid groups
     /// rank above an over, as in measure_performance). Every invalid group is
     /// re-measured by a later invocation kept as evidence. A valid gated
-    /// `over` is listed with its cell and repeats, and its pass is not clean
-    /// until a ruling (W2-47 review). Done: dev and playtest `-VsyncOff`
+    /// `over` is listed with its cell and repeats, and its pass is not clean:
+    /// by R34 (plan 2.4) the over stands and W5-11 re-gates it (W2-47
+    /// review). Done: dev and playtest `-VsyncOff`
     /// cover stress, exit 0 and have no stress over. The kept cpu_frame p99
     /// medians, interface_draw and interface_total means and worst frames
     /// over 50 ms meet the live gates, and the R31 A/B ran two different
@@ -960,6 +961,14 @@ mod tests {
         );
         let window = strings(json.pointer(&format!("{path}/window_utc")));
         assert_eq!(window.len(), 2, "acceptance.w2_47.window_utc: {window:?}");
+        let note = json
+            .pointer(&format!("{path}/note"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        assert!(
+            note.contains("R34") && !note.contains("pending a ruling"),
+            "acceptance.w2_47.note records the R34 answer, not an open ruling: {note:?}"
+        );
         let repeat = whole(&json, "/run/repeat_acceptance");
         let passes = object(&json, &format!("{path}/passes"));
         for required in [
@@ -1108,13 +1117,18 @@ mod tests {
             if overs.is_empty() {
                 assert_eq!(clean, Some(true), "passes/{name}: gate_clean");
             } else {
-                // A valid over is not re-measured away: it stands until a ruling.
+                // A valid over is not re-measured away: by R34 it stands and
+                // W5-11 re-gates it.
                 assert_eq!(clean, Some(false), "passes/{name}: a valid over {overs:?}");
                 let reason = text(pass, "not_clean");
                 assert!(
                     reason.contains("plan 2.5 row")
+                        && reason.contains("R34")
+                        && reason.contains("W5-11")
+                        && !reason.contains("is answered")
                         && overs.iter().all(|cell| reason.contains(cell.as_str())),
-                    "passes/{name}: not_clean names {overs:?} and the plan 2.5 row: {reason:?}"
+                    "passes/{name}: not_clean names {overs:?}, the plan 2.5 row and its \
+                     R34 answer: {reason:?}"
                 );
             }
             over_cells.insert(name.as_str(), overs);
