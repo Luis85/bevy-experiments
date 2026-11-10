@@ -221,10 +221,13 @@ fn deploy_at_committed_rank(g: &mut Game, mode: Mode, seed: u64, step: u32) {
 /// W2-40 (design enemy-balance §10, acceptance G6.9): over random sequences
 /// of victories, defeats, withdrawals and npc retreats by the player and
 /// Mara, and of worker expeditions that win or are recalled, the threat rank
-/// equals the committed victories after every step.
+/// equals the committed victories after every step. Each win is checked to
+/// commit exactly one victory and every other step none, so a setup that
+/// stopped winning cannot pass at 0 == 0.
 #[test]
 fn threat_rank_equals_committed_victories() {
-    let mut seen = [0u32; 6];
+    // Actions 0..=5, and 6 for a worker expedition that won.
+    let mut seen = [0u32; 7];
     for seed in SEEDS {
         let mut rng = Rng::new(seed);
         let mut g = strategic_game();
@@ -235,6 +238,8 @@ fn threat_rank_equals_committed_victories() {
             .unwrap();
         for step in 0..8 {
             let action = rng.below(6) as usize;
+            let before = committed_victories(&g);
+            let mut won = false;
             match action {
                 0 | 1 => {
                     let mode = if action == 0 {
@@ -250,6 +255,12 @@ fn threat_rank_equals_committed_victories() {
                     boss.hp = 0;
                     boss.injury.unconscious = true;
                     advance(&mut g, 1);
+                    assert_eq!(
+                        g.last_result().map(|r| r.outcome),
+                        Some(Outcome::Victory),
+                        "seed {seed} step {step} (action {action}): won"
+                    );
+                    won = true;
                 }
                 2 => {
                     deploy_at_committed_rank(&mut g, Mode::Personal, seed, step);
@@ -282,6 +293,7 @@ fn threat_rank_equals_committed_victories() {
                         a.boss_spawned = true;
                         a.enemies.last_mut().unwrap().injury.unconscious = true;
                         advance(&mut g, 1);
+                        won = true;
                     } else {
                         g.recall_survivor(battle).unwrap();
                     }
@@ -289,9 +301,21 @@ fn threat_rank_equals_committed_victories() {
                         g.battles().iter().all(|b| b.settled),
                         "seed {seed} step {step}: settled"
                     );
+                    let summary = g.battles().iter().find(|b| b.id == battle).unwrap();
+                    let outcome = summary.summary.as_ref().and_then(|s| s.outcome);
+                    assert_eq!(
+                        outcome == Some(Outcome::Victory),
+                        won,
+                        "seed {seed} step {step}: worker outcome {outcome:?}"
+                    );
                 }
             }
-            seen[action] += 1;
+            assert_eq!(
+                committed_victories(&g),
+                before + u64::from(won),
+                "seed {seed} step {step} (action {action}): one victory per win"
+            );
+            seen[if won && action == 5 { 6 } else { action }] += 1;
             assert!(g.attempt().is_none(), "seed {seed} step {step}: finished");
             assert_eq!(
                 u64::from(g.campaign().progression_rank()),
