@@ -603,6 +603,7 @@ Each entry gives the binding ruling and then what it supersedes in **this** spec
 
 - **Owner / wave:** enemy-balance, wave 2 (evaluators), 4 (gate).
 - **Ruling:** runs_to_liberate = median Liberation(1) over 20 seeds of lux-*; asserts median(lux-easy) &lt;= 6 and median(lux-hard) &lt;= 1.5 x median(lux-normal) (missing = 21). start-aut / start-bgd: median FirstVictory in 2..=4 asserted; per-seed "no run-1 victory" only reported.
+- **As built (W2 review, 6f20cf2, 10 November 2026):** "missing = 21" still holds for the medians the evaluator reports, but `RunsToLiberate::hard_within_ratio` no longer compares a censored Hard median as a run count. When the median Hard seed never liberates (`hard.reached <= (hard.seeds - 1) / 2`, the lower median index landing on a miss), the gate fails as unmeasured: 21 only bounds the true Hard median from below, so it cannot show Hard is within 1.5x Normal. Hard 21 against Normal 14 therefore fails, although 21 x 2 <= 14 x 3. A censored Normal median against a measured Hard one still passes, since Hard is then below any Normal run. `runs_to_liberate_ratio_rejects_hard_above_1_5x_normal` (tests/pacing_harness.rs) pins both readings; the wave-4 gate (W4-04..n) reads G6.15 this way.
 - **Supersedes in this spec:** §9 pacing_targets bullets on LUX/AUT/BGD (unnamed profiles, per-seed AUT rule).
 
 #### W-5. Front ramp value

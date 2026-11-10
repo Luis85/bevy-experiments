@@ -114,7 +114,7 @@
 | G6.12 | No 15-win streak after run 10 | `goal6_no_15_streak_after_run_10` (release) | 4 |
 | G6.13 | Final stage ≥ 1.3x the first in EHP x arrival | `front_ramp_final_over_first_normal_is_at_least_1_35` (core, equal rank) | 2, 4 |
 | G6.14 | Wave tiers at ranks 10/20/40 differ | `snapshot_wave_tiers_at_10_20_40_are_7_10_11` | 2 |
-| G6.15 | LUX: Easy ≤ 6 runs; Hard ≤ 1.5x Normal | `goal6_lux_easy_at_most_6_runs`, `goal6_lux_hard_at_most_1_5x_normal` (release) | 4 |
+| G6.15 | LUX: Easy ≤ 6 runs; Hard ≤ 1.5x Normal | `goal6_lux_easy_at_most_6_runs`, `goal6_lux_hard_at_most_1_5x_normal` (release) (W2 review, 6f20cf2: a censored Hard median, whose median seed never liberates in 20 runs, fails as unmeasured instead of counting as 21, since 21 only bounds it from below; a censored Normal median against a measured Hard one passes; design-enemy-balance W-4 as-built note) | 4 |
 | G6.16 | Every archetype spawns and is killed | `goal6_archetype_coverage` (release, telemetry) | 4 |
 | G6.17 | Boss time-to-kill 20-60 s | `goal6_boss_ttk_median_20_60_s` (release) | 4 |
 | G6.18 | Clamped starts get their first victory on run 2-4 | `goal6_clamped_starts_first_victory_runs_2_to_4` | 4 |
