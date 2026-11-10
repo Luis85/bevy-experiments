@@ -1,5 +1,14 @@
 # Island simulation ownership and extension contracts
 
+The regional `living_world` extension composes immutable construction, settlement
+identity, employment, ecology, routes and recorded restoration in `village/frontier`.
+[ADR 0037](adr/0037-regional-living-world.md) defines those owners and their profile-only
+registrations. Employment changes feed the existing resident Work boundary; they
+do not introduce a second needs/work controller. Rendering uses derived terrain
+chunks and persistent appearance IDs; it cannot drive authoritative scheduling.
+The published settlement chart contains immutable public destinations, while all
+live resources, residents and property retain actor-scoped observation rules.
+
 Island Village is content built on the framework's existing capabilities. Its
 composition root is `content/testbed_content/src/village/mod.rs`; the generic
 crates do not know about residents, cottages, island terrain or colony policy.

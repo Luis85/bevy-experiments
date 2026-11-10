@@ -8,6 +8,7 @@ mod commands;
 mod discovery;
 pub mod economy;
 pub mod environment;
+pub mod frontier;
 pub mod geography;
 pub mod goap;
 pub use geography as geometry;
@@ -51,6 +52,7 @@ pub(crate) struct BirthPreset(pub String);
 
 pub fn intrinsic_action(verb: &str) -> bool {
     verb == "join_island"
+        || frontier::activities::VERBS.contains(&verb)
         || homestead::VERBS.contains(&verb)
         || matches!(
             verb,
@@ -80,6 +82,7 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
     use npc_framework::perf::PerfAppExt;
     app.register_budget("village.economy", 250, 0);
     app.insert_resource(crate::world_runtime::ActiveWorld(p.clone()));
+    frontier::register(app);
     // Host observation only: no sim registry/hash/snapshot entry and no tick system.
     app.insert_resource(
         npc_framework::agent_io::scheduler::SchedulerEventClassifier(scheduler::classify),
@@ -242,6 +245,10 @@ pub const PLACES: [(Role, i32, i32, &str); 9] = [
     (Role::Innkeeper, 2, -7, "The Lantern Inn"),
 ];
 pub fn spawn_places(world: &mut World, ids: &mut crate::TestbedIds) {
+    if frontier::enabled(world) {
+        frontier::spawn_places(world, ids);
+        return;
+    }
     let day_length = world.resource::<SimConfig>().day_length;
     let geography = *geography::for_world(world);
     // Allocate exactly the original shoreline identities before any incumbent
@@ -353,6 +360,10 @@ pub fn apply(world: &mut World, played: SimId) {
     let home = world.get::<SimPos>(e).copied().unwrap_or_default();
     initialise_person(world, e, Role::Visitor, &alias, home, SimId(0));
     world.entity_mut(e).insert(VillageDiary::default());
+    if frontier::enabled(world) {
+        frontier::spawn(world);
+        return;
+    }
     for role in Role::RESIDENTS {
         let station = world
             .resource::<crate::TestbedIds>()
@@ -480,4 +491,5 @@ fn tick(world: &mut World) {
     ai::tick(world);
     homestead::tick(world);
     colony::tick(world);
+    frontier::tick(world);
 }

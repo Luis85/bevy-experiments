@@ -85,12 +85,16 @@ fn present(world: &mut World) {
     } else {
         None
     };
+    let elevation = projection.map_or(0.0, |(position, _)| {
+        testbed_content::village::frontier::terrain::height_mm(world, position) as f32 / 1000.0
+    });
     for (mut transform, mut visible) in world
         .query_filtered::<(&mut Transform, &mut Visibility), With<Preview>>()
         .iter_mut(world)
     {
         if let Some((position, _)) = projection {
             transform.translation = sim_to_world(position);
+            transform.translation.y += elevation;
             *visible = Visibility::Inherited;
         } else {
             *visible = Visibility::Hidden;

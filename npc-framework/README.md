@@ -1,7 +1,8 @@
 # npc-framework
 
-**Island Village is the playable showcase.** Twelve NPC residents run food, materials,
-tools and clothing chains while maintaining homes and social relationships. Start at
+**Island Village is the playable showcase.** The coastal world has three settlements
+and 42 NPC residents running food, fishing, materials, tools and clothing chains,
+with independent homes, changing occupations and renewable habitats. Start at
 the title, choose **New game** or **Continue**, then gather, craft, build a cottage
 and tend a garden in the same window. **Oversee the village** also lets you begin
 with colony management before creating a mortal visitor. Inspection and terrain editing remain
@@ -18,14 +19,18 @@ a nearby action; **Esc / Menu** pauses; **Ctrl+S** saves the local island. The 3
 world and permanent-life survival rules remain in place.
 [Start playing](docs/island-life.md) · [Colony and landscape tools](docs/island-colony.md) ·
 [Editable NPC routines and GOAP](docs/island-ai-authoring.md).
+[Explore the larger coastal world](docs/living-world.md) covers regional travel,
+fishing, restoration, occupations, authoring and preserved legacy saves.
 [Architecture and mechanic ownership](docs/architecture-island.md) describes the
 simulation, domain, action, control and presentation boundaries.
-The [experience](docs/research/2026-11-09-experience-research.md),
-[simulation](docs/research/2026-11-09-simulation-research.md) and
-[implementation](docs/research/2026-11-09-implementation-research.md) research briefs
-record the developer evidence and improvement proposals behind the final polish.
-Implemented scope and verification are separate: see the
-[validation record](docs/_notes/2026-11-09-island-player-flow-validation.md).
+The [world/ecology](docs/research/2026-11-09-living-world-expansion.md),
+[residents/economy](docs/research/2026-11-09-adaptive-regional-residents.md) and
+[graphics/experience](docs/research/2026-11-09-world-fidelity.md) research briefs
+explain this iteration's design and review decisions. The
+[living-world validation record](docs/_notes/2026-11-09-living-world-validation.md)
+records the 14-day autonomous audit, native confirmation and remaining final checks.
+Earlier player-flow evidence remains in its
+[separate validation record](docs/_notes/2026-11-09-island-player-flow-validation.md).
 
 The remaining examples below document the framework and historical development scenarios.
 Use `--developer-menu` to open the older launcher toolbox and its settings/editors.

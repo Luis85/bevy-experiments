@@ -32,6 +32,16 @@ pub const TAN: &str = "village_tan";
 pub const SPIN: &str = "village_spin";
 pub const TAILOR: &str = "village_tailor";
 pub const FORGE_SPEAR: &str = "village_forge_spear";
+pub const FISH: &str = "village_fish";
+pub const FISHING_ROD: &str = "village_fishing_rod";
+pub const MAKE_ROD: &str = "village_make_rod";
+pub const COOK_FISH: &str = "village_cook_fish";
+pub const WEAVE_COAT: &str = "village_weave_coat";
+pub const FRONTIER_RECIPE_VERBS: &[&str] = &[
+    "craft:village_make_rod",
+    "craft:village_cook_fish",
+    "craft:village_weave_coat",
+];
 pub const SAW_LOG_COST: u32 = 1;
 pub const SAW_PLANK_YIELD: u32 = 4;
 // Four full exposed cold days at one wear/tick: thirteen actors need 3.25
@@ -85,6 +95,64 @@ pub const LIVING_TRADE_KINDS: &[&str] = &[
     WARM_CLOTHES,
     WATER,
 ];
+pub const FRONTIER_TRADE_KINDS: &[&str] = &[
+    "axe",
+    "bread",
+    "hammer",
+    "ingot",
+    "log",
+    "ore",
+    "pickaxe",
+    "plank",
+    BERRIES,
+    BOWL,
+    COOKED_MEAL,
+    FIBER,
+    FISH,
+    FISHING_ROD,
+    FLOUR,
+    GRAIN,
+    HIDE,
+    LEATHER,
+    RAW_MEAT,
+    SPEAR,
+    THREAD,
+    WARM_CLOTHES,
+    WATER,
+];
+
+/// Additional renewable chains are registered only by the regional profile.
+pub fn register_frontier(app: &mut App) {
+    app.register_item_kind(ItemKindDef::new(FISH).weight_g(500).stackable(20))
+        .register_item_kind(
+            ItemKindDef::new(FISHING_ROD)
+                .weight_g(800)
+                .tag("tool:fishing"),
+        );
+    for recipe in [
+        RecipeDef::new(MAKE_ROD)
+            .input("plank", 1)
+            .input(THREAD, 2)
+            .station(SAW)
+            .duration(180)
+            .output(FISHING_ROD, 1),
+        RecipeDef::new(COOK_FISH)
+            .input(FISH, 2)
+            .input(WATER, 1)
+            .input("log", 1)
+            .station(BAKE)
+            .duration(200)
+            .output(COOKED_MEAL, 2),
+        RecipeDef::new(WEAVE_COAT)
+            .input(THREAD, 8)
+            .input(FIBER, 4)
+            .station(TAILOR)
+            .duration(480)
+            .output(WARM_CLOTHES, 1),
+    ] {
+        app.register_recipe(recipe);
+    }
+}
 pub fn register(app: &mut App) {
     for (kind, grams, stack) in [
         (GRAIN, 250, 50),
@@ -219,7 +287,9 @@ pub fn food_restore(kind: &str) -> Option<i32> {
 }
 
 pub fn trade_kinds(world: &World) -> &'static [&'static str] {
-    if super::needs_driven(world) {
+    if super::frontier::enabled(world) {
+        FRONTIER_TRADE_KINDS
+    } else if super::needs_driven(world) {
         LIVING_TRADE_KINDS
     } else {
         TRADE_KINDS
@@ -227,6 +297,13 @@ pub fn trade_kinds(world: &World) -> &'static [&'static str] {
 }
 
 pub fn outputs_for(world: &World, role: Role) -> &'static [&'static str] {
+    if super::frontier::enabled(world) {
+        match role {
+            Role::Fisher => return &[FISH],
+            Role::Carpenter => return &["plank", BOWL, FISHING_ROD],
+            _ => {}
+        }
+    }
     if !super::needs_driven(world) {
         return outputs(role);
     }
@@ -242,6 +319,16 @@ pub fn outputs_for(world: &World, role: Role) -> &'static [&'static str] {
 }
 
 pub fn wants_for(world: &World, role: Role, kind: &str) -> bool {
+    if super::frontier::enabled(world)
+        && match role {
+            Role::Fisher => kind == FISHING_ROD,
+            Role::Baker => kind == FISH,
+            Role::Carpenter => kind == THREAD,
+            _ => false,
+        }
+    {
+        return true;
+    }
     if !super::needs_driven(world) {
         return wants(role, kind);
     }
@@ -260,6 +347,14 @@ pub fn wants_for(world: &World, role: Role, kind: &str) -> bool {
 
 /// Candidate jobs; the NPC planner chooses from current backed demand, not this order.
 pub fn recipes_for(world: &World, role: Role) -> &'static [&'static str] {
+    if super::frontier::enabled(world) {
+        match role {
+            Role::Baker => return &[BAKE, COOK, COOK_FISH],
+            Role::Carpenter => return &[SAW, CARVE, MAKE_ROD],
+            Role::Tailor => return &[SPIN, TAILOR, WEAVE_COAT],
+            _ => {}
+        }
+    }
     if super::needs_driven(world) {
         match role {
             Role::Baker => return &[BAKE, COOK],
@@ -298,6 +393,8 @@ pub fn price(kind: &str) -> Option<u32> {
         WARM_CLOTHES => 34,
         SPEAR => 10,
         BERRIES => 2,
+        FISH => 4,
+        FISHING_ROD => 12,
         _ => return None,
     })
 }
@@ -314,6 +411,8 @@ pub fn stock_limit(kind: &str) -> u32 {
         THREAD | COOKED_MEAL => 24,
         WARM_CLOTHES => 4,
         SPEAR => 8,
+        FISH => 20,
+        FISHING_ROD => 4,
         _ => 0,
     }
 }

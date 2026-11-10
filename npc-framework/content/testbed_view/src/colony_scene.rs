@@ -1,4 +1,6 @@
 //! Live terrain and restrained village atmosphere. These are separate view entities.
+#[path = "living_scene.rs"]
+pub(crate) mod living_scene;
 use bevy::prelude::*;
 use npc_framework::prelude::{SimClock, SimConfig, SimPos};
 use npc_framework::view_helpers::ViewHidden;
@@ -34,6 +36,16 @@ struct Smoke {
 struct HiddenArrivals(BTreeSet<Entity>);
 
 pub(crate) fn plugin(app: &mut App) {
+    if testbed_content::village::frontier::enabled(app.world()) {
+        living_scene::plugin(app);
+        app.init_resource::<HiddenArrivals>().add_systems(
+            Update,
+            hide_arrivals
+                .in_set(ViewSystems::Present)
+                .after(crate::fog::FogSet),
+        );
+        return;
+    }
     if !testbed_content::village::colony::enabled(app.world()) {
         return;
     }

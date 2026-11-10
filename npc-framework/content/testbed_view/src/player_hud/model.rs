@@ -233,7 +233,11 @@ pub(super) fn rows(world: &World, observed: &Value, state: &PlayerState, ready: 
                 let kind = resource["kind"].as_str().unwrap_or("material");
                 let pos = player_actions::known_position(world, SimId(target));
                 let stocked = resource["remaining"].as_u64().is_none_or(|count| count > 0);
-                let detail = if !stocked {
+                let tool_ready = kind != catalog::FISH
+                    || stock.get(catalog::FISHING_ROD).copied().unwrap_or(0) > 0;
+                let detail = if !tool_ready {
+                    "Bring a fishing rod. Craft one at a carpenter's workshop using 1 plank and 2 thread, or buy one.".into()
+                } else if !stocked {
                     "Depleted for now. Return after it recovers.".into()
                 } else {
                     resource["remaining"].as_u64().map_or_else(
@@ -243,7 +247,11 @@ pub(super) fn rows(world: &World, observed: &Value, state: &PlayerState, ready: 
                 };
                 rows.push(Row::action(
                     format!("gather_{target}"),
-                    format!("Gather {}", friendly(kind)),
+                    if kind == catalog::FISH {
+                        "Cast your fishing rod".into()
+                    } else {
+                        format!("Gather {}", friendly(kind))
+                    },
                     detail,
                     work(
                         "Gather one item",
@@ -252,7 +260,7 @@ pub(super) fn rows(world: &World, observed: &Value, state: &PlayerState, ready: 
                         json!({"quantity":1}),
                         pos,
                     ),
-                    ready && stocked && pos.is_some(),
+                    ready && stocked && tool_ready && pos.is_some(),
                 ));
             }
             if array(&village["environment"]["resources"]).is_empty() {
@@ -589,30 +597,126 @@ fn home_heating(village: &Value, rows: &mut Vec<Row>) {
 }
 
 fn explore_places(world: &World, observed: &Value, ready: bool, rows: &mut Vec<Row>) {
-    rows.push(Row::note(
-        "explore_intro",
-        "Explore on foot",
-        "Walk 6 m in a world direction. WASD and right-click also move your character.",
-    ));
-    if let Some(here) = position(&observed["sections"]["self"]["pos"]) {
-        for (direction, dx, dz) in [
-            ("north", 0, 6000),
-            ("east", 6000, 0),
-            ("south", 0, -6000),
-            ("west", -6000, 0),
-        ] {
-            let mut row = Row::action(
-                format!("explore_{direction}"),
-                format!("Walk 6 m {direction}"),
-                "",
-                Action::Walk(SimPos::new(
-                    here.x.saturating_add(dx),
-                    here.z.saturating_add(dz),
-                )),
-                ready,
-            );
-            row.compact = true;
-            rows.push(row);
+    let regional = &observed["sections"]["living_world"];
+    if regional.is_object() {
+        if !array(&regional["chart"]).is_empty() {
+            rows.push(Row::note(
+                "regional_chart",
+                "Coastal chart",
+                format!(
+                    "{} settlements share this island. Carry food and water for the journey.",
+                    array(&regional["chart"]).len()
+                ),
+            ));
+            let here = position(&observed["sections"]["self"]["pos"]);
+            for destination in array(&regional["chart"]) {
+                let Some(pos) = position(&destination["position"]) else {
+                    continue;
+                };
+                let name = destination["name"].as_str().unwrap_or("Settlement");
+                let description = match destination["biome"].as_str() {
+                    Some("coast") => "Fishing, village workshops and a place to begin.",
+                    Some("woodland") => "Woodland resources, forest homes and habitat restoration.",
+                    Some("ridge") => "Upland homes, exposed stone and mining work.",
+                    _ => "Follow the paths to another community.",
+                };
+                let distance = here
+                    .map(|here| {
+                        format!(
+                            "{} m away · ",
+                            (here.dist2(pos) as f64).sqrt() as u32 / 1000
+                        )
+                    })
+                    .unwrap_or_default();
+                rows.push(Row::action(
+                    format!(
+                        "destination_{}",
+                        destination["key"].as_str().unwrap_or(name)
+                    ),
+                    format!("Travel to {name}"),
+                    format!("{distance}{description}"),
+                    Action::Walk(pos),
+                    ready,
+                ));
+            }
+        }
+        rows.push(Row::heading("landcare", "Care for the landscape"));
+        rows.push(Row::note("landcare_intro", "What you take changes the world", "Fish stocks, trees and forage recover over time. Approach a resource site to inspect it, plant tree cuttings or restore its habitat."));
+        for site in array(&regional["nearby_sites"]) {
+            let (Some(target), Some(pos)) = (id(&site["id"]), position(&site["position"])) else {
+                continue;
+            };
+            let resource = friendly(site["kind"].as_str().unwrap_or("Resource"));
+            rows.push(Row::note(
+                format!("ecology_{target}"),
+                format!("{resource} site"),
+                format!(
+                    "{} / {} available · Habitat {}%\nSoil {}% · Disturbance {}%{}",
+                    site["remaining"],
+                    site["capacity"],
+                    site["vitality_percent"],
+                    site["soil_percent"],
+                    site["disturbance_percent"],
+                    site["growth_hours"]
+                        .as_u64()
+                        .map_or(String::new(), |hours| format!(
+                            "\n{} plantings growing · Next growth in {hours} game hours",
+                            site["plantings"]
+                        ))
+                ),
+            ));
+            for action in array(&site["actions"]) {
+                let verb = action["verb"].as_str().unwrap_or("");
+                let label = if verb == "plant_tree" {
+                    "Plant a tree cutting"
+                } else {
+                    "Restore habitat"
+                };
+                let available = action["available"].as_bool() == Some(true);
+                let detail = if available {
+                    if verb == "plant_tree" {
+                        "Uses 1 log cutting and 1 water. Growth takes time."
+                    } else {
+                        "Uses 2 fiber and 1 water. Improves delayed recovery."
+                    }
+                } else {
+                    action["reason"].as_str().unwrap_or("Unavailable")
+                };
+                rows.push(Row::action(
+                    format!("{verb}_{target}"),
+                    label,
+                    detail,
+                    work(label, verb, Some(target), json!({}), Some(pos)),
+                    ready && available,
+                ));
+            }
+        }
+    } else {
+        rows.push(Row::note(
+            "explore_intro",
+            "Explore on foot",
+            "Walk 6 m in a world direction. WASD and right-click also move your character.",
+        ));
+        if let Some(here) = position(&observed["sections"]["self"]["pos"]) {
+            for (direction, dx, dz) in [
+                ("north", 0, 6000),
+                ("east", 6000, 0),
+                ("south", 0, -6000),
+                ("west", -6000, 0),
+            ] {
+                let mut row = Row::action(
+                    format!("explore_{direction}"),
+                    format!("Walk 6 m {direction}"),
+                    "",
+                    Action::Walk(SimPos::new(
+                        here.x.saturating_add(dx),
+                        here.z.saturating_add(dz),
+                    )),
+                    ready,
+                );
+                row.compact = true;
+                rows.push(row);
+            }
         }
     }
     rows.push(Row::heading("known_places", "Places you know"));

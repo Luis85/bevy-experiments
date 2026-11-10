@@ -8,6 +8,20 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Regional living world
+
+- Add an opt-in 256×256 metre coastal world with three settlements, 42 residents,
+  explicit homes, persistent identities and bounded occupation changes.
+- Add finite ecology and delayed restoration, fishing and renewable woven clothing;
+  distribute regional production and use reachable physical sourcing.
+- Expand character, workplace and nature assets with recorded CC0 provenance,
+  regional terrain chunks, atmosphere and a published settlement chart.
+- Hold regional entry behind an opaque preparation screen until terrain GPU
+  buffers and render pipelines are ready. Retain water-only chunk identities
+  without uploading empty meshes, including terrain edits back to land.
+- Preserve old saves; normal play uses a separate living-world save and frozen
+  construction. ADR 0037 describes ownership; the coastal-world guide covers play.
+
 ### One-window island life
 
 - Connect the title, named New game, Continue, play, pause, save and return to title

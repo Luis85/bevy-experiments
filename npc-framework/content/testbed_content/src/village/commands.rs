@@ -50,6 +50,11 @@ pub(super) fn verb_gate(world: &World, e: Entity, verb: &str) -> Option<String> 
         });
     }
     let person = world.get::<Villager>(e)?;
+    if let Some(reason) = super::frontier::activities::busy(world, e)
+        && !matches!(verb, "stop_work" | "talk" | "read_diary" | "write_diary")
+    {
+        return Some(reason);
+    }
     if let Some(reason) = super::homestead::busy(world, e)
         && !matches!(verb, "stop_work" | "talk" | "read_diary" | "write_diary")
     {
@@ -173,7 +178,14 @@ impl VillageAct {
                     return Err("move within 1.5 m of the resource patch".into());
                 }
                 if p.remaining == 0 {
-                    return Err("resource patch is depleted until tomorrow".into());
+                    return Err(if super::frontier::enabled(world) {
+                        "resource patch is depleted; renewable sites recover over time".into()
+                    } else {
+                        "resource patch is depleted until tomorrow".into()
+                    });
+                }
+                if p.kind == catalog::FISH && econ::count(world, actor, catalog::FISHING_ROD) == 0 {
+                    return Err("fishing requires a fishing rod in your pack".into());
                 }
                 if world.get::<Gathering>(actor).is_some()
                     || world.get::<super::hunting::Hunting>(actor).is_some()
@@ -550,7 +562,7 @@ fn new_life(world: &mut World) -> Result<(), String> {
         preset: Some(preset),
         ..Default::default()
     };
-    let pos = SimPos::new(500, -1500);
+    let pos = super::frontier::spec(world).map_or(SimPos::new(500, -1500), |spec| spec.actor_start);
     let id = crate::layout::spawn_unit(world, pos, &spec)?;
     if let Some(e) = entity_of(world, old.played) {
         world

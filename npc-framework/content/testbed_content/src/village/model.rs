@@ -31,6 +31,7 @@ pub enum Role {
     Hunter,
     Tanner,
     Tailor,
+    Fisher,
 }
 impl Role {
     pub const RESIDENTS: [Self; 9] = [
@@ -59,6 +60,7 @@ impl Role {
             Self::Hunter => "hunter",
             Self::Tanner => "tanner",
             Self::Tailor => "tailor",
+            Self::Fisher => "fisher",
         }
     }
     pub fn person(self) -> &'static str {
@@ -76,6 +78,7 @@ impl Role {
             Self::Hunter => "Rhea",
             Self::Tanner => "Sage",
             Self::Tailor => "Lina",
+            Self::Fisher => "Finn",
         }
     }
     pub fn tag(self) -> u8 {

@@ -18,6 +18,9 @@ fn seed_kind() -> String {
 }
 
 pub(super) fn idle(world: &World, actor: Entity) -> Result<(), String> {
+    if let Some(reason) = super::super::frontier::activities::busy(world, actor) {
+        return Err(reason);
+    }
     if world.get::<CottageBuild>(actor).is_some()
         || world.get::<super::super::Gathering>(actor).is_some()
         || world.get::<super::super::hunting::Hunting>(actor).is_some()
@@ -44,10 +47,14 @@ fn site_clear(world: &World, plot: Entity) -> Result<(), String> {
     let house = cottage_center(center);
     let grid = world.resource::<SpatialGrid>();
     let cells = grid.footprint_cells(house, cottage_footprint());
-    if cells
-        .iter()
-        .any(|cell| !geography::for_world(world).land_cell(cell.x, cell.z))
-    {
+    if cells.iter().any(|cell| {
+        if super::super::frontier::enabled(world) {
+            super::super::frontier::terrain::cell(world, cell.x, cell.z)
+                .is_none_or(|terrain| !terrain.walkable())
+        } else {
+            !geography::for_world(world).land_cell(cell.x, cell.z)
+        }
+    }) {
         return Err("the cottage footprint must be on land".into());
     }
     for entity in world.resource::<SimIndex>().map.values().copied() {

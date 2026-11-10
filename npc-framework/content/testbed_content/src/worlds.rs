@@ -10,7 +10,8 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 pub const PLAIN_EXPLORER: &str = "plain_explorer";
-pub const BUILTIN_PRESETS: [(&str, &str); 7] = [
+pub const BUILTIN_PRESETS: [(&str, &str); 8] = [
+    ("living_world", include_str!("../worlds/living_world.json")),
     (
         PLAIN_EXPLORER,
         include_str!("../worlds/plain_explorer.json"),
@@ -38,6 +39,8 @@ pub const BUILTIN_PRESETS: [(&str, &str); 7] = [
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WorldPreset {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub living_world: Option<crate::village::frontier::LivingWorldSpec>,
     #[serde(default, skip_serializing_if = "is_false")]
     pub colony: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -165,6 +168,14 @@ pub struct InhabitantsSpec {
 
 pub fn validate(p: &WorldPreset) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
+    if let Some(definition) = &p.living_world {
+        if !p.colony || p.island_ai.is_none() {
+            errors.push("The regional living world requires colony and resident AI policy.".into());
+        }
+        if let Err(error) = definition.validate() {
+            errors.push(error);
+        }
+    }
     if p.colony
         && (p.scene != WorldScene::IslandVillage
             || p.economy != EconomyModel::NeedsDriven
@@ -301,7 +312,11 @@ pub fn install_builtins(dir: &Path) -> Result<(), String> {
         for (id, text) in BUILTIN_PRESETS.iter().filter(|(id, _)| {
             matches!(
                 *id,
-                "island_village" | "living_island" | "living_homestead" | "island_colony"
+                "island_village"
+                    | "living_island"
+                    | "living_homestead"
+                    | "island_colony"
+                    | "living_world"
             )
         }) {
             let path = dir.join(format!("{id}.json"));

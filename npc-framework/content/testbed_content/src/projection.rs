@@ -105,6 +105,16 @@ pub fn world_state(world: &mut World) -> Result<Value, String> {
             {
                 view["replenish_at"] = json!(renew_at);
             }
+        } else if let Some(settlement) = world.get::<village::frontier::Settlement>(e) {
+            view["kind"] = json!("settlement");
+            view["name"] = json!(settlement.label);
+        } else if village::frontier::enabled(world)
+            && world.get::<village::colony::Household>(e).is_some()
+        {
+            let home = world.get::<village::colony::Household>(e).expect("home");
+            view["kind"] = json!("home");
+            view["name"] = json!(home.label);
+            view["residents"] = json!(home.residents);
         } else if let Some(item) = world.get::<Item>(e) {
             if world.get::<CarriedBy>(e).is_some() {
                 continue;
@@ -132,9 +142,23 @@ pub fn world_state(world: &mut World) -> Result<Value, String> {
         .collect();
     let mut terrain = json!({"origin":{"x":-32000,"z":-32000},"cell_size_mm":1000,
         "width":64,"height":64,"cells":cells,"paths":geography.roads});
+    if let Some(regional) = world.get_resource::<village::frontier::terrain::TerrainState>() {
+        let bounds = regional.bounds();
+        terrain = json!({"origin":{"x":bounds.min.x*1000,"z":bounds.min.z*1000},"cell_size_mm":1000,
+            "width":regional.width,"height":regional.height,
+            "cells":regional.cells.iter().map(|c|u8::from(c.walkable())).collect::<Vec<_>>(),
+            "height_mm":regional.cells.iter().map(|c|c.height_mm).collect::<Vec<_>>(),
+            "revision":regional.revision});
+    }
     if !geography.expansion_plots.is_empty() {
         terrain["expansion_plots"] = json!(geography.expansion_plots);
         terrain["districts"] = json!(geography.districts);
+    }
+    if let Some(spec) = village::frontier::spec(world) {
+        terrain["expansion_plots"] = json!(spec.plots);
+        terrain["districts"]=json!(spec.settlements.iter().map(|settlement|json!({
+            "id":settlement.key,"label":settlement.label,"x":settlement.center.x,"z":settlement.center.z,"biome":settlement.biome
+        })).collect::<Vec<_>>());
     }
     let world_name = world
         .get_resource::<crate::world_runtime::ActiveWorld>()

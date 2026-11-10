@@ -24,6 +24,10 @@ use crate::anim::pose_of;
 use crate::fog::{Fogged, Look, marker_pos};
 use crate::visuals::ActorVisual;
 
+#[cfg(test)]
+#[path = "overlay_regional_tests.rs"]
+mod regional_tests;
+
 /// Whether the overlay (text + item markers) is shown. Toggle with F1.
 #[derive(Resource, Clone, Copy, Debug)]
 pub struct OverlayState {
@@ -61,7 +65,7 @@ pub(crate) fn plugin(app: &mut App) {
 }
 #[allow(clippy::too_many_arguments)]
 fn colony_diagnostics(
-    terrain: Option<Res<testbed_content::village::terrain::TerrainState>>,
+    colony: Option<Res<testbed_content::village::colony::ColonyState>>,
     state: Res<OverlayState>,
     paths: Option<ResMut<npc_framework::view_helpers::nav_gizmos::NavGizmos>>,
     gate: Option<Res<crate::FrontendGate>>,
@@ -71,7 +75,7 @@ fn colony_diagnostics(
     store: Option<ResMut<GizmoConfigStore>>,
 ) {
     let gated = gate.is_some_and(|gate| gate.0);
-    if terrain.is_some()
+    if colony.is_some()
         && let Some(mut paths) = paths
     {
         paths.enabled = state.visible && !gated;

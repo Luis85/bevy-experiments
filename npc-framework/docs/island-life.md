@@ -142,7 +142,9 @@ opens the pause menu. Choose **Resume**, **Save game**, **Save and title** or
 **Quit game**. The last two save before leaving play. A save failure keeps the
 application open with a recoverable error.
 
-The local save is `local-island.world.json` in the configured agents folder. During
+Normal play now uses `living-world.world.json` in the configured agents folder.
+The previous `local-island.world.json` is preserved and can be opened explicitly;
+see [the coastal world](living-world.md) for regional play and compatibility. During
 play it autosaves every minute; **Ctrl+S** or **F9** saves immediately. A second
 window cannot own the same save. Backups use `.previous-N.json` and are never
 overwritten. Save data includes the world's rules; editing a preset does not change

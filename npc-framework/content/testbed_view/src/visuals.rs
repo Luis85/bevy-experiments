@@ -295,6 +295,7 @@ fn spawn_visuals(
             Option<&Owner>,
             Option<&testbed_content::actors::ActorModel>,
             Option<&Sensors>,
+            Option<&testbed_content::village::frontier::labor::ResidentProfile>,
         ),
         Without<Prop>,
     >,
@@ -495,12 +496,13 @@ fn spawn_visuals(
         index.map.insert(sim, root);
     }
 
-    for (sim, unit, pos, owner, preset_model, sensors) in &actors {
+    for (sim, unit, pos, owner, preset_model, sensors, profile) in &actors {
         if !fresh(&mut index, sim) {
             continue;
         }
-        let kind = preset_model
-            .and_then(|m| ModelKind::from_name(&m.0))
+        let kind = profile
+            .map(|profile| ModelKind::for_resident(profile.appearance))
+            .or_else(|| preset_model.and_then(|m| ModelKind::from_name(&m.0)))
             .unwrap_or_else(|| ModelKind::for_actor(&unit.template, owner.map(|o| o.0.0)));
         if kind.is_robot() && robots.is_none() {
             continue;
@@ -544,7 +546,7 @@ fn spawn_visuals(
                     ActorModel { root },
                     model(
                         &assets.actor[kind.index()],
-                        Transform::from_scale(Vec3::splat(V)),
+                        Transform::from_scale(Vec3::splat(kind.scale())),
                     ),
                 ))
                 .observe(crate::anim::on_actor_ready);
@@ -699,6 +701,7 @@ type VisualSimKinds = Or<(
     With<TestbedUnit>,
     With<testbed_content::village::VillagePlace>,
     With<testbed_content::village::ResourcePatch>,
+    With<testbed_content::village::colony::Household>,
     With<testbed_content::village::hunting::Wildlife>,
     With<testbed_content::village::homestead::HomesteadPlot>,
     With<testbed_content::village::homestead::Cottage>,
@@ -1237,6 +1240,39 @@ mod tests {
         );
     }
 
+    #[test]
+    fn settlement_house_visual_survives_cleanup_until_its_household_is_removed() {
+        let mut app = App::new();
+        app.init_resource::<VisualIndex>()
+            .add_systems(Update, despawn_visuals);
+        let home = app
+            .world_mut()
+            .spawn(testbed_content::village::colony::Household {
+                label: "Household".into(),
+                capacity: 2,
+                residents: vec![],
+                door: SimPos::new(0, 0),
+                heated_until: 0,
+                logs_burned: 0,
+            })
+            .id();
+        let visual = app.world_mut().spawn(VisualOf(home)).id();
+        app.world_mut()
+            .resource_mut::<VisualIndex>()
+            .map
+            .insert(home, visual);
+        app.update();
+        app.update();
+        assert!(app.world().get_entity(visual).is_ok());
+        assert_eq!(
+            app.world().resource::<VisualIndex>().map.get(&home),
+            Some(&visual)
+        );
+        app.world_mut().despawn(home);
+        app.update();
+        assert!(app.world().get_entity(visual).is_err());
+    }
+
     use npc_framework::interaction::items::{place_in_world, put_in_inventory, put_in_slot};
     use npc_framework::perception::{ExploredCells, RevealsFog, SeenStatics, VisibleCells};
     use npc_framework::prelude::{Equipment, GridBounds, Inventory, SpatialGrid, spawn_sim};
@@ -1253,8 +1289,8 @@ mod tests {
             .init_resource::<SimClock>();
         macro_rules! models {($($name:ident),* $(,)?)=>{Models{$($name:default(),)*}};}
         app.insert_resource(ViewAssets {
-            actor_gltf: default(),
-            actor: default(),
+            actor_gltf: vec![default(); ModelKind::ANIMATED.len()],
+            actor: vec![default(); ModelKind::ANIMATED.len()],
             grass: default(),
             models: models!(
                 wall,

@@ -121,9 +121,12 @@ fn saved_construction(
 }
 
 fn fresh_construction(rules: Option<&Path>) -> Result<ScenarioDoc, String> {
-    let mut doc = testbed_content::scenario::scenario_doc("island_colony")?;
     let preset = if let Some(path) = rules {
-        if !path.exists() && path.file_stem().is_some_and(|name| name == "island_colony") {
+        if !path.exists()
+            && path
+                .file_stem()
+                .is_some_and(|name| name == "island_colony" || name == "living_world")
+        {
             testbed_content::worlds::install_builtins(
                 path.parent().ok_or("World rules need a parent directory")?,
             )?;
@@ -137,15 +140,44 @@ fn fresh_construction(rules: Option<&Path>) -> Result<ScenarioDoc, String> {
     } else {
         testbed_content::worlds::builtin_preset("island_colony").expect("shipped island rules")
     };
+    construction_from_preset(preset)
+}
+
+fn shipped_preset(rules: Option<&Path>) -> testbed_content::worlds::WorldPreset {
+    let key = if rules
+        .and_then(Path::file_stem)
+        .is_some_and(|name| name == "living_world")
+    {
+        "living_world"
+    } else {
+        "island_colony"
+    };
+    testbed_content::worlds::builtin_preset(key).expect("shipped island profile")
+}
+
+fn construction_from_preset(
+    preset: testbed_content::worlds::WorldPreset,
+) -> Result<ScenarioDoc, String> {
+    let mut doc = testbed_content::scenario::scenario_doc("island_colony")?;
     testbed_content::worlds::validate(&preset).map_err(|errors| errors.join("; "))?;
     if !preset.colony {
         return Err("Local island rules must enable the colony simulation.".into());
+    }
+    if let Some(region) = &preset.living_world {
+        doc.actors
+            .first_mut()
+            .ok_or("Island construction needs an arrival actor")?
+            .pos = Some((region.actor_start.x, region.actor_start.z));
     }
     testbed_content::explorer::context::ExplorerContext::for_world(
         "human",
         "human",
         &testbed_content::actors::human_preset(),
-        "island_colony",
+        if preset.living_world.is_some() {
+            "living_world"
+        } else {
+            "island_colony"
+        },
         &preset,
     )
     .write_to(&mut doc)?;
@@ -379,6 +411,57 @@ fn refresh_label(
 mod tests {
     use super::*;
     use npc_framework::{kernel::hash::state_hash, prelude::*};
+
+    #[test]
+    fn regional_host_uses_authored_arrival_and_resumes_frozen_construction() {
+        let dir = std::env::temp_dir().join(format!("npc-regional-host-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("world.json");
+        let rules = dir.join("living_world.json");
+        let preset = testbed_content::worlds::builtin_preset("living_world").unwrap();
+        let start = preset.living_world.as_ref().unwrap().actor_start;
+        std::fs::write(&rules, serde_json::to_vec(&preset).unwrap()).unwrap();
+        let mut app = open(&path, Some(7), Some(&rules), false, |_| {}).unwrap();
+        let played = app
+            .world()
+            .resource::<testbed_content::village::VillageState>()
+            .played;
+        let actor = app.world().resource::<SimIndex>().get(played).unwrap();
+        assert_eq!(app.world().get::<SimPos>(actor), Some(&start));
+        assert_eq!(
+            testbed_content::village::colony::summary(app.world()).residents,
+            42
+        );
+        run_ticks(app.world_mut(), 17);
+        save(app.world_mut()).unwrap();
+        let hash = state_hash(app.world_mut());
+        drop(app);
+        std::fs::write(&rules, "invalid replacement rules").unwrap();
+        let mut restored = open(&path, None, Some(&rules), false, |_| {}).unwrap();
+        assert_eq!(state_hash(restored.world_mut()), hash);
+        drop(restored);
+        let fresh_path = dir.join("fallback.json");
+        let fallback = session::open(&fresh_path, None, Some(&rules), |_| {}).unwrap();
+        assert!(testbed_content::village::frontier::enabled(
+            fallback.world()
+        ));
+        assert!(
+            session::summary(fallback.world())
+                .issue
+                .unwrap()
+                .contains("The Living Island")
+        );
+        assert!(
+            !fresh_path.exists(),
+            "opening the title must not silently create a fallback save"
+        );
+        drop(fallback);
+        std::fs::remove_file(fresh_path.with_extension("world.lock")).unwrap();
+        std::fs::remove_file(&path).unwrap();
+        std::fs::remove_file(&rules).unwrap();
+        std::fs::remove_file(path.with_extension("world.lock")).unwrap();
+        std::fs::remove_dir(dir).unwrap();
+    }
 
     #[test]
     fn local_island_resumes_the_same_state_and_refuses_a_second_owner() {

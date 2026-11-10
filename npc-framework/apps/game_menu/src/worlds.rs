@@ -53,6 +53,9 @@ impl ScreenshotPage {
 
 #[derive(Clone, Debug)]
 struct Draft {
+    // The form exposes only part of a world. Keep its complete typed source so
+    // optional construction data remain the parse shape for edit/clone/revert.
+    source: WorldPreset,
     values: BTreeMap<String, String>,
 }
 impl Draft {
@@ -87,14 +90,16 @@ impl Draft {
         // The default event switch is omitted from saved descriptors but remains editable.
         value["ai_scheduler"]["events_enabled"] = preset.ai_scheduler.events_enabled.into();
         flatten("", &value, &mut values);
-        Self { values }
+        Self {
+            source: preset.clone(),
+            values,
+        }
     }
     fn text(&self, key: &str) -> &str {
         self.values.get(key).map(String::as_str).unwrap_or_default()
     }
     fn parse(&self) -> Result<WorldPreset, Vec<String>> {
-        let mut value =
-            serde_json::to_value(worlds::plain_preset()).expect("WorldPreset serializes");
+        let mut value = serde_json::to_value(&self.source).expect("WorldPreset serializes");
         value["scene"] = "explorer".into();
         value["economy"] = "fixed".into();
         value["island_geography"] = "compact".into();
@@ -1290,6 +1295,92 @@ mod tests {
             .values
             .insert("needs.battery.low_speed_pct".into(), "-".into());
         assert!(draft.parse().is_err());
+    }
+
+    fn authored_regional_preset() -> WorldPreset {
+        let mut preset = worlds::builtin_preset("living_world").unwrap();
+        preset.name = "Authored coastal world".into();
+        let construction = preset.living_world.as_mut().unwrap();
+        construction.width_cells = 320;
+        construction.actor_start.x = 1500;
+        construction.settlements[0].label = "Dawn Harbour".into();
+        construction.settlements[0].sites[0].capacity = 3;
+        construction.settlements[1].homes[0].label = "Alder cottage".into();
+        construction.plots[0].x -= 1000;
+        worlds::validate(&preset).unwrap();
+        preset
+    }
+
+    #[test]
+    fn unrelated_world_edits_and_draft_clone_preserve_authored_regional_geometry() {
+        let mut expected = authored_regional_preset();
+        let mut draft = Draft::new(&expected);
+        expected.description = "Only the public description changed".into();
+        draft
+            .values
+            .insert("description".into(), expected.description.clone());
+        assert_eq!(draft.parse().unwrap(), expected);
+        assert_eq!(draft.clone().parse().unwrap(), expected);
+    }
+
+    #[test]
+    fn regional_geometry_survives_editor_save_duplicate_and_both_revert_paths() {
+        let dir = tmp("regional-world-preservation");
+        let original = dir.join("authored_coast.json");
+        let preset = authored_regional_preset();
+        let construction = preset.living_world.clone();
+        std::fs::write(&original, serde_json::to_vec_pretty(&preset).unwrap()).unwrap();
+        let mut editor = WorldEditor::new(dir.clone());
+        let index = editor
+            .entries
+            .iter()
+            .position(|entry| entry.path == original)
+            .unwrap();
+        editor.select(index);
+        assert_eq!(editor.draft.parse().unwrap(), preset);
+        assert!(!editor.dirty());
+
+        let description = "Saved without changing regional construction";
+        editor
+            .draft
+            .values
+            .insert("description".into(), description.into());
+        assert_eq!(editor.save(false).unwrap(), original);
+        let saved: WorldPreset =
+            serde_json::from_slice(&std::fs::read(&original).unwrap()).unwrap();
+        assert_eq!(saved.living_world, construction);
+        assert_eq!(saved.description, description);
+
+        perform(&mut editor, WorldAction::Duplicate);
+        assert!(editor.selected.is_none());
+        editor
+            .draft
+            .values
+            .insert("description".into(), "Discard this unsaved edit".into());
+        perform(&mut editor, WorldAction::Revert);
+        let reverted = editor.draft.parse().unwrap();
+        assert_eq!(reverted.living_world, construction);
+        assert_eq!(reverted.description, description);
+        let duplicate = editor.save(false).unwrap();
+        assert_ne!(duplicate, original);
+        let copied: WorldPreset =
+            serde_json::from_slice(&std::fs::read(&duplicate).unwrap()).unwrap();
+        assert_eq!(copied.living_world, construction);
+
+        editor.draft.values.insert(
+            "description".into(),
+            "Discard this persisted-draft edit".into(),
+        );
+        perform(&mut editor, WorldAction::Revert);
+        assert_eq!(editor.draft.parse().unwrap(), copied);
+        assert!(!editor.dirty());
+        perform(&mut editor, WorldAction::New);
+        assert!(editor.draft.parse().unwrap().living_world.is_none());
+
+        let resolved = dir.canonicalize().unwrap();
+        assert!(resolved.starts_with(std::env::temp_dir().canonicalize().unwrap()));
+        drop(editor);
+        std::fs::remove_dir_all(resolved).unwrap();
     }
 
     #[test]

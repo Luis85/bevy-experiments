@@ -168,6 +168,20 @@ fn listing(world: &World, actor: Entity, kind: &str) -> Option<Listing> {
 }
 
 /// Explicit offers can include a visitor's goods. Unlisted visitor stock is private.
+fn automatic_seller(world: &World, actor: Entity, kind: &str) -> bool {
+    if let Some(profile) = super::frontier::labor::profile(world, actor) {
+        // A change of profession does not make previously produced real goods
+        // disappear from the market. Personal reserves remain protected below.
+        return profile
+            .allowed_roles
+            .iter()
+            .any(|role| catalog::outputs_for(world, *role).contains(&kind));
+    }
+    world
+        .get::<Villager>(actor)
+        .is_some_and(|v| catalog::outputs_for(world, v.role).contains(&kind))
+}
+
 pub fn sells(world: &World, actor: Entity, kind: &str) -> bool {
     if !living(world, actor) {
         return false;
@@ -175,9 +189,7 @@ pub fn sells(world: &World, actor: Entity, kind: &str) -> bool {
     if enabled(world) && listing(world, actor, kind).is_some() {
         return available_to_sell(world, actor, kind) > 0;
     }
-    world
-        .get::<Villager>(actor)
-        .is_some_and(|v| catalog::outputs_for(world, v.role).contains(&kind))
+    automatic_seller(world, actor, kind)
 }
 
 /// Published quantity is bounded by actual, unreserved physical stock.
@@ -189,10 +201,7 @@ pub fn available_to_sell(world: &World, actor: Entity, kind: &str) -> u32 {
     if let Some(offer) = listing(world, actor, kind) {
         return offer.quantity.min(stock);
     }
-    if !world
-        .get::<Villager>(actor)
-        .is_some_and(|v| catalog::outputs_for(world, v.role).contains(&kind))
-    {
+    if !automatic_seller(world, actor, kind) {
         return 0;
     }
     stock.saturating_sub(super::production::desired_stock(world, actor, kind))
@@ -244,9 +253,7 @@ pub fn quote(
         return Err("seller wallet is full".into());
     }
     if enabled(world) {
-        let automatic_stock = world
-            .get::<Villager>(seller)
-            .is_some_and(|v| catalog::outputs_for(world, v.role).contains(&kind));
+        let automatic_stock = automatic_seller(world, seller, kind);
         if (automatic_stock || listing(world, seller, kind).is_some())
             && available_to_sell(world, seller, kind) < n
         {

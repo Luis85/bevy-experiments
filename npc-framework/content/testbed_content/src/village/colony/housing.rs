@@ -62,6 +62,11 @@ pub fn home_heating(world: &World, actor: Entity) -> Option<HomeHeating> {
 }
 
 pub(super) fn establish_resident_home(world: &mut World, id: SimId, person: &Villager) {
+    // Regional construction assigns an independent house before colony startup.
+    // Rebuilding household state on a workplace would erase that ownership.
+    if home_of(world, id).is_some() {
+        return;
+    }
     if let Some(place) = world.resource::<SimIndex>().get(person.workplace) {
         world.entity_mut(place).insert(Household {
             label: format!("{} household", person.name),

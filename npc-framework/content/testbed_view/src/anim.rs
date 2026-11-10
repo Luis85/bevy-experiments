@@ -52,6 +52,14 @@ impl Pose {
     }
 
     fn clip(self, kind: ModelKind) -> &'static str {
+        if kind.civilian_rig() {
+            return match self {
+                Pose::Idle | Pose::Ride => "CharacterArmature|Idle",
+                Pose::Walk => "CharacterArmature|Walk",
+                Pose::Work | Pose::Craft | Pose::PickUp => "CharacterArmature|Interact",
+                Pose::Interact => "CharacterArmature|Wave",
+            };
+        }
         let skeleton = matches!(kind, ModelKind::SkeletonMinion | ModelKind::SkeletonWarrior);
         match self {
             Pose::Idle => "Idle",
@@ -104,8 +112,8 @@ pub fn pose_of(
 /// The shared graphs, one per model kind, built once its glb is loaded.
 #[derive(Resource, Default)]
 pub(crate) struct ActorAnimations {
-    graphs: [Option<(Handle<AnimationGraph>, [AnimationNodeIndex; 7])>; 4],
-    unavailable: [bool; 4],
+    graphs: Vec<Option<(Handle<AnimationGraph>, [AnimationNodeIndex; 7])>>,
+    unavailable: Vec<bool>,
 }
 
 /// On the entity holding an actor's `AnimationPlayer`.
@@ -119,7 +127,7 @@ pub(crate) struct ActorAnimTarget {
 }
 
 /// Meshes of the KayKit kits an actor should not carry around.
-pub(crate) const HIDDEN_MESHES: [&str; 12] = [
+pub(crate) const HIDDEN_MESHES: &[&str] = &[
     "1H_Sword",
     "1H_Sword_Offhand",
     "2H_Sword",
@@ -132,6 +140,17 @@ pub(crate) const HIDDEN_MESHES: [&str; 12] = [
     "1H_Crossbow",
     "2H_Crossbow",
     "Throwable",
+    "1H_Axe",
+    "1H_Axe_Offhand",
+    "2H_Axe",
+    "Staff",
+    "Wand",
+    "Barbarian_Round_Shield",
+    "Mug",
+    "Spellbook",
+    "Spellbook_open",
+    "1H_Wand",
+    "2H_Staff",
 ];
 
 pub(crate) fn plugin(app: &mut App) {
@@ -150,6 +169,8 @@ fn build_graphs(
     mut anims: ResMut<ActorAnimations>,
 ) {
     let Some(assets) = assets else { return };
+    anims.graphs.resize_with(ModelKind::ANIMATED.len(), || None);
+    anims.unavailable.resize(ModelKind::ANIMATED.len(), false);
     for kind in ModelKind::ANIMATED {
         let i = kind.index();
         if anims.graphs[i].is_some() || anims.unavailable[i] {
@@ -158,7 +179,7 @@ fn build_graphs(
         let Some(gltf) = gltfs.get(&assets.actor_gltf[i]) else {
             continue;
         };
-        let Some(idle) = gltf.named_animations.get("Idle").cloned() else {
+        let Some(idle) = gltf.named_animations.get(kind.idle_clip()).cloned() else {
             warn!("testbed_view: {kind:?} has no `Idle` clip; animation disabled");
             anims.unavailable[i] = true;
             continue;
@@ -207,6 +228,23 @@ pub(crate) fn on_actor_ready(
         match name.as_str() {
             "handslot.r" => actor.hand_r = Some(e),
             "handslot.l" => actor.hand_l = Some(e),
+            "Wrist.R" | "Wrist.L" if actor.kind.civilian_rig() => {
+                // Imported FBX-to-glTF bones inherit a scale of 100. Normalize
+                // the socket to the existing item-in-hand V convention.
+                let socket = commands
+                    .spawn((
+                        Name::new("civilian tool socket"),
+                        ChildOf(e),
+                        Transform::from_scale(Vec3::splat(crate::visuals::V / 100.0)),
+                        Visibility::default(),
+                    ))
+                    .id();
+                if name.as_str() == "Wrist.R" {
+                    actor.hand_r = Some(socket);
+                } else {
+                    actor.hand_l = Some(socket);
+                }
+            }
             n if HIDDEN_MESHES.contains(&n) => {
                 commands.entity(e).insert(Visibility::Hidden);
             }
@@ -236,7 +274,11 @@ fn drive_animation(
 ) {
     let now = time.elapsed_secs();
     for (entity, mut player, mut target, transitions) in &mut players {
-        let Some((graph, nodes)) = &anims.graphs[target.kind.index()] else {
+        let Some((graph, nodes)) = anims
+            .graphs
+            .get(target.kind.index())
+            .and_then(Option::as_ref)
+        else {
             continue;
         };
         let pose = roots
@@ -293,6 +335,22 @@ mod tests {
     use npc_framework::prelude::SimId;
 
     use super::*;
+
+    #[test]
+    fn civilian_semantic_clips_use_the_imported_rig_names() {
+        assert_eq!(
+            Pose::Walk.clip(ModelKind::VillageWoman),
+            "CharacterArmature|Walk"
+        );
+        assert_eq!(
+            Pose::Work.clip(ModelKind::FarmerMan),
+            "CharacterArmature|Interact"
+        );
+        assert_eq!(
+            Pose::Interact.clip(ModelKind::TravellerWoman),
+            "CharacterArmature|Wave"
+        );
+    }
 
     fn doing(verb: &str) -> Interacting {
         Interacting {

@@ -93,10 +93,12 @@ pub(crate) fn open(
         let doc = match fresh_construction(rules) {
             Ok(doc) => doc,
             Err(error) => {
+                let shipped = shipped_preset(rules);
                 issue = Some(format!(
-                    "The edited world rules could not load: {error} New game will use the shipped island rules; your files are preserved."
+                    "The edited world rules could not load: {error} New game will use the shipped {} profile; your files are preserved.",
+                    shipped.name
                 ));
-                fresh_construction(None)?
+                construction_from_preset(shipped)?
             }
         };
         (doc, seed_override.unwrap_or(7))

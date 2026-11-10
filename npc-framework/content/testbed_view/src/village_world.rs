@@ -38,7 +38,7 @@ struct Label {
 #[derive(Resource, Default)]
 struct Labels(BTreeMap<SimId, (Entity, bool)>);
 #[derive(Component)]
-struct StaticId(SimId);
+pub(crate) struct StaticId(pub(crate) SimId);
 #[derive(Component)]
 struct ActorCaption(SimId);
 #[derive(Component)]
@@ -200,6 +200,7 @@ fn follow_hero(
         )>,
     >,
     manual: Option<Res<crate::camera::CameraManualIntent>>,
+    regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
 ) {
     let manual_pan = manual.as_deref().is_some_and(|manual| {
         let fresh = manual.serial != follow.input_serial;
@@ -217,7 +218,15 @@ fn follow_hero(
     let Some(target) = index
         .get(state.played)
         .and_then(|entity| positions.get(entity).ok())
-        .map(|pos| sim_to_world(*pos))
+        .map(|pos| {
+            let mut at = sim_to_world(*pos);
+            if let Some(terrain) = &regional {
+                at.y = terrain
+                    .cell(pos.x.div_euclid(1000), pos.z.div_euclid(1000))
+                    .map_or(0.0, |c| c.height_mm.max(0) as f32 / 1000.0);
+            }
+            at
+        })
     else {
         follow.expected_focus = None;
         return;
@@ -295,7 +304,9 @@ fn follow_hero(
         } else {
             smoothing_origin.lerp(target, alpha)
         };
-        camera.focus.y = 0.0;
+        if regional.is_none() {
+            camera.focus.y = 0.0;
+        }
         *transform = camera.transform();
         follow.expected_focus = Some(camera.focus);
         follow.actor = Some(state.played);
@@ -416,7 +427,7 @@ pub(crate) fn framed_focus(
     if ray.direction.y.abs() < 0.000_001 {
         return None;
     }
-    let distance = -ray.origin.y / ray.direction.y;
+    let distance = (actor.y - ray.origin.y) / ray.direction.y;
     if distance < 0.0 {
         return None;
     }
@@ -504,7 +515,9 @@ fn spawn(
     mut index: ResMut<VisualIndex>,
     geography: Option<Res<testbed_content::village::geometry::Geography>>,
     terrain: Option<Res<testbed_content::village::terrain::TerrainState>>,
+    regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
 ) {
+    let expanded = regional.is_some();
     let geography = geography
         .as_deref()
         .unwrap_or(&testbed_content::village::geometry::FIXED);
@@ -520,15 +533,17 @@ fn spawn(
         reflectance: if terrain.is_some() { 0.06 } else { 0.65 },
         ..default()
     });
-    commands.spawn((
-        Name::new("island surrounding water"),
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(
-            if terrain.is_some() { 600. } else { 160. },
-            if terrain.is_some() { 600. } else { 160. },
-        ))),
-        MeshMaterial3d(water),
-        Transform::from_xyz(0., -0.13, 0.),
-    ));
+    if !expanded {
+        commands.spawn((
+            Name::new("island surrounding water"),
+            Mesh3d(meshes.add(Plane3d::default().mesh().size(
+                if terrain.is_some() { 600. } else { 160. },
+                if terrain.is_some() { 600. } else { 160. },
+            ))),
+            MeshMaterial3d(water),
+            Transform::from_xyz(0., -0.13, 0.),
+        ));
+    }
     let sand = materials.add(StandardMaterial {
         base_color: Color::srgb(0.72, 0.64, 0.43),
         perceptual_roughness: 1.,
@@ -558,7 +573,7 @@ fn spawn(
             "island grassland",
         ),
     ] {
-        if terrain.is_none() {
+        if terrain.is_none() && !expanded {
             commands.spawn((
                 Name::new(name),
                 Mesh3d(meshes.add(Cylinder::new(radius, height))),
@@ -573,7 +588,7 @@ fn spawn(
         ..default()
     });
     for path in geography.roads {
-        if terrain.is_some() {
+        if terrain.is_some() || expanded {
             continue;
         }
         let (x, z, w, d) = (
@@ -604,6 +619,9 @@ fn spawn(
         Color::srgb(0.52, 0.43, 0.29)
     });
     for plot in geography.expansion_plots {
+        if expanded {
+            continue;
+        }
         let center = Vec3::new(plot.x as f32 / 1000., 0., plot.z as f32 / 1000.);
         let width = plot.width_mm as f32 / 1000.;
         let depth = plot.depth_mm as f32 / 1000.;
@@ -649,6 +667,9 @@ fn spawn(
     }
     let sign_board = meshes.add(Cuboid::new(1.2, 0.4, 0.10));
     for district in geography.districts {
+        if expanded {
+            continue;
+        }
         let center = Vec3::new(district.x as f32 / 1000., 0., district.z as f32 / 1000.);
         let root = commands
             .spawn((
@@ -704,7 +725,24 @@ fn spawn(
             .id();
         index.map.insert(e, root);
         commands.entity(root).with_children(|p| {
-            if place.role != Role::WaterKeeper {
+            if expanded {
+                let path = crate::colony_scene::living_scene::building(place.role);
+                p.spawn((
+                    crate::colony_scene::living_scene::BuildingModel {
+                        station: *id,
+                        visual: root,
+                    },
+                    WorldAssetRoot(server.load(GltfAssetLabel::Scene(0).from_asset(path))),
+                    Transform::from_xyz(
+                        0.0,
+                        0.0,
+                        testbed_content::village::frontier::settlements::WORKPLACE_OFFSET_MM as f32
+                            / 1000.0,
+                    )
+                    .with_scale(Vec3::splat(2.4)),
+                ))
+                .observe(crate::colony_scene::living_scene::building_ready);
+            } else if place.role != Role::WaterKeeper {
                 p.spawn((
                     WorldAssetRoot(house.clone()),
                     Transform::from_xyz(0., 0., 2.5).with_scale(Vec3::splat(4.)),
@@ -724,7 +762,7 @@ fn spawn(
                     Transform::from_xyz(1., 0., 0.2).with_scale(Vec3::splat(1.7)),
                 ));
             }
-            if place.role == Role::Miller {
+            if place.role == Role::Miller && !expanded {
                 let pivot = p
                     .spawn((
                         Windmill,
@@ -755,9 +793,14 @@ fn spawn(
                     _ => None,
                 };
                 if let Some(prop) = prop {
+                    let scale = if expanded && matches!(place.role, Role::Carpenter | Role::Smith) {
+                        3.4
+                    } else {
+                        0.8
+                    };
                     p.spawn((
                         WorldAssetRoot(prop.clone()),
-                        Transform::from_xyz(-1.4, 0., -0.2).with_scale(Vec3::splat(0.8)),
+                        Transform::from_xyz(-1.4, 0., -0.2).with_scale(Vec3::splat(scale)),
                     ));
                 }
             }
@@ -783,22 +826,46 @@ fn spawn(
             "ore" => (rock.clone(), 3.0),
             testbed_content::village::catalog::FIBER => (grain.clone(), 1.3),
             testbed_content::village::catalog::BERRIES => (tree.clone(), 1.2),
+            testbed_content::village::catalog::FISH if expanded => (
+                server.load(GltfAssetLabel::Scene(0).from_asset("living/nature/waterplant_B.gltf")),
+                3.0,
+            ),
             _ => (barrel.clone(), 1.5),
         };
-        commands.entity(root).with_child((
-            WorldAssetRoot(model),
-            Transform::from_scale(Vec3::splat(scale)),
-        ));
+        let child = commands
+            .spawn((
+                ChildOf(root),
+                WorldAssetRoot(model),
+                Visibility::Inherited,
+                Transform::from_scale(Vec3::splat(scale)),
+            ))
+            .id();
+        if expanded {
+            commands
+                .entity(child)
+                .insert(crate::colony_scene::living_scene::ResourceVisual::new(
+                    *id, scale,
+                ));
+            crate::colony_scene::living_scene::resource_details(
+                &mut commands,
+                &server,
+                root,
+                *id,
+                &patch.kind,
+            );
+        }
         label(
             &mut commands,
             *id,
             root,
             match patch.kind.as_str() {
+                "log" if expanded => "Managed woodland",
                 "log" => "Fallen wood",
                 "ore" => "Ore vein",
                 testbed_content::village::catalog::GRAIN => "Grain field",
                 testbed_content::village::catalog::FIBER => "Fiber plants",
                 testbed_content::village::catalog::BERRIES => "Berry bushes",
+                testbed_content::village::catalog::FISH => "Fishing water",
                 _ => "Clean water",
             },
             2.8,
@@ -1489,6 +1556,7 @@ fn nearby_rect(
 #[allow(clippy::too_many_arguments)]
 fn project(
     mut commands: Commands,
+    regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
     index: Res<npc_framework::prelude::SimIndex>,
     camera: Query<
         (
@@ -1604,7 +1672,13 @@ fn project(
             index
                 .get(label.sim)
                 .and_then(|e| positions.get(e).ok())
-                .map(|p| sim_to_world(*p) + Vec3::Y * label.lift)
+                .map(|p| {
+                    crate::colony_scene::living_scene::raised_point(
+                        regional.as_deref(),
+                        *p,
+                        label.lift,
+                    )
+                })
         });
         if shown
             && let Some(pos) = pos
@@ -1633,6 +1707,10 @@ fn project(
             };
             let anchor = if bubble.is_some() {
                 point - Vec2::new(0.0, size.y)
+            } else if label.actor {
+                // Actor labels end above the head anchor instead of extending
+                // downward across the face/body, including the two-line caption.
+                point - Vec2::new(0.0, size.y + 4.0)
             } else {
                 point
             };
@@ -1693,6 +1771,8 @@ fn weather(
     mut materials: ResMut<Assets<StandardMaterial>>,
     assets: Option<Res<ViewAssets>>,
     colony: Option<Res<testbed_content::village::colony::ColonyState>>,
+    regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
+    mut atmospheres: Query<(&RtsCamera, &mut DistanceFog)>,
 ) {
     let (_, season, _) =
         testbed_content::village::calendar_at(clock.tick, &config, market.is_some());
@@ -1756,6 +1836,57 @@ fn weather(
     } else {
         Color::srgb(0.56, 0.76, 0.93)
     };
+    if regional.is_some() {
+        let angle = phase * std::f32::consts::TAU;
+        let day_end = (1.0 - config.night_permille.min(1000) as f32 / 1000.0).clamp(0.01, 0.99);
+        let daylight = if phase < day_end {
+            0.25 + 0.75 * (phase / day_end * std::f32::consts::PI).sin().max(0.0)
+        } else {
+            0.125 * (1.0 + ((phase - day_end) / (1.0 - day_end) * std::f32::consts::TAU).cos())
+        };
+        let dusk = (1.0 - (daylight - 0.5).abs() * 2.0).max(0.0);
+        for (mut light, mut transform) in &mut sun {
+            light.illuminance = 900.0 + daylight * 11500.0;
+            light.color = Color::srgb(
+                0.66 + daylight * 0.34,
+                0.76 + daylight * 0.19 - dusk * 0.13,
+                1.0 - daylight * 0.12 - dusk * 0.23,
+            );
+            *transform = Transform::from_xyz(
+                angle.sin() * 40.0,
+                12.0 + daylight * 30.0,
+                angle.cos() * 25.0,
+            )
+            .looking_at(Vec3::ZERO, Vec3::Y);
+        }
+        ambient.brightness = 260.0 + daylight * 380.0;
+        ambient.color = Color::srgb(0.66 + daylight * 0.25, 0.75 + daylight * 0.18, 1.0);
+        sky.0 = Color::srgb(
+            0.07 + daylight * 0.49,
+            0.10 + daylight * 0.63,
+            0.18 + daylight * 0.66,
+        );
+        for (camera, mut fog) in &mut atmospheres {
+            fog.color = Color::srgb(
+                0.10 + daylight * 0.48,
+                0.14 + daylight * 0.56,
+                0.22 + daylight * 0.51,
+            );
+            fog.falloff = FogFalloff::from_visibility_colors(
+                (camera.distance * 3.5).max(210.0),
+                Color::srgb(
+                    0.15 + daylight * 0.23,
+                    0.20 + daylight * 0.32,
+                    0.31 + daylight * 0.30,
+                ),
+                Color::srgb(
+                    0.20 + daylight * 0.53,
+                    0.27 + daylight * 0.55,
+                    0.38 + daylight * 0.48,
+                ),
+            );
+        }
+    }
     for mut t in &mut mill {
         t.rotation =
             Quat::from_rotation_z((clock.tick % 480) as f32 * std::f32::consts::TAU / 480.0);
@@ -2018,12 +2149,9 @@ mod label_tests {
         let expected = projection
             .world_to_viewport(&GlobalTransform::from(local), position)
             .unwrap();
+        let stale_projection = projection.world_to_viewport(&stale, position).unwrap();
         assert!(
-            projection
-                .world_to_viewport(&stale, position)
-                .unwrap()
-                .distance(expected)
-                > 20.0,
+            stale_projection.distance(expected) > 20.0,
             "fixture must contain a materially stale global pose"
         );
         let camera = app
@@ -2049,17 +2177,35 @@ mod label_tests {
             ))
             .id();
         let hash = npc_framework::prelude::state_hash(app.world_mut());
-        app.world_mut().run_system_once(project).unwrap();
-        let node = app.world().get::<Node>(caption).unwrap();
-        assert_eq!(node.display, Display::Flex);
-        assert_eq!(node.left, px(expected.x - 60.0));
-        assert_eq!(node.top, px(expected.y));
-        assert_eq!(
-            *app.world().get::<GlobalTransform>(camera).unwrap(),
-            stale,
-            "projection does not mutate transform propagation"
-        );
-        assert_eq!(npc_framework::prelude::state_hash(app.world_mut()), hash);
+        // A caption's lower edge now clears the projected head anchor by 4px.
+        // Exercise one- and two-line captions without changing the camera proof.
+        for height in [22.0, 42.0] {
+            app.world_mut()
+                .get_mut::<Label>(caption)
+                .unwrap()
+                .fallback_size
+                .y = height;
+            app.world_mut().run_system_once(project).unwrap();
+            let node = app.world().get::<Node>(caption).unwrap();
+            assert_eq!(node.display, Display::Flex);
+            assert_eq!(node.left, px(expected.x - 60.0));
+            assert_eq!(node.top, px(expected.y - (height + 4.0)));
+            let (Val::Px(left), Val::Px(top)) = (node.left, node.top) else {
+                panic!("caption projection must use logical pixel coordinates")
+            };
+            assert_eq!(top + height, expected.y - 4.0);
+            let projected_anchor = Vec2::new(left + 60.0, top + height + 4.0);
+            assert!(
+                projected_anchor.distance(stale_projection) > 20.0,
+                "caption must still use this frame's local pose, not the stale global pose"
+            );
+            assert_eq!(
+                *app.world().get::<GlobalTransform>(camera).unwrap(),
+                stale,
+                "projection does not mutate transform propagation"
+            );
+            assert_eq!(npc_framework::prelude::state_hash(app.world_mut()), hash);
+        }
     }
     #[test]
     fn island_follow_default_preserves_an_explicit_operator_camera() {

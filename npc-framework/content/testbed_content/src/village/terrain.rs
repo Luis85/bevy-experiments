@@ -86,8 +86,10 @@ fn index(x: i32, z: i32) -> Option<usize> {
 
 pub fn register(app: &mut App) {
     if colony::enabled(app.world()) {
-        app.register_sim_resource::<TerrainState>()
-            .register_command::<Terraform>();
+        if !super::frontier::enabled(app.world()) {
+            app.register_sim_resource::<TerrainState>();
+        }
+        app.register_command::<Terraform>();
     }
 }
 
@@ -189,6 +191,16 @@ impl Terraform {
         Ok(cells)
     }
     pub fn check(&self, world: &World) -> Result<(), String> {
+        if super::frontier::enabled(world) {
+            return super::frontier::terrain::terraform_check(
+                world,
+                self.x,
+                self.z,
+                self.radius,
+                self.height_mm,
+                self.surface,
+            );
+        }
         let terrain = world
             .get_resource::<TerrainState>()
             .ok_or("terrain editing requires the island colony")?;
@@ -291,6 +303,16 @@ impl Terraform {
         Ok(())
     }
     pub fn perform(&self, world: &mut World) -> Result<(), String> {
+        if super::frontier::enabled(world) {
+            return super::frontier::terrain::terraform(
+                world,
+                self.x,
+                self.z,
+                self.radius,
+                self.height_mm,
+                self.surface,
+            );
+        }
         self.check(world)?;
         let brush = self.brush()?;
         let value = TerrainCell {

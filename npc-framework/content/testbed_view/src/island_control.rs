@@ -4,7 +4,7 @@
 use crate::player_actions::{self, ControlState};
 use bevy::prelude::*;
 use npc_framework::kernel::commands::{CommandQueue, SkippedCommands};
-use npc_framework::prelude::{Owner, SimClock, SimCommand, SimControl, SimId, SimIndex};
+use npc_framework::prelude::{Owner, SimClock, SimCommand, SimControl, SimId, SimIndex, SimPos};
 use npc_framework::view_helpers::command_ui::{
     CommandBindings, CommandSelection, CommandUi, NpcCommandUiSet, select_units,
 };
@@ -407,6 +407,46 @@ fn prepare_pointer_input(world: &mut World) {
     if let Err(error) = &selected {
         set_status(world, error);
     }
+    if matches!(selected, Ok(true))
+        && world.contains_resource::<testbed_content::village::frontier::terrain::TerrainState>()
+        && !world
+            .query_filtered::<&bevy::picking::hover::Hovered, With<Node>>()
+            .iter(world)
+            .any(bevy::picking::hover::Hovered::get)
+    {
+        let cursor = world
+            .query_filtered::<&Window, With<bevy::window::PrimaryWindow>>()
+            .single(world)
+            .ok()
+            .and_then(Window::cursor_position);
+        let ray = cursor.and_then(|cursor| {
+            world
+                .query_filtered::<(&Camera, &GlobalTransform), With<Camera3d>>()
+                .single(world)
+                .ok()
+                .and_then(|(camera, transform)| camera.viewport_to_world(transform, cursor).ok())
+        });
+        if let Some(ray) = ray
+            && npc_framework::view_helpers::command_ui::pick_unit(world, ray).is_none()
+        {
+            let hit = world
+                .get_resource::<testbed_content::village::frontier::terrain::TerrainState>()
+                .and_then(|terrain| crate::colony_scene::living_scene::raycast(terrain, ray));
+            if let Some(hit) = hit {
+                let position = SimPos::new(
+                    (hit.x * 1000.0).round() as i32,
+                    (hit.z * 1000.0).round() as i32,
+                );
+                if let Err(error) = player_actions::walk(world, position) {
+                    set_status(world, error);
+                }
+            }
+            // Prevent the generic y=0 plane resolver from issuing a second order.
+            if let Some(mut buttons) = world.get_resource_mut::<ButtonInput<MouseButton>>() {
+                buttons.clear_just_pressed(order);
+            }
+        }
+    }
     if !matches!(selected, Ok(true))
         && let Some(mut buttons) = world.get_resource_mut::<ButtonInput<MouseButton>>()
     {
@@ -677,6 +717,83 @@ mod tests {
         assert_eq!(player_actions::control(app.world()), ControlState::Free);
         assert_eq!(applied_count(&app, "DetachController"), 1);
         assert_eq!(*app.world().resource::<IslandMode>(), IslandMode::Inspector);
+    }
+
+    #[test]
+    fn regional_restoration_survives_mode_changes_before_and_after_application() {
+        use npc_framework::prelude::*;
+        use testbed_content::village::{
+            ResourcePatch, catalog, economy,
+            frontier::{
+                activities::{EcologyWork, FrontierAct},
+                ecology::EcologicalPatch,
+            },
+        };
+        let mut app = testbed_content::new_sim_app(7, "living_world");
+        app.init_resource::<IslandMode>()
+            .init_resource::<IslandControl>()
+            .init_resource::<CharacterWalk>()
+            .init_resource::<SimControl>()
+            .init_resource::<player_actions::NativeActions>();
+        request_mode(app.world_mut(), IslandMode::Character).unwrap();
+        step(&mut app);
+        let id = app.world().resource::<VillageState>().played;
+        let actor = app.world().resource::<SimIndex>().get(id).unwrap();
+        let (patch, site) = app
+            .world()
+            .resource::<SimIndex>()
+            .map
+            .iter()
+            .find(|(_, e)| {
+                app.world()
+                    .get::<ResourcePatch>(**e)
+                    .is_some_and(|p| p.kind == "log")
+            })
+            .map(|(id, e)| (*id, *e))
+            .unwrap();
+        let position = *app.world().get::<SimPos>(site).unwrap();
+        app.world_mut().entity_mut(actor).insert(position);
+        app.world_mut()
+            .get_mut::<EcologicalPatch>(site)
+            .unwrap()
+            .biomass_milli = 50000;
+        economy::grant(app.world_mut(), actor, Item::new("log"));
+        economy::grant(app.world_mut(), actor, Item::new(catalog::WATER));
+        submit(
+            app.world_mut(),
+            None,
+            SimCommand::content(&FrontierAct {
+                unit: id,
+                target: patch,
+                verb: "plant_tree".into(),
+            }),
+        )
+        .unwrap();
+        request_mode(app.world_mut(), IslandMode::Inspector).unwrap();
+        assert_eq!(pending_count(&app, "DetachController"), 0);
+        step(&mut app);
+        let work = app.world().get::<EcologyWork>(actor).unwrap().clone();
+        request_mode(app.world_mut(), IslandMode::Editor).unwrap();
+        assert_eq!(
+            player_actions::prepare_suspend(app.world_mut()).unwrap(),
+            None
+        );
+        for claim in &work.materials {
+            assert!(app.world().resource::<Reservations>().holds(claim.item, id));
+        }
+        while app.world().resource::<SimClock>().tick <= work.ends + 2 {
+            step(&mut app);
+        }
+        assert_eq!(
+            app.world()
+                .get::<EcologicalPatch>(site)
+                .unwrap()
+                .planted_units,
+            1
+        );
+        assert!(app.world().get::<EcologyWork>(actor).is_none());
+        assert_eq!(player_actions::control(app.world()), ControlState::Free);
+        assert_eq!(*app.world().resource::<IslandMode>(), IslandMode::Editor);
     }
 
     #[test]

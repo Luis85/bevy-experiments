@@ -22,6 +22,12 @@ player milestones.
 
 ## Confirmed direction
 
+The current increment expands the island into a connected coastal world with several
+villages, varied terrain and resident appearances, changing occupations, renewable
+ecology, and meaningful exploration and restoration. The existing 3D presentation,
+survival rules and continuous native flow remain the foundation. Actual world
+changes and readable activities take priority over decorative claims of simulation.
+
 On 2026-11-09 the user asked for a coherent Stardew Valley-inspired experience from
 starting the game through menus into play and building, with substantial UI/UX work.
 They explicitly chose to retain the existing 3D island and current survival and
@@ -59,10 +65,23 @@ the title have clear outcomes and preserve the world when saving fails.
 
 ## Evidence on hand
 
-The previous iteration passed the full gate with 1,816 tests and included a 14-day
-autonomous economy audit, native captures, and architecture/visual reviews. See
-`docs/_notes/2026-11-08-island-colony-validation.md`. Those results are baseline
-evidence, not verification of this new increment.
+The [living-world validation record](docs/_notes/2026-11-09-living-world-validation.md)
+records the current seed-7, 336,000-tick audit: all 42 founding residents remained
+alive and housed, with 8,400 currency conserved, 2,846 transactions and 94 coats
+produced. This covers 14 days through winter and spring, not a full year or an
+indefinite guarantee. Native confirmation includes 54 captures at 1280×720 and
+1024×768, three actual village journeys, and home visuals retained across Continue
+and New. Six additional inspected captures confirm the final terrain shading and
+editor diagnostics corrections. Physical input and GPU/FPS performance targets
+remain unverified. The [startup follow-up](docs/_notes/2026-11-10-terrain-startup-polish.md)
+confirms an opaque preparation screen, coherent terrain reveal and water/land
+chunk updates with zero empty-mesh warnings. Its full gate returned `ok: true`:
+1,960 tests passed, with all
+architecture, replay, snapshot and dependency-policy stages passing. The validation
+record retains the skipped/ignored counts and the limits of each check.
+
+The [previous player-flow validation](docs/_notes/2026-11-09-island-player-flow-validation.md)
+remains baseline evidence; its passing gate does not verify this increment.
 
 ## Accessibility and interaction
 

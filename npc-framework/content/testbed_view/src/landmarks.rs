@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use npc_framework::agent_io::map::{Landmark, MapEnabled};
 use npc_framework::agent_io::notes::{NotesDirs, NotesStores};
 use npc_framework::prelude::SimPos;
-use npc_framework::view_helpers::{ViewSystems, sim_to_world};
+use npc_framework::view_helpers::ViewSystems;
 
 use crate::explorer_panel::{ExplorerFiles, map_actor};
 
@@ -268,6 +268,7 @@ fn rebuild(
         });
 }
 fn project(
+    regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
     cameras: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     mut markers: Query<(&LandmarkMarker, &mut Node), Without<LandmarkLabel>>,
     mut labels: Query<(&LandmarkLabel, &ComputedNode, &mut Node), Without<LandmarkMarker>>,
@@ -278,7 +279,11 @@ fn project(
     let viewport = camera.logical_viewport_rect();
     let mut anchors = BTreeMap::new();
     for (marker, mut node) in &mut markers {
-        let point = sim_to_world(SimPos::new(marker.pos[0], marker.pos[1])) + Vec3::Y * 0.10;
+        let point = crate::colony_scene::living_scene::raised_point(
+            regional.as_deref(),
+            SimPos::new(marker.pos[0], marker.pos[1]),
+            0.10,
+        );
         match camera.world_to_viewport(transform, point) {
             Ok(position) if viewport.is_none_or(|rect| rect.contains(position)) => {
                 // Bevy 0.20 already includes the logical viewport origin.

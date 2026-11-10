@@ -1,5 +1,7 @@
 //! One native window from title to daily life, pause and a safely saved return.
 //! This application layer owns lifecycle and files; gameplay enters as commands.
+#[cfg(test)]
+mod startup_tests;
 mod ui;
 use crate::island::session;
 use bevy::input_focus::InputFocus;
@@ -22,6 +24,30 @@ pub(crate) enum Screen {
 enum Destination {
     Title,
     Quit,
+}
+
+/// Renderer readiness belongs to presentation. A headless host has no such gate.
+fn scene_ready(world: &World) -> bool {
+    world
+        .get_resource::<testbed_view::SceneReadiness>()
+        .is_none_or(|scene| scene.ready && scene.error.is_none())
+}
+
+fn scene_preparation_message(world: &World) -> (&'static str, NoticeTone) {
+    if world
+        .get_resource::<testbed_view::SceneReadiness>()
+        .is_some_and(|scene| scene.error.is_some())
+    {
+        (
+            "The island could not finish preparing. Quit and restart to try again.",
+            NoticeTone::Error,
+        )
+    } else {
+        (
+            "Preparing the island… You can start once the landscape is ready.",
+            NoticeTone::Info,
+        )
+    }
 }
 struct PendingExit {
     destination: Destination,
@@ -387,6 +413,17 @@ fn process(world: &mut World) {
     for action in actions {
         let screen = world.resource::<FrontendState>().screen;
         if screen == Screen::Transition {
+            continue;
+        }
+        if matches!(
+            action,
+            Action::Continue
+                | Action::ContinueInspector
+                | Action::New
+                | Action::Begin
+                | Action::BeginInspector
+        ) && !scene_ready(world)
+        {
             continue;
         }
         let result = match action {

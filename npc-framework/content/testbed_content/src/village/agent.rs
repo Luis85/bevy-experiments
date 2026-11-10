@@ -45,6 +45,15 @@ pub fn activity(world: &World, entity: Entity) -> (&'static str, bool, &'static 
             true,
             "Wait for your cottage to finish, or use stop_work to release its materials.",
         )
+    } else if world
+        .get::<super::frontier::activities::EcologyWork>(entity)
+        .is_some()
+    {
+        (
+            "restoring",
+            true,
+            "Wait for landscape work to finish, or use stop_work to release its materials.",
+        )
     } else if world.get::<Gathering>(entity).is_some() {
         (
             "gathering",
@@ -365,7 +374,10 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
         )];
     }
     let mut out = Vec::new();
-    if world.get::<Gathering>(ctx.entity).is_some()
+    if world
+        .get::<super::frontier::activities::EcologyWork>(ctx.entity)
+        .is_some()
+        || world.get::<Gathering>(ctx.entity).is_some()
         || world.get::<super::hunting::Hunting>(ctx.entity).is_some()
         || world
             .get::<npc_framework::crafting::Crafting>(ctx.entity)

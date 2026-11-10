@@ -3,6 +3,29 @@ use npc_framework::kernel::hash::state_hash;
 use serde_json::json;
 
 #[test]
+fn regional_map_disabled_keeps_landscape_care_without_rendering_a_chart() {
+    let world = World::new();
+    let observed = json!({"sections":{"living_world":{"chart":[],"nearby_sites":[{
+        "id":17,"kind":"log","remaining":10,"capacity":40,"position":{"x":0,"z":0},
+        "vitality_percent":60,"soil_percent":80,"disturbance_percent":20,
+        "actions":[{"verb":"plant_tree","available":true}]
+    }]}}});
+    let state = PlayerState {
+        tab: Some(Tab::Explore),
+        ..default()
+    };
+    let rows = model::rows(&world, &observed, &state, true);
+    assert!(
+        rows.iter()
+            .all(|row| row.key != "regional_chart" && !row.key.starts_with("destination_"))
+    );
+    assert!(
+        rows.iter()
+            .any(|row| row.key == "plant_tree_17" && row.enabled)
+    );
+}
+
+#[test]
 fn player_camera_anchor_stays_centered_clear_of_header_workspace_and_toolbar() {
     for (width, height, workspace) in [(1024., 768., true), (1280., 720., false)] {
         let viewport = Rect::new(0., 0., width, height);

@@ -1,0 +1,988 @@
+{
+  "name": "The Living Island",
+  "description": "Explore Harbour, Alderwood and Stone Ridge: three working villages, a changing ecosystem and a world shaped by its inhabitants.",
+  "scene": "island_village",
+  "economy": "needs_driven",
+  "island_geography": "expanded",
+  "living_world": {
+    "version": 1,
+    "width_cells": 256,
+    "height_cells": 256,
+    "actor_start": {
+      "x": 500,
+      "z": -43000
+    },
+    "settlements": [
+      {
+        "key": "harbour",
+        "label": "Harbour",
+        "center": {
+          "x": 0,
+          "z": -30000
+        },
+        "biome": "coast",
+        "sites": [
+          {
+            "key": "work_1",
+            "label": "Harbour farmer",
+            "role": "farmer",
+            "position": {
+              "x": -30000,
+              "z": -38000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_2",
+            "label": "Harbour miller",
+            "role": "miller",
+            "position": {
+              "x": -20000,
+              "z": -38000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_3",
+            "label": "Harbour baker",
+            "role": "baker",
+            "position": {
+              "x": -10000,
+              "z": -38000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_4",
+            "label": "Harbour well keeper",
+            "role": "water_keeper",
+            "position": {
+              "x": 0,
+              "z": -38000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_5",
+            "label": "Harbour woodcutter",
+            "role": "woodcutter",
+            "position": {
+              "x": 10000,
+              "z": -38000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_6",
+            "label": "Harbour carpenter",
+            "role": "carpenter",
+            "position": {
+              "x": 20000,
+              "z": -38000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_7",
+            "label": "Harbour miner",
+            "role": "miner",
+            "position": {
+              "x": 30000,
+              "z": -38000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_8",
+            "label": "Harbour blacksmith",
+            "role": "smith",
+            "position": {
+              "x": -30000,
+              "z": -22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_9",
+            "label": "Harbour innkeeper",
+            "role": "innkeeper",
+            "position": {
+              "x": -20000,
+              "z": -22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_10",
+            "label": "Harbour hunter",
+            "role": "hunter",
+            "position": {
+              "x": -10000,
+              "z": -22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_11",
+            "label": "Harbour tanner",
+            "role": "tanner",
+            "position": {
+              "x": 0,
+              "z": -22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_12",
+            "label": "Harbour tailor",
+            "role": "tailor",
+            "position": {
+              "x": 10000,
+              "z": -22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_13",
+            "label": "Harbour fisher",
+            "role": "fisher",
+            "position": {
+              "x": 20000,
+              "z": -22000
+            },
+            "capacity": 2
+          }
+        ],
+        "homes": [
+          {
+            "key": "home_00",
+            "label": "Harbour cottage 1",
+            "door": {
+              "x": -24000,
+              "z": -50000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_01",
+            "label": "Harbour cottage 2",
+            "door": {
+              "x": -16000,
+              "z": -50000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_02",
+            "label": "Harbour cottage 3",
+            "door": {
+              "x": -8000,
+              "z": -50000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_03",
+            "label": "Harbour cottage 4",
+            "door": {
+              "x": 0,
+              "z": -50000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_04",
+            "label": "Harbour cottage 5",
+            "door": {
+              "x": 8000,
+              "z": -50000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_05",
+            "label": "Harbour cottage 6",
+            "door": {
+              "x": 16000,
+              "z": -50000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_06",
+            "label": "Harbour cottage 7",
+            "door": {
+              "x": 24000,
+              "z": -50000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_07",
+            "label": "Harbour cottage 8",
+            "door": {
+              "x": -24000,
+              "z": -9000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_08",
+            "label": "Harbour cottage 9",
+            "door": {
+              "x": -16000,
+              "z": -9000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_09",
+            "label": "Harbour cottage 10",
+            "door": {
+              "x": -8000,
+              "z": -9000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_10",
+            "label": "Harbour cottage 11",
+            "door": {
+              "x": 0,
+              "z": -9000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_11",
+            "label": "Harbour cottage 12",
+            "door": {
+              "x": 8000,
+              "z": -9000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_12",
+            "label": "Harbour cottage 13",
+            "door": {
+              "x": 16000,
+              "z": -9000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_13",
+            "label": "Harbour cottage 14",
+            "door": {
+              "x": 24000,
+              "z": -9000
+            },
+            "capacity": 2
+          }
+        ]
+      },
+      {
+        "key": "alderwood",
+        "label": "Alderwood",
+        "center": {
+          "x": -65000,
+          "z": 40000
+        },
+        "biome": "woodland",
+        "sites": [
+          {
+            "key": "work_1",
+            "label": "Alderwood farmer",
+            "role": "farmer",
+            "position": {
+              "x": -53000,
+              "z": 22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_2",
+            "label": "Alderwood miller",
+            "role": "miller",
+            "position": {
+              "x": -53000,
+              "z": 34000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_3",
+            "label": "Alderwood baker",
+            "role": "baker",
+            "position": {
+              "x": -53000,
+              "z": 46000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_4",
+            "label": "Alderwood well keeper",
+            "role": "water_keeper",
+            "position": {
+              "x": -53000,
+              "z": 58000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_5",
+            "label": "Alderwood woodcutter",
+            "role": "woodcutter",
+            "position": {
+              "x": -61000,
+              "z": 22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_6",
+            "label": "Alderwood carpenter",
+            "role": "carpenter",
+            "position": {
+              "x": -61000,
+              "z": 34000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_7",
+            "label": "Alderwood miner",
+            "role": "miner",
+            "position": {
+              "x": -61000,
+              "z": 46000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_8",
+            "label": "Alderwood blacksmith",
+            "role": "smith",
+            "position": {
+              "x": -61000,
+              "z": 58000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_9",
+            "label": "Alderwood innkeeper",
+            "role": "innkeeper",
+            "position": {
+              "x": -69000,
+              "z": 22000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_10",
+            "label": "Alderwood hunter",
+            "role": "hunter",
+            "position": {
+              "x": -69000,
+              "z": 34000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_11",
+            "label": "Alderwood tanner",
+            "role": "tanner",
+            "position": {
+              "x": -69000,
+              "z": 46000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_12",
+            "label": "Alderwood tailor",
+            "role": "tailor",
+            "position": {
+              "x": -69000,
+              "z": 58000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_13",
+            "label": "Alderwood fisher",
+            "role": "fisher",
+            "position": {
+              "x": -39000,
+              "z": 32000
+            },
+            "capacity": 2
+          }
+        ],
+        "homes": [
+          {
+            "key": "home_00",
+            "label": "Alderwood cottage 1",
+            "door": {
+              "x": -89000,
+              "z": 16000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_01",
+            "label": "Alderwood cottage 2",
+            "door": {
+              "x": -89000,
+              "z": 24000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_02",
+            "label": "Alderwood cottage 3",
+            "door": {
+              "x": -89000,
+              "z": 32000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_03",
+            "label": "Alderwood cottage 4",
+            "door": {
+              "x": -89000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_04",
+            "label": "Alderwood cottage 5",
+            "door": {
+              "x": -89000,
+              "z": 48000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_05",
+            "label": "Alderwood cottage 6",
+            "door": {
+              "x": -89000,
+              "z": 56000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_06",
+            "label": "Alderwood cottage 7",
+            "door": {
+              "x": -89000,
+              "z": 64000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_07",
+            "label": "Alderwood cottage 8",
+            "door": {
+              "x": -41000,
+              "z": 16000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_08",
+            "label": "Alderwood cottage 9",
+            "door": {
+              "x": -41000,
+              "z": 24000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_09",
+            "label": "Alderwood cottage 10",
+            "door": {
+              "x": -41000,
+              "z": 32000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_10",
+            "label": "Alderwood cottage 11",
+            "door": {
+              "x": -41000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_11",
+            "label": "Alderwood cottage 12",
+            "door": {
+              "x": -41000,
+              "z": 48000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_12",
+            "label": "Alderwood cottage 13",
+            "door": {
+              "x": -41000,
+              "z": 56000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_13",
+            "label": "Alderwood cottage 14",
+            "door": {
+              "x": -41000,
+              "z": 64000
+            },
+            "capacity": 2
+          }
+        ]
+      },
+      {
+        "key": "stone_ridge",
+        "label": "Stone Ridge",
+        "center": {
+          "x": 65000,
+          "z": 40000
+        },
+        "biome": "ridge",
+        "sites": [
+          {
+            "key": "work_1",
+            "label": "Stone Ridge farmer",
+            "role": "farmer",
+            "position": {
+              "x": 47000,
+              "z": 28000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_2",
+            "label": "Stone Ridge miller",
+            "role": "miller",
+            "position": {
+              "x": 59000,
+              "z": 28000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_3",
+            "label": "Stone Ridge baker",
+            "role": "baker",
+            "position": {
+              "x": 71000,
+              "z": 28000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_4",
+            "label": "Stone Ridge well keeper",
+            "role": "water_keeper",
+            "position": {
+              "x": 83000,
+              "z": 28000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_5",
+            "label": "Stone Ridge woodcutter",
+            "role": "woodcutter",
+            "position": {
+              "x": 51000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_6",
+            "label": "Stone Ridge carpenter",
+            "role": "carpenter",
+            "position": {
+              "x": 63000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_7",
+            "label": "Stone Ridge miner",
+            "role": "miner",
+            "position": {
+              "x": 75000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_8",
+            "label": "Stone Ridge blacksmith",
+            "role": "smith",
+            "position": {
+              "x": 87000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_9",
+            "label": "Stone Ridge innkeeper",
+            "role": "innkeeper",
+            "position": {
+              "x": 43000,
+              "z": 52000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_10",
+            "label": "Stone Ridge hunter",
+            "role": "hunter",
+            "position": {
+              "x": 55000,
+              "z": 52000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_11",
+            "label": "Stone Ridge tanner",
+            "role": "tanner",
+            "position": {
+              "x": 67000,
+              "z": 52000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_12",
+            "label": "Stone Ridge tailor",
+            "role": "tailor",
+            "position": {
+              "x": 79000,
+              "z": 52000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "work_13",
+            "label": "Stone Ridge fisher",
+            "role": "fisher",
+            "position": {
+              "x": 91000,
+              "z": 32000
+            },
+            "capacity": 2
+          }
+        ],
+        "homes": [
+          {
+            "key": "home_00",
+            "label": "Stone Ridge cottage 1",
+            "door": {
+              "x": 35000,
+              "z": 16000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_01",
+            "label": "Stone Ridge cottage 2",
+            "door": {
+              "x": 35000,
+              "z": 24000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_02",
+            "label": "Stone Ridge cottage 3",
+            "door": {
+              "x": 35000,
+              "z": 32000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_03",
+            "label": "Stone Ridge cottage 4",
+            "door": {
+              "x": 35000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_04",
+            "label": "Stone Ridge cottage 5",
+            "door": {
+              "x": 35000,
+              "z": 48000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_05",
+            "label": "Stone Ridge cottage 6",
+            "door": {
+              "x": 35000,
+              "z": 56000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_06",
+            "label": "Stone Ridge cottage 7",
+            "door": {
+              "x": 35000,
+              "z": 64000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_07",
+            "label": "Stone Ridge cottage 8",
+            "door": {
+              "x": 95000,
+              "z": 16000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_08",
+            "label": "Stone Ridge cottage 9",
+            "door": {
+              "x": 95000,
+              "z": 24000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_09",
+            "label": "Stone Ridge cottage 10",
+            "door": {
+              "x": 95000,
+              "z": 32000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_10",
+            "label": "Stone Ridge cottage 11",
+            "door": {
+              "x": 95000,
+              "z": 40000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_11",
+            "label": "Stone Ridge cottage 12",
+            "door": {
+              "x": 95000,
+              "z": 48000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_12",
+            "label": "Stone Ridge cottage 13",
+            "door": {
+              "x": 95000,
+              "z": 56000
+            },
+            "capacity": 2
+          },
+          {
+            "key": "home_13",
+            "label": "Stone Ridge cottage 14",
+            "door": {
+              "x": 95000,
+              "z": 64000
+            },
+            "capacity": 2
+          }
+        ]
+      }
+    ],
+    "plots": [
+      {
+        "id": "harbour_home_w",
+        "label": "Harbour west homestead",
+        "x": -40000,
+        "z": -50000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "housing"
+      },
+      {
+        "id": "harbour_home_e",
+        "label": "Harbour east homestead",
+        "x": 40000,
+        "z": -50000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "housing"
+      },
+      {
+        "id": "harbour_garden_w",
+        "label": "Harbour kitchen garden",
+        "x": -10000,
+        "z": -65000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "garden"
+      },
+      {
+        "id": "harbour_garden_e",
+        "label": "Harbour orchard garden",
+        "x": 10000,
+        "z": -65000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "garden"
+      },
+      {
+        "id": "alderwood_home_w",
+        "label": "Alderwood woodland homestead",
+        "x": -96000,
+        "z": 14000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "housing"
+      },
+      {
+        "id": "alderwood_home_e",
+        "label": "Alderwood valley homestead",
+        "x": -35000,
+        "z": 64000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "housing"
+      },
+      {
+        "id": "alderwood_garden_w",
+        "label": "Alderwood herb garden",
+        "x": -76000,
+        "z": 78000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "garden"
+      },
+      {
+        "id": "alderwood_garden_e",
+        "label": "Alderwood berry garden",
+        "x": -58000,
+        "z": 78000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "garden"
+      },
+      {
+        "id": "ridge_home_w",
+        "label": "Stone Ridge valley homestead",
+        "x": 30000,
+        "z": 72000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "housing"
+      },
+      {
+        "id": "ridge_home_e",
+        "label": "Stone Ridge eastern homestead",
+        "x": 111000,
+        "z": 10000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "housing"
+      },
+      {
+        "id": "ridge_garden_w",
+        "label": "Stone Ridge terrace garden",
+        "x": 58000,
+        "z": 78000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "garden"
+      },
+      {
+        "id": "ridge_garden_e",
+        "label": "Stone Ridge sheltered garden",
+        "x": 76000,
+        "z": 78000,
+        "width_mm": 6000,
+        "depth_mm": 6000,
+        "use_kind": "garden"
+      }
+    ]
+  },
+  "colony": true,
+  "island_ai": {},
+  "needs": {
+    "hunger": {
+      "on": true,
+      "rise_milli_per_tick": 2,
+      "low_milli": 60000,
+      "out_milli": 100000,
+      "low_speed_pct": 75
+    },
+    "thirst": {
+      "on": true,
+      "rise_milli_per_tick": 3,
+      "low_milli": 60000,
+      "out_milli": 100000,
+      "low_speed_pct": 60
+    },
+    "energy": {
+      "on": true,
+      "rise_milli_per_tick": 2,
+      "low_milli": 60000,
+      "out_milli": 100000,
+      "low_speed_pct": 50
+    },
+    "battery": {
+      "on": false,
+      "rise_milli_per_tick": 0,
+      "low_milli": 60000,
+      "out_milli": 100000,
+      "low_speed_pct": 100
+    }
+  },
+  "day_night": {
+    "on": true,
+    "cycle_ticks": 24000,
+    "night_vision_pct": 50
+  },
+  "detection": "automatic",
+  "perception": {
+    "forget_after_ticks": 1200,
+    "memory_capacity": 256
+  },
+  "systems": {
+    "map": true,
+    "crafting": true,
+    "vehicles": false,
+    "locked_doors": false,
+    "progression": true
+  },
+  "inhabitants": {
+    "workers": 0,
+    "skeletons": 0
+  }
+}

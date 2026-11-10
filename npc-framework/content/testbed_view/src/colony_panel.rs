@@ -48,6 +48,8 @@ enum Action {
     Gatherings,
     Resident(SimId),
     Home(SimId, SimId),
+    Profession(SimId, SimId),
+    Settlement(SimId),
     Commission(SimId, SimId),
     CancelHome(SimId),
     Surface(TerrainSurface),
@@ -422,7 +424,13 @@ fn pointer(world: &mut World) {
             .iter(world)
             .find_map(|(camera, transform)| camera.viewport_to_world(transform, cursor).ok())
     });
-    let cell = ray.and_then(|ray| terrain_hit(world.resource::<TerrainState>(), ray));
+    let cell = ray.and_then(|ray| {
+        if village::frontier::enabled(world) {
+            crate::colony_scene::living_scene::terrain_hit(world, ray)
+        } else {
+            terrain_hit(world.resource::<TerrainState>(), ray)
+        }
+    });
     let command = cell.map(|(x, z)| {
         let state = world.resource::<Ledger>();
         Terraform {
@@ -577,7 +585,26 @@ fn process(world: &mut World) {
                     .and_then(|e| world.get::<npc_framework::prelude::SimPos>(e))
                     .copied();
                 if let Some(position) = position {
-                    crate::island_camera::focus(world, sim_to_world(position), 24.0);
+                    crate::island_camera::focus(world, sim_to_world(position), 12.0);
+                }
+            }
+            Action::Profession(resident, workplace) => queue(
+                world,
+                SimCommand::content(&village::frontier::labor::AssignProfession {
+                    resident,
+                    workplace,
+                }),
+                "Assignment requested. The resident finishes committed work before changing jobs."
+                    .into(),
+            ),
+            Action::Settlement(id) => {
+                if let Some(position) = world
+                    .resource::<SimIndex>()
+                    .get(id)
+                    .and_then(|entity| world.get::<npc_framework::prelude::SimPos>(entity))
+                    .copied()
+                {
+                    crate::island_camera::focus(world, sim_to_world(position), 65.0);
                 }
             }
             Action::Home(resident, house) => queue(
@@ -621,11 +648,25 @@ fn process(world: &mut World) {
             }
             Action::Height(delta) => {
                 let water = world.resource::<Ledger>().surface == TerrainSurface::Water;
+                let regional = village::frontier::enabled(world);
                 let value = world
                     .resource::<Ledger>()
                     .height_mm
                     .saturating_add(delta)
-                    .clamp(if water { -1000 } else { 0 }, if water { 0 } else { 3000 });
+                    .clamp(
+                        if water {
+                            if regional { -2000 } else { -1000 }
+                        } else {
+                            0
+                        },
+                        if water {
+                            0
+                        } else if regional {
+                            12000
+                        } else {
+                            3000
+                        },
+                    );
                 world.resource_mut::<Ledger>().height_mm = value;
             }
             Action::Radius(delta) => {
@@ -633,7 +674,11 @@ fn process(world: &mut World) {
                     .resource::<Ledger>()
                     .radius
                     .saturating_add_signed(delta)
-                    .min(3);
+                    .min(if village::frontier::enabled(world) {
+                        8
+                    } else {
+                        3
+                    });
                 world.resource_mut::<Ledger>().radius = value;
             }
         }
@@ -788,10 +833,11 @@ pub(crate) fn refresh(world: &mut World) {
         reconcile(world, rows);
     }
     let state = world.resource::<Ledger>();
+    let regional = village::frontier::enabled(world);
     let limits = if state.surface == TerrainSurface::Water {
-        (-1000, 0)
+        (if regional { -2000 } else { -1000 }, 0)
     } else {
-        (0, 3000)
+        (0, if regional { 12000 } else { 3000 })
     };
     let disabled: Vec<_> = world
         .query::<(Entity, &LedgerAction)>()
@@ -812,7 +858,7 @@ pub(crate) fn refresh(world: &mut World) {
                         if delta < 0 {
                             state.radius == 0
                         } else {
-                            state.radius == 3
+                            state.radius == if regional { 8 } else { 3 }
                         }
                     }
                     _ => false,
@@ -962,7 +1008,12 @@ fn typography(
         }
     }
 }
-fn brush_gizmo(mode: Res<IslandMode>, state: Res<Ledger>, mut gizmos: Gizmos) {
+fn brush_gizmo(
+    mode: Res<IslandMode>,
+    state: Res<Ledger>,
+    terrain: Option<Res<village::frontier::terrain::TerrainState>>,
+    mut gizmos: Gizmos,
+) {
     if *mode != IslandMode::Editor {
         return;
     }
@@ -977,13 +1028,32 @@ fn brush_gizmo(mode: Res<IslandMode>, state: Res<Ledger>, mut gizmos: Gizmos) {
     } else {
         GOLD
     };
-    for (x, z) in brush_cells(x, z, state.radius) {
+    let cells = terrain.as_ref().map_or_else(
+        || brush_cells(x, z, state.radius),
+        |terrain| regional_brush_cells(terrain.bounds(), x, z, state.radius),
+    );
+    for (x, z) in cells {
         gizmos.cube(
             Transform::from_xyz(x as f32 + 0.5, y, z as f32 + 0.5)
                 .with_scale(Vec3::new(1.0, 0.06, 1.0)),
             color,
         );
     }
+}
+
+fn regional_brush_cells(
+    bounds: npc_framework::prelude::GridBounds,
+    cx: i32,
+    cz: i32,
+    radius: u32,
+) -> Vec<(i32, i32)> {
+    let radius = radius.min(8) as i32;
+    (-radius..=radius)
+        .flat_map(|z| (-radius..=radius).map(move |x| (x, z)))
+        .filter(|(x, z)| x * x + z * z <= radius * radius)
+        .map(|(x, z)| (cx.saturating_add(x), cz.saturating_add(z)))
+        .filter(|(x, z)| bounds.contains(npc_framework::prelude::CellCoord::new(*x, *z)))
+        .collect()
 }
 
 fn brush_cells(cx: i32, cz: i32, radius: u32) -> Vec<(i32, i32)> {

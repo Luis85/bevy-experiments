@@ -50,7 +50,11 @@ pub const CONTENT: &str = "testbed";
 
 /// The embedded scenario files: `(name, JSON)`. `testbed` is the default
 /// showcase; the others focus on one feature each (see the README).
-pub const SCENARIO_FILES: [(&str, &str); 14] = [
+pub const SCENARIO_FILES: [(&str, &str); 15] = [
+    (
+        "living_world",
+        include_str!("../scenarios/living_world.json"),
+    ),
     ("testbed", include_str!("../scenarios/testbed.json")),
     ("doors", include_str!("../scenarios/doors.json")),
     (
@@ -110,6 +114,7 @@ pub enum Detection {
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields, default)]
 pub struct WorldSpec {
+    pub living_world: Option<crate::village::frontier::LivingWorldSpec>,
     pub colony: bool,
     pub island_ai: Option<crate::village::policy::IslandAiPolicy>,
     pub economy: crate::worlds::EconomyModel,
@@ -129,6 +134,7 @@ pub struct WorldSpec {
 impl Default for WorldSpec {
     fn default() -> Self {
         Self {
+            living_world: None,
             colony: false,
             island_ai: None,
             economy: crate::worlds::EconomyModel::Fixed,
@@ -152,6 +158,12 @@ impl WorldSpec {
             return Ok(Self::default());
         }
         let spec: Self = serde_json::from_value(v.clone()).map_err(|e| format!("world: {e}"))?;
+        if let Some(definition) = &spec.living_world {
+            definition.validate()?;
+            if !spec.colony || spec.island_ai.is_none() {
+                return Err("Regional living world requires colony and resident AI policy".into());
+            }
+        }
         if spec.colony
             && (spec.layout != Layout::Island
                 || spec.economy != crate::worlds::EconomyModel::NeedsDriven
@@ -212,14 +224,21 @@ pub fn testbed_plugins(seed: u64, detection: Detection) -> NpcPlugins {
 /// `world`, with `plugins` added before the freeze.
 pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -> App {
     let mut app = App::new();
-    app.insert_resource(SpatialGrid::new(
-        1000,
-        GridBounds::centered(world.layout.grid_cells(), world.layout.grid_cells()),
-    ))
-    .insert_resource(PerceptionConfig {
-        stagger: world.stagger.max(1),
-        ..Default::default()
-    });
+    let regional = world
+        .explorer_context
+        .as_ref()
+        .and_then(|c| c.world.as_ref())
+        .and_then(|s| s.preset.living_world.as_ref())
+        .or(world.living_world.as_ref());
+    let bounds = regional.map_or_else(
+        || GridBounds::centered(world.layout.grid_cells(), world.layout.grid_cells()),
+        |s| s.bounds(),
+    );
+    app.insert_resource(SpatialGrid::new(1000, bounds))
+        .insert_resource(PerceptionConfig {
+            stagger: world.stagger.max(1),
+            ..Default::default()
+        });
     app.add_plugins((
         testbed_plugins(seed, world.detection),
         NavPlugin,
@@ -252,6 +271,7 @@ pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -
                 preset.island_geography = world.island_geography;
                 preset.colony = world.colony;
                 preset.island_ai = world.island_ai.clone();
+                preset.living_world = world.living_world.clone();
                 preset
             });
         crate::village::prepare(&mut app, &preset);
@@ -421,6 +441,10 @@ pub fn register_scenario_loader(loaders: &mut ScenarioLoaders) {
 /// game menu lists them).
 pub fn embedded_scenarios() -> &'static [(&'static str, &'static str)] {
     const LIST: [(&str, &str); SCENARIO_FILES.len()] = [
+        (
+            "living_world",
+            "Explore three working villages, restore woodland habitats and shape a larger living island.",
+        ),
         (
             "testbed",
             "The showcase: 8 actors in two factions, a woodcutter, Per-roll detection.",

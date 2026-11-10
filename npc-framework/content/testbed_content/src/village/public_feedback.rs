@@ -28,8 +28,8 @@ pub struct PublicBubble {
     pub expires_tick: u64,
 }
 
-/// A trusted registration key, never a submitted free-form label. Unknown or
-/// malformed names receive a closed fallback at the calling site.
+/// A safe label resolved from a trusted registration key, never submitted
+/// free-form text. Unknown or malformed names receive a closed fallback.
 pub fn public_verb(world: &World, candidate: &str) -> Option<&'static str> {
     let name = match candidate {
         "cancel" => "cancel",
@@ -42,7 +42,14 @@ pub fn public_verb(world: &World, candidate: &str) -> Option<&'static str> {
                 .0
         }
     };
-    (!name.chars().any(char::is_control)).then_some(name)
+    if name.chars().any(char::is_control) {
+        return None;
+    }
+    Some(match name {
+        "plant_tree" => "plant a tree cutting",
+        "restore_habitat" => "restore habitat",
+        _ => name,
+    })
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -222,4 +229,56 @@ pub fn bubbles(world: &World) -> BTreeMap<SimId, Vec<PublicBubble>> {
         result.entry(actor).or_default().push(speech);
     }
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use npc_framework::kernel::hash::state_hash;
+
+    #[test]
+    fn restoration_labels_require_registered_verbs_and_never_echo_payloads() {
+        let mut app = crate::new_sim_app(7, "living_world");
+        assert_eq!(
+            public_verb(app.world(), "plant_tree"),
+            Some("plant a tree cutting")
+        );
+        assert_eq!(
+            public_verb(app.world(), "restore_habitat"),
+            Some("restore habitat")
+        );
+        assert_eq!(public_verb(app.world(), "plant_tree\nPRIVATE_CANARY"), None);
+        let actor = app.world().resource::<crate::TestbedIds>().id("Ada");
+        for (handle, verb) in [
+            (1, "plant_tree"),
+            (2, "restore_habitat"),
+            (3, "PRIVATE_CANARY"),
+        ] {
+            app.world_mut().resource_mut::<Journal>().push(
+                0,
+                Some(actor),
+                JournalKind::ExternalAction {
+                    handle,
+                    verb: verb.into(),
+                    status: "started".into(),
+                    latency_ticks: None,
+                },
+            );
+        }
+        let before = state_hash(app.world_mut());
+        let feed = bubbles(app.world());
+        assert_eq!(
+            feed[&actor][0].text,
+            "Action: plant a tree cutting; restore habitat; recorded action"
+        );
+        assert!(
+            !serde_json::to_string(&feed)
+                .unwrap()
+                .contains("PRIVATE_CANARY")
+        );
+        assert_eq!(state_hash(app.world_mut()), before);
+        let legacy = crate::new_sim_app(7, "island_colony");
+        assert_eq!(public_verb(legacy.world(), "plant_tree"), None);
+        assert_eq!(public_verb(legacy.world(), "restore_habitat"), None);
+    }
 }

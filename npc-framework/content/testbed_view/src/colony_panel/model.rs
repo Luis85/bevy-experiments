@@ -75,6 +75,30 @@ pub(super) fn entries(world: &World) -> Vec<Entry> {
                     false,
                 ),
             ];
+            if village::frontier::enabled(world) {
+                rows.push(Entry::text("regions_title", "Across the island", true));
+                for (id, entity) in village::frontier::settlements::all(world) {
+                    let place = world
+                        .get::<village::frontier::Settlement>(entity)
+                        .expect("settlement");
+                    let residents = world
+                        .resource::<SimIndex>()
+                        .map
+                        .values()
+                        .filter(|actor| {
+                            village::frontier::settlements::member(world, **actor) == Some(id)
+                                && world.get::<Villager>(**actor).is_some()
+                                && village::living(world, **actor)
+                        })
+                        .count();
+                    rows.push(Entry::action(
+                        format!("region{}", id.0),
+                        format!("{} · {residents} residents", place.label),
+                        Action::Settlement(id),
+                    ));
+                }
+                rows.push(Entry::text("regional_chains","Fish to cooked meals\nFiber to thread, fishing rods & woven coats\nShared reference prices and community fund; goods still travel physically.",false));
+            }
             for days in 1..=4 {
                 rows.push(Entry::action(
                     format!("reserve{days}"),
@@ -203,12 +227,22 @@ pub(super) fn entries(world: &World) -> Vec<Entry> {
                         ledger.height_mm as f32 / 1000.0,
                         ledger.radius,
                         ledger.radius * 2 + 1,
-                        super::brush_cells(
-                            ledger.cell.map_or(0, |(x, _)| x),
-                            ledger.cell.map_or(0, |(_, z)| z),
-                            ledger.radius
-                        )
-                        .len()
+                        world
+                            .get_resource::<village::frontier::terrain::TerrainState>()
+                            .map_or_else(
+                                || super::brush_cells(
+                                    ledger.cell.map_or(0, |(x, _)| x),
+                                    ledger.cell.map_or(0, |(_, z)| z),
+                                    ledger.radius
+                                ),
+                                |terrain| super::regional_brush_cells(
+                                    terrain.bounds(),
+                                    ledger.cell.map_or(0, |(x, _)| x),
+                                    ledger.cell.map_or(0, |(_, z)| z),
+                                    ledger.radius
+                                )
+                            )
+                            .len()
                     ),
                     false,
                 ),
@@ -300,6 +334,48 @@ fn resident_entries(world: &World) -> Vec<Entry> {
             ));
         }
         rows.push(Entry::text("selected", detail, false));
+        if let Some(job) = village::frontier::labor::summary(world, entity) {
+            rows.push(Entry::text(
+                "employment_title",
+                "Work & qualifications",
+                true,
+            ));
+            rows.push(Entry::text(
+                "employment",
+                format!(
+                    "Qualified for: {}\n{}\n{} ticks until automatic reconsideration{}",
+                    job.allowed_roles.join(", "),
+                    job.reason,
+                    job.cooldown_remaining,
+                    job.pending_workplace.map_or(String::new(), |id| format!(
+                        "\nRequested workplace #{}; waiting for a safe work boundary",
+                        id.0
+                    ))
+                ),
+                false,
+            ));
+            for vacancy in village::frontier::labor::vacancies(world) {
+                let command = village::frontier::labor::AssignProfession {
+                    resident: id,
+                    workplace: vacancy.workplace,
+                };
+                if command.check(world).is_ok() {
+                    let settlement = world
+                        .resource::<SimIndex>()
+                        .get(vacancy.settlement)
+                        .and_then(|e| world.get::<village::frontier::Settlement>(e))
+                        .map_or("Settlement", |s| s.label.as_str());
+                    rows.push(Entry::action(
+                        format!("job{}", vacancy.workplace.0),
+                        format!(
+                            "Request {} in {settlement} · {}/{} places filled",
+                            vacancy.role, vacancy.occupied, vacancy.capacity
+                        ),
+                        Action::Profession(id, vacancy.workplace),
+                    ));
+                }
+            }
+        }
         rows.push(Entry::text(
             "plan",
             village::goap::explain(world, entity),

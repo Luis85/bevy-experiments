@@ -209,6 +209,16 @@ fn words(world: &World, verb: &str) -> [String; 3] {
             "Planting your crop…",
             "Your crop is planted.",
         ],
+        "plant_tree" => [
+            "Tree planting requested.",
+            "Planting a tree cutting…",
+            "Tree cutting planted. Growth takes time.",
+        ],
+        "restore_habitat" => [
+            "Habitat restoration requested.",
+            "Restoring the habitat…",
+            "Habitat work is complete. Recovery takes time.",
+        ],
         "water_crop" => [
             "Watering requested.",
             "Watering your crop…",
@@ -302,8 +312,19 @@ pub(super) fn track(
 fn long_work(verb: &str) -> bool {
     matches!(
         verb,
-        "gather" | "hunt" | "build_cottage" | "rest" | "rest_home" | "rest_ground"
+        "gather"
+            | "hunt"
+            | "build_cottage"
+            | "rest"
+            | "rest_home"
+            | "rest_ground"
+            | "plant_tree"
+            | "restore_habitat"
     )
+}
+
+fn restoration(verb: &str) -> bool {
+    matches!(verb, "plant_tree" | "restore_habitat")
 }
 
 fn active_work(world: &World, watch: &Watch) -> bool {
@@ -316,6 +337,9 @@ fn active_work(world: &World, watch: &Watch) -> bool {
         "build_cottage" => world
             .get::<CottageBuild>(actor)
             .is_some_and(|work| Some(work.plot) == watch.target),
+        "plant_tree" | "restore_habitat" => world
+            .get::<testbed_content::village::frontier::activities::EcologyWork>(actor)
+            .is_some_and(|work| Some(work.target) == watch.target && work.verb == watch.verb),
         "hunt" => testbed_content::village::activity(world, actor).0 == "hunting",
         "rest" | "rest_home" | "rest_ground" => {
             testbed_content::village::activity(world, actor).0 == "resting"
@@ -324,8 +348,39 @@ fn active_work(world: &World, watch: &Watch) -> bool {
     }
 }
 
+fn restoration_event_matches(
+    watch: &Watch,
+    effect: &npc_framework::kernel::json::JsonObject,
+    target_field: &str,
+    verb_field: &str,
+) -> bool {
+    restoration(&watch.verb)
+        && watch.target.is_some_and(|target| {
+            effect.get(target_field).and_then(Value::as_u64) == Some(u64::from(target.0))
+                && effect.get(verb_field).and_then(Value::as_str) == Some(watch.verb.as_str())
+        })
+}
+
+fn effect_started(watch: &Watch, effect: &npc_framework::kernel::json::JsonObject) -> bool {
+    effect.get("type").and_then(Value::as_str) == Some("LandscapeWorkStarted")
+        && restoration_event_matches(watch, effect, "target", "verb")
+}
+
 fn effect_result(watch: &Watch, effect: &npc_framework::kernel::json::JsonObject) -> Option<bool> {
     let kind = effect.get("type")?.as_str()?;
+    if restoration(&watch.verb) {
+        return match kind {
+            "HabitatRestored" if restoration_event_matches(watch, effect, "patch", "work") => {
+                Some(true)
+            }
+            "LandscapeWorkCancelled"
+                if restoration_event_matches(watch, effect, "target", "verb") =>
+            {
+                Some(false)
+            }
+            _ => None,
+        };
+    }
     let expected = match watch.verb.as_str() {
         "gather" => ("VillageGathered", Some("patch")),
         "build_cottage" => ("VillageCottageBuilt", Some("plot")),
@@ -384,12 +439,19 @@ pub(super) fn update(world: &mut World, current: Option<ActorStamp>, native_now:
             .filter(|event| event.unit == Some(watch.actor.id))
         {
             match &event.event {
-                JournalKind::ExternalAction { handle, status, .. }
-                    if watch.handle == Some(*handle) =>
+                JournalKind::ExternalAction {
+                    handle,
+                    verb,
+                    status,
+                    ..
+                } if watch.handle == Some(*handle)
+                    && (!restoration(&watch.verb) || *verb == watch.verb) =>
                 {
                     match status.as_str() {
-                        "started" => watch.started = true,
-                        "done" => result = Some(true),
+                        "started" if !restoration(&watch.verb) => watch.started = true,
+                        // Dispatch is not physical completion of timed landscape
+                        // work. Only its own domain outcome can confirm success.
+                        "done" if !restoration(&watch.verb) => result = Some(true),
                         "cancelled" | "failed" | "rejected" => result = Some(false),
                         _ => {}
                     }
@@ -397,7 +459,10 @@ pub(super) fn update(world: &mut World, current: Option<ActorStamp>, native_now:
                 JournalKind::Effect {
                     effect,
                     applied: true,
-                } if watch.handle.is_none() => {
+                } if watch.handle.is_none() || restoration(&watch.verb) => {
+                    if effect_started(&watch, effect) {
+                        watch.started = true;
+                    }
                     if let Some(outcome) = effect_result(&watch, effect) {
                         result = Some(outcome);
                     }
@@ -413,7 +478,11 @@ pub(super) fn update(world: &mut World, current: Option<ActorStamp>, native_now:
             if completed {
                 watch.words[2].clone()
             } else {
-                "Your activity stopped before it finished. Check its requirements before trying again.".into()
+                match watch.verb.as_str() {
+                    "plant_tree" => "Tree planting stopped before completion.",
+                    "restore_habitat" => "Habitat restoration stopped before completion.",
+                    _ => "Your activity stopped before it finished. Check its requirements before trying again.",
+                }.into()
             },
         );
         return;
@@ -438,7 +507,7 @@ pub(super) fn update(world: &mut World, current: Option<ActorStamp>, native_now:
         feedback(world, watch.words[2].clone());
         return;
     }
-    if applied && !pending && watch.handle.is_some() {
+    if applied && !pending && watch.handle.is_some() && !restoration(&watch.verb) {
         let queued = world
             .get::<npc_framework::agent_io::control::ExternalQueue>(watch.actor.entity)
             .is_some_and(|queue| {
@@ -459,7 +528,7 @@ pub(super) fn update(world: &mut World, current: Option<ActorStamp>, native_now:
             return;
         }
     }
-    if working || watch.started && watch.handle.is_some() {
+    if working || watch.started && watch.handle.is_some() && !restoration(&watch.verb) {
         watch.started = true;
         feedback(world, watch.words[1].clone());
     } else if applied && !pending && long_work(&watch.verb) {
@@ -527,6 +596,257 @@ mod tests {
             .feedback
             .as_deref()
             .unwrap_or("")
+    }
+
+    fn restoration_fixture() -> (App, ActorStamp, SimId, Entity) {
+        use testbed_content::village::{catalog, frontier::ecology::EcologicalPatch};
+        let mut app = testbed_content::new_sim_app(7, "living_world");
+        let id = app.world().resource::<VillageState>().played;
+        JoinIsland { unit: id.0 }.perform(app.world_mut()).unwrap();
+        take_control(app.world_mut()).unwrap();
+        run_ticks(app.world_mut(), 1);
+        tick(app.world_mut());
+        let who = actor(app.world()).unwrap();
+        let (target, site) = app
+            .world()
+            .resource::<SimIndex>()
+            .map
+            .iter()
+            .find(|(_, entity)| {
+                app.world()
+                    .get::<ResourcePatch>(**entity)
+                    .is_some_and(|patch| patch.kind == "log")
+            })
+            .map(|(id, entity)| (*id, *entity))
+            .unwrap();
+        let at = *app.world().get::<SimPos>(site).unwrap();
+        app.world_mut().entity_mut(who.entity).insert(at);
+        app.world_mut()
+            .get_mut::<EcologicalPatch>(site)
+            .unwrap()
+            .biomass_milli = 50_000;
+        for (kind, count) in [("log", 1), (catalog::WATER, 1), (catalog::FIBER, 2)] {
+            economy::grant(app.world_mut(), who.entity, Item::new(kind).stack(count));
+        }
+        for _ in 0..32 {
+            run_ticks(app.world_mut(), 1);
+            tick(app.world_mut());
+        }
+        (app, who, target, site)
+    }
+
+    fn restore(app: &mut App, target: SimId, verb: &str) {
+        act(
+            app.world_mut(),
+            ActStep {
+                verb: Some(verb.into()),
+                target: Some(target.0),
+                ..default()
+            },
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn restoration_feedback_tracks_real_requests_work_and_delayed_growth_completion() {
+        use testbed_content::village::frontier::{
+            activities::EcologyWork, ecology::EcologicalPatch,
+        };
+        for (verb, requested, working, completed) in [
+            (
+                "plant_tree",
+                "Tree planting requested.",
+                "Planting a tree cutting…",
+                "Tree cutting planted. Growth takes time.",
+            ),
+            (
+                "restore_habitat",
+                "Habitat restoration requested.",
+                "Restoring the habitat…",
+                "Habitat work is complete. Recovery takes time.",
+            ),
+        ] {
+            let (mut app, who, target, site) = restoration_fixture();
+            restore(&mut app, target, verb);
+            assert_eq!(message(&app), requested);
+            run_ticks(app.world_mut(), 1);
+            tick(app.world_mut());
+            assert_eq!(message(&app), working);
+            let ends = app.world().get::<EcologyWork>(who.entity).unwrap().ends;
+            let before = state_hash(app.world_mut());
+            update(app.world_mut(), Some(who), true);
+            assert_eq!(
+                state_hash(app.world_mut()),
+                before,
+                "feedback must not perform work"
+            );
+            while app.world().resource::<SimClock>().tick <= ends {
+                run_ticks(app.world_mut(), 1);
+                tick(app.world_mut());
+            }
+            assert_eq!(message(&app), completed);
+            assert!(app.world().resource::<NativeActions>().progress.is_none());
+            let ecology = app.world().get::<EcologicalPatch>(site).unwrap();
+            assert_eq!(ecology.planted_units + ecology.restored_units, 1);
+            assert_eq!(
+                ecology.pending_growth.len(),
+                1,
+                "completion is planting, not instant mature growth"
+            );
+            app.world_mut().resource_mut::<NativeActions>().feedback = Some("New selection".into());
+            tick(app.world_mut());
+            assert_eq!(
+                message(&app),
+                "New selection",
+                "terminal receipts are consumed once"
+            );
+        }
+    }
+
+    #[test]
+    fn actual_restoration_cancellation_never_reports_completion_or_spends_materials() {
+        use testbed_content::village::{VillageAct, catalog, frontier::ecology::EcologicalPatch};
+        for (verb, stopped) in [
+            ("plant_tree", "Tree planting stopped before completion."),
+            (
+                "restore_habitat",
+                "Habitat restoration stopped before completion.",
+            ),
+        ] {
+            let (mut app, who, target, site) = restoration_fixture();
+            let before: Vec<_> = ["log", catalog::WATER, catalog::FIBER]
+                .into_iter()
+                .map(|kind| (kind, economy::count(app.world(), who.entity, kind)))
+                .collect();
+            restore(&mut app, target, verb);
+            run_ticks(app.world_mut(), 1);
+            tick(app.world_mut());
+            // A real recorded cancellation arriving independently of the HUD
+            // leaves the original restoration watch available to explain it.
+            submit(
+                app.world_mut(),
+                None,
+                SimCommand::content(&VillageAct::new(who.id, "stop_work")),
+            )
+            .unwrap();
+            run_ticks(app.world_mut(), 1);
+            tick(app.world_mut());
+            assert_eq!(message(&app), stopped);
+            assert!(app.world().resource::<NativeActions>().progress.is_none());
+            for (kind, count) in before {
+                assert_eq!(economy::count(app.world(), who.entity, kind), count);
+            }
+            let ecology = app.world().get::<EcologicalPatch>(site).unwrap();
+            assert_eq!(ecology.planted_units + ecology.restored_units, 0);
+        }
+    }
+
+    #[test]
+    fn restoration_outcomes_require_matching_actor_site_verb_and_epoch() {
+        let (mut app, who, target, _) = restoration_fixture();
+        restore(&mut app, target, "plant_tree");
+        let other = app
+            .world()
+            .resource::<testbed_content::TestbedIds>()
+            .id("Ada");
+        let other_entity = app.world().resource::<SimIndex>().get(other).unwrap();
+        // Retain the foreign events in the shared buffer so this verifies the
+        // feedback actor filter, rather than relying on harvest to discard them.
+        app.world_mut()
+            .entity_mut(other_entity)
+            .insert(ExternalController {
+                id: "other-test-controller".into(),
+                mode: ControlMode::Direct,
+                on_idle: IdlePolicy::Idle,
+            });
+        for (unit, site, verb) in [
+            (other, target, "plant_tree"),
+            (who.id, SimId(u32::MAX), "plant_tree"),
+            (who.id, target, "restore_habitat"),
+        ] {
+            for event in ["LandscapeWorkStarted", "LandscapeWorkCancelled"] {
+                journal::record_effect(
+                    app.world_mut(),
+                    Some(unit),
+                    event,
+                    &json!({"target":site,"verb":verb}),
+                );
+            }
+            journal::record_effect(
+                app.world_mut(),
+                Some(unit),
+                "HabitatRestored",
+                &json!({"patch":site,"work":verb}),
+            );
+        }
+        events::harvest(app.world_mut());
+        let before = state_hash(app.world_mut());
+        update(app.world_mut(), Some(who), true);
+        assert_eq!(message(&app), "Tree planting requested.");
+        assert!(
+            !app.world()
+                .resource::<NativeActions>()
+                .progress
+                .as_ref()
+                .unwrap()
+                .started
+        );
+        assert_eq!(state_hash(app.world_mut()), before);
+        run_ticks(app.world_mut(), 1);
+        tick(app.world_mut());
+        assert_eq!(message(&app), "Planting a tree cutting…");
+        journal::record_effect(
+            app.world_mut(),
+            Some(who.id),
+            "HabitatRestored",
+            &json!({"patch":target,"work":"plant_tree"}),
+        );
+        events::harvest(app.world_mut());
+        app.insert_resource(AgentIoState::default());
+        let next = actor(app.world()).unwrap();
+        assert_ne!(who.epoch, next.epoch);
+        app.world_mut().resource_mut::<NativeActions>().feedback = Some("Resumed island".into());
+        update(app.world_mut(), Some(next), true);
+        assert!(app.world().resource::<NativeActions>().progress.is_none());
+        assert_eq!(message(&app), "Resumed island");
+    }
+
+    #[test]
+    fn restoration_dispatch_completion_is_not_a_physical_outcome() {
+        let (mut app, who, target, _) = restoration_fixture();
+        let seq = events::last_seq(app.world());
+        track(
+            app.world_mut(),
+            who,
+            Some(target),
+            &json!({"verb":"restore_habitat","handle":123}),
+            seq,
+        );
+        journal::record(app.world_mut(), Some(who.id), || {
+            JournalKind::ExternalAction {
+                handle: 123,
+                verb: "restore_habitat".into(),
+                status: "done".into(),
+                latency_ticks: None,
+            }
+        });
+        events::harvest(app.world_mut());
+        update(app.world_mut(), Some(who), true);
+        assert_eq!(message(&app), "Habitat restoration requested.");
+        assert!(app.world().resource::<NativeActions>().progress.is_some());
+        journal::record_effect(
+            app.world_mut(),
+            Some(who.id),
+            "LandscapeWorkCancelled",
+            &json!({"target":target,"verb":"restore_habitat"}),
+        );
+        events::harvest(app.world_mut());
+        update(app.world_mut(), Some(who), true);
+        assert_eq!(
+            message(&app),
+            "Habitat restoration stopped before completion."
+        );
+        assert!(app.world().resource::<NativeActions>().progress.is_none());
     }
 
     fn publish_log(app: &mut App, who: ActorStamp) {

@@ -359,9 +359,9 @@ fn parse_args(raw: &[String]) -> Args {
                     .unwrap_or_else(|| {
                         testbed_content::explorer::settings::Settings::default_for(&home)
                     });
-            args.island_save = Some(settings.agents_dir.join("local-island.world.json"));
+            args.island_save = Some(settings.agents_dir.join("living-world.world.json"));
             if args.island_rules.is_none() {
-                args.island_rules = Some(settings.worlds_dir().join("island_colony.json"));
+                args.island_rules = Some(settings.worlds_dir().join("living_world.json"));
             }
         }
     }

@@ -28,7 +28,13 @@ pub fn tick(world: &mut World) {
         .map(|(e, id, p)| (*id, e, p.clone()))
         .collect();
     patches.sort_by_key(|(id, _, _)| *id);
+    if super::frontier::enabled(world) {
+        super::frontier::ecology::tick(world);
+    }
     for (_, e, mut p) in patches {
+        if super::frontier::enabled(world) {
+            break;
+        }
         if now >= p.replenish_at {
             let capacity = if p.kind == catalog::GRAIN {
                 match season {
@@ -78,7 +84,7 @@ pub(super) fn work(world: &mut World, e: Entity) {
                 }
             }
         }
-        Role::Visitor | Role::Hunter | Role::Tanner | Role::Tailor => {}
+        Role::Visitor | Role::Hunter | Role::Tanner | Role::Tailor | Role::Fisher => {}
     }
 }
 
@@ -120,11 +126,21 @@ pub(super) fn market_supplier(world: &World, buyer: Entity, kind: &str) -> Optio
                 &goods.into_iter().map(|(_, item)| item).collect::<Vec<_>>(),
             )
             .ok()?;
-            let distance = here.dist2(*world.get::<SimPos>(*seller)?);
-            Some((price, distance, *id, *seller))
+            let distance = if super::frontier::enabled(world) {
+                i64::from(
+                    super::frontier::routes::estimate(world, here, *world.get::<SimPos>(*seller)?)?
+                        .distance_mm,
+                )
+            } else {
+                here.dist2(*world.get::<SimPos>(*seller)?)
+            };
+            let local = !super::frontier::enabled(world)
+                || super::production::economic_settlement(world, buyer)
+                    == super::production::economic_settlement(world, *seller);
+            Some((!local, price, distance, *id, *seller))
         })
-        .min_by_key(|(price, distance, id, _)| (*price, *distance, *id))
-        .map(|(_, _, _, seller)| seller)
+        .min_by_key(|(remote, price, distance, id, _)| (*remote, *price, *distance, *id))
+        .map(|(_, _, _, _, seller)| seller)
 }
 
 fn buy_market_input(world: &mut World, actor: Entity, kind: &str, wanted: u32) -> bool {
@@ -179,7 +195,15 @@ pub(super) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<
         .filter_map(|(id, e)| {
             let patch = world.get::<ResourcePatch>(*e)?;
             let pos = *world.get::<SimPos>(*e)?;
-            (patch.kind == kind && patch.remaining > 0).then_some((here.dist2(pos), *id, *e))
+            if patch.kind != kind || patch.remaining == 0 {
+                return None;
+            }
+            let distance = if super::frontier::enabled(world) {
+                i64::from(super::frontier::routes::estimate(world, here, pos)?.distance_mm)
+            } else {
+                here.dist2(pos)
+            };
+            Some((distance, *id, *e))
         })
         .min_by_key(|(distance, id, _)| (*distance, *id))
         .map(|(_, id, entity)| (id, entity))
@@ -246,6 +270,11 @@ fn living_work(world: &mut World, actor: Entity) {
         && home.carried_fuel < home.fuel_required
         && (buy_market_input(world, actor, home.fuel_kind, home.fuel_required)
             || gather_job(world, actor, home.fuel_kind))
+    {
+        return;
+    }
+
+    if super::frontier::enabled(world) && super::frontier::labor::consider_assignment(world, actor)
     {
         return;
     }
@@ -382,7 +411,7 @@ fn living_work(world: &mut World, actor: Entity) {
             || production::production_demand(world, actor, catalog::HIDE) > 0)
         && npc_framework::interaction::items::carried_matching(world, actor, catalog::SPEAR)
             .is_some()
-        && let Some((target, prey, _)) = super::hunting::available_prey(world).into_iter().next()
+        && let Some((target, prey, _)) = prey_source(world, actor)
     {
         production::intent(world, actor, "hunt", catalog::RAW_MEAT, "", Some(target));
         if !approach_work(world, actor, prey) {
@@ -418,6 +447,23 @@ fn living_work(world: &mut World, actor: Entity) {
         return;
     }
     world.entity_mut(actor).remove::<MoveIntent>();
+}
+
+fn prey_source(world: &World, actor: Entity) -> Option<(SimId, Entity, SimPos)> {
+    let prey = super::hunting::available_prey(world);
+    if !super::frontier::enabled(world) {
+        return prey.into_iter().next();
+    }
+    let here = *world.get::<SimPos>(actor)?;
+    let region = super::production::economic_settlement(world, actor);
+    prey.into_iter()
+        .filter_map(|(id, entity, position)| {
+            let distance = super::frontier::routes::estimate(world, here, position)?.distance_mm;
+            let local = super::frontier::settlements::member(world, entity) == region;
+            Some((!local, distance, id, entity, position))
+        })
+        .min_by_key(|(remote, distance, id, ..)| (*remote, *distance, *id))
+        .map(|(_, _, id, entity, position)| (id, entity, position))
 }
 
 /// Execute the colony's read-only work request through the same movement and
@@ -605,6 +651,7 @@ pub(crate) fn stop_work(world: &mut World, e: Entity, reason: &str) {
 /// releases reservations and replans; it never resumes a stale action cursor.
 /// External queues remain the responsibility of `stop_work` / control ownership.
 pub(crate) fn cancel_owned_work(world: &mut World, e: Entity, reason: &str) {
+    super::frontier::activities::cancel(world, e);
     if world.get::<super::homestead::CottageBuild>(e).is_some() {
         super::homestead::cancel(world, e);
     }
@@ -877,6 +924,7 @@ fn finish_gathers(world: &mut World, now: u64) {
         if p.remaining == 0
             || !econ::near(world, e, patch)
             || econ::fit(world, e, &[Item::new(&p.kind)]).is_err()
+            || (p.kind == catalog::FISH && econ::count(world, e, catalog::FISHING_ROD) == 0)
         {
             continue;
         }
@@ -884,6 +932,9 @@ fn finish_gathers(world: &mut World, now: u64) {
             .get_mut::<ResourcePatch>(patch)
             .expect("patch")
             .remaining -= 1;
+        if super::frontier::enabled(world) {
+            super::frontier::ecology::harvested(world, g.patch, 1);
+        }
         econ::grant(world, e, Item::new(&p.kind));
         econ::produce(world, &p.kind, 1);
         super::production::completed(world, id, &p.kind, 1);

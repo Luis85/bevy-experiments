@@ -19,15 +19,15 @@ pub struct Road {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
-pub struct ExpansionPlot {
-    pub id: &'static str,
-    pub label: &'static str,
+pub struct ExpansionPlot<'a> {
+    pub id: &'a str,
+    pub label: &'a str,
     /// Rectangle center, in authoritative millimetres.
     pub x: i32,
     pub z: i32,
     pub width_mm: i32,
     pub depth_mm: i32,
-    pub use_kind: &'static str,
+    pub use_kind: &'a str,
 }
 
 /// Read-only wayfinding for existing trades, without borders or shop ownership.
@@ -49,7 +49,7 @@ pub struct BoundarySegment {
 pub struct Geography {
     pub radii_mm: (i32, i32),
     pub roads: &'static [Road],
-    pub expansion_plots: &'static [ExpansionPlot],
+    pub expansion_plots: &'static [ExpansionPlot<'static>],
     pub districts: &'static [District],
     pub wildlife_home: SimPos,
     resources: &'static [(&'static str, SimPos)],
@@ -236,6 +236,149 @@ pub const FIXED: Geography = Geography {
     ],
 };
 
+// The regional profile retains the shared homestead action contract. These
+// authored clearings are independent of the original island's six plots.
+const REGIONAL_PLOTS: &[ExpansionPlot] = &[
+    ExpansionPlot {
+        id: "harbour_home_w",
+        label: "Harbour west homestead",
+        x: -40000,
+        z: -50000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "housing",
+    },
+    ExpansionPlot {
+        id: "harbour_home_e",
+        label: "Harbour east homestead",
+        x: 40000,
+        z: -50000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "housing",
+    },
+    ExpansionPlot {
+        id: "harbour_garden_w",
+        label: "Harbour kitchen garden",
+        x: -10000,
+        z: -65000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "garden",
+    },
+    ExpansionPlot {
+        id: "harbour_garden_e",
+        label: "Harbour orchard garden",
+        x: 10000,
+        z: -65000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "garden",
+    },
+    ExpansionPlot {
+        id: "alderwood_home_w",
+        label: "Alderwood woodland homestead",
+        x: -96000,
+        z: 14000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "housing",
+    },
+    ExpansionPlot {
+        id: "alderwood_home_e",
+        label: "Alderwood valley homestead",
+        x: -35000,
+        z: 64000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "housing",
+    },
+    ExpansionPlot {
+        id: "alderwood_garden_w",
+        label: "Alderwood herb garden",
+        x: -76000,
+        z: 78000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "garden",
+    },
+    ExpansionPlot {
+        id: "alderwood_garden_e",
+        label: "Alderwood berry garden",
+        x: -58000,
+        z: 78000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "garden",
+    },
+    ExpansionPlot {
+        id: "ridge_home_w",
+        label: "Stone Ridge valley homestead",
+        x: 30000,
+        z: 72000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "housing",
+    },
+    ExpansionPlot {
+        id: "ridge_home_e",
+        label: "Stone Ridge eastern homestead",
+        x: 111000,
+        z: 10000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "housing",
+    },
+    ExpansionPlot {
+        id: "ridge_garden_w",
+        label: "Stone Ridge terrace garden",
+        x: 58000,
+        z: 78000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "garden",
+    },
+    ExpansionPlot {
+        id: "ridge_garden_e",
+        label: "Stone Ridge sheltered garden",
+        x: 76000,
+        z: 78000,
+        width_mm: 6000,
+        depth_mm: 6000,
+        use_kind: "garden",
+    },
+];
+const REGIONAL: Geography = Geography {
+    radii_mm: (121000, 119000),
+    roads: &[],
+    expansion_plots: REGIONAL_PLOTS,
+    districts: &[
+        District {
+            id: "harbour",
+            label: "Harbour",
+            x: 0,
+            z: -30000,
+        },
+        District {
+            id: "alderwood",
+            label: "Alderwood",
+            x: -65000,
+            z: 40000,
+        },
+        District {
+            id: "stone_ridge",
+            label: "Stone Ridge",
+            x: 65000,
+            z: 40000,
+        },
+    ],
+    wildlife_home: SimPos::new(-93000, 68000),
+    resources: &[],
+};
+pub(crate) fn regional_plots() -> &'static [ExpansionPlot<'static>] {
+    REGIONAL_PLOTS
+}
+
 pub const LIVING: Geography = Geography {
     radii_mm: (30000, 25000),
     roads: LIVING_ROADS,
@@ -382,6 +525,9 @@ impl SimHashResource for Geography {
 }
 
 pub fn register_living(app: &mut App) {
+    if super::frontier::enabled(app.world()) {
+        return;
+    }
     if !is_expanded(app.world()) {
         return;
     }
@@ -399,6 +545,9 @@ pub fn is_expanded(world: &World) -> bool {
 }
 
 pub fn for_world(world: &World) -> &Geography {
+    if super::frontier::enabled(world) {
+        return &REGIONAL;
+    }
     if is_expanded(world) {
         world.get_resource::<Geography>().unwrap_or(&LIVING)
     } else {

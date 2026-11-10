@@ -178,7 +178,9 @@ npcctl agent-token rotate --explorer-home DIR --agent NAME
 ```
 
 Read ID/TOKEN privately from the agent's `AGENTS.md`; never paste real credentials into documentation or logs.
-Normal `game_menu` play uses the configured agents folder's `local-island.world.json`,
+Normal `game_menu` play uses the configured agents folder's `living-world.world.json`,
+with the new `living_world` construction; the previous `local-island.world.json`
+is preserved and still loads explicitly using its frozen original profile,
 with no remote listener by default. Explicit `--front-end` forwards host flags such
 as `--island-save PATH`, `--island-rules PATH` and `--remote`. The title does not tick
 or overwrite the world; the pause menu provides Save game, Save and title, and Quit game.

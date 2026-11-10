@@ -509,21 +509,22 @@ pub(crate) fn committed_work(world: &World) -> bool {
     };
     if matches!(
         testbed_content::village::activity(world, actor.entity).0,
-        "building" | "crafting" | "gathering" | "hunting" | "resting"
+        "building" | "crafting" | "gathering" | "hunting" | "resting" | "restoring"
     ) {
         return true;
     }
     if world
         .get::<npc_framework::agent_io::control::ExternalQueue>(actor.entity)
         .is_some_and(|queue| {
-            queue
-                .current
-                .as_ref()
-                .is_some_and(|action| action.item.verb.starts_with("craft:"))
-                || queue
-                    .pending
-                    .iter()
-                    .any(|action| action.verb.starts_with("craft:"))
+            queue.current.as_ref().is_some_and(|action| {
+                action.item.verb.starts_with("craft:")
+                    || testbed_content::village::frontier::activities::VERBS
+                        .contains(&action.item.verb.as_str())
+            }) || queue.pending.iter().any(|action| {
+                action.verb.starts_with("craft:")
+                    || testbed_content::village::frontier::activities::VERBS
+                        .contains(&action.verb.as_str())
+            })
         })
     {
         return true;
@@ -548,9 +549,14 @@ pub(crate) fn committed_work(world: &World) -> bool {
                         "gather" | "hunt" | "rest" | "rest_home" | "rest_ground"
                     ),
                     "HomesteadAct" => verb == "build_cottage",
+                    "FrontierAct" => {
+                        testbed_content::village::frontier::activities::VERBS.contains(&verb)
+                    }
                     "AgentAct" => {
                         payload.get("controller").and_then(Value::as_str) == Some(NATIVE_CONTROLLER)
-                            && verb.starts_with("craft:")
+                            && (verb.starts_with("craft:")
+                                || testbed_content::village::frontier::activities::VERBS
+                                    .contains(&verb))
                     }
                     _ => false,
                 }

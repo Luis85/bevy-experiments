@@ -124,7 +124,10 @@ pub fn available_prey(world: &World) -> Vec<(SimId, Entity, SimPos)> {
         .map
         .iter()
         .filter_map(|(id, entity)| {
-            if !alive_prey(world, *entity) {
+            if !alive_prey(world, *entity)
+                || (super::frontier::enabled(world)
+                    && !super::frontier::ecology::harvestable_prey(world, *id))
+            {
                 return None;
             }
             Some((*id, *entity, *world.get::<SimPos>(*entity)?))
@@ -150,6 +153,12 @@ fn prey_check(world: &World, actor: Entity, target: SimId) -> Result<Entity, Str
     let prey = entity_of(world, target).ok_or("a living wild animal is required")?;
     if prey == actor || !alive_prey(world, prey) {
         return Err("a living wild animal is required".into());
+    }
+    if super::frontier::enabled(world) && !super::frontier::ecology::harvestable_prey(world, target)
+    {
+        return Err(
+            "Leave the breeding refuge undisturbed; this habitat needs its remaining adults".into(),
+        );
     }
     if !economy::near(world, actor, prey) {
         return Err("move within 1.5 m of the living animal".into());
@@ -350,6 +359,10 @@ pub fn tick(world: &mut World) {
             "VillageHunted",
             &json!({"target":work.target,"meat":2,"hide":1,"spear_spent":true}),
         );
+    }
+    if super::frontier::enabled(world) {
+        super::frontier::ecology::wildlife_tick(world);
+        return;
     }
     let habitats: Vec<_> = world
         .resource::<SimIndex>()

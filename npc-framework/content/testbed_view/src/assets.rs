@@ -29,23 +29,37 @@ pub fn asset_plugin() -> AssetPlugin {
     }
 }
 
-/// Four animated KayKit actors and two procedural robot bodies.
+/// Presentation identity. Occupations never select a frontier resident's body.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum ModelKind {
     Knight,
     Rogue,
     SkeletonMinion,
     SkeletonWarrior,
+    Barbarian,
+    Mage,
+    UnhoodedRogue,
+    VillageWoman,
+    TravellerWoman,
+    FarmerMan,
+    TravellerMan,
     Rover,
     Sentinel,
 }
 
 impl ModelKind {
-    pub const ANIMATED: [ModelKind; 4] = [
+    pub const ANIMATED: [ModelKind; 11] = [
         ModelKind::Knight,
         ModelKind::Rogue,
         ModelKind::SkeletonMinion,
         ModelKind::SkeletonWarrior,
+        ModelKind::Barbarian,
+        ModelKind::Mage,
+        ModelKind::UnhoodedRogue,
+        ModelKind::VillageWoman,
+        ModelKind::TravellerWoman,
+        ModelKind::FarmerMan,
+        ModelKind::TravellerMan,
     ];
 
     pub fn index(self) -> usize {
@@ -58,6 +72,13 @@ impl ModelKind {
             ModelKind::Rogue => "characters/Rogue_Hooded.glb",
             ModelKind::SkeletonMinion => "testbed/characters/Skeleton_Minion.glb",
             ModelKind::SkeletonWarrior => "testbed/characters/Skeleton_Warrior.glb",
+            ModelKind::Barbarian => "living/characters/Barbarian.glb",
+            ModelKind::Mage => "living/characters/Mage.glb",
+            ModelKind::UnhoodedRogue => "living/characters/Rogue.glb",
+            ModelKind::VillageWoman => "living/characters/VillageWoman.glb",
+            ModelKind::TravellerWoman => "living/characters/TravellerWoman.glb",
+            ModelKind::FarmerMan => "living/characters/FarmerMan.glb",
+            ModelKind::TravellerMan => "living/characters/TravellerMan.glb",
             ModelKind::Rover | ModelKind::Sentinel => return None,
         })
     }
@@ -68,6 +89,13 @@ impl ModelKind {
             "rogue" => Self::Rogue,
             "skeleton_minion" => Self::SkeletonMinion,
             "skeleton_warrior" => Self::SkeletonWarrior,
+            "barbarian" => Self::Barbarian,
+            "mage" => Self::Mage,
+            "unhooded_rogue" => Self::UnhoodedRogue,
+            "village_woman" => Self::VillageWoman,
+            "traveller_woman" => Self::TravellerWoman,
+            "farmer_man" => Self::FarmerMan,
+            "traveller_man" => Self::TravellerMan,
             "rover" => Self::Rover,
             "sentinel" => Self::Sentinel,
             _ => return None,
@@ -76,6 +104,44 @@ impl ModelKind {
 
     pub fn is_robot(self) -> bool {
         matches!(self, Self::Rover | Self::Sentinel)
+    }
+
+    pub fn civilian_rig(self) -> bool {
+        matches!(
+            self,
+            Self::VillageWoman | Self::TravellerWoman | Self::FarmerMan | Self::TravellerMan
+        )
+    }
+
+    pub fn scale(self) -> f32 {
+        // Measured imported bind-pose heights: Quaternius ~1.8m, KayKit ~2.3m.
+        if self.civilian_rig() {
+            1.0
+        } else {
+            crate::visuals::V
+        }
+    }
+
+    pub fn idle_clip(self) -> &'static str {
+        if self.civilian_rig() {
+            "CharacterArmature|Idle"
+        } else {
+            "Idle"
+        }
+    }
+
+    pub fn for_resident(appearance: u8) -> Self {
+        const ROSTER: [ModelKind; 8] = [
+            ModelKind::VillageWoman,
+            ModelKind::FarmerMan,
+            ModelKind::TravellerWoman,
+            ModelKind::TravellerMan,
+            ModelKind::UnhoodedRogue,
+            ModelKind::Mage,
+            ModelKind::Barbarian,
+            ModelKind::Rogue,
+        ];
+        ROSTER[appearance as usize % ROSTER.len()]
     }
 
     /// Faction 1 = adventurers (Knight for the smith and the woodcutter,
@@ -150,8 +216,8 @@ pub(crate) const GRASS: &str = "textures/grass_color.jpg";
 #[derive(Resource, Clone)]
 pub(crate) struct ViewAssets {
     /// Per [`ModelKind`]: the glTF (for its clips) and its scene.
-    pub actor_gltf: [Handle<Gltf>; 4],
-    pub actor: [Handle<WorldAsset>; 4],
+    pub actor_gltf: Vec<Handle<Gltf>>,
+    pub actor: Vec<Handle<WorldAsset>>,
     pub models: Models,
     pub grass: Handle<Image>,
 }
@@ -181,9 +247,38 @@ fn load_assets(mut commands: Commands, server: Option<Res<AssetServer>>) {
         .load(GRASS);
     commands.insert_resource(ViewAssets {
         actor_gltf: ModelKind::ANIMATED
-            .map(|k| server.load(k.path().expect("animated model path"))),
-        actor: ModelKind::ANIMATED.map(|k| scene(&server, k.path().expect("animated model path"))),
+            .into_iter()
+            .map(|k| server.load(k.path().expect("animated model path")))
+            .collect(),
+        actor: ModelKind::ANIMATED
+            .into_iter()
+            .map(|k| scene(&server, k.path().expect("animated model path")))
+            .collect(),
         models: Models::load(&server),
         grass,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn resident_roster_uses_distinct_models_and_separate_rig_families() {
+        let roster: std::collections::BTreeSet<_> = (0..42).map(ModelKind::for_resident).collect();
+        assert!(roster.len() >= 6);
+        assert!(roster.contains(&ModelKind::VillageWoman));
+        assert!(roster.contains(&ModelKind::FarmerMan));
+        for (index, kind) in ModelKind::ANIMATED.into_iter().enumerate() {
+            assert_eq!(kind.index(), index);
+            assert!(
+                std::path::Path::new(ASSET_DIR)
+                    .join(kind.path().unwrap())
+                    .is_file()
+            );
+        }
+        assert_ne!(
+            ModelKind::VillageWoman.idle_clip(),
+            ModelKind::Rogue.idle_clip()
+        );
+    }
 }

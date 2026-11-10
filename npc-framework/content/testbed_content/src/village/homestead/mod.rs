@@ -62,7 +62,12 @@ pub fn spawn(world: &mut World) {
     if !geography::is_expanded(world) {
         return;
     }
-    for definition in geography::for_world(world).expansion_plots {
+    let regional = super::frontier::spec(world).map(|s| s.plots.clone());
+    let definitions: Vec<_> = regional
+        .as_ref()
+        .map(|plots| plots.iter().map(|p| p.as_expansion()).collect())
+        .unwrap_or_else(|| geography::for_world(world).expansion_plots.to_vec());
+    for definition in definitions {
         spawn_sim(
             world,
             (
@@ -97,12 +102,20 @@ pub fn plots(world: &World) -> Vec<(SimId, Entity)> {
         .collect()
 }
 
-pub fn definition(world: &World, plot: Entity) -> Option<&geography::ExpansionPlot> {
+pub fn definition(world: &World, plot: Entity) -> Option<geography::ExpansionPlot<'_>> {
     let state = world.get::<HomesteadPlot>(plot)?;
+    if let Some(spec) = super::frontier::spec(world) {
+        return spec
+            .plots
+            .iter()
+            .find(|p| p.id == state.plot_id)
+            .map(|p| p.as_expansion());
+    }
     geography::for_world(world)
         .expansion_plots
         .iter()
         .find(|definition| definition.id == state.plot_id)
+        .copied()
 }
 
 pub fn cottage_center(center: SimPos) -> SimPos {
@@ -120,7 +133,7 @@ pub fn cottage_footprint() -> Footprint {
 
 pub fn bed_position(world: &World, plot: Entity, index: u32) -> Option<SimPos> {
     let definition = definition(world, plot)?;
-    bed_position_in(definition, index)
+    bed_position_in(&definition, index)
 }
 
 pub fn bed_position_in(definition: &geography::ExpansionPlot, index: u32) -> Option<SimPos> {

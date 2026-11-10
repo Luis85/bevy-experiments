@@ -15,6 +15,9 @@ pub(super) fn register(app: &mut App) {
 fn immovable(world: &World, id: SimId) -> bool {
     world.resource::<SimIndex>().get(id).is_some_and(|entity| {
         world.get::<VillagePlace>(entity).is_some()
+            || (super::frontier::enabled(world)
+                && (world.get::<super::frontier::Settlement>(entity).is_some()
+                    || world.get::<super::colony::Household>(entity).is_some()))
             || world.get::<ResourcePatch>(entity).is_some()
             || world.get::<HomesteadPlot>(entity).is_some()
     })

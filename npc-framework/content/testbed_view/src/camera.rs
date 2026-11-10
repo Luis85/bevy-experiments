@@ -134,6 +134,7 @@ fn rts_camera(
     mode: Option<Res<crate::IslandMode>>,
     experience: Option<Res<crate::PlayerExperience>>,
     terrain: Option<Res<testbed_content::village::terrain::TerrainState>>,
+    regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
 ) {
     let dt = time.delta_secs();
     let character = mode.as_deref() == Some(&crate::IslandMode::Character);
@@ -213,7 +214,9 @@ fn rts_camera(
             if lines != 0.0 {
                 rts.distance = (rts.distance * 0.9f32.powf(lines)).clamp(
                     MIN_DISTANCE,
-                    if terrain.is_some() {
+                    if regional.is_some() {
+                        600.0
+                    } else if terrain.is_some() {
                         180.0
                     } else {
                         MAX_DISTANCE
@@ -221,11 +224,16 @@ fn rts_camera(
                 );
             }
         }
-        let pan_limit = if terrain.is_some() { 90.0 } else { PAN_LIMIT };
+        let pan_limit = regional.as_ref().map_or(
+            if terrain.is_some() { 90.0 } else { PAN_LIMIT },
+            |terrain| terrain.width.max(terrain.height) as f32 * 0.5 + 20.0,
+        );
         rts.focus = rts
             .focus
             .clamp(Vec3::splat(-pan_limit), Vec3::splat(pan_limit));
-        rts.focus.y = 0.0;
+        if regional.is_none() {
+            rts.focus.y = 0.0;
+        }
         let want = rts.transform();
         if *transform != want {
             *transform = want;

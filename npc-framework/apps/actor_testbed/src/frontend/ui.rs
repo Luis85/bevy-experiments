@@ -19,7 +19,7 @@ impl Default for NameDraft {
     }
 }
 #[derive(Resource, Default)]
-struct RenderedRevision(Option<u64>);
+struct RenderedRevision(Option<(u64, bool, bool)>);
 #[derive(Component)]
 pub(super) struct ShellRoot;
 #[derive(Component)]
@@ -146,6 +146,7 @@ fn rebuild(world: &mut World) {
         return;
     }
     let summary = session::summary(world);
+    let ready = super::scene_ready(world);
     let root = world
         .spawn((
             FrontendUiRoot,
@@ -170,7 +171,13 @@ fn rebuild(world: &mut World) {
                 0.02,
                 0.03,
                 0.035,
-                if screen == Screen::Title { 0.28 } else { 0.55 },
+                if !ready {
+                    1.0
+                } else if screen == Screen::Title {
+                    0.28
+                } else {
+                    0.55
+                },
             )),
         ))
         .id();
@@ -205,6 +212,10 @@ fn rebuild(world: &mut World) {
         if screen == Screen::Title { 40.0 } else { 30.0 },
         ui::GOLD,
     );
+    if !ready {
+        let (text, tone) = super::scene_preparation_message(world);
+        label(world, panel, text, 15.0, notice_color(tone));
+    }
     let body = world
         .spawn((
             ChildOf(panel),
@@ -226,7 +237,11 @@ fn rebuild(world: &mut World) {
             label(
                 world,
                 body,
-                "Build a home, tend a garden, and find your place among a living village.",
+                if testbed_content::village::frontier::enabled(world) {
+                    "Follow the coast, discover three villages, and make a home in a changing world."
+                } else {
+                    "Build a home, tend a garden, and find your place among a living village."
+                },
                 18.0,
                 ui::TEXT,
             );
@@ -257,7 +272,7 @@ fn rebuild(world: &mut World) {
                 0,
                 true,
                 Action::Continue,
-                summary.can_continue,
+                ready && summary.can_continue,
             );
             let new = action(
                 world,
@@ -266,7 +281,7 @@ fn rebuild(world: &mut World) {
                 1,
                 !summary.can_continue,
                 Action::New,
-                summary.can_start,
+                ready && summary.can_start,
             );
             if summary.can_continue {
                 action(
@@ -276,10 +291,10 @@ fn rebuild(world: &mut World) {
                     2,
                     false,
                     Action::ContinueInspector,
-                    true,
+                    ready,
                 );
             }
-            first = Some(if summary.can_continue {
+            first = ready.then_some(if summary.can_continue {
                 continue_button
             } else {
                 new
@@ -475,7 +490,7 @@ fn rebuild(world: &mut World) {
     let footer = row(world, panel);
     match screen {
         Screen::Title => {
-            action(
+            let help = action(
                 world,
                 footer,
                 "How to play",
@@ -484,6 +499,9 @@ fn rebuild(world: &mut World) {
                 Action::Controls,
                 true,
             );
+            if first.is_none() {
+                first = Some(help);
+            }
             action(world, footer, "Quit game", 4, false, Action::Quit, true);
         }
         Screen::New => {
@@ -496,7 +514,7 @@ fn rebuild(world: &mut World) {
                 1,
                 true,
                 Action::Begin,
-                valid && summary.can_start,
+                ready && valid && summary.can_start,
             );
             world.entity_mut(begin).insert(BeginButton);
             let oversee = action(
@@ -506,7 +524,7 @@ fn rebuild(world: &mut World) {
                 2,
                 false,
                 Action::BeginInspector,
-                valid && summary.can_start,
+                ready && valid && summary.can_start,
             );
             world.entity_mut(oversee).insert(BeginButton);
         }
@@ -536,7 +554,13 @@ pub(super) fn refresh(world: &mut World) {
     if !world.contains_resource::<NameDraft>() {
         return;
     }
-    let revision = world.resource::<FrontendState>().revision;
+    let revision = (
+        world.resource::<FrontendState>().revision,
+        super::scene_ready(world),
+        world
+            .get_resource::<testbed_view::SceneReadiness>()
+            .is_some_and(|scene| scene.error.is_some()),
+    );
     if world.resource::<RenderedRevision>().0 != Some(revision) {
         rebuild(world);
         world.resource_mut::<RenderedRevision>().0 = Some(revision);
@@ -572,7 +596,7 @@ pub(super) fn refresh(world: &mut World) {
         .iter(world)
         .collect();
     for entity in begin {
-        if problem.is_some() || !session::summary(world).can_start {
+        if problem.is_some() || !session::summary(world).can_start || !super::scene_ready(world) {
             world.entity_mut(entity).insert(InteractionDisabled);
         } else {
             world.entity_mut(entity).remove::<InteractionDisabled>();

@@ -105,7 +105,8 @@ struct FarmCaption {
 struct FarmFacts<'w, 's> {
     clock: Res<'w, SimClock>,
     village: Res<'w, VillageState>,
-    geography: Res<'w, geography::Geography>,
+    geography: Option<Res<'w, geography::Geography>>,
+    regional: Option<Res<'w, testbed_content::village::frontier::world_spec::LivingWorldSpec>>,
     index: Res<'w, SimIndex>,
     fog: Option<Res<'w, FogOfWar>>,
     io: Option<Res<'w, AgentIoState>>,
@@ -140,11 +141,20 @@ impl FarmFacts<'_, '_> {
                 .and_then(|memory| memory.get(id))
                 .is_some_and(|percept| percept.sensed)
     }
-    fn definition(&self, id: &str) -> Option<&'static geography::ExpansionPlot> {
+    fn definition(&self, id: &str) -> Option<geography::ExpansionPlot<'_>> {
+        if let Some(spec) = &self.regional {
+            return spec
+                .plots
+                .iter()
+                .find(|plot| plot.id == id)
+                .map(|plot| plot.as_expansion());
+        }
         self.geography
+            .as_deref()?
             .expansion_plots
             .iter()
             .find(|definition| definition.id == id)
+            .copied()
     }
 }
 
@@ -445,7 +455,7 @@ fn spawn_roots(
             .iter()
             .enumerate()
             .filter_map(|(index, _)| {
-                let bed = homestead::bed_position_in(definition, index as u32)?;
+                let bed = homestead::bed_position_in(&definition, index as u32)?;
                 Some(bed_visual(
                     &mut commands,
                     details,
@@ -655,7 +665,7 @@ fn present(facts: FarmFacts, mut view: FarmPresentation) {
             };
             if visual.observed.as_ref() != Some(&snapshot) {
                 if let Some(definition) = facts.definition(&plot.plot_id) {
-                    visual.caption = caption(definition, Some(&snapshot));
+                    visual.caption = caption(&definition, Some(&snapshot));
                 }
                 visual.observed = Some(snapshot);
             }
@@ -779,6 +789,35 @@ fn present(facts: FarmFacts, mut view: FarmPresentation) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn regional_farm_facts_use_frozen_plots_without_legacy_geography_resource() {
+        let mut spec = testbed_content::village::frontier::world_spec::LivingWorldSpec::default();
+        spec.plots[0].x += 1000;
+        let expected = spec.plots[0].clone();
+        let mut app = App::new();
+        app.insert_resource(spec)
+            .init_resource::<SimIndex>()
+            .init_resource::<SimClock>()
+            .insert_resource(VillageState {
+                played: SimId(1),
+                agent_alias: "QA".into(),
+                life: 1,
+                fund: 0,
+                last_dividend_day: 0,
+                produced: default(),
+                transactions: 0,
+            })
+            .add_systems(Update, move |facts: FarmFacts| {
+                let plot = facts
+                    .definition(&expected.id)
+                    .expect("frozen regional plot");
+                assert_eq!(plot.x, expected.x);
+                assert_eq!(plot.label, expected.label);
+            });
+        app.update();
+        assert!(!app.world().contains_resource::<geography::Geography>());
+    }
 
     #[test]
     fn native_farm_remembers_observed_foreign_crops_and_refreshes_owned_crops() {

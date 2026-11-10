@@ -77,7 +77,10 @@ pub fn decision(world: &World, actor: Entity) -> Option<&'static str> {
 }
 
 fn busy(world: &World, actor: Entity) -> bool {
-    world.get::<super::Gathering>(actor).is_some()
+    world
+        .get::<super::frontier::activities::EcologyWork>(actor)
+        .is_some()
+        || world.get::<super::Gathering>(actor).is_some()
         || world.get::<Crafting>(actor).is_some()
         || (super::needs_driven(world)
             && (world.get::<super::hunting::Hunting>(actor).is_some()

@@ -41,7 +41,7 @@ fn with_settings(forwarded: &[String], settings: &Settings) -> Vec<String> {
             "--island-save".into(),
             settings
                 .agents_dir
-                .join("local-island.world.json")
+                .join("living-world.world.json")
                 .display()
                 .to_string(),
         ]);
@@ -51,7 +51,7 @@ fn with_settings(forwarded: &[String], settings: &Settings) -> Vec<String> {
             "--island-rules".into(),
             settings
                 .worlds_dir()
-                .join("island_colony.json")
+                .join("living_world.json")
                 .display()
                 .to_string(),
         ]);
@@ -74,6 +74,11 @@ mod tests {
         let args = arguments(&[]).unwrap().unwrap();
         assert!(args.contains(&"--front-end".into()));
         assert!(args.contains(&"--no-remote".into()));
+        assert!(
+            args.iter()
+                .any(|arg| arg.ends_with("living-world.world.json"))
+        );
+        assert!(args.iter().any(|arg| arg.ends_with("living_world.json")));
         assert!(arguments(&["--developer-menu".into()]).unwrap().is_none());
         assert!(
             arguments(&["--screen".into(), "worlds".into()])

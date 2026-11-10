@@ -55,6 +55,7 @@ mod player_actions;
 mod player_hud;
 mod robots;
 mod scene;
+mod scene_readiness;
 mod village;
 mod village_world;
 mod visuals;
@@ -79,6 +80,7 @@ pub use fog::{
 };
 pub use island_control::IslandMode;
 pub use player_hud::{FrontendGate, FrontendUiRoot, PlayerExperience, PlayerMenuRequest};
+pub use scene_readiness::SceneReadiness;
 
 /// One control authority for the host shell, player toolbar and advanced modes.
 pub fn request_island_mode(world: &mut World, mode: IslandMode) -> Result<(), String> {
@@ -176,6 +178,7 @@ impl Plugin for TestbedViewPlugin {
             colony_panel::plugin,
             colony_scene::plugin,
             player_hud::plugin,
+            scene_readiness::plugin,
         ))
         .add_systems(Update, toggle_debug_panels.in_set(ViewSystems::Input));
     }

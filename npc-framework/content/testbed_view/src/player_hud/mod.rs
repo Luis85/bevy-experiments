@@ -1,6 +1,7 @@
 //! One player-facing workspace over the shared, actor-scoped action adapter.
 //! This module owns presentation state only; the host owns menus and world lifecycle.
 mod actions;
+mod atlas;
 mod build_preview;
 mod life;
 mod model;
@@ -72,7 +73,7 @@ impl Tab {
             Self::Garden => "Plant a real seed, water its bed, then return for the harvest.",
             Self::Trade => "Every exchange needs real goods, coins and a nearby buyer.",
             Self::People => "Meet the people whose work keeps the island alive.",
-            Self::Explore => "Choose a direction or return to a place you have discovered.",
+            Self::Explore => "Follow the coastal chart, or return to a place you have discovered.",
         }
     }
 }
@@ -1067,6 +1068,7 @@ pub(crate) fn refresh(world: &mut World) {
         Vec::new()
     };
     reconcile(world, rows);
+    atlas::refresh(world, &observed, ready);
 }
 /// Keep the workspace between the actual header and feedback heights. This also
 /// handles toolbar/header wrapping without relying on a single window resolution.

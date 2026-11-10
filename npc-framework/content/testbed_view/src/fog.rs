@@ -402,6 +402,7 @@ struct FogMask {
     region: Option<MaskRegion>,
     /// [`mask_hash`] of the texels written.
     hash: Option<u64>,
+    terrain_revision: Option<u64>,
 }
 
 /// The fog's decide step (in `ViewSystems::Animate`, before the visuals).
@@ -574,6 +575,7 @@ fn spawn_mask(
         image,
         region: None,
         hash: None,
+        terrain_revision: None,
     });
 }
 
@@ -602,8 +604,10 @@ fn update_mask(
     actors: Query<FogActor, With<RevealsFog>>,
     mask: Option<ResMut<FogMask>>,
     mut images: ResMut<Assets<Image>>,
-    mut planes: Query<(&mut Transform, &mut Visibility), With<FogMaskPlane>>,
+    mut planes: Query<(&mut Transform, &mut Visibility, &Mesh3d), With<FogMaskPlane>>,
     mut last: Local<Option<DirtyKey>>,
+    terrain: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
+    mut meshes: Option<ResMut<Assets<Mesh>>>,
 ) {
     let Some(mut mask) = mask else { return };
     let lens = lens_of(&fog, grid.as_deref(), actors.iter());
@@ -612,11 +616,15 @@ fn update_mask(
         fog.enabled,
         lens.map(|l| l.actor),
     );
-    if *last == Some(key) {
+    let terrain_changed = terrain.as_ref().is_some_and(|t| t.is_changed());
+    if terrain_changed {
+        mask.terrain_revision = None;
+    }
+    if *last == Some(key) && !terrain_changed {
         return;
     }
     *last = Some(key);
-    let Ok((mut transform, mut vis)) = planes.single_mut() else {
+    let Ok((mut transform, mut vis, mesh)) = planes.single_mut() else {
         return;
     };
     let Some(lens) = lens else {
@@ -625,6 +633,17 @@ fn update_mask(
     };
     vis.set_if_neq(Visibility::Inherited);
     let region = MaskRegion::covering(lens.grid);
+    if let Some(terrain) = &terrain
+        && (mask.region != Some(region)
+            || mask.terrain_revision != Some(terrain.revision)
+            || terrain_changed)
+        && let Some(meshes) = meshes.as_mut()
+        && let Some(mut target) = meshes.get_mut(&mesh.0)
+    {
+        *target = crate::colony_scene::living_scene::terrain_mask_mesh(terrain, region);
+        *transform = Transform::IDENTITY;
+        mask.terrain_revision = Some(terrain.revision);
+    }
     let hash = mask_hash(&lens);
     if mask.region == Some(region) && mask.hash == Some(hash) {
         return;
@@ -639,8 +658,10 @@ fn update_mask(
         }
         let (w, h) = (region.width as f32 * cell, region.height as f32 * cell);
         let (x0, z0) = (region.min.x as f32 * cell, region.min.z as f32 * cell);
-        transform.translation = Vec3::new(x0 + w / 2.0, MASK_Y, z0 + h / 2.0);
-        transform.scale = Vec3::new(w, 1.0, h);
+        if terrain.is_none() {
+            transform.translation = Vec3::new(x0 + w / 2.0, MASK_Y, z0 + h / 2.0);
+            transform.scale = Vec3::new(w, 1.0, h);
+        }
         mask.region = Some(region);
     } else if let Some(mut image) = images.get_mut(&mask.image) {
         image.data = Some(texels);

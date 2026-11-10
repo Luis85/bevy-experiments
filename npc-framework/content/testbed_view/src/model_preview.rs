@@ -17,7 +17,6 @@ use testbed_content::actors::{RANGE_MAX_MM, SensorSpec, human_preset};
 
 use crate::assets::ModelKind;
 use crate::robots::{self, RobotAssets};
-use crate::visuals::V;
 
 /// The edited preset's model and sensor definitions. Replacing either
 /// rebuilds only the visual preview; no actor or simulation is spawned.
@@ -119,13 +118,13 @@ struct PreviewIdlePlayer(ModelKind);
 
 #[derive(Resource)]
 struct PreviewAssets {
-    scenes: [Handle<WorldAsset>; 4],
-    gltfs: [Handle<Gltf>; 4],
+    scenes: Vec<Handle<WorldAsset>>,
+    gltfs: Vec<Handle<Gltf>>,
 }
 
 #[derive(Resource, Default)]
 struct PreviewAnimations {
-    idle: [Option<(Handle<AnimationGraph>, AnimationNodeIndex)>; 4],
+    idle: Vec<Option<(Handle<AnimationGraph>, AnimationNodeIndex)>>,
 }
 
 #[derive(Default)]
@@ -171,13 +170,18 @@ impl Plugin for ModelPreviewPlugin {
 fn load_assets(mut commands: Commands, server: Option<Res<AssetServer>>) {
     let Some(server) = server else { return };
     commands.insert_resource(PreviewAssets {
-        scenes: ModelKind::ANIMATED.map(|kind| {
-            server.load(
-                GltfAssetLabel::Scene(0).from_asset(kind.path().expect("animated model path")),
-            )
-        }),
+        scenes: ModelKind::ANIMATED
+            .into_iter()
+            .map(|kind| {
+                server.load(
+                    GltfAssetLabel::Scene(0).from_asset(kind.path().expect("animated model path")),
+                )
+            })
+            .collect(),
         gltfs: ModelKind::ANIMATED
-            .map(|kind| server.load(kind.path().expect("animated model path"))),
+            .into_iter()
+            .map(|kind| server.load(kind.path().expect("animated model path")))
+            .collect(),
     });
 }
 
@@ -310,7 +314,7 @@ fn sync_model(
                 ChildOf(root),
                 PreviewModel(kind),
                 WorldAssetRoot(assets.scenes[kind.index()].clone()),
-                Transform::from_scale(Vec3::splat(V)),
+                Transform::from_scale(Vec3::splat(kind.scale())),
             ))
             .observe(model_ready);
     }
@@ -354,6 +358,9 @@ fn idle_animation(
     let Some(assets) = assets else {
         return;
     };
+    animation
+        .idle
+        .resize_with(ModelKind::ANIMATED.len(), || None);
     for kind in ModelKind::ANIMATED {
         let slot = &mut animation.idle[kind.index()];
         if slot.is_some() {
@@ -361,7 +368,7 @@ fn idle_animation(
         }
         let Some(clip) = gltfs
             .get(&assets.gltfs[kind.index()])
-            .and_then(|gltf| gltf.named_animations.get("Idle"))
+            .and_then(|gltf| gltf.named_animations.get(kind.idle_clip()))
         else {
             continue;
         };

@@ -54,9 +54,25 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
         .filter(|(id, entity)| *id != me && social_available(world, **entity))
         .filter_map(|(id, entity)| {
             let target = world.get::<SimPos>(*entity).copied()?;
-            (pos.dist2(target) <= 15_000_i64.pow(2)).then_some((*id, target))
+            let direct = pos.dist2(target);
+            if direct > 15_000_i64.pow(2) {
+                return None;
+            }
+            let distance = if super::super::frontier::enabled(world) {
+                let route = super::super::frontier::routes::estimate(world, *pos, target)?;
+                // Leisure is local in walking distance too. A person across a
+                // pond must not keep winning over reachable nearby company.
+                if route.distance_mm > 15_000 {
+                    return None;
+                }
+                i64::from(route.distance_mm)
+            } else {
+                direct
+            };
+            Some((distance, *id, target))
         })
-        .min_by_key(|(id, target)| (pos.dist2(*target), *id))
+        .min_by_key(|(distance, id, _)| (*distance, *id))
+        .map(|(_, id, target)| (id, target))
 }
 
 pub(super) fn tick(world: &mut World, now: u64) {

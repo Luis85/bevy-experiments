@@ -30,6 +30,13 @@ pub fn validate_snapshot_structure(
             HomesteadPlot::NAME,
             super::hunting::WildlifeHabitat::NAME,
             Household::NAME,
+            super::frontier::labor::ResidentProfile::NAME,
+            super::frontier::labor::Employment::NAME,
+            super::frontier::Settlement::NAME,
+            super::frontier::SettlementMember::NAME,
+            super::frontier::SettlementSite::NAME,
+            super::frontier::ecology::EcologicalPatch::NAME,
+            super::frontier::ecology::HabitatEcology::NAME,
         ]
         .into_iter()
         .filter(|name| baseline.components.contains_key(*name))
@@ -47,6 +54,19 @@ pub fn validate_snapshot_structure(
             if !entity.components.contains_key(name) {
                 return Err(format!("Island identity {} is missing {name}", baseline.id));
             }
+        }
+        if let Some(identity) = baseline
+            .components
+            .get(super::frontier::labor::ResidentProfile::NAME)
+            && entity
+                .components
+                .get(super::frontier::labor::ResidentProfile::NAME)
+                != Some(identity)
+        {
+            return Err(format!(
+                "Regional identity {} differs from its frozen construction profile",
+                baseline.id
+            ));
         }
         if arrival
             && !entity.components.contains_key(AwaitingArrival::NAME)
@@ -90,26 +110,41 @@ pub fn validate_colony(world: &World) -> Result<(), String> {
     {
         return Err("The played identity has no visitor life or reserved arrival".into());
     }
-    for role in Role::RESIDENTS
-        .into_iter()
-        .chain([Role::Hunter, Role::Tanner, Role::Tailor])
-    {
-        let entity = ids
-            .get(role.person())
-            .and_then(|id| index.get(id))
-            .ok_or_else(|| format!("Required resident {} is missing", role.person()))?;
-        if world
-            .get::<Villager>(entity)
-            .is_none_or(|person| person.role != role)
+    if super::frontier::enabled(world) {
+        super::frontier::settlements::validate(world)?;
+        super::frontier::ecology::validate(world)?;
+        super::frontier::labor::validate(world)?;
+    } else {
+        for role in Role::RESIDENTS
+            .into_iter()
+            .chain([Role::Hunter, Role::Tanner, Role::Tailor])
         {
-            return Err(format!(
-                "Required resident {} has no matching life",
-                role.person()
-            ));
+            let entity = ids
+                .get(role.person())
+                .and_then(|id| index.get(id))
+                .ok_or_else(|| format!("Required resident {} is missing", role.person()))?;
+            if world
+                .get::<Villager>(entity)
+                .is_none_or(|person| person.role != role)
+            {
+                return Err(format!(
+                    "Required resident {} has no matching life",
+                    role.person()
+                ));
+            }
         }
     }
     let mut members = BTreeSet::new();
     for (id, entity) in &index.map {
+        if let Some(work) = world.get::<super::frontier::activities::EcologyWork>(*entity) {
+            if !super::frontier::enabled(world)
+                || !super::living(world, *entity)
+                || world.get::<AwaitingArrival>(*entity).is_some()
+            {
+                return Err("Restoration work requires a living regional participant".into());
+            }
+            super::frontier::activities::validate_work(world, *entity, work)?;
+        }
         if let Some(person) = world.get::<Villager>(*entity) {
             if world.get::<Vitality>(*entity).is_none()
                 || world.get::<Needs>(*entity).is_none()
@@ -192,24 +227,28 @@ pub fn validate_colony(world: &World) -> Result<(), String> {
             return Err("A housing project has missing participants".into());
         }
     }
-    let terrain = world
-        .get_resource::<TerrainState>()
-        .ok_or("Island terrain is missing")?;
-    if terrain.cells.len() != WIDTH * WIDTH {
-        return Err("Island terrain has an invalid size".into());
-    }
-    let grid = world
-        .get_resource::<SpatialGrid>()
-        .ok_or("Island navigation is missing")?;
-    for z in -32..32 {
-        for x in -32..32 {
-            let cell = terrain.cell(x, z).expect("validated grid size");
-            if !(-1000..=MAX_HEIGHT_MM).contains(&cell.height_mm)
-                || (cell.surface == TerrainSurface::Water && cell.height_mm > 0)
-                || (cell.surface != TerrainSurface::Water && cell.height_mm < 0)
-                || grid.static_cell(CellCoord::new(x, z)) != cell.navigation()
-            {
-                return Err("Island terrain and navigation are inconsistent".into());
+    if super::frontier::enabled(world) {
+        super::frontier::terrain::validate(world)?;
+    } else {
+        let terrain = world
+            .get_resource::<TerrainState>()
+            .ok_or("Island terrain is missing")?;
+        if terrain.cells.len() != WIDTH * WIDTH {
+            return Err("Island terrain has an invalid size".into());
+        }
+        let grid = world
+            .get_resource::<SpatialGrid>()
+            .ok_or("Island navigation is missing")?;
+        for z in -32..32 {
+            for x in -32..32 {
+                let cell = terrain.cell(x, z).expect("validated grid size");
+                if !(-1000..=MAX_HEIGHT_MM).contains(&cell.height_mm)
+                    || (cell.surface == TerrainSurface::Water && cell.height_mm > 0)
+                    || (cell.surface != TerrainSurface::Water && cell.height_mm < 0)
+                    || grid.static_cell(CellCoord::new(x, z)) != cell.navigation()
+                {
+                    return Err("Island terrain and navigation are inconsistent".into());
+                }
             }
         }
     }
