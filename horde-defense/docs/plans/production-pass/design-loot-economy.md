@@ -304,9 +304,9 @@ Test-rule exceptions, labelled in the code:
 
 See `digest_moves`. In short:
 - Wave 1: no moves.
-- Wave 2: four provisional GOLDEN re-pins (format, quality, content, pick). GAMEPLAY_TRACE is never moved by loot.
+- Wave 2: four provisional GOLDEN re-pins were planned (format, quality, content, pick). As cut, loot moved three: W2-06 F (format), W2-08 C (content) and W2-09 G (pick; R33: a gameplay mechanic, though `support::classify` labels it C). W2-07, the relative quality roll, moved no digest. W2-49 folded all three into GOLDEN (`crates/horde_core/tests/determinism.rs` re-bless log). GAMEPLAY_TRACE is never moved by loot.
 - Settlement and elites: no moves at rank 0.
-- Smoke must be byte-identical across the whole loot series. Pacing was meant to be too; R28 (plan §2.4, 2026-11-09) accepts W2-08's move of the default `pacing 60 --runs` output and re-baselines it. Later commits diff that output against the latest recorded one, `target/production-after/w2-41/pacing.txt` (sha256 e19f06694be215fe05068c542cb3f56e8741d2ed959aa5db03ba9d68d6bbe65c). A wave-2 commit may move pacing on purpose if it records the before/after rows in plan §9.6.
+- Smoke must be byte-identical across the whole loot series. Pacing was meant to be too; R28 (plan §2.4, 2026-11-09) accepts W2-08's move of the default `pacing 60 --runs` output and re-baselines it. Later commits diff that output against the latest recorded one: `target/production-after/w2-41/pacing.txt` at R28 (sha256 e19f06694be215fe05068c542cb3f56e8741d2ed959aa5db03ba9d68d6bbe65c), then each output a later commit records with its before/after rows in plan §9.6, `target/production-after/w2-54/pacing.txt` at the W2 review (sha256 902cd8959650bf40c68dfcd31ba3789cc635d77d12c0cd6727d1a791c7f7d738), as in ruling W-1 below and waves.md W2-01. A wave-2 commit may move pacing on purpose if it records the before/after rows in plan §9.6.
 
 ## Risks
 
