@@ -1,8 +1,9 @@
 //! W2-30 (design enemy-balance §4 "Shield-bearer", "Juggernaut", "Sprinter"
 //! and "Counter seams", ruling W-7): ranged armor, stagger immunity, groups
-//! and the hazard multiplier on spit. No shipped archetype authors these
-//! fields yet (the records land with the composition, W2-31), so every test
-//! injects a test-only profile.
+//! and the hazard multiplier on spit. Every test injects a test-only profile
+//! so the mechanism is pinned apart from the shipped records: the composition
+//! (W2-31) authored the shield-bearer's ranged armor, the juggernaut's
+//! `stagger_immune` and the sprinter's `group_size` 4 in `enemy_catalog.json`.
 
 use super::*;
 use crate::enemy_catalog::{DeathEffect, ResolvedEnemy};

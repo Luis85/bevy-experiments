@@ -1,7 +1,8 @@
 //! W2-27 (design enemy-balance §4 "Spitter", acceptance G6.6): the ranged
 //! stop, walls that intercept spit, the NPC range penalty and the far-half
-//! guard. No shipped archetype authors `reach` yet (the spitter record lands
-//! with the composition, W2-31), so every test injects a test-only profile.
+//! guard. Every test injects a test-only profile so the mechanism is pinned
+//! apart from the shipped records: the composition (W2-31) authored the
+//! spitter's `reach` 4.0 in `enemy_catalog.json`.
 
 use super::*;
 

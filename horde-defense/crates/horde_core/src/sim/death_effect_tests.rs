@@ -1,8 +1,8 @@
 //! W2-29 (design enemy-balance §4 "Exploder" and "Splitter", ruling W-7):
 //! the exploder's fuse and death burst, the splitter's children and their NPC
-//! resolution. No shipped archetype authors a `death_effect` yet (the
-//! exploder and splitter records land with the composition, W2-31), so every
-//! test injects a test-only profile.
+//! resolution. Every test injects a test-only profile so the mechanism is
+//! pinned apart from the shipped records: the composition (W2-31) authored
+//! the exploder's `Burst` and the splitter's `Split` in `enemy_catalog.json`.
 
 use super::*;
 use crate::enemy_catalog::{DeathEffect, ResolvedEnemy};
