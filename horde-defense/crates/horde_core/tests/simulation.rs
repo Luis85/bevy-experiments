@@ -130,17 +130,29 @@ fn boss_timer_is_not_victory_and_boss_transaction_is_atomic() {
     let a = g.attempt_mut().unwrap();
     a.enemies.iter_mut().find(|e| e.boss).unwrap().hp = 0;
     let before = g.campaign().coins;
+    let level_before = g.campaign().player.level;
     advance(&mut g, 1);
     assert!(g.attempt().is_none());
     let r = g.last_result().unwrap();
     assert_eq!(r.outcome, Outcome::Victory);
     assert!(r.first_clear);
     // W2-54: the finish also pays, once, the shipped level grants the
-    // victory XP raised (the report's progression receipt).
+    // victory XP raised (the report's progression receipt), 28 coins, so
+    // the wallet moves 130 -> 158.
     let receipt = &r.progression_rewards;
     let settled = receipt.level_coins + receipt.milestones.iter().map(|m| m.coins).sum::<u64>();
-    assert!(settled > 0, "the victory levelled the player");
+    let level_after = g.campaign().player.level;
+    assert_eq!(
+        receipt.level_coins,
+        (level_before + 1..=level_after)
+            .map(horde_core::progression::level_grant)
+            .sum::<u64>(),
+        "the grant is the shipped one for each level gained"
+    );
+    assert_eq!(settled, 28, "the shipped grant for the victory's levels");
     let payout = content().levels[0].boss_reward + content().levels[0].completion_bonus;
+    assert_eq!(payout, 130);
+    assert_eq!(g.campaign().coins - before, 158);
     assert_eq!(g.campaign().coins - before, payout + settled);
     advance(&mut g, 10);
     assert_eq!(g.campaign().coins - before, payout + settled);
@@ -308,14 +320,25 @@ fn parallel_rewards_and_unique_loot_settle_exactly_once() {
         .map(|b| (payout as f32 * b.game().attempt().unwrap().modifiers.reward).round() as u64)
         .sum();
     let records = g.campaign().run_history.len();
+    let level_before = g.campaign().player.level;
     advance(&mut g, 1);
     // W2-54: the idle pass that credited the victories also pays, once, the
-    // shipped level grants they raised (the run records' receipts).
+    // shipped level grants they raised (the run records' receipts): 49
+    // coins, so the wallet moves 322 -> 371.
     let settled: u64 = g.campaign().run_history[records..]
         .iter()
         .map(|r| r.level_grant_coins + r.milestone_coins)
         .sum();
-    assert!(settled > 0, "the victories levelled the player");
+    assert_eq!(
+        settled,
+        (level_before + 1..=g.campaign().player.level)
+            .map(horde_core::progression::level_grant)
+            .sum::<u64>(),
+        "the grant is the shipped one for each level gained"
+    );
+    assert_eq!(settled, 49, "the shipped grant for the victories' levels");
+    assert_eq!(expected_payout, 322);
+    assert_eq!(g.campaign().coins - coins, 371);
     assert_eq!(g.campaign().coins - coins, expected_payout + settled);
     assert_eq!(g.campaign().items.len(), items + 2);
     let ids: std::collections::BTreeSet<_> = g.campaign().items.iter().map(|i| i.id).collect();

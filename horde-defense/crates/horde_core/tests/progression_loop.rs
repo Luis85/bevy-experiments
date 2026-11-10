@@ -78,6 +78,7 @@ fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loo
                     _ => {}
                 }
                 let banked_before = game.campaign().coins;
+                let level_before = game.campaign().player.level;
                 let weapon_before = game.campaign().player.loadout[Slot::Ranged.index()];
                 let injured_boss = fight(&mut game);
                 let report = game.last_result().unwrap();
@@ -110,6 +111,26 @@ fn normal_short_arena_earned_route_clears_within_five_runs_without_equipping_loo
                 let receipt = &report.progression_rewards;
                 let settled =
                     receipt.level_coins + receipt.milestones.iter().map(|m| m.coins).sum::<u64>();
+                assert_eq!(
+                    receipt.level_coins,
+                    (level_before + 1..=game.campaign().player.level)
+                        .map(horde_core::progression::level_grant)
+                        .sum::<u64>(),
+                    "country {country} seed {seed} run {run}: the shipped grant per level gained"
+                );
+                for milestone in &receipt.milestones {
+                    let authored = horde_core::progression::rewards()
+                        .milestones
+                        .iter()
+                        .find(|m| m.rank == milestone.rank)
+                        .unwrap();
+                    assert_eq!(milestone.coins, authored.coins);
+                }
+                if (country, seed, run) == ("DEU", 1, 1) {
+                    // The W2-54 move: 270 earned, the 28-coin grant, wallet 298.
+                    assert_eq!((report.coins, settled), (270, 28));
+                    assert_eq!(game.campaign().coins, 298);
+                }
                 assert_eq!(
                     game.campaign().coins,
                     banked_before + report.coins + settled,
