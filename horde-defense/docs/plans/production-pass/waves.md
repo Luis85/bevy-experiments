@@ -429,6 +429,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Files: `EnemyView.aim_target`; a dashed aim line.
 - Fail-first: `spitter_windup_draws_aim_line_to_wall_or_defender`.
 - Pin: `every_windup_event_has_a_windup_view_in_the_same_frame` (normal and reduced). Mutation proof: force windup None.
+- Wave-2 close capture item (W2 review, 2026-11-10): W2-31 shipped the spitter with `reach` 4.0 (`enemy_catalog.json`), so it winds up as far as four yards beyond the defense line and its dashed aim line crosses that gap. The W2-47 stress fixture (787929f) covers the vertex half: it draws every catalogue archetype, the spitter included. The visual half is not yet checked. The wave-2 close captures include a spitter mid-windup at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, checking that the aim line runs from the spitter to the wall or defender it targets, stays legible over the lanes and does not hide the defender, the spitter or the HUD. Spitters spawn from rank 6, so the shipped `battle` and `boss` stills (rank 0) never show one. Name the still used (`fx-stress` or `stress` if one frames a windup, otherwise a new spitter-windup still, which needs a waves.md slot). A defect found there becomes a capture-ledger row (plan §10).
 - Deps: W2-27.
 
 **W2-29 · enemy-balance · Exploder and splitter; `rules::resolve_blast` / `resolve_object_blast`; NPC rules**
@@ -508,6 +509,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Files: `BattleView.boss_phase`; the "PHASE n - NAME" label and a ring for the whole hold (static ring in reduced mode).
 - Fail-first: `boss_phase_hold_shows_phase_label_and_ring_for_90_ticks` (normal and reduced).
 - Note (W2-36, 2026-11-08): the saved `Event` of kind `BossPhase` carries the transition number in `value`, the hold in `duration_ticks` (90) and the boss in `actor_id`; `SimEvent::BossPhase { boss_id, kind, phase, lane, at }` is unchanged. The live state is `Enemy.boss_state` (`entered`, `hold_until`, `profile.name`; `BossState::held(tick)`), so the hold left is `hold_until - tick`. horde_game still maps `SimEvent::BossPhase` to no cue (`runner/runtime.rs`).
+- Wave-2 close capture item (W2 review, 2026-11-10): no shipped review scene shows a phase hold. Phases start past rank 4, the `boss` still deploys stage 0 of a fresh campaign (rank 0), and the rank-50 render fixtures spawn a phased boss but enter no transition until it is hurt (plan §9.6, W2-36). The wave-2 close captures include a boss inside its 90-tick phase hold at 1440x900@1.0 and 1050x700@1.35, normal and `LASTLIGHT_REVIEW_REDUCED`, checking that the "PHASE n - NAME" label sits legibly over the boss's name callout and clear of the HUD and banners (in the top lane too), and that the ring circles the boss's feet for the whole hold (static in reduced mode). Taking it needs a phased-boss review scene (a boss past rank 4, hurt into its first transition), which needs a waves.md slot. A defect found there becomes a capture-ledger row (plan §10).
 - Deps: W2-36.
 
 **W2-38 · enemy-balance · generate_world.py commit A (writer only)**
