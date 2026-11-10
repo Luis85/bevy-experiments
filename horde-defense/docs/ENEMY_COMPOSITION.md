@@ -64,9 +64,11 @@ separate from these ordinary profiles.
 An archetype may also author `"target_urgency"`: yards added to an NPC
 defender's target score, so negative values are engaged sooner (finite,
 −100–100). When omitted it defaults from `base_enemy_kind` (Runner −3,
-otherwise 0), so older catalogues keep their targeting; the shipped Runner-tagged
-archetypes author −3 explicitly. It is a resolved, saved snapshot field like the
-others.
+otherwise 0), so older catalogues keep their targeting. In the shipped catalogue
+`runner`, `caller-pack`, `skitter` and `plated-runner` author −3 explicitly,
+`sprinter` and `splitter-brood` (also Runner-based) omit it and take the −3
+default, the `spitter` authors −2 and the Shambler-based `exploder` −4. It is a
+resolved, saved snapshot field like the others.
 
 The composition fields (W2-31; design enemy-balance §4) are optional, default
 to the legacy behaviour and are skipped in a snapshot at that default, so the
@@ -84,9 +86,12 @@ to the legacy behaviour and are skipped in a snapshot at that default, so the
 
 A split target is checked at load: it must exist, must not be the splitter
 itself, needs no boss unlock, and has no death effect and no group of its own.
-The exploder authors attack damage 1, the bound's minimum: its fuse replaces
-the attack with its burst, so the value is never read (the design table's 0 is
-outside the attack bound).
+The exploder authors attack damage 1, the bound's minimum (the design table's 0
+is outside the attack bound). The simulation never reads it: the fuse replaces
+the attack with its burst, on the defender and on a structure alike. Only the
+analysis-only skill value model reads it: `campaign/tree_value.rs` takes the
+survivor hit from the burst but scales the exploder's structure hit from this
+damage times its structure multiplier.
 
 Component IDs are local to their table. Archetype IDs are persistent identities;
 keep them stable when rebalancing. Components contain values, not references to
