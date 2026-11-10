@@ -886,9 +886,85 @@ mod tests {
             assert_eq!(error.to_string(), "No active expedition with that ID");
         }
     }
+    /// The `Command` variants appended after recording FORMAT 1's 41
+    /// (`tests/recording_vocabulary.rs`), in declaration order.
+    const APPENDED_COMMANDS: [&str; 9] = [
+        "DeletePreset",
+        "SetAutoSell",
+        "ApplyAutoSellToStash",
+        "SetNextDefender",
+        "BeginDefense",
+        "SetRecruitTactics",
+        "AcknowledgeOutcomes",
+        "SelectCountry",
+        "RecruitAs",
+    ];
+    /// The index in [`APPENDED_COMMANDS`] of `command`'s variant, or None for
+    /// one of the 41 FORMAT 1 variants. Exhaustive: an appended variant does
+    /// not compile until it is listed here, and the round-trip test below
+    /// then wants a sample of it.
+    fn appended_index(command: &Command) -> Option<usize> {
+        match command {
+            Command::ContinueJourney
+            | Command::LeaveJourney
+            | Command::SetBalance(_)
+            | Command::ChooseSurvivor(_)
+            | Command::ChooseStart(_)
+            | Command::EnterCountry(_)
+            | Command::Deploy { .. }
+            | Command::Withdraw
+            | Command::SetPaused(_)
+            | Command::Place { .. }
+            | Command::Salvage(_)
+            | Command::SaveStartingLayout
+            | Command::SaveExpeditionLayout(_)
+            | Command::ClearExpeditionLayout(_)
+            | Command::ClearLayout
+            | Command::RespecPlayer
+            | Command::BuySkillNode(_)
+            | Command::BuyItem(_)
+            | Command::Equip { .. }
+            | Command::Lock { .. }
+            | Command::Favorite { .. }
+            | Command::SellItem(_)
+            | Command::SellUnprotected
+            | Command::SavePreset { .. }
+            | Command::ApplyPreset { .. }
+            | Command::BuyNpcPoint
+            | Command::TrainNpc(_)
+            | Command::RespecNpc
+            | Command::SetNpcPolicy(_)
+            | Command::Recruit(_)
+            | Command::EquipRecruit { .. }
+            | Command::TrainRecruit { .. }
+            | Command::BuyRecruitPoint(_)
+            | Command::SetRecruitPolicy { .. }
+            | Command::AssignGuard { .. }
+            | Command::ReleaseGuard(_)
+            | Command::DeploySurvivor { .. }
+            | Command::CountryOperation { .. }
+            | Command::RecallSurvivor(_)
+            | Command::PlaceExpedition { .. }
+            | Command::SalvageExpedition { .. } => None,
+            Command::DeletePreset { .. } => Some(0),
+            Command::SetAutoSell(_) => Some(1),
+            Command::ApplyAutoSellToStash { .. } => Some(2),
+            Command::SetNextDefender(_) => Some(3),
+            Command::BeginDefense { .. } => Some(4),
+            Command::SetRecruitTactics { .. } => Some(5),
+            Command::AcknowledgeOutcomes { .. } => Some(6),
+            Command::SelectCountry(_) => Some(7),
+            Command::RecruitAs { .. } => Some(8),
+        }
+    }
+    /// W2-48 (design-save-determinism §6): a debug recording replays every
+    /// command it holds, so each appended variant, at non-default values,
+    /// parses back to itself and reserializes to the very line it was read
+    /// from, under its own externally tagged name. One sample per appended
+    /// variant, in declaration order, beside three FORMAT 1 variants.
     #[test]
     fn commands_round_trip_through_serde_for_replay() {
-        let commands = [
+        let v1 = [
             Command::SetNpcPolicy(tactics(30)),
             Command::PlaceExpedition {
                 battle: 4,
@@ -897,11 +973,58 @@ mod tests {
                 column: 1,
             },
             Command::ChooseSurvivor(SurvivorId::June),
-            Command::DeletePreset { index: 2 },
         ];
-        for command in commands {
-            let json = serde_json::to_string(&command).unwrap();
-            assert_eq!(serde_json::from_str::<Command>(&json).unwrap(), command);
+        let rule = AutoSellRule {
+            enabled: true,
+            sell_below: Quality::Epic,
+            slots: [false, true, true, false],
+            keep_upgrades: false,
+            apply_to_npc_runs: false,
+        };
+        let appended = [
+            Command::DeletePreset { index: 2 },
+            Command::SetAutoSell(rule),
+            Command::ApplyAutoSellToStash {
+                expect_count: 7,
+                expect_coins: 1_234,
+            },
+            Command::SetNextDefender(DefenderId::Recruit(3)),
+            Command::BeginDefense { stage: 4 },
+            Command::SetRecruitTactics {
+                id: 5,
+                tactics: tactics(40),
+            },
+            Command::AcknowledgeOutcomes {
+                battles: vec![9, 12],
+                folded: 3,
+            },
+            Command::SelectCountry("POL".into()),
+            Command::RecruitAs {
+                country: "HUN".into(),
+                archetype: "medic".into(),
+            },
+        ];
+        assert!(v1.iter().all(|c| appended_index(c).is_none()));
+        assert_eq!(
+            appended.iter().map(appended_index).collect::<Vec<_>>(),
+            (0..APPENDED_COMMANDS.len()).map(Some).collect::<Vec<_>>(),
+            "one sample per appended variant, in declaration order"
+        );
+        let defenders = [DefenderId::Player, DefenderId::Mara].map(Command::SetNextDefender);
+        for command in v1.into_iter().chain(appended).chain(defenders) {
+            let line = serde_json::to_string(&command).unwrap();
+            let replayed: Command = serde_json::from_str(&line).unwrap();
+            assert_eq!(replayed, command, "{line}");
+            assert_eq!(serde_json::to_string(&replayed).unwrap(), line);
+            if let Some(index) = appended_index(&command) {
+                let value: serde_json::Value = serde_json::from_str(&line).unwrap();
+                let name = value.as_object().and_then(|map| map.keys().next());
+                assert_eq!(
+                    name.map(String::as_str),
+                    Some(APPENDED_COMMANDS[index]),
+                    "{line}"
+                );
+            }
         }
     }
     #[test]

@@ -101,6 +101,64 @@ fn elites_consume_no_combat_rng() {
     }
 }
 
+/// W2-48 (design-save-determinism §5 "RNG keying", plan EB14): the keyed
+/// ELITE and AFFIX rolls neither draw nor read the combat RNG, at any rate.
+/// From one game, every rate from 0 to 10000 spawns the same hostiles in the
+/// same lanes with the combat RNG in the same state after every director
+/// pass, and leaves the strategy RNG and the seed alone. With the combat RNG
+/// reseeded (other hostiles, other lanes) every hostile's verdict and affix
+/// are still the ones its keyed hashes give.
+#[test]
+fn elite_roll_consumes_no_combat_rng() {
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    for mode in [Mode::Personal, Mode::Npc] {
+        let run = |rate: u32, reseed: Option<u64>| {
+            let mut g = game_at(mode, 13);
+            let a = g.attempt.as_mut().unwrap();
+            a.progression.elite_rate_bp = rate;
+            if let Some(seed) = reseed {
+                a.rng = Rng::new(seed);
+            }
+            let strategy = g.strategy.rng.state;
+            let (seed, attempt) = (g.seed, a.id);
+            let mut spawned = Vec::new();
+            let mut states = Vec::new();
+            for _ in 0..300 {
+                let (pass, state) = director_spawns(&mut g, 1);
+                spawned.extend(pass);
+                states.push(state);
+            }
+            assert_eq!(g.strategy.rng.state, strategy, "{mode:?} {rate}");
+            assert_eq!(g.seed, seed, "{mode:?} {rate}");
+            (spawned, states, seed, attempt)
+        };
+        let plain = |v: &[Spawned]| -> Vec<(u64, String, u8)> {
+            v.iter().map(|(i, id, l, _)| (*i, id.clone(), *l)).collect()
+        };
+        let (base, base_states, _, _) = run(0, None);
+        assert!(base.len() >= 300, "{mode:?}: {} spawns", base.len());
+        for rate in [1, 200, 850, 1_275, 5_000, 9_999, 10_000] {
+            let (spawned, states, _, _) = run(rate, None);
+            let moved = (0..states.len()).find(|&n| states[n] != base_states[n]);
+            assert_eq!(moved, None, "{mode:?} {rate}: the combat RNG moved at pass");
+            assert_eq!(plain(&spawned), plain(&base), "{mode:?} {rate}");
+            let (other, _, seed, attempt) = run(rate, Some(0x0dd5_eed5));
+            assert_ne!(plain(&other), plain(&base), "{mode:?}: the reseed shows");
+            for (id, archetype, _, affix) in other {
+                let elite = catalog.elite_eligible(&archetype)
+                    && director::rolls_elite(seed, attempt, id, rate);
+                let expected = elite.then(|| {
+                    let key = crate::hash::keyed(seed, attempt, id, crate::hash::tags::AFFIX);
+                    let base = catalog.resolve(&archetype).unwrap();
+                    let profile = catalog.elite_profile(&base, key).unwrap();
+                    profile.elite.unwrap().affix_id
+                });
+                assert_eq!(affix, expected, "{mode:?} {rate}: enemy {id} ({archetype})");
+            }
+        }
+    }
+}
+
 #[test]
 fn elite_fraction_at_rank_13_is_8_5_pm_0_5_over_20k() {
     let mut g = game_at(Mode::Personal, 13);

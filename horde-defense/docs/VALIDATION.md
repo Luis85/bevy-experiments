@@ -1198,6 +1198,25 @@ The two earlier sittings are not evidence: `ab-interface-total` measured A twice
 - The script-level battlefield primitive and vertex gates: landed earlier in W2-47 and held live in every pass (above).
 - The egui_probe/present_wait span ordering, including baseline.v3: re-measured (see "baseline.v3 on the 7abb0ab spans" above). No other span-ordering item is open.
 
+## Legacy guards and fixture behaviour — 10 November 2026 (W2-48)
+
+The save-determinism guards that keep the wave-2 systems away from encounters saved before them (design-save-determinism §5 and §11, plan EB14 and SD6), and behaviour tests that play the v6 fixture forward through the wave-2 rules. Each guards behaviour an earlier wave-2 commit landed, so each passed on the parent (ad61a22); the proof is a mutation of the production code, run against the named test and reverted:
+
+| Test | Where | Mutation | Failure |
+|---|---|---|---|
+| `elite_roll_consumes_no_combat_rng` (every rate 0-10000, both modes; the reseeded verdicts and affixes match the keyed hashes) | `src/sim/elite_tests.rs` | an elite spawn draws `a.rng.below(2)`; separately, the ELITE key mixes in `a.rng.state` | `Personal 200: the combat RNG moved at pass` `Some(9)`; `Personal 200: enemy 42 (brute)` `None` vs `Some("hardened")` |
+| `rank_zero_deploy_spawns_no_elites_and_has_no_new_archetypes` (Easy/Normal/Hard, both modes, 3 seeds, 3 minutes) | `tests/legacy_guards.rs` | the director's rate floored at 850 bp; separately, its wave pool tier raised by 6 | `Easy Personal 0x1: elite enemy 32`; `Easy Personal 0x1: new archetype exploder` |
+| `legacy_attempt_snapshots_have_zero_elite_rate_and_no_boss_phases` (v1-v6 roots and the v6 expedition; the v7 freeze shows both marks) | same | load gives an attempt at rank 3 or more one boss transition | `v1 root` `(0, 1, 0, 0, 0, 0)` vs `(0, 0, 0, 0, 0, 0)` |
+| `v6_active_attempt_spawns_no_elites_for_3600_ticks` | same | the 850 bp floor | `expedition 16` (telemetry counts elites) |
+| `v6_legacy_boss_has_no_phases` (a frozen-0 boss under both thresholds; the same boss on a 2-transition snapshot phases) | same | the load mutation above | the expedition snapshot reads 1, not 0 |
+| `continue_journey_after_migrated_companion_report_redeploys_companion` (inline JSON: the v6 payload without its live defense, its keyless Mara report a Belarus stage 1 loss) | same | `next_defender` ignores the report | `Player` vs `Mara` |
+| `v6_fixture_recruit_can_take_over_the_next_defense` | same | `ContinueJourney` keeps the choice; separately, the takeover finish never releases the recruit | `Continue clears the choice`; `Defending` vs `Ready` |
+| `worker_level_up_does_not_pay_the_level_grant_twice` (the live Polish expedition levels 33 -> 34) | same | a worker settles its own ledger | `a worker never settles` `(34, 34)` vs `(34, 33)` |
+| `migrated_threat_jump_pays_no_milestone` (the v6 payload pre-threat: victories 0 jump to its clear rank 14 at load) | same | step (d) claims by the saved victories | claims `{}` vs `{5, 10}` |
+| `commands_round_trip_through_serde_for_replay` (the 9 appended variants at non-default values) | `src/command.rs` | `AcknowledgeOutcomes.folded` `#[serde(default, skip_serializing)]` | `{"AcknowledgeOutcomes":{"battles":[9,12]}}` reads `folded: 0`, not 3 |
+
+No production code changed and no digest moved.
+
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 
 W1-49 is done when `battlefield_paint` does not grow over the stress run, and the perf design asks for `settled_corpses_drawn` in stress. Neither number had been written down: the W1-49 commits had only headless cache tests.

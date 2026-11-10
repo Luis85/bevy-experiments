@@ -611,6 +611,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `migrated_threat_jump_pays_no_milestone`
   - `commands_round_trip_through_serde_for_replay` (all 9 appended variants)
 - Deps: W2-01 to W2-47.
+- **Done is met (2026-11-10).** The ten tests exist: `elite_roll_consumes_no_combat_rng` in `src/sim/elite_tests.rs`, `commands_round_trip_through_serde_for_replay` in `src/command.rs` (one sample per appended variant, checked by an exhaustive variant match), and the other eight in the new `tests/legacy_guards.rs`. Every behaviour they guard landed in an earlier wave-2 commit (W2-11/12, W2-22, W2-33, W2-36, W2-54), so each passed on the parent ad61a22 and carries a mutation proof instead of a fail-first line (VALIDATION.md "Legacy guards and fixture behaviour"). No production code changed; no digest moved, `PROVISIONAL` is unchanged, and V1-V6, `V6_DROP_TRACE_FNV` and `save_v7.json` are untouched.
 
 **W2-49 · save-determinism · Wave-2 re-bless (single)**
 - Steps: fold PROVISIONAL into GOLDEN; write a per-digest reason table (classes F/T/C/G with anatomy diffs); `RULESET_VERSION` 3 and `TRACE_RULESET`; smoke and pacing after in `target/production-after-wave2/`.

@@ -46,7 +46,7 @@
 | G3.1 | `available_defenders()` and `SetNextDefender`; picker on Results and Briefing | `available_defenders_lists_player_mara_recruits_with_blockers`, `picker_lists_ready_recruit_and_dispatches_set_next_defender`, `results_picker_persists_choice_across_save_load` | 2, 3 |
 | G3.2 | Persisting the defender choice | `next_defender_persists_through_save_load_and_continue_deploys_it` | 2 |
 | G3.3 | Rejecting a reserved or guarding recruit | `set_next_defender_typed_rejections_leave_state_unchanged`, `recruit_on_main_run_cannot_be_dispatched_trained_or_equipped`, `defending_recruit_rejects_every_ready_gated_mutation` | 1, 2 |
-| G3.4 | `continue_journey` reserves the defender's loadout like deploy_survivor | `recruit_takeover_deploys_with_recruit_loadout_and_identity`, `staged_recruit_defending_main_run_validates`, `takeover_does_not_reserve_maras_idle_loadout` | 1, 2 |
+| G3.4 | `continue_journey` reserves the defender's loadout like deploy_survivor | `recruit_takeover_deploys_with_recruit_loadout_and_identity`, `staged_recruit_defending_main_run_validates`, `takeover_does_not_reserve_maras_idle_loadout`; on the v6 fixture `v6_fixture_recruit_can_take_over_the_next_defense` (W2-48) | 1, 2 |
 | G3.5 | Idempotent `settle_parallel` | `settle_parallel_twice_is_a_no_op`, `random_tick_recall_interleavings_settle_each_battle_once` (200 cases), `repeated_settle_parallel_is_idempotent` | 2 |
 | G3.6 | SelectCountry never creates an attempt; outbreaks get "Plan response" | `select_country_never_creates_an_attempt`, `outbreak_plan_targets_final_stage...`, `plan_response_opens_briefing_without_attempt` | 2, 3 |
 | G3.7 | Recruit progression reaches 10 levels by the 6th liberation | `allowance_reaches_level_ten_by_sixth_liberation` (84), `allowance_never_below_legacy_and_monotonic` | 2 |
@@ -58,7 +58,7 @@
 | G3.13 | Decision 4: the winning defender gets XP/CP; Personal first_clear XP unchanged | `takeover_victory_credits_recruit_not_mara`, `mara_finish_matches_legacy_attempt_counting` | 2 |
 | G3.14 | Decision 5: liberation Results shows "Recruit from <Country>" or names the node | `liberation_results_offers_recruit_when_node_owned`, `liberation_results_names_missing_survivor_network`, `recruit_offer_names_the_missing_recruitment_node` | 2, 3 |
 | G3.15 | Decision 15: two archetypes plus an origin trait | `recruit_offer_has_two_distinct_archetypes_and_recruit_as_applies_the_choice`, `recruiting_draws_no_strategy_rng` | 2 |
-| G3.16 | R2: an absent `defender` key means the mode owner; GOLDEN does not move for it; takeover stamps the recruit's appearance | `golden_and_default_games_serialize_no_defender_key`, `npc_report_without_key_reads_mara_personal_reads_player`, `expedition_attempt_carries_recruit_seat_and_appearance`, `battlefield_draws_profile_appearance_not_forced_female` | 1, 2, 3 |
+| G3.16 | R2: an absent `defender` key means the mode owner; GOLDEN does not move for it; takeover stamps the recruit's appearance | `golden_and_default_games_serialize_no_defender_key`, `npc_report_without_key_reads_mara_personal_reads_player`, `expedition_attempt_carries_recruit_seat_and_appearance`, `battlefield_draws_profile_appearance_not_forced_female`, `continue_journey_after_migrated_companion_report_redeploys_companion` (W2-48) | 1, 2, 3 |
 
 ## Goal 4: loot, items, auto-sell
 
@@ -66,7 +66,7 @@
 |---|---|---|---|
 | G4.1 | `Game::sale_eligibility` is used by SellItem, sell_extras, quotes and auto-sell, and excludes protected, locked, favourite, reserved, equipped, preset, recruit-equipped and npc_only items (R11) | `every_sell_path_agrees_with_sale_eligibility`, `strict_sell_rejects_equipped_preset_reserved_recruit_and_npc_only`, `sale_eligibility_is_pure`, `properties::sale_paths_never_sell_guarded_items` (500) | 1, 2 |
 | G4.2 | A test shows the old filter selling a recruit-equipped item | `old_campaign_filter_sells_recruit_equipped_item` (W1-18), inverted to `strict_sell_rejects_recruit_equipped_item` (W1-20) | 1 |
-| G4.3 | `AutoSellRule {..}` plus `Command::SetAutoSell` | `set_auto_sell_rejects_poor_threshold_with_auto_sell_rule_invalid`, `command_serde_round_trip_covers_appended_economy_variants` | 1 |
+| G4.3 | `AutoSellRule {..}` plus `Command::SetAutoSell` | `set_auto_sell_rejects_poor_threshold_with_auto_sell_rule_invalid`, `command_serde_round_trip_covers_appended_economy_variants`, `commands_round_trip_through_serde_for_replay` (all 9 appended variants, W2-48) | 1, 2 |
 | G4.4 | Runs after reservation release (main) and after the worker remap; no RNG; checked wallet; each item sold at most once | `takeover_auto_sell_runs_after_release...`, `auto_sell_consumes_no_rng`, `wallet_overflow_keeps_items`, `worker_loot_sold_exactly_once_in_main_campaign`, `save_mid_expedition_preserves_pending_auto_sell_and_sells_once`, `queued_drop_reserved_by_another_deployment_keeps_the_save_valid`, `final_sweep_sells_a_queue_no_record_drained` | 2 |
 | G4.5 | `tests/auto_sell.rs` plus a property test: no guarded item is sold; the quote equals the coins realised | `tests/auto_sell.rs` suite; `properties::sale_paths_never_sell_guarded_items` | 2 |
 | G4.6 | Rule off: nothing moves | `rule_off_moves_nothing` | 2 |
@@ -78,14 +78,14 @@
 | G4.12 | 39 append-only items: every tier 1-4 has 1 Ranged per class and ≥ 3 per other slot; drops weighted by tier and trained class | `every_tier_1_to_4_has_one_ranged_per_class_and_three_per_other_slot`, `appended_ids_keep_v1_order`, `weighted_drops_favour_current_tier`, `trained_class_weighted` | 2 |
 | G4.13 | The auto-sell profile stays within 1 run of baseline at tiers 1-3 | `auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3` (release) | 4 |
 | G4.14 | Decision 7: relative quality; existing items keep stats and value | `relative_roll_never_drops_a_tier4_below_epic`, `v6_items_keep_stats_and_value` | 1, 2 |
-| G4.15 | R4: legacy attempts keep the old drop path | `V6_DROP_TRACE_FNV` pin, `legacy_attempt_never_pushes_drop_ids_and_is_never_auto_sold` | 1, 2 |
+| G4.15 | R4: legacy attempts keep the old drop path | `V6_DROP_TRACE_FNV` pin, `legacy_attempt_never_pushes_drop_ids_and_is_never_auto_sold`; their frozen snapshots roll no elite and phase no boss: `legacy_attempt_snapshots_have_zero_elite_rate_and_no_boss_phases`, `v6_active_attempt_spawns_no_elites_for_3600_ticks`, `v6_legacy_boss_has_no_phases` (W2-48) | 1, 2 |
 
 ## Goal 5: progression, tree, skills
 
 | AC | Criterion | Proof | Wave |
 |---|---|---|---|
 | G5.1 | Lower Steady hands and Hardened; raise Trap mastery 1 and Quick throw | `steady_hands_..._at_most_40_percent_per_shotgun_trigger`, `hardened_leaves_runner_contact_damaging`, `trap_mastery_1_adds_a_trap_charge`, `quick_throw_adds_throws_per_deployment` | 4 |
-| G5.2 | Milestones at ranks 5/10/15/20 and the level-up coin grant (decision 14) | `level_grant_is_paid_once_at_root_finish`, `milestone_paid_once_per_rank_across_save_reload`, `worker_victory_level_up_pays_the_grant_once_in_the_parent...`, `v6_save_migrates_level_grant_paid_to_level_and_claims_reached_milestones`; the shipped values: `shipped_catalogue_authors_the_design_grant_and_milestones` (W2-54) | 1, 2 |
+| G5.2 | Milestones at ranks 5/10/15/20 and the level-up coin grant (decision 14) | `level_grant_is_paid_once_at_root_finish`, `milestone_paid_once_per_rank_across_save_reload`, `worker_victory_level_up_pays_the_grant_once_in_the_parent...`, `v6_save_migrates_level_grant_paid_to_level_and_claims_reached_milestones`; on the v6 fixture `worker_level_up_does_not_pay_the_level_grant_twice` and `migrated_threat_jump_pays_no_milestone` (W2-48); the shipped values: `shipped_catalogue_authors_the_design_grant_and_milestones` (W2-54) | 1, 2 |
 | G5.3 | Up to 8 new append-only nodes (user: yes, ≤ 8) | `skill_catalog_is_append_only_with_eight_weapon_mastery_nodes` (len 177, FNV of the first 169), `counters_name_catalog_archetypes` | 2 |
 | G5.4 | Remove the disabled IQ/HP/FP rows | `npc_trainable_rows_exclude_iq_hp_fp`, `training_lists_have_no_iq_hp_fp_text` | 2, 3 |
 | G5.5 | Mara training and recruit cost scale with threat; the UI reads core prices (R10) | `recruit_and_training_prices_scale_with_threat`, `camp_price_labels_follow_core_price_at_rank_10`, `ui_has_no_literal_camp_prices_or_mara_mapping` | 2, 3 |
@@ -102,7 +102,7 @@
 |---|---|---|---|
 | G6.1 | Two-axis threat; floors past rank 4; `wave_tier` bound lifted; 8-12 composition tiers | `snapshot_wave_tiers_at_10_20_40_are_7_10_11`, `catalogue_has_twelve_tiers...`, `progression_snapshot_accepts_wave_tier_up_to_max_wave_tier` / `_rejects_above_max`, `every_floor_tier_exists_in_enemy_catalog` | 1, 2 |
 | G6.2 | 6-8 archetypes with serde defaults, bounds and an NPC resolution | `resolved_enemy_validate_rejects_*`, `legacy_resolved_enemy_and_snapshot_serialize_byte_identically`, `npc_resolution_for_each_new_archetype`, the per-archetype NPC tests in W2-29/30 | 1, 2 |
-| G6.3 | Elite affix table and elite fields; elite_rate 0 below rank 3, 2% at 3, 15% at 23; elites drop Uncommon+ | `elite_bp_pins`, `elite_fraction_at_rank_13_is_8_5_pm_0_5_over_20k`, `every_elite_kill_drops_uncommon_or_better`, `elite_status_never_changes_combat_rng_draw_count` | 2 |
+| G6.3 | Elite affix table and elite fields; elite_rate 0 below rank 3, 2% at 3, 15% at 23; elites drop Uncommon+ | `elite_bp_pins`, `elite_fraction_at_rank_13_is_8_5_pm_0_5_over_20k`, `every_elite_kill_drops_uncommon_or_better`, `elite_status_never_changes_combat_rng_draw_count`, `elite_roll_consumes_no_combat_rng` and `rank_zero_deploy_spawns_no_elites_and_has_no_new_archetypes` (W2-48) | 2 |
 | G6.4 | Boss armor and damage scale with threat; one phase per BossKind; capstone boss | `rank_20_boss_armor_exceeds_rank_0_both_modes`, `boss_damage_multiplier_follows_rank`, `boss_crossing_50_percent_enters_phase_once...`, `capstone_has_one_extra_transition...` | 2, 4 |
 | G6.5 | Hard raises the elite rate, ramp and boss phases; the preset applies to the next deployment | `hard_elite_rate_1_5x_normal_easy_0_5x`, `front_ramp_orders_hard_over_normal_over_easy`, `hard_has_two_above_rank_4`, `custom_edit_from_hard_keeps_hard_extras` | 1, 2 |
 | G6.6 | Short-range spitter, never attacking from the far half | `spitter_never_winds_up_or_damages_from_the_far_half` (widths 8/12/20/30) | 2 |
