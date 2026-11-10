@@ -1019,6 +1019,32 @@ fn w2_42_rows_vary_the_acceptance_profile_by_one_option() {
     }
 }
 
+/// A registered Easy or Hard profile plays its runs at that preset: the
+/// simulator's `SetBalance` reaches the game, so every `PacingRun` records
+/// the profile's difficulty.
+#[test]
+fn non_normal_profiles_play_at_their_preset() {
+    let mut played = BTreeSet::new();
+    for p in pacing_registry()
+        .iter()
+        .filter(|p| p.difficulty != BalancePreset::Normal)
+    {
+        let report = simulate_pacing(&PacingProfile {
+            max_runs: 1,
+            stop_after: None,
+            ..*p
+        })
+        .unwrap_or_else(|e| panic!("{}: {e}", p.id));
+        assert_eq!(report.runs.len(), 1, "{}", p.id);
+        assert_eq!(report.runs[0].difficulty, p.difficulty, "{}", p.id);
+        played.insert(p.id);
+    }
+    assert_eq!(
+        played,
+        BTreeSet::from(["easy", "hard", "lux-easy", "lux-hard"])
+    );
+}
+
 #[test]
 fn takeover_survivor_retries_a_stage_the_recruit_lost() {
     let profile = PacingProfile {
