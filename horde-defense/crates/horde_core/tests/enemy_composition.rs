@@ -144,3 +144,58 @@ fn every_floor_tier_exists_in_enemy_catalog() {
         assert!(message.contains(&format!("wave tier {tier}")), "{message}");
     }
 }
+
+/// Set in the child process of
+/// `strict_load_rejects_a_progression_override_past_the_last_wave_tier`.
+const STRICT_LOAD_CHILD: &str = "HORDE_TEST_STRICT_LOAD_CHILD";
+
+/// W2 review: `init_catalogs` itself runs the floor check. A process whose
+/// `LASTLIGHT_PROGRESSION` override names a floor one tier past the enemy
+/// catalogue (a catalogue that parses and validates on its own) fails the
+/// strict load as an invalid progression catalogue. The catalogues are
+/// process-wide, so the load runs in a fresh child process of this test.
+#[test]
+fn strict_load_rejects_a_progression_override_past_the_last_wave_tier() {
+    if std::env::var_os(STRICT_LOAD_CHILD).is_some() {
+        let error = init_catalogs().expect_err("a floor past the last wave tier");
+        let horde_core::catalog::ContentError::Invalid { catalog, message } = &error else {
+            panic!("not an invalid catalogue: {error}");
+        };
+        assert_eq!(*catalog, "progression", "{error}");
+        assert!(message.contains("wave tier 12"), "{message}");
+        return;
+    }
+    let mut value: serde_json::Value = serde_json::from_str(PROGRESSION_JSON).unwrap();
+    let floors = value["pressure_floors"].as_array_mut().unwrap();
+    let mut floor = floors.last().unwrap().clone();
+    let tier = enemy_catalog().wave_count();
+    assert_eq!(tier, 12);
+    floor["wave_tier"] = tier.into();
+    floors.push(floor);
+    let text = value.to_string();
+    ProgressionCatalog::from_json_str(&text).expect("the override is valid on its own");
+    let path = std::path::Path::new(env!("CARGO_TARGET_TMPDIR"))
+        .join("strict-load-floor-past-last-wave-tier.json");
+    std::fs::write(&path, text).unwrap();
+    let mut child = std::process::Command::new(std::env::current_exe().unwrap());
+    child.args([
+        "strict_load_rejects_a_progression_override_past_the_last_wave_tier",
+        "--exact",
+        "--nocapture",
+        "--test-threads=1",
+    ]);
+    for (_, var) in horde_core::catalog::CATALOG_OVERRIDES {
+        child.env_remove(var);
+    }
+    let output = child
+        .env("LASTLIGHT_PROGRESSION", &path)
+        .env(STRICT_LOAD_CHILD, "1")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success() && stdout.contains("1 passed"),
+        "the child's strict load accepted the override:\n{stdout}\n{stderr}"
+    );
+}
