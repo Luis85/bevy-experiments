@@ -917,23 +917,48 @@ mod tests {
         assert_eq!(listed, kept, "baseline.v3.kept_previous");
     }
 
+    /// R30's load validity (`scripts/lib/MachineLoad.ps1`, InvalidAtPercent):
+    /// a run with a CPU load sample at or above it is invalid evidence.
+    const R30_INVALID_AT_PERCENT: u64 = 90;
+
+    fn strings(value: Option<&Value>) -> Vec<&str> {
+        value
+            .and_then(Value::as_array)
+            .map(|items| items.iter().filter_map(Value::as_str).collect())
+            .unwrap_or_default()
+    }
+
+    fn text<'a>(value: &'a Value, key: &str) -> &'a str {
+        value.get(key).and_then(Value::as_str).unwrap_or("")
+    }
+
     /// W2-47: the wave-2 re-gate on the new stress fixture is recorded in
-    /// `acceptance.w2_47`. Every pass it lists exited 0 (Done: dev and
-    /// playtest `-Scene stress -VsyncOff`), its cpu_frame p99 medians and
-    /// worst frames over 50 ms meet the live gates, and the R31 A/B ran two
-    /// different executables with B's median at most 1.05 x A's per size.
+    /// `acceptance.w2_47`. Each pass lists every invocation with its start,
+    /// commit, executable and exit; a pass's `exit` is its last invocation's,
+    /// and an invocation's exit follows from what it recorded (invalid groups
+    /// rank above an over, as in measure_performance). Every invalid group is
+    /// re-measured by a later invocation kept as evidence. A valid gated
+    /// `over` is listed with its cell and repeats, and its pass is not clean
+    /// until a ruling (W2-47 review). Done: dev and playtest `-VsyncOff`
+    /// cover stress, exit 0 and have no stress over. The kept cpu_frame p99
+    /// medians, interface_draw and interface_total means and worst frames
+    /// over 50 ms meet the live gates, and the R31 A/B ran two different
+    /// executables with B's median at most 1.05 x A's per size.
     #[test]
     fn perf_budget_records_the_w2_47_regate() {
         let json = budget();
         let path = "/acceptance/w2_47";
-        let commit = json
-            .pointer(&format!("{path}/commit"))
-            .and_then(Value::as_str)
-            .unwrap_or("");
+        let commits = strings(json.pointer(&format!("{path}/commits")));
         assert!(
-            commit.len() >= 7 && commit.chars().all(|c| c.is_ascii_hexdigit()),
-            "acceptance.w2_47.commit names the measured commit: {commit:?}"
+            !commits.is_empty()
+                && commits
+                    .iter()
+                    .all(|c| c.len() >= 7 && c.chars().all(|c| c.is_ascii_hexdigit())),
+            "acceptance.w2_47.commits names every measured commit: {commits:?}"
         );
+        let window = strings(json.pointer(&format!("{path}/window_utc")));
+        assert_eq!(window.len(), 2, "acceptance.w2_47.window_utc: {window:?}");
+        let repeat = whole(&json, "/run/repeat_acceptance");
         let passes = object(&json, &format!("{path}/passes"));
         for required in [
             "dev-novsync",
@@ -943,24 +968,210 @@ mod tests {
         ] {
             assert!(passes.contains_key(required), "passes/{required}");
         }
+        let mut starts = Vec::new();
+        let mut over_cells = std::collections::BTreeMap::new();
         for (name, pass) in passes {
+            let command = text(pass, "command");
+            let profile = command
+                .split_whitespace()
+                .skip_while(|word| *word != "-Profile")
+                .nth(1)
+                .unwrap_or("");
+            let shas = strings(json.pointer(&format!("{path}/executables_sha256/{profile}")));
+            assert!(
+                !shas.is_empty(),
+                "passes/{name}: {command:?} names a recorded profile"
+            );
+            let evidence = strings(pass.get("evidence"));
+            assert!(
+                !evidence.is_empty()
+                    && evidence.iter().all(|p| p.starts_with("target/perf/w2-47/")),
+                "passes/{name}: evidence under target/perf/w2-47/"
+            );
+            let kept = |invocation: &str| {
+                evidence
+                    .iter()
+                    .any(|p| p.rsplit('/').next() == Some(invocation))
+            };
+            let mut order: Vec<(&str, &Value)> =
+                object(&json, &format!("{path}/passes/{name}/invocations"))
+                    .iter()
+                    .map(|(key, record)| (key.as_str(), record))
+                    .collect();
+            order.sort_by_key(|(_, record)| text(record, "started_utc"));
+            let mut overs = Vec::new();
+            for (index, (invocation, record)) in order.iter().enumerate() {
+                let at = format!("passes/{name}/invocations/{invocation}");
+                let started = text(record, "started_utc");
+                assert!(
+                    started.len() == 20 && started.ends_with('Z'),
+                    "{at}: started_utc {started:?}"
+                );
+                starts.push(started);
+                let commit = text(record, "commit");
+                assert!(
+                    commits.contains(&commit),
+                    "{at}: commit {commit:?} is in commits"
+                );
+                let sha = text(record, "executable_sha256");
+                assert!(
+                    shas.contains(&sha),
+                    "{at}: executable {sha:?} is a recorded {profile} exe"
+                );
+                let invalid = strings(record.get("invalid_groups"));
+                let over = record
+                    .get("over")
+                    .and_then(Value::as_array)
+                    .map(Vec::as_slice)
+                    .unwrap_or_default();
+                // measure_performance ranks invalid evidence (2) above over budget (1).
+                let expected = if !invalid.is_empty() {
+                    2
+                } else if !over.is_empty() {
+                    1
+                } else {
+                    0
+                };
+                assert_eq!(
+                    record.get("exit").and_then(Value::as_u64),
+                    Some(expected),
+                    "{at}: exit with invalid groups {invalid:?} and {} over cells",
+                    over.len()
+                );
+                for group in &invalid {
+                    assert!(
+                        order[index + 1..].iter().any(|(later, r)| kept(later)
+                            && strings(r.get("remeasures")).contains(group)),
+                        "{at}: invalid group {group} is re-measured by a later invocation kept as evidence"
+                    );
+                }
+                for cell in over {
+                    let (scene, size) = (text(cell, "scene"), text(cell, "size"));
+                    assert_eq!(
+                        text(cell, "metric"),
+                        "cpu_frame_p99_ms",
+                        "{at}: over metric"
+                    );
+                    assert!(CPU_GATED_SCENES.contains(&scene), "{at}: {scene} is gated");
+                    assert_eq!(
+                        cell.get("limit").and_then(Value::as_f64),
+                        Some(CPU_FRAME_P99_MS_MAX),
+                        "{at}: the live gate"
+                    );
+                    let mut repeats: Vec<f64> = cell
+                        .get("repeats")
+                        .and_then(Value::as_array)
+                        .map(|values| values.iter().filter_map(Value::as_f64).collect())
+                        .unwrap_or_default();
+                    assert_eq!(repeats.len(), repeat, "{at}: {scene}/{size} repeats");
+                    repeats.sort_by(f64::total_cmp);
+                    let median = cell.get("median").and_then(Value::as_f64);
+                    assert_eq!(
+                        median,
+                        Some(repeats[repeat / 2]),
+                        "{at}: {scene}/{size} median"
+                    );
+                    assert!(
+                        median.is_some_and(|median| median > CPU_FRAME_P99_MS_MAX),
+                        "{at}: {scene}/{size} is over"
+                    );
+                    let loads: Vec<u64> = cell
+                        .get("load_max_percent")
+                        .and_then(Value::as_array)
+                        .map(|values| values.iter().filter_map(Value::as_u64).collect())
+                        .unwrap_or_default();
+                    assert!(
+                        loads.len() == repeat
+                            && loads.iter().all(|load| *load < R30_INVALID_AT_PERCENT),
+                        "{at}: {scene}/{size} is valid under R30: loads {loads:?}"
+                    );
+                    overs.push(format!("{scene}/{size}"));
+                }
+            }
+            let (last, last_record) = order
+                .last()
+                .unwrap_or_else(|| panic!("passes/{name} lists its invocations"));
+            assert!(kept(last), "passes/{name}: {last} is kept as evidence");
+            assert_eq!(
+                pass.get("exit").and_then(Value::as_u64),
+                last_record.get("exit").and_then(Value::as_u64),
+                "passes/{name}: exit is its last invocation's"
+            );
             assert_eq!(
                 pass.get("exit").and_then(Value::as_u64),
                 Some(0),
                 "passes/{name} exits 0"
             );
-            let evidence = pass.get("evidence").and_then(Value::as_array);
+            let clean = pass.get("gate_clean").and_then(Value::as_bool);
+            if overs.is_empty() {
+                assert_eq!(clean, Some(true), "passes/{name}: gate_clean");
+            } else {
+                // A valid over is not re-measured away: it stands until a ruling.
+                assert_eq!(clean, Some(false), "passes/{name}: a valid over {overs:?}");
+                let reason = text(pass, "not_clean");
+                assert!(
+                    reason.contains("plan 2.5 row")
+                        && overs.iter().all(|cell| reason.contains(cell.as_str())),
+                    "passes/{name}: not_clean names {overs:?} and the plan 2.5 row: {reason:?}"
+                );
+            }
+            over_cells.insert(name.as_str(), overs);
+        }
+        // Done: `-Scene stress -VsyncOff` in dev and playtest.
+        for name in ["dev-novsync", "playtest-novsync"] {
+            let command = text(&passes[name], "command");
             assert!(
-                evidence.is_some_and(|paths| !paths.is_empty()
-                    && paths.iter().all(|p| p
-                        .as_str()
-                        .is_some_and(|p| p.starts_with("target/perf/w2-47/")))),
-                "passes/{name}: evidence under target/perf/w2-47/"
+                command.contains("-VsyncOff") && command.contains("-Scene all"),
+                "passes/{name} covers stress with -VsyncOff: {command:?}"
+            );
+            assert!(
+                over_cells[name]
+                    .iter()
+                    .all(|cell| !cell.starts_with("stress/")),
+                "passes/{name}: no stress over"
+            );
+        }
+        starts.sort_unstable();
+        assert_eq!(
+            window[0], starts[0],
+            "window_utc starts at the first invocation"
+        );
+        assert!(
+            starts.iter().all(|start| *start <= window[1]),
+            "window_utc ends after every invocation starts"
+        );
+        let sizes = keys(object(&json, "/sizes"));
+        for size in &sizes {
+            for scene in ["peak", "progressed-peak"] {
+                let draw = number(
+                    &json,
+                    &format!("{path}/interface_draw_mean_ms/{scene}/{size}"),
+                );
+                let limit = number(
+                    &json,
+                    &format!("/scenes/{scene}/interface_draw_mean_ms_max/{size}"),
+                );
+                assert!(
+                    draw <= limit,
+                    "{scene} {size}: interface_draw {draw} over {limit}"
+                );
+            }
+            let total = number(
+                &json,
+                &format!("{path}/interface_total_mean_ms/progressed-peak/{size}"),
+            );
+            let limit = number(
+                &json,
+                &format!("/baseline/v3/interface_total_mean_ms/progressed-peak/{size}"),
+            );
+            assert!(
+                total <= limit,
+                "progressed-peak {size}: interface_total {total} over {limit}"
             );
         }
         for profile in ["dev", "playtest"] {
             for scene in CPU_GATED_SCENES {
-                for size in keys(object(&json, "/sizes")) {
+                for size in &sizes {
                     let p99 = number(
                         &json,
                         &format!("{path}/cpu_frame_p99_ms/{profile}/{scene}/{size}"),
@@ -989,9 +1200,17 @@ mod tests {
             sha("a").len() == 64 && sha("b").len() == 64 && sha("a") != sha("b"),
             "the A/B measured two executables"
         );
+        let b_commit = json
+            .pointer(&format!("{ab}/b_commit"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        assert!(
+            commits.contains(&b_commit),
+            "the A/B's B commit {b_commit:?} is in commits"
+        );
         let tolerance = number(&json, &format!("{ab}/tolerance"));
         assert_eq!(tolerance, 1.05, "R31");
-        for size in keys(object(&json, "/sizes")) {
+        for size in &sizes {
             let a = number(&json, &format!("{ab}/{size}/a_median"));
             let b = number(&json, &format!("{ab}/{size}/b_median"));
             assert!(
