@@ -1,7 +1,8 @@
 //! Skill schema at neutral values (W1-26): the saved `SkillModifiers` fields
 //! `class_modifiers`, `armor_penetration` and `hazard_damage_multiplier`
-//! inside `Attempt.profile`. No shipped node grants them yet (W2), so these
-//! tests stage the values as a save would.
+//! inside `Attempt.profile`. Since W2-41 the shipped nodes 170-177 author
+//! them; these tests still stage the values as a save would, so the schema
+//! is pinned apart from the shipped tree.
 mod support;
 use horde_core::{
     content::Mode,

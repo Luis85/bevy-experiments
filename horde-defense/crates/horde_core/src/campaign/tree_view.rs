@@ -1533,8 +1533,9 @@ mod tests {
 
     /// Design progression-tree §5 "Recommender": a class perk acts now only
     /// with an owned, non-npc_only Ranged item of its class that is not one
-    /// of Mara's guns, and never for Mara. No shipped node authors a perk
-    /// yet (W2-41), so the node is injected.
+    /// of Mara's guns, and never for Mara. Six of the shipped nodes 170-177
+    /// (W2-41) author class perks; the test injects its own node so the rule
+    /// is pinned apart from the shipped tree.
     #[test]
     fn class_modifier_node_acts_now_only_with_owned_class_weapon() {
         use crate::weapons::{WeaponClass, WeaponSpec};

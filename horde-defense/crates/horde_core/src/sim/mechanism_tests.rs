@@ -1,7 +1,9 @@
 //! W2-24 (design progression-tree §5 "Folding", ruling E12): the skill-perk
-//! mechanisms at neutral authored values. No shipped node authors a class
-//! perk, penetration, a hazard multiplier or trap charges per rank yet, so
-//! every test injects the value it needs.
+//! mechanisms at neutral authored values. Every test injects the value it
+//! needs, so the mechanism is pinned apart from the shipped tree. Since W2-41
+//! nodes 170-177 author class perks, `shield_breaker`'s penetration and
+//! `blast_discipline`'s hazard multiplier; only trap charges per rank are
+//! still unauthored.
 
 use super::*;
 use crate::content::StructureDefinition;
