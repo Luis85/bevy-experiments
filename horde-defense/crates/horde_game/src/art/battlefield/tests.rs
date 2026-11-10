@@ -1899,8 +1899,7 @@ fn boss_phase_hold_shows_phase_label_and_ring_for_90_ticks() {
 /// the wall's face, closer than the line's lead, where the dashes used to
 /// start beyond the target and none was drawn. A short line draws at least
 /// one dash, or its whole second half when that is shorter, and its last
-/// dash ends no more than a gap short of the target; a long line keeps its
-/// lead.
+/// dash ends on the target; a long line keeps its lead.
 #[test]
 fn aim_line_at_close_range_still_draws() {
     let sy = 40.0;
@@ -1919,7 +1918,7 @@ fn aim_line_at_close_range_still_draws() {
         assert!(first.distance(from) > 0.0, "{fraction}: clear of the body");
         let last = dashes.last().unwrap()[1];
         assert!(
-            last.distance(to) <= sy * enemies::AIM_GAP + 1e-3,
+            last.distance(to) < 1e-3,
             "{fraction}: ends {} short of the target",
             last.distance(to)
         );
@@ -1934,6 +1933,43 @@ fn aim_line_at_close_range_still_draws() {
             "{fraction} lanes: lead {}",
             first.distance(from)
         );
+    }
+}
+
+/// W2 review: an aim line ends on its target, as `aim_dashes` documents.
+/// The loop used to stop once the next dash would start past the target, so
+/// a line whose length fell in the trailing gap ended up to one gap (0.1
+/// lane heights) short. Over a sweep of lengths the last dash now ends on
+/// the target, the dashes keep their order and gaps, and no dash grows past
+/// a dash plus a gap.
+#[test]
+fn aim_line_ends_on_its_target() {
+    let sy = 40.0;
+    let from = pos2(300.0, 200.0);
+    for step in 1..=600 {
+        let length = sy * step as f32 * 0.01;
+        let to = from + vec2(-length * 0.6, -length * 0.8);
+        let dashes = enemies::aim_dashes(from, to, sy);
+        let last = dashes.last().expect("a dash")[1];
+        assert!(
+            last.distance(to) < 1e-3,
+            "{length} points: ends {} short of the target",
+            last.distance(to)
+        );
+        for pair in dashes.windows(2) {
+            let gap = pair[0][1].distance(pair[1][0]);
+            assert!(
+                (gap - sy * enemies::AIM_GAP).abs() < 1e-3,
+                "{length} points: gap {gap}"
+            );
+        }
+        for [a, b] in &dashes {
+            assert!(
+                a.distance(*b) <= sy * (enemies::AIM_DASH + enemies::AIM_GAP) + 1e-3,
+                "{length} points: dash {}",
+                a.distance(*b)
+            );
+        }
     }
 }
 

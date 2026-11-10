@@ -364,7 +364,8 @@ const AIM_WIDTH: f32 = 1.5;
 
 /// The dashes of a ranged windup's aim line (W2-28) from the spitter's feet
 /// at `from` to its target at `to`: it starts [`AIM_LEAD`] lanes clear of
-/// the body and ends on the target, the last dash cut short there. A target
+/// the body and ends on the target, the last dash cut short or stretched by
+/// at most a gap to meet it, so no line stops a gap short. A target
 /// closer than twice the lead (a spit from just past a wall's face) starts
 /// the line halfway, so a close spit still draws its twin. Static (no march
 /// or pulse), so reduced effects draw the same line.
@@ -375,10 +376,12 @@ pub(super) fn aim_dashes(from: Pos2, to: Pos2, sy: f32) -> Vec<[Pos2; 2]> {
     let mut dashes = Vec::new();
     let mut at = (sy * AIM_LEAD).min(length * 0.5);
     while at < length && dash > 0.0 {
-        dashes.push([
-            from + direction * at,
-            from + direction * (at + dash).min(length),
-        ]);
+        let end = if at + step >= length {
+            length
+        } else {
+            at + dash
+        };
+        dashes.push([from + direction * at, from + direction * end]);
         at += step;
     }
     dashes
