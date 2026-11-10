@@ -671,24 +671,36 @@ mod tests {
     /// table authors is accepted.
     #[test]
     fn v2_unknown_affix_rejected() {
+        let core: Vec<&str> = enemy_catalog().elite_affix_ids().collect();
+        assert_affix_ids_checked_against(&core);
+        // W2 review: the affix table is append-only content, so a sixth
+        // affix must not break this presentation test.
+        let mut appended = core.clone();
+        appended.push("sixth");
+        assert_affix_ids_checked_against(&appended);
+    }
+
+    /// The affix check of `v2_unknown_affix_rejected` against `table`.
+    fn assert_affix_ids_checked_against(table: &[&str]) {
         let tell = bundled()["elite_tells"]["default"].clone();
         let entry = |id: &str| serde_json::json!({ "affix": id, "tell": tell.clone() });
-        let core: Vec<&str> = enemy_catalog().elite_affix_ids().collect();
-        assert_eq!(
-            core,
-            ["hardened", "frenzied", "vicious", "shielded", "volatile"]
-        );
+        let load = |value: serde_json::Value| {
+            EnemyVisualCatalog::from_json_against(&value.to_string(), table)
+        };
+        // Core pins its own table (enemy_catalog.rs); this check needs only
+        // the shipped `volatile` it pairs with each unknown id.
+        assert!(table.contains(&"volatile"), "{table:?}");
         let mut every = bundled();
-        every["elite_tells"]["affixes"] = core.iter().map(|id| entry(id)).collect();
-        let catalog = compile(every).unwrap();
-        for id in &core {
+        every["elite_tells"]["affixes"] = table.iter().map(|id| entry(id)).collect();
+        let catalog = load(every).unwrap();
+        for id in table {
             assert!(catalog.elite_affixes.iter().any(|known| known.affix == *id));
         }
         for unknown in ["cursed", "Hardened", "volatile "] {
             let mut value = bundled();
             value["elite_tells"]["affixes"] =
                 serde_json::json!([entry("volatile"), entry(unknown)]);
-            let err = compile(value).unwrap_err();
+            let err = load(value).unwrap_err();
             assert!(
                 err.contains("unknown elite affix") && err.contains(unknown),
                 "{unknown}: {err}"
