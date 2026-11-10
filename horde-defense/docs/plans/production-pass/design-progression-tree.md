@@ -134,6 +134,11 @@ Descriptions are updated, including all 10 trap-rank texts ("+1 charge").
 
 \* A counter's gate is the largest of 5/10/15/20 at or below the first rank at which any listed archetype has spawn weight in enemy-balance's tiers. It may move to V5, and the test enforces this.
 
+*As built (W2-41; W2 review):* `skills.json` differs from the table above in two ways, and `skills.json` is authoritative (waves.md W2-41 notes).
+- The counters name the catalogue id `sprinter`, not "sprinter-swarm" (shotgun_pump_drill and mg_belt_feeder).
+- The footnote's rule was applied to every node with counters, not only the two starred ones, against the W2-31/W2-32 tiers (sprinter and spitter from rank 6, exploder and shield-bearer from rank 8, splitter and juggernaut from rank 10). It moved shield_breaker and blast_discipline from V10 to V5, smg_spray_control from V15 to V10, and mg_belt_feeder from V20 to V5. `counter_nodes_open_no_later_than_their_archetypes` rejects the table's gates. The shipped gates are therefore: shotgun_pump_drill, marksman_steady_aim, shield_breaker, blast_discipline and mg_belt_feeder V5; smg_spray_control V10; pistol_double_tap V15; rifle_breath_control V20.
+- Effects, prerequisites, positions and prices are the table's. The prices are still provisional, for W4-p to fit. blast_discipline shipped because the burst and reach paths had landed (W2-27, W2-29), so the `big_game_rounds` fallback below was not built.
+
 The weak classes (shotgun x1.20 and marksman x1.39 at R0) get their perks first.
 
 **Fallback (A's graft):** if enemy-balance's burst/reach paths have not landed by the time step W2-H starts, replace blast_discipline with `big_game_rounds`:
