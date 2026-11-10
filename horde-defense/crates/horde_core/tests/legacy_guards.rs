@@ -305,14 +305,18 @@ fn v6_active_attempt_spawns_no_elites_for_3600_ticks() {
 #[test]
 fn v6_legacy_boss_has_no_phases() {
     let mut g = decode(FIXTURE_V6);
-    let expedition = g
-        .battles()
-        .iter()
-        .find(|b| b.id == V6_LIVE_EXPEDITION)
-        .unwrap();
+    // The boss under test spawns on the root attempt, so its snapshot is
+    // the precondition (the expedition's is pinned by
+    // `legacy_attempt_snapshots_have_zero_elite_rate_and_no_boss_phases`).
+    let root = g.attempt().unwrap();
     assert_eq!(
-        expedition.game().attempt().unwrap().progression.boss_phases,
-        0
+        (
+            root.mode,
+            root.progression.rank,
+            root.progression.boss_phases
+        ),
+        (Mode::Personal, 14, 0),
+        "the v6 root snapshot froze no boss transitions"
     );
     let mut phased = g.clone();
     phased.attempt_mut().unwrap().progression.boss_phases = 2;
