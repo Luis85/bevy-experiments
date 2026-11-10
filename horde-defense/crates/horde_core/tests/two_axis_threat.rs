@@ -306,6 +306,29 @@ fn npc_boss_attack_adds_include_boss_damage_term() {
 }
 
 #[test]
+fn stage_boss_rank_reads_the_front_position_purely() {
+    // Schema v7 §6 pure read (W4-02 reads it): the rank a stage's boss
+    // would carry, from the one derivation; None outside the catalogue or
+    // past the country's last stage. No mutation, no RNG.
+    let g = Game::default();
+    let before = serde_json::to_value(&g).unwrap();
+    let usa = world().country("USA").unwrap();
+    for stage in 0..usa.level_count() {
+        assert_eq!(
+            g.stage_boss_rank("USA", stage),
+            Some(usa.front_position(stage).boss_rank()),
+            "stage {stage}"
+        );
+    }
+    assert_eq!(g.stage_boss_rank("USA", 5), Some(BossRank::Regional));
+    assert_eq!(g.stage_boss_rank("USA", 23), Some(BossRank::Capstone));
+    assert_eq!(g.stage_boss_rank("USA", 0), Some(BossRank::Sector));
+    assert_eq!(g.stage_boss_rank("USA", usa.level_count()), None);
+    assert_eq!(g.stage_boss_rank("ZZZ", 0), None);
+    assert_eq!(serde_json::to_value(&g).unwrap(), before);
+}
+
+#[test]
 fn boss_rank_derivation_usa_24() {
     let usa = world().country("USA").unwrap();
     assert_eq!(usa.level_count(), 24);

@@ -1504,6 +1504,16 @@ impl Game {
             .country(id)
             .map(|c| c.effective_difficulty(&self.campaign.world))
     }
+    /// The rank the boss of 0-based `stage` of country `id` carries
+    /// (schema v7 §6): `Country::front_position(stage).boss_rank()`, the
+    /// derivation deploy stamps. `None` outside the catalogue or past the
+    /// country's last stage. Pure: no mutation, no RNG.
+    pub fn stage_boss_rank(&self, id: &str, stage: usize) -> Option<crate::progression::BossRank> {
+        crate::world::world()
+            .country(id)
+            .filter(|c| stage < c.level_count())
+            .map(|c| c.front_position(stage).boss_rank())
+    }
     /// The single public sale-eligibility read (LE-1): what selling `id` pays
     /// now, or the first guard that blocks it. Pure: no mutation, no RNG.
     pub fn sale_eligibility(&self, id: u64) -> Result<SaleQuote, SaleBlock> {
