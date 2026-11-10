@@ -139,9 +139,12 @@ an aura):
    (`KindMap` keys, kill tallies, sprite choice). See ARCHITECTURE.md on why these
    enums stay exhaustive.
 
-`EnemyKind` still selects behaviour in two places on purpose: the timed boss
-spawns through the Brute default profile, and the Caller boss summons the Runner
-default. Both resolve their numbers from the catalogue's `defaults`.
+`EnemyKind` still selects behaviour in three places on purpose: the timed boss
+spawns through the Brute default profile, the Caller boss summons the Runner
+default, and a splitter's child whose `archetype_id` is missing from the current
+catalogue (or could not be a child) falls back to the Runner default
+(`split_child_profile`, W2-29). All resolve their numbers from the catalogue's
+`defaults`.
 
 ## Waves and boss unlocks
 
