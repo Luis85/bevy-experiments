@@ -638,6 +638,26 @@ fn runs_to_liberate_ratio_rejects_hard_above_1_5x_normal() {
         .hard_within_ratio(GOAL6_LUX_HARD_OVER_NORMAL)
         .expect_err("two seeds never liberate");
     assert!(err.contains("Hard median run >20"), "{err}");
+    // A censored Hard median is no run count: 21 against Normal 14 sits at
+    // exactly 1.5x, but a Hard sweep whose median seed never liberates
+    // cannot show it is within the ratio.
+    let late = liberations("lux-normal", &[Some(14), Some(14), Some(15)]);
+    let lux = runs_to_liberate(&easy, &late, &stuck).expect("three LUX sweeps");
+    assert_eq!((lux.normal.median, lux.hard.median), (14, 21));
+    let err = lux
+        .hard_within_ratio(GOAL6_LUX_HARD_OVER_NORMAL)
+        .expect_err("the Hard median seed never liberates");
+    assert!(
+        err.contains("Hard median run >20: the median Hard seed never liberates in 20 runs"),
+        "{err}"
+    );
+    // A censored Normal median with a measured Hard one is still a pass:
+    // Hard 10 is below any Normal run past 20.
+    let never = liberations("lux-normal", &[None, None, Some(3)]);
+    let measured = liberations("lux-hard", &[Some(10), Some(10), Some(11)]);
+    let lux = runs_to_liberate(&easy, &never, &measured).expect("three LUX sweeps");
+    let ok = lux.hard_within_ratio(GOAL6_LUX_HARD_OVER_NORMAL);
+    assert!(ok.is_ok(), "{ok:?}");
     // Easy above 6 runs fails its own check, not the ratio.
     let slow = liberations("lux-easy", &[Some(7), Some(7), Some(8)]);
     let lux = runs_to_liberate(&slow, &normal, &hard).expect("three LUX sweeps");

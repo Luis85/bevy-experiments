@@ -377,10 +377,23 @@ impl RunsToLiberate {
         }
         verdict(problems, self.summary())
     }
-    /// The Hard median is at most `num / den` times the Normal median.
+    /// The Hard median is at most `num / den` times the Normal median. A
+    /// censored Hard median (its median seed never liberates, counted as
+    /// `max_runs + 1`) is no run count and fails: it only bounds the true
+    /// median from below. A censored Normal median against a measured Hard
+    /// one passes, since Hard is then below any Normal run.
     pub fn hard_within_ratio(&self, (num, den): (usize, usize)) -> Result<String, String> {
         let mut problems = Vec::new();
-        if self.hard.median * den > self.normal.median * num {
+        // The lower median sits at index (seeds - 1) / 2 of the sorted runs,
+        // and every miss sorts after every hit.
+        if self.hard.reached <= self.hard.seeds.saturating_sub(1) / 2 {
+            problems.push(format!(
+                "Hard median run {}: the median Hard seed never liberates in {} runs, so the {}x Normal ratio is unmeasured",
+                run_cell(self.hard.median, self.max_runs),
+                self.max_runs,
+                num as f32 / den as f32
+            ));
+        } else if self.hard.median * den > self.normal.median * num {
             let ratio = num as f32 / den as f32;
             problems.push(format!(
                 "Hard median run {} is above {ratio}x Normal median run {} ({})",
