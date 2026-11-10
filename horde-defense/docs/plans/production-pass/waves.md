@@ -711,6 +711,7 @@ Wave-2 exit:
   - `roster_shows_core_power_and_status_labels`
   - `home_primary_after_liberation_is_choose_next_country`
 - Rewrites: `navigation_tests` (reason recorded).
+- Also owns (W2 review, 2026-11-10): the recruit service-record display in the roster drill-down, with the "since records began" label that design-campaign-defenders §1.10 asks for on a record whose runs predate v7. W2-21's `ServiceRecord` has no such flag, and no other row names a service-record display. The signal is a pure core read on `ServiceRecord`, never a saved field (save_v7.json is frozen); the writer picks the derivation (one candidate: the recruit's `npc_attempts` exceeding its counted `deployments`). If no derivable signal holds, the writer records that in plan §2.5 instead of saving one.
 
 **W3-03 · ux-flow · `Screen::Upgrades` split and 3-action Results**
 - Fail-first:
@@ -838,6 +839,7 @@ Wave-2 exit:
   - `threshold_chips_show_text_and_shape_markers`
   - `blocked_sale_shows_typed_reason_and_shortcut`
   - `delete_preset_shortcut_dispatches_command`
+- Also owns (W2 review, 2026-11-10): the armory item row (`ui/armory.rs:141`) prints "unlock tier N" for every definition, loot-only ones included, and no UI shows `content::LOOT_ONLY_REASON`. A loot-only definition shows a loot-only label read from core (that constant, or the typed reason the armory command already returns) in place of the unlock tier. W3-26 rewrites the `{:?}` slot in the same line; whichever lands second keeps both changes.
 
 **W3-22 · progression-tree · Goal-5 UI**
 - Content: Results level and milestone lines, TRAINABLE lists, IQ text removed, perk and counter previews.
@@ -853,6 +855,10 @@ Wave-2 exit:
   - `briefing_shows_effective_difficulty_and_capstone_badge`
   - `results_lists_elite_kills_and_boss_ttk`
   - `preferences_shows_custom_basis_label`
+- Also owns (W2 review, 2026-11-10), three enemy readouts no row named. Each is presentation over a pure core read; none moves a digest.
+  - The briefing forecast (`deployment_progression` / `next_victory_progression`) is rank-only and does not show W2-26's in-country front ramp on later stages. The briefing shows the stage's ramp. W4-02 owns only the regional-checkpoint lines.
+  - The HUD danger detail ("N attacks winding up", `ui/hud/view.rs:216`) counts only `contact() && Windup`, so a stationed spitter's windup (W2-28, `EnemyView.aim_target`) is left out. The count and its wording include ranged windups.
+  - The inspector's "protection N" (`inspector.rs:75`, through `Attempt::enemy_protection`) shows base armor only. A shield-bearer's ranged armor (W2-30/W2-31), which player shots meet, is shown too.
 
 **W3-24 · ux-flow · Onboarding callouts and country dossier**
 - Files: `seed_seen_callouts`, `CampaignFeature::id`; New game sets Some(empty); `restore_defaults` keeps `seen_callouts`.
@@ -927,6 +933,9 @@ Wave-3 exit:
 | W4-10 | enemy-balance | Docs: ENEMY_COMPOSITION.md, PROGRESSION_SCALING.md, the goal-6 section of BALANCE_AND_RUN_STATS.md, the WORLD.md band paragraph | qa `required_docs_sections_exist` | W4-09 |
 | W4-11 | progression-tree | Docs: the goal-5 section of BALANCE_AND_RUN_STATS.md (tier definition, TreeExhausted, OperationsOpen) and the AGENTS.md pacing_targets section | check_views | W4-09 |
 
+Also owns (W2 review, 2026-11-10; a wave-2 follow-up no row named):
+- **W4-l:** optional single-home cleanup. `validate_attempt_loot` (`sim/persistence.rs:455`) calls `content().max_drop_tier()` rather than `crate::loot::max_drop_tier()` (`loot.rs:23`). The two are equivalent today, so the change moves no digest. It is not a defect, and the row may drop it.
+
 Wave-4 exit: every ignored `pacing_targets` assertion passes in release (goal 3, goal 4 auto-sell, goal 5, goal 6), with before/after tables in the plan.
 
 ---
@@ -947,6 +956,9 @@ Wave-4 exit: every ignored `pacing_targets` assertion passes in release (goal 3,
 | W5-10 | qa-captures | Storm scene, weapon snapshot assertion, flash counters in manifest v2; reduced zero asserts | `storm_fixture_is_a_storm_tagged_stage`, `manifest_v2_records_flash_counters` | W5-09 |
 | W5-11 | perf-architecture | Re-gate after graphics: fx caps in PERF_BUDGET (decals 64, lights 24, explosion frames 8, flames 21/9); fx-stress gates | `perf_budget_json_matches_presentation_caps`, `perf_scenes_agree...`; stress and fx-stress exit 0 with -VsyncOff | W5-09 |
 | W5-12 | save-determinism | Zero-move verification record (0/6, 0/4, 0/6) | existing pins | W5-11 |
+
+Also owns (W2 review, 2026-11-10; a wave-2 follow-up no row named):
+- **W5-11:** hardening the wave-1 test `egui_pass_excludes_unrelated_post_update_systems` (`crates/horde_game/src/diagnostics/tests.rs:283`, `review` feature). It sleeps on the wall clock and asserts the relative bound `egui_pass_ms + 8.0 <= main_cpu_ms`. It failed once under load in the wave-2 review and passed on rerun; the failure output was not captured. Until W5-11 lands, a failure is rerun once and its output is kept in the commit body or the review notes; a second failure on a quiet machine is a finding for that wave's review, not a flake. The hardened test still proves what it proves today (the 8 ms PostUpdate sleeper lies outside the egui_pass span in either registration order) without a bound that machine load can break.
 
 The human review for weapon-classes and night/storm is logged as pending if it is not done.
 
