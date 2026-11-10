@@ -3620,6 +3620,33 @@ fn country_choice_preview_names_stage_count_and_mara_timing() {
 }
 
 #[test]
+fn country_choice_preview_has_no_mara_line_once_her_liberation_is_met() {
+    // One liberation already meets the "Meet Mara" node's minimum_liberated,
+    // so no further liberation (of a new country, a liberated one, or one an
+    // outbreak reopened after every stage was cleared) is what brings her,
+    // even while her node is still unbought.
+    let mut g = Game::default();
+    g.apply(&Command::ChooseSurvivor(
+        horde_core::survivors::SurvivorId::Rook,
+    ))
+    .unwrap();
+    let countries = &world().countries;
+    let liberated = countries[0].id.clone();
+    let reopened = countries[1].id.clone();
+    let world_state = &mut g.campaign_mut().world;
+    world_state.cleared.push(liberated.clone());
+    world_state
+        .clear_high_water
+        .insert(reopened.clone(), countries[1].level_count());
+    assert_eq!(g.campaign().liberated_count(), 2);
+    assert!(!g.campaign().npc_available());
+    for country in countries {
+        let preview = g.country_choice_preview(&country.id).unwrap();
+        assert!(!preview.companion_after_liberation, "{}", country.id);
+    }
+}
+
+#[test]
 fn legacy_campaign_meets_mara_after_its_first_defense_not_a_liberation() {
     // A legacy campaign (legacy_features) gets the Companion feature after
     // its first defense with no node (Campaign::has_feature), so liberating
