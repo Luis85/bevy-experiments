@@ -361,6 +361,50 @@ fn failed_parallel_loot_insert_is_reported_once_instead_of_silently_lost() {
     advance(&mut g, 3);
     assert!(g.take_settlement_issues().is_empty());
 }
+/// W2 review: the expedition summary's `loot_count` counts the drops the
+/// settlement pass stored in the shared stash, once each, and never a drop
+/// it reported as `LootLost`.
+#[test]
+fn parallel_summary_loot_count_counts_stored_drops_not_lost_ones() {
+    use horde_core::sim::SettlementIssue;
+    let mut g = strategic_game();
+    let country = g.campaign().world.cleared[0].clone();
+    let recruit = g
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    let battle = g.deploy_survivor(recruit, &country, 0).unwrap();
+    // One identity left in the shared stash: the first drop is stored and
+    // the second is lost.
+    g.campaign_mut().next_item_id = u64::MAX - 1;
+    let items = g.campaign().items.len();
+    for level in [8, 9] {
+        g.battles_mut()[0]
+            .game_mut()
+            .campaign_mut()
+            .add_item_with_quality(4, level, None)
+            .unwrap();
+    }
+    g.tick(Input::default());
+    assert_eq!(g.campaign().items.len(), items + 1, "one drop is stored");
+    let issues = g.take_settlement_issues();
+    assert!(
+        matches!(
+            issues.as_slice(),
+            [SettlementIssue::LootLost { level: 9, .. }]
+        ),
+        "{issues:?}"
+    );
+    let loot_count = |g: &Game| {
+        g.battles()
+            .iter()
+            .find(|b| b.id == battle)
+            .and_then(|b| b.summary.as_ref())
+            .map(|s| s.loot_count)
+    };
+    assert_eq!(loot_count(&g), Some(1), "the stored drop, not the lost one");
+    advance(&mut g, 3);
+    assert_eq!(loot_count(&g), Some(1), "counted once");
+}
 #[test]
 fn country_modifiers_and_replayed_clears_preserve_local_progress() {
     let mut g = legacy_game();
