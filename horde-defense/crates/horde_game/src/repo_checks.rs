@@ -941,34 +941,39 @@ fn staging_outside_entitlements(name: &str, text: &str) -> Vec<String> {
     let mut violations = Vec::new();
     // (fn name, brace depth outside its body)
     let mut functions: Vec<(String, usize)> = Vec::new();
-    let mut pending: Option<String> = None;
+    // (fn name, `(`/`[` nesting at its `fn`) until its body opens.
+    let mut pending: Option<(String, usize)> = None;
     let mut depth = 0usize;
+    let mut nesting = 0usize;
     let mut line = 1;
     let mut i = 0;
     while i < chars.len() {
         match chars[i] {
             '\n' => line += 1,
             '{' => {
-                if let Some(function) = pending.take() {
+                if let Some((function, _)) = pending.take() {
                     functions.push((function, depth));
                 }
                 depth += 1;
             }
+            '(' | '[' => nesting += 1,
+            ')' | ']' => nesting = nesting.saturating_sub(1),
             '}' => {
                 depth = depth.saturating_sub(1);
                 if functions.last().is_some_and(|(_, outer)| *outer == depth) {
                     functions.pop();
                 }
             }
-            // A body-less declaration (a trait method).
-            ';' => pending = None,
+            // A body-less declaration (a trait method). A `;` inside the
+            // signature's brackets (`[u8; 4]`) does not end it.
+            ';' if pending.as_ref().is_some_and(|(_, at)| *at == nesting) => pending = None,
             _ if starts_word(i) && word_at(i) == "fn" => {
                 let mut j = i + 2;
                 while chars.get(j).is_some_and(|c| c.is_whitespace()) {
                     j += 1;
                 }
                 if j > i + 2 {
-                    pending = Some(word_at(j));
+                    pending = Some((word_at(j), nesting));
                 }
             }
             _ => {}
@@ -1047,6 +1052,8 @@ fn prepare_x(f: &mut F) {
 fn entitle_start(f: &mut F) { f.game.deploy_country_stage(0, Mode::Personal); }
 fn prepare_y(f: &mut F) -> impl Fn() { f.game.staging_count(); }
 f.game.staging();
+fn entitle_bytes(f: &mut F, b: [u8; 4]) { f.game.staging(); }
+fn prepare_z(f: &mut F, b: [u8; 4]) { f.game.staging(); }
 ";
     let rule = "stage feature state through Game::apply(&Command), or entitle it in an \
                 `entitle_*` helper";
@@ -1062,6 +1069,8 @@ f.game.staging();
         (17, "sell_item", "in fn prepare_x"),
         (18, "place", "in fn prepare_x"),
         (24, "staging", "outside any fn"),
+        // A `;` inside a signature (`[u8; 4]`) does not end the fn.
+        (26, "staging", "in fn prepare_z"),
     ]
     .into_iter()
     .map(|(line, seam, place)| format!("x.rs:{line}: `{seam}` {place}; {rule}"))
