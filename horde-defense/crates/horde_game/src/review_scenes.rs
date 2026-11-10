@@ -184,8 +184,10 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     wave1_still("fx-stress", "perf-architecture", "max-lanes", true),
     wave1_still("battle-mid", "ux-flow", "battle", false),
     wave1_still("operations-observer", "ux-flow", "operations", false),
-    // Wave-2 close stills (W2-55): W2-37's phase hold.
+    // Wave-2 close stills (W2-55): W2-37's phase hold and W2-41's Firearms
+    // column at x = -1780.
     wave2_still("boss-phase", "vfx-lighting", "boss", true),
+    wave2_still("skills-firearms", "progression-tree", "skills", false),
 ];
 
 /// Workshop scenes named `<prefix><model id>`.
@@ -366,7 +368,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 1
+            46 + 13 + 2
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

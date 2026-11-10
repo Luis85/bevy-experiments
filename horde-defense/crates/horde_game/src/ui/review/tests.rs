@@ -265,6 +265,7 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("operations-observer", Screen::Camp, Some(Tab::Operations)),
     // Wave-2 close stills (W2-55).
     ("boss-phase", Screen::Battle, None),
+    ("skills-firearms", Screen::Results, Some(Tab::Skills)),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1264,6 +1265,89 @@ fn boss_phase_fixture_pauses_a_boss_inside_its_phase_hold() {
         assert_eq!(
             phase.hold_left_ticks,
             90 - u64::from(fixtures::production::BOSS_PHASE_HOLD_PLAYED)
+        );
+    }
+}
+
+/// Every painted text run containing `label` (newlines read as spaces), with
+/// its painted bounds.
+fn text_bounds(output: &egui::FullOutput, label: &str) -> Vec<egui::Rect> {
+    fn walk(shape: &egui::epaint::Shape, label: &str, found: &mut Vec<egui::Rect>) {
+        match shape {
+            egui::epaint::Shape::Text(text)
+                if text.galley.text().replace('\n', " ").contains(label) =>
+            {
+                found.push(text.galley.rect.translate(text.pos.to_vec2()));
+            }
+            egui::epaint::Shape::Vec(shapes) => {
+                shapes.iter().for_each(|shape| walk(shape, label, found));
+            }
+            _ => {}
+        }
+    }
+    let mut found = Vec::new();
+    for clipped in &output.shapes {
+        walk(&clipped.shape, label, &mut found);
+    }
+    found
+}
+
+/// W2-41's close capture item: no still opened Journey upgrades on the
+/// Firearms column at x = -1780. skills-firearms focuses Pistol double tap
+/// (-1780, 0): the tree selects it and paints its title inside the canvas at
+/// 1440x900@1.0 and at the compact 1050x700@1.35.
+#[test]
+fn skills_firearms_fixture_opens_on_pistol_double_tap_at_both_sizes() {
+    assert_eq!(
+        review_scenes::lookup("skills-firearms"),
+        Some(review_scenes::SceneKind::Still),
+        "skills-firearms is a registered still"
+    );
+    let node = horde_core::skill_catalog::skills()
+        .node("pistol_double_tap")
+        .expect("pistol_double_tap");
+    assert_eq!(node.branch, "Firearms");
+    assert_eq!(node.position, [-1780.0, 0.0]);
+    for (size, scale) in [
+        (egui::vec2(1440.0, 900.0), 1.0),
+        (egui::vec2(1050.0, 700.0) / 1.35, 1.35),
+    ] {
+        let mut f = staged("skills-firearms");
+        assert!(f.screen == Screen::Results, "staged {:?}", f.screen);
+        assert_eq!(f.nav.tab, Tab::Skills);
+        f.settings.scale = scale;
+        let ctx = egui::Context::default();
+        crate::settings::install_font(&ctx);
+        crate::settings::configure(&ctx, scale);
+        let mut warmup = ctx.run_ui(egui::RawInput::default(), |_| {});
+        warmup.textures_delta.clear();
+        let mut output = None;
+        for _ in 0..2 {
+            f.runtime.begin_frame(ctx.cumulative_frame_nr() as u32);
+            let mut frame = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(egui::Pos2::ZERO, size)),
+                    ..egui::RawInput::default()
+                },
+                |ui| crate::ui::draw_screen(ui.ctx(), &mut f.ctx(), 0.0),
+            );
+            frame.textures_delta.clear();
+            output = Some(frame);
+        }
+        let output = output.expect("two frames");
+        assert_eq!(
+            crate::ui::progression::selected_node_for_test(&ctx).as_deref(),
+            Some("pistol_double_tap"),
+            "scale {scale}: the focus selects Pistol double tap"
+        );
+        let layout = crate::ui::progression::layout_for_test(&ctx).expect("a tree layout");
+        assert_eq!(layout.compact, scale > 1.0, "scale {scale}");
+        let titles = text_bounds(&output, &node.name);
+        assert!(
+            titles.iter().any(|rect| layout.canvas.contains_rect(*rect)),
+            "scale {scale}: {:?} painted inside the canvas {:?}: {titles:?}",
+            node.name,
+            layout.canvas
         );
     }
 }

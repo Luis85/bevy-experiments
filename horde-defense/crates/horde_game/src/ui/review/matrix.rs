@@ -248,7 +248,7 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
                 .find(|i| !i.protected)
                 .map(|i| i.id);
         }
-        "skills" | "skills-survival" | "skills-ordnance" => {
+        "skills" | "skills-survival" | "skills-ordnance" | "skills-firearms" => {
             f.screen = Screen::Results;
             f.nav.tab = Tab::Skills;
             f.campaign.improvement_focus =
@@ -256,6 +256,8 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
                     match screen.as_str() {
                         "skills-survival" => "field_fitness",
                         "skills-ordnance" => "grenade_training",
+                        // W2-55: the Firearms column at x = -1780.
+                        "skills-firearms" => "pistol_double_tap",
                         _ => "pistol_training",
                     }
                     .into(),
