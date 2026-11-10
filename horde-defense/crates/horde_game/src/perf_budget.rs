@@ -465,10 +465,6 @@ mod tests {
             .collect()
     }
 
-    /// The script's `-Scene` set, the budget's gated scenes and the review
-    /// registry's perf fixtures that run live (motion, no input save) are one
-    /// set, so a scene can never be measured without a budget or gated
-    /// without a staged fixture.
     /// W2-47 (R18): the battlefield egui gates are live in every perf run,
     /// not only headless. `measure_performance.ps1` compares each scene's
     /// worst repeat of the frame report's battlefield maxima with
@@ -498,6 +494,10 @@ mod tests {
         }
     }
 
+    /// The script's `-Scene` set, the budget's gated scenes and the review
+    /// registry's perf fixtures that run live (motion, no input save) are one
+    /// set, so a scene can never be measured without a budget or gated
+    /// without a staged fixture.
     #[test]
     fn perf_scenes_agree_across_script_budget_and_review_matrix() {
         use crate::review_scenes::{LIST_HEADER, REVIEW_SCENES, SceneKind, list_lines};
