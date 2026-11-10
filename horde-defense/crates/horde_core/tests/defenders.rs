@@ -1645,6 +1645,28 @@ fn allowance_never_below_legacy_and_monotonic() {
     assert_eq!(c.allowance(), before);
 }
 
+#[test]
+fn allowance_stops_growing_at_the_max_level_whatever_the_first_clears() {
+    // Content is append-only: a catalogue of 10 or more levels gives a
+    // campaign 10 or more first clears, and the clears term alone must not
+    // carry the cap past MAX_ADVANCEMENT_LEVEL.
+    let max = u32::from(MAX_ADVANCEMENT_LEVEL);
+    for clears in [9, 10, 12, 40] {
+        let mut c = Campaign {
+            legacy_features: true,
+            ..Campaign::default()
+        };
+        c.first_clears = (0..clears).map(|i| format!("appended_level_{i}")).collect();
+        let level = (1 + clears).min(max);
+        assert_eq!(
+            u32::from(c.advancement_cap_level()),
+            level,
+            "{clears} first clears"
+        );
+        assert_eq!(c.allowance(), 12 + 8 * (level - 1), "{clears} first clears");
+    }
+}
+
 /// The pre-W2-10 definition: a scan of every catalogue country.
 fn full_scan_liberated(c: &Campaign) -> u32 {
     world()

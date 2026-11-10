@@ -397,16 +397,17 @@ impl Campaign {
         self.has_feature(crate::skill_catalog::CampaignFeature::Companion)
     }
     /// The highest advancement level the campaign allows its survivor
-    /// defenders (CD5): `max(1 + first_clears, min(10, 1 + ceil(3L/2)))` with
-    /// `L` the high-water liberation count. Never below the legacy level
-    /// `1 + first_clears`, and equal to it with nothing liberated.
+    /// defenders (CD5): `min(10, max(1 + first_clears, 1 + ceil(3L/2)))`
+    /// with `L` the high-water liberation count. Never below the legacy level
+    /// `1 + first_clears` up to the max level 10 (a catalogue of 10 or more
+    /// levels stops there too), and equal to it with nothing liberated.
     pub fn advancement_cap_level(&self) -> u8 {
         self.cap_level().min(u32::from(u8::MAX)) as u8
     }
     fn cap_level(&self) -> u32 {
         let max = u32::from(crate::defenders::MAX_ADVANCEMENT_LEVEL);
         let by_liberation = (1 + (3 * self.liberated_count()).div_ceil(2)).min(max);
-        let by_clears = 1 + self.first_clears.len() as u32;
+        let by_clears = (1 + self.first_clears.len() as u32).min(max);
         by_clears.max(by_liberation)
     }
     /// Advancement points the campaign allows each survivor defender:
