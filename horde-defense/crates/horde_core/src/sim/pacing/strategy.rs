@@ -19,7 +19,9 @@
 //! The evaluators are pure, shaped like the goal-5 and goal-6 ones: `Ok`
 //! carries the summary the acceptance prints, `Err` the reasons followed by
 //! it. Run counts are 1-based runs completed; a missed value counts as the
-//! profile's `max_runs + 1`, and quantiles round down (the lower median).
+//! profile's `max_runs + 1` (a missed liberation's minutes count as
+//! `missed`, over the same seeds), and quantiles round down (the lower
+//! median).
 use super::targets::{run_cell, verdict};
 use super::{
     CampSpend, Milestone, PacingDefender, PacingFarm, PacingProfile, PacingReport, PacingSell,
@@ -901,6 +903,27 @@ fn liberation_minutes(report: &StrategyReport, n: u32) -> Option<f32> {
         .map(|r| r.minutes_total)
 }
 
+/// Liberation `n`'s minutes as `median [p90]` cells over every report: a
+/// seed that missed it counts as missed (above every reached value), as the
+/// run cells count it as `max_runs + 1`, so both cells describe the same
+/// seeds. A quantile that falls on a miss reads `missed`.
+fn liberation_minutes_cells(reports: &[StrategyReport], n: u32) -> Option<(String, String)> {
+    let cell = |m: f32| {
+        if m.is_finite() {
+            format!("{m:.0}")
+        } else {
+            "missed".to_owned()
+        }
+    };
+    median_p90(
+        reports
+            .iter()
+            .map(|r| liberation_minutes(r, n).unwrap_or(f32::INFINITY))
+            .collect(),
+    )
+    .map(|(m, p)| (cell(m), cell(p)))
+}
+
 /// G3.10: the runs and minutes to liberations 2, 4 and 10 and the coins per
 /// minute are reported. Fails when a liberation's median run is missing
 /// (most seeds never reached it), since it cannot be reported.
@@ -917,13 +940,8 @@ pub fn liberations_and_coins_per_minute(reports: &[StrategyReport]) -> Result<St
         let (median, p90, reached) =
             run_stats(reports, |r| r.pacing.milestone(m).map(|(run, _)| run))
                 .expect("reports are not empty");
-        let minutes = median_p90(
-            reports
-                .iter()
-                .filter_map(|r| liberation_minutes(r, n))
-                .collect(),
-        )
-        .map_or_else(|| "n/a".to_owned(), |(m, p)| format!("{m:.0} [p90 {p:.0}]"));
+        let minutes = liberation_minutes_cells(reports, n)
+            .map_or_else(|| "n/a".to_owned(), |(m, p)| format!("{m} [p90 {p}]"));
         parts.push(format!(
             "liberation {n}: runs {} [p90 {}] {reached}/{seeds}, minutes {minutes}",
             run_cell(median, max),
@@ -1057,12 +1075,8 @@ pub fn strategy_table(reports: &[StrategyReport]) -> String {
             runs_cell(g, &|r| r.pacing.milestone(m).map(|(run, _)| run))
         });
         line(&format!("Liberation {n} (minutes)"), &|g| {
-            float_cell(
-                g.iter()
-                    .filter_map(|r| liberation_minutes(r, n).map(f64::from))
-                    .collect(),
-                0,
-            )
+            liberation_minutes_cells(g, n)
+                .map_or_else(|| "n/a".to_owned(), |(m, p)| format!("{m} [{p}]"))
         });
     }
     line("Coins per minute", &|g| {

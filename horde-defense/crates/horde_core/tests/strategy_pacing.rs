@@ -378,6 +378,49 @@ fn liberation_and_coin_rate_report_needs_most_seeds_to_reach_each_liberation() {
 }
 
 #[test]
+fn liberation_minutes_count_a_missed_seed_like_the_runs_do() {
+    // One seed in four reaches liberation 10 (run 12, 18 minutes); three
+    // stop at 9. The runs median counts the misses as max_runs + 1, so the
+    // minutes median over the same four seeds is missed too, not the one
+    // seed's 18 minutes.
+    let lib: Vec<u32> = (1..=12).map(|r: u32| r.saturating_sub(2)).collect();
+    let short: Vec<u32> = (1..=12).map(|r: u32| r.saturating_sub(2).min(9)).collect();
+    let mixed: Vec<StrategyReport> = (0..4)
+        .map(|s| synthetic("strategy", s, if s < 1 { &lib } else { &short }, &[], 90))
+        .collect();
+    let err = liberations_and_coins_per_minute(&mixed).expect_err("liberation 10 is missing");
+    assert!(
+        err.contains("1/4, minutes missed [p90 missed]"),
+        "liberation 10 minutes over every seed: {err}"
+    );
+    // Liberation 2, reached by every seed at run 4 (6 minutes), is unchanged.
+    assert!(
+        err.contains("liberation 2: runs 4 [p90 4] 4/4, minutes 6 [p90 6]"),
+        "{err}"
+    );
+    let table = strategy_table(&mixed);
+    let row = table
+        .lines()
+        .find(|l| l.starts_with("| Liberation 10 (minutes)"))
+        .expect("minutes row");
+    assert_eq!(
+        row, "| Liberation 10 (minutes) | missed [missed] |",
+        "{table}"
+    );
+    // Two seeds in four reach it: the lower median is theirs, the p90 is
+    // missed.
+    let two: Vec<StrategyReport> = (0..4)
+        .map(|s| synthetic("strategy", s, if s < 2 { &lib } else { &short }, &[], 90))
+        .collect();
+    let row = strategy_table(&two)
+        .lines()
+        .find(|l| l.starts_with("| Liberation 10 (minutes)"))
+        .map(str::to_owned)
+        .expect("minutes row");
+    assert_eq!(row, "| Liberation 10 (minutes) | 18 [missed] |");
+}
+
+#[test]
 fn parallel_must_free_neighbours_within_two_thirds_of_solo_runs() {
     // Germany liberated at run 3; the solo route frees the third neighbour
     // 9 runs later.
