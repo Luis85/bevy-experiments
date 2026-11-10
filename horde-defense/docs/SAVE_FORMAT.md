@@ -237,8 +237,16 @@ tick into `boss_ttk_ticks`, and the encounter's boss rank into `boss_rank`
 ### Enemy schema
 
 Every key below is optional and absent at its neutral value; v6 saves load
-with the neutral values and need no migration step. Nothing writes a
-non-neutral value yet (enemy-balance, wave 2).
+with the neutral values and need no migration step. Since wave 2 the game
+writes non-neutral values: the catalogue's archetypes carry `reach`,
+`ranged_armor`, `npc_ranged_armor`, `stagger_immune`, `group_size`,
+`death_effect` and `tags` into the spawn snapshot (W2-31); the director
+writes `split_child` (W2-29), `elite` (W2-33) and `boss_state` (W2-36); and
+the deploy snapshot writes `front_ramp`, `boss_rank` and
+`boss_damage_multiplier` (W2-26), `boss_armor_multiplier` and
+`npc_boss_armor_add` (W2-32), `elite_rate_bp` (W2-33) and `boss_phases`
+(W2-36). Only `boss_health_multiplier` and `boss_reward_multiplier` stay
+1.0 until their wave-4 writer (W4-01).
 
 - A spawn snapshot `attempt.enemies[*].resolved` may carry `reach` (yards,
   0–12, absent at 0), `ranged_armor` (0–1000), `npc_ranged_armor` (0–100),
