@@ -14,7 +14,9 @@ use horde_core::sim::{
     simulate_pacing, simulate_pacing_seed, simulate_strategy_seed, simulate_strategy_traced,
     strategy_table,
 };
-use horde_core::strategy::StrategyState;
+use horde_core::sim::{Game, Input};
+use horde_core::strategy::{OutbreakOutcome, StrategyState};
+use horde_core::world::{Country, world};
 use std::collections::BTreeSet;
 
 fn row(id: &str) -> PacingProfile {
@@ -124,6 +126,143 @@ fn strategy_bot_acts_only_through_commands() {
         replay_strategy(&profile, 0, &without).state_digest(),
         trace.digest
     );
+}
+
+/// W2 review: the S1 row's grand-strategy paths act only through
+/// `Game::apply` too. Seed index 3 of the strategy row reaches them all
+/// inside 25 runs: country operations once grand strategy unlocks, an
+/// urgent outbreak answered by the main run (`SelectCountry` and
+/// `BeginDefense` with no `ContinueJourney`) and by guards, the guards
+/// released once it is contained, the interrupted country resumed, and
+/// the other countries picked by the fewest-stages route. The bot's steps
+/// alone, replayed through `Game::apply` and the clock, rebuild the game
+/// it ended with; the state read before each command says which path took
+/// it.
+#[test]
+fn s1_strategy_bot_acts_only_through_commands() {
+    let profile = PacingProfile {
+        max_runs: 25,
+        ..row(STRATEGY_PROFILE_ID)
+    };
+    let route = profile.plan.strategy.expect("S1 plan").route;
+    assert_eq!(route, PacingRoute::FewestStages);
+    let trace = simulate_strategy_traced(&profile, 3).expect("the S1 row runs");
+    assert!(
+        trace.report.strategy_unlock.is_some(),
+        "grand strategy unlocks"
+    );
+    let mut g = pacing_start(&profile, 3);
+    let mut seen = BTreeSet::new();
+    // A ContinueJourney earlier in this camp, and the country the main run
+    // left to answer an outbreak.
+    let (mut journey, mut left) = (false, None::<String>);
+    for step in &trace.steps {
+        let command = match step {
+            StrategyStep::Idle(ticks) => {
+                journey = false;
+                for _ in 0..*ticks {
+                    g.tick(Input::default());
+                }
+                continue;
+            }
+            StrategyStep::Tick(input) => {
+                g.tick(input.clone());
+                continue;
+            }
+            StrategyStep::Command(command) => command,
+        };
+        match command {
+            Command::AssignGuard { .. } => {
+                seen.insert("AssignGuard");
+            }
+            Command::ReleaseGuard(_) => {
+                seen.insert("ReleaseGuard");
+            }
+            Command::CountryOperation { .. } => {
+                assert!(g.strategy().grand_strategy_unlocked(g.campaign()));
+                seen.insert("CountryOperation");
+            }
+            Command::ContinueJourney => journey = true,
+            Command::SelectCountry(country) if !journey => {
+                assert!(
+                    g.strategy()
+                        .outbreaks
+                        .iter()
+                        .any(|o| o.country_id == *country && o.outcome == OutbreakOutcome::Active),
+                    "an urgent answer selects an active outbreak: {country}"
+                );
+                let w = &g.campaign().world;
+                if left.is_none() {
+                    left = w
+                        .active
+                        .clone()
+                        .filter(|a| !w.cleared.contains(a) && a != country);
+                }
+                seen.insert("urgent SelectCountry");
+            }
+            Command::SelectCountry(country) => {
+                if left.take().as_ref() == Some(country) {
+                    seen.insert("resume");
+                } else {
+                    assert_eq!(*country, fewest_stages_front(&g), "the S1 route");
+                    seen.insert("FewestStages");
+                }
+            }
+            Command::BeginDefense { .. } if !journey => {
+                seen.insert("urgent BeginDefense");
+            }
+            _ => {}
+        }
+        let _ = g.apply(command);
+    }
+    assert_eq!(
+        g.state_digest(),
+        trace.digest,
+        "the commands and the clock alone rebuild the game"
+    );
+    assert_eq!(
+        seen,
+        BTreeSet::from([
+            "AssignGuard",
+            "CountryOperation",
+            "FewestStages",
+            "ReleaseGuard",
+            "resume",
+            "urgent BeginDefense",
+            "urgent SelectCountry",
+        ])
+    );
+}
+
+/// The S1 main run's next country after a liberation: the enterable, not
+/// liberated front with the fewest stages, then the lowest difficulty and
+/// id, preferring one no expedition holds.
+fn fewest_stages_front(g: &Game) -> String {
+    let w = &g.campaign().world;
+    let live: BTreeSet<&str> = g
+        .battles()
+        .iter()
+        .filter(|b| !b.settled)
+        .map(|b| b.country_id.as_str())
+        .collect();
+    let fronts: Vec<_> = world()
+        .countries
+        .iter()
+        .filter(|c| w.can_enter(&c.id) && !w.cleared.contains(&c.id))
+        .collect();
+    let order = |a: &&&Country, b: &&&Country| {
+        a.level_count()
+            .cmp(&b.level_count())
+            .then(a.difficulty.total_cmp(&b.difficulty))
+            .then(a.id.cmp(&b.id))
+    };
+    fronts
+        .iter()
+        .filter(|c| !live.contains(c.id.as_str()))
+        .min_by(order)
+        .or_else(|| fronts.iter().min_by(order))
+        .map(|c| c.id.clone())
+        .expect("a front is left")
 }
 
 #[test]
