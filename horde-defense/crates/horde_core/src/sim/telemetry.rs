@@ -139,3 +139,58 @@ fn archetype_entry<'m, V: Default>(
     }
     Some(map.entry(archetype.to_owned()).or_default())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The writer half of the schema v7 §3.12 key bound (the loader half is
+    /// `telemetry_schema.rs`): a full map takes no new key in any of the
+    /// three per-archetype maps, but its existing keys still count.
+    #[test]
+    fn archetype_maps_refuse_a_new_key_at_the_limit() {
+        let mut t = CombatTelemetry::default();
+        for n in 0..MAX_TELEMETRY_ARCHETYPES {
+            let id = format!("a{n:03}");
+            t.count_archetype_spawn(&id);
+            t.count_archetype_kill(&id);
+            t.count_archetype_damage_taken(&id, 5);
+        }
+        for map in [
+            t.spawned_by_archetype.len(),
+            t.kills_by_archetype.len(),
+            t.damage_taken_by_archetype.len(),
+        ] {
+            assert_eq!(map, MAX_TELEMETRY_ARCHETYPES);
+        }
+
+        t.count_archetype_spawn("overflow");
+        t.count_archetype_damage_taken("overflow", 7);
+        assert!(
+            !t.spawned_by_archetype.contains_key("overflow"),
+            "a full spawn map takes no new key"
+        );
+        assert!(
+            !t.damage_taken_by_archetype.contains_key("overflow"),
+            "a full damage map takes no new key"
+        );
+        // A kill is counted only below its archetype's spawns, so the kill
+        // map is checked on a key the spawn map holds: `a000` (one spawn)
+        // leaves the full kill map, whose slot another key takes.
+        t.kills_by_archetype.remove("a000");
+        t.kills_by_archetype.insert("spare".into(), 0);
+        t.count_archetype_kill("a000");
+        assert!(
+            !t.kills_by_archetype.contains_key("a000"),
+            "a full kill map takes no new key"
+        );
+
+        // Existing keys keep counting.
+        t.count_archetype_spawn("a002");
+        t.count_archetype_kill("a002");
+        t.count_archetype_damage_taken("a002", 7);
+        assert_eq!(t.spawned_by_archetype["a002"], 2);
+        assert_eq!(t.kills_by_archetype["a002"], 2);
+        assert_eq!(t.damage_taken_by_archetype["a002"], 12);
+    }
+}
