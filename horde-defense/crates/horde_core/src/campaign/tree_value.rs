@@ -8,7 +8,10 @@
 //! ancestors (which include its lower ladder ranks) also owns the node,
 //! measured against the director's own wave pool
 //! (`wave_pool(progression().snapshot(rank).wave_tier)`, no boss unlocks)
-//! weighted by spawn weight at the Normal balance. Capability nodes (an
+//! weighted by spawn weight times group size, since each pick spawns
+//! `group_size` members. No balance preset is read: enemy health and damage
+//! are the progression snapshot's alone, which matches Normal (its enemy
+//! health and damage multipliers are 1). Capability nodes (an
 //! `Unlock`, `FeatureUnlock`, `Blueprint` or `WeaponTraining` effect) carry
 //! no value.
 //!
@@ -417,7 +420,8 @@ struct Target {
     reach: bool,
 }
 
-/// The progression snapshot and weighted wave pool at one rank.
+/// The progression snapshot and wave pool at one rank, each archetype
+/// weighted by spawn weight times group size.
 struct Context {
     snapshot: ProgressionSnapshot,
     pool: Vec<Target>,
@@ -433,7 +437,9 @@ impl Context {
                 let e = catalog.resolve(&entry.archetype_id).ok()?;
                 let hit = (e.damage as f32 * snapshot.enemy_damage).round() as i32;
                 Some(Target {
-                    weight: f64::from(entry.weight),
+                    // Each weighted pick spawns `group_size` members
+                    // (`Director::spawn_group`).
+                    weight: f64::from(entry.weight) * f64::from(e.group_size.max(1)),
                     hp: (e.health as f32 * snapshot.enemy_health).round().max(1.0) as i32,
                     armor: e.armor,
                     ranged_armor: e.ranged_armor,
@@ -591,5 +597,39 @@ impl Context {
             value += term.max(METRIC_FLOOR).ln();
         }
         value
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pool_weights_count_every_member_of_a_group_pick() {
+        // The director spawns `group_size` members per weighted pick, so a
+        // sprinter pick (group 4) puts four bodies on the field.
+        let catalog = enemy_catalog();
+        let tier = |rank: u32| crate::progression::catalog().snapshot(rank).wave_tier;
+        let rank = (0..=40)
+            .find(|&r| {
+                catalog.wave_pool(tier(r), &[]).iter().any(|e| {
+                    catalog
+                        .resolve(&e.archetype_id)
+                        .is_ok_and(|e| e.group_size > 1)
+                })
+            })
+            .expect("a grouped archetype spawns at some rank");
+        let context = Context::at(rank);
+        let pool = catalog.wave_pool(context.snapshot.wave_tier, &[]);
+        assert_eq!(pool.len(), context.pool.len());
+        for (entry, target) in pool.iter().zip(&context.pool) {
+            let group = catalog.resolve(&entry.archetype_id).unwrap().group_size;
+            assert_eq!(
+                target.weight,
+                f64::from(entry.weight) * f64::from(group),
+                "rank {rank}: {}",
+                entry.archetype_id
+            );
+        }
     }
 }
