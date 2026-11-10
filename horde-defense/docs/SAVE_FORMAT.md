@@ -247,8 +247,9 @@ writes `split_child` (W2-29), `elite` (W2-33) and `boss_state` (W2-36); and
 the deploy snapshot writes `front_ramp`, `boss_rank` and
 `boss_damage_multiplier` (W2-26), `boss_armor_multiplier` and
 `npc_boss_armor_add` (W2-32), `elite_rate_bp` (W2-33) and `boss_phases`
-(W2-36). Only `boss_health_multiplier` and `boss_reward_multiplier` stay
-1.0 until their wave-4 writer (W4-01).
+(W2-26 for Hard's preset `boss_phase_bonus` past rank 4; W2-36 adds the
+rank and Capstone terms for every preset). Only `boss_health_multiplier`
+and `boss_reward_multiplier` stay 1.0 until their wave-4 writer (W4-01).
 
 - A spawn snapshot `attempt.enemies[*].resolved` may carry `reach` (yards,
   0–12, absent at 0), `ranged_armor` (0–1000), `npc_ranged_armor` (0–100),
