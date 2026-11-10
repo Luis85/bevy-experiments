@@ -15,7 +15,9 @@
 #   -TimeoutSeconds N            per run, default 900
 # Build: A is extracted with `git archive --format=zip ab03da9 horde-defense` into <target>/ab-w1/src (reused while
 # <target>/ab-w1/src/.ab-commit names the same commit) and built there with the same CARGO_TARGET_DIR; its exe is copied
-# out before B (the workspace) is built, because both builds write <target>/debug/horde-defense.exe. A copied exe has no
+# out before B (the workspace) is built, because both builds write <target>/debug/horde-defense.exe. Cargo keeps one
+# fingerprint for both arms' packages, so each arm's build first cleans horde-defense and horde_core (Invoke-AbArmBuild;
+# without it B's build was fresh and B was A's exe, W2-47), and an A and B with the same sha256 exit 3. A copied exe has no
 # assets folder beside it, so each arm reads the assets of the tree it was built from (main.rs asset_directory).
 # Each arm is measure_performance.ps1 -Scene progressed-peak -Profile dev -NoBuild -NoBudget -NoWaitQuiet with
 # CARGO_TARGET_DIR at that arm's exe folder, so every run keeps that script's validity (report, window size, display R27,
@@ -123,6 +125,7 @@ try {
     $status = Get-GitLine @('status', '--porcelain', '--', 'horde-defense') (Join-Path $tools 'git-status')
     $dirtyB = [bool]$status
     $sourceA = $null
+    $armCargo = { param($Arguments, $LogStem, $WorkingDirectory) Invoke-Cargo -Arguments $Arguments -LogStem $LogStem -WorkingDirectory $WorkingDirectory | Out-Null }
     if ($ExecutableA) { $builtA = Resolve-WorkspacePath $ExecutableA -Workspace $workspace }
     else {
         if (-not $commitA) { throw "git cannot resolve $($rule.Commit)" }
@@ -142,7 +145,7 @@ try {
             Write-Utf8NoBom -Path $marker -Text $commitA
         }
         $sourceA = Join-Path $sourceRoot 'horde-defense'
-        Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $tools 'cargo-a') -WorkingDirectory $sourceA | Out-Null
+        Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-a') -WorkingDirectory $sourceA
         $builtA = Get-HordeExecutable -Profile dev -Workspace $workspace
     }
     $exeA = Join-Path $destination 'exe-a\debug\horde-defense.exe'
@@ -150,12 +153,13 @@ try {
     Copy-Item -LiteralPath $builtA -Destination $exeA
     if ($ExecutableB) { $builtB = Resolve-WorkspacePath $ExecutableB -Workspace $workspace }
     else {
-        if (-not $NoBuild) { Invoke-Cargo -Arguments @('build', '--locked', '-p', 'horde-defense') -LogStem (Join-Path $tools 'cargo-b') | Out-Null }
+        if (-not $NoBuild) { Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-b') -WorkingDirectory $workspace }
         $builtB = Get-HordeExecutable -Profile dev -Workspace $workspace
     }
     $exeB = Join-Path $destination 'exe-b\debug\horde-defense.exe'
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $exeB) | Out-Null
     Copy-Item -LiteralPath $builtB -Destination $exeB
+    Assert-AbArmsDiffer (Get-FileSha256 -Path $exeA) (Get-FileSha256 -Path $exeB)
     $arms['A'] = [ordered]@{ label = "wave-1 close ($($rule.Commit))"; commit = $commitA; source = $sourceA; built_from = $builtA; executable = 'exe-a/debug/horde-defense.exe'; executable_sha256 = (Get-FileSha256 -Path $exeA) }
     $arms['B'] = [ordered]@{ label = 'HEAD'; commit = $commitB; dirty = $dirtyB; built_from = $builtB; executable = 'exe-b/debug/horde-defense.exe'; executable_sha256 = (Get-FileSha256 -Path $exeB) }
 

@@ -12,6 +12,23 @@ function Get-AbRule {
     return [pscustomobject]@{ Commit = 'ab03da9'; Pairs = 5; Tolerance = 1.05; Scene = 'progressed-peak'; Profile = 'dev' }
 }
 
+function Invoke-AbArmBuild([scriptblock]$Cargo, [string]$LogStem, [string]$WorkingDirectory) {
+    # Builds one arm into the shared CARGO_TARGET_DIR. Both arms are the same workspace packages (horde-defense,
+    # horde_core) in the same dev profile, and cargo keeps one fingerprint and one uplifted dev executable for
+    # them, so the second arm's build read the first arm's sources as fresh and left the first arm's executable in place
+    # (W2-47: both arms of the first re-gate ran ab03da9). Cleaning the two packages first makes every arm a real build.
+    # $Cargo takes (Arguments, LogStem, WorkingDirectory); the A/B script passes its cargo runner.
+    $Cargo.Invoke(@(@('clean', '-p', 'horde-defense', '-p', 'horde_core'), "$LogStem-clean", $WorkingDirectory)) | Out-Null
+    $Cargo.Invoke(@(@('build', '--locked', '-p', 'horde-defense'), $LogStem, $WorkingDirectory)) | Out-Null
+}
+
+function Assert-AbArmsDiffer([string]$ShaA, [string]$ShaB) {
+    # An A/B of one executable against itself is no evidence: throw before any pair runs.
+    if ($ShaA.ToLowerInvariant() -eq $ShaB.ToLowerInvariant()) {
+        throw "A and B are the same executable (sha256 $($ShaA.ToLowerInvariant())); an arm's build did not replace the other's"
+    }
+}
+
 function Get-AbMedian([double[]]$Values) {
     if ($null -eq $Values -or $Values.Count -eq 0) { return $null }
     $sorted = [double[]]$Values.Clone()

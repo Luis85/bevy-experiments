@@ -1267,14 +1267,34 @@ try {
         }
     }
 
+    # W2-47: the two arms are distinct files (the same fake game, compiled twice), because the script refuses an A and a
+    # B with the same sha256.
+    . (Join-Path $scriptsDirectory 'lib\AbInterfaceTotal.ps1')
+    $helperB = Join-Path $temporary 'native-helper-b.exe'
+    Add-Type -TypeDefinition ($helperSource + "`n// the A/B's B arm`n") -OutputType ConsoleApplication -OutputAssembly $helperB
+
+    Test-Case 'Invoke-AbArmBuild cleans the workspace packages before it builds an arm (W2-47)' {
+        $calls = New-Object System.Collections.Generic.List[string]
+        $cargo = { param($Arguments, $LogStem, $WorkingDirectory) $calls.Add("$($Arguments -join ' ')|$(Split-Path -Leaf $LogStem)|$WorkingDirectory") }
+        Invoke-AbArmBuild -Cargo $cargo -LogStem (Join-Path $temporary 'logs\cargo-a') -WorkingDirectory 'C:\src-a'
+        Assert-Equal 'clean -p horde-defense -p horde_core|cargo-a-clean|C:\src-a,build --locked -p horde-defense|cargo-a|C:\src-a' ($calls -join ',') 'clean, then build, in the arm''s tree'
+    }
+
+    Test-Case 'Assert-AbArmsDiffer refuses an A and a B with the same executable (W2-47)' {
+        Assert-AbArmsDiffer 'aa11' 'bb22'
+        $message = $null
+        try { Assert-AbArmsDiffer 'AA11' 'aa11' } catch { $message = $_.Exception.Message }
+        Assert-Equal 'A and B are the same executable (sha256 aa11); an arm''s build did not replace the other''s' $message 'the guard'
+    }
+
     # R31: ab_interface_total.ps1 end to end on the shimmed machine, both arms copies of the fake game. The fake reports
     # the interface_total mean HORDE_FAKE_INTERFACE_TOTAL gives its arm folder (exe-a or exe-b).
     $abScript = Join-Path $scriptsDirectory 'ab_interface_total.ps1'
-    function Invoke-AbGate([string]$Name, [string]$Totals, [string[]]$Shim = @(), [string[]]$Extra = @()) {
+    function Invoke-AbGate([string]$Name, [string]$Totals, [string[]]$Shim = @(), [string[]]$Extra = @(), [string]$ExeB = $helperB) {
         $out = Join-Path $temporary $Name
         $env:HORDE_FAKE_INTERFACE_TOTAL = $Totals
         try {
-            $m = Invoke-Shimmed $abScript $Name (@('-NoBuild', '-ExecutableA', $helper, '-ExecutableB', $helper, '-Pairs', '2', '-OutputDirectory', $out) + $Extra) $Shim
+            $m = Invoke-Shimmed $abScript $Name (@('-NoBuild', '-ExecutableA', $helper, '-ExecutableB', $ExeB, '-Pairs', '2', '-OutputDirectory', $out) + $Extra) $Shim
         }
         finally { [Environment]::SetEnvironmentVariable('HORDE_FAKE_INTERFACE_TOTAL', $null, 'Process') }
         $record = $null
@@ -1319,6 +1339,13 @@ try {
         Assert-Equal 'normal invalid  |small pass 2 2' (Format-AbRecord $m.Record) 'checks'
         Assert-True (@($m.Record.checks)[0].note -like 'pair 1: B invalid (CPU load 95% during the run*') "note: $(@($m.Record.checks)[0].note)"
         Assert-Equal 'invalid evidence' $m.Record.verdict 'verdict'
+    }
+
+    Test-Case 'ab_interface_total exits 3 before any pair when A and B are the same executable (W2-47)' {
+        $m = Invoke-AbGate 'ab-same' 'exe-a=2.0;exe-b=2.0' @() @() $helper
+        Assert-Equal 3 $m.Result.ExitCode "exit code; $($m.Log)"
+        Assert-Equal 0 @($m.Record.order).Count 'no pair ran'
+        Assert-True ($m.Record.failure -like 'A and B are the same executable (sha256 *') "failure: $($m.Record.failure)"
     }
 
     Test-Case 'ab_interface_total exits 3 on bad arguments and 2 when the quiet window times out (R31)' {
