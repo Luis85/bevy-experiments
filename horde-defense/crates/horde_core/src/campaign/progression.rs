@@ -823,7 +823,10 @@ impl Campaign {
     /// native v7 save owes no backlog (as migration step (c); level 1 writes
     /// nothing). `Game::settle_progression_rewards` (W2-22) pays the ledger
     /// at settlement; this shim keeps it current mid-battle and in workers
-    /// while no grant is authored, which the GOLDEN mid-run states pin.
+    /// while no grant is authored. The shipped grant is non-zero from level 2
+    /// on (W2-54), so GOLDEN no longer exercises it; only
+    /// `neutral_level_ups_keep_the_grant_ledger_paid` (a neutral rewards
+    /// block) covers it.
     fn pay_neutral_level_grants(&mut self) {
         let player = &mut self.player;
         let mut owed = player.level_grant_paid.max(1).saturating_add(1)..=player.level;
