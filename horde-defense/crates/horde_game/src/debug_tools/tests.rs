@@ -449,10 +449,14 @@ fn v6_recording_initial_state_goes_through_from_payload() {
 
 /// Replaces `v6_fresh_recording_reproduces_before_strict_sale` (W1-20): a
 /// ruleset 1 recording that sells an equipped item is not expected to
-/// reproduce under ruleset 2 (strict `SellItem`). Replay still loads the v6
-/// initial state, applies every command and reaches the end line; the
-/// recorded sale is now a typed rejection, so the digest differs, and the
-/// warnings name both the older ruleset and the older save version.
+/// reproduce under ruleset 2. Replay still loads the v6 initial state,
+/// applies every command and reaches the end line, and the warnings name
+/// both the older ruleset and the older save version. Since W2-39 the digest
+/// differs before the sale is reached: the replayed defender falls early, the
+/// recorded buy is refused for want of coins, and the recorded sale names an
+/// item never bought (`SaleBlocked(Unknown)`). The strict equipped-sale rule
+/// (`SaleBlocked(EquippedPersonal)`) is checked separately on that state,
+/// with the coins the buy needs.
 #[test]
 fn pre_strict_recording_diverges_with_ruleset_warning() {
     horde_core::catalog::init_catalogs().unwrap();
@@ -510,7 +514,7 @@ fn pre_strict_recording_diverges_with_ruleset_warning() {
     assert_ne!(
         hex(report.digest),
         recorded,
-        "ruleset 2 refuses the equipped sale"
+        "the replay diverges: the recorded buy is refused for coins and the sale is SaleBlocked(Unknown)"
     );
     assert!(!report.matches_recording());
     // Ruleset 2 refuses a sale as a typed SaleBlocked rejection that changes
