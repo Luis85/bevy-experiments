@@ -12,14 +12,23 @@ function Get-AbRule {
     return [pscustomobject]@{ Commit = 'ab03da9'; Pairs = 5; Tolerance = 1.05; Scene = 'progressed-peak'; Profile = 'dev' }
 }
 
-function Invoke-AbArmBuild([scriptblock]$Cargo, [string]$LogStem, [string]$WorkingDirectory) {
+function Invoke-AbArmBuild([scriptblock]$Cargo, [string]$LogStem, [string]$WorkingDirectory, [string]$Target) {
     # Builds one arm into the shared CARGO_TARGET_DIR. Both arms are the same workspace packages (horde-defense,
     # horde_core) in the same dev profile, and cargo keeps one fingerprint and one uplifted dev executable for
     # them, so the second arm's build read the first arm's sources as fresh and left the first arm's executable in place
     # (W2-47: both arms of the first re-gate ran ab03da9). Cleaning the two packages first makes every arm a real build.
     # $Cargo takes (Arguments, LogStem, WorkingDirectory); the A/B script passes its cargo runner.
-    $Cargo.Invoke(@(@('clean', '-p', 'horde-defense', '-p', 'horde_core'), "$LogStem-clean", $WorkingDirectory)) | Out-Null
-    $Cargo.Invoke(@(@('build', '--locked', '-p', 'horde-defense'), $LogStem, $WorkingDirectory)) | Out-Null
+    # -Target is the rooted shared target (Resolve-HordeTarget), set as CARGO_TARGET_DIR for both cargo calls and then
+    # restored: A's tree is not the workspace, so an unset CARGO_TARGET_DIR built A into that tree's own target and a
+    # relative one resolved against that tree, while the script reads A from the shared target (W2 review).
+    if (-not $Target -or -not [IO.Path]::IsPathRooted($Target)) { throw "Invoke-AbArmBuild needs a rooted -Target, not '$Target'" }
+    $saved = [Environment]::GetEnvironmentVariable('CARGO_TARGET_DIR', 'Process')
+    [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $Target, 'Process')
+    try {
+        $Cargo.Invoke(@(@('clean', '-p', 'horde-defense', '-p', 'horde_core'), "$LogStem-clean", $WorkingDirectory)) | Out-Null
+        $Cargo.Invoke(@(@('build', '--locked', '-p', 'horde-defense'), $LogStem, $WorkingDirectory)) | Out-Null
+    }
+    finally { [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $saved, 'Process') }
 }
 
 function Restore-AbWorkspaceBuild([scriptblock]$Cargo, [bool]$ABuilt, [bool]$BBuilt, [string]$LogStem, [string]$Workspace) {

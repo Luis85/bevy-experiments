@@ -17,7 +17,8 @@
 #   -QuietTimeoutMinutes N       1..1440, default 240; a quiet window that times out exits 2
 #   -TimeoutSeconds N            per run, default 900
 # Build: A is extracted with `git archive --format=zip ab03da9 horde-defense` into <target>/ab-w1/src (reused while
-# <target>/ab-w1/src/.ab-commit names the same commit) and built there with the same CARGO_TARGET_DIR; its exe is copied
+# <target>/ab-w1/src/.ab-commit names the same commit) and built there with CARGO_TARGET_DIR set to the rooted <target>
+# for both arms' builds (an unset or relative one would resolve against A's tree, W2 review); its exe is copied
 # out before B (the workspace) is built, because both builds write <target>/debug/horde-defense.exe. Cargo keeps one
 # fingerprint for both arms' packages, so each arm's build first cleans horde-defense and horde_core (Invoke-AbArmBuild;
 # without it B's build was fresh and B was A's exe, W2-47), and an A and B with the same sha256 exit 3. A copied exe has no
@@ -154,7 +155,7 @@ try {
         }
         $sourceA = Join-Path $sourceRoot 'horde-defense'
         $aBuildStarted = $true
-        Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-a') -WorkingDirectory $sourceA
+        Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-a') -WorkingDirectory $sourceA -Target $target
         $builtA = Get-HordeExecutable -Profile dev -Workspace $workspace
     }
     $exeA = Join-Path $destination 'exe-a\debug\horde-defense.exe'
@@ -163,7 +164,7 @@ try {
     if ($ExecutableB) { $builtB = Resolve-WorkspacePath $ExecutableB -Workspace $workspace }
     else {
         if (-not $NoBuild) {
-            Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-b') -WorkingDirectory $workspace
+            Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-b') -WorkingDirectory $workspace -Target $target
             $bBuilt = $true
         }
         $builtB = Get-HordeExecutable -Profile dev -Workspace $workspace

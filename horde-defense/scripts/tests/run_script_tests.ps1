@@ -1338,8 +1338,30 @@ try {
     Test-Case 'Invoke-AbArmBuild cleans the workspace packages before it builds an arm (W2-47)' {
         $calls = New-Object System.Collections.Generic.List[string]
         $cargo = { param($Arguments, $LogStem, $WorkingDirectory) $calls.Add("$($Arguments -join ' ')|$(Split-Path -Leaf $LogStem)|$WorkingDirectory") }
-        Invoke-AbArmBuild -Cargo $cargo -LogStem (Join-Path $temporary 'logs\cargo-a') -WorkingDirectory 'C:\src-a'
+        Invoke-AbArmBuild -Cargo $cargo -LogStem (Join-Path $temporary 'logs\cargo-a') -WorkingDirectory 'C:\src-a' -Target 'C:\tgt'
         Assert-Equal 'clean -p horde-defense -p horde_core|cargo-a-clean|C:\src-a,build --locked -p horde-defense|cargo-a|C:\src-a' ($calls -join ',') 'clean, then build, in the arm''s tree'
+    }
+
+    Test-Case 'Invoke-AbArmBuild builds both arms into the resolved target when CARGO_TARGET_DIR is unset or relative (W2 review)' {
+        # A is built in <target>\ab-w1\src\horde-defense: with CARGO_TARGET_DIR unset cargo wrote it to that tree's own
+        # target, and with a relative one it resolved it against that tree, while the script read A from the workspace's.
+        $calls = New-Object System.Collections.Generic.List[string]
+        $cargo = { param($Arguments, $LogStem, $WorkingDirectory) $calls.Add("$($Arguments[0])|$([Environment]::GetEnvironmentVariable('CARGO_TARGET_DIR', 'Process'))") }
+        try {
+            foreach ($configured in @($null, 'rel\tgt')) {
+                [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $configured, 'Process')
+                $calls.Clear()
+                $resolved = Resolve-HordeTarget -Workspace $workspace
+                Invoke-AbArmBuild -Cargo $cargo -LogStem (Join-Path $temporary 'logs\cargo-a') -WorkingDirectory 'C:\src-a' -Target $resolved
+                Invoke-AbArmBuild -Cargo $cargo -LogStem (Join-Path $temporary 'logs\cargo-b') -WorkingDirectory $workspace -Target $resolved
+                Assert-Equal "clean|$resolved,build|$resolved,clean|$resolved,build|$resolved" ($calls -join ',') "CARGO_TARGET_DIR '$configured': every arm build sees the resolved target"
+                Assert-Equal $configured ([Environment]::GetEnvironmentVariable('CARGO_TARGET_DIR', 'Process')) "CARGO_TARGET_DIR '$configured' is restored"
+            }
+            $message = $null
+            try { Invoke-AbArmBuild -Cargo $cargo -LogStem (Join-Path $temporary 'logs\cargo-a') -WorkingDirectory 'C:\src-a' -Target 'rel\tgt' } catch { $message = $_.Exception.Message }
+            Assert-Equal 'Invoke-AbArmBuild needs a rooted -Target, not ''rel\tgt''' $message 'a relative target is refused'
+        }
+        finally { [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $savedTarget, 'Process') }
     }
 
     Test-Case 'Restore-AbWorkspaceBuild cleans the workspace packages when A was built and B was not (W2-47 review)' {
