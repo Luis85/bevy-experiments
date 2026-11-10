@@ -570,18 +570,29 @@ impl Game {
         }
         // Ruling E1: the op-chain sync copies both ledgers as this pass's
         // settlement left them, so a continuing worker never lags a claim or
-        // a grant the pass just settled.
+        // a grant the pass just settled. The worker keeps the level and rank
+        // it was synced and armed at; a later battle of the same pass may
+        // have raised the parent's past them, so the copy stops at the
+        // worker's own level and rank (a ledger above them is refused by
+        // save validation). Its next stage victory re-syncs it in full.
         for battle in self
             .battles
             .iter_mut()
             .filter(|b| redeployed.contains(&b.id))
         {
-            battle.game.campaign.player.level_grant_paid = self.campaign.player.level_grant_paid;
-            battle
-                .game
+            let worker = &mut battle.game.campaign;
+            worker.player.level_grant_paid = self
+                .campaign
+                .player
+                .level_grant_paid
+                .min(worker.player.level);
+            let rank = worker.progression_rank();
+            worker.milestones_claimed = self
                 .campaign
                 .milestones_claimed
-                .clone_from(&self.campaign.milestones_claimed);
+                .range(..=rank)
+                .copied()
+                .collect();
         }
     }
     /// Settles progression at the end of a pass that credited battle

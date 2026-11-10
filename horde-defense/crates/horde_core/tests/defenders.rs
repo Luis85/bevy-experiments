@@ -723,13 +723,18 @@ fn battle(g: &Game, id: u64) -> &ParallelBattle {
     g.battles().iter().find(|b| b.id == id).unwrap()
 }
 
-/// Ends the battle's current stage in victory on the next tick.
-fn win_stage(g: &mut Game, id: u64) {
+/// Sets the battle's current stage up to end in victory on the next tick.
+fn arm_stage_win(g: &mut Game, id: u64) {
     let b = g.battles_mut().iter_mut().find(|b| b.id == id).unwrap();
     enemy(b.game_mut(), 5, 20.0, true);
     let a = b.game_mut().attempt_mut().unwrap();
     a.boss_spawned = true;
     a.enemies[0].injury.unconscious = true;
+}
+
+/// Ends the battle's current stage in victory on the next tick.
+fn win_stage(g: &mut Game, id: u64) {
+    arm_stage_win(g, id);
     advance(g, 1);
 }
 
@@ -852,6 +857,78 @@ fn country_operation_sync_copies_the_ledgers_the_settlement_wrote() {
         worker.player.level_grant_paid,
         parent.player.level_grant_paid
     );
+}
+
+/// Two country operations whose stage victories settle in the same idle
+/// pass: operation A is credited and re-armed first, then B's credit levels
+/// the player and reaches rank 5, which the end-of-pass settlement pays. The
+/// ledger copy onto the continuing A never exceeds the level and rank A was
+/// synced at, so every save of the pass still validates.
+#[test]
+fn country_operation_ledger_copy_stays_within_the_workers_synced_rank() {
+    let (mut g, home, first) = game_with_alex();
+    let second = recruit(&mut g, &home);
+    let countries: Vec<String> = world()
+        .countries
+        .iter()
+        .filter(|c| {
+            g.campaign().world.can_enter(&c.id)
+                && !g.campaign().world.cleared.contains(&c.id)
+                && c.level_count() > 1
+        })
+        .take(2)
+        .map(|c| c.id.clone())
+        .collect();
+    assert_eq!(countries.len(), 2);
+    let a = g.deploy_country_operation(first, &countries[0]).unwrap();
+    let b = g.deploy_country_operation(second, &countries[1]).unwrap();
+    let position = |g: &Game, id: u64| g.battles().iter().position(|x| x.id == id).unwrap();
+    assert!(position(&g, a) < position(&g, b), "A settles before B");
+    let c = g.campaign_mut();
+    c.threat_revision = 1;
+    c.victories = 3;
+    c.milestones_claimed.clear();
+    // One victory leaves the player one XP short of the next level; the
+    // second levels it.
+    c.player.xp = 0;
+    while c.player.next_level_xp() <= c.completion_xp_preview() + 1 {
+        c.player.level += 1;
+        if c.legacy_features {
+            c.player.points += 1;
+        }
+    }
+    c.player.level_grant_paid = c.player.level;
+    let victory_xp = c.completion_xp_preview();
+    assert!(victory_xp > 0 && victory_xp < c.player.next_level_xp());
+    c.player.xp = c.player.next_level_xp() - victory_xp - 1;
+    let level = c.player.level;
+    arm_stage_win(&mut g, a);
+    arm_stage_win(&mut g, b);
+    advance(&mut g, 1);
+    assert!(g.take_settlement_issues().is_empty());
+    let parent = g.campaign();
+    assert_eq!(parent.player.level, level + 1, "B's credit levelled up");
+    assert_eq!(parent.progression_rank(), 5);
+    assert_eq!(parent.player.level_grant_paid, level + 1);
+    assert!(parent.milestones_claimed.contains(&5), "the pass claimed 5");
+    g.to_save_json()
+        .unwrap_or_else(|e| panic!("save after the pass: {e}"));
+    for id in [a, b] {
+        let op = battle(&g, id);
+        assert!(!op.settled && op.stage == 1, "operation {id} continues");
+        let worker = op.game().campaign();
+        assert!(
+            worker.player.level_grant_paid <= worker.player.level,
+            "operation {id} grant ledger"
+        );
+        assert!(
+            worker
+                .milestones_claimed
+                .last()
+                .is_none_or(|rank| *rank <= worker.progression_rank()),
+            "operation {id} claims"
+        );
+    }
 }
 
 #[test]
