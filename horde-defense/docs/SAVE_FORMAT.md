@@ -118,8 +118,10 @@ uses them is unchanged. Loading rejects any of these as invalid:
   attempt's `loot` or than 4096, or name id 0 or an id at or above
   `next_item_id`, or that are present on an attempt without `drop_tier` or
   on an expedition's attempt (only a root attempt with a drop tier records
-  drops); an `attempt.drop_tier` outside 1 to the highest droppable item tier
-  (absent means an attempt deployed before v7);
+  drops); an `attempt.loot_quality_counts` summing above the attempt's
+  `loot` (root or expedition attempt; the bound the report inherits); an
+  `attempt.drop_tier` outside 1 to the highest droppable item tier (absent
+  means an attempt deployed before v7);
 - `last_result.drop_ids` with a repeated id or the bounds above (any order);
   `last_result.loot_by_quality` summing above `loot`;
 - a `last_result.auto_sold` receipt whose `count` plus `kept_on_overflow`
