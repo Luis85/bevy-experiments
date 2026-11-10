@@ -526,8 +526,10 @@ impl ProgressionCatalog {
     }
     /// `1 + early × min(rank, knee) + late × (rank - knee)` past the knee:
     /// the enemy health and damage growth (design enemy-balance §2). Up to
-    /// the knee, or with no late slope, it is the single legacy slope bit
-    /// for bit.
+    /// the knee, or with no knee (`u32::MAX`), it is the single legacy slope
+    /// bit for bit. With a knee and no late slope it is flat past the knee
+    /// (`1 + early × knee`), not the legacy slope; the `late == 0` return
+    /// only skips adding zero.
     fn growth(&self, rank: u32, early: f32, late: f32) -> f32 {
         let knee = self.growth_knee_rank;
         let value = 1.0 + rank.min(knee) as f32 * early;
