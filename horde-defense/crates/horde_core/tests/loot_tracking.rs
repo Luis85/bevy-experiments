@@ -101,17 +101,37 @@ fn new_attempts_always_store_some_drop_tier() {
     assert!(valid(tier(&g)), "a country stage");
     g.set_paused(false);
 
-    // Ticked with expedition drops: the worker never records one.
+    // Ticked with expedition drops: the worker never records one. Its
+    // first tick defeats a staged hostile whose kill is the twentieth, so
+    // the worker banks at least that drop.
+    let w = g
+        .battles_mut()
+        .iter_mut()
+        .find(|b| b.id == battle)
+        .unwrap()
+        .game_mut();
+    support::enemy(w, 1, 10.0, false);
+    let a = w.attempt_mut().unwrap();
+    let staged = a.enemies.last_mut().unwrap();
+    staged.hp = 0;
+    staged.injury.unconscious = true;
+    a.kills += 19 - a.kills % 20;
+    let mut worker_drops = 0;
     for _ in 0..3600 {
         g.tick(Input::default());
         let worker = g.battles().iter().find(|b| b.id == battle).unwrap().game();
         if let Some(a) = worker.attempt() {
+            worker_drops = worker_drops.max(a.loot);
             assert!(a.drop_ids.is_empty(), "an expedition never records drops");
         }
         if g.attempt().is_none() {
             break;
         }
     }
+    assert!(
+        worker_drops > 0,
+        "the worker banked a drop it did not record"
+    );
     reloads(&g, "the strategic game");
 }
 
