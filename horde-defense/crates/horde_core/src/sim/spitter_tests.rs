@@ -343,28 +343,36 @@ fn spitter_never_winds_up_or_damages_from_the_far_half() {
             "width {width}: the spitter attacks from its station"
         );
         // The resolution guard: a spitter in contact from the far half (no
-        // valid play stations one there) neither winds up nor wounds.
+        // valid play stations one there) neither winds up nor wounds. A
+        // finished windup stages the strike; a recovery about to end stages
+        // the next windup.
         for mode in [Mode::Personal, Mode::Npc] {
-            let mut g = game(mode);
-            let mut a = g.attempt.take().unwrap();
-            a.width_yards = width;
-            a.tick = 120;
-            let spitter = spawn_spitter(&mut g, &mut a, 12.0, 5, half + 0.5);
-            let e = a.enemies.last_mut().unwrap();
-            e.contact_since = Some(60);
-            e.attack_left = 0;
-            e.attack_phase = EnemyPhase::Windup;
-            let (hp, injury) = (a.hp, a.injury.clone());
-            let seq = a.event_seq;
-            g.enemy_attacks(&mut a);
-            assert_eq!((a.hp, &a.injury), (hp, &injury), "width {width} {mode:?}");
-            assert!(
-                a.events
-                    .iter()
-                    .filter(|e| e.seq >= seq)
-                    .all(|e| e.actor_id != Some(spitter)),
-                "width {width} {mode:?}: no windup or strike from the far half"
-            );
+            for (phase, left) in [(EnemyPhase::Windup, 0), (EnemyPhase::Recovery, 1)] {
+                let mut g = game(mode);
+                let mut a = g.attempt.take().unwrap();
+                a.width_yards = width;
+                a.tick = 120;
+                let spitter = spawn_spitter(&mut g, &mut a, 12.0, 5, half + 0.5);
+                let e = a.enemies.last_mut().unwrap();
+                e.contact_since = Some(60);
+                e.attack_left = left;
+                e.attack_phase = phase;
+                let (hp, injury) = (a.hp, a.injury.clone());
+                let seq = a.event_seq;
+                g.enemy_attacks(&mut a);
+                assert_eq!(
+                    (a.hp, &a.injury),
+                    (hp, &injury),
+                    "width {width} {mode:?} {phase:?}"
+                );
+                assert!(
+                    a.events
+                        .iter()
+                        .filter(|e| e.seq >= seq)
+                        .all(|e| e.actor_id != Some(spitter)),
+                    "width {width} {mode:?} {phase:?}: no windup or strike from the far half"
+                );
+            }
         }
     }
 }

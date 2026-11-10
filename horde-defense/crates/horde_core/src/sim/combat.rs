@@ -24,6 +24,15 @@ pub(crate) fn hazard_scaled(a: &Attempt, raw: i32) -> i32 {
     }
 }
 
+/// True when `e`'s next attack is a spit from the far half (acceptance
+/// G6.6): the resolution guard skips both its windup and its strike there.
+fn far_half_spit(a: &Attempt, e: &Enemy) -> bool {
+    let structure = e
+        .target_structure
+        .and_then(|id| a.structures.iter().find(|s| s.id == id));
+    spit_range(a, e, structure).is_some() && spit_from_far_half(a, e)
+}
+
 /// An exploder's blast (design enemy-balance §4 "Exploder", ruling W-7),
 /// copied out of its [`DeathEffect::Burst`].
 #[derive(Clone, Copy, Debug)]
@@ -201,6 +210,7 @@ impl Game {
                 a.enemies[n].attack_left = a.enemies[n].attack_left.saturating_sub(1);
                 if a.enemies[n].attack_phase == EnemyPhase::Recovery
                     && a.enemies[n].attack_left == 0
+                    && !far_half_spit(a, &a.enemies[n])
                 {
                     let duration = seconds(enemy_profile(&a.enemies[n]).windup);
                     a.enemies[n].attack_phase = EnemyPhase::Windup;
@@ -273,10 +283,10 @@ impl Game {
                 .and_then(|id| a.structures.iter().position(|s| s.id == id));
             // A spitter's strike from its station (W2-27) takes the existing
             // attack path; Some carries the yards to its target.
-            let spit = spit_range(a, e, structure.map(|s| &a.structures[s]));
-            if spit.is_some() && spit_from_far_half(a, e) {
+            if far_half_spit(a, e) {
                 continue;
             }
+            let spit = spit_range(a, e, structure.map(|s| &a.structures[s]));
             if let Some((blast, true)) = blast_of(e) {
                 // Its windup completed in contact: the exploder detonates
                 // instead of attacking and leaves the field without reward.
