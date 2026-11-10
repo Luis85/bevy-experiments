@@ -30,8 +30,22 @@ fn without_features(mut game: Game) -> Game {
     game
 }
 
-/// Five fixtures, one per way the page opens or stays shut, with the value
-/// each must give.
+/// A fresh profile that owns only the catalogue node granting `feature`, so
+/// that feature term alone can open the page.
+fn node_only(feature: CampaignFeature) -> Game {
+    let mut game = without_features(Game::default());
+    let unlock = game
+        .campaign()
+        .feature_unlock(feature)
+        .unwrap_or_else(|| panic!("a skill node grants {feature:?}"));
+    game.campaign_mut().skill_nodes.insert(unlock.node_id);
+    assert!(game.strategy().roster.is_empty() && game.battles().is_empty());
+    game
+}
+
+/// Eight fixtures, one per way the page opens or stays shut, with the value
+/// each must give: one per feature term (through its skill node), the roster
+/// and expedition terms, legacy features, a full v7 save and a fresh profile.
 fn fixtures() -> Vec<(&'static str, Game, bool)> {
     let v1 = Game::decode_save_generation(FIXTURE_V1.as_bytes()).expect("v1 fixture loads");
     let v7 = Game::decode_save_generation(FIXTURE_V7.as_bytes()).expect("v7 fixture loads");
@@ -45,6 +59,21 @@ fn fixtures() -> Vec<(&'static str, Game, bool)> {
         ("v7 freeze", v7, true),
         ("v7 roster only", roster_only, true),
         ("v7 expeditions only", battles_only, true),
+        (
+            "Recruitment node only",
+            node_only(CampaignFeature::Recruitment),
+            true,
+        ),
+        (
+            "Parallel node only",
+            node_only(CampaignFeature::Parallel),
+            true,
+        ),
+        (
+            "Operations node only",
+            node_only(CampaignFeature::Operations),
+            true,
+        ),
     ]
 }
 
