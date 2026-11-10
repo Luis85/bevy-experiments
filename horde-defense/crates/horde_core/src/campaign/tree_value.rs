@@ -25,7 +25,10 @@
 //!   firearm nodes average the log over [`BENCHMARK_GUNS`]; a class perk
 //!   uses its class's benchmark gun.
 //! - **Survival**: `ln(health / max(mean hit after armor and the hazard
-//!   multiplier, 0.25))`; the hazard multiplier scales reach attackers' hits.
+//!   multiplier, 0.25))`. A fused exploder's hit is its blast (it detonates
+//!   in contact instead of attacking); the hazard multiplier scales that
+//!   blast and reach attackers' spit. A burst without a fuse goes off where
+//!   the body falls and is not counted.
 //! - **Melee**: ln of the mean kill fraction per strike (contact armor)
 //!   times the strikes in one stamina pool.
 //! - **Ordnance**: ln of Σ charges × clipped damage (impact plus burn) ×
@@ -37,7 +40,7 @@
 //!   fortification and engineering multiplier, `sim::npc::structure_bonus`).
 use crate::campaign::{Campaign, DefenderProfile};
 use crate::content::{Mode, Slot, StructureKind, content};
-use crate::enemy_catalog::enemy_catalog;
+use crate::enemy_catalog::{DeathEffect, enemy_catalog};
 use crate::ordnance::OrdnanceKind;
 use crate::progression::ProgressionSnapshot;
 use crate::skill_catalog::{SkillEffect, SkillModifiers, SkillNode, skills};
@@ -417,9 +420,13 @@ struct Target {
     armor: i32,
     ranged_armor: i32,
     contact_armor: i32,
-    hit: i32,
+    /// One hit on the survivor before armor: the contact strike or spit,
+    /// or a fused exploder's blast.
+    survivor_hit: i32,
     structure_hit: i32,
-    reach: bool,
+    /// The survivor's hit is hazard damage (a spit or a blast), which the
+    /// hazard multiplier scales.
+    hazard: bool,
 }
 
 /// The progression snapshot and wave pool at one rank, each archetype
@@ -437,7 +444,14 @@ impl Context {
             .into_iter()
             .filter_map(|entry| {
                 let e = catalog.resolve(&entry.archetype_id).ok()?;
-                let hit = (e.damage as f32 * snapshot.enemy_damage).round() as i32;
+                let scale = |base: i32| (base as f32 * snapshot.enemy_damage).round() as i32;
+                let hit = scale(e.damage);
+                let fused = match &e.death_effect {
+                    Some(DeathEffect::Burst {
+                        damage, fuse: true, ..
+                    }) => Some(*damage),
+                    _ => None,
+                };
                 Some(Target {
                     // Each weighted pick spawns `group_size` members
                     // (`Director::spawn_group`).
@@ -446,9 +460,11 @@ impl Context {
                     armor: e.armor,
                     ranged_armor: e.ranged_armor,
                     contact_armor: (e.armor as f32 * e.contact_armor_fraction).floor() as i32,
-                    hit,
+                    // A fused exploder detonates in contact instead of
+                    // attacking (sim/combat.rs `detonate_fuse`).
+                    survivor_hit: fused.map_or(hit, scale),
                     structure_hit: hit.saturating_mul(i32::from(e.structure_damage_multiplier)),
-                    reach: e.reach > 0.0,
+                    hazard: fused.is_some() || e.reach > 0.0,
                 })
             })
             .collect();
@@ -509,10 +525,10 @@ impl Context {
         let p = bench().profile(m, bench().starter).personal;
         let hazard = m.hazard_damage_multiplier;
         let mean_hit = self.mean(|t| {
-            let raw = if t.reach && hazard != 1.0 {
-                (t.hit as f32 * hazard).round() as i32
+            let raw = if t.hazard && hazard != 1.0 {
+                (t.survivor_hit as f32 * hazard).round() as i32
             } else {
-                t.hit
+                t.survivor_hit
             };
             f64::from((raw - p.armor).max(0))
         });
@@ -686,5 +702,59 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn survival_counts_a_fused_burst_as_a_hazard_hit() {
+        // A fused exploder detonates in contact instead of attacking, and
+        // the survivor's hazard multiplier scales the blast (sim/combat.rs
+        // `detonate_fuse`, `hazard_scaled`), as it scales a spit.
+        let node = skills()
+            .node("blast_discipline")
+            .expect("shipped skill node");
+        let before = fold(node, false);
+        let after = fold(node, true);
+        let hazard = after.hazard_damage_multiplier;
+        assert!(hazard < 1.0);
+        let armor = bench().profile(&before, bench().starter).personal.armor;
+        let catalog = enemy_catalog();
+        let mut fused_seen = false;
+        for rank in reference_ranks(node) {
+            let snapshot = crate::progression::catalog().snapshot(rank);
+            let (mut weight, mut sum_before, mut sum_after) = (0.0, 0.0, 0.0);
+            for entry in catalog.wave_pool(snapshot.wave_tier, &[]) {
+                let e = catalog.resolve(&entry.archetype_id).expect("resolves");
+                let scale = |base: i32| (base as f32 * snapshot.enemy_damage).round() as i32;
+                let (raw, is_hazard) = match &e.death_effect {
+                    Some(DeathEffect::Burst {
+                        damage, fuse: true, ..
+                    }) => {
+                        fused_seen = true;
+                        (scale(*damage), true)
+                    }
+                    _ => (scale(e.damage), e.reach > 0.0),
+                };
+                let hit = |m: f32| {
+                    let raw = if is_hazard && m != 1.0 {
+                        (raw as f32 * m).round() as i32
+                    } else {
+                        raw
+                    };
+                    f64::from((raw - armor).max(0))
+                };
+                let w = f64::from(entry.weight) * f64::from(e.group_size);
+                weight += w;
+                sum_before += w * hit(1.0);
+                sum_after += w * hit(hazard);
+            }
+            let expected =
+                ((sum_before / weight).max(0.25) / (sum_after / weight).max(0.25)).ln() as f32;
+            let gain = node_value_at(node, rank).expect("valued");
+            assert!(
+                (gain - expected).abs() < 1e-5,
+                "rank {rank}: gain {gain} != {expected}"
+            );
+        }
+        assert!(fused_seen, "a fused exploder spawns at a reference rank");
     }
 }
