@@ -614,7 +614,10 @@ fn migrated_threat_jump_pays_no_milestone() {
     for (label, mut game) in [("migrated", g), ("unclaimed", unclaimed)] {
         apply_ok(&mut game, Command::Withdraw);
         let paid = game.last_result().unwrap().progression_rewards.clone();
-        assert_eq!(paid.level_coins, 0, "{label}: the level grant is paid");
+        assert_eq!(
+            paid.level_coins, 0,
+            "{label}: the migrated ledger already paid the level grant, so the withdrawal pays none"
+        );
         assert_eq!(
             game.campaign().milestones_claimed,
             BTreeSet::from([5, 10]),
