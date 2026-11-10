@@ -60,9 +60,11 @@ const FROZEN_ARCHETYPES: [&str; 11] = [
     "hungry-shambler",
 ];
 
-/// The v6 fixture's recruit that came home from the won Hungarian
-/// expedition (Ready), and the live Polish expedition's recruit.
+/// The v6 fixture's roster recruit 2, home from the won Hungarian
+/// expedition (Ready).
 const V6_READY_RECRUIT: u64 = 2;
+/// The battle id of the v6 fixture's live Polish expedition (its recruit is
+/// roster id 3).
 const V6_LIVE_EXPEDITION: u64 = 16;
 
 fn decode(text: &str) -> Game {
