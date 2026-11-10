@@ -296,6 +296,7 @@ Rules:
 - **progression.json** (all keys serde default to legacy-neutral):
   - `front_ramp_max` (0..=0.5, bundled 0.18; tuning window [0.17,0.25]);
   - `boss_damage_per_rank` (0..=0.05, bundled 0.01);
+  - `boss_armor_per_rank` (0..=0.05, bundled 0.02; Personal boss armor `1 + value × (min(rank, 50) − 4)` above rank 4, clamped 1..=4) and `npc_boss_armor_rank_step` (0..=100, bundled 8; NPC bosses +1 armor per that many ranks above 4, at most +20), both W2-32, 0 keeps the level's boss armor;
   - `boss_ranks.{sector,regional,capstone}.{health,armor,reward,damage,npc_armor_add,extra_transitions}`;
   - growth knee keys, `pressure_floors` rows 5..=28, the elite curve block;
   - `rewards { level_grant_xp_fraction, milestones[] }`, `camp_prices`.
