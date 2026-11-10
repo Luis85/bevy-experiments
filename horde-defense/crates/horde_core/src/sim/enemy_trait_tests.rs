@@ -429,6 +429,58 @@ fn npc_sprinter_group_spawns_group_size_members_without_extra_rng() {
     assert_eq!(a.rng, rng);
 }
 
+/// W2 review: the director's own weighted wave pick of the shipped
+/// sprinter spawns its whole group in the chosen lane, and the pass draws
+/// only the lane and the one weighted roll.
+#[test]
+fn npc_director_wave_pick_of_a_sprinter_spawns_its_group() {
+    let catalog = crate::enemy_catalog::enemy_catalog();
+    let sprinter = catalog.resolve("sprinter").unwrap();
+    assert!(sprinter.group_size > 1, "the shipped sprinter is a pack");
+    let tier = 5;
+    let mut g = game(Mode::Npc);
+    let mut base = g.attempt.take().unwrap();
+    base.progression.wave_tier = tier;
+    base.progression.batch_size = 1;
+    base.progression.elite_rate_bp = 0;
+    base.progression.enemy_cap = 16;
+    let pool = catalog.wave_pool(base.level.max(tier), &g.campaign.unlocked_bosses());
+    let total: u64 = pool.iter().map(|entry| u64::from(entry.weight)).sum();
+    // The first combat seed whose weighted roll lands on the sprinter,
+    // with the lane and the RNG state that one lane draw and one roll give.
+    let (mut a, lane, after) = (1..10_000)
+        .find_map(|seed| {
+            let mut a = base.clone();
+            a.rng = Rng::new(seed);
+            let mut probe = a.clone();
+            let lane = choose_lane(&mut probe);
+            let mut roll = probe.rng.below(total);
+            let picked = pool.iter().find(|entry| {
+                let weight = u64::from(entry.weight);
+                if roll < weight {
+                    return true;
+                }
+                roll -= weight;
+                false
+            })?;
+            (picked.archetype_id == "sprinter").then_some((a, lane, probe.rng))
+        })
+        .expect("a seed picks the sprinter");
+    a.spawn_credit = 0.999_999;
+    g.spawn_director(&mut a);
+    assert_eq!(a.rng, after, "one lane draw and one weighted roll");
+    assert_eq!(
+        a.enemies.len(),
+        usize::from(sprinter.group_size),
+        "group_size members"
+    );
+    for (k, e) in a.enemies.iter().enumerate() {
+        let r = e.resolved.as_ref().expect("a wave spawn is resolved");
+        assert_eq!(r.archetype_id, "sprinter", "member {k}");
+        assert_eq!(e.lane, lane, "member {k}");
+    }
+}
+
 // ---------------------------------------------------------------------------
 // The hazard seam on spit.
 
