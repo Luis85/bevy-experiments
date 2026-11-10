@@ -103,8 +103,9 @@ fn elites_consume_no_combat_rng() {
 
 /// W2-48 (design-save-determinism §5 "RNG keying", plan EB14): the keyed
 /// ELITE and AFFIX rolls neither draw nor read the combat RNG, at any rate.
-/// From one game, every rate from 0 to 10000 spawns the same hostiles in the
-/// same lanes with the combat RNG in the same state after every director
+/// From one game, each sampled rate (1, 200, 850, 1275, 5000, 9999 and
+/// 10000 bp, across the 0-10000 range) spawns the same hostiles as rate 0 in
+/// the same lanes with the combat RNG in the same state after every director
 /// pass, and leaves the strategy RNG and the seed alone. With the combat RNG
 /// reseeded (other hostiles, other lanes) every hostile's verdict and affix
 /// are still the ones its keyed hashes give.

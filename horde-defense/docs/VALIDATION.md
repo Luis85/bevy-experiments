@@ -1207,7 +1207,7 @@ The save-determinism guards that keep the wave-2 systems away from encounters sa
 
 | Test | Where | Mutation | Failure |
 |---|---|---|---|
-| `elite_roll_consumes_no_combat_rng` (every rate 0-10000, both modes; the reseeded verdicts and affixes match the keyed hashes) | `src/sim/elite_tests.rs` | an elite spawn draws `a.rng.below(2)`; separately, the ELITE key mixes in `a.rng.state` | `Personal 200: the combat RNG moved at pass` `Some(9)`; `Personal 200: enemy 42 (brute)` `None` vs `Some("hardened")` |
+| `elite_roll_consumes_no_combat_rng` (rates 1, 200, 850, 1275, 5000, 9999 and 10000 bp against rate 0, both modes; the reseeded verdicts and affixes match the keyed hashes) | `src/sim/elite_tests.rs` | an elite spawn draws `a.rng.below(2)`; separately, the ELITE key mixes in `a.rng.state` | `Personal 200: the combat RNG moved at pass` `Some(9)`; `Personal 200: enemy 42 (brute)` `None` vs `Some("hardened")` |
 | `rank_zero_deploy_spawns_no_elites_and_has_no_new_archetypes` (Easy/Normal/Hard, both modes, 3 seeds, 3 minutes) | `tests/legacy_guards.rs` | the director's rate floored at 850 bp; separately, its wave pool tier raised by 6 | `Easy Personal 0x1: elite enemy 32`; `Easy Personal 0x1: new archetype exploder` |
 | `legacy_attempt_snapshots_have_zero_elite_rate_and_no_boss_phases` (v1-v6 roots and the v6 expedition; the v7 freeze shows both marks) | same | load gives an attempt at rank 3 or more one boss transition | `v1 root` `(0, 1, 0, 0, 0, 0)` vs `(0, 0, 0, 0, 0, 0)` |
 | `v6_active_attempt_spawns_no_elites_for_3600_ticks` | same | the 850 bp floor | `expedition 16` (telemetry counts elites) |
