@@ -85,8 +85,27 @@ any of these as invalid:
 While a recruit holds the seat, `reserved: "Npc"` no longer covers Mara's
 loadout; only the recruit's items in `reserved_items` are reserved.
 
-An expedition `summary` may carry an `outcome` or `acknowledged: true` only
-once its battle has settled, and lists at most 32 `fronts`.
+### Expedition outcome notices
+
+A `battles[*]` record may carry a `summary`: the notice the player sees once
+the expedition settles. Settlement writes it a pass at a time (`settle_parallel`
+in `sim/parallel.rs`). Each pass adds the coins and stored loot it committed to
+the parent (`coins`, `loot_count`) and each victory it credited
+(`stages_cleared`, `liberated`), so an operation settled over several passes,
+or across a save and load, is counted once. The single settled transition
+finalises it: `outcome` becomes the expedition's last report outcome and, for
+a liberation, `fronts` lists the fronts the country opened (at most 32).
+`AcknowledgeOutcomes` sets `acknowledged`. Loading rejects a summary with an
+`outcome` or `acknowledged: true` on a battle that has not settled, and one
+that lists more than 32 `fronts`.
+
+The root `battles` list holds at most 32 records (`MAX_BATTLES`); loading
+rejects more. After each new expedition deploy, settled battles are dropped,
+oldest first, until the list is back at 32: an acknowledged or summary-less
+one when there is one, otherwise an unacknowledged one, whose notice is then
+counted in `strategy.folded_outcomes` (a saturating u32, absent at 0) so no
+outcome goes uncounted. Live battles are never dropped. `AcknowledgeOutcomes`
+subtracts its `folded` from that count (saturating).
 
 ### Loot tracking and auto-sell
 
@@ -293,8 +312,11 @@ theirs at the marked slots.
    clear count. Every expedition campaign gains the parent's claims, limited
    to those its own rank reached. Below rank 5 nothing is written.
 
-The step adds no `acknowledged` flag, so v6 expeditions that had already
-settled never raise a notice.
+The step adds no `acknowledged` flag and no `summary`, so v6 expeditions that
+had already settled never raise a notice. A v6 expedition still in flight gets
+its `summary` from its first settlement pass after the load, so its notice
+counts only the coins, loot and stages settled from then on, not what v6
+passes had already committed.
 
 **v6 expeditions keep Female until their next re-deploy.** A v6 expedition
 was deployed with Mara's Female appearance, not its recruit's identity. The
