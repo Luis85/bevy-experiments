@@ -528,6 +528,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 **W2-40 · enemy-balance · Victory-to-threat guard tests**
 - Files: `tests/threat_guard.rs`; proptest rank == committed victories over 120 seeds.
 - Fail-first: the Capstone, Regional and takeover rows. Existing rows are mutation-checked by removing `saturating_add` at `campaign/world.rs:47`.
+- Note (W2 review, 2026-11-10): none of the three rows failed first. ebdbe47's body records that the Capstone, Regional and takeover rows pass on its parent 1c778e1 (the guard already held), so `tests/threat_guard.rs` and `threat_rank_equals_committed_victories` are characterisation pins and carry mutation proofs instead of fail-first evidence, each recorded in that body and reverted: removing `self.victories = self.victories.saturating_add(1);` at `campaign/world.rs:47` fails every positive row and the property; replacing the takeover branch's `commit_victory` with `false` in `finish` fails only `takeover`; crediting only a Sector boss's victory fails `Regional`, `Capstone` and `reopened outbreak` (a Capstone too). The wave-close completeness check reads those mutation proofs as W2-40's evidence.
 - Deps: W2-36, W2-11.
 
 **W2-41 · progression-tree · W2-H: 8 decision-19 nodes (ids 170-177)**
