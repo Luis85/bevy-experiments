@@ -193,13 +193,20 @@ impl EliteCurve {
         }
         Ok(())
     }
-    /// The elite chance in basis points at threat `rank`.
+    /// The elite chance in basis points at threat `rank`. Total on any
+    /// curve: one that never went through validate (no rank span, ranks or
+    /// rates reversed) holds `start_bp` from `min_rank` rather than panic.
     pub fn bp(&self, rank: u32) -> u32 {
         if self.end_bp == 0 || rank < self.min_rank {
             return 0;
         }
-        let step = (self.end_bp - self.start_bp) / (self.end_rank - self.min_rank);
-        self.start_bp + step * (rank.min(self.end_rank) - self.min_rank)
+        let step = self
+            .end_bp
+            .saturating_sub(self.start_bp)
+            .checked_div(self.end_rank.saturating_sub(self.min_rank))
+            .unwrap_or(0);
+        let ranks = rank.min(self.end_rank).saturating_sub(self.min_rank);
+        self.start_bp.saturating_add(step.saturating_mul(ranks))
     }
 }
 /// The elite spawn chance in basis points at threat `rank`, before the
@@ -1021,5 +1028,45 @@ mod tests {
             .collect();
         assert_eq!(passed, Vec::<&str>::new(), "rows that validated");
         edit(&|e| *e = EliteCurve::default()).unwrap();
+    }
+    /// W2 review: `bp` is pub, so a curve that never went through validate
+    /// (no rank span, ranks or rates reversed, extreme values) never panics
+    /// or wraps; it holds `start_bp` from `min_rank` and never leaves the
+    /// curve's own range.
+    #[test]
+    fn elite_bp_never_panics_on_an_unvalidated_curve() {
+        let curve = |min_rank, start_bp, end_rank, end_bp| EliteCurve {
+            min_rank,
+            start_bp,
+            end_rank,
+            end_bp,
+        };
+        let curves = [
+            curve(5, 300, 5, 900),
+            curve(9, 300, 4, 900),
+            curve(3, 1500, 23, 200),
+            curve(0, u32::MAX, u32::MAX, u32::MAX),
+            curve(0, u32::MAX - 1, 1, u32::MAX),
+            curve(0, 1, 2, u32::MAX),
+        ];
+        for c in curves {
+            for rank in [0, 1, 4, 5, 9, 23, 1000, u32::MAX] {
+                let bp = std::panic::catch_unwind(|| c.bp(rank))
+                    .unwrap_or_else(|_| panic!("{c:?} panics at rank {rank}"));
+                let expected_floor = if rank < c.min_rank { 0 } else { c.start_bp };
+                assert!(
+                    (expected_floor.min(c.end_bp)..=c.start_bp.max(c.end_bp)).contains(&bp),
+                    "{c:?} rank {rank}: {bp}"
+                );
+            }
+        }
+        assert_eq!(curve(5, 300, 5, 900).bp(5), 300, "no span holds start_bp");
+        assert_eq!(curve(5, 300, 5, 900).bp(50), 300);
+        assert_eq!(curve(9, 300, 4, 900).bp(9), 300, "reversed ranks");
+        assert_eq!(
+            curve(3, 1500, 23, 200).bp(23),
+            1500,
+            "a falling curve holds"
+        );
     }
 }
