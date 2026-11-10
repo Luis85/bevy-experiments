@@ -34,7 +34,7 @@ The authored personal progression DAG contains 177 nodes rooted at stable pistol
 
 ### Price curve and pacing (foundation pass)
 
-Node prices scale with prerequisite depth from the original authoring: depth 1 ×2, depth 2 ×2.5, depth 3 and deeper ×3, rounded to 5 coins. Blueprints and feature unlocks (Field engineering, Meet Mara, Survivor network, Parallel command, Country operations) keep their prices, so building and companions open on the same milestones. The full tree costs 52,180 coins (was 18,125). The first encounter's boss has 1,100 HP (was 2,400). The reason and the before/after pacing table (runs to the first victory, to each tier, to the first liberation and each feature) are in [the foundation pass plan](plans/2026-11-04-foundation-pass.md). Re-measure with `cargo run --locked --release -p horde_core --example pacing -- 60 --runs`.
+Node prices scale with prerequisite depth from the original authoring: depth 1 ×2, depth 2 ×2.5, depth 3 and deeper ×3, rounded to 5 coins. Blueprints and feature unlocks (Field engineering, Meet Mara, Survivor network, Parallel command, Country operations) keep their prices, so building and companions open on the same milestones. At the foundation pass the full tree cost 52,180 coins (was 18,125); the eight decision-19 nodes (W2-41, prices provisional until W4-p) bring it to 61,180. The first encounter's boss has 1,100 HP (was 2,400). The reason and the before/after pacing table (runs to the first victory, to each tier, to the first liberation and each feature) are in [the foundation pass plan](plans/2026-11-04-foundation-pass.md). Re-measure with `cargo run --locked --release -p horde_core --example pacing -- 60 --runs`.
 
 ## Mara's advancement
 
