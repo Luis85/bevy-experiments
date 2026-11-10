@@ -107,7 +107,7 @@
 | G6.5 | Hard raises the elite rate, ramp and boss phases; the preset applies to the next deployment | `hard_elite_rate_1_5x_normal_easy_0_5x`, `front_ramp_orders_hard_over_normal_over_easy`, `hard_has_two_above_rank_4`, `custom_edit_from_hard_keeps_hard_extras` | 1, 2 |
 | G6.6 | Short-range spitter, never attacking from the far half | `spitter_never_winds_up_or_damages_from_the_far_half` (widths 8/12/20/30) | 2 |
 | G6.7 | Country difficulty about 0.85-1.6, via the generator, never hand-edited | `world_difficulty_matches_band_formula`; `generate_world.py --check` exits 0; `--self-test` | 2 |
-| G6.8 | Regional checkpoint every 6 stages (max 3), never saved per stage | `boss_rank_derivation_usa_24`, `regional_checkpoint_distribution_is_219_12_4_7`, `checkpoints_add_no_saved_field` | 2 |
+| G6.8 | Regional checkpoint every 6 stages (max 3), never saved per stage | `boss_rank_derivation_usa_24`, `regional_checkpoint_distribution_is_219_12_4_7`, `checkpoints_add_no_saved_field` (W2 review: a USA save deployed on stages 1-23 adds only the attempt-scoped `boss_rank` off Sector and the Capstone's `boss_phases`), `stage_boss_rank_reads_the_front_position_purely` | 2 |
 | G6.9 | Victory to threat guard (test, not re-implemented) | `tests/threat_guard.rs` plus a proptest (saturating_add mutation recorded) | 2 |
 | G6.10 | `tests/pacing_targets.rs` is #[ignore] and documented in AGENTS.md | file present; AGENTS.md section (W2-03, W4-11) | 2, 4 |
 | G6.11 | Defeat rate 10-25% in every 20-run window after the first victory (Normal, expert-deu, 20 seeds) | `goal6_defeat_rate_windows` (release) | 4 |

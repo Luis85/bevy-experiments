@@ -429,6 +429,55 @@ fn regional_checkpoint_distribution_is_219_12_4_7() {
     assert_eq!(distribution, [219, 12, 4, 7]);
 }
 
+/// Checkpoints are derived, never saved per stage (ruling W-9, acceptance
+/// G6.8): the save of a USA game deployed on any of its stages 1-23, with
+/// every earlier stage (checkpoints among them) cleared, has the same key
+/// paths as stage 1's, except the attempt-scoped snapshot's `boss_rank`,
+/// written exactly on the Regional and Capstone stages, and the Capstone's
+/// `boss_phases`. (Stage 0 has no clear and a ramp of exactly 1.0, so its
+/// save lacks those keys; it is a Sector stage without `boss_rank`.)
+#[test]
+fn checkpoints_add_no_saved_field() {
+    const BOSS_RANK: &str = "/attempt/progression/boss_rank";
+    const BOSS_PHASES: &str = "/attempt/progression/boss_phases";
+    let usa = world().country("USA").unwrap();
+    let saved = |stage: usize| {
+        let mut g = support::country_game("USA");
+        for clear in 0..stage {
+            g.campaign_mut().record_country_stage_clear(clear).unwrap();
+        }
+        g.deploy_country_stage(stage, Mode::Personal).unwrap();
+        support::game_key_paths(&serde_json::to_value(&g).unwrap())
+    };
+    assert!(!saved(0).contains(BOSS_RANK), "stage 0 is a Sector stage");
+    let base = saved(1);
+    let mut checkpoints = Vec::new();
+    for stage in 1..usa.level_count() {
+        let mut paths = saved(stage);
+        let rank = usa.front_position(stage).boss_rank();
+        assert_eq!(
+            paths.remove(BOSS_RANK),
+            rank != BossRank::Sector,
+            "stage {stage} ({rank:?}) saves boss_rank only off Sector"
+        );
+        assert_eq!(
+            paths.remove(BOSS_PHASES),
+            rank == BossRank::Capstone,
+            "stage {stage} ({rank:?}): boss_phases at rank 0"
+        );
+        let added: Vec<&String> = paths.symmetric_difference(&base).collect();
+        assert!(
+            added.is_empty(),
+            "stage {stage} ({rank:?}) changes the saved fields: {added:?}"
+        );
+        if rank == BossRank::Regional {
+            checkpoints.push(stage);
+        }
+    }
+    assert_eq!(checkpoints, usa.regional_checkpoints());
+    assert_eq!(checkpoints, [5, 11, 17]);
+}
+
 /// Pin: without a country the ramp is the literal 1.0 and changes nothing;
 /// stage 0 of a multi-stage front is the same encounter.
 #[test]
