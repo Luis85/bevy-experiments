@@ -265,6 +265,25 @@ fn record(trace: &mut Option<&mut Vec<StrategyStep>>, step: StrategyStep) {
         t.push(step);
     }
 }
+impl<'t> Bot<'t> {
+    fn new(g: Game, plan: StrategyPlan, trace: Option<&'t mut Vec<StrategyStep>>) -> Self {
+        Self {
+            g,
+            plan,
+            trace,
+            run: 1,
+            camp_ticks: 0,
+            expedition_coins: 0,
+            expeditions_settled: 0,
+            expedition_stages: 0,
+            settled: BTreeSet::new(),
+            seen_overruns: BTreeSet::new(),
+            overruns: Vec::new(),
+            unlock: None,
+            resume: None,
+        }
+    }
+}
 impl Bot<'_> {
     fn act(&mut self, command: Command) -> Result<CommandOutcome, CommandError> {
         record(&mut self.trace, StrategyStep::Command(command.clone()));
@@ -362,19 +381,34 @@ impl Bot<'_> {
             .ok_or_else(|| "No country left to enter".to_owned())
     }
     /// The front an expedition takes next: a 3-stage front by route that is
-    /// neither the main run's country nor held by another expedition.
+    /// neither the main run's country (the active one, or the one it left
+    /// to answer an outbreak and will resume) nor held by another
+    /// expedition.
     fn expedition_target(&self) -> Option<String> {
         let live = self.live_battle_countries();
-        let main = self.g.campaign.world.active.clone();
+        let main = self.g.campaign.world.active.as_deref();
+        let resume = self.resume.as_deref();
         self.fronts()
             .into_iter()
             .filter(|c| {
+                let id = Some(c.id.as_str());
                 c.level_count() == EXPEDITION_FRONT_STAGES
                     && !live.contains(&c.id)
-                    && main.as_deref() != Some(c.id.as_str())
+                    && main != id
+                    && resume != id
             })
             .min_by(|a, b| self.route_order(a, b))
             .map(|c| c.id.clone())
+    }
+    /// The country the main run left to answer an outbreak, taken, while it
+    /// is still an enterable, not liberated front that no expedition holds
+    /// (else the main run picks its next country afresh).
+    fn take_resume(&mut self) -> Option<String> {
+        let live = self.live_battle_countries();
+        let w = &self.g.campaign.world;
+        self.resume
+            .take()
+            .filter(|c| w.can_enter(c) && !w.cleared.contains(c) && !live.contains(c))
     }
     /// The offered archetype whose recruit would have the higher power at
     /// the next threat (the first on a tie), tried on copies of the game.
@@ -615,12 +649,7 @@ impl Bot<'_> {
             return Ok(());
         }
         if self.must(Command::ContinueJourney)? == CommandOutcome::CountryLiberated {
-            let w = &self.g.campaign.world;
-            let resume = self
-                .resume
-                .take()
-                .filter(|c| w.can_enter(c) && !w.cleared.contains(c));
-            let next = match resume {
+            let next = match self.take_resume() {
                 Some(c) => c,
                 None => self.next_country()?,
             };
@@ -651,21 +680,7 @@ fn play(
     }
     let g = pacing_start(profile, seed_index);
     let seed = g.seed;
-    let mut bot = Bot {
-        g,
-        plan,
-        trace,
-        run: 1,
-        camp_ticks: 0,
-        expedition_coins: 0,
-        expeditions_settled: 0,
-        expedition_stages: 0,
-        settled: BTreeSet::new(),
-        seen_overruns: BTreeSet::new(),
-        overruns: Vec::new(),
-        unlock: None,
-        resume: None,
-    };
+    let mut bot = Bot::new(g, plan, trace);
     bot.must(Command::ChooseSurvivor(crate::survivors::SurvivorId::Rook))?;
     if bot.g.campaign.balance_settings.preset != profile.difficulty {
         bot.must(Command::SetBalance(BalanceSettings::for_preset(
@@ -1192,4 +1207,64 @@ pub fn strategy_table(reports: &[StrategyReport]) -> String {
         }
     }
     s
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sim::ParallelBattle;
+
+    /// S1's bot on a campaign that started in and liberated Germany, so its
+    /// neighbours are open fronts.
+    fn bot_after_germany() -> Bot<'static> {
+        let mut g = Game::default();
+        g.campaign.choose_start_country("DEU").unwrap();
+        let levels = world().country("DEU").unwrap().level_count();
+        g.campaign.world.country_levels.insert("DEU".into(), levels);
+        g.campaign.world.cleared.push("DEU".into());
+        Bot::new(g, StrategyPlan::S1, None)
+    }
+    fn live_expedition(country: &str) -> ParallelBattle {
+        ParallelBattle {
+            id: 1,
+            recruit_id: 1,
+            country_id: country.to_owned(),
+            stage: 0,
+            game: Box::new(Game::default()),
+            synced_coins: 0,
+            synced_item_id: 0,
+            synced_item_index: 0,
+            settled: false,
+            loadout: [0; 4],
+            country_operation: false,
+            summary: None,
+            pending_auto_sell: vec![],
+        }
+    }
+
+    #[test]
+    fn expeditions_leave_the_interrupted_main_country_alone() {
+        let mut bot = bot_after_germany();
+        let first = bot.expedition_target().expect("a 3-stage front");
+        // The main run left `first` to answer an outbreak elsewhere: the
+        // run will resume there, so no expedition takes it meanwhile.
+        bot.g.campaign.world.active = Some("FRA".into());
+        bot.resume = Some(first.clone());
+        let next = bot.expedition_target().expect("another 3-stage front");
+        assert_ne!(next, first, "the expedition takes the resume country");
+    }
+
+    #[test]
+    fn the_main_run_does_not_resume_a_country_an_expedition_holds() {
+        let mut bot = bot_after_germany();
+        let held = bot.expedition_target().expect("a 3-stage front");
+        bot.resume = Some(held.clone());
+        bot.g.battles.push(live_expedition(&held));
+        assert_eq!(bot.take_resume(), None, "{held} is an expedition's front");
+        assert_eq!(bot.resume, None, "taken");
+        // A front no expedition holds is resumed.
+        bot.g.battles[0].settled = true;
+        bot.resume = Some(held.clone());
+        assert_eq!(bot.take_resume(), Some(held));
+    }
 }
