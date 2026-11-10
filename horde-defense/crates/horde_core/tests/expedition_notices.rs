@@ -173,17 +173,42 @@ fn country_operation_notice_appears_once_after_final_stage_with_liberation_and_f
     let country = operation_country(&g);
     let stages = country.level_count();
     let operation = g.deploy_country_operation(ids[0], &country.id).unwrap();
+    // Stage n drops n + 1 items in the worker game, so the summary's
+    // loot_count is checked against what settlement really stored.
+    let mut dropped = 0u32;
+    let parent_items = g.campaign().items.len();
+    let natural = |g: &Game| -> u32 {
+        g.campaign()
+            .run_history
+            .iter()
+            .filter(|r| r.recruit_id == Some(ids[0]))
+            .map(|r| r.loot)
+            .sum()
+    };
     for stage in 0..stages {
+        // What the earlier stages stored (this stage's drops settle on its
+        // victory tick).
+        let stored = dropped + natural(&g);
+        let b = g
+            .battles_mut()
+            .iter_mut()
+            .find(|b| b.id == operation)
+            .unwrap();
+        for _ in 0..=stage {
+            b.game_mut().campaign_mut().add_item(4).unwrap();
+            dropped += 1;
+        }
         let b = battle(&g, operation);
         assert_eq!((b.stage, b.settled), (stage, false));
         assert_eq!(announced(&g), Vec::<u64>::new(), "stage {stage}");
         // The running count is saved: a reload mid-operation keeps it.
         g = reload(&g);
-        let cleared = battle(&g, operation)
+        let (cleared, loot) = battle(&g, operation)
             .summary
             .as_ref()
-            .map_or(0, |s| s.stages_cleared);
+            .map_or((0, 0), |s| (s.stages_cleared, s.loot_count));
         assert_eq!(cleared, stage as u32, "stage {stage}");
+        assert_eq!(loot, stored, "stage {stage}: loot_count");
         win_stage(&mut g, operation);
         assert!(g.take_settlement_issues().is_empty(), "stage {stage}");
     }
@@ -198,6 +223,19 @@ fn country_operation_notice_appears_once_after_final_stage_with_liberation_and_f
         .map(|c| c.id.clone())
         .collect();
     assert!(!fronts.is_empty(), "{} opens a front", country.id);
+    // Each stage's own drops (its run record's `loot`) on top of the
+    // injected ones.
+    let records = g
+        .campaign()
+        .run_history
+        .iter()
+        .filter(|r| r.recruit_id == Some(ids[0]))
+        .count();
+    assert_eq!(records, stages);
+    let loot = dropped + natural(&g);
+    // Auto-sale is off: every stored drop is still in the parent's armory
+    // (beside what the operation hands back when it settles).
+    assert!(g.campaign().items.len() - parent_items >= loot as usize);
     let notices = g.unacknowledged_outcomes();
     assert_eq!(notices.notices.len(), 1);
     let notice = &notices.notices[0];
@@ -211,7 +249,7 @@ fn country_operation_notice_appears_once_after_final_stage_with_liberation_and_f
             liberated: true,
             fronts: fronts.clone(),
             coins: battle(&g, operation).game().campaign().coins,
-            loot_count: notice.summary.loot_count,
+            loot_count: loot,
             acknowledged: false,
         }
     );
