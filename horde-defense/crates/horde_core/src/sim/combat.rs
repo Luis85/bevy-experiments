@@ -274,9 +274,7 @@ impl Game {
             // A spitter's strike from its station (W2-27) takes the existing
             // attack path; Some carries the yards to its target.
             let spit = spit_range(a, e, structure.map(|s| &a.structures[s]));
-            if spit.is_some() && e.x > a.width_yards * 0.5 + 0.01 {
-                // The far-half guard (acceptance G6.6): `ranged_stop` never
-                // stations a spitter there, so valid play never reaches it.
+            if spit.is_some() && spit_from_far_half(a, e) {
                 continue;
             }
             if let Some((blast, true)) = blast_of(e) {

@@ -1958,6 +1958,13 @@ fn spit_range(a: &Attempt, e: &Enemy, structure: Option<&Structure>) -> Option<f
     };
     (e.x > face + 0.01).then(|| (e.x - at[0]).hypot(e.y() - at[1]))
 }
+/// The far-half guard (acceptance G6.6): true when `e` stands past the
+/// middle of the field, where no spit flies. `ranged_stop` never stations a
+/// spitter there, so valid play never reaches it. The one predicate of the
+/// resolution (sim/combat.rs) and of [`Attempt::spit_target`].
+fn spit_from_far_half(a: &Attempt, e: &Enemy) -> bool {
+    e.x > a.width_yards * 0.5 + 0.01
+}
 impl Attempt {
     /// Where the strike `e` has in hand lands when it is a spit (W2-28, the
     /// aim line that is the visual twin of a ranged windup): the centre of
@@ -1971,7 +1978,7 @@ impl Attempt {
             .target_structure
             .and_then(|id| self.structures.iter().find(|s| s.id == id));
         spit_range(self, e, structure)?;
-        if e.x > self.width_yards * 0.5 + 0.01 {
+        if spit_from_far_half(self, e) {
             return None;
         }
         Some(structure.map_or(self.defender_position(), |s| [s.x(), s.y()]))

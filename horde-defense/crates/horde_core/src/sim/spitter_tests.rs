@@ -457,6 +457,30 @@ fn npc_spitter_uses_range_penalty_and_dodge() {
 }
 
 #[test]
+fn far_half_guard_is_one_predicate_for_resolution_and_aim() {
+    // W2 review: the resolution guard (sim/combat.rs) and the aim accessor
+    // (`Attempt::spit_target`) share `spit_from_far_half`; the far half
+    // starts strictly past the middle of the field plus 0.01 yd.
+    for width in [8.0, 12.0, 20.0, 30.0] {
+        let mut g = field(width);
+        let mut a = g.attempt.take().unwrap();
+        let edge = width * 0.5 + 0.01;
+        spawn_spitter(&mut g, &mut a, 12.0, 5, edge);
+        a.enemies.last_mut().unwrap().contact_since = Some(0);
+        let e = a.enemies.last().unwrap().clone();
+        assert!(
+            !spit_from_far_half(&a, &e),
+            "width {width}: the edge is near"
+        );
+        assert!(a.spit_target(&e).is_some(), "width {width}: it aims");
+        let mut far = e.clone();
+        far.x = edge + 0.01;
+        assert!(spit_from_far_half(&a, &far), "width {width}: past the edge");
+        assert_eq!(a.spit_target(&far), None, "width {width}: it never aims");
+    }
+}
+
+#[test]
 fn spit_target_is_where_the_winding_spit_lands() {
     // W2-28: the accessor behind the ranged windup's aim line names the point
     // the next Spit event carries: the intercepting wall, then the defender
