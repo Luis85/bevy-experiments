@@ -2,20 +2,22 @@
 //! threaded sweep and the milestone statistics; the goal-5 evaluators
 //! (W2-03) and the goal-6 rows and evaluators (W2-04) on synthetic reports.
 use horde_core::balance::BalancePreset;
+use horde_core::content::{Mode, Slot, content};
 use horde_core::defenders::DefenderId;
 use horde_core::sim::{
     ArchetypeRun, DEFAULT_PROFILE_ID, DefeatWindow, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS,
     GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT, GOAL6_LUX_EASY_MAX_RUNS,
     GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS, GOAL6_START_PROFILE_IDS,
-    GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, LEGACY_PROFILE_IDS, Milestone,
-    MilestoneStats, Outcome, PacingAim, PacingDefender, PacingFarm, PacingPlan, PacingProfile,
-    PacingReport, PacingRun, PacingSell, PacingSpend, archetype_coverage, boss_ttk_median_s, by_id,
-    clamped_start_first_victory, defeat_rate_windows, defeat_windows, longest_win_streak,
-    max_win_streak, median_run_within, node_retired, nodes_left, pacing_registry, pacing_seed,
-    pacing_sweep_with_threads, runs_to_liberate, simulate_pacing, tier_affordable_runs,
-    tree_exhausted, tree_outlasts_liberation, unlock_order,
+    GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, Game, LEGACY_PROFILE_IDS,
+    Milestone, MilestoneStats, Outcome, PacingAim, PacingDefender, PacingFarm, PacingPlan,
+    PacingProfile, PacingReport, PacingRun, PacingSell, PacingSpend, archetype_coverage,
+    boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows, defeat_windows,
+    equip_dropped_upgrades, longest_win_streak, max_win_streak, median_run_within, node_retired,
+    nodes_left, pacing_registry, pacing_seed, pacing_sweep_with_threads, runs_to_liberate,
+    simulate_pacing, tier_affordable_runs, tree_exhausted, tree_outlasts_liberation, unlock_order,
 };
 use horde_core::skill_catalog::{CampaignFeature, SkillNode, skills};
+use horde_core::world::world;
 use std::collections::{BTreeMap, BTreeSet};
 
 #[test]
@@ -797,6 +799,58 @@ fn auto_sell_profile_records_auto_sold_coins() {
         (a.outcome, a.kills, a.coins, a.elapsed),
         (b.outcome, b.kills, b.coins, b.elapsed)
     );
+}
+
+#[test]
+fn equip_drops_profile_wears_dropped_upgrades() {
+    // The row varies the acceptance profile by `equip_drops` alone.
+    let expert = by_id(DEFAULT_PROFILE_ID).expect("registered");
+    let row = by_id("equip-drops").expect("equip-drops is registered");
+    assert_eq!(
+        PacingProfile {
+            id: expert.id,
+            name: expert.name,
+            ..row
+        },
+        PacingProfile {
+            plan: PacingPlan {
+                equip_drops: true,
+                ..PacingPlan::SOLO
+            },
+            ..expert
+        }
+    );
+    // The camp step equips an owned drop that beats the survivor's slot by
+    // the recommender's test, and leaves one the survivor cannot use.
+    let mut game = Game::default();
+    let start = world().countries[0].id.clone();
+    let c = game.staging().campaign();
+    c.choose_start_country(&start).expect("start country");
+    let index = |id: &str| {
+        content()
+            .items
+            .iter()
+            .position(|i| i.id.as_str() == id)
+            .unwrap_or_else(|| panic!("{id} ships"))
+    };
+    let axe = c.add_item(index("fire_axe")).expect("owned");
+    let rifle = c.add_item(index("marksman_rifle")).expect("owned");
+    let before = game.campaign().player.loadout;
+    assert!(
+        game.campaign()
+            .upgrade_gain(Mode::Personal, before, &game.campaign().npc, axe)
+            .is_some()
+    );
+    assert_eq!(equip_dropped_upgrades(&mut game), Ok(vec![axe]));
+    let after = game.campaign().player.loadout;
+    assert_eq!(after[Slot::Melee.index()], axe);
+    assert_eq!(after[Slot::Ranged.index()], before[Slot::Ranged.index()]);
+    assert!(!after.contains(&rifle));
+    // Nothing left beats the new loadout.
+    assert_eq!(equip_dropped_upgrades(&mut game), Ok(vec![]));
+    // The profile runs.
+    let report = simulate_pacing(&PacingProfile { max_runs: 2, ..row }).expect("profile runs");
+    assert_eq!(report.runs.len(), 2);
 }
 
 #[test]

@@ -59,7 +59,7 @@ pub use pacing::{
     PacingRoute, PacingRun, PacingSell, PacingSpend, RunsToLiberate, STRATEGY_PROFILE_ID,
     STRATEGY_PROFILE_IDS, StrategyPlan, StrategyReport, StrategyRun, StrategyStep, StrategyTrace,
     StrategyUnlock, UNLOCK_ORDER, archetype_coverage, boss_ttk_median_s, by_id,
-    clamped_start_first_victory, defeat_rate_windows, defeat_windows,
+    clamped_start_first_victory, defeat_rate_windows, defeat_windows, equip_dropped_upgrades,
     liberations_and_coins_per_minute, longest_win_streak, max_win_streak, median_earned_after,
     median_run_within, node_depths, node_retired, nodes_left, outbreak_reopens,
     pacing_archetype_ids, pacing_profiles, pacing_registry, pacing_seed, pacing_start,

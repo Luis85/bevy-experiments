@@ -125,8 +125,9 @@ fn farm_step(farm: PacingFarm, frontier: usize, defeats: u32, replayed: bool) ->
 /// The camp plan a profile follows besides aim and spend.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct PacingPlan {
-    /// Equip dropped items that beat the current loadout. Not implemented
-    /// yet: [`simulate_pacing`] rejects a plan that sets it.
+    /// Equip dropped items that beat the current loadout, in camp before
+    /// any sale or purchase ([`equip_dropped_upgrades`]). The strategy bot
+    /// does not combine it with a strategy plan.
     pub equip_drops: bool,
     pub sell: PacingSell,
     pub defender: PacingDefender,
@@ -150,13 +151,7 @@ impl PacingPlan {
         strategy: None,
     };
     fn unsupported(&self) -> Option<&'static str> {
-        if self.equip_drops {
-            Some("equip_drops")
-        } else if self.train_companions {
-            Some("train_companions")
-        } else {
-            None
-        }
+        self.train_companions.then_some("train_companions")
     }
 }
 /// One scripted player. `id` is the stable registry key; `name` is the
@@ -214,7 +209,7 @@ const EXPERT_DEU: PacingProfile = PacingProfile {
     stop_after: None,
 };
 /// Every named profile. Ids are stable and unique; rows are appended.
-const REGISTRY: [PacingProfile; 18] = [
+const REGISTRY: [PacingProfile; 19] = [
     EXPERT_DEU,
     PacingProfile {
         id: "novice-deu",
@@ -379,6 +374,17 @@ const REGISTRY: [PacingProfile; 18] = [
             ..PacingPlan::SOLO
         },
         stop_after: Some(Milestone::Liberation(1 + GOAL3_NEIGHBOURS_FREED as u32)),
+        ..EXPERT_DEU
+    },
+    // Acceptance G5.6 (W2 review): the acceptance profile that also wears
+    // the drops that beat its loadout.
+    PacingProfile {
+        id: "equip-drops",
+        name: "expert, tree first, Germany, equips drops",
+        plan: PacingPlan {
+            equip_drops: true,
+            ..PacingPlan::SOLO
+        },
         ..EXPERT_DEU
     },
 ];
@@ -713,6 +719,43 @@ fn reached(milestones: &mut Vec<(Milestone, usize, f32)>, m: Milestone, run: usi
         milestones.push((m, run, minutes));
     }
 }
+/// The equip-drops plan's camp step: for each slot in [`Slot::ALL`] order,
+/// equips through `Command::Equip` the owned item that raises the
+/// survivor's slot score the most by the recommender's own test
+/// ([`Campaign::upgrade_gain`], so only an item the survivor may use and
+/// that beats the slot by more than the margin; ties keep the lowest id).
+/// Items a recruit or an expedition holds are skipped. Purchases are
+/// equipped when bought, so what this finds is loot. Returns the ids
+/// equipped, in slot order.
+///
+/// [`Campaign::upgrade_gain`]: crate::campaign::Campaign::upgrade_gain
+pub fn equip_dropped_upgrades(g: &mut Game) -> Result<Vec<u64>, String> {
+    let mut equipped = Vec::new();
+    for slot in crate::content::Slot::ALL {
+        let c = &g.campaign;
+        let best = c
+            .items
+            .iter()
+            .filter(|item| {
+                !c.item_reserved(item.id)
+                    && item.definition.definition().is_some_and(|d| d.slot == slot)
+            })
+            .filter_map(|item| {
+                c.upgrade_gain(Mode::Personal, c.player.loadout, &c.npc, item.id)
+                    .map(|gain| (item.id, gain))
+            })
+            .max_by(|a, b| a.1.total_cmp(&b.1).then(b.0.cmp(&a.0)));
+        if let Some((id, _)) = best {
+            g.apply(&Command::Equip {
+                mode: Mode::Personal,
+                id,
+            })
+            .map_err(|e| e.to_string())?;
+            equipped.push(id);
+        }
+    }
+    Ok(equipped)
+}
 /// The camp sale of `sell`, before spending: `ManualExtras` sells what
 /// `SellUnprotected` would (nothing is `Ok(0)`); the other plans sell
 /// nothing in camp.
@@ -837,6 +880,9 @@ pub fn simulate_pacing_seed(
     let mut defeats = 0u32;
     let mut replayed = false;
     for index in 0..profile.max_runs {
+        if plan.equip_drops {
+            equip_dropped_upgrades(&mut g)?;
+        }
         camp_sale(&mut g, plan.sell)?;
         let spent_recruit = match plan.defender {
             PacingDefender::Survivor => 0,

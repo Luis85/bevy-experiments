@@ -89,7 +89,7 @@
 | G5.3 | Up to 8 new append-only nodes (user: yes, ≤ 8) | `skill_catalog_is_append_only_with_eight_weapon_mastery_nodes` (len 177, FNV of the first 169), `counters_name_catalog_archetypes` | 2 |
 | G5.4 | Remove the disabled IQ/HP/FP rows | `npc_trainable_rows_exclude_iq_hp_fp`, `training_lists_have_no_iq_hp_fp_text` | 2, 3 |
 | G5.5 | Mara training and recruit cost scale with threat; the UI reads core prices (R10) | `recruit_and_training_prices_scale_with_threat`, `camp_price_labels_follow_core_price_at_rank_10`, `ui_has_no_literal_camp_prices_or_mara_mapping` | 2, 3 |
-| G5.6 | Pacing profiles: equip-drops, auto-sell, takeover, farm, Easy/Hard, 150-run; per-archetype telemetry; `--csv` | `pacing_registry_ids_are_unique...`, `auto_sell_profile_records_auto_sold_coins`, `takeover_profile_records_first_takeover`, `combat_telemetry_counts_spawns_kills_and_damage_taken_by_archetype`, `pacing_csv_has_header...` | 2 |
+| G5.6 | Pacing profiles: equip-drops, auto-sell, takeover, farm, Easy/Hard, 150-run; per-archetype telemetry; `--csv` | `pacing_registry_ids_are_unique...`, `equip_drops_profile_wears_dropped_upgrades`, `auto_sell_profile_records_auto_sold_coins`, `takeover_profile_records_first_takeover`, `combat_telemetry_counts_spawns_kills_and_damage_taken_by_archetype`, `pacing_csv_has_header...` | 2 |
 | G5.7 | First victory on run 2-4 (expert-deu, Normal, 20 seeds, median) | `goal5_first_victory_run_2_to_4` (release) | 4 |
 | G5.8 | Tiers 1-3 affordable at about runs 4/8/12 | `goal5_tiers_affordable...` (release); `tier_costs_sit_in_design_bands` | 4 |
 | G5.9 | The tree lasts past the 2nd liberation | `goal5_tree_outlasts_second_liberation` (release; median(TreeExhausted) > median(Liberation(2)) and ≥ 1 node bought after it) | 4 |
