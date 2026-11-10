@@ -417,7 +417,8 @@ impl RunsToLiberate {
 }
 
 /// G6.18: a clamped start's median first victory lies in `window`. Seeds
-/// that win run 1 are only reported (ruling W-4).
+/// that win run 1 are only reported (ruling W-4). Every report must be of
+/// one profile, the start the label names.
 pub fn clamped_start_first_victory(
     reports: &[PacingReport],
     window: RangeInclusive<usize>,
@@ -425,6 +426,12 @@ pub fn clamped_start_first_victory(
     let Some(first) = reports.first() else {
         return Err(no_reports());
     };
+    if let Some(r) = reports.iter().find(|r| r.profile.id != first.profile.id) {
+        return Err(format!(
+            "the clamped start mixes {} ({}) with {} ({}); evaluate one start at a time",
+            r.profile.id, r.profile.country, first.profile.id, first.profile.country
+        ));
+    }
     let label = format!("First victory, {} start", first.profile.country);
     let run_one: Vec<String> = reports
         .iter()

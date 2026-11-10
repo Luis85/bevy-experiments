@@ -799,6 +799,14 @@ fn boss_ttk_coverage_and_clamped_starts_on_synthetic_runs() {
         clamped_start_first_victory(&late, GOAL6_CLAMPED_FIRST_VICTORY).expect_err("median run 5");
     assert!(err.contains("BGD start"), "{err}");
     assert!(err.contains("median run 5, outside runs 2-4"), "{err}");
+    // One start per call: a mixed slice is no clamped-start median.
+    let mixed = [starts[0].clone(), late[0].clone()];
+    let err = clamped_start_first_victory(&mixed, GOAL6_CLAMPED_FIRST_VICTORY)
+        .expect_err("AUT and BGD pooled");
+    assert!(
+        err.contains("start-bgd") && err.contains("start-aut"),
+        "{err}"
+    );
 }
 
 // W2-42 (W2-I): the profiles that need other remits' commands. The
