@@ -171,8 +171,13 @@ pub struct PacingProfile {
     /// campaign default (Normal) issues no command.
     pub difficulty: BalancePreset,
     pub plan: PacingPlan,
-    /// End the profile after the run in which this milestone is first
-    /// reached (at most `max_runs` runs either way).
+    /// End the profile once this milestone is held, checked after each run
+    /// (at most `max_runs` runs either way). A post-run milestone recorded
+    /// at `n` (first held after run `n`) stops right after run `n`. A camp
+    /// milestone (Feature, TierFirstNode, TierOwned, OperationsOpen) is
+    /// recorded at `n` when first held in camp before run `n + 1`, but the
+    /// check only follows a run, so run `n + 1` still plays and the report
+    /// has `n + 1` runs.
     pub stop_after: Option<Milestone>,
 }
 /// The registry key of the acceptance profile (goals 5 and 6).
