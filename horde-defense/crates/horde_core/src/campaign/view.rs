@@ -534,10 +534,19 @@ mod tests {
             ("recruitment_network", 100)
         );
         assert_eq!(recruitment.liberations_required, 1);
-        // Every feature has exactly the catalogue node that grants it, so
-        // the answer always agrees with the node the purchase preflight gates.
+        // Every feature is granted by exactly one catalogue node (a second
+        // FeatureUnlock node appended to skills.json fails here), so the
+        // answer always agrees with the node the purchase preflight gates.
         for feature in CampaignFeature::ALL {
+            let grant = SkillEffect::FeatureUnlock(feature);
+            let granting: Vec<&str> = skills()
+                .nodes
+                .iter()
+                .filter(|node| node.effects.contains(&grant))
+                .map(|node| node.id.as_str())
+                .collect();
             let unlock = c.feature_unlock(feature).unwrap();
+            assert_eq!(granting, [unlock.node_id.as_str()], "{feature:?}");
             let node = skills().node(&unlock.node_id).unwrap();
             assert!(node.effects.contains(&SkillEffect::FeatureUnlock(feature)));
             assert_eq!(
