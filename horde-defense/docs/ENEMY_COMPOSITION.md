@@ -213,6 +213,15 @@ offered affix pair must pass `ResolvedEnemy::validate` at load, or the load is
 rejected; there are no runtime clamps. The encounter health guard (deploy and
 save validation) counts the largest elite whenever the snapshot rolls elites.
 
+An elite kill always drops exactly one item (ruling E8, W2-35) in an attempt
+deployed from wave 2 on (`drop_tier` Some): the 3% roll and the every-20th-kill
+rule still apply, and when neither gives a drop the elite's pick is the keyed
+`keyed(seed, attempt id, enemy id, ELITE_PICK)` modulo the drop table's total,
+so it draws no combat RNG. Its quality is never below `ELITE_QUALITY_FLOOR`
+(Uncommon). The drop is lost only when the pool is empty or the armory refuses
+the item. A legacy attempt (`drop_tier` None) has no elite drop term. See
+ITEM_QUALITY.md for the drop table and the floor.
+
 Telemetry counts `elites_spawned` and `elites_killed` (never more kills than
 spawns); a finished run's record copies the kills into `elite_kills`.
 
