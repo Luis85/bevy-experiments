@@ -1,4 +1,4 @@
-//! Axis 1 of the threat past rank 4 (W2-32; design-enemy-balance Â§2,
+//! Axis 1 of the threat past rank 4 (W2-32; design-enemy-balance §2,
 //! "Growth knee", "Floors and composition tiers" and "Boss armor"). Enemy
 //! health and damage grow on a steeper slope past the knee at rank 4, so
 //! the gear/HP ratio stops widening; `pressure_floors` rows 5..=28 carry
@@ -21,7 +21,7 @@ fn bundled() -> Value {
 }
 
 /// The gear damage multiplier a shop item carries at threat `rank`:
-/// `1 + damage_per_level Ã— (item_level - 1)`, the item level being the
+/// `1 + damage_per_level × (item_level - 1)`, the item level being the
 /// snapshot's `min(max_item_level, 1 + rank / item_level_rank_step)`.
 fn gear(cfg: &ProgressionCatalog, rank: u32) -> f64 {
     let level = cfg.snapshot(rank).item_level;
@@ -127,7 +127,7 @@ fn growth_matches_gear_within_band() {
         let ratio = gear(cfg, rank) / health(rank);
         assert!((ratio - expected).abs() < 0.006, "rank {rank}: {ratio}");
     }
-    // The snapshot formulas: `1 + per_rank Ã— min(r, k) + late Ã— max(r - k, 0)`.
+    // The snapshot formulas: `1 + per_rank × min(r, k) + late × max(r - k, 0)`.
     for rank in 0..=200u32 {
         let (early, late) = (rank.min(4) as f64, rank.saturating_sub(4) as f64);
         let s = cfg.snapshot(rank);
@@ -142,7 +142,7 @@ fn growth_matches_gear_within_band() {
             "rank {rank}"
         );
     }
-    // HP x arrival against gear (design Â§2): .99 / 1.07 / 1.25 at ranks
+    // HP x arrival against gear (design §2): .99 / 1.07 / 1.25 at ranks
     // 10 / 20 / 40.
     for (rank, expected) in [(10, 0.99), (20, 1.07), (40, 1.25)] {
         let s = cfg.snapshot(rank);
@@ -247,7 +247,7 @@ fn rank_20_boss_armor_exceeds_rank_0_both_modes() {
         (20.0f32 * 1.32).round() as i32
     );
     assert_eq!(boss_armor(Mode::Npc, 20), level.boss_npc_armor + 2);
-    // The snapshot fields: `1 + .02 Ã— (min(r, 50) - 4)` in 1..=4 and
+    // The snapshot fields: `1 + .02 × (min(r, 50) - 4)` in 1..=4 and
     // `(r - 4) / 8` in 0..=20.
     let cfg = catalog();
     for (rank, multiplier, add) in [
