@@ -216,6 +216,8 @@ Each also needs: EffectCategory (Firearms; Survival for hazard), keywords (class
   - `defender: PacingDefender { Survivor, MaraWhenReady, RecruitWhenReady }`
   - `farm: PacingFarm { None, ReplayAfterDefeats(u32) }`
   - `train_companions: bool`
+
+  *As built (W2-42; W2 review):* `PacingDefender` (`sim/pacing.rs`) has two variants, `Survivor` and `RecruitWhenReady`. `MaraWhenReady` was not built: no registry row uses it, since the integration ruling below gives CD only the `takeover` row with `PacingDefender::RecruitWhenReady`, and W2-42 added only that variant. A row that hands the main run to Mara would add the variant then. The line above is unchanged.
 - **Profile ids:** expert-deu (the "default" acceptance profile, first column of the wave-0 table), novice-deu, novice-gear-lux, equip-drops, manual-sell, auto-sell, takeover, farm, easy, hard, long (150 runs). `by_id(&str)`, `DEFAULT_PROFILE_ID = "expert-deu"`.
 - **Actions** all go through `Game::apply`: SetBalance before ChooseStart, BuySkillNode, BuyItem/Equip, SellUnprotected/SetAutoSell, BuyNpcPoint/TrainNpc, Recruit/RecruitAs, SetNextDefender, Deploy.
 - **Seeds:** `pacing_seed(base, i)` returns base when i == 0, otherwise `splitmix64(base ^ i)`. For i > 0 the strategy RNG is `Rng::new(seed ^ 0x504C41475545)`, through a pub(crate) seam in strategy.rs.
