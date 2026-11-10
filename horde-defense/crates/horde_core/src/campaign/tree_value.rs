@@ -33,6 +33,8 @@
 //! - **Fortification**: ln of the engineering multiplier plus, per owned
 //!   blueprint, ln of its structure term: trap charges × kill fraction per
 //!   charge, turret kill fraction per second, wall durability per mean hit.
+//!   Damage and durability carry the sim's structure bonus (rank,
+//!   fortification and engineering multiplier, `sim::npc::structure_bonus`).
 use crate::campaign::{Campaign, DefenderProfile};
 use crate::content::{Mode, Slot, StructureKind, content};
 use crate::enemy_catalog::enemy_catalog;
@@ -576,7 +578,11 @@ impl Context {
             }
             let d = content().structure(kind);
             let rank = m.structure_ranks[kind];
-            let bonus = (1.0 + rank as f32 * 0.2) * self.snapshot.fortification_multiplier;
+            // `sim::npc::structure_bonus`: the skill engineering multiplier
+            // scales damage and durability with the rank and fortification.
+            let bonus = (1.0 + rank as f32 * 0.2)
+                * self.snapshot.fortification_multiplier
+                * m.engineering_multiplier;
             let damage = (d.damage as f32 * bonus).round() as i32;
             let kill_fraction = |ranged: bool| {
                 self.mean(|t| {
@@ -630,6 +636,55 @@ mod tests {
                 "rank {rank}: {}",
                 entry.archetype_id
             );
+        }
+    }
+
+    #[test]
+    fn structure_rank_gains_use_the_engineered_damage_and_durability() {
+        // The sim scales structure damage and durability by
+        // `sim::npc::structure_bonus`: rank, progression fortification and
+        // the skill engineering multiplier. Each rank 1 owns Engineering
+        // (x1.25) through its blueprint.
+        for (id, kind) in [
+            ("trap_rank_1", StructureKind::Trap),
+            ("turret_rank_1", StructureKind::Turret),
+            ("wall_rank_1", StructureKind::Wall),
+        ] {
+            let node = skills().node(id).expect("shipped skill node");
+            let before = fold(node, false);
+            assert!(before.engineering && before.engineering_multiplier > 1.0);
+            assert_eq!(before.structure_ranks[kind], 0, "{id}");
+            let d = content().structure(kind);
+            for rank in reference_ranks(node) {
+                let c = Context::at(rank);
+                let term = |r: u32| {
+                    let bonus = (1.0 + r as f32 * 0.2)
+                        * c.snapshot.fortification_multiplier
+                        * before.engineering_multiplier;
+                    let damage = (d.damage as f32 * bonus).round() as i32;
+                    let kill = |ranged: bool| {
+                        c.mean(|t| {
+                            let armor = t.armor + if ranged { t.ranged_armor } else { 0 };
+                            (f64::from((damage - armor).max(0)) / f64::from(t.hp)).min(1.0)
+                        })
+                    };
+                    let term = match kind {
+                        StructureKind::Trap => f64::from(d.charges_at_rank(r)) * kill(false),
+                        StructureKind::Turret => kill(true) / f64::from(d.cooldown.max(1.0 / 60.0)),
+                        StructureKind::Wall => {
+                            f64::from((d.health as f32 * bonus).round())
+                                / c.mean(|t| f64::from(t.structure_hit.max(0))).max(0.25)
+                        }
+                    };
+                    term.max(METRIC_FLOOR).ln()
+                };
+                let expected = (term(1) - term(0)) as f32;
+                let gain = node_value_at(node, rank).expect("valued");
+                assert!(
+                    (gain - expected).abs() < 1e-5,
+                    "{id} at rank {rank}: gain {gain} != engineered {expected}"
+                );
+            }
         }
     }
 }
