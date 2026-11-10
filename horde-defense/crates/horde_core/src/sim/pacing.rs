@@ -8,10 +8,15 @@
 //! milestone statistics over seeds ([`MilestoneStats`]). Other remits add
 //! registry rows and evaluators on this API. The goal-5 evaluators (W2-03)
 //! live in [`targets`], the goal-6 rows' evaluators (W2-04) in [`goal6`].
-//! The plans that sell, farm or hand the main run to a recruit (W2-42) act
-//! only through `Game::apply`. The strategy rows and their goal-3
-//! evaluators (W2-43, ruling P7) live in [`strategy`]: a plan with a
-//! [`StrategyPlan`] is played by a bot that acts only through commands.
+//! The plans that sell, farm or hand the main run to a recruit (W2-42) take
+//! their own steps (equip, sell, recruit, next defender and the replay or
+//! frontier deploy) through `Game::apply`. Like every non-strategy plan,
+//! they still continue the journey with `Game::continue_journey` and enter
+//! the next country with `Campaign::enter_country` directly; routing those
+//! through commands would move pacing and need plan §9.6 rows (R28). The
+//! strategy rows and their goal-3 evaluators (W2-43, ruling P7) live in
+//! [`strategy`]: a plan with a [`StrategyPlan`] is played by a bot that
+//! acts only through commands.
 mod goal6;
 #[cfg(test)]
 mod plan_tests;
