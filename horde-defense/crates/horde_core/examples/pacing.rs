@@ -488,6 +488,113 @@ mod tests {
         assert!(FIT_PARTIAL_NOTE.contains("leans toward slow seeds"));
     }
 
+    /// design-progression-tree §11's `--csv` header, written out in the spec.
+    const DESIGN: &str =
+        include_str!("../../../docs/plans/production-pass/design-progression-tree.md");
+
+    /// The fixed columns of §11's CSV header (before the per-archetype ones).
+    fn design_fixed_columns() -> Vec<&'static str> {
+        let line = DESIGN
+            .lines()
+            .find_map(|l| l.trim_start().strip_prefix("- **CSV header:** "))
+            .expect("design-progression-tree §11 writes out the CSV header");
+        let fixed = line
+            .split(", then")
+            .next()
+            .expect("the fixed columns precede the per-archetype ones");
+        fixed.split(',').map(str::trim).collect()
+    }
+
+    fn csv_run(index: usize, killed: u32) -> horde_core::sim::PacingRun {
+        use horde_core::sim::{ArchetypeRun, Outcome};
+        let first = pacing_archetype_ids()
+            .into_iter()
+            .next()
+            .expect("the catalogue has archetypes");
+        horde_core::sim::PacingRun {
+            index,
+            seed: 7,
+            difficulty: BalancePreset::Normal,
+            country: "DEU".to_owned(),
+            stage: 0,
+            outcome: Outcome::Victory,
+            country_freed: false,
+            elapsed: 61.5,
+            coins: 120,
+            level_grant_coins: 0,
+            milestone_coins: 0,
+            cumulative_coins: 120 * index as u64,
+            rank: 1,
+            level: 2,
+            lanes: 3,
+            defender: DefenderId::Player,
+            kills: killed,
+            learned: vec!["a".to_owned(), "b".to_owned()],
+            spent_tree: 0,
+            spent_gear: 0,
+            spent_training: 0,
+            spent_recruit: 0,
+            auto_sold_count: 0,
+            auto_sold_coins: 0,
+            nodes_owned: 2,
+            nodes_left: 10,
+            wallet: 40,
+            boss_ttk_s: None,
+            archetypes: [(
+                first,
+                ArchetypeRun {
+                    spawned: killed + 1,
+                    killed,
+                    damage_taken: 9,
+                },
+            )]
+            .into_iter()
+            .collect(),
+        }
+    }
+
+    #[test]
+    fn pacing_csv_has_header_and_one_row_per_run() {
+        let profile = by_id("expert-deu").expect("registered");
+        let report = |seed_index: usize, runs: usize| PacingReport {
+            profile,
+            seed_index,
+            seed: 7,
+            runs: (1..=runs).map(|i| csv_run(i, 3 * i as u32)).collect(),
+            milestones: vec![],
+        };
+        let text = csv(&[report(0, 1), report(1, 2)]);
+        let mut lines = text.lines();
+        let header: Vec<&str> = lines.next().expect("a header line").split(',').collect();
+        let fixed = design_fixed_columns();
+        assert_eq!(fixed.len(), 29, "§11 names 29 fixed columns");
+        let mut expected: Vec<String> = fixed.iter().map(|c| (*c).to_owned()).collect();
+        for id in pacing_archetype_ids() {
+            for suffix in ["spawned", "killed", "damage_taken"] {
+                expected.push(format!("{id}_{suffix}"));
+            }
+        }
+        assert_eq!(
+            header, expected,
+            "the header is section 11's, archetypes in catalogue order"
+        );
+        let rows: Vec<&str> = lines.collect();
+        assert_eq!(rows.len(), 3, "one row per run across every report");
+        for row in &rows {
+            assert_eq!(
+                row.split(',').count(),
+                header.len(),
+                "every row has the header's field count: {row}"
+            );
+        }
+        assert!(
+            rows[2].starts_with("expert-deu,7,Normal,2,DEU,1,Victory,61.50,120,"),
+            "{}",
+            rows[2]
+        );
+        assert!(text.ends_with('\n'), "the last row ends its line");
+    }
+
     fn argv(args: &[&str]) -> Vec<String> {
         args.iter().map(|a| (*a).to_owned()).collect()
     }
