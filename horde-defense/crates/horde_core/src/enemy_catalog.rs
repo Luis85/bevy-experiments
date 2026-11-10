@@ -1344,6 +1344,33 @@ mod tests {
         assert!(parse(&data).is_err());
     }
 
+    /// W2-31: an unused attack or defense component is bounded on reach and
+    /// ranged armor too; no archetype resolves it, so only the component
+    /// loop can reject it.
+    #[test]
+    fn unused_components_still_bound_reach_and_ranged_armor() {
+        let cases: [(&str, &str, serde_json::Value, &str); 6] = [
+            ("attacks", "reach", (-0.5).into(), "attack"),
+            ("attacks", "reach", 12.5.into(), "attack"),
+            ("defenses", "ranged_armor", (-1).into(), "defense"),
+            ("defenses", "ranged_armor", 1001.into(), "defense"),
+            ("defenses", "npc_ranged_armor", (-1).into(), "defense"),
+            ("defenses", "npc_ranged_armor", 101.into(), "defense"),
+        ];
+        for (table, field, value, kind) in cases {
+            let mut data = authored();
+            let mut unused = data[table][0].clone();
+            unused["id"] = "unused-out-of-bounds".into();
+            unused[field] = value.clone();
+            data[table].as_array_mut().unwrap().push(unused);
+            assert_eq!(
+                parse(&data).err(),
+                Some(format!("Invalid {kind} component: unused-out-of-bounds")),
+                "{table}.{field} = {value}"
+            );
+        }
+    }
+
     #[test]
     fn unused_attack_components_still_validate_demolition_multipliers() {
         for multiplier in [0, 9] {
