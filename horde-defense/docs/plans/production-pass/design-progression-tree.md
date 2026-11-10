@@ -241,6 +241,8 @@ Each also needs: EffectCategory (Firearms; Survival for hazard), keywords (class
 
   The other two legacy profiles are reported. long runs at 5 seeds and is informational.
 
+  *As built (W2-03; W2 review):* `tests/pacing_targets.rs` sweeps and prints expert-deu only. The other two legacy profiles, novice-deu and novice-gear-lux, are reported by the `pacing` example, not by the acceptance tests: the default `pacing [N]` prints all three legacy profiles at one seed (the plan §9.6 tables' novice DEU and novice LUX columns), and `--profile novice-deu --profile novice-gear-lux --seeds 20` gives their 20-seed rows (the W2-01 baseline in plan §9). Neither gates anything.
+
 ## Saves and digests
 - Every new saved field is skip-if-default, so wave 1 moves no digest.
 - Wave 2 moves GOLDEN (all 6) once, for the telemetry maps.

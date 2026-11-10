@@ -6,7 +6,9 @@
 //! cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture
 //! ```
 //!
-//! The acceptance sweep is expert-deu (Normal, 60 runs) over 20 seeds. The
+//! The acceptance sweep is expert-deu (Normal, 60 runs) over 20 seeds; the
+//! other two legacy profiles (novice-deu, novice-gear-lux) are reported by
+//! the `pacing` example, not here (design-progression-tree "As built"). The
 //! goal-6 rows (lux-easy, lux-normal, lux-hard, start-aut, start-bgd) are a
 //! second sweep over the same 20 seeds, and the strategy rows (strategy,
 //! neighbours-solo, neighbours-parallel) a third. Each sweep runs once per
