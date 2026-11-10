@@ -807,6 +807,35 @@ mod tests {
         );
     }
     #[test]
+    fn allowance_hint_never_offers_a_clear_once_every_catalogue_level_is_cleared() {
+        // A 9-stage start country maps its stages onto the 5 catalogue
+        // levels, so its liberation first-clears all of them: no new first
+        // clear can happen, and only liberations can raise the cap.
+        let mut c = Campaign::default();
+        c.choose_start_country("DEU").unwrap();
+        let stages = crate::world::country_stage_count("DEU").unwrap();
+        assert!(stages > content().levels.len(), "{stages}");
+        for stage in 0..stages {
+            c.record_country_stage_clear(stage).unwrap();
+        }
+        c.first_clears = content().levels.iter().map(|l| l.id.clone()).collect();
+        assert_eq!(c.liberated_count(), 1);
+        assert_eq!(c.advancement_cap_level(), 6);
+        let hint = c.allowance_raise_hint();
+        assert!(!hint.to_lowercase().contains("clear a new stage"), "{hint}");
+        assert!(hint.contains("Liberate"), "{hint}");
+        // L = 3 ties the terms (6 vs 6); still only liberation is a lever.
+        for id in ["VAT", "LUX"] {
+            let count = crate::world::country_stage_count(id).unwrap();
+            c.world.clear_high_water.insert(id.to_owned(), count);
+        }
+        assert_eq!(c.liberated_count(), 3);
+        assert_eq!(c.advancement_cap_level(), 6);
+        let hint = c.allowance_raise_hint();
+        assert!(!hint.to_lowercase().contains("clear a new stage"), "{hint}");
+        assert_eq!(hint, "Liberate a country to raise the allowance.");
+    }
+    #[test]
     fn earned_objectives_precede_paid_training() {
         let mut c = Campaign {
             coins: 1000,

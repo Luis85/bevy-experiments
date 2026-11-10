@@ -418,7 +418,9 @@ impl Campaign {
     /// only what would raise the cap level from here: a new stage clear
     /// while the first-clear term carries the cap, a liberation while the
     /// liberation term does (W2-10), both when they tie; nothing at the max
-    /// level.
+    /// level. A new clear counts only while some catalogue level is still
+    /// uncleared: country stages map onto the catalogue levels, so once all
+    /// of them are first-cleared only liberations raise the cap.
     pub fn allowance_raise_hint(&self) -> String {
         let max = crate::defenders::MAX_ADVANCEMENT_LEVEL;
         let cap = self.cap_level();
@@ -427,12 +429,17 @@ impl Campaign {
         }
         let clears = self.first_clears.len() as u32;
         let liberations = self.liberated_count();
-        let clear_raises = cap_level_for(clears + 1, liberations) > cap;
+        let new_clear_possible = content()
+            .levels
+            .iter()
+            .any(|level| !self.first_clears.contains(&level.id));
+        let clear_raises = new_clear_possible && cap_level_for(clears + 1, liberations) > cap;
         let liberation_raises = cap_level_for(clears, liberations + 1) > cap;
         match (liberation_raises, clear_raises) {
+            (true, true) => "Liberate a country or clear a new stage to raise the allowance.",
             (true, false) => "Liberate a country to raise the allowance.",
             (false, true) => "Clear a new stage to raise the allowance.",
-            _ => "Liberate a country or clear a new stage to raise the allowance.",
+            (false, false) => "Liberate more countries to raise the allowance.",
         }
         .to_owned()
     }
