@@ -89,13 +89,30 @@ fn production(source: &'static str) -> &'static str {
     source.split("#[cfg(test)]").next().unwrap()
 }
 
-/// Whether `line` holds an integer literal `25` token (not `25.0`, `250`
-/// or `x25`).
+/// Integer literal suffixes: `25u64` and `25_u64` are still the price.
+const INTEGER_SUFFIXES: [&str; 12] = [
+    "u8", "u16", "u32", "u64", "u128", "usize", "i8", "i16", "i32", "i64", "i128", "isize",
+];
+
+/// Whether `line` holds an integer literal `25` token, bare or with an
+/// integer suffix (`25u64`, `25_u64`), but not `25.0`, `250`, `25_000`,
+/// `25f32` or `x25`.
 fn has_literal_25(line: &str) -> bool {
     let bytes = line.as_bytes();
     let word = |b: u8| b.is_ascii_alphanumeric() || b == b'_' || b == b'.';
     line.match_indices("25").any(|(at, _)| {
-        (at == 0 || !word(bytes[at - 1])) && bytes.get(at + 2).is_none_or(|&b| !word(b))
+        if at > 0 && word(bytes[at - 1]) {
+            return false;
+        }
+        let rest = &line[at + 2..];
+        let tail = rest
+            .find(|c: char| !(c.is_ascii_alphanumeric() || c == '_'))
+            .map_or(rest, |end| &rest[..end]);
+        if tail.is_empty() {
+            // `25.0` is a float; a bare `25` ends here.
+            return !rest.starts_with('.');
+        }
+        INTEGER_SUFFIXES.contains(&tail.strip_prefix('_').unwrap_or(tail))
     })
 }
 
@@ -109,10 +126,25 @@ fn camp_price_scan_flags_literals_and_raw_recruit_cost() {
         "        self.spend(25)?;",
         "            && g.campaign.coins >= 25",
         "RecommendationAction::BuyTraining,25);",
+        // A typed literal is still the price.
+        "        self.spend(25u64)?;",
+        "            && g.campaign.coins >= 25_u64",
+        "let price: u32 = 25i32 as u32;",
+        "x(25usize)",
     ] {
         assert!(has_literal_25(line), "{line}");
     }
-    for line in ["a.stamina >= 25.0", "250", "x25", "1.25"] {
+    for line in [
+        "a.stamina >= 25.0",
+        "250",
+        "x25",
+        "1.25",
+        "25_000",
+        "25f32",
+        "25_f64",
+        "25ux",
+        "x_25",
+    ] {
         assert!(!has_literal_25(line), "{line}");
     }
     assert!(!"let price = world().strategy_config.recruit_cost;".contains(RECRUIT_PRICE_BASE));
