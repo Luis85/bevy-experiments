@@ -691,6 +691,28 @@ fn results_loot_survives_reload_and_offers_upgrades_for_defender() {
     assert_eq!(offered(&g), Vec::<u64>::new());
     g.recall_survivor(b).unwrap();
     assert_eq!(offered(&g), [vest]);
+    // An item another deployment holds is not offered, though the defender
+    // is free: a second recruit takes the vest on an expedition.
+    let other = g
+        .with_strategy(|strategy, campaign| strategy.recruit(campaign, &country))
+        .unwrap();
+    g.apply(&Command::EquipRecruit {
+        id: other,
+        item: vest,
+    })
+    .unwrap();
+    let away = g.deploy_survivor(other, &country, 0).unwrap();
+    assert!(g.campaign().item_reserved(vest), "held by the expedition");
+    let r = g
+        .strategy()
+        .roster
+        .iter()
+        .find(|r| r.id == recruit)
+        .unwrap();
+    assert_eq!(r.status, RecruitStatus::Ready, "the defender is in camp");
+    assert_eq!(offered(&g), Vec::<u64>::new());
+    g.recall_survivor(away).unwrap();
+    assert_eq!(offered(&g), [vest]);
 
     // The same drops after Mara's run are judged for Mara: the marksman
     // rifle beats her carbine, the axes and the vest do not beat her tier-4
