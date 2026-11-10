@@ -250,8 +250,6 @@ fn boss_crossing_50_percent_enters_phase_once_with_90_tick_hold_event_and_surviv
     }
 }
 
-/// A Caller in phase 1 calls its reinforcements after `call_interval ×
-/// 0.6`: 540 ticks instead of 900.
 /// Design enemy-balance §6: for its 90-tick hold a boss in contact at the
 /// line neither counts down its attack nor strikes, then resumes on the
 /// tick the hold ends. The phase enters on tick 150, so the hold spans the
@@ -315,6 +313,8 @@ fn held_boss_neither_counts_down_nor_strikes() {
     }
 }
 
+/// A Caller in phase 1 calls its reinforcements after `call_interval ×
+/// 0.6`: 540 ticks instead of 900.
 #[test]
 fn caller_phase_shortens_interval() {
     for mode in [Mode::Personal, Mode::Npc] {
