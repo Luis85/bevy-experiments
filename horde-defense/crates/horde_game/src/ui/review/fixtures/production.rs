@@ -1,10 +1,12 @@
-//! The production pass's wave-1 review scenes (design-qa-captures 1.8).
+//! The production pass's wave-1 review scenes (design-qa-captures 1.8) and
+//! the wave-2 close stills (W2-55).
 //!
 //! The recipes in this file stage feature state through
 //! `Game::apply(&Command)`; the `staging()` seam and the other non-command
 //! `Game` mutators (`deploy`, `set_paused`, `sell_item`, ...) appear here
 //! only inside top-level `entitle_*` helpers (the start country, coins,
-//! experience, earlier stage clears and inventory grants);
+//! experience, earlier stage clears, inventory grants, and the boss-phase
+//! clock and wound);
 //! `repo_checks::production_fixtures_stage_features_through_commands`
 //! enforces it for this file only. One exception, sanctioned by
 //! design-qa-captures (operations-observer row): `prepare_operations_observer`
@@ -66,6 +68,17 @@ pub(in crate::ui::review) const BATTLE_MID_GEOMETRY: (u8, f32) = (7, 16.0);
 /// seconds. Two enemies a lane only gather near defeat.
 pub(in crate::ui::review) const BATTLE_MID_TICKS: u64 = 60 * 20;
 
+/// The boss-phase rank: the first whose Normal boss has a phase (W2-36).
+pub(in crate::ui::review) const BOSS_PHASE_RANK: u64 = 5;
+/// Ticks of the 90-tick hold played before the boss-phase still: a third,
+/// so the still lands mid-hold and a motion export sees the rest.
+pub(in crate::ui::review) const BOSS_PHASE_HOLD_PLAYED: u32 = 30;
+/// Smoke-input play before the boss-phase clock advances: twenty seconds.
+const BOSS_PHASE_PLAY_TICKS: u32 = 60 * 20;
+/// The director spawns the boss within a second of its time.
+const BOSS_ARRIVAL_TICK_CAP: u32 = 60;
+/// The boss walks in for eight seconds, as in the boss scene.
+const BOSS_WALK_TICKS: u32 = 60 * 8;
 /// A results-defeat run that has not settled after 10 minutes is a bug.
 const DEFEAT_TICK_CAP: u32 = 36_000;
 /// The first player shot comes within a second of the trigger.
@@ -82,6 +95,7 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "weapon-classes-turret" => prepare_turret(f),
         "battle-mid" => prepare_battle_mid(f),
         "operations-observer" => prepare_operations_observer(f),
+        "boss-phase" => prepare_boss_phase(f),
         _ => {
             let Some(&(_, class, item)) = WEAPON_CLASS_SCENES
                 .iter()
@@ -136,6 +150,20 @@ fn entitle_victories(f: &mut FrontendParts, victories: u64) {
         campaign.first_clear(level, Mode::Personal);
         campaign.finish_attempt();
     }
+}
+/// The defense clock one tick before its boss's time, as
+/// `peak_render_fixture` sets it, so the director spawns the boss itself.
+fn entitle_boss_clock(f: &mut FrontendParts) {
+    let a = f.game.staging().attempt().expect("a live defense");
+    let boss_tick = (a.boss_time() * 60.0).ceil() as u64;
+    a.tick = a.tick.max(boss_tick.saturating_sub(1));
+}
+/// The live boss wounded to half its hit points, its first phase threshold;
+/// the next tick enters the phase by the core's own rule.
+fn entitle_boss_wound(f: &mut FrontendParts) {
+    let a = f.game.staging().attempt().expect("a live defense");
+    let boss = a.enemies.iter_mut().find(|e| e.boss).expect("the boss");
+    boss.hp = boss.max_hp / 2;
 }
 fn entitle_coins(f: &mut FrontendParts, coins: u64) {
     f.game.staging().campaign().reward(coins, 0, Mode::Personal);
@@ -371,6 +399,48 @@ fn prepare_battle_mid(f: &mut FrontendParts) {
     deploy(f, 0, Mode::Personal);
     for _ in 0..BATTLE_MID_TICKS {
         assert!(f.game.attempt().is_some(), "battle-mid stays live");
+        f.game.tick(Input::default());
+    }
+    pause(f);
+}
+
+/// A boss inside its phase hold (W2-37's close capture): a stage-0 defense
+/// at `BOSS_PHASE_RANK`, played with the smoke input for
+/// `BOSS_PHASE_PLAY_TICKS`. Then the clock advances to the boss's time and
+/// the director spawns the boss by its own rule (a level-1 survivor does not
+/// outlast a rank-5 horde to its 240-second boss). The boss walks in for
+/// `BOSS_WALK_TICKS`, is wounded to its first threshold, enters the phase on
+/// the next tick and holds for `BOSS_PHASE_HOLD_PLAYED` more, then the still
+/// pauses.
+fn prepare_boss_phase(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    entitle_victories(f, BOSS_PHASE_RANK);
+    deploy(f, 0, Mode::Personal);
+    for _ in 0..BOSS_PHASE_PLAY_TICKS {
+        assert!(f.game.attempt().is_some(), "the defense stands");
+        let input = horde_core::sim::smoke_input(&f.game);
+        f.game.tick(input);
+    }
+    entitle_boss_clock(f);
+    for _ in 0..BOSS_ARRIVAL_TICK_CAP {
+        if f.game.attempt().expect("the defense stands").boss_spawned {
+            break;
+        }
+        f.game.tick(Input::default());
+    }
+    assert!(
+        f.game.attempt().is_some_and(|a| a.boss_spawned),
+        "no boss within {BOSS_ARRIVAL_TICK_CAP} ticks of its time"
+    );
+    for _ in 0..BOSS_WALK_TICKS {
+        f.game.tick(Input::default());
+    }
+    entitle_boss_wound(f);
+    let entered = tick_until(f, 1, Input::default(), |event| {
+        matches!(event, SimEvent::BossPhase { phase: 1, .. })
+    });
+    assert!(entered, "the wounded boss enters its first phase");
+    for _ in 0..BOSS_PHASE_HOLD_PLAYED {
         f.game.tick(Input::default());
     }
     pause(f);

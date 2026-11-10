@@ -357,6 +357,7 @@ Targets: median at most 50 ms in the default row and at most 34 ms with Low late
   - `equipment_autosell_rule_counts_only_below_uncommon_in_core` (2 of 6 qualities, Poor and Common; this line read "1 of 6" before the W2 review)
   - `briefing_recruit_staging_sets_next_defender_through_command`
 - `repo_checks::production_fixtures_stage_features_through_commands` scans fixtures/production.rs for `staging()` outside `fn entitle_*`.
+- Wave-2 close stills (W2-55, W2 review): `boss-phase` (W2-37's phase hold: a rank-5 boss wounded into phase 1, paused with 60 of 90 hold ticks left; `boss_phase_fixture_pauses_a_boss_inside_its_phase_hold`).
 
 ### Wave 3
 - Register upgrades, camp-home, briefing-recruit, equipment-autosell, results-liberation-recruit and takeover-battle; save-error gains the modal.

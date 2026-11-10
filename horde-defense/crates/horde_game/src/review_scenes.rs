@@ -92,6 +92,19 @@ const fn wave1_still(
     }
 }
 
+/// A wave-2 close still (W2-55) with its owner and its wave-0 "before" scene.
+const fn wave2_still(
+    name: &'static str,
+    owner: &'static str,
+    before_proxy: &'static str,
+    motion: bool,
+) -> ReviewScene {
+    ReviewScene {
+        since_wave: 2,
+        ..wave1_still(name, owner, before_proxy, motion)
+    }
+}
+
 /// Every named scene. Workshop prefixes are in `WORKSHOP_PREFIXES`.
 pub const REVIEW_SCENES: &[ReviewScene] = &[
     // The 41 wave-0 capture_review.ps1 stills, in that script's order.
@@ -171,6 +184,8 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     wave1_still("fx-stress", "perf-architecture", "max-lanes", true),
     wave1_still("battle-mid", "ux-flow", "battle", false),
     wave1_still("operations-observer", "ux-flow", "operations", false),
+    // Wave-2 close stills (W2-55): W2-37's phase hold.
+    wave2_still("boss-phase", "vfx-lighting", "boss", true),
 ];
 
 /// Workshop scenes named `<prefix><model id>`.
@@ -351,7 +366,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13
+            46 + 13 + 1
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

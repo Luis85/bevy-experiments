@@ -263,6 +263,8 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     ("fx-stress", Screen::Battle, None),
     ("battle-mid", Screen::Battle, None),
     ("operations-observer", Screen::Camp, Some(Tab::Operations)),
+    // Wave-2 close stills (W2-55).
+    ("boss-phase", Screen::Battle, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1218,4 +1220,50 @@ fn briefing_recruit_staging_sets_next_defender_through_command() {
             .is_some_and(|option| option.selectable.is_ok()),
         "the recruit can defend next"
     );
+}
+
+// ----- Wave-2 close stills (W2-55) -----
+
+/// W2-37's close capture needs a boss inside its phase hold: the boss-phase
+/// still stages a boss past rank 4 that crossed half its hit points, paused
+/// mid-hold, so the view carries the phase in normal and reduced effects.
+#[test]
+fn boss_phase_fixture_pauses_a_boss_inside_its_phase_hold() {
+    assert_eq!(
+        review_scenes::lookup("boss-phase"),
+        Some(review_scenes::SceneKind::Still),
+        "boss-phase is a registered still"
+    );
+    let f = staged("boss-phase");
+    assert!(f.screen == Screen::Battle, "staged {:?}", f.screen);
+    let a = f.game.attempt().expect("a live battle");
+    assert!(a.paused, "the still is paused mid-hold");
+    assert!(
+        a.progression.rank > 4,
+        "rank {} has no phases",
+        a.progression.rank
+    );
+    let boss = a.enemies.iter().find(|e| e.boss).expect("a boss");
+    assert!(boss.boss_held(a.tick), "tick {}: the boss holds", a.tick);
+    for reduced in [false, true] {
+        let view = crate::battle_view::BattleViewModel::build(
+            a,
+            crate::animation::SceneAnimation::sample(a, reduced),
+            crate::battle_view::SceneBlend::NONE,
+            reduced,
+        );
+        let phase = view
+            .boss_phase
+            .unwrap_or_else(|| panic!("reduced {reduced}: the view carries the phase"));
+        assert_eq!((phase.boss_id, phase.transition), (boss.id, 1));
+        assert!(
+            phase.hold_left_ticks > 0 && phase.hold_left_ticks < 90,
+            "reduced {reduced}: mid-hold, {} ticks left",
+            phase.hold_left_ticks
+        );
+        assert_eq!(
+            phase.hold_left_ticks,
+            90 - u64::from(fixtures::production::BOSS_PHASE_HOLD_PLAYED)
+        );
+    }
 }
