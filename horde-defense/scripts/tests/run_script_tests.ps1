@@ -78,6 +78,12 @@ public static class LastLightNativeHelper {
             Thread.Sleep(int.Parse(args[1]) * 1000);
             return 0;
         }
+        // 'mark <file> <s>' sleeps, then writes <file> as it exits, so a caller can tell a sample taken before the exit.
+        if (args.Length == 3 && args[0] == "mark") {
+            Thread.Sleep(int.Parse(args[2]) * 1000);
+            File.WriteAllText(args[1], "exited");
+            return 0;
+        }
         if (args.Length == 4 && args[0] == "parent") {
             ProcessStartInfo info = new ProcessStartInfo(Process.GetCurrentProcess().MainModule.FileName, "sleep " + args[3]);
             info.UseShellExecute = false;
@@ -691,21 +697,44 @@ try {
         Assert-True ($null -eq $none.Mean -and $null -eq $none.Max) 'no mean or max without samples'
     }
 
-    Test-Case 'Invoke-Native -Sample runs the sampler at the start and every interval until the exit (R30)' {
-        $script:sampleWatch = [Diagnostics.Stopwatch]::StartNew()
-        $script:sampleTimes = New-Object System.Collections.Generic.List[double]
-        $r = Invoke-Native -FilePath $helper -Arguments @('sleep', '2') -LogStem (Join-Path $temporary 'logs\sampled') -TimeoutSeconds 30 -Sample { $script:sampleTimes.Add($script:sampleWatch.Elapsed.TotalSeconds) } -SampleMilliseconds 500
+    # The -Sample cases assert the sampling structure, not the wall clock: machine load stretches process start-up and the
+    # child's lifetime, so no bound below depends on how long a run took on this machine. The 'mark' helper writes its
+    # marker only as it exits, so a sample that sees no marker was taken while the child still ran. The sample counts are
+    # bounded below by the structure and above by twice the wait slices of the run's own measured length (or its timeout),
+    # which load can only lengthen.
+    Test-Case 'Invoke-Native -Sample samples once right after the start, before the first wait (R30)' {
+        $script:sampleMarker = Join-Path $temporary 'sampled-start.exited'
+        $script:sampleSeen = New-Object System.Collections.Generic.List[bool]
+        # A 600 s interval: the first wait outlasts the child, so every sample but the first would come after the exit.
+        $r = Invoke-Native -FilePath $helper -Arguments @('mark', $script:sampleMarker, '2') -LogStem (Join-Path $temporary 'logs\sampled-start') -TimeoutSeconds 30 -Sample { $script:sampleSeen.Add((Test-Path -LiteralPath $script:sampleMarker)) } -SampleMilliseconds 600000
         Assert-Equal 0 $r.ExitCode 'exit code'
-        Assert-True ($script:sampleTimes.Count -ge 4 -and $script:sampleTimes.Count -le 6) "samples over 2 s at 500 ms: $($script:sampleTimes -join ', ')"
-        Assert-True ($script:sampleTimes[0] -lt 0.4) "the first sample is at the start: $($script:sampleTimes[0])"
-        $script:sampleTimes.Clear()
+        Assert-True (Test-Path -LiteralPath $script:sampleMarker) 'the helper marks its exit'
+        Assert-Equal 'False' ($script:sampleSeen -join ',') 'exactly one sample, taken before the child exited'
+    }
+
+    Test-Case 'Invoke-Native -Sample samples again every interval until the exit (R30)' {
+        $script:sampleMarker = Join-Path $temporary 'sampled.exited'
+        $script:sampleSeen = New-Object System.Collections.Generic.List[bool]
+        $r = Invoke-Native -FilePath $helper -Arguments @('mark', $script:sampleMarker, '2') -LogStem (Join-Path $temporary 'logs\sampled') -TimeoutSeconds 30 -Sample { $script:sampleSeen.Add((Test-Path -LiteralPath $script:sampleMarker)) } -SampleMilliseconds 500
+        Assert-Equal 0 $r.ExitCode 'exit code'
+        Assert-True (-not $script:sampleSeen[0]) "the first sample comes before the exit: $($script:sampleSeen -join ', ')"
+        # The child sleeps 2 s after its own start-up, so it outlives at least two 500 ms intervals.
+        Assert-True ($script:sampleSeen.Count -ge 2) "a child that outlives two intervals is sampled again: $($script:sampleSeen.Count)"
+        $most = 2 * (1 + [Math]::Ceiling($r.Seconds / 0.5))
+        Assert-True ($script:sampleSeen.Count -le $most) "one sample per 500 ms wait slice of the $($r.Seconds) s run (at most $most): $($script:sampleSeen.Count)"
+    }
+
+    Test-Case 'Invoke-Native -Sample keeps sampling up to the timeout, and a sampled run still times out (R30)' {
+        $script:sampleSeen = New-Object System.Collections.Generic.List[bool]
         $message = $null
         try {
-            Invoke-Native -FilePath $helper -Arguments @('sleep', '30') -LogStem (Join-Path $temporary 'logs\sampled-hung') -TimeoutSeconds 1 -Sample { $script:sampleTimes.Add(0) } -SampleMilliseconds 400 | Out-Null
+            Invoke-Native -FilePath $helper -Arguments @('sleep', '30') -LogStem (Join-Path $temporary 'logs\sampled-hung') -TimeoutSeconds 1 -Sample { $script:sampleSeen.Add($false) } -SampleMilliseconds 400 | Out-Null
         }
         catch { $message = $_.Exception.Message }
         Assert-True ($message -match 'Timed out after 1 s') "a sampled run still times out: $message"
-        Assert-True ($script:sampleTimes.Count -ge 2 -and $script:sampleTimes.Count -le 4) "samples before the timeout: $($script:sampleTimes.Count)"
+        Assert-True ($script:sampleSeen.Count -ge 1) "a sample before the timeout: $($script:sampleSeen.Count)"
+        # A 1 s timeout holds at most three 400 ms wait slices and the sample after the last.
+        Assert-True ($script:sampleSeen.Count -le 8) "one sample per wait slice of the 1 s timeout (at most 8): $($script:sampleSeen.Count)"
     }
 
     Test-Case 'Exit-DisplayHold restores an outer hold it did not create (R31: the A/B sitting holds the display around each pass)' {
