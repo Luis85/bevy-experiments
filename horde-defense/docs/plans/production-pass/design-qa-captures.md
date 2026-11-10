@@ -134,7 +134,7 @@ Shared rules:
 | upgrades | 3 | ux-flow | Upgrades | Back to battle | journey-upgrades | journey-upgrades staging, then Screen::Upgrades. |
 | camp-home | 3 | ux-flow | Camp (home) | Go to briefing | active-camp | Roster with 2 recruits, a guard, a live expedition, an outbreak and Mara met. |
 | briefing-recruit | 3 | campaign-defenders | Tab::Briefing | (loop map) | briefing-npc | A recruit is ready, then `f.act(Command::SetNextDefender(recruit))`, then open_briefing. |
-| equipment-autosell | 3 | loot-economy | Tab::Armory + Auto-sell panel | - | quality-armory | One tier-1 Ranged item per `Quality::ALL` (as matrix.rs:198-211), then `Command::SetAutoSell{enabled:true, sell_below:Uncommon}`. The preview reads "would have sold 1". |
+| equipment-autosell | 3 | loot-economy | Tab::Armory + Auto-sell panel | - | quality-armory | One tier-1 Ranged item per `Quality::ALL` (as matrix.rs:198-211), then `Command::SetAutoSell{enabled:true, sell_below:Uncommon}`. The preview reads "would have sold 2": decision 6 sells strictly below Uncommon, so the Poor and the Common drop (`auto_sell_preview`; W2-46 pins 2, W2 review; this row read "1" before). |
 | results-liberation-recruit | 3 | campaign-defenders | Results | Choose next country | journey-liberated | purchase `recruitment_network` (skills.json:4019) and SetAutoSell before the final win, then `prepare_journey_victory(f,true)`. Shows "Recruit from Germany" and "Auto-sold N +C". |
 | takeover-battle | 3 | campaign-defenders / vfx | Battle | - | npc | SetNextDefender(recruit) and deploy. Asserts the drawn identity comes from the defender, not the Mode::Npc Female default (art/battlefield/mod.rs:104-108). |
 | storm | 5 | vfx-lighting | Battle | - | battle | `first_stage_where(t.storm)`. The presentation tick is chosen so one pulse peaks inside the motion window. |
@@ -354,7 +354,7 @@ Targets: median at most 50 ms in the default row and at most 34 ms with Low late
 
 ### Wave 2
 - Core-only staging helpers compile against the real Commands as loot-economy and campaign-defenders land them:
-  - `equipment_autosell_rule_counts_only_below_uncommon_in_core` (1 of 6 qualities)
+  - `equipment_autosell_rule_counts_only_below_uncommon_in_core` (2 of 6 qualities, Poor and Common; this line read "1 of 6" before the W2 review)
   - `briefing_recruit_staging_sets_next_defender_through_command`
 - `repo_checks::production_fixtures_stage_features_through_commands` scans fixtures/production.rs for `staging()` outside `fn entitle_*`.
 
