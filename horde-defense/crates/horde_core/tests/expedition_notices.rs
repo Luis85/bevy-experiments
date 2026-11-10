@@ -155,6 +155,42 @@ fn each_settled_expedition_yields_exactly_one_notice_across_save_reload() {
     assert_eq!(announced(&reload(&g)), Vec::<u64>::new());
 }
 
+/// schema-v7 "Pure read APIs": `unacknowledged_outcomes` changes nothing
+/// (no RNG, no mutation) whether it lists nothing, skips a live expedition,
+/// announces settled ones, skips an acknowledged one, reports a folded count
+/// or meets the v6 summary-less battles.
+#[test]
+fn unacknowledged_outcomes_is_a_pure_read() {
+    let pure = |g: &Game, label: &str| {
+        let before = serde_json::to_value(g).unwrap();
+        let first = g.unacknowledged_outcomes();
+        assert_eq!(serde_json::to_value(g).unwrap(), before, "{label}");
+        assert_eq!(g.unacknowledged_outcomes(), first, "{label}: repeatable");
+        first
+    };
+    let (mut g, country, ids) = game_with_recruits(3);
+    assert_eq!(pure(&g, "no expeditions").notices, Vec::new());
+    let won = g.deploy_survivor(ids[0], &country, 0).unwrap();
+    let recalled = g.deploy_survivor(ids[1], &country, 0).unwrap();
+    let live = g.deploy_survivor(ids[2], &country, 0).unwrap();
+    advance(&mut g, 2);
+    assert_eq!(pure(&g, "live expeditions").notices, Vec::new());
+    win_stage(&mut g, won);
+    g.recall_survivor(recalled).unwrap();
+    let settled = pure(&g, "settled and live");
+    let ids_of = |n: &horde_core::sim::OutcomeNotices| -> Vec<u64> {
+        n.notices.iter().map(|n| n.battle).collect()
+    };
+    assert_eq!(ids_of(&settled), [won, recalled]);
+    acknowledge(&mut g, vec![won], 0);
+    g.strategy_mut().folded_outcomes = 2;
+    let after = pure(&g, "acknowledged and folded");
+    assert_eq!((ids_of(&after), after.folded), (vec![recalled], 2));
+    assert!(ids_of(&after).iter().all(|id| *id != live));
+    let v6 = Game::decode_save_generation(FIXTURE_V6.as_bytes()).expect("v6 fixture");
+    assert_eq!(pure(&v6, "v6 battles").notices, Vec::new());
+}
+
 #[test]
 fn acknowledge_outcomes_ignores_live_expeditions() {
     let (mut g, country, ids) = game_with_recruits(1);
