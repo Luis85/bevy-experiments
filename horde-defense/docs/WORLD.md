@@ -47,9 +47,11 @@ real-world prosperity, conflict, safety, or assessments of national populations.
 
 Modifiers have concrete gameplay fields: enemy health, enemy speed, reward
 multiplier, additive build supply, personal weapon damage and NPC attack skill.
-The starting country does not change these values. Encounter templates provide
-the five battlefield roles; a country can contain more local stages than
-templates.
+The starting country does not change these authored values, but the start clamp
+below changes its effective difficulty, and with it the enemy health, enemy
+speed and reward multipliers its deployments play (Austria 0.85 plays 0.95,
+Bangladesh 1.60 plays 1.05). Encounter templates provide the five battlefield
+roles; a country can contain more local stages than templates.
 
 Country difficulty spans 0.85-1.60 in whole hundredths. The band follows the
 country's size alone, through the stage count that population already sets,
