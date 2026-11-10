@@ -367,7 +367,7 @@ fn recruiting_draws_no_strategy_rng() {
             "recruiting drew the strategy RNG"
         );
     }
-    // The keyed choice follows the game seed, never the strategy RNG.
+    // The keyed choice never follows the strategy RNG.
     let base = camp(4, 0, true);
     let mut reseeded = base.clone();
     reseeded.strategy_mut().rng = horde_core::rules::Rng::new(99);
@@ -377,6 +377,55 @@ fn recruiting_draws_no_strategy_rng() {
             reseeded.recruit_offer(&country)
         );
     }
+}
+
+/// W2 review (ruling E7): the game's offer is keyed on the game seed and
+/// the next recruit id as well as the country. Each changes some second
+/// archetype with the others held, the first staying the rotation's.
+#[test]
+fn recruit_offer_follows_the_game_seed_and_next_recruit_id() {
+    let base = camp(4, 0, true);
+    let countries = base.campaign().world.cleared.clone();
+    let seconds = |game: &Game| -> Vec<Archetype> {
+        countries
+            .iter()
+            .map(|country| {
+                let [first, second] = game
+                    .recruit_offer(country)
+                    .unwrap()
+                    .archetypes
+                    .map(|choice| choice.archetype);
+                assert_eq!(first, Archetype::rotation(game.strategy().next_recruit_id));
+                assert_eq!(
+                    [first, second],
+                    game.strategy().recruit_offer_for(game.seed(), country),
+                    "the offer is keyed on the game seed"
+                );
+                second
+            })
+            .collect()
+    };
+    let at_base = seconds(&base);
+    let reseeded = [1, 7, 0xDEAD_BEEF_2026, u64::MAX].map(|seed| {
+        let mut game = base.clone();
+        game.set_seed(seed);
+        seconds(&game)
+    });
+    assert!(
+        reseeded.iter().any(|s| *s != at_base),
+        "the game seed keys the offer: {at_base:?} {reseeded:?}"
+    );
+    // Recruit ids 1, 5, 9, ... share the rotation's first archetype.
+    let later = (1..=4u64).map(|n| {
+        let mut game = base.clone();
+        game.strategy_mut().next_recruit_id = 1 + 4 * n;
+        seconds(&game)
+    });
+    assert!(
+        later.clone().any(|s| s != at_base),
+        "the next recruit id keys the offer: {at_base:?} {:?}",
+        later.collect::<Vec<_>>()
+    );
 }
 
 #[test]
