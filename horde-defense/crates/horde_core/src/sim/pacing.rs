@@ -457,7 +457,9 @@ pub struct PacingRun {
     /// Nodes learned in camp before this run.
     pub learned: Vec<String>,
     /// Coins spent in camp before this run, by purpose. Training stays 0
-    /// until a plan trains; recruiting is paid only by a takeover plan.
+    /// until a plan trains; recruiting is paid by a takeover plan
+    /// (`recruit_when_ready`) and by a strategy plan that recruits
+    /// (`StrategyPlan.recruit_up_to` > 0).
     pub spent_tree: u64,
     pub spent_gear: u64,
     pub spent_training: u64,
