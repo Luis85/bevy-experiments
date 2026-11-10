@@ -100,7 +100,8 @@ positional paths or fetched with `--download`. It refuses source bytes that do
 not match the sha256 pins in `sources` (exit 3; `--allow-source-drift` accepts
 and re-pins them) and any change to a country's stage count (exit 4;
 `--allow-stage-count-change`), and it keeps the top-level configuration and
-each `level_override`. `--self-test` exercises every mode on throwaway files.
+each country's `level_override`, `stage_theme_ids` and any other key the
+generator does not build. `--self-test` exercises every mode on throwaway files.
 The rebuild computes adjacency before simplifying display coordinates, checks
 connectivity during generation, and emits stable sorted IDs and neighbors.
 Change `difficulty` only through the generator, and review the diff of any

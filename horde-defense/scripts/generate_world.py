@@ -15,7 +15,8 @@ python -I -B scripts/generate_world.py --rebuild (110m.geojson 50m.geojson | --d
     --allow-source-drift, which re-pins them) and no country's stage count may
     change (exit 4, unless --allow-stage-count-change). Every top-level key other
     than `sources` and `countries` (version, the level config, strategy_config,
-    stage_themes) and each country's `level_override` are carried over.
+    stage_themes) and each country's `level_override`, `stage_theme_ids` and any
+    other key the generator does not build are carried over.
 python -I -B scripts/generate_world.py --self-test
     Exercises the modes above on throwaway files in a temporary directory.
 
@@ -211,9 +212,16 @@ def rebuild(world, raws, allow_source_drift=False, allow_stage_count_change=Fals
     if drift and not allow_source_drift:
         raise Refused(SOURCE_DRIFT, 'source sha256 drift: ' + '; '.join(drift) + ' (--allow-source-drift accepts and re-pins)')
     countries, links, routes = build_countries(raws)
-    overrides = {country['id']: country.get('level_override') for country in world.get('countries', [])}
+    # Authored per-country data survives: level_override, and every key the
+    # generator does not build (stage_theme_ids, world.rs Country), in its
+    # committed order after the generated keys.
+    committed = {country['id']: country for country in world.get('countries', [])}
     for country in countries:
-        country['level_override'] = overrides.get(country['id'])
+        old = committed.get(country['id'], {})
+        country['level_override'] = old.get('level_override')
+        for key, value in old.items():
+            if key not in country:
+                country[key] = copy.deepcopy(value)
     out = copy.deepcopy(world)
     out['sources'] = sources
     out['countries'] = countries
@@ -406,6 +414,12 @@ def self_test():
         authored = world.read_bytes()
         code, text = run(*rebuild_argv)
         case('--rebuild is reproducible and keeps each level_override', code == 0 and world.read_bytes() == authored,
+             f'exit {code}: {text.strip()}')
+        rebuilt['countries'][0]['stage_theme_ids'] = ['self-test-theme']
+        world.write_bytes(render(rebuilt))
+        authored = world.read_bytes()
+        code, text = run(*rebuild_argv)
+        case('--rebuild keeps each authored stage_theme_ids', code == 0 and world.read_bytes() == authored,
              f'exit {code}: {text.strip()}')
         code, text = run('--check', *rebuild_argv)
         case('--check --rebuild exits 0 on a reproduced catalogue', code == 0, f'exit {code}: {text.strip()}')
