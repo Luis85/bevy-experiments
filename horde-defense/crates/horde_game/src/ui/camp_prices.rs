@@ -29,20 +29,38 @@ pub(super) fn training_point(campaign: &Campaign, npc: &Npc) -> PriceButton {
     }
 }
 
-/// "Recruit survivor" in `country` at the core recruit price.
+/// "Recruit survivor" in `country` at the core recruit price. The disabled
+/// hover names each blocker that holds the button, in the order the checks
+/// read; an open button keeps the whole requirement list.
 pub(super) fn recruit(game: &Game, country: &str) -> PriceButton {
     let campaign = game.campaign();
     let price = campaign.recruit_price();
-    let enabled = campaign.world.cleared.iter().any(|id| id == country)
-        && game.strategy().roster.len() < world().strategy_config.max_roster
-        && campaign.coins >= price
-        && campaign.reserved.is_none();
+    let max = world().strategy_config.max_roster;
+    let blockers: Vec<String> = [
+        (!campaign.world.cleared.iter().any(|id| id == country))
+            .then(|| "Choose a liberated country.".to_owned()),
+        (game.strategy().roster.len() >= max)
+            .then(|| format!("The roster is full ({max} survivors).")),
+        (campaign.coins < price)
+            .then(|| format!("Requires {price} coins; you have {}.", campaign.coins)),
+        campaign
+            .reserved
+            .is_some()
+            .then(|| "Return the active defender to camp first.".to_owned()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect();
     PriceButton {
         label: format!("Recruit survivor · {price} coins"),
-        enabled,
-        disabled_hover: format!(
-            "Choose a liberated country, keep space in the roster and {price} coins, and return the active defender to camp."
-        ),
+        enabled: blockers.is_empty(),
+        disabled_hover: if blockers.is_empty() {
+            format!(
+                "Requires a liberated country, room in the roster, {price} coins and the active defender in camp."
+            )
+        } else {
+            blockers.join(" ")
+        },
     }
 }
 
@@ -104,6 +122,55 @@ mod tests {
         assert!(!training_point(game.campaign(), &game.campaign().npc).enabled);
         let (game, _) = camp_at_rank_10(50);
         assert!(training_point(game.campaign(), &game.campaign().npc).enabled);
+    }
+
+    /// The recruit hover names each blocker that holds the button, so coins
+    /// alone read as coins alone (W2 review), and the full list stays a
+    /// readable sentence.
+    #[test]
+    fn recruit_hover_names_only_the_blockers() {
+        let (game, country) = camp_at_rank_10(199);
+        assert_eq!(
+            recruit(&game, &country).disabled_hover,
+            "Requires 200 coins; you have 199."
+        );
+        let (mut game, country) = camp_at_rank_10(1_000);
+        game.staging().campaign().reserved = Some(horde_core::content::Mode::Personal);
+        assert_eq!(
+            recruit(&game, &country).disabled_hover,
+            "Return the active defender to camp first."
+        );
+        let (game, _) = camp_at_rank_10(1_000);
+        let elsewhere = world()
+            .countries
+            .iter()
+            .find(|c| !game.campaign().world.cleared.contains(&c.id))
+            .unwrap()
+            .id
+            .clone();
+        assert_eq!(
+            recruit(&game, &elsewhere).disabled_hover,
+            "Choose a liberated country."
+        );
+        // A full roster and short coins: both named, in one sentence each.
+        let (mut game, country) = camp_at_rank_10(1_000_000);
+        let max = world().strategy_config.max_roster;
+        while game.strategy().roster.len() < max {
+            game.apply(&horde_core::command::Command::Recruit(country.clone()))
+                .unwrap();
+        }
+        game.staging().campaign().coins = 0;
+        let price = game.campaign().recruit_price();
+        assert_eq!(
+            recruit(&game, &country).disabled_hover,
+            format!("The roster is full ({max} survivors). Requires {price} coins; you have 0.")
+        );
+        // An open button keeps the whole requirement list as its hover.
+        let (game, country) = camp_at_rank_10(1_000);
+        assert_eq!(
+            recruit(&game, &country).disabled_hover,
+            "Requires a liberated country, room in the roster, 200 coins and the active defender in camp."
+        );
     }
 
     #[test]
