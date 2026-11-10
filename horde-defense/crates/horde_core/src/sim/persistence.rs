@@ -14,7 +14,20 @@ const MAX_GENERATION_BYTES: u64 = 64 * 1024 * 1024;
 ///   with its loadout slots replaced by starter equipment, so ruleset 1
 ///   recordings that sold such an item diverge. No seeded run sells, so
 ///   `GAMEPLAY_TRACE` and `GOLDEN` are unchanged.
-pub const RULESET_VERSION: u32 = 2;
+/// - 3 (W2-49, the wave-2 re-bless): names two changes (ruling R15). W1-69:
+///   enemies no longer queue behind each other in a lane, so every enemy at
+///   the line or a structure attacks (ruleset 2 was kept through wave 1).
+///   Wave 2: auto-sell, takeover, the weighted drop table, the relative
+///   quality roll and loot-only drops, threat-scaled camp prices, the
+///   in-country front ramp, the late growth slopes and floors, elites from
+///   rank 3, boss phases past rank 4, the new archetypes, the country
+///   difficulty bands, the weapon-mastery nodes and the authored level grant
+///   and rank milestones. A recording made under ruleset 2 (from W1-20 on)
+///   can diverge on replay and now warns. `GAMEPLAY_TRACE` is
+///   unchanged by wave 2 (the traced runs are rank 0 with no country);
+///   `GOLDEN` moved for format, telemetry and the drop pick
+///   (tests/determinism.rs).
+pub const RULESET_VERSION: u32 = 3;
 
 /// A save or load failure. `Display` keeps the player-facing wording.
 #[derive(Debug)]
@@ -1122,14 +1135,9 @@ mod tests {
         std::fs::remove_dir(root).unwrap();
     }
 
-    /// Ruleset 2 (W1-20): `SellItem` is strict. The same saved state and
-    /// commands that sold an equipped, preset, recruit-equipped or NPC-issue
-    /// item under ruleset 1 now reject it with `SaleBlocked`.
-    #[test]
-    fn ruleset_version_is_2() {
-        assert_eq!(RULESET_VERSION, 2);
-    }
-
+    /// The envelope names the current ruleset. Ruleset 3 (W2-49, the wave-2
+    /// re-bless) covers W1-69 (no lane queue, R15) and the wave-2 rules, so a
+    /// save or recording written under ruleset 2 warns on load or replay.
     #[test]
     fn envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions() {
         static NEXT: AtomicU64 = AtomicU64::new(0);
@@ -1145,6 +1153,7 @@ mod tests {
         let envelope: SaveEnvelope = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(envelope.version, SAVE_VERSION);
         assert_eq!(envelope.ruleset_version, Some(RULESET_VERSION));
+        assert_eq!(envelope.ruleset_version, Some(3), "ruleset 3 since W2-49");
         assert_eq!(
             envelope.content_fingerprint,
             Some(crate::catalog::content_fingerprint())

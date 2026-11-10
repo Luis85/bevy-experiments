@@ -621,6 +621,13 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
 - Fail-first: `envelopes_carry_version_ruleset_and_fingerprint` asserts 3.
 - Done: PROVISIONAL None; V1-V6 unchanged.
 - Deps: W2-48, W2-52, W2-54.
+- **Done is met (2026-11-10).** `PROVISIONAL` is None and `PROVISIONAL_CAUSES` is empty.
+  - `GOLDEN` folded the six provisional digests. Each run nets F against the wave-1 close anatomy (ab03da9): key paths and the telemetry-stripped payload move, while items, outcome and trace do not. `GAMEPLAY_TRACE` 0/6.
+  - The re-bless log in `tests/determinism.rs` has one row per digest with its causes: W2-05 T, W2-06 F, W2-08 C, W2-52 F, W2-09 G with `support::classify`'s C (R33), and W2-54 F. Below the log is the wave-1 → W2-49 anatomy diff.
+  - `RULESET_VERSION` and `TRACE_RULESET` are 3. The doc comment, the log and VALIDATION.md name W1-69 (no lane queue) and the wave-2 rules.
+  - Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` asserts 3 (`left: Some(2)`, `right: Some(3)` on the parent).
+  - V1-V6, `V6_DROP_TRACE_FNV` and `save_v7.json` are unchanged.
+  - In `target/production-after-wave2/`, smoke and default pacing are byte-identical to W2-54's, and the 20-seed acceptance is in plan §9.2 and §9.6 (VALIDATION.md "Wave-2 re-bless and ruleset 3").
 
 **W2-50 · perf-architecture · The gate-3 episode in the shipped default configuration, before the W2-47 re-gate**
 - Slot: before W2-47; the id is appended so no id changes. W1-61's A/B repeat `target/perf/w1-61/head-ab-playtest-vsync/stress-on-r2` (playtest, pipelined on, VSync on, stress normal: the shipped default configuration) ran about 400 frames of 47-67 ms. Outside driver stalls it had 6 frames over 50 ms (exit 1), 407 over 33 ms, a p99 of 47.1 ms and 46.3 FPS. It is not a driver stall under the user ruling (named coverage 0.89-0.94) and is not attributed (4-6 ms per frame outside App::update). Plan 9.4 and §2.5; VALIDATION.md W1-61.

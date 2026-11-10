@@ -59,12 +59,42 @@
 //! | 1 | W1-69 | 0x1a571167 Personal | 0x3be131386490e3b2->0x2902d75f0238e1a3 | 0x8beb3e2e0553347a->0x5cc8bde4faf09763 | G | W1-69 user decision: enemies no longer queue behind each other (a body that waited 0.65 yd behind another now walks on; outcome at t1800 kills 11, coins 37, loot 1) |
 //! | 1 | W1-69 | 0x1a571167 Npc | unchanged | 0x85ec9e5263ea48af->0x20c2f0bd540515c4 | G | W1-69 user decision: enemies no longer queue behind each other (no passing offset, so traced y and event order move; end state unchanged) |
 //! | 1 | W1-69 | 0xdeadbeef2026 Npc | unchanged | 0x1fda7a0649d44756->0x9d7678e43c2f560f | G | W1-69 user decision: enemies no longer queue behind each other (no passing offset, so traced y and event order move; end state unchanged) |
+//! | 2 | W2-49 | 0x1 Personal | 0x303ea36fac6a070b->0xbed5e2714b6590fe | unchanged | T W2-05, F W2-06, F W2-52, F W2-54; net F | W2-05 telemetry maps; W2-06 drop_tier Some(1); W2-52 level_grant_paid 2 (level 1 -> 2); W2-54 the authored grant makes the shim inert, so level_grant_paid is no longer saved. Anatomy: keys and core move; items, outcome and trace unchanged |
+//! | 2 | W2-49 | 0x1 Npc | 0xeede2391290bb381->0xcffe0be4463d46d6 | unchanged | T W2-05, F W2-06; net F | W2-05 telemetry maps; W2-06 drop_tier Some(1). Anatomy: keys and core move; items, outcome and trace unchanged |
+//! | 2 | W2-49 | 0x1a571167 Personal | 0x2902d75f0238e1a3->0x3368f18097f7fb5e | unchanged | T W2-05, F W2-06, C W2-08, F W2-52, G W2-09 (support::classify: C), F W2-54; net F | W2-05 telemetry maps; W2-06 drop_tier Some(1) and the one drop in drop_ids; W2-08 the 39 loot_only items enlarge the tier-1 pool (12 -> 18), so the one a.rng draw picks another definition; W2-52 level_grant_paid 2; W2-09 the weighted single draw (R33: a gameplay mechanic, G, though classify labels it C, items only) lands on the wave-1 definition again, so the net items hash is unchanged; W2-54 level_grant_paid no longer saved. Anatomy: keys and core move; items, outcome and trace unchanged (t1800 kills 11, coins 37, loot 1) |
+//! | 2 | W2-49 | 0x1a571167 Npc | 0x6a2ba00f7e4018d8->0x97d93e67bd2bed2f | unchanged | T W2-05, F W2-06; net F | W2-05 telemetry maps; W2-06 drop_tier Some(1). Anatomy: keys and core move; items, outcome and trace unchanged |
+//! | 2 | W2-49 | 0xdeadbeef2026 Personal | 0x5aaf1f080eb1da92->0x7be5c84d229d8d71 | unchanged | T W2-05, F W2-06, F W2-52, F W2-54; net F | as 0x1 Personal. Anatomy: keys and core move; items, outcome and trace unchanged |
+//! | 2 | W2-49 | 0xdeadbeef2026 Npc | 0xc1bb9ef207925afc->0x6dcebbedcc7582c9 | unchanged | T W2-05, F W2-06; net F | W2-05 telemetry maps; W2-06 drop_tier Some(1). Anatomy: keys and core move; items, outcome and trace unchanged |
 //!
 //! W1-69 is the wave-1 re-bless (ruling R7, folded directly: the user's
 //! 2026-11-06 decision that enemies overlap is the only cause, so no
 //! `PROVISIONAL` step). The other five GOLDEN and three TRACE digests, the
 //! V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins
 //! did not move.
+//!
+//! W2-49 is the wave-2 re-bless (rulings P3, R7, R15, R16, R33). It folds the
+//! `PROVISIONAL` digests that W2-05, W2-06, W2-08, W2-52, W2-09 and W2-54 set
+//! into `GOLDEN`: 6/6 moved, `GAMEPLAY_TRACE` 0/6. The class column lists each
+//! cause's class in commit order and the net label `support::classify` gives
+//! the wave-1-close anatomy (ab03da9) against the W2-49 anatomy. Every run
+//! nets F: its key paths and its telemetry-stripped payload move, while its
+//! items, outcome summary and trace do not. W2-09's row is G under R33 (the
+//! weighted pick is a gameplay mechanic) though `support::classify` labels its
+//! own move C (items only). Anatomy, wave-1 close -> W2-49:
+//!
+//! | seed/mode | keys | core | items | outcome | trace |
+//! |---|---|---|---|---|---|
+//! | 0x1 Personal | 0x8a4c8226e2df0f7a->0xbdf9c3b221052103 | 0x2d4354e3a69b4e4c->0x610e5241cbe719a5 | unchanged 0x9148a6bf065cdfaa | unchanged 0x41fef8752e01bcc2 | unchanged |
+//! | 0x1 Npc | 0x8a4c8226e2df0f7a->0xbdf9c3b221052103 | 0x9d9eeb61bc22a6a0->0x77d9ff0f18cfcf07 | unchanged 0x9148a6bf065cdfaa | unchanged 0x237989fcf5b0919e | unchanged |
+//! | 0x1a571167 Personal | 0x4bbabacd6a590564->0x72f5e366ed803b2a | 0x63f7f6bb7fd129f3->0xa87c9461fccc04a6 | unchanged 0x48f43caeb9493765 | unchanged 0x26d7eb5a5f8d8505 | unchanged |
+//! | 0x1a571167 Npc | 0x8a4c8226e2df0f7a->0xbdf9c3b221052103 | 0xdbac444dcac24b75->0x1c1a5cda83ff432c | unchanged 0x9148a6bf065cdfaa | unchanged 0x6552fa80f7948cbe | unchanged |
+//! | 0xdeadbeef2026 Personal | 0x8a4c8226e2df0f7a->0xbdf9c3b221052103 | 0xc4ed2aebbeaff2d8->0xf9d3e482239eb995 | unchanged 0x9148a6bf065cdfaa | unchanged 0xeff821037e64ea04 | unchanged |
+//! | 0xdeadbeef2026 Npc | 0x8a4c8226e2df0f7a->0xbdf9c3b221052103 | 0x3b5bd46dcb5972b8->0x713699b0faef6131 | unchanged 0x9148a6bf065cdfaa | unchanged 0xabd2f667ea5645d2 | unchanged |
+//!
+//! `RULESET_VERSION` and `TRACE_RULESET` move 2 -> 3 in W2-49: the bump names
+//! W1-69 (no lane queue, R15) and the wave-2 rules, and `GAMEPLAY_TRACE` is
+//! unchanged by it. V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the
+//! `save_v7.json` pins did not move. `PROVISIONAL` is None again.
 mod support;
 use horde_core::command::Command;
 use horde_core::content::Mode;
@@ -80,14 +110,16 @@ const SEEDS: [u64; 3] = [1, 0x1A57_1167, 0xDEAD_BEEF_2026];
 /// longer saved and attempt/report levels serialize as level IDs. The payload
 /// of every run changed, no gameplay did: `GAMEPLAY_TRACE` is unchanged.
 /// W1-69 (user decision, enemies no longer queue behind each other) moved
-/// 0x1A57_1167 Personal; see the re-bless log.
+/// 0x1A57_1167 Personal. W2-49 (the wave-2 re-bless) folded the wave-2
+/// provisional digests into all six (net class F; outcomes and traces
+/// unchanged); see the re-bless log.
 const GOLDEN: [(u64, Mode, u64); 6] = [
-    (1, Mode::Personal, 0x303e_a36f_ac6a_070b),
-    (1, Mode::Npc, 0xeede_2391_290b_b381),
-    (0x1A57_1167, Mode::Personal, 0x2902_d75f_0238_e1a3),
-    (0x1A57_1167, Mode::Npc, 0x6a2b_a00f_7e40_18d8),
-    (0xDEAD_BEEF_2026, Mode::Personal, 0x5aaf_1f08_0eb1_da92),
-    (0xDEAD_BEEF_2026, Mode::Npc, 0xc1bb_9ef2_0792_5afc),
+    (1, Mode::Personal, 0xbed5_e271_4b65_90fe),
+    (1, Mode::Npc, 0xcffe_0be4_463d_46d6),
+    (0x1A57_1167, Mode::Personal, 0x3368_f180_97f7_fb5e),
+    (0x1A57_1167, Mode::Npc, 0x97d9_3e67_bd2b_ed2f),
+    (0xDEAD_BEEF_2026, Mode::Personal, 0x7be5_c84d_229d_8d71),
+    (0xDEAD_BEEF_2026, Mode::Npc, 0x6dce_bbed_cc75_82c9),
 ];
 
 /// `(seed, mode)` -> FNV-1a of the per-tick gameplay trace (tick, hp, coins,
@@ -96,7 +128,7 @@ const GOLDEN: [(u64, Mode, u64); 6] = [
 /// maps. The save-v5 and save-v6 re-blesses of `GOLDEN` are format-only: this trace proves
 /// the gameplay outcomes of the same six runs did not move. W1-69 (user
 /// decision, enemies no longer queue behind each other) re-blessed three of
-/// them; see the re-bless log.
+/// them; see the re-bless log. Wave 2 (W2-49) moved none of them.
 const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
     (1, Mode::Personal, 0xa6ca_a6de_7fd9_2b1a),
     (1, Mode::Npc, 0x2966_10f8_ded8_a91f),
@@ -111,97 +143,23 @@ const GAMEPLAY_TRACE: [(u64, Mode, u64); 6] = [
 ///
 /// - 2 (W1-20, strict `SellItem`): the traced runs never sell, so every
 ///   `GAMEPLAY_TRACE` digest is unchanged; only the label moves.
-const TRACE_RULESET: u32 = 2;
+/// - 3 (W2-49, the wave-2 re-bless): the bump names W1-69 (no lane queue,
+///   R15), whose three `GAMEPLAY_TRACE` moves were re-blessed in wave 1, and
+///   the wave-2 rules, which move none of the six traces: the traced runs are
+///   rank 0 with no country (no elites, no boss phases, no front ramp, no
+///   difficulty band, no new archetype) and the weighted drop pick still
+///   makes one draw. Only the label moves.
+const TRACE_RULESET: u32 = 3;
 
 /// Provisional `(GOLDEN, GAMEPLAY_TRACE)` digests, in `GOLDEN` order, set by
 /// a digest-moving commit until the wave's re-bless folds them (ruling P3).
-///
-/// W2-05: all six GOLDEN digests move (class T); every GAMEPLAY_TRACE digest
-/// is unchanged.
-/// W2-06: all six GOLDEN digests move again (class F); every GAMEPLAY_TRACE
-/// digest is unchanged.
-/// W2-08: the 0x1a571167 Personal GOLDEN digest moves (class C); the other
-/// five and every GAMEPLAY_TRACE digest are unchanged.
-/// W2-52: the three Personal GOLDEN digests move (class F); the three Npc
-/// digests and every GAMEPLAY_TRACE digest are unchanged.
-/// W2-09: the 0x1a571167 Personal GOLDEN digest moves (class G, the weighted
-/// pick); the other five and every GAMEPLAY_TRACE digest are unchanged.
-/// W2-54: the three Personal GOLDEN digests move (class F, the authored
-/// level grant makes the W2-52 shim inert); the three Npc digests and every
-/// GAMEPLAY_TRACE digest are unchanged.
-const PROVISIONAL: Option<([u64; 6], [u64; 6])> = Some((
-    [
-        0xbed5_e271_4b65_90fe,
-        0xcffe_0be4_463d_46d6,
-        0x3368_f180_97f7_fb5e,
-        0x97d9_3e67_bd2b_ed2f,
-        0x7be5_c84d_229d_8d71,
-        0x6dce_bbed_cc75_82c9,
-    ],
-    [
-        0xa6ca_a6de_7fd9_2b1a,
-        0x2966_10f8_ded8_a91f,
-        0x5cc8_bde4_faf0_9763,
-        0x20c2_f0bd_5405_15c4,
-        0x46a2_adc6_720f_8678,
-        0x9d76_78e4_3c2f_560f,
-    ],
-));
+/// None since W2-49 folded the wave-2 causes (W2-05, W2-06, W2-08, W2-52,
+/// W2-09, W2-54) into `GOLDEN`; their reasons are in the re-bless log.
+const PROVISIONAL: Option<([u64; 6], [u64; 6])> = None;
 
 /// Why `PROVISIONAL` moved: `(commit tag, class, reason)`, one per moving
 /// commit. Empty exactly when `PROVISIONAL` is None.
-const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[
-    (
-        "W2-05",
-        MoveClass::T,
-        "telemetry population, no gameplay change: the attempt telemetry now \
-         carries spawned_by_archetype and kills_by_archetype (and \
-         damage_taken_by_archetype once a hostile wounds the defender); outcome, \
-         trace, items and the telemetry-stripped payload are unchanged",
-    ),
-    (
-        "W2-06",
-        MoveClass::F,
-        "drop tracking, no gameplay change: every attempt now saves its frozen \
-         drop_tier (Some(1) in all six runs) and a root attempt lists its drops \
-         in drop_ids (the one drop of 0x1a571167 Personal); outcome, trace and \
-         items are unchanged, only the key paths and the saved values of the \
-         new keys move",
-    ),
-    (
-        "W2-08",
-        MoveClass::C,
-        "the 39 loot_only items (29-67) join the drop pool of attempts deployed \
-         from v7 on: the one drop of 0x1a571167 Personal now picks from 18 \
-         tier-1 definitions instead of 12, so the owned item moves; the pick is \
-         still one a.rng draw, so outcome and trace are unchanged, and the other \
-         five runs drop nothing",
-    ),
-    (
-        "W2-52",
-        MoveClass::F,
-        "neutral level-up grant ledger (R16), no gameplay change: while every \
-         level grant is 0 coins a Personal level-up keeps \
-         player.level_grant_paid at the level, so the three Personal runs \
-         (level 1 -> 2) now save level_grant_paid 2; outcome, trace and items \
-         are unchanged, and the Npc runs level no player",
-    ),
-    (
-        "W2-09",
-        MoveClass::G,
-        "the weighted single-draw DropTable (plan LE-5) replaces the uniform          pick: the one drop of 0x1a571167 Personal (drop tier 1) now weighs a          trained Ranged class x3, so the same one a.rng draw lands on another          definition and the owned item moves; outcome and trace are unchanged          (support::classify labels the anatomy C, items only), the other five          runs drop nothing, and neutral weights restore the old digest",
-    ),
-    (
-        "W2-54",
-        MoveClass::F,
-        "progression.json authors the level grant (0.25) and the four rank \
-         milestones (R32): a non-zero grant makes the W2-52 shim inert, so \
-         the three Personal runs (level 1 -> 2, still live at tick 1800) owe \
-         the grant again and save no level_grant_paid; outcome, trace and \
-         items are unchanged, the Npc runs level no player, and rank 0 \
-         reaches no milestone",
-    ),
-];
+const PROVISIONAL_CAUSES: &[(&str, MoveClass, &str)] = &[];
 
 /// The ledger rules: provisional digests carry causes, every cause names its
 /// commit and reason, and causes never outlive the provisional pin.

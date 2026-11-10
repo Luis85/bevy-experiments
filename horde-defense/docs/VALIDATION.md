@@ -439,6 +439,8 @@ Final documentation checks passed **69 source-backed Views**, retaining all 64 p
 
 **W1-69 does not bump the ruleset (R15, wave-1 close).** Enemies stopped queueing in W1-69, so a debug recording made before W1-69 can diverge in combat on replay. It still carries ruleset 2, so replay prints no ruleset warning for it. The W2-49 bump (2 -> 3) names both W1-69 (no lane queue) and the wave-2 change. From then on these recordings warn like any older ruleset.
 
+**Ruleset 3 (W2-49, 10 November 2026).** `RULESET_VERSION` and `TRACE_RULESET` are 3. The bump names W1-69 (no lane queue) and the wave-2 rules ("Wave-2 re-bless and ruleset 3" below). A debug recording made under ruleset 2 (from W1-20 up to W2-49) now replays with the warning "recorded under ruleset 2, this build uses 3; the replay may diverge", and a save written under ruleset 2 (among them the frozen `save_v7.json`) loads with one drift warning per process. Neither is fatal. Recording FORMAT stays 1 and `SAVE_VERSION` stays 7.
+
 ## save_v6.json as cut — 5 November 2026 (W1-01, recorded 7 November in the W1 review)
 
 `crates/horde_core/tests/fixtures/save_v6.json` does not match the plan in schema-v7.md §11 on four points. The plan has not been changed. Ruling R12 (wave-1 close, 7 November 2026) accepts the differences: the fixture is frozen evidence and the §11 numbers were estimates. schema-v7.md §11 carries the ruling as a note.
@@ -1216,6 +1218,45 @@ The save-determinism guards that keep the wave-2 systems away from encounters sa
 | `commands_round_trip_through_serde_for_replay` (the 9 appended variants at non-default values) | `src/command.rs` | `AcknowledgeOutcomes.folded` `#[serde(default, skip_serializing)]` | `{"AcknowledgeOutcomes":{"battles":[9,12]}}` reads `folded: 0`, not 3 |
 
 No production code changed and no digest moved.
+
+## Wave-2 re-bless and ruleset 3 — 10 November 2026 (W2-49)
+
+This is the wave's one save-determinism re-bless (rulings P3, R7). Six wave-2 commits had moved `GOLDEN` provisionally, each with a cause in `PROVISIONAL_CAUSES`. W2-49 folds those digests into `GOLDEN`, then resets `PROVISIONAL` to None and `PROVISIONAL_CAUSES` to empty. The reasons now sit in the re-bless log of `crates/horde_core/tests/determinism.rs`. `GOLDEN` moved 6/6 and `GAMEPLAY_TRACE` 0/6. These did not move: the V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins, the frozen-catalogue pin and `SAVE_VERSION` 7.
+
+| Seed / mode | GOLDEN, wave-1 close → W2-49 | Causes in commit order (class) | Net (`support::classify`) |
+|---|---|---|---|
+| 0x1 Personal | 0x303ea36fac6a070b → 0xbed5e2714b6590fe | W2-05 T, W2-06 F, W2-52 F, W2-54 F | F |
+| 0x1 Npc | 0xeede2391290bb381 → 0xcffe0be4463d46d6 | W2-05 T, W2-06 F | F |
+| 0x1a571167 Personal | 0x2902d75f0238e1a3 → 0x3368f18097f7fb5e | W2-05 T, W2-06 F, W2-08 C, W2-52 F, W2-09 G (R33; `support::classify` labels it C), W2-54 F | F |
+| 0x1a571167 Npc | 0x6a2ba00f7e4018d8 → 0x97d93e67bd2bed2f | W2-05 T, W2-06 F | F |
+| 0xdeadbeef2026 Personal | 0x5aaf1f080eb1da92 → 0x7be5c84d229d8d71 | W2-05 T, W2-06 F, W2-52 F, W2-54 F | F |
+| 0xdeadbeef2026 Npc | 0xc1bb9ef207925afc → 0x6dcebbedcc7582c9 | W2-05 T, W2-06 F | F |
+
+What each cause changed:
+- **W2-05 (T):** the attempt telemetry carries the per-archetype spawned, killed and damage-taken maps.
+- **W2-06 (F):** every attempt saves its frozen `drop_tier` (Some(1) in all six runs), and a root attempt lists its drops in `drop_ids`.
+- **W2-08 (C):** the 39 `loot_only` items grow the tier-1 pool from 12 to 18 definitions, so the one drop of 0x1a571167 Personal picks another definition.
+- **W2-52 (F):** a Personal level-up from 1 to 2 under the neutral grant saves `level_grant_paid` 2.
+- **W2-09:** the weighted single draw moves that drop again. It is class G under R33, because the pick is a gameplay mechanic, although `support::classify` labels the move C (items only).
+- **W2-54 (F):** the authored 0.25 grant makes the W2-52 shim inert, so `level_grant_paid` is no longer saved.
+
+**Anatomy.** Before is `determinism_anatomy` on the wave-1 close tree ab03da9, built from an exported tree with its own target directory (`target/production-after-wave2/anatomy_before_w1close_ab03da9.txt`). After is W2-49 (`anatomy_after.txt`, identical to W2-54's `anatomy_after.txt`).
+- In all six runs the key paths and the telemetry-stripped payload move. The items hash, the outcome summary (kills, coins, hp, loot, spawned and `rng.state` at ticks 600, 1200 and 1800) and the trace do not, so each run nets F.
+- The keys hash of the five runs without a drop goes 0x8a4c8226e2df0f7a → 0xbdf9c3b221052103, and 0x1a571167 Personal's goes 0x4bbabacd6a590564 → 0x72f5e366ed803b2a.
+- 0x1a571167 Personal keeps its items hash 0x48f43caeb9493765. W2-08 and W2-09 each moved its one drop, and the weighted draw lands on the wave-1 definition again.
+
+**Ruleset 3.** `RULESET_VERSION` and `TRACE_RULESET` go from 2 to 3 (rulings P4 and R15). The bump names both changes since ruleset 2:
+- W1-69: no lane queue. Every enemy at the line or a structure attacks.
+- The wave-2 rules: auto-sell, takeover, the weighted drop table, the relative quality roll and loot-only drops, threat-scaled camp prices, the in-country front ramp, the late growth slopes and floors, elites from rank 3, boss phases past rank 4, the new archetypes, the country difficulty bands, the weapon-mastery nodes, and the authored level grant and rank milestones.
+
+`GAMEPLAY_TRACE` keeps W1-69's three wave-1 re-blesses, and wave 2 moves none of the six traces. The traced runs are rank 0 with no country, and the weighted pick still makes one draw. Replay and load behaviour are in "Strict sale and ruleset 2" above.
+
+Fail-first: `envelopes_carry_version_ruleset_and_fingerprint_and_reject_unknown_versions` now asserts the literal ruleset 3 and failed on the parent with `left: Some(2)` `right: Some(3)`. It replaces the removed `ruleset_version_is_2`.
+
+**Smoke and pacing after wave 2** (`target/production-after-wave2/`, not committed). The bump changes no rule, so both outputs equal the last recorded ones:
+- `--smoke` (`smoke.txt`, PASS, exit 0) is byte-identical to `w2-54/smoke.txt` (sha256 846f0b4c...3425fe50).
+- `pacing 60 --runs` (`pacing.txt`) is byte-identical to `w2-54/pacing.txt` (sha256 902cd895...c7f7d738).
+- The 20-seed release acceptance (`pacing_targets.txt`) is in plan §9.2 and §9.6.
 
 ## Settled corpses in stress — 7 November 2026 (W1-49)
 

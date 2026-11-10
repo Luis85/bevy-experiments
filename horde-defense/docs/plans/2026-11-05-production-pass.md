@@ -755,6 +755,8 @@ Digest ledger:
 
 **Wave 1 result:** through W1-68 `GOLDEN` 0/6 and `GAMEPLAY_TRACE` 0/6 moved (both families identical to the pre-W1-01 parent of `b82658a`). W1-69, the user's 2026-11-06 decision that enemies overlap (§2.2), is the wave-1 re-bless: `GOLDEN` 1/6 (0x1A57_1167 Personal) and `GAMEPLAY_TRACE` 3/6 (0x1A57_1167 Personal and Npc, 0xDEAD_BEEF_2026 Npc), class G, folded directly with a reason per digest in `tests/determinism.rs`. `PROVISIONAL` is None with no causes; `RULESET_VERSION` 2 (W1-20, label only); V1-V6 continuation pins, `V6_DROP_TRACE_FNV` and the `save_v7.json` pins unchanged. R15: W1-69 does not bump `RULESET_VERSION`. The W2-49 bump (2 -> 3) names both W1-69 (no lane queue) and the wave-2 change, so until then a debug recording made before W1-69 replays without a ruleset warning even though its combat can diverge (VALIDATION.md "Strict sale and ruleset 2").
 
+**Wave 2 result (W2-49, 10 November 2026):** six wave-2 commits moved `GOLDEN` provisionally: W2-05 (T), W2-06 (F), W2-08 (C), W2-52 (F), W2-09 (G under R33; `support::classify` labels it C) and W2-54 (F). W2-49, the wave-2 re-bless, folds them. `GOLDEN` moved 6/6, every run net class F against the wave-1 close anatomy (ab03da9): key paths and the telemetry-stripped payload move, while items, outcome summary and trace do not. `GAMEPLAY_TRACE` moved 0/6. `PROVISIONAL` is None with no causes, and the reasons per digest are in the `tests/determinism.rs` re-bless log and VALIDATION.md "Wave-2 re-bless and ruleset 3". `RULESET_VERSION` and `TRACE_RULESET` are 3, and the bump names W1-69 (no lane queue, R15) and the wave-2 rules. The V1-V6 continuation pins, `V6_DROP_TRACE_FNV`, the `save_v7.json` pins and the frozen-catalogue pin are unchanged. Smoke and pacing after are in `target/production-after-wave2/` (§9.2 and §9.6).
+
 ### Expected moves after the freeze
 
 | Wave | Digest | Expected | Class | Cause (commit) | Re-bless |
@@ -852,16 +854,16 @@ Filled at each wave close. "Before" values are wave 0 unless a wave records a ne
 
 | Measure | Wave 0 | After W2 (W2-49) | After W4 (W4-08) |
 |---|---|---|---|
-| expert-deu first victory (1 seed / 20-seed median) | run 4 / (W2-01, post-W1-69: run 3 / 3 [2, 5]) | | |
-| Tier 1 / 2 / 3 affordable | runs 3 / 5 / 7 | | |
-| Tree exhausted vs Liberation(2) | run 24 vs (W2-01, post-W1-69 20-seed median: 25 [24, 26] vs 17 [16, 18]) | | |
-| Unlock order Fortifications / Mara / Operations (median) | 4 / 14 / 14 (Recruitment) | | |
-| Defeat rate per 20-run window after first victory | 0% after run 10 / (W2-04, 20 seeds: 0.0-13.2%, 36 of 39 windows under 10%) | | |
-| Longest win streak after run 10 | 50 / (W2-04, 20 seeds: median 50, every seed 46-50) | | |
-| LUX runs to liberate Easy / Normal / Hard | (W2-04, 20-seed median: 4 [4, 4] / 6 [5, 7] / 8 [8, 8]) | | |
-| Boss TTK median (s) | (W2-04, 20 seeds: 6.4 [p25 5.9, p90 32.1] over 1,091 kills) | | |
-| Smoke Personal stages 1-5 / Npc stages 1-5 | see 1.3 | | |
-| Strategy profile: liberations 2/4/10, coins per minute | (W2-43, before tuning, 20 seeds: S1 runs 8 / 18 / 42, 3,154 coins/min; S2b/S2a runs to free 3 neighbours 9 / 9) | | |
+| expert-deu first victory (1 seed / 20-seed median) | run 4 / (W2-01, post-W1-69: run 3 / 3 [2, 5]) | run 2 / 3 [2, 4] | |
+| Tier 1 / 2 / 3 affordable | runs 3 / 5 / 7 | 20-seed 3 [2, 3] / 5 [5, 6] / 8 [8, 9] at 930 / 5,190 / 11,675 coins (W2-41 nodes counted) | |
+| Tree exhausted vs Liberation(2) | run 24 vs (W2-01, post-W1-69 20-seed median: 25 [24, 26] vs 17 [16, 18]) | 26 [25, 27] vs 17 [16, 18] (177 nodes) | |
+| Unlock order Fortifications / Mara / Operations (median) | 4 / 14 / 14 (Recruitment) | 3 [2, 4] / 14 [13, 15] / 14 [13, 15] | |
+| Defeat rate per 20-run window after first victory | 0% after run 10 / (W2-04, 20 seeds: 0.0-13.2%, 36 of 39 windows under 10%) | 0.0-16.2%, 35 of 39 windows outside 10-25% | |
+| Longest win streak after run 10 | 50 / (W2-04, 20 seeds: median 50, every seed 46-50) | median 50, every seed 45-50 | |
+| LUX runs to liberate Easy / Normal / Hard | (W2-04, 20-seed median: 4 [4, 4] / 6 [5, 7] / 8 [8, 8]) | 4 [4, 5] / 5 [5, 6] / 9 [8, 11] | |
+| Boss TTK median (s) | (W2-04, 20 seeds: 6.4 [p25 5.9, p90 32.1] over 1,091 kills) | 25.5 [p25 21.5, p90 36.4] over 1,090 kills | |
+| Smoke Personal stages 1-5 / Npc stages 1-5 | see 1.3 | PASS; every stage won, failed attempts Personal 2 (stage 1 x2) / Npc 3 (stage 1 x2, stage 2 x1) (§9.6) | |
+| Strategy profile: liberations 2/4/10, coins per minute | (W2-43, before tuning, 20 seeds: S1 runs 8 / 18 / 42, 3,154 coins/min; S2b/S2a runs to free 3 neighbours 9 / 9) | S1 runs 8 / 18 / 41, 3,183.5 coins/min; S2b/S2a 9 / 9 | |
 
 W2-01 20-seed baseline (2026-11-07, pacing harness v2 on the post-W1-69 rules): `cargo run --locked --release -p horde_core --example pacing -- 60 --profile expert-deu --profile novice-deu --profile novice-gear-lux --seeds 20`, once with `--csv --out target/production-before/pacing_20seed_before.csv` (3,600 runs, sha256 af9763f3...54b1b) and once with `--fit-tiers 3,5,7,9,11,13 --out target/production-before/pacing_20seed_before.txt` (sha256 321a9af1...98b3), both not committed. Cells are the lower median [p25, p75] of runs completed; a missed milestone counts as 61. expert-deu: first victory 3 [2, 5]; tiers 1 / 2 / 3 affordable 3 / 5 / 7; Fortifications / Mara / Recruitment / Operations unlocked 3 / 14 / 14 / 23; Liberation(1) 14 [13, 15], Liberation(2) 17 [16, 18]; tree exhausted 25 [24, 26]; rank 5 / 10 / 15 / 20 at 10 / 15 / 20 / 25. Median earned at runs 3 / 5 / 7 / 9 / 11 / 13 over tier 1-6 cost: 1.37 / 0.87 / 1.07 / 1.56 / 1.88 / 2.23. Seed index 0 is the profile's own seed, so the default `pacing 60 --runs` still equals `target/production-after/w1-69/pacing.txt` byte for byte (§9.6).
 
@@ -890,6 +892,8 @@ W2-54 (the authored level grant and milestones, 2026-11-09) moved both, on purpo
 W2-03 goal-5 "before" (2026-11-07, post-W1-69 rules): `cargo test --locked --release -p horde_core --test pacing_targets -- --ignored --nocapture`, output in `target/production-before/pacing_targets_goal5_before.txt` (not committed; the sweep took about 62 s). Tier windows are the "about 4 / 8 / 12" target with one run either side (3-5, 7-9, 11-13). `goal5_first_victory_run_2_to_4` PASS: 3 [2, 5] 20/20. `goal5_tiers_affordable_3_5_7_9_11_13` FAIL: tier 1 3 [3, 3] passes; tier 2 5 [5, 6] and tier 3 7 [6, 7] are early. `goal5_tree_outlasts_second_liberation` PASS: Liberation(2) 17 [16, 18] 20/20, tree exhausted 25 [24, 26] 20/20, median 37 [33, 41] nodes bought after Liberation(2). `goal5_unlock_order_fortifications_mara_operations` FAIL: Fortifications 3 [2, 5], Mara 14 [13, 15], Operations open 14 [13, 15]. Every seed keeps Fortifications <= Mara <= Operations, but the Mara and Operations medians are equal. Both failures are wave-4 work (W4-p).
 
 W2-04 goal-6 "before" (2026-11-07, post-W1-69 rules): the same command, now 11 tests (`--test-threads 1` for a stable print order), output in `target/production-before/pacing_targets_before.txt` (sha256 fa2f5b86...720be0, not committed; both sweeps took about 59 s). The goal-5 lines equal the W2-03 run. The defeat windows are aligned on each seed's own first victory, and a run that is not a victory counts as a defeat. `goal6_defeat_rate_windows` FAIL: 36 of the 39 pooled 20-run windows are outside 10-25%, lowest 0.0% at offset 8, highest 13.2% at offset 0. `goal6_no_15_streak_after_run_10` FAIL: every seed has a 46-50 win streak from run 11 (median 50). `goal6_boss_ttk_median_20_60_s` FAIL: 6.4 s [p25 5.9, p90 32.1] over 1,091 boss kills. `goal6_archetype_coverage` FAIL: 0 of the 11 catalogue archetypes are counted, because the per-archetype telemetry is populated only from W2-05. `goal6_lux_easy_at_most_6_runs` and `goal6_lux_hard_at_most_1_5x_normal` PASS: Liberation(1) Easy 4 [4, 4], Normal 6 [5, 7], Hard 8 [8, 8], all 20/20. `goal6_clamped_starts_first_victory_runs_2_to_4` PASS: AUT 3 [3, 5] and BGD 4 [2, 5], no run-1 victory in either. These starts are not clamped yet, because the clamp lands with the difficulty bands (ruling W-10). The four failures are wave-4 work (W4-04..n), apart from coverage, which W2-05 unblocks.
+
+W2-49 (the wave-2 re-bless, 2026-11-10) fills the "After W2" column. It moved neither pacing nor smoke. The default `pacing 60 --runs` and `--smoke` outputs in `target/production-after-wave2/` are byte-identical to W2-54's. The 20-seed release acceptance (`target/production-after-wave2/pacing_targets.txt`, 294 s, not committed) equals `w2-54/pacing_targets.txt` apart from its timing line: 8 pass, 6 fail. The cells are the 20-seed lower median [p25, p75] unless stated otherwise. The wave-2 before/after rows are in §9.6, "Wave 2 before/after, at the W2-49 re-bless".
 
 ### 9.6 Enemies overlap (W1-69): pacing and smoke
 
@@ -1104,6 +1108,44 @@ W2-54 20-seed release acceptance (2026-11-09): `cargo test --locked --release -p
 - PASS, unchanged: `goal6_archetype_coverage` (18/18), `fewer_than_five_outbreak_reopens_over_ten_liberations` (median 0).
 - Still failing, moved: `goal5_tiers_affordable_3_5_7_9_11_13` (tier 1 3 [3, 3] → 3 [2, 3], tier 2 7 [6, 7] → 5 [5, 6], now early too, tier 3 9 [8, 10] → 8 [8, 9]; the grants and milestones bring every tier earlier, PT6 and the tier definition are W4-p's), `goal5_unlock_order_fortifications_mara_operations` (Fortifications 3 [2, 5] → 3 [2, 4], Mara and Operations 15 [14, 16] → 14 [13, 15]), `goal6_defeat_rate_windows` (34 → 35 of 39 windows outside 10-25%; highest 19.0% → 16.2% at offset 0), `goal6_lux_hard_at_most_1_5x_normal` (Hard 10 [9, 12] → 9 [8, 11] against Normal 5 [5, 6]).
 - Still failing: `goal6_no_15_streak_after_run_10` (every seed a 47-50 win streak from run 11), `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs` (9 / 9, ratio 1.00).
+
+**Wave 2 before/after, at the W2-49 re-bless (2026-11-10).** W2-49 bumps `RULESET_VERSION` to 3 and moves no rule. In `target/production-after-wave2/` (UTF-8, no BOM, LF; not committed):
+- `cargo run --locked --release -p horde_core --example pacing -- 60 --runs --out target/production-after-wave2/pacing.txt` is byte-identical to `w2-54/pacing.txt` (sha256 902cd895...c7f7d738).
+- `--smoke` (`smoke.txt`, PASS, exit 0) is byte-identical to `w2-54/smoke.txt` (sha256 846f0b4c...3425fe50).
+
+So the whole wave-2 move is the sum of the commits recorded above. Before is the post-W1-69 baseline (`w1-69/pacing.txt` and `w1-69/smoke.txt`, the wave-1 close). Runs / battle minutes, w1-69 → wave 2:
+
+| Milestone | expert, tree first, DEU | novice, tree first, DEU | novice, gear first, LUX |
+|---|---|---|---|
+| First victory | 3 / 9 → 2 / 6 | 5 / 17 → 3 / 9 | 3 / 10 → 2 / 7 |
+| First liberation | 14 / 58 → 14 / 62 | 17 / 69 → 15 / 60 | 6 / 22 → 5 / 18 |
+| Tier 1 affordable (930 coins) | 3 / 9 → 2 / 6 | 3 / 9 → 3 / 9 | 3 / 10 → 2 / 7 |
+| Tier 2 affordable (2,790 → 5,190 coins, W2-41) | 5 / 17 → 5 / 17 | 6 / 20 → 6 / 20 | 5 / 18 → 5 / 18 |
+| Tier 3 affordable (4,975 → 11,675 coins) | 7 / 25 → 7 / 27 | 8 / 28 → 9 / 34 | 6 / 22 → 8 / 30 |
+| Tier 4 affordable (6,655 → 15,655 coins) | 7 / 25 → 9 / 37 | 9 / 32 → 10 / 38 | 7 / 25 → 9 / 34 |
+| Fortifications unlocked | 3 / 9 → 2 / 6 | 5 / 17 → 3 / 9 | 3 / 10 → 2 / 7 |
+| Mara / Recruitment unlocked | 14 / 58 → 14 / 62 | 17 / 69 → 15 / 60 | 6 / 22 and 7 / 25 → 5 / 18 |
+| Parallel defenses unlocked | 17 / 71 → 17 / 75 | 20 / 82 → 18 / 73 | 9 / 34 → 8 / 30 |
+| Country operations unlocked | 23 / 96 → 23 / 100 | 26 / 108 → 24 / 100 | 19 / 76 → 20 / 83 |
+| Non-victories in 60 runs (runs) | 5 (1, 2, 4, 8, 10) → 5 (1, 3, 7, 8, 9) | 8 (1, 2, 3, 4, 6, 7, 11, 12) → 6 (1, 2, 4, 7, 8, 9) | 3 (1, 2, 5) → 2 (1, 3) |
+| Battle coins over 60 runs (grants and milestones excluded) | 269,927 → 505,870 | 248,312 → 496,870 | 299,150 → 547,785 |
+| Battle time over 60 runs | 14,850 s → 15,835 s | 14,924 s → 15,908 s | 14,772 s → 15,995 s |
+
+Smoke, w1-69 → wave 2 (PASS both):
+- The legacy autonomous run is still a Defeat: 49 kills, 163 coins in 136.0 s → 70 kills, 240 coins in 174.0 s (W2-39).
+- Failed Personal attempts go 1 → 2, because stage 1 is now won at attempt 3 (W2-54). Personal stage 5 is a Victory: 253.8 s, 284 kills, 2,653 coins → 254.2 s, 286 kills, 2,996 coins.
+- Failed Npc attempts stay at 3. Npc stage 4 goes 223.0 s, 118 kills, 1,223 coins → 220.0 s, 122 kills, 1,345 coins (W2-33), and stage 5 goes 256.0 s, 150 kills, 1,564 coins → 256.0 s, 152 kills, 1,632 coins.
+
+The 20-seed release acceptance, post-W1-69 (W2-01, W2-03 and W2-04 "before" runs) → wave 2 (`target/production-after-wave2/pacing_targets.txt`):
+- First victory: 3 [2, 5] → 3 [2, 4].
+- Liberation(2): 17 [16, 18] → 17 [16, 18]. Tree exhausted: 25 [24, 26] → 26 [25, 27].
+- Tiers 1 / 2 / 3 affordable: 3 / 5 / 7 → 3 / 5 / 8.
+- LUX Easy / Normal / Hard: 4 / 6 / 8 → 4 / 5 / 9.
+- Boss TTK: 6.4 s → 25.5 s.
+- Archetype coverage: 0 of 11 → 18 of 18.
+- AUT / BGD clamped starts: 3 / 4 → 4 / 3.
+
+Still failing, all wave-4 work (W4-04..n, W4-p, W4-c): `goal5_tiers_affordable_3_5_7_9_11_13`, `goal5_unlock_order_fortifications_mara_operations`, `goal6_defeat_rate_windows`, `goal6_lux_hard_at_most_1_5x_normal`, `goal6_no_15_streak_after_run_10` and `parallel_frees_three_stage_neighbours_within_two_thirds_of_solo_runs`.
 
 ### 9.3 Audio
 
