@@ -169,8 +169,10 @@ pub struct StrategyRun {
     pub expedition_stages: u32,
     /// Outbreaks triggered so far.
     pub outbreaks: u32,
-    /// Everything earned so far: the run's earnings (`cumulative_coins`)
-    /// plus the expeditions'.
+    /// Everything earned so far: the run's earnings (`cumulative_coins`,
+    /// which also hold the level grants and milestone coins an expedition
+    /// victory settled while no main attempt was live) plus the
+    /// expeditions'.
     pub coins_total: u64,
     /// Battle and camp minutes so far.
     pub minutes_total: f32,
@@ -256,6 +258,8 @@ struct Bot<'t> {
     expedition_stages: u32,
     /// Settled expeditions already counted.
     settled: BTreeSet<u64>,
+    /// Run history records already counted for settlement receipts.
+    history_seen: usize,
     seen_overruns: BTreeSet<u64>,
     overruns: Vec<Overrun>,
     unlock: Option<StrategyUnlock>,
@@ -279,6 +283,7 @@ impl<'t> Bot<'t> {
             expeditions_settled: 0,
             expedition_stages: 0,
             settled: BTreeSet::new(),
+            history_seen: 0,
             seen_overruns: BTreeSet::new(),
             overruns: Vec::new(),
             unlock: None,
@@ -328,8 +333,22 @@ impl Bot<'_> {
             });
         }
     }
-    /// Adds the coins of every newly settled expedition.
-    fn count_settled(&mut self) {
+    /// Adds the coins of every newly settled expedition, and to `book`'s
+    /// earnings the level grants and milestone coins stamped on the new
+    /// expedition run records: an expedition victory credited while no main
+    /// attempt is live (the camp idle) is settled by `settle_parallel`, so
+    /// its receipt is on the worker's record, never on a main run's report.
+    /// While a main attempt is live the main run's finish settles and its
+    /// report carries the receipt, and the worker's record holds zero.
+    fn count_settled(&mut self, book: &mut RunBook) {
+        let history = &self.g.campaign.run_history;
+        let receipts = history[self.history_seen.min(history.len())..]
+            .iter()
+            .filter(|r| r.worker_id.is_some())
+            .map(|r| r.level_grant_coins.saturating_add(r.milestone_coins))
+            .fold(0, u64::saturating_add);
+        self.history_seen = history.len();
+        book.earned = book.earned.saturating_add(receipts);
         for b in &self.g.battles {
             if let Some(s) = b.summary.as_ref().filter(|_| b.settled)
                 && self.settled.insert(b.id)
@@ -698,7 +717,7 @@ fn play(
             bot.must(Command::SetPaused(false))?;
             bot.idle(plan.camp_ticks);
         }
-        bot.count_settled();
+        bot.count_settled(&mut book);
         let spent_recruit = bot.camp()?;
         let spend = bot.spend(profile.spend, spent_recruit)?;
         bot.check_unlock(index);
@@ -725,7 +744,7 @@ fn play(
         if bot.g.attempt.is_some() {
             bot.must(Command::Withdraw)?;
         }
-        bot.count_settled();
+        bot.count_settled(&mut book);
         book.record(&bot.g, index, seed, spend)?;
         if let Some(r) = &bot.g.last_result {
             last_run_ticks = (r.elapsed * TICKS_PER_SECOND as f32).round() as u64;
@@ -1280,5 +1299,59 @@ mod tests {
         bot.g.battles[0].settled = true;
         bot.resume = Some(held.clone());
         assert_eq!(bot.take_resume(), Some(held));
+    }
+
+    #[test]
+    fn idle_pass_expedition_rewards_count_in_the_earnings() {
+        // A campaign one victory short of rank 5 with a recruit on an
+        // expedition to the start country's first stage; no main attempt.
+        let mut g = Game::default();
+        g.campaign.legacy_features = true;
+        g.campaign.balance_settings = BalanceSettings::legacy();
+        // Four liberated countries unlock parallel expeditions.
+        let country = world().countries[0].id.clone();
+        g.campaign.choose_start_country(&country).unwrap();
+        for c in world().countries.iter().take(4) {
+            g.campaign
+                .world
+                .country_levels
+                .insert(c.id.clone(), c.level_count());
+            g.campaign.world.cleared.push(c.id.clone());
+        }
+        g.campaign.coins = 10_000;
+        g.campaign.attempts = 1;
+        g.campaign.victories = 4;
+        let recruit = g.strategy.recruit(&mut g.campaign, &country).unwrap();
+        let b = g.deploy_survivor(recruit, &country, 0).unwrap();
+        let mut bot = Bot::new(g, StrategyPlan::S1, None);
+        bot.must(Command::SetPaused(false)).unwrap();
+        // The expedition wins its stage on the next tick of the idle pass.
+        let w = &mut bot.g.battles.iter_mut().find(|x| x.id == b).unwrap().game;
+        let mut a = w.attempt.take().unwrap();
+        w.spawn_enemy(&mut a, crate::content::EnemyKind::Shambler, 5, true);
+        a.enemies.last_mut().unwrap().x = 20.0;
+        a.boss_spawned = true;
+        a.enemies[0].injury.unconscious = true;
+        w.attempt = Some(a);
+        bot.idle(1);
+        assert!(bot.g.attempt.is_none());
+        assert_eq!(bot.g.campaign.progression_rank(), 5);
+        let record = bot
+            .g
+            .campaign
+            .run_history
+            .iter()
+            .find(|r| r.worker_id == Some(b))
+            .expect("the expedition's run record")
+            .clone();
+        let paid = record.level_grant_coins + record.milestone_coins;
+        assert!(record.milestone_coins >= 500, "{record:?}");
+        let mut book = RunBook::new();
+        bot.count_settled(&mut book);
+        assert_eq!(book.earned, paid, "the settlement receipt is earned");
+        // Counted once.
+        bot.idle(3);
+        bot.count_settled(&mut book);
+        assert_eq!(book.earned, paid);
     }
 }

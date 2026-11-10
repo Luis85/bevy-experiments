@@ -438,7 +438,8 @@ pub struct PacingRun {
     pub level_grant_coins: u64,
     pub milestone_coins: u64,
     /// Everything earned so far: run coins, level grants, milestone coins
-    /// and auto-sold coins.
+    /// and auto-sold coins (for the strategy bot, also the level grants and
+    /// milestone coins settled on expedition records in camp).
     pub cumulative_coins: u64,
     /// Progression rank and player level after the run.
     pub rank: u32,
