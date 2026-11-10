@@ -295,3 +295,28 @@ fn run_record_carries_boss_ttk_elite_kills_and_boss_rank() {
         horde_core::progression::BossRank::Regional
     );
 }
+
+/// W2 review: the record's bounds hold for telemetry outside them (a save
+/// edited by hand, say). Elite kills are capped at the run's kills and the
+/// boss time-to-kill at the run's duration; values inside the bounds are
+/// copied unchanged (the test above).
+#[test]
+fn run_record_clamps_elite_kills_to_kills_and_boss_ttk_to_duration() {
+    let (mut g, mut a) = staged(Mode::Personal);
+    a.tick = 100;
+    a.kills = 2;
+    a.telemetry.elites_killed = 5;
+    a.telemetry.boss_arrival_tick = Some(10);
+    a.telemetry.boss_defeat_tick = Some(5_000);
+    *g.attempt_slot_mut() = Some(a);
+    g.withdraw();
+    let record = g.campaign().run_history.last().unwrap();
+    assert_eq!(record.duration_ticks, 100);
+    assert_eq!(record.kills, 2);
+    assert_eq!(record.elite_kills, 2, "elite kills are at most the kills");
+    assert_eq!(
+        record.boss_ttk_ticks,
+        Some(100),
+        "the boss time-to-kill is at most the run's duration"
+    );
+}
