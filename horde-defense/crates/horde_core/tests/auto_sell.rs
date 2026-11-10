@@ -411,7 +411,8 @@ fn takeover_auto_sell_runs_after_release_and_never_sells_the_recruits_loadout() 
     reload(&g);
 }
 
-/// A legacy run whose staged kills drop `drops` real items.
+/// A legacy-features game's run on the v7 drop path (`drop_tier` Some, so
+/// `drop_ids` records each drop) whose staged kills drop `drops` real items.
 fn run_with_real_drops(drops: usize) -> Game {
     let mut g = support::game(Mode::Personal);
     for _ in 0..drops {
@@ -430,6 +431,7 @@ fn run_with_real_drops(drops: usize) -> Game {
 fn auto_sell_consumes_no_rng() {
     let mut on = run_with_real_drops(6);
     let mut off = on.clone();
+    let strategy_rng = on.strategy().rng;
     set_rule(
         &mut on,
         AutoSellRule {
@@ -443,6 +445,17 @@ fn auto_sell_consumes_no_rng() {
     assert!(kept.auto_sold.is_empty());
     assert_eq!(sold.log, kept.log);
     assert_eq!(sold.telemetry, kept.telemetry);
+    // Settlement leaves the strategy layer's random state where it was.
+    assert_eq!(
+        on.strategy().rng,
+        off.strategy().rng,
+        "the sale drew strategy RNG"
+    );
+    assert_eq!(
+        on.strategy().rng,
+        strategy_rng,
+        "settlement drew strategy RNG"
+    );
     // The next run starts from the same random state and plays out the same
     // way, tick for tick.
     for g in [&mut on, &mut off] {
