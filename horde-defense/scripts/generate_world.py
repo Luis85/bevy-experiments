@@ -341,8 +341,10 @@ def self_test():
 
         loaded = json.loads(committed.decode('utf-8'))
         world.write_bytes((json.dumps(loaded, separators=(',', ':'), ensure_ascii=False) + '\n').encode('utf-8'))
+        compact = world.read_bytes()
         code, text = run('--check', '--world', str(world))
-        case('--check exits 1 on a byte difference (the compact form)', code == 1, f'exit {code}: {text.strip()}')
+        case('--check exits 1 on a byte difference (the compact form) and writes nothing',
+             code == 1 and world.read_bytes() == compact, f'exit {code}: {text.strip()}')
         code, text = run('--world', str(world))
         case('--from-existing is the default and restores the bytes', code == 0 and world.read_bytes() == committed, f'exit {code}: {text.strip()}')
 
@@ -350,7 +352,8 @@ def self_test():
         perturbed['countries'][0]['difficulty'] = 9.99
         world.write_bytes(render(perturbed))
         code, text = run('--check', '--from-existing', '--world', str(world))
-        case('--check exits 1 on a changed difficulty', code == 1, f'exit {code}: {text.strip()}')
+        case('--check exits 1 on a changed difficulty and writes nothing',
+             code == 1 and world.read_bytes() == render(perturbed), f'exit {code}: {text.strip()}')
         code, text = run('--from-existing', '--world', str(world))
         case('--from-existing recomputes difficulty only', code == 0 and world.read_bytes() == committed, f'exit {code}: {text.strip()}')
 
