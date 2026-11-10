@@ -443,12 +443,13 @@ W2-36 amended the Hard row on the plan §2.5 default (the W2-26 pin reading): `b
 ## 10. Victory→threat guard (test it, do not re-implement it)
 
 `tests/threat_guard.rs` is table-driven:
-- Positive rows: Personal first clear, Personal replay, NPC replay, reopened outbreak, worker `last_result` (parallel.rs:270), worker `pending_runs` from a chained operation (parallel.rs:236), Regional, Capstone, Hard win, elite-kill run, and takeover (added when campaign-defenders lands `SetNextDefender`).
+- Positive rows: Personal first clear, Personal replay, NPC replay, reopened outbreak, worker `last_result` (parallel.rs:443-445 at HEAD; :270 when written), worker `pending_runs` from a chained operation (parallel.rs:386-388 at HEAD; :236 when written), Regional, Capstone, Hard win, elite-kill run, and takeover (added when campaign-defenders lands `SetNextDefender`).
 - Negative rows: defeat, withdraw, Retreat & train, abstract garrison containment.
 - Each positive row asserts +1 exactly once and `next_victory_progression().rank == rank + 1`.
 - Property test in tests/properties.rs: rank == committed victories over 120 seeds.
-- Existing-path rows are mutation-checked: removing `saturating_add` at campaign/world.rs:47 makes them fail. Record that in the commit message.
-- campaign/world.rs:35-54 stays unchanged.
+- Existing-path rows are mutation-checked: removing `saturating_add` at campaign/world.rs:50 (:47 when written) makes them fail. Record that in the commit message.
+- campaign/world.rs:35-57 (`first_clear` with its doc comment; :35-54 when written) stays unchanged.
+  As cut (W2 review, 10 November 2026): the victory increment is unchanged, but W2-22 (d39fb06) removed `first_clear`'s `claim_neutral_milestones` call when progression settlement took over the milestones, and W2-11 added the doc comment. The `settle_parallel` lines above are its two `first_clear` calls: the record-less `!had_pending` path for a worker `last_result`, and the `pending_runs` loop.
 
 ## 11. 400-enemy stress (perf-owned seam)
 
