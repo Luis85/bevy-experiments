@@ -593,8 +593,10 @@ impl ProgressionCatalog {
             // §6): one transition past rank 4. The preset bonus and the
             // boss-rank term are folded in at deploy.
             boss_phases: u8::from(rank > BOSS_SCALING_FROM_RANK),
-            // The other enemy-side fields stay neutral until their wave-2
-            // writers.
+            // front_ramp and boss_rank are written with the front position
+            // in Campaign::progression_for. boss_health_multiplier and
+            // boss_reward_multiplier stay 1.0 until their wave-4 writer
+            // (W4-01, ruling W-9).
             ..ProgressionSnapshot::default()
         }
     }
