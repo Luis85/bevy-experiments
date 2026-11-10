@@ -144,7 +144,6 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.label("Survive until the boss arrives, then defeat it. The timer alone does not clear the defense. Coins and recovered items are banked as you earn them.");
     });
 }
-/// A briefing column heading; the loadout's carries its one action.
 /// "N build supply · D× regional difficulty" for a deployment in `country`,
 /// D the difficulty it plays at (`Game::effective_country_difficulty`, the
 /// start clamp included).
@@ -155,6 +154,7 @@ fn supply_and_difficulty(game: &Game, country: &Country, supply: i64) -> String 
             .unwrap_or(country.difficulty)
     )
 }
+/// A briefing column heading; the loadout's carries its one action.
 fn heading(ui: &mut egui::Ui, title: &str) {
     ui.label(RichText::new(title).size(18.0).strong());
 }
