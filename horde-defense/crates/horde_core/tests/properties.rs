@@ -221,7 +221,8 @@ fn deploy_at_committed_rank(g: &mut Game, mode: Mode, seed: u64, step: u32) {
 /// W2-40 (design enemy-balance §10, acceptance G6.9): over random sequences
 /// of victories, defeats, withdrawals and npc retreats by the player and
 /// Mara, and of worker expeditions that win or are recalled, the threat rank
-/// equals the committed victories after every step. Each win is checked to
+/// equals the committed victories after every step, and every deploy (main
+/// run or worker) freezes that rank in its attempt. Each win is checked to
 /// commit exactly one victory and every other step none, so a setup that
 /// stopped winning cannot pass at 0 == 0.
 #[test]
@@ -286,6 +287,13 @@ fn threat_rank_equals_committed_victories() {
                     let battle = g
                         .deploy_survivor(recruit, &home, 0)
                         .unwrap_or_else(|e| panic!("seed {seed} step {step}: {e}"));
+                    // The worker's run freezes the committed rank too.
+                    let worker = g.battles().iter().find(|b| b.id == battle).unwrap();
+                    assert_eq!(
+                        u64::from(worker.game().attempt().unwrap().progression.rank),
+                        committed_victories(&g),
+                        "seed {seed} step {step}: worker deploy rank"
+                    );
                     let b = g.battles_mut().iter_mut().find(|b| b.id == battle).unwrap();
                     if rng.below(2) == 0 {
                         enemy(b.game_mut(), 5, 20.0, true);
