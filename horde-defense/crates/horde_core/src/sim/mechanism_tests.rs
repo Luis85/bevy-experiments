@@ -282,13 +282,26 @@ fn existing_structures_keep_charges_without_charges_per_rank() {
     for rank in 0..=10 {
         assert_eq!(trap_charges_after_placement(trap, rank), trap.charges);
     }
-    // A trap already on the field keeps its placed charges when the rank
-    // rises later; charges are fixed at placement.
+}
+
+#[test]
+fn placed_trap_keeps_its_placement_charges_when_the_rank_rises() {
+    // Ruling E12: charges are fixed at placement. The definition scales
+    // (test-only authored value): a trap placed at rank 0 holds 3 and one
+    // placed after the rank rises to 10 holds 13. A sim that re-derived
+    // charges after placement (from the catalogue, whose trap does not
+    // scale, or from the current rank) cannot keep both through a tick.
+    let mut trap = content().structure(StructureKind::Trap).clone();
+    trap.charges_per_rank = 1;
     let mut g = trap_game();
     g.deploy(0, Mode::Personal).unwrap();
-    g.place(StructureKind::Trap, 5, 0).unwrap();
+    g.place_definition(&trap, 5, 0).unwrap();
     g.campaign.structure_upgrades[StructureKind::Trap] = 10;
-    g.tick(Input::default());
+    g.place_definition(&trap, 6, 0).unwrap();
+    for _ in 0..2 {
+        g.tick(Input::default());
+    }
     let a = g.attempt.as_ref().unwrap();
-    assert_eq!(a.structures[0].charges, trap.charges);
+    let charges: Vec<u32> = a.structures.iter().map(|s| s.charges).collect();
+    assert_eq!(charges, [3, 13]);
 }
