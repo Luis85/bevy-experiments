@@ -95,7 +95,10 @@ impl Game {
         Ok(recruit.npc.clone())
     }
     /// The loadout part of a recruit's verdict: `npc`'s items exist, fit
-    /// their slots and are usable by a survivor defender. No mutation.
+    /// their slots, are usable by a survivor defender and are not held by
+    /// another deployment (the takeover commit's `check_external`). The main
+    /// run's own hold is left out, so a defense in progress keeps the
+    /// between-defenses verdict. No mutation.
     pub(super) fn recruit_loadout_check(&self, npc: &Npc) -> Result<(), String> {
         self.campaign.validate_loadout(npc.loadout)?;
         for item in npc.loadout {
@@ -103,6 +106,16 @@ impl Game {
             self.campaign
                 .weapon_access(Mode::Npc, item.definition_index())
                 .map_err(str::to_owned)?;
+        }
+        let takeover = self.campaign.reserved_recruit.and_then(|id| {
+            self.strategy
+                .roster
+                .iter()
+                .find(|r| r.id == id)
+                .map(|r| r.npc.loadout)
+        });
+        if self.campaign.held_elsewhere(npc.loadout, takeover) {
+            return Err(crate::campaign::ITEM_HELD_ELSEWHERE.into());
         }
         Ok(())
     }

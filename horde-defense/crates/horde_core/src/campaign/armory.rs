@@ -1,6 +1,9 @@
 //! Owned items, presets, equipment reservations and weapon access.
 
 use super::*;
+/// The refusal for an item another deployment already holds.
+pub(crate) const ITEM_HELD_ELSEWHERE: &str =
+    "A unique item is already reserved by another deployment";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Item {
@@ -313,15 +316,23 @@ impl Campaign {
         self.reserved_items.extend(loadout);
         Ok(())
     }
+    /// Whether one of `loadout`'s items sits in `reserved_items`, held by a
+    /// deployment other than the main run: a guard, an expedition, or the
+    /// main run's takeover recruit unless its loadout is `main_run`.
+    pub(crate) fn held_elsewhere(&self, loadout: [u64; 4], main_run: Option<[u64; 4]>) -> bool {
+        loadout.iter().any(|id| {
+            self.reserved_items.contains(id) && !main_run.is_some_and(|items| items.contains(id))
+        })
+    }
     /// `reserve_external`'s verdict without the reservation: the loadout is
     /// valid and none of its items is held by another deployment.
     pub(crate) fn check_external(&self, loadout: [u64; 4]) -> Result<(), String> {
         self.validate_loadout(loadout)?;
         let main = self.main_run_loadout();
-        if loadout.iter().any(|id| {
-            self.reserved_items.contains(id) || main.is_some_and(|items| items.contains(id))
-        }) {
-            return Err("A unique item is already reserved by another deployment".into());
+        if self.held_elsewhere(loadout, None)
+            || main.is_some_and(|items| loadout.iter().any(|id| items.contains(id)))
+        {
+            return Err(ITEM_HELD_ELSEWHERE.into());
         }
         Ok(())
     }

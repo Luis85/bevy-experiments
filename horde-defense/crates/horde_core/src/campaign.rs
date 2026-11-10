@@ -18,6 +18,7 @@ pub mod tree_value;
 mod tree_view;
 mod view;
 mod world;
+pub(crate) use armory::ITEM_HELD_ELSEWHERE;
 pub use armory::{Item, Preset};
 pub use auto_sell::{AutoSellRule, AutoSoldLine, AutoSoldReceipt, MAX_AUTO_SOLD_LINES};
 pub(crate) use loadout::mean_basic_damage;

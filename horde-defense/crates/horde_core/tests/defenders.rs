@@ -2859,6 +2859,102 @@ fn every_entry_point_gives_a_blocked_recruit_the_same_reason() {
     assert_eq!(g.clone().retry(), Err(expected.to_string()), "retry");
 }
 
+/// A Ready recruit sharing an item that a guard holds cannot take over (the
+/// commit's reservation check), so the verdict says so: every entry point
+/// and the defender list give the same typed InvalidLoadout. The main
+/// run's own hold is left out, so a defense in progress keeps the
+/// between-defenses verdict.
+#[test]
+fn every_entry_point_refuses_a_recruit_whose_item_a_guard_holds() {
+    let (mut g, id) = takeover_ready();
+    take_over(&mut g, id);
+    apply_ok(&mut g, Command::Withdraw);
+    let country = g.campaign().world.cleared[0].clone();
+    let guard = recruit(&mut g, &country);
+    let shared = g.campaign_mut().add_item(4).unwrap();
+    apply_ok(&mut g, Command::EquipRecruit { id, item: shared });
+    apply_ok(
+        &mut g,
+        Command::EquipRecruit {
+            id: guard,
+            item: shared,
+        },
+    );
+    apply_ok(&mut g, Command::SetNextDefender(DefenderId::Recruit(id)));
+    apply_ok(
+        &mut g,
+        Command::AssignGuard {
+            id: guard,
+            country: country.clone(),
+        },
+    );
+    let blocker = DefenderBlocker::InvalidLoadout {
+        reason: "A unique item is already reserved by another deployment".into(),
+    };
+    let expected = CommandError::DefenderUnavailable {
+        defender: DefenderId::Recruit(id),
+        blocker: blocker.clone(),
+    };
+    assert_eq!(
+        g.clone()
+            .apply(&Command::SetNextDefender(DefenderId::Recruit(id))),
+        Err(expected.clone()),
+        "SetNextDefender"
+    );
+    assert_eq!(
+        g.clone().apply(&Command::BeginDefense { stage: 0 }),
+        Err(expected.clone()),
+        "BeginDefense"
+    );
+    assert_eq!(
+        g.continue_blocker(),
+        Some(expected.clone()),
+        "continue_blocker"
+    );
+    assert_eq!(
+        g.clone().apply(&Command::ContinueJourney),
+        Err(expected.clone()),
+        "ContinueJourney"
+    );
+    assert_eq!(g.clone().retry(), Err(expected.to_string()), "retry");
+    let row = |g: &Game, who: u64| {
+        g.available_defenders()
+            .into_iter()
+            .find(|o| o.card.id == DefenderId::Recruit(who))
+            .unwrap()
+            .selectable
+    };
+    assert_eq!(row(&g, id), Err(blocker), "available_defenders");
+
+    // Control: a recruit sharing items with the main run (the player's
+    // rifle, and an item of a recruit taking over) keeps its verdict while
+    // that defense is live.
+    let (mut g, id) = takeover_ready();
+    let other = recruit(&mut g, &country);
+    let rifle = g.campaign().player.loadout[Slot::Ranged.index()];
+    let shared = g.campaign_mut().add_item(4).unwrap();
+    apply_ok(&mut g, Command::EquipRecruit { id, item: shared });
+    apply_ok(
+        &mut g,
+        Command::EquipRecruit {
+            id: other,
+            item: rifle,
+        },
+    );
+    let mut personal = g.clone();
+    personal.deploy_country_stage(0, Mode::Personal).unwrap();
+    assert_eq!(row(&personal, other), Ok(()), "a live player defense");
+    apply_ok(
+        &mut g,
+        Command::EquipRecruit {
+            id: other,
+            item: shared,
+        },
+    );
+    take_over(&mut g, id);
+    assert_eq!(row(&g, other), Ok(()), "a live takeover");
+}
+
 /// `continue_blocker` is `ContinueJourney`'s own refusal, read without a
 /// change, so Results can disable Continue and say why.
 #[test]

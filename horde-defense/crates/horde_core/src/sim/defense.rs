@@ -35,7 +35,8 @@ impl Game {
     /// The typed reason `defender` cannot be chosen or sent into the next
     /// defense, ignoring any defense in progress: Mara needs Companion, a
     /// recruit needs Recruitment, must be in camp and must carry a loadout
-    /// it can deploy with (in that order). No mutation.
+    /// it can deploy with, none of it held by another deployment (in that
+    /// order). No mutation.
     pub(crate) fn defender_selectable(&self, defender: DefenderId) -> Result<(), CommandError> {
         let blocker = match defender {
             DefenderId::Player => None,
