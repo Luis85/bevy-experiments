@@ -123,8 +123,10 @@ impl Default for StrategyState {
 }
 impl StrategyState {
     /// A fresh strategy layer whose RNG starts at `seed ^ STRATEGY_RNG_SALT`,
-    /// so `seeded(0)` is the default. The pacing sweep's seam: seed index 0
-    /// keeps the default RNG and every later index varies it.
+    /// so `seeded(0)` is the default. The pacing sweep's seam
+    /// (`sim::pacing_start`): seed index 0 of a plan that does not set
+    /// `seed_strategy` keeps the default RNG; every later index, and every
+    /// index of a plan that sets it, is seeded.
     pub(crate) fn seeded(seed: u64) -> Self {
         Self {
             rng: Rng::new(seed ^ STRATEGY_RNG_SALT),
