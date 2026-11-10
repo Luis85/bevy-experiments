@@ -6,6 +6,9 @@
 //! - `--runs` lists every run under the table.
 //! - `--profile ID|all` (repeatable) selects registry profiles; without it
 //!   the three legacy profiles are printed.
+//! - `--difficulty easy|normal|hard` and `--country ISO3` replace every
+//!   selected profile's balance preset and start country; the table column
+//!   heading then ends in `[ISO3, Preset]`.
 //! - `--seeds N` plays seed indices `0..N` per profile (default 1) and
 //!   prints `median [p25, p75] reached/seeds` cells.
 //! - `--csv` prints one CSV row per run instead of the table.
@@ -25,6 +28,7 @@
 //! With no flag but `max_runs` and `--runs`, the output is the pre-v2 table.
 //! Unknown or malformed arguments exit with status 2.
 #![allow(clippy::print_stdout, clippy::print_stderr)]
+use horde_core::balance::BalancePreset;
 use horde_core::defenders::DefenderId;
 use horde_core::sim::{
     EarnedAfter, LEGACY_PROFILE_IDS, Milestone, MilestoneStats, PacingProfile, PacingReport,
@@ -33,10 +37,11 @@ use horde_core::sim::{
     pacing_sweep, parallel_frees_neighbours, strategy_sweep, strategy_table, tier_cost,
 };
 use horde_core::skill_catalog::CampaignFeature;
+use horde_core::world::world;
 use std::fmt::Write as _;
 
 const USAGE: &str = "usage: pacing [max_runs] [--runs] [--csv] [--out PATH] \
-[--profile ID|all]... [--seeds N] [--fit-tiers a,b,c] [--values] [--strategy]";
+[--profile ID|all]... [--difficulty easy|normal|hard] [--country ISO3] [--seeds N] [--fit-tiers a,b,c] [--values] [--strategy]";
 
 #[derive(Default)]
 struct Args {
@@ -46,6 +51,8 @@ struct Args {
     out: Option<String>,
     profiles: Vec<String>,
     seeds: Option<usize>,
+    difficulty: Option<BalancePreset>,
+    country: Option<&'static str>,
     fit_tiers: Vec<usize>,
     values: bool,
     strategy: bool,
@@ -72,6 +79,28 @@ fn parse(args: &[String]) -> Result<Args, String> {
                     return Err(format!("unknown profile {id}"));
                 }
                 out.profiles.push(id);
+            }
+            "--difficulty" => {
+                let name = value("--difficulty")?;
+                out.difficulty = Some(match name.as_str() {
+                    "easy" => BalancePreset::Easy,
+                    "normal" => BalancePreset::Normal,
+                    "hard" => BalancePreset::Hard,
+                    _ => {
+                        return Err(format!(
+                            "--difficulty needs easy, normal or hard, not {name}"
+                        ));
+                    }
+                });
+            }
+            "--country" => {
+                let id = value("--country")?;
+                let country = world().countries.iter().find(|c| c.id == id);
+                out.country = Some(
+                    country
+                        .map(|c| c.id.as_str())
+                        .ok_or_else(|| format!("unknown country {id}"))?,
+                );
             }
             "--seeds" => {
                 let n = value("--seeds")?;
@@ -104,6 +133,8 @@ fn parse(args: &[String]) -> Result<Args, String> {
             || out.list_runs
             || out.values
             || !out.profiles.is_empty()
+            || out.difficulty.is_some()
+            || out.country.is_some()
             || !out.fit_tiers.is_empty())
     {
         return Err(
@@ -175,10 +206,19 @@ fn selected(args: &Args) -> Vec<PacingProfile> {
     }
     let mut seen = std::collections::BTreeSet::new();
     profiles.retain(|p| seen.insert(p.id));
-    if let Some(max_runs) = args.max_runs {
-        for p in &mut profiles {
+    for p in &mut profiles {
+        if let Some(max_runs) = args.max_runs {
             p.max_runs = max_runs;
         }
+        if args.difficulty.is_none() && args.country.is_none() {
+            continue;
+        }
+        p.difficulty = args.difficulty.unwrap_or(p.difficulty);
+        p.country = args.country.unwrap_or(p.country);
+        // The example's few profiles live until it exits.
+        p.name = Box::leak(
+            format!("{} [{}, {}]", p.name, p.country, p.difficulty.name()).into_boxed_str(),
+        );
     }
     profiles
 }
@@ -446,5 +486,39 @@ mod tests {
         let partial = EarnedAfter { sampled: 7, ..all };
         assert_eq!(fit_cell(partial, 1000), " 1.50 (1500, 7/20 seeds) |");
         assert!(FIT_PARTIAL_NOTE.contains("leans toward slow seeds"));
+    }
+
+    fn argv(args: &[&str]) -> Vec<String> {
+        args.iter().map(|a| (*a).to_owned()).collect()
+    }
+
+    #[test]
+    fn difficulty_and_country_override_every_selected_profile() {
+        let args = parse(&argv(&["--difficulty", "hard", "--country", "AUT"])).expect("parses");
+        let profiles = selected(&args);
+        assert_eq!(profiles.len(), LEGACY_PROFILE_IDS.len());
+        for p in &profiles {
+            assert_eq!((p.difficulty, p.country), (BalancePreset::Hard, "AUT"));
+            assert!(p.name.ends_with("[AUT, Hard]"), "{}", p.name);
+        }
+        let easy =
+            parse(&argv(&["--profile", "lux-hard", "--difficulty", "easy"])).expect("parses");
+        let lux = selected(&easy);
+        assert_eq!(
+            (lux[0].difficulty, lux[0].country),
+            (BalancePreset::Easy, "LUX")
+        );
+        let plain = selected(&parse(&[]).expect("parses"));
+        assert!(plain.iter().all(|p| !p.name.contains('[')));
+        for bad in [
+            &["--difficulty", "custom"][..],
+            &["--difficulty"],
+            &["--country", "XXX"],
+            &["--country"],
+            &["--strategy", "--country", "AUT"],
+            &["--strategy", "--difficulty", "hard"],
+        ] {
+            assert!(parse(&argv(bad)).is_err(), "{bad:?}");
+        }
     }
 }
