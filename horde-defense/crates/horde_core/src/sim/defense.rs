@@ -36,7 +36,9 @@ impl Game {
     /// defense, ignoring any defense in progress: Mara needs Companion, a
     /// recruit needs Recruitment, must be in camp and must carry a loadout
     /// it can deploy with, and no defender's items may be held by another
-    /// deployment (in that order). No mutation.
+    /// deployment (in that order). The one exception: a recruit defending
+    /// the main run (a takeover) is not in camp, so it reads
+    /// `DefenderBlocker::Defending` until the defense ends. No mutation.
     pub(crate) fn defender_selectable(&self, defender: DefenderId) -> Result<(), CommandError> {
         let held = |loadout| {
             self.held_elsewhere_between_defenses(loadout)

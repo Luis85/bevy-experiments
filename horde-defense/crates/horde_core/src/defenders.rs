@@ -348,8 +348,10 @@ pub struct DefenderCard {
 /// One row of `Game::available_defenders`: the card, whether
 /// `SetNextDefender` would accept it between defenses (or the typed reason
 /// it would not), whether it is the next defender, and its power at the
-/// next threat. A live defense does not change `selectable`, but rejects
-/// every choice with `CommandError::DefenseInProgress`.
+/// next threat. A live defense rejects every choice with
+/// `CommandError::DefenseInProgress` and leaves `selectable` at its
+/// between-defenses verdict, with one exception: during a takeover the
+/// defending recruit's row reads `Err(DefenderBlocker::Defending)`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct DefenderOption {
     pub card: DefenderCard,

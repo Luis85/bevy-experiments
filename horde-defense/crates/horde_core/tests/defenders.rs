@@ -3214,8 +3214,9 @@ fn available_defenders_lists_player_mara_recruits_with_blockers() {
             ),
         }
     }
-    // During a defense the rows keep the between-defenses verdict, while
-    // every SetNextDefender is DefenseInProgress (the documented contract).
+    // During a player or Mara defense the rows keep the between-defenses
+    // verdict, while every SetNextDefender is DefenseInProgress (the
+    // documented contract).
     let mut live = g.clone();
     live.deploy_country_stage(0, Mode::Personal).unwrap();
     let verdicts = |list: &[DefenderOption]| -> Vec<_> {
@@ -3227,6 +3228,32 @@ fn available_defenders_lists_player_mara_recruits_with_blockers() {
     for option in &list {
         assert_eq!(
             live.clone()
+                .apply(&Command::SetNextDefender(option.card.id)),
+            Err(CommandError::DefenseInProgress),
+            "{:?}",
+            option.card.id
+        );
+    }
+    // A takeover is the one exception: the defending recruit's row reads
+    // Defending while it holds the main run, and every other row keeps its
+    // between-defenses verdict.
+    let mut takeover = g.clone();
+    take_over(&mut takeover, ready);
+    let expected: Vec<_> = verdicts(&list)
+        .into_iter()
+        .map(|(id, verdict)| {
+            if id == DefenderId::Recruit(ready) {
+                (id, Err(DefenderBlocker::Defending))
+            } else {
+                (id, verdict)
+            }
+        })
+        .collect();
+    assert_eq!(verdicts(&takeover.available_defenders()), expected);
+    for option in &list {
+        assert_eq!(
+            takeover
+                .clone()
                 .apply(&Command::SetNextDefender(option.card.id)),
             Err(CommandError::DefenseInProgress),
             "{:?}",
