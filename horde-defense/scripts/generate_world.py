@@ -12,8 +12,11 @@ python -I -B scripts/generate_world.py --check [--rebuild ...]
 python -I -B scripts/generate_world.py --rebuild (110m.geojson 50m.geojson | --download)
     Rebuilds the countries from public-domain Natural Earth. The source bytes must
     match the sha256 pins in world.json `sources` (exit 3, unless
-    --allow-source-drift, which re-pins them) and no country's stage count may
-    change (exit 4, unless --allow-stage-count-change). Every top-level key other
+    --allow-source-drift, which re-pins them), every committed country id must
+    come back (exit 5; ids are saved, so no flag accepts a vanished or renamed
+    id) and no country's stage count may change (exit 4, unless
+    --allow-stage-count-change). Committed countries keep their order and a new
+    one is appended. Every top-level key other
     than `sources` and `countries` (version, the level config, strategy_config,
     stage_themes) and each country's `level_override`, `stage_theme_ids` and any
     other key the generator does not build are carried over.
@@ -22,7 +25,7 @@ python -I -B scripts/generate_world.py --self-test
 
 --world PATH points any mode at another world.json. Exit codes: 0 success, 1 a
 --check difference or a self-test failure, 2 usage, 3 source drift, 4 a stage-count
-change. A refused run writes nothing.
+change, 5 a vanished or renamed country id. A refused run writes nothing.
 """
 import argparse
 import collections
@@ -43,6 +46,7 @@ BASE = 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/ge
 NAMES = ['ne_110m_admin_0_countries.geojson', 'ne_50m_admin_0_countries.geojson']
 SOURCE_DRIFT = 3
 STAGE_COUNT_CHANGE = 4
+ID_CHANGE = 5
 
 
 class Refused(Exception):
@@ -212,6 +216,17 @@ def rebuild(world, raws, allow_source_drift=False, allow_stage_count_change=Fals
     if drift and not allow_source_drift:
         raise Refused(SOURCE_DRIFT, 'source sha256 drift: ' + '; '.join(drift) + ' (--allow-source-drift accepts and re-pins)')
     countries, links, routes = build_countries(raws)
+    # Country ids are saved, so they never change: every committed id must
+    # come back, in its committed position, and a new one is appended.
+    order = [country['id'] for country in world.get('countries', [])]
+    built = [country['id'] for country in countries]
+    missing = [code for code in order if code not in built]
+    if missing:
+        new = [code for code in built if code not in order]
+        raise Refused(ID_CHANGE, f"{len(missing)} saved country ids vanish or are renamed: {', '.join(missing)}"
+                      f" (new ids: {', '.join(new) or 'none'}); ids never change, so no flag accepts this")
+    position = {code: i for i, code in enumerate(order)}
+    countries.sort(key=lambda country: position.get(country['id'], len(order)))
     # Authored per-country data survives: level_override, and every key the
     # generator does not build (stage_theme_ids, world.rs Country), in its
     # committed order after the generated keys.
@@ -441,6 +456,23 @@ def self_test():
         case('--rebuild exits 4 when one stage count changes', code == STAGE_COUNT_CHANGE and 'FRA 7 -> 8' in text
              and world.read_bytes() == accepted, f'exit {code}: {text.strip()}')
 
+        allow_all = [*rebuild_argv, '--allow-source-drift', '--allow-stage-count-change']
+        for name, sources in [('vanishes', synthetic_sources(fra_population=68000000, drop={'ISL'})),
+                              ('is renamed', synthetic_sources(fra_population=68000000, rename={'ISL': 'ISX'}))]:
+            small.write_bytes(sources[0])
+            large.write_bytes(sources[1])
+            code, text = run(*allow_all)
+            case(f'--rebuild exits 5 when a saved id {name}, whatever the --allow flags',
+                 code == ID_CHANGE and 'ISL' in text and world.read_bytes() == accepted, f'exit {code}: {text.strip()}')
+        sources = synthetic_sources(fra_population=68000000, belgium=True)
+        small.write_bytes(sources[0])
+        large.write_bytes(sources[1])
+        code, text = run(*allow_all)
+        appended = [country['id'] for country in json.loads(world.read_bytes().decode('utf-8'))['countries']]
+        case('--rebuild appends a new country after the saved ids', code == 0 and appended == ['FRA', 'DEU', 'ISL', 'BEL'],
+             f'exit {code}: {appended} {text.strip()}')
+        world.write_bytes(accepted)
+
         for argv, name in [(['--rebuild', '--world', str(world)], '--rebuild without sources'),
                            (['--rebuild', '--world', str(world), str(small)], '--rebuild with one GeoJSON file'),
                            (['--rebuild', '--download', '--world', str(world), str(small), str(large)], '--rebuild with paths and --download'),
@@ -458,20 +490,29 @@ def self_test():
     return 0
 
 
-def synthetic_sources(fra_population=67000000):
-    """Tiny 110m and 50m GeoJSON stand-ins: two bordering squares and an island."""
+def synthetic_sources(fra_population=67000000, drop=(), rename=None, belgium=False):
+    """Tiny 110m and 50m GeoJSON stand-ins: two bordering squares and an island.
+
+    `drop` leaves out those codes, `rename` maps a code to another, and
+    `belgium` adds a third square that sorts between France and Germany.
+    """
     def square(x, y):
         return [[x, y], [x + 1, y], [x + 1, y + 1], [x, y + 1], [x, y]]
 
     def feature(code, name, x, y, population, subregion):
+        code = (rename or {}).get(code, code)
         return dict(type='Feature', geometry=dict(type='Polygon', coordinates=[square(x, y)]),
                     properties=dict(ADM0_A3=code, ADMIN=name, NAME_LONG=name, POP_EST=population, POP_YEAR=2019,
                                     SUBREGION=subregion, TYPE='Sovereign country', LABEL_X=x + 0.5, LABEL_Y=y + 0.5))
     land = [feature('DEU', 'Germany', 10, 50, 83000000, 'Western Europe'),
             feature('FRA', 'France', 9, 50, fra_population, 'Western Europe')]
+    if belgium:
+        land.append(feature('BEL', 'Belgium', 11, 50, 11500000, 'Western Europe'))
     island = feature('ISL', 'Iceland', -20, 64, 360000, 'Northern Europe')
+    land = [f for f in land if f['properties']['ADM0_A3'] not in drop]
+    islands = [f for f in [island] if f['properties']['ADM0_A3'] not in drop]
     return [json.dumps(dict(type='FeatureCollection', features=features)).encode('utf-8')
-            for features in (land, land + [island])]
+            for features in (land, land + islands)]
 
 
 if __name__ == '__main__':

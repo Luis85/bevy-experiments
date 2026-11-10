@@ -98,12 +98,15 @@ and exits 1 when the output differs from the committed bytes. `--rebuild`
 rebuilds the countries from the Natural Earth 110m and 50m files, given as two
 positional paths or fetched with `--download`. It refuses source bytes that do
 not match the sha256 pins in `sources` (exit 3; `--allow-source-drift` accepts
-and re-pins them) and any change to a country's stage count (exit 4;
-`--allow-stage-count-change`), and it keeps the top-level configuration and
-each country's `level_override`, `stage_theme_ids` and any other key the
-generator does not build. `--self-test` exercises every mode on throwaway files.
-The rebuild computes adjacency before simplifying display coordinates, checks
-connectivity during generation, and emits stable sorted IDs and neighbors.
+and re-pins them), a committed country id that vanishes or is renamed (exit 5;
+ids are saved, so no flag accepts it) and any change to a country's stage
+count (exit 4; `--allow-stage-count-change`). Committed countries keep their
+order and a new one is appended after them. It keeps the top-level
+configuration and each country's `level_override`, `stage_theme_ids` and any
+other key the generator does not build. `--self-test` exercises every mode on
+throwaway files. The rebuild computes adjacency before simplifying display
+coordinates, checks connectivity during generation, and emits stable IDs and
+sorted neighbors.
 Change `difficulty` only through the generator, and review the diff of any
 regeneration before committing it.
 
