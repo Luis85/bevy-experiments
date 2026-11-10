@@ -586,27 +586,32 @@ fn elite_drop_quality_is_at_least_uncommon_and_boss_drop_has_no_floor() {
 }
 
 /// Acceptance G6.3: every elite a director wave fields drops one item of
-/// Uncommon or better when it falls, whatever its archetype and affix.
+/// Uncommon or better when it falls, whatever its archetype and affix. Every
+/// boss is defeated first, so the boss-gated pack variants join too.
 #[test]
 fn every_elite_kill_drops_uncommon_or_better() {
     let catalog = crate::enemy_catalog::enemy_catalog();
+    let eligible: Vec<&str> = catalog
+        .archetype_ids()
+        .filter(|id| catalog.elite_eligible(id))
+        .collect();
+    let gates: Vec<_> = eligible
+        .iter()
+        .filter_map(|id| catalog.resolve(id).unwrap().unlocked_by)
+        .collect();
+    assert!(!gates.is_empty(), "some eligible archetype is boss-gated");
     for mode in [Mode::Personal, Mode::Npc] {
         let mut g = game_at(mode, 23);
+        g.campaign.defeated_bosses.extend(&gates);
         let mut a = g.attempt.take().unwrap();
         a.progression.elite_rate_bp = 10_000;
         let mut affixes = BTreeSet::new();
         let mut kills = 0;
-        for archetype in catalog
-            .archetype_ids()
-            .filter(|id| catalog.elite_eligible(id))
-        {
+        for &archetype in &eligible {
             for n in 0..8usize {
                 a.enemies.clear();
-                if g.spawn_archetype_as(&mut a, archetype, (n % 5) as u8, director::Arrival::Wave)
-                    .is_err()
-                {
-                    break; // a boss variant not yet unlocked
-                }
+                g.spawn_archetype_as(&mut a, archetype, (n % 5) as u8, director::Arrival::Wave)
+                    .unwrap_or_else(|e| panic!("{mode:?} {archetype}: {e}"));
                 a.enemies.truncate(1);
                 let e = &mut a.enemies[0];
                 let affix = e.resolved.as_ref().and_then(|r| r.elite.as_ref());
@@ -629,7 +634,11 @@ fn every_elite_kill_drops_uncommon_or_better() {
                 kills += 1;
             }
         }
-        assert!(kills >= 40, "{mode:?}: {kills} elite kills");
+        assert_eq!(
+            kills,
+            8 * eligible.len(),
+            "{mode:?}: every eligible archetype fell"
+        );
         assert_eq!(affixes.len(), 5, "{mode:?}: every affix fell: {affixes:?}");
     }
 }
