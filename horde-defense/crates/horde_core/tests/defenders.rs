@@ -3619,6 +3619,26 @@ fn country_choice_preview_names_stage_count_and_mara_timing() {
     assert!(!preview.companion_after_liberation);
 }
 
+#[test]
+fn legacy_campaign_meets_mara_after_its_first_defense_not_a_liberation() {
+    // A legacy campaign (legacy_features) gets the Companion feature after
+    // its first defense with no node (Campaign::has_feature), so liberating
+    // the chosen country is not what brings Mara.
+    let mut g = support::legacy_game();
+    g.apply(&Command::ChooseSurvivor(
+        horde_core::survivors::SurvivorId::Rook,
+    ))
+    .unwrap();
+    assert_eq!(g.campaign().attempts, 0);
+    assert!(!g.campaign().npc_available());
+    for country in &world().countries {
+        let preview = g.country_choice_preview(&country.id).unwrap();
+        assert!(!preview.companion_after_liberation, "{}", country.id);
+    }
+    g.campaign_mut().attempts = 1;
+    assert!(g.campaign().npc_available(), "Mara joins after one defense");
+}
+
 // ---------------------------------------------------------------------------
 // W2-21: the pure defender_power read (design 1.11) on the inputs a deploy
 // uses, the derived service_record (1.10) and the Recruit.containments

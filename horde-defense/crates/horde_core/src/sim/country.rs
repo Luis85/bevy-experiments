@@ -38,7 +38,8 @@ pub struct CountryChoicePreview {
     /// The defenses that liberate the country.
     pub stage_count: usize,
     /// Mara is not yet in camp, and once this country is liberated her
-    /// upgrade node's liberation requirement is met.
+    /// upgrade node's liberation requirement is met. Always false for a
+    /// legacy campaign, which meets her after its first defense instead.
     pub companion_after_liberation: bool,
 }
 
@@ -108,7 +109,10 @@ impl Game {
                 .get(country_id)
                 .is_some_and(|clears| *clears >= stage_count);
         let after = self.campaign.liberated_count() + u32::from(!counted);
+        // A legacy campaign meets Mara after its first defense, not through
+        // her node (`Campaign::has_feature`), so no liberation brings her.
         let companion_after_liberation = !self.campaign.npc_available()
+            && !self.campaign.legacy_features
             && skills()
                 .node(&feature_node(CampaignFeature::Companion))
                 .is_some_and(|node| after >= node.minimum_liberated);
