@@ -502,7 +502,7 @@ Format: **Id · owner · title.** Files. *Fail-first.* Done. Deps.
   - `caller_phase_shortens_interval`
   - `second_transition_clamped`
 - Note (W2-32, 2026-11-08): the rank boss armor of design-enemy-balance §2 ("Boss armor") landed in W2-32. `ProgressionCatalog::snapshot` writes `boss_armor_multiplier` and `npc_boss_armor_add`, and `place_enemy` applies them to the boss's armor at spawn, so exposure still zeroes it. W2-36's "armor scaling" is only the phase `armor_mult` in `enemy_armor_vs`, on top of that spawn armor; do not apply the rank terms a second time.
-- Note (W2-26 review, 2026-11-08): `ProgressionSnapshot::fold_extras` (W2-26) already adds `boss_phase_bonus`, and only past rank 4. Add only the `(r>4)` and `extra_transitions` terms; adding the bonus again would count it twice. Hard at ranks 0-4 (schema-v7 §3.10 gives 1 phase, W2-26's neutral-snapshot pin gives none) is open in plan §2.5. Settle it with a test of Hard ranks 0-4 that matches the ruling, and amend schema §3.10 or the pin to match.
+- Note (W2-26 review, 2026-11-08): `ProgressionSnapshot::fold_extras` (W2-26) already adds `boss_phase_bonus`, and only past rank 4. Add only the `(r>4)` and `extra_transitions` terms; adding the bonus again would count it twice. Hard at ranks 0-4 (schema-v7 §3.10 gives 1 phase, W2-26's neutral-snapshot pin gives none) is open in plan §2.5. Settle it with a test of Hard ranks 0-4 that matches the ruling, and amend schema §3.10 or the pin to match. **Settled by W2-36 (2026-11-08)** on the plan §2.5 default: Hard at ranks 0-4 has Normal's count (`hard_ranks_zero_to_four_have_normals_phase_count`), and schema-v7 §3.10 and the design-enemy-balance §6 table are amended.
 - Deps: W2-32.
 
 **W2-37 · vfx-lighting · Visual twin for BossPhase**
