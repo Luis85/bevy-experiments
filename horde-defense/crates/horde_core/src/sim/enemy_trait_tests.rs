@@ -64,6 +64,8 @@ enum Act {
     Turret,
     Melee,
     Ordnance,
+    Trap,
+    Fire,
 }
 
 /// Personal damage one durable shield-bearer (`armor`, `ranged` ranged
@@ -71,8 +73,10 @@ enum Act {
 /// else at x 8, while the defender carries `penetration`.
 fn shield_damage(armor: i32, ranged: i32, contact: bool, act: Act, penetration: i32) -> i32 {
     let mut g = game(Mode::Personal);
-    if act == Act::Turret {
-        g.place(StructureKind::Turret, 5, 0).unwrap();
+    match act {
+        Act::Turret => g.place(StructureKind::Turret, 5, 0).unwrap(),
+        Act::Trap => g.place(StructureKind::Trap, 5, 0).unwrap(),
+        _ => {}
     }
     let mut a = g.attempt.take().unwrap();
     a.profile.modifiers.armor_penetration = penetration;
@@ -81,6 +85,22 @@ fn shield_damage(armor: i32, ranged: i32, contact: bool, act: Act, penetration: 
     p.ranged_armor = ranged;
     p.validate().unwrap();
     let x = if contact { DEFENSE_LINE } else { 8.0 };
+    if act == Act::Trap {
+        // The trap sits under the hostile, wherever it stands.
+        a.structures[0].position_x = Some(x);
+    }
+    if act == Act::Fire {
+        // A Molotov's fire zone, without the impact blast before it.
+        a.ordnance.fire_zones.push(crate::ordnance::FireZone {
+            id: 9_999,
+            cell: [x as u8, 5],
+            radius: 1.5,
+            damage: 20,
+            ticks_left: 40,
+            tick_left: 1,
+            tick_interval: 10,
+        });
+    }
     let e = &mut a.enemies[0];
     e.resolved = Some(p);
     e.x = x;
@@ -100,7 +120,7 @@ fn shield_damage(armor: i32, ranged: i32, contact: bool, act: Act, penetration: 
             melee: true,
             ..Input::default()
         }),
-        Act::Turret => {
+        Act::Turret | Act::Trap | Act::Fire => {
             for _ in 0..40 {
                 g.tick(Input::default());
             }
@@ -183,11 +203,14 @@ fn shield_ranged_armor_applies_to_shot_and_turret_until_contact() {
         shield_damage(armor, ranged, false, Act::Shot, ranged),
         shield_damage(armor, 0, false, Act::Shot, 0)
     );
-    // In contact, and for melee and blasts, the shield does nothing.
+    // In contact, and for melee, blasts, traps and fire, the shield does
+    // nothing.
     for (act, contact) in [
         (Act::Shot, true),
         (Act::Melee, true),
         (Act::Ordnance, false),
+        (Act::Trap, false),
+        (Act::Fire, false),
     ] {
         let base = shield_damage(armor, 0, contact, act, 0);
         assert!(base > 0, "{act:?} reaches it");
