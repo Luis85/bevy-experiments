@@ -491,6 +491,22 @@ fn drop_tracking_bounds_reject_out_of_range_saves() {
             "Invalid saved attempt drop tracking",
             edited(worker_drops),
         ),
+        (
+            // `finish` copies the counts into the report, whose bound
+            // rejects a sum above loot: the live attempt must reject it too.
+            "attempt quality counts above loot",
+            "Invalid saved attempt drop tracking",
+            attempt("loot_quality_counts", counts(&[("Common", 2), ("Rare", 1)])),
+        ),
+        (
+            "worker attempt quality counts above loot",
+            "Invalid saved attempt drop tracking",
+            edited(|s| {
+                let worker = &mut s.value["battles"][s.live]["game"]["attempt"];
+                worker["loot"] = json!(1);
+                worker["loot_quality_counts"] = counts(&[("Poor", 2)]);
+            }),
+        ),
     ];
     let wrong: Vec<String> = only_drop_bound
         .into_iter()
@@ -511,6 +527,12 @@ fn drop_tracking_bounds_reject_out_of_range_saves() {
     worker.value["battles"][worker.live]["game"]["attempt"]["drop_ids"] = json!([]);
     if let Err(error) = load(worker.value) {
         panic!("worker loot 1 without drops: {error}");
+    }
+    // Quality counts that sum to exactly the attempt's loot load.
+    let mut full = staged();
+    full.value["attempt"]["loot_quality_counts"] = counts(&[("Common", 1), ("Rare", 1)]);
+    if let Err(error) = load(full.value) {
+        panic!("attempt quality counts equal to loot: {error}");
     }
     // A drop list of exactly MAX_RUN_DROPS ids is not rejected for its length.
     let mut many = staged();

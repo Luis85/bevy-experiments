@@ -435,13 +435,19 @@ fn validate_report_loot(report: &Report, next_item_id: u64) -> Result<(), String
     report.auto_sold.validate(report.loot)
 }
 /// An attempt's drop ids (strictly ascending, at most its loot and
-/// [`MAX_RUN_DROPS`], each an issued id) and frozen drop tier (schema v7 §3.3).
-/// Drops are recorded only at depth 0 on the `drop_tier` Some path (rulings
-/// E5 and E11): a legacy or worker attempt never holds any.
+/// [`MAX_RUN_DROPS`], each an issued id), quality counts (summing to at most
+/// its loot, the bound `finish` hands to the report) and frozen drop tier
+/// (schema v7 §3.3). Drops are recorded only at depth 0 on the `drop_tier`
+/// Some path (rulings E5 and E11): a legacy or worker attempt never holds any.
 fn validate_attempt_loot(a: &Attempt, next_item_id: u64, depth: usize) -> Result<(), String> {
     if (!a.drop_ids.is_empty() && (a.drop_tier.is_none() || depth > 0))
         || a.drop_ids.len() > MAX_RUN_DROPS
         || a.drop_ids.len() > a.loot as usize
+        || a.loot_quality_counts
+            .values()
+            .map(|n| u64::from(*n))
+            .sum::<u64>()
+            > u64::from(a.loot)
         || a.drop_ids.first().is_some_and(|id| *id == 0)
         || a.drop_ids.last().is_some_and(|id| *id >= next_item_id)
         || a.drop_ids.windows(2).any(|pair| pair[0] >= pair[1])
