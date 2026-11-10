@@ -8,7 +8,8 @@
 //! descending, id; hostiles at their crowd-staggered spot) with each hit flash
 //! right after its sprite, the overlay (a ranged windup's dashed aim line,
 //! outline, stun and windup rings, health and windup bars), then the callout
-//! text, a holding boss's "PHASE n - NAME" last. Rejected enemy art keeps
+//! text, a holding boss's name and "PHASE n - NAME" last, moved as one
+//! block so the clip never stacks them on one row. Rejected enemy art keeps
 //! the per-enemy procedural figure path.
 use super::super::{AMBER, ArenaProjection, GREEN, RED, bar, figure, line, soft_shadow};
 use super::batch::{FieldMeshes, MeshBuilder};
@@ -66,13 +67,17 @@ pub(super) fn paint(
 ) -> HostilesDrawn {
     let sy = arena.lane_height();
     // A holding boss's phase (W2-37): its ring under the bodies, its label
-    // with the callouts.
+    // last, stacked over the boss's name (which the per-body callouts then
+    // leave out).
     let phase = holding_boss(view).map(|(boss, phase)| {
         let [x, y] = boss.drawn();
-        let (ring, label) = phase_anchors(arena.world(x, y), sy, boss.height.pixels(sy));
+        let at = arena.world(x, y);
+        let (ring, label) = phase_anchors(at, sy, boss.height.pixels(sy));
         let radii = phase_ring(sy, phase.hold_left_ticks, reduced);
-        (ring, radii, label, phase.label())
+        let name = boss.label.map(|name| (name_anchor(at, sy), name));
+        (ring, radii, label, phase.label(), boss.id, name)
     });
+    let stacked = phase.as_ref().map(|phase| phase.4);
     if textures.enemy_art_rejected {
         for (lane, contact) in lane_contacts(view) {
             let (band, gauge) = contact_band(arena, view, lane, contact);
@@ -87,10 +92,11 @@ pub(super) fn paint(
             ));
         }
         for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
-            enemy(p, arena, e, ring, textures, outlines, reduced);
+            let named = stacked != Some(e.id);
+            enemy(p, arena, e, ring, textures, outlines, reduced, named);
         }
-        if let Some((.., at, text)) = &phase {
-            callout(p, *at, Align2::CENTER_BOTTOM, text, 10.0);
+        if let Some((.., at, text, _, name)) = &phase {
+            phase_callouts(p, *at, text, *name);
         }
         return HostilesDrawn::default();
     }
@@ -173,13 +179,10 @@ pub(super) fn paint(
             )),
             HealthView::Bar { .. } | HealthView::Hidden => {}
         }
-        if let Some(label) = e.label {
-            labels.push((
-                at + vec2(0.0, -sy * 0.7),
-                Align2::CENTER_CENTER,
-                label,
-                10.0,
-            ));
+        if let Some(label) = e.label
+            && stacked != Some(e.id)
+        {
+            labels.push((name_anchor(at, sy), Align2::CENTER_CENTER, label, 10.0));
         }
     }
     layers.underlay.paint(p);
@@ -202,14 +205,36 @@ pub(super) fn paint(
     for (at, align, text, size) in labels {
         callout(p, at, align, text, size);
     }
-    if let Some((.., at, text)) = &phase {
-        callout(p, *at, Align2::CENTER_BOTTOM, text, 10.0);
+    if let Some((.., at, text, _, name)) = &phase {
+        phase_callouts(p, *at, text, *name);
     }
     drawn
 }
 
+/// How far over its feet, in lane heights, a hostile's name callout is
+/// centred.
+const NAME_LIFT: f32 = 0.7;
+
+/// Where the name callout of a hostile drawn at `at` is centred.
+fn name_anchor(at: Pos2, sy: f32) -> Pos2 {
+    at + vec2(0.0, -sy * NAME_LIFT)
+}
+
+/// A holding boss's "PHASE n - NAME" label, its bottom edge at `label_at`,
+/// stacked as one block with the boss's `name` callout when it has one.
+fn phase_callouts(p: &Painter, label_at: Pos2, text: &str, name: Option<(Pos2, &str)>) {
+    let label = (label_at, Align2::CENTER_BOTTOM, text, 10.0);
+    match name {
+        Some((at, name)) => callouts(p, [(at, Align2::CENTER_CENTER, name, 10.0), label]),
+        None => callouts(p, [label]),
+    }
+}
+
 /// How far inside the battlefield clip a hostile's callout stays.
 pub(super) const CALLOUT_MARGIN: f32 = 2.0;
+
+/// One amber callout: its anchor, the alignment there, its text and size.
+type Callout<'a> = (Pos2, Align2, &'a str, f32);
 
 /// A hostile's amber callout (boss name, EXPOSED, CRIT) anchored at `at` by
 /// `align`, moved the least that keeps the whole text `CALLOUT_MARGIN` inside
@@ -217,24 +242,45 @@ pub(super) const CALLOUT_MARGIN: f32 = 2.0;
 /// a readable name (CF-1-11). An anchor already inside paints exactly where
 /// `Painter::text` did.
 fn callout(p: &Painter, at: Pos2, align: Align2, text: &str, size: f32) {
-    let galley = p.layout_no_wrap(text.to_owned(), FontId::proportional(size), AMBER);
-    let rect = align.anchor_size(at, galley.size());
+    callouts(p, [(at, align, text, size)]);
+}
+
+/// Callouts that move as one block, painted in order: each laid out at its
+/// anchor, then the block (their union) moved the least that keeps it
+/// `CALLOUT_MARGIN` inside the painter's clip, as [`callout`] moves one. A
+/// holding boss's name and phase label stack this way, so clamped in the
+/// top lane they keep their order and never overprint.
+fn callouts<const N: usize>(p: &Painter, group: [Callout<'_>; N]) {
+    let laid = group.map(|(at, align, text, size)| {
+        let galley = p.layout_no_wrap(text.to_owned(), FontId::proportional(size), AMBER);
+        (align.anchor_size(at, galley.size()), galley)
+    });
+    let block = laid
+        .iter()
+        .fold(Rect::NOTHING, |block, (rect, _)| block.union(*rect));
     let clip = p.clip_rect().shrink(CALLOUT_MARGIN);
     let min = pos2(
-        rect.min.x.min(clip.right() - rect.width()).max(clip.left()),
-        rect.min
+        block
+            .min
+            .x
+            .min(clip.right() - block.width())
+            .max(clip.left()),
+        block
+            .min
             .y
-            .min(clip.bottom() - rect.height())
+            .min(clip.bottom() - block.height())
             .max(clip.top()),
     );
-    // Moved only when it would be cut: an anchor inside keeps its exact
+    // Moved only when it would be cut: a block inside keeps its exact
     // position, so callouts away from the edges paint as before.
-    let min = if p.clip_rect().contains_rect(rect) {
-        rect.min
+    let shift = if p.clip_rect().contains_rect(block) {
+        Vec2::ZERO
     } else {
-        min
+        min - block.min
     };
-    p.galley(min, galley, AMBER);
+    for (rect, galley) in laid {
+        p.galley(rect.min + shift, galley, AMBER);
+    }
 }
 
 /// The contact of each lane with a hostile on the line: one band per lane
@@ -310,22 +356,24 @@ pub(super) fn windup_rings(view: &BattleViewModel) -> Vec<bool> {
 }
 
 /// Lead, dash and gap of an aim line, in lane heights.
-const AIM_LEAD: f32 = 0.25;
-const AIM_DASH: f32 = 0.16;
-const AIM_GAP: f32 = 0.1;
+pub(super) const AIM_LEAD: f32 = 0.25;
+pub(super) const AIM_DASH: f32 = 0.16;
+pub(super) const AIM_GAP: f32 = 0.1;
 /// Width of an aim line's dashes, in points.
 const AIM_WIDTH: f32 = 1.5;
 
 /// The dashes of a ranged windup's aim line (W2-28) from the spitter's feet
 /// at `from` to its target at `to`: it starts [`AIM_LEAD`] lanes clear of
-/// the body and ends on the target, the last dash cut short there. Static
-/// (no march or pulse), so reduced effects draw the same line.
+/// the body and ends on the target, the last dash cut short there. A target
+/// closer than twice the lead (a spit from just past a wall's face) starts
+/// the line halfway, so a close spit still draws its twin. Static (no march
+/// or pulse), so reduced effects draw the same line.
 pub(super) fn aim_dashes(from: Pos2, to: Pos2, sy: f32) -> Vec<[Pos2; 2]> {
     let length = from.distance(to);
     let direction = (to - from) / length.max(f32::EPSILON);
     let (dash, step) = (sy * AIM_DASH, sy * (AIM_DASH + AIM_GAP));
     let mut dashes = Vec::new();
-    let mut at = sy * AIM_LEAD;
+    let mut at = (sy * AIM_LEAD).min(length * 0.5);
     while at < length && dash > 0.0 {
         dashes.push([
             from + direction * at,
@@ -354,7 +402,7 @@ const PHASE_BREATH: f32 = 0.08;
 /// Width of the phase ring, in points.
 const PHASE_RING_WIDTH: f32 = 2.5;
 /// How far over the boss's name callout the phase label sits, in points.
-const PHASE_LABEL_GAP: f32 = 7.0;
+pub(super) const PHASE_LABEL_GAP: f32 = 7.0;
 
 /// Where a holding boss drawn at `at` with figure height `figure_height`
 /// rings its feet (on its shadow), and where its phase label's bottom edge
@@ -362,7 +410,7 @@ const PHASE_LABEL_GAP: f32 = 7.0;
 fn phase_anchors(at: Pos2, sy: f32, figure_height: f32) -> (Pos2, Pos2) {
     (
         at + vec2(0., figure_height * 0.48),
-        at + vec2(0.0, -sy * 0.7 - PHASE_LABEL_GAP),
+        name_anchor(at, sy) - vec2(0.0, PHASE_LABEL_GAP),
     )
 }
 
@@ -421,6 +469,9 @@ fn overlay(mesh: &mut MeshBuilder, sy: f32, e: &EnemyView, at: Pos2, outlines: b
 }
 
 /// The per-enemy vector path for rejected enemy art: procedural figures.
+/// `named` is false for a holding boss, whose name stacks with its phase
+/// label after every body.
+#[allow(clippy::too_many_arguments)]
 fn enemy(
     p: &Painter,
     arena: ArenaProjection,
@@ -429,6 +480,7 @@ fn enemy(
     textures: ArtTextures,
     outlines: bool,
     reduced: bool,
+    named: bool,
 ) {
     let sy = arena.lane_height();
     let [x, y] = e.drawn();
@@ -529,13 +581,9 @@ fn enemy(
         }
         HealthView::Hidden => {}
     }
-    if let Some(label) = e.label {
-        callout(
-            p,
-            at + vec2(0.0, -sy * 0.7),
-            Align2::CENTER_CENTER,
-            label,
-            10.0,
-        );
+    if let Some(label) = e.label
+        && named
+    {
+        callout(p, name_anchor(at, sy), Align2::CENTER_CENTER, label, 10.0);
     }
 }

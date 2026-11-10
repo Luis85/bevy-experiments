@@ -1893,3 +1893,161 @@ fn boss_phase_hold_shows_phase_label_and_ring_for_90_ticks() {
         assert!(!texts(&view, false, reduced).iter().any(|t| t == label));
     }
 }
+
+/// W2 review: a spit at close range still draws its aim line, the visual
+/// twin of the ranged windup. `spit_range` lets a spit fly from just past
+/// the wall's face, closer than the line's lead, where the dashes used to
+/// start beyond the target and none was drawn. A short line draws at least
+/// one dash, or its whole second half when that is shorter, and its last
+/// dash ends no more than a gap short of the target; a long line keeps its
+/// lead.
+#[test]
+fn aim_line_at_close_range_still_draws() {
+    let sy = 40.0;
+    let from = pos2(300.0, 200.0);
+    for fraction in [0.02, 0.1, 0.2, 0.25, 0.3, 0.45] {
+        let length = sy * fraction;
+        let to = from + vec2(-length * 0.8, length * 0.6);
+        let dashes = enemies::aim_dashes(from, to, sy);
+        assert!(!dashes.is_empty(), "{fraction} lanes: no aim line");
+        let drawn: f32 = dashes.iter().map(|[a, b]| a.distance(*b)).sum();
+        assert!(
+            drawn >= (length * 0.5).min(sy * enemies::AIM_DASH) - 1e-3,
+            "{fraction} lanes: {drawn} of {length} drawn"
+        );
+        let [first, ..] = dashes[0];
+        assert!(first.distance(from) > 0.0, "{fraction}: clear of the body");
+        let last = dashes.last().unwrap()[1];
+        assert!(
+            last.distance(to) <= sy * enemies::AIM_GAP + 1e-3,
+            "{fraction}: ends {} short of the target",
+            last.distance(to)
+        );
+    }
+    // Past twice the lead the line is unchanged: its first dash starts the
+    // lead clear of the body.
+    for fraction in [0.5, 1.0, 4.0] {
+        let to = from + vec2(-sy * fraction, 0.0);
+        let first = enemies::aim_dashes(from, to, sy)[0][0];
+        assert!(
+            (first.distance(from) - sy * enemies::AIM_LEAD).abs() < 1e-3,
+            "{fraction} lanes: lead {}",
+            first.distance(from)
+        );
+    }
+}
+
+/// W2 review (W2-37's BossPhase twin): a holding boss in the top lane has
+/// its name callout and its "PHASE n - NAME" label both pulled inside the
+/// clip, and they used to land on the same row and overprint. The pair now
+/// moves as one block: the label stays over the name, neither overlaps the
+/// other and both stay whole inside the clip, on the batched path and the
+/// rejected-art figures. A mid-field boss keeps both where they were.
+#[test]
+fn boss_phase_label_and_name_never_overprint_in_the_top_lane() {
+    use crate::battle_view::BossPhaseView;
+    use horde_core::{balance::BalanceSettings, content::EnemyKind};
+    let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(1050.0, 700.0) / 1.35);
+    let clip = Rect::from_min_max(
+        canvas.min + vec2(24.0, 124.0),
+        canvas.max - vec2(24.0, 84.0),
+    );
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings {
+            start_lanes: 17,
+            max_lanes: 17,
+            start_width: 30,
+            max_width: 30,
+            ..Default::default()
+        })
+        .unwrap();
+    game.deploy(0, horde_core::content::Mode::Personal).unwrap();
+    for lane in [0, 8] {
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        a.enemies.clear();
+        game.spawn_enemy(&mut a, EnemyKind::Brute, lane, true);
+        let boss = a.enemies.last_mut().expect("a boss");
+        boss.x = a.width_yards * 0.5;
+        let id = boss.id;
+        *game.attempt_slot_mut() = Some(a);
+        let a = game.attempt().unwrap();
+        let mut view =
+            BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
+        view.boss_phase = Some(BossPhaseView {
+            boss_id: id,
+            transition: 1,
+            name: "Breach".into(),
+            hold_left_ticks: 45,
+        });
+        let phase_text = view.boss_phase.as_ref().unwrap().label();
+        let name_text = view.enemies[0].label.expect("a boss name");
+        let arena = ArenaProjection::with_geometry(clip, view.lanes, view.width);
+        let sy = arena.lane_height();
+        let [x, y] = view.enemies[0].drawn();
+        let at = arena.world(x, y);
+        for rejected in [false, true] {
+            let textures = ArtTextures {
+                enemy_art_rejected: rejected,
+                ..textures()
+            };
+            let ctx = egui::Context::default();
+            crate::settings::install_font(&ctx);
+            crate::settings::configure(&ctx, 1.35);
+            crate::visual_assets::publish_source_flash_masks(&ctx);
+            let input = egui::RawInput {
+                screen_rect: Some(canvas),
+                ..Default::default()
+            };
+            let mut output = ctx.run_ui(input, |ui| {
+                enemies::paint(
+                    &ui.painter().with_clip_rect(clip),
+                    arena,
+                    &view,
+                    textures,
+                    false,
+                    false,
+                    rig_shadow(),
+                );
+            });
+            output.textures_delta.clear();
+            let rect_of = |wanted: &str| -> Rect {
+                let rects: Vec<Rect> = output
+                    .shapes
+                    .iter()
+                    .filter_map(|clipped| match &clipped.shape {
+                        egui::Shape::Text(text) if text.galley.text() == wanted => {
+                            Some(text.galley.rect.translate(text.pos.to_vec2()))
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(rects.len(), 1, "rejected {rejected}: one {wanted:?}");
+                rects[0]
+            };
+            let (name, phase) = (rect_of(name_text), rect_of(&phase_text));
+            let label = format!("lane {lane}, rejected {rejected}: {name:?} {phase:?}");
+            assert!(
+                clip.contains_rect(name) && clip.contains_rect(phase),
+                "{label}"
+            );
+            assert!(!name.intersects(phase), "{label}: they overprint");
+            assert!(
+                phase.bottom() <= name.top() + 0.01,
+                "{label}: over the name"
+            );
+            if lane == 8 {
+                // Mid-field: the name centred `0.7` lanes over the feet and
+                // the label's bottom `PHASE_LABEL_GAP` over that, as before.
+                assert!(
+                    (name.center().y - (at.y - sy * 0.7)).abs() < 0.01,
+                    "{label}"
+                );
+                assert!(
+                    (phase.bottom() - (at.y - sy * 0.7 - enemies::PHASE_LABEL_GAP)).abs() < 0.01,
+                    "{label}"
+                );
+            }
+        }
+    }
+}
