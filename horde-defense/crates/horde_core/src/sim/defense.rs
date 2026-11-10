@@ -35,14 +35,26 @@ impl Game {
     /// The typed reason `defender` cannot be chosen or sent into the next
     /// defense, ignoring any defense in progress: Mara needs Companion, a
     /// recruit needs Recruitment, must be in camp and must carry a loadout
-    /// it can deploy with, none of it held by another deployment (in that
-    /// order). No mutation.
+    /// it can deploy with, and no defender's items may be held by another
+    /// deployment (in that order). No mutation.
     pub(crate) fn defender_selectable(&self, defender: DefenderId) -> Result<(), CommandError> {
+        let held = |loadout| {
+            self.held_elsewhere_between_defenses(loadout)
+                .then(|| DefenderBlocker::InvalidLoadout {
+                    reason: crate::campaign::ITEM_HELD_ELSEWHERE.into(),
+                })
+        };
         let blocker = match defender {
-            DefenderId::Player => None,
-            DefenderId::Mara => (!self.campaign.npc_available()).then(|| DefenderBlocker::Locked {
-                node_id: feature_node(CampaignFeature::Companion),
-            }),
+            DefenderId::Player => held(self.campaign.player.loadout),
+            DefenderId::Mara => {
+                if self.campaign.npc_available() {
+                    held(self.campaign.npc.loadout)
+                } else {
+                    Some(DefenderBlocker::Locked {
+                        node_id: feature_node(CampaignFeature::Companion),
+                    })
+                }
+            }
             DefenderId::Recruit(id) => {
                 let recruit = self
                     .strategy
@@ -140,8 +152,9 @@ impl Game {
             .collect()
     }
     /// The selectable defender with the highest power at the next threat;
-    /// on a tie the earlier in [`Self::available_defenders`] order, so the
-    /// player (always selectable) is the fallback.
+    /// on a tie the earlier in [`Self::available_defenders`] order. The
+    /// player is the fallback when nobody is selectable (a guard or an
+    /// expedition holding one of the player's items blocks the player too).
     pub(crate) fn recommended_defender(&self) -> DefenderId {
         let mut best: Option<(DefenderId, u16)> = None;
         for option in self.available_defenders() {

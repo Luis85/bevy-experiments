@@ -107,6 +107,16 @@ impl Game {
                 .weapon_access(Mode::Npc, item.definition_index())
                 .map_err(str::to_owned)?;
         }
+        if self.held_elsewhere_between_defenses(npc.loadout) {
+            return Err(crate::campaign::ITEM_HELD_ELSEWHERE.into());
+        }
+        Ok(())
+    }
+    /// Whether one of `loadout`'s items is held by a deployment other than
+    /// the main run: `Campaign::held_elsewhere` with a live takeover
+    /// recruit's own hold left out, so a defense in progress keeps the
+    /// between-defenses verdict. No mutation.
+    pub(super) fn held_elsewhere_between_defenses(&self, loadout: [u64; 4]) -> bool {
         let takeover = self.campaign.reserved_recruit.and_then(|id| {
             self.strategy
                 .roster
@@ -114,10 +124,7 @@ impl Game {
                 .find(|r| r.id == id)
                 .map(|r| r.npc.loadout)
         });
-        if self.campaign.held_elsewhere(npc.loadout, takeover) {
-            return Err(crate::campaign::ITEM_HELD_ELSEWHERE.into());
-        }
-        Ok(())
+        self.campaign.held_elsewhere(loadout, takeover)
     }
     /// The takeover commit: the recruit's loadout and the main run are
     /// reserved and the recruit is Defending, or nothing changed.

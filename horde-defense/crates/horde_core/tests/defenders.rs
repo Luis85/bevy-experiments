@@ -2955,6 +2955,74 @@ fn every_entry_point_refuses_a_recruit_whose_item_a_guard_holds() {
     assert_eq!(row(&g, other), Ok(()), "a live takeover");
 }
 
+/// The player and Mara get the recruits' held-elsewhere verdict: a recruit
+/// carrying the mode owner's ranged item onto guard duty holds it in
+/// `reserved_items`, so the owner's deploy would fail. Every entry point
+/// refuses with the same typed `InvalidLoadout`, `continue_blocker` among
+/// them.
+#[test]
+fn every_entry_point_refuses_a_mode_owner_whose_item_a_guard_holds() {
+    for owner in [DefenderId::Player, DefenderId::Mara] {
+        let (mut g, id) = takeover_ready();
+        apply_ok(
+            &mut g,
+            Command::Deploy {
+                stage: 0,
+                mode: Mode::Personal,
+            },
+        );
+        apply_ok(&mut g, Command::Withdraw);
+        let country = g.campaign().world.cleared[0].clone();
+        let item = match owner {
+            DefenderId::Mara => g.campaign().npc.loadout[Slot::Ranged.index()],
+            _ => g.campaign().player.loadout[Slot::Ranged.index()],
+        };
+        apply_ok(&mut g, Command::SetNextDefender(owner));
+        apply_ok(&mut g, Command::EquipRecruit { id, item });
+        apply_ok(
+            &mut g,
+            Command::AssignGuard {
+                id,
+                country: country.clone(),
+            },
+        );
+        let blocker = DefenderBlocker::InvalidLoadout {
+            reason: "A unique item is already reserved by another deployment".into(),
+        };
+        let expected = CommandError::DefenderUnavailable {
+            defender: owner,
+            blocker: blocker.clone(),
+        };
+        assert_eq!(
+            g.continue_blocker(),
+            Some(expected.clone()),
+            "{owner:?} continue_blocker"
+        );
+        assert_eq!(
+            g.clone().apply(&Command::ContinueJourney),
+            Err(expected.clone()),
+            "{owner:?} ContinueJourney"
+        );
+        assert_eq!(
+            g.clone().apply(&Command::SetNextDefender(owner)),
+            Err(expected.clone()),
+            "{owner:?} SetNextDefender"
+        );
+        assert_eq!(
+            g.clone().apply(&Command::BeginDefense { stage: 0 }),
+            Err(expected.clone()),
+            "{owner:?} BeginDefense"
+        );
+        let row = g
+            .available_defenders()
+            .into_iter()
+            .find(|o| o.card.id == owner)
+            .unwrap()
+            .selectable;
+        assert_eq!(row, Err(blocker), "{owner:?} available_defenders");
+    }
+}
+
 /// `continue_blocker` is `ContinueJourney`'s own refusal, read without a
 /// change, so Results can disable Continue and say why.
 #[test]

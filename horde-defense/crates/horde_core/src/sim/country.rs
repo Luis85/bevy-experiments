@@ -29,7 +29,8 @@ pub struct OutbreakPlan {
     /// The selectable defender with the highest power at the next threat
     /// (`Game::defender_power`). On a tie the earliest in
     /// `Game::available_defenders` order wins (player, Mara, recruits by
-    /// id), so Mara wins a Mara/recruit tie; the player is the fallback.
+    /// id), so Mara wins a Mara/recruit tie. The player is the fallback when
+    /// nobody is selectable, the player included.
     pub recommended_defender: DefenderId,
 }
 
