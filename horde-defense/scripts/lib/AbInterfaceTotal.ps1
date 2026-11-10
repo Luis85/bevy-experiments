@@ -22,6 +22,16 @@ function Invoke-AbArmBuild([scriptblock]$Cargo, [string]$LogStem, [string]$Worki
     $Cargo.Invoke(@(@('build', '--locked', '-p', 'horde-defense'), $LogStem, $WorkingDirectory)) | Out-Null
 }
 
+function Restore-AbWorkspaceBuild([scriptblock]$Cargo, [bool]$ABuilt, [bool]$BBuilt, [string]$LogStem, [string]$Workspace) {
+    # A's build (Invoke-AbArmBuild in the ab03da9 tree) leaves its fingerprints and its executable in the shared
+    # CARGO_TARGET_DIR under the workspace's own package names, so the next plain workspace build (measure_performance,
+    # cargo run --smoke) would be fresh and keep A (W2-47 review). Unless B was built after it, clean the two packages
+    # in the workspace so that build is HEAD's. Returns $true when it cleaned.
+    if (-not $ABuilt -or $BBuilt) { return $false }
+    $Cargo.Invoke(@(@('clean', '-p', 'horde-defense', '-p', 'horde_core'), $LogStem, $Workspace)) | Out-Null
+    return $true
+}
+
 function Assert-AbArmsDiffer([string]$ShaA, [string]$ShaB) {
     # An A/B of one executable against itself is no evidence: throw before any pair runs.
     if ($ShaA.ToLowerInvariant() -eq $ShaB.ToLowerInvariant()) {

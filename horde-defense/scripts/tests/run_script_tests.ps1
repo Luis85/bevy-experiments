@@ -1280,6 +1280,17 @@ try {
         Assert-Equal 'clean -p horde-defense -p horde_core|cargo-a-clean|C:\src-a,build --locked -p horde-defense|cargo-a|C:\src-a' ($calls -join ',') 'clean, then build, in the arm''s tree'
     }
 
+    Test-Case 'Restore-AbWorkspaceBuild cleans the workspace packages when A was built and B was not (W2-47 review)' {
+        $calls = New-Object System.Collections.Generic.List[string]
+        $cargo = { param($Arguments, $LogStem, $WorkingDirectory) $calls.Add("$($Arguments -join ' ')|$(Split-Path -Leaf $LogStem)|$WorkingDirectory") }
+        $stem = Join-Path $temporary 'logs\cargo-restore'
+        Assert-Equal $false (Restore-AbWorkspaceBuild -Cargo $cargo -ABuilt $false -BBuilt $false -LogStem $stem -Workspace 'C:\ws') 'A not built'
+        Assert-Equal $false (Restore-AbWorkspaceBuild -Cargo $cargo -ABuilt $true -BBuilt $true -LogStem $stem -Workspace 'C:\ws') 'B built after A'
+        Assert-Equal 0 $calls.Count 'no clean while the workspace holds HEAD''s build'
+        Assert-Equal $true (Restore-AbWorkspaceBuild -Cargo $cargo -ABuilt $true -BBuilt $false -LogStem $stem -Workspace 'C:\ws') 'A built, B not'
+        Assert-Equal 'clean -p horde-defense -p horde_core|cargo-restore|C:\ws' ($calls -join ',') 'A''s packages cleaned in the workspace'
+    }
+
     Test-Case 'Assert-AbArmsDiffer refuses an A and a B with the same executable (W2-47)' {
         Assert-AbArmsDiffer 'aa11' 'bb22'
         $message = $null
@@ -1319,6 +1330,7 @@ try {
         Assert-Equal 13 @($m.Machine | Where-Object { $_ -like 'ps|*' }).Count 'the measure passes skip their own window'
         Assert-Equal 21 @($m.Machine | Where-Object { $_ -like 'load|*' }).Count '13 window samples and one per run'
         Assert-Equal $true $m.Record.display_hold.released 'the sitting''s display hold is released'
+        Assert-Equal $false $m.Record.workspace_cleaned 'nothing was built, so the workspace is not cleaned'
         Assert-True ($m.Markdown -match '\| normal \| 2, 2 \| 2.08, 2.08 \| 2 \| 2.08 \| 1.04 \| 2.1 \| pass \|') "ab.md check row; $($m.Markdown)"
         foreach ($arm in @('a', 'b')) {
             Assert-True (Test-Path -LiteralPath (Join-Path $temporary "ab-pass\pair-1-$arm\summary.json")) "pair 1 $arm keeps its measure_performance evidence"
@@ -1356,6 +1368,12 @@ try {
             $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary "logs\ab-bad-$index") -TimeoutSeconds 120
             Assert-Equal 3 $r.ExitCode ("$($arguments -join ' '): exit code; out: " + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
         }
+        # W2-47 review: building A and not B would leave A's fingerprints and exe in the workspace target, so -ExecutableB
+        # needs -ExecutableA. -Pairs 0 is also bad, so the refusal must come first (and nothing is ever built here).
+        $all = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $abScript, '-ExecutableB', $helperB, '-Pairs', '0')
+        $r = Invoke-Native -FilePath (Resolve-Tool 'powershell') -Arguments $all -LogStem (Join-Path $temporary 'logs\ab-bad-b-only') -TimeoutSeconds 120
+        Assert-Equal 3 $r.ExitCode ('-ExecutableB alone: exit code; out: ' + (Read-Log $r.Out) + ' err: ' + (Read-Log $r.Err))
+        Assert-True ((Read-Log $r.Out) -like '*-ExecutableB needs -ExecutableA*') ('-ExecutableB alone is refused; out: ' + (Read-Log $r.Out))
         $m = Invoke-AbGate 'ab-timeout' 'exe-a=2.0;exe-b=2.0' @('-ShimLoad', '50') @('-QuietTimeoutMinutes', '1')
         Assert-Equal 2 $m.Result.ExitCode "exit code; $($m.Log)"
         Assert-Equal 0 @($m.Record.order).Count 'no pair ran'

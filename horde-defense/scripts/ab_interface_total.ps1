@@ -9,7 +9,10 @@
 #   -Pairs N                     1..20, default 5 (the R31 gate)
 #   -OutputDirectory <dir>       default <target>/perf/<yyyyMMdd-HHmmss>-ab-interface-total; must be missing or empty
 #   -NoBuild                     use -ExecutableA (required) and -ExecutableB (default <target>/debug/horde-defense.exe)
-#   -ExecutableA, -ExecutableB   override an arm's executable (copied into <out>/exe-a|exe-b/debug/)
+#   -ExecutableA, -ExecutableB   override an arm's executable (copied into <out>/exe-a|exe-b/debug/); -ExecutableB needs
+#                                -ExecutableA, and when A is built but B's build does not follow (it threw), the finally
+#                                block cleans horde-defense and horde_core in the workspace so the shared target does not
+#                                keep A's build for the next workspace build (W2-47 review; ab.json workspace_cleaned)
 #   -WaitQuiet | -NoWaitQuiet    the R30 quiet window before the first pair (default on)
 #   -QuietTimeoutMinutes N       1..1440, default 240; a quiet window that times out exits 2
 #   -TimeoutSeconds N            per run, default 900
@@ -51,6 +54,8 @@ function ConvertTo-BoundedInt([string]$Name, [string]$Text, [int]$Minimum, [int]
 }
 
 if ($null -ne $Unexpected -and $Unexpected.Count -gt 0) { throw "Unexpected argument(s): $($Unexpected -join ' ')" }
+# Building A and not B would leave A's fingerprints and exe in the workspace target (W2-47 review).
+if ($ExecutableB -and -not $ExecutableA) { throw '-ExecutableB needs -ExecutableA: building only A would leave the wave-1 build in the workspace target' }
 [int]$Pairs = ConvertTo-BoundedInt 'Pairs' $Pairs 1 20
 [int]$QuietTimeoutMinutes = ConvertTo-BoundedInt 'QuietTimeoutMinutes' $QuietTimeoutMinutes 1 1440
 [int]$TimeoutSeconds = ConvertTo-BoundedInt 'TimeoutSeconds' $TimeoutSeconds 1 86400
@@ -117,6 +122,10 @@ $displayHold = $null
 $commitA = $null
 $commitB = $null
 $dirtyB = $null
+$aBuildStarted = $false
+$bBuilt = $false
+$workspaceCleaned = $false
+$armCargo = { param($Arguments, $LogStem, $WorkingDirectory) Invoke-Cargo -Arguments $Arguments -LogStem $LogStem -WorkingDirectory $WorkingDirectory | Out-Null }
 try {
     # The sitting is held on as a whole: measure_performance's own hold restores this one when it releases (R27).
     $displayHold = Enter-DisplayHold
@@ -125,7 +134,6 @@ try {
     $status = Get-GitLine @('status', '--porcelain', '--', 'horde-defense') (Join-Path $tools 'git-status')
     $dirtyB = [bool]$status
     $sourceA = $null
-    $armCargo = { param($Arguments, $LogStem, $WorkingDirectory) Invoke-Cargo -Arguments $Arguments -LogStem $LogStem -WorkingDirectory $WorkingDirectory | Out-Null }
     if ($ExecutableA) { $builtA = Resolve-WorkspacePath $ExecutableA -Workspace $workspace }
     else {
         if (-not $commitA) { throw "git cannot resolve $($rule.Commit)" }
@@ -145,6 +153,7 @@ try {
             Write-Utf8NoBom -Path $marker -Text $commitA
         }
         $sourceA = Join-Path $sourceRoot 'horde-defense'
+        $aBuildStarted = $true
         Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-a') -WorkingDirectory $sourceA
         $builtA = Get-HordeExecutable -Profile dev -Workspace $workspace
     }
@@ -153,7 +162,10 @@ try {
     Copy-Item -LiteralPath $builtA -Destination $exeA
     if ($ExecutableB) { $builtB = Resolve-WorkspacePath $ExecutableB -Workspace $workspace }
     else {
-        if (-not $NoBuild) { Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-b') -WorkingDirectory $workspace }
+        if (-not $NoBuild) {
+            Invoke-AbArmBuild -Cargo $armCargo -LogStem (Join-Path $tools 'cargo-b') -WorkingDirectory $workspace
+            $bBuilt = $true
+        }
         $builtB = Get-HordeExecutable -Profile dev -Workspace $workspace
     }
     $exeB = Join-Path $destination 'exe-b\debug\horde-defense.exe'
@@ -213,6 +225,17 @@ catch {
 finally {
     Exit-DisplayHold $displayHold
     [Environment]::SetEnvironmentVariable('CARGO_TARGET_DIR', $savedTarget, 'Process')
+    # A was built and B's build did not follow it (it threw): the workspace target still holds A (W2-47 review).
+    try {
+        $workspaceCleaned = Restore-AbWorkspaceBuild -Cargo $armCargo -ABuilt $aBuildStarted -BBuilt $bBuilt -LogStem (Join-Path $tools 'cargo-restore-clean') -Workspace $workspace
+        if ($workspaceCleaned) { Write-Output "cleaned horde-defense and horde_core in the workspace: $target no longer holds A's build" }
+    }
+    catch {
+        $restoreFailure = "the workspace target may still hold A's build ($($rule.Commit)); run cargo clean -p horde-defense -p horde_core: $($_.Exception.Message)"
+        if ($failure) { $failure = "$failure; $restoreFailure" } else { $failure = $restoreFailure }
+        $exitCode = 3
+        Write-Output "FAIL $restoreFailure"
+    }
     $labels = @{ 0 = 'pass'; 1 = 'B over 1.05 x A'; 2 = 'invalid evidence'; 3 = 'build or run failure' }
     $checks = @()
     if ($null -ne $verdict) { $checks = @($verdict.Checks) }
@@ -224,7 +247,7 @@ finally {
         exit_code = $exitCode; verdict = $labels[$exitCode]; failure = $failure
         scene = $rule.Scene; profile = $rule.Profile; present_mode = $gatePresent; pipelined = $gatePipelined
         pairs = $Pairs; tolerance = $rule.Tolerance; sizes = $sizeNames; cargo_target_dir = $target
-        arms = $arms; quiet_window = $quietRecord
+        arms = $arms; workspace_cleaned = $workspaceCleaned; quiet_window = $quietRecord
         display_hold = $(if ($null -ne $displayHold) { [ordered]@{ held = $displayHold.Held; released = $displayHold.Released; released_from = $displayHold.ReleasedFrom } } else { $null })
         order = @($order.ToArray()); runs = $runRows; checks = $checks
     }
