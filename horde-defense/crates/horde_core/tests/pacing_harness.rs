@@ -944,9 +944,28 @@ fn equip_drops_profile_wears_dropped_upgrades() {
     assert!(!after.contains(&rifle));
     // Nothing left beats the new loadout.
     assert_eq!(equip_dropped_upgrades(&mut game), Ok(vec![]));
-    // The profile runs.
-    let report = simulate_pacing(&PacingProfile { max_runs: 2, ..row }).expect("profile runs");
-    assert_eq!(report.runs.len(), 2);
+    // The profile wears what drops: on the same seed it plays the
+    // acceptance profile's first run (nothing has dropped yet), then a
+    // later run differently once its camp step equips a drop.
+    let runs = 4;
+    let report = simulate_pacing(&PacingProfile {
+        max_runs: runs,
+        ..row
+    })
+    .expect("profile runs");
+    let plain = simulate_pacing(&PacingProfile {
+        max_runs: runs,
+        ..expert
+    })
+    .expect("profile runs");
+    assert_eq!((report.runs.len(), plain.runs.len()), (runs, runs));
+    let played = |r: &PacingRun| (r.stage, r.outcome, r.kills, r.coins, r.elapsed.to_bits());
+    assert_eq!(played(&report.runs[0]), played(&plain.runs[0]), "run 1");
+    let (wore, bare): (Vec<_>, Vec<_>) = (
+        report.runs[1..].iter().map(played).collect(),
+        plain.runs[1..].iter().map(played).collect(),
+    );
+    assert_ne!(wore, bare, "the equipped drops change a later run");
 }
 
 #[test]
