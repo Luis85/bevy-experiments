@@ -520,3 +520,67 @@ fn spit_target_is_where_the_winding_spit_lands() {
     assert!(spits.contains(&None), "then the defender: {spits:?}");
     assert!(advancing > 0 && melee_windups > 0 && runner_windups > 0);
 }
+
+#[test]
+fn ranged_windup_points_where_its_spit_lands() {
+    // W2 review: a stationed spitter's Windup event carries the point its
+    // Spit lands on (the intercepting wall's centre, then the defender), not
+    // its own position; a melee windup at a wall face still points at
+    // itself and one at the line at the defender.
+    let reach = 4.0;
+    let stop = DEFENSE_LINE + reach;
+    let mut g = field(12.0);
+    g.set_paused(true);
+    g.place(StructureKind::Wall, 5, 0).unwrap();
+    g.place(StructureKind::Wall, 7, 4).unwrap();
+    g.set_paused(false);
+    let mut a = g.attempt.take().unwrap();
+    a.structures[0].hp = 100;
+    a.structures[0].max_hp = 100;
+    a.structures[1].hp = 1_000_000;
+    a.structures[1].max_hp = 1_000_000;
+    let near_wall = a.structures[0].id;
+    let wall_centre = [a.structures[0].x(), a.structures[0].y()];
+    let far_face = a.structures[1].x() + a.structures[1].blocking_radius();
+    let spitter = spawn_spitter(&mut g, &mut a, reach, 5, stop + 1.0);
+    let melee = spawn_spitter(&mut g, &mut a, reach, 7, far_face + 1.0);
+    g.spawn_enemy(&mut a, EnemyKind::Runner, 2, false);
+    a.enemies.last_mut().unwrap().x = DEFENSE_LINE + 0.5;
+    let runner = a.enemies.last().unwrap().id;
+    g.attempt = Some(a);
+    let (mut seen, mut aimed, mut spits) = (0, None, Vec::new());
+    let (mut wall_windups, mut melee_windups, mut runner_windups) = (0, 0, 0);
+    for _ in 0..3600 {
+        g.tick(Input::default());
+        let a = g.attempt.as_ref().expect("the defender cannot fall");
+        let defender = a.defender_position();
+        for ev in new_events(a, &mut seen) {
+            if ev.kind == EventKind::Windup && ev.actor_id == Some(spitter) {
+                if ev.target_id == Some(near_wall) {
+                    assert_eq!(ev.to, wall_centre, "the windup aims at the wall");
+                    wall_windups += 1;
+                } else {
+                    assert_eq!(ev.to, defender, "past the wall it aims at the defender");
+                }
+                aimed = Some(ev.to);
+            } else if ev.kind == EventKind::Spit && ev.actor_id == Some(spitter) {
+                assert_eq!(Some(ev.to), aimed, "the spit lands where its windup aimed");
+                spits.push(ev.target_id);
+            } else if ev.kind == EventKind::Windup && ev.actor_id == Some(melee) {
+                assert_eq!(ev.to, ev.from, "a melee windup at a wall face");
+                melee_windups += 1;
+            } else if ev.kind == EventKind::Windup && ev.actor_id == Some(runner) {
+                assert_eq!(ev.to, defender, "a melee windup at the line");
+                runner_windups += 1;
+            }
+        }
+        if spits.contains(&None) && melee_windups > 0 && runner_windups > 0 {
+            break;
+        }
+    }
+    assert!(
+        spits.contains(&Some(near_wall)) && spits.contains(&None),
+        "the wall, then the defender, drew spit: {spits:?}"
+    );
+    assert!(wall_windups > 0 && melee_windups > 0 && runner_windups > 0);
+}

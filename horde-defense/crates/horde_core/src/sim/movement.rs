@@ -108,18 +108,11 @@ impl Game {
                             duration_ticks: duration,
                             ..Default::default()
                         };
+                        // A stationed spitter's windup points where its spit
+                        // lands (the wall centre or the defender).
+                        let to = a.windup_to(enemy, point);
                         a.event_with(EventKind::Contact, point, point, 0, meta);
-                        a.event_with(
-                            EventKind::Windup,
-                            point,
-                            if target.is_none() {
-                                a.defender_position()
-                            } else {
-                                point
-                            },
-                            0,
-                            meta,
-                        );
+                        a.event_with(EventKind::Windup, point, to, 0, meta);
                         if stop <= DEFENSE_LINE + 0.01 && a.first_contact.is_none() {
                             a.first_contact = Some(a.elapsed());
                         }

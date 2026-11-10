@@ -1966,6 +1966,19 @@ impl Attempt {
         }
         Some(structure.map_or(self.defender_position(), |s| [s.x(), s.y()]))
     }
+    /// Where a Windup event of `e` published at `from` points: a stationed
+    /// spitter's [`Attempt::spit_target`] (the wall centre or the defender
+    /// its Spit lands on), else the defender for a strike at the line and
+    /// `from` itself for a melee strike at a structure's face.
+    pub(crate) fn windup_to(&self, e: &Enemy, from: [f32; 2]) -> [f32; 2] {
+        self.spit_target(e).unwrap_or_else(|| {
+            if e.target_structure.is_none() {
+                self.defender_position()
+            } else {
+                from
+            }
+        })
+    }
 }
 /// What struck a hostile, for the armor it meets (design enemy-balance §4
 /// "Shield-bearer").

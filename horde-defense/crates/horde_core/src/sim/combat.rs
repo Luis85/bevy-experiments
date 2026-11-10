@@ -215,17 +215,8 @@ impl Game {
                         duration_ticks: duration,
                         ..Default::default()
                     };
-                    a.event_with(
-                        EventKind::Windup,
-                        point,
-                        if meta.target_id.is_none() {
-                            a.defender_position()
-                        } else {
-                            point
-                        },
-                        0,
-                        meta,
-                    );
+                    let to = a.windup_to(e, point);
+                    a.event_with(EventKind::Windup, point, to, 0, meta);
                 }
             }
             let mut turn_shock = 0;
@@ -346,14 +337,11 @@ impl Game {
             };
             a.enemies[n].windup_total = a.enemies[n].attack_left;
             if !siege {
+                let to = a.windup_to(&a.enemies[n], origin);
                 a.event_with(
                     EventKind::Windup,
                     origin,
-                    if target_id.is_none() {
-                        a.defender_position()
-                    } else {
-                        origin
-                    },
+                    to,
                     0,
                     EventMetadata {
                         duration_ticks: a.enemies[n].attack_left,
