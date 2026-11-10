@@ -65,7 +65,9 @@ country plays clamped to 0.95-1.05 (`Country::effective_difficulty`, shown by
 `Game::effective_country_difficulty` on the map and the briefing), so no first
 defense opens far easier or harder than the rest; before a start is chosen
 every country shows its clamped value. Every other country plays its raw value,
-and the front order, the recommended start and pacing read the raw value too.
+and the front order (`fronts_opened_by`), the recommended next front
+(`Campaign::recommendation`, the easiest enterable uncleared country) and
+pacing's routes read the raw value too. Nothing recommends a starting country.
 The clamp is derived, never saved.
 
 ## Unlock and clear contract
