@@ -233,6 +233,12 @@ fn phase_callouts(p: &Painter, label_at: Pos2, text: &str, name: Option<(Pos2, &
 /// How far inside the battlefield clip a hostile's callout stays.
 pub(super) const CALLOUT_MARGIN: f32 = 2.0;
 
+/// The INK backing under every hostile callout (CF-2-05), at the alpha the
+/// cue labels take (design-vfx-lighting.md, cue helpers).
+pub(super) const CALLOUT_BACKING: C = C::from_rgba_unmultiplied_const(17, 23, 24, 190);
+/// How far the backing reaches past its callout's text on every side.
+pub(super) const CALLOUT_PAD: f32 = 2.0;
+
 /// One amber callout: its anchor, the alignment there, its text and size.
 type Callout<'a> = (Pos2, Align2, &'a str, f32);
 
@@ -240,7 +246,9 @@ type Callout<'a> = (Pos2, Align2, &'a str, f32);
 /// `align`, moved the least that keeps the whole text `CALLOUT_MARGIN` inside
 /// the painter's clip, so a boss at the field's edge or in its top lane keeps
 /// a readable name (CF-1-11). An anchor already inside paints exactly where
-/// `Painter::text` did.
+/// `Painter::text` did. Its text sits on a `CALLOUT_BACKING` plate padded
+/// `CALLOUT_PAD` round it, so it stays legible over the bodies behind
+/// (CF-2-05; the same in reduced effects).
 fn callout(p: &Painter, at: Pos2, align: Align2, text: &str, size: f32) {
     callouts(p, [(at, align, text, size)]);
 }
@@ -278,6 +286,14 @@ fn callouts<const N: usize>(p: &Painter, group: [Callout<'_>; N]) {
     } else {
         min - block.min
     };
+    // Every backing first, so none covers a text of the block (CF-2-05).
+    for (rect, _) in &laid {
+        p.rect_filled(
+            rect.translate(shift).expand(CALLOUT_PAD),
+            2.0,
+            CALLOUT_BACKING,
+        );
+    }
     for (rect, galley) in laid {
         p.galley(rect.min + shift, galley, AMBER);
     }

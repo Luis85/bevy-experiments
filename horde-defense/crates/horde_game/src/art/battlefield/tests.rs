@@ -2230,3 +2230,126 @@ fn boss_phase_label_and_name_never_overprint_in_the_top_lane() {
         }
     }
 }
+
+/// CF-2-05: a holding boss's "PHASE n - NAME" label, its name or EXPOSED
+/// callout and a CRIT callout drew as bare amber text, so over the hostiles
+/// behind a boss "PHASE" crossed a walker's head. Every hostile callout now
+/// paints an INK backing, padded `CALLOUT_PAD` round its text, before the
+/// text it backs, on the batched path and the rejected-art figures, normal
+/// and reduced, in the top lane and mid-field.
+#[test]
+fn hostile_callouts_paint_an_ink_backing_under_their_text() {
+    use crate::battle_view::{BossPhaseView, HealthView};
+    use horde_core::{balance::BalanceSettings, content::EnemyKind};
+    let canvas = Rect::from_min_size(pos2(0.0, 0.0), vec2(1050.0, 700.0) / 1.35);
+    let clip = Rect::from_min_max(
+        canvas.min + vec2(24.0, 124.0),
+        canvas.max - vec2(24.0, 84.0),
+    );
+    let mut game = Game::default();
+    game.campaign_mut()
+        .set_balance_settings(BalanceSettings {
+            start_lanes: 17,
+            max_lanes: 17,
+            start_width: 30,
+            max_width: 30,
+            ..Default::default()
+        })
+        .unwrap();
+    game.deploy(0, horde_core::content::Mode::Personal).unwrap();
+    for lane in [0, 8] {
+        let mut a = game.attempt_slot_mut().take().unwrap();
+        a.enemies.clear();
+        game.spawn_enemy(&mut a, EnemyKind::Brute, lane, true);
+        let boss = a.enemies.last_mut().expect("a boss");
+        boss.x = a.width_yards * 0.5;
+        let id = boss.id;
+        // A second boss further on, critically wounded, so its CRIT
+        // callout and its own name are checked too.
+        let mut other = a.enemies[0].clone();
+        (other.id, other.x) = (a.next_id, a.width_yards * 0.8);
+        a.next_id += 1;
+        a.enemies.push(other);
+        *game.attempt_slot_mut() = Some(a);
+        let a = game.attempt().unwrap();
+        for reduced in [false, true] {
+            let mut view = BattleViewModel::build(
+                a,
+                SceneAnimation::sample(a, reduced),
+                SceneBlend::NONE,
+                reduced,
+            );
+            view.boss_phase = Some(BossPhaseView {
+                boss_id: id,
+                transition: 1,
+                name: "Breach".into(),
+                hold_left_ticks: 45,
+            });
+            view.enemies[1].health = HealthView::Critical;
+            let arena = ArenaProjection::with_geometry(clip, view.lanes, view.width);
+            for rejected in [false, true] {
+                let textures = ArtTextures {
+                    enemy_art_rejected: rejected,
+                    ..textures()
+                };
+                let ctx = egui::Context::default();
+                crate::settings::install_font(&ctx);
+                crate::settings::configure(&ctx, 1.35);
+                crate::visual_assets::publish_source_flash_masks(&ctx);
+                let input = egui::RawInput {
+                    screen_rect: Some(canvas),
+                    ..Default::default()
+                };
+                let mut output = ctx.run_ui(input, |ui| {
+                    enemies::paint(
+                        &ui.painter().with_clip_rect(clip),
+                        arena,
+                        &view,
+                        textures,
+                        false,
+                        reduced,
+                        rig_shadow(),
+                    );
+                });
+                output.textures_delta.clear();
+                let backings: Vec<(usize, Rect)> = output
+                    .shapes
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, clipped)| match &clipped.shape {
+                        egui::Shape::Rect(rect) if rect.fill == enemies::CALLOUT_BACKING => {
+                            Some((i, rect.rect))
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                let mut texts = 0;
+                for (i, clipped) in output.shapes.iter().enumerate() {
+                    let egui::Shape::Text(text) = &clipped.shape else {
+                        continue;
+                    };
+                    texts += 1;
+                    let drawn = text.galley.rect.translate(text.pos.to_vec2());
+                    let padded = drawn.expand(enemies::CALLOUT_PAD);
+                    let label = format!(
+                        "lane {lane}, reduced {reduced}, rejected {rejected}: {:?} at {drawn:?}",
+                        text.galley.text()
+                    );
+                    assert!(
+                        backings.iter().any(|&(at, rect)| {
+                            at < i
+                                && (rect.min - padded.min).length() < 0.01
+                                && (rect.max - padded.max).length() < 0.01
+                        }),
+                        "{label}: no INK backing {padded:?} under it, backings {backings:?}"
+                    );
+                }
+                // The phase label, two names (or EXPOSED) and the CRIT.
+                assert_eq!(
+                    texts, 4,
+                    "lane {lane}, reduced {reduced}, rejected {rejected}"
+                );
+            }
+        }
+    }
+}
