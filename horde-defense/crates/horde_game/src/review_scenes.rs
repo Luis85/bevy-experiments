@@ -188,6 +188,8 @@ pub const REVIEW_SCENES: &[ReviewScene] = &[
     // column at x = -1780.
     wave2_still("boss-phase", "vfx-lighting", "boss", true),
     wave2_still("skills-firearms", "progression-tree", "skills", false),
+    // W2-57 (CF-2-04): W2-28's ranged windup, a spitter mid-windup at reach.
+    wave2_still("spitter-windup", "vfx-lighting", "battle", false),
 ];
 
 /// Workshop scenes named `<prefix><model id>`.
@@ -368,7 +370,7 @@ mod tests {
                 .iter()
                 .filter(|line| line.contains("\tStill\t"))
                 .count(),
-            46 + 13 + 2
+            46 + 13 + 3
         );
         assert!(review.contains(&"model-parity-\tWorkshop\tfalse\tfalse\tfalse\t\t\t0".into()));
         assert!(review.contains(&"peak\tStill\ttrue\ttrue\tfalse\t\t\t0".into()));

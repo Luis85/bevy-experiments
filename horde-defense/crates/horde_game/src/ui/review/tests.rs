@@ -266,6 +266,8 @@ const EXPECTED: &[(&str, Screen, Option<Tab>)] = &[
     // Wave-2 close stills (W2-55).
     ("boss-phase", Screen::Battle, None),
     ("skills-firearms", Screen::Results, Some(Tab::Skills)),
+    // W2-57 (CF-2-04).
+    ("spitter-windup", Screen::Battle, None),
 ];
 
 /// An isolated still review of `scene`, staged exactly as startup stages it.
@@ -1331,6 +1333,82 @@ fn boss_phase_motion_export_plays_the_whole_hold() {
         .map(|k| (k < 23).then(|| (boss, 1, 89 - 4 * k)))
         .collect();
     assert_eq!(frames, expected);
+}
+
+/// W2-28's close capture (CF-2-04) needs a spitter winding up at its reach:
+/// the spitter-windup still is a rank-6 or later field, paused with a
+/// catalogue spitter stationed four yards beyond the defense line halfway
+/// through its windup, so the view draws its aim line at the point its spit
+/// lands (the wall centre or the defender) in normal and reduced effects.
+#[test]
+fn spitter_windup_fixture_pauses_a_spitter_mid_windup_at_its_reach() {
+    use horde_core::sim::{DEFENSE_LINE, EnemyPhase};
+    assert_eq!(
+        review_scenes::lookup("spitter-windup"),
+        Some(review_scenes::SceneKind::Still),
+        "spitter-windup is a registered still"
+    );
+    let f = staged("spitter-windup");
+    assert!(f.screen == Screen::Battle, "staged {:?}", f.screen);
+    let a = f.game.attempt().expect("a live battle");
+    assert!(a.paused, "the still is paused mid-windup");
+    assert!(
+        a.progression.rank >= 6,
+        "rank {} fields no spitters",
+        a.progression.rank
+    );
+    let spitter = a
+        .enemies
+        .iter()
+        .find(|e| {
+            e.resolved
+                .as_ref()
+                .is_some_and(|r| r.archetype_id == "spitter")
+                && e.attack_phase == EnemyPhase::Windup
+        })
+        .expect("a catalogue spitter winds up");
+    let reach = spitter.resolved.as_ref().map(|r| r.reach).unwrap_or(0.0);
+    assert_eq!(reach, 4.0, "the shipped spitter's reach");
+    assert!(
+        (spitter.x - (DEFENSE_LINE + reach)).abs() < 0.01,
+        "the spitter stands at its reach, x {}",
+        spitter.x
+    );
+    let target = a.spit_target(spitter).expect("the windup is a spit");
+    assert!(
+        spitter.attack_left > 0 && spitter.attack_left < spitter.windup_total,
+        "mid-windup: {} of {} ticks left",
+        spitter.attack_left,
+        spitter.windup_total
+    );
+    assert!(
+        spitter.attack_left.abs_diff(spitter.windup_total / 2) <= 1,
+        "halfway: {} of {} ticks left",
+        spitter.attack_left,
+        spitter.windup_total
+    );
+    for reduced in [false, true] {
+        let view = crate::battle_view::BattleViewModel::build(
+            a,
+            crate::animation::SceneAnimation::sample(a, reduced),
+            crate::battle_view::SceneBlend::NONE,
+            reduced,
+        );
+        let drawn = view
+            .enemies
+            .iter()
+            .find(|e| e.id == spitter.id)
+            .unwrap_or_else(|| panic!("reduced {reduced}: the spitter is drawn"));
+        assert!(
+            drawn.windup.is_some(),
+            "reduced {reduced}: its windup shows"
+        );
+        assert_eq!(
+            drawn.aim_target,
+            Some(target),
+            "reduced {reduced}: the aim line runs to where the spit lands"
+        );
+    }
 }
 
 /// Every painted text run containing `label` (newlines read as spaces), with

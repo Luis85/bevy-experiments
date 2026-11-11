@@ -1,5 +1,5 @@
 //! The production pass's wave-1 review scenes (design-qa-captures 1.8) and
-//! the wave-2 close stills (W2-55).
+//! the wave-2 close stills (W2-55, W2-57).
 //!
 //! The recipes in this file stage feature state through
 //! `Game::apply(&Command)`; the `staging()` seam and the other non-command
@@ -23,7 +23,7 @@ use horde_core::{
     content::{Mode, Slot, StructureKind, content},
     defenders::DefenderId,
     quality::Quality,
-    sim::{Actor, Input, Outcome, SimEvent},
+    sim::{Actor, Attempt, DEFENSE_LINE, EnemyPhase, Input, Outcome, SimEvent},
     skill_catalog::{CampaignFeature, SkillEffect, skills},
     weapons::{WeaponClass, WeaponSpec},
     world::{Country, StageTheme, world},
@@ -76,6 +76,11 @@ const BOSS_PHASE_PLAY_TICKS: u32 = 60 * 20;
 const BOSS_ARRIVAL_TICK_CAP: u32 = 60;
 /// The boss walks in for eight seconds, as in the boss scene.
 const BOSS_WALK_TICKS: u32 = 60 * 8;
+/// The spitter-windup rank: the first whose wave tier fields the catalogue
+/// spitter (rank 6 plays wave tier 5, W2-31).
+pub(in crate::ui::review) const SPITTER_WINDUP_RANK: u64 = 6;
+/// A rank-6 stage stations its first spitter well inside two minutes.
+const SPITTER_STATION_TICK_CAP: u32 = 60 * 120;
 /// A results-defeat run that has not settled after 10 minutes is a bug.
 const DEFEAT_TICK_CAP: u32 = 36_000;
 /// The first player shot comes within a second of the trigger.
@@ -93,6 +98,7 @@ pub(in crate::ui::review) fn prepare(f: &mut FrontendParts, screen: &str) -> boo
         "battle-mid" => prepare_battle_mid(f),
         "operations-observer" => prepare_operations_observer(f),
         "boss-phase" => prepare_boss_phase(f),
+        "spitter-windup" => prepare_spitter_windup(f),
         _ => {
             let Some(&(_, class, item)) = WEAPON_CLASS_SCENES
                 .iter()
@@ -437,6 +443,60 @@ fn prepare_boss_phase(f: &mut FrontendParts) {
         matches!(event, SimEvent::BossPhase { phase: 1, .. })
     });
     assert!(entered, "the wounded boss enters its first phase");
+    pause(f);
+}
+
+/// The id of a catalogue spitter winding up a spit from its station at its
+/// full reach beyond the defense line, if one does.
+fn spitter_at_reach(a: &Attempt) -> Option<u64> {
+    a.enemies
+        .iter()
+        .find(|e| {
+            e.resolved.as_ref().is_some_and(|r| {
+                r.archetype_id == "spitter" && (e.x - (DEFENSE_LINE + r.reach)).abs() < 0.01
+            }) && e.attack_phase == EnemyPhase::Windup
+                && a.spit_target(e).is_some()
+        })
+        .map(|e| e.id)
+}
+
+/// A spitter winding up at its reach (W2-28's close capture, CF-2-04): a
+/// stage-0 defense at `SPITTER_WINDUP_RANK`, played with the smoke input
+/// (which shoots the nearest hostile, so a stationed spitter outlives the
+/// crowd at the line) until the director's first spitter stations four
+/// yards beyond the line and winds up. It is then left unanswered to the
+/// middle of that windup, where the still pauses. Everything after the rank
+/// entitlement is play.
+fn prepare_spitter_windup(f: &mut FrontendParts) {
+    entitle_start(f, "DEU");
+    entitle_victories(f, SPITTER_WINDUP_RANK);
+    deploy(f, 0, Mode::Personal);
+    let mut spitter = None;
+    for _ in 0..SPITTER_STATION_TICK_CAP {
+        let a = f.game.attempt().expect("the defense stands");
+        spitter = spitter_at_reach(a);
+        if spitter.is_some() {
+            break;
+        }
+        let input = horde_core::sim::smoke_input(&f.game);
+        f.game.tick(input);
+    }
+    let spitter = spitter.unwrap_or_else(|| {
+        panic!("no spitter winds up at its reach within {SPITTER_STATION_TICK_CAP} ticks")
+    });
+    loop {
+        let a = f.game.attempt().expect("the defense stands");
+        let e = a
+            .enemies
+            .iter()
+            .find(|e| e.id == spitter)
+            .expect("the spitter lives");
+        assert_eq!(e.attack_phase, EnemyPhase::Windup, "the spitter winds up");
+        if e.attack_left <= e.windup_total / 2 {
+            break;
+        }
+        f.game.tick(Input::default());
+    }
     pause(f);
 }
 
