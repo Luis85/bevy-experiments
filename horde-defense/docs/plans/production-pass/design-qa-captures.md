@@ -357,7 +357,7 @@ Targets: median at most 50 ms in the default row and at most 34 ms with Low late
   - `equipment_autosell_rule_counts_only_below_uncommon_in_core` (2 of 6 qualities, Poor and Common; this line read "1 of 6" before the W2 review)
   - `briefing_recruit_staging_sets_next_defender_through_command`
 - `repo_checks::production_fixtures_stage_features_through_commands` scans fixtures/production.rs for `staging()` outside `fn entitle_*`.
-- Wave-2 close stills (W2-55, W2 review): `boss-phase` (W2-37's phase hold: a rank-5 boss wounded into phase 1, paused with 60 of 90 hold ticks left; `boss_phase_fixture_pauses_a_boss_inside_its_phase_hold`) and `skills-firearms` (W2-41's Firearms column at x = -1780: the skills recipe focused on `pistol_double_tap`; `skills_firearms_fixture_opens_on_pistol_double_tap_at_both_sizes`).
+- Wave-2 close stills (W2-55, W2 review): `boss-phase` (W2-37's phase hold: a rank-5 boss wounded into phase 1, paused with 60 of 90 hold ticks left; `boss_phase_fixture_pauses_a_boss_inside_its_phase_hold`; W2-56 (CF-2-03) pauses it on the entry tick instead, and its motion export holds that tick through the warm-up and resumes on native frame `FIRST - 1`, so frames 0-22 draw the hold and frame 23 its end: `boss_phase_motion_export_plays_the_whole_hold`) and `skills-firearms` (W2-41's Firearms column at x = -1780: the skills recipe focused on `pistol_double_tap`; `skills_firearms_fixture_opens_on_pistol_double_tap_at_both_sizes`).
 
 ### Wave 3
 - Register upgrades, camp-home, briefing-recruit, equipment-autosell, results-liberation-recruit and takeover-battle; save-error gains the modal.

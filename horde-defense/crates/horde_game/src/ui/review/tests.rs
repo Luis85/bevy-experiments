@@ -1227,7 +1227,9 @@ fn briefing_recruit_staging_sets_next_defender_through_command() {
 
 /// W2-37's close capture needs a boss inside its phase hold: the boss-phase
 /// still stages a boss past rank 4 that crossed half its hit points, paused
-/// mid-hold, so the view carries the phase in normal and reduced effects.
+/// on the tick it entered the hold (CF-2-03: the whole 90 ticks left for a
+/// motion export), so the view carries the phase in normal and reduced
+/// effects.
 #[test]
 fn boss_phase_fixture_pauses_a_boss_inside_its_phase_hold() {
     assert_eq!(
@@ -1238,7 +1240,7 @@ fn boss_phase_fixture_pauses_a_boss_inside_its_phase_hold() {
     let f = staged("boss-phase");
     assert!(f.screen == Screen::Battle, "staged {:?}", f.screen);
     let a = f.game.attempt().expect("a live battle");
-    assert!(a.paused, "the still is paused mid-hold");
+    assert!(a.paused, "the still is paused in the hold");
     assert!(
         a.progression.rank > 4,
         "rank {} has no phases",
@@ -1257,16 +1259,78 @@ fn boss_phase_fixture_pauses_a_boss_inside_its_phase_hold() {
             .boss_phase
             .unwrap_or_else(|| panic!("reduced {reduced}: the view carries the phase"));
         assert_eq!((phase.boss_id, phase.transition), (boss.id, 1));
-        assert!(
-            phase.hold_left_ticks > 0 && phase.hold_left_ticks < 90,
-            "reduced {reduced}: mid-hold, {} ticks left",
-            phase.hold_left_ticks
-        );
         assert_eq!(
-            phase.hold_left_ticks,
-            90 - u64::from(fixtures::production::BOSS_PHASE_HOLD_PLAYED)
+            phase.hold_left_ticks, 90,
+            "reduced {reduced}: the whole hold is left"
         );
     }
+}
+
+/// CF-2-03: the boss-phase motion export plays the whole hold. Its warm-up
+/// frames hold the staged entry tick, and the export resumes the defense one
+/// native frame before frame-0000, so frames 0-22 draw the phase on ticks
+/// 1-89 of the 90-tick hold (normal and reduced) and frame 23 its end. The
+/// loop stands in for the App: per native frame `RuntimeSet::Apply`, one fixed
+/// step (the export's `FixedTimesteps(1)`), then Update (`capture_frames` and
+/// the battle screen's control publish).
+#[cfg(feature = "review")]
+#[test]
+fn boss_phase_motion_export_plays_the_whole_hold() {
+    use crate::capture_sequence::{COUNT, LAST, frame_index};
+    use crate::runner::ControlFrame;
+    let vars = [
+        ("LASTLIGHT_REVIEW_SCREEN", "boss-phase"),
+        ("LASTLIGHT_REVIEW_MOTION", "1"),
+        ("LASTLIGHT_CAPTURE_SEQUENCE", "frames"),
+    ];
+    let config = LaunchConfig::parse(std::iter::empty::<std::ffi::OsString>(), |name| {
+        vars.iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| (*value).into())
+    })
+    .expect("valid export launch");
+    let mut f = FrontendParts::load(&config, crate::profile::SettingsLoad::default());
+    assert!(
+        f.game.global_paused(),
+        "the export's warm-up holds the staged entry tick"
+    );
+    let boss = f
+        .game
+        .attempt()
+        .and_then(|a| a.enemies.iter().find(|e| e.boss))
+        .map(|e| e.id)
+        .expect("a boss");
+    let mut frames = Vec::new();
+    for frame in 1..=LAST {
+        f.flush();
+        f.step();
+        if frame_index(frame).is_some() {
+            let a = f.game.attempt().expect("the defense stands");
+            let phase = [false, true].map(|reduced| {
+                crate::battle_view::BattleViewModel::build(
+                    a,
+                    crate::animation::SceneAnimation::sample(a, reduced),
+                    crate::battle_view::SceneBlend::NONE,
+                    reduced,
+                )
+                .boss_phase
+                .map(|p| (p.boss_id, p.transition, p.hold_left_ticks))
+            });
+            assert_eq!(phase[0], phase[1], "native frame {frame}: both modes agree");
+            frames.push(phase[0]);
+        }
+        schedule_motion_release(&config, &mut f.runtime, frame);
+        // The battle screen's egui pass publishes enabled 1x controls.
+        f.runtime.publish(ControlFrame {
+            enabled: true,
+            speed: 1,
+            ..ControlFrame::default()
+        });
+    }
+    let expected: Vec<_> = (0..u64::from(COUNT))
+        .map(|k| (k < 23).then(|| (boss, 1, 89 - 4 * k)))
+        .collect();
+    assert_eq!(frames, expected);
 }
 
 /// Every painted text run containing `label` (newlines read as spaces), with

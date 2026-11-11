@@ -15,9 +15,22 @@ fn prepare_directory(directory: &std::path::Path) -> std::io::Result<()> {
     std::fs::create_dir(directory)
 }
 
-const FIRST: u32 = 60;
-const STEP: u32 = 4;
-const COUNT: u32 = 24;
+/// The native frame of frame-0000: the first 59 frames warm the window up.
+pub(crate) const FIRST: u32 = 60;
+/// Native frames between two captured frames.
+pub(crate) const STEP: u32 = 4;
+/// Captured frames per export.
+pub(crate) const COUNT: u32 = 24;
+/// The native frame of the last captured frame.
+pub(crate) const LAST: u32 = FIRST + STEP * (COUNT - 1);
+/// The captured frame drawn on native frame `frame`, if any.
+pub(crate) fn frame_index(frame: u32) -> Option<u32> {
+    (FIRST..=LAST)
+        .contains(&frame)
+        .then(|| frame - FIRST)
+        .filter(|offset| offset.is_multiple_of(STEP))
+        .map(|offset| offset / STEP)
+}
 #[derive(Default)]
 pub struct SequenceCapture {
     initialized: bool,
@@ -96,6 +109,7 @@ pub fn capture_frames(
     session: Res<crate::runner::GameSession>,
     settings: Res<crate::settings::Settings>,
     mut battle: ResMut<crate::ui::BattleUi>,
+    mut runtime: ResMut<crate::runner::Runtime>,
     mut state: Local<SequenceCapture>,
     config: Res<crate::launch::LaunchConfig>,
     mut exit: MessageWriter<AppExit>,
@@ -119,11 +133,12 @@ pub fn capture_frames(
     state.frame += 1;
     let frame = state.frame;
     crate::ui::schedule_gesture_review(&config, &session.game, &mut battle, frame);
-    if frame >= FIRST && (frame - FIRST).is_multiple_of(STEP) && (frame - FIRST) / STEP < COUNT {
+    crate::ui::schedule_motion_release(&config, &mut runtime, frame);
+    if let Some(index) = frame_index(frame) {
         let Some(directory) = state.directory.clone() else {
             return;
         };
-        let file = format!("frame-{:04}.png", (frame - FIRST) / STEP);
+        let file = format!("frame-{index:04}.png");
         commands
             .spawn(Screenshot::primary_window())
             .observe(save_to_disk(directory.join(&file)));
@@ -168,7 +183,7 @@ pub fn capture_frames(
             corpse_count: attempt.map_or(0, |a| a.corpses.len()),
         });
     }
-    if frame >= FIRST + STEP * (COUNT - 1) + 32 {
+    if frame >= LAST + 32 {
         state.done = true;
         let Some(directory) = state.directory.as_ref() else {
             return;

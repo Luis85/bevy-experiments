@@ -114,6 +114,30 @@ pub(crate) fn schedule_gesture_review(
     }
 }
 
+/// The native frame on which a motion export releases a fixture staged
+/// paused, or None when the fixture runs live from startup. The boss-phase
+/// export (CF-2-03) holds the staged entry tick of its 90-tick phase hold
+/// through the capture warm-up and resumes one frame before frame-0000, so
+/// frames 0-22 draw ticks 1-89 of the hold and frame 23 its end.
+#[cfg(feature = "review")]
+pub(crate) fn motion_release_frame(launch: &crate::launch::LaunchConfig) -> Option<u32> {
+    (launch.reviewing("boss-phase") && launch.motion_review() && launch.sequence_path().is_some())
+        .then_some(crate::capture_sequence::FIRST - 1)
+}
+
+/// Capture-service timing bridge: on the release frame the export resumes
+/// its held fixture with the ordinary `SetPaused(false)` command.
+#[cfg(feature = "review")]
+pub(crate) fn schedule_motion_release(
+    launch: &crate::launch::LaunchConfig,
+    runtime: &mut crate::runner::Runtime,
+    frame: u32,
+) {
+    if motion_release_frame(launch) == Some(frame) {
+        runtime.enqueue(horde_core::command::Command::SetPaused(false), "");
+    }
+}
+
 /// What one review still showed, written beside its PNG as the capture
 /// sidecar (`<capture>.json`). Rects are `[left, top, right, bottom]` in egui
 /// points. The battle field and its effects clip come from the rects the
@@ -257,10 +281,17 @@ pub(super) fn apply_reduced_override(
 /// This changes startup state only; fixed systems still own every tick. The
 /// synthetic and copied perf fixtures keep their staged disclaimer (no
 /// gameplay or FPS claim) instead of the generic live-motion note; the peak
-/// fixture, staged paused, says it runs live.
+/// fixture, staged paused, says it runs live. A fixture with a
+/// `motion_release_frame` stays paused until the export resumes it.
 pub(super) fn apply_motion_override(f: &mut FrontendParts, config: &crate::launch::LaunchConfig) {
     if config.scenario.is_some() && !config.practice && config.motion_review() {
-        f.game.set_paused(false);
+        #[cfg(feature = "review")]
+        let held = motion_release_frame(config).is_some();
+        #[cfg(not(feature = "review"))]
+        let held = false;
+        if !held {
+            f.game.set_paused(false);
+        }
         f.battle.set_construction(false);
         match config.scenario.as_deref() {
             Some("stress" | "fx-stress" | "progressed-peak" | "max-lanes" | "npc-stutter") => {}

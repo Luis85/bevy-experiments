@@ -70,9 +70,6 @@ pub(in crate::ui::review) const BATTLE_MID_TICKS: u64 = 60 * 20;
 
 /// The boss-phase rank: the first whose Normal boss has a phase (W2-36).
 pub(in crate::ui::review) const BOSS_PHASE_RANK: u64 = 5;
-/// Ticks of the 90-tick hold played before the boss-phase still: a third,
-/// so the still lands mid-hold and a motion export sees the rest.
-pub(in crate::ui::review) const BOSS_PHASE_HOLD_PLAYED: u32 = 30;
 /// Smoke-input play before the boss-phase clock advances: twenty seconds.
 const BOSS_PHASE_PLAY_TICKS: u32 = 60 * 20;
 /// The director spawns the boss within a second of its time.
@@ -409,9 +406,9 @@ fn prepare_battle_mid(f: &mut FrontendParts) {
 /// `BOSS_PHASE_PLAY_TICKS`. Then the clock advances to the boss's time and
 /// the director spawns the boss by its own rule (a level-1 survivor does not
 /// outlast a rank-5 horde to its 240-second boss). The boss walks in for
-/// `BOSS_WALK_TICKS`, is wounded to its first threshold, enters the phase on
-/// the next tick and holds for `BOSS_PHASE_HOLD_PLAYED` more, then the still
-/// pauses.
+/// `BOSS_WALK_TICKS`, is wounded to its first threshold and enters the phase
+/// on the next tick, where the still pauses with the whole hold left; a
+/// motion export plays it all (CF-2-03, `review::motion_release_frame`).
 fn prepare_boss_phase(f: &mut FrontendParts) {
     entitle_start(f, "DEU");
     entitle_victories(f, BOSS_PHASE_RANK);
@@ -440,9 +437,6 @@ fn prepare_boss_phase(f: &mut FrontendParts) {
         matches!(event, SimEvent::BossPhase { phase: 1, .. })
     });
     assert!(entered, "the wounded boss enters its first phase");
-    for _ in 0..BOSS_PHASE_HOLD_PLAYED {
-        f.game.tick(Input::default());
-    }
     pause(f);
 }
 

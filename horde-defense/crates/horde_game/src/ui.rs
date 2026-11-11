@@ -231,7 +231,7 @@ use self::operations::operations;
 
 mod review;
 #[cfg(feature = "review")]
-pub(crate) use review::{ReviewFrameFacts, schedule_gesture_review};
+pub(crate) use review::{ReviewFrameFacts, schedule_gesture_review, schedule_motion_release};
 
 mod feedback;
 
