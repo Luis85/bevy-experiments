@@ -43,6 +43,77 @@ pub(super) fn stub_label(parent: &str) -> String {
     format!("from {parent}")
 }
 
+/// Whether `a` and `b` share area: rects that only touch do not.
+pub(super) fn overlaps(a: Rect, b: Rect) -> bool {
+    a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y
+}
+
+/// Whether the wire segment `a`-`b` runs through `rect` (its bounding box
+/// shares area with it; drawn wires are axis-aligned).
+pub(super) fn segment_meets(rect: Rect, a: egui::Pos2, b: egui::Pos2) -> bool {
+    overlaps(Rect::from_two_pos(a, b), rect)
+}
+
+/// Where a stub's label may go, best first, as anchor points and the side of
+/// the label each anchors (CF-2-02): beyond the stub's far end along its
+/// overall direction, so a short bend never puts it over the child's icon;
+/// then beside the stub's longest leg, running from its far end toward the
+/// child, centred on the leg, or running from its far end away from the
+/// child, on either side, `lift` points further off the leg than the 3-4 pt
+/// gap (the spot beyond the far end only at no lift). `points` is the drawn stub in
+/// screen points, far end first.
+pub(super) fn label_spots(points: &[egui::Pos2], lift: f32) -> Vec<(egui::Pos2, egui::Align2)> {
+    use egui::{Align, Align2};
+    let start = points[0];
+    let tip = *points.last().expect("nonempty stub");
+    let lead = (tip - start).normalized();
+    // The stub's longest leg, from its end nearer the far end: a stub may
+    // start with a sliver of a bend.
+    let (from, leg) = points
+        .windows(2)
+        .map(|pair| (pair[0], pair[1]))
+        .max_by(|a, b| (a.1 - a.0).length().total_cmp(&(b.1 - b.0).length()))
+        .unwrap_or((start, tip));
+    let middle = from + (leg - from) * 0.5;
+    let beyond = if lead.x > 0.5 {
+        (start + vec2(-4.0, 0.0), Align2::RIGHT_CENTER)
+    } else if lead.x < -0.5 {
+        (start + vec2(4.0, 0.0), Align2::LEFT_CENTER)
+    } else if lead.y > 0.0 {
+        (start + vec2(0.0, -3.0), Align2::CENTER_BOTTOM)
+    } else {
+        (start + vec2(0.0, 3.0), Align2::CENTER_TOP)
+    };
+    let mut spots = if lift == 0.0 { vec![beyond] } else { vec![] };
+    let along = leg - from;
+    let level = along.x.abs() >= along.y.abs();
+    // The label's edge at the far end when it runs toward the child, and
+    // when it runs away from it.
+    let (toward, away) = if (level && along.x < 0.0) || (!level && along.y < 0.0) {
+        (Align::Max, Align::Min)
+    } else {
+        (Align::Min, Align::Max)
+    };
+    // A level leg: over it, then under it. An upright one: to its left,
+    // then to its right.
+    for (gap, side) in [(-1.0, Align::Max), (1.0, Align::Min)] {
+        for (at, along_leg) in [(from, toward), (middle, Align::Center), (from, away)] {
+            spots.push(if level {
+                (
+                    at + vec2(0.0, (3.0 + lift) * gap),
+                    Align2([along_leg, side]),
+                )
+            } else {
+                (
+                    at + vec2((4.0 + lift) * gap, 0.0),
+                    Align2([side, along_leg]),
+                )
+            });
+        }
+    }
+    spots
+}
+
 pub(super) fn route_length(route: &[egui::Vec2]) -> f32 {
     route.windows(2).map(|w| (w[1] - w[0]).length()).sum()
 }

@@ -1,6 +1,9 @@
 use super::model::{CANVAS, Emphasis, Node, Tone, fade_fill};
 use super::pictogram::{lock_mark, pictogram};
-use super::wires::{LONG_EDGE, STUB_LENGTH, WireCache, route_length, stub_label, wire_stub};
+use super::wires::{
+    LONG_EDGE, STUB_LENGTH, WireCache, label_spots, overlaps, route_length, segment_meets,
+    skill_obstacle, stub_label, wire_stub,
+};
 use crate::art::{AMBER, INK, MUTED, TEXT};
 use bevy_egui::egui::{self, Align, Align2, Color32, FontId, Rect, Sense, Stroke, pos2, vec2};
 
@@ -9,6 +12,9 @@ pub(super) const MAX_SCALE: f32 = 1.6;
 /// Below these scales captions would collide, so they are left out.
 pub(super) const TITLE_SCALE: f32 = 0.55;
 const BADGE_SCALE: f32 = 0.45;
+/// How much further off its stub's leg, in points, a whole stub label may
+/// go before it is shortened (CF-2-02).
+const LABEL_LIFTS: [f32; 5] = [0.0, 8.0, 16.0, 24.0, 32.0];
 
 /// Zoom, pan and selection. UI view state only; never saved in `Campaign`.
 #[derive(Clone)]
@@ -165,6 +171,10 @@ impl<'a> Graph<'a> {
             usize::from(*child == selected || *parent == selected)
                 + 2 * usize::from(emphasis.path.contains(child))
         });
+        // Every wire drawn, in screen points, and the stubs whose labels go
+        // on once every wire is down, so a label is placed clear of them all.
+        let mut drawn: Vec<Vec<egui::Pos2>> = Vec::with_capacity(ordered.len());
+        let mut labels = Vec::new();
         for (&(parent, child), route) in ordered {
             if route.len() < 2 {
                 continue;
@@ -197,36 +207,84 @@ impl<'a> Graph<'a> {
             }
             let tip = *points.last().expect("nonempty route");
             let direction = (tip - points[points.len() - 2]).normalized();
-            let start = points[0];
-            // The label sits beyond the stub's far end, along its overall
-            // direction, so a stub with a short bend never puts the label
-            // over the child's icon.
-            let lead = (tip - start).normalized();
-            painter.add(egui::Shape::line(points, stroke));
+            painter.add(egui::Shape::line(points.clone(), stroke));
             let wing = egui::vec2(-direction.y, direction.x) * 4.0;
             painter.line_segment([tip, tip - direction * 8.0 + wing], stroke);
             painter.line_segment([tip, tip - direction * 8.0 - wing], stroke);
             if long && scale >= TITLE_SCALE {
-                let (anchor, offset) = if lead.x > 0.5 {
-                    (Align2::RIGHT_CENTER, vec2(-4.0, 0.0))
-                } else if lead.x < -0.5 {
-                    (Align2::LEFT_CENTER, vec2(4.0, 0.0))
-                } else if lead.y > 0.0 {
-                    (Align2::CENTER_BOTTOM, vec2(0.0, -3.0))
+                let color = if related {
+                    TEXT.gamma_multiply(0.85)
                 } else {
-                    (Align2::CENTER_TOP, vec2(0.0, 3.0))
+                    MUTED.gamma_multiply(if searching { 0.4 } else { 0.8 })
                 };
-                painter.text(
-                    start + offset,
-                    anchor,
-                    stub_label(&self.nodes[parent].title),
-                    FontId::proportional((11.0 * scale).max(11.0)),
-                    if related {
-                        TEXT.gamma_multiply(0.85)
-                    } else {
-                        MUTED.gamma_multiply(if searching { 0.4 } else { 0.8 })
-                    },
-                );
+                labels.push((drawn.len(), parent, color));
+            }
+            drawn.push(points);
+        }
+        if !labels.is_empty() {
+            let envelopes: Vec<Rect> = self
+                .nodes
+                .iter()
+                .map(|node| {
+                    let world = skill_obstacle(node);
+                    Rect::from_two_pos(point(world.min.to_vec2()), point(world.max.to_vec2()))
+                })
+                .collect();
+            let font = FontId::proportional((11.0 * scale).max(11.0));
+            let mut placed: Vec<Rect> = Vec::with_capacity(labels.len());
+            for (wire, parent, color) in labels {
+                // A label meets no node's icon and caption, no other wire and
+                // no label already placed (CF-2-02).
+                let clear = |rect: Rect, placed: &[Rect]| {
+                    !envelopes.iter().any(|&e| overlaps(rect, e))
+                        && !placed.iter().any(|&p| overlaps(rect, p))
+                        && drawn.iter().enumerate().all(|(i, points)| {
+                            i == wire || !points.windows(2).any(|w| segment_meets(rect, w[0], w[1]))
+                        })
+                };
+                let text = stub_label(&self.nodes[parent].title);
+                let spots = label_spots(&drawn[wire], 0.0);
+                let layout = |width: f32, rows: usize| {
+                    let mut job =
+                        egui::text::LayoutJob::simple(text.clone(), font.clone(), color, width);
+                    job.wrap.max_rows = rows;
+                    job.wrap.break_anywhere = rows == 1;
+                    painter.layout_job(job)
+                };
+                let full = painter.layout_no_wrap(text.clone(), font.clone(), color);
+                let width = full.size().x;
+                // Whole on one row, then on two, at the first clear spot by
+                // the stub, then up to `LABEL_LIFTS` further off its leg;
+                // else shortened on one row by the stub's far end.
+                let galleys = [full, layout(width * 0.6, 2)];
+                let whole = LABEL_LIFTS.into_iter().find_map(|lift| {
+                    let spots = label_spots(&drawn[wire], lift);
+                    galleys.iter().find_map(|galley| {
+                        spots.iter().find_map(|&(at, anchor)| {
+                            let rect = anchor.anchor_size(at, galley.size());
+                            clear(rect, &placed).then(|| (rect, galley.clone()))
+                        })
+                    })
+                });
+                let found = whole.or_else(|| {
+                    let mut short = width;
+                    while short > 4.0 * font.size {
+                        short -= font.size;
+                        let galley = layout(short, 1);
+                        let spot = spots.iter().take(4).find_map(|&(at, anchor)| {
+                            let rect = anchor.anchor_size(at, galley.size());
+                            clear(rect, &placed).then_some(rect)
+                        });
+                        if let Some(rect) = spot {
+                            return Some((rect, galley));
+                        }
+                    }
+                    None
+                });
+                if let Some((rect, galley)) = found {
+                    placed.push(rect);
+                    painter.galley(rect.min, galley, color);
+                }
             }
         }
         let mut clicked = canvas.clicked();

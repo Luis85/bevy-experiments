@@ -404,3 +404,136 @@ fn every_body_attribute_draws_its_own_pictogram() {
         assert!(seen.insert(icon.clone()), "{attribute} repeats {icon}");
     }
 }
+/// CF-2-02 (and the label half of CF-2-01): at every zoom that draws stub
+/// labels, from the 1050x700@1.35 compact default (0.6) through the
+/// 1440x900 default to the maximum, each "from ..." label of a cross-graph
+/// stub meets no node's icon and caption envelope and no other drawn wire.
+/// Before, the stub into Reload drill ran "from Survivor foundations" under
+/// the Steady hands icon.
+#[test]
+fn every_stub_label_clears_every_node_envelope_and_other_wire_at_every_zoom() {
+    let nodes = catalogue_nodes();
+    let (_, origin) = skill_bounds(&nodes);
+    let routes = WireCache::default().resolve(&nodes);
+    let ctx = egui::Context::default();
+    crate::settings::install_font(&ctx);
+    for scale in [TITLE_SCALE, 0.6, 0.72, 0.84, 1.0, 1.25, MAX_SCALE] {
+        let mut view = View {
+            scale,
+            ..View::default()
+        };
+        let mut canvas = Rect::NOTHING;
+        let mut output = ctx.run_ui(
+            egui::RawInput {
+                screen_rect: Some(Rect::from_min_size(pos2(0.0, 0.0), vec2(1500.0, 900.0))),
+                ..Default::default()
+            },
+            |ui| {
+                canvas = Graph::skills(&nodes).show(
+                    ui,
+                    egui::Id::new("stub-label-proof"),
+                    &mut view,
+                    &Emphasis::default(),
+                    vec2(1400.0, 800.0),
+                );
+            },
+        );
+        output.textures_delta.clear();
+        let center = canvas.center() + view.pan;
+        let point = |v: egui::Vec2| center + (v - origin) * scale;
+        let envelopes: Vec<_> = nodes
+            .iter()
+            .map(|n| {
+                let world = skill_obstacle(n);
+                (
+                    n,
+                    Rect::from_two_pos(point(world.min.to_vec2()), point(world.max.to_vec2())),
+                )
+            })
+            .collect();
+        // Every drawn wire as screen segments, by its (parent, child).
+        let wires: Vec<_> = routes
+            .iter()
+            .filter(|(_, route)| route.len() >= 2)
+            .map(|(&edge, route)| {
+                let world = if route_length(route) > LONG_EDGE {
+                    wire_stub(route, STUB_LENGTH)
+                } else {
+                    route.clone()
+                };
+                (edge, world.into_iter().map(point).collect::<Vec<_>>())
+            })
+            .collect();
+        let crosses = |rect: Rect, a: egui::Pos2, b: egui::Pos2| {
+            let span = Rect::from_two_pos(a, b);
+            span.min.x < rect.max.x
+                && rect.min.x < span.max.x
+                && span.min.y < rect.max.y
+                && rect.min.y < span.max.y
+        };
+        let mut labels = 0;
+        for clipped in &output.shapes {
+            let egui::Shape::Text(text) = &clipped.shape else {
+                continue;
+            };
+            let Some(parent_title) = text.galley.text().strip_prefix("from ") else {
+                continue;
+            };
+            labels += 1;
+            let label = text.galley.rect.translate(text.pos.to_vec2());
+            for (node, envelope) in &envelopes {
+                assert!(
+                    !label.intersects(*envelope),
+                    "scale {scale}: the label {:?} at {label:?} meets {}'s envelope {envelope:?}",
+                    text.galley.text(),
+                    node.title
+                );
+            }
+            // Its own stub is the nearest stub from that parent, within 40
+            // points; every other wire stays clear.
+            let gap = |points: &[egui::Pos2]| {
+                points
+                    .windows(2)
+                    .map(|pair| {
+                        let span = Rect::from_two_pos(pair[0], pair[1]);
+                        let dx = (span.min.x - label.max.x).max(label.min.x - span.max.x);
+                        let dy = (span.min.y - label.max.y).max(label.min.y - span.max.y);
+                        dx.max(dy).max(0.0)
+                    })
+                    .fold(f32::INFINITY, f32::min)
+            };
+            let own = wires
+                .iter()
+                .filter(|(edge, _)| {
+                    route_length(&routes[edge]) > LONG_EDGE
+                        && nodes[edge.0]
+                            .title
+                            .starts_with(parent_title.trim_end_matches('\u{2026}'))
+                })
+                .map(|(edge, points)| (*edge, gap(points)))
+                .min_by(|a, b| a.1.total_cmp(&b.1));
+            let own = match own {
+                Some((edge, gap)) if gap <= 40.0 => edge,
+                _ => panic!(
+                    "scale {scale}: the label {:?} at {label:?} lies by no stub of its parent",
+                    text.galley.text()
+                ),
+            };
+            for (edge, points) in &wires {
+                if *edge == own {
+                    continue;
+                }
+                for pair in points.windows(2) {
+                    assert!(
+                        !crosses(label, pair[0], pair[1]),
+                        "scale {scale}: the label {:?} at {label:?} crosses the wire {} -> {}",
+                        text.galley.text(),
+                        nodes[edge.0].title,
+                        nodes[edge.1].title
+                    );
+                }
+            }
+        }
+        assert!(labels > 0, "scale {scale}: stub labels are drawn");
+    }
+}
