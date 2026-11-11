@@ -46,6 +46,10 @@ struct Bubble {
     /// once none is painted (the hostile died of a hit merged into it, W1
     /// review).
     beside: Option<(Side, Rect)>,
+    /// How far `draw_for` last moved the popup off its own spot to keep it
+    /// clear of the popups placed before it (CF-2-06); kept while it stays
+    /// clear, so a moved popup does not jump between frames.
+    nudge: egui::Vec2,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Side {
@@ -95,6 +99,7 @@ fn classify(a: &Attempt, event: &Event) -> Option<Bubble> {
         target,
         started: 0.0,
         beside: None,
+        nudge: egui::Vec2::ZERO,
     })
 }
 /// `to` when it lies in the world box `[0, size[0]] x [0, size[1]]`;
@@ -396,7 +401,73 @@ pub(super) fn draw(ui: &egui::Ui, arena: Rect, f: &mut UiCtx) {
         );
     }
 }
-/// Draws `battle`'s popups; none meets a rect of `keep_clear` (CF-1-09).
+/// One popup laid out on its own spot, before `draw_for` keeps it clear of
+/// the others.
+struct Draft {
+    /// Its drawn rect, outline included, where nothing else moves it.
+    spot: Rect,
+    /// Where a moved popup must stay: the field, or the effects clip over an
+    /// actor.
+    bounds: Rect,
+    /// The struck hostile's health bar it keeps beside, if any.
+    bar: Option<Rect>,
+    galley: std::sync::Arc<egui::Galley>,
+    color: Color32,
+    fade: f32,
+    border: f32,
+    started: f64,
+}
+/// Whether `a` and `b` share area: rects that only touch do not.
+fn overlaps(a: Rect, b: Rect) -> bool {
+    a.min.x < b.max.x && b.min.x < a.max.x && a.min.y < b.max.y && b.min.y < a.max.y
+}
+/// The offset that moves `spot` clear of every rect in `placed` by
+/// `KEEP_CLEAR_GAP` (CF-2-06). `previous` (the last frame's) when it is still
+/// clear, else none when `spot` is clear already, else the shortest move
+/// (upward first on a tie) that stacks it over, under or beside a placed rect
+/// and leaves it inside `bounds` and off every rect of `obstacles` (the HUD
+/// keep-clear and the struck health bar). `None` when no such move exists.
+fn clear_spot(
+    spot: Rect,
+    previous: egui::Vec2,
+    placed: &[Rect],
+    obstacles: impl Iterator<Item = Rect>,
+    bounds: Rect,
+) -> Option<egui::Vec2> {
+    let obstacles: Vec<Rect> = obstacles.collect();
+    let free = |offset: egui::Vec2| {
+        let moved = spot.translate(offset);
+        let apart = moved.expand(KEEP_CLEAR_GAP * 0.5);
+        !placed.iter().any(|&rect| overlaps(apart, rect))
+    };
+    let allowed = |offset: egui::Vec2| {
+        let moved = spot.translate(offset);
+        bounds.contains_rect(moved) && !obstacles.iter().any(|&rect| overlaps(moved, rect))
+    };
+    if previous != egui::Vec2::ZERO && free(previous) && allowed(previous) {
+        return Some(previous);
+    }
+    if free(egui::Vec2::ZERO) {
+        return Some(egui::Vec2::ZERO);
+    }
+    let mut moves: Vec<egui::Vec2> = placed
+        .iter()
+        .flat_map(|rect| {
+            [
+                vec2(0.0, rect.top() - KEEP_CLEAR_GAP - spot.bottom()),
+                vec2(0.0, rect.bottom() + KEEP_CLEAR_GAP - spot.top()),
+                vec2(rect.left() - KEEP_CLEAR_GAP - spot.right(), 0.0),
+                vec2(rect.right() + KEEP_CLEAR_GAP - spot.left(), 0.0),
+            ]
+        })
+        .collect();
+    moves.sort_by(|a, b| a.length().total_cmp(&b.length()).then(a.y.total_cmp(&b.y)));
+    moves
+        .into_iter()
+        .find(|&offset| free(offset) && allowed(offset))
+}
+/// Draws `battle`'s popups; none meets a rect of `keep_clear` (CF-1-09), and
+/// none meets another (CF-2-06).
 /// `blend` is the one the field painted `a`'s hostiles with this frame.
 #[allow(clippy::too_many_arguments)]
 pub(super) fn draw_for(
@@ -448,6 +519,7 @@ pub(super) fn draw_for(
     warm_glyphs(ui.ctx(), &mut state.warmed);
     let p = ui.painter_at(arena.effects_clip);
     let mut positions = None;
+    let mut drafts = Vec::with_capacity(stream.active.len());
     for bubble in &mut stream.active {
         let age = (now - bubble.started).max(0.0);
         let (scale, rise, fade) = motion(age, reduced);
@@ -531,7 +603,52 @@ pub(super) fn draw_for(
             let beside = Rect::from_center_size(center, galley.size()).expand(border);
             center += vec2(0.0, keep_clear_shift(beside, keep_clear));
         }
-        let origin = center - galley.size() * 0.5;
+        drafts.push(Draft {
+            spot: Rect::from_center_size(center, galley.size()).expand(border),
+            bounds,
+            bar,
+            galley,
+            color,
+            fade,
+            border,
+            started: bubble.started,
+        });
+    }
+    // Two popups that land on one spot (two hits on one wall, a MISS beside
+    // a number) are kept apart (CF-2-06): the oldest keep their spots and
+    // each newer one moves the least way clear of those placed before it,
+    // or is not drawn this frame when no way is clear.
+    let mut order: Vec<usize> = (0..drafts.len()).collect();
+    order.sort_by(|&i, &j| {
+        drafts[i]
+            .started
+            .total_cmp(&drafts[j].started)
+            .then(i.cmp(&j))
+    });
+    let mut placed: Vec<Rect> = Vec::with_capacity(drafts.len());
+    let mut moves = vec![None; drafts.len()];
+    for i in order {
+        let draft = &drafts[i];
+        let bubble = &mut stream.active[i];
+        let obstacles = keep_clear.iter().copied().chain(draft.bar);
+        let found = clear_spot(draft.spot, bubble.nudge, &placed, obstacles, draft.bounds);
+        if let Some(offset) = found {
+            bubble.nudge = offset;
+            placed.push(draft.spot.translate(offset));
+        }
+        moves[i] = found;
+    }
+    for (draft, offset) in drafts.into_iter().zip(moves) {
+        let Some(offset) = offset else { continue };
+        let Draft {
+            spot,
+            galley,
+            color,
+            fade,
+            border,
+            ..
+        } = draft;
+        let origin = spot.center() + offset - galley.size() * 0.5;
         let outline = Color32::from_black_alpha((240.0 * fade) as u8);
         for direction in [
             vec2(-1.0, -1.0),
@@ -1376,6 +1493,97 @@ mod tests {
                 }
             }
         }
+    }
+    /// CF-2-06: on the stress field, run live for two seconds, no two
+    /// popups drawn on one frame overlap (outline included), at both target
+    /// sizes, normal and reduced. Before, two hits on one wall drew "43" and
+    /// "14" as "4314" and a MISS lay over a number.
+    #[test]
+    fn live_popups_never_overlap_one_another_on_the_stress_field() {
+        let mut game = horde_core::sim::stress_render_fixture().expect("stress fixture");
+        game.set_paused(false);
+        game.attempt_mut().unwrap().paused = false;
+        let mut views: Vec<_> = TARGET_SIZES
+            .into_iter()
+            .flat_map(|(size, zoom)| [false, true].map(move |reduced| (size, zoom, reduced)))
+            .map(|(size, zoom, reduced)| {
+                let ctx = egui::Context::default();
+                crate::settings::install_font(&ctx);
+                crate::settings::configure(&ctx, zoom);
+                let settings = Settings {
+                    reduced_effects: reduced,
+                    ..Settings::default()
+                };
+                (size, reduced, ctx, settings, Feedback::default())
+            })
+            .collect();
+        let (mut frames, mut crowded) = (0, 0);
+        for frame in 0..120_u32 {
+            game.tick(horde_core::sim::Input::default());
+            let Some(a) = game.attempt() else { break };
+            frames += 1;
+            for (size, reduced, ctx, settings, state) in &mut views {
+                let canvas = Rect::from_min_size(pos2(0.0, 0.0), *size);
+                let layout = crate::ui::battle::BattleLayout::new(
+                    canvas,
+                    a.lane_count,
+                    a.width_yards,
+                    false,
+                );
+                let arena = art::ArenaProjection::for_attempt(layout.field.rect, a)
+                    .with_effects_clip(layout.effects_clip);
+                let input = egui::RawInput {
+                    time: Some(f64::from(frame) / 60.0),
+                    screen_rect: Some(canvas),
+                    ..Default::default()
+                };
+                let mut output = ctx.run_ui(input, |ui| {
+                    draw_for(
+                        ui,
+                        a,
+                        arena,
+                        SceneBlend::NONE,
+                        0,
+                        state,
+                        settings,
+                        review::LootCaptureMode::Disabled,
+                        &layout.effects_keep_clear(),
+                    );
+                });
+                output.textures_delta.clear();
+                let texts: Vec<Rect> = output
+                    .shapes
+                    .iter()
+                    .filter_map(|clipped| match &clipped.shape {
+                        egui::Shape::Text(text) => {
+                            Some(text.galley.rect.translate(text.pos.to_vec2()))
+                        }
+                        _ => None,
+                    })
+                    .collect();
+                // Each popup is eight outline copies and its face.
+                assert_eq!(texts.len() % 9, 0, "frame {frame}");
+                let popups: Vec<Rect> = texts
+                    .chunks(9)
+                    .map(|chunk| chunk.iter().copied().reduce(Rect::union).unwrap())
+                    .collect();
+                if popups.len() > 1 {
+                    crowded += 1;
+                }
+                for (i, first) in popups.iter().enumerate() {
+                    for second in &popups[i + 1..] {
+                        let overlap = first.intersect(*second);
+                        assert!(
+                            overlap.width() <= 0.0 || overlap.height() <= 0.0,
+                            "{size:?}, reduced {reduced}, frame {frame}: popup {first:?} \
+                             overlaps popup {second:?}"
+                        );
+                    }
+                }
+            }
+        }
+        assert_eq!(frames, 120, "the stress field stays live");
+        assert!(crowded > 0, "some frame draws several popups");
     }
     #[test]
     fn punch_is_large_then_settles_while_reduced_feedback_has_no_punch_or_drift() {
