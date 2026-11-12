@@ -606,7 +606,8 @@ try {
         Assert-True ($null -eq (Get-CpuLoadPercent)) 'a failed query is unknown'
     }
 
-    # Wait-QuietMachine over scripted samples: each sample takes the next load and the next process list.
+    # Wait-QuietMachine over scripted samples: each sample takes the next load and the next process list. The clock
+    # (Get-MachineLoadClock) is scripted too: it moves only when a shimmed Start-Sleep or a slow query moves it.
     function Set-QuietScript([object[]]$Loads, [object[]]$Builds = @()) {
         $script:quietLoads = New-Object System.Collections.Generic.Queue[object]
         foreach ($load in $Loads) { $script:quietLoads.Enqueue($load) }
@@ -614,9 +615,11 @@ try {
         foreach ($build in $Builds) { $script:quietBuilds.Enqueue($build) }
         $script:quietSleeps = New-Object System.Collections.Generic.List[int]
         $script:quietLog = New-Object System.Collections.Generic.List[string]
+        $script:quietClock = New-Object DateTime 2026, 11, 11, 16, 35, 14, ([DateTimeKind]::Utc)
     }
     $quietShims = {
-        function Start-Sleep { param([int]$Seconds) $script:quietSleeps.Add($Seconds) }
+        function Get-MachineLoadClock { $script:quietClock }
+        function Start-Sleep { param([int]$Seconds) $script:quietSleeps.Add($Seconds); $script:quietClock = $script:quietClock.AddSeconds($Seconds) }
         function Get-CpuLoadPercent { if ($script:quietLoads.Count -gt 1) { $script:quietLoads.Dequeue() } else { $script:quietLoads.Peek() } }
         function Get-ForeignBuildProcess([int]$RootId) {
             $next = 'none'
@@ -674,11 +677,35 @@ try {
         Assert-Equal 13 $wait.Samples 'a 1-minute timeout is 13 samples'
         Assert-Equal 12 $script:quietSleeps.Count 'waits'
         Assert-Equal 'mean CPU load' (@($wait.WaitedFor) -join '|') 'what it waited for'
-        Assert-Equal 'quiet window: timed out after 1 min (13 samples): still waiting for the mean CPU load to fall under 35% (50% over 60 s)' $script:quietLog[$script:quietLog.Count - 1] 'last log line'
+        Assert-Equal 60 $wait.Seconds 'it waited 60 s by the clock'
+        Assert-Equal 'quiet window: timed out after 1 min (13 samples, 60 s): still waiting for the mean CPU load to fall under 35% (50% over 60 s)' $script:quietLog[$script:quietLog.Count - 1] 'last log line'
         Set-QuietScript @($null)
         $wait = Wait-QuietMachine -TimeoutMinutes 1
         Assert-True $wait.TimedOut 'an unreadable load never counts as quiet'
         Assert-Equal 'readable CPU load' (@($wait.WaitedFor) -join '|') 'unreadable load'
+    }
+
+    Test-Case 'Wait-QuietMachine times out by the clock when the system queries are slow (R30: QuietTimeoutMinutes is wall time)' {
+        # The W2-close passes waited 5 h 44 min and 6 h 02 min on a 240-minute timeout: the limit was a sample count and
+        # each sample also paid two slow Get-CimInstance queries. Here each query takes 20 s, so a sample costs 40 s
+        # beside its 5 s sleep: sample 1 ends at 40 s, sample 2 at 85 s, and the 1-minute deadline stops the wait there.
+        . $machineLibrary
+        Set-QuietScript @()
+        function Get-MachineLoadClock { $script:quietClock }
+        function Start-Sleep { param([int]$Seconds) $script:quietSleeps.Add($Seconds); $script:quietClock = $script:quietClock.AddSeconds($Seconds) }
+        function Get-CimInstance {
+            [CmdletBinding()]
+            param([Parameter(Position = 0)][string]$ClassName, [string[]]$Property)
+            $script:quietClock = $script:quietClock.AddSeconds(20)
+            if ($ClassName -eq 'Win32_Process') { return [pscustomobject]@{ ProcessId = 4; ParentProcessId = 0; Name = 'System' } }
+            return [pscustomobject]@{ LoadPercentage = 10 }
+        }
+        $wait = Wait-QuietMachine -TimeoutMinutes 1 -RootId 99999 -OnLog { param($Line) $script:quietLog.Add($Line) }
+        Assert-True $wait.TimedOut 'timed out'
+        Assert-Equal 2 $wait.Samples 'the deadline, not 13 samples, ends the wait'
+        Assert-Equal 1 $script:quietSleeps.Count 'one 5 s wait'
+        Assert-Equal 85 $wait.Seconds 'the elapsed wall time, not the nominal 5 s steps'
+        Assert-Equal 'quiet window: timed out after 1 min (2 samples, 85 s): still waiting for 13 load samples (2 so far)' $script:quietLog[$script:quietLog.Count - 1] 'last log line'
     }
 
     Test-Case 'Test-RunLoad makes a run with a load sample of 90% or more invalid (R30)' {

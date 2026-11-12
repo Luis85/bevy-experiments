@@ -4,9 +4,9 @@
 # every 5 s) over the last 60 s is under 35%. A 5 s sampler runs beside every run, and a run with any load sample of
 # 90% or more is invalid evidence.
 # Dot-source it: . (Join-Path $PSScriptRoot 'lib\MachineLoad.ps1')
-# The two system queries are Get-CimInstance calls in Get-ProcessTable and Get-CpuLoadPercent, and the waits are
-# Start-Sleep. Self-tests: scripts/tests/run_script_tests.ps1 shims Get-CimInstance and Start-Sleep, or the functions
-# Wait-QuietMachine calls.
+# The two system queries are Get-CimInstance calls in Get-ProcessTable and Get-CpuLoadPercent, the waits are
+# Start-Sleep and the clock is Get-MachineLoadClock. Self-tests: scripts/tests/run_script_tests.ps1 shims
+# Get-CimInstance, Start-Sleep and the clock, or the functions Wait-QuietMachine calls.
 
 function Get-MachineLoadRule {
     # The R30 numbers. A quiet window is WindowSeconds / IntervalSeconds + 1 samples (13), so it spans 60 s.
@@ -58,6 +58,11 @@ function Get-CpuLoadPercent {
     return [double](($values | Measure-Object -Average).Average)
 }
 
+function Get-MachineLoadClock {
+    # The wall clock (UTC) that Wait-QuietMachine measures its timeout and its elapsed seconds by.
+    return [DateTime]::UtcNow
+}
+
 function Format-Percent($Value) {
     if ($null -eq $Value) { return '-' }
     return ([double]$Value).ToString('0.####', [Globalization.CultureInfo]::InvariantCulture)
@@ -65,15 +70,19 @@ function Format-Percent($Value) {
 
 function Wait-QuietMachine {
     # Samples the process table and the CPU load every 5 s until the last 13 samples (60 s) saw no foreign build
-    # process and their mean load is under 35%, or until TimeoutMinutes have passed (TimeoutMinutes x 12 + 1 samples).
-    # A sample with a foreign build, an unreadable process table or an unreadable load restarts the window. OnLog gets
-    # one line whenever what it waits for changes. Returns Quiet, TimedOut, Samples, Seconds (the nominal 5 s steps),
-    # MeanPercent and MaxPercent (of the last window), WaitedFor (what held the start, in order) and Log.
+    # process and their mean load is under 35%, or until TimeoutMinutes of wall time have passed (Get-MachineLoadClock;
+    # no new sample starts after the deadline, and never more than TimeoutMinutes x 12 + 1 samples, since the queries
+    # take time beside each 5 s sleep). A sample with a foreign build, an unreadable process table or an unreadable
+    # load restarts the window. OnLog gets one line whenever what it waits for changes. Returns Quiet, TimedOut,
+    # Samples, Seconds (the elapsed wall time, whole seconds), MeanPercent and MaxPercent (of the last window),
+    # WaitedFor (what held the start, in order) and Log.
     [CmdletBinding()]
     param([int]$TimeoutMinutes = 240, [int]$RootId = $PID, [scriptblock]$OnLog)
     $rule = Get-MachineLoadRule
     $needed = [int]($rule.WindowSeconds / $rule.IntervalSeconds) + 1
     $limit = [int]($TimeoutMinutes * 60 / $rule.IntervalSeconds) + 1
+    $started = Get-MachineLoadClock
+    $deadline = $started.AddMinutes($TimeoutMinutes)
     $windowLoads = New-Object System.Collections.Generic.List[double]
     $quietLines = New-Object System.Collections.Generic.List[string]
     $heldBy = New-Object System.Collections.Generic.List[string]
@@ -89,7 +98,10 @@ function Wait-QuietMachine {
         if ($OnLog) { & $OnLog "quiet window: $Text" }
     }
     while ($sample -lt $limit) {
-        if ($sample -gt 0) { Start-Sleep -Seconds $rule.IntervalSeconds }
+        if ($sample -gt 0) {
+            if ((Get-MachineLoadClock) -ge $deadline) { break }
+            Start-Sleep -Seconds $rule.IntervalSeconds
+        }
         $sample += 1
         $foreign = @()
         $tableProblem = $null
@@ -132,13 +144,13 @@ function Wait-QuietMachine {
         if ($key -eq 'settling') { $waitingFor = "waiting for $needed load samples ($($windowLoads.Count) so far)" }
         else { $waitingFor = $text }
     }
-    $seconds = ($sample - 1) * $rule.IntervalSeconds
+    $seconds = [int][Math]::Round(((Get-MachineLoadClock) - $started).TotalSeconds)
     if ($quiet) {
         $null = & $note "quiet after $sample samples ($seconds s): mean CPU load $(Format-Percent $mean)% over $($rule.WindowSeconds) s (under $($rule.QuietBelowPercent)%), max $(Format-Percent $max)%, no foreign build process"
     }
     else {
         if (-not $waitingFor) { $waitingFor = "waiting for $needed load samples" }
-        $null = & $note "timed out after $TimeoutMinutes min ($sample samples): still $waitingFor"
+        $null = & $note "timed out after $TimeoutMinutes min ($sample samples, $seconds s): still $waitingFor"
     }
     if ($windowLoads.Count -eq 0) { $mean = $null; $max = $null }
     return [pscustomobject]@{
