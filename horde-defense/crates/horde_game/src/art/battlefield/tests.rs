@@ -11,6 +11,8 @@ use bevy_egui::egui::{ClippedPrimitive, TextureId, pos2, vec2};
 use horde_core::sim::Game;
 use std::sync::Arc;
 
+mod appearance;
+
 /// Fake egui ids for every sheet the battlefield samples.
 fn textures() -> ArtTextures {
     ArtTextures {

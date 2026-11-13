@@ -232,7 +232,8 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
         // Only a pass that draws the field records it: a collapsed window or
         // a settled deployment leaves no stale rect behind.
         f.battle.observer_arena_rect = None;
-        egui::Window::new(format!("Live battlefield #{id}"))
+        egui::Window::new(observer_title(f.game, id))
+            .id(observer_window_id(id))
             .default_size(vec2(
                 900.0_f32.min(ui.ctx().content_rect().width() - 32.0),
                 540.0,
@@ -382,6 +383,23 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
             muted(ui, line);
         }
     });
+}
+
+/// The observer window's title (ruling D17): the expedition and the recruit
+/// fighting it, named from the roster through `Game::battle_defender_card`.
+/// Inside the worker the companion slot is the recruit, so its own attempt
+/// would name Mara. A battle whose recruit left the roster keeps the number.
+fn observer_title(game: &horde_core::sim::Game, battle: u64) -> String {
+    match game.battle_defender_card(battle) {
+        Some(card) => format!("Live battlefield #{battle} · {}", card.name),
+        None => format!("Live battlefield #{battle}"),
+    }
+}
+
+/// The observer window's egui id: per expedition, independent of the title,
+/// so naming the recruit does not move or reset the window.
+pub(in crate::ui) fn observer_window_id(battle: u64) -> egui::Id {
+    egui::Id::new(("lastlight.observer_window", battle))
 }
 
 /// A recruit's service record (`Game::service_record`, design 1.10): one

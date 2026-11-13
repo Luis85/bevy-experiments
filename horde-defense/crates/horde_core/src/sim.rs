@@ -633,6 +633,12 @@ impl Attempt {
     pub fn defender(&self) -> DefenderId {
         resolve(self.mode, self.seat)
     }
+    /// The appearance the battlefield draws this attempt's defender with:
+    /// the one stamped on the profile at deploy (ruling D17). Mara's deploy
+    /// stamps Female, a recruit's its identity-table appearance.
+    pub fn defender_appearance(&self) -> crate::survivors::Appearance {
+        self.profile.appearance
+    }
     /// The surviving structures as a reusable country layout plan.
     pub fn structure_layout(&self) -> Vec<crate::campaign::Placement> {
         self.structures

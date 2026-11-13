@@ -864,9 +864,7 @@ fn a_collapsed_observer_records_no_field() {
     observed_operations(&mut f, (3, 12.0));
     assert!(f.battle.observer_arena_rect.is_some());
     let id = f.campaign.observed.expect("observed");
-    // egui 0.36 keys a window's area by `Id::new(title.text())`, an Option.
-    let title = format!("Live battlefield #{id}");
-    let window = egui::Id::new(Some(title.as_str()));
+    let window = crate::ui::operations::observer_window_id(id);
     let ctx = operations_context();
     let mut collapsing = egui::collapsing_header::CollapsingState::load_with_default_open(
         &ctx,
@@ -883,6 +881,86 @@ fn a_collapsed_observer_records_no_field() {
         "the collapsed window is still drawn"
     );
     assert_eq!(f.battle.observer_arena_rect, None);
+}
+
+/// The meshes drawn inside `clip` from egui-managed textures: in the
+/// observer box these are the survivor rig's parts, sampled from the player
+/// source sheets (the two models share sheets, so the parts' regions tell
+/// them apart). Each `observed_operations_output` call draws on a fresh
+/// context, which uploads the sources in catalogue order, so the texture ids
+/// compare across calls.
+fn managed_meshes(output: &egui::FullOutput, clip: egui::Rect) -> Vec<egui::Mesh> {
+    fn collect(shape: &egui::Shape, into: &mut Vec<egui::Mesh>) {
+        match shape {
+            egui::Shape::Vec(shapes) => shapes.iter().for_each(|shape| collect(shape, into)),
+            egui::Shape::Mesh(mesh) => {
+                if matches!(mesh.texture_id, egui::TextureId::Managed(_)) {
+                    into.push((**mesh).clone());
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut meshes = Vec::new();
+    for clipped in output.shapes.iter().filter(|s| s.clip_rect == clip) {
+        collect(&clipped.shape, &mut meshes);
+    }
+    meshes
+}
+
+/// The observer window is the expedition recruit's (W3-17, ruling D17): its
+/// title names the recruit from `Game::battle_defender_card`, and the field
+/// draws the worker attempt's stamped appearance instead of Mara's Female.
+#[test]
+fn observer_window_draws_the_expedition_recruit_not_mara() {
+    use horde_core::survivors::Appearance;
+    let mut f = staged("operations");
+    let (_, observer_box, output) = observed_operations_output(&mut f, (11, 30.0));
+    let id = f.campaign.observed.expect("observed");
+    let card = f
+        .game
+        .battle_defender_card(id)
+        .expect("the expedition's recruit is on the roster");
+    assert_ne!(card.name, "Mara");
+    let title = format!("Live battlefield #{id} · {}", card.name);
+    let titles: Vec<String> = output
+        .shapes
+        .iter()
+        .filter_map(|s| match &s.shape {
+            egui::Shape::Text(text) => Some(text.galley.text().to_owned()),
+            _ => None,
+        })
+        .filter(|text| text.starts_with("Live battlefield"))
+        .collect();
+    assert_eq!(titles, [title], "the window title names the recruit");
+
+    // The worker attempt carries the recruit's identity appearance, and the
+    // field draws that model: stamping the other appearance changes the rig.
+    let worker_appearance = |f: &FrontendParts| {
+        let battle = f.game.battles().iter().find(|b| b.id == id).unwrap();
+        battle.game().attempt().unwrap().defender_appearance()
+    };
+    assert_eq!(worker_appearance(&f), card.appearance);
+    let own = managed_meshes(&output, observer_box);
+    assert!(!own.is_empty(), "the rig draws from its source sheets");
+    let other = match card.appearance {
+        Appearance::Male => Appearance::Female,
+        Appearance::Female => Appearance::Male,
+    };
+    let battle = f
+        .game
+        .battles_mut()
+        .iter_mut()
+        .find(|b| b.id == id)
+        .unwrap();
+    battle.game_mut().attempt_mut().unwrap().profile.appearance = other;
+    let (_, observer_box, output) = observed_operations_output(&mut f, (11, 30.0));
+    // `assert!`, not `assert_ne!`: a failure must not dump the meshes.
+    assert!(
+        managed_meshes(&output, observer_box) != own,
+        "the observer draws the worker attempt's appearance, {:?} then {other:?}",
+        card.appearance
+    );
 }
 
 /// An 11x30 field already fills the observer box, so the uniform fit leaves

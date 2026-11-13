@@ -31,7 +31,7 @@ use crate::{
 };
 use bevy::log::warn;
 use bevy_egui::egui::{self, Align2, FontId, Painter, Pos2, Rect, Stroke, pos2, vec2};
-use horde_core::{content::Mode, sim::Attempt};
+use horde_core::sim::Attempt;
 
 pub struct RenderOptions {
     pub construction: bool,
@@ -185,11 +185,9 @@ fn defender(
 ) -> Option<Pos2> {
     let sy = arena.lane_height();
     let origin = arena.world(view.defender.position[0], view.defender.position[1]);
-    let appearance = if a.mode == Mode::Npc {
-        horde_core::survivors::Appearance::Female
-    } else {
-        a.profile.appearance
-    };
+    // The appearance stamped at deploy (ruling D17): Mara's Npc deploy stamps
+    // Female, a recruit's seat stamps its identity-table appearance.
+    let appearance = a.defender_appearance();
     let manual_target = arena.world(aim[0], aim[1]);
     let mut player_sample = crate::defender_presentation::sample(
         a,

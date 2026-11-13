@@ -5,7 +5,7 @@ use crate::{
     visual_assets::{self, ArtTextures},
 };
 use bevy_egui::egui::{self, Color32 as C, Painter, Stroke, vec2};
-use horde_core::{content::Mode, ordnance::OrdnanceKind, sim::Attempt};
+use horde_core::{ordnance::OrdnanceKind, sim::Attempt};
 
 pub(super) fn fire_zones(
     p: &Painter,
@@ -95,12 +95,8 @@ pub(super) fn thrown(
     let sy = arena.lane_height();
     let origin = arena.world(view.defender.position[0], view.defender.position[1]);
     let size = vec2(sy * 0.82, sy * 0.87);
-    let appearance = if a.mode == Mode::Npc {
-        horde_core::survivors::Appearance::Female
-    } else {
-        a.profile.appearance
-    };
-    let model_id = visual_assets::player_model_id(appearance).ok();
+    // The same stamped appearance the rig is drawn with (ruling D17).
+    let model_id = visual_assets::player_model_id(a.defender_appearance()).ok();
     let cache_key = egui::Id::new(("lastlight.player_release.v1", p.layer_id().id));
     let mut releases = p
         .ctx()
