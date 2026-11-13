@@ -6,6 +6,8 @@ paths:
   - "apps/rts_units_demo/**"
   - "content/testbed_view/**"
   - "apps/actor_testbed/**"
+  - "content/island_view/**"
+  - "apps/island_game/**"
   - "content/**/view/**"
   - "content/**/*view*.rs"
 ---

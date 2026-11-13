@@ -142,8 +142,7 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(
             Update,
             keys.in_set(ViewSystems::OverlayInput)
-                .before(crate::island_shell::ShellInput)
-                .run_if(not(crate::modal_open)),
+                .before(crate::island_shell::ShellInput),
         )
         .add_systems(
             Update,

@@ -1,7 +1,7 @@
 """Per-system view cost on the authored living world, read from BRP `npc/perf`.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/measure_view_perf.py [--binary target/debug/actor_testbed.exe]
+  python scripts/playtest/measure_view_perf.py [--binary target/debug/island_game.exe]
       [--match homestead_panel] [--seconds 6] [--running]
       [--camera 0,0,330] [--no-dressing] [--size 2560x1440]
 
@@ -30,7 +30,7 @@ from capture_native import ROOT, WINDOW, query, rpc
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/actor_testbed.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--match", default="homestead_panel")
     parser.add_argument("--seconds", type=float, default=6.0)
     parser.add_argument("--running", action="store_true", help="sample with the world running at 1x")
@@ -41,7 +41,7 @@ def main():
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build actor_testbed before measuring")
+        parser.error("Build island_game before measuring")
     run = ROOT / "target" / ("playtest-view-perf-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     with socket.socket() as sock:

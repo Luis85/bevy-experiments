@@ -7,7 +7,7 @@
 //! [`TextEdit::Copy`] / [`TextEdit::Cut`] / [`TextEdit::Paste`] for Bevy's
 //! in-app buffer. These systems take those edits out of a field's queue in
 //! `Update` (before Bevy applies the queue in `PostUpdate`) and use the OS
-//! clipboard instead, through `island_content::explorer::clipboard`, on a
+//! clipboard instead, through `island_content::clipboard`, on a
 //! background thread:
 //!
 //! - **Copy / Cut** write the selection; Cut's edit becomes a
@@ -20,7 +20,7 @@ use std::sync::{Arc, Mutex};
 
 use bevy::prelude::*;
 use bevy::text::{EditableText, TextEdit};
-use island_content::explorer::clipboard;
+use island_content::clipboard;
 
 /// Takes [`TextEdit::Copy`] and [`TextEdit::Cut`] out of `edits` and returns
 /// the text to put on the OS clipboard (`selected`) when one was queued. The

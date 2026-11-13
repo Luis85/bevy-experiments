@@ -309,7 +309,6 @@ macro_rules! models {
 models! {
     wall = "testbed/dungeon/wall.gltf.glb",
     doorway = "testbed/dungeon/wall_doorway.glb",
-    floor = "testbed/dungeon/floor_tile_large.gltf.glb",
     chest = "testbed/dungeon/chest.glb",
     key = "testbed/dungeon/key.gltf.glb",
     food = "testbed/dungeon/plate_food_A.gltf.glb",
@@ -322,7 +321,6 @@ models! {
     stump_b = "hex/tree_single_B_cut.gltf",
     stone = "hex/resource_stone.gltf",
     lumber = "hex/resource_lumber.gltf",
-    rock = "hex/rock_single_A.gltf",
     book = "furniture/book_single.gltf",
     axe = "props/axe_1handed.gltf",
     workbench = "testbed/survival/workbench.glb",

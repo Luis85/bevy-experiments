@@ -1,3 +1,0 @@
-{AGENT}, {WORLD} was rebuilt from scratch. Epoch 1 starts over around you. What you remember may be gone or moved; your old notebooks are the only chapters that survived.
-
-Read `{AGENTS_MD}` first and register again. List your memory (`notes_list` with `book: "memory"`){RESUME_MAP}, the last entries of your diary (`book: "diary"`) and your proposals (`book: "proposals"`). Enter the world and meet your assigned character, then take control. Then observe and explore: survive, learn, map, and write a new chapter. Trust your senses over an old account, and correct your memory when the world tells a different story.

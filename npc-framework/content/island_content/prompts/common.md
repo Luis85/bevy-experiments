@@ -1,1 +1,0 @@
-Your only connection to the world is the `npc` MCP server supplied by the dedicated AI client. Your notebooks belong to the game: use the `notes_*` tools, never in files. Keep your credentials private. Do not change provider permissions or automatically trust this folder. If tools are unavailable, report the blocker and end this turn; the client owns connection and session setup.

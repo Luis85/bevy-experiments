@@ -2,7 +2,7 @@
 shape palette, settings, and the ground, rock, shore, road and tree-line look.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_view_followups.py [--binary target/debug/game_menu.exe]
+  python scripts/playtest/capture_view_followups.py [--binary target/debug/island_game.exe]
 
 Uses a disposable spectator world, native widget activation over BRP, bounded
 operator clock steps and `ISLAND_VIEW_DAY_PHASE=0.35` (noon light). The camera
@@ -29,7 +29,7 @@ from capture_native import ROOT, query
 from capture_native_homestead import file_hash
 from capture_player_flow import ALERTS, LEDGER, LEGEND, PAGES, PRIMARY, wait_for
 
-CAMERA = "testbed_view::camera::RtsCamera"
+CAMERA = "island_view::camera::RtsCamera"
 
 
 def island_pitch(distance):
@@ -139,12 +139,12 @@ class FollowupFlow(LivingFlow):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/view-followups")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     run = ROOT / "target" / ("playtest-view-followups-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings = run / "settings.json"
@@ -167,7 +167,7 @@ def main():
     child = flow = None
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

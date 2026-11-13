@@ -3,7 +3,7 @@ at three real times of day, carried goods and work poses at settlement zoom,
 the one save notice and the Live tip.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_view_checks.py [--binary target/debug/game_menu.exe]
+  python scripts/playtest/capture_view_checks.py [--binary target/debug/island_game.exe]
 
 Uses a disposable spectator world and native widget activation over BRP. The
 light is never pinned: the operator clock is stepped to the real morning, dusk
@@ -250,7 +250,7 @@ class CheckFlow(FollowupFlow):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/view-checks")
     parser.add_argument("--settlement", default="Stone Ridge")
     parser.add_argument("--only-poses", action="store_true",
@@ -258,7 +258,7 @@ def main():
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     run = ROOT / "target" / ("playtest-view-checks-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings = run / "settings.json"
@@ -280,7 +280,7 @@ def main():
     child = flow = None
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

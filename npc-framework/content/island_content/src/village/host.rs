@@ -1,53 +1,20 @@
 //! Host-side diary publication. Never scheduled in NpcSimTick; files never enter sim decisions.
 use super::{PublishDiary, model::*};
 use bevy_ecs::prelude::*;
-use npc_framework::agent_io::notes::{Book, NotesDirs, NotesOwner, NotesStores};
+use npc_framework::agent_io::notes::{Book, NotesDirs, NotesStores};
 use npc_framework::kernel::commands::CommandQueue;
 use npc_framework::prelude::*;
-use std::{
-    collections::BTreeSet,
-    path::{Path, PathBuf},
-};
+use std::collections::BTreeSet;
 
 #[derive(Resource, Default)]
 pub struct DiaryBridge {
     pub error: Option<String>,
 }
-pub fn life_notes_dir(root: &Path, life: u32) -> PathBuf {
-    if life <= 1 {
-        root.into()
-    } else {
-        root.join("lives").join(life.to_string())
-    }
-}
-/// Keep the shared notes store and the current body's folder aligned. Prior files are preserved.
-pub fn setup_notes(world: &mut World) {
-    let Some(state) = world.get_resource::<VillageState>().cloned() else {
-        return;
-    };
-    let Some(session) = world.get_resource::<crate::explorer::host::ExplorerSession>() else {
-        return;
-    };
-    let path = life_notes_dir(&session.dir.dir, state.life);
-    let owner = NotesOwner {
-        agent: session.meta.agent.clone(),
-        world: session.meta.world.clone(),
-    };
-    world
-        .get_resource_or_init::<NotesDirs>()
-        .0
-        .insert(state.played, path.clone());
-    world
-        .get_resource_or_init::<NotesStores>()
-        .set_owner(&path, owner);
-}
-/// Called by the headless host frame hook, the windowed host and before saving.
+/// Called by the windowed host each frame and before saving.
 pub fn frame(world: &mut World) {
     if world.get_resource::<VillageState>().is_none() {
         return;
     }
-    crate::explorer::host::refresh_village_assignment(world);
-    setup_notes(world);
     let excluded = world
         .query::<(&SimId, &Vitality)>()
         .iter(world)
@@ -82,13 +49,8 @@ pub fn frame(world: &mut World) {
     for (id, book) in jobs {
         let mut pages = book.pages.clone();
         let dir = world
-            .get_resource::<crate::explorer::host::ExplorerSession>()
-            .map(|s| life_notes_dir(&s.dir.dir, book.life))
-            .or_else(|| {
-                world
-                    .get_resource::<NotesDirs>()
-                    .and_then(|d| d.0.get(&book.author).cloned())
-            });
+            .get_resource::<NotesDirs>()
+            .and_then(|d| d.0.get(&book.author).cloned());
         if let Some(dir) = dir {
             let read = world
                 .get_resource_or_init::<NotesStores>()

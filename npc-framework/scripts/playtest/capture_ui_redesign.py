@@ -2,7 +2,7 @@
 gallery and the Oversee shell, at 1280x720 and 1024x768.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_ui_redesign.py [--binary target/debug/game_menu.exe]
+  python scripts/playtest/capture_ui_redesign.py [--binary target/debug/island_game.exe]
       [--skip-gallery] [--skip-oversee]
 
 Two disposable runs of the real game, driven over BRP like
@@ -191,7 +191,7 @@ def launch(binary, run, extra, phase=None, save=None):
     if phase is not None:
         environment["ISLAND_VIEW_DAY_PHASE"] = str(phase)
     log = (run / "native.log").open("wb")
-    child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+    child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
         "--island-save", str(run / "living-world.world.json"), "--remote", "--remote-port", str(port),
         "--no-render-remote", "--out-dir", str(run), *extra], cwd=ROOT, env=environment,
         stdout=log, stderr=subprocess.STDOUT,
@@ -384,14 +384,14 @@ def stop(child, run, report, label):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-redesign-p2")
     parser.add_argument("--skip-gallery", action="store_true")
     parser.add_argument("--skip-oversee", action="store_true")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     base = ROOT / "target" / ("playtest-ui-redesign-" + uuid.uuid4().hex[:10])
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),
         "input": "native BRP widget activation by control name; pointer through window cursor "

@@ -8,7 +8,7 @@ list. The cottage half (homestead tiers, an upgrade, sleep and the day's
 account) starts from prepared saves in capture_ui_live3.py.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_ui_live2.py [--binary target/debug/game_menu.exe]
+  python scripts/playtest/capture_ui_live2.py [--binary target/debug/island_game.exe]
       [--only live,people,calendar,oversee]
 
 One disposable run of the real game, driven over BRP like the phase 6/7
@@ -259,13 +259,13 @@ def oversee(flow, report, checks):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-live2")
     parser.add_argument("--only", default="people,live,calendar,oversee")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     wanted = [part.strip() for part in args.only.split(",") if part.strip()]
     base = ROOT / "target" / ("playtest-ui-live2-" + uuid.uuid4().hex[:10])
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),

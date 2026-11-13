@@ -39,14 +39,3 @@ fn raw_saved_scenarios_do_not_inherit_a_new_builtin_shoreline() {
         IslandGeography::Expanded
     );
 }
-
-#[test]
-fn expanded_geography_rejects_incompatible_world_models() {
-    let mut preset = worlds::plain_preset();
-    preset.island_geography = IslandGeography::Expanded;
-    assert!(worlds::validate(&preset).is_err());
-    assert!(
-        WorldSpec::parse(&json!({"layout":"island","island_geography":"expanded","furnish":false}))
-            .is_err()
-    );
-}

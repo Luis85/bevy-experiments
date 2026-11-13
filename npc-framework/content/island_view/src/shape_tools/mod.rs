@@ -254,8 +254,7 @@ pub(crate) fn plugin(app: &mut App) {
                 .chain()
                 .in_set(ViewSystems::OverlayInput)
                 .after(crate::colony_panel::pointer)
-                .run_if(not(crate::player_hud::active))
-                .run_if(not(crate::modal_open)),
+                .run_if(not(crate::player_hud::active)),
         )
         .add_systems(
             Update,

@@ -51,12 +51,6 @@ pub fn copy(text: &str) -> Result<(), String> {
     Err(errors.join("; "))
 }
 
-/// Prompt-only boundary. Ordinary editable-field copy preserves the user's text;
-/// generated or older saved prompt copies share the renderer's canonical form.
-pub fn copy_prompt(text: &str) -> Result<(), String> {
-    copy(&super::prompt::normalize_prompt(text))
-}
-
 /// The script is fixed; untrusted text is data on stdin, never executable argv.
 /// The previous clip.exe transport prefixed FF FE, which can become a leading
 /// U+FEFF in pasted text. Do not reintroduce an encoding marker into this payload.
@@ -267,34 +261,6 @@ mod tests {
         assert_eq!(payload, text.as_bytes());
         assert!(!payload.starts_with(&[0xef, 0xbb, 0xbf]) && !payload.starts_with(&[0xff, 0xfe]));
         assert_eq!(String::from_utf8(payload).unwrap(), text);
-    }
-
-    #[test]
-    fn start_resume_and_other_prompt_copy_payloads_equal_the_normalized_rendered_text() {
-        use crate::explorer::prompt::{PromptKind, PromptVars, normalize_prompt, render_prompt};
-        let vars = PromptVars {
-            agent: "Herp".into(),
-            world: "Café Island".into(),
-            url: "http://127.0.0.1:15702".into(),
-            unit: 1,
-            npcctl: std::path::PathBuf::from("C:/games/npcctl.exe"),
-            dir: std::path::PathBuf::from("C:/agents/Zoë 🌊"),
-            npcctl_missing: false,
-            map_enabled: true,
-        };
-        for kind in [
-            PromptKind::Start,
-            PromptKind::Resume,
-            PromptKind::ResumeChanged,
-            PromptKind::ResumeRebuilt,
-        ] {
-            let shown = render_prompt(kind, &vars);
-            let (_, _, bytes) = windows_copy_tool(&shown);
-            let copied = String::from_utf8(bytes).unwrap();
-            assert_eq!(copied, shown, "{kind:?} render/copy equivalence");
-            assert_eq!(copied, normalize_prompt(&copied));
-            assert!(!copied.starts_with('\u{feff}'));
-        }
     }
 
     #[test]

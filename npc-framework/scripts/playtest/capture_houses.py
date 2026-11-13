@@ -2,7 +2,7 @@
 houses beside a resident, and the cutaway that shows a home's inside.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_houses.py [--binary target/debug/actor_testbed.exe]
+  python scripts/playtest/capture_houses.py [--binary target/debug/island_game.exe]
       [--skip-build] [--days 2] [--pin-night]
 
 Uses a disposable spectator world and native widget activation over BRP, like
@@ -224,7 +224,7 @@ class HousesFlow(WiringFlow, UiFlow):
 def cheap_cottage(run):
     """A copy of the shipped rules whose cottage needs no materials and 40
     ticks of work: authored rules given to the host, not a simulation write."""
-    preset = json.loads((ROOT / "content/testbed_content/worlds/living_world.json")
+    preset = json.loads((ROOT / "content/island_content/worlds/living_world.json")
                         .read_text(encoding="utf-8"))
     changed = []
 
@@ -250,7 +250,7 @@ def cheap_cottage(run):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/actor_testbed.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/houses")
     parser.add_argument("--skip-build", action="store_true",
                         help="leave out the player-built cottage and run on the shipped rules")
@@ -263,7 +263,7 @@ def main():
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build actor_testbed before running the capture")
+        parser.error("Build island_game before running the capture")
     run = ROOT / "target" / ("playtest-houses-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     save = run / "living-world.world.json"
@@ -278,14 +278,14 @@ def main():
     if args.pin_night:
         environment["ISLAND_VIEW_DAY_PHASE"] = "0.85"
     # The front end of actor_testbed starts the coastal world from its rules file.
-    shipped = ROOT / "content/testbed_content/worlds/living_world.json"
+    shipped = ROOT / "content/island_content/worlds/living_world.json"
     rules = ["--island-rules", str(shipped if args.skip_build or args.pin_night else cheap_cottage(run))]
     host = []
     if binary.name.lower().startswith("game_menu"):
         settings = run / "settings.json"
         settings.write_text(json.dumps({"agents_dir": str(run / "agents"),
             "worlds_dir": str(run / "rules"), "fog_of_war": True}), encoding="utf-8")
-        host = ["--settings", str(settings)]
+        host = ["--island-rules", str(run / "rules" / "living_world.json")]
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),
         "pinned_night": args.pin_night,
         "rules": "shipped" if args.skip_build or args.pin_night else

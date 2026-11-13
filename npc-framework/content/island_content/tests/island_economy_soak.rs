@@ -360,46 +360,6 @@ fn depleted_bowl_demand_restarts_the_secondary_carpentry_stage_for_all_three_see
 }
 
 #[test]
-fn three_seed_accelerated_seasonal_fixtures_keep_production_and_finite_money() {
-    for seed in [1, 7, 42] {
-        for (season, day) in [("spring", 0), ("summer", 7), ("autumn", 14), ("winter", 21)] {
-            let mut preset = island_content::worlds::builtin_preset("island_village").unwrap();
-            // Separate operator fixture: only the day length and need decay are accelerated.
-            preset.day_night.cycle_ticks = 2400;
-            preset.needs.hunger.rise_milli_per_tick = 20;
-            preset.needs.thirst.rise_milli_per_tick = 30;
-            preset.needs.energy.rise_milli_per_tick = 20;
-            let doc =
-                island_content::worlds::world_doc(&preset, &island_content::actors::human_preset())
-                    .unwrap();
-            let mut app = island_content::scenario::load_with(&doc, seed, |_| {})
-                .unwrap()
-                .app;
-            // Labeled seasonal setup, never used by the actor or as unaided-play evidence.
-            app.world_mut().resource_mut::<SimClock>().tick = day * 2400;
-            let total = money(&mut app);
-            let mut availability = Availability::default();
-            for _ in 0..12 {
-                run_ticks(app.world_mut(), 200);
-                availability.sample(&app);
-                assert_eq!(money(&mut app), total, "{seed}/{season}: currency changed");
-            }
-            report(&mut app, seed, season, &availability, Value::Null);
-            assert_residents_alive(&mut app, seed);
-            assert!(app.world().resource::<VillageState>().transactions > 0);
-            assert!(
-                app.world()
-                    .resource::<VillageState>()
-                    .produced
-                    .values()
-                    .sum::<u64>()
-                    > 0
-            );
-        }
-    }
-}
-
-#[test]
 fn exhausted_field_replenishes_only_at_the_day_boundary_with_the_new_seasons_capacity() {
     for (day, season, expected_grain) in [
         (1, Season::Spring, 60),

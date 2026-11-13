@@ -2,7 +2,7 @@
 crop fields, the merchant boat, the weather and sleepers of both rigs.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_world.py [--binary target/debug/actor_testbed.exe]
+  python scripts/playtest/capture_world.py [--binary target/debug/island_game.exe]
       [--only main|boat|rain|storm|snow] [--field-days 2]
 
 Five disposable runs of the real game, driven over BRP like
@@ -87,7 +87,7 @@ FIELD = "regional_field_v1"
 BUILT = "regional_building_v1"
 PROFILE = "regional_resident_profile_v1"
 MERCHANT = "regional_merchant_v1"
-SHIPPED = ROOT / "content/testbed_content/worlds/living_world.json"
+SHIPPED = ROOT / "content/island_content/worlds/living_world.json"
 
 
 def rules_with_weather(run, kind, quick_crops=False):
@@ -182,7 +182,7 @@ class WorldFlow(HousesFlow):
             self.report.setdefault("perf", {})[label] = {"unavailable": str(error)}
             return
         sampled = time.monotonic() - began
-        rows = {row["name"].split("testbed_view::")[-1]: [row["p50_us"], row["p95_us"]]
+        rows = {row["name"].split("island_view::")[-1]: [row["p50_us"], row["p95_us"]]
                 for row in report.get("systems", []) if any(part in row.get("name", "") for part in match)}
         self.report.setdefault("perf", {})[label] = {
             "frames": report.get("frames"),
@@ -1791,7 +1791,7 @@ def homework_run(binary, base, report):
         # The operator's world read does not carry `UpgradeWork` (it is the
         # simulation's own component, not in the state export): read it from
         # the ECS by its type, with each holder's SimId.
-        work_type = "testbed_content::village::live::UpgradeWork"
+        work_type = "island_content::village::live::UpgradeWork"
         sim_type = "npc_sim::ids::SimId"
         entry["work_source"] = "world.query " + work_type
 
@@ -2670,7 +2670,7 @@ def grey_share(path, box):
 # as the simulation moves them: a herd grazing and walking, a flight, a
 # dead animal if a hunt ends in one; and the frame cost of the herds.
 
-MOTION_TYPE = "testbed_content::village::wildlife::WildlifeMotion"
+MOTION_TYPE = "island_content::village::wildlife::WildlifeMotion"
 SIM_ID_TYPE = "npc_sim::ids::SimId"
 
 
@@ -3002,7 +3002,7 @@ def shape12_run(binary, base, report):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/actor_testbed.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/world3")
     parser.add_argument("--only", choices=("main", "boat", "rain", "storm", "snow",
                                            "scale", "live", "harbour", "harsh", "third", "bodies",
@@ -3019,7 +3019,7 @@ def main():
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build actor_testbed before running the capture")
+        parser.error("Build island_game before running the capture")
     base = ROOT / "target" / ("playtest-world-" + uuid.uuid4().hex[:10])
     base.mkdir(parents=True)
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),

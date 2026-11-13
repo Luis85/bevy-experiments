@@ -1,28 +1,13 @@
-//! Scenario files (`content: "testbed"`, agent-control spec §3.3), the
-//! loader registered with `npc_agent_io`, and the headless constructors.
+//! Island scenario files (`content: "island"`), the loader registered with
+//! `npc_agent_io`, and the headless constructors.
 //!
-//! ```json
-//! {"version":1,"content":"testbed","name":"testbed","seed":1,
-//!  "world":{"layout":"compound","furnish":true,"store_locked":true,
-//!           "detection":"per_roll","stagger":4,
-//!           "items":[{"kind":"book","pos":[-5500,6500],"name":"target"}],
-//!           "open_doors":["workshop_door"]},
-//!  "actors":[{"kind":"unit","template":"carpenter","pos":[-5500,500],
-//!             "owner":1,"behaviour":"wander","equip":["axe"],
-//!             "carry":[{"kind":"log","stack":3}],"name":"carpenter"}],
-//!  "controllers":[{"actor":0,"controller":"agent","mode":"Advisor"}]}
-//! ```
-//!
-//! `world` (all optional): `layout` `"compound"` (default; walls and doors,
-//! [`crate::layout`]), `"open"` (no walls) or `"frontier"` (the compound plus
-//! groves, ore, a ruin and scattered items outside, on a 128-cell grid); `furnish` (default `true`:
-//! workstations, items, trees, ore, cart, wagon); `store_locked` (default
-//! `true`); `detection` `"per_roll"` (default: Perception rolls,
-//! `npc_rules` Per) or `"automatic"`; `stagger` (perception scans every N
-//! ticks, default 4); extra `items` with `pos`; `open_doors` by name.
-//! `actors` are `kind: "unit"` with the [`UnitSpec`] fields; `pos` is
-//! required. The world spawns first (so its `SimId`s do not depend on the
-//! actors), then the actors in order. Names land in [`TestbedIds`].
+//! `world` holds the island construction (`layout: "island"`, the economy and
+//! geography profile, the colony and resident AI policy, and for the regional
+//! island the `living_world` definition); `furnish` must be `false` (the
+//! island supplies its own village). `actors` are `kind: "unit"` with the
+//! [`UnitSpec`] fields; `pos` is required. The world spawns first (so its
+//! `SimId`s do not depend on the actors), then the actors in order. Names
+//! land in [`TestbedIds`].
 //!
 //! The scenario files in `content/island_content/scenarios/` are embedded
 //! ([`SCENARIO_FILES`]); [`try_new_sim_app`] builds one by name.
@@ -38,10 +23,7 @@ use npc_framework::kernel::spatial::GridBounds;
 use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::layout::{
-    FRONTIER_GRID_CELLS, GRID_CELLS, ItemSpec, UnitSpec, spawn_frontier, spawn_furnishing,
-    spawn_item, spawn_unit, spawn_walls,
-};
+use crate::layout::{GRID_CELLS, ItemSpec, UnitSpec, spawn_item, spawn_unit};
 use crate::world::TestbedIds;
 use crate::{TestbedAgentPlugin, TestbedPlugin};
 
@@ -50,25 +32,11 @@ pub const CONTENT: &str = "island";
 
 /// The embedded scenario files: `(name, JSON)`. `testbed` is the default
 /// showcase; the others focus on one feature each (see the README).
-pub const SCENARIO_FILES: [(&str, &str); 15] = [
+pub const SCENARIO_FILES: [(&str, &str); 4] = [
     (
         "living_world",
         include_str!("../scenarios/living_world.json"),
     ),
-    ("testbed", include_str!("../scenarios/testbed.json")),
-    ("doors", include_str!("../scenarios/doors.json")),
-    (
-        "locked_store",
-        include_str!("../scenarios/locked_store.json"),
-    ),
-    ("chop", include_str!("../scenarios/chop.json")),
-    ("craft", include_str!("../scenarios/craft.json")),
-    ("perception", include_str!("../scenarios/perception.json")),
-    ("vehicles", include_str!("../scenarios/vehicles.json")),
-    ("formation", include_str!("../scenarios/formation.json")),
-    ("agent", include_str!("../scenarios/agent.json")),
-    ("smithy", include_str!("../scenarios/smithy.json")),
-    ("explorer", include_str!("../scenarios/explorer.json")),
     ("ai_village", include_str!("../scenarios/ai_village.json")),
     (
         "living_village",
@@ -83,22 +51,15 @@ pub const SCENARIO_FILES: [(&str, &str); 15] = [
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Layout {
+    /// The island village, spawned by [`crate::village`].
     #[default]
-    Compound,
-    Open,
-    /// The compound plus the outside features of [`crate::layout::spawn_frontier`]
-    /// on a 128-cell grid.
-    Frontier,
     Island,
 }
 
 impl Layout {
     /// Grid size in cells (centred on the origin).
     pub const fn grid_cells(self) -> u32 {
-        match self {
-            Self::Frontier => FRONTIER_GRID_CELLS,
-            Self::Compound | Self::Open | Self::Island => GRID_CELLS,
-        }
+        GRID_CELLS
     }
 }
 
@@ -121,7 +82,7 @@ pub struct WorldSpec {
     pub island_geography: crate::worlds::IslandGeography,
     pub ai_scheduler: Option<npc_framework::agent_io::scheduler::SchedulerPolicy>,
     /// Present only in host-generated explorer descriptors; pure replay data.
-    pub explorer_context: Option<crate::explorer::context::ExplorerContext>,
+    pub explorer_context: Option<crate::construction::ExplorerContext>,
     pub layout: Layout,
     pub furnish: bool,
     pub store_locked: bool,
@@ -141,7 +102,7 @@ impl Default for WorldSpec {
             island_geography: crate::worlds::IslandGeography::Compact,
             ai_scheduler: None,
             explorer_context: None,
-            layout: Layout::Compound,
+            layout: Layout::Island,
             furnish: true,
             store_locked: true,
             detection: Detection::PerRoll,
@@ -285,15 +246,6 @@ pub fn build_app(seed: u64, world: &WorldSpec, plugins: impl FnOnce(&mut App)) -
 }
 
 fn spawn_world(world: &mut World, spec: &WorldSpec, ids: &mut TestbedIds) -> Result<(), String> {
-    if matches!(spec.layout, Layout::Compound | Layout::Frontier) {
-        spawn_walls(world, ids, spec.store_locked);
-    }
-    if spec.furnish {
-        spawn_furnishing(world, ids);
-    }
-    if spec.layout == Layout::Frontier {
-        spawn_frontier(world, ids);
-    }
     if spec.layout == Layout::Island {
         crate::village::spawn_places(world, ids);
     }
@@ -439,75 +391,6 @@ pub fn register_scenario_loader(loaders: &mut ScenarioLoaders) {
     loaders.add(CONTENT, load_scenario);
 }
 
-/// Every embedded scenario as `(name, one-line description)`, in
-/// [`SCENARIO_FILES`] order (the README's scenario table, shortened; the
-/// game menu lists them).
-pub fn embedded_scenarios() -> &'static [(&'static str, &'static str)] {
-    const LIST: [(&str, &str); SCENARIO_FILES.len()] = [
-        (
-            "living_world",
-            "Explore three working villages, restore woodland habitats and shape a larger living island.",
-        ),
-        (
-            "testbed",
-            "The showcase: 8 actors in two factions, a woodcutter, Per-roll detection.",
-        ),
-        (
-            "doors",
-            "An observer facing a book behind the closed workshop door.",
-        ),
-        (
-            "locked_store",
-            "A keeper near the store key and a warden at the locked store door.",
-        ),
-        (
-            "chop",
-            "A lumberjack with an axe and a bare-handed novice next to a tree.",
-        ),
-        (
-            "craft",
-            "A master carpenter and a novice at the workbench, 8 logs each.",
-        ),
-        (
-            "perception",
-            "Open field: a sharp-eyed scout and a dull minion, each 9 m from a book.",
-        ),
-        (
-            "vehicles",
-            "A driver and a passenger next to the cart; the wagon outside the gate.",
-        ),
-        (
-            "formation",
-            "Four faction-1 units in the yard and one enemy outside.",
-        ),
-        (
-            "agent",
-            "The doors scenario with an Advisor agent controller on the observer.",
-        ),
-        (
-            "smithy",
-            "The crafting chain: key, store, pickaxe, ore, forge, a smith and a joiner.",
-        ),
-        (
-            "explorer",
-            "The frontier map for an AI agent: the compound, groves, ore and a ruin.",
-        ),
-        (
-            "ai_village",
-            "An island village: earn coins, buy food and lodging, survive the seasons, and leave a diary.",
-        ),
-        (
-            "living_village",
-            "A needs-driven island: gather, hunt, craft and trade in a physical adaptive economy.",
-        ),
-        (
-            "island_colony",
-            "Island Village: inspect a living colony, join as a character, or shape the landscape.",
-        ),
-    ];
-    &LIST
-}
-
 /// The embedded scenario file `name` (see [`SCENARIO_FILES`]).
 pub fn scenario_text(name: &str) -> Option<&'static str> {
     SCENARIO_FILES
@@ -520,7 +403,7 @@ pub fn scenario_text(name: &str) -> Option<&'static str> {
 pub fn scenario_doc(name: &str) -> Result<ScenarioDoc, String> {
     let text = scenario_text(name).ok_or_else(|| {
         format!(
-            "unknown testbed scenario `{name}` (expected one of {:?})",
+            "unknown island scenario `{name}` (expected one of {:?})",
             SCENARIO_FILES.map(|(n, _)| n)
         )
     })?;
@@ -556,24 +439,4 @@ pub fn try_new_sim_app_with(
 /// [`try_new_sim_app`], panicking on an unknown scenario.
 pub fn new_sim_app(seed: u64, scenario: &str) -> App {
     try_new_sim_app(seed, scenario, 0).unwrap_or_else(|e| panic!("{e}"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn every_embedded_scenario_has_a_description() {
-        let listed: Vec<&str> = embedded_scenarios().iter().map(|(n, _)| *n).collect();
-        let files: Vec<&str> = SCENARIO_FILES.iter().map(|(n, _)| *n).collect();
-        assert_eq!(listed, files, "same names, same order as SCENARIO_FILES");
-        for (name, desc) in embedded_scenarios() {
-            assert!(!desc.trim().is_empty(), "`{name}` has no description");
-            assert!(!desc.contains('\n'), "`{name}`: one line");
-        }
-        assert!(
-            listed.contains(&"explorer"),
-            "Ruling R4: explorer is listed"
-        );
-    }
 }

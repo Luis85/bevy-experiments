@@ -682,12 +682,6 @@ fn observer_feedback(world: &mut World) {
         "World paused. Operator: resume to advance actions and needs.".into()
     } else if pending {
         "Control queued. Host: applying at the next simulation tick.".into()
-    } else if world.contains_resource::<island_content::explorer::host::ExplorerSession>()
-        && world
-            .get::<npc_framework::agent_io::ExternalController>(entity)
-            .is_none()
-    {
-        "AI: enter_world, then take_control. Operator: connect the chosen CLI.".into()
     } else {
         format!("AI: {recovery}")
     };
@@ -825,12 +819,10 @@ struct LiveData<'w, 's> {
     config: Res<'w, SimConfig>,
     index: Res<'w, SimIndex>,
     people: Query<'w, 's, (&'static Villager, &'static Vitality, &'static Wallet)>,
-    controllers: Query<'w, 's, &'static npc_framework::agent_io::ExternalController>,
     books: Query<'w, 's, (&'static SimId, &'static DroppedDiary, &'static CarriedBy)>,
     policy: Res<'w, SchedulerPolicy>,
     status: Option<Res<'w, SchedulerStatus>>,
     bridge: Option<Res<'w, village::host::DiaryBridge>>,
-    session: Option<Res<'w, island_content::explorer::host::ExplorerSession>>,
     needs: Query<'w, 's, &'static npc_framework::needs::Needs>,
     registry: Res<'w, npc_framework::needs::NeedRegistry>,
     feedback: Res<'w, ObserverFeedback>,
@@ -856,12 +848,10 @@ fn refresh(
         config,
         index,
         people,
-        controllers,
         books,
         policy,
         status,
         bridge,
-        session,
         needs,
         registry,
         feedback,
@@ -1078,15 +1068,6 @@ fn refresh(
         header.push_str("\nF1 controls | F7 notebook");
         header
     };
-    if session.is_some()
-        && person.life > 1
-        && vital.died_at.is_none()
-        && controllers.get(e).is_err()
-    {
-        header.push_str(
-            "\nNew life has arrived. Press F10 and start your AI client for the new actor.",
-        );
-    }
     if let Some(error) = bridge.as_ref().and_then(|b| b.error.as_deref()) {
         header.push_str(&format!("\n{}", compact(error, 160)));
     }
@@ -1097,11 +1078,7 @@ fn refresh(
         header.push_str(&format!("\n{}", compact(&reader.message, 160)));
     }
     let body = if reader.setup {
-        let client_help = if session.is_some() {
-            "Press F10 for AI agent controls. Choose Start Codex or Start Claude using an installed, logged-in CLI. The dedicated client prepares and prompts the agent automatically; Stop agent leaves the game running."
-        } else {
-            "Launch an explorer world from the game menu for integrated AI agent controls."
-        };
+        let client_help = "Run the game with --remote for AI agent control over agent/*.";
         let event_status = status
             .as_ref()
             .and_then(|s| s.agents.iter().find(|a| a.unit == state.played.0));

@@ -264,7 +264,7 @@ fn construction_from_preset(
             .ok_or("Island construction needs an arrival actor")?
             .pos = Some((region.actor_start.x, region.actor_start.z));
     }
-    island_content::explorer::context::ExplorerContext::for_world(
+    island_content::construction::ExplorerContext::for_world(
         "human",
         "human",
         &island_content::actors::human_preset(),

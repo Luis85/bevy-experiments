@@ -397,8 +397,7 @@ pub(crate) fn plugin(app: &mut App) {
             (keys, keyboard_navigation, shield, home_click)
                 .chain()
                 .in_set(ViewSystems::OverlayInput)
-                .after(crate::island_shell::ShellInput)
-                .run_if(not(crate::modal_open)),
+                .after(crate::island_shell::ShellInput),
         )
         .add_systems(
             Update,

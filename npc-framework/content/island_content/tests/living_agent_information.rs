@@ -3,22 +3,6 @@ use npc_framework::prelude::*;
 use serde_json::json;
 
 #[test]
-fn living_world_briefing_teaches_dynamic_quotes_and_shared_production_without_fixed_prices() {
-    let preset = island_content::worlds::builtin_preset("living_island").unwrap();
-    let rules = island_content::explorer::workspace::render_world_rules(&preset);
-    for text in [
-        "offer_goods",
-        "hunt",
-        "Warmth",
-        "limit_price",
-        "never advance ticks",
-    ] {
-        assert!(rules.contains(text), "missing {text}: {rules}");
-    }
-    assert!(!rules.contains("Bread costs 6 coins"));
-}
-
-#[test]
 fn default_agent_market_news_is_compact_and_observing_never_changes_the_simulation() {
     let mut app = island_content::new_sim_app(7, "living_village");
     run_ticks(app.world_mut(), 1200);

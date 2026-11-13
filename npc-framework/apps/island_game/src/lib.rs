@@ -1,99 +1,42 @@
-//! The windowed Actor Testbed (actor-capabilities spec §4.9): the
-//! `island_content` compound with every capability on, drawn by
-//! `island_view`, driven at 20 ticks/s by the kernel's driver.
+//! Island Village: the shipped game. One window holds the title,
+//! New/Continue, play and pause (`frontend`, `island::session`); the world is
+//! the `island_content` simulation drawn by `island_view`, driven at 20
+//! ticks/s by the kernel's driver.
 //!
 //! ```text
-//! cargo run -p island_game -- [--scenario NAME|FILE] [--seed N] [--speed N] [--player N]
-//!     [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE]
-//!     [--screenshot PATH --after-secs S] [--panels journal,perf,sheet,perception,explorer,map]
-//!     [--journal FILE] [--record FILE] [--paused] [--perf-warn] [--mute] [--fog on|off]
+//! cargo run -p island_game                       # the player flow (title first)
+//! cargo run -p island_game -- [--island-save FILE] [--island-rules FILE] [--dev-keys]
+//!     [--seed N] [--speed N] [--mute] [--screenshot PATH --after-secs S] [--ui-gallery PAGE]
 //!     [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote]
 //!     [--out-dir DIR]
-//! cargo run -p island_game -- --explorer-home DIR --agent NAME [--world NAME [--preset ID]]
-//!     [--resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog]
-//!     [--actors-dir DIR]
-//!     [other flags but --scenario/--seed]
-//!     (`--world` is New only: a resumed world comes from the agent's folder)
+//! cargo run -p island_game -- --scenario NAME|FILE | --island-save FILE [--island-new]
+//!     [--island-mode inspector|character|editor] [--commands FILE] [--record FILE] [--journal FILE]
+//!     [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--panels ..] [--paused]
+//!     (the developer host: no title, straight into the world)
 //! ```
 //!
-//! `--scenario` takes a scenario file path or an embedded scenario name
-//! (`testbed`, `doors`, `vehicles`, `formation`, ..; default `testbed`); an
-//! existing file wins over a name (the same order as `npcctl serve`).
-//! `--player` is the faction the RTS UI commands (default 1). `--select`
-//! preselects units (and centres the camera on it) for screenshots;
-//! `--commands` submits a `{"tick", "cmd"}` list (the `npcctl run` format)
-//! when each tick comes up. The names of what the scenario spawned and their
-//! `SimId`s are logged at startup. `--fog on|off` draws the fog of war of the
-//! actor that reveals fog (the explorer's; spec G8): black where it has never
-//! been, greyed as last seen where it is not looking, units only while it
-//! senses them. Default on in explorer mode, off elsewhere (a scenario without
-//! such an actor shows everything anyway); **F8** toggles it.
+//! Without flags the game opens its title screen on the island-owned save
+//! (`<home>/island-village/island.world.json`, rules beside it). A
+//! `--scenario`, a bare `--island-save` (without `--front-end`),
+//! `--island-new`, `--commands` or `--record` selects the developer host.
 //!
-//! With the default `debug-tools` feature the game can serve the Bevy
-//! Remote Protocol on `127.0.0.1:15702`: the `npc/*` methods (plus
-//! `npc/screenshot {path}`) and the agent methods (`agent/attach|observe|
-//! act|events|..`, `world/state`) of `npc_agent_io`, so an external agent
-//! can drive a unit in the running window. BRP is **on by default in dev
-//! builds and off in release builds** (`--remote` / `--no-remote`
-//! override): it has no Origin/Host checks, so it is a development tool.
-//! RPC file paths are relative to `--out-dir` (default `target/npc-out`).
-//! `app/quit {pid?}` is the game menu's graceful quit: it answers, then the
-//! app exits 0 (an explorer window saves and removes `run.json` first, as
-//! when it is closed with "No").
-//! The built-in profiler feeds F4; a mechanic over its p95 budget is logged
-//! once (`warn!`, then `debug!`), `--perf-warn` warns on every breach (at
-//! most once per mechanic per 5 s).
-//!
-//! **Explorer mode** (`--explorer-home`, game menu spec §5.2–5.4): one AI
-//! agent's world, the embedded `explorer` scenario with its actor named after
-//! the agent, in the agent folder `DIR/<slug(NAME)>/`. Without `--resume` it
-//! is New: the folder is created (it must not exist), the world gets a
-//! wall-clock seed and is saved at tick 0 (`<world>.world.json`, its header
-//! holding the scenario and seed). `--resume` rebuilds from the save's
-//! scenario and seed and loads it before the first frame. A save from another
-//! build (format version or content hash) exits with code 3 unless
-//! `--load-anyway` (load what fits) or `--fresh-world` (back up the save as
-//! `<world>.world.<date>.json`, new world, diary kept) is given.
-//! `--check-save` prints `{"ok":true}` or `{"ok":false,"error":..,"kind":
-//! "content_hash"|"version"|"unreadable"}` and exits 0 / 1 without a window.
-//! Explorer mode always serves BRP, on the first free port from
-//! `--remote-port N` (default 15702) up to `N + 19` whose next port (the
-//! render-app server) is free too; a port taken before BRP could bind it
-//! exits 2 (try again) instead of advertising a dead URL.
-//! `--resume --exact-port N` moves a detached world (`npcctl serve
-//! --explorer-home`, stopped first) into the window on its port: exactly `N`,
-//! retried for up to 10 s, never another port (exit 4, "port N is still in
-//! use"); no prompt modal (the agent is already playing): the sim runs and a
-//! notice says "moved here from detached" for 5 s. Every explorer window
-//! writes `run.json` (mode `window`) into the agent folder and removes it on
-//! exit. Closing an explorer window asks "Keep it running detached?": Yes
-//! saves, starts `npcctl serve --explorer-home DIR --agent NAME --resume
-//! --port N --wait-port` (its own console, it outlives the window) on this
-//! window's port, prints `{"detached":{"pid","port","agent","world"}}` for
-//! the menu and exits; No saves and exits; Escape goes back. **F9** moves the
-//! world to detached without asking. `--close-dialog` opens that dialog at
-//! start (for visual checks with `--screenshot`).
-//! The sim starts paused in explorer mode. Usage errors exit with code 2.
+//! With the default `debug-tools` feature the game can serve the Bevy Remote
+//! Protocol on `127.0.0.1:15702` (`npc/*`, `agent/*`, `world/state`): on by
+//! default in dev builds, off in release builds (`--remote` / `--no-remote`
+//! override). `app/quit {pid?}` saves and quits a local island.
 //!
 //! The app owns the host side: the speed keys (Space pause, `-`/`=` slower /
 //! faster through 1x/3x/10x, `.` one tick while paused) act on the kernel's
-//! `SimControl` (digits are the control groups of the command UI).
+//! `SimControl`.
 
-mod actor_editor;
-mod ai_client;
-mod editor_mode;
-mod explorer;
 mod frontend;
 mod island;
-mod projection;
 
 use std::collections::VecDeque;
 use std::path::PathBuf;
 
 use bevy::prelude::*;
-use explorer::{ExplorerArgs, ExplorerFlags, ExplorerSession, Start};
 use island_content::TestbedIds;
-use island_content::explorer::host as explorer_host;
 use island_view::{
     CameraFocusOnSelected, CameraStart, CommandUi, FogOfWar, RtsCamera, Selected, TestbedPanels,
     TestbedViewPlugin,
@@ -115,17 +58,13 @@ const TICK_HZ: u32 = 20;
 /// Multipliers the `-` / `=` keys step through.
 pub const SPEED_PRESETS: [u32; 3] = [1, 3, 10];
 
-const USAGE: &str = "usage: island_game [--scenario NAME|FILE] [--seed N] [--speed N] [--player N] \
-[--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE] [--screenshot PATH] \
-[--after-secs S] [--panels journal,perf,sheet,perception,explorer,map] [--journal FILE] [--record FILE] [--paused] [--perf-warn] [--mute] \
-[--fog on|off] [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote] [--out-dir DIR]
-[--world-state-out FILE [--world-state-interval-ms 50..60000]]
-[--island-mode inspector|character|editor] [--island-save FILE [--island-rules FILE] [--island-new]]
-       island_game --front-end [--dev-keys] [--island-save FILE] [--island-rules FILE] [capture/remote flags]
-       island_game --explorer-home DIR --agent NAME [--world NAME [--preset ID] [--world-preset ID] | --resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog] [--actors-dir DIR] [--worlds-dir DIR] [other flags except --scenario and --seed]
-       (explorer mode: BRP is always on, on the first free port from --remote-port N on, N..=N+19, default 15702;
-        --exact-port N: exactly N, waited for up to 10 s, else exit 4)
-       island_game --actor-editor [--actors-dir DIR] [--editor-preset ID] [--screenshot PATH --after-secs S]";
+const USAGE: &str = "usage: island_game [--front-end] [--island-save FILE] [--island-rules FILE] [--dev-keys] [--seed N] [--speed N] \
+[--mute] [--screenshot PATH] [--after-secs S] [--ui-gallery PAGE] [--remote | --no-remote] [--remote-port N] \
+[--render-remote-port N | --no-render-remote] [--out-dir DIR]
+       island_game (--scenario NAME|FILE | --island-save FILE [--island-new]) [--island-mode inspector|character|editor] \
+[--seed N] [--speed N] [--player N] [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE] \
+[--screenshot PATH] [--after-secs S] [--panels journal,perf,sheet,perception] [--journal FILE] [--record FILE] [--paused] \
+[--perf-warn] [--mute] [--fog on|off] [remote flags]";
 
 #[cfg_attr(not(feature = "debug-tools"), allow(dead_code))]
 struct Args {
@@ -160,9 +99,6 @@ struct Args {
     /// `--fog on|off` (`None`: on in explorer mode, off elsewhere).
     fog: Option<bool>,
     remote: RemoteArgs,
-    /// Explorer mode (`--explorer-home`).
-    explorer: Option<ExplorerArgs>,
-    projection: projection::ProjectionArgs,
 }
 
 fn usage(msg: &str) -> ! {
@@ -259,18 +195,17 @@ fn parse_args(raw: &[String]) -> Args {
         // BRP on in dev builds, off in release builds (and never without
         // `debug-tools`).
         remote: RemoteArgs::new(cfg!(debug_assertions) && cfg!(feature = "debug-tools")),
-        explorer: None,
-        projection: projection::ProjectionArgs::default(),
     };
-    let (mut explorer, mut scenario_given) = (ExplorerFlags::default(), false);
+    let mut scenario_given = false;
+    let mut front_end_flag = false;
     let mut it = raw.iter().cloned();
     while let Some(flag) = it.next() {
-        if args.remote.flag(&flag) || explorer.switch(&flag) {
+        if args.remote.flag(&flag) {
             continue;
         }
         match flag.as_str() {
             "--front-end" => {
-                args.front_end = true;
+                front_end_flag = true;
                 continue;
             }
             "--dev-keys" => {
@@ -302,13 +237,6 @@ fn parse_args(raw: &[String]) -> Args {
         let bad = |what: &str| -> ! { usage(&format!("{flag}: `{value}` is not {what}")) };
         if let Some(r) = args.remote.value(&flag, &value) {
             r.unwrap_or_else(|e| usage(&e));
-            continue;
-        }
-        if explorer.value(&flag, &value) {
-            continue;
-        }
-        if let Some(result) = args.projection.value(&flag, &value) {
-            result.unwrap_or_else(|error| usage(&error));
             continue;
         }
         match flag.as_str() {
@@ -358,38 +286,32 @@ fn parse_args(raw: &[String]) -> Args {
     if !cfg!(feature = "debug-tools") && args.remote.remote {
         usage("--remote needs the debug-tools feature");
     }
-    args.explorer = explorer
-        .finish(scenario_given, args.seed.is_some())
-        .unwrap_or_else(|e| usage(&e));
+    // The player flow unless a developer host was asked for.
+    args.front_end = front_end_flag
+        || !(scenario_given
+            || args.island_save.is_some()
+            || args.island_new
+            || args.record.is_some()
+            || args.commands.is_some());
     if args.front_end {
-        if args.explorer.is_some()
-            || args.scenario != "island_colony"
+        if args.scenario != "island_colony"
             || args.island_new
             || args.record.is_some()
             || args.commands.is_some()
         {
             usage(
-                "--front-end is the local island flow; explorer, alternate scenarios, --island-new and startup replay commands use the developer host",
+                "--front-end is the local island flow; alternate scenarios, --island-new and startup replay commands use the developer host",
             );
         }
         if args.island_save.is_none() {
-            let home = std::env::var_os("USERPROFILE")
-                .or_else(|| std::env::var_os("HOME"))
-                .map(PathBuf::from)
-                .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
-            let settings =
-                island_content::explorer::settings::Settings::file(&|key| std::env::var(key).ok())
-                    .map(|path| island_content::explorer::settings::Settings::load(&path, &home))
-                    .unwrap_or_else(|| {
-                        island_content::explorer::settings::Settings::default_for(&home)
-                    });
-            args.island_save = Some(settings.agents_dir.join("living-world.world.json"));
+            let folder = island_home();
+            args.island_save = Some(folder.join(SAVE_FILE));
             if args.island_rules.is_none() {
-                args.island_rules = Some(settings.worlds_dir().join("living_world.json"));
+                args.island_rules = Some(folder.join(RULES_FILE));
             }
         }
     }
-    if args.island_save.is_some() && (args.explorer.is_some() || args.scenario != "island_colony") {
+    if args.island_save.is_some() && args.scenario != "island_colony" {
         usage("--island-save requires the standalone island_colony scenario");
     }
     if args.island_rules.is_some() && args.island_save.is_none() {
@@ -398,14 +320,26 @@ fn parse_args(raw: &[String]) -> Args {
     if args.island_new && args.island_save.is_none() {
         usage("--island-new requires --island-save");
     }
-    if let Some(ex) = &args.explorer {
-        explorer::refuse_recording_on_resume(ex, args.record.is_some(), args.commands.is_some())
-            .unwrap_or_else(|e| usage(&e));
-    }
-    args.projection
-        .validate()
-        .unwrap_or_else(|error| usage(&error));
     args
+}
+
+/// The island's own folder name under the user's home (D5; nothing is read
+/// from the developer menu's agents folder).
+pub const ISLAND_HOME_DIR: &str = "island-village";
+/// The save file in [`island_home`].
+pub const SAVE_FILE: &str = "island.world.json";
+/// The world rules file in [`island_home`] (installed from the shipped
+/// preset when missing).
+pub const RULES_FILE: &str = "living_world.json";
+
+/// `<home>/island-village`, home from `USERPROFILE` or `HOME`, else the
+/// current folder.
+pub fn island_home() -> PathBuf {
+    std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default())
+        .join(ISLAND_HOME_DIR)
 }
 
 /// The scenario file at path `name` when one exists, else the embedded
@@ -460,9 +394,7 @@ fn host(app: &mut App, args: &Args) {
                 resolution: (1280, 720).into(),
                 ..default()
             }),
-            // An explorer window asks before it closes
-            // (`explorer::install_close_to_detached`).
-            close_when_requested: args.explorer.is_none() && args.island_save.is_none(),
+            close_when_requested: args.island_save.is_none(),
             ..default()
         })
         .set(island_view::asset_plugin());
@@ -492,7 +424,7 @@ fn host(app: &mut App, args: &Args) {
             ..default()
         })
         .insert_resource(FogOfWar {
-            enabled: fog_enabled(args.fog, args.explorer.is_some()),
+            enabled: fog_enabled(args.fog, false),
         })
         .add_plugins(TestbedViewPlugin)
         .add_systems(
@@ -525,7 +457,7 @@ fn host(app: &mut App, args: &Args) {
     debug_tools::install(app, args);
 }
 
-/// The scenario app (`--scenario`, the mode without explorer flags).
+/// The game's app: the player flow, a local save, or a scenario.
 fn scenario_app(args: &Args) -> App {
     if args.front_end {
         return island::session::open(
@@ -564,157 +496,16 @@ fn scenario_app(args: &Args) -> App {
     }
 }
 
-/// Picks the BRP port for explorer mode and turns the remote interface on:
-/// the first free one from `--remote-port` (default 15702) on, at most
-/// [`explorer::PORT_SPAN`] further. Exits 2 without the `debug-tools`
-/// feature or when no port is free.
-fn explorer_port(args: &mut Args) -> u16 {
-    if !cfg!(feature = "debug-tools") {
-        usage("explorer mode needs the remote interface (build with the debug-tools feature)");
-    }
-    let Some(ex) = args.explorer.clone() else {
-        usage("explorer mode needs --explorer-home");
-    };
-    let dir = explorer::agent_dir(&ex);
-    if let Some(port) = ex.exact_port {
-        // A detached world is moving here: its port only, never another
-        // (the agent's settings pin the URL), once its host is gone.
-        match explorer::wait_for_handover(&dir, port, explorer::EXACT_PORT_WAIT) {
-            explorer::Handover::Ready => {}
-            explorer::Handover::PortInUse => port_in_use(port),
-            explorer::Handover::Running(run) => already_running(&ex, &run),
-        }
-        args.remote.remote = true;
-        args.remote.port = port;
-        return port;
-    }
-    // One owner per world: both would autosave the same save.
-    if let Some(run) = explorer::running_elsewhere(&dir) {
-        already_running(&ex, &run);
-    }
-    let first = args.remote.port;
-    let last = first.saturating_add(explorer::PORT_SPAN);
-    let Some(port) = explorer::pick_port(first, last) else {
-        usage(&format!(
-            "no free remote port in {first}..={last} (each also needs the next port free for \
-             the render server): close another game or agent first, or pick another \
-             --remote-port"
-        ));
-    };
-    args.remote.remote = true;
-    args.remote.port = port;
-    port
-}
-
-/// The agent's world runs in another live process: exits 2.
-fn already_running(ex: &ExplorerArgs, run: &island_content::explorer::host::RunFile) -> ! {
-    eprintln!(
-        "island_game: {}: stop it first, or delete {} if no game runs it",
-        explorer::already_running(&ex.agent, run),
-        island_content::explorer::host::RunFile::path(&explorer::agent_dir(ex)).display()
-    );
-    std::process::exit(2);
-}
-
-/// `--exact-port N` stayed taken: exits 4.
-fn port_in_use(port: u16) -> ! {
-    eprintln!("island_game: {}", explorer::port_in_use(port));
-    std::process::exit(explorer::EXIT_PORT_IN_USE);
-}
-
-/// Explorer mode: `--check-save` (prints, exits 0 / 1) or the app built New
-/// or resumed. Exits 3 for a save that needs `--load-anyway` /
-/// `--fresh-world`, 2 for any other failure.
-fn explorer_app(ex: &ExplorerArgs, args: &Args, port: u16) -> App {
-    if ex.check_only {
-        let result = explorer_host::check_save(&ex.home, &ex.agent);
-        println!("{}", explorer_host::check_json(&result));
-        std::process::exit(i32::from(result.is_err()));
-    }
-    match explorer::build_explorer_app(ex, |app| host(app, args)) {
-        Ok((mut app, start, dir)) => {
-            if let Err(e) = explorer::prepare_session(&mut app, &start, &dir, port) {
-                eprintln!("island_game: {e}");
-                std::process::exit(2);
-            }
-            if ex.exact_port.is_some() {
-                // The agent is already playing: no modal.
-                explorer::show_moved_notice(&mut app);
-            }
-            ai_client::install(&mut app, dir.clone(), ex.exact_port.is_none());
-            explorer::install_close_to_detached(&mut app, &ex.home, &ex.agent, port);
-            if ex.show_close_dialog {
-                explorer::open_close_dialog(&mut app);
-            }
-            app.insert_resource(island_view::ExplorerFiles {
-                dir: dir.dir.clone(),
-            });
-            let session = app.world().resource::<ExplorerSession>();
-            let how = match &start {
-                Start::New => "new world".to_owned(),
-                Start::Resumed(r) if r.defaulted.is_empty() => "resumed".to_owned(),
-                Start::Resumed(r) => format!("resumed (defaulted {:?})", r.defaulted),
-                Start::ResumedChanged(r) => format!(
-                    "resumed a save from another build (skipped {:?}, defaulted {:?})",
-                    r.skipped, r.defaulted
-                ),
-                Start::Rebuilt => "fresh world (the old save was backed up)".to_owned(),
-            };
-            info!(
-                "island_game: explorer `{}` in `{}` (seed {}): {how}; folder {}",
-                session.meta.agent,
-                session.meta.world,
-                session.seed,
-                dir.dir.display()
-            );
-            app
-        }
-        // The port was taken again between the wait and BRP's bind.
-        Err(e) if ex.exact_port.is_some() && explorer::is_busy_remote(&e) => port_in_use(port),
-        Err(e) => {
-            eprintln!("island_game: {e}");
-            std::process::exit(if explorer_host::needs_choice(&e) {
-                3
-            } else {
-                2
-            });
-        }
-    }
-}
-
 /// Run the native host with explicit arguments. The launcher calls this before
 /// creating any window, so title, play and pause share one app lifecycle.
 pub fn run_from_args(raw: Vec<String>) -> AppExit {
-    match editor_mode::parse(&raw) {
-        Ok(Some(args)) => {
-            if let Err(e) = editor_mode::run(args) {
-                usage(&e);
-            }
-            return AppExit::Success;
-        }
-        Err(e) => usage(&e),
-        Ok(None) => {}
-    }
-    let mut args = parse_args(&raw);
+    let args = parse_args(&raw);
     // The profiler's subscriber before the sim app exists: the sim's system
     // spans are created as its plugins add them, before `host` adds the
     // window (`DefaultPlugins` without its `LogPlugin` there).
     #[cfg(feature = "debug-tools")]
     npc_framework::perf::install_log_plugin_now();
-    let mut app = match args.explorer.clone() {
-        Some(ex) => {
-            let port = if ex.check_only {
-                0
-            } else {
-                explorer_port(&mut args)
-            };
-            explorer_app(&ex, &args, port)
-        }
-        None => scenario_app(&args),
-    };
-    args.projection
-        .install(&mut app)
-        .unwrap_or_else(|error| usage(&error));
+    let mut app = scenario_app(&args);
     if let Some(path) = &args.journal {
         match JournalSink::create(path) {
             Ok(sink) => app.world_mut().resource_mut::<Journal>().sink = Some(sink),

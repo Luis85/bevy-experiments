@@ -6,7 +6,7 @@
   Takes a Cargo profile directory that already holds the game executable
   (for example target\release) and writes:
 
-    <OutDir>\game_menu.exe     the game (title, play, pause: one process)
+    <OutDir>\island_game.exe   the game (title, play, pause: one process)
     <OutDir>\assets\           models, textures, audio, fonts
     <OutDir>\LICENSE.txt       the repository licence
     <OutDir>\CREDITS.md        asset sources and licences
@@ -14,7 +14,7 @@
 
   The executable finds `assets` beside itself at run time, so the folder can
   be moved or zipped. It does not build anything: run
-  `cargo build --locked --release -p game_menu` first.
+  `cargo build --locked --release -p island_game` first.
 
 .EXAMPLE
   .\scripts\package_island.ps1 -ProfileDir target\release -OutDir dist\IslandVillage
@@ -24,7 +24,7 @@ param(
     [Parameter(Mandatory = $true)][string]$ProfileDir,
     [Parameter(Mandatory = $true)][string]$OutDir,
     # The executable to ship, as named in the profile directory.
-    [string]$Executable = "game_menu.exe",
+    [string]$Executable = "island_game.exe",
     # Replace an existing package folder.
     [switch]$Force
 )
@@ -35,7 +35,7 @@ $repository = Split-Path -Parent $workspace
 
 $game = Join-Path $ProfileDir $Executable
 if (-not (Test-Path -LiteralPath $game -PathType Leaf)) {
-    throw "No $Executable in $ProfileDir. Build it first: cargo build --locked --release -p game_menu"
+    throw "No $Executable in $ProfileDir. Build it first: cargo build --locked --release -p island_game"
 }
 $assets = Join-Path $workspace "assets"
 if (-not (Test-Path -LiteralPath $assets -PathType Container)) {

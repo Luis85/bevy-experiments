@@ -21,11 +21,11 @@ from capture_player_flow import PRIMARY, wait_for
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the targeted check")
+        parser.error("Build island_game before running the targeted check")
     run = ROOT / "target" / ("playtest-ridge-check-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings = run / "settings.json"
@@ -46,7 +46,7 @@ def main():
     child = flow = None
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

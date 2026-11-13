@@ -215,8 +215,7 @@ pub(crate) fn plugin(app: &mut App) {
                 .in_set(ViewSystems::OverlayInput)
                 .before(ShellInput)
                 .before(crate::resident_inspector::keys)
-                .before(crate::island_build::keys)
-                .run_if(not(crate::modal_open)),
+                .before(crate::island_build::keys),
         )
         .add_systems(
             Update,
@@ -231,8 +230,7 @@ pub(crate) fn plugin(app: &mut App) {
             )
                 .chain()
                 .in_set(ViewSystems::OverlayInput)
-                .in_set(ShellInput)
-                .run_if(not(crate::modal_open)),
+                .in_set(ShellInput),
         )
         .add_systems(
             Update,

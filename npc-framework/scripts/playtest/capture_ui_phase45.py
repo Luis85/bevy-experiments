@@ -3,7 +3,7 @@ phase 3 follow-ups: the Live HUD and its workspaces, Shape's rail, brush bar
 and cursor tag, and the Oversee pages that changed, at 1280x720 and 1024x768.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_ui_phase45.py [--binary target/debug/game_menu.exe]
+  python scripts/playtest/capture_ui_phase45.py [--binary target/debug/island_game.exe]
       [--only oversee,keys,shape,live,compact,night,pouch,save]
 
 One disposable run of the real game, driven over BRP like
@@ -163,7 +163,7 @@ def oversee(flow, report, checks):
     # Closer, so the tag over the selected resident can be read.
     entity, _ = flow.camera_entity()
     flow.call("world.mutate_components", {"entity": entity,
-              "component": "testbed_view::camera::RtsCamera", "path": "distance", "value": 16.0})
+              "component": "island_view::camera::RtsCamera", "path": "distance", "value": 16.0})
     time.sleep(1.0)
     flow.both("gap-world-tag", flow.park, settle=0.9)
     report["inspector_day_tab"] = flow.card("Day")
@@ -818,13 +818,13 @@ def save_notice(flow, report, checks):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-redesign-p45")
     parser.add_argument("--only", default="oversee,keys,shape,live")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     wanted = [part.strip() for part in args.only.split(",") if part.strip()]
     base = ROOT / "target" / ("playtest-ui-phase45-" + uuid.uuid4().hex[:10])
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),

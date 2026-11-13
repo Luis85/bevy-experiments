@@ -8,7 +8,7 @@
 //! it may take and its sensors ([`SensorSpec`]). Memory span and capacity
 //! are world settings (map/memory spec M1), not preset fields.
 //!
-//! The game ships [`BUILTIN_PRESETS`] (human, rover, sentinel), copied into
+//! The game ships [`BUILTIN_PRESETS`] (human), copied into
 //! an actors folder that has no preset yet ([`load_presets`]). A preset's id
 //! is its file name without `.json` (`human`); `--preset` and `agent.json`
 //! name it by id.
@@ -44,11 +44,7 @@ use serde::{Deserialize, Serialize};
 use crate::world::TestbedUnit;
 
 /// The built-in presets `(id, JSON)`, by id.
-pub const BUILTIN_PRESETS: [(&str, &str); 3] = [
-    ("human", include_str!("../actors/human.json")),
-    ("rover", include_str!("../actors/rover.json")),
-    ("sentinel", include_str!("../actors/sentinel.json")),
-];
+pub const BUILTIN_PRESETS: [(&str, &str); 1] = [("human", include_str!("../actors/human.json"))];
 
 /// The default preset (the human scout of every explorer before presets).
 pub const HUMAN: &str = "human";
@@ -290,7 +286,7 @@ pub fn install_builtins(dir: &Path) -> Result<(), String> {
     for (id, text) in BUILTIN_PRESETS {
         let path = dir.join(format!("{id}.json"));
         if !path.exists() {
-            crate::explorer::workspace::write_atomic(&path, text).map_err(err)?;
+            crate::worlds::write_atomic(&path, text).map_err(err)?;
         }
     }
     Ok(())

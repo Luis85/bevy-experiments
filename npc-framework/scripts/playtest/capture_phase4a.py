@@ -1,7 +1,7 @@
 """Native captures of the Live / Oversee / Shape bar, alerts, economy and settings.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_phase4a.py [--binary target/debug/game_menu.exe]
+  python scripts/playtest/capture_phase4a.py [--binary target/debug/island_game.exe]
 
 Uses a disposable spectator world, native widget activation over BRP and bounded
 operator clock steps. Every state is captured at 1280x720 and 1024x768 and copied
@@ -27,12 +27,12 @@ from capture_player_flow import PRIMARY, wait_for
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/phase4a")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     run = ROOT / "target" / ("playtest-phase4a-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings = run / "settings.json"
@@ -53,7 +53,7 @@ def main():
     child = flow = None
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

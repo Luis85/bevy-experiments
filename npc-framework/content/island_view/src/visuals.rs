@@ -299,7 +299,6 @@ fn spawn_visuals(
     mut commands: Commands,
     assets: Option<Res<ViewAssets>>,
     rings: Option<Res<Rings>>,
-    robots: Option<Res<crate::robots::RobotAssets>>,
     (village, regional): (
         Option<Res<island_content::village::VillageState>>,
         Option<Res<island_content::village::frontier::terrain::TerrainState>>,
@@ -523,7 +522,7 @@ fn spawn_visuals(
         .as_deref()
         .filter(|_| regional.is_some())
         .map(|state| state.played);
-    for (sim, unit, pos, owner, preset_model, sensors, profile, id) in &actors {
+    for (sim, unit, pos, owner, preset_model, _sensors, profile, id) in &actors {
         if !fresh(&mut index, sim) {
             continue;
         }
@@ -556,7 +555,8 @@ fn spawn_visuals(
             Some(cast) if is_played && profile.is_none() => cast::player(cast, kind),
             _ => kind,
         };
-        if kind.is_robot() && robots.is_none() {
+        // The island has no robot bodies.
+        if kind.is_robot() {
             continue;
         }
         let at = sim_to_world(*pos);
@@ -577,21 +577,7 @@ fn spawn_visuals(
                 FogDim::default(),
             ))
             .id();
-        if kind.is_robot() {
-            let (right, left) = crate::robots::spawn(
-                &mut commands,
-                root,
-                kind,
-                sensors,
-                robots.as_deref().expect("robot assets ready"),
-            );
-            commands.entity(root).insert(ActorVisual {
-                kind,
-                motion: Motion::at(at),
-                hand_r: Some(right),
-                hand_l: Some(left),
-            });
-        } else {
+        {
             let scale = cast.map_or(kind.scale(), |cast| cast::adult_scale(cast, kind));
             let mut body = commands.spawn((
                 ChildOf(root),
@@ -1210,8 +1196,6 @@ fn item_transforms(
 
 #[cfg(test)]
 mod tests {
-    use island_content::layout::{cart_vehicle, wagon_vehicle};
-    use npc_framework::prelude::Seat;
 
     use super::*;
 
@@ -1377,7 +1361,6 @@ mod tests {
             models: models!(
                 wall,
                 doorway,
-                floor,
                 chest,
                 key,
                 food,
@@ -1390,7 +1373,6 @@ mod tests {
                 stump_b,
                 stone,
                 lumber,
-                rock,
                 book,
                 axe,
                 workbench,
@@ -1768,31 +1750,6 @@ mod tests {
             ModelKind::for_actor("novice", Some(2)),
             ModelKind::SkeletonMinion
         );
-    }
-
-    #[test]
-    fn riders_sit_in_the_bed_and_share_offsets_sideways() {
-        let cart = cart_vehicle();
-        let driver = seat_local(PropKind::Cart, &cart, 0);
-        let passenger = seat_local(PropKind::Cart, &cart, 1);
-        assert!(driver.y > 0.0 && passenger.y == driver.y);
-        assert!(
-            passenger.z < driver.z,
-            "the passenger sits behind the driver"
-        );
-        let wagon = wagon_vehicle();
-        let (a, b) = (
-            seat_local(PropKind::Wagon, &wagon, 1),
-            seat_local(PropKind::Wagon, &wagon, 2),
-        );
-        assert_eq!(a.z, b.z);
-        assert!(
-            (a.x + b.x).abs() < 1e-6 && a.x != b.x,
-            "spread around the axis"
-        );
-        // A seat index past the end does not panic.
-        let lone = Vehicle::direct(10).seat(Seat::driver());
-        seat_local(PropKind::Wagon, &lone, 5);
     }
 
     #[test]

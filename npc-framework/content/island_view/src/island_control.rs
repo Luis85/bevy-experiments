@@ -62,18 +62,12 @@ pub(crate) fn plugin(app: &mut App) {
         .init_resource::<IslandControl>()
         .init_resource::<CharacterWalk>()
         .add_systems(Startup, initialize)
-        .add_systems(
-            Update,
-            character_walk
-                .in_set(ViewSystems::Input)
-                .run_if(not(crate::modal_open)),
-        )
+        .add_systems(Update, character_walk.in_set(ViewSystems::Input))
         .add_systems(
             Update,
             prepare_pointer_input
                 .in_set(ViewSystems::Input)
-                .before(NpcCommandUiSet)
-                .run_if(not(crate::modal_open)),
+                .before(NpcCommandUiSet),
         )
         .add_systems(
             Update,

@@ -13,7 +13,6 @@ use npc_framework::agent_io::{AgentCtx, AgentIoAppExt, Section};
 use npc_framework::prelude::*;
 use serde_json::json;
 
-use crate::walls::{WALLS_SECTION, walls_section};
 use crate::world::TestbedUnit;
 
 /// Registers the `testbed` and `walls` observation sections (add next to
@@ -22,8 +21,7 @@ pub struct TestbedAgentPlugin;
 
 impl Plugin for TestbedAgentPlugin {
     fn build(&self, app: &mut App) {
-        app.register_observation("testbed", testbed_section)
-            .register_observation(WALLS_SECTION, walls_section);
+        app.register_observation("testbed", testbed_section);
     }
 }
 

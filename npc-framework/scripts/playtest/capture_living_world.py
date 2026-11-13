@@ -136,13 +136,13 @@ def terrain_candidate(snapshot, operator_state):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--skip-travel", action="store_true", help="capture UI and inspector regions only; no player journey claim")
     parser.add_argument("--confirm", action="store_true", help="single bounded confirmation of the same critical states")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running native QA")
+        parser.error("Build island_game before running native QA")
     run = ROOT / "target" / ("playtest-living-world-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     save = run / "living-world.world.json"
@@ -164,7 +164,7 @@ def main():
     report["asset_root"] = str(ROOT / "assets")
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

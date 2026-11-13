@@ -1,7 +1,7 @@
 """One-window Island Village flow through actual native widgets.
 
 Build separately, then run:
-  python scripts/playtest/capture_player_flow.py --binary target/debug/game_menu.exe
+  python scripts/playtest/capture_player_flow.py --binary target/debug/island_game.exe
   python scripts/playtest/capture_player_flow.py --build-cottage
   python scripts/playtest/capture_player_flow.py --life-loop --skip-trade
   python scripts/playtest/capture_player_flow.py --trade-only
@@ -1265,7 +1265,7 @@ class PlayerFlow(Rehearsal):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--build-cottage", action="store_true", help="also run actor-observed material acquisition and construction")
     parser.add_argument("--life-loop", action="store_true", help="also build, plant, water, harvest, and seek one observed surplus sale")
     parser.add_argument("--trade-only", action="store_true", help="fresh empty-handed market rehearsal; a verified actual stock/coin sale is mandatory")
@@ -1288,7 +1288,7 @@ def main():
         parser.error("--resume-save must name an existing snapshot; it is copied and never edited")
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("--binary must name a built game_menu executable")
+        parser.error("--binary must name a built island_game executable")
     run = ROOT / "target" / ("playtest-player-flow-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings = run / "settings.json"
@@ -1323,7 +1323,7 @@ def main():
     report["renderer_override"] = environment.get("WGPU_BACKEND")
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--remote", "--remote-port", str(port), "--no-render-remote", "--out-dir", str(run)],
                 cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT,
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))

@@ -5,7 +5,7 @@ tips of each mode, a second-level tooltip in each mode, and the Shape redo
 after a refused dab, at 1280x720 and 1024x768.
 
 Build first, then run from npc-framework:
-  python scripts/playtest/capture_ui_phase67.py [--binary target/debug/game_menu.exe]
+  python scripts/playtest/capture_ui_phase67.py [--binary target/debug/island_game.exe]
 
 One disposable run of the real game, driven over BRP like
 `capture_ui_phase45.py`: controls by the text on them or by their `Name`, the
@@ -452,7 +452,7 @@ def title_again(flow, report, checks):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-redesign-p67")
     parser.add_argument("--only", default="",
                         help="comma-separated parts: menus,oversee,shape,live,again")
@@ -461,7 +461,7 @@ def main():
     wanted = lambda part: not only or part in only  # noqa: E731
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     base = ROOT / "target" / ("playtest-ui-phase67-" + uuid.uuid4().hex[:10])
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),
         "input": "native BRP widget activation by text or control name; pointer through window "

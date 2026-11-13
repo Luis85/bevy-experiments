@@ -809,8 +809,7 @@ pub(super) fn plugin(app: &mut App) {
                 .before(crate::island_shell::ShellInput)
                 .before(super::keys)
                 .before(super::pointer)
-                .run_if(not(crate::player_hud::active))
-                .run_if(not(crate::modal_open)),
+                .run_if(not(crate::player_hud::active)),
         )
         .add_systems(
             Update,

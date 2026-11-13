@@ -4,7 +4,7 @@ Shape stroke driven through the real pointer path with its plan-to-mesh time.
 
 Build first, then run from npc-framework:
   python scripts/playtest/capture_view_wiring.py [--mode full|shape|night]
-      [--per-cell] [--pin-night] [--binary target/debug/game_menu.exe]
+      [--per-cell] [--pin-night] [--binary target/debug/island_game.exe]
 
 Uses a disposable spectator world and native widget activation over BRP, like
 `capture_view_checks.py`. The Shape drag is not a recorded command sent by the
@@ -199,7 +199,7 @@ class WiringFlow(CheckFlow):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/view-wiring")
     parser.add_argument("--mode", choices=("full", "shape", "night"), default="full")
     parser.add_argument("--per-cell", action="store_true",
@@ -210,7 +210,7 @@ def main():
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     run = ROOT / "target" / ("playtest-view-wiring-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings = run / "settings.json"
@@ -238,7 +238,7 @@ def main():
     child = flow = None
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

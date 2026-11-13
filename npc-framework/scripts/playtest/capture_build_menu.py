@@ -3,7 +3,7 @@ cards, at 1280x720 and 1024x768, and of one site from placement to completion.
 
 Build first, then run from npc-framework:
   python scripts/playtest/capture_build_menu.py [--building cottage]
-      [--days 6] [--binary target/debug/game_menu.exe]
+      [--days 6] [--binary target/debug/island_game.exe]
 
 Uses a disposable spectator world and native widget activation over BRP, like
 `capture_inspector.py`. The ghost and the placement go through the real
@@ -231,7 +231,7 @@ def site_state(site):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/build-menu")
     parser.add_argument("--building", default="cottage", help="catalogue key of the building to place")
     parser.add_argument("--days", type=float, default=6.0, help="game days to wait for completion")
@@ -241,7 +241,7 @@ def main():
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     run = ROOT / "target" / ("playtest-build-menu-" + uuid.uuid4().hex[:10])
     run.mkdir(parents=True)
     settings = run / "settings.json"
@@ -259,7 +259,7 @@ def main():
     if args.reserve is not None:
         # Authored rules, not a sim write: a copy of the shipped preset with a
         # different reserve, given to the host the way a player would.
-        preset = json.loads((ROOT / "content/testbed_content/worlds/living_world.json")
+        preset = json.loads((ROOT / "content/island_content/worlds/living_world.json")
                             .read_text(encoding="utf-8"))
 
         def retune(node):
@@ -290,7 +290,7 @@ def main():
     child = flow = None
     try:
         with (run / "native.log").open("wb") as log:
-            child = subprocess.Popen([str(binary), "--front-end", "--settings", str(settings),
+            child = subprocess.Popen([str(binary), "--front-end", "--island-rules", str(run / "rules" / "living_world.json"),
                 "--island-save", str(save), *rules, "--remote", "--remote-port", str(port),
                 "--no-render-remote", "--out-dir", str(run)], cwd=ROOT, env=environment,
                 stdout=log, stderr=subprocess.STDOUT,

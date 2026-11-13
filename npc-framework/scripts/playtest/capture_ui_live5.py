@@ -9,7 +9,7 @@ Workers and guests tab, its building title and the civic fund chip. Each at
 
 Make the saves and build first, then run from npc-framework:
   cargo test --locked -p testbed_content --test island_capture_fixtures -- --ignored --test-threads 5
-  cargo build --locked -p game_menu
+  cargo build --locked -p island_game
   python scripts/playtest/capture_ui_live5.py [--only worlds,summary,gift,upgrade,inn]
 
 Every change to the world is a recorded command that a control, a click or a
@@ -34,7 +34,7 @@ from capture_ui_redesign import SIZES, stop
 capture_player_flow.SIZES = SIZES
 MENU = "Game menu"
 WORLDS = "World list"
-PATCH = "testbed_content::village::model::ResourcePatch"
+PATCH = "island_content::village::model::ResourcePatch"
 SIMPOS = "npc_sim::math::SimPos"
 
 
@@ -338,13 +338,13 @@ PARTS = {"worlds": ("cottage-evening", [worlds]),
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-live5")
     parser.add_argument("--only", default="worlds,summary,gift,upgrade,inn")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     wanted = [part.strip() for part in args.only.split(",") if part.strip()]
     base = ROOT / "target" / ("playtest-ui-live5-" + uuid.uuid4().hex[:10])
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),

@@ -1,23 +1,14 @@
 //! Immutable, validated explorer world rules. Files are read only by hosts.
-use crate::actors::ActorPreset;
 use crate::scenario::Detection;
 use bevy_app::App;
 use bevy_ecs::prelude::*;
-use npc_framework::agent_io::scenario::ScenarioDoc;
 use npc_framework::prelude::SimId;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-pub const PLAIN_EXPLORER: &str = "plain_explorer";
-pub const BUILTIN_PRESETS: [(&str, &str); 8] = [
+pub const BUILTIN_PRESETS: [(&str, &str); 5] = [
     ("living_world", include_str!("../worlds/living_world.json")),
-    (
-        PLAIN_EXPLORER,
-        include_str!("../worlds/plain_explorer.json"),
-    ),
-    ("survival", include_str!("../worlds/survival.json")),
-    ("night_shift", include_str!("../worlds/night_shift.json")),
     (
         "island_village",
         include_str!("../worlds/island_village.json"),
@@ -273,9 +264,6 @@ pub(crate) fn need_specs(p: &WorldPreset) -> [(&'static str, NeedSpec); 4] {
 pub fn builtin_preset(id: &str) -> Option<WorldPreset> {
     serde_json::from_str(BUILTIN_PRESETS.iter().find(|(n, _)| *n == id)?.1).ok()
 }
-pub fn plain_preset() -> WorldPreset {
-    builtin_preset(PLAIN_EXPLORER).expect("shipped Plain world parses")
-}
 pub fn preset_id(path: &Path) -> Option<String> {
     crate::actors::preset_id(path)
 }
@@ -343,7 +331,7 @@ pub fn install_builtins(dir: &Path) -> Result<(), String> {
     for (id, text) in BUILTIN_PRESETS {
         let path = dir.join(format!("{id}.json"));
         if !path.exists() {
-            crate::explorer::workspace::write_atomic(&path, text).map_err(|e| e.to_string())?;
+            write_atomic(&path, text).map_err(|e| e.to_string())?;
         }
     }
     Ok(())
@@ -398,31 +386,18 @@ pub fn resolve_preset(world: &World, id: &str) -> Option<WorldPreset> {
         .and_then(|p| p.0.get(id).cloned())
         .or_else(|| builtin_preset(id))
 }
-pub fn world_doc(p: &WorldPreset, actor: &ActorPreset) -> Result<ScenarioDoc, String> {
-    validate(p).map_err(|e| e.join("; "))?;
-    let mut doc = crate::scenario::scenario_doc("explorer")?;
-    if p.scene == WorldScene::IslandVillage {
-        if actor.body != crate::actors::Body::Human {
-            return Err(
-                "The island village requires a human actor with Hunger, Thirst and Energy.".into(),
-            );
-        }
-        doc.world["layout"] = "island".into();
-        doc.world["furnish"] = false.into();
-        doc.actors[0].pos = Some((500, -1500));
-    }
-    doc.world["store_locked"] = p.systems.locked_doors.into();
-    doc.world["detection"] = serde_json::to_value(p.detection).map_err(|e| e.to_string())?;
-    doc.actors[0].extra.insert("preset".into(), "human".into());
-    crate::explorer::context::ExplorerContext::for_world(
-        "explorer",
-        "human",
-        actor,
-        PLAIN_EXPLORER,
-        p,
-    )
-    .write_to(&mut doc)?;
-    Ok(doc)
+/// Writes `text` to `path` atomically (a temp file beside it, then a rename).
+pub(crate) fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let tmp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
+    std::fs::write(&tmp, text)
+        .and_then(|()| std::fs::rename(&tmp, path))
+        .inspect_err(|_| {
+            let _ = std::fs::remove_file(&tmp);
+        })
 }
 pub fn prepare(app: &mut App, p: &WorldPreset) {
     crate::world_runtime::prepare(app, p);

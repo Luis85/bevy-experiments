@@ -9,7 +9,7 @@ its Reduce-motion steady edge, the unaffordable build card, a failed save's
 
 Make the saves and build first, then run from npc-framework:
   cargo test --locked -p testbed_content --test island_capture_fixtures -- --ignored --test-threads 1
-  cargo build --locked -p game_menu
+  cargo build --locked -p island_game
   python scripts/playtest/capture_ui_live3.py [--only menus,cottage,upgrade,hard]
 
 Each part starts the real game on a copy of one save in
@@ -443,13 +443,13 @@ PARTS = {"menus": ("cottage-evening", [menus]),
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-live3")
     parser.add_argument("--only", default="menus,cottage,upgrade,hard")
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     wanted = [part.strip() for part in args.only.split(",") if part.strip()]
     base = ROOT / "target" / ("playtest-ui-live3-" + uuid.uuid4().hex[:10])
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),

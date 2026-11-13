@@ -193,8 +193,7 @@ pub(crate) fn plugin(app: &mut App) {
             (keys, shield)
                 .chain()
                 .in_set(ViewSystems::OverlayInput)
-                .run_if(not(crate::player_hud::enabled))
-                .run_if(not(crate::modal_open)),
+                .run_if(not(crate::player_hud::enabled)),
         )
         .add_systems(
             Update,

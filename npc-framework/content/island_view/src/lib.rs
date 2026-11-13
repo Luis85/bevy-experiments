@@ -38,8 +38,6 @@ mod camera;
 mod colony_panel;
 mod colony_scene;
 mod command;
-mod explorer_modal;
-mod explorer_panel;
 mod field_clipboard;
 mod fog;
 pub mod game_ui;
@@ -54,15 +52,12 @@ mod island_homes;
 mod island_poses;
 mod island_shell;
 mod island_world;
-mod landmarks;
-mod model_preview;
 mod overlay;
 mod panel_scroll;
 mod panels;
 mod player_actions;
 mod player_hud;
 mod resident_inspector;
-mod robots;
 mod scene;
 mod scene_readiness;
 mod shape_tools;
@@ -77,12 +72,6 @@ pub use anim::{Pose, pose_of};
 pub use assets::{ASSET_DIR, asset_plugin};
 pub use camera::{CameraFocusOnSelected, CameraStart, IslandCameraSettings, RtsCamera};
 pub use command::{FORMATION_SPACING_MM, context_tool_order};
-pub use explorer_modal::{
-    ExplorerModalPlugin, ExplorerModalSystems, PromptModal, PromptModalClosed, modal_open,
-};
-pub use explorer_panel::{
-    ExplorerFiles, NoteField, NotesControl, NotesInput, STALE_NOTE, editor_typing,
-};
 pub use fog::{
     CellFog, FogLens, FogOfWar, Look, MASK_EXPLORED, MASK_GREY, MASK_UNEXPLORED, MASK_VISIBLE,
     MaskRegion, area_look, marker_pos, mask_alpha, mask_hash, mask_texel, mask_texels, static_look,
@@ -162,10 +151,6 @@ pub fn clear_player_view_intent(world: &mut World) {
     player_actions::clear_view(world);
     island_control::clear_view(world);
 }
-pub use model_preview::{
-    ModelPreview, ModelPreviewPlugin, ModelPreviewSettings, ModelPreviewSystems,
-    ModelPreviewViewport, PreviewActor,
-};
 pub use npc_framework::view_helpers::command_ui::{CommandFormation, CommandSelection, CommandUi};
 pub use npc_framework::view_helpers::{
     ScreenshotRequest, Selected, VisualIndex, VisualOf, save_screenshot, sim_to_world,
@@ -217,15 +202,12 @@ impl Plugin for TestbedViewPlugin {
             village_world::plugin,
             village::plugin,
             homestead_panel::plugin,
-            robots::plugin,
             scene::plugin,
             camera::plugin,
             visuals::plugin,
             anim::plugin,
             overlay::plugin,
             panels::plugin,
-            explorer_panel::plugin,
-            landmarks::plugin,
             command::plugin,
             fog::plugin,
         ))

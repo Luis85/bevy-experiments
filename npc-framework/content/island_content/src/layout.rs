@@ -1,24 +1,8 @@
-//! The compound: walls, doors, furnishing and actors (spawned by the
-//! scenario loader, [`crate::scenario`]).
+//! Spawning units and items for the island's scenario loader
+//! ([`crate::scenario`]).
 //!
 //! 1 m grid cells; a cell `(x, z)` has its centre at `(x·1000 + 500,
-//! z·1000 + 500)` mm (+z is north). The compound spans cells x −12..=12,
-//! z −10..=10:
-//!
-//! - outer walls with the **gate** (closed, unlocked) at cell (0, −10);
-//! - an inner wall on row z = 3 with the **workshop door** (closed) at
-//!   (−6, 3) and the **store door** (locked, key `key:store`) at (6, 3);
-//! - a divider on column x = 0 (z 4..=9) between the **workshop** (west:
-//!   workbench, anvil, forge, a book) and the **store** (east: pickaxe,
-//!   hammer, a scroll, a chest);
-//! - the **yard** (south: three trees, an ore rock, the axe, the store key,
-//!   bread, a log pile and the `ByCrew` cart); outside the gate the `Direct`
-//!   armored wagon and two more trees.
-//!
-//! Each straight wall run is one sim entity: `Prop { Wall }` plus a
-//! `GridBlocker` and a `GridOccluder` with the run's footprint. Doors are
-//! `Door` entities in one-cell gaps (the interaction plugin makes a closed
-//! door's cell blocking and occluding). [`ascii_map`] draws the result.
+//! z·1000 + 500)` mm (+z is north). [`ascii_map`] draws a region.
 
 use bevy_ecs::prelude::*;
 use npc_framework::interaction::items::{kind_def, put_in_inventory, put_in_slot};
@@ -27,25 +11,11 @@ use npc_framework::prelude::*;
 use npc_framework::rules::template_sheet;
 use serde::Deserialize;
 
-use crate::content::{
-    ANVIL, AXE, BOOK, BREAD, FORGE, HAMMER, KEY_STORE, LOG, MINING, ORE, PICKAXE, SCROLL,
-    STORE_KEY, TOOL_AXE, TOOL_PICKAXE, WOODCUTTING, WORKBENCH,
-};
-use crate::world::{Behaviour, Prop, PropKind, TestbedIds, TestbedUnit, kinds};
+use crate::content::{AXE, BOOK, BREAD, HAMMER, LOG, ORE, PICKAXE, SCROLL, STORE_KEY};
+use crate::world::{Behaviour, Prop, PropKind, TestbedUnit, kinds};
 
-/// Compound half extent in cells (x).
-pub const HALF_X: i32 = 12;
-/// Compound half extent in cells (z).
-pub const HALF_Z: i32 = 10;
-/// Row of the inner wall (workshop and store to the north, yard south).
-pub const INNER_Z: i32 = 3;
-pub const GATE_CELL: (i32, i32) = (0, -HALF_Z);
-pub const WORKSHOP_DOOR_CELL: (i32, i32) = (-6, INNER_Z);
-pub const STORE_DOOR_CELL: (i32, i32) = (6, INNER_Z);
 /// Grid size in cells (centred on the origin).
 pub const GRID_CELLS: u32 = 64;
-/// Grid size of the `frontier` layout.
-pub const FRONTIER_GRID_CELLS: u32 = 128;
 
 /// Actor walking speed, mm per tick (1.4 m/s at 20 Hz).
 pub const UNIT_SPEED: i32 = 70;
@@ -56,91 +26,10 @@ pub const VISION_HALF_FOV_DEG: u16 = 60;
 pub const HEARING_MM: i32 = 10_000;
 pub const INVENTORY_SLOTS: u32 = 8;
 pub const INVENTORY_MAX_G: u32 = 30_000;
-pub const CART_SPEED: i32 = 80;
-pub const WAGON_SPEED: i32 = 70;
 
 /// The centre of cell `(x, z)`.
 pub const fn cell(x: i32, z: i32) -> SimPos {
     SimPos::new(x * 1000 + 500, z * 1000 + 500)
-}
-
-// ---------------------------------------------------------------- walls
-
-/// One wall run from cell `a` to cell `b` (same row or column, inclusive).
-pub fn spawn_wall(world: &mut World, a: (i32, i32), b: (i32, i32)) -> SimId {
-    assert!(a.0 == b.0 || a.1 == b.1, "wall runs are straight");
-    let (x0, x1) = (a.0.min(b.0), a.0.max(b.0));
-    let (z0, z1) = (a.1.min(b.1), a.1.max(b.1));
-    let centre = SimPos::new((x0 + x1 + 1) * 500, (z0 + z1 + 1) * 500);
-    let fp = Footprint {
-        half_x_mm: (x1 - x0) * 500,
-        half_z_mm: (z1 - z0) * 500,
-    };
-    let yaw = if z0 == z1 && x0 != x1 { 0 } else { 90 };
-    spawn_sim(
-        world,
-        (
-            centre,
-            Prop {
-                kind: PropKind::Wall,
-                yaw_deg: yaw,
-            },
-            GridBlocker(fp),
-            GridOccluder(fp),
-        ),
-    )
-    .0
-}
-
-fn spawn_door(world: &mut World, at: (i32, i32), door: Door) -> SimId {
-    spawn_sim(
-        world,
-        (
-            cell(at.0, at.1),
-            door,
-            Prop::new(PropKind::Doorway),
-            Perceivable::new(kinds::DOOR),
-        ),
-    )
-    .0
-}
-
-/// Walls and doors (see the module docs).
-pub fn spawn_walls(world: &mut World, ids: &mut TestbedIds, store_locked: bool) {
-    let (hx, hz) = (HALF_X, HALF_Z);
-    // Outer ring (the gate gap in the south wall).
-    spawn_wall(world, (-hx, -hz), (GATE_CELL.0 - 1, -hz));
-    spawn_wall(world, (GATE_CELL.0 + 1, -hz), (hx, -hz));
-    spawn_wall(world, (-hx, hz), (hx, hz));
-    spawn_wall(world, (-hx, -hz + 1), (-hx, hz - 1));
-    spawn_wall(world, (hx, -hz + 1), (hx, hz - 1));
-    // Inner wall with two doors, and the workshop/store divider.
-    spawn_wall(
-        world,
-        (-hx + 1, INNER_Z),
-        (WORKSHOP_DOOR_CELL.0 - 1, INNER_Z),
-    );
-    spawn_wall(
-        world,
-        (WORKSHOP_DOOR_CELL.0 + 1, INNER_Z),
-        (STORE_DOOR_CELL.0 - 1, INNER_Z),
-    );
-    spawn_wall(world, (STORE_DOOR_CELL.0 + 1, INNER_Z), (hx - 1, INNER_Z));
-    spawn_wall(world, (0, INNER_Z + 1), (0, hz - 1));
-
-    let gate = spawn_door(world, GATE_CELL, Door::closed());
-    ids.name("gate", gate);
-    let workshop = spawn_door(world, WORKSHOP_DOOR_CELL, Door::closed());
-    ids.name("workshop_door", workshop);
-    let store_door = if !crate::world_runtime::enabled(world, |s| s.locked_doors) {
-        Door::closed()
-    } else if store_locked {
-        Door::locked(KEY_STORE)
-    } else {
-        Door::lockable(KEY_STORE)
-    };
-    let store = spawn_door(world, STORE_DOOR_CELL, store_door);
-    ids.name("store_door", store);
 }
 
 // ---------------------------------------------------------------- things
@@ -159,198 +48,6 @@ pub fn spawn_item(world: &mut World, kind: &str, stack: u32, quality: i32, pos: 
         world.entity_mut(e).insert(t);
     }
     id
-}
-
-fn tree(world: &mut World, pos: SimPos) -> SimId {
-    spawn_sim(
-        world,
-        (
-            pos,
-            Prop::new(PropKind::Tree),
-            ToolTarget::new(TOOL_AXE)
-                .yields(ItemYield::new(LOG, 2))
-                .duration(60)
-                .check(WOODCUTTING, 2)
-                .uses(3),
-            Perceivable::new(kinds::TREE),
-        ),
-    )
-    .0
-}
-
-fn ore_rock(world: &mut World, pos: SimPos) -> SimId {
-    spawn_sim(
-        world,
-        (
-            pos,
-            Prop::new(PropKind::OreRock),
-            ToolTarget::new(TOOL_PICKAXE)
-                .yields(ItemYield::new(ORE, 1))
-                .duration(80)
-                .check(MINING, 0)
-                .uses(6),
-            Perceivable::new(kinds::ORE),
-        ),
-    )
-    .0
-}
-
-fn station(world: &mut World, kind: PropKind, station: &str, pos: SimPos) -> SimId {
-    spawn_sim(
-        world,
-        (
-            pos,
-            Prop::new(kind),
-            Workstation::new([station]),
-            Perceivable::new(kinds::STATION),
-        ),
-    )
-    .0
-}
-
-/// The `ByCrew` cart: a required driver seat and one passenger seat.
-pub fn cart_vehicle() -> Vehicle {
-    Vehicle::by_crew(CART_SPEED)
-        .seat(Seat::driver())
-        .seat(Seat::passenger().offset(0, -700))
-}
-
-/// The `Direct` armored wagon: an optional (cosmetic) driver seat and two
-/// passenger seats; it is a unit itself (orders, nav).
-pub fn wagon_vehicle() -> Vehicle {
-    Vehicle::direct(WAGON_SPEED)
-        .seat(Seat::driver().optional())
-        .seats(2, Seat::passenger().offset(0, -900))
-}
-
-fn vehicle(world: &mut World, kind: PropKind, v: Vehicle, speed: i32, pos: SimPos) -> SimId {
-    spawn_sim(
-        world,
-        (
-            pos,
-            Prop::new(kind),
-            v,
-            Commandable::new(speed),
-            Owner(PlayerId(1)),
-            NavAgent,
-            Perceivable::new(kinds::VEHICLE),
-        ),
-    )
-    .0
-}
-
-/// Workstations, items, trees, the ore rock and the vehicles.
-pub fn spawn_furnishing(world: &mut World, ids: &mut TestbedIds) {
-    // Workshop.
-    if crate::world_runtime::enabled(world, |s| s.crafting) {
-        let id = station(world, PropKind::Workbench, WORKBENCH, cell(-9, 7));
-        ids.name("workbench", id);
-        let id = station(world, PropKind::Anvil, ANVIL, cell(-4, 7));
-        ids.name("anvil", id);
-        let id = station(world, PropKind::Forge, FORGE, cell(-2, 8));
-        ids.name("forge", id);
-    }
-    let id = spawn_item(world, BOOK, 1, 0, cell(-7, 5));
-    ids.name("book", id);
-    // Store.
-    let id = spawn_item(world, PICKAXE, 1, 0, cell(4, 7));
-    ids.name("pickaxe", id);
-    let id = spawn_item(world, HAMMER, 1, 0, cell(6, 8));
-    ids.name("hammer", id);
-    let id = spawn_item(world, SCROLL, 1, 0, cell(8, 5));
-    ids.name("scroll", id);
-    let (id, _) = spawn_sim(world, (cell(9, 8), Prop::new(PropKind::Chest)));
-    ids.name("chest", id);
-    // Yard.
-    for (i, (x, z)) in [(-9, -7), (-9, -3), (-6, -8)].into_iter().enumerate() {
-        let id = tree(world, cell(x, z));
-        ids.name(format!("tree_{i}"), id);
-    }
-    let id = ore_rock(world, cell(9, -7));
-    ids.name("ore_rock", id);
-    let id = spawn_item(world, AXE, 1, 0, cell(-4, -5));
-    ids.name("axe", id);
-    if crate::world_runtime::enabled(world, |s| s.locked_doors) {
-        let id = spawn_item(world, STORE_KEY, 1, 0, cell(8, -2));
-        ids.name("store_key", id);
-    }
-    let id = spawn_item(world, BREAD, 3, 0, cell(1, -4));
-    ids.name("bread", id);
-    let id = spawn_item(world, LOG, 2, 0, cell(-3, -8));
-    ids.name("logs", id);
-    if crate::world_runtime::enabled(world, |s| s.vehicles) {
-        let id = vehicle(
-            world,
-            PropKind::Cart,
-            cart_vehicle(),
-            CART_SPEED,
-            cell(4, -6),
-        );
-        ids.name("cart", id);
-        // Outside the gate.
-        let id = vehicle(
-            world,
-            PropKind::Wagon,
-            wagon_vehicle(),
-            WAGON_SPEED,
-            cell(0, -15),
-        );
-        ids.name("wagon", id);
-    }
-    for (i, (x, z)) in [(-5, -15), (6, -16)].into_iter().enumerate() {
-        let id = tree(world, cell(x, z));
-        ids.name(format!("tree_{}", i + 3), id);
-    }
-}
-
-/// The ruin's wall ring: cells x −3..=3, z 26..=30, the gap at `(0, 26)`.
-pub const RUIN_GAP_CELL: (i32, i32) = (0, 26);
-
-/// The outside features of the `frontier` layout, spawned after the compound
-/// (so its ids are those of every compound scenario): a tree grove west and
-/// east of the compound, three ore rocks north-east, a ruin to the north (a
-/// 7×5 wall ring with a one-cell gap on its south side, a chest and a scroll
-/// inside) and items scattered where the start does not see them.
-pub fn spawn_frontier(world: &mut World, ids: &mut TestbedIds) {
-    const WEST: [(i32, i32); 7] = [
-        (-26, -6),
-        (-29, -3),
-        (-25, -1),
-        (-28, 2),
-        (-24, 4),
-        (-30, 5),
-        (-27, 8),
-    ];
-    const EAST: [(i32, i32); 6] = [(24, -5), (27, -2), (25, 1), (29, 3), (23, 6), (28, 8)];
-    for (i, (x, z)) in WEST.into_iter().chain(EAST).enumerate() {
-        let id = tree(world, cell(x, z));
-        ids.name(format!("grove_tree_{i}"), id);
-    }
-    for (i, (x, z)) in [(20, 15), (23, 17), (26, 14)].into_iter().enumerate() {
-        let id = ore_rock(world, cell(x, z));
-        ids.name(format!("far_ore_{i}"), id);
-    }
-    // The ruin.
-    spawn_wall(world, (-3, 26), (-1, 26));
-    spawn_wall(world, (1, 26), (3, 26));
-    spawn_wall(world, (-3, 30), (3, 30));
-    spawn_wall(world, (-3, 27), (-3, 29));
-    spawn_wall(world, (3, 27), (3, 29));
-    let (id, _) = spawn_sim(world, (cell(-1, 28), Prop::new(PropKind::Chest)));
-    ids.name("ruin_chest", id);
-    let id = spawn_item(world, SCROLL, 1, 0, cell(1, 28));
-    ids.name("ruin_scroll", id);
-    // Scattered items.
-    for (i, (x, z)) in [(-18, -16), (31, -7)].into_iter().enumerate() {
-        let id = spawn_item(world, BREAD, 1, 0, cell(x, z));
-        ids.name(format!("far_bread_{i}"), id);
-    }
-    for (i, (x, z)) in [(14, -22), (-16, 20), (34, 20)].into_iter().enumerate() {
-        let id = spawn_item(world, LOG, 1, 0, cell(x, z));
-        ids.name(format!("far_log_{i}"), id);
-    }
-    let id = spawn_item(world, BOOK, 1, 0, cell(-36, 14));
-    ids.name("far_book", id);
 }
 
 // ---------------------------------------------------------------- actors

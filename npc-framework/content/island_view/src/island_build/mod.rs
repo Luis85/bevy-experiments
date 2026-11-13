@@ -179,8 +179,7 @@ pub(crate) fn plugin(app: &mut App) {
             Update,
             keys.in_set(ViewSystems::OverlayInput)
                 .before(crate::island_shell::ShellInput)
-                .before(crate::resident_inspector::keys)
-                .run_if(not(crate::modal_open)),
+                .before(crate::resident_inspector::keys),
         )
         .add_systems(
             Update,
@@ -188,8 +187,7 @@ pub(crate) fn plugin(app: &mut App) {
                 .in_set(ViewSystems::OverlayInput)
                 .after(crate::colony_panel::pointer)
                 .after(crate::shape_tools::pointer)
-                .run_if(not(crate::player_hud::active))
-                .run_if(not(crate::modal_open)),
+                .run_if(not(crate::player_hud::active)),
         )
         .add_systems(
             Update,

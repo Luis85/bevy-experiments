@@ -8,7 +8,7 @@ undoing, redoing and removing a garden plot and a barrel.
 
 Make the saves and build first, then run from npc-framework:
   cargo test --locked -p testbed_content --test island_capture_fixtures -- --ignored --test-threads 7
-  cargo build --locked -p game_menu
+  cargo build --locked -p island_game
   python scripts/playtest/capture_ui_live8.py
       [--only settings,worlds,summary,upgrade,builder,builder-door,alerts,boat,economy,strength,
               shift-tab,older-save,jobs,priorities,plots,props]
@@ -490,13 +490,13 @@ PARTS = {"settings": ("cottage-evening", [settings]),
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/game_menu.exe")
+    parser.add_argument("--binary", type=Path, default=ROOT / "target/debug/island_game.exe")
     parser.add_argument("--out", type=Path, default=ROOT / "target/npc-out/ui-live8")
     parser.add_argument("--only", default=",".join(PARTS))
     args = parser.parse_args()
     binary = args.binary.resolve()
     if not binary.is_file():
-        parser.error("Build game_menu before running the capture")
+        parser.error("Build island_game before running the capture")
     wanted = [part.strip() for part in args.only.split(",") if part.strip()]
     base = ROOT / "target" / ("playtest-ui-live8-" + uuid.uuid4().hex[:10])
     report = {"ok": False, "binary": str(binary), "binary_sha256": file_hash(binary),

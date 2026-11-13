@@ -65,7 +65,7 @@ fn construction() -> ScenarioDoc {
     let actor = doc.actors.first_mut().expect("arrival actor");
     actor.pos = Some((region.actor_start.x, region.actor_start.z));
     actor.extra.insert("name".into(), NAME.into());
-    island_content::explorer::context::ExplorerContext::for_world(
+    island_content::construction::ExplorerContext::for_world(
         "human",
         "human",
         &island_content::actors::human_preset(),

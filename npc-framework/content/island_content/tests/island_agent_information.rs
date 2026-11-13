@@ -131,31 +131,6 @@ fn activity_distinguishes_gathering_and_explains_cancellation() {
 }
 
 #[test]
-fn island_handbook_objective_is_specific_without_changing_other_worlds() {
-    let island = island_content::worlds::builtin_preset("island_village").unwrap();
-    let rules = island_content::explorer::workspace::render_world_rules(&island);
-    for text in [
-        "earn a living",
-        "Permanent death",
-        "Diary",
-        "operator",
-        "never advance ticks",
-        "Free gathering",
-        "remaining reserves",
-        "accepted action is queued",
-        "turn ending does not pause",
-    ] {
-        assert!(rules.contains(text), "missing {text}: {rules}");
-    }
-    assert!(!rules.contains("your character collapses or shuts down"));
-    assert!(!rules.contains("Ada") && !rules.contains("Rowan"));
-    let legacy = island_content::worlds::builtin_preset("plain_explorer").unwrap();
-    let rules = island_content::explorer::workspace::render_world_rules(&legacy);
-    assert!(!rules.contains("earn a living") && !rules.contains("scheduler"));
-    assert!(rules.contains("No survival needs are enabled."));
-}
-
-#[test]
 fn depleted_shop_explains_unavailability_and_duplicate_stacks_do_not_duplicate_demand() {
     let (mut app, actor, session) = fixture();
     let baker = id(&app, Role::Baker.person());
