@@ -1,7 +1,10 @@
 //! Simulation events to cues. This is the v1 mapping, moved here unchanged so
 //! the runtime and the offline renderer hear the same battle.
 
-use crate::cue::Cue;
+use crate::{
+    cue::Cue,
+    pan::{self, Places},
+};
 use horde_core::{
     content::StructureKind,
     ordnance::OrdnanceKind,
@@ -90,5 +93,51 @@ pub fn event_sound(cues: &mut Vec<Cue>, event: &SimEvent) {
     };
     if let Some(cue) = cue {
         push_cue(cues, cue);
+    }
+}
+
+/// The x in yards a cue of `event` sounds from, when the event has a place:
+/// a trap or turret at its own position, an impact where it lands, a kill, a
+/// spawn, a blast, a burn and a lost structure where they happen.
+pub fn event_x(cue: Cue, event: &SimEvent) -> Option<f32> {
+    let at = match (cue, event) {
+        (Cue::Trap | Cue::TurretShot, SimEvent::Shot { from, .. }) => from,
+        (
+            Cue::Trap,
+            SimEvent::Hit(strike)
+            | SimEvent::Armor(strike)
+            | SimEvent::Miss(strike)
+            | SimEvent::Defended(strike),
+        ) => &strike.from,
+        (
+            Cue::Impact | Cue::Armor,
+            SimEvent::Hit(strike) | SimEvent::WeakPoint(strike) | SimEvent::Armor(strike),
+        ) => &strike.to,
+        (Cue::Kill, SimEvent::Kill { at, .. })
+        | (Cue::Incoming, SimEvent::Spawn { at, .. })
+        | (Cue::Explosion | Cue::Molotov, SimEvent::Explosion { at, .. })
+        | (Cue::Fire, SimEvent::Burn { at, .. })
+        | (Cue::Structure, SimEvent::StructureLost { at, .. }) => at,
+        _ => return None,
+    };
+    Some(at[0])
+}
+
+/// [`event_sound`], and the pan place of every cue the event newly queued.
+/// `width_yards` is the width of the field the event happened on; `None`
+/// (no attempt) leaves the cues centred.
+pub fn event_sound_at(
+    cues: &mut Vec<Cue>,
+    places: &mut Places,
+    event: &SimEvent,
+    width_yards: Option<f32>,
+) {
+    let queued = cues.len();
+    event_sound(cues, event);
+    let Some(width) = width_yards else { return };
+    for cue in &cues[queued..] {
+        if let Some(x) = event_x(*cue, event) {
+            places.place(*cue, pan::lane_position(x, width));
+        }
     }
 }

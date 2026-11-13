@@ -93,7 +93,7 @@ pub(super) fn draw(
         return Ok(());
     }
     draw_screen(ctx, &mut f, time.elapsed_secs());
-    sounds.write_batch(cues.into_iter().map(crate::audio::CueRequest));
+    sounds.write_batch(cues.into_iter().map(crate::audio::CueRequest::centred));
     ctx.request_repaint();
     Ok(())
 }

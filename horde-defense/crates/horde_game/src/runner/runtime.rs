@@ -8,7 +8,13 @@ pub(crate) use horde_audio::events::push_cue;
 use horde_core::command::Command;
 // The event-to-cue mapping lives in `horde_audio`, shared with the offline
 // renderer.
+#[cfg(test)]
 pub(super) use horde_audio::events::event_sound;
+use horde_audio::{
+    events::event_sound_at,
+    pan::{self, Places},
+    render::fire_bed_x,
+};
 use horde_core::sim::{BattleId, Game, Input, SimEvent};
 #[cfg(feature = "review")]
 use persistence::PersistenceMetrics;
@@ -35,6 +41,9 @@ pub struct Runtime {
     pub(super) pending_aims: AttackAims,
     pub(super) save_requests: Vec<SaveIntent>,
     pub(super) observed_battle: Option<u64>,
+    /// Lane pan places of the cues drained since the runner last forwarded
+    /// its cues (`RuntimeParams::run` takes them).
+    pub(super) cue_places: Places,
     pub(super) dirty: bool,
     pub(super) save_ticks: u64,
     pub(super) retry_save_at: u64,
@@ -302,7 +311,7 @@ impl Runtime {
     /// does a command that finishes the attempt outside a tick (`Withdraw`
     /// pauses the game, so its terminal event would otherwise wait).
     pub(super) fn drain_sounds(&mut self, game: &mut Game, cues: &mut Vec<SoundCue>) {
-        let newest_event = tick_sounds(game, self.observed_battle, cues);
+        let newest_event = tick_sounds(game, self.observed_battle, cues, &mut self.cue_places);
         #[cfg(feature = "dev")]
         {
             self.last_event_seq = newest_event.or(self.last_event_seq);
@@ -413,13 +422,17 @@ pub(super) fn merge_actions(into: &mut Input, from: &Input) {
 /// Sounds for one tick's drained events. The main deployment is always
 /// audible; camp observation hears the observed expedition in full and only
 /// important cues from the others, without multiplying ordinary shots.
+/// The root battle's positional cues get their lane pan place in `places`;
+/// an expedition heard from camp is centred.
 /// Returns the newest root event sequence number it drained.
 pub(super) fn tick_sounds(
     game: &mut Game,
     observed: Option<u64>,
     cues: &mut Vec<SoundCue>,
+    places: &mut Places,
 ) -> Option<u64> {
     let camp = game.attempt().is_none();
+    let root_width = game.attempt().map(|a| a.width_yards);
     let mut newest = None;
     for record in game.drain_events() {
         if record.battle == BattleId::Root {
@@ -439,11 +452,17 @@ pub(super) fn tick_sounds(
             }
         };
         if audible {
-            event_sound(cues, &record.event);
+            let width = root_width.filter(|_| record.battle == BattleId::Root);
+            event_sound_at(cues, places, &record.event, width);
         }
     }
     let fire = match game.attempt() {
-        Some(a) => !a.ordnance.fire_zones.is_empty(),
+        Some(a) => {
+            if let Some(x) = fire_bed_x(&a.ordnance.fire_zones) {
+                places.place(SoundCue::Fire, pan::lane_position(x, a.width_yards));
+            }
+            !a.ordnance.fire_zones.is_empty()
+        }
         None => game.battles().iter().any(|battle| {
             !battle.settled
                 && observed == Some(battle.id)

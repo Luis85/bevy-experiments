@@ -7,8 +7,26 @@ pub use horde_audio::{bank::variant_path, cue::Cue, mix::MAX_EFFECT_VOICES, sele
 
 /// One requested cue, written by the runner and the UI and played by
 /// `SfxPlugin`.
-#[derive(bevy::prelude::Message, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CueRequest(pub Cue);
+#[derive(bevy::prelude::Message, Clone, Copy, Debug, PartialEq)]
+pub struct CueRequest {
+    pub cue: Cue,
+    /// The lane pan position (`horde_audio::pan::lane_position`) of the event
+    /// behind the cue; `None` is centred.
+    pub place: Option<f32>,
+}
+impl CueRequest {
+    /// A cue without a place: interface sounds, stingers, the defender.
+    pub fn centred(cue: Cue) -> Self {
+        Self { cue, place: None }
+    }
+    /// A cue at its place in `places`, if it has one.
+    pub fn placed(cue: Cue, places: &horde_audio::pan::Places) -> Self {
+        Self {
+            cue,
+            place: places.of(cue),
+        }
+    }
+}
 
 /// Every WAV the runtime can load, relative to `assets/`: every variant of
 /// every shipped bank (alias cues play these banks; retired cues are

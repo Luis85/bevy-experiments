@@ -21,6 +21,7 @@ pub mod events;
 pub mod export;
 pub mod meter;
 pub mod mix;
+pub mod pan;
 pub mod render;
 pub mod select;
 pub mod synth;

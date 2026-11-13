@@ -67,7 +67,10 @@ impl RuntimeParams<'_> {
             self.session.set_changed();
         }
         self.notices.write_batch(notices);
-        self.cues.write_batch(cues.into_iter().map(CueRequest));
+        // The places of this pass's root-battle events travel with its cues.
+        let places = std::mem::take(&mut self.runtime.bypass_change_detection().cue_places);
+        self.cues
+            .write_batch(cues.into_iter().map(|cue| CueRequest::placed(cue, &places)));
         result
     }
 }

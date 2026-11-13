@@ -1,14 +1,23 @@
 //! `SfxPlugin`: plays the `CueRequest` messages the runner (and UI) write on a
 //! small, prioritised voice budget. Each voice follows the bus its cue's mix
 //! row names: Combat effects, Interface sounds or Music & stingers.
+//!
+//! A voice plays as a [`PannedClip`]: the cue's WAV into two channels at the
+//! gains of its lane pan (`horde_audio::pan`; centred with "Mono audio"). A
+//! variant whose WAV has not loaded yet plays as a plain centred
+//! `AudioSource`, so no cue is lost.
 use crate::{
     audio::{Cue as SoundCue, CueRequest},
     runner::RuntimeSet,
     settings::Settings,
 };
-use bevy::prelude::*;
+use bevy::{
+    audio::{AddAudioSource, ChannelCount, Decodable, Sample, SampleRate, Source},
+    prelude::*,
+};
 use horde_audio::{
     mix::{Sliders, mix},
+    pan::{self, Places},
     render::audible,
     select::select_sounds,
 };
@@ -17,6 +26,7 @@ pub struct SfxPlugin;
 impl Plugin for SfxPlugin {
     fn build(&self, app: &mut App) {
         app.add_message::<CueRequest>()
+            .add_audio_source::<PannedClip>()
             .init_resource::<SfxState>()
             .add_systems(
                 Update,
@@ -48,7 +58,75 @@ pub struct EffectVoice {
     last_gain: f32,
     cue_gain: f32,
     cue: SoundCue,
+    /// The `[left, right]` pan gains the voice started with; a voice that
+    /// fell back to the plain player sounds centred whatever this says.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pan: [f32; 2],
 }
+
+/// A cue's clip panned into two channels: the decoded source, each frame
+/// written as `[left, right]` at `gains`.
+#[derive(Asset, TypePath, Clone, Debug)]
+pub struct PannedClip {
+    /// The WAV, shared with the loaded asset (the bytes are an `Arc`).
+    pub source: AudioSource,
+    /// `[left, right]`, from `horde_audio::pan`.
+    pub gains: [f32; 2],
+}
+impl Decodable for PannedClip {
+    type Decoder = PannedDecoder;
+    fn decoder(&self) -> PannedDecoder {
+        let inner = self.source.decoder();
+        PannedDecoder {
+            channels: inner.channels().get(),
+            inner,
+            gains: self.gains,
+            right: None,
+        }
+    }
+}
+/// Interleaved stereo at the source's rate. A mono source feeds both
+/// channels; of a wider source the first two channels play.
+pub struct PannedDecoder {
+    inner: <AudioSource as Decodable>::Decoder,
+    channels: u16,
+    gains: [f32; 2],
+    /// The right sample of the frame whose left sample went out last.
+    right: Option<Sample>,
+}
+impl Iterator for PannedDecoder {
+    type Item = Sample;
+    fn next(&mut self) -> Option<Sample> {
+        if let Some(right) = self.right.take() {
+            return Some(right);
+        }
+        let left = self.inner.next()?;
+        let mut right = left;
+        for channel in 1..self.channels {
+            let sample = self.inner.next().unwrap_or_default();
+            if channel == 1 {
+                right = sample;
+            }
+        }
+        self.right = Some(right * self.gains[1]);
+        Some(left * self.gains[0])
+    }
+}
+impl Source for PannedDecoder {
+    fn current_span_len(&self) -> Option<usize> {
+        None
+    }
+    fn channels(&self) -> ChannelCount {
+        ChannelCount::new(2).expect("two channels")
+    }
+    fn sample_rate(&self) -> SampleRate {
+        self.inner.sample_rate()
+    }
+    fn total_duration(&self) -> Option<std::time::Duration> {
+        self.inner.total_duration()
+    }
+}
+
 /// The gain of `cue`'s bus at the current sliders.
 fn bus_gain(sliders: Sliders, cue: SoundCue) -> f32 {
     sliders.bus_gain(mix(cue).bus)
@@ -56,6 +134,8 @@ fn bus_gain(sliders: Sliders, cue: SoundCue) -> f32 {
 fn play_sounds(
     mut commands: Commands,
     assets: Res<AssetServer>,
+    sources: Res<Assets<AudioSource>>,
+    mut clips: ResMut<Assets<PannedClip>>,
     time: Res<Time<Real>>,
     settings: Res<Settings>,
     mut cues: MessageReader<CueRequest>,
@@ -66,7 +146,16 @@ fn play_sounds(
     let bus_gains = sliders.bus_gains();
     let reduced = settings.reduced_effects;
     let now_ms = (time.elapsed_secs_f64() * 1000.0) as u64;
-    let mut sounds: Vec<SoundCue> = cues.read().map(|request| request.0).collect();
+    let mut places = Places::default();
+    let mut sounds: Vec<SoundCue> = cues
+        .read()
+        .map(|request| {
+            if let Some(place) = request.place {
+                places.place(request.cue, place);
+            }
+            request.cue
+        })
+        .collect();
     let rotation = state.rotation;
     state.rotation = state.rotation.wrapping_add(u64::from(!sounds.is_empty()));
     // A cue on a muted bus takes no start slot and keeps its cooldown.
@@ -100,18 +189,31 @@ fn play_sounds(
         }
         let cue_gain = mix(cue).level(reduced);
         let voice_gain = bus_gain(sliders, cue) * cue_gain;
-        let entity = commands
-            .spawn((
-                EffectVoice {
-                    priority: rank(cue),
-                    last_gain: voice_gain,
-                    cue_gain,
-                    cue,
-                },
-                AudioPlayer::new(assets.load(crate::audio::variant_path(cue, rotation))),
-                PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(voice_gain)),
-            ))
-            .id();
+        let gains = pan::voice_gains(cue, &places, reduced, settings.mono_audio);
+        let voice = (
+            EffectVoice {
+                priority: rank(cue),
+                last_gain: voice_gain,
+                cue_gain,
+                cue,
+                pan: gains,
+            },
+            PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(voice_gain)),
+        );
+        let handle: Handle<AudioSource> = assets.load(crate::audio::variant_path(cue, rotation));
+        let entity = match sources.get(&handle) {
+            Some(source) => commands.spawn((
+                voice,
+                AudioPlayer(clips.add(PannedClip {
+                    source: source.clone(),
+                    gains,
+                })),
+            )),
+            // Not loaded yet: the plain player waits for the load and plays
+            // the cue centred.
+            None => commands.spawn((voice, AudioPlayer::new(handle))),
+        }
+        .id();
         live.push((entity, rank(cue)));
     }
 }
@@ -160,6 +262,7 @@ mod tests {
                     last_gain: 0.7,
                     cue_gain: 1.0,
                     cue: SoundCue::Explosion,
+                    pan: pan::CENTRE,
                 },
                 PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(0.7)),
             ))
@@ -245,6 +348,7 @@ mod tests {
                         last_gain: -1.0,
                         cue_gain: mix(cue).level(false),
                         cue,
+                        pan: pan::CENTRE,
                     },
                     PlaybackSettings::DESPAWN,
                 ))
@@ -288,6 +392,7 @@ mod tests {
         let mut app = App::new();
         app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()))
             .init_asset::<AudioSource>()
+            .init_asset::<PannedClip>()
             .add_message::<CueRequest>()
             .init_resource::<SfxState>()
             .insert_resource(Settings {
@@ -296,7 +401,7 @@ mod tests {
             })
             .add_systems(Update, play_sounds);
         let started = |app: &mut App, cue: SoundCue| {
-            app.world_mut().write_message(CueRequest(cue));
+            app.world_mut().write_message(CueRequest::centred(cue));
             app.update();
             let mut voices = app.world_mut().query::<&EffectVoice>();
             voices.iter(app.world()).filter(|v| v.cue == cue).count()
@@ -341,5 +446,173 @@ mod tests {
             .advance_by(std::time::Duration::from_secs(10));
         assert_eq!(started(&mut app, SoundCue::Confirm), 0);
         assert_eq!(started(&mut app, SoundCue::Explosion), 1);
+    }
+
+    /// A play-systems app with `wav` already loaded as the asset every
+    /// variant path of `cue` resolves to. Returns the app.
+    fn pan_app(settings: Settings) -> App {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()))
+            .init_asset::<AudioSource>()
+            .init_asset::<PannedClip>()
+            .add_message::<CueRequest>()
+            .init_resource::<SfxState>()
+            .insert_resource(settings)
+            .add_systems(Update, play_sounds);
+        app
+    }
+    fn start(app: &mut App, request: CueRequest) -> Entity {
+        app.world_mut().write_message(request);
+        app.update();
+        let mut voices = app.world_mut().query::<(Entity, &EffectVoice)>();
+        let found: Vec<Entity> = voices
+            .iter(app.world())
+            .filter(|(_, voice)| voice.cue == request.cue)
+            .map(|(entity, _)| entity)
+            .collect();
+        assert_eq!(found.len(), 1, "{request:?}");
+        found[0]
+    }
+    fn clear(app: &mut App) {
+        let mut voices = app
+            .world_mut()
+            .query_filtered::<Entity, With<EffectVoice>>();
+        let live: Vec<Entity> = voices.iter(app.world()).collect();
+        for entity in live {
+            app.world_mut().despawn(entity);
+        }
+        app.world_mut()
+            .resource_mut::<Time<Real>>()
+            .advance_by(std::time::Duration::from_secs(10));
+    }
+    fn far(cue: SoundCue) -> CueRequest {
+        CueRequest {
+            cue,
+            place: Some(1.0),
+        }
+    }
+
+    /// A placed request starts its voice at the balance law's gains: the
+    /// far end at `[1 - D, 1]`, half the depth in reduced effects, and a cue
+    /// that never pans (the defender's gun, a stinger, an interface sound)
+    /// centred even with a place.
+    #[test]
+    fn placed_requests_start_voices_at_the_lane_pan_gains() {
+        let mut app = pan_app(Settings::default());
+        let voice = start(&mut app, far(SoundCue::Explosion));
+        let pan_of =
+            |app: &App, voice: Entity| app.world().entity(voice).get::<EffectVoice>().unwrap().pan;
+        assert_eq!(pan_of(&app, voice), [1.0 - pan::PAN_DEPTH, 1.0]);
+        clear(&mut app);
+        let centred = start(&mut app, CueRequest::centred(SoundCue::Explosion));
+        assert_eq!(pan_of(&app, centred), pan::CENTRE);
+        for cue in [SoundCue::Rifle, SoundCue::Victory, SoundCue::Confirm] {
+            clear(&mut app);
+            let voice = start(&mut app, far(cue));
+            assert_eq!(pan_of(&app, voice), pan::CENTRE, "{cue:?}");
+        }
+        clear(&mut app);
+        app.world_mut().resource_mut::<Settings>().reduced_effects = true;
+        let reduced = start(&mut app, far(SoundCue::Explosion));
+        assert_eq!(pan_of(&app, reduced), [1.0 - pan::PAN_DEPTH_REDUCED, 1.0]);
+    }
+
+    /// The "Mono audio" setting: every voice starts centred, wherever its
+    /// event happened.
+    #[test]
+    fn mono_audio_forces_centre() {
+        let mut app = pan_app(Settings {
+            mono_audio: true,
+            ..Settings::default()
+        });
+        for cue in [SoundCue::Explosion, SoundCue::Kill, SoundCue::Incoming] {
+            clear(&mut app);
+            let voice = start(&mut app, far(cue));
+            let voice = app.world().entity(voice);
+            assert_eq!(
+                voice.get::<EffectVoice>().unwrap().pan,
+                pan::CENTRE,
+                "{cue:?}"
+            );
+        }
+        // Off again, the same request pans.
+        clear(&mut app);
+        app.world_mut().resource_mut::<Settings>().mono_audio = false;
+        let voice = start(&mut app, far(SoundCue::Explosion));
+        let voice = app.world().entity(voice);
+        assert_ne!(voice.get::<EffectVoice>().unwrap().pan, pan::CENTRE);
+    }
+
+    fn tone(frames: usize) -> Vec<f32> {
+        (0..frames)
+            .map(|n| ((n % 64) as f32 / 64.0 - 0.5) * 0.8)
+            .collect()
+    }
+
+    /// The decoder writes every source frame as `[left, right]` at the pan
+    /// gains, as two channels at the source's own rate.
+    #[test]
+    fn panned_clip_outputs_two_channels_at_source_rate() {
+        for rate in [22_050_u32, 44_100] {
+            let samples = tone(500);
+            let source = AudioSource {
+                bytes: horde_audio::wav::pcm16_bytes(rate, &samples).into(),
+            };
+            let plain: Vec<Sample> = source.decoder().collect();
+            assert_eq!(plain.len(), samples.len());
+            let gains = [0.7, 1.0];
+            let decoder = PannedClip { source, gains }.decoder();
+            assert_eq!(decoder.channels().get(), 2);
+            assert_eq!(decoder.sample_rate().get(), rate);
+            let out: Vec<Sample> = decoder.collect();
+            assert_eq!(out.len(), 2 * plain.len());
+            for (frame, sample) in out.chunks_exact(2).zip(&plain) {
+                assert_eq!(frame, [sample * gains[0], sample * gains[1]]);
+            }
+            assert!(out.iter().any(|sample| sample.abs() > 0.2));
+        }
+    }
+
+    /// A variant that has not loaded yet plays as a plain `AudioSource`
+    /// player, so the cue is not lost; once its WAV is loaded the voice is a
+    /// `PannedClip` with the request's gains.
+    #[test]
+    fn unloaded_clip_falls_back_to_audio_source_player() {
+        let mut app = pan_app(Settings::default());
+        let voice = start(&mut app, far(SoundCue::Explosion));
+        let entity = app.world().entity(voice);
+        assert!(entity.contains::<AudioPlayer<AudioSource>>());
+        assert!(!entity.contains::<AudioPlayer<PannedClip>>());
+        // Load every variant the rotation can pick.
+        let wav = AudioSource {
+            bytes: horde_audio::wav::pcm16_bytes(44_100, &tone(100)).into(),
+        };
+        let handles: Vec<Handle<AudioSource>> = (0..SoundCue::Explosion.bank().variants())
+            .map(|variant| {
+                let path = crate::audio::variant_path(SoundCue::Explosion, u64::from(variant));
+                let handle = app.world().resource::<AssetServer>().load(path);
+                app.world_mut()
+                    .resource_mut::<Assets<AudioSource>>()
+                    .insert(handle.id(), wav.clone())
+                    .unwrap();
+                handle
+            })
+            .collect();
+        clear(&mut app);
+        let voice = start(&mut app, far(SoundCue::Explosion));
+        let entity = app.world().entity(voice);
+        assert!(!entity.contains::<AudioPlayer<AudioSource>>());
+        let player = entity
+            .get::<AudioPlayer<PannedClip>>()
+            .expect("a panned voice");
+        let clip = app
+            .world()
+            .resource::<Assets<PannedClip>>()
+            .get(&player.0)
+            .expect("the clip asset");
+        assert_eq!(clip.gains, [1.0 - pan::PAN_DEPTH, 1.0]);
+        assert_eq!(clip.gains, entity.get::<EffectVoice>().unwrap().pan);
+        assert_eq!(clip.source.bytes, wav.bytes);
+        drop(handles);
     }
 }

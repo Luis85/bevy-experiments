@@ -199,6 +199,8 @@ fn audio_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     ui.add(egui::Slider::new(&mut settings.ambience, 0.0..=1.0).text("Atmosphere"));
     ui.add(egui::Slider::new(&mut settings.music, 0.0..=1.0).text("Music & stingers"));
     ui.add(egui::Slider::new(&mut settings.ui, 0.0..=1.0).text("Interface sounds"));
+    ui.checkbox(&mut settings.mono_audio, "Mono audio")
+        .on_hover_text("Plays every sound centred, the same in both ears.");
 }
 /// The Controls row label of a binding. Pause is the battle's pause: the
 /// camp's world clock has its own key.

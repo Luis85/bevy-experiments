@@ -11,10 +11,11 @@
 //! - **Effects.** [`LegacyPolicy`] is the v1 voice policy of `horde_game`'s
 //!   `SfxPlugin`: at most two starts per frame, a rotation that picks the
 //!   variant, [`MAX_EFFECT_VOICES`] voices, and a more important cue cutting
-//!   the least important voice at once. A voice plays its mono clip into both
-//!   channels at `bus gain x row gain`, where the bus gain is
+//!   the least important voice at once. A voice plays its mono clip at
+//!   `bus gain x row gain`, where the bus gain is
 //!   `master x the bus's slider x calibration` of the cue's own bus
-//!   ([`Sliders::bus_gain`]).
+//!   ([`Sliders::bus_gain`]), into the two channels at the gains of its lane
+//!   pan ([`pan::voice_gains`]; centred with [`Scene::mono`]).
 //! - **Ambience.** The six loops play dual mono from the scene's first sample.
 //!   Each follows `weight x master x ambience x context share x calibration`
 //!   through the adapter's 1.2 s smoothstep crossfade, stepped per frame and
@@ -27,9 +28,10 @@
 use crate::{
     bank::{AMBIENCE_FILES, variant_path},
     cue::Cue,
-    events::{event_sound, push_cue},
+    events::{event_sound_at, push_cue},
     meter::{self, Loudness},
     mix::{Bus, CONTEXT_GAIN, MAX_EFFECT_VOICES, mix},
+    pan::{self, Places},
     select::{CueGate, select_sounds},
     wav,
 };
@@ -75,7 +77,20 @@ impl Context {
 pub struct Frame {
     /// The cues requested in this frame, before selection.
     pub cues: Vec<Cue>,
+    /// Where the positional cues of this frame sound from; a cue without a
+    /// place is centred.
+    pub places: Places,
     pub context: Context,
+}
+impl Frame {
+    /// A frame that requests `cues`, all centred.
+    pub fn centred(cues: Vec<Cue>, context: Context) -> Self {
+        Self {
+            cues,
+            places: Places::default(),
+            context,
+        }
+    }
 }
 
 pub use crate::mix::Sliders;
@@ -88,6 +103,8 @@ pub struct Scene {
     pub sliders: Sliders,
     /// Reduced effects: the reduced gain and cooldown columns.
     pub reduced: bool,
+    /// The "Mono audio" setting: every voice plays centred.
+    pub mono: bool,
 }
 
 /// A rendered stereo signal at [`RATE`].
@@ -314,7 +331,8 @@ struct Voice<'a> {
     priority: u8,
     clip: &'a [f32],
     position: usize,
-    gain: f32,
+    /// Left and right.
+    gains: [f32; 2],
 }
 
 /// Renders `frames` at the scene's sliders and theme.
@@ -322,7 +340,10 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
     let bus_gains = scene.sliders.bus_gains();
     let ambience = bus_gains[Bus::Atmosphere as usize];
     let weights = normalized(scene.weights);
+    // The dual-mono ambience; it joins both sides at the end.
     let mut out = vec![0.0_f32; frames.len() * FRAME_SAMPLES];
+    // The voices' left and right.
+    let mut sides = [out.clone(), out.clone()];
     let mut policy = LegacyPolicy::default();
     let mut voices: Vec<Voice> = Vec::new();
     let mut envelope = Envelope::default();
@@ -341,13 +362,17 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
                 priority: start.priority,
                 clip: library.clip(start.cue, start.variant),
                 position: 0,
-                gain: bus_gains[mix(start.cue).bus as usize] * start.gain,
+                gains: pan::voice_gains(start.cue, &frame.places, scene.reduced, scene.mono)
+                    .map(|side| side * bus_gains[mix(start.cue).bus as usize] * start.gain),
             });
         }
         for voice in &mut voices {
             let rest = &voice.clip[voice.position..];
-            for (sample, source) in block.iter_mut().zip(rest) {
-                *sample += source * voice.gain;
+            for (side, gain) in sides.iter_mut().zip(voice.gains) {
+                let block = &mut side[index * FRAME_SAMPLES..(index + 1) * FRAME_SAMPLES];
+                for (sample, source) in block.iter_mut().zip(rest) {
+                    *sample += source * gain;
+                }
             }
             voice.position += FRAME_SAMPLES.min(rest.len());
         }
@@ -367,10 +392,20 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         }
         loop_gains = next;
     }
-    Stereo {
-        right: out.clone(),
-        left: out,
+    let [mut left, mut right] = sides;
+    for ((left, right), ambience) in left.iter_mut().zip(&mut right).zip(&out) {
+        *left += ambience;
+        *right += ambience;
     }
+    Stereo { left, right }
+}
+
+/// The x in yards the fire bed sounds from: the first burning zone. `None`
+/// when nothing burns.
+pub fn fire_bed_x(zones: &[horde_core::ordnance::FireZone]) -> Option<f32> {
+    zones
+        .first()
+        .map(|zone| horde_core::ordnance::cell_center(zone.cell)[0])
 }
 
 /// Ticks `game`'s battle `ticks` times with [`smoke_input`], one frame per
@@ -382,21 +417,24 @@ pub fn battle_frames(game: &mut Game, ticks: u32) -> Vec<Frame> {
         .map(|_| {
             let input = smoke_input(game);
             let in_battle = game.attempt().is_some();
+            let width = game.attempt().map(|attempt| attempt.width_yards);
             game.tick(input);
             let mut cues = Vec::new();
+            let mut places = Places::default();
             for record in game.drain_events() {
                 if record.battle == BattleId::Root {
-                    event_sound(&mut cues, &record.event);
+                    event_sound_at(&mut cues, &mut places, &record.event, width);
                 }
             }
-            if game
-                .attempt()
-                .is_some_and(|attempt| !attempt.ordnance.fire_zones.is_empty())
+            if let Some(attempt) = game.attempt()
+                && let Some(x) = fire_bed_x(&attempt.ordnance.fire_zones)
             {
                 push_cue(&mut cues, Cue::Fire);
+                places.place(Cue::Fire, pan::lane_position(x, attempt.width_yards));
             }
             Frame {
                 cues,
+                places,
                 context: if in_battle {
                     Context::Battle
                 } else {
@@ -421,10 +459,7 @@ pub const REFERENCE_RESULTS_SECONDS: u32 = 8;
 /// or the victory stinger when the battle is still running after 44 s. The
 /// loot reveal and the coin batch join the results when those cues exist.
 pub fn reference_mixed_60s(battle: &mut Game) -> Vec<Frame> {
-    let idle = |context| Frame {
-        cues: Vec::new(),
-        context,
-    };
+    let idle = |context| Frame::centred(Vec::new(), context);
     let mut frames =
         vec![idle(Context::Camp); (REFERENCE_CAMP_SECONDS * TICKS_PER_SECOND) as usize];
     for second in [2, 5] {

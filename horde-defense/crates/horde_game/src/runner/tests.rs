@@ -1314,3 +1314,41 @@ fn reload_profile_reads_the_save_until_the_journey_or_the_files_change() {
     assert!(host.runtime.saved_since_load());
     assert_eq!(reload(&mut host, 2), Err(RELOAD_REFUSED.into()));
 }
+
+/// Lane pan (A6-07): the root battle's positional cues carry the pan place
+/// of their event, the place depends on the event's x alone, and the
+/// defender's own shots stay centred.
+#[test]
+fn root_battle_cues_carry_their_lane_pan_place() {
+    use horde_audio::pan::{Places, lane_position, positional};
+    let mut game = Game::default();
+    game.deploy(0, Mode::Personal).unwrap();
+    game.set_paused(false);
+    let width = game.attempt().unwrap().width_yards;
+    let mut heard = std::collections::BTreeMap::new();
+    for _ in 0..60 * 60 {
+        if game.attempt().is_none() {
+            break;
+        }
+        let input = horde_core::sim::smoke_input(&game);
+        game.tick(input);
+        let (mut cues, mut places) = (Vec::new(), Places::default());
+        tick_sounds(&mut game, None, &mut cues, &mut places);
+        for cue in cues {
+            let place = places.of(cue);
+            assert!(positional(cue) || place.is_none(), "{cue:?} is centred");
+            if let Some(place) = place {
+                assert!((0.0..=1.0).contains(&place), "{cue:?} at {place}");
+                heard.entry(format!("{cue:?}")).or_insert(place);
+            }
+        }
+    }
+    // Enemies enter at the far end; kills and impacts happen on the field.
+    let incoming = heard["Incoming"];
+    assert!(incoming > lane_position(width - 3.0, width), "{heard:?}");
+    assert!(
+        heard.contains_key("Kill") && heard.contains_key("Impact"),
+        "{heard:?}"
+    );
+    assert!(heard["Kill"] < incoming, "{heard:?}");
+}

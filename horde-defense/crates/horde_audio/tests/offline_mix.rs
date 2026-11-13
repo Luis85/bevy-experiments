@@ -50,10 +50,7 @@ fn dense_battle() -> Game {
 
 fn idle(context: Context, count: usize) -> Vec<Frame> {
     (0..count)
-        .map(|_| Frame {
-            cues: Vec::new(),
-            context,
-        })
+        .map(|_| Frame::centred(Vec::new(), context))
         .collect()
 }
 fn rms(samples: &[f32]) -> f64 {
@@ -79,6 +76,7 @@ fn default_scene(weights: [f32; 6]) -> Scene {
         weights,
         sliders: Sliders::DEFAULT,
         reduced: false,
+        mono: false,
     }
 }
 
@@ -190,6 +188,7 @@ fn single_cue_renders_dual_mono_at_bus_times_row_gain() {
             ..Sliders::DEFAULT
         },
         reduced: false,
+        mono: false,
     };
     let out = render::render(&library, &frames, &scene);
     assert_eq!(out.left.len(), 120 * FRAME_SAMPLES);
@@ -328,6 +327,7 @@ fn reference_render(weights: [f32; 6], sliders: Sliders) -> Stereo {
             weights,
             sliders,
             reduced: false,
+            mono: false,
         },
     )
 }

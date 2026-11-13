@@ -43,7 +43,7 @@ pub(super) fn handle_notices(
     for notice in notices {
         f.apply_notice(notice);
     }
-    cues.write_batch(buffer.into_iter().map(CueRequest));
+    cues.write_batch(buffer.into_iter().map(CueRequest::centred));
 }
 
 /// `OnEnter(Screen::Battle)`: a new deployment starts with centred aim,

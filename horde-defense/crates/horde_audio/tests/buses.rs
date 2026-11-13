@@ -30,10 +30,7 @@ fn library() -> Library {
 /// without ambience. Returns the sample peak.
 fn peak_of(library: &Library, cue: Cue, sliders: Sliders) -> f32 {
     let mut frames: Vec<Frame> = (0..120)
-        .map(|_| Frame {
-            cues: Vec::new(),
-            context: Context::Battle,
-        })
+        .map(|_| Frame::centred(Vec::new(), Context::Battle))
         .collect();
     frames[0].cues.push(cue);
     let scene = Scene {
@@ -43,6 +40,7 @@ fn peak_of(library: &Library, cue: Cue, sliders: Sliders) -> f32 {
             ..sliders
         },
         reduced: false,
+        mono: false,
     };
     render::render(library, &frames, &scene)
         .left
