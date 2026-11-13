@@ -15,6 +15,7 @@ fn on(screen: Screen) -> EscapeContext {
         journey_started: true,
         attempt_live: false,
         durable_pending: false,
+        draft_dirty: false,
         pause_is_escape: true,
         construction: false,
     }
@@ -46,6 +47,13 @@ fn pause_on_p(cx: EscapeContext) -> EscapeContext {
         ..cx
     }
 }
+/// Settings with an unapplied difficulty draft.
+fn dirty_settings() -> EscapeContext {
+    EscapeContext {
+        draft_dirty: true,
+        ..on(Screen::Settings)
+    }
+}
 /// Camp home after a settled defense, with no main defense live.
 fn home_after_report() -> EscapeContext {
     EscapeContext {
@@ -56,6 +64,7 @@ fn home_after_report() -> EscapeContext {
 
 const QUIT: ModalKind = ModalKind::Quit;
 const RETURN: ModalKind = ModalKind::ReturnToMenu;
+const DRAFT: ModalKind = ModalKind::DraftWarning;
 
 const TABS: [Tab; 9] = [
     Tab::Home,
@@ -68,12 +77,13 @@ const TABS: [Tab; 9] = [
     Tab::Engineering,
     Tab::Operations,
 ];
-const OVERLAYS: [Overlay; 11] = [
+const OVERLAYS: [Overlay; 12] = [
     Overlay::Rebind,
     Overlay::TextFocus,
     Overlay::AppModal(ModalKind::Quit),
     Overlay::AppModal(ModalKind::ReturnToMenu),
     Overlay::AppModal(ModalKind::Storage),
+    Overlay::AppModal(ModalKind::DraftWarning),
     Overlay::NewJourneyModal,
     Overlay::Details,
     Overlay::Popup,
@@ -336,8 +346,47 @@ fn matrix_table() {
             with(Overlay::Popup, on(Screen::Settings)),
             A::LeaveToEgui,
         ),
+        // The draft warning (W3-07, UX-09).
+        (
+            "settings with an unapplied draft opens the draft warning",
+            dirty_settings(),
+            A::OpenModal(DRAFT),
+        ),
+        (
+            "the draft warning closes: keep editing",
+            with(Overlay::AppModal(DRAFT), dirty_settings()),
+            A::CloseModal,
+        ),
+        (
+            "the draft warning closes while its save is pending",
+            pending(with(Overlay::AppModal(DRAFT), dirty_settings())),
+            A::CloseModal,
+        ),
+        (
+            "a rebind cancels before the draft warning opens",
+            with(Overlay::Rebind, dirty_settings()),
+            A::CancelRebind,
+        ),
+        (
+            "a dropdown over an unapplied draft is egui's",
+            with(Overlay::Popup, dirty_settings()),
+            A::LeaveToEgui,
+        ),
+        (
+            "an unapplied draft waits for a pending save",
+            pending(dirty_settings()),
+            A::Ignore,
+        ),
+        (
+            "an unapplied draft matters only on Settings",
+            EscapeContext {
+                draft_dirty: true,
+                ..camp(Tab::Briefing)
+            },
+            A::GoTab(Tab::Home),
+        ),
     ];
-    assert!(rows.len() >= 45, "{} rows", rows.len());
+    assert!(rows.len() >= 52, "{} rows", rows.len());
     let failures: Vec<String> = rows
         .iter()
         .filter_map(|(name, cx, expected)| {
@@ -354,8 +403,8 @@ fn every_context() -> Vec<EscapeContext> {
     for screen in Screen::ALL {
         for tab in TABS {
             for overlay in OVERLAYS {
-                for bits in 0u8..128 {
-                    let bit = |n: u8| bits & (1 << n) != 0;
+                for bits in 0u16..256 {
+                    let bit = |n: u16| bits & (1 << n) != 0;
                     all.push(EscapeContext {
                         screen,
                         tab,
@@ -367,6 +416,7 @@ fn every_context() -> Vec<EscapeContext> {
                         durable_pending: bit(4),
                         pause_is_escape: bit(5),
                         construction: bit(6),
+                        draft_dirty: bit(7),
                     });
                 }
             }
@@ -388,7 +438,7 @@ fn follow(cx: EscapeContext, action: EscapeAction) -> Option<EscapeContext> {
 #[test]
 fn properties() {
     let all = every_context();
-    assert_eq!(all.len(), 7 * 9 * 11 * 128);
+    assert_eq!(all.len(), 7 * 9 * 12 * 256);
     for cx in all {
         let action = escape_action(&cx);
         // A focused text field and an open popup keep Escape for egui, and
@@ -438,6 +488,28 @@ fn properties() {
                 assert_ne!(screen, cx.screen, "{cx:?}");
             }
             _ => {}
+        }
+        // An unapplied difficulty draft matters only on Settings, where a
+        // bare Escape opens the draft warning instead of leaving.
+        if cx.screen != Screen::Settings {
+            assert_eq!(
+                action,
+                escape_action(&EscapeContext {
+                    draft_dirty: false,
+                    ..cx
+                }),
+                "{cx:?}"
+            );
+        } else if cx.overlay == Overlay::None && !cx.durable_pending {
+            assert_eq!(
+                action,
+                if cx.draft_dirty {
+                    A::OpenModal(ModalKind::DraftWarning)
+                } else {
+                    A::SettingsBack
+                },
+                "{cx:?}"
+            );
         }
         // The tab matters only on the camp.
         if cx.screen != Screen::Camp {

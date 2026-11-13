@@ -5,7 +5,11 @@
 //!
 //! A storage error (UX-08, §4 "Storage modal") takes the slot from whatever
 //! modal is open: the preempted modal is dropped, not queued.
-use super::{StatusUi, UiCtx, primary_action::primary_in_modal};
+//!
+//! The draft warning (UX-09, §4 "Settings") opens when a Settings leave
+//! route meets an unapplied difficulty draft: "Apply and return", "Discard
+//! and return" or "Keep editing" (which Escape and a backdrop click also do).
+use super::{StatusUi, UiCtx, preferences::DraftState, primary_action::primary_in_modal};
 use crate::{
     art::{MUTED, RED},
     runner::{AppCommand, SaveIntent},
@@ -21,6 +25,18 @@ pub(crate) enum AppModal {
     ReturnToMenu,
     /// A save, load or settings read failed.
     Storage(StorageError),
+    /// Leaving Settings by `then` would drop an unapplied difficulty draft.
+    DraftWarning { then: LeaveSettings },
+}
+
+/// The Settings leave route a draft warning interrupted.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum LeaveSettings {
+    /// Save and return to the screen Settings was opened from (the amber
+    /// primary and Escape).
+    Back,
+    /// "Save and return to main menu".
+    Menu,
 }
 
 /// What the storage modal reports.
@@ -46,6 +62,7 @@ pub(crate) enum ModalKind {
     Quit,
     ReturnToMenu,
     Storage,
+    DraftWarning,
 }
 
 impl AppModal {
@@ -54,15 +71,19 @@ impl AppModal {
             Self::Quit => ModalKind::Quit,
             Self::ReturnToMenu => ModalKind::ReturnToMenu,
             Self::Storage(_) => ModalKind::Storage,
+            Self::DraftWarning { .. } => ModalKind::DraftWarning,
         }
     }
     /// The confirmation an Escape press opens. A storage modal is opened by
-    /// its error, never by a key.
+    /// its error, never by a key. Escape leaves Settings by its Back route.
     pub(super) fn confirmation(kind: ModalKind) -> Option<Self> {
         match kind {
             ModalKind::Quit => Some(Self::Quit),
             ModalKind::ReturnToMenu => Some(Self::ReturnToMenu),
             ModalKind::Storage => None,
+            ModalKind::DraftWarning => Some(Self::DraftWarning {
+                then: LeaveSettings::Back,
+            }),
         }
     }
 }
@@ -86,6 +107,15 @@ fn confirmation_text(quit: bool) -> (&'static str, &'static str, &'static str) {
 
 /// The label of the button that keeps the player where they are.
 pub(super) const STAY: &str = "Stay";
+
+/// The draft warning (design-ux-flow §4 "Settings").
+pub(super) const DRAFT_WARNING_TITLE: &str = "Unapplied difficulty changes";
+pub(super) const APPLY_AND_RETURN: &str = "Apply and return";
+pub(super) const DISCARD_AND_RETURN: &str = "Discard and return";
+pub(super) const KEEP_EDITING: &str = "Keep editing";
+/// Why "Apply and return" is disabled; the Settings Apply button says the
+/// same.
+pub(super) const FIX_DRAFT_FIRST: &str = "Fix the highlighted value first.";
 
 /// Storage modal titles.
 pub(super) const SAVE_FAILED_TITLE: &str = "Save failed";
@@ -166,6 +196,7 @@ pub(super) fn show(ctx: &egui::Context, f: &mut UiCtx) {
     match f.status.modal.clone() {
         None => {}
         Some(AppModal::Storage(error)) => show_storage(ctx, f, &error),
+        Some(AppModal::DraftWarning { then }) => show_draft_warning(ctx, f, then),
         Some(modal) => show_confirmation(ctx, f, modal == AppModal::Quit),
     }
 }
@@ -202,6 +233,71 @@ fn show_confirmation(ctx: &egui::Context, f: &mut UiCtx, quit: bool) {
         }
         Some(false) => f.status.close_modal(),
         // A backdrop click stays, as "Stay" does.
+        None if shown.should_close() => f.status.close_modal(),
+        None => {}
+    }
+}
+
+/// What a click in the draft warning asks for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum DraftChoice {
+    Apply,
+    Discard,
+    Keep,
+}
+
+/// The draft warning: the difficulty draft differs from what the next run
+/// uses, and leaving Settings would drop it.
+fn show_draft_warning(ctx: &egui::Context, f: &mut UiCtx, then: LeaveSettings) {
+    let pending = f.runtime.durable_transition_pending() || f.status.save_pending;
+    let draft = f.balance_draft_state();
+    let shown = egui::Modal::new(egui::Id::new("lastlight_app_modal")).show(ctx, |ui| {
+        ui.set_max_width(440.0);
+        ui.heading(DRAFT_WARNING_TITLE);
+        ui.label(
+            "The difficulty draft differs from what the next run uses.              Leaving Settings without applying it drops the draft.",
+        );
+        let invalid = matches!(draft, DraftState::Invalid);
+        if invalid {
+            // Readable without hovering the disabled button.
+            ui.label(RichText::new(FIX_DRAFT_FIRST).color(RED));
+        }
+        ui.add_space(10.0);
+        let mut choice = None;
+        ui.horizontal_wrapped(|ui| {
+            ui.add_enabled_ui(!pending, |ui| {
+                ui.add_enabled_ui(!invalid, |ui| {
+                    if primary_in_modal(ui, APPLY_AND_RETURN)
+                        .on_disabled_hover_text(FIX_DRAFT_FIRST)
+                        .clicked()
+                    {
+                        choice = Some(DraftChoice::Apply);
+                    }
+                });
+                if ui.button(DISCARD_AND_RETURN).clicked() {
+                    choice = Some(DraftChoice::Discard);
+                }
+            });
+            if ui.button(KEEP_EDITING).clicked() {
+                choice = Some(DraftChoice::Keep);
+            }
+        });
+        choice
+    });
+    match shown.inner {
+        Some(DraftChoice::Apply) => {
+            f.status.modal = None;
+            // The steps are queued ahead of the save, so the save holds them.
+            f.apply_balance_draft(draft);
+            f.finish_leaving_settings(then);
+        }
+        Some(DraftChoice::Discard) => {
+            f.status.modal = None;
+            f.discard_balance_draft();
+            f.finish_leaving_settings(then);
+        }
+        Some(DraftChoice::Keep) => f.status.close_modal(),
+        // A backdrop click keeps editing, as Escape does.
         None if shown.should_close() => f.status.close_modal(),
         None => {}
     }

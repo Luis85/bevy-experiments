@@ -10,10 +10,13 @@
 //! the screen answers: the menu asks to quit, a camp tab goes back to Camp
 //! home, Camp home and Results ask to return to the main menu, and the battle
 //! closes construction or, only when Pause is bound to Escape (decision 18),
-//! passes the press on to the Pause binding.
+//! passes the press on to the Pause binding. Settings saves and returns,
+//! unless the difficulty draft is unapplied: then the press opens the draft
+//! warning, and the next one closes it ("Keep editing").
 use super::{
     Screen, Tab, UiCtx,
     modal::{AppModal, ModalKind},
+    preferences::DraftState,
 };
 use crate::{runner::SaveIntent, settings::Action};
 use bevy_egui::egui;
@@ -36,6 +39,9 @@ pub(super) struct EscapeContext {
     /// A durable transition (menu, quit or settings-return save, a reset) or
     /// a save is pending: Escape does not navigate.
     pub(super) durable_pending: bool,
+    /// The Settings difficulty draft is unapplied (`DraftState` is not
+    /// `Clean`).
+    pub(super) draft_dirty: bool,
     /// `bindings[Pause] == "Escape"`.
     pub(super) pause_is_escape: bool,
     /// The battle's construction overlay is open.
@@ -82,7 +88,7 @@ pub(super) enum EscapeAction {
     Go(Screen),
     OpenModal(ModalKind),
     CloseHistory,
-    /// Settings save and return.
+    /// Settings save and return, with no unapplied difficulty draft.
     SettingsBack,
     /// Left to the Pause binding, which is Escape.
     PassToPause,
@@ -153,6 +159,8 @@ fn screen_action(cx: &EscapeContext) -> EscapeAction {
         Screen::Battle => A::Ignore,
         Screen::Results => A::OpenModal(ModalKind::ReturnToMenu),
         Screen::History => A::CloseHistory,
+        // An unapplied difficulty draft is never dropped silently (UX-09).
+        Screen::Settings if cx.draft_dirty => A::OpenModal(ModalKind::DraftWarning),
         Screen::Settings => A::SettingsBack,
     }
 }
@@ -221,6 +229,7 @@ pub(super) fn escape_context(ctx: &egui::Context, f: &UiCtx) -> EscapeContext {
         durable_pending: f.runtime.durable_transition_pending()
             || f.runtime.reset_in_progress()
             || f.status.save_pending,
+        draft_dirty: f.screen == Screen::Settings && f.balance_draft_state() != DraftState::Clean,
         pause_is_escape: f.settings.bindings[Action::Pause as usize] == "Escape",
         construction: f.battle.construction,
     }

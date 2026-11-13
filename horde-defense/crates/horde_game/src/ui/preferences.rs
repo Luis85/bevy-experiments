@@ -1,15 +1,21 @@
 //! Settings presentation. Changes persist through the existing save-and-return intent.
-use super::{Screen, UiCtx, chrome, muted, primary, status};
+use super::{
+    Screen, UiCtx, chrome,
+    modal::{AppModal, FIX_DRAFT_FIRST, LeaveSettings},
+    muted, primary, status,
+};
 use crate::{
     art::{AMBER, INK, RED},
     runner::SaveIntent,
     settings::{Action, Settings},
 };
 use bevy_egui::egui;
-use horde_core::command::Command;
+use horde_core::{campaign::Campaign, command::Command};
 
 pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
-    // Escape saves and returns through the router (ui/escape.rs).
+    // Escape saves and returns through the router (ui/escape.rs). Every
+    // leave route meets the draft warning when the difficulty draft is
+    // unapplied (`leave_settings`).
     let ctx = root.ctx().clone();
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK).inner_margin(20))
@@ -18,12 +24,12 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
                 chrome::page_title(ui, "Settings", "");
                 ui.add_enabled_ui(!f.runtime.durable_transition_pending(), |ui| {
                     if primary(ui, f.settings_return_label()).clicked() {
-                        f.request_save(SaveIntent::SettingsBack);
+                        f.leave_settings(LeaveSettings::Back);
                     }
                     if !matches!(f.nav.return_screen, Screen::Menu | Screen::SurvivorSelection | Screen::Settings)
                         && ui.button("Save and return to main menu").clicked()
                     {
-                        f.save_settings_to_menu();
+                        f.leave_settings(LeaveSettings::Menu);
                     }
                 });
             });
@@ -260,43 +266,99 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
                 "Draft next deployment at your level: {draft_lanes} lanes · {draft_width:.0} yd path"
             ),
         );
-        // Pending when applying would change the saved settings or the
-        // extras basis (the same values edited from another preset). With
-        // the Custom chip chosen, an unedited named draft applies as Custom
-        // on that preset's basis (R21), in the core's steps.
-        let outcome = if *custom_chosen {
-            campaign.custom_balance_outcome(draft.clone())
-        } else {
-            campaign.balance_outcome(draft.clone())
-        };
-        let changed = outcome != Ok((committed.clone(), campaign.balance_extras_basis));
+        let state = draft_state(campaign, draft, *custom_chosen);
+        let changed = state != DraftState::Clean;
         let apply = ui
             .add_enabled(
                 valid.is_ok() && changed,
                 egui::Button::new("Apply to next run"),
             )
             .on_disabled_hover_text(if valid.is_err() {
-                "Fix the highlighted value first."
+                FIX_DRAFT_FIRST
             } else {
                 "Nothing to apply: the draft matches the next run."
             })
             .clicked();
         if changed {
-            muted(ui, "Unapplied draft. Apply before saving and returning.");
+            muted(ui, UNAPPLIED_DRAFT);
         }
-        apply.then(|| {
-            if *custom_chosen {
-                horde_core::campaign::Campaign::custom_balance_steps(draft)
-            } else {
-                vec![draft.clone()]
-            }
-        })
+        apply.then_some(state)
     };
-    if let Some(steps) = apply {
-        // Only the last step reports success; the steps apply in order.
+    if let Some(state) = apply {
+        f.apply_balance_draft(state);
+    }
+    ui.separator();
+}
+
+/// The note under an unapplied difficulty draft. Leaving with one opens the
+/// draft warning.
+pub(super) const UNAPPLIED_DRAFT: &str = "Unapplied draft. Apply before saving and returning.";
+
+/// How the difficulty draft stands against what the next run uses.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum DraftState {
+    /// Applying it would change nothing.
+    Clean,
+    /// Applying it would change the saved settings or the extras basis:
+    /// the `SetBalance` settings to send, in order.
+    Pending(Vec<horde_core::balance::BalanceSettings>),
+    /// It fails validation, so it cannot be applied.
+    Invalid,
+}
+
+/// The state of `draft`. It is pending when applying would change the saved
+/// settings or the extras basis (the same values edited from another
+/// preset). With the Custom chip chosen, an unedited named draft applies as
+/// Custom on that preset's basis (R21), in the core's steps.
+pub(super) fn draft_state(
+    campaign: &Campaign,
+    draft: &horde_core::balance::BalanceSettings,
+    custom_chosen: bool,
+) -> DraftState {
+    let outcome = if custom_chosen {
+        campaign.custom_balance_outcome(draft.clone())
+    } else {
+        campaign.balance_outcome(draft.clone())
+    };
+    match outcome {
+        Err(_) => DraftState::Invalid,
+        Ok(outcome)
+            if outcome
+                == (
+                    campaign.balance_settings.clone(),
+                    campaign.balance_extras_basis,
+                ) =>
+        {
+            DraftState::Clean
+        }
+        Ok(_) if custom_chosen => DraftState::Pending(Campaign::custom_balance_steps(draft)),
+        Ok(_) => DraftState::Pending(vec![draft.clone()]),
+    }
+}
+
+impl UiCtx<'_> {
+    /// The state of the difficulty draft; clean before Settings first opens.
+    pub(super) fn balance_draft_state(&self) -> DraftState {
+        self.prefs
+            .balance_draft
+            .as_ref()
+            .map_or(DraftState::Clean, |draft| {
+                draft_state(
+                    self.game.campaign(),
+                    draft,
+                    self.prefs.balance_custom_chosen,
+                )
+            })
+    }
+    /// Queues the `SetBalance` steps of a pending draft, in order. Only the
+    /// last step reports success.
+    pub(super) fn apply_balance_draft(&mut self, state: DraftState) {
+        let DraftState::Pending(steps) = state else {
+            return;
+        };
         let last = steps.len().saturating_sub(1);
         for (step, settings) in steps.into_iter().enumerate() {
-            f.dispatch(
+            self.dispatch(
                 Command::SetBalance(settings),
                 if step == last {
                     "Difficulty saved for the next deployment. Active fields are unchanged."
@@ -306,5 +368,28 @@ fn gameplay_settings(ui: &mut egui::Ui, f: &mut UiCtx) {
             );
         }
     }
-    ui.separator();
+    /// Drops the difficulty draft: it shows the next run's settings again.
+    pub(super) fn discard_balance_draft(&mut self) {
+        self.prefs.balance_draft = Some(self.game.campaign().balance_settings.clone());
+        self.prefs.balance_custom_chosen = false;
+    }
+    /// A Settings leave route (the primary, "Save and return to main menu",
+    /// Escape): an unapplied difficulty draft opens the draft warning
+    /// (UX-09) instead of being dropped silently; otherwise it leaves.
+    pub(super) fn leave_settings(&mut self, then: LeaveSettings) {
+        if self.balance_draft_state() == DraftState::Clean {
+            self.finish_leaving_settings(then);
+        } else {
+            // A waiting rebind prompt would capture the modal's click.
+            self.prefs.rebind = None;
+            self.status.modal = Some(AppModal::DraftWarning { then });
+        }
+    }
+    /// Saves and leaves Settings by `then`, whatever the draft holds.
+    pub(super) fn finish_leaving_settings(&mut self, then: LeaveSettings) {
+        match then {
+            LeaveSettings::Back => self.request_save(SaveIntent::SettingsBack),
+            LeaveSettings::Menu => self.save_settings_to_menu(),
+        }
+    }
 }

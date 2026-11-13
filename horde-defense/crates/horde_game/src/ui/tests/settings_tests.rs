@@ -673,3 +673,195 @@ fn escape_cancels_a_rebind_instead_of_binding_escape() {
     assert_eq!(f.settings.bindings[Action::Reload as usize], "R");
     assert_eq!(f.settings.bindings[Action::Pause as usize], "Escape");
 }
+
+/// The labels of the last frame's modal primaries.
+fn modal_primaries(h: &Harness) -> Vec<String> {
+    h.primaries()
+        .into_iter()
+        .filter(|record| record.surface == Surface::Modal)
+        .map(|record| record.label)
+        .collect()
+}
+
+/// Settings opened from the camp on a committed Normal, with the Hard preset
+/// chosen and not applied.
+fn settings_with_unapplied_hard(h: &Harness, f: &mut FrontendParts) {
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    f.game
+        .apply(&Command::SetBalance(BalanceSettings::for_preset(
+            BalancePreset::Normal,
+        )))
+        .unwrap();
+    f.act(|c| c.open_settings());
+    f.flush_for_test();
+    assert!(f.screen == Screen::Settings);
+    h.click(f, View::Full, "Hard");
+    assert_eq!(
+        f.prefs.balance_draft,
+        Some(BalanceSettings::for_preset(BalancePreset::Hard))
+    );
+}
+
+/// W3-07 (UX-09, G2.6): Escape on Settings with an unapplied difficulty
+/// draft opens the draft warning instead of saving and dropping the draft.
+/// Escape again keeps editing; "Discard and return" and "Apply and return"
+/// leave by the route the press asked for.
+#[test]
+fn dirty_draft_escape_opens_warning() {
+    use crate::ui::modal::{
+        APPLY_AND_RETURN, AppModal, DISCARD_AND_RETURN, DRAFT_WARNING_TITLE, KEEP_EDITING,
+        LeaveSettings,
+    };
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    let normal = BalanceSettings::for_preset(BalancePreset::Normal);
+    let hard = BalanceSettings::for_preset(BalancePreset::Hard);
+    let warning = Some(AppModal::DraftWarning {
+        then: LeaveSettings::Back,
+    });
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    settings_with_unapplied_hard(&h, f);
+
+    h.key(f, View::Full, Key::Escape);
+    assert_eq!(f.status.modal, warning);
+    assert!(f.screen == Screen::Settings);
+    assert!(!f.status.save_pending, "nothing is saved yet");
+    assert_eq!(f.game.campaign().balance_settings, normal);
+    h.frame(f, View::Full, vec![]);
+    let output = h.frame(f, View::Full, vec![]);
+    assert_eq!(text_count(&output, DRAFT_WARNING_TITLE), 1);
+    assert_eq!(text_count(&output, DISCARD_AND_RETURN), 1);
+    assert_eq!(text_count(&output, KEEP_EDITING), 1);
+    assert_eq!(modal_primaries(&h), [APPLY_AND_RETURN]);
+
+    // Escape keeps editing: the modal closes and the draft is still there.
+    h.key(f, View::Full, Key::Escape);
+    assert_eq!(f.status.modal, None);
+    assert!(f.screen == Screen::Settings);
+    assert_eq!(f.prefs.balance_draft, Some(hard.clone()));
+    // So does "Keep editing".
+    h.key(f, View::Full, Key::Escape);
+    h.click(f, View::Full, KEEP_EDITING);
+    assert_eq!(f.status.modal, None);
+    assert!(f.screen == Screen::Settings);
+    assert_eq!(f.prefs.balance_draft, Some(hard.clone()));
+
+    // "Discard and return" drops the draft and saves back to the camp.
+    h.key(f, View::Full, Key::Escape);
+    assert_eq!(f.status.modal, warning);
+    h.click(f, View::Full, DISCARD_AND_RETURN);
+    assert_eq!(f.status.modal, None);
+    assert!(f.screen == Screen::Camp, "{}", f.status.message);
+    assert_eq!(f.game.campaign().balance_settings, normal);
+    assert_eq!(f.prefs.balance_draft, Some(normal.clone()));
+    let saved = Game::load(&f.paths.campaign()).unwrap();
+    assert_eq!(saved.campaign().balance_settings, normal);
+
+    // "Apply and return" applies the draft before the save, then returns.
+    settings_with_unapplied_hard(&h, f);
+    h.key(f, View::Full, Key::Escape);
+    assert_eq!(f.status.modal, warning);
+    h.click(f, View::Full, APPLY_AND_RETURN);
+    assert_eq!(f.status.modal, None);
+    assert!(f.screen == Screen::Camp, "{}", f.status.message);
+    assert_eq!(f.game.campaign().balance_settings, hard);
+    let saved = Game::load(&f.paths.campaign()).unwrap();
+    assert_eq!(saved.campaign().balance_settings, hard);
+
+    // A draft applied on the screen is not unapplied: Escape just leaves.
+    f.act(|c| c.open_settings());
+    f.flush_for_test();
+    h.click(f, View::Full, "Easy");
+    h.click(f, View::Full, "Apply to next run");
+    h.key(f, View::Full, Key::Escape);
+    assert_eq!(f.status.modal, None);
+    assert!(f.screen == Screen::Camp, "{}", f.status.message);
+    assert_eq!(
+        f.game.campaign().balance_settings,
+        BalanceSettings::for_preset(BalancePreset::Easy)
+    );
+}
+
+/// W3-07: the two leave buttons meet the same warning, and it remembers
+/// which route to finish.
+#[test]
+fn dirty_draft_leave_buttons_open_warning_for_their_route() {
+    use crate::ui::modal::{APPLY_AND_RETURN, AppModal, KEEP_EDITING, LeaveSettings};
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    let hard = BalanceSettings::for_preset(BalancePreset::Hard);
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    settings_with_unapplied_hard(&h, f);
+
+    // The amber primary.
+    h.click(f, View::Full, "Save and return to camp");
+    assert_eq!(
+        f.status.modal,
+        Some(AppModal::DraftWarning {
+            then: LeaveSettings::Back
+        })
+    );
+    assert!(f.screen == Screen::Settings);
+    assert!(!f.status.save_pending);
+    h.click(f, View::Full, KEEP_EDITING);
+    assert_eq!(f.status.modal, None);
+
+    // "Save and return to main menu".
+    h.click(f, View::Full, "Save and return to main menu");
+    assert_eq!(
+        f.status.modal,
+        Some(AppModal::DraftWarning {
+            then: LeaveSettings::Menu
+        })
+    );
+    assert!(f.screen == Screen::Settings);
+    assert!(!f.status.save_pending);
+    h.click(f, View::Full, APPLY_AND_RETURN);
+    assert_eq!(f.status.modal, None);
+    assert!(f.screen == Screen::Menu, "{}", f.status.message);
+    let saved = Game::load(&f.paths.campaign()).unwrap();
+    assert_eq!(saved.campaign().balance_settings, hard);
+    assert!(saved.global_paused());
+}
+
+/// W3-07: a draft that fails validation cannot be applied from the warning;
+/// it says why without a hover, and can still be discarded.
+#[test]
+fn invalid_draft_warning_disables_apply_and_still_discards() {
+    use crate::ui::modal::{
+        APPLY_AND_RETURN, AppModal, DISCARD_AND_RETURN, FIX_DRAFT_FIRST, LeaveSettings,
+    };
+    use horde_core::balance::{BalancePreset, BalanceSettings};
+    let normal = BalanceSettings::for_preset(BalancePreset::Normal);
+    let warning = Some(AppModal::DraftWarning {
+        then: LeaveSettings::Back,
+    });
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    settings_with_unapplied_hard(&h, f);
+    let draft = f.prefs.balance_draft.as_mut().unwrap();
+    draft.start_lanes = 17;
+    draft.max_lanes = 3;
+    assert!(draft.validate().is_err());
+
+    h.key(f, View::Full, Key::Escape);
+    assert_eq!(f.status.modal, warning);
+    h.frame(f, View::Full, vec![]);
+    let output = h.frame(f, View::Full, vec![]);
+    assert_eq!(text_count(&output, FIX_DRAFT_FIRST), 1);
+    // The disabled primary does nothing.
+    h.click(f, View::Full, APPLY_AND_RETURN);
+    assert_eq!(f.status.modal, warning);
+    assert!(f.screen == Screen::Settings);
+    assert!(!f.status.save_pending);
+    assert_eq!(f.game.campaign().balance_settings, normal);
+
+    h.click(f, View::Full, DISCARD_AND_RETURN);
+    assert_eq!(f.status.modal, None);
+    assert!(f.screen == Screen::Camp, "{}", f.status.message);
+    assert_eq!(f.game.campaign().balance_settings, normal);
+    assert_eq!(f.prefs.balance_draft, Some(normal));
+}
