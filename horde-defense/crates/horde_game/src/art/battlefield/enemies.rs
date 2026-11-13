@@ -1,25 +1,21 @@
-//! Bodies and live hostiles: sprite, shadow, contact and windup gauges, impact
-//! light, health and boss callouts, and a holding boss's phase ring and label.
+//! Live hostiles in two passes. World pass ([`bodies`]): one shadow mesh
+//! and one sprite mesh in the view's painter order (lane feet, x descending,
+//! id; hostiles at their crowd-staggered spot) with each hit flash right
+//! after its sprite, whatever their number ([`super::batch::FieldMeshes`]).
+//! Rejected enemy art keeps the per-enemy procedural figure path.
 //!
-//! Hostiles paint as layered meshes ([`super::batch::FieldMeshes`]) whatever
-//! their number: the underlay (one contact band per lane, a holding boss's
-//! phase ring, one windup ground ring per stack), one
-//! shadow mesh, one sprite mesh in the view's painter order (lane feet, x
-//! descending, id; hostiles at their crowd-staggered spot) with each hit flash
-//! right after its sprite, the overlay (a ranged windup's dashed aim line,
-//! outline, stun and windup rings, health and windup bars), then the callout
-//! text, a holding boss's name and "PHASE n - NAME" last, moved as one
-//! block so the clip never stacks them on one row. Rejected enemy art keeps
-//! the per-enemy procedural figure path.
-use super::super::{AMBER, ArenaProjection, GREEN, RED, bar, figure, line, soft_shadow};
-use super::batch::{FieldMeshes, MeshBuilder};
+//! Cue pass ([`cues`], after the lighting grade): contact bands and gauges,
+//! windup rings and bars, a ranged windup's dashed aim line, outlines, stun
+//! rings, health bars, a holding boss's phase ring, then the callouts, each
+//! on its INK backing ([`super::cue`]).
+use super::super::{AMBER, ArenaProjection, GREEN, RED, figure, soft_shadow};
+use super::batch::FieldMeshes;
+use super::cue::{self, CueBatch, Label};
 use crate::{
     battle_view::{BattleViewModel, BossPhaseView, ContactView, EnemyView, HealthView},
     visual_assets::{self, Actor, ArtTextures, HitFlash},
 };
-use bevy_egui::egui::{
-    self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, Vec2, pos2, vec2,
-};
+use bevy_egui::egui::{Align2, Color32 as C, Painter, Pos2, Rect, Vec2, vec2};
 
 /// The box a hostile's sprite is fitted into: `figure_height` tall, centred
 /// on its drawn spot `at`.
@@ -39,9 +35,6 @@ pub(crate) fn body_box(
         body_size(height.pixels(arena.lane_height())),
     )
 }
-
-/// Segments of the batched outline, stun and windup rings.
-const RING_SEGMENTS: u32 = 20;
 
 pub(super) fn tint(rgba: Option<[f32; 4]>) -> C {
     rgba.map_or(C::WHITE, |v| {
@@ -74,7 +67,9 @@ pub(super) struct HostilesDrawn {
     pub flash_quads: usize,
 }
 
-/// Paints every hostile and reports what it drew ([`HostilesDrawn`]).
+/// Paints every hostile's body and its cues at once (the passes
+/// [`bodies`] and [`cues`] back to back, with no grade between them).
+#[cfg(test)]
 pub(super) fn paint(
     p: &Painter,
     arena: ArenaProjection,
@@ -84,38 +79,28 @@ pub(super) fn paint(
     reduced: bool,
     rig_shadow: RigShadow,
 ) -> HostilesDrawn {
+    let drawn = bodies(p, arena, view, textures, reduced, rig_shadow);
+    let mut batch = CueBatch::new(view.enemies.len());
+    cues(&mut batch, arena, view, outlines, reduced);
+    batch.paint(p);
+    drawn
+}
+
+/// World pass: every hostile's shadow, sprite and hit flash, and reports
+/// what it drew ([`HostilesDrawn`]). Their gauges, rings and labels are
+/// [`cues`], painted after the grade.
+pub(super) fn bodies(
+    p: &Painter,
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    textures: ArtTextures,
+    reduced: bool,
+    rig_shadow: RigShadow,
+) -> HostilesDrawn {
     let sy = arena.lane_height();
-    // A holding boss's phase (W2-37): its ring under the bodies, its label
-    // last, stacked over the boss's name (which the per-body callouts then
-    // leave out).
-    let phase = holding_boss(view).map(|(boss, phase)| {
-        let [x, y] = boss.drawn();
-        let at = arena.world(x, y);
-        let (ring, label) = phase_anchors(at, sy, boss.height.pixels(sy));
-        let radii = phase_ring(sy, phase.hold_left_ticks, reduced);
-        let name = boss.label.map(|name| (name_anchor(at, sy), name));
-        (ring, radii, label, phase.label(), boss.id, name)
-    });
-    let stacked = phase.as_ref().map(|phase| phase.4);
     if textures.enemy_art_rejected {
-        for (lane, contact) in lane_contacts(view) {
-            let (band, gauge) = contact_band(arena, view, lane, contact);
-            p.rect_filled(band, 0.0, RED.gamma_multiply(0.18));
-            line(p, gauge[0], gauge[1], 3.0, gauge_color(contact));
-        }
-        if let Some((ring, radii, ..)) = &phase {
-            p.add(egui::Shape::ellipse_stroke(
-                *ring,
-                *radii,
-                Stroke::new(PHASE_RING_WIDTH, AMBER),
-            ));
-        }
-        for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
-            let named = stacked != Some(e.id);
-            enemy(p, arena, e, ring, textures, outlines, reduced, named);
-        }
-        if let Some((.., at, text, _, name)) = &phase {
-            phase_callouts(p, *at, text, *name);
+        for e in &view.enemies {
+            enemy(p, arena, e, textures, reduced);
         }
         return HostilesDrawn::default();
     }
@@ -126,29 +111,13 @@ pub(super) fn paint(
     let masks = visual_assets::flash_masks(p.ctx());
     let mut layers = FieldMeshes::new(textures, view.enemies.len());
     let mut figures = Vec::new();
-    let mut labels = Vec::new();
     layers
         .shadows
         .shadow(rig_shadow.at, rig_shadow.size, rig_shadow.alpha);
-    for (lane, contact) in lane_contacts(view) {
-        let (band, gauge) = contact_band(arena, view, lane, contact);
-        layers.underlay.quad(band, RED.gamma_multiply(0.18));
-        layers
-            .underlay
-            .line(gauge[0], gauge[1], 3.0, gauge_color(contact));
-    }
-    if let Some((ring, radii, ..)) = &phase {
-        layers
-            .underlay
-            .ring(*ring, *radii, PHASE_RING_WIDTH, RING_SEGMENTS, AMBER);
-    }
-    for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
+    for e in &view.enemies {
         let [x, y] = e.drawn();
         let at = arena.world(x, y);
         let pose = &e.pose;
-        if ring {
-            windup_ring(&mut layers.underlay, sy, at);
-        }
         let actor = e.sprite.map(Actor::Enemy);
         let has_walk = e.sprite.is_some_and(|s| s.is_walk()) && textures.walkers.is_some();
         let painted_at = arena.world(
@@ -183,28 +152,7 @@ pub(super) fn paint(
             }
             _ => figures.push((painted_at, e)),
         }
-        if let Some(to) = e.aim_target {
-            for [a, b] in aim_dashes(at, arena.world(to[0], to[1]), sy) {
-                layers.overlay.line(a, b, AIM_WIDTH, RED);
-            }
-        }
-        overlay(&mut layers.overlay, sy, e, at, outlines);
-        match e.health {
-            HealthView::Critical => labels.push((
-                at + vec2(0.0, -sy * 0.44),
-                Align2::CENTER_BOTTOM,
-                "CRIT · FIGHTING",
-                8.0,
-            )),
-            HealthView::Bar { .. } | HealthView::Hidden => {}
-        }
-        if let Some(label) = e.label
-            && stacked != Some(e.id)
-        {
-            labels.push((name_anchor(at, sy), Align2::CENTER_CENTER, label, 10.0));
-        }
     }
-    layers.underlay.paint(p);
     layers.shadows.paint(p);
     layers.actors.paint(p);
     // A sprite missing from its sheet (never a rejected catalogue) falls back
@@ -220,15 +168,119 @@ pub(super) fn paint(
             false,
         );
     }
-    layers.overlay.paint(p);
-    for (at, align, text, size) in labels {
-        callout(p, at, align, text, size);
-    }
-    if let Some((.., at, text, _, name)) = &phase {
-        phase_callouts(p, *at, text, *name);
-    }
     drawn
 }
+
+/// Cue pass: collects every hostile cue into `batch`, the same for batched
+/// and rejected art. One contact band and gauge per lane, a holding boss's
+/// phase ring (W2-37), one windup ground ring per stack, each ranged
+/// windup's dashed aim line (W2-28), the outline, windup bar, stun ring and
+/// health bar of each body, then its callouts; a holding boss's name and
+/// "PHASE n - NAME" last, as one block.
+pub(super) fn cues(
+    batch: &mut CueBatch,
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    outlines: bool,
+    reduced: bool,
+) {
+    let sy = arena.lane_height();
+    let font = cue::font(sy);
+    let bar = cue::bar_height(sy);
+    let holding = holding_boss(view);
+    let stacked = holding.map(|(boss, _)| boss.id);
+    for (lane, contact) in lane_contacts(view) {
+        let (band, gauge) = contact_band(arena, view, lane, contact);
+        batch.wash(band, RED.gamma_multiply(0.18));
+        batch.line(gauge[0], gauge[1], 3.0, gauge_color(contact));
+    }
+    if let Some((boss, phase)) = holding {
+        let [x, y] = boss.drawn();
+        let (ring, _) = phase_anchors(arena.world(x, y), sy, boss.height.pixels(sy));
+        batch.ellipse(
+            ring,
+            phase_ring(sy, phase.hold_left_ticks, reduced),
+            PHASE_RING_WIDTH,
+            AMBER,
+        );
+    }
+    for (e, ring) in view.enemies.iter().zip(windup_rings(view)) {
+        let [x, y] = e.drawn();
+        let at = arena.world(x, y);
+        if ring {
+            batch.ellipse(at + vec2(0., sy * 0.3), vec2(sy * 0.36, sy * 0.13), 2., RED);
+        }
+        if let Some(to) = e.aim_target {
+            for [a, b] in aim_dashes(at, arena.world(to[0], to[1]), sy) {
+                batch.line(a, b, AIM_WIDTH, RED);
+            }
+        }
+        if outlines {
+            batch.ellipse(at, Vec2::splat(sy * 0.4), 1., AMBER);
+        }
+        if let Some(progress) = e.windup {
+            batch.bar(
+                Rect::from_center_size(at + vec2(0., sy * 0.43), vec2(sy * 0.66, bar)),
+                progress,
+                RED,
+            );
+        }
+        if e.stunned {
+            batch.ellipse(at + vec2(0., -sy * 0.3), Vec2::splat(sy * 0.16), 1.4, AMBER);
+        }
+        match e.health {
+            HealthView::Bar { fraction, boss } => batch.bar(
+                Rect::from_center_size(
+                    at + vec2(0.0, -sy * HEALTH_BAR_LIFT),
+                    vec2(if boss { sy * 1.1 } else { sy * 0.65 }, bar),
+                ),
+                fraction,
+                if boss { AMBER } else { RED },
+            ),
+            HealthView::Critical => batch.label(Label::amber(
+                at + vec2(0.0, -sy * 0.44),
+                Align2::CENTER_BOTTOM,
+                "CRIT · FIGHTING",
+                font * CRIT_FONT,
+            )),
+            HealthView::Hidden => {}
+        }
+        if let Some(label) = e.label
+            && stacked != Some(e.id)
+        {
+            batch.label(Label::amber(
+                name_anchor(at, sy),
+                Align2::CENTER_CENTER,
+                label,
+                font,
+            ));
+        }
+    }
+    if let Some((boss, phase)) = holding {
+        let [x, y] = boss.drawn();
+        let at = arena.world(x, y);
+        let (_, label_at) = phase_anchors(at, sy, boss.height.pixels(sy));
+        let mut block = Vec::with_capacity(2);
+        if let Some(name) = boss.label {
+            block.push(Label::amber(
+                name_anchor(at, sy),
+                Align2::CENTER_CENTER,
+                name,
+                font,
+            ));
+        }
+        block.push(Label::amber(
+            label_at,
+            Align2::CENTER_BOTTOM,
+            phase.label(),
+            font,
+        ));
+        batch.label_block(block);
+    }
+}
+
+/// The CRIT callout's size, as a fraction of the cue font.
+const CRIT_FONT: f32 = 0.8;
 
 /// How far over its feet, in lane heights, a hostile's name callout is
 /// centred.
@@ -239,84 +291,8 @@ fn name_anchor(at: Pos2, sy: f32) -> Pos2 {
     at + vec2(0.0, -sy * NAME_LIFT)
 }
 
-/// A holding boss's "PHASE n - NAME" label, its bottom edge at `label_at`,
-/// stacked as one block with the boss's `name` callout when it has one.
-fn phase_callouts(p: &Painter, label_at: Pos2, text: &str, name: Option<(Pos2, &str)>) {
-    let label = (label_at, Align2::CENTER_BOTTOM, text, 10.0);
-    match name {
-        Some((at, name)) => callouts(p, [(at, Align2::CENTER_CENTER, name, 10.0), label]),
-        None => callouts(p, [label]),
-    }
-}
-
-/// How far inside the battlefield clip a hostile's callout stays.
-pub(super) const CALLOUT_MARGIN: f32 = 2.0;
-
-/// The INK backing under every hostile callout (CF-2-05), at the alpha the
-/// cue labels take (design-vfx-lighting.md, cue helpers).
-pub(super) const CALLOUT_BACKING: C = C::from_rgba_unmultiplied_const(17, 23, 24, 190);
-/// How far the backing reaches past its callout's text on every side.
-pub(super) const CALLOUT_PAD: f32 = 2.0;
-
-/// One amber callout: its anchor, the alignment there, its text and size.
-type Callout<'a> = (Pos2, Align2, &'a str, f32);
-
-/// A hostile's amber callout (boss name, EXPOSED, CRIT) anchored at `at` by
-/// `align`, moved the least that keeps the whole text `CALLOUT_MARGIN` inside
-/// the painter's clip, so a boss at the field's edge or in its top lane keeps
-/// a readable name (CF-1-11). An anchor already inside paints exactly where
-/// `Painter::text` did. Its text sits on a `CALLOUT_BACKING` plate padded
-/// `CALLOUT_PAD` round it, so it stays legible over the bodies behind
-/// (CF-2-05; the same in reduced effects).
-fn callout(p: &Painter, at: Pos2, align: Align2, text: &str, size: f32) {
-    callouts(p, [(at, align, text, size)]);
-}
-
-/// Callouts that move as one block, painted in order: each laid out at its
-/// anchor, then the block (their union) moved the least that keeps it
-/// `CALLOUT_MARGIN` inside the painter's clip, as [`callout`] moves one. A
-/// holding boss's name and phase label stack this way, so clamped in the
-/// top lane they keep their order and never overprint.
-fn callouts<const N: usize>(p: &Painter, group: [Callout<'_>; N]) {
-    let laid = group.map(|(at, align, text, size)| {
-        let galley = p.layout_no_wrap(text.to_owned(), FontId::proportional(size), AMBER);
-        (align.anchor_size(at, galley.size()), galley)
-    });
-    let block = laid
-        .iter()
-        .fold(Rect::NOTHING, |block, (rect, _)| block.union(*rect));
-    let clip = p.clip_rect().shrink(CALLOUT_MARGIN);
-    let min = pos2(
-        block
-            .min
-            .x
-            .min(clip.right() - block.width())
-            .max(clip.left()),
-        block
-            .min
-            .y
-            .min(clip.bottom() - block.height())
-            .max(clip.top()),
-    );
-    // Moved only when it would be cut: a block inside keeps its exact
-    // position, so callouts away from the edges paint as before.
-    let shift = if p.clip_rect().contains_rect(block) {
-        Vec2::ZERO
-    } else {
-        min - block.min
-    };
-    // Every backing first, so none covers a text of the block (CF-2-05).
-    for (rect, _) in &laid {
-        p.rect_filled(
-            rect.translate(shift).expand(CALLOUT_PAD),
-            2.0,
-            CALLOUT_BACKING,
-        );
-    }
-    for (rect, galley) in laid {
-        p.galley(rect.min + shift, galley, AMBER);
-    }
-}
+#[cfg(test)]
+pub(super) use super::cue::{CALLOUT_BACKING, CALLOUT_MARGIN, CALLOUT_PAD};
 
 /// The contact of each lane with a hostile on the line: one band per lane
 /// however many hostiles stack there (W1-69, enemies overlap), so the band
@@ -461,65 +437,10 @@ fn holding_boss(view: &BattleViewModel) -> Option<(&EnemyView, &BossPhaseView)> 
 
 /// How far over its feet, in lane heights, a hostile's health bar is centred.
 pub(crate) const HEALTH_BAR_LIFT: f32 = 0.41;
-/// The windup ground ring under the feet at `at`; the contact bands are drawn
-/// per lane first.
-fn windup_ring(mesh: &mut MeshBuilder, sy: f32, at: Pos2) {
-    mesh.ring(
-        at + vec2(0., sy * 0.3),
-        vec2(sy * 0.36, sy * 0.13),
-        2.,
-        RING_SEGMENTS,
-        RED,
-    );
-}
 
-/// Outline, windup bar, stun ring and health bar, above every sprite.
-fn overlay(mesh: &mut MeshBuilder, sy: f32, e: &EnemyView, at: Pos2, outlines: bool) {
-    if outlines {
-        mesh.ring(at, Vec2::splat(sy * 0.4), 1., RING_SEGMENTS, AMBER);
-    }
-    if let Some(progress) = e.windup {
-        mesh.bar(
-            Rect::from_center_size(at + vec2(0., sy * 0.43), vec2(sy * 0.66, 3.)),
-            progress,
-            RED,
-        );
-    }
-    if e.stunned {
-        mesh.ring(
-            at + vec2(0., -sy * 0.3),
-            Vec2::splat(sy * 0.16),
-            1.4,
-            RING_SEGMENTS,
-            AMBER,
-        );
-    }
-    if let HealthView::Bar { fraction, boss } = e.health {
-        mesh.bar(
-            Rect::from_center_size(
-                at + vec2(0.0, -sy * HEALTH_BAR_LIFT),
-                vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
-            ),
-            fraction,
-            if boss { AMBER } else { RED },
-        );
-    }
-}
-
-/// The per-enemy vector path for rejected enemy art: procedural figures.
-/// `named` is false for a holding boss, whose name stacks with its phase
-/// label after every body.
-#[allow(clippy::too_many_arguments)]
-fn enemy(
-    p: &Painter,
-    arena: ArenaProjection,
-    e: &EnemyView,
-    ring: bool,
-    textures: ArtTextures,
-    outlines: bool,
-    reduced: bool,
-    named: bool,
-) {
+/// The per-enemy body path for rejected enemy art: a procedural figure with
+/// its shadow and hit flash. Its cues are [`cues`], as for batched art.
+fn enemy(p: &Painter, arena: ArenaProjection, e: &EnemyView, textures: ArtTextures, reduced: bool) {
     let sy = arena.lane_height();
     let [x, y] = e.drawn();
     let at = arena.world(x, y);
@@ -531,29 +452,6 @@ fn enemy(
         y + if has_walk { 0. } else { pose.offset[1] },
     );
     let figure_height = e.height.pixels(sy);
-    if outlines {
-        p.circle_stroke(at, sy * 0.4, Stroke::new(1., AMBER));
-    }
-    if let Some(progress) = e.windup {
-        if ring {
-            p.add(egui::Shape::ellipse_stroke(
-                at + vec2(0., sy * 0.3),
-                vec2(sy * 0.36, sy * 0.13),
-                Stroke::new(2., RED),
-            ));
-        }
-        bar(
-            p,
-            Rect::from_center_size(at + vec2(0., sy * 0.43), vec2(sy * 0.66, 3.)),
-            progress,
-            RED,
-        );
-    }
-    if let Some(to) = e.aim_target {
-        for dash in aim_dashes(at, arena.world(to[0], to[1]), sy) {
-            p.line_segment(dash, Stroke::new(AIM_WIDTH, RED));
-        }
-    }
     soft_shadow(
         p,
         at + vec2(1., figure_height * 0.48),
@@ -592,36 +490,5 @@ fn enemy(
             HitFlash { strength, reduced },
             pose,
         );
-    }
-    if e.stunned {
-        p.circle_stroke(at + vec2(0., -sy * 0.3), sy * 0.16, Stroke::new(1.4, AMBER));
-    }
-    match e.health {
-        HealthView::Critical => {
-            callout(
-                p,
-                at + vec2(0.0, -sy * 0.44),
-                Align2::CENTER_BOTTOM,
-                "CRIT · FIGHTING",
-                8.0,
-            );
-        }
-        HealthView::Bar { fraction, boss } => {
-            bar(
-                p,
-                Rect::from_center_size(
-                    at + vec2(0.0, -sy * HEALTH_BAR_LIFT),
-                    vec2(if boss { sy * 1.1 } else { sy * 0.65 }, 3.0),
-                ),
-                fraction,
-                if boss { AMBER } else { RED },
-            );
-        }
-        HealthView::Hidden => {}
-    }
-    if let Some(label) = e.label
-        && named
-    {
-        callout(p, name_anchor(at, sy), Align2::CENTER_CENTER, label, 10.0);
     }
 }

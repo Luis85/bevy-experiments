@@ -105,7 +105,8 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     numbers: f.settings.numbers,
                     reduced: f.settings.reduced_effects,
                     blood: f.settings.blood,
-                    theme: view.theme,
+                    scene: art::SceneLook::of(view.theme, view.field.setting.as_ref()),
+                    canvas,
                     textures: f.textures,
                     // The construction panel is painted over the field below.
                     occluder: f.battle.construction.then_some(layout.construction_panel),
@@ -116,7 +117,6 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 perf.record_scene(drawn);
                 perf.record_battlefield_clip(field_painter.clip_rect());
             }
-            art::world_atmosphere(ui.painter(), canvas);
             if f.battle.low_hp {
                 // Over the field and the forest, under every HUD frame.
                 low_hp_edge(

@@ -52,13 +52,17 @@ pub const FX_LIFETIME_MAX_SECONDS: f64 = 2.0;
 /// ruling R22 (gates only tighten), never above the gate it replaces
 /// (`egui_measured.previous.gates`). The W2 review re-measure on the W2-47
 /// stress fixture (776075c), like the post-W1-69 one (4d599a5,
-/// `egui_measured.w1_69`), reaches 19 primitives in every scene, so
-/// 19 x 1.25 gives 24. The W1-51 measurement (a93e340) reached 47, which
-/// kept the 48 ceiling.
-pub const BATTLEFIELD_PRIMITIVES_MAX: usize = 24;
+/// `egui_measured.w1_69`), reached 19 primitives in every scene, so
+/// 19 x 1.25 gave 24. The W1-51 measurement (a93e340) reached 47, which
+/// kept the 48 ceiling. The W5-01 render-pass split (world, grade,
+/// vignette, cue pass) reaches 18 in every scene, so 18 x 1.25 = 22.5
+/// tightens the gate to 23.
+pub const BATTLEFIELD_PRIMITIVES_MAX: usize = 23;
 /// Most extra primitives 400 enemies may cost over 52.
 pub const PRIMITIVE_GROWTH_52_TO_400_MAX: usize = 2;
-/// Battlefield vertex gates per measured scene. The W2 review re-measure
+/// Battlefield vertex gates per measured scene. The W5-01 re-measure (cue
+/// halos) reaches progressed-peak 39,444 and stress 56,345; neither gate
+/// moves, by the same reasoning as before it. The W2 review re-measure
 /// (776075c, the W2-47 stress fixture) reaches progressed-peak 38,524
 /// (x 1.25 is above its 40,000 ceiling) and stress 52,325 with the corpse
 /// caps full (x 1.25 = 65,406.25; post-W1-69, 4d599a5: 49,502). That is

@@ -2,14 +2,15 @@ mod backdrop;
 mod battlefield;
 pub mod camera;
 mod figures;
+pub mod lighting;
 mod palette;
 mod projection;
 mod scenes;
 #[cfg(test)]
 mod tests;
 
+pub use backdrop::world_backdrop;
 use backdrop::{box_at, line, paint_ground};
-pub use backdrop::{world_atmosphere, world_backdrop};
 #[cfg(test)]
 pub(crate) use battlefield::reinforcements_anchor;
 pub(crate) use battlefield::{
@@ -23,6 +24,7 @@ pub use battlefield::{RenderOptions, battlefield, battlefield_for_attempt, sampl
 pub use camera::{FieldFit, fit_field};
 pub use figures::{bar, figure, structure};
 use figures::{soft_shadow, structure_fallback};
+pub use lighting::{SceneLook, scene_look};
 pub use palette::{AMBER, GREEN, INK, MUTED, PANEL, RED, TEXT};
 pub use projection::ArenaProjection;
 #[cfg(test)]

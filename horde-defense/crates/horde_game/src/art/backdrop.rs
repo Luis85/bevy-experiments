@@ -308,13 +308,11 @@ pub(super) fn peripheral_details(theme: usize, edge: usize) -> &'static [(Prop, 
     }
 }
 
-/// Apply after the actors so the complete world shares one gentle edge falloff.
-/// Central combat remains fully lit; the fixed aim origin and geometry do not move.
-pub fn world_atmosphere(p: &Painter, canvas: Rect) {
-    edge_shade(p, canvas);
-}
-
-fn edge_shade(p: &Painter, canvas: Rect) {
+/// The vignette pass of a battlefield (`battlefield::render`, after the
+/// lighting grade and under every cue): one gentle edge falloff over the
+/// complete world. Central combat remains fully lit; the fixed aim origin
+/// and geometry do not move.
+pub(super) fn edge_shade(p: &Painter, canvas: Rect) {
     let mut mesh = egui::epaint::Mesh::default();
     let depth = canvas.height().min(canvas.width()) * 0.16;
     // Smooth vertex color interpolation gives darker corners and gentler side

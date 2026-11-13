@@ -24,6 +24,7 @@ pub use placement::placement_preview;
 #[cfg(test)]
 pub use readouts::BossEvent;
 pub use readouts::{BossNotice, FieldHint, OrdnanceSlotView, ReticleReadout};
+pub(crate) use screen::biome_theme;
 pub use screen::{BattleScreen, arena_geometry};
 
 /// Per-thread counts of the battle view builds, for the once-per-egui-pass

@@ -1,6 +1,15 @@
-//! Egui renderer of a `BattleViewModel`, painted back to front: ground and
-//! weather, burning ground, construction grid, structures, bodies, hostiles,
-//! the survivor rig, thrown ordnance, event effects and impact particles.
+//! Egui renderer of a `BattleViewModel`, painted in passes (W5-01,
+//! design-vfx-lighting §2):
+//!
+//! 1. World: ground and weather, burning ground, structures, bodies,
+//!    hostiles, the survivor rig, thrown ordnance, event effects and impact
+//!    particles.
+//! 2. Grade: the stage's lighting over-rect across the whole canvas
+//!    (`super::lighting`), the forest backdrop included.
+//! 3. Vignette: the canvas edge falloff.
+//! 4. Construction grid, while construction is on.
+//! 5. Cues: every warning, gauge and label on its INK backing (`cue`), so
+//!    no grade or vignette dims a cue.
 //!
 //! Anything drawn per hostile, per body or per particle is batched into
 //! layer meshes (`batch`), so the primitive count does not grow with the
@@ -10,6 +19,7 @@
 //! impact-particle mesh.
 mod batch;
 mod corpses;
+mod cue;
 mod enemies;
 mod fx;
 mod ordnance;
@@ -28,7 +38,7 @@ pub(crate) use terrain::{
 #[cfg(test)]
 mod tests;
 
-use super::{ArenaProjection, RED, soft_shadow};
+use super::{ArenaProjection, RED, SceneLook, backdrop, lighting, soft_shadow};
 use crate::{
     animation::{self, SceneAnimation, SceneCache},
     battle_view::{BattleViewModel, SceneBlend},
@@ -36,7 +46,7 @@ use crate::{
     visual_assets::{self, ArtTextures},
 };
 use bevy::log::warn;
-use bevy_egui::egui::{self, Align2, FontId, Painter, Pos2, Rect, Stroke, pos2, vec2};
+use bevy_egui::egui::{self, Align2, FontId, Painter, Pos2, Rect, Vec2, pos2, vec2};
 use horde_core::sim::Attempt;
 
 pub struct RenderOptions {
@@ -45,7 +55,12 @@ pub struct RenderOptions {
     pub numbers: bool,
     pub reduced: bool,
     pub blood: bool,
-    pub theme: usize,
+    /// Backdrop theme, lighting grade and storm tag of the stage
+    /// ([`super::scene_look`]).
+    pub scene: SceneLook,
+    /// The whole canvas this field sits on (the window, or an observer's
+    /// box): the grade and the vignette cover it, clipped to it.
+    pub canvas: Rect,
     pub textures: ArtTextures,
     /// An opaque overlay painted over the field after it (the main battle's
     /// open construction panel; `None` for the observer and with the panel
@@ -127,45 +142,67 @@ fn render(
 ) -> enemies::HostilesDrawn {
     let textures = options.textures;
     let reduced = options.reduced;
-    terrain::paint(p, arena, options.theme, textures);
+    let fx_options = fx::FxOptions {
+        numbers: options.numbers,
+        reduced,
+        blood: options.blood,
+        textures,
+        occluder: options.occluder,
+    };
+    let mut batch = cue::CueBatch::new(view.enemies.len());
+    // 1. World pass.
+    terrain::paint(p, arena, options.scene.theme_index, textures);
     fx::ambient(p, arena, &view.particles);
     ordnance::fire_zones(p, arena, view, reduced, textures);
-    if options.construction {
-        terrain::construction_grid(p, arena, view, options.occluder);
-    }
     structures::paint(p, arena, view, textures);
     corpses::paint(p, arena, view, a, textures, options.blood);
     let rig_shadow = rig_shadow(arena, view);
-    let hostiles = enemies::paint(
-        p,
-        arena,
-        view,
-        textures,
-        options.outlines,
-        reduced,
-        rig_shadow,
-    );
+    let hostiles = enemies::bodies(p, arena, view, textures, reduced, rig_shadow);
     let equipment = crate::gear_appearance::from_frozen_gear(&a.profile, &a.gear_snapshot);
     if !hostiles.rig_shadow {
         soft_shadow(p, rig_shadow.at, rig_shadow.size, rig_shadow.alpha);
     }
     let muzzle = defender(p, arena, view, a, aim, reduced, equipment.as_ref());
     ordnance::thrown(p, arena, view, a, reduced, textures, equipment.as_ref());
-    fx::events(
-        p,
-        arena,
-        view,
-        muzzle,
-        &fx::FxOptions {
-            numbers: options.numbers,
-            reduced,
-            blood: options.blood,
-            textures,
-            occluder: options.occluder,
-        },
-    );
+    fx::events(p, arena, view, muzzle, &fx_options);
     fx::particles(p, arena, &view.particles);
+    // 2. Grade and 3. vignette, over the whole canvas. The sky pulse is
+    // W5-02's wall-clock lightning; until it lands no stage flashes.
+    // (`with_clip_rect` would intersect with the arena clip `p` carries.)
+    let mut canvas = p.clone();
+    canvas.set_clip_rect(options.canvas);
+    let (grade, sky) = lighting::scene_grade(options.scene, reduced, 0.0);
+    lighting::paint_grade(&canvas, options.canvas, grade, sky);
+    backdrop::edge_shade(&canvas, options.canvas);
+    // 4. Construction grid.
+    if options.construction {
+        terrain::construction_grid(p, arena, view, options.occluder);
+    }
+    // 5. Cue pass.
+    collect_cues(&mut batch, arena, view, options, &fx_options);
+    batch.paint(p);
     hostiles
+}
+
+/// Every cue of the frame, in paint order: the hostiles' gauges and labels,
+/// the event cues, then the survivor's hit ring.
+fn collect_cues(
+    batch: &mut cue::CueBatch,
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    options: &RenderOptions,
+    fx_options: &fx::FxOptions,
+) {
+    enemies::cues(batch, arena, view, options.outlines, options.reduced);
+    fx::event_cues(batch, arena, view, fx_options);
+    let origin = arena.world(view.defender.position[0], view.defender.position[1]);
+    defender_feedback(
+        batch,
+        origin,
+        arena.lane_height(),
+        &view.defender.pose,
+        options.reduced,
+    );
 }
 
 /// The survivor rig's soft shadow, drawn in the hostiles' shadow layer.
@@ -232,7 +269,6 @@ fn defender(
             None
         }
     };
-    paint_defender_feedback(p, origin, sy, &view.defender.pose, reduced);
     player_pose.map(|pose| pos2(pose.muzzle[0], pose.muzzle[1]))
 }
 
@@ -258,18 +294,20 @@ fn player_model_error(p: &Painter, origin: Pos2, error: &str) {
     );
 }
 
-fn paint_defender_feedback(
-    p: &Painter,
+/// The survivor's hit ring, the visual twin of the hurt sound.
+fn defender_feedback(
+    batch: &mut cue::CueBatch,
     origin: Pos2,
     lane_height: f32,
     pose: &animation::DefenderPose,
     reduced: bool,
 ) {
     if pose.hit > 0. {
-        p.circle_stroke(
+        batch.ellipse(
             origin,
-            lane_height * 0.52,
-            Stroke::new(if reduced { 1. } else { 1.5 }, RED.gamma_multiply(pose.hit)),
+            Vec2::splat(lane_height * 0.52),
+            if reduced { 1. } else { 1.5 },
+            RED.gamma_multiply(pose.hit),
         );
     }
 }

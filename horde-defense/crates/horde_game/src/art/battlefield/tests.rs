@@ -44,7 +44,10 @@ fn options(textures: ArtTextures) -> RenderOptions {
         numbers: true,
         reduced: false,
         blood: true,
-        theme: 0,
+        scene: SceneLook::neutral(0),
+        // Beside the arena, so the canvas-clipped grade and vignette stay
+        // out of the arena's own primitives, as in the battle screen.
+        canvas: arena().expand(24.0),
         textures,
         occluder: None,
     }
@@ -996,12 +999,21 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         textures: textures(),
         occluder: None,
     };
+    // Both halves of the event painters: the world pass and the cue pass.
+    let both = |view: &BattleViewModel| {
+        painted(|p| {
+            fx::events(p, projection, view, None, &options);
+            let mut batch = cue::CueBatch::new(0);
+            fx::event_cues(&mut batch, projection, view, &options);
+            batch.paint(p);
+        })
+    };
     for kind in kinds {
         view.fx = vec![event(kind, 0.0)];
-        let fresh = painted(|p| fx::events(p, projection, &view, None, &options));
+        let fresh = both(&view);
         assert!(!fresh.is_empty(), "{kind:?} draws when fresh");
         view.fx = vec![event(kind, fx::fx_lifetime(kind) + 1.0 / 60.0)];
-        let stale = painted(|p| fx::events(p, projection, &view, None, &options));
+        let stale = both(&view);
         assert!(stale.is_empty(), "{kind:?} draws past its lifetime");
     }
 }
@@ -1796,8 +1808,8 @@ fn spitter_windup_draws_aim_line_to_wall_or_defender() {
             "reduced {reduced}: at the defender"
         );
         assert_eq!(aim(melee), None, "reduced {reduced}: a melee windup aims");
-        // The batched overlay draws each aim line as its dashes, one 4-vertex
-        // quad apiece, and nothing else.
+        // The cue pass draws each aim line as its dashes, one 4-vertex quad
+        // apiece on a 4-vertex INK halo (W5-01), and nothing else.
         let dashes: usize = view
             .enemies
             .iter()
@@ -1820,7 +1832,7 @@ fn spitter_windup_draws_aim_line_to_wall_or_defender() {
         }
         assert_eq!(
             vertices(&view_primitives(&game, &view, textures(), reduced)),
-            vertices(&view_primitives(&game, &unaimed, textures(), reduced)) + 4 * dashes,
+            vertices(&view_primitives(&game, &unaimed, textures(), reduced)) + 8 * dashes,
             "reduced {reduced}: the aim lines paint as dashes"
         );
         // The rejected-art path draws them too.
@@ -1970,30 +1982,43 @@ fn boss_phase_hold_shows_phase_label_and_ring_for_90_ticks() {
             assert!(ring.x > sy * 0.4 && ring.y > 0.0, "a ring around the boss");
             if painting {
                 // W2 review: the ring the battlefield paints is the one the
-                // pin checks. Rejected art strokes it as an ellipse.
+                // pin checks. Since W5-01 it is a cue: the first ring of the
+                // cue pass's fill mesh (20 segments, an outer and an inner
+                // vertex each), AMBER on its INK halo, for rejected art too.
                 let art = ArtTextures {
                     enemy_art_rejected: true,
                     ..textures()
                 };
-                let drawn: Vec<_> = painted(|p| {
+                let shapes = painted(|p| {
                     let options = RenderOptions {
                         reduced,
                         ..options(art)
                     };
                     battlefield(p, arena(), &view, a, [10.0, 5.0], options);
-                })
-                .into_iter()
-                .filter_map(|shape| match shape {
-                    egui::Shape::Ellipse(e)
-                        if e.stroke
-                            == Stroke::new(enemies::PHASE_RING_WIDTH, super::super::AMBER) =>
-                    {
-                        Some(e.radius)
-                    }
-                    _ => None,
-                })
-                .collect();
-                assert_eq!(drawn, [ring], "reduced {reduced}: tick {}", a.tick);
+                });
+                let drawn: Vec<_> = meshes(&shapes)
+                    .into_iter()
+                    .filter(|mesh| {
+                        mesh.texture_id == TextureId::default()
+                            && mesh.vertices.len() >= 40
+                            && mesh.vertices[..40]
+                                .iter()
+                                .all(|v| v.color == super::super::AMBER)
+                    })
+                    .map(|mesh| {
+                        let bounds = mesh.vertices[..40].iter().fold(Rect::NOTHING, |r, v| {
+                            r.union(Rect::from_min_max(v.pos, v.pos))
+                        });
+                        (bounds.size() - vec2(1.0, 1.0) * enemies::PHASE_RING_WIDTH) * 0.5
+                    })
+                    .collect();
+                assert_eq!(drawn.len(), 1, "one phase ring mesh");
+                assert!(
+                    (drawn[0] - ring).length() < 0.01,
+                    "reduced {reduced}: tick {}: {:?} vs {ring:?}",
+                    a.tick,
+                    drawn[0]
+                );
                 painted_rings[usize::from(reduced)].push(drawn[0]);
             }
             rings[usize::from(reduced)].push(ring);
@@ -2351,5 +2376,293 @@ fn hostile_callouts_paint_an_ink_backing_under_their_text() {
                 );
             }
         }
+    }
+}
+
+/// A peak-fixture view staged with every cue the field paints: a contact
+/// lane, a windup with its aim line, a stun, a health bar, CRIT and name
+/// callouts, a holding boss's phase, the survivor's hit ring and each event
+/// cue (boss warning, reinforcements, spawn, boss, contact damage, coins).
+fn every_cue_view() -> (Game, BattleViewModel) {
+    use crate::battle_view::{BossPhaseView, ContactView, FxView, HealthView};
+    use horde_core::sim::EventKind;
+    let game = horde_core::sim::peak_render_fixture().expect("peak fixture");
+    let a = game.attempt().unwrap();
+    let mut view =
+        BattleViewModel::build(a, SceneAnimation::sample(a, false), SceneBlend::NONE, false);
+    assert!(view.enemies.len() >= 4, "the peak fixture has hostiles");
+    let target = view.defender.position;
+    let e = &mut view.enemies[0];
+    e.contact = Some(ContactView {
+        ready: 0.5,
+        recovering: false,
+    });
+    e.windup = Some(0.5);
+    e.aim_target = Some(target);
+    e.stunned = true;
+    e.health = HealthView::Bar {
+        fraction: 0.4,
+        boss: false,
+    };
+    view.enemies[1].contact = Some(ContactView {
+        ready: 0.2,
+        recovering: true,
+    });
+    view.enemies[1].health = HealthView::Critical;
+    view.enemies[2].label = Some("SIEGE BRUTE");
+    view.enemies[3].label = Some("WARDEN");
+    view.boss_phase = Some(BossPhaseView {
+        boss_id: view.enemies[3].id,
+        transition: 1,
+        name: "BREACH".into(),
+        hold_left_ticks: 30,
+    });
+    view.defender.pose.hit = 0.6;
+    let event = |kind| FxView {
+        kind,
+        age: 0.05,
+        from: [2.0, 3.5],
+        to: [12.0, 3.5],
+        value: 150,
+        lane: Some(3),
+        actor_id: None,
+        target_id: None,
+    };
+    view.fx = [
+        EventKind::BossWarning,
+        EventKind::Reinforcements,
+        EventKind::Spawn,
+        EventKind::Boss,
+        EventKind::Damage,
+        EventKind::Kill,
+    ]
+    .map(event)
+    .to_vec();
+    (game, view)
+}
+
+/// `color` without its alpha: the colour the cue shows at full strength.
+fn opaque(color: egui::Color32) -> [u8; 3] {
+    let [r, g, b, _] = color.to_srgba_unmultiplied();
+    [r, g, b]
+}
+
+/// G7.2 (W5-01): every cue primitive the field collects, outlines on, is
+/// painted over an INK backing it contrasts with by at least 3:1 (WCAG
+/// 1.4.11), in normal and reduced effects. The backing is INK at the halo
+/// alpha (230; label plates 190), fading only with its cue, and the halo
+/// geometry covers the fill geometry.
+#[test]
+fn every_cue_primitive_has_an_ink_backing_with_contrast_at_least_3() {
+    use super::super::{INK, lighting};
+    use cue::CueKind;
+    let (game, view) = every_cue_view();
+    let a = game.attempt().unwrap();
+    let projection = ArenaProjection::for_attempt(arena(), a);
+    let ink = lighting::relative_luminance([INK.r(), INK.g(), INK.b()]);
+    for reduced in [false, true] {
+        let options = RenderOptions {
+            outlines: true,
+            reduced,
+            ..options(textures())
+        };
+        let fx_options = fx::FxOptions {
+            numbers: true,
+            reduced,
+            blood: true,
+            textures: textures(),
+            occluder: None,
+        };
+        let mut batch = cue::CueBatch::new(view.enemies.len());
+        collect_cues(&mut batch, projection, &view, &options, &fx_options);
+        let kinds: std::collections::HashSet<CueKind> =
+            batch.records.iter().map(|record| record.kind).collect();
+        assert_eq!(kinds.len(), 7, "every cue kind is staged: {kinds:?}");
+        for record in &batch.records {
+            let strength = f32::from(record.color.a()) / 255.0;
+            assert!(strength > 0.0, "{record:?} is visible");
+            let backing = opaque(record.backing);
+            for (got, want) in backing.into_iter().zip([INK.r(), INK.g(), INK.b()]) {
+                assert!(got.abs_diff(want) <= 2, "{record:?}: the backing is INK");
+            }
+            let floor = if record.kind == CueKind::Label {
+                190.0
+            } else {
+                230.0
+            };
+            assert!(
+                f32::from(record.backing.a()) >= floor * strength - 2.0,
+                "{record:?}: backing alpha under {floor} x {strength}"
+            );
+            let ratio = lighting::contrast(lighting::relative_luminance(opaque(record.color)), ink);
+            assert!(ratio >= 3.0, "{record:?}: contrast {ratio:.2} against INK");
+        }
+        // Three meshes however many cues: halo, fill, marker; then text.
+        let shapes = painted(|p| {
+            let mut batch = cue::CueBatch::new(view.enemies.len());
+            collect_cues(&mut batch, projection, &view, &options, &fx_options);
+            batch.paint(p);
+        });
+        let geometry: Vec<&egui::Mesh> = shapes
+            .iter()
+            .take_while(|shape| matches!(shape, egui::Shape::Mesh(_)))
+            .filter_map(|shape| match shape {
+                egui::Shape::Mesh(mesh) => Some(&**mesh),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(geometry.len(), 3, "halo, fill and marker meshes");
+        assert_eq!(meshes(&shapes).len(), 3, "no cue mesh after the text");
+        let bounds = |mesh: &egui::Mesh| {
+            mesh.vertices.iter().fold(Rect::NOTHING, |r, v| {
+                r.union(Rect::from_min_max(v.pos, v.pos))
+            })
+        };
+        let halo = bounds(geometry[0]);
+        for fill in &geometry[1..] {
+            assert!(
+                halo.contains_rect(bounds(fill)),
+                "the halo mesh covers the cue geometry"
+            );
+        }
+    }
+}
+
+/// A cue painted without its helper would dodge the guard above: no hostile
+/// or event painter of the battlefield draws text itself, so every field
+/// label goes through `cue` and its INK plate.
+#[test]
+fn only_the_cue_pass_paints_field_labels() {
+    for (name, source) in [
+        ("enemies.rs", include_str!("enemies.rs")),
+        ("fx.rs", include_str!("fx.rs")),
+    ] {
+        for call in ["p.text(", "p.galley(", "layout_no_wrap("] {
+            assert!(!source.contains(call), "{name} paints text with {call}");
+        }
+    }
+}
+
+/// W5-01 pass order: world, grade, vignette, then cues. On a night stage
+/// the grade over-rect and the vignette mesh are painted across the canvas
+/// before any cue, so neither dims a warning; a neutral stage paints no
+/// grade rect, and reduced effects keep the same order.
+#[test]
+fn cue_pass_paints_after_the_grade_and_the_vignette() {
+    use super::super::lighting::{self, Lighting, SceneLook};
+    let (game, view) = every_cue_view();
+    let a = game.attempt().unwrap();
+    let canvas = arena().expand(24.0);
+    let night = lighting::grade(Lighting::Night);
+    let night_fill = egui::Color32::from_rgba_unmultiplied(
+        night.tint[0],
+        night.tint[1],
+        night.tint[2],
+        (night.alpha * 255.0).round() as u8,
+    );
+    let pass = |scene: SceneLook, reduced: bool| {
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            let painter = ui.painter().with_clip_rect(arena());
+            let options = RenderOptions {
+                scene,
+                reduced,
+                canvas,
+                ..options(textures())
+            };
+            battlefield(&painter, arena(), &view, a, [10.0, 5.0], options);
+        });
+        output.textures_delta.clear();
+        output.shapes
+    };
+    let night_scene = SceneLook {
+        lighting: Lighting::Night,
+        ..SceneLook::neutral(0)
+    };
+    for reduced in [false, true] {
+        let shapes = pass(night_scene, reduced);
+        let grade = shapes
+            .iter()
+            .position(|s| matches!(&s.shape, egui::Shape::Rect(r) if r.fill == night_fill))
+            .expect("the night grade rect");
+        assert_eq!(
+            shapes[grade].clip_rect, canvas,
+            "the grade covers the canvas"
+        );
+        match &shapes[grade].shape {
+            egui::Shape::Rect(rect) => assert_eq!(rect.rect, canvas),
+            _ => unreachable!(),
+        }
+        let vignette = &shapes[grade + 1];
+        assert_eq!(vignette.clip_rect, canvas, "the vignette follows the grade");
+        match &vignette.shape {
+            egui::Shape::Mesh(mesh) => {
+                assert_eq!(mesh.vertices.len(), 24, "the edge-shade rings");
+                assert!(mesh.vertices.iter().all(|v| opaque(v.color) == [0, 0, 0]));
+            }
+            other => panic!("the vignette is one mesh: {other:?}"),
+        }
+        let texts: Vec<(usize, String)> = shapes
+            .iter()
+            .enumerate()
+            .filter_map(|(n, s)| match &s.shape {
+                egui::Shape::Text(text) => Some((n, text.galley.text().to_owned())),
+                _ => None,
+            })
+            .collect();
+        for cue in [
+            "BOSS APPROACHING",
+            "REINFORCEMENTS",
+            "INCOMING",
+            "SIEGE BRUTE",
+            "+150c",
+        ] {
+            assert!(
+                texts.iter().any(|(n, text)| text == cue && *n > grade + 1),
+                "reduced {reduced}: {cue} paints after the vignette: {texts:?}"
+            );
+        }
+        // The only text under the grade is the structures' own readouts (a
+        // trap's charges), which are world dressing, not warnings.
+        assert!(
+            texts
+                .iter()
+                .filter(|(n, _)| *n < grade)
+                .all(|(_, text)| text.parse::<u32>().is_ok()),
+            "reduced {reduced}: no cue label is painted under the grade: {texts:?}"
+        );
+        assert!(
+            shapes[grade + 2..].iter().all(|s| s.clip_rect == arena()),
+            "the cue pass is clipped to the arena"
+        );
+    }
+    let neutral = pass(SceneLook::neutral(0), false);
+    assert!(
+        !neutral
+            .iter()
+            .any(|s| s.clip_rect == canvas && matches!(s.shape, egui::Shape::Rect(_))),
+        "a neutral stage paints no grade rect"
+    );
+    assert_eq!(
+        neutral.iter().filter(|s| s.clip_rect == canvas).count(),
+        1,
+        "a neutral stage paints the vignette only on the canvas"
+    );
+}
+
+/// Cue bars and labels scale with the zoom (design-vfx-lighting, cue
+/// helpers): bar height clamp(0.05 sy, 3, 6) pt, font clamp(0.16 sy, 10, 14).
+#[test]
+fn cue_bars_and_labels_scale_with_zoom_inside_their_clamps() {
+    assert_eq!(cue::bar_height(18.3), 3.0);
+    assert_eq!(cue::bar_height(100.0), 5.0);
+    assert_eq!(cue::bar_height(230.0), 6.0);
+    assert_eq!(cue::font(18.3), 10.0);
+    assert_eq!(cue::font(75.0), 12.0);
+    assert_eq!(cue::font(230.0), 14.0);
+    for sy in (10..400).map(|n| n as f32) {
+        assert!((3.0..=6.0).contains(&cue::bar_height(sy)));
+        assert!((10.0..=14.0).contains(&cue::font(sy)));
+        assert_eq!((cue::font(sy) * 2.0).fract(), 0.0, "half-point steps");
     }
 }

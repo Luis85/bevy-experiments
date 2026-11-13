@@ -1,6 +1,6 @@
 {
   "fixture": "over-battlefield-primitives",
-  "description": "VsyncOff dev run inside every timing gate, but the stress normal battlefield painter drew 25 clipped primitives in its worst frame (W2-47, R18): egui.battlefield_primitives.max is gated against egui.battlefield_primitives_max (24) in every scene, worst repeat, so the run is over budget (exit 1).",
+  "description": "VsyncOff dev run inside every timing gate, but the stress normal battlefield painter drew 25 clipped primitives in its worst frame (W2-47, R18): egui.battlefield_primitives.max is gated against egui.battlefield_primitives_max (23) in every scene, worst repeat, so the run is over budget (exit 1).",
   "run": {
     "profile": "dev",
     "vsync_off": true,

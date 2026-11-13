@@ -91,6 +91,13 @@ impl MeshBuilder {
         self.mesh.add_triangle(first, first + 1, first + 2);
         self.mesh.add_triangle(first + 2, first + 1, first + 3);
     }
+    /// A solid triangle.
+    pub(super) fn triangle(&mut self, points: [Pos2; 3], color: C) {
+        let first = self.vertex(points[0], color);
+        self.vertex(points[1], color);
+        self.vertex(points[2], color);
+        self.mesh.add_triangle(first, first + 1, first + 2);
+    }
     /// A filled ellipse of `radii` as a fan of `segments` triangles.
     pub(super) fn fan(&mut self, center: Pos2, radii: Vec2, segments: u32, color: C) {
         let floored = radii.max(Vec2::splat(self.pixel * min_fan_radius_px(segments)));
@@ -129,13 +136,6 @@ impl MeshBuilder {
             self.mesh.add_triangle(a, a + 1, b);
             self.mesh.add_triangle(b, a + 1, b + 1);
         }
-    }
-    /// The `art::bar` gauge: a dark track and the filled `value` fraction.
-    pub(super) fn bar(&mut self, rect: Rect, value: f32, color: C) {
-        self.quad(rect, C::from_black_alpha(100));
-        let mut fill = rect;
-        fill.max.x = fill.min.x + fill.width() * value.clamp(0.0, 1.0);
-        self.quad(fill, color);
     }
     /// Adds the mesh to `p`, unless nothing was drawn into it.
     pub(super) fn paint(self, p: &Painter) {
@@ -292,21 +292,17 @@ impl ShadowMesh {
     }
 }
 
-/// The per-hostile layers of one battlefield, painted back to front:
-/// untextured underlay, shadows, sprites, untextured overlay, then text.
+/// The per-hostile world layers of one battlefield, painted back to front:
+/// shadows, then sprites. Gauges, rings and labels are cues (`super::cue`).
 pub(super) struct FieldMeshes {
-    pub(super) underlay: MeshBuilder,
     pub(super) shadows: ShadowMesh,
     pub(super) actors: ActorMeshes,
-    pub(super) overlay: MeshBuilder,
 }
 impl FieldMeshes {
     pub(super) fn new(textures: ArtTextures, enemies: usize) -> Self {
         Self {
-            underlay: MeshBuilder::untextured(enemies),
             shadows: ShadowMesh::new(textures, enemies + 1),
             actors: ActorMeshes::new(textures, enemies),
-            overlay: MeshBuilder::untextured(enemies * 2),
         }
     }
 }

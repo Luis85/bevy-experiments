@@ -291,7 +291,10 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                         .filter(|p| r.contains(*p))
                         .map(|p| projection.inverse(p))
                         .unwrap_or([a.width_yards*0.5,a.defender_position()[1]]);
-                    art::world_backdrop(ui.painter(),effects_clip,projection,a.level,f.textures,effects_clip.height()/art::camera::REFERENCE_LANES);
+                    // Every view of a worker's battle takes its country's
+                    // biome theme and its stage's grade, not the level's.
+                    let scene=art::scene_look(a);
+                    art::world_backdrop(ui.painter(),effects_clip,projection,scene.theme_index,f.textures,effects_clip.height()/art::camera::REFERENCE_LANES);
                     art::battlefield_for_attempt(
                         &ui.painter_at(effects_clip),
                         r,
@@ -304,7 +307,8 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                             numbers: f.settings.numbers,
                             reduced: f.settings.reduced_effects,
                             blood: f.settings.blood,
-                            theme: a.level,
+                            scene,
+                            canvas: effects_clip,
                             textures: f.textures,
                             occluder: None,
                         },

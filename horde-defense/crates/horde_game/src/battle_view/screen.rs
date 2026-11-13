@@ -26,7 +26,7 @@ pub fn arena_geometry(game: &Game) -> (u8, f32) {
 
 /// The backdrop and terrain theme of a country's biome, matched without
 /// regard to ASCII case and without allocating.
-pub(super) fn biome_theme(biome: &str) -> usize {
+pub(crate) fn biome_theme(biome: &str) -> usize {
     let is = |names: &[&str]| names.iter().any(|name| biome.eq_ignore_ascii_case(name));
     if is(&["desert", "arid"]) {
         2

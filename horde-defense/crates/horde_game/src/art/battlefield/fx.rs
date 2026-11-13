@@ -1,15 +1,18 @@
-//! Weather, impact particles and short-lived event effects: explosions,
-//! callouts, tracers, contact damage and hit sparks.
+//! Weather, impact particles and short-lived event effects. World pass
+//! ([`events`]): explosions, tracers, hit sparks. Cue pass ([`event_cues`],
+//! after the lighting grade): REINFORCEMENTS, the INCOMING spawn marker,
+//! contact damage and banked-coin numbers, each on its INK backing
+//! ([`super::cue`]). The boss warning and arrival are the wall-clock
+//! banner's (`ui::battle::boss_banner`, W3-14).
 use super::super::{AMBER, ArenaProjection, MUTED, RED, TEXT, box_at, line};
 use super::batch::MeshBuilder;
+use super::cue::{self, CueBatch, Label};
 use crate::{
     animation::{Particle, ParticleKind},
     battle_view::BattleViewModel,
     visual_assets::{self, ArtTextures, PropMotion},
 };
-use bevy_egui::egui::{
-    self, Align2, Color32 as C, FontId, Painter, Pos2, Rect, Stroke, Vec2, vec2,
-};
+use bevy_egui::egui::{self, Align2, Color32 as C, Painter, Pos2, Rect, Stroke, Vec2, vec2};
 use horde_core::{content::StructureKind, sim::EventKind};
 
 pub(super) struct FxOptions {
@@ -174,14 +177,12 @@ pub(super) fn events(
     options: &FxOptions,
 ) {
     let FxOptions {
-        numbers,
         reduced,
         blood,
         textures,
-        occluder,
+        ..
     } = *options;
     let sy = arena.lane_height();
-    let origin = arena.world(view.defender.position[0], view.defender.position[1]);
     for e in &view.fx {
         let age = e.age;
         let alpha = (1.0 - age / fx_lifetime(e.kind)).clamp(0.0, 1.0);
@@ -224,36 +225,6 @@ pub(super) fn events(
                         );
                     }
                 }
-            }
-            EventKind::Reinforcements if age < fx_lifetime(EventKind::Reinforcements) => {
-                let lane = e.lane.unwrap_or(view.lanes / 2) as f32 + 0.5;
-                p.text(
-                    reinforcements_anchor(arena, view.width, lane, occluder),
-                    Align2::RIGHT_CENTER,
-                    "REINFORCEMENTS",
-                    FontId::proportional(10.),
-                    AMBER,
-                );
-            }
-            // The boss's arrival is the wall-clock banner's, not a spawn tag.
-            EventKind::Spawn if age < fx_lifetime(e.kind) => {
-                let at = arena.world(view.width - 0.5, e.to[1]);
-                p.add(egui::Shape::convex_polygon(
-                    vec![
-                        at + vec2(0.0, -6.0),
-                        at + vec2(-8.0, 0.0),
-                        at + vec2(0.0, 6.0),
-                    ],
-                    AMBER,
-                    Stroke::NONE,
-                ));
-                p.text(
-                    at + vec2(-12.0, 0.0),
-                    Align2::RIGHT_CENTER,
-                    "INCOMING",
-                    FontId::proportional(10.0),
-                    AMBER,
-                );
             }
             EventKind::Shot
                 if age < 0.12
@@ -308,20 +279,6 @@ pub(super) fn events(
                     AMBER.gamma_multiply(1.0 - age / 0.12),
                 );
             }
-            EventKind::Damage if age < 0.3 && e.target_id.is_none() => {
-                line(
-                    p,
-                    arena.world(1.5, e.from[1]),
-                    arena.world(1.5, e.from[1] + 0.5),
-                    4.0,
-                    RED.gamma_multiply(alpha),
-                );
-                p.circle_stroke(
-                    origin,
-                    sy * 0.7,
-                    Stroke::new(2.0, RED.gamma_multiply(alpha)),
-                );
-            }
             EventKind::Hit
             | EventKind::WeakPoint
             | EventKind::Kill
@@ -362,40 +319,80 @@ pub(super) fn events(
                         );
                     }
                 }
-                // Currency feedback stays separate from the real-time resolved
-                // damage-number cache used by battlefield presentation.
-                if numbers && e.kind == EventKind::Kill && e.value > 0 {
-                    let rise = if reduced { 0.0 } else { age * 24.0 };
-                    coin_popup(p, at + vec2(0.0, -12.0 - rise), e.value, alpha, reduced);
-                }
             }
             _ => {}
         }
     }
 }
-/// Banked-coin pop-up: amber with the same eight-way dark outline as the
-/// damage numbers, so it reads against any ground. Reduced effects keep it
-/// still (the caller drops the drift) with a thinner outline.
-fn coin_popup(p: &Painter, center: Pos2, coins: i32, alpha: f32, reduced: bool) {
-    let galley = p.layout_no_wrap(
-        format!("+{coins}c"),
-        FontId::proportional(if reduced { 15.0 } else { 16.0 }),
-        AMBER,
-    );
-    let origin = center - galley.size() * 0.5;
-    let outline = C::from_black_alpha((235.0 * alpha.clamp(0.0, 1.0)) as u8);
-    let border = if reduced { 1.0 } else { 1.5 };
-    for direction in [
-        vec2(-1.0, -1.0),
-        vec2(0.0, -1.0),
-        vec2(1.0, -1.0),
-        vec2(-1.0, 0.0),
-        vec2(1.0, 0.0),
-        vec2(-1.0, 1.0),
-        vec2(0.0, 1.0),
-        vec2(1.0, 1.0),
-    ] {
-        p.galley_with_override_text_color(origin + direction * border, galley.clone(), outline);
+/// Cue pass: the event cues of `view`, collected into `batch`.
+pub(super) fn event_cues(
+    batch: &mut CueBatch,
+    arena: ArenaProjection,
+    view: &BattleViewModel,
+    options: &FxOptions,
+) {
+    let FxOptions {
+        numbers,
+        reduced,
+        occluder,
+        ..
+    } = *options;
+    let sy = arena.lane_height();
+    let font = cue::font(sy);
+    let origin = arena.world(view.defender.position[0], view.defender.position[1]);
+    for e in &view.fx {
+        let age = e.age;
+        let alpha = (1.0 - age / fx_lifetime(e.kind)).clamp(0.0, 1.0);
+        match e.kind {
+            EventKind::Reinforcements if age < fx_lifetime(EventKind::Reinforcements) => {
+                let lane = e.lane.unwrap_or(view.lanes / 2) as f32 + 0.5;
+                batch.label(Label::amber(
+                    reinforcements_anchor(arena, view.width, lane, occluder),
+                    Align2::RIGHT_CENTER,
+                    "REINFORCEMENTS",
+                    font,
+                ));
+            }
+            // The boss's arrival is the wall-clock banner's, not a spawn tag.
+            EventKind::Spawn if age < fx_lifetime(e.kind) => {
+                let at = arena.world(view.width - 0.5, e.to[1]);
+                batch.marker(
+                    [
+                        at + vec2(0.0, -6.0),
+                        at + vec2(-8.0, 0.0),
+                        at + vec2(0.0, 6.0),
+                    ],
+                    AMBER,
+                );
+                batch.label(Label::amber(
+                    at + vec2(-12.0, 0.0),
+                    Align2::RIGHT_CENTER,
+                    "INCOMING",
+                    font,
+                ));
+            }
+            EventKind::Damage if age < 0.3 && e.target_id.is_none() => {
+                batch.line(
+                    arena.world(1.5, e.from[1]),
+                    arena.world(1.5, e.from[1] + 0.5),
+                    4.0,
+                    RED.gamma_multiply(alpha),
+                );
+                batch.ellipse(
+                    origin,
+                    Vec2::splat(sy * 0.7),
+                    2.0,
+                    RED.gamma_multiply(alpha),
+                );
+            }
+            // Currency feedback stays separate from the real-time resolved
+            // damage-number cache used by battlefield presentation.
+            EventKind::Kill if alpha > 0.0 && numbers && e.value > 0 => {
+                let at = arena.world(e.to[0], e.to[1]);
+                let rise = if reduced { 0.0 } else { age * 24.0 };
+                batch.coin(at + vec2(0.0, -12.0 - rise), e.value, alpha, reduced);
+            }
+            _ => {}
+        }
     }
-    p.galley_with_override_text_color(origin, galley, AMBER.gamma_multiply(alpha));
 }
