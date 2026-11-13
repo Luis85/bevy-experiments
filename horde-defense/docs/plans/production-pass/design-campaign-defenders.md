@@ -517,7 +517,7 @@ A GOLDEN or GAMEPLAY_TRACE diff in a campaign-defenders commit is a defect, not 
 4. `RecruitStatus::Deployed` is shared by expedition and takeover. The UI must use `recruit_duty()`.
 5. The auto-reset of next_defender to Player must be visible (strategy note plus picker).
 6. Strategy pacing runtime is minutes in release. Keep it `#[ignore]`, release-only and queued after the debug builds, with at most 2 cargo builders.
-7. The ≤ 1/1.5 neighbour ratio depends on the Parallel unlock at 2 liberations (`strategy_config.parallel_unlock_freed`). If it fails in wave 4, the fix comes through balance owners with evidence, never through harness definitions.
+7. The ≤ 1/1.5 neighbour ratio depends on the Parallel unlock at 2 liberations (`strategy_config.parallel_unlock_freed`). If it fails in wave 4, the fix comes through balance owners with evidence, never through harness definitions. *Measured (W4-c, 2026-11-13; plan §9.6 "W4-c goal-3 strategy acceptance"):* it fails at 9 / 9 runs, and the Parallel unlock is not the cause: no expedition clears a stage in any seed, because a recruit under the Npc rules cannot hold a stage at the campaign's threat rank (13 and up when the first expedition leaves). No `strategy_config` value changes that, so W4-c shipped no data change and the row waits for a user decision (plan §2.5, "G3.11 stays red").
 8. The checkpoint theme changes the background of the 23 large countries' checkpoint stages in captures. qa-captures must expect it.
 9. Takeover does not change lane geometry (it follows player.level, campaign.rs:209-211), so the uniform zoom-to-fit camera needs no defender input. The observer-window fit (ui/operations.rs:277) belongs to ux-flow and vfx-lighting.
 
