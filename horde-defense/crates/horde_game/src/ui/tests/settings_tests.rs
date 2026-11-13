@@ -865,3 +865,96 @@ fn invalid_draft_warning_disables_apply_and_still_discards() {
     assert_eq!(f.game.campaign().balance_settings, normal);
     assert_eq!(f.prefs.balance_draft, Some(normal));
 }
+
+/// The left edge and the centre height of the "Interface scale" slider label.
+fn scale_label(output: &FullOutput) -> (f32, f32) {
+    fn find(shape: &egui::epaint::Shape) -> Option<(f32, f32)> {
+        match shape {
+            egui::epaint::Shape::Text(text)
+                if text.galley.text().starts_with("Interface scale") =>
+            {
+                Some((
+                    text.pos.x + text.galley.rect.left(),
+                    text.pos.y + text.galley.rect.center().y,
+                ))
+            }
+            egui::epaint::Shape::Vec(shapes) => shapes.iter().find_map(find),
+            _ => None,
+        }
+    }
+    output
+        .shapes
+        .iter()
+        .find_map(|clipped| find(&clipped.shape))
+        .expect("the Interface scale slider is drawn")
+}
+
+/// W3-08 (UX-10, G2.6): dragging the interface-scale slider edits a draft;
+/// `Settings::scale`, which `draw_screen` applies every frame, moves only
+/// when the pointer is released. A plain click on the rail commits at once.
+#[test]
+fn scale_applies_only_on_release() {
+    let button = |pos: Pos2, pressed: bool| Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed,
+        modifiers: Modifiers::NONE,
+    };
+    let mut fixture = IsolatedFrontend::new();
+    let h = Harness::new();
+    let f = &mut fixture.frontend;
+    f.screen = Screen::Settings;
+    let applied = f.settings.scale;
+    let output = h.frame(f, View::Settings, vec![]);
+    let (label_left, y) = scale_label(&output);
+    // The rail starts at the panel's 20-point margin and is 100 points wide;
+    // the value box and the label follow it.
+    assert!(label_left > 130.0, "label at {label_left}");
+    let (low, mid, high) = (pos2(30.0, y), pos2(70.0, y), pos2(112.0, y));
+
+    // Press near the low end and drag: only the draft follows the pointer.
+    h.frame(
+        f,
+        View::Settings,
+        vec![Event::PointerMoved(low), button(low, true)],
+    );
+    h.frame(f, View::Settings, vec![Event::PointerMoved(mid)]);
+    assert_eq!(f.settings.scale, applied, "the scale moved mid-drag");
+    let first = f.prefs.scale_draft.expect("a held slider has a draft");
+    h.frame(f, View::Settings, vec![Event::PointerMoved(high)]);
+    let dragged = f.prefs.scale_draft.expect("a held slider has a draft");
+    assert!(dragged > first, "{dragged} after {first}");
+    assert_ne!(dragged, applied);
+    assert_eq!(f.settings.scale, applied, "the scale moved mid-drag");
+
+    let output = h.frame(f, View::Settings, vec![Event::PointerMoved(high)]);
+    assert_eq!(text_count(&output, crate::ui::preferences::SCALE_LABEL), 1);
+
+    // Release commits the draft and clears it.
+    h.frame(
+        f,
+        View::Settings,
+        vec![Event::PointerMoved(high), button(high, false)],
+    );
+    assert_eq!(f.settings.scale, dragged);
+    assert_eq!(f.prefs.scale_draft, None);
+    h.frame(f, View::Settings, vec![]);
+    assert_eq!(f.settings.scale, dragged);
+
+    // A click without a drag commits on its release too.
+    h.press_at(f, View::Settings, low, h.target.pixels);
+    assert!(f.settings.scale < dragged, "{}", f.settings.scale);
+    assert_eq!(f.prefs.scale_draft, None);
+
+    // A draft left behind (the screen was left mid-drag) is dropped, never
+    // applied: by the next Settings frame, and when Settings opens.
+    let committed = f.settings.scale;
+    f.prefs.scale_draft = Some(1.3);
+    h.frame(f, View::Settings, vec![]);
+    assert_eq!(f.prefs.scale_draft, None);
+    assert_eq!(f.settings.scale, committed);
+    f.prefs.scale_draft = Some(1.3);
+    f.act(|c| c.open_settings());
+    assert_eq!(f.prefs.scale_draft, None);
+    assert_eq!(f.settings.scale, committed);
+}

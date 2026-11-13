@@ -209,6 +209,10 @@ pub(crate) struct SettingsUi {
     /// basis (R21, `Campaign::custom_balance_steps`); the draft keeps the
     /// named preset so the core keeps its extras.
     pub(super) balance_custom_chosen: bool,
+    /// The interface scale while its slider is held (UX-10). `Settings::scale`
+    /// keeps the applied value until the drag ends, so the screen does not
+    /// rescale under the pointer; `None` whenever the slider is at rest.
+    pub(super) scale_draft: Option<f32>,
     pub(super) rebind: Option<Action>,
     pub(super) binding_armed: bool,
 }

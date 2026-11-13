@@ -46,13 +46,13 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
                 gameplay_settings(ui, f);
                 if ui.available_width() >= 800.0 {
                     ui.columns(2, |columns| {
-                        display_settings(&mut columns[0], f.settings);
+                        display_settings(&mut columns[0], f.settings, &mut f.prefs.scale_draft);
                         combat_settings(&mut columns[0], f.settings);
                         audio_settings(&mut columns[0], f.settings);
                         remap_settings(&mut columns[1], f, &ctx);
                     });
                 } else {
-                    display_settings(ui, f.settings);
+                    display_settings(ui, f.settings, &mut f.prefs.scale_draft);
                     combat_settings(ui, f.settings);
                     audio_settings(ui, f.settings);
                     remap_settings(ui, f, &ctx);
@@ -60,6 +60,7 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
                 chrome::section(ui, "Profile");
                 if ui.button("Restore display, audio & control defaults").clicked() {
                     *f.settings = Settings::default();
+                    f.prefs.scale_draft = None;
                     f.prefs.rebind = None;
                 }
                 muted(ui, format!("Save location: {}", f.paths.campaign().display()));
@@ -67,9 +68,12 @@ pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
             });});
         });
 }
-fn display_settings(ui: &mut egui::Ui, settings: &mut Settings) {
+/// The interface-scale slider's label (UX-10).
+pub(super) const SCALE_LABEL: &str = "Interface scale (applies on release)";
+
+fn display_settings(ui: &mut egui::Ui, settings: &mut Settings, scale_draft: &mut Option<f32>) {
     chrome::section(ui, "Readability & effects");
-    ui.add(egui::Slider::new(&mut settings.scale, 0.75..=1.35).text("Interface scale"));
+    scale_slider(ui, settings, scale_draft);
     ui.checkbox(&mut settings.outlines, "Outline enemy silhouettes");
     ui.checkbox(&mut settings.numbers, "Show damage numbers");
     ui.checkbox(&mut settings.reduced_effects, "Reduce flashes and movement");
@@ -78,6 +82,30 @@ fn display_settings(ui: &mut egui::Ui, settings: &mut Settings) {
         "Show contextual field guidance",
     );
     ui.checkbox(&mut settings.blood, "Blood effects");
+}
+/// The scale slider edits `scale_draft`; `Settings::scale`, which
+/// `draw_screen` applies every frame, takes the value when the drag ends, so
+/// the screen never rescales under a held pointer (UX-10). A change with no
+/// pointer held (arrow keys, a typed value once it is confirmed) commits at
+/// once.
+fn scale_slider(ui: &mut egui::Ui, settings: &mut Settings, scale_draft: &mut Option<f32>) {
+    let mut value = scale_draft.unwrap_or(settings.scale);
+    let response = ui.add(
+        egui::Slider::new(&mut value, 0.75..=1.35)
+            .update_while_editing(false)
+            .text(SCALE_LABEL),
+    );
+    let held = response.dragged() || response.is_pointer_button_down_on();
+    if response.drag_stopped() || (response.changed() && !held) {
+        settings.scale = value;
+        *scale_draft = None;
+    } else if held {
+        *scale_draft = Some(value);
+    } else {
+        // Nothing holds the slider: a draft left by a drag that ended off
+        // this screen is dropped, never applied later.
+        *scale_draft = None;
+    }
 }
 fn combat_settings(ui: &mut egui::Ui, settings: &mut Settings) {
     chrome::section(ui, "Aiming & firing");
