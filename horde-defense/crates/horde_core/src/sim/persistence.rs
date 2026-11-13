@@ -452,7 +452,7 @@ fn validate_attempt_loot(a: &Attempt, next_item_id: u64, depth: usize) -> Result
         || a.drop_ids.last().is_some_and(|id| *id >= next_item_id)
         || a.drop_ids.windows(2).any(|pair| pair[0] >= pair[1])
         || a.drop_tier
-            .is_some_and(|tier| !(1..=content().max_drop_tier()).contains(&tier))
+            .is_some_and(|tier| !(1..=crate::loot::max_drop_tier()).contains(&tier))
     {
         return Err("Invalid saved attempt drop tracking".into());
     }

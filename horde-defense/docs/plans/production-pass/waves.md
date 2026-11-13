@@ -980,7 +980,7 @@ Wave-3 exit:
 | W4-11 | progression-tree | Docs: the goal-5 section of BALANCE_AND_RUN_STATS.md (tier definition, TreeExhausted, OperationsOpen) and the AGENTS.md pacing_targets section | check_views | W4-09 |
 
 Also owns (W2 review, 2026-11-10; a wave-2 follow-up no row named):
-- **W4-l:** optional single-home cleanup. `validate_attempt_loot` (`sim/persistence.rs:455`) calls `content().max_drop_tier()` rather than `crate::loot::max_drop_tier()` (`loot.rs:23`). The two are equivalent today, so the change moves no digest. It is not a defect, and the row may drop it.
+- **W4-l:** optional single-home cleanup. `validate_attempt_loot` (`sim/persistence.rs:455`) calls `content().max_drop_tier()` rather than `crate::loot::max_drop_tier()` (`loot.rs:23`). The two are equivalent today, so the change moves no digest. It is not a defect, and the row may drop it. **Done by W4-l (2026-11-13)** in its own commit: the validator reads `crate::loot::max_drop_tier()`; no test changed and no digest moved.
 
 Also owns (wave-2 close, 2026-11-13; orchestrator rulings R37-R53, plan §2.4):
 - **W4-04..n (R37):** G6.11 has no minimum seed count per window. The goal-6 defeat-window summary reports how many seeds each window pooled; at a9fc30a `defeat_rate_windows` names only the seeds of the lowest and highest windows and the fewest-to-most range, so the loop's first commit adds the count for every window (test-first), and every tuning commit reads those counts beside the rates.
