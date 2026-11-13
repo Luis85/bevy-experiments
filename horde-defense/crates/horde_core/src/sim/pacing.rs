@@ -7,7 +7,8 @@
 //! variation ([`pacing_seed`]), a threaded sweep ([`pacing_sweep`]) and
 //! milestone statistics over seeds ([`MilestoneStats`]). Other remits add
 //! registry rows and evaluators on this API. The goal-5 evaluators (W2-03)
-//! live in [`targets`], the goal-6 rows' evaluators (W2-04) in [`goal6`].
+//! live in [`targets`], the goal-6 rows' evaluators (W2-04) in [`goal6`],
+//! the auto-sell gate and the stash-growth report (W4-l) in [`loot`].
 //! Every plan takes its camp steps through `Game::apply`: the difficulty
 //! (SetBalance), the survivor (ChooseSurvivor), the skill nodes
 //! (BuySkillNode) and the gear (BuyItem and Equip). The plans that sell,
@@ -24,6 +25,7 @@
 //! [`strategy`]: a plan with a [`StrategyPlan`] is played by a bot that
 //! acts only through commands.
 mod goal6;
+mod loot;
 #[cfg(test)]
 mod plan_tests;
 mod strategy;
@@ -34,6 +36,10 @@ pub use goal6::{
     GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS,
     RunsToLiberate, archetype_coverage, boss_ttk_median_s, clamped_start_first_victory,
     defeat_rate_windows, defeat_windows, longest_win_streak, max_win_streak, runs_to_liberate,
+};
+pub use loot::{
+    AUTO_SELL_PROFILE_ID, AUTO_SOLD_EARLY_RUNS, GOAL4_AUTO_SELL_SLACK_RUNS, GOAL4_AUTO_SELL_TIERS,
+    STASH_GROWTH_RUNS, auto_sell_within_default, stash_growth,
 };
 pub use strategy::{
     DEU_THREE_STAGE_NEIGHBOURS, GOAL3_LIBERATIONS, GOAL3_NEIGHBOURS_FREED,
@@ -470,6 +476,9 @@ pub struct PacingRun {
     pub spent_recruit: u64,
     pub auto_sold_count: u32,
     pub auto_sold_coins: u64,
+    /// Items the campaign holds after the run, worn ones included: the
+    /// stash size a save stores (W4-l).
+    pub items_owned: usize,
     /// Skill nodes owned after the run, and those neither owned nor retired
     /// ([`nodes_left`]).
     pub nodes_owned: usize,
@@ -1228,6 +1237,7 @@ impl RunBook {
             spent_recruit: spend.spent_recruit,
             auto_sold_count: r.auto_sold.count,
             auto_sold_coins: r.auto_sold.coins,
+            items_owned: g.campaign.items.len(),
             nodes_owned,
             nodes_left: left,
             wallet: g.campaign.coins,

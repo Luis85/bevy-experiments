@@ -536,6 +536,7 @@ mod tests {
             spent_recruit: 0,
             auto_sold_count: 0,
             auto_sold_coins: 0,
+            items_owned: 4,
             nodes_owned: 2,
             nodes_left: 10,
             wallet: 40,

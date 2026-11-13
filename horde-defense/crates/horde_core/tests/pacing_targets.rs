@@ -1,4 +1,5 @@
-//! Pacing acceptance: goal 5 (W2-03), goal 6 (W2-04) and goal 3 (W2-43).
+//! Pacing acceptance: goal 5 (W2-03), goal 6 (W2-04), goal 3 (W2-43) and
+//! the goal-4 auto-sell rows (W4-l).
 //! Release only: every test is `#[ignore = "release-only"]`. From
 //! horde-defense/, after the debug builds:
 //!
@@ -11,7 +12,10 @@
 //! the `pacing` example, not here (design-progression-tree "As built"). The
 //! goal-6 rows (lux-easy, lux-normal, lux-hard, start-aut, start-bgd) are a
 //! second sweep over the same 20 seeds, and the strategy rows (strategy,
-//! neighbours-solo, neighbours-parallel) a third. Each sweep runs once per
+//! neighbours-solo, neighbours-parallel) a third. The auto-sell gate
+//! (G4.13) sweeps auto-sell over the same 20 seeds and 60 runs, and the
+//! stash-growth report (R39) sweeps it again at 150 runs, which takes
+//! several minutes; name a test to run only its sweeps. Each sweep runs once per
 //! test binary (a `OnceLock` cache) and every test reads it. Each test
 //! prints its summary line (PASS or FAIL) and fails with the reasons. The
 //! evaluators are pinned on synthetic reports in `tests/pacing_harness.rs`
@@ -19,14 +23,16 @@
 #![allow(clippy::print_stdout)] // the acceptance prints its summary lines
 use horde_core::balance::BalancePreset;
 use horde_core::sim::{
-    DEFAULT_PROFILE_ID, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, GOAL6_CLAMPED_FIRST_VICTORY,
+    AUTO_SELL_PROFILE_ID, AUTO_SOLD_EARLY_RUNS, DEFAULT_PROFILE_ID, GOAL4_AUTO_SELL_SLACK_RUNS,
+    GOAL4_AUTO_SELL_TIERS, GOAL5_FIRST_VICTORY, GOAL5_TIER_WINDOWS, GOAL6_CLAMPED_FIRST_VICTORY,
     GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
     GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_WINDOW_RUNS, Milestone, PacingProfile,
-    PacingReport, RunsToLiberate, STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS, StrategyReport,
-    archetype_coverage, boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows,
-    liberations_and_coins_per_minute, max_win_streak, median_run_within, outbreak_reopens,
-    pacing_archetype_ids, pacing_sweep, parallel_frees_neighbours, runs_to_liberate,
-    strategy_sweep, tier_affordable_runs, tree_outlasts_liberation, unlock_order,
+    PacingReport, RunsToLiberate, STASH_GROWTH_RUNS, STRATEGY_PROFILE_ID, STRATEGY_PROFILE_IDS,
+    StrategyReport, archetype_coverage, auto_sell_within_default, boss_ttk_median_s, by_id,
+    clamped_start_first_victory, defeat_rate_windows, liberations_and_coins_per_minute,
+    max_win_streak, median_run_within, outbreak_reopens, pacing_archetype_ids, pacing_sweep,
+    parallel_frees_neighbours, runs_to_liberate, stash_growth, strategy_sweep,
+    tier_affordable_runs, tree_outlasts_liberation, unlock_order,
 };
 use std::sync::OnceLock;
 
@@ -251,5 +257,64 @@ fn fewer_than_five_outbreak_reopens_over_ten_liberations() {
     check(
         "fewer_than_five_outbreak_reopens_over_ten_liberations",
         outbreak_reopens(&strategy_row(STRATEGY_PROFILE_ID)),
+    );
+}
+
+// Goal 4 (W4-l, design-loot-economy "Numbers to measure"): the auto-sell
+// rows. The gate compares the auto-sell profile with the expert-deu sweep
+// of the same build; the stash report plays it to 150 runs (ruling R39).
+
+/// The auto-sell profile, optionally with another run limit.
+fn auto_sell_profile(max_runs: Option<usize>) -> PacingProfile {
+    let profile = by_id(AUTO_SELL_PROFILE_ID).expect("the auto-sell profile is registered");
+    // It is the acceptance profile but for the sale plan.
+    let default = by_id(DEFAULT_PROFILE_ID).expect("the acceptance profile is registered");
+    assert_eq!(
+        PacingProfile {
+            id: default.id,
+            name: default.name,
+            plan: default.plan,
+            ..profile
+        },
+        default
+    );
+    PacingProfile {
+        max_runs: max_runs.unwrap_or(profile.max_runs),
+        ..profile
+    }
+}
+
+/// The auto-sell sweep at the acceptance length (60 runs), played once.
+fn auto_sell_sweep() -> &'static [PacingReport] {
+    static SWEEP: OnceLock<Vec<PacingReport>> = OnceLock::new();
+    SWEEP.get_or_init(|| {
+        pacing_sweep(&[auto_sell_profile(None)], SEEDS).expect("the auto-sell sweep runs")
+    })
+}
+
+#[test]
+#[ignore = "release-only"]
+fn auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3() {
+    check(
+        "auto_sell_profile_within_one_run_of_default_at_tiers_1_to_3",
+        auto_sell_within_default(
+            expert_sweep(),
+            auto_sell_sweep(),
+            &GOAL4_AUTO_SELL_TIERS,
+            GOAL4_AUTO_SELL_SLACK_RUNS,
+        ),
+    );
+}
+
+#[test]
+#[ignore = "release-only"]
+fn stash_growth_reported_for_150_runs() {
+    let last = *STASH_GROWTH_RUNS.iter().max().expect("runs to report");
+    assert_eq!(last, 150);
+    let sweep = pacing_sweep(&[auto_sell_profile(Some(last))], SEEDS)
+        .expect("the 150-run auto-sell sweep runs");
+    check(
+        "stash_growth_reported_for_150_runs",
+        stash_growth(&sweep, &STASH_GROWTH_RUNS, AUTO_SOLD_EARLY_RUNS),
     );
 }

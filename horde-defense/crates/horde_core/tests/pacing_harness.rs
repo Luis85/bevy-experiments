@@ -5,17 +5,19 @@ use horde_core::balance::BalancePreset;
 use horde_core::content::{Mode, Slot, content};
 use horde_core::defenders::DefenderId;
 use horde_core::sim::{
-    ArchetypeRun, DEFAULT_PROFILE_ID, DefeatWindow, EarnedAfter, GOAL5_FIRST_VICTORY,
+    AUTO_SELL_PROFILE_ID, AUTO_SOLD_EARLY_RUNS, ArchetypeRun, DEFAULT_PROFILE_ID, DefeatWindow,
+    EarnedAfter, GOAL4_AUTO_SELL_SLACK_RUNS, GOAL4_AUTO_SELL_TIERS, GOAL5_FIRST_VICTORY,
     GOAL5_TIER_WINDOWS, GOAL6_BOSS_TTK_S, GOAL6_CLAMPED_FIRST_VICTORY, GOAL6_DEFEAT_RATE_PCT,
     GOAL6_LUX_EASY_MAX_RUNS, GOAL6_LUX_HARD_OVER_NORMAL, GOAL6_LUX_PROFILE_IDS,
     GOAL6_START_PROFILE_IDS, GOAL6_STREAK_FROM_RUN, GOAL6_STREAK_LIMIT, GOAL6_WINDOW_RUNS, Game,
     LEGACY_PROFILE_IDS, Milestone, MilestoneStats, Outcome, PacingAim, PacingDefender, PacingFarm,
-    PacingPlan, PacingProfile, PacingReport, PacingRun, PacingSell, PacingSpend,
-    archetype_coverage, boss_ttk_median_s, by_id, clamped_start_first_victory, defeat_rate_windows,
-    defeat_windows, equip_dropped_upgrades, longest_win_streak, max_win_streak,
-    median_earned_after, median_run_within, node_depths, node_retired, nodes_left, pacing_registry,
-    pacing_seed, pacing_sweep_with_threads, runs_to_liberate, simulate_pacing,
-    tier_affordable_runs, tree_exhausted, tree_outlasts_liberation, unlock_order,
+    PacingPlan, PacingProfile, PacingReport, PacingRun, PacingSell, PacingSpend, STASH_GROWTH_RUNS,
+    archetype_coverage, auto_sell_within_default, boss_ttk_median_s, by_id,
+    clamped_start_first_victory, defeat_rate_windows, defeat_windows, equip_dropped_upgrades,
+    longest_win_streak, max_win_streak, median_earned_after, median_run_within, node_depths,
+    node_retired, nodes_left, pacing_registry, pacing_seed, pacing_sweep_with_threads,
+    runs_to_liberate, simulate_pacing, stash_growth, tier_affordable_runs, tree_exhausted,
+    tree_outlasts_liberation, unlock_order,
 };
 use horde_core::skill_catalog::{CampaignFeature, SkillNode, skills};
 use horde_core::world::world;
@@ -256,6 +258,7 @@ fn camp_run(index: usize, learned: usize) -> PacingRun {
         spent_recruit: 0,
         auto_sold_count: 0,
         auto_sold_coins: 0,
+        items_owned: 0,
         nodes_owned: 0,
         nodes_left: 0,
         wallet: 0,
@@ -1193,4 +1196,178 @@ fn farm_profile_replays_the_previous_stage_after_two_frontier_defeats() {
         }
     }
     assert!(replays > 0, "the novice farms inside 20 runs");
+}
+
+// W4-l (G4.13, R39): the auto-sell gate and the stash-growth report on
+// synthetic reports. The release acceptance runs the same evaluators on the
+// auto-sell sweeps (tests/pacing_targets.rs).
+
+/// A run that left `items_owned` items after auto-selling `sold` items for
+/// `coins`.
+fn loot_run(index: usize, items_owned: usize, sold: u32, coins: u64) -> PacingRun {
+    PacingRun {
+        items_owned,
+        auto_sold_count: sold,
+        auto_sold_coins: coins,
+        ..camp_run(index, 0)
+    }
+}
+
+/// Seed `seed_index` of the registered profile `id`, with tiers 1-3
+/// affordable at `tiers` and these runs.
+fn loot_report(
+    seed_index: usize,
+    id: &str,
+    tiers: [usize; 3],
+    runs: Vec<PacingRun>,
+) -> PacingReport {
+    PacingReport {
+        profile: by_id(id).expect("registered"),
+        seed_index,
+        seed: pacing_seed(0x1A571167, seed_index),
+        runs,
+        milestones: (1..=3)
+            .zip(tiers)
+            .map(|(tier, run)| (Milestone::TierAffordable(tier), run, 0.0))
+            .collect(),
+    }
+}
+
+fn tier_sweep(id: &str, tiers: [usize; 3]) -> Vec<PacingReport> {
+    (0..3).map(|i| loot_report(i, id, tiers, vec![])).collect()
+}
+
+#[test]
+fn auto_sell_gate_compares_tier_medians_with_the_default_sweep() {
+    let gate = |default: &[PacingReport], auto: &[PacingReport]| {
+        auto_sell_within_default(
+            default,
+            auto,
+            &GOAL4_AUTO_SELL_TIERS,
+            GOAL4_AUTO_SELL_SLACK_RUNS,
+        )
+    };
+    assert_eq!(GOAL4_AUTO_SELL_TIERS, [1, 2, 3]);
+    assert_eq!(GOAL4_AUTO_SELL_SLACK_RUNS, 1);
+    assert_eq!(AUTO_SELL_PROFILE_ID, "auto-sell");
+    let default = tier_sweep(DEFAULT_PROFILE_ID, [4, 8, 12]);
+    // One run early, level and one run late all pass.
+    let summary = gate(&default, &tier_sweep(AUTO_SELL_PROFILE_ID, [3, 8, 13]))
+        .expect("each tier is within one run");
+    assert!(
+        summary.contains("Tier 1 affordable 3 [3, 3] 3/3 with auto-sell, 4 [4, 4] 3/3 without"),
+        "{summary}"
+    );
+    assert!(
+        summary.contains("Tier 3 affordable 13 [13, 13] 3/3"),
+        "{summary}"
+    );
+    // Two runs early fails and names the tier; the other tiers still print.
+    let err = gate(&default, &tier_sweep(AUTO_SELL_PROFILE_ID, [2, 8, 12]))
+        .expect_err("tier 1 is two runs early");
+    assert!(
+        err.contains(
+            "Tier 1 affordable at median run 2 with auto-sell is 2 runs from run 4 without"
+        ),
+        "{err}"
+    );
+    assert!(!err.contains("Tier 2 affordable at median"), "{err}");
+    assert!(err.contains("Tier 2 affordable 8 [8, 8] 3/3"), "{err}");
+    let err = gate(&default, &tier_sweep(AUTO_SELL_PROFILE_ID, [4, 8, 14]))
+        .expect_err("tier 3 is two runs late");
+    assert!(
+        err.contains(
+            "Tier 3 affordable at median run 14 with auto-sell is 2 runs from run 12 without"
+        ),
+        "{err}"
+    );
+    // The two sweeps must be the no-sale profile and an auto-selling one,
+    // over the same number of seeds.
+    let err = gate(&default, &default).expect_err("the second sweep never sells");
+    assert!(err.contains("expert-deu does not auto-sell"), "{err}");
+    let auto = tier_sweep(AUTO_SELL_PROFILE_ID, [4, 8, 12]);
+    let err = gate(&auto, &auto).expect_err("the baseline sells");
+    assert!(err.contains("the baseline auto-sell sells"), "{err}");
+    let err = gate(&default, &auto[..2]).expect_err("2 seeds against 3");
+    assert!(
+        err.contains("3 default seeds against 2 auto-sell seeds"),
+        "{err}"
+    );
+    assert!(gate(&[], &auto).is_err() && gate(&default, &[]).is_err());
+}
+
+#[test]
+fn stash_growth_reports_medians_at_each_run_and_early_auto_sold_coins() {
+    // Three seeds of four runs: items owned, items auto-sold, coins.
+    let seed = |i: usize, rows: [(usize, u32, u64); 4]| {
+        let runs = rows
+            .iter()
+            .enumerate()
+            .map(|(n, &(items, sold, coins))| loot_run(n + 1, items, sold, coins))
+            .collect();
+        loot_report(i, AUTO_SELL_PROFILE_ID, [4, 8, 12], runs)
+    };
+    let reports = [
+        seed(0, [(10, 1, 5), (20, 2, 30), (30, 0, 0), (40, 3, 9)]),
+        seed(1, [(12, 0, 0), (26, 4, 10), (33, 1, 7), (48, 2, 8)]),
+        seed(2, [(11, 2, 9), (22, 1, 20), (35, 5, 50), (44, 1, 1)]),
+    ];
+    let summary = stash_growth(&reports, &[2, 4], 3).expect("every seed played run 4");
+    // Run 2: items 20 / 22 / 26, sold so far 3 / 3 / 4.
+    assert!(
+        summary.contains("after run 2: 22 [20, 22] items owned, 3 [3, 3] auto-sold so far"),
+        "{summary}"
+    );
+    // Run 4: items 40 / 44 / 48, sold so far 6 / 7 / 9.
+    assert!(
+        summary.contains("after run 4: 44 [40, 44] items owned, 7 [6, 7] auto-sold so far"),
+        "{summary}"
+    );
+    // Per run, the lower median of the three seeds' coins.
+    assert!(
+        summary.contains("auto-sold coins per run, runs 1-3: 5 / 20 / 7"),
+        "{summary}"
+    );
+    assert!(summary.contains("3 seeds"), "{summary}");
+    // A seed that stopped before a requested run is named and fails.
+    let mut short = reports.to_vec();
+    short[1].runs.truncate(3);
+    let err = stash_growth(&short, &[2, 4], 3).expect_err("seed 1 has no run 4");
+    assert!(err.contains("seed 1 played 3 runs, not 4"), "{err}");
+    assert!(!err.contains("seed 0 played"), "{err}");
+    // A sweep that never auto-sold is not the auto-sell measurement.
+    let mut unsold = reports.to_vec();
+    for run in unsold.iter_mut().flat_map(|r| &mut r.runs) {
+        (run.auto_sold_count, run.auto_sold_coins) = (0, 0);
+    }
+    let err = stash_growth(&unsold, &[2, 4], 3).expect_err("nothing sold");
+    assert!(err.contains("no item was auto-sold"), "{err}");
+    assert!(
+        stash_growth(&[], &[2, 4], 3).is_err(),
+        "no reports is not a pass"
+    );
+    assert_eq!(STASH_GROWTH_RUNS, [60, 150]);
+    assert_eq!(AUTO_SOLD_EARLY_RUNS, 6);
+}
+
+#[test]
+fn pacing_run_records_the_items_owned_after_settlement() {
+    let one_run = |id: &str| {
+        simulate_pacing(&PacingProfile {
+            max_runs: 1,
+            ..by_id(id).expect("registered")
+        })
+        .expect("profile runs")
+        .runs
+        .remove(0)
+    };
+    // Run 1 is the same fight with and without the rule, so the auto-sell
+    // row ends it owning exactly the items it sold fewer.
+    let (kept, sold) = (one_run(DEFAULT_PROFILE_ID), one_run(AUTO_SELL_PROFILE_ID));
+    assert!(sold.auto_sold_count > 0, "run 1 auto-sells something");
+    assert!(sold.items_owned > 0);
+    assert_eq!(
+        kept.items_owned,
+        sold.items_owned + sold.auto_sold_count as usize
+    );
 }

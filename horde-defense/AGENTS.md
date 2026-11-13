@@ -32,7 +32,9 @@ run after the debug builds. Every test in crates/horde_core/tests/pacing_targets
 one OnceLock sweep (expert-deu, Normal, 20 seeds, 60 runs) feeds the goal-5 tests and most goal-6 tests, and a
 second (lux-easy, lux-normal, lux-hard, start-aut, start-bgd; 20 seeds, at most 20 runs) feeds the LUX and
 start-country tests (W2-04). A third (strategy, neighbours-solo, neighbours-parallel; 20 seeds) feeds the goal-3 tests
-(W2-43). Each prints a PASS or FAIL summary. Rows may fail until the wave-4 balance pass. Once the release build exists,
+(W2-43). The auto-sell gate (W4-l, G4.13) sweeps auto-sell (20 seeds, 60 runs) against the first sweep, and
+stash_growth_reported_for_150_runs sweeps it again at 150 runs (about 6 minutes; name a test to run only its sweeps).
+Each prints a PASS or FAIL summary. Rows may fail until the wave-4 balance pass. Once the release build exists,
 the first two sweeps take about a minute and the strategy sweep several more. The evaluators' synthetic tests
 (tests/pacing_harness.rs, tests/strategy_pacing.rs) run in the normal suite. The goal-3 table:
 cargo run --locked --release -p horde_core --example pacing -- --strategy --seeds 20 --out PATH.
