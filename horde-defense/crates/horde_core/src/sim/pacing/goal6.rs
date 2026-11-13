@@ -117,12 +117,37 @@ pub fn defeat_windows(reports: &[PacingReport], window: usize) -> Vec<DefeatWind
         .collect()
 }
 
+/// R37: how many seeds every window pooled, as runs of consecutive offsets
+/// with the same count ("0-10 pool 2, 11-15 pool 1").
+fn seeds_per_window(windows: &[DefeatWindow]) -> String {
+    let mut groups: Vec<(usize, usize, usize)> = Vec::new();
+    for w in windows {
+        match groups.last_mut() {
+            Some((_, last, seeds)) if *seeds == w.seeds && *last + 1 == w.offset => {
+                *last = w.offset;
+            }
+            _ => groups.push((w.offset, w.offset, w.seeds)),
+        }
+    }
+    groups
+        .iter()
+        .map(|&(first, last, seeds)| {
+            if first == last {
+                format!("{first} pool {seeds}")
+            } else {
+                format!("{first}-{last} pool {seeds}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// G6.11: the pooled defeat rate of every [`defeat_windows`] window lies in
 /// [`GOAL6_DEFEAT_RATE_PCT`]. A seed that never wins fails and is named, and
 /// no full window at all is not a pass. The summary names the seeds the
-/// lowest and highest windows pool and the range over every window, since
-/// tail windows pool only the seeds that play that long; no seed floor
-/// applies.
+/// lowest and highest windows pool, the range over every window and the
+/// count of every window (R37), since tail windows pool only the seeds that
+/// play that long; no seed floor applies.
 pub fn defeat_rate_windows(reports: &[PacingReport], window: usize) -> Result<String, String> {
     if reports.is_empty() {
         return Err(no_reports());
@@ -179,8 +204,9 @@ pub fn defeat_rate_windows(reports: &[PacingReport], window: usize) -> Result<St
             pct.end()
         ));
     }
+    let per_window = seeds_per_window(&windows);
     let summary = format!(
-        "{} windows of {window} runs after the first victory over {winners} winning seeds: {extremes}; windows pool {fewest}-{most} seeds (target {}-{}%)",
+        "{} windows of {window} runs after the first victory over {winners} winning seeds: {extremes}; windows pool {fewest}-{most} seeds; seeds per window: offsets {per_window} (target {}-{}%)",
         windows.len(),
         pct.start(),
         pct.end()
