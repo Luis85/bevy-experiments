@@ -380,6 +380,8 @@ pub struct FxView {
     /// What burst in an Explosion event ([`explosion_ordnance`]); `None`
     /// for every other kind.
     pub ordnance: Option<OrdnanceKind>,
+    /// A Kill event of a boss: its saved body has a boss kind (W5-06).
+    pub boss: bool,
 }
 /// The ground mark a burst leaves (W5-05): derived from an Explosion event
 /// still in the event log, aged in seconds up to [`SCORCH_SECONDS`].
@@ -476,6 +478,14 @@ fn shot_source(a: &Attempt, event: &Event) -> Option<FxSource> {
         .any(|s| s.id == id && s.kind == StructureKind::Trap);
     (!trap).then_some(FxSource::Turret)
 }
+/// Whether the Kill `event` felled a boss: the body it left (the kill names
+/// the dead hostile as its actor) has a boss kind.
+fn boss_kill(a: &Attempt, event: &Event) -> bool {
+    let since = a.corpses.partition_point(|corpse| corpse.tick < event.tick);
+    a.corpses[since..]
+        .iter()
+        .any(|corpse| Some(corpse.id) == event.actor_id && corpse.boss_kind.is_some())
+}
 /// The events of `a` some painter can still draw (`art::fx_lifetime`), oldest
 /// first, each Shot with its volley and source.
 fn fx_views(a: &Attempt) -> Vec<FxView> {
@@ -518,6 +528,7 @@ fn fx_views(a: &Attempt) -> Vec<FxView> {
             volley,
             source: shot.then(|| shot_source(a, e)).flatten(),
             ordnance: (e.kind == EventKind::Explosion).then(|| explosion_ordnance(a, e)),
+            boss: e.kind == EventKind::Kill && boss_kill(a, e),
         });
     }
     out.reverse();

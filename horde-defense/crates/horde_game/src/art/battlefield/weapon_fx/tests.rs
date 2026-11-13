@@ -112,7 +112,6 @@ fn paint_events(game: &Game, reduced: bool) -> Vec<Shape> {
     let options = fx::FxOptions {
         numbers: false,
         reduced,
-        blood: false,
         textures: Default::default(),
         occluder: None,
     };

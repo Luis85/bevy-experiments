@@ -996,12 +996,12 @@ fn fx_painters_draw_nothing_past_fx_lifetime() {
         volley: Some(crate::battle_view::Volley::SINGLE),
         source: Some(crate::art::FxSource::Turret),
         ordnance: None,
+        boss: false,
     };
     let projection = ArenaProjection::for_attempt(arena(), a);
     let options = fx::FxOptions {
         numbers: true,
         reduced: false,
-        blood: true,
         textures: textures(),
         occluder: None,
     };
@@ -2439,6 +2439,7 @@ fn every_cue_view() -> (Game, BattleViewModel) {
         volley: Some(crate::battle_view::Volley::SINGLE),
         source: Some(crate::art::FxSource::Turret),
         ordnance: None,
+        boss: false,
     };
     view.fx = [
         EventKind::BossWarning,
@@ -2481,7 +2482,6 @@ fn every_cue_primitive_has_an_ink_backing_with_contrast_at_least_3() {
         let fx_options = fx::FxOptions {
             numbers: true,
             reduced,
-            blood: true,
             textures: textures(),
             occluder: None,
         };

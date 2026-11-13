@@ -1,7 +1,8 @@
 //! Egui renderer of a `BattleViewModel`, painted in passes (W5-01,
 //! design-vfx-lighting §2):
 //!
-//! 1. World: ground and weather, burning ground, structures, bodies,
+//! 1. World: ground and weather, burning ground, blood decals (`decals`,
+//!    with the blood setting on), structures, bodies,
 //!    hostiles, the survivor rig, thrown ordnance, event effects and impact
 //!    particles.
 //! 2. Grade: the stage's lighting over-rect across the whole canvas
@@ -22,9 +23,11 @@
 mod batch;
 mod corpses;
 mod cue;
+mod decals;
 mod enemies;
 mod explosion;
 mod fx;
+mod hits;
 mod light;
 mod ordnance;
 mod structures;
@@ -154,7 +157,6 @@ fn render(
     let fx_options = fx::FxOptions {
         numbers: options.numbers,
         reduced,
-        blood: options.blood,
         textures,
         occluder: options.occluder,
     };
@@ -164,6 +166,7 @@ fn render(
     fx::ambient(p, arena, &view.particles);
     explosion::scorch(p, arena, view, reduced);
     ordnance::fire_zones(p, arena, view, reduced, textures);
+    decals::paint(p, arena, a, options.blood, reduced);
     structures::paint(p, arena, view, textures);
     corpses::paint(p, arena, view, a, textures, options.blood);
     let rig_shadow = rig_shadow(arena, view);

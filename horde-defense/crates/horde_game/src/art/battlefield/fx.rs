@@ -1,10 +1,10 @@
 //! Weather, impact particles and short-lived event effects. World pass
-//! ([`events`]): tracers, hit sparks (bursts are in [`super::explosion`]). Cue pass ([`event_cues`],
+//! ([`events`]): tracers, then the hit sparks and kill bursts of [`super::hits`] (bursts are in [`super::explosion`]). Cue pass ([`event_cues`],
 //! after the lighting grade): REINFORCEMENTS, the INCOMING spawn marker,
 //! contact damage and banked-coin numbers, each on its INK backing
 //! ([`super::cue`]). The boss warning and arrival are the wall-clock
 //! banner's (`ui::battle::boss_banner`, W3-14).
-use super::super::{AMBER, ArenaProjection, MUTED, RED, TEXT, line};
+use super::super::{AMBER, ArenaProjection, RED};
 use super::batch::MeshBuilder;
 use super::cue::{self, CueBatch, Label};
 use super::weapon_fx;
@@ -19,7 +19,6 @@ use horde_core::{content::StructureKind, sim::EventKind};
 pub(super) struct FxOptions {
     pub numbers: bool,
     pub reduced: bool,
-    pub blood: bool,
     pub textures: ArtTextures,
     /// See [`super::RenderOptions::occluder`].
     pub occluder: Option<Rect>,
@@ -227,78 +226,29 @@ pub(super) fn events(
     options: &FxOptions,
 ) {
     let FxOptions {
-        reduced,
-        blood,
-        textures,
-        ..
+        reduced, textures, ..
     } = *options;
     let sy = arena.lane_height();
-    for e in &view.fx {
-        let age = e.age;
-        let alpha = (1.0 - age / fx_lifetime(e.kind)).clamp(0.0, 1.0);
-        match e.kind {
-            EventKind::Shot => {
-                if let (Some(source), Some(from)) =
-                    (e.source, shot_origin(arena, view, e, muzzle, textures))
-                {
-                    weapon_fx::paint_shot(
-                        p,
-                        weapon_fx::weapon_fx(source),
-                        weapon_fx::Shot {
-                            from,
-                            to: arena.world(e.to[0], e.to[1]),
-                            lane: sy,
-                            age_ticks: shot_age_ticks(e),
-                            volley: e.volley.unwrap_or(Volley::SINGLE),
-                            reduced,
-                        },
-                    );
-                }
-            }
-            EventKind::Hit
-            | EventKind::WeakPoint
-            | EventKind::Kill
-            | EventKind::Armor
-            | EventKind::Melee
-                if alpha > 0.0 =>
-            {
-                let at = arena.world(e.to[0], e.to[1]);
-                if blood && !reduced && e.kind == EventKind::Kill {
-                    for n in 0..4 {
-                        p.circle_filled(
-                            at + vec2((n as f32 * 2.3).sin() * 9.0, (n as f32 * 4.2).cos() * 6.0),
-                            2.0,
-                            C::from_rgb(102, 52, 42).gamma_multiply(alpha),
-                        );
-                    }
-                }
-                let color = if e.kind == EventKind::Armor {
-                    MUTED
-                } else if e.kind == EventKind::WeakPoint {
-                    AMBER
-                } else {
-                    TEXT
-                };
-                if !reduced {
-                    for d in [
-                        vec2(-1.0, -1.0),
-                        vec2(1.0, -1.0),
-                        vec2(-1.0, 1.0),
-                        vec2(1.0, 1.0),
-                    ] {
-                        line(
-                            p,
-                            at + d * 4.0,
-                            at + d * 8.0,
-                            1.5,
-                            color.gamma_multiply(alpha),
-                        );
-                    }
-                }
-            }
-            _ => {}
+    for e in view.fx.iter().filter(|e| e.kind == EventKind::Shot) {
+        if let (Some(source), Some(from)) =
+            (e.source, shot_origin(arena, view, e, muzzle, textures))
+        {
+            weapon_fx::paint_shot(
+                p,
+                weapon_fx::weapon_fx(source),
+                weapon_fx::Shot {
+                    from,
+                    to: arena.world(e.to[0], e.to[1]),
+                    lane: sy,
+                    age_ticks: shot_age_ticks(e),
+                    volley: e.volley.unwrap_or(Volley::SINGLE),
+                    reduced,
+                },
+            );
         }
     }
+    // Hit sparks and kill bursts, over the tracers.
+    super::hits::paint(p, arena, view, reduced);
 }
 /// Cue pass: the event cues of `view`, collected into `batch`.
 pub(super) fn event_cues(

@@ -367,6 +367,15 @@ Usage rules:
 - One untextured mesh, drawn before corpse_batch (visual_assets.rs:442).
 - Only when `settings.blood`; static in reduced.
 
+**As built (W5-06):**
+- `art/battlefield/hits.rs`: `spark_length(lane, damage)` and `spark_width(lane)` are the two formulas above; `spark_count(damage)` is 4 below 20 damage, 6 below 60, else 8. `burst(&FxView, lane)` is the pure spark set of an impact event (Hit, WeakPoint, Armor, Melee: damage-scaled, coloured as before; Kill: `KILL_SPARKS` = 6 of `KILL_SPARK_LANES` = 0.16 lanes, times `BOSS_KILL_SCALE` = 1.8 for a boss). `paint` draws the newest `HIT_EVENTS_MAX` = 64 live impact events as one untextured mesh of 4-vertex quads, called at the end of `fx::events`; the sparks drift outward and fade over the event's 0.45 s.
+- `FxView.boss` is true for a Kill event whose body (the `a.corpses` record with the kill's `actor_id`, not older than the event) has a boss kind. The Kill event names the dead hostile as its actor, not its target.
+- Reduced: no sparks and no kill burst, as before W5-06 (the damage number and the hit flash carry the hit).
+- `art/battlefield/decals.rs`: `decals(a, blood, reduced)` is empty with blood off, else one `Decal` for each of the newest `BLOOD_DECALS_MAX` = 64 records of `a.corpses`, at the body's drawn feet (its crowd stagger included). A stain is 3 to 5 flattened blobs from a SplitMix64 scramble of the body's id and death tick (no RNG); a boss's is 1.6 times as large. `paint` draws them as one untextured mesh of 8-segment fans, colour (78,30,26) alpha 150, after the fire zones and before the structures and the bodies.
+- A stain spreads from 0.4 to its full size over `SPREAD_TICKS` = 18 sim ticks (so it holds while paused); reduced draws the full stain from the first frame. The stain replaces the four red dots a Kill event drew for 0.45 s with blood on.
+- No screen shake: `field_rect_never_offsets_on_damage_or_explosion` (ISO-9) paints survivor damage, an explosion, a 5000-damage hit and a boss kill at every age of their effects and requires the ground, the projection, every hostile and the survivor to stay where a quiet field has them, in normal and reduced effects.
+- Not in this row: the PERF_BUDGET fx caps (decals 64) and the fx-stress scene (W5-09 to W5-11 read the constants above).
+
 ## 7. Elite tells: enemy_visuals.json v2
 
 ### Wave 1 loader (visual_assets/enemy_visuals.rs)
