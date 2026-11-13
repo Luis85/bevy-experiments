@@ -44,39 +44,15 @@ fn near_position(world: &World, actor: Entity, pos: SimPos) -> bool {
 
 fn site_clear(world: &World, plot: Entity) -> Result<(), String> {
     let center = *world.get::<SimPos>(plot).ok_or("plot has no position")?;
-    let house = cottage_center(center);
-    let grid = world.resource::<SpatialGrid>();
-    let cells = grid.footprint_cells(house, cottage_footprint());
-    if cells.iter().any(|cell| {
-        if super::super::frontier::enabled(world) {
-            super::super::frontier::terrain::cell(world, cell.x, cell.z)
-                .is_none_or(|terrain| !terrain.walkable())
-        } else {
-            !geography::for_world(world).land_cell(cell.x, cell.z)
-        }
-    }) {
-        return Err("the cottage footprint must be on land".into());
-    }
-    for entity in world.resource::<SimIndex>().map.values().copied() {
-        let Some(pos) = world.get::<SimPos>(entity).copied() else {
-            continue;
-        };
-        if let Some(blocker) = world.get::<GridBlocker>(entity)
-            && grid
-                .footprint_cells(pos, blocker.0)
-                .iter()
-                .any(|cell| cells.contains(cell))
-        {
-            return Err("the cottage site is blocked".into());
-        }
-        if world.get::<Villager>(entity).is_some()
-            && living(world, entity)
-            && cells.contains(&grid.cell_of(pos))
-        {
-            return Err(
-                "a living actor occupies the cottage site; stand near its front door".into(),
-            );
-        }
+    let (house, body, _) = cottage_body(world, front_door(center), None);
+    body_fits(world, house, body, None)?;
+    // Living world: the plot must also hold the body the cottage grows into.
+    if super::super::frontier::enabled(world)
+        && let Some(larger) = super::super::live::larger_building(world)
+    {
+        let (house, body, _) = cottage_body(world, front_door(center), Some(&larger));
+        body_fits(world, house, body, None)
+            .map_err(|reason| format!("this plot has no room for the larger cottage: {reason}"))?;
     }
     Ok(())
 }
@@ -97,7 +73,8 @@ fn build_plan(world: &World, actor: Entity, plot: Entity) -> Result<Vec<BuildMat
     }
     site_clear(world, plot)?;
     let mut materials = Vec::new();
-    for (kind, count) in [("plank", PLANK_COST), ("log", LOG_COST)] {
+    let roles = super::super::roles::roles(world);
+    for (kind, count) in [(roles.lumber, PLANK_COST), (roles.timber, LOG_COST)] {
         for (item, selected) in economy::selected(world, actor, kind, count)? {
             materials.push(BuildMaterial {
                 item,
@@ -170,13 +147,20 @@ impl HomesteadAct {
                             .is_some_and(|other| other.use_kind == definition.use_kind)
                 })
                 .count();
+            let allowance = super::super::live::garden_allowance(world, me);
             let limit = if definition.use_kind == "housing" {
                 MAX_HOUSING_PLOTS
             } else {
-                MAX_GARDEN_PLOTS
+                allowance.map_or(MAX_GARDEN_PLOTS, |plots| plots as usize)
             };
             if owned >= limit {
-                return Err("you may own one housing plot and one garden plot".into());
+                return Err(match allowance {
+                    Some(plots) if definition.use_kind != "housing" => format!(
+                        "you may own {plots} garden plot{}; a homestead upgrade that adds plots allows another",
+                        if plots == 1 { "" } else { "s" }
+                    ),
+                    _ => "you may own one housing plot and one garden plot".into(),
+                });
             }
             return Ok(());
         }
@@ -296,7 +280,7 @@ impl HomesteadAct {
                 );
             }
             "plant" => {
-                let definition = *crop_definition(world, &self.kind).expect("checked crop kind");
+                let definition = crop_definition(world, &self.kind).expect("checked crop kind");
                 economy::consume(world, actor, definition.seed_kind, definition.seed_count)?;
                 world.get_mut::<HomesteadPlot>(plot).expect("plot").beds[self.bed as usize] =
                     Some(Crop {
@@ -318,7 +302,7 @@ impl HomesteadAct {
                     .as_ref()
                     .expect("crop")
                     .kind;
-                let definition = *crop_definition(world, kind).expect("checked crop kind");
+                let definition = crop_definition(world, kind).expect("checked crop kind");
                 economy::consume(world, actor, definition.water_kind, definition.water_count)?;
                 let ready_at = now.saturating_add(u64::from(definition.growth_ticks));
                 let mut estate = world.get_mut::<HomesteadPlot>(plot).expect("plot");
@@ -337,7 +321,7 @@ impl HomesteadAct {
                     .as_ref()
                     .expect("crop")
                     .kind;
-                let definition = *crop_definition(world, kind).expect("checked crop kind");
+                let definition = crop_definition(world, kind).expect("checked crop kind");
                 let announce = !world.get::<HomesteadPlot>(plot).expect("plot").beds
                     [self.bed as usize]
                     .as_ref()
@@ -361,6 +345,13 @@ impl HomesteadAct {
                 super::super::production::completed(
                     world,
                     me,
+                    definition.yield_kind,
+                    definition.yield_count,
+                );
+                super::super::live::booked(
+                    world,
+                    me,
+                    super::super::live::Book::Gathered,
                     definition.yield_kind,
                     definition.yield_count,
                 );
@@ -431,7 +422,9 @@ impl ContentCommand for HomesteadAct {
             .map_err(|reason| CommandError::Unavailable { reason })
     }
     fn apply(self, world: &mut World) {
-        let _ = self.perform(world);
+        if self.perform(world).is_ok() {
+            super::super::live::homestead_acted(world, SimId(self.unit), &self.verb);
+        }
     }
     fn unit(&self) -> Option<SimId> {
         Some(SimId(self.unit))

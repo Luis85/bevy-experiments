@@ -10,13 +10,29 @@ pub const MAX_DIARY_PAGES: usize = 256;
 pub const MAX_DIARY_BYTES: usize = 1_048_576;
 pub const DAYS_PER_SEASON: u64 = 7;
 pub const NPC_SEED_COINS: u32 = 200;
+/// Holdings above this pay the daily proportional levy (regional profile).
+pub const LEVY_THRESHOLD: u32 = NPC_SEED_COINS;
+/// Share of the holdings above [`LEVY_THRESHOLD`] moved into the fund each day.
+pub const LEVY_PERCENT: u32 = 10;
+/// A living resident below this is topped up to it from the fund, if it can pay.
+pub const DESTITUTION_FLOOR: u32 = 40;
+/// Per-resident reserve the fund keeps for floor grants before it pays the
+/// equal civic dividend.
+pub const FUND_RESERVE_PER_RESIDENT: u32 = 20;
 
 /// Immutable presentation/perception construction data, like the incumbent explorer actor base.
 #[derive(Component, Clone, Debug, Serialize, Deserialize)]
 pub struct VillageSight(pub npc_framework::perception::Sensors);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Reflect)]
-#[serde(rename_all = "snake_case")]
+/// A profession's identity.
+///
+/// The named variants are the shipped trades (and the Actor Testbed's fixed
+/// table); [`Role::Trade`] is any other trade a world's catalog defines,
+/// identified by its data key. In data and saves every role is its key
+/// string (`"farmer"`, `"water_keeper"`, `"potter"`), so a catalog can add a
+/// trade without code. Living-world logic reads behaviour from the
+/// profession's catalog entry and never branches on a named trade.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Reflect)]
 pub enum Role {
     Visitor,
     Farmer,
@@ -32,7 +48,88 @@ pub enum Role {
     Tanner,
     Tailor,
     Fisher,
+    /// A trade only the world's catalog defines, by its data key.
+    Trade(&'static str),
 }
+
+/// Data keys of the named roles, in declaration order.
+const NAMED_ROLES: [(Role, &str); 14] = [
+    (Role::Visitor, "visitor"),
+    (Role::Farmer, "farmer"),
+    (Role::Miller, "miller"),
+    (Role::Baker, "baker"),
+    (Role::WaterKeeper, "water_keeper"),
+    (Role::Woodcutter, "woodcutter"),
+    (Role::Carpenter, "carpenter"),
+    (Role::Miner, "miner"),
+    (Role::Smith, "smith"),
+    (Role::Innkeeper, "innkeeper"),
+    (Role::Hunter, "hunter"),
+    (Role::Tanner, "tanner"),
+    (Role::Tailor, "tailor"),
+    (Role::Fisher, "fisher"),
+];
+
+/// Interned keys of data-only trades. The pool only grows and holds each
+/// distinct key once; a role compares, orders and hashes by its key string,
+/// never by where it sits here, so the pool cannot affect a simulation.
+static TRADE_KEYS: std::sync::Mutex<std::collections::BTreeSet<&'static str>> =
+    std::sync::Mutex::new(std::collections::BTreeSet::new());
+
+impl Role {
+    /// The role named by a data key: a named variant, or a data-only trade.
+    pub fn from_key(key: &str) -> Self {
+        if let Some((role, _)) = NAMED_ROLES.iter().find(|(_, name)| *name == key) {
+            return *role;
+        }
+        let mut pool = TRADE_KEYS
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner());
+        if let Some(found) = pool.get(key) {
+            return Self::Trade(found);
+        }
+        let leaked: &'static str = Box::leak(key.to_owned().into_boxed_str());
+        pool.insert(leaked);
+        Self::Trade(leaked)
+    }
+    /// The role's data key (`"water_keeper"`, `"potter"`).
+    pub fn key(self) -> &'static str {
+        match self {
+            Self::Trade(key) => key,
+            named => NAMED_ROLES
+                .iter()
+                .find(|(role, _)| *role == named)
+                .map_or("visitor", |(_, key)| key),
+        }
+    }
+    /// A data-only trade, which no fixed table knows.
+    pub fn is_data_only(self) -> bool {
+        matches!(self, Self::Trade(_))
+    }
+}
+
+impl Serialize for Role {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(self.key())
+    }
+}
+
+impl<'de> Deserialize<'de> for Role {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let key = String::deserialize(deserializer)?;
+        let valid = !key.is_empty()
+            && key
+                .chars()
+                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+        if !valid {
+            return Err(serde::de::Error::custom(format!(
+                "`{key}` is not a trade key (lower-case letters, digits and `_`)"
+            )));
+        }
+        Ok(Self::from_key(&key))
+    }
+}
+
 impl Role {
     pub const RESIDENTS: [Self; 9] = [
         Self::Farmer,
@@ -61,6 +158,7 @@ impl Role {
             Self::Tanner => "tanner",
             Self::Tailor => "tailor",
             Self::Fisher => "fisher",
+            Self::Trade(key) => key,
         }
     }
     pub fn person(self) -> &'static str {
@@ -79,10 +177,27 @@ impl Role {
             Self::Tanner => "Sage",
             Self::Tailor => "Lina",
             Self::Fisher => "Finn",
+            Self::Trade(_) => "Worker",
         }
     }
+    /// Hash tag of a named role (its declaration index); every data-only
+    /// trade shares the next one and hashes its key after it.
     pub fn tag(self) -> u8 {
-        self as u8
+        match self {
+            Self::Trade(_) => 14,
+            named => NAMED_ROLES
+                .iter()
+                .position(|(role, _)| *role == named)
+                .map_or(0, |index| index as u8),
+        }
+    }
+    /// Feeds the role into a state hash: the tag alone for a named role (as
+    /// before data-only trades existed), the tag and key for a data trade.
+    pub fn sim_hash(self, h: &mut Fnv64) {
+        h.u8(self.tag());
+        if let Self::Trade(key) = self {
+            h.str(key);
+        }
     }
 }
 #[derive(Component, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
@@ -101,7 +216,7 @@ pub struct Villager {
 impl SimHash for Villager {
     const NAME: &'static str = "island_villager";
     fn sim_hash(&self, h: &mut Fnv64) {
-        h.u8(self.role.tag());
+        self.role.sim_hash(h);
         h.str(&self.name);
         self.home.sim_hash(h);
         h.u32(self.workplace.0);
@@ -166,7 +281,7 @@ pub struct VillagePlace {
 impl SimHash for VillagePlace {
     const NAME: &'static str = "island_place";
     fn sim_hash(&self, h: &mut Fnv64) {
-        h.u8(self.role.tag());
+        self.role.sim_hash(h);
         h.str(&self.label);
     }
 }
@@ -304,8 +419,58 @@ pub enum Season {
 }
 pub fn calendar(world: &World) -> (u64, Season, bool) {
     let tick = world.resource::<SimClock>().tick;
+    calendar_on(world, tick)
+}
+/// Days in one season of this world: data in the regional profile
+/// (`economy.tuning.days_per_season`), [`DAYS_PER_SEASON`] elsewhere.
+pub fn days_per_season(world: &World) -> u64 {
+    super::frontier::economy_spec::tuning(world)
+        .map_or(DAYS_PER_SEASON, |tuning| tuning.days_per_season.max(1))
+}
+/// Calendar day of tick 0. Older profiles: 19 when needs-driven, else 0. The
+/// regional profile reads `economy.tuning.founding_day`.
+pub fn first_day(world: &World) -> u64 {
+    if !super::needs_driven(world) {
+        return 0;
+    }
+    match super::frontier::economy_spec::tuning(world) {
+        Some(tuning) if tuning.founding_day >= 0 => tuning.founding_day as u64,
+        Some(tuning) => founding_day(tuning.days_per_season.max(1)),
+        None => founding_day(DAYS_PER_SEASON),
+    }
+}
+/// The calendar of this world at any tick, with its own year length.
+pub fn calendar_on(world: &World, tick: u64) -> (u64, Season, bool) {
     let config = world.resource::<SimConfig>();
-    calendar_at(tick, config, super::needs_driven(world))
+    if super::frontier::economy_spec::tuning(world).is_none() {
+        return calendar_at(tick, config, super::needs_driven(world));
+    }
+    calendar_with(tick, config, first_day(world), days_per_season(world))
+}
+/// First calendar day of a needs-driven world: two days before winter.
+pub fn founding_day(season_days: u64) -> u64 {
+    (3 * season_days).saturating_sub(2).max(2 * season_days)
+}
+/// [`calendar_at`] for a year of `4 * season_days` days whose tick 0 falls on
+/// calendar day `first_day`.
+pub fn calendar_with(
+    tick: u64,
+    config: &SimConfig,
+    first_day: u64,
+    season_days: u64,
+) -> (u64, Season, bool) {
+    let season_days = season_days.max(1);
+    let day = tick / config.day_length.max(1) + first_day;
+    (day, season_of(day, season_days), config.is_night(tick))
+}
+/// Season of a calendar day.
+pub fn season_of(day: u64, season_days: u64) -> Season {
+    match day / season_days.max(1) % 4 {
+        0 => Season::Spring,
+        1 => Season::Summer,
+        2 => Season::Autumn,
+        _ => Season::Winter,
+    }
 }
 /// Shared simulation/observer calendar; Living starts in late autumn.
 pub fn calendar_at(tick: u64, config: &SimConfig, needs_driven: bool) -> (u64, Season, bool) {

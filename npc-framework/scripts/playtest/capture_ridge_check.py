@@ -58,7 +58,7 @@ def main():
             flow.window = int(query(url, with_types=[PRIMARY])[0]["entity"])
             flow.click("New game")
             flow.click("Oversee the village")
-            wait_for(lambda: flow.widget("Play character"))
+            wait_for(lambda: flow.widget("Live"))
             flow.call("npc/pause")
             flow.advance(6500)
             flow.region("Stone Ridge")
@@ -66,7 +66,7 @@ def main():
             flow.region("Harbour")
             flow.capture("harbour-slope")
             flow.retained_homes("targeted-spectator")
-            flow.click("Terraform")
+            flow.click("Shape")
             flow.capture("editor-navigation-overlay")
             state = flow.state()
             if not any("island_awaiting_arrival_v1" in e.get("components", {}) for e in state["entities"]):

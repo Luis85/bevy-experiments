@@ -34,6 +34,35 @@ pub fn social_available(world: &World, actor: Entity) -> bool {
         .all(|need| economy::need(world, actor, need) >= critical)
 }
 
+/// Slowest and fastest work pace, as a percentage of the base duration.
+pub const WORK_PACE_SLOWEST: u32 = 115;
+pub const WORK_PACE_FASTEST: u32 = 90;
+
+/// Regional work duration multiplier from morale: 115% at zero morale down to
+/// 90% at full morale. Actors without social life, and other profiles, get 100.
+pub fn work_pace_percent(world: &World, actor: Entity) -> u32 {
+    if !super::super::frontier::enabled(world) {
+        return 100;
+    }
+    let Some(social) = world.get::<SocialLife>(actor) else {
+        return 100;
+    };
+    let morale = social.morale.clamp(0, 100_000) as u32;
+    let (slowest, fastest) = super::super::frontier::economy_spec::tuning(world).map_or(
+        (WORK_PACE_SLOWEST, WORK_PACE_FASTEST),
+        |tuning| {
+            (
+                tuning.work_pace_slowest_percent,
+                tuning.work_pace_fastest_percent,
+            )
+        },
+    );
+    // Elders work slower; everybody else at 100%.
+    (slowest - morale * (slowest - fastest) / 100_000)
+        * super::super::demography::work_percent(world, actor)
+        / 100
+}
+
 /// Leisure remains a low-priority action beneath survival and funded work.
 pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
     let policy = world.get_resource::<ColonyState>()?;
@@ -47,15 +76,23 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
     }
     let me = world.get::<SimId>(actor)?;
     let pos = world.get::<SimPos>(actor)?;
-    world
-        .resource::<SimIndex>()
-        .map
+    // Only actors with a social life can be met, and distance is the cheapest
+    // test, so it comes first. The ranking key ends in the identity.
+    let others: Vec<(SimId, Entity)> = world
+        .try_query::<(Entity, &SimId, &SocialLife)>()
+        .map(|mut query| query.iter(world).map(|(e, id, _)| (*id, e)).collect())
+        .unwrap_or_default();
+    others
         .iter()
-        .filter(|(id, entity)| *id != me && social_available(world, **entity))
         .filter_map(|(id, entity)| {
             let target = world.get::<SimPos>(*entity).copied()?;
             let direct = pos.dist2(target);
-            if direct > 15_000_i64.pow(2) {
+            if id == me || direct > 15_000_i64.pow(2) || !social_available(world, *entity) {
+                return None;
+            }
+            // Somebody inside a building is company only for those inside it.
+            let indoors = super::super::indoors::inside_entity(world, *entity);
+            if indoors.is_some() && indoors != super::super::indoors::inside_entity(world, actor) {
                 return None;
             }
             let distance = if super::super::frontier::enabled(world) {
@@ -76,15 +113,17 @@ pub fn social_target(world: &World, actor: Entity) -> Option<(SimId, SimPos)> {
 }
 
 pub(super) fn tick(world: &mut World, now: u64) {
-    let people: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter(|(_, entity)| {
-            world.get::<SocialLife>(**entity).is_some() && living(world, **entity)
+    let mut people: Vec<(SimId, Entity)> = world
+        .try_query::<(Entity, &SimId, &SocialLife)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .filter(|(entity, _, _)| living(world, *entity))
+                .map(|(entity, id, _)| (*id, entity))
+                .collect()
         })
-        .map(|(id, entity)| (*id, *entity))
-        .collect();
+        .unwrap_or_default();
+    people.sort_unstable_by_key(|(id, _)| *id);
     for (id, actor) in &people {
         let housed = home_of(world, *id).is_some();
         let social = world.get::<SocialLife>(*actor).expect("social");
@@ -104,7 +143,38 @@ pub(super) fn tick(world: &mut World, now: u64) {
     if !world.resource::<ColonyState>().gatherings {
         return;
     }
+    // Spatial buckets of the meeting reach: a resident can only meet somebody
+    // in its own or a neighbouring bucket, so the pass looks at neighbours
+    // instead of at every pair. Candidates keep their identity order, so the
+    // first partner found is the one a pass over all pairs would find.
+    const BUCKET_MM: i32 = 1_500;
+    let mut buckets: std::collections::BTreeMap<(i32, i32), Vec<usize>> =
+        std::collections::BTreeMap::new();
+    let mut cells = Vec::with_capacity(people.len());
+    for (index, (_, actor)) in people.iter().enumerate() {
+        let cell = world
+            .get::<SimPos>(*actor)
+            .map(|pos| (pos.x.div_euclid(BUCKET_MM), pos.z.div_euclid(BUCKET_MM)));
+        if let Some(cell) = cell {
+            buckets.entry(cell).or_default().push(index);
+        }
+        cells.push(cell);
+    }
     for (index, (a_id, a)) in people.iter().enumerate() {
+        let Some((cx, cz)) = cells[index] else {
+            continue;
+        };
+        let mut near: Vec<usize> = (-1..=1)
+            .flat_map(|dx| (-1..=1).map(move |dz| (cx + dx, cz + dz)))
+            .filter_map(|cell| buckets.get(&cell))
+            .flatten()
+            .copied()
+            .filter(|other| *other > index)
+            .collect();
+        if near.is_empty() {
+            continue;
+        }
+        near.sort_unstable();
         if !social_available(world, *a)
             || world
                 .get::<SocialLife>(*a)
@@ -115,15 +185,18 @@ pub(super) fn tick(world: &mut World, now: u64) {
         {
             continue;
         }
-        for (b_id, b) in people.iter().skip(index + 1) {
-            if !social_available(world, *b)
+        for (b_id, b) in near.into_iter().map(|other| &people[other]) {
+            if !economy::near(world, *a, *b)
+                // A passer-by does not meet somebody who is indoors.
+                || super::super::indoors::inside_entity(world, *a)
+                    != super::super::indoors::inside_entity(world, *b)
+                || !social_available(world, *b)
                 || world
                     .get::<SocialLife>(*b)
                     .expect("social")
                     .last_social_tick
                     .saturating_add(300)
                     > now
-                || !economy::near(world, *a, *b)
             {
                 continue;
             }

@@ -9,24 +9,151 @@ use bevy::{
     prelude::*,
     world_serialization::WorldAsset,
 };
+use std::path::{Path, PathBuf};
+use std::sync::{Once, OnceLock};
 
-/// Absolute path of the workspace `assets/` folder, fixed at compile time so
-/// `cargo run -p actor_testbed` and the built executable find the assets
-/// regardless of the cwd.
+/// Absolute path of the workspace `assets/` folder, fixed at compile time:
+/// the developer fallback, so `cargo run -p actor_testbed` finds the assets
+/// regardless of the cwd. A copied build resolves its own (see
+/// [`resolve_asset_dir`]).
 pub const ASSET_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../../assets");
 
-/// `AssetPlugin` pointing at the workspace assets (`BEVY_ASSET_ROOT`, when
-/// set, wins: `<BEVY_ASSET_ROOT>/assets`).
+/// Environment variable naming the asset folder itself; it wins over
+/// everything else.
+pub const ASSET_DIR_ENV: &str = "ISLAND_ASSETS";
+
+/// Where the asset folder was found.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AssetSource {
+    /// The `ISLAND_ASSETS` environment variable.
+    Environment,
+    /// An `assets` folder beside the executable: a packaged build.
+    BesideExecutable,
+    /// `<BEVY_ASSET_ROOT>/assets`, as Bevy itself resolves it.
+    BevyAssetRoot,
+    /// The workspace this build was compiled in.
+    Workspace,
+}
+
+impl AssetSource {
+    pub fn describe(self) -> &'static str {
+        match self {
+            Self::Environment => "the ISLAND_ASSETS environment variable",
+            Self::BesideExecutable => "the assets folder beside the executable",
+            Self::BevyAssetRoot => "BEVY_ASSET_ROOT",
+            Self::Workspace => "the workspace this build was compiled in",
+        }
+    }
+}
+
+/// The asset folder a run uses, and why.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AssetDir {
+    pub path: PathBuf,
+    pub source: AssetSource,
+    /// An `ISLAND_ASSETS` value that named no folder and was passed over.
+    pub ignored: Option<PathBuf>,
+}
+
+/// Picks the asset folder at run time, first match wins:
+///
+/// 1. `ISLAND_ASSETS`, when it names an existing folder;
+/// 2. an `assets` folder beside the executable;
+/// 3. the developer fallback: `<BEVY_ASSET_ROOT>/assets` when that variable
+///    is set, else the compile-time workspace folder.
+///
+/// The fallback is returned even when it does not exist, so a build copied
+/// without its assets still reports where it looked.
+pub fn resolve_asset_dir(
+    island_assets: Option<&Path>,
+    executable: Option<&Path>,
+    bevy_asset_root: Option<&Path>,
+    workspace: &Path,
+) -> AssetDir {
+    let ignored = island_assets
+        .filter(|path| !path.is_dir())
+        .map(Path::to_path_buf);
+    let found = |path: PathBuf, source| AssetDir {
+        path,
+        source,
+        ignored: ignored.clone(),
+    };
+    if let Some(path) = island_assets.filter(|path| path.is_dir()) {
+        return found(path.to_path_buf(), AssetSource::Environment);
+    }
+    if let Some(beside) = executable
+        .and_then(Path::parent)
+        .map(|folder| folder.join("assets"))
+        .filter(|path| path.is_dir())
+    {
+        return found(beside, AssetSource::BesideExecutable);
+    }
+    match bevy_asset_root {
+        Some(root) => found(root.join("assets"), AssetSource::BevyAssetRoot),
+        None => found(workspace.to_path_buf(), AssetSource::Workspace),
+    }
+}
+
+/// This process's asset folder, resolved once from its environment.
+pub fn asset_dir() -> &'static AssetDir {
+    static CHOSEN: OnceLock<AssetDir> = OnceLock::new();
+    CHOSEN.get_or_init(|| {
+        let variable = |name: &str| {
+            std::env::var_os(name)
+                .filter(|value| !value.is_empty())
+                .map(PathBuf::from)
+        };
+        resolve_asset_dir(
+            variable(ASSET_DIR_ENV).as_deref(),
+            std::env::current_exe().ok().as_deref(),
+            variable("BEVY_ASSET_ROOT").as_deref(),
+            Path::new(ASSET_DIR),
+        )
+    })
+}
+
+/// `AssetPlugin` reading from [`asset_dir`].
 pub fn asset_plugin() -> AssetPlugin {
-    let file_path = if std::env::var_os("BEVY_ASSET_ROOT").is_some() {
+    let chosen = asset_dir();
+    // Bevy joins a relative path onto `BEVY_ASSET_ROOT` itself; every other
+    // choice is absolute, so the working directory never matters.
+    let file_path = if chosen.source == AssetSource::BevyAssetRoot {
         "assets".to_string()
     } else {
-        ASSET_DIR.to_string()
+        chosen.path.to_string_lossy().into_owned()
     };
     AssetPlugin {
         file_path,
         ..default()
     }
+}
+
+/// Says once which asset folder this run reads, and why.
+fn log_asset_dir() {
+    static LOGGED: Once = Once::new();
+    LOGGED.call_once(|| {
+        let chosen = asset_dir();
+        if let Some(ignored) = &chosen.ignored {
+            warn!(
+                "{ASSET_DIR_ENV}={} is not a folder; ignored",
+                ignored.display()
+            );
+        }
+        if chosen.path.is_dir() {
+            info!(
+                "assets: {} (from {})",
+                chosen.path.display(),
+                chosen.source.describe()
+            );
+        } else {
+            error!(
+                "assets: {} (from {}) does not exist; set {ASSET_DIR_ENV} or put an assets \
+                 folder beside the executable",
+                chosen.path.display(),
+                chosen.source.describe()
+            );
+        }
+    });
 }
 
 /// Presentation identity. Occupations never select a frontier resident's body.
@@ -231,6 +358,7 @@ fn scene(server: &AssetServer, path: &'static str) -> Handle<WorldAsset> {
 }
 
 fn load_assets(mut commands: Commands, server: Option<Res<AssetServer>>) {
+    log_asset_dir();
     let Some(server) = server else {
         warn!("testbed_view: no AssetServer, nothing will be drawn");
         return;
@@ -262,6 +390,92 @@ fn load_assets(mut commands: Commands, server: Option<Res<AssetServer>>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A scratch folder of this test's own, removed when dropped.
+    struct Scratch(PathBuf);
+    impl Scratch {
+        fn new(tag: &str) -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "island-assets-{tag}-{}-{:?}",
+                std::process::id(),
+                std::thread::current().id()
+            ));
+            let _ = std::fs::remove_dir_all(&path);
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+        fn folder(&self, name: &str) -> PathBuf {
+            let path = self.0.join(name);
+            std::fs::create_dir_all(&path).unwrap();
+            path
+        }
+    }
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    #[test]
+    fn assets_resolve_from_the_environment_then_the_executable_then_the_workspace() {
+        let scratch = Scratch::new("order");
+        let named = scratch.folder("named");
+        let packaged = scratch.folder("package");
+        let executable = packaged.join("game_menu.exe");
+        let beside = scratch.folder("package/assets");
+        let bare = scratch.folder("bare").join("game_menu.exe");
+        let workspace = scratch.folder("workspace/assets");
+        let bevy_root = scratch.folder("bevy-root");
+        let pick = |env: Option<&Path>, exe: Option<&Path>, root: Option<&Path>| {
+            let chosen = resolve_asset_dir(env, exe, root, &workspace);
+            (chosen.path, chosen.source)
+        };
+
+        // 1. The variable wins over a packaged folder and every fallback.
+        assert_eq!(
+            pick(Some(&named), Some(&executable), Some(&bevy_root)),
+            (named.clone(), AssetSource::Environment)
+        );
+        // 2. Without it, the folder beside the executable.
+        assert_eq!(
+            pick(None, Some(&executable), Some(&bevy_root)),
+            (beside.clone(), AssetSource::BesideExecutable)
+        );
+        // 3. A build with nothing beside it is a developer build.
+        assert_eq!(
+            pick(None, Some(&bare), None),
+            (workspace.clone(), AssetSource::Workspace)
+        );
+        assert_eq!(
+            pick(None, None, None),
+            (workspace.clone(), AssetSource::Workspace)
+        );
+        assert_eq!(
+            pick(None, Some(&bare), Some(&bevy_root)),
+            (bevy_root.join("assets"), AssetSource::BevyAssetRoot),
+            "capture scripts keep steering a developer build"
+        );
+
+        // A variable that names no folder is passed over, and reported.
+        let missing = scratch.0.join("nowhere");
+        let chosen = resolve_asset_dir(Some(&missing), Some(&executable), None, &workspace);
+        assert_eq!(chosen.source, AssetSource::BesideExecutable);
+        assert_eq!(chosen.ignored, Some(missing.clone()));
+        let chosen = resolve_asset_dir(Some(&named), Some(&executable), None, &workspace);
+        assert_eq!(chosen.ignored, None);
+        // A file called `assets` beside the executable is not an asset folder.
+        let odd = scratch.folder("odd");
+        std::fs::write(odd.join("assets"), b"").unwrap();
+        assert_eq!(
+            pick(None, Some(&odd.join("game_menu.exe")), None),
+            (workspace.clone(), AssetSource::Workspace)
+        );
+        // The fallback is named even when it is absent, so the log can say so.
+        let gone = scratch.0.join("gone/assets");
+        let chosen = resolve_asset_dir(None, Some(&bare), None, &gone);
+        assert_eq!((chosen.path, chosen.source), (gone, AssetSource::Workspace));
+    }
+
     #[test]
     fn resident_roster_uses_distinct_models_and_separate_rig_families() {
         let roster: std::collections::BTreeSet<_> = (0..42).map(ModelKind::for_resident).collect();

@@ -3,12 +3,22 @@
 mod actions;
 mod atlas;
 mod build_preview;
+mod depth;
+mod hud;
 mod life;
 mod model;
 #[cfg(test)]
 mod research_tests;
+mod rest;
+mod session;
 #[cfg(test)]
 mod tests;
+mod workspace;
+
+#[cfg(test)]
+use workspace::reconcile;
+
+pub(crate) use session::{leave_character_view, show_life_choices, toolbar_clearance};
 
 use crate::{
     IslandMode, game_ui as ui,
@@ -33,6 +43,25 @@ use std::collections::BTreeMap;
 pub struct PlayerExperience {
     pub enabled: bool,
 }
+/// Host opt-in (`--dev-keys`) that keeps the developer toggles (F1, F3-F8)
+/// reachable inside the player session. Developer launches ignore it.
+#[derive(Resource, Clone, Copy, Debug, Default)]
+pub struct DeveloperKeys(pub bool);
+/// Developer toggles work everywhere except an unflagged player session.
+pub(crate) fn developer_keys_allowed(
+    experience: Option<&PlayerExperience>,
+    developer: Option<&DeveloperKeys>,
+) -> bool {
+    !experience.is_some_and(|experience| experience.enabled)
+        || developer.is_some_and(|developer| developer.0)
+}
+/// Run condition form of [`developer_keys_allowed`].
+pub(crate) fn developer_keys(
+    experience: Option<Res<PlayerExperience>>,
+    developer: Option<Res<DeveloperKeys>>,
+) -> bool {
+    developer_keys_allowed(experience.as_deref(), developer.as_deref())
+}
 /// Host-owned modal gate. It blocks gameplay input and hides gameplay UI, not the host shell.
 #[derive(Resource, Clone, Copy, Debug, Default)]
 pub struct FrontendGate(pub bool);
@@ -54,6 +83,52 @@ pub(super) enum Tab {
     Explore,
 }
 impl Tab {
+    /// In hotbar order.
+    pub(super) const ALL: [Self; 7] = [
+        Self::Pouch,
+        Self::Craft,
+        Self::Build,
+        Self::Garden,
+        Self::Trade,
+        Self::People,
+        Self::Explore,
+    ];
+    /// The word on the hotbar tile.
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::Pouch => "Pouch",
+            Self::Craft => "Craft",
+            Self::Build => "Build",
+            Self::Garden => "Garden",
+            Self::Trade => "Trade",
+            Self::People => "People",
+            Self::Explore => "Explore",
+        }
+    }
+    /// The key that opens it, as its key cap shows it.
+    pub(super) fn key(self) -> &'static str {
+        match self {
+            Self::Pouch => "I",
+            Self::Craft => "C",
+            Self::Build => "B",
+            Self::Garden => "G",
+            Self::Trade => "T",
+            Self::People => "N",
+            Self::Explore => "M",
+        }
+    }
+    pub(super) fn icon(self) -> crate::game_ui::icon::Icon {
+        use crate::game_ui::icon::Icon;
+        match self {
+            Self::Pouch => Icon::Pouch,
+            Self::Craft => Icon::Craft,
+            Self::Build => Icon::Build,
+            Self::Garden => Icon::Garden,
+            Self::Trade => Icon::Trade,
+            Self::People => Icon::People,
+            Self::Explore => Icon::Explore,
+        }
+    }
     fn title(self) -> &'static str {
         match self {
             Self::Pouch => "Your pouch",
@@ -88,7 +163,15 @@ pub(super) struct WorkRequest {
 #[derive(Clone, Debug, PartialEq)]
 pub(super) enum Action {
     Open(Tab),
+    /// A hotbar tile: open its workspace, or close it when it is the open one.
+    Toggle(Tab),
     Close,
+    /// Choose an item of the pouch; choosing it again lets go.
+    Item(String),
+    /// Craft: list every recipe (`true`) or only what can be made now.
+    CraftAll(bool),
+    /// Fold the goal tracker to its title, or open it again.
+    GoalFold,
     Menu,
     Inspect,
     Successor,
@@ -105,6 +188,16 @@ pub(super) enum Action {
     Walk(SimPos),
     Work(WorkRequest),
     Goal,
+    /// A recorded live-mode command: sleep, wake, gift, repeat, upgrade.
+    Live(depth::LiveRequest),
+    /// Choose a gift for this resident, or put the picker away.
+    GiftFor(Option<u32>),
+    /// Open the pouch at what helps this need (`None` shows everything).
+    NeedHelp(Option<&'static str>),
+    /// How many times a gathering is repeated.
+    Repeat(u32),
+    /// Put the day's account away.
+    DismissSummary,
 }
 #[derive(Resource)]
 pub(super) struct PlayerState {
@@ -113,6 +206,11 @@ pub(super) struct PlayerState {
     bed: u32,
     crop: String,
     person: Option<u32>,
+    /// The item chosen in the pouch.
+    item: Option<String>,
+    /// Craft lists every recipe, not only what can be made now.
+    craft_all: bool,
+    goal_folded: bool,
     requests: Vec<Action>,
     rows: BTreeMap<String, Entity>,
     context: Option<model::Row>,
@@ -122,6 +220,12 @@ pub(super) struct PlayerState {
     preview_follow: Option<bool>,
     successor_from: Option<SimId>,
     focus_workspace: bool,
+    /// The resident a gift is being chosen for.
+    gift_for: Option<u32>,
+    /// The need the pouch is filtered to, from a click on that need.
+    need_filter: Option<&'static str>,
+    /// Gatherings per order: 1, 5 or 10.
+    repeat: u32,
 }
 impl Default for PlayerState {
     fn default() -> Self {
@@ -131,6 +235,9 @@ impl Default for PlayerState {
             bed: 0,
             crop: testbed_content::village::catalog::GRAIN.into(),
             person: None,
+            item: None,
+            craft_all: true,
+            goal_folded: false,
             requests: Vec::new(),
             rows: BTreeMap::new(),
             context: None,
@@ -140,55 +247,28 @@ impl Default for PlayerState {
             preview_follow: None,
             successor_from: None,
             focus_workspace: false,
+            gift_for: None,
+            need_filter: None,
+            repeat: 1,
         }
     }
 }
 #[derive(Component)]
 pub(crate) struct PlayerRoot;
-#[derive(Component)]
-struct HeaderRoot;
+/// The hotbar: the alert stack and the camera keep clear of it.
 #[derive(Component)]
 struct ToolbarRoot;
 #[derive(Component)]
-struct FeedbackRoot;
-#[derive(Component)]
 pub(crate) struct WorkspaceRoot;
+/// The goal tracker.
 #[derive(Component)]
 pub(crate) struct JourneyRoot;
 #[derive(Component)]
 struct WorkspaceBody;
-#[derive(Component)]
-struct WorkspaceTitle;
-#[derive(Component)]
-struct WorkspaceSubtitle;
-#[derive(Component)]
-struct StatusText;
-#[derive(Component)]
-struct CalendarText;
-#[derive(Component)]
-struct CoinsText;
-#[derive(Component)]
-struct JourneyTitle;
-#[derive(Component)]
-struct JourneyDetail;
-#[derive(Component)]
-struct ContextLabel;
-#[derive(Component)]
-struct ContextButton;
-#[derive(Component)]
-struct NeedLabel(&'static str);
-#[derive(Component)]
-struct NeedFill(&'static str);
 #[derive(Component, Clone)]
 struct PlayerAction(Action);
 #[derive(Component)]
 struct PlayerControl;
-#[derive(Component)]
-struct ToolbarTab(Tab);
-#[derive(Component)]
-struct RowTitle;
-#[derive(Component)]
-struct RowDetail;
 #[derive(Component)]
 struct DeathRoot;
 #[derive(Component)]
@@ -215,6 +295,63 @@ pub(crate) fn active(world: &World) -> bool {
             .get_resource::<FrontendGate>()
             .is_some_and(|gate| gate.0)
 }
+/// Whether Tab belongs to the character workspace or a life prompt right now.
+pub(crate) fn owns_tab(world: &World) -> bool {
+    world
+        .get_resource::<PlayerState>()
+        .is_some_and(|state| state.tab.is_some())
+        || life::needs_prompt(world)
+}
+/// Where the goal tracker ends, with its margin: chrome beside it starts here.
+pub(crate) const GOAL_EDGE: f32 = 316.0;
+/// Width of the open Live workspace, for chrome that must keep clear of it;
+/// zero while none is open.
+pub(crate) fn workspace_width(world: &World) -> f32 {
+    if !active(world) || dead(world) {
+        return 0.0;
+    }
+    world
+        .get_resource::<PlayerState>()
+        .and_then(|state| state.tab)
+        .map_or(0.0, |tab| {
+            workspace::width(tab, crate::game_ui::scale::layout(world).class).0
+        })
+}
+/// A click on your own cottage in Live opens it: the Build workspace with
+/// its tiers, upgrade and chest, and the cut-away home (the homes view opens
+/// the selected building). Closing the workspace lets the cottage go again.
+fn home_click(world: &mut World) {
+    if !active(world) || dead(world) {
+        return;
+    }
+    let Some(home) = depth::played(world)
+        .and_then(|(unit, _)| testbed_content::village::colony::home_of(world, unit))
+    else {
+        return;
+    };
+    let selected = world
+        .get_resource::<Selected>()
+        .and_then(|selected| selected.0);
+    if selected == Some(home) && world.resource::<PlayerState>().tab != Some(Tab::Build) {
+        world.resource_mut::<Selected>().0 = None;
+    }
+    let clicked = world
+        .get_resource::<ButtonInput<MouseButton>>()
+        .is_some_and(|mouse| mouse.just_pressed(MouseButton::Left));
+    if !clicked || crate::island_build::building_at_cursor(world) != Some(home) {
+        return;
+    }
+    if let Some(mut chosen) = world.get_resource_mut::<Selected>() {
+        chosen.0 = Some(home);
+    }
+    if world.resource::<PlayerState>().tab != Some(Tab::Build) {
+        world
+            .resource_mut::<PlayerState>()
+            .requests
+            .push(Action::Open(Tab::Build));
+    }
+}
+
 pub(crate) fn dead(world: &World) -> bool {
     world
         .get_resource::<testbed_content::village::VillageState>()
@@ -225,6 +362,10 @@ pub(crate) fn dead(world: &World) -> bool {
         })
         .and_then(|actor| world.get::<testbed_content::village::Vitality>(actor))
         .is_some_and(|vital| vital.died_at.is_some())
+}
+/// Whether the played character is asleep, by the simulation's account.
+pub(crate) fn player_asleep(world: &World) -> bool {
+    rest::asleep(world)
 }
 pub(crate) fn gate_open(gate: Option<Res<FrontendGate>>) -> bool {
     !gate.is_some_and(|gate| gate.0)
@@ -244,6 +385,8 @@ pub(crate) fn plugin(app: &mut App) {
         .init_resource::<FrontendGate>()
         .init_resource::<PlayerMenuRequest>()
         .init_resource::<PlayerState>()
+        .init_resource::<hud::Hud>()
+        .init_resource::<workspace::Frame>()
         .init_resource::<InputFocus>()
         .init_resource::<HiddenRoots>()
         .configure_sets(Update, ViewSystems::Input.run_if(not(input_active)))
@@ -251,9 +394,10 @@ pub(crate) fn plugin(app: &mut App) {
         .add_systems(Startup, spawn)
         .add_systems(
             Update,
-            (keys, keyboard_navigation, shield)
+            (keys, keyboard_navigation, shield, home_click)
                 .chain()
                 .in_set(ViewSystems::OverlayInput)
+                .after(crate::island_shell::ShellInput)
                 .run_if(not(crate::modal_open)),
         )
         .add_systems(
@@ -262,6 +406,14 @@ pub(crate) fn plugin(app: &mut App) {
                 .chain()
                 .in_set(ViewSystems::Present)
                 .after(crate::colony_panel::refresh),
+        )
+        // After the kit has painted its controls: the need row is a control,
+        // and the paint would put its own outline back over the pulse.
+        .add_systems(
+            Update,
+            hud::pulse
+                .after(ViewSystems::Present)
+                .after(crate::game_ui::widgets::paint),
         )
         .add_systems(Update, restore_roots.before(ViewSystems::Sync))
         .add_systems(Update, hide_roots.after(ViewSystems::Present));
@@ -290,317 +442,91 @@ pub(crate) fn clear(world: &mut World) {
     }
     crate::homestead_panel::set_open(world, false);
 }
-fn root(world: &mut World, name: &'static str, node: Node) -> Entity {
+/// A top-level piece of the Live HUD: `skin` is the kit's `chrome` or
+/// `panel` bundle for its node.
+fn root(world: &mut World, name: &'static str, skin: impl Bundle) -> Entity {
     world
         .spawn((
             Name::new(name),
             PlayerRoot,
-            Hovered::default(),
-            GlobalZIndex(27),
+            GlobalZIndex(crate::game_ui::tokens::layer::CHROME),
             TabGroup::new(7),
-            ui::panel(node),
+            skin,
         ))
         .id()
 }
-fn row(world: &mut World, parent: Entity) -> Entity {
-    world
-        .spawn((
-            ChildOf(parent),
-            Node {
-                flex_wrap: FlexWrap::Wrap,
-                column_gap: px(8),
-                row_gap: px(6),
-                align_items: AlignItems::Center,
-                ..default()
-            },
-        ))
-        .id()
-}
+/// A kit button of the HUD's own panels (the life choices, the death modal).
 fn button(world: &mut World, parent: Entity, label: &str, action: Action, primary: bool) -> Entity {
-    ui::button(
+    use crate::game_ui::tokens::Surface;
+    use crate::game_ui::widgets::{self as w, ButtonSpec, Kind, Reach};
+    w::button(
         world,
         parent,
-        label,
-        0,
-        primary,
+        ButtonSpec::new(
+            label,
+            if primary {
+                Kind::Primary
+            } else {
+                Kind::Secondary
+            },
+            Surface::Paper,
+        )
+        .reach(Reach::Tab(0)),
         (PlayerControl, PlayerAction(action)),
     )
 }
 fn spawn(world: &mut World) {
-    let hud = root(
-        world,
-        "Player status",
-        Node {
-            position_type: PositionType::Absolute,
-            top: px(12),
-            left: px(12),
-            right: px(12),
-            min_height: px(62),
-            padding: UiRect::axes(px(14), px(9)),
-            column_gap: px(16),
-            row_gap: px(6),
-            flex_wrap: FlexWrap::Wrap,
-            align_items: AlignItems::Center,
-            display: Display::None,
-            ..default()
-        },
-    );
-    world.entity_mut(hud).insert(HeaderRoot);
-    world.spawn((
-        ChildOf(hud),
-        CalendarText,
-        ui::text("Island Village", 17., ui::GOLD),
-        Node {
-            min_width: px(165),
-            ..default()
-        },
-    ));
-    for (key, title) in [
-        ("health", "Health"),
-        ("hunger", "Food"),
-        ("thirst", "Water"),
-        ("energy", "Energy"),
-        ("warmth", "Warmth"),
-    ] {
-        let metric = world
-            .spawn((
-                ChildOf(hud),
-                Node {
-                    width: px(86),
-                    row_gap: px(5),
-                    flex_direction: FlexDirection::Column,
-                    ..default()
-                },
-            ))
-            .id();
-        world.spawn((
-            ChildOf(metric),
-            NeedLabel(key),
-            ui::text(title, 13., ui::TEXT),
-        ));
-        let track = world
-            .spawn((
-                ChildOf(metric),
-                Node {
-                    height: px(5),
-                    width: percent(100),
-                    ..default()
-                },
-                BackgroundColor(ui::FIELD),
-            ))
-            .id();
-        world.spawn((
-            ChildOf(track),
-            NeedFill(key),
+    use crate::game_ui::tokens as t;
+    use crate::game_ui::widgets as w;
+    hud::spawn(world);
+    workspace::spawn(world);
+    rest::spawn(world);
+    // The end of a life: a modal over a scrim, in the kit's own style.
+    let death = world
+        .spawn((
+            Name::new("A life remembered"),
+            PlayerRoot,
+            DeathRoot,
+            Hovered::default(),
+            TabGroup::new(7),
+            GlobalZIndex(t::layer::SCRIM),
             Node {
-                height: percent(100),
+                position_type: PositionType::Absolute,
+                left: px(0),
+                top: px(0),
                 width: percent(100),
+                height: percent(100),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                display: Display::None,
                 ..default()
             },
-            BackgroundColor(ui::SUCCESS),
-        ));
-    }
-    world.spawn((
-        ChildOf(hud),
-        CoinsText,
-        ui::text("0 coins", 17., ui::GOLD),
-        Node {
-            flex_grow: 1.0,
-            min_width: px(80),
-            ..default()
-        },
-    ));
-    button(world, hud, "Menu · Esc", Action::Menu, false);
-    let toolbar = root(
+            BackgroundColor(t::SCRIM),
+        ))
+        .id();
+    let card = w::modal_panel(world, death, "This life has ended", "");
+    let detail = w::paragraph(
         world,
-        "Player toolbar",
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(12),
-            right: px(12),
-            bottom: px(12),
-            padding: UiRect::all(px(5)),
-            justify_content: JustifyContent::Center,
-            column_gap: px(6),
-            row_gap: px(5),
-            flex_wrap: FlexWrap::Wrap,
-            display: Display::None,
-            ..default()
-        },
+        card,
+        "",
+        t::BODY,
+        w::Tone::secondary(t::Surface::Paper),
     );
-    world.entity_mut(toolbar).insert(ToolbarRoot);
-    for (tab, label) in [
-        (Tab::Pouch, "Pouch · I"),
-        (Tab::Craft, "Craft · C"),
-        (Tab::Build, "Build · B"),
-        (Tab::Garden, "Garden · G"),
-        (Tab::Trade, "Trade · T"),
-        (Tab::People, "People · N"),
-        (Tab::Explore, "Explore · M"),
-    ] {
-        let entity = button(world, toolbar, label, Action::Open(tab), false);
-        world.entity_mut(entity).insert(ToolbarTab(tab));
-    }
-    button(world, toolbar, "Stop · X", Action::Stop, false);
-    let journal = root(
-        world,
-        "First days guidance",
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(12),
-            top: px(90),
-            width: px(270),
-            max_width: percent(32),
-            padding: UiRect::all(px(14)),
-            row_gap: px(8),
-            flex_direction: FlexDirection::Column,
-            display: Display::None,
-            ..default()
-        },
-    );
-    world.entity_mut(journal).insert(JourneyRoot);
-    world.spawn((
-        ChildOf(journal),
-        JourneyTitle,
-        ui::text("Your first days", 20., ui::GOLD),
-    ));
-    world.spawn((ChildOf(journal), JourneyDetail, ui::text("", 14., ui::TEXT)));
-    button(world, journal, "Take the next step", Action::Goal, true);
-    let feedback = root(
-        world,
-        "Player context",
-        Node {
-            position_type: PositionType::Absolute,
-            right: px(12),
-            bottom: px(74),
-            width: percent(45),
-            max_width: px(540),
-            padding: UiRect::all(px(9)),
-            row_gap: px(5),
-            flex_direction: FlexDirection::Column,
-            display: Display::None,
-            ..default()
-        },
-    );
-    world.entity_mut(feedback).insert(FeedbackRoot);
-    let context = button(world, feedback, "E · Look around", Action::Goal, false);
-    world.entity_mut(context).insert(ContextButton);
-    for child in world
-        .get::<Children>(context)
-        .map(|c| c.to_vec())
-        .unwrap_or_default()
-    {
-        world.entity_mut(child).insert(ContextLabel);
-    }
-    world.spawn((
-        ChildOf(feedback),
-        StatusText,
-        ui::text(
-            "WASD move · E interact · Q/R orbit · wheel zoom",
-            13.,
-            ui::MUTED,
-        ),
-    ));
-    let workspace = root(
-        world,
-        "Player workspace",
-        Node {
-            position_type: PositionType::Absolute,
-            right: px(12),
-            top: px(90),
-            width: px(430),
-            max_width: percent(55),
-            bottom: px(230),
-            max_height: px(850),
-            padding: UiRect::all(px(14)),
-            row_gap: px(10),
-            flex_direction: FlexDirection::Column,
-            display: Display::None,
-            ..default()
-        },
-    );
-    world.entity_mut(workspace).insert(WorkspaceRoot);
-    let heading = row(world, workspace);
-    world.spawn((
-        ChildOf(heading),
-        WorkspaceTitle,
-        ui::text("Your pouch", 23., ui::GOLD),
-        Node {
-            flex_grow: 1.,
-            ..default()
-        },
-    ));
-    button(world, heading, "Close", Action::Close, false);
-    world.spawn((
-        ChildOf(workspace),
-        WorkspaceSubtitle,
-        ui::text("", 14., ui::MUTED),
-    ));
-    let body = world
+    world.entity_mut(detail).insert(DeathDetail);
+    let choices = world
         .spawn((
-            ChildOf(workspace),
-            WorkspaceBody,
-            ScrollArea,
+            ChildOf(card),
             Node {
                 flex_direction: FlexDirection::Column,
                 row_gap: px(8),
-                flex_grow: 1.,
-                min_height: px(0),
-                overflow: Overflow::scroll_y(),
+                margin: UiRect::top(px(6)),
                 ..default()
             },
         ))
         .id();
-    for id in crate::game_ui::attach_panel_scroll_when_needed(
-        world,
-        workspace,
-        body,
-        "Player",
-        ["More above", "More below"],
-    ) {
-        world.entity_mut(id).insert(PlayerControl);
-    }
-    let death = root(
-        world,
-        "A life remembered",
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(0),
-            top: px(0),
-            width: percent(100),
-            height: percent(100),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            display: Display::None,
-            ..default()
-        },
-    );
-    world.entity_mut(death).insert((
-        DeathRoot,
-        GlobalZIndex(36),
-        BackgroundColor(Color::srgba(0.025, 0.035, 0.045, 0.82)),
-    ));
-    let card = world
-        .spawn((
-            ChildOf(death),
-            ui::panel(Node {
-                width: px(500),
-                max_width: percent(88),
-                padding: UiRect::all(px(26)),
-                row_gap: px(16),
-                flex_direction: FlexDirection::Column,
-                ..default()
-            }),
-        ))
-        .id();
-    world.spawn((
-        ChildOf(card),
-        ui::text("This life has ended", 30., ui::GOLD),
-    ));
-    world.spawn((ChildOf(card),DeathDetail,ui::text("Your home, possessions and diary remain in the living village. A successor begins a new mortal life; the person you lost stays part of its history.",17.,ui::TEXT)));
     let successor = button(
         world,
-        card,
+        choices,
         "Begin a successor life",
         Action::Successor,
         true,
@@ -608,13 +534,13 @@ fn spawn(world: &mut World) {
     world.entity_mut(successor).insert(SuccessorButton);
     let watch = button(
         world,
-        card,
+        choices,
         "Keep watching the village",
         Action::WatchVillage,
         false,
     );
     world.entity_mut(watch).insert(WatchButton);
-    button(world, card, "Return to the menu", Action::Menu, false);
+    button(world, choices, "Return to the menu", Action::Menu, false);
     life::spawn(world);
 }
 fn activate(
@@ -633,8 +559,11 @@ fn keys(world: &mut World) {
         .get_resource::<InputFocus>()
         .and_then(|focus| focus.get())
         .is_some_and(|entity| {
+            // A focused hotbar tile or need is still the HUD's own: its
+            // keys keep working. Another panel's control keeps the keyboard.
             world.get::<bevy::text::EditableText>(entity).is_some()
                 || (world.get::<PlayerControl>(entity).is_none()
+                    && world.get::<crate::game_ui::KeyFocus>(entity).is_none()
                     && world.get::<Window>(entity).is_none())
         })
     {
@@ -682,6 +611,23 @@ fn keys(world: &mut World) {
             world
                 .resource_mut::<ButtonInput<KeyCode>>()
                 .reset(KeyCode::Escape);
+        }
+        return;
+    }
+    // The day's account takes Enter and Esc; nothing else reaches the world under it.
+    if rest::summary_open(world) {
+        let close = [KeyCode::Escape, KeyCode::Enter, KeyCode::NumpadEnter]
+            .into_iter()
+            .filter(|key| keys.just_pressed(*key))
+            .collect::<Vec<_>>();
+        if !close.is_empty() {
+            world
+                .resource_mut::<PlayerState>()
+                .requests
+                .push(Action::DismissSummary);
+            for key in close {
+                world.resource_mut::<ButtonInput<KeyCode>>().reset(key);
+            }
         }
         return;
     }
@@ -877,32 +823,46 @@ fn disabled(world: &mut World, entity: Entity, value: bool) {
     }
 }
 pub(crate) fn refresh(world: &mut World) {
-    adapt_layout(world);
+    hud::place(world);
     let active = active(world);
     let dead = dead(world);
-    let open = world.resource::<PlayerState>().tab.is_some();
+    let open = world.resource::<PlayerState>().tab;
+    // The HUD's own roots: the chrome while a living character is played,
+    // the workspace while it is open, the modal for a life that has ended.
     for (mut node, workspace, death, spectator) in world
         .query_filtered::<(
             &mut Node,
             Has<WorkspaceRoot>,
             Has<DeathRoot>,
             Has<SpectatorLifeRoot>,
-        ), With<PlayerRoot>>()
+        ), (With<PlayerRoot>, Without<ChildOf>)>()
         .iter_mut(world)
     {
-        node.display = if active
+        let display = if active
             && !spectator
             && if dead {
                 death
             } else {
-                !death && (!workspace || open)
+                !death && (!workspace || open.is_some())
             } {
             Display::Flex
         } else {
             Display::None
         };
+        if node.display != display {
+            node.display = display;
+        }
+    }
+    if !active || dead {
+        for mut node in world
+            .query_filtered::<&mut Node, With<hud::PromptRoot>>()
+            .iter_mut(world)
+        {
+            node.display = Display::None;
+        }
     }
     life::refresh(world);
+    rest::refresh(world, active && !dead);
     if !active {
         return;
     }
@@ -948,332 +908,186 @@ pub(crate) fn refresh(world: &mut World) {
         clear(world);
     }
     world.resource_mut::<PlayerState>().stamp = Some(stamp);
-    let selected_tab = world.resource::<PlayerState>().tab;
-    for (tab, mut button) in world
-        .query::<(&ToolbarTab, &mut ui::GameButton)>()
-        .iter_mut(world)
-    {
-        button.primary = selected_tab == Some(tab.0);
-    }
     let village = &observed["sections"]["village"];
-    text::<CalendarText>(
-        world,
-        format!(
-            "Day {} · {}\nPlay · {} · {}",
-            village["calendar"]["day"],
-            model::friendly(village["calendar"]["season"].as_str().unwrap_or("island")),
-            if world.resource::<SimControl>().is_stopped() {
-                "Paused".into()
-            } else {
-                format!("{}×", world.resource::<SimControl>().multiplier)
-            },
-            if village["calendar"]["night"] == true {
-                "Night"
-            } else {
-                "Daylight"
-            }
-        ),
-    );
-    text::<CoinsText>(
-        world,
-        format!("{} coins", village["coins"].as_u64().unwrap_or(0)),
-    );
-    let values: BTreeMap<_, _> = [
-        ("health", village["health"].as_u64().unwrap_or(0)),
-        ("hunger", village["needs"]["hunger"].as_u64().unwrap_or(0)),
-        ("thirst", village["needs"]["thirst"].as_u64().unwrap_or(0)),
-        ("energy", village["needs"]["energy"].as_u64().unwrap_or(0)),
-        ("warmth", village["needs"]["warmth"].as_u64().unwrap_or(0)),
-    ]
-    .into_iter()
-    .collect();
-    for (label, mut text) in world.query::<(&NeedLabel, &mut Text)>().iter_mut(world) {
-        let title = match label.0 {
-            "hunger" => "Food",
-            "thirst" => "Water",
-            "energy" => "Energy",
-            "warmth" => "Warmth",
-            _ => "Health",
-        };
-        text.0 = format!("{title} {}%", values[label.0] / 1000);
-    }
-    for (fill, mut node, mut color) in world
-        .query::<(&NeedFill, &mut Node, &mut BackgroundColor)>()
-        .iter_mut(world)
-    {
-        let value = values[fill.0].min(100000);
-        node.width = percent(value as f32 / 1000.);
-        color.0 = if value < 20000 {
-            ui::ERROR
-        } else if value < 45000 {
-            ui::GOLD
-        } else {
-            ui::SUCCESS
-        };
-    }
+    let need = |name: &str| village["needs"][name].as_u64().unwrap_or(0);
+    let values = [
+        village["health"].as_u64().unwrap_or(0),
+        need("hunger"),
+        need("thirst"),
+        need("energy"),
+        need("warmth"),
+    ];
     let stopped = world.resource::<SimControl>().is_stopped();
-    let busy =
-        village["activity"]["busy"] == true || world.resource::<NativeActions>().pending.is_some();
-    let ready = player_actions::control(world) == ControlState::Native
-        && !stopped
-        && !busy
-        && !crate::island_control::control_pending(world);
-    let selected = world.get_resource::<Selected>().and_then(|s| s.0);
-    let context = model::context(world, &observed, selected, ready);
-    let context_text = context.as_ref().map_or(
-        "Move near a resource, plot or neighbour · E interact".into(),
-        |row| row.title.clone(),
-    );
-    text::<ContextLabel>(world, context_text);
-    let context_buttons: Vec<_> = world
-        .query_filtered::<Entity, With<ContextButton>>()
-        .iter(world)
-        .collect();
-    for button in context_buttons {
-        disabled(
-            world,
-            button,
-            context.as_ref().is_none_or(|row| !row.enabled),
-        );
-        if let Some(action) = context.as_ref().and_then(|row| row.action.clone()) {
-            world.entity_mut(button).insert(PlayerAction(action));
-        }
-    }
-    world.resource_mut::<PlayerState>().context = context;
-    let feedback = world
+    let pending = world
         .resource::<NativeActions>()
         .pending
         .as_ref()
-        .map(|p| format!("Walking, then {}", p.label))
-        .or_else(|| world.resource::<NativeActions>().feedback.clone())
-        .unwrap_or_else(|| "WASD move · E interact · Q/R orbit · wheel zoom".into());
-    text::<StatusText>(
+        .map(|pending| pending.label.clone());
+    let busy = village["activity"]["busy"] == true;
+    let ready = player_actions::control(world) == ControlState::Native
+        && !stopped
+        && !busy
+        && pending.is_none()
+        && !crate::island_control::control_pending(world);
+    let selected = world.get_resource::<Selected>().and_then(|s| s.0);
+    // At your own door from evening on, sleep comes first.
+    let sleep = depth::LiveRequest::new("sleep");
+    // Asleep, E wakes; the sleeping strip stands in the prompt's place.
+    let asleep = rest::asleep(world);
+    let context = if asleep {
+        Some(model::wake_row())
+    } else if depth::check(world, &sleep).is_ok() {
+        Some(model::sleep_row(sleep, ready))
+    } else {
+        model::context(world, &observed, selected, ready)
+    };
+    let working = (busy && !asleep)
+        .then(|| model::working_words(village["activity"]["kind"].as_str().unwrap_or("")));
+    let prompt = if asleep {
+        hud::prompt(None, None, None)
+    } else {
+        hud::prompt(
+            context
+                .as_ref()
+                .map(|row| (row.title.as_str(), row.enabled)),
+            pending.as_deref(),
+            working,
+        )
+    };
+    let context_action = context.as_ref().and_then(|row| row.action.clone());
+    world.resource_mut::<PlayerState>().context = context;
+    let journey = testbed_content::village::player_journey::project(&observed);
+    let feedback = world.resource::<NativeActions>().feedback.clone();
+    let mut goal_action = actions::goal_action(world, &observed);
+    // A homestead upgrade under way takes island hours; when nothing more
+    // urgent calls, the goal says what is happening and what to do meanwhile.
+    let site_goal = depth::played(world)
+        .and_then(|(unit, _)| testbed_content::village::view::upgrade_site(world, unit))
+        .map(|site| {
+            let day = world
+                .get_resource::<npc_framework::prelude::SimConfig>()
+                .map_or(2_400, |config| config.day_length.max(24));
+            model::upgrade_goal(&site, day / 24)
+        });
+    // The upgrade is the goal when nothing else calls; beside a provision
+    // or garden step it is one sentence after that step.
+    let upgrade = site_goal
+        .clone()
+        .filter(|_| matches!(journey.next.id, "neighbors" | "trade" | "village_life"));
+    let aside = site_goal
+        .filter(|_| {
+            matches!(
+                journey.next.id,
+                "water" | "food" | "seed" | "plant" | "water_crop" | "harvest"
+            )
+        })
+        .map(|(title, _)| model::meanwhile_at_home(&title));
+    if upgrade.is_some() {
+        goal_action = Action::Open(Tab::Build);
+    }
+    // Asleep, the goal card folds to its title: the strip says the rest.
+    let folded = world.resource::<PlayerState>().goal_folded || asleep;
+    let reasons = hud::NEEDS.map(|(key, ..)| depth::need_reason(world, key));
+    let chain = depth::chain(world);
+    let work = depth::work_fraction(world);
+    let repeat = depth::repeat_words(world);
+    for line in depth::outcomes(world) {
+        crate::island_shell::notice(world, line);
+    }
+    trade_sound(world);
+    hud::refresh(
         world,
-        if stopped {
-            "World paused. Open Menu to resume.".into()
-        } else {
-            feedback
+        hud::Facts {
+            values,
+            coins: village["coins"].as_u64().unwrap_or(0),
+            journey: journey.title,
+            // Asleep, the folded card says so, not "finish your activity".
+            goal: if asleep {
+                "Asleep until morning".to_owned()
+            } else if let Some((title, _)) = &upgrade {
+                title.clone()
+            } else {
+                journey.next.title.to_owned()
+            },
+            detail: match (&upgrade, &aside) {
+                (Some((_, detail)), _) => detail.clone(),
+                (None, Some(aside)) => format!("{} {aside}", journey.next.detail),
+                (None, None) => journey.next.detail.clone(),
+            },
+            progress: if upgrade.is_some() {
+                None
+            } else {
+                journey
+                    .next
+                    .progress
+                    .map(|progress| (progress.current, progress.target, progress.unit))
+            },
+            goal_action,
+            prompt,
+            context: context_action,
+            feedback: feedback.as_deref(),
+            open,
+            folded,
+            chain,
+            reasons,
+            work,
+            repeat,
         },
     );
-    let (goal, detail) = actions::guidance(&observed);
-    text::<JourneyTitle>(world, goal);
-    text::<JourneyDetail>(world, detail);
-    if let Some(tab) = world.resource::<PlayerState>().tab {
-        text::<WorkspaceTitle>(world, tab.title().into());
-        text::<WorkspaceSubtitle>(world, tab.subtitle().into());
-    }
-    let rows = if world.resource::<PlayerState>().tab.is_some() {
+    let rows = if let Some(tab) = open {
+        let stock = model::inventory(&observed);
+        let pouch: Vec<(String, String, u64)> = stock
+            .iter()
+            .map(|(kind, count)| (kind.clone(), model::friendly(kind), *count))
+            .collect();
+        let at = (tab == Tab::Craft)
+            .then(|| model::station_in_reach(world, &observed))
+            .flatten();
+        workspace::frame(
+            world,
+            tab,
+            model::badge(&observed, tab, at.as_deref()),
+            &pouch,
+        );
         model::rows(world, &observed, world.resource::<PlayerState>(), ready)
     } else {
         Vec::new()
     };
-    reconcile(world, rows);
-    atlas::refresh(world, &observed, ready);
+    workspace::reconcile(world, rows);
+    atlas::refresh(world, &observed);
 }
-/// Keep the workspace between the actual header and feedback heights. This also
-/// handles toolbar/header wrapping without relying on a single window resolution.
-fn adapt_layout(world: &mut World) {
-    let mut header = 62.0_f32;
-    let mut toolbar = 54.0_f32;
-    let mut feedback = 140.0_f32;
-    for (node, size, is_header, is_toolbar, is_feedback) in world
-        .query::<(
-            &Node,
-            &ComputedNode,
-            Has<HeaderRoot>,
-            Has<ToolbarRoot>,
-            Has<FeedbackRoot>,
-        )>()
-        .iter(world)
-    {
-        let height = size.size().y * size.inverse_scale_factor();
-        if node.display == Display::None || height <= 0. {
-            continue;
-        }
-        if is_header {
-            header = height;
-        }
-        if is_toolbar {
-            toolbar = height;
-        }
-        if is_feedback {
-            feedback = height;
-        }
-    }
-    for mut node in world
-        .query_filtered::<&mut Node, With<FeedbackRoot>>()
-        .iter_mut(world)
-    {
-        node.bottom = px(24.0 + toolbar);
-    }
-    for (mut node,is_workspace) in world.query_filtered::<(&mut Node,Has<WorkspaceRoot>),Or<(With<WorkspaceRoot>,With<JourneyRoot>)>>().iter_mut(world) {
-        node.top=px(24.0+header);
-        if is_workspace {node.bottom=px(36.0+toolbar+feedback);}
-    }
-}
-fn reconcile(world: &mut World, rows: Vec<model::Row>) {
-    let Some(body) = world
-        .query_filtered::<Entity, With<WorkspaceBody>>()
-        .iter(world)
-        .next()
-    else {
+
+/// The played character's trade so far today, as the coin sound last heard
+/// it: `(day, coins bought and sold)`.
+#[derive(Resource, Default)]
+pub(crate) struct TradeHeard(Option<(u64, u64)>);
+
+/// A coin when a trade of the played character completes: the day's coins
+/// bought and sold grew. A new day, or the first look, only remembers.
+fn trade_sound(world: &mut World) {
+    let Some((unit, _)) = depth::played(world) else {
         return;
     };
-    let old = world.resource::<PlayerState>().rows.clone();
-    let mut live = BTreeMap::new();
-    let mut order = Vec::new();
-    if let Some(mut node) = world.get_mut::<Node>(body) {
-        // Full-width rows retain the vertical workspace layout; compact controls
-        // share a row so direction/crop/bed choices do not become tall card stacks.
-        node.flex_direction = FlexDirection::Row;
-        node.flex_wrap = FlexWrap::Wrap;
-        node.align_content = AlignContent::FlexStart;
-        node.column_gap = px(8);
+    let now = testbed_content::village::live::day_so_far(world, unit).map(|day| {
+        (
+            day.day,
+            u64::from(day.bought_coins) + u64::from(day.sold_coins),
+        )
+    });
+    let heard = world.get_resource::<TradeHeard>().and_then(|heard| heard.0);
+    if traded(heard, now) {
+        crate::game_ui::sound::play(world, crate::game_ui::sound::UiSound::Coin);
     }
-    for (index, row) in rows.into_iter().enumerate() {
-        let entity = if let Some(entity) = old.get(&row.key).copied() {
-            entity
-        } else {
-            let entity = if let Some(action) = row.action.clone() {
-                button(world, body, &row.title, action, false)
-            } else {
-                world
-                    .spawn((
-                        ChildOf(body),
-                        Node {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: px(4),
-                            flex_shrink: 0.,
-                            ..default()
-                        },
-                    ))
-                    .id()
-            };
-            let previous = world
-                .get::<Children>(entity)
-                .map(|c| c.to_vec())
-                .unwrap_or_default();
-            for child in previous {
-                world.despawn(child);
-            }
-            world.spawn((
-                ChildOf(entity),
-                RowTitle,
-                ui::text(
-                    &row.title,
-                    if row.heading { 19. } else { 16. },
-                    if row.heading { ui::GOLD } else { ui::TEXT },
-                ),
-            ));
-            world.spawn((
-                ChildOf(entity),
-                RowDetail,
-                ui::text(&row.detail, 13., ui::MUTED),
-            ));
-            entity
-        };
-        if let Some(mut node) = world.get_mut::<Node>(entity) {
-            node.flex_direction = FlexDirection::Column;
-            node.align_items = AlignItems::Stretch;
-            node.row_gap = px(5);
-            node.width = if row.item {
-                px(115)
-            } else if row.compact {
-                percent(48)
-            } else {
-                percent(100)
-            };
-            node.min_height = if row.item {
-                px(86)
-            } else if row.action.is_some() {
-                px(44)
-            } else {
-                px(0)
-            };
-            node.padding = if row.action.is_some() {
-                UiRect::all(px(10))
-            } else {
-                UiRect::axes(px(2), px(5))
-            };
-        }
-        if let Some(action) = row.action {
-            world.entity_mut(entity).insert((
-                PlayerAction(action),
-                bevy::ui::prelude::AccessibleLabel::new(if row.detail.is_empty() {
-                    row.title.clone()
-                } else {
-                    format!("{}. {}", row.title, row.detail)
-                }),
-            ));
-            disabled(world, entity, !row.enabled);
-            world
-                .entity_mut(entity)
-                .insert(bevy::input_focus::tab_navigation::TabIndex(
-                    100 + index as i32,
-                ));
-        }
-        for child in world
-            .get::<Children>(entity)
-            .map(|c| c.to_vec())
-            .unwrap_or_default()
-        {
-            let title = world.get::<RowTitle>(child).is_some();
-            if let Some(mut text) = world.get_mut::<Text>(child) {
-                text.0 = if title {
-                    row.title.clone()
-                } else {
-                    row.detail.clone()
-                };
-            }
-        }
-        if let Some(mut button) = world.get_mut::<ui::GameButton>(entity) {
-            button.primary = row.selected;
-        }
-        live.insert(row.key, entity);
-        order.push(entity);
-    }
-    for (key, entity) in old {
-        if !live.contains_key(&key) {
-            if world.resource::<InputFocus>().get() == Some(entity) {
-                world.resource_mut::<InputFocus>().clear();
-            }
-            world.despawn(entity);
-        }
-    }
-    world.entity_mut(body).replace_children(&order);
-    if std::mem::take(&mut world.resource_mut::<PlayerState>().focus_workspace) {
-        let preferred = [
-            "build_home",
-            "claim_site",
-            "plant",
-            "water",
-            "harvest",
-            "greet",
-            "open_garden",
-        ]
-        .into_iter()
-        .filter_map(|key| live.get(key).copied())
-        .find(|entity| world.get::<InteractionDisabled>(*entity).is_none());
-        let bed = format!("bed_{}", world.resource::<PlayerState>().bed);
-        let preferred = preferred.or_else(|| live.get(&bed).copied());
-        let next = preferred.or_else(|| {
-            order.iter().copied().find(|entity| {
-                world.get::<PlayerAction>(*entity).is_some()
-                    && world.get::<InteractionDisabled>(*entity).is_none()
-            })
-        });
-        if let Some(entity) = next {
-            world
-                .resource_mut::<InputFocus>()
-                .set(entity, FocusCause::Navigated);
-            world.trigger(bevy::ui_widgets::ScrollIntoView { entity });
-        }
-    }
-    world.resource_mut::<PlayerState>().rows = live;
+    world.insert_resource(TradeHeard(now));
+}
+
+/// Whether the day's trade grew since it was last heard.
+pub(crate) fn traded(heard: Option<(u64, u64)>, now: Option<(u64, u64)>) -> bool {
+    matches!((heard, now), (Some((day, before)), Some((today, after))) if day == today && after > before)
 }
 
 #[derive(Resource, Default)]
-struct HiddenRoots(BTreeMap<Entity, Display>);
+pub(crate) struct HiddenRoots(BTreeMap<Entity, Display>);
 fn restore_roots(world: &mut World) {
     if world
         .get_resource::<FrontendGate>()
@@ -1288,7 +1102,7 @@ fn restore_roots(world: &mut World) {
         }
     }
 }
-fn hide_roots(world: &mut World) {
+pub(crate) fn hide_roots(world: &mut World) {
     if !world
         .get_resource::<FrontendGate>()
         .is_some_and(|gate| gate.0)
@@ -1296,7 +1110,12 @@ fn hide_roots(world: &mut World) {
         return;
     }
     let roots: Vec<_> = world
-        .query_filtered::<(Entity, &Node), (Without<ChildOf>, Without<FrontendUiRoot>)>()
+        .query_filtered::<(Entity, &Node), (
+            Without<ChildOf>,
+            Without<FrontendUiRoot>,
+            // A tooltip card is a root too; a menu control's card must show.
+            Without<crate::game_ui::tooltip::TooltipRoot>,
+        )>()
         .iter(world)
         .map(|(entity, node)| (entity, node.display))
         .collect();

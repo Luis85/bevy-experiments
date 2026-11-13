@@ -131,6 +131,109 @@ pub fn cottage_footprint() -> Footprint {
     }
 }
 
+/// Catalogue key of the living-world homestead cottage, and of the larger
+/// body the `larger_cottage` upgrade grows it into.
+pub const COTTAGE_BUILDING: &str = "cottage";
+
+/// The body of a homestead cottage behind the door of its plot: its centre,
+/// half extents and beds. In the living world it is the catalogue building
+/// `building` (the standard cottage when `None`): `width` across the door,
+/// `depth` behind it, a door gap of 0.8 m as before. Elsewhere it is the old
+/// 2 x 2 m cottage with three beds.
+pub fn cottage_body(
+    world: &World,
+    door: SimPos,
+    building: Option<&str>,
+) -> (SimPos, Footprint, u32) {
+    if super::frontier::enabled(world)
+        && let Some(def) = super::civic::definition(world, building.unwrap_or(COTTAGE_BUILDING))
+    {
+        let half_x_mm = def.footprint.width as i32 * 500;
+        let half_z_mm = def.footprint.depth as i32 * 500;
+        let beds = match def.kind {
+            super::frontier::building_spec::BuildingKind::Home { beds } => beds,
+            _ => 3,
+        };
+        return (
+            SimPos::new(door.x, door.z - 800 - half_z_mm),
+            Footprint {
+                half_x_mm,
+                half_z_mm,
+            },
+            beds,
+        );
+    }
+    (cottage_center(door), cottage_footprint(), 3)
+}
+
+/// The body a built cottage has now: its own position and blocker.
+pub fn built_body(world: &World, cottage: Entity) -> Option<(SimPos, Footprint)> {
+    world.get::<Cottage>(cottage)?;
+    let centre = *world.get::<SimPos>(cottage)?;
+    let body = world
+        .get::<GridBlocker>(cottage)
+        .map_or_else(cottage_footprint, |blocker| blocker.0);
+    Some((centre, body))
+}
+
+/// Whether a cottage body fits behind a plot's door: on land, inside the map,
+/// clear of every other structure (`except` the cottage that grows) and of
+/// standing residents. The reason says what is in the way.
+pub fn body_fits(
+    world: &World,
+    centre: SimPos,
+    body: Footprint,
+    except: Option<Entity>,
+) -> Result<(), String> {
+    let grid = world.resource::<SpatialGrid>();
+    let cells = grid.footprint_cells(centre, body);
+    let size = format!(
+        "{} x {} m",
+        body.half_x_mm * 2 / 1000,
+        body.half_z_mm * 2 / 1000
+    );
+    if cells.iter().any(|cell| !grid.bounds().contains(*cell)) {
+        return Err(format!("a {size} cottage does not fit inside the map here"));
+    }
+    if cells.iter().any(|cell| {
+        if super::frontier::enabled(world) {
+            super::frontier::terrain::cell(world, cell.x, cell.z)
+                .is_none_or(|terrain| !terrain.walkable())
+        } else {
+            !geography::for_world(world).land_cell(cell.x, cell.z)
+        }
+    }) {
+        return Err(format!("the {size} cottage footprint must be on land"));
+    }
+    for entity in world.resource::<SimIndex>().map.values().copied() {
+        if Some(entity) == except {
+            continue;
+        }
+        let Some(pos) = world.get::<SimPos>(entity).copied() else {
+            continue;
+        };
+        if let Some(blocker) = world.get::<GridBlocker>(entity)
+            && grid
+                .footprint_cells(pos, blocker.0)
+                .iter()
+                .any(|cell| cells.contains(cell))
+        {
+            return Err(format!(
+                "the {size} cottage site is blocked by another structure"
+            ));
+        }
+        if world.get::<Villager>(entity).is_some()
+            && living(world, entity)
+            && cells.contains(&grid.cell_of(pos))
+        {
+            return Err(
+                "a living actor occupies the cottage site; stand near its front door".into(),
+            );
+        }
+    }
+    Ok(())
+}
+
 pub fn bed_position(world: &World, plot: Entity, index: u32) -> Option<SimPos> {
     let definition = definition(world, plot)?;
     bed_position_in(&definition, index)
@@ -253,16 +356,17 @@ fn finish_build(world: &mut World, actor: Entity, build: CottageBuild) {
             world.get_mut::<Item>(entity).expect("material").stack = remaining;
         }
     }
+    let (body_centre, body, _) = cottage_body(world, front_door(center), None);
     let (cottage, _) = spawn_sim(
         world,
         (
-            cottage_center(center),
+            body_centre,
             Cottage {
                 plot: build.plot,
                 plot_id,
             },
-            GridBlocker(cottage_footprint()),
-            GridOccluder(cottage_footprint()),
+            GridBlocker(body),
+            GridOccluder(body),
             Perceivable::new(crate::world::kinds::STATION),
         ),
     );

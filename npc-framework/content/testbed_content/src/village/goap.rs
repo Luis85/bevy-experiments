@@ -6,12 +6,13 @@
 //! decision replans from the resulting world. Stale offers cannot spend money.
 use super::{ResourcePatch, Villager, Wallet, catalog, economy, market, policy, production};
 use bevy_ecs::prelude::*;
+use bevy_reflect::Reflect;
 use npc_framework::crafting::{RecipeDef, RecipeRegistry, Workstation};
 use npc_framework::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[serde(tag = "action", rename_all = "snake_case")]
 pub enum PlanStep {
     Buy {
@@ -37,14 +38,185 @@ impl PlanStep {
             Self::Craft { recipe, .. } => format!("craft {recipe}"),
         }
     }
+    /// The good this step adds to the actor's pack.
+    pub fn product(&self) -> &str {
+        match self {
+            Self::Buy { kind, .. } | Self::Gather { kind, .. } => kind,
+            Self::Craft { good, .. } => good,
+        }
+    }
+    pub fn target(&self) -> SimId {
+        match self {
+            Self::Buy { target, .. } | Self::Gather { target, .. } | Self::Craft { target, .. } => {
+                *target
+            }
+        }
+    }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 pub struct WorkPlan {
     pub goal: String,
     pub steps: Vec<PlanStep>,
     pub expanded: u32,
     pub cost: u32,
+}
+
+/// A cached plan is searched again after this many ticks at the latest.
+pub const PLAN_TTL_TICKS: u64 = 600;
+
+/// The resident's last searched plan (regional profile only). It is reused while
+/// its first step is still pending and that step's preconditions hold, so a long
+/// walk to a seller or source no longer repeats the whole search every decision.
+#[derive(Component, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+#[reflect(Component)]
+pub struct PlanMemo {
+    pub plan: WorkPlan,
+    pub made_at: u64,
+    pub role: super::Role,
+    pub workplace: SimId,
+    /// Carried units of the first step's product when the plan was made.
+    pub head_stock: u32,
+}
+impl SimHash for PlanMemo {
+    const NAME: &'static str = "regional_plan_memo_v1";
+    fn sim_hash(&self, h: &mut Fnv64) {
+        h.str(&self.plan.goal);
+        h.u32(self.plan.steps.len() as u32);
+        for step in &self.plan.steps {
+            h.str(&step.label());
+            h.u32(step.target().0);
+        }
+        h.u32(self.plan.expanded);
+        h.u32(self.plan.cost);
+        h.u64(self.made_at);
+        self.role.sim_hash(h);
+        h.u32(self.workplace.0);
+        h.u32(self.head_stock);
+    }
+}
+
+/// Outcome of looking up a resident's cached plan.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Recall {
+    /// The cached plan is still executable from its first step.
+    Hit(WorkPlan),
+    /// Nothing cached (or caching does not apply to this world).
+    Miss,
+    /// The first step completed or the plan aged out: search again, silently.
+    Finished,
+    /// A precondition of the first step no longer holds: search again.
+    Failed(&'static str),
+}
+
+pub fn recall(world: &World, actor: Entity) -> Recall {
+    if !super::frontier::enabled(world) {
+        return Recall::Miss;
+    }
+    let (Some(memo), Some(person)) = (world.get::<PlanMemo>(actor), world.get::<Villager>(actor))
+    else {
+        return Recall::Miss;
+    };
+    let Some(step) = memo.plan.steps.first() else {
+        return Recall::Finished;
+    };
+    let now = world.resource::<SimClock>().tick;
+    if now >= memo.made_at.saturating_add(PLAN_TTL_TICKS)
+        || economy::count(world, actor, step.product()) != memo.head_stock
+    {
+        return Recall::Finished;
+    }
+    if person.role != memo.role || person.workplace != memo.workplace {
+        return Recall::Failed("occupation changed");
+    }
+    if production::production_demand(world, actor, &memo.plan.goal) == 0 {
+        return Recall::Failed("goal is no longer funded");
+    }
+    let target = world.resource::<SimIndex>().get(step.target());
+    let reachable = |entity: Entity| {
+        world
+            .get::<SimPos>(entity)
+            .is_some_and(|pos| !super::routing::avoiding(world, actor, *pos, Some(step.target())))
+    };
+    match step {
+        PlanStep::Buy { kind, .. } => {
+            let Some(seller) = target.filter(|seller| {
+                super::living(world, *seller) || super::civic::is_depot(world, *seller)
+            }) else {
+                return Recall::Failed("seller is gone");
+            };
+            if !market::sells(world, seller, kind)
+                || market::available_to_sell(world, seller, kind) == 0
+            {
+                return Recall::Failed("offer withdrawn or sold out");
+            }
+            let coins = world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins);
+            if market::asking_price(world, seller, kind).is_none_or(|price| price > coins) {
+                return Recall::Failed("offer is no longer affordable");
+            }
+            if !reachable(seller) {
+                return Recall::Failed("route to the seller was abandoned");
+            }
+        }
+        PlanStep::Gather { kind, .. } => {
+            let Some(source) = target else {
+                return Recall::Failed("source is gone");
+            };
+            if world
+                .get::<ResourcePatch>(source)
+                .is_none_or(|patch| patch.remaining == 0)
+            {
+                return Recall::Failed("source is depleted");
+            }
+            if economy::fit(world, actor, &[npc_framework::interaction::Item::new(kind)]).is_err() {
+                return Recall::Failed("pack is full");
+            }
+            if !reachable(source) {
+                return Recall::Failed("route to the source was abandoned");
+            }
+        }
+        PlanStep::Craft { recipe, .. } => {
+            let Some(def) = world.resource::<RecipeRegistry>().recipes.get(recipe) else {
+                return Recall::Failed("recipe is gone");
+            };
+            if target.is_none() {
+                return Recall::Failed("workstation is gone");
+            }
+            if def
+                .inputs
+                .iter()
+                .any(|input| economy::count(world, actor, &input.key) < input.count)
+            {
+                return Recall::Failed("craft inputs are missing");
+            }
+        }
+    }
+    Recall::Hit(memo.plan.clone())
+}
+
+pub(super) fn remember(world: &mut World, actor: Entity, plan: &WorkPlan) {
+    if !super::frontier::enabled(world) {
+        return;
+    }
+    let (Some(step), Some(person)) = (plan.steps.first(), world.get::<Villager>(actor)) else {
+        return;
+    };
+    let memo = PlanMemo {
+        plan: plan.clone(),
+        made_at: world.resource::<SimClock>().tick,
+        role: person.role,
+        workplace: person.workplace,
+        head_stock: economy::count(world, actor, step.product()),
+    };
+    if world.get::<PlanMemo>(actor) != Some(&memo) {
+        world.entity_mut(actor).insert(memo);
+    }
+}
+
+pub(super) fn forget(world: &mut World, actor: Entity) {
+    if world.get::<PlanMemo>(actor).is_some() {
+        world.entity_mut(actor).remove::<PlanMemo>();
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -332,7 +504,9 @@ fn domain(world: &World, actor: Entity, goal: &str, tuning: &policy::GoapPolicy)
                 outputs: vec![(i, 1)],
                 source: Some(source),
                 price: 0,
-                cost: patch.gather_ticks.max(1).saturating_mul(tuning.gather_cost),
+                cost: super::living::gather_ticks(world, actor, kind, patch.gather_ticks)
+                    .max(1)
+                    .saturating_mul(tuning.gather_cost),
                 pos: *world.get::<SimPos>(source_entity)?,
             });
         }
@@ -374,7 +548,13 @@ fn assess(world: &World, actor: Entity) -> PlanAssessment {
         .iter()
         .filter_map(|kind| {
             let demand = production::production_demand(world, actor, kind);
-            let essential = catalog::food_restore(kind).is_some() || *kind == catalog::WATER;
+            // Regional: an ingredient of food is as urgent as the food. Without
+            // this a farmer with a long order book for fibre never cuts grain,
+            // and bread stays unbaked however much is bid for it.
+            let essential = catalog::food_restore_in(world, kind).is_some()
+                || *kind == super::roles::roles(world).drink
+                || super::frontier::economy_spec::registry(world)
+                    .is_some_and(|registry| registry.feeds_food(kind));
             (demand > 0).then_some((essential, demand, *kind))
         })
         .collect();
@@ -399,6 +579,45 @@ fn assess(world: &World, actor: Entity) -> PlanAssessment {
     } else {
         PlanAssessment::UnavailablePrerequisites
     }
+}
+
+/// [`explain`] in words a player reads: goods and recipes by their display
+/// names from the world's data, never raw keys ("Goal: fiber", "buy thread
+/// -> Spin thread"). The raw text stays in [`explain`] for tools.
+pub fn explain_readable(world: &World, actor: Entity) -> String {
+    let PlanAssessment::Ready(plan) = assess(world, actor) else {
+        return explain(world, actor);
+    };
+    let good = |kind: &str| {
+        super::catalog::display_in(world, kind)
+            .map_or_else(|| kind.replace('_', " "), str::to_owned)
+    };
+    let recipe = |key: &str| {
+        super::frontier::economy_spec::registry(world)
+            .and_then(|registry| {
+                registry
+                    .spec
+                    .recipes
+                    .iter()
+                    .find(|recipe| recipe.key == key)
+            })
+            .map_or_else(|| key.replace('_', " "), |recipe| recipe.display.clone())
+    };
+    let steps: Vec<String> = plan
+        .steps
+        .iter()
+        .map(|step| match step {
+            PlanStep::Buy { kind, .. } => format!("buy {}", good(kind)),
+            PlanStep::Gather { kind, .. } => format!("gather {}", good(kind)),
+            PlanStep::Craft { recipe: key, .. } => recipe(key),
+        })
+        .collect();
+    format!(
+        "Goal: {}
+{}",
+        good(&plan.goal),
+        steps.join(" -> ")
+    )
 }
 
 pub fn explain(world: &World, actor: Entity) -> String {

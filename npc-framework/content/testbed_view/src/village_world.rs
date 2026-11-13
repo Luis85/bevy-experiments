@@ -41,6 +41,9 @@ struct Labels(BTreeMap<SimId, (Entity, bool)>);
 pub(crate) struct StaticId(pub(crate) SimId);
 #[derive(Component)]
 struct ActorCaption(SimId);
+/// The status shape of a resident's world tag, and what it shows now.
+#[derive(Component)]
+struct CaptionStatus(SimId, Option<crate::game_ui::tokens::Status>);
 #[derive(Component)]
 struct WorldLabelText;
 /// Immutable scenery anchor, never part of the authoritative world.
@@ -48,6 +51,17 @@ struct WorldLabelText;
 struct SceneryAnchor(Vec3);
 #[derive(Resource, Default)]
 struct CaptionRefresh(f32);
+
+/// Whether the played character is asleep (`player_hud::player_asleep`),
+/// read with the captions: their caption is hidden while they sleep.
+#[derive(Resource, Default, Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) struct PlayedAsleep(pub(crate) bool);
+
+/// Whether a caption is hidden because it is the played character's and
+/// they are asleep.
+pub(crate) fn hidden_while_asleep(actor: bool, played: bool, asleep: bool) -> bool {
+    actor && played && asleep
+}
 #[derive(Resource)]
 struct SpeechFont(Handle<Font>);
 fn load_speech_font(mut commands: Commands, fonts: Option<ResMut<Assets<Font>>>) {
@@ -143,6 +157,7 @@ pub(crate) fn plugin(app: &mut App) {
     }
     app.init_resource::<Labels>()
         .init_resource::<CaptionRefresh>()
+        .init_resource::<PlayedAsleep>()
         .init_resource::<Bubbles>()
         .add_systems(PreStartup, load_speech_font)
         .add_systems(Startup, spawn)
@@ -152,6 +167,7 @@ pub(crate) fn plugin(app: &mut App) {
                 .in_set(ViewSystems::Sync)
                 .before(crate::visuals::despawn_visuals),
         )
+        .add_systems(Update, animals_idle.in_set(ViewSystems::Present))
         .add_systems(
             Update,
             wildlife_visuals
@@ -471,6 +487,22 @@ fn label(
                 + 4.0
         },
     );
+    use crate::game_ui::tokens as t;
+    // A resident's tag is chrome, like the bars: bark with a thin edge, the
+    // status shape, then the name and what they are doing.
+    let (padding, fill, edge) = if actor {
+        (
+            UiRect::axes(px(8), px(4)),
+            t::BARK_800.with_alpha(0.94),
+            t::BARK_600,
+        )
+    } else {
+        (
+            UiRect::axes(px(5), px(2)),
+            Color::srgba(0.04, 0.055, 0.07, 0.86),
+            Color::NONE,
+        )
+    };
     commands
         .spawn((
             Name::new("village world label"),
@@ -485,20 +517,50 @@ fn label(
             GlobalZIndex(3),
             Node {
                 position_type: PositionType::Absolute,
-                padding: UiRect::axes(px(5), px(2)),
+                padding,
                 width: px(width),
+                column_gap: px(6),
+                align_items: AlignItems::Center,
+                border: UiRect::all(px(if actor { 1.0 } else { 0.0 })),
+                border_radius: BorderRadius::all(px(if actor { t::RADIUS_MD } else { 0.0 })),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.04, 0.055, 0.07, 0.86)),
+            BackgroundColor(fill),
+            BorderColor::all(edge),
         ))
         .with_children(|p| {
+            if actor {
+                p.spawn((
+                    CaptionStatus(sim, None),
+                    Pickable::IGNORE,
+                    Node {
+                        width: px(12),
+                        height: px(12),
+                        flex_shrink: 0.0,
+                        display: Display::None,
+                        ..default()
+                    },
+                ));
+            }
             let mut caption = p.spawn((
                 WorldLabelText,
                 native_text(text, 11.0),
                 TextLayout::default().with_linebreak(bevy::text::LineBreak::WordOrCharacter),
+                // The words have the tag's width less its padding, edge and
+                // the status shape's slot; a long activity wraps to a second
+                // line inside it.
+                if actor {
+                    Node {
+                        width: px(width - 16.0 - 2.0 - 18.0),
+                        flex_shrink: 0.0,
+                        ..default()
+                    }
+                } else {
+                    Node::default()
+                },
             ));
             if actor {
-                caption.insert(ActorCaption(sim));
+                caption.insert((ActorCaption(sim), TextColor(t::CREAM_50)));
             }
         })
         .id()
@@ -510,7 +572,11 @@ fn spawn(
     mut materials: ResMut<Assets<StandardMaterial>>,
     server: Res<AssetServer>,
     assets: Option<Res<ViewAssets>>,
-    places: Query<(Entity, &SimId, &SimPos, &VillagePlace)>,
+    // Workplaces built after the founding are drawn by `island_build`.
+    places: Query<
+        (Entity, &SimId, &SimPos, &VillagePlace),
+        Without<testbed_content::village::civic::Building>,
+    >,
     patches: Query<(Entity, &SimId, &SimPos, &ResourcePatch)>,
     mut index: ResMut<VisualIndex>,
     geography: Option<Res<testbed_content::village::geometry::Geography>>,
@@ -709,8 +775,10 @@ fn spawn(
         server.load(GltfAssetLabel::Scene(0).from_asset("hex/tree_single_A.gltf"));
     let rock: Handle<WorldAsset> =
         server.load(GltfAssetLabel::Scene(0).from_asset("hex/resource_stone.gltf"));
-    let bed: Handle<WorldAsset> =
-        server.load(GltfAssetLabel::Scene(0).from_asset("furniture/bed_single_A.gltf"));
+    // The old village marks its inn with a bed beside it. On the regional
+    // island a bed stands inside the inn (`island_homes`), never outdoors.
+    let inn_bed: Option<Handle<WorldAsset>> = (!expanded)
+        .then(|| server.load(GltfAssetLabel::Scene(0).from_asset("furniture/bed_single_A.gltf")));
     for (e, id, pos, place) in &places {
         let root = commands
             .spawn((
@@ -725,23 +793,68 @@ fn spawn(
             .id();
         index.map.insert(e, root);
         commands.entity(root).with_children(|p| {
-            if expanded {
+            if expanded && place.role == Role::Innkeeper {
+                // An inn is a place somebody can be inside: `island_homes`
+                // fits its house to the body the simulation blocks.
+            } else if expanded {
                 let path = crate::colony_scene::living_scene::building(place.role);
-                p.spawn((
-                    crate::colony_scene::living_scene::BuildingModel {
-                        station: *id,
-                        visual: root,
-                    },
-                    WorldAssetRoot(server.load(GltfAssetLabel::Scene(0).from_asset(path))),
-                    Transform::from_xyz(
-                        0.0,
-                        0.0,
-                        testbed_content::village::frontier::settlements::WORKPLACE_OFFSET_MM as f32
-                            / 1000.0,
-                    )
-                    .with_scale(Vec3::splat(2.4)),
-                ))
-                .observe(crate::colony_scene::living_scene::building_ready);
+                // A solid workplace is fitted to the body the simulation
+                // blocks behind the site; the well and the fishing hut are
+                // open and keep their scale.
+                let frame = crate::island_homes::model::BodyFrame::of_founding_workplace(*pos);
+                let (placed, fitted) = crate::island_world::workplaces::model_transform(
+                    place.role,
+                    !matches!(place.role, Role::WaterKeeper | Role::Fisher),
+                    &Transform::from_translation(sim_to_world(*pos)),
+                    &frame,
+                    testbed_content::village::frontier::settlements::WORKPLACE_OFFSET_MM as f32
+                        / 1000.0,
+                );
+                let model = p
+                    .spawn((
+                        crate::colony_scene::living_scene::BuildingModel {
+                            station: *id,
+                            visual: root,
+                        },
+                        WorldAssetRoot(server.load(GltfAssetLabel::Scene(0).from_asset(path))),
+                        placed,
+                    ))
+                    .observe(crate::colony_scene::living_scene::building_ready)
+                    .id();
+                // The trade's own goods by its entrance, to one side of the
+                // path: sacks at the mill, a stack of sawn wood at the
+                // woodcutter's and the carpenter's.
+                let goods: &[(&'static str, Vec3, f32, f32)] = match place.role {
+                    Role::Miller => &[
+                        ("hex/sack.gltf", Vec3::new(1.7, 0.0, 0.3), 5.0, 0.4),
+                        ("hex/sack.gltf", Vec3::new(2.15, 0.0, 0.55), 5.0, 1.3),
+                        ("hex/sack.gltf", Vec3::new(1.9, 0.32, 0.42), 5.0, 2.2),
+                    ],
+                    Role::Woodcutter | Role::Carpenter => &[(
+                        "living/props/resource_lumber.gltf",
+                        Vec3::new(-2.0, 0.0, 0.4),
+                        4.4,
+                        0.2,
+                    )],
+                    _ => &[],
+                };
+                for (path, at, scale, yaw) in goods {
+                    p.spawn((
+                        Name::new("trade goods"),
+                        WorldAssetRoot(server.load(GltfAssetLabel::Scene(0).from_asset(*path))),
+                        Transform::from_translation(*at)
+                            .with_rotation(Quat::from_rotation_y(*yaw))
+                            .with_scale(Vec3::splat(*scale)),
+                    ));
+                }
+                if fitted {
+                    p.commands().entity(root).insert((
+                        crate::island_world::workplaces::WorkplaceFit(placed),
+                        crate::island_world::workplaces::occluder(
+                            place.role, frame, &placed, model,
+                        ),
+                    ));
+                }
             } else if place.role != Role::WaterKeeper {
                 p.spawn((
                     WorldAssetRoot(house.clone()),
@@ -779,7 +892,7 @@ fn spawn(
                     ));
                 }
             }
-            if place.role == Role::Innkeeper {
+            if let Some(bed) = inn_bed.as_ref().filter(|_| place.role == Role::Innkeeper) {
                 p.spawn((
                     WorldAssetRoot(bed.clone()),
                     Transform::from_xyz(1.9, 0., 0.2).with_scale(Vec3::splat(0.42)),
@@ -820,8 +933,16 @@ fn spawn(
             ))
             .id();
         index.map.insert(e, root);
+        // On the island a wood patch is a Kenney pine (recoloured like the
+        // woods) and a berry patch a Kenney bush: no plain cones.
+        let island_model =
+            |path: &'static str| server.load(GltfAssetLabel::Scene(0).from_asset(path));
         let (model, scale) = match patch.kind.as_str() {
             testbed_content::village::catalog::GRAIN => (grain.clone(), 2.2),
+            "log" if expanded => (island_model("living/nature/tree_pineRoundA.glb"), 5.2),
+            testbed_content::village::catalog::BERRIES if expanded => {
+                (island_model("living/nature/plant_bushLarge.glb"), 3.6)
+            }
             "log" => (tree.clone(), 3.0),
             "ore" => (rock.clone(), 3.0),
             testbed_content::village::catalog::FIBER => (grain.clone(), 1.3),
@@ -840,6 +961,18 @@ fn spawn(
                 Transform::from_scale(Vec3::splat(scale)),
             ))
             .id();
+        if expanded
+            && (patch.kind == testbed_content::village::catalog::BERRIES || patch.kind == "log")
+        {
+            if patch.kind == testbed_content::village::catalog::BERRIES {
+                commands
+                    .entity(child)
+                    .insert(crate::colony_scene::living_scene::KenneyShrub);
+            }
+            commands
+                .entity(child)
+                .observe(crate::colony_scene::living_scene::recolour_kenney);
+        }
         if expanded {
             commands
                 .entity(child)
@@ -878,12 +1011,81 @@ fn spawn(
         last: None,
     });
 }
+/// On an animal body drawn by a model with its own clips: the box idle
+/// leaves it alone.
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct Modelled;
+
+/// The body of an animal's visual, under its root: what the idle moves.
+#[derive(Component, Clone, Copy, Debug)]
+pub(crate) struct AnimalBody {
+    seed: f32,
+}
+
+/// An animal's idle at sim time `seconds`: it breathes, and now and then
+/// dips its head to graze and shifts its weight. Returns the body's turn
+/// (a pitch forward) and its height scale; both small.
+pub(crate) fn animal_idle(seconds: f32, seed: f32) -> (Quat, f32) {
+    let breath = 1.0 + 0.018 * (seconds * 2.1 + seed * 5.0).sin();
+    // A graze every 7 to 10 s: down over a second, held, back up.
+    let cycle = 7.0 + 3.0 * (seed * 1.7).fract();
+    let t = (seconds / cycle + seed).fract() * cycle;
+    let dip = if t < 2.4 {
+        let x = (t / 2.4 * std::f32::consts::PI).sin();
+        x * x
+    } else {
+        0.0
+    };
+    let shift = 0.012 * (seconds * 0.37 + seed * 3.0).sin();
+    (
+        // The head is the body's -Z: a positive turn about +X dips it.
+        Quat::from_rotation_x(0.09 * dip) * Quat::from_rotation_z(shift),
+        breath,
+    )
+}
+
+/// Move the animals' bodies on the sim clock: they stand still while the
+/// game is paused, like everything the simulation drives.
+pub(crate) fn animals_idle(
+    clock: Option<Res<npc_framework::prelude::SimClock>>,
+    (sim_time, rate, control): (
+        Option<Res<npc_framework::prelude::SimTime>>,
+        Option<Res<npc_framework::prelude::SimRate>>,
+        Option<Res<npc_framework::prelude::SimControl>>,
+    ),
+    motion: Option<Res<crate::island_world::ambient::AmbientMotion>>,
+    mut bodies: Query<(&AnimalBody, &mut Transform), Without<Modelled>>,
+) {
+    // Only on the island, whose ambient motion this is; legacy scenes keep
+    // their still animals.
+    let (Some(clock), Some(motion)) = (clock, motion) else {
+        return;
+    };
+    if motion.scale <= 0.0 {
+        return;
+    }
+    let alpha = npc_framework::view_helpers::interp::interp_alpha(
+        sim_time.as_deref(),
+        rate.as_deref(),
+        control.as_deref(),
+    );
+    let seconds = (clock.tick as f32 - 1.0 + alpha) / 20.0;
+    for (body, mut transform) in &mut bodies {
+        let (turn, breath) = animal_idle(seconds, body.seed);
+        if transform.rotation != turn {
+            transform.rotation = turn;
+            transform.scale = Vec3::new(1.0, breath, 1.0);
+        }
+    }
+}
+
 fn wildlife_visuals(
     mut commands: Commands,
     animals: Query<(Entity, &SimId, &SimPos), With<testbed_content::village::hunting::Wildlife>>,
     mut index: ResMut<VisualIndex>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    deer: Option<Res<crate::island_world::wildlife::DeerAssets>>,
 ) {
     let unseen: Vec<_> = animals
         .iter()
@@ -909,7 +1111,45 @@ fn wildlife_visuals(
             ))
             .id();
         index.map.insert(entity, visual);
-        commands.entity(visual).with_children(|body| {
+        // The parts hang from one body the idle moves, so a deer model with
+        // or without clips drops in under the same body.
+        let body_root = commands
+            .spawn((
+                Name::new("deer body"),
+                AnimalBody {
+                    seed: (id.0 % 89) as f32 * 0.37,
+                },
+                ChildOf(visual),
+                Transform::default(),
+                Visibility::Inherited,
+            ))
+            .id();
+        // On the island: the deer and stag models, clips chosen from the
+        // simulation (`island_world::wildlife`).
+        if let Some(deer) = deer.as_deref() {
+            let seed = (id.0 % 89) as f32 * 0.37;
+            // Each faces its own way until it first moves; the root follows
+            // the simulation's position and the body turns toward where it
+            // goes (`wildlife::move_deer`).
+            let (_, heading) = crate::island_world::wildlife::herd_place(*id);
+            commands.entity(body_root).insert((
+                Modelled,
+                crate::island_world::wildlife::DeerMotion::facing(heading),
+                Transform::from_rotation(Quat::from_rotation_y(heading)),
+            ));
+            commands
+                .entity(visual)
+                .insert(crate::island_world::wildlife::WildDeer { body: body_root });
+            commands
+                .spawn((
+                    crate::island_world::wildlife::model_bundle(deer, *id, seed),
+                    ChildOf(body_root),
+                ))
+                .observe(crate::island_world::wildlife::on_ready);
+            label(&mut commands, *id, visual, "Deer", 2.1, false);
+            continue;
+        }
+        commands.entity(body_root).with_children(|body| {
             for (position, scale, material) in [
                 (
                     Vec3::new(0., 0.86, 0.),
@@ -1043,40 +1283,32 @@ fn actor_caption(world: &World, entity: Entity) -> Option<String> {
             .get_resource::<crate::OverlayState>()
             .is_some_and(|state| state.visible)
     {
-        let name = format!("{} · You", caption_short(&person.name, 24));
+        // Your own tag reads like a resident's: who, then what they are
+        // doing, in the same lower-case words.
+        let name = format!("{} (you)", caption_short(&person.name, 24));
+        if crate::player_hud::player_asleep(world) {
+            return Some(format!("{name}\nasleep until morning"));
+        }
         return Some(match activity {
-            "idle" => name,
-            "building" => format!("{name}\nBuilding your cottage"),
-            "walking" => format!("{name}\nWalking"),
-            "resting" => format!("{name}\nResting"),
-            "gathering" => format!("{name}\nGathering supplies"),
-            "crafting" => format!("{name}\nMaking something"),
-            "dead" => format!("{} · Remembered", caption_short(&person.name, 24)),
-            _ => name,
+            // Idle is the player's to decide: "ready", not "waiting for you"
+            // beside "(you)".
+            "idle" => format!("{name}\nready"),
+            "building" => format!("{name}\nbuilding your cottage"),
+            "walking" => format!("{name}\nwalking"),
+            "resting" => format!("{name}\nresting"),
+            "gathering" => format!("{name}\ngathering supplies"),
+            "crafting" => format!("{name}\nmaking something"),
+            "dead" => format!("{}\nremembered", caption_short(&person.name, 24)),
+            other => format!("{name}\n{}", other.replace('_', " ")),
         });
     }
-    let detail = match activity {
-        "gathering" => world
-            .get::<testbed_content::village::Gathering>(entity)
-            .and_then(|g| {
-                world
-                    .resource::<npc_framework::prelude::SimIndex>()
-                    .get(g.patch)
-            })
-            .and_then(|patch| world.get::<ResourcePatch>(patch))
-            .map(|patch| format!("gathering {}", patch.kind.trim_start_matches("village_"))),
-        "crafting" => world
-            .get::<npc_framework::crafting::Crafting>(entity)
-            .map(|craft| format!("crafting {}", craft.recipe.trim_start_matches("village_"))),
-        _ => testbed_content::village::production::job_summary(world, entity).or_else(|| {
-            testbed_content::village::behavior::decision(world, entity).map(str::to_owned)
-        }),
-    };
+    // The name, then the same words as the resident inspector and the roster.
+    // Their trade is in the inspector; the tag's shape says how they are.
+    let detail = crate::resident_inspector::activity_label(world, entity);
     Some(format!(
-        "{} | {}\n{}",
+        "{}\n{}",
         caption_short(&person.name, 24),
-        person.role.name(),
-        caption_short(detail.as_deref().unwrap_or(activity), 32),
+        caption_short(&detail, 32),
     ))
 }
 /// Presentation only: visible NPCs explain their work without adding a second world-truth feed.
@@ -1089,6 +1321,10 @@ fn actor_captions(world: &mut World) {
         return;
     }
     refresh.0 = 0.0;
+    let asleep = PlayedAsleep(crate::player_hud::player_asleep(world));
+    if world.get_resource::<PlayedAsleep>() != Some(&asleep) {
+        world.insert_resource(asleep);
+    }
     let labels: Vec<_> = world
         .query::<(Entity, &ActorCaption)>()
         .iter(world)
@@ -1104,6 +1340,45 @@ fn actor_captions(world: &mut World) {
             && text.0 != caption
         {
             text.0 = caption;
+        }
+    }
+    // The status shape beside the name: the inspector's own badge, as a
+    // shape and a colour, for residents and for the played character alike.
+    let slots: Vec<_> = world
+        .query::<(Entity, &CaptionStatus)>()
+        .iter(world)
+        .map(|(entity, status)| (entity, status.0, status.1))
+        .collect();
+    for (slot, id, shown) in slots {
+        let status = world
+            .resource::<npc_framework::prelude::SimIndex>()
+            .get(id)
+            .map(|entity| crate::resident_inspector::status_of(world, entity).0);
+        if status == shown {
+            continue;
+        }
+        world.entity_mut(slot).despawn_children();
+        if let Some(status) = status {
+            crate::game_ui::icon::icon(
+                world,
+                slot,
+                crate::game_ui::icon::Icon::status(status),
+                12.0,
+                crate::game_ui::widgets::Tone::status(
+                    crate::game_ui::tokens::Surface::Chrome,
+                    status,
+                ),
+            );
+        }
+        if let Some(mut node) = world.get_mut::<Node>(slot) {
+            node.display = if status.is_some() {
+                Display::Flex
+            } else {
+                Display::None
+            };
+        }
+        if let Some(mut state) = world.get_mut::<CaptionStatus>(slot) {
+            state.1 = status;
         }
     }
 }
@@ -1575,6 +1850,10 @@ fn project(
     colony: Option<Res<testbed_content::village::colony::ColonyState>>,
     mode: Option<Res<crate::IslandMode>>,
     diagnostics: Option<Res<crate::OverlayState>>,
+    (cutaways, asleep): (
+        Option<Res<crate::island_homes::Cutaways>>,
+        Option<Res<PlayedAsleep>>,
+    ),
     vitality: Query<&Vitality>,
     mut labels: Query<(
         Entity,
@@ -1668,7 +1947,25 @@ fn project(
         {
             shown = false;
         }
+        if hidden_while_asleep(
+            label.actor,
+            label.sim == state.played,
+            asleep.as_deref().is_some_and(|asleep| asleep.0),
+        ) {
+            shown = false;
+        }
         let pos = scenery.map(|anchor| anchor.0).or_else(|| {
+            // Somebody drawn inside a cut-away home is captioned where they
+            // are seen, in bed or on the floor: the simulation keeps them on
+            // the entrance point.
+            let indoors = index.get(label.sim).and_then(|sim| {
+                cutaways
+                    .as_deref()
+                    .and_then(|open| open.caption_anchor(sim, label.lift))
+            });
+            if indoors.is_some() {
+                return indoors;
+            }
             index
                 .get(label.sim)
                 .and_then(|e| positions.get(e).ok())
@@ -1773,6 +2070,8 @@ fn weather(
     colony: Option<Res<testbed_content::village::colony::ColonyState>>,
     regional: Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
     mut atmospheres: Query<(&RtsCamera, &mut DistanceFog)>,
+    pinned: Option<Res<crate::island_atmosphere::daylight::ViewDayOverride>>,
+    weather: Option<Res<crate::island_world::weather::WeatherLook>>,
 ) {
     let (_, season, _) =
         testbed_content::village::calendar_at(clock.tick, &config, market.is_some());
@@ -1837,53 +2136,48 @@ fn weather(
         Color::srgb(0.56, 0.76, 0.93)
     };
     if regional.is_some() {
-        let angle = phase * std::f32::consts::TAU;
-        let day_end = (1.0 - config.night_permille.min(1000) as f32 / 1000.0).clamp(0.01, 0.99);
-        let daylight = if phase < day_end {
-            0.25 + 0.75 * (phase / day_end * std::f32::consts::PI).sin().max(0.0)
-        } else {
-            0.125 * (1.0 + ((phase - day_end) / (1.0 - day_end) * std::f32::consts::TAU).cos())
+        let phase =
+            crate::island_atmosphere::daylight::view_phase(clock.tick, &config, pinned.as_deref());
+        let daylight = crate::island_atmosphere::daylight::daylight(phase, config.night_permille);
+        let light = crate::island_atmosphere::sky::sky_light(daylight);
+        let srgb = |[r, g, b]: [f32; 3]| Color::srgb(r, g, b);
+        // Today's weather and a shock dim the sun, bring the haze nearer
+        // and mix the sky towards their own grey. The grey follows the
+        // hour, so a wet night is still a night.
+        let (change, flash) = weather.as_deref().map_or(
+            (crate::island_world::weather::SkyChange::CLEAR, 0.0),
+            |look| {
+                (
+                    crate::island_world::weather::sky_change(look.kind, look.shock, look.amount),
+                    look.flash,
+                )
+            },
+        );
+        let hour = 0.22 + 0.78 * crate::island_atmosphere::sky::sun_strength(daylight);
+        let under = |colour: [f32; 3]| -> [f32; 3] {
+            std::array::from_fn(|channel| {
+                let grey = change.tint[channel] * hour;
+                let mixed = colour[channel] + (grey - colour[channel]) * change.tint_amount;
+                mixed + (1.0 - mixed) * flash * 0.5
+            })
         };
-        let dusk = (1.0 - (daylight - 0.5).abs() * 2.0).max(0.0);
-        for (mut light, mut transform) in &mut sun {
-            light.illuminance = 900.0 + daylight * 11500.0;
-            light.color = Color::srgb(
-                0.66 + daylight * 0.34,
-                0.76 + daylight * 0.19 - dusk * 0.13,
-                1.0 - daylight * 0.12 - dusk * 0.23,
-            );
-            *transform = Transform::from_xyz(
-                angle.sin() * 40.0,
-                12.0 + daylight * 30.0,
-                angle.cos() * 25.0,
-            )
+        for (mut sun, mut transform) in &mut sun {
+            sun.illuminance = light.sun_lux * change.sun + flash * 9_000.0;
+            sun.color = srgb(light.sun_color);
+            *transform = Transform::from_translation(crate::island_atmosphere::sky::sun_position(
+                phase, daylight,
+            ))
             .looking_at(Vec3::ZERO, Vec3::Y);
         }
-        ambient.brightness = 260.0 + daylight * 380.0;
-        ambient.color = Color::srgb(0.66 + daylight * 0.25, 0.75 + daylight * 0.18, 1.0);
-        sky.0 = Color::srgb(
-            0.07 + daylight * 0.49,
-            0.10 + daylight * 0.63,
-            0.18 + daylight * 0.66,
-        );
+        ambient.brightness = light.ambient * change.ambient * (1.0 + flash * 1.4);
+        ambient.color = srgb(light.ambient_color);
+        sky.0 = srgb(under(light.sky));
         for (camera, mut fog) in &mut atmospheres {
-            fog.color = Color::srgb(
-                0.10 + daylight * 0.48,
-                0.14 + daylight * 0.56,
-                0.22 + daylight * 0.51,
-            );
+            fog.color = srgb(under(light.fog));
             fog.falloff = FogFalloff::from_visibility_colors(
-                (camera.distance * 3.5).max(210.0),
-                Color::srgb(
-                    0.15 + daylight * 0.23,
-                    0.20 + daylight * 0.32,
-                    0.31 + daylight * 0.30,
-                ),
-                Color::srgb(
-                    0.20 + daylight * 0.53,
-                    0.27 + daylight * 0.55,
-                    0.38 + daylight * 0.48,
-                ),
+                crate::island_atmosphere::sky::fog_visibility(camera.distance) * change.visibility,
+                srgb(under(light.fog_extinction)),
+                srgb(under(light.fog_inscatter)),
             );
         }
     }
@@ -1895,13 +2189,29 @@ fn weather(
 pub(crate) fn corpse_pose(
     people: Query<(&Vitality, &Villager)>,
     clock: Res<SimClock>,
-    mut roots: Query<(&VisualOf, &mut Transform), With<crate::visuals::ActorVisual>>,
+    config: Option<Res<SimConfig>>,
+    island: Option<Res<crate::island_poses::IslandPoses>>,
+    repose: Option<Res<crate::island_poses::ReposeCache>>,
+    mut roots: Query<(&VisualOf, &mut Transform, &crate::visuals::ActorVisual)>,
 ) {
-    for (of, mut transform) in &mut roots {
-        if people
-            .get(of.0)
-            .is_ok_and(|(v, p)| v.died_at.is_some() || p.resting_until > clock.tick)
-        {
+    let night = config.is_some_and(|config| config.is_night(clock.tick));
+    for (of, mut transform, actor) in &mut roots {
+        if people.get(of.0).is_ok_and(|(v, p)| {
+            let resting = p.resting_until > clock.tick;
+            crate::island_poses::lays_root(
+                island.is_some(),
+                actor.kind,
+                v.died_at.is_some(),
+                resting,
+                // Asleep as the simulation has it; a legacy scene, which
+                // keeps no such record, reads a rest at night as sleep.
+                resting
+                    && repose
+                        .as_deref()
+                        .and_then(|cache| cache.asleep(of.0))
+                        .unwrap_or(night),
+            )
+        }) {
             transform.rotation = Quat::from_rotation_z(std::f32::consts::FRAC_PI_2);
             transform.translation.y = 0.18;
         }
@@ -2785,6 +3095,11 @@ mod label_tests {
                 .0
                 .ends_with("\nresting")
         );
+        // Not asleep through the player's own sleep: the caption stays.
+        assert_eq!(
+            app.world().get_resource::<PlayedAsleep>(),
+            Some(&PlayedAsleep(false))
+        );
         app.world_mut().get_mut::<Vitality>(entity).unwrap().died_at = Some(0);
         app.world_mut().resource_mut::<CaptionRefresh>().0 = 1.0;
         actor_captions(app.world_mut());
@@ -2793,7 +3108,31 @@ mod label_tests {
                 .get::<Text>(caption)
                 .unwrap()
                 .0
-                .ends_with("\ndead")
+                .ends_with("\ndied")
+        );
+    }
+    #[test]
+    fn the_played_characters_caption_is_hidden_while_they_sleep() {
+        // Only the played character's own caption, only while asleep.
+        assert!(hidden_while_asleep(true, true, true));
+        assert!(!hidden_while_asleep(true, true, false));
+        assert!(
+            !hidden_while_asleep(true, false, true),
+            "a resident keeps theirs"
+        );
+        assert!(
+            !hidden_while_asleep(false, true, true),
+            "a speech bubble stays"
+        );
+        // The flag follows `player_hud::player_asleep` as the captions refresh.
+        let mut app = testbed_content::try_new_sim_app(1, "ai_village", 1).unwrap();
+        app.init_resource::<Time<Real>>()
+            .insert_resource(CaptionRefresh(1.0))
+            .insert_resource(PlayedAsleep(true));
+        actor_captions(app.world_mut());
+        assert_eq!(
+            *app.world().resource::<PlayedAsleep>(),
+            PlayedAsleep(crate::player_hud::player_asleep(app.world()))
         );
     }
     #[test]

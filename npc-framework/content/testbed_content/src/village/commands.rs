@@ -141,6 +141,19 @@ impl VillageAct {
             "buy" | "sell" => {
                 let trader = self.target(world)?;
                 let buy = self.verb == "buy";
+                // Stores, stalls and building sites trade through their own
+                // validated transfers; `sell` there consigns or delivers.
+                if let Some(checked) = super::civic::trade_check(
+                    world,
+                    actor,
+                    trader,
+                    buy,
+                    &self.kind,
+                    self.quantity,
+                    self.limit_price,
+                ) {
+                    return checked;
+                }
                 econ::merchant_check(world, actor, trader, &self.kind, self.quantity, buy)?;
                 let (buyer, seller) = if buy {
                     (actor, trader)
@@ -200,16 +213,17 @@ impl VillageAct {
             "eat" | "drink" => {
                 let kind = if self.verb == "eat" {
                     if self.kind.is_empty() {
-                        "bread"
+                        super::roles::roles(world).baked
                     } else {
                         self.kind.as_str()
                     }
                 } else {
-                    catalog::WATER
+                    super::roles::roles(world).drink
                 };
                 if self.verb == "eat"
-                    && (catalog::food_restore(kind).is_none()
-                        || (!super::needs_driven(world) && kind != "bread"))
+                    && (catalog::food_restore_in(world, kind).is_none()
+                        || (!super::needs_driven(world)
+                            && kind != super::roles::roles(world).baked))
                 {
                     return Err(
                         "eat needs a finished edible good; raw materials must be cooked".into(),
@@ -236,11 +250,24 @@ impl VillageAct {
                 let keeper = world
                     .get::<Villager>(inn)
                     .ok_or("target is not the innkeeper")?;
-                if keeper.role != Role::Innkeeper || !living(world, inn) {
+                if !super::frontier::economy_spec::is_service(world, keeper.role)
+                    || !living(world, inn)
+                {
                     return Err("rent a bed from the living innkeeper".into());
                 }
-                if !econ::near(world, actor, inn) {
+                // Living world: a bed is rented at the inn, the keeper paid
+                // wherever it is; elsewhere from the innkeeper in person.
+                let at_the_inn = super::frontier::enabled(world)
+                    && super::indoors::at_inn(world, actor, keeper.workplace);
+                if !at_the_inn && !econ::near(world, actor, inn) {
                     return Err("move within 1.5 m of the innkeeper".into());
+                }
+                // Regional: the inn has a fixed number of guest beds.
+                if super::frontier::enabled(world)
+                    && super::indoors::inside_entity(world, actor) != Some(keeper.workplace)
+                    && super::indoors::free_guest_bed(world, keeper.workplace).is_none()
+                {
+                    return Err("the inn has no free bed".into());
                 }
                 if world.get::<Wallet>(actor).map_or(0, |w| w.coins) < catalog::BED_PRICE {
                     return Err(format!("a bed costs {} coins", catalog::BED_PRICE));
@@ -382,6 +409,16 @@ impl VillageAct {
             "new_life" => new_life(world),
             "buy" | "sell" => {
                 let trader = self.target(world)?;
+                if let Some(done) = super::civic::trade(
+                    world,
+                    actor,
+                    trader,
+                    self.verb == "buy",
+                    &self.kind,
+                    self.quantity,
+                ) {
+                    return done;
+                }
                 if self.verb == "buy" {
                     econ::trade(world, actor, trader, &self.kind, self.quantity)
                 } else {
@@ -399,17 +436,17 @@ impl VillageAct {
             "eat" | "drink" => {
                 let (kind, need, amount) = if self.verb == "eat" {
                     let kind = if self.kind.is_empty() {
-                        "bread"
+                        super::roles::roles(world).baked
                     } else {
                         self.kind.as_str()
                     };
                     (
                         kind,
                         "Hunger",
-                        catalog::food_restore(kind).expect("checked food"),
+                        catalog::food_restore_in(world, kind).expect("checked food"),
                     )
                 } else {
-                    (catalog::WATER, "Thirst", 90_000)
+                    (super::roles::roles(world).drink, "Thirst", 90_000)
                 };
                 econ::consume(world, actor, kind, 1)?;
                 econ::restore(world, actor, need, amount);
@@ -442,7 +479,11 @@ impl VillageAct {
                 ai::stop_work(world, actor, "renting a bed");
                 world.get_mut::<Wallet>(actor).expect("wallet").coins -= catalog::BED_PRICE;
                 world.get_mut::<Wallet>(keeper).expect("wallet").coins += catalog::BED_PRICE;
+                if super::frontier::enabled(world) {
+                    super::frontier::labor::took(world, keeper, catalog::BED_PRICE);
+                }
                 ai::start_rest(world, actor, catalog::BED_TICKS, 400);
+                super::indoors::rented_bed(world, actor, keeper);
                 record_effect(
                     world,
                     Some(SimId(self.unit)),
@@ -471,11 +512,12 @@ impl VillageAct {
                     .map(|kind| json!({"kind":kind,
                         "quantity":if market::enabled(world) { market::available_to_sell(world,target,kind) } else { econ::count(world,target,kind) },
                         "price":market::asking_price(world,target,kind)})).collect();
+                let keeper = super::frontier::economy_spec::is_service(world, v.role);
                 record_effect(
                     world,
                     Some(SimId(self.unit)),
                     "VillageConversation",
-                    &json!({"name":v.name,"role":v.role,"offers":offers,"bed_price":if v.role==Role::Innkeeper{Some(catalog::BED_PRICE)}else{None}}),
+                    &json!({"name":v.name,"role":v.role,"offers":offers,"bed_price":if keeper{Some(catalog::BED_PRICE)}else{None}}),
                 );
                 super::speech::speak(world, SimId(self.unit), self.target, "What do you offer?");
                 Ok(())
@@ -544,7 +586,17 @@ impl ContentCommand for VillageAct {
             .map_err(|reason| CommandError::Unavailable { reason })
     }
     fn apply(self, world: &mut World) {
-        let _ = self.perform(world);
+        // A recorded action of a played character feeds its bonds and goals.
+        if self.perform(world).is_ok() {
+            super::live::acted(
+                world,
+                SimId(self.unit),
+                &self.verb,
+                self.target,
+                &self.kind,
+                self.quantity,
+            );
+        }
     }
     fn unit(&self) -> Option<SimId> {
         Some(SimId(self.unit))

@@ -40,6 +40,13 @@ pub(super) fn watching(world: &World) -> bool {
 
 pub(super) fn watch(world: &mut World) -> Result<(), String> {
     crate::request_island_mode(world, IslandMode::Inspector)?;
+    leave(world);
+    Ok(())
+}
+
+/// The character view gives way to another mode: close its workspace and
+/// acknowledge an ended life. This requests no mode and changes no actor.
+pub(super) fn leave(world: &mut World) {
     actions::restore_follow(world);
     let watched = dead(world).then(|| stamp(world)).flatten();
     world.get_resource_or_init::<LifeView>().watched = watched;
@@ -50,7 +57,6 @@ pub(super) fn watch(world: &mut World) -> Result<(), String> {
     if let Some(mut focus) = world.get_resource_mut::<InputFocus>() {
         focus.clear();
     }
-    Ok(())
 }
 
 pub(super) fn show_choices(world: &mut World) {
@@ -61,29 +67,40 @@ pub(super) fn show_choices(world: &mut World) {
 }
 
 pub(super) fn spawn(world: &mut World) {
+    use crate::game_ui::tokens::{self as t, Surface};
+    use crate::game_ui::widgets::{self as w, ButtonSpec, Kind, Reach, Size, Tone};
+    // Watching after a life has ended: one line and the way back to the choices.
     let bar = root(
         world,
         "Spectator life choices",
-        Node {
-            position_type: PositionType::Absolute,
-            left: px(12),
-            bottom: px(12),
-            width: px(300),
-            max_width: percent(45),
-            padding: UiRect::all(px(12)),
-            row_gap: px(8),
-            flex_direction: FlexDirection::Column,
-            display: Display::None,
-            ..default()
-        },
+        w::chrome(
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(t::SCREEN_MARGIN),
+                bottom: px(t::SCREEN_MARGIN),
+                width: px(300),
+                max_width: percent(45),
+                padding: UiRect::axes(px(12), px(8)),
+                row_gap: px(8),
+                flex_direction: FlexDirection::Column,
+                display: Display::None,
+                ..default()
+            },
+            t::RADIUS_LG,
+        ),
     );
     world.entity_mut(bar).insert(SpectatorLifeRoot);
-    world.spawn((
-        ChildOf(bar),
-        SpectatorLifeStatus,
-        ui::text("", 14., ui::TEXT),
-    ));
-    button(world, bar, "Life choices · L", Action::LifeChoices, false);
+    let status = w::paragraph(world, bar, "", t::DENSE, Tone::text(Surface::Chrome));
+    world.entity_mut(status).insert(SpectatorLifeStatus);
+    w::button(
+        world,
+        bar,
+        ButtonSpec::new("Life choices", Kind::Secondary, Surface::Chrome)
+            .size(Size::Small)
+            .key("L")
+            .reach(Reach::Tab(0)),
+        (PlayerControl, PlayerAction(Action::LifeChoices)),
+    );
 }
 
 pub(super) fn refresh(world: &mut World) {
@@ -119,16 +136,7 @@ pub(super) fn refresh(world: &mut World) {
     for (entity, successor) in buttons {
         disabled(world, entity, pending || successor && stopped);
     }
-    let rate = if stopped {
-        "Paused".into()
-    } else {
-        format!(
-            "{}×",
-            world
-                .get_resource::<SimControl>()
-                .map_or(1, |control| control.multiplier)
-        )
-    };
+    let rate = crate::island_shell::clock(world).rate();
     text::<SpectatorLifeStatus>(
         world,
         format!("Watching the village · {rate}\nThis life has ended. A successor can begin later."),
@@ -140,7 +148,7 @@ pub(super) fn refresh(world: &mut World) {
             if pending {
                 "\n\nA new life is arriving."
             } else if stopped {
-                "\n\nOpen Menu and resume the world before beginning a successor."
+                "\n\nThe world is paused. Press Space to resume before beginning a successor."
             } else {
                 ""
             }

@@ -8,6 +8,620 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
 
 ## [Unreleased]
 
+### Living world: Oversee targets and priorities, Shape plots and props, trades from data
+
+- Profession targets: `SetProfessionTarget { settlement, profession, wanted }`
+  (`wanted: null` clears) sets a wanted headcount that the labour review
+  moves toward through the usual trade-change rules; view
+  `frontier::oversee::profession_table` (current, wanted, free seats and a
+  reason when they differ). ADR 0043.
+- Village priorities: `SetVillagePriority { settlement, topic, profession?,
+  level }` over `housing`, `storage`, `workplace`, `food_reserve`,
+  `fuel_reserve`, `coats`, `boat_orders` (`low`, `normal`, `high`); normal is
+  the old behaviour; view `frontier::oversee::priorities` with one sentence
+  per level. ADR 0043.
+- Shape: `PlacePlot` / `RemovePlot` (farm `field` or the new `garden`
+  plot, finished and empty) and `PlaceProp` / `RemoveProp` (props from the
+  new catalog list `economy.props`: barrel, crate stack, fence piece, flower
+  bed, signpost, flag, wheelbarrow, each with its model); exported worlds
+  carry the plots in `buildings` and the props in `props`. Views
+  `frontier::props::{catalog, props}`. ADR 0043.
+- A trade is its data key: `Role::Trade(key)` for a trade only the catalog
+  defines, `Role::from_key`/`key`; every role reads and writes as its key
+  string. Living-world logic no longer branches on a named trade
+  (`economy_spec::{trades, is_service, open_site, trade_label}`); a trade,
+  its goods, recipe, patch and workplace can be added in data alone
+  (`tests/island_data_trade.rs`). The planner may build the first workplace
+  of a catalog trade a settlement lacks. `RegionalOccupationChanged` adds
+  `from_key`, `to_key`, `from_trade`, `to_trade`. ADR 0042.
+- `ISLAND_SAVE_VERSION` is 2.
+
+### Living world: coats from the start, stalking hunters, save identity (pass 5)
+
+- A resident who carries a coat and wears none puts it on at once, in any
+  season (`VillageCoatWorn`). Two founders in three come wearing a coat
+  (`tuning.founder_coats_per_three`, 2); each settlement is founded with its
+  tailors' workshop built and each tailor holding one batch of coat
+  materials (`tuning.found_coat_workshops`, true).
+- The boat orders 3 goods a call (`merchant.order_goods`); its purchases
+  against an order no longer move the island's quotes or trade margins.
+- A hunter keeps its prey and re-paths only once it moved 3 m; the stalked
+  animal does not flee from that hunter. `tuning.wildlife_motion` (true).
+- New view data: `view::plan_lines` (raw and readable planner lines, no raw
+  keys in `readable`), `view::activity_progress_permille`,
+  `view::workplace_name`; `goap::explain_readable`.
+- Goods carry a `drink` tag; `catalog::good_with_tag`, `catalog::has_tag`
+  (ADR 0042).
+- Island saves carry an identity: `village::island_save` (`save_island`,
+  `check_island_save`, `load_island_save`, `IslandSaveCheck`); only a save of
+  this build loads, every other is refused with a typed check (ADR 0042).
+- The roles of goods and trades are catalog data (`village::roles`): new good
+  tags (`timber`, `lumber`, `metal`, `ore`, `meat`, `hide`, `leather`, `yarn`,
+  `fiber`, `baked`, `cooked`, `foraged`, `grain`), profession fields
+  `hunt { tool, yields }`, `builds`, `sows`, `display`; a living world missing
+  a role is refused at load naming it. The Actor Testbed keeps
+  `roles::TESTBED`.
+- `view::upgrade_stage(world, unit) -> Option<(ticks_left, ticks_total)>`:
+  the stage of work under way at a homestead upgrade's door.
+
+### Living world: coats, boat orders, a fund for building, deer that live
+
+- Goods a resident has no use for (`market::no_use`) are carried whole to a
+  store, which sells them (`tuning.unused_goods_to_market`).
+- `hunting::available_prey` and the habitat count query the wild animals
+  instead of every entity (same animals, same order).
+- A resident moved to another home while resting in the old one wakes.
+- Tuning `grants_spare_sites` (true) switches the floor-grant rule.
+- Coat makers keep a shelf of `max(2, residents / tuning.coat_shelf_residents)`
+  (15) coats while anybody lacks one, in every season, from their own purse.
+- Outside the coat season a resident without a coat is granted its price only
+  from the fund's balance above its reserve (`tuning.coat_grants_any_season`);
+  `life.coat_season` holds then while a coat is on offer it or the fund can
+  pay (`living::coat_wanted_now`, `living::coat_grant_room`).
+- The boat announces at each call what it will buy at the next
+  (`merchant.order_goods` 2, `order_units` 10, `order_price_percent` 130):
+  financed demand in the port's plan, paid from its purse, expiring unfilled
+  when it leaves (`VillageBoatOrder`, `VillageBoatOrderClosed`);
+  `BoatView.next_order: Vec<merchant::BoatOrder>`.
+- Floor grants no longer take the coins the fund holds for open sites; sites
+  spend `civic::site_budget`.
+- Deer graze, wander inside their range, keep 1.5 m apart, gallop from a
+  resident who comes close and settle again (`wildlife::WildlifeMotion`,
+  `view::wildlife()`); births keep 1.5 m from every animal.
+- A hired builder starts work anywhere within the door's 4 m reach (the owner
+  may stand on the door point), its claim is renewed while it walks, and a
+  builder on its claim who stands still reads `waiting`, never `walking`.
+
+### Living world: nobody freezes, raw prices, service trades
+
+- Nobody freezes (ADR 0041): the resident tree opens with `life.freezing`
+  (Warmth below `tuning.freezing_warmth`, 30000, without a coat, unless a lower
+  critical Thirst or Hunger), so the lowest critical need is served first; a
+  coatless resident in the cold below `tuning.exposure_warmth` (50000) starts
+  no outdoor errand and idles at home; from `tuning.coat_lead_days` (3) before
+  winter `life.coat_season` makes a coat a priority purchase, the civic fund
+  pays the price a resident cannot (`VillageCoatGrant`) and tailors stock a
+  coat for everybody without one.
+- Raw goods have stock cover (`tuning.raw_stock_cover`): every traded good's
+  island target comes from its daily use, so stock on offer up to it is not a
+  glut and a gathered good's quote no longer walks down to 1 coin while supply
+  only matches demand.
+- The inn is a service trade (`service.wage_floor` in data): an inn without a
+  keeper is staffed from a trade with workers to spare, its keeper stays, and
+  the civic fund tops the day's takings up to the floor (`VillageServiceWage`).
+- The trading post is no longer restocked from storage: it is the boat's
+  stall, and restocking carried the harbour's food 90 m from its homes.
+- The boat calls every 3 days, pays the island's base price for what it buys
+  (berries and hides added) and asks 140% for what it sells. Its imports land at
+  a market stall founded near the harbour centre (`merchant.market`), not at the
+  waterfront post: shopping at the water had cut meetings, couples and births.
+- A tired or cold resident far from home rents a bed at a nearer staffed inn
+  (`tuning.inn_detour_m`), at the inn itself: in the living world `rest` is
+  valid at the inn's entrance and pays the keeper wherever it is.
+- A within-cover quote below base climbs back to base, as an above-base quote
+  with nothing short already fell back to it.
+- `tuning.idle_trade_days` (0, off by default): when set, a worker whose trade
+  has had no work (goods above target, none short) for that many days may take
+  a vacancy elsewhere, down to one worker of the trade. With 2 days the 14-day
+  soak saw 319-364 job changes against 62-95 off, so it ships off. A keeper is
+  staffed only from somebody whose switching cooldown has run out.
+- Imports the civic fund cannot pay for are laid on the market stall on
+  consignment (`merchant::MERCHANT_OWNER`) and paid to the boat's purse when
+  bought; the boat no longer buys fiber or thread (it took a spring's fiber
+  from the tailors).
+- The production plan no longer counts a resident's hearth fuel reserve as
+  supply for a building site, which never receives it: a site's logs are cut.
+- A player's open homestead orders are production demand like a civic site's
+  (`live::order_demand`): a carpenter saws ordered planks nobody has to spare.
+- A coat grant is paid only when the coat purchase starts (journaled then; the
+  coins go back otherwise), may draw on the fund's destitution reserve (not on
+  building-levy coins), and in the coat season a resident the plan listed no
+  coat for buys one directly. A guest asleep at an inn reads "asleep at the
+  inn".
+- `UpgradeSiteView.ordered_at: Option<u64>` (tick of the last order).
+- `DaySummary` gains `bought`, `sold`, `bought_coins` and `sold_coins`.
+- Births say why they wait (`VillageBirthDeferred` in the journal).
+
+### Living world: physical homestead work, the boat as an outlet
+
+- Island view: props placed with Shape are drawn from their catalog model (or a model matched by key, or a small crate), turned and on the ground, and go when removed; placed fields and gardens are drawn like founding fields; an open workplace of a data-only trade is a yard.
+- Island view: a trade only the world's data defines gets a legend hue of its own (hashed from its key onto a palette kept apart from the shipped trades), the generic workshop (market) model, the hammer pose and its sound; an unknown good is stored as a crate. A prop table (`island_world::props`) maps placed props' data keys to manifest models, an unknown prop to a small crate.
+- Island sound: one system (`island_audio`) on the manifest's CC0 files. Ambience layers cross-fade with the coast, woods, wind, rain and storm (thunder at gaps), birds by day, crickets by night, a village murmur and fires nearby; waves, leaf rustle, crickets and murmur are made in code. Work one-shots come from the poses and machines on screen (capped, thinned at speed, pitch varied), with quiet day and night music, jingles on a new morning and a finished building, and UI sounds through `PlayUiSound`. `AudioLevels` holds the volumes; `ISLAND_AUDIO_OFF=1` silences a run.
+- Island view: a homestead upgrade's new part rises behind the cottage with the work (frame, walls, roof), its scaffold up once materials are in.
+- Island view, phase A: rain darkens and glosses the buildings with the ground; a hired builder waiting at the door between stages faces the house; the harbour's rowing boat rocks on the swell; trees and grass far from the camera sway a quarter as often and an unchanged sway is not rewritten; the sea's swell is worked out once per grid point (a quarter of the wave sums).
+- Island view, eleventh pass: the deer move as the simulation moves them: they follow its positions smoothly between its steps, turn toward where they go, walk and gallop at playback speeds matched to the ground, graze out of step, and fall once and lie still when dead; the view's herd spacing is now a small nudge that fades while they move.
+- Island view, tenth pass: the field gate's crossbars are farm-timber brown; stags keep 2.5 m from each other and 2.15 m from does, so their antlers no longer run into each other; a builder working an upgrade stage at the door faces the house.
+- Island view, ninth pass: farm fences, gates and the barrow are a mid brown; winter evergreens and shrubs stay dark green with snow on their tops (broadleaves bare, grass straw); the pier has a planked walkway, which also hides the blurred streak at its foot.
+- Island view, eighth pass:
+  - Ship, rowing boats, pier, field fences, gates and the barrow are dark oak with a mid-brown deck and trim (the noon hull samples R 146, R-B 44); signposts and bark are oak brown.
+  - The ship lies at least 10 m out with a real pier to it, mooring posts along it; both harbour flags stand on land at its foot.
+  - Deer keep 1.6 m apart and clear of trees, bushes and rocks; winter bushes and undergrowth are dark and grey, grass straw; depot barns and market stalls fly a yellow flag.
+- Island view, seventh pass:
+  - The ship, rowing boats and pier sections show their kit colours (brown wood, pale sails) through a recoloured palette.
+  - The ship floats clear with room at bow and stern, the jetty is the kit's pier sections, the rowing boats are 3.6 m long (one ashore, one afloat), and the deer stand apart as a loose herd.
+  - Gulls have swept, bent wings and glide.
+  - The plain cone trees are gone: the woods and the wood patches are Kenney's faceted pines and broadleaves, and the broadleaves turn in autumn.
+  - Sites show the kit's building stages, mills have sacks and woodcutters sawn wood, and inns fly flags.
+  - The ground is worn at doors and along desire lines.
+  - Shadow cascades follow the camera.
+- Island view, sixth pass (models and motion):
+  - The merchant ship is Kenney's `ship-small` (sail furled at the berth and set to sail in and out, pennants streaming downwind), with mooring posts, rowing boats, an anchor, fish and flags at the harbour.
+  - Deer and stags are the Quaternius models, with clips chosen from the simulation.
+  - The woods mix KayKit and Kenney trees (Kenney's greens recoloured by season) with undergrowth kept off roads, doors, bodies and fishing banks.
+  - Fields are fenced, settlements have signposts, and homes have a mantel, firewood, a rug and a shelf.
+  - Cloud shadows now read at island zoom (and go under an overcast), trees sway visibly each at their own pace, swells run over the sea, the shore's foam breathes, crops ripple, gulls follow the ship, small birds fly in flocks, and butterflies, fireflies and falling leaves come in their seasons.
+  - Winter snow lies unevenly, the fisher's line reaches the water, and the watermill's wheel turns about its own axle.
+- Island view: ambient motion. One wind for the whole island (from the weather, gusting, turning over the day) on a view clock that runs while paused: clouds drift and wrap, their shadows slide over the land at island zoom, trees sway, smoke and rain bend, the boat rides the swell and its sail shivers, lanterns and hearths flicker, gulls circle the harbour. Mills, wheels and saws spin up and down on the sim clock only while worked; deer breathe and graze. `AmbientMotion { scale }` stops all of it at 0. The boat floats clear of the beach and the post at the sim's berth or straight out from it; the winter beach is wet sand, not snow.
+- Homestead upgrades are physical (ADR 0040). An order is carried to the
+  cottage door by a resident of the settlement (from its spare stock, or bought
+  at a store on the way) and paid from the owner's escrow only when it is handed
+  over there; a hired builder walks to the door in working hours and builds in
+  paid stages (`UpgradeWork`); a friend walks over in free time through the new
+  `life.help` leaf to bring a material, work a stage or harvest a ripe bed. The
+  civic planner never sees these sites. Cancelling returns goods and the whole
+  escrow; a hauler keeps what it was carrying.
+- `view::upgrade_site` reports `workers` ("Oak is bringing 2 log.").
+- The trading post is founded at the waterfront beside the berth, the sea cell
+  nearest to the harbour's centre (`view::boat().berth`); `placement.coast` lets
+  a waterfront building stand on the coast.
+- The merchant boat buys the island's surplus above the stock targets (residents
+  of every settlement carry it to the post while the boat is in) and sells what
+  the island is short of; purse 6,000, larger limits and logs on its list.
+- The soak's journal reader read `(last, now]` and dropped every entry of a tick
+  that is a multiple of the sample interval, which is when the boat sails: the
+  `VillageBoatDuty` counter now reads `[last, now)`.
+- Repeat gathering walks to its patch when out of reach; `view::activity_progress`
+  gives done/total for gathering, crafting, a rest on the ground and a stage of
+  homestead work; `view::catalogue` adds `reasons` (materials short, open-site
+  allowance, homestead tier, placement); `RelationView.tastes_known`/`tastes`;
+  `view::held` and an activity-aware `view::held_tool`; the homestead
+  observation reports the real cottage body in the living world.
+- Fishing grounds lie at the water: a fish patch is placed on the dry cell beside
+  water nearest to its fisher's site (it stood on dry land up to 28 m from the
+  pond). A resident gathering there reads "fishing" (`view::activity_label`), and
+  `view::held` reports the fishing rod.
+- Fix: a living-world save made after a hunt, a burial or a removed resource patch
+  no longer fails to Continue ("Required island identity N is missing"). The
+  structure check now requires only permanent construction identities and lets
+  mortal ones go only the way the simulation removes them
+  (`tests/island_save_continue.rs`).
+- `WorkplaceView.solid` is now true for founding workplaces with a body (all but
+  the well and the fishing spot), whose blocker is a separate entity.
+- New resident leaf parameter `life.haul boat`: while the boat is in, residents
+  carry stock it buys to the trading post (tried after `materials` in work hours).
+- Acceptance: `regional_economy_soak` reports the 5th percentile of the
+  per-sample lowest resident need on seeds 7, 11 and 23
+  (`fourteen_days_on_three_seeds_meet_the_acceptance_bars`).
+
+### Island interface redesign, phases 1 and 2
+
+- Add one design system for the island interface in `testbed_view::game_ui`:
+  design tokens (`tokens`), a widget kit with every state (`widgets`), two-level
+  tooltips (`tooltip`), icons looked up by concept (`icon`) and an automatic
+  interface size with layout classes (`scale`). Parchment panels over dark chrome;
+  the optional Dusk panel style is a table swap. A contrast test recomputes the
+  spec's pairs. Guide: `docs/island-ui.md`; decision: ADR 0039.
+- Add 92 CC0 interface pictograms (Maki 8.0.0, Temaki 5.13.0) as two embedded
+  atlases, with `scripts/fetch_ui_icons.py`, `assets/ui-icons-manifest.json`, the
+  two licence texts and a credits section. Nine further glyphs are drawn in code.
+- Rebuild the Oversee shell: a top bar with the mode switch, seven village totals
+  with tooltips, weather, date and a segmented clock; an alert stack of three
+  rows; bottom docks for Overlays and Places, the build categories and the
+  ledger's pages (Village, Economy, People, Projects, Journal). The ledger is
+  closed by default and shares one right column with the inspector.
+- New Oversee keys: F1 to F5 (ledger pages), O (overlays), M (places), F (follow),
+  Alt (tooltip detail). Esc undoes one step per press and no longer also opens
+  the pause menu when it closed something.
+- Settings: **Interface size: automatic** (the default; 150% at 1080p, 200% at
+  1440p, times the existing percentage) and **Panels: parchment / dusk**, stored
+  in `island-settings.json` as `ui_scale_auto` and `panel_style`.
+- Remove the permanent hint text of the Oversee ledger and the keys written into
+  bar labels ("Live · 1", "Menu · Esc", "Pause · Space").
+- Add a developer widget gallery (`--ui-gallery PAGE`) and
+  `scripts/playtest/capture_ui_redesign.py`.
+
+### Island interface redesign, phase 3
+
+- Rebuild the resident inspector on the parchment kit in the right column: a
+  header with the trade's colour and icon, a status badge in words, and four
+  tabs (Overview, Day, Why, Home and job). A resident chosen from the roster
+  has a People button that leads back to it. The job and home commands move from
+  the People page to the inspector's **Home and job** tab; the roster row still
+  leads there.
+- Replace the build palette with a build tray above the docks: cards with icon,
+  cost as icon and count pairs and one line of purpose, the island's stock of
+  the materials at the side, and a tag beside the cursor that gives the verdict
+  in words, the simulation's reason, the cost, the footprint and the keys. The
+  palette's hint lines and its Turn, Put down and Close buttons are gone (R,
+  right-click or Esc, and B or the close button do those). Build categories are
+  derived from the catalogue; a world with a crop-plot building gets **Farms**.
+- Rebuild the building and site card in the right column, with a status badge
+  and a progress bar for a site.
+- Ledger pages: Economy groups goods, marks low ones, opens a detail card for a
+  chosen good and moves professions to a **Jobs** view; Projects shows the civic
+  fund as two numbers, sites as rows with a progress bar and material chips,
+  folds the planner's view and decisions, and says **Abandon** where it said
+  Cancel (the safe answer comes first in the question).
+- Compact layout (less than 1024 by 700 after the interface size): the top
+  bar's totals move to a second row, the weather folds into the date and the
+  ledger dock becomes one Ledger tile.
+- Choosing an already selected resident or building from a ledger row now hands
+  the right column to its panel again.
+- A click anywhere on a home or an inn, roof and outer walls included, selects
+  it: the click box is the building's real body up to its chimney. An inn's
+  card says who is inside now. The caption of a resident drawn inside a
+  cut-away home sits over them, in bed or on the floor, not over the entrance.
+  The Trades key hides while no marker is drawn (at night, with everybody
+  indoors).
+- Capture scripts: `scripts/playtest/capture_ui_phase3.py` is new; the older
+  `capture_*.py` scripts find the renamed controls ("Menu", "Live", the ledger
+  dock, the Journal page, the build tray) through shared helpers in
+  `capture_player_flow.py`.
+
+### Island interface redesign, phases 4 and 5, and phase 3 follow-ups
+
+- **Live** is rebuilt on the design system. The goal tracker (top left) shows
+  the journey, the next step, its progress and one button that names what it
+  does; it folds to its title by its arrow, and by itself while a workspace is
+  open. The needs (bottom left) are icon, word and bar, with a triangle below
+  45% and a diamond below 20%; percentages are in the tooltips. The hotbar
+  (bottom centre) has the seven workspaces and Stop with key caps. A prompt
+  pill appears only for something in reach ("E Gather Water") or for work
+  under way ("Walking, then: gather one item", with Stop). Outcomes and
+  requested actions are toasts under the top bar; the permanent feedback line
+  and the hint line are gone.
+- Live workspaces open in the right column on the parchment kit, with an icon,
+  a name, a status badge and Close. Craft and Trade are two panes wide, with
+  the pouch beside the recipes or offers, where the window allows. A pouch
+  item is chosen first; Eat, Drink, Wear and Offer for sale then appear for
+  it. Recipes show their inputs as chips with have/need, the workshop and the
+  seconds at 1x; a recipe that cannot be made keeps its place, disabled, with
+  the reason beneath, and **Can make / All** narrows the list. The end of a
+  life is a modal in the same style; the spectator's life choices are a chip
+  with the key L.
+- Tab from the top bar now goes on to the goal and the needs, then the hotbar,
+  in Live.
+- **Shape** is rebuilt: a tool rail (Raise, Lower, Flatten, Smooth, Paint, Undo,
+  Redo and the history depth "12 of 32"), one brush bar (a Size slider with [
+  and ], Edge Hard or Soft, four Surface swatches) and a tag beside the cursor
+  ("Raise · ground at 6.3 m"). A refusal turns the outline red and dashed and
+  adds the simulation's reason to the tag. Cell coordinates, the hint lines
+  and "Landscape updated · N edits applied" are gone; what still needs saying
+  is a short notice above the brush bar. All keys are unchanged.
+- Projects: "Homes residents build themselves" replaces the count of "active
+  construction projects" that disagreed with the sites listed above it.
+- The tag over a selected resident is the design system's world tag: name,
+  what they are doing and a status shape.
+- The inspector says spans in time words ("They will look at their trade again
+  in about 2 hours."), reads the day plan, the latest decision and the
+  activity from the simulation's own view functions, and gains **Family and
+  bed** on Overview (partner, parents, children, the bed and whether they are
+  asleep, resting or awake).
+- The Village page gains **Families**: households, couples, children, elders,
+  and the births, arrivals and deaths since the island was founded (a young
+  island says that nothing has changed yet).
+- The calendar tells tomorrow's weather and the supply boat where the world
+  has them.
+- The goods table sorts by any header (again to reverse) within its groups; at
+  the Compact size its last header is "Change" and a good's detail card is two
+  lines. With totals on the bar and little room (1024 wide), the bar gives up
+  the weather chip first and then the words of the modes.
+- Building cards have tabs where there is data: Overview, Residents or Workers
+  (at an inn, who is inside), Stock.
+- The Paused pill and the notices keep clear of a two-pane Live workspace
+  (they stand between the goal and the workspace then) and the pill gives way
+  to the open calendar.
+- An inn's card lists its guest beds: how many are taken, and each bed with
+  its guest and when the rented rest ends.
+- The People page ends with **Departed**: who has died, as one sentence each.
+  An inspector open on somebody who has been laid to rest closes with a note;
+  alerts name them from the record of the departed. The Journal notes burials
+  and sleepers woken before morning.
+- The developer homestead panel takes its colours from the tokens.
+- `scripts/playtest/capture_ui_phase45.py` is new; it also sends Tab, Esc, B,
+  F1 to F5 and the Live and Shape keys as key messages and reads back what the
+  interface did.
+
+### Island interface redesign, phases 6 and 7
+
+- The title is a column on a bark gradient over the live island: Continue (with
+  who and when on its second line) leads when there is a save, New game when
+  there is none; Settings and How to play sit side by side; Quit is quiet; a
+  credits line stands at the bottom.
+- A new beginning asks for a name and then how to begin: **Live** (start on the
+  island), **Oversee** (the villages first) or **Shape** (the land first), each
+  with one sentence. Beginning in Shape is new.
+- The pause menu is a panel over a scrim: who and when and how long ago the
+  island was saved, Resume (Esc), Save game (Ctrl+S), Settings, How to play, and
+  under a rule "Save and go to title" and "Save and quit". Its mode buttons are
+  gone: the modes are in the top bar.
+- Settings has four tabs. Sound: three sliders and Mute. Display: Interface size
+  (Auto or Fixed, a slider, a line drawn at the chosen size) and Windowed or
+  Borderless. Controls: camera pan speed, edge pan and the list of keys.
+  Accessibility: Reduce motion, Tooltip delay, Show tips with "Show the
+  first-run tips again", and Panel style (Parchment or Dusk). Sliders keep a
+  step button at each end. Changes still apply at once.
+- How to play is a Guide with five pages: Controls, Oversee, Live, Shape, The
+  economy.
+- Saving and loading answer on the island's toast lane in every mode: "Island
+  saved" with a tick, "Island loaded. Welcome back, …" after Continue, and a
+  failed save as a toast that stays, with its reason and "Try again". The old
+  notice chip at the bottom left is gone.
+- First-run tips: four in Oversee (totals, build dock, a resident, alerts), one
+  in Live, one in Shape. One small card at a time beside what it explains;
+  "Got it" dismisses it for good, the settings file remembers, and Settings can
+  show them again. Show tips off hides them and the hint under the Live goal.
+- Tooltips: workspace rows (what it does; then what it takes and why not),
+  recipe input chips, pouch slots and the chosen item's buttons.
+- The chosen pouch item is one card with a named button per thing to do. The
+  Explore chart is drawn in the interface's own colours and no longer repeats
+  the destinations as buttons.
+- The tag over your own character reads like a resident's: a status shape, the
+  name with "(you)", and what they are doing.
+- A planned purchase says where it will be made on the inspector's Why tab
+  ("They will buy bread at Harbour market stall 1.").
+- With a two-pane workspace open in a 1024 wide window, toasts stand under the
+  folded goal tracker instead of over it.
+- Fixed: a Shape stroke in which the simulation refused a dab could be undone
+  but not redone. A refused dab is now taken back out of its stroke, and a
+  stroke of refused dabs alone is no history.
+- `scripts/playtest/capture_ui_phase67.py` is new.
+- Seen natively and fixed: the first-run tip card spawned with two hover
+  components and stopped the game at start; the Oversee totals and alerts tips
+  stood over the Paused pill and the journal line and now stand beside the
+  alert column under the toast lane; tooltips now stand above toasts; the
+  title's gradient keeps its darkness to the column's edge; "Island loaded"
+  survives the loading hitch; the played character's tag says "ready" (not
+  "waiting for you") and "asleep until morning".
+- Plain ledger headers and the inspector's sections have tooltips; menu
+  buttons carry one too, but it does not show natively yet; under a host menu only the menu's own controls show one. A failed
+  save's "Try again" is on the Tab ring. Empty states of the building card and
+  a good's card say what to do next. The inspector's Home and job tab says the
+  work plan in words instead of the planner's trace.
+- Reduce motion now has a consumer: a critical need's row pulses once every two
+  seconds, a steady edge with the setting on.
+
+### Island interface: Live depth
+
+- The goal tracker counts the goal chain ("Step 2 of 7") with pips, says what
+  the current goal unlocks, and says a finished goal once as a toast.
+- The working pill has a bar where the simulation knows the work's length (a
+  rest, a night, a homestead upgrade) and "3 of 10" for a repeat order; Stop
+  ends the order too. Gather & craft has a ×1 / ×5 / ×10 stepper.
+- A need's tooltip gives the simulation's reason it is low; a click on a need
+  opens the pouch at what helps it. The pouch shows the pack's weight and, where
+  there is one, the tool in hand and its uses left.
+- At your own door from evening on the prompt offers "Sleep until morning"; while
+  asleep a quiet veil with Wake up covers the world and the host runs the clock
+  at 30x, then gives your speed back; on waking a card gives the day's account
+  (coins, goods gathered, made and received, people met, the lowest point of
+  each need, the next goal). Enter or Esc puts it away.
+- People shows each neighbour's friendship tier with pips and what it gives; a
+  gift picker offers the pouch's giftable goods and names a resident's taste
+  once you can know it. Gifts, tier changes, greetings, invitations and help are
+  toasts and Journal notes.
+- Build lists the homestead's tiers with their cost (have/need), work time, what
+  each gives and why one is not available yet; an upgrade under way is a card
+  with deliveries, work left and Cancel.
+- The calendar lists the village gatherings (today first) and who is in
+  mourning. The Economy page has a Days column for food and water and marks
+  under two days Low; a good's card says who makes it. The build tray takes
+  availability and its reason from the simulation's catalogue. Ages read as the
+  simulation words them ("Adult · 34"); the Village page has this year's births,
+  arrivals and deaths; the inspector lists a resident's Friends.
+- `scripts/playtest/capture_ui_live2.py` is new.
+
+### Island interface: Oversee targets and priorities, Shape plots and props
+
+- Oversee, Economy, Jobs for one village: each trade from the catalog with
+  Now, Wanted and Open, then −, + and "Village decides" under it
+  (`SetProfessionTarget`). When now and wanted differ, the simulation's
+  reason is shown under the row. A service trade has no controls and says why.
+- Oversee, Economy, Priorities for one village: Low, Normal and High for
+  each topic (`SetVillagePriority`), with the simulation's sentence on what
+  the level changes.
+- Shape, Place (L): the catalog's plots (buildings with a field) and props,
+  with a ghost, a cursor tag with the refusal reason, R to turn, and
+  Remove placed. Placements share Undo and Redo with strokes; the inverse is
+  `RemovePlot`/`RemoveProp` or the placement again.
+- Trades from data show by display name in the roster, the resident and
+  workplace cards and the marker legend (with the world's colour). An
+  unknown trade gets a generic picture.
+
+### Island interface: two weights, a quiet load
+
+- Barlow SemiBold joins Regular (OFL, credited in `assets/CREDITS.md`):
+  headings, panel titles, key figures and the selected tab are SemiBold,
+  through the type scale.
+- The alert sound stays quiet for what a world's first scan finds after a
+  load or a new game.
+- The Jobs table names trades from the world's data.
+
+### Island interface: phase A (old saves, the colony's day, Shape strength)
+
+- An island saved by an older version is named on the title ("This island
+  was saved by an older version and cannot be opened. It is kept as a
+  backup; start a new island."), New game is offered, and the file is kept;
+  every save now records its island version.
+- The Economy page opens with "Today on the island": the civic fund, where
+  the merchant boat is, what its call traded and what it wants next.
+- Shape's brush bar has a Strength switch (Gentle, Normal, Strong); the brush
+  outline is drawn thicker and in front of the ground.
+- The Craft badge says "At the …" when the character stands at a known
+  workshop; Shift+Tab from the world in Live enters the top bar.
+- Sound: Settings has Music and Interface sounds sliders beside Master,
+  Ambience and Effects, saved and applied as `AudioLevels`. The shared
+  widgets ask for interface sounds (click, page, open and close, confirm and
+  deny, place, alert, coin, a rate-limited hover).
+
+### Island interface: the boat's next order, builder between stages (pass 8)
+
+- The merchant boat's next order shows as rows: in the calendar's outlook
+  (Oversee and Live) and in the Live Trade tab: "Next call wants 10 planks
+  at 14 coins each.", and in port "In port, it wants …: 3 sold so far."
+  Nothing shows when it wants nothing.
+- The journal and alerts say the boat's order and its end in plain words
+  (`VillageBoatOrder`, `VillageBoatOrderClosed`), and a resident's trade
+  says its goods with the plural helper.
+- The homestead card says a builder between stages "is between stages of
+  work on your homestead", and a friend on the way "is on the way to lend a
+  hand" (apart from the builder's "on the way to work").
+- Fixture `upgrade-underway-at-door`: the same upgrade with the owner at the
+  door, where the builder joins the owner's work.
+
+### Island interface: builder at work, alerts, inn sleepers (pass 7)
+
+- The resident inspector keeps the simulation's "asleep at the inn" like
+  "asleep at home", instead of falling back to "sleeping".
+- A view test feeds a homestead site with its hired builder working and
+  checks the card says "… is building at your door." and not "on the way".
+- `capture_ui_live7.py` steps the clock 20 ticks at a time after the
+  materials are in, so the builder's short stage at the door (about 180
+  ticks) is caught on screen; the `village-alerts` fixture has residents
+  starving and thirsty so the alerts list has rows to hover.
+
+### Island interface: polish (pass 6)
+
+- Reduce motion also stills the island's ambient motion (`AmbientMotion`
+  scale 0); it is kept with the other settings.
+- `ISLAND_TIPS_SEEN=all` starts a run with every first-run tip seen; the
+  capture scripts set it.
+- The upgrade card's status is short rows, one sentence each: where the
+  materials stand, what is ordered and not yet taken and since when, who is
+  bringing what, who is hired, what to do meanwhile.
+- An alert's tooltip stands beside the list instead of over the next alert.
+- A world file that cannot be used says so in plain words; the parser's
+  detail goes to the log.
+- With Shape's Resources panel open the toast lane is centred beside it, so
+  an export's toast no longer covers the goods.
+- The `cottage-evening` fixture also sells to a resident, so the morning
+  account shows a Sold row.
+
+### Island interface: New game on an exported world
+
+- New game lists the window's world first, then every world exported from
+  Shape beside the world rules, newest first, with its date, settlements and
+  patches by good; an unreadable or invalid file is listed, disabled, with
+  the reason. The chosen file goes through the same staging, validation,
+  backup and rollback as the shipped world, and the save keeps the whole
+  construction.
+- After an export the toast offers "Start a new game on it" while that is
+  safe; it saves the island (kept as a backup), then opens New game with the
+  export chosen.
+- Counts of goods agree with their number ("Order 2 logs", "1 plank"); a
+  workplace card is titled by its building ("Harbour inn"); the civic fund
+  chip reads the fund itself; the morning account adds Bought and Sold.
+- The upgrade card says when nobody has taken an order yet and how long ago
+  it was placed (`UpgradeSiteView::ordered_at`), names haulers and the hired
+  builder in its own words, and drops "carry it to your door" once
+  everything missing is ordered. The goal card says what is happening at
+  home while residents fetch and build, or adds it after a water, food or
+  garden step.
+- The morning account no longer lists a purchase twice (Bought, not
+  Received). An empty civic fund says its sites wait for coins instead of
+  "held". A tooltip whose text wraps takes its full width at once, so its
+  last line is no longer clipped. Shape's first-run tip stands under the
+  toast lane, clear of an export's toast.
+- Shape's patch labels are chips: a picture at island zoom, the name on hover
+  or close up, never one under another or under the first-run tip.
+- Fixtures: `upgrade-underway` orders the rest and hires a builder by the
+  physical flow; `village-life` keeps the neighbour awake.
+
+### Island interface: Shape resources and world export
+
+- Shape has a Resources group beside the terrain brushes: Resource (N) places
+  a patch of a good from the world's patch list at a richness from 25% to 400%
+  ("Poor / Normal / Rich / Abundant"), with a ghost that is green where it can
+  go and red with the simulation's reason where not; Remove (E) takes the
+  patch under the pointer away, or says why not. Existing patches carry a
+  marker and a label while either tool is in hand; Esc puts the tool down.
+  Both are recorded commands (`PlaceResourcePatch`, `RemoveResourcePatch`) and
+  are not part of Undo (the tooltips and the hint say so).
+- "Export world" in the Shape rail asks the host to write the shaped island
+  as `<world>-shaped-N.json` in the worlds folder: the running world's rules
+  with the `living_world` block of `frontier::shape::export_world`, checked as
+  a world preset before it is written. A toast names the file; a failed
+  write offers Try again.
+- The morning account leaves out empty rows, wraps long ones inside the card
+  and adds the day's friendship changes and homestead steps from the journal.
+- The upgrade card drops Deliver (carried goods go in by themselves at the
+  door) for one line that says so; Order, Hire and Cancel stay, and who is on
+  the way or at work is said in the simulation's words.
+- Menu tooltips stand beside their button, or above it, never over the next.
+- Asleep, the goal card folds to its title.
+- The Village page lists the inns with their guest beds; a row opens the
+  inn's card.
+- Prepared saves `village-life` (a death this morning, a guest at the inn, a
+  neighbour beside the played character) and `larger-cottage-done` (every
+  homestead tier built, a stocked chest, the character outside by day), and
+  `scripts/playtest/capture_ui_live4.py`.
+
+### Island interface: Live depth, seen natively
+
+- Fix menu tooltips: the card of a title, pause or Settings button was built
+  and hidden in the same frame, because the player HUD hides every island root
+  while a host menu is open and the card is a root. Tooltip cards are exempt
+  (`TooltipRoot`); a unit test runs both systems in frame order.
+- Gather & craft and Trade: an empty pouch is one line above the list, and the
+  list takes the whole width; with goods the two panes stay.
+- The title's Continue button has its tooltip (it is built apart from the other
+  buttons and had none); a test checks every title, pause and Settings control.
+- A tooltip stands above the panel of its anchor: the day's account card hid
+  its own button's tooltip. The critical-need pulse is drawn after the kit's
+  paint, which had put the need row's outline back every frame.
+- The upgrade card offers Order (per missing good, price with the carrying fee)
+  and Hire a builder (its cost) beside Deliver and Cancel; orders and hiring are
+  toasts and Homestead notes in the Journal. Recipes and garden work take the
+  ×1 / ×5 / ×10 repeat stepper ("Work the whole plot"); a stopped order says why.
+- People lists every neighbour the game keeps a bond with, not only faces seen
+  in the last minute. The title and pause say the day of the season, as the bar.
+- A failed save's toast reads as sentences without the key; first-run tips
+  stand under the Paused pill and one toast.
+- Notices said together are each shown in turn (the lane had one slot, so an
+  upgrade's "is finished" was replaced by the next outcome in the same frame).
+  With an upgrade under way, Build shows its card first.
+- Sleep no longer covers the sleeper: the view's edges dim (centre clear, no
+  animation) and a strip where the prompt stands says "Sleeping… · morning at
+  06:00" with Wake up (E); the bar's clock stays visible through the 30x night.
+- In Live a click on your own cottage opens it: Build with its tiers, upgrade
+  and chest, and the cottage becomes the selection, which the homes view cuts
+  away.
+- Empty states: the Journal's Important filter says to choose Everything when
+  only routine notes exist; the calendar says what it lists on an island with
+  no gathering or mourning; Gather & craft says why no recipe is listed.
+- Add prepared island saves for captures,
+  `content/testbed_content/tests/island_capture_fixtures.rs` (`#[ignore]`d):
+  `cottage-evening`, `upgrade-underway` and `hard-times` in
+  `target/npc-out/fixtures/`, loadable with `--island-save`.
+- Add `scripts/playtest/capture_ui_live3.py` (menu tooltips, sleep from prompt
+  to the day's account, the upgrade and chest, the critical need and Reduce
+  motion, the unaffordable build card, a failed save's Try again);
+  `capture_ui_redesign.launch` takes a `save` to copy in; `capture_player_flow`
+  resolves the old "Word · K" labels to the redesigned controls and anchors
+  exploration at the actor's first own observation; the natural-play cottage
+  part of `capture_ui_live2.py` is replaced by the saves.
+
+
 ### Regional living world
 
 - Add an opt-in 256×256 metre coastal world with three settlements, 42 residents,
@@ -21,6 +635,478 @@ Bevy compatibility: `0.1.x` (unreleased) targets Bevy 0.20, Rust ≥ 1.97.1.
   without uploading empty meshes, including terrain edits back to land.
 - Preserve old saves; normal play uses a separate living-world save and frozen
   construction. ADR 0037 describes ownership; the coastal-world guide covers play.
+- Replace the regional daily wealth cap with a 10% levy on coins above 200, a
+  40-coin destitution floor and an equal dividend of the fund above its reserve;
+  remove the scripted innkeeper sink there. Other profiles keep the cap.
+- Rank regional labour by realised margin: three flexible residents per settlement,
+  and a persistent margin gap moves surplus workers with a shorter cooldown.
+- Read the coastal world's goods, recipes, professions, resource patches, founding
+  endowments and economy tuning from a validated, hashed `economy` data block in the
+  world file (`docs/island-economy-authoring.md`); a file without the block loads the
+  built-in economy. This changes the `living_world` content hash: older local
+  coastal-world saves do not continue.
+- Make the world seed matter in the coastal world: founders get seeded food tastes,
+  one extra seeded aptitude and a seeded band of starting stores.
+- Keep coastal homes warm through winter: stewards stock hearth fuel from two days
+  before winter, cold residents fetch fuel from a nearer patch, rest by the hearth
+  until warm and shelter when freezing; the last essential worker stays while demand
+  exists and a settled specialist may cover a vacant essential trade.
+- Damp coastal labour thrash: no return to a profession left less than two days ago
+  without a doubled pay gap, no refill of a seat vacated within 2,400 ticks, and no
+  move away from goods in demand except towards a larger shortage. An empty
+  essential workplace overrides these rules.
+- Add the regional `TerraformCells` batch command (one atomic, recorded command per
+  painted stroke; `Terraform` is unchanged) and journal effects
+  `VillageStarvationOnset`, `VillageThirstOnset` and `VillagePatchDepleted`.
+- Bound coastal market prices at five times the base price and let an unfunded,
+  unsold quote above base drift back down.
+- Add axe, pickaxe and hoe recipes with 120-use durability; the matching tool speeds
+  log, ore and grain gathering and bare hands slow it, for residents and players.
+- Drain health in deep cold, burn hearth logs faster in winter and let morale scale
+  work time between 90% and 115% (regional profile only).
+- Cache each resident's GOAP plan until its first step completes or fails, and
+  abandon a destination after three failed detours, avoiding it for 1,200 ticks.
+- Add a three-seed island soak, price-economy tests and explicit player buy-out and
+  coin-hoarding shock tests. The regional content hash changes: existing
+  `living-world` saves do not load.
+- Make the developer toggles (F1 overlay, F3 journal, F4 perf, F5 sheet, F6 perception,
+  F7 notebooks, F8 fog) inert in the player session unless the host gets `--dev-keys`.
+- Title the player session window "Island Village"; developer launches keep theirs.
+- Correct the island guides: 42 residents in three settlements, the `living-world`
+  save, profession assignment and the 0 to 12 metre living-world height range.
+- Author coastal residents' behaviour in data: the tree is
+  `content/testbed_content/trees/resident.json` (or `living_world.behavior.trees`),
+  validated before the freeze with messages naming the file and node, hashed and
+  kept in the world's construction data. The one decision leaf is split into 19
+  `life.*` leaves (go to, buy, sell, gather, craft, eat, drink, sleep, warm up,
+  socialise, haul, build, hunt, GOAP as `life.pursue_goal`, ...) and 35 named
+  conditions; a guard that aborts lower-priority work is refused unless its branch
+  can start. Other island profiles keep their built-in tree. This changes the
+  `living_world` content hash again: older local coastal-world saves do not continue.
+- Give every coastal resident four seeded traits (diligence, sociability,
+  chronotype, thrift) and read work, meal, leisure and sleep windows from data;
+  residents take evening leisure, eat at meal times and shift their day accordingly.
+- Journal a `VillageDecision` record when a resident's activity changes: the chosen
+  branch, every higher-priority option passed over with its failing condition or
+  reason, and for GOAP the goal and plan length. Records never change the sim;
+  `village::resident::explain` and `label` expose the same facts to views.
+- Fix slow bread recovery after a buy-out. The cause was a made-to-order chain with
+  no buffers: ordered bread waited for a farmer to cut grain behind a long fibre
+  order book, a miller to fetch and mill it and a baker to fetch the flour. Bakers
+  now keep four flour and millers four grain (economy data), producers rank
+  ingredients of food with food, and units delivered in a market round answer as
+  many unfilled orders in the coastal price rule. The buy-out test now asserts bread
+  is back within twice its base price two days after the buy-out.
+- Stop cloning the whole world preset per resident per tick in the island vitals pass.
+- Rewrite `docs/island-ai-authoring.md` as the behaviour authoring guide.
+- Let the coastal village grow: building types are data (`economy.buildings`: cost,
+  work, footprint, kind, placement rules), the recorded `PlaceBuilding` and
+  `CancelBuilding` commands open and abandon construction sites, residents carry
+  the materials there and build in stages, and the finished building keeps the
+  site's identity. `village::civic::placement_check` is the pure placement query.
+- Add stores and market stalls as sellers of record: goods lie there on their
+  owner's behalf and are sold at the quote while the owner is elsewhere, crediting
+  them at once. `life.haul` gains `materials`, `surplus` and `restock`; `life.build`
+  also works building sites; four conditions (`life.has_surplus`,
+  `life.site_needs_materials`, `life.site_needs_builder`, `life.stall_needs_stock`)
+  join the list. Buying and selling at a store, and delivering to a site, use the
+  shared `buy`/`sell` action.
+- Add a civic planner per settlement: it houses the homeless and commissions one
+  home, store or workplace at a time on a lasting shortage, journaled as
+  `VillageCivicProject`. The civic fund pays for delivered materials, and the daily
+  dividend returns only what open sites do not need. New `economy.tuning` fields
+  hold every threshold. `labor::settle_newcomer` settles a homeless arrival.
+  This changes the `living_world` content hash again: older local coastal-world
+  saves do not continue. Other profiles and the recorded replays are unchanged.
+- Add demography to the coastal world: every resident has a seeded age and life
+  stage (`economy.demography`, ages in seasons). Housed adults with lasting mutual
+  affinity become couples; a couple with food and a bed (a free one, or a home the
+  planner can pay for) has children, who are household members that eat and do not
+  work; a child comes of age into a free workplace seat with one aptitude of a
+  parent; elders slow down and die of old age on a seeded day. A dead resident's
+  coins and plain goods pass to the household, else to the civic fund. Journal
+  effects: `VillageBirth`, `VillageComingOfAge`, `VillagePairing`, `VillageElder`,
+  `VillageInheritance`, `VillageChildDeath`, `VillageAdoption`, `VillageFamilyMoved`,
+  `VillageArrival`; `VillageDeath` gains `cause` and `name`.
+- Add crop fields: a building with the `field` attribute (an open storage building
+  with plots) is founded beside each farm and may be commissioned by the planner on
+  a lasting grain shortage. Farmers work it through `life.sow`, `life.tend` and
+  `life.harvest` (conditions `life.field_needs_sowing`, `life.field_needs_tending`,
+  `life.field_needs_harvest`); crops (`economy.crops`) have seasonal windows and lie
+  fallow in winter; farmers sow only while the settlement is short of grain per
+  resident. Wild grain becomes a finite founding reserve.
+- Add the merchant boat (`economy.merchant`): a periodic visitor at the Harbour
+  trading post with a finite purse and finite stock, the only external source and
+  sink. Island coins plus `village::merchant::purse` are constant. Settlers land
+  with it when housing, seats and food allow.
+- Add deterministic daily weather and rare seasonal shocks (`economy.weather`):
+  rain speeds crops and refills water, a storm halts outdoor work and the boat
+  (`life.storm` and the tree's `Storm` branch), snow raises warmth loss; drought,
+  blight and harsh winter are seeded events.
+- Make the civic reserve follow the recent shortfall of the levy against
+  destitution grants, let the fund feed a hungry child from a store, and hold a planner's
+  unaffordable project back from the daily dividend. The planner also moves crowded
+  families, builds family houses, fields and workplaces for grown children.
+- Fund building: when open sites need more than the civic fund may spend, a
+  building levy (`tuning.building_levy_percent`, at most a twentieth of each
+  resident's coins above the destitution floor, only what is needed) is raised at
+  once and earmarked for materials, so a placed building is supplied without a
+  subsidy; grants are still paid first. `civic::funding` and `SiteView.funding`
+  say in words whether a site is funded. `SiteView` gains `placed_at`,
+  `last_delivery_at` and `paid`, `BuildingView` gains `crop_plots`, `PlannerState`
+  gains `last_decision_text`, and `VillageSiteCancelled` carries the label and
+  position. Journal effect `VillageBuildingLevy`.
+- Rest market prices on a stormy day and let residents lay in a third day of
+  provisions the day before; a field's granary stores only its crop.
+- Let a gatherer whose good sells above its base price keep a few units beyond
+  its orders (`tuning.stall_restock_level`): makers worked to order, so a price
+  that rose in a storm had nothing to bring it down again.
+- Add a relief levy (`tuning.relief_levy_percent`): when the fund cannot pay the
+  destitution grants of the day, the shortfall is raised from coins above the
+  floor. Journal effect `VillageReliefLevy`; `VillageCivicLevy` gains
+  `relief_levy`.
+- Add `tuning.days_per_season` and `tuning.founding_day`; `village::calendar` uses
+  them (`calendar_at` keeps the seven-day year of the other profiles).
+- Put residents inside their homes: a resident standing at the door of the home it
+  sleeps in is indoors (`village::indoors::Indoors`) until it walks off. Indoors
+  the hearth decides warmth, a coat does not wear and only somebody inside the
+  same home can be met. Everybody with a bed sleeps in it; a rented bed beside the
+  inn is inside the inn. Journal effect `VillageWentIndoors` (after 600 ticks
+  outdoors).
+- Add `village::view`: read accessors for the activity label, the latest decision
+  as data, effective schedule blocks, season effects, household and family, weather
+  and forecast, boat status, field plots, who is inside which building, each
+  home's entrance, footprint, facing and beds, and awake/resting/asleep. A
+  resident at home no longer reads "going home".
+- Replace whole-index scans on resident hot paths with component queries, bucket
+  social meetings by position and memoise searched route estimates by grid
+  revision; results are unchanged in every profile.
+- Sleep through the night: in its sleep block a resident with a bed goes to bed
+  and sleeps to the end of the block (`tuning.sleep_energy_per_tick`); a critical
+  need, a starving child of the home or a player order wakes it (`VillageWoken`).
+  A rest at home by day is a short nap (`tuning.nap_energy_per_tick`). The
+  `Bedtime` branch now runs `life.sleep`.
+- Buy at a fixed place: a seller who is walking is a target only within six
+  metres, so a slow buyer no longer trails a seller across the settlement.
+  `view::supplier` names where a resident would buy.
+- Add `view::inn`/`view::inns` (an inn as a place with four guest beds; a full
+  inn turns guests away) and `door`, `body_min`, `body_max` on `HomeView`; a
+  homestead cottage reports the two by two metres the simulation blocks.
+- Remove the body of a dead resident a day after death and keep the life in
+  `Demography::departed` (`view::departed`, journal `VillageLaidToRest`).
+- Send an adult for food when a child of the home is hungry and nobody at home
+  carries any.
+- Move the gatherer's shelf to its own switch, `tuning.gatherer_shelf_units`.
+- Add live mode for the coastal world (`economy.live`, command `LiveAct`): sleep
+  to the morning with a day summary, repeat-gather orders, bonds with residents
+  (talk, trade, gifts with seeded tastes, neglect; a discount, a gift back and
+  invitations by tier), residents who speak first, a goal chain that opens
+  homestead upgrades paid in goods and work, calendar gatherings the residents
+  walk to, and mourning when somebody is laid to rest. Views: `day_summary`,
+  `day_so_far`, `asleep_until`, `repeat_order`, `relationships`, `gift_tastes`,
+  `goals`, `homestead_tiers`, `gatherings`, `mourning`.
+- Add a price floor in percent of the base price (`tuning.price_floor_percent`).
+- Let an inn guest sleep the night and read the guest beds from data
+  (`tuning.inn_guest_beds`).
+- Add `view::daily_use`, `view::producers` and `view::catalogue`.
+- This changes the `living_world` content hash again: older local coastal-world
+  saves do not continue. Other profiles and the recorded replays are unchanged.
+- Replace the flat price floor with reservation prices and stock targets
+  (`tuning.reservation_prices`, `maker_margin_percent`, `raw_floor_percent`,
+  `stock_target_days`, `stock_cover_pricing`, `trade_window_rounds`): makers do not
+  sell below input cost plus a margin, start no batch while the settlement
+  offers more than two days of its use, and stock within that target no longer
+  lowers a price (for goods made in batches or grown; gathered goods have no
+  cover). A quote below every seller's reservation climbs towards it.
+  `margin_persist_ticks` and `margin_cooldown_ticks` default to 6,000 (were
+  2,400): with real margins the shorter hysteresis moved workers about 200 times
+  in the 14-day audit, now 118. `price_floor_percent` defaults to 0. New hashed resource
+  `regional_trade_volume_v1` (`village::stock::TradeVolume`); `view::daily_use`
+  lists every traded good.
+- Let a resident go to a gathering only while every need is above
+  `live.gathering_needs_above` (50,000): the 14-day audit showed the midwinter
+  fire behind the Hunger, Thirst and Warmth regression of the live-mode pass.
+- Add a boat duty (`tuning.boat_duty_percent`, 5): each merchant-boat trade pays
+  a share of its value from the purse into the civic fund (`VillageBoatDuty`).
+- Finish live mode: repeat orders of crafting (`recipe`) and garden work (`task`)
+  with stop reasons; homestead upgrades as private sites with deliveries, orders
+  filled by residents for a fee in escrow, a hired builder and `cancel_upgrade`;
+  a storage chest (`store`, `take`, `view::chest`, `view::upgrade_site`); the
+  garden plot allowance enforced; friends at a helping tier who help
+  (`VillageFriendHelped`); goods in the day summary booked by the action; a goal
+  chain over the new tiers. The living-world homestead cottage is the catalogue
+  cottage (4 x 5 m, two beds) and the larger cottage grows into the family house
+  (5 x 6 m, four beds). Add `view::workplace` and `view::workplaces`.
+- Add Shape commands `PlaceResourcePatch` and `RemoveResourcePatch`; a settlement
+  keeps at least one patch of every good (up to four of one). Add
+  `frontier::export_world` and the optional `terrain`, `resource_patches` and
+  `buildings` blocks of `living_world`, built again from an exported file.
+- The `living_world` content hash changes again (new tuning and live fields,
+  new commands and resource, `CivicState.founded`, `Merchant.duty_paid`).
+
+### Three ways to play (Live / Oversee / Shape)
+
+- Add the Oversee build menu (**Build · B**): a palette of the world's buildings
+  by kind with cost and purpose, a placement ghost that snaps to cells, turns with
+  R and is green or red by the simulation's own placement check with its reason
+  beside the cursor; a click records `PlaceBuilding`, right-click or Esc puts the
+  building down.
+- Draw what the village builds: construction sites that fill in with deliveries
+  and work, finished homes and workplaces in the settlement's roof colour with
+  window light and chimney smoke, stockpiles and barns with visible stock, market
+  stalls with goods on display. Roots are spawned and despawned on change only.
+- Add **Building projects** to the ledger's Village tab: the civic fund, open
+  sites with material progress and a confirmed Cancel (`CancelBuilding`), each
+  planner's last review and its recent decisions with reasons.
+- Add project started / finished / cancelled notes and a "site waiting for
+  materials for N days" warning to the alert feed.
+- Add building cards for sites, homes, workplaces, stores and stalls, and name the
+  site, store or stall in resident activities ("building Harbour cottage 3",
+  "carrying planks to …", "selling bread at …") in place of "building a cottage".
+
+- Add a persistent island session bar: Menu, a Live / Oversee / Shape mode switcher
+  (keys 1 / 2 / 3, active mode lit) and one shared clock with day, season, time of
+  day and Pause / 1× / 3× / 10×. Space, `-` and `=` now act the same in every mode,
+  including character play; the character HUD no longer asks for the menu to resume.
+- Add village alerts from journal effects and existing components: a scrollable,
+  folded, 40-row, click-to-focus feed while overseeing and fading notices in
+  character play. Session-scoped view state; nothing is saved or hashed.
+- Add an Economy ledger tab: per-settlement stock, reference price and a view-side
+  trend for every tradeable good, plus workers and open workplaces per profession.
+- Replace the ledger's landscape list with a Shape palette: Raise, Lower, Flatten,
+  Smooth and Paint with radius (`[` / `]`), hard or soft edge, drag painting, and
+  session undo / redo (Ctrl+Z / Ctrl+Y). All of it records the existing absolute
+  `Terraform` command; refusals show beside the cursor. Developer launches keep a
+  Landscape tab and their ledger mode and clock rows.
+- Add a Settings screen (title and pause): volumes, mute, interface size and
+  windowed or borderless display, kept in `island-settings.json` beside the save.
+- Rename the pause menu's mode entries to "Oversee the village" and "Shape the
+  landscape"; playtest scripts use the new bar labels.
+- Give village alerts a severity: the Oversee feed shows critical and warning
+  rows and folds each day's routine notes (job changes, trades, arrivals, levy
+  day) into one line that unfolds on click; a filter offers Important, Critical
+  or Everything, the panel collapses to its header, and Live toasts fire for
+  emergencies only. Homelessness and food or water shortage are new warnings.
+- Put the session bar and the Shape palette in the Tab order with a visible
+  focus ring; a click still leaves keyboard focus alone, so Space keeps pausing.
+- Add Edge pan and Pan speed to Settings (`edge_pan`, `pan_speed` in
+  `island-settings.json`); name middle-mouse orbit and edge panning in the
+  on-screen hints and How to play.
+- Outline the resident markers and add a collapsible key of the trades, shown
+  while overseeing at the zooms where markers are drawn.
+- Stop the developer Home & farm panel from building an actor observation every
+  frame: nothing while closed, and only on changed inputs while open.
+- Keep the Economy tab's settlement selector on one row, size the Shape palette
+  to its content, and leave a camera the player has moved where it is when a
+  panel opens or the window resizes.
+- Record a Shape dab in the coastal world as one command: the `Terraform` disc
+  when the brush ends at one value, otherwise one atomic `TerraformCells` batch;
+  undo and redo are one batch each and a refused one stays in the history. A
+  stroke is bounded to 4,096 cells. A soft radius-4 Raise drag went from a median
+  36.5 s between planning a dab and its mesh (588 commands, 28 of 40 dabs
+  dropped) to 0.19 s (29 commands, none dropped); `ISLAND_VIEW_SHAPE_BATCH=off`
+  keeps the old recording for comparison. The older island world still records
+  uneven dabs cell by cell.
+- Report starvation, dangerous thirst and emptied resource patches in the coastal
+  world from the simulation's `VillageStarvationOnset`, `VillageThirstOnset` and
+  `VillagePatchDepleted` journal effects. The component scan remains for
+  homelessness and shortages, reads needs once when a session opens, and is the
+  whole source where no onsets are journaled; nothing is reported by both.
+- Announce a save only when the player asked for it (Ctrl+S, F9, the pause menu)
+  or when it failed. The minute autosave no longer shows "Island saved".
+- Add a resident inspector to Oversee: selecting a resident in the world or in
+  the roster opens a card with their work, home, activity, need bars, coins and
+  carried goods, traits in plain words, the day's schedule with the present
+  moment marked, and a "Why" section built from the latest `VillageDecision`
+  record (what they chose, what would have come first and why it did not, the
+  plan and its steps left). Follow keeps the camera on them; Esc or a click on
+  empty ground closes it. View state only; nothing is recorded or saved.
+- Make the Residents tab a sortable roster (name, settlement, profession, mood,
+  wealth) with a settlement filter, the activity label and a need indicator per
+  row; the selected resident's job and home commands are one step away.
+- Open a read-only calendar from the clock: season and day within it, days to
+  the next season, sunrise and sunset, and what the season changes for growth
+  and cold, read from the running world.
+- Use one activity wording (the running leaf's label, made concrete by the
+  physical action) in the inspector, the roster and the caption over a
+  resident; a resident meeting a neighbour in free time greets them.
+- Correct the guides: the minute autosave is silent, and ADR 0038 describes
+  terrain strokes as one batch command per dab.
+
+### Island world
+
+- Fit every solid workplace to the 5 m body the simulation blocks for it, door
+  or working side to the entrance, by one scale and without stretching it: a
+  mill's door is 1.89 m (it was 0.76 m), a smithy's 1.22 m, and no workshop
+  but the mill stands taller than the inn. Open workplaces keep their scale.
+  Piles stand clear of the walls; scenery gives way to anything built later.
+- Take a building out of the way while it stands between the camera and the
+  played character, or the selected resident at a close camera, without
+  opening it.
+- Draw a house's door open while somebody steps through it.
+- Draw crop fields plot by plot from `view::fields`: fallow, sown, growing in
+  ten steps, ripe; frosted in winter.
+- Draw the merchant boat from `view::boat`: sailing in, moored off the shore
+  nearest the trading post, sailing out.
+- Draw today's weather from `view::weather`: rain, storm with lightning and
+  snow as falling sheets round the camera, with a dimmer, hazier sky; shocks
+  tint the air. Clear weather costs nothing.
+- Key the sleep pose on `view::repose`: anybody asleep lies down on both rigs,
+  any other rest sits; in a cut-away home only sleepers are in bed.
+- Draw the inn from `view::inn`: its body, its four guest beds and each guest
+  in their own.
+- Fit the Live character's homestead cottage to the 2 by 2 m body the
+  simulation gives it (door 1.58 m) and cut it away like any home: its three
+  beds are one bunk of three berths, the only way they fit.
+- Stop tracking a resident whose entity the simulation has removed.
+- Add `island_world` (`testbed_view`) and `scripts/playtest/capture_world.py`.
+- Refit workplaces: fill the body across the ground, lift up to 1.25 times
+  towards a door 0.85 of a resident, cap at 7 m (the mill 9 m). The bakery and
+  smithy reach 0.85; the timber yard, mine and market stay short.
+- Give the Live character the adventurer rig with a warm player ring instead
+  of the robot capsule; it steps through doors, sleeps and is unblocked like a
+  resident.
+- Ease a blocking building down to its footing over 0.2 s and back up, take
+  its smoke and lights with it, and treat scenery trees the same way.
+- Dress the regional island's residents, children and played character from
+  one family of bodies (the KayKit adventurers), varied by body, hat, cape and
+  cloth colour picked from the `SimId`; adults stand 1.8 m and children 0.62
+  of that. Legacy scenarios keep their bodies.
+- Keep rain, storm and snow streaks their size in metres at every zoom, and
+  short within 15 m of the camera, so none is longer than 6 % of the picture;
+  from a camera above 60 m fade them out for two crossed layers of drifting
+  haze.
+- Draw the played character as the Knight on the regional island, whatever
+  its preset's model; `ISLAND_VIEW_PLAYER_BODY` still overrides for captures.
+- Cut a home in the camera's way away instead of squashing it to its
+  footing, and ease every cutaway's roof and walls down and up over 0.2 s.
+- Keep everybody standing indoors 0.45 m clear of the furniture and the
+  walls, and bring the chimney breast down with the back wall.
+- Moor the boat on the simulation's berth and lay the jetty from it; draw
+  homestead builders hammering, haulers carrying logs or planks, tools from
+  `view::held` (none when bare-handed), fishers facing the water, lowered
+  cutaway walls as one kerb, and the cottage's chimney 0.9 m wide.
+- Test a tree against its trunk and tapering crown with a 0.5 m margin, and a
+  home up to its ridge, before taking it out of the camera's way.
+- Lay snow on the homes' roofs while it lies on the ground, and put the
+  homestead chest in the cottage's cutaway once the character has one.
+- Draw a scaffold round the homestead cottage while its upgrade is open, the
+  delivered logs and planks beside it, and refit the cottage when the
+  simulation grows its body (4 by 5 m to 5 by 6 m).
+- Draw work tools 1.3 times larger so they read at settlement zoom.
+- Add capture overrides `ISLAND_VIEW_PLAYER_BODY`, `ISLAND_VIEW_CAST`,
+  `ISLAND_VIEW_FLASH` and `ISLAND_VIEW_SHOCK` (view only) and the third
+  `capture_world.py` pass (`target/npc-out/world3/`).
+- Build a jetty and quay from the nearest shore to the boat's berth, with
+  crates, barrels and a lantern; stack unloaded goods on the quay while the
+  boat is in; draw the boat only where the played actor sees.
+- Make wet weather overcast (sun 0.06 to 0.25, more sky light), draw many thin
+  short streaks with none near the lens, wet and snow the ground over seconds,
+  bend trees in a storm, and show drought, blight and a harsh winter on the
+  ground and the fields.
+- Put an axe, a hoe, a rod or a hammer in the hand while a chop, farm, fish or
+  hammer clip plays.
+- Keep a door open 1.0 s after a step so it reads at 1x.
+
+### Island homes
+
+- Fit every home's house to the body the simulation gives it: the walls cover
+  its cells, the door faces the entrance and is 2.2 m high, 1.22 times a
+  resident (it was 1.26 m on a 2.2 by 2.5 m house, on the far side). Built
+  cottages and family houses are fitted the same way; the inn becomes a
+  two-storey house with a sign.
+- Stop drawing residents the simulation has indoors: they step into the doorway
+  and are hidden, and step out again when they leave. Nobody with a bed is
+  drawn asleep outdoors.
+- Cut a home or inn away when its card is open, an occupant is selected or the
+  camera is close: no roof, the walls on the camera's side lowered, one bed per
+  bed of the home, a table, a hearth that burns when the home is heated and
+  lights the room at night, and the occupants in bed or by the hearth. Interior
+  entities exist only while a building is cut away.
+- Remove the bed that stood outdoors beside the regional inn.
+- Add `island_homes` (`testbed_view`) and `scripts/playtest/capture_houses.py`;
+  document proportions, rules and limits in `docs/island-atmosphere.md`.
+
+### Island atmosphere
+
+- Give the island play camera an HDR target, restrained bloom and an explicit
+  TonyMcMapface tonemapper; UI and window captures are unaffected.
+- Fade path lanterns along the dusk curve and add a warm door light to homes that
+  are heated or occupied at night, capped at 24 lantern and 16 home lights.
+- Replace hearth smoke with nine rising, fading puffs at each cottage's real
+  chimney; add embers and a flickering glow over a forge while a craft runs there.
+- Map island work to distinct shipped clips: sleep, sit, carry, chop, farm, fish and
+  hammer. Legacy scenarios keep their previous animation and lay-down pose.
+- Recolour roofs per settlement (harbour blue, Alderwood moss, Stone Ridge
+  terracotta) and add one decorative, non-colliding watchtower beside each.
+- Show a sack, log bundle or crate on residents hauling bulk goods and a stock pile
+  beside each workplace that grows with its inventory.
+- Add CC0 island audio: crossfaded ambience by biome and time of day, rate-limited
+  spatial chop, hammer and mill sounds, a UI click and an `IslandAudioSettings`
+  resource. `--mute` and `--screenshot` runs are silent; headless hosts play nothing.
+  Sources and hashes are recorded in `assets/CREDITS.md`. See `docs/island-atmosphere.md`.
+- Light the coastal world by a faster day curve: sunrise now has half of noon's light
+  instead of a quarter, noon is 14,000 lux with a brighter sky light, dawn and dusk are
+  gold and night is a readable moon blue. Distance haze reaches full strength at 14
+  times the zoom distance instead of 3.5, so a settlement keeps its own colours.
+  HDR and bloom were measured not to change brightness.
+- Colour the coastal ground per grid corner instead of per cell: neighbouring cells
+  blend, authored roads are drawn from their centre lines (3 m main roads, 1.6 m lanes,
+  no stair steps), biome borders are feathered, turf varies gently, ridge stone gathers
+  into outcrops, and the shore gets a sand edge and a shallow-water tint. Walkable
+  cells and their costs are unchanged; chunks still rebuild only near an edit.
+- Lower the coastal camera to 38 degrees at settlement zoom, steepening to 58 degrees
+  at the overview. Dragging with the middle mouse button orbits and tilts, and the
+  cursor at a window edge pans (`ISLAND_VIEW_EDGE_PAN=off` to disable).
+- Show a trade-coloured dot above each resident at settlement zoom, at most 96,
+  fading out up close and at the overview.
+- Add view-only review aids: `ISLAND_VIEW_DAY_PHASE`, `ISLAND_VIEW_POST=off` and
+  `ISLAND_VIEW_STATS=1` (scene size and frame time in the log).
+- Give the ground a fine grain up close (a tiling texture generated in code,
+  with a mip chain), stand low rocks on the ridge outcrops, slope a beach from
+  the land's edge into the water instead of a stepped bank, let roads wander,
+  vary in width, wear at the verge and round their junctions, mute the autumn
+  palette to olive and ochre, and fray the woodland edge with thinned trees and
+  bushes. All view-only: cells, costs, hashes and replays are unchanged.
+- Add `scripts/playtest/capture_view_followups.py` and `measure_view_perf.py`;
+  `RtsCamera` is reflected so a capture script can place the view over BRP.
+- Make chimney smoke and forge fire readable from settlement zoom. Smoke was gated
+  on a lit hearth alone, which no home has on a new island's first day, and was too
+  faint to see when it did show. A settlement home with someone in now also shows a
+  cooking fire (not in winter, and not for a homestead cottage, where smoke keeps
+  meaning heat); puffs are larger, denser, pale by day and lean with one wind. A
+  working forge shows a fire in its chimney mouth, larger embers and its own smoke.
+- Show a carried load only while its resident walks; a load on a still figure hid
+  the working arm and, with everyone holding hearth logs, was on every resident.
+- Say a save once: one "Island saved · Ctrl+S" notice at the bottom left that fades
+  after a few seconds, instead of a permanent label and a second line beside it. A
+  failed save stays until the next attempt.
+- Show the Live tip under the session bar for eight seconds the first time, then only
+  while the Live button is hovered or focused.
+- Resolve the asset folder at run time: `ISLAND_ASSETS`, then an `assets` folder
+  beside the executable, then the developer fallback; the choice is logged once.
+  Add `scripts/package_island.ps1` and `docs/island-packaging.md`.
+- Add `ISLAND_VIEW_DRESSING=off`, `scripts/playtest/capture_view_checks.py` and
+  `pose_sheet.py`; `measure_view_perf.py` takes `--camera`, `--size` and
+  `--no-dressing`. Rocks, bushes and shore slopes measured no slower.
+- Draw chimney smoke as camera-facing quads with a soft alpha texture made in
+  code: nine overlapping puffs a chimney that start a third of a metre across,
+  grow, lean and thin out, each with its own size, wander and turn. The spheres
+  read as a chain of hard-edged discs. Smoke takes its colour from the sky model
+  (a blue-grey a third as bright at night) and is not lit by lamps.
+- Make forge embers seven 13 cm sparks with their own rhythm, arc and flicker
+  over a low bed of coals, in place of twelve evenly spaced 24 cm balls.
+- Raise the coastal night to the older island's level (moon 2,300 lux, sky
+  450 cd/m2; it had been 1,500 and 340), give a lit home an amber lantern on both
+  long walls and a lit pane on each side wall, and strengthen its door light.
+  Before, a settlement seen from behind showed no lit pane at all.
+- Build a resident marker's dark rim into the dot's own mesh. As a second entity
+  behind a depth bias, some rims were drawn over their dots: black discs from
+  one side of the island.
+- Add `scripts/playtest/capture_view_wiring.py`, which also drives a Shape drag
+  through the window's cursor and mouse-button input and reports the view's
+  plan-to-mesh time (`ISLAND_VIEW_STATS=1`).
+
 
 ### One-window island life
 

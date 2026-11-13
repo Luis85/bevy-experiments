@@ -1,5 +1,9 @@
 //! View-only bounded panel scrolling: visible rail, page controls and overflow hint.
 //! Callers keep their own focus/keyboard scope by marking the returned buttons.
+//!
+//! [`attach_rail`] is the redesigned form: a six-pixel rail that appears only
+//! when the content overflows, the wheel, and the panel's own Page keys. It has
+//! no paging buttons and no hint text; screens move to it as they adopt the kit.
 use bevy::input_focus::InputFocus;
 use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::picking::hover::Hovered;
@@ -32,6 +36,18 @@ struct OverflowChrome {
     footer: Entity,
     controls: [Entity; 2],
 }
+/// A body whose rail shows only while it overflows.
+#[derive(Component)]
+struct RailOnly {
+    rail: Entity,
+}
+/// A body whose rail lies under it and shows only while it overflows sideways.
+#[derive(Component)]
+struct RailOnlyX {
+    rail: Entity,
+}
+#[derive(Component)]
+struct RailThumb;
 #[derive(Resource)]
 struct ScrollFont(Handle<Font>);
 struct PanelScrollPlugin;
@@ -202,6 +218,162 @@ fn attach_with_visibility(
     }
     [above, below]
 }
+/// Put `body` beside a six-pixel rail in the kit's colours. The rail is
+/// hidden until the measured body overflows. Returns the rail.
+pub(crate) fn attach_rail(world: &mut World, root: Entity, body: Entity, prefix: &str) -> Entity {
+    use crate::game_ui::tokens::Surface;
+    use crate::game_ui::widgets::{Role, Swatch, Tone};
+    let old_position = world
+        .get::<Children>(root)
+        .and_then(|children| children.iter().position(|child| child == body));
+    let frame = world
+        .spawn((
+            Name::new(format!("{prefix} scroll viewport")),
+            ChildOf(root),
+            Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: px(4),
+                flex_grow: 1.0,
+                flex_shrink: 1.0,
+                min_height: px(0),
+                min_width: px(0),
+                align_items: AlignItems::Stretch,
+                ..default()
+            },
+        ))
+        .id();
+    world.entity_mut(body).insert(ChildOf(frame));
+    if let Some(mut node) = world.get_mut::<Node>(body) {
+        node.flex_grow = 1.0;
+        node.flex_shrink = 1.0;
+        node.min_width = px(0);
+        node.width = px(0);
+        node.min_height = px(0);
+    }
+    if let Some(position) = old_position {
+        let mut order = world
+            .get::<Children>(root)
+            .map(|children| children.to_vec())
+            .unwrap_or_default();
+        order.retain(|entity| *entity != frame);
+        order.insert(position.min(order.len()), frame);
+        world.entity_mut(root).replace_children(&order);
+    }
+    let rail = world
+        .spawn((
+            Name::new(format!("{prefix} scroll rail")),
+            ChildOf(frame),
+            Hovered::default(),
+            Swatch::Fill,
+            Tone::new(Surface::Paper, Role::Sunken),
+            Node {
+                width: px(6),
+                min_width: px(6),
+                flex_shrink: 0.0,
+                border_radius: BorderRadius::all(px(3)),
+                display: Display::None,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            Scrollbar::new(body, ControlOrientation::Vertical, 28.0),
+        ))
+        .id();
+    world.spawn((
+        ChildOf(rail),
+        RailThumb,
+        Hovered::default(),
+        ScrollbarThumb {
+            border_radius: BorderRadius::all(px(3)),
+            ..default()
+        },
+        Swatch::Fill,
+        Tone::new(Surface::Paper, Role::Control),
+        BackgroundColor(Color::NONE),
+    ));
+    world.entity_mut(body).insert(RailOnly { rail });
+    rail
+}
+
+/// The sideways form of [`attach_rail`], for a single row of cards: the rail
+/// lies under `body` and appears only while the row is wider than its place.
+pub(crate) fn attach_rail_x(world: &mut World, root: Entity, body: Entity, prefix: &str) -> Entity {
+    use crate::game_ui::tokens::Surface;
+    use crate::game_ui::widgets::{Role, Swatch, Tone};
+    let old_position = world
+        .get::<Children>(root)
+        .and_then(|children| children.iter().position(|child| child == body));
+    let frame = world
+        .spawn((
+            Name::new(format!("{prefix} scroll viewport")),
+            ChildOf(root),
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: px(4),
+                flex_grow: 1.0,
+                flex_shrink: 1.0,
+                min_height: px(0),
+                min_width: px(0),
+                align_items: AlignItems::Stretch,
+                ..default()
+            },
+        ))
+        .id();
+    world.entity_mut(body).insert(ChildOf(frame));
+    if let Some(mut node) = world.get_mut::<Node>(body) {
+        node.flex_grow = 1.0;
+        node.flex_shrink = 1.0;
+        node.min_width = px(0);
+        node.min_height = px(0);
+    }
+    if let Some(position) = old_position {
+        let mut order = world
+            .get::<Children>(root)
+            .map(|children| children.to_vec())
+            .unwrap_or_default();
+        order.retain(|entity| *entity != frame);
+        order.insert(position.min(order.len()), frame);
+        world.entity_mut(root).replace_children(&order);
+    }
+    let rail = world
+        .spawn((
+            Name::new(format!("{prefix} scroll rail")),
+            ChildOf(frame),
+            Hovered::default(),
+            Swatch::Fill,
+            Tone::new(Surface::Paper, Role::Sunken),
+            Node {
+                height: px(6),
+                min_height: px(6),
+                flex_shrink: 0.0,
+                border_radius: BorderRadius::all(px(3)),
+                display: Display::None,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            Scrollbar::new(body, ControlOrientation::Horizontal, 28.0),
+        ))
+        .id();
+    world.spawn((
+        ChildOf(rail),
+        RailThumb,
+        Hovered::default(),
+        ScrollbarThumb {
+            border_radius: BorderRadius::all(px(3)),
+            ..default()
+        },
+        Swatch::Fill,
+        Tone::new(Surface::Paper, Role::Control),
+        BackgroundColor(Color::NONE),
+    ));
+    world.entity_mut(body).insert(RailOnlyX { rail });
+    rail
+}
+
+/// How far (logical px) a body's content reaches past its right edge.
+pub(crate) fn overflow_x(node: &ComputedNode) -> f32 {
+    ((node.content_size().x - node.size().x) * node.inverse_scale_factor()).max(0.0)
+}
+
 fn page_button(
     world: &mut World,
     parent: Entity,
@@ -242,6 +414,10 @@ fn page_button(
     ));
     button
 }
+/// Logical pixels a body may fall short of its content before the scroll
+/// rail and page buttons appear: layout rounds each panel row to whole
+/// pixels, which alone can leave a list one pixel short.
+const OVERFLOW_SLACK: f32 = 1.5;
 fn bounds(node: &ComputedNode) -> (f32, f32) {
     let visible = (node.size().y - node.scrollbar_size.y).max(0.0) * node.inverse_scale_factor();
     let total = node.content_size().y * node.inverse_scale_factor();
@@ -274,6 +450,69 @@ fn load_font(mut commands: Commands, fonts: Option<ResMut<Assets<Font>>>) {
     }
 }
 fn refresh(world: &mut World) {
+    let rails: Vec<_> = world
+        .query::<(Entity, &RailOnly, &ComputedNode)>()
+        .iter(world)
+        .map(|(body, rail, node)| (body, rail.rail, bounds(node).1 > OVERFLOW_SLACK))
+        .collect();
+    for (body, rail, overflowing) in rails {
+        let display = if overflowing {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if let Some(mut node) = world.get_mut::<Node>(rail)
+            && node.display != display
+        {
+            node.display = display;
+        }
+        if !overflowing
+            && let Some(mut position) = world.get_mut::<ScrollPosition>(body)
+            && position.y != 0.0
+        {
+            position.y = 0.0;
+        }
+    }
+    let rails: Vec<_> = world
+        .query::<(Entity, &RailOnlyX, &ComputedNode)>()
+        .iter(world)
+        .map(|(body, rail, node)| (body, rail.rail, overflow_x(node) > OVERFLOW_SLACK))
+        .collect();
+    for (body, rail, overflowing) in rails {
+        let display = if overflowing {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if let Some(mut node) = world.get_mut::<Node>(rail)
+            && node.display != display
+        {
+            node.display = display;
+        }
+        if !overflowing
+            && let Some(mut position) = world.get_mut::<ScrollPosition>(body)
+            && position.x != 0.0
+        {
+            position.x = 0.0;
+        }
+    }
+    // The thumb darkens under the pointer and while dragged.
+    let thumbs: Vec<_> = world
+        .query_filtered::<(Entity, &Hovered, &ScrollbarDragState), With<RailThumb>>()
+        .iter(world)
+        .map(|(entity, hovered, drag)| (entity, hovered.get() || drag.dragging))
+        .collect();
+    for (entity, active) in thumbs {
+        use crate::game_ui::tokens::Surface;
+        use crate::game_ui::widgets::{Role, Tone};
+        let tone = Tone::new(
+            Surface::Paper,
+            if active { Role::Caption } else { Role::Control },
+        );
+        if world.get::<Tone>(entity) != Some(&tone) {
+            world.entity_mut(entity).insert(tone);
+        }
+    }
     let conditional: Vec<_> = world
         .query::<(Entity, &OverflowChrome, &ComputedNode)>()
         .iter(world)
@@ -283,7 +522,8 @@ fn refresh(world: &mut World) {
                 chrome.rail,
                 chrome.footer,
                 chrome.controls,
-                bounds(node).1 > 0.5,
+                // A body that is short by a rounded pixel still fits.
+                bounds(node).1 > OVERFLOW_SLACK,
             )
         })
         .collect();

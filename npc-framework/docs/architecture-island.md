@@ -22,9 +22,15 @@ registrations and numerical model. See [ADR 0035](adr/0035-island-colony-showcas
 | --- | --- | --- |
 | Simulation lifecycle | `npc_kernel`, host app | `NpcSimTick`, ordered `NpcSet`s, `SimControl`, recorded commands and snapshots |
 | Resident arbitration | `village/behavior.rs` | One `island_life` behavior tree and its saved `LifeDecision`; need and work priorities use the same runtime |
+| Regional resident behaviour data | `village/resident/` | Validate the `behavior` block (trees, traits, schedule, places); register the granular `life.*` leaves, named conditions and scorers; seed `ResidentTraits`; write `VillageDecision` records from unhashed scratch state |
 | Physical action execution | `village/ai.rs`, shared action capabilities | Interpret the selected goal; use `VillageAct`, `HomesteadAct`, crafting and `MoveIntent`; own cancellation of resident work |
 | Production allocation | `village/production.rs` | Forecast demand, allocate finite stock/cash, expose funded targets; own every mutation of `ProductionPlan` |
 | Planning | `village/goap.rs` | Read live facts and return a bounded `WorkPlan`; pure assessment distinguishes no funded goal, unavailable prerequisites and search limits; execution revalidates every first step |
+| Regional economy data | `village/frontier/economy_spec.rs` | Validate the `economy` block (goods, recipes, professions, patches, endowments, tuning); build the frozen `EconomyRegistry` that `village/catalog.rs` lookups read; hashed with the world construction |
+| Buildings, stores and civic planning (regional) | `village/civic/` | `placement` owns the pure placement query and the recorded `PlaceBuilding`/`CancelBuilding`; `sites` owns paid deliveries, staged work, completion and refunds; `depot` owns stores and stalls as sellers of record; `haul` owns the resident steps behind `life.haul` and `life.build`; `planner` owns the staggered per-settlement review. `CivicState` indexes all of it by settlement and is hashed and saved |
+| Live mode and homestead work (regional) | `village/live.rs`, `village/live/jobs.rs` | `LiveState` (bonds, goals, tiers, upgrades, chests, errands) and the recorded `LiveAct`; a homestead upgrade is a private site paid from the owner's escrow, supplied by `life.haul materials` and built by `life.build` (after the village's own sites) and helped by `life.help`, all at the door; the civic planner never sees it ([ADR 0040](adr/0040-homestead-work-and-the-payer.md)) |
+| Merchant boat (regional) | `village/merchant.rs` | The island's outlet and source at the berth: buys surplus above the stock targets from the port's stores, sells shortfalls to the civic fund into the trading post; purse and limits are data; `view::boat` reports the berth |
+| Shaping the world (regional) | `village/frontier/shape.rs` | Recorded `PlaceResourcePatch`/`RemoveResourcePatch` and the pure `export_world` |
 | Authored life policy | `village/policy.rs` | Validate priority/threshold/search configuration; register and save the immutable policy |
 | Household mechanics | `village/colony/housing.rs` | Beds, assignments, commissions, hearths, material demand, own-household heating facts and read-only `ConstructionIntent` |
 | Social mechanics | `village/colony/social.rs` | Proximity meetings, affinity, morale, shared leisure eligibility and read-only meeting destinations |
@@ -114,6 +120,22 @@ order. Island Effects execute in the existing explicit order:
 routine priorities. `goap.rs` searches within the Work branch; its fallback is
 another work-selection policy under that same leaf. Neither owns a separate
 clock. All authoritative iteration uses stable IDs and integer state.
+
+The regional profile (`living_world`) replaces that tree with data. Its tree is
+`trees/resident.json` (or `living_world.behavior.trees`), validated with the
+world, hashed and kept in the construction data. The one decision leaf is split
+into granular leaves (`life.buy`, `life.gather`, `life.craft`, `life.eat`, ...),
+and GOAP is one of them (`life.pursue_goal`). A regional leaf takes its step
+when it **starts**, in the think pass, through the same `VillageAct`,
+`HomesteadAct`, crafting and `MoveIntent` seams, and fails at once when it
+cannot begin so its selector tries the next option in the same think. The think
+pass runs residents in `SimId` order, so these effects stay deterministic. The
+other profiles still stage a goal at start and apply it in the island Effects
+pass. Both share `LifeDecision`, the stop contract below and `advance`, which
+holds a leaf for one decision interval or until its physical work ends.
+`resident/record.rs` owns `DecisionTrace`: per-tick scratch and the last
+recorded leaf per resident. It is not hashed or saved and is never read by a
+decision; with the journal off nothing is recorded.
 
 The external AI CLI scheduler is a host-side operator service. Its wall-clock
 polling and credentials are outside simulation hashes; its actions enter through
@@ -213,6 +235,15 @@ on disk. A requested fresh world backs up the old save. Closing a persistent
 window through its launcher must use its graceful save protocol, and a refused
 save must remain visible and retryable.
 
+The structure check (`integrity::validate_snapshot_structure`) compares a save
+with a freshly built world. Permanent construction identities (settlements, their
+founding sites, workplaces and homes, homestead plots, wildlife habitats, the
+arrival) must all be there. Mortal ones may be missing only as the simulation
+removes them: an animal (hunted or died), a resident laid to rest (named in
+`Demography.departed`), a resource patch removed while another patch of its good
+still serves its settlement, and a building site laid out from an exported world
+and cancelled. Anything else missing is refused as a truncated or edited save.
+
 There is no historical local-island schema migration implemented in this
 iteration. Strict compatibility and the local format discriminator are explicit
 contracts. When a real schema change is needed, implement a versioned transform
@@ -242,8 +273,10 @@ visual verification remain separate requirements; this document makes no claim
 that a test has been run merely because it is listed here.
 
 The current authoring surface validates routine priorities, need thresholds and
-planner budgets. Behavior-tree topology and profession catalogs remain authored in
-Rust. There is no arbitrary BT graph editor, demographic labor replacement, terrain
+planner budgets. In the regional profile the behaviour-tree topology, the daily
+schedule, resident trait ranges and the economy catalog are data
+([behaviour](island-ai-authoring.md), [economy](island-economy-authoring.md));
+the other profiles keep their tree and catalogs in Rust. There is no arbitrary BT graph editor, demographic labor replacement, terrain
 undo history or authored audio system in this increment. A bounded shortage fixture
 tests one replenishing-resource disruption; it does not prove resilience to permanent
 loss of a specialist or arbitrary disasters.

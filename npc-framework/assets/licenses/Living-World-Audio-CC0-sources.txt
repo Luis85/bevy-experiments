@@ -1,0 +1,93 @@
+Living world audio: sources and licence record (added 2026-11-13)
+=================================================================
+
+Every file under living/audio/ is CC0 1.0 Universal (public domain dedication),
+https://creativecommons.org/publicdomain/zero/1.0/ . Per-file download URLs
+(archive URL + "#" + member path for files taken from an archive), byte counts and
+SHA-256 hashes are in ../living-world-manifest.json. All files are used unchanged
+(byte-identical to the source file or archive member); nothing was re-encoded.
+
+Licence evidence: each item comes from the author's own OpenGameArt page, whose
+"License(s)" field lists CC0 only and which names the uploader as the author (no
+"Submitted by" a third party). Pages read on 2026-11-13. Kenney archives also carry
+the licence text kept beside this file. No download needed an account.
+
+Archive / file                              SHA-256 of the download
+-------------------------------------------------------------------------------
+Kenney, "Interface Sounds (1.0)"  licence: Kenney-Interface-Sounds-1.0.txt
+  page https://opengameart.org/content/interface-sounds
+  kenney_interfaceSounds.zip                f2193d072726d6758a5f7871b2dcc54dcce0d5c35c6f0a62f92549b327c81232
+  -> ui/{click,hover,open,close,confirm,error,place,alert}.ogg
+Kenney, "50 RPG sound effects"  licence: Kenney-RPG-Audio.txt
+  page https://opengameart.org/content/50-rpg-sound-effects
+  RPGsounds_Kenney.zip                      3ae398ad63e293f9c450bda22d5d81c3af69c74df66fc1400f33c012c0bbc231
+  -> ui/{coin,coin_2,page}.ogg, work/{chop_1,cloth_1,cloth_2,door_open,door_close,step_dirt_1,step_dirt_2}.ogg
+Kenney, "85 Short music jingles"  licence: Kenney-Music-Jingles.txt
+  page https://opengameart.org/content/85-short-music-jingles
+  jingleSounds_Kenney.zip                   be324b6cf26e35c95c2a344569a2470512819d0246cc81328bef3499de3682e5
+  -> music/{jingle_morning,jingle_built}.ogg
+rubberduck, "100 CC0 metal and wood SFX"
+  page https://opengameart.org/content/100-cc0-metal-and-wood-sfx
+  100-CC0-wood-metal-SFX.zip                be6eba63b03409ac0c77787a956b1503a7c186403d04aef9725c52644a4b7878
+  -> work/{hammer_1,hammer_2,metal_1,metal_2}.ogg
+rubberduck, "100 CC0 SFX #2"
+  page https://opengameart.org/content/100-cc0-sfx-2
+  sfx_100_v2.zip                            0fc61b4494e2e893c0c015ced4877b3f689c7d84a48cb61daecd7ddb52db797b
+  -> work/{chop_2,chop_3,stone_1,stone_2,stone_3}.ogg, ambience/thunder.ogg
+rubberduck, "30 CC0 SFX loops"
+  page https://opengameart.org/content/30-cc0-sfx-loops
+  sfx_loops.zip                             9c013474c7e56192a0d1b2840535a1e1d8b93166948d4a9f7136bb6c3d5421cd
+  -> work/saw_loop.ogg
+rubberduck, "40 CC0 water / splash / slime SFX"
+  page https://opengameart.org/content/40-cc0-water-splash-slime-sfx
+  water-splash-slime-sfx.zip                7cd39abb49d4362a37ba18dc0e454c7dc1d08029d4e5b683149046bc237b2eba
+  -> work/{splash_1,splash_2,splash_3}.ogg
+TinyWorlds, "Different steps on wood, stone, leaves, gravel and mud"
+  page https://opengameart.org/content/different-steps-on-wood-stone-leaves-gravel-and-mud
+  [kdd]DifferentSteps_0.zip                 987d072b7deaa65177e005ddd8185f2351be7c9a76cd7575dea560549c39b33b
+  -> work/{step_grass_1,step_grass_2,step_wood_1,step_wood_2,step_wood_3,dig_1,dig_2}.ogg
+StarNinjas, "7 Eating Crunches"
+  page https://opengameart.org/content/7-eating-crunches
+  crunch_-_tito.zip                         92017d0e4130d5b3fb4622ae9c17f4b4c099f5fdd08ea7c3322cea9e0b81f85f
+  -> work/{eat_1,eat_2}.ogg
+StarNinjas, "Saw or Wood Impact"
+  page https://opengameart.org/content/saw-or-wood-impact
+  saw_-_starninjas_0.ogg                    4ed1587394af8adde4fe6443ca6367a16b6dbb8e5e09d39c96df608de32c5d32
+  -> work/saw.ogg
+kheetor, "tree chop fall thud"
+  page https://opengameart.org/content/tree-chop-fall-thud
+  chop-tree-fall.ogg                        21842dd004b46315a5d52be80997773421d8b1d3a0d473ddbcad388efd93b33a
+  -> work/tree_fall.ogg
+Ylmir, "Rain (loopable)"
+  page https://opengameart.org/content/rain-loopable
+  Rain OGG.zip                              e68f3e1c77493cf43bec84cebff5043bff6be9ce16d59b24caa988cd460aa75b
+  -> ambience/rain.ogg (member 1.ogg)
+WuxiaScrub, "Rain + Long Thunder"
+  page https://opengameart.org/content/rain-long-thunder
+  rain-thunder.ogg                          9499fd1aefa3b5d8ba3764ea46d15c00ab449be7e19c029290a1f52228f1434c
+  -> ambience/storm.ogg
+isaiah658, "Ambient Bird Sounds"
+  page https://opengameart.org/content/ambient-bird-sounds
+  birds-isaiah658_0.ogg                     359e4e3f9da9d75aac64cede511c7e3ef8b461f9d9f8c230f8f80e44c4b3e35f
+  -> ambience/birds.ogg
+Kresiek The Furry, "AMB Morning Sounds (Perfect Loop)"
+  page https://opengameart.org/content/amb-morning-sounds-perfect-loop
+  amb_morning_0.ogg                         f49f9470038fcbd75742ca88a9914de0e7fe515340cfddaf3a7614e42678b4a7
+  -> ambience/birds_morning.ogg
+IgnasD, "Wind"
+  page https://opengameart.org/content/wind
+  wind.zip                                  8f6185f6eb836a5c35c492e8dabd276e507ba3e4dca0e7d551d04c689d0c0d63
+  -> ambience/wind.ogg (member wind/Wind.ogg)
+AntumDeluge, "Fire Crackling" (page text also states "Creative Commons Zero (CC0)")
+  page https://opengameart.org/content/fire-crackling
+  fire-1_0.ogg                              f922929805bc6afdf0a35727fa3998033db544c1b6f62ed3aeab94341ed6ddeb
+  -> ambience/fire.ogg
+Écrivain, "Meadow Thoughts"
+  page https://opengameart.org/content/meadow-thoughts
+  Meadow Thoughts.ogg                       9c55cfadb5acca6ef9ca81bf89d343b13f2b09984d45ae520cf877f1f9ad4404
+  -> music/day.ogg
+Cleyton Kauffman, "Forest Whisper Theme" (the archive's readme also states
+"Creative Commons Zero (CC0)"; the readme itself is not copied)
+  page https://opengameart.org/content/forest-whisper-theme
+  forest_whisper_theme.zip                  11516801f38f4b004fa9e3641ff287fa39cb998fc805d376b372cc03db4d573f
+  -> music/night.ogg (member "Forest Whisper Theme/Forest Whisper.ogg")

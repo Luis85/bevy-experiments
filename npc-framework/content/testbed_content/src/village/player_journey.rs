@@ -93,8 +93,13 @@ fn gather(village: &Value, kind: &str) -> Option<ActionHint> {
     let source = resources(village, kind)?;
     action("gather", Some(id(&source["id"])?), json!({"quantity":1}))
 }
+/// The good that plays `name` in this world (`drink`, `baked`, `timber`,
+/// ...), as the observation's catalog roles say; empty when none.
+fn role<'a>(village: &'a Value, name: &str) -> &'a str {
+    village["economy"]["roles"][name].as_str().unwrap_or("")
+}
 fn provision(village: &Value, kind: &str, expanded: bool) -> Task {
-    let (key, title, detail) = if kind == catalog::WATER {
+    let (key, title, detail) = if kind == role(village, "drink") {
         (
             "water",
             "Keep water in your pack",
@@ -160,9 +165,13 @@ pub fn project(observation: &Value) -> Journey {
         }
     }
     let held = |kind: &str| stock.get(kind).copied().unwrap_or(0);
-    let food = ["bread", catalog::COOKED_MEAL, catalog::BERRIES]
-        .into_iter()
-        .find(|kind| held(kind) > 0);
+    let food = [
+        role(village, "baked"),
+        role(village, "cooked"),
+        role(village, "foraged"),
+    ]
+    .into_iter()
+    .find(|kind| !kind.is_empty() && held(kind) > 0);
     let need = |kind: &str| village["needs"][kind].as_i64().unwrap_or(100_000);
     let busy = village["activity"]["busy"] == true;
     if busy && (need("hunger") < 15_000 || need("thirst") < 15_000) {
@@ -206,7 +215,7 @@ pub fn project(observation: &Value) -> Journey {
         ));
     }
     if need("thirst") < 30_000 {
-        return wrap(if held(catalog::WATER) > 0 {
+        return wrap(if held(role(village, "drink")) > 0 {
             task(
                 "drink",
                 "Take a drink",
@@ -214,7 +223,7 @@ pub fn project(observation: &Value) -> Journey {
                 action("drink", None, json!({})),
             )
         } else {
-            provision(village, catalog::WATER, expanded)
+            provision(village, role(village, "drink"), expanded)
         });
     }
     if need("hunger") < 30_000 {
@@ -226,7 +235,7 @@ pub fn project(observation: &Value) -> Journey {
                 action("eat", None, json!({"kind":kind})),
             )
         } else {
-            provision(village, catalog::BERRIES, expanded)
+            provision(village, role(village, "foraged"), expanded)
         });
     }
     if need("energy") < 25_000 {
@@ -241,11 +250,11 @@ pub fn project(observation: &Value) -> Journey {
         }
         return wrap(next);
     }
-    if held(catalog::WATER) == 0 {
-        return wrap(provision(village, catalog::WATER, expanded));
+    if held(role(village, "drink")) == 0 {
+        return wrap(provision(village, role(village, "drink"), expanded));
     }
     if food.is_none() {
-        return wrap(provision(village, catalog::BERRIES, expanded));
+        return wrap(provision(village, role(village, "foraged"), expanded));
     }
     if farm.is_null() {
         return wrap(task(
@@ -263,29 +272,30 @@ pub fn project(observation: &Value) -> Journey {
                 .find(|input| input["kind"] == kind)
                 .map_or(fallback, |input| count(&input["count"]))
         };
-        let plank_target = required("plank", homestead::PLANK_COST);
+        let (timber, lumber) = (role(village, "timber"), role(village, "lumber"));
+        let plank_target = required(lumber, homestead::PLANK_COST);
         let logs_for_planks = plank_target
-            .saturating_sub(held("plank"))
+            .saturating_sub(held(lumber))
             .div_ceil(catalog::SAW_PLANK_YIELD)
             .saturating_mul(catalog::SAW_LOG_COST);
-        let log_target = required("log", homestead::LOG_COST).saturating_add(logs_for_planks);
-        if held("log") < log_target {
+        let log_target = required(timber, homestead::LOG_COST).saturating_add(logs_for_planks);
+        if held(timber) < log_target {
             let mut next = task(
                 "timber",
                 "Gather timber for a cottage",
                 format!(
                     "Keep {log_target} logs: enough to saw missing planks and retain the cottage's timber. Explore the western timber yard if the wood source is not yet known."
                 ),
-                gather(village, "log"),
+                gather(village, timber),
             );
             next.progress = Some(Progress {
-                current: held("log"),
+                current: held(timber),
                 target: log_target,
                 unit: "logs",
             });
             return wrap(next);
         }
-        if held("plank") < plank_target {
+        if held(lumber) < plank_target {
             let station = array(&village["environment"]["workstations"])
                 .iter()
                 .find(|station| {
@@ -305,7 +315,7 @@ pub fn project(observation: &Value) -> Journey {
                 action,
             );
             next.progress = Some(Progress {
-                current: held("plank"),
+                current: held(lumber),
                 target: plank_target,
                 unit: "planks",
             });
@@ -378,7 +388,11 @@ pub fn project(observation: &Value) -> Journey {
         .filter_map(|crop| crop["kind"].as_str())
         .collect();
     if crop_kinds.is_empty() {
-        crop_kinds.push(farm["crop"]["seed_kind"].as_str().unwrap_or(catalog::GRAIN));
+        crop_kinds.push(
+            farm["crop"]["seed_kind"]
+                .as_str()
+                .unwrap_or(role(village, "grain")),
+        );
     }
     let seed = crop_kinds.iter().copied().find(|kind| held(kind) > 0);
     let active_garden = plots.iter().filter(|plot| plot["own"] == true).any(|plot| {
@@ -405,7 +419,7 @@ pub fn project(observation: &Value) -> Journey {
                 if let Some(action) = &mut hint {
                     action.position = position(&bed["position"]);
                 }
-                let detail = if crop_kinds.contains(&catalog::BERRIES) {
+                let detail = if crop_kinds.contains(&role(village, "foraged")) {
                     "Plant carried grain for milling and trade, or a berry for an edible crop. Planting consumes a real seed or berry."
                 } else {
                     "Plant a carried grain seed in an empty bed, then water it to begin growth."
@@ -437,12 +451,14 @@ pub fn project(observation: &Value) -> Journey {
             ));
         }
     }
-    let surplus = [catalog::GRAIN, catalog::BERRIES].into_iter().find(|kind| {
-        held(kind) > 3
-            && !array(&village["economy"]["own_offers"])
-                .iter()
-                .any(|offer| offer["kind"] == *kind)
-    });
+    let surplus = [role(village, "grain"), role(village, "foraged")]
+        .into_iter()
+        .find(|kind| {
+            held(kind) > 3
+                && !array(&village["economy"]["own_offers"])
+                    .iter()
+                    .any(|offer| offer["kind"] == *kind)
+        });
     if let Some(kind) = surplus {
         return wrap(task(
             "trade",

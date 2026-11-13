@@ -45,11 +45,19 @@ pub fn validate_snapshot_structure(
         if required.is_empty() && !arrival {
             continue;
         }
-        let entity = saved
+        let Some(entity) = saved
             .entities
             .iter()
             .find(|entity| entity.id == baseline.id)
-            .ok_or_else(|| format!("Required island identity {} is missing", baseline.id))?;
+        else {
+            if mortal_and_gone(baseline, saved) {
+                continue;
+            }
+            return Err(format!(
+                "Required island identity {} is missing",
+                baseline.id
+            ));
+        };
         for name in required {
             if !entity.components.contains_key(name) {
                 return Err(format!("Island identity {} is missing {name}", baseline.id));
@@ -76,6 +84,72 @@ pub fn validate_snapshot_structure(
         }
     }
     Ok(())
+}
+
+/// Whether a construction identity may be missing from a later save, and is
+/// accounted for. Permanent identities (settlements, their founding sites,
+/// workplaces and homes, homestead plots, wildlife habitats, the arrival)
+/// must always be there. Mortal ones may go, each only the way the
+/// simulation removes it:
+///
+/// - an animal (`island_wildlife`): hunted, or died in its habitat;
+/// - a resident: laid to rest, so `Demography.departed` names it;
+/// - a resource patch: removed by `RemoveResourcePatch`, which never removes
+///   the last patch of a good in its settlement, so another one remains;
+/// - a building site laid out from an exported world: cancelled (a finished
+///   one keeps its identity as the building).
+fn mortal_and_gone(
+    baseline: &npc_framework::snapshot::EntitySnapshot,
+    saved: &npc_framework::snapshot::WorldSnapshot,
+) -> bool {
+    use serde_json::Value;
+    let has = |name: &str| baseline.components.contains_key(name);
+    let permanent = [
+        super::frontier::Settlement::NAME,
+        super::frontier::SettlementSite::NAME,
+        VillagePlace::NAME,
+        Household::NAME,
+        HomesteadPlot::NAME,
+        super::hunting::WildlifeHabitat::NAME,
+        super::frontier::ecology::HabitatEcology::NAME,
+        AwaitingArrival::NAME,
+    ];
+    if permanent.iter().any(|name| has(name)) {
+        return false;
+    }
+    if has(super::hunting::Wildlife::NAME) || has(super::civic::ConstructionSite::NAME) {
+        return true;
+    }
+    if has(super::frontier::labor::ResidentProfile::NAME) || has(Villager::NAME) {
+        return saved
+            .resources
+            .get(super::demography::Demography::NAME)
+            .and_then(|demography| demography.get("departed"))
+            .and_then(Value::as_array)
+            .is_some_and(|departed| {
+                departed.iter().any(|record| {
+                    record.get("resident").and_then(Value::as_u64) == Some(baseline.id)
+                })
+            });
+    }
+    if let Some(patch) = baseline.components.get(super::ResourcePatch::NAME) {
+        let member = |components: &std::collections::BTreeMap<String, Value>| {
+            components
+                .get(super::frontier::SettlementMember::NAME)
+                .cloned()
+        };
+        let kind = patch.get("kind").cloned();
+        let settlement = member(&baseline.components);
+        return kind.is_some()
+            && saved.entities.iter().any(|other| {
+                other
+                    .components
+                    .get(super::ResourcePatch::NAME)
+                    .is_some_and(|other_patch| other_patch.get("kind").cloned() == kind)
+                    && member(&other.components) == settlement
+            });
+    }
+    false
 }
 
 pub fn validate_colony(world: &World) -> Result<(), String> {
@@ -114,6 +188,7 @@ pub fn validate_colony(world: &World) -> Result<(), String> {
         super::frontier::settlements::validate(world)?;
         super::frontier::ecology::validate(world)?;
         super::frontier::labor::validate(world)?;
+        super::civic::validate(world)?;
     } else {
         for role in Role::RESIDENTS
             .into_iter()

@@ -190,6 +190,11 @@ pub fn validate(p: &WorldPreset) -> Result<(), Vec<String>> {
         if let Err(error) = policy.validate() {
             errors.push(error);
         }
+        if p.living_world.is_some()
+            && let Err(error) = policy.validate_regional()
+        {
+            errors.push(error);
+        }
     }
     if p.island_geography == IslandGeography::Expanded
         && (p.scene != WorldScene::IslandVillage || p.economy != EconomyModel::NeedsDriven)

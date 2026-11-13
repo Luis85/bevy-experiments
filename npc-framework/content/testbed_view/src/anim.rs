@@ -34,10 +34,24 @@ pub enum Pose {
     Craft,
     PickUp,
     Ride,
+    /// Island life (`island_poses`): resting through the night.
+    Sleep,
+    /// A daytime rest.
+    Sit,
+    /// Walking with bulk goods.
+    Carry,
+    /// Felling timber.
+    Chop,
+    /// Hoeing, planting, harvesting, foraging.
+    Farm,
+    Fish,
+    /// Smithing, carpentry, building.
+    Hammer,
 }
 
 impl Pose {
-    const ALL: [Pose; 7] = [
+    pub(crate) const COUNT: usize = 14;
+    pub(crate) const ALL: [Pose; Pose::COUNT] = [
         Pose::Idle,
         Pose::Walk,
         Pose::Work,
@@ -45,19 +59,37 @@ impl Pose {
         Pose::Craft,
         Pose::PickUp,
         Pose::Ride,
+        Pose::Sleep,
+        Pose::Sit,
+        Pose::Carry,
+        Pose::Chop,
+        Pose::Farm,
+        Pose::Fish,
+        Pose::Hammer,
     ];
 
     fn slot(self) -> usize {
         self as usize
     }
 
-    fn clip(self, kind: ModelKind) -> &'static str {
+    /// Every name below exists in the shipped rigs (see
+    /// `docs/island-atmosphere.md` for the inventory). Where a rig has no
+    /// dedicated clip the closest one is used; nothing is retargeted.
+    pub(crate) fn clip(self, kind: ModelKind) -> &'static str {
         if kind.civilian_rig() {
+            // The Quaternius civilians ship 24 clips with no sit, lie, carry
+            // or fishing motion: those fall back to a calm stance or the walk.
             return match self {
                 Pose::Idle | Pose::Ride => "CharacterArmature|Idle",
-                Pose::Walk => "CharacterArmature|Walk",
-                Pose::Work | Pose::Craft | Pose::PickUp => "CharacterArmature|Interact",
+                Pose::Walk | Pose::Carry => "CharacterArmature|Walk",
+                Pose::Work | Pose::Craft | Pose::PickUp | Pose::Farm => {
+                    "CharacterArmature|Interact"
+                }
                 Pose::Interact => "CharacterArmature|Wave",
+                Pose::Sleep | Pose::Sit => "CharacterArmature|Idle_Neutral",
+                Pose::Chop => "CharacterArmature|Sword_Slash",
+                Pose::Hammer => "CharacterArmature|Punch_Right",
+                Pose::Fish => "CharacterArmature|Idle_Sword",
             };
         }
         let skeleton = matches!(kind, ModelKind::SkeletonMinion | ModelKind::SkeletonWarrior);
@@ -70,7 +102,21 @@ impl Pose {
             Pose::Craft => "Use_Item",
             Pose::PickUp => "PickUp",
             Pose::Ride => "Sit_Chair_Idle",
+            Pose::Sleep => "Lie_Idle",
+            Pose::Sit => "Sit_Floor_Idle",
+            // No carry clip in the KayKit set: the slower second walk.
+            Pose::Carry => "Walking_B",
+            Pose::Chop => "1H_Melee_Attack_Slice_Diagonal",
+            Pose::Farm => "2H_Melee_Attack_Chop",
+            // No fishing clip: the two-handed ready stance holds the rod.
+            Pose::Fish => "2H_Melee_Idle",
+            Pose::Hammer => "1H_Melee_Attack_Chop",
         }
+    }
+
+    /// Whether the clip itself lays the body down (no root rotation needed).
+    pub(crate) fn clip_lies_down(self, kind: ModelKind) -> bool {
+        self == Pose::Sleep && !kind.civilian_rig()
     }
 
     pub fn label(self) -> &'static str {
@@ -82,6 +128,13 @@ impl Pose {
             Pose::Craft => "craft",
             Pose::PickUp => "pick up",
             Pose::Ride => "ride",
+            Pose::Sleep => "sleep",
+            Pose::Sit => "sit",
+            Pose::Carry => "carry",
+            Pose::Chop => "chop",
+            Pose::Farm => "farm",
+            Pose::Fish => "fish",
+            Pose::Hammer => "hammer",
         }
     }
 }
@@ -112,7 +165,7 @@ pub fn pose_of(
 /// The shared graphs, one per model kind, built once its glb is loaded.
 #[derive(Resource, Default)]
 pub(crate) struct ActorAnimations {
-    graphs: Vec<Option<(Handle<AnimationGraph>, [AnimationNodeIndex; 7])>>,
+    graphs: Vec<Option<(Handle<AnimationGraph>, [AnimationNodeIndex; Pose::COUNT])>>,
     unavailable: Vec<bool>,
 }
 
@@ -124,6 +177,17 @@ pub(crate) struct ActorAnimTarget {
     current: Option<Pose>,
     /// When the sim first reported a different pose than the one playing.
     pending_since: Option<(Pose, f32)>,
+}
+
+impl ActorAnimTarget {
+    /// The actor's visual root.
+    pub(crate) fn root(&self) -> Entity {
+        self.root
+    }
+    /// The pose whose clip is playing now.
+    pub(crate) fn playing(&self) -> Option<Pose> {
+        self.current
+    }
 }
 
 /// Meshes of the KayKit kits an actor should not carry around.
@@ -258,6 +322,7 @@ fn drive_animation(
     mut commands: Commands,
     time: Res<Time>,
     anims: Res<ActorAnimations>,
+    island: crate::island_poses::IslandPoseContext,
     roots: Query<(&VisualOf, &ActorVisual)>,
     sims: Query<(
         Option<&MountedIn>,
@@ -286,6 +351,11 @@ fn drive_animation(
             .ok()
             .and_then(|(of, actor)| {
                 let (m, i, c, gathering) = sims.get(of.0).ok()?;
+                if m.is_none()
+                    && let Some(pose) = island.pose(of.0, i, c, gathering, actor.motion.moving)
+                {
+                    return Some(pose);
+                }
                 Some(
                     if gathering.is_some() && m.is_none() && i.is_none() && !actor.motion.moving {
                         Pose::Work
@@ -304,7 +374,17 @@ fn drive_animation(
                 }
             };
             // Ride and walk start at once; idle (and short blips) wait.
-            let urgent = matches!(pose, Pose::Ride | Pose::Walk | Pose::Work);
+            let urgent = matches!(
+                pose,
+                Pose::Ride
+                    | Pose::Walk
+                    | Pose::Work
+                    | Pose::Carry
+                    | Pose::Chop
+                    | Pose::Farm
+                    | Pose::Fish
+                    | Pose::Hammer
+            );
             if !urgent && now - since < DEBOUNCE_SECS {
                 continue;
             }
@@ -396,6 +476,84 @@ mod tests {
             "Walking_D_Skeletons"
         );
         assert_eq!(Pose::Walk.clip(ModelKind::Knight), "Walking_A");
-        assert_eq!(Pose::ALL.len(), 7);
+        assert_eq!(Pose::ALL.len(), Pose::COUNT);
+        for (slot, pose) in Pose::ALL.into_iter().enumerate() {
+            assert_eq!(pose.slot(), slot);
+        }
+    }
+
+    /// Clip names read from the shipped GLBs (see `docs/island-atmosphere.md`).
+    const KAYKIT_CLIPS: &[&str] = &[
+        "1H_Melee_Attack_Chop",
+        "1H_Melee_Attack_Slice_Diagonal",
+        "2H_Melee_Attack_Chop",
+        "2H_Melee_Idle",
+        "Idle",
+        "Interact",
+        "Lie_Idle",
+        "PickUp",
+        "Sit_Chair_Idle",
+        "Sit_Floor_Idle",
+        "Use_Item",
+        "Walking_A",
+        "Walking_B",
+        "Walking_D_Skeletons",
+    ];
+    const CIVILIAN_CLIPS: &[&str] = &[
+        "CharacterArmature|Idle",
+        "CharacterArmature|Idle_Neutral",
+        "CharacterArmature|Idle_Sword",
+        "CharacterArmature|Interact",
+        "CharacterArmature|Punch_Right",
+        "CharacterArmature|Sword_Slash",
+        "CharacterArmature|Walk",
+        "CharacterArmature|Wave",
+    ];
+
+    #[test]
+    fn every_pose_maps_to_a_clip_that_ships_in_its_rig() {
+        for kind in ModelKind::ANIMATED {
+            let shipped = if kind.civilian_rig() {
+                CIVILIAN_CLIPS
+            } else {
+                KAYKIT_CLIPS
+            };
+            for pose in Pose::ALL {
+                assert!(
+                    shipped.contains(&pose.clip(kind)),
+                    "{kind:?} {pose:?} -> {}",
+                    pose.clip(kind)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn island_activities_read_as_distinct_motions_on_the_kaykit_rig() {
+        let work = [
+            Pose::Sleep,
+            Pose::Sit,
+            Pose::Carry,
+            Pose::Chop,
+            Pose::Farm,
+            Pose::Fish,
+            Pose::Hammer,
+        ];
+        let clips: std::collections::BTreeSet<_> = work
+            .iter()
+            .map(|pose| pose.clip(ModelKind::Barbarian))
+            .collect();
+        assert_eq!(clips.len(), work.len());
+        assert!(!clips.contains("Idle") && !clips.contains("Walking_A"));
+        // The civilian rig has fewer clips; work motions still differ.
+        let civilian: std::collections::BTreeSet<_> =
+            [Pose::Chop, Pose::Farm, Pose::Hammer, Pose::Fish]
+                .iter()
+                .map(|pose| pose.clip(ModelKind::FarmerMan))
+                .collect();
+        assert_eq!(civilian.len(), 4);
+        assert!(Pose::Sleep.clip_lies_down(ModelKind::Rogue));
+        assert!(!Pose::Sleep.clip_lies_down(ModelKind::VillageWoman));
+        assert!(!Pose::Sit.clip_lies_down(ModelKind::Rogue));
     }
 }

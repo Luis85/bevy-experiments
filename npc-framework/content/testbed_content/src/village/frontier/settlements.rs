@@ -51,13 +51,13 @@ pub fn register(app: &mut App) {
         .register_sim_component::<SettlementSite>();
 }
 pub fn all(world: &World) -> Vec<(SimId, Entity)> {
-    world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter(|(_, e)| world.get::<Settlement>(**e).is_some())
-        .map(|(id, e)| (*id, *e))
-        .collect()
+    // A query over the few settlements, not a scan of every identity.
+    let Some(mut query) = world.try_query::<(Entity, &SimId, &Settlement)>() else {
+        return Vec::new();
+    };
+    let mut out: Vec<(SimId, Entity)> = query.iter(world).map(|(e, id, _)| (*id, e)).collect();
+    out.sort_unstable_by_key(|(id, _)| *id);
+    out
 }
 pub fn member(world: &World, entity: Entity) -> Option<SimId> {
     world.get::<SettlementMember>(entity).map(|m| m.settlement)
@@ -71,13 +71,13 @@ pub fn definition(world: &World, settlement: SimId) -> Option<&SettlementDef> {
         .find(|s| &s.key == key)
 }
 pub fn workplace(world: &World, settlement: SimId, role: Role) -> Option<SimId> {
-    world.resource::<SimIndex>().map.iter().find_map(|(id, e)| {
-        (member(world, *e) == Some(settlement)
-            && world
-                .get::<VillagePlace>(*e)
-                .is_some_and(|s| s.role == role))
-        .then_some(*id)
-    })
+    // The first in identity order, as a scan of the index would find it.
+    let mut query = world.try_query::<(&SimId, &SettlementMember, &VillagePlace)>()?;
+    query
+        .iter(world)
+        .filter(|(_, member, place)| member.settlement == settlement && place.role == role)
+        .map(|(id, _, _)| *id)
+        .min()
 }
 pub fn site_entity(world: &World, settlement: SimId, key: &str) -> Option<Entity> {
     world
@@ -133,15 +133,9 @@ pub fn spawn(world: &mut World, ids: &mut crate::TestbedIds) {
         );
         ids.name(format!("settlement_{}", definition.key), settlement);
         for site in definition.sites {
-            let station = match site.role {
-                Role::Miller => catalog::MILL,
-                Role::Baker => catalog::BAKE,
-                Role::Carpenter => catalog::SAW,
-                Role::Smith => catalog::SMELT,
-                Role::Tanner => catalog::TAN,
-                Role::Tailor => catalog::TAILOR,
-                _ => catalog::INN,
-            };
+            let station = super::economy_spec::registry(world)
+                .and_then(|registry| registry.profession(site.role))
+                .map_or(catalog::INN, |entry| entry.station);
             let (id, _) = spawn_sim(
                 world,
                 (
@@ -160,7 +154,7 @@ pub fn spawn(world: &mut World, ids: &mut crate::TestbedIds) {
                 ),
             );
             ids.name(format!("{}_{}", definition.key, site.key), id);
-            if !matches!(site.role, Role::WaterKeeper | Role::Fisher) {
+            if !super::economy_spec::open_site(world, site.role) {
                 spawn_sim(
                     world,
                     (

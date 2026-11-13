@@ -6,12 +6,27 @@ use npc_framework::prelude::*;
 use serde::Serialize;
 use serde_json::json;
 
-const HEARTH_FUEL: &str = "log";
 const HEARTH_FUEL_REQUIRED: u32 = 1;
 const HEARTH_REACH_MM: u32 = 1500;
 
 fn heating_period(world: &World) -> u64 {
-    (world.resource::<SimConfig>().day_length / 2).max(1)
+    let day = world.resource::<SimConfig>().day_length;
+    // Regional winters burn through a log faster: three lightings a day, not two.
+    if let Some(tuning) = super::super::frontier::economy_spec::tuning(world)
+        && super::super::calendar(world).1 == super::super::Season::Winter
+    {
+        let lightings = tuning
+            .winter_hearth_lightings
+            .saturating_add(super::super::weather::extra_hearth_lightings(world));
+        return (day / u64::from(lightings.max(1))).max(1);
+    }
+    (day / 2).max(1)
+}
+
+/// Ticks one hearth log heats a home today: half a day, less in a regional
+/// winter and less again in a harsh one.
+pub fn heating_period_ticks(world: &World) -> u64 {
+    heating_period(world)
 }
 
 /// Own-household facts and public hearth rules. No other resident's inventory is
@@ -43,7 +58,7 @@ pub fn home_heating(world: &World, actor: Entity) -> Option<HomeHeating> {
         .saturating_sub(world.resource::<SimClock>().tick);
     let heated = remaining_ticks > 0;
     let cold = super::super::living::cold(world);
-    let carried_fuel = economy::count(world, actor, HEARTH_FUEL);
+    let carried_fuel = economy::count(world, actor, super::super::roles::roles(world).fuel);
     let within_reach = world
         .get::<SimPos>(actor)
         .is_some_and(|position| position.dist2(home.door) <= i64::from(HEARTH_REACH_MM).pow(2));
@@ -52,7 +67,7 @@ pub fn home_heating(world: &World, actor: Entity) -> Option<HomeHeating> {
         remaining_ticks,
         period_ticks: heating_period(world),
         cold,
-        fuel_kind: HEARTH_FUEL,
+        fuel_kind: super::super::roles::roles(world).fuel,
         fuel_required: HEARTH_FUEL_REQUIRED,
         carried_fuel,
         within_reach,
@@ -79,24 +94,24 @@ pub(super) fn establish_resident_home(world: &mut World, id: SimId, person: &Vil
     }
 }
 
+/// Households ascending by identity: a query over the homes, not a scan of
+/// every identity in the world.
 pub(super) fn households(world: &World) -> Vec<(SimId, Entity)> {
-    world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter(|(_, entity)| world.get::<Household>(**entity).is_some())
-        .map(|(id, e)| (*id, *e))
-        .collect()
+    let Some(mut query) = world.try_query::<(Entity, &SimId, &Household)>() else {
+        return Vec::new();
+    };
+    let mut out: Vec<(SimId, Entity)> = query.iter(world).map(|(e, id, _)| (*id, e)).collect();
+    out.sort_unstable_by_key(|(id, _)| *id);
+    out
 }
+/// The household with the lowest identity that lists `resident`.
 pub fn home_of(world: &World, resident: SimId) -> Option<SimId> {
-    households(world)
-        .into_iter()
-        .find(|(_, e)| {
-            world
-                .get::<Household>(*e)
-                .is_some_and(|home| home.residents.contains(&resident))
-        })
-        .map(|(id, _)| id)
+    let mut query = world.try_query::<(&SimId, &Household)>()?;
+    query
+        .iter(world)
+        .filter(|(_, home)| home.residents.contains(&resident))
+        .map(|(id, _)| *id)
+        .min()
 }
 pub fn home_heated(world: &World, actor: Entity) -> bool {
     if !world.contains_resource::<ColonyState>() {
@@ -146,10 +161,52 @@ pub fn household_materials(world: &World, actor: Entity) -> Vec<(&'static str, u
         .resource::<SimClock>()
         .tick
         .saturating_add(world.resource::<SimConfig>().day_length / 4);
-    if steward == Some(&id) && home.heated_until <= soon {
-        vec![(HEARTH_FUEL, HEARTH_FUEL_REQUIRED)]
+    if steward != Some(&id) {
+        return Vec::new();
+    }
+    let lighting = if home.heated_until <= soon {
+        HEARTH_FUEL_REQUIRED
+    } else {
+        0
+    };
+    // Heat demand reaches the woodcutters before the cold does: in the regional
+    // profile a steward keeps a fuel reserve from a few days before winter until
+    // it ends, instead of ordering one log when the hearth is already going out.
+    let reserve = super::super::frontier::settlements::member(world, actor).map_or_else(
+        || winter_fuel_reserve(world),
+        |region| fuel_level_reserve(world, region, winter_fuel_reserve(world)),
+    );
+    let wanted = lighting.max(reserve);
+    if wanted > 0 {
+        vec![(super::super::roles::roles(world).fuel, wanted)]
     } else {
         Vec::new()
+    }
+}
+
+/// A settlement's fuel reserve after the overseer's fuel priority.
+pub(crate) fn fuel_level_reserve(world: &World, settlement: SimId, normal: u32) -> u32 {
+    use crate::village::frontier::oversee::{self, PriorityTopic};
+    oversee::scale(
+        oversee::level(world, settlement, PriorityTopic::FuelReserve, None),
+        normal,
+    )
+}
+
+/// Hearth logs a regional steward keeps in and shortly before winter.
+fn winter_fuel_reserve(world: &World) -> u32 {
+    let Some(tuning) = super::super::frontier::economy_spec::tuning(world) else {
+        return 0;
+    };
+    let (day, season, _) = super::super::calendar(world);
+    let season_days = super::super::days_per_season(world);
+    let winter = |day: u64| (day / season_days) % 4 == 3;
+    if season == super::super::Season::Winter
+        || (1..=tuning.winter_fuel_lead_days).any(|ahead| winter(day + ahead))
+    {
+        tuning.winter_fuel_reserve
+    } else {
+        0
     }
 }
 pub(super) fn assign(world: &mut World, resident: SimId, house: SimId) {
@@ -172,7 +229,16 @@ pub(super) fn assign(world: &mut World, resident: SimId, house: SimId) {
         .resource::<SimIndex>()
         .get(resident)
         .expect("resident");
-    world.get_mut::<Villager>(actor).expect("resident").home = door;
+    let now = world.resource::<SimClock>().tick;
+    let living_world = super::super::frontier::enabled(world);
+    let mut person = world.get_mut::<Villager>(actor).expect("resident");
+    // Living world: a resident moved to another home while it rests in the
+    // old one wakes, and walks to the new one: it does not sleep on where
+    // the old home was, outside every building.
+    if living_world && person.home != door && person.resting_until > now {
+        person.resting_until = now;
+    }
+    person.home = door;
     record_effect(
         world,
         Some(resident),
@@ -254,9 +320,15 @@ pub fn cottage_claimed(world: &mut World, plot: Entity, owner: SimId) {
         return;
     };
     if world.get::<Household>(cottage).is_none() {
+        // Living world: the beds of the catalogue cottage; elsewhere three.
+        let (_, _, capacity) = super::super::homestead::cottage_body(
+            world,
+            super::super::homestead::front_door(center),
+            None,
+        );
         world.entity_mut(cottage).insert(Household {
             label: "Homestead cottage".into(),
-            capacity: 3,
+            capacity,
             residents: Vec::new(),
             door: super::super::homestead::front_door(center),
             heated_until: 0,
@@ -307,8 +379,14 @@ pub fn construction_materials(world: &World, actor: Entity) -> Vec<(&'static str
         return Vec::new();
     }
     vec![
-        ("plank", super::super::homestead::PLANK_COST),
-        ("log", super::super::homestead::LOG_COST),
+        (
+            super::super::roles::roles(world).lumber,
+            super::super::homestead::PLANK_COST,
+        ),
+        (
+            super::super::roles::roles(world).timber,
+            super::super::homestead::LOG_COST,
+        ),
     ]
 }
 
@@ -471,6 +549,7 @@ pub(super) fn tick(world: &mut World, now: u64) -> bool {
         );
     }
     if super::super::living::cold(world) {
+        let fuel = super::super::roles::roles(world).fuel;
         for (house_id, entity) in households(world) {
             let house = world.get::<Household>(entity).expect("house").clone();
             if house.heated_until > now {
@@ -484,11 +563,11 @@ pub(super) fn tick(world: &mut World, now: u64) -> bool {
                     || world
                         .get::<SimPos>(actor)
                         .is_none_or(|pos| pos.dist2(house.door) > i64::from(HEARTH_REACH_MM).pow(2))
-                    || economy::count(world, actor, HEARTH_FUEL) < HEARTH_FUEL_REQUIRED
+                    || economy::count(world, actor, fuel) < HEARTH_FUEL_REQUIRED
                 {
                     continue;
                 }
-                if economy::consume(world, actor, HEARTH_FUEL, HEARTH_FUEL_REQUIRED).is_ok() {
+                if economy::consume(world, actor, fuel, HEARTH_FUEL_REQUIRED).is_ok() {
                     let heated_until = now.saturating_add(heating_period(world));
                     let mut house = world.get_mut::<Household>(entity).expect("house");
                     house.heated_until = heated_until;

@@ -38,6 +38,8 @@ struct HiddenArrivals(BTreeSet<Entity>);
 pub(crate) fn plugin(app: &mut App) {
     if testbed_content::village::frontier::enabled(app.world()) {
         living_scene::plugin(app);
+        crate::island_atmosphere::plugin(app);
+        crate::island_audio::plugin(app);
         app.init_resource::<HiddenArrivals>().add_systems(
             Update,
             hide_arrivals

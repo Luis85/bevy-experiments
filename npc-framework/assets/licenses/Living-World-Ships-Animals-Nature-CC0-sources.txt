@@ -1,0 +1,60 @@
+Living world: ships, animals, nature and village props (added 2026-11-12)
+=========================================================================
+
+Every file listed here is CC0 1.0 Universal (public domain dedication),
+https://creativecommons.org/publicdomain/zero/1.0/ . Per-file download URLs,
+byte counts and SHA-256 hashes are in ../living-world-manifest.json.
+Licence evidence was read on each creator's own page on 2026-11-12.
+
+1. KayKit Medieval Hexagon Pack 1.0 (Kay Lousberg)
+   Files: living/nature/{trees_A_large,trees_A_medium,trees_B_large,trees_B_medium,
+          trees_A_cut,trees_B_cut,rock_single_A,rock_single_C,waterlily_B,waterplant_C}.*
+          living/props/*.gltf|.bin and living/props/hexagons_medieval.png
+   Source: https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0
+           commit 84fa4e91af6a88989be7c99e0891cede11f2ca38 (same commit as the earlier files)
+   Licence text: KayKit-Medieval-Hexagon-Pack-1.0.txt (already retained)
+   Changes: none.
+
+2. Kenney Pirate Kit 2.1 (Kenney, www.kenney.nl)
+   Files: living/ships/*.glb and living/ships/Textures/colormap.png
+   Source: Kenney's own OpenGameArt upload, https://opengameart.org/content/pirate-kit
+           (submitted by user "kenney"; licence field: CC0)
+           archive kenney_pirate-kit_2.1.zip,
+           sha256 667ed2caf92954ddb98f7b7cede831fe99ab75063c26b25e23d32715bee9c943
+   Licence text: Kenney-Pirate-Kit-2.1.txt (from the archive)
+   Changes: none (files copied from "Models/GLB format/").
+
+3. Kenney Nature Kit 2.1 (Kenney, www.kenney.nl)
+   Files: living/nature/*.glb, living/props/{fence_simple,fence_gate,sign,
+          crops_wheatStageA,crops_wheatStageB}.glb
+   Source: Kenney's own OpenGameArt upload, https://opengameart.org/content/nature-kit
+           (submitted by user "kenney"; licence field: CC0)
+           archive "Nature Kit (2.1).zip",
+           sha256 fa7974a0d342bfe63c38664ba9f8ec1a4aab8ea25f099bdc56870e33588c4d9d
+   Licence text: Kenney-Nature-Kit-2.1.txt (from the archive)
+   Changes: none (files copied from "Models/GLTF format/").
+
+4. Quaternius Pirate Kit (Quaternius)
+   Files: living/ships/{Prop_Anchor,Environment_Dock_Pole,Prop_Fish_Mackerel,
+          Prop_Bucket_Fishes}.gltf (self-contained, embedded 32x32 atlas)
+   Source: https://quaternius.com/packs/piratekit.html (License: CC0, linking the CC0 1.0
+           deed); its "Download" button opens the creator's public Google Drive folder
+           https://drive.google.com/drive/folders/1KjMzhVsDcyvYMWeVjZcRfuu8auBLpNi2
+   Licence text: that Drive folder contains no licence file; the CC0 statement is the one
+           on the creator's pack page above.
+   Source sha256: Prop_Anchor 98504894d03160b86f8b4a34d6e1b9b31bac173ce424378100f13143fd0223fc
+                  Environment_Dock_Pole f5a511f3f59283153ed470b3edd4a3f91700ee31d6fe89fd941510ac08318ced
+                  Prop_Fish_Mackerel 2695abf47ba7f8b15959fee50df63ea6c44ce15347323880a9c66bbd38bff92e
+                  Prop_Bucket_Fishes f366412e831a4f14b73cf4a1d15e2acc70c2588c36bdf7db24f18d235e059861
+   Changes: none.
+
+5. Quaternius Ultimate Animated Animal Pack (Quaternius, July 2021)
+   Files: living/animals/{Deer,Stag}.gltf (self-contained, base64-embedded buffer)
+   Source: https://quaternius.com/packs/ultimateanimatedanimals.html (License: CC0);
+           its "Download" button opens the creator's public Google Drive folder
+           https://drive.google.com/drive/folders/1uJ3N5HfB7jKTseJUNQr3N4YaN0UuEtHk ,
+           subfolder glTF/ (Deer.gltf, Stag.gltf).
+   Licence text: Quaternius-Ultimate-Animated-Animal-Pack.txt (License.txt from that folder)
+   Source sha256: Deer.gltf b8afd0647e7a74332ce802c8326dfefe1a2b76da67ab925a631aaddb5ae9bdd4
+                  Stag.gltf 170b964909d16d1ab4d428b1d714f25016913d32481acd9c3d62923192583be6
+   Changes: none.

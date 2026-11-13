@@ -6,7 +6,7 @@
 //! cargo run -p actor_testbed -- [--scenario NAME|FILE] [--seed N] [--speed N] [--player N]
 //!     [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE]
 //!     [--screenshot PATH --after-secs S] [--panels journal,perf,sheet,perception,explorer,map]
-//!     [--journal FILE] [--record FILE] [--paused] [--perf-warn] [--fog on|off]
+//!     [--journal FILE] [--record FILE] [--paused] [--perf-warn] [--mute] [--fog on|off]
 //!     [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote]
 //!     [--out-dir DIR]
 //! cargo run -p actor_testbed -- --explorer-home DIR --agent NAME [--world NAME [--preset ID]]
@@ -117,11 +117,11 @@ pub const SPEED_PRESETS: [u32; 3] = [1, 3, 10];
 
 const USAGE: &str = "usage: actor_testbed [--scenario NAME|FILE] [--seed N] [--speed N] [--player N] \
 [--select ID[,ID..]] [--camera X,Z,DIST[,YAW_DEG[,PITCH_DEG]]] [--commands FILE] [--screenshot PATH] \
-[--after-secs S] [--panels journal,perf,sheet,perception,explorer,map] [--journal FILE] [--record FILE] [--paused] [--perf-warn] \
+[--after-secs S] [--panels journal,perf,sheet,perception,explorer,map] [--journal FILE] [--record FILE] [--paused] [--perf-warn] [--mute] \
 [--fog on|off] [--remote | --no-remote] [--remote-port N] [--render-remote-port N | --no-render-remote] [--out-dir DIR]
 [--world-state-out FILE [--world-state-interval-ms 50..60000]]
 [--island-mode inspector|character|editor] [--island-save FILE [--island-rules FILE] [--island-new]]
-       actor_testbed --front-end [--island-save FILE] [--island-rules FILE] [capture/remote flags]
+       actor_testbed --front-end [--dev-keys] [--island-save FILE] [--island-rules FILE] [capture/remote flags]
        actor_testbed --explorer-home DIR --agent NAME [--world NAME [--preset ID] [--world-preset ID] | --resume [--load-anyway | --fresh-world] [--exact-port N]] [--check-save] [--close-dialog] [--actors-dir DIR] [--worlds-dir DIR] [other flags except --scenario and --seed]
        (explorer mode: BRP is always on, on the first free port from --remote-port N on, N..=N+19, default 15702;
         --exact-port N: exactly N, waited for up to 10 s, else exit 4)
@@ -135,6 +135,11 @@ struct Args {
     island_rules: Option<PathBuf>,
     island_new: bool,
     front_end: bool,
+    /// `--dev-keys`: keep the developer toggles (F1, F3-F8) in the player session.
+    dev_keys: bool,
+    /// `--ui-gallery PAGE`: a developer screen that shows the widget kit in
+    /// every state, for screenshot checks. Never offered in a menu.
+    ui_gallery: Option<testbed_view::game_ui::gallery::Page>,
     seed: Option<u64>,
     speed: u32,
     player: u32,
@@ -150,6 +155,8 @@ struct Args {
     paused: bool,
     /// `--perf-warn`: warn on every budget breach, not once per mechanic.
     perf_warn: bool,
+    /// No island audio (also implied by `--screenshot` capture runs).
+    mute: bool,
     /// `--fog on|off` (`None`: on in explorer mode, off elsewhere).
     fog: Option<bool>,
     remote: RemoteArgs,
@@ -231,6 +238,8 @@ fn parse_args(raw: &[String]) -> Args {
         island_rules: None,
         island_new: false,
         front_end: false,
+        dev_keys: false,
+        ui_gallery: None,
         seed: None,
         speed: 1,
         player: 1,
@@ -245,6 +254,7 @@ fn parse_args(raw: &[String]) -> Args {
         record: None,
         paused: false,
         perf_warn: false,
+        mute: false,
         fog: None,
         // BRP on in dev builds, off in release builds (and never without
         // `debug-tools`).
@@ -263,6 +273,10 @@ fn parse_args(raw: &[String]) -> Args {
                 args.front_end = true;
                 continue;
             }
+            "--dev-keys" => {
+                args.dev_keys = true;
+                continue;
+            }
             "--island-new" => {
                 args.island_new = true;
                 continue;
@@ -273,6 +287,10 @@ fn parse_args(raw: &[String]) -> Args {
             }
             "--perf-warn" => {
                 args.perf_warn = true;
+                continue;
+            }
+            "--mute" => {
+                args.mute = true;
                 continue;
             }
             "-h" | "--help" => usage(""),
@@ -325,6 +343,12 @@ fn parse_args(raw: &[String]) -> Args {
             "--journal" => args.journal = Some(PathBuf::from(value)),
             "--record" => args.record = Some(PathBuf::from(value)),
             "--fog" => args.fog = Some(parse_fog(&value).unwrap_or_else(|| bad("on or off"))),
+            "--ui-gallery" => {
+                args.ui_gallery = Some(
+                    testbed_view::game_ui::gallery::Page::parse(&value)
+                        .unwrap_or_else(|| bad("tokens, controls, data, messages or icons")),
+                );
+            }
             _ => usage(&format!("unknown flag {flag}")),
         }
     }
@@ -403,6 +427,16 @@ fn scenario_doc(name: &str) -> Result<(ScenarioDoc, bool), String> {
     }
 }
 
+/// The player session carries the game's name only; developer launches keep
+/// the framework in theirs.
+fn window_title(front_end: bool, colony: bool) -> &'static str {
+    match (front_end, colony) {
+        (true, _) => "Island Village",
+        (false, true) => "Island Village | NPC Framework",
+        (false, false) => "NPC Framework | Actor Testbed",
+    }
+}
+
 /// The host side added to the testbed app before its content freezes:
 /// window, renderer, driver, view, journal and the remote interface.
 fn host(app: &mut App, args: &Args) {
@@ -412,17 +446,17 @@ fn host(app: &mut App, args: &Args) {
     }
     if args.front_end {
         app.insert_resource(testbed_view::PlayerExperience { enabled: true })
-            .insert_resource(testbed_view::FrontendGate(true));
+            .insert_resource(testbed_view::FrontendGate(true))
+            .insert_resource(testbed_view::DeveloperKeys(args.dev_keys));
+    }
+    // Capture runs are automation: they stay silent like `--mute`.
+    if args.mute || args.screenshot.is_some() {
+        app.insert_resource(testbed_view::IslandAudioSettings::muted());
     }
     let plugins = DefaultPlugins
         .set(WindowPlugin {
             primary_window: Some(Window {
-                title: if colony {
-                    "Island Village | NPC Framework"
-                } else {
-                    "NPC Framework | Actor Testbed"
-                }
-                .into(),
+                title: window_title(args.front_end, colony).into(),
                 resolution: (1280, 720).into(),
                 ..default()
             }),
@@ -469,6 +503,20 @@ fn host(app: &mut App, args: &Args) {
         .add_systems(Startup, (log_names, preselect));
     if args.front_end {
         frontend::install(app);
+        // Shape's "Export world" writes beside the world rules, or beside
+        // the save when no rules file was named.
+        let folder = args
+            .island_rules
+            .as_deref()
+            .or(args.island_save.as_deref())
+            .and_then(std::path::Path::parent)
+            .map(std::path::Path::to_path_buf);
+        if let Some(folder) = folder {
+            app.insert_resource(frontend::ExportFolder(folder));
+        }
+    }
+    if let Some(page) = args.ui_gallery {
+        testbed_view::game_ui::gallery::install(app, page);
     }
     if !app.is_plugin_added::<JournalPlugin>() {
         app.add_plugins(JournalPlugin::default());
@@ -809,6 +857,19 @@ mod tests {
         assert_eq!(args.screenshot, Some(PathBuf::from("title.png")));
         assert_eq!(args.after_secs, 2.0);
         assert!(!args.remote.remote);
+        assert!(!args.dev_keys, "developer toggles are opt-in for players");
+    }
+
+    #[test]
+    fn player_session_title_and_developer_keys_are_explicit() {
+        let raw = ["--front-end", "--dev-keys", "--island-save", "scratch.json"];
+        assert!(parse_args(&raw.map(str::to_owned)).dev_keys);
+        assert!(!parse_args(&raw.map(str::to_owned)).mute);
+        let quiet = ["--front-end", "--mute", "--island-save", "scratch.json"];
+        assert!(parse_args(&quiet.map(str::to_owned)).mute);
+        assert_eq!(window_title(true, true), "Island Village");
+        assert_eq!(window_title(false, true), "Island Village | NPC Framework");
+        assert_eq!(window_title(false, false), "NPC Framework | Actor Testbed");
     }
 
     #[test]

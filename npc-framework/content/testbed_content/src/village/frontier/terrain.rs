@@ -81,7 +81,8 @@ impl SimHashResource for TerrainState {
     }
 }
 pub fn register(app: &mut App) {
-    app.register_sim_resource::<TerrainState>();
+    app.register_sim_resource::<TerrainState>()
+        .register_command::<TerraformCells>();
 }
 pub fn bounds(world: &World) -> GridBounds {
     world
@@ -114,6 +115,10 @@ fn near_segment(p: SimPos, a: SimPos, b: SimPos, radius: i32) -> bool {
         a.z + (dz * projection / length) as i32,
     );
     p.dist2(nearest) <= i64::from(radius).pow(2)
+}
+/// Whether `p` lies on one of the generated roads of the living world.
+pub fn on_road(world: &World, p: SimPos) -> bool {
+    super::spec(world).is_some_and(|spec| road(spec, p))
 }
 fn road(spec: &LivingWorldSpec, p: SimPos) -> bool {
     for settlement in &spec.settlements {
@@ -220,7 +225,22 @@ pub fn spawn(world: &mut World) {
     for index in 0..bounds.len() as u32 {
         let cell = bounds.coord(index);
         let p = SimPos::new(cell.x * 1000 + 500, cell.z * 1000 + 500);
-        let value = generated_cell(&spec, p, seed, index);
+        let mut value = generated_cell(&spec, p, seed, index);
+        // An exported world keeps its own heights and surfaces; the biome
+        // still follows the settlements.
+        if let Some(terrain) = &spec.terrain
+            && let (Some(height), Some(surface)) = (
+                terrain.heights.get(index as usize),
+                terrain
+                    .surfaces
+                    .chars()
+                    .nth(index as usize)
+                    .and_then(super::shape::surface_of),
+            )
+        {
+            value.height_mm = *height;
+            value.surface = surface;
+        }
         world
             .resource_mut::<SpatialGrid>()
             .set_static(cell, value.navigation());
@@ -234,6 +254,19 @@ pub fn spawn(world: &mut World) {
     });
 }
 
+fn value_check(height_mm: i32, surface: TerrainSurface) -> Result<(), String> {
+    if !(-2000..=12000).contains(&height_mm)
+        || (surface == TerrainSurface::Water && height_mm > 0)
+        || (surface != TerrainSurface::Water && height_mm < 0)
+    {
+        return Err("Dry terrain must be 0..12000 mm; water -2000..0 mm".into());
+    }
+    Ok(())
+}
+
+/// One absolute cell value of a terrain edit.
+pub type CellEdit = (CellCoord, i32, TerrainSurface);
+
 fn brush(
     world: &World,
     x: i32,
@@ -246,12 +279,7 @@ fn brush(
     if radius > 8 || !bounds.contains(CellCoord::new(x, z)) {
         return Err("Brush must be within the regional map; radius is 0..8 metres".into());
     }
-    if !(-2000..=12000).contains(&height_mm)
-        || (surface == TerrainSurface::Water && height_mm > 0)
-        || (surface != TerrainSurface::Water && height_mm < 0)
-    {
-        return Err("Dry terrain must be 0..12000 mm; water -2000..0 mm".into());
-    }
+    value_check(height_mm, surface)?;
     let mut cells = Vec::new();
     let r = radius as i32;
     for cz in z - r..=z + r {
@@ -272,17 +300,29 @@ pub fn terraform_check(
     height_mm: i32,
     surface: TerrainSurface,
 ) -> Result<(), String> {
+    let edits: Vec<CellEdit> = brush(world, x, z, radius, height_mm, surface)?
+        .into_iter()
+        .map(|cell| (cell, height_mm, surface))
+        .collect();
+    edits_check(world, &edits)
+}
+
+/// Validates a whole set of in-bounds cell values in one pass. Every rule of
+/// the single brush applies to the combined result, so a batch is atomic.
+fn edits_check(world: &World, edits: &[CellEdit]) -> Result<(), String> {
     let terrain = world
         .get_resource::<TerrainState>()
         .ok_or("Regional terrain is missing")?;
-    let changed: Vec<_> = brush(world, x, z, radius, height_mm, surface)?
-        .into_iter()
-        .filter(|c| {
+    let edits: Vec<CellEdit> = edits
+        .iter()
+        .copied()
+        .filter(|(c, height_mm, surface)| {
             terrain
                 .cell(c.x, c.z)
-                .is_some_and(|v| v.height_mm != height_mm || v.surface != surface)
+                .is_some_and(|v| v.height_mm != *height_mm || v.surface != *surface)
         })
         .collect();
+    let changed: Vec<CellCoord> = edits.iter().map(|(cell, _, _)| *cell).collect();
     if changed.is_empty() {
         return Ok(());
     }
@@ -298,7 +338,11 @@ pub fn terraform_check(
         let fixed = world.get::<VillagePlace>(*e).is_some()
             || world.get::<ResourcePatch>(*e).is_some()
             || world.get::<Household>(*e).is_some()
-            || world.get::<HomesteadPlot>(*e).is_some();
+            || world.get::<HomesteadPlot>(*e).is_some()
+            || world.get::<crate::village::civic::Building>(*e).is_some()
+            || world
+                .get::<crate::village::civic::ConstructionSite>(*e)
+                .is_some();
         let occupied = world.get::<Villager>(*e).is_some()
             || world.get::<crate::village::hunting::Wildlife>(*e).is_some()
             || world
@@ -323,10 +367,10 @@ pub fn terraform_check(
         return Err("Brush overlaps a solid building".into());
     }
     let mut candidate = terrain.clone();
-    for c in &changed {
+    for (c, height_mm, surface) in &edits {
         let value = &mut candidate.cells[terrain.bounds().index(*c).expect("brush") as usize];
-        value.height_mm = height_mm;
-        value.surface = surface;
+        value.height_mm = *height_mm;
+        value.surface = *surface;
     }
     // Heightfield traversal has one ground surface. Prevent introducing a
     // discontinuous dry step that would make visual traversal misleading.
@@ -378,29 +422,12 @@ pub fn terraform(
     surface: TerrainSurface,
 ) -> Result<(), String> {
     terraform_check(world, x, z, radius, height_mm, surface)?;
-    let cells = brush(world, x, z, radius, height_mm, surface)?;
-    let mut changed = 0;
-    for c in cells {
-        let index = world
-            .resource::<TerrainState>()
-            .bounds()
-            .index(c)
-            .expect("brush") as usize;
-        let mut value = world.resource::<TerrainState>().cells[index];
-        if value.height_mm == height_mm && value.surface == surface {
-            continue;
-        }
-        value.height_mm = height_mm;
-        value.surface = surface;
-        world.resource_mut::<TerrainState>().cells[index] = value;
-        world
-            .resource_mut::<SpatialGrid>()
-            .set_static(c, value.navigation());
-        changed += 1;
-    }
+    let edits: Vec<CellEdit> = brush(world, x, z, radius, height_mm, surface)?
+        .into_iter()
+        .map(|cell| (cell, height_mm, surface))
+        .collect();
+    let changed = edits_apply(world, &edits);
     if changed > 0 {
-        let mut state = world.resource_mut::<TerrainState>();
-        state.revision = state.revision.saturating_add(1);
         record_effect(
             world,
             None,
@@ -410,6 +437,112 @@ pub fn terraform(
     }
     Ok(())
 }
+/// Writes already validated cell values; one revision for the whole set.
+fn edits_apply(world: &mut World, edits: &[CellEdit]) -> u32 {
+    let mut changed = 0;
+    for (c, height_mm, surface) in edits {
+        let index = world
+            .resource::<TerrainState>()
+            .bounds()
+            .index(*c)
+            .expect("checked cell") as usize;
+        let mut value = world.resource::<TerrainState>().cells[index];
+        if value.height_mm == *height_mm && value.surface == *surface {
+            continue;
+        }
+        value.height_mm = *height_mm;
+        value.surface = *surface;
+        world.resource_mut::<TerrainState>().cells[index] = value;
+        world
+            .resource_mut::<SpatialGrid>()
+            .set_static(*c, value.navigation());
+        changed += 1;
+    }
+    if changed > 0 {
+        let mut state = world.resource_mut::<TerrainState>();
+        state.revision = state.revision.saturating_add(1);
+    }
+    changed
+}
+
+/// Most cells one `TerraformCells` command may carry.
+pub const MAX_TERRAFORM_CELLS: usize = 4096;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TerraformCell {
+    pub x: i32,
+    pub z: i32,
+    pub height_mm: i32,
+    pub surface: TerrainSurface,
+}
+
+/// A painted stroke as one recorded command: every listed cell receives its own
+/// absolute value, the combined result is validated once, and either all cells
+/// change or none does. Registered only in the regional profile.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TerraformCells {
+    pub cells: Vec<TerraformCell>,
+}
+impl TerraformCells {
+    fn edits(&self, world: &World) -> Result<Vec<CellEdit>, String> {
+        if self.cells.is_empty() || self.cells.len() > MAX_TERRAFORM_CELLS {
+            return Err(format!(
+                "TerraformCells needs 1..={MAX_TERRAFORM_CELLS} cells"
+            ));
+        }
+        let bounds = bounds(world);
+        let mut seen = BTreeSet::new();
+        let mut edits = Vec::with_capacity(self.cells.len());
+        for cell in &self.cells {
+            let at = CellCoord::new(cell.x, cell.z);
+            if !bounds.contains(at) {
+                return Err(format!(
+                    "Cell [{}, {}] is outside the regional map",
+                    cell.x, cell.z
+                ));
+            }
+            if !seen.insert(at) {
+                return Err(format!("Cell [{}, {}] is listed twice", cell.x, cell.z));
+            }
+            value_check(cell.height_mm, cell.surface)?;
+            edits.push((at, cell.height_mm, cell.surface));
+        }
+        Ok(edits)
+    }
+    pub fn check(&self, world: &World) -> Result<(), String> {
+        if !super::enabled(world) {
+            return Err("TerraformCells requires the regional living world".into());
+        }
+        edits_check(world, &self.edits(world)?)
+    }
+    pub fn perform(&self, world: &mut World) -> Result<(), String> {
+        self.check(world)?;
+        let edits = self.edits(world)?;
+        let changed = edits_apply(world, &edits);
+        if changed > 0 {
+            record_effect(
+                world,
+                None,
+                "RegionalTerrainChanged",
+                &json!({"batch":edits.len(),"cells":changed}),
+            );
+        }
+        Ok(())
+    }
+}
+impl ContentCommand for TerraformCells {
+    const NAME: &'static str = "TerraformCells";
+    fn validate(&self, world: &World) -> Result<(), npc_framework::kernel::commands::CommandError> {
+        self.check(world)
+            .map_err(|reason| npc_framework::kernel::commands::CommandError::Unavailable { reason })
+    }
+    fn apply(self, world: &mut World) {
+        let _ = self.perform(world);
+    }
+}
+
 pub fn validate(world: &World) -> Result<(), String> {
     let terrain = world
         .get_resource::<TerrainState>()

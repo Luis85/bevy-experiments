@@ -41,7 +41,12 @@ struct PerceptionText;
 pub(crate) fn plugin(app: &mut App) {
     app.init_resource::<TestbedPanels>()
         .add_systems(Startup, spawn_panels)
-        .add_systems(Update, toggle_panels.in_set(ViewSystems::Input))
+        .add_systems(
+            Update,
+            toggle_panels
+                .run_if(crate::player_hud::developer_keys)
+                .in_set(ViewSystems::Input),
+        )
         .add_systems(Update, sync_panel_presentation.in_set(ViewSystems::Sync))
         .add_systems(
             Update,
@@ -88,7 +93,10 @@ fn spawn_panels(mut commands: Commands) {
         });
 }
 
-fn toggle_panels(keys: Option<Res<ButtonInput<KeyCode>>>, mut panels: ResMut<TestbedPanels>) {
+pub(crate) fn toggle_panels(
+    keys: Option<Res<ButtonInput<KeyCode>>>,
+    mut panels: ResMut<TestbedPanels>,
+) {
     if let Some(keys) = keys {
         if keys.just_pressed(KeyCode::F5) {
             panels.sheet = !panels.sheet;

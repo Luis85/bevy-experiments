@@ -1,0 +1,52 @@
+Island Village audio: sources and licence record
+================================================
+
+Every file below is dedicated to the public domain under Creative Commons Zero 1.0
+(https://creativecommons.org/publicdomain/zero/1.0/). Retrieved 2026-11-10. The licence
+was read from each source page at retrieval time; pages that listed any licence other
+than CC0 were rejected.
+
+Kenney, "RPG sounds" (licence text: Kenney-RPG-Audio.txt)
+  page  https://opengameart.org/content/50-rpg-sound-effects   (submitter: kenney, licence: CC0)
+  file  https://opengameart.org/sites/default/files/RPGsounds_Kenney.zip
+  used unchanged, from the archive's OGG/ folder:
+  d00c2b3c9fff07e376145c8c8c45c90e5084ec192f6ce0387db233f7b86f1486  audio/kenney-rpg-audio/chop.ogg
+  8a346186fd297254248cab8e8117060a52a5cf2a84f603153a762108550ea95e  audio/kenney-rpg-audio/creak1.ogg
+  8a990afdc03aebb91d528f5385e2f95582dbfa8e2c12c71098ab01be9142294a  audio/kenney-rpg-audio/creak2.ogg
+  9851a69d0c613e13bceef08060ecc4148f098ef487927cbebe270d642398a3b3  audio/kenney-rpg-audio/metalClick.ogg
+  8e1f820d217d380fde10e969d109db34303e3f4d11c3951926eddef813d04ae2  audio/kenney-rpg-audio/metalPot2.ogg
+  d306e5b848f6843332d0ca19f8f7dfe5796aeb56d8273902b085df463273f1dc  audio/kenney-rpg-audio/metalPot3.ogg
+
+Kenney, "Interface Sounds (1.0)" (licence text: Kenney-Interface-Sounds-1.0.txt)
+  page  https://opengameart.org/content/interface-sounds   (submitter: kenney, licence: CC0)
+  file  https://opengameart.org/sites/default/files/kenney_interfaceSounds.zip
+  used unchanged, from the archive's Audio/ folder:
+  ccfb7fa0cccdd9faec0eb16033c732b1e308d139d80f799161495d58f7adcdb9  audio/kenney-interface-sounds/click_001.ogg
+
+isaiah658, "Ambient Bird Sounds"
+  page  https://opengameart.org/content/ambient-bird-sounds   (licence: CC0)
+  file  https://opengameart.org/sites/default/files/birds-isaiah658.ogg
+  used unchanged:
+  359e4e3f9da9d75aac64cede511c7e3ef8b461f9d9f8c230f8f80e44c4b3e35f  audio/ambience/birds-isaiah658.ogg
+
+TinyWorlds, "Forest Ambience"
+  page  https://opengameart.org/content/forest-ambience   (licence: CC0)
+  file  https://opengameart.org/sites/default/files/Forest_Ambience.mp3
+  transcoded MP3 -> Ogg Vorbis (ffmpeg libvorbis -q:a 3), gain +18 dB, 50 ms fade at each end:
+  1bdb83f5dce37d8280d204f985bcea209d30bdfb201a547f267a96b2c4cd8d69  audio/ambience/forest-tinyworlds.ogg
+
+Wolfgang, "Crickets Ambient Noise - loopable"
+  page  https://opengameart.org/content/crickets-ambient-noise-loopable   (licence: CC0)
+  file  https://opengameart.org/sites/default/files/crickets-oneloop.mp3
+  transcoded MP3 -> Ogg Vorbis (ffmpeg libvorbis -q:a 3), 50 ms fade at each end:
+  8adce150438049a3aa2976ecfecb15ca4bc80e75590137ec9435b469ee0868a4  audio/ambience/crickets-wolfgang.ogg
+
+jasinski, "alkaibeach" (packaged as "Beach Ocean Waves" by qubodup)
+  page    https://opengameart.org/content/beach-ocean-waves   (licence: CC0)
+  origin  https://freesound.org/people/jasinski/sounds/18363/   (licence: CC0 1.0)
+  file    https://opengameart.org/sites/default/files/jasinski-wave-prev.ogg
+  re-encoded Ogg Vorbis (ffmpeg libvorbis -q:a 3) with a 0.6 s fade at each end:
+  285fe21abd525ad608c1548248442fc0e5357570d151efc54746247e172fb7a8  audio/ambience/waves-jasinski.ogg
+
+Not included: Kenney "Impact Sounds" and "UI Audio" (kenney.nl offers them only through a
+signed browser download; no copy on the author's OpenGameArt account was located).

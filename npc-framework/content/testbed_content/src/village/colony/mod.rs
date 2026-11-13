@@ -5,6 +5,7 @@
 mod arrival;
 mod commands;
 mod housing;
+pub(crate) use housing::fuel_level_reserve;
 mod model;
 mod social;
 mod summary;
@@ -13,11 +14,13 @@ pub use arrival::JoinIsland;
 pub use commands::ColonyAct;
 pub use housing::{
     ConstructionIntent, HomeHeating, can_claim_cottage, construction_intent,
-    construction_materials, cottage_claimed, home_heated, home_heating, home_of,
-    household_materials,
+    construction_materials, cottage_claimed, heating_period_ticks, home_heated, home_heating,
+    home_of, household_materials,
 };
 pub use model::{AwaitingArrival, ColonyState, Household, HousingProject, SocialLife};
-pub use social::{social_available, social_target};
+pub use social::{
+    WORK_PACE_FASTEST, WORK_PACE_SLOWEST, social_available, social_target, work_pace_percent,
+};
 pub use summary::{ColonySummary, summary};
 // Compatibility path for callers of the original colony action API. Execution
 // belongs to the resident action layer; colony domain queries never call AI.

@@ -1,11 +1,17 @@
 //! One native window from title to daily life, pause and a safely saved return.
 //! This application layer owns lifecycle and files; gameplay enters as commands.
+mod export;
+mod settings;
 #[cfg(test)]
 mod startup_tests;
 mod ui;
+mod worlds;
 use crate::island::session;
 use bevy::input_focus::InputFocus;
 use bevy::prelude::*;
+pub(crate) use export::ExportFolder;
+#[cfg(test)]
+pub(crate) use export::export as export_world;
 use npc_framework::kernel::driver::NpcDriverSet;
 use npc_framework::prelude::{SimClock, SimControl};
 use npc_framework::view_helpers::ViewSystems;
@@ -18,12 +24,15 @@ pub(crate) enum Screen {
     Playing,
     Pause,
     Controls,
+    Settings,
     Transition,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Destination {
     Title,
     Quit,
+    /// Saved, then the New-game screen with the exported world chosen.
+    NewGame,
 }
 
 /// Renderer readiness belongs to presentation. A headless host has no such gate.
@@ -73,7 +82,14 @@ pub(crate) struct FrontendState {
     resume_mode: IslandMode,
     resume_multiplier: u32,
     pending: Option<PendingExit>,
+    /// The control to focus after a rebuild, so repeated settings steps keep
+    /// their place for keyboard users.
+    refocus: Option<Action>,
     revision: u64,
+    settings_tab: SettingsTab,
+    guide_page: u8,
+    /// The player's speed while the played character sleeps faster.
+    sleep_restore: Option<u32>,
 }
 impl Default for FrontendState {
     fn default() -> Self {
@@ -86,12 +102,16 @@ impl Default for FrontendState {
             resume_mode: IslandMode::Character,
             resume_multiplier: 1,
             pending: None,
+            refocus: None,
             revision: 1,
+            settings_tab: SettingsTab::default(),
+            guide_page: 0,
+            sleep_restore: None,
         }
     }
 }
 
-#[derive(Component, Clone, Copy, Debug)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Action {
     Continue,
     ContinueInspector,
@@ -105,21 +125,59 @@ pub(crate) enum Action {
     Save,
     Title,
     Quit,
-    Inspect,
-    Terraform,
+    Settings,
+    Adjust(settings::Change),
+    /// A new island, entered in Shape.
+    BeginShape,
+    /// A tab of the Settings screen, or a page of the Guide.
+    SettingsTab(SettingsTab),
+    GuidePage(u8),
+    /// A world in the New-game list, by its place in the list.
+    ChooseWorld(u8),
+}
+
+/// The four tabs of the Settings screen.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum SettingsTab {
+    #[default]
+    Sound,
+    Display,
+    Controls,
+    Accessibility,
+}
+
+impl SettingsTab {
+    pub(crate) const ALL: [Self; 4] = [
+        Self::Sound,
+        Self::Display,
+        Self::Controls,
+        Self::Accessibility,
+    ];
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Sound => "Sound",
+            Self::Display => "Display",
+            Self::Controls => "Controls",
+            Self::Accessibility => "Accessibility",
+        }
+    }
 }
 
 pub(crate) fn install(app: &mut App) {
+    settings::install(app);
     testbed_view::game_ui::install(app);
     testbed_view::game_ui::install_panel_scroll(app);
     testbed_view::install_text_clipboard(app);
     app.init_resource::<FrontendState>()
+        .init_resource::<export::ExportState>()
+        .init_resource::<worlds::WorldChoice>()
         .insert_resource(testbed_view::PlayerExperience { enabled: true })
         .init_resource::<InputFocus>()
         .insert_resource(FrontendGate(true))
         .init_resource::<PlayerMenuRequest>()
         .add_systems(Startup, ui::spawn)
         .add_observer(ui::activate)
+        .add_observer(ui::slide)
         .add_systems(
             Update,
             (ui::sync_name, ui::keyboard_navigation)
@@ -128,7 +186,7 @@ pub(crate) fn install(app: &mut App) {
         )
         .add_systems(
             Update,
-            (keys, process)
+            (keys, process, night)
                 .chain()
                 .after(ViewSystems::OverlayInput)
                 .before(ViewSystems::Input)
@@ -141,13 +199,34 @@ pub(crate) fn install(app: &mut App) {
                 .after(ViewSystems::Input)
                 .before(ViewSystems::Sync),
         )
-        .add_systems(Update, ui::refresh.after(ViewSystems::Present));
+        .add_systems(Update, ui::refresh.after(ViewSystems::Present))
+        .add_systems(Update, export::process.after(ViewSystems::Present));
+}
+
+/// The sound of going from one screen to another: a menu opens over play,
+/// closes back to it, and turns a page between menus.
+pub(crate) fn screen_sound(
+    from: Screen,
+    to: Screen,
+) -> Option<testbed_view::game_ui::sound::UiSound> {
+    use testbed_view::game_ui::sound::UiSound;
+    match (from == Screen::Playing, to == Screen::Playing) {
+        _ if from == to => None,
+        (true, false) => Some(UiSound::Open),
+        (false, true) => Some(UiSound::Close),
+        _ => Some(UiSound::Page),
+    }
 }
 
 fn set_screen(world: &mut World, screen: Screen) {
+    let from = world.resource::<FrontendState>().screen;
+    if let Some(sound) = screen_sound(from, screen) {
+        testbed_view::game_ui::sound::play(world, sound);
+    }
     {
         let mut flow = world.resource_mut::<FrontendState>();
         flow.screen = screen;
+        flow.refocus = None;
         flow.revision = flow.revision.wrapping_add(1);
     }
     world.resource_mut::<FrontendGate>().0 = screen != Screen::Playing;
@@ -179,7 +258,7 @@ fn keys(world: &mut World) {
     if escape {
         let screen = world.resource::<FrontendState>().screen;
         let action = match screen {
-            Screen::New | Screen::Controls => Some(Action::Back),
+            Screen::New | Screen::Controls | Screen::Settings => Some(Action::Back),
             Screen::Pause => Some(Action::Resume),
             Screen::Playing
                 if world.get_resource::<IslandMode>() != Some(&IslandMode::Character) =>
@@ -193,6 +272,23 @@ fn keys(world: &mut World) {
             if let Some(mut keys) = world.get_resource_mut::<ButtonInput<KeyCode>>() {
                 keys.reset(KeyCode::Escape);
             }
+        }
+    }
+    // "Try again" on a failed save's or export's toast: the outcome is the
+    // next toast.
+    if testbed_view::take_island_toast_retry(world) {
+        let offer = world.resource_mut::<export::ExportState>().offer.take();
+        if world.resource::<export::ExportState>().retry {
+            export::run(world);
+        } else if let Some(path) = offer {
+            // Saved first, through the ordinary exit; then the New-game
+            // screen with this world chosen.
+            world.resource_mut::<export::ExportState>().next_world = Some(path);
+            if let Err(error) = begin_exit(world, Destination::NewGame) {
+                message(world, NoticeTone::Error, error);
+            }
+        } else {
+            let _ = crate::island::save(world);
         }
     }
     // The application keeps the window until its world is safely saved.
@@ -210,6 +306,35 @@ fn keys(world: &mut World) {
     }
 }
 
+/// The speed the host runs while the played character sleeps.
+pub(crate) const SLEEP_SPEED: u32 = 30;
+
+/// While the played character sleeps in Live, the host runs the clock
+/// faster and gives the player's own speed back on waking. The simulation
+/// skips nothing: it only runs more ticks per second. A speed the player
+/// chooses during the night is kept.
+fn night(world: &mut World) {
+    let asleep = world.resource::<FrontendState>().screen == Screen::Playing
+        && world.get_resource::<IslandMode>() == Some(&IslandMode::Character)
+        && testbed_view::island_player_asleep(world);
+    let restore = world.resource::<FrontendState>().sleep_restore;
+    match (asleep, restore) {
+        (true, None) => {
+            let speed = world.resource::<SimControl>().multiplier;
+            world.resource_mut::<FrontendState>().sleep_restore = Some(speed.max(1));
+            world.resource_mut::<SimControl>().multiplier = SLEEP_SPEED;
+        }
+        (false, Some(speed)) => {
+            world.resource_mut::<FrontendState>().sleep_restore = None;
+            let mut control = world.resource_mut::<SimControl>();
+            if control.multiplier == SLEEP_SPEED {
+                control.multiplier = speed;
+            }
+        }
+        _ => {}
+    }
+}
+
 fn start_play(world: &mut World, new_name: Option<String>) -> Result<(), String> {
     start_in_mode(world, new_name, IslandMode::Character)
 }
@@ -220,7 +345,10 @@ fn start_in_mode(
     requested: IslandMode,
 ) -> Result<(), String> {
     if let Some(name) = new_name {
-        session::new_game(world, &name)?;
+        let chosen = world
+            .get_resource::<worlds::WorldChoice>()
+            .and_then(worlds::WorldChoice::chosen_path);
+        session::new_game_on(world, &name, chosen.as_deref())?;
     } else {
         session::continue_game(world)?;
     }
@@ -293,10 +421,12 @@ fn begin_exit(world: &mut World, destination: Destination) -> Result<(), String>
     }
     let active = session::summary(world).active;
     if !active {
-        if destination == Destination::Quit {
-            world.write_message(AppExit::Success);
-        } else {
-            set_screen(world, Screen::Title);
+        match destination {
+            Destination::Quit => {
+                world.write_message(AppExit::Success);
+            }
+            Destination::Title => set_screen(world, Screen::Title),
+            Destination::NewGame => open_new_game(world),
         }
         return Ok(());
     }
@@ -376,6 +506,14 @@ fn finish_exit(world: &mut World) {
         Ok(()) if destination == Destination::Quit => {
             world.write_message(AppExit::Success);
         }
+        Ok(()) if destination == Destination::NewGame => {
+            open_new_game(world);
+            message(
+                world,
+                NoticeTone::Success,
+                "Your island is saved and will be kept as a backup. Name your character and choose how to begin.",
+            );
+        }
         Ok(()) => {
             set_screen(world, Screen::Title);
             message(
@@ -389,6 +527,23 @@ fn finish_exit(world: &mut World) {
             message(world, NoticeTone::Error, error);
         }
     }
+}
+
+/// The New-game screen, its world list read again; an exported world the
+/// player asked for is chosen.
+fn open_new_game(world: &mut World) {
+    let prefer = world
+        .resource_mut::<export::ExportState>()
+        .next_world
+        .take();
+    let folder = world.get_resource::<ExportFolder>().map(|f| f.0.clone());
+    let default = session::default_world(world).clone();
+    world.resource_mut::<worlds::WorldChoice>().reload(
+        &default,
+        folder.as_deref(),
+        prefer.as_deref(),
+    );
+    set_screen(world, Screen::New);
 }
 
 /// A final durability failure must restore an actionable shell, even if an
@@ -422,18 +577,46 @@ fn process(world: &mut World) {
                 | Action::New
                 | Action::Begin
                 | Action::BeginInspector
+                | Action::BeginShape
         ) && !scene_ready(world)
         {
             continue;
         }
         let result = match action {
-            Action::Continue if screen == Screen::Title => start_play(world, None),
+            Action::Continue if screen == Screen::Title => start_play(world, None).map(|()| {
+                // Loading is said once, on the island, like a save.
+                let player = session::summary(world).player;
+                testbed_view::island_toast(
+                    world,
+                    testbed_view::ToastTone::Done,
+                    format!("Island loaded. Welcome back, {player}."),
+                    false,
+                    false,
+                );
+            }),
             Action::ContinueInspector if screen == Screen::Title => {
                 start_in_mode(world, None, IslandMode::Inspector)
             }
             Action::New if screen == Screen::Title => {
-                set_screen(world, Screen::New);
+                open_new_game(world);
                 message(world, NoticeTone::Info, "");
+                Ok(())
+            }
+            Action::ChooseWorld(index) if screen == Screen::New => {
+                {
+                    let mut choice = world.resource_mut::<worlds::WorldChoice>();
+                    let index = usize::from(index);
+                    if choice
+                        .entries
+                        .get(index)
+                        .is_some_and(|entry| entry.problem.is_none())
+                    {
+                        choice.chosen = index;
+                    }
+                }
+                let mut flow = world.resource_mut::<FrontendState>();
+                flow.refocus = Some(action);
+                flow.revision = flow.revision.wrapping_add(1);
                 Ok(())
             }
             Action::Begin if screen == Screen::New => {
@@ -444,14 +627,61 @@ fn process(world: &mut World) {
                 let name = ui::draft_name(world);
                 start_in_mode(world, Some(name), IslandMode::Inspector)
             }
+            // Shape first: the island is overseen, with the tools in hand.
+            Action::BeginShape if screen == Screen::New => {
+                let name = ui::draft_name(world);
+                start_in_mode(world, Some(name), IslandMode::Inspector).and_then(|()| {
+                    testbed_view::request_island_mode(world, IslandMode::Editor)?;
+                    world.resource_mut::<FrontendState>().resume_mode = IslandMode::Editor;
+                    Ok(())
+                })
+            }
+            Action::SettingsTab(tab) if screen == Screen::Settings => {
+                let mut flow = world.resource_mut::<FrontendState>();
+                flow.settings_tab = tab;
+                flow.refocus = Some(action);
+                flow.revision = flow.revision.wrapping_add(1);
+                Ok(())
+            }
+            Action::GuidePage(page) if screen == Screen::Controls => {
+                let mut flow = world.resource_mut::<FrontendState>();
+                flow.guide_page = page;
+                flow.refocus = Some(action);
+                flow.revision = flow.revision.wrapping_add(1);
+                Ok(())
+            }
             Action::Back => {
-                let target = if screen == Screen::Controls {
+                let target = if matches!(screen, Screen::Controls | Screen::Settings) {
                     world.resource::<FrontendState>().controls_back
                 } else {
                     Screen::Title
                 };
                 set_screen(world, target);
+                if screen == Screen::Settings {
+                    message(world, NoticeTone::Info, "");
+                }
                 Ok(())
+            }
+            Action::Settings if matches!(screen, Screen::Title | Screen::Pause) => {
+                world.resource_mut::<FrontendState>().controls_back = screen;
+                set_screen(world, Screen::Settings);
+                message(world, NoticeTone::Info, "");
+                Ok(())
+            }
+            Action::Adjust(change) if screen == Screen::Settings => {
+                let saved = settings::change(world, change);
+                let mut flow = world.resource_mut::<FrontendState>();
+                // A slider is filled in place: rebuilding the screen would
+                // take the thumb from under the pointer.
+                if !change.continuous() {
+                    flow.refocus = Some(action);
+                    flow.revision = flow.revision.wrapping_add(1);
+                }
+                if saved.is_ok() {
+                    flow.message.clear();
+                    flow.notice_tone = NoticeTone::Info;
+                }
+                saved
             }
             Action::Controls => {
                 world.resource_mut::<FrontendState>().controls_back = screen;
@@ -466,9 +696,6 @@ fn process(world: &mut World) {
                 let mode = world.resource::<FrontendState>().resume_mode;
                 resume(world, mode)
             }
-            Action::Inspect if screen == Screen::Pause => testbed_view::watch_island_village(world)
-                .and_then(|()| resume(world, IslandMode::Inspector)),
-            Action::Terraform if screen == Screen::Pause => resume(world, IslandMode::Editor),
             Action::Save if screen == Screen::Pause => crate::island::save(world)
                 .map(|()| message(world, NoticeTone::Success, "Your island is saved.")),
             Action::Title if screen == Screen::Pause => begin_exit(world, Destination::Title),
@@ -486,6 +713,24 @@ fn process(world: &mut World) {
 mod tests {
     use super::*;
     use npc_framework::prelude::run_ticks;
+
+    #[test]
+    fn menus_open_over_play_close_back_to_it_and_turn_pages_between() {
+        use testbed_view::game_ui::sound::UiSound;
+        assert_eq!(
+            screen_sound(Screen::Playing, Screen::Pause),
+            Some(UiSound::Open)
+        );
+        assert_eq!(
+            screen_sound(Screen::Pause, Screen::Playing),
+            Some(UiSound::Close)
+        );
+        assert_eq!(
+            screen_sound(Screen::Title, Screen::Settings),
+            Some(UiSound::Page)
+        );
+        assert_eq!(screen_sound(Screen::Pause, Screen::Pause), None);
+    }
 
     #[test]
     fn overseeing_new_and_saved_islands_defers_arrival_until_character_entry() {

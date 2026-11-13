@@ -249,7 +249,7 @@ def water_cell_in_empty_chunk(terrain, state):
 def lifecycle(flow, save, report):
     flow.click("New game")
     flow.click("Oversee the village")
-    poll(lambda: flow.has_widget("Play character"), flow.child, flow.deadline)
+    poll(lambda: flow.has_widget("Live"), flow.child, flow.deadline)
     flow.call("npc/pause")
     flow.click("Menu")
     # Keep the pause menu open during operator stepping/saving to hold the clock.

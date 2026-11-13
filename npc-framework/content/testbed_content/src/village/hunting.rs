@@ -119,20 +119,22 @@ pub fn spawn(world: &mut World, ids: &mut crate::TestbedIds) {
 /// An NPC's internal source search; clients discover individual animals through
 /// ordinary perception and cannot use this helper as an omniscient RPC.
 pub fn available_prey(world: &World) -> Vec<(SimId, Entity, SimPos)> {
-    world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter_map(|(id, entity)| {
-            if !alive_prey(world, *entity)
-                || (super::frontier::enabled(world)
-                    && !super::frontier::ecology::harvestable_prey(world, *id))
-            {
-                return None;
-            }
-            Some((*id, *entity, *world.get::<SimPos>(*entity)?))
+    // The wild animals only, ascending by id: the order a pass over the whole
+    // index gave, without visiting every entity of the world.
+    let Some(mut query) = world.try_query::<(Entity, &SimId, &SimPos, &Wildlife)>() else {
+        return Vec::new();
+    };
+    let mut prey: Vec<(SimId, Entity, SimPos)> = query
+        .iter(world)
+        .filter(|(entity, id, ..)| {
+            alive_prey(world, *entity)
+                && (!super::frontier::enabled(world)
+                    || super::frontier::ecology::harvestable_prey(world, **id))
         })
-        .collect()
+        .map(|(entity, id, at, _)| (*id, entity, *at))
+        .collect();
+    prey.sort_unstable_by_key(|(id, ..)| *id);
+    prey
 }
 
 fn alive_prey(world: &World, entity: Entity) -> bool {
@@ -142,10 +144,12 @@ fn alive_prey(world: &World, entity: Entity) -> bool {
             .is_some_and(|v| v.health > 0 && v.died_at.is_none())
 }
 
-fn yield_items() -> [Item; 2] {
+/// What one hunt yields: the hunting trade's yields in the catalog data.
+fn yield_items(world: &World) -> [Item; 2] {
+    let roles = super::roles::roles(world);
     [
-        Item::new(catalog::RAW_MEAT).stack(2),
-        Item::new(catalog::HIDE),
+        Item::new(roles.meat).stack(roles.meat_per_hunt),
+        Item::new(roles.hide).stack(roles.hide_per_hunt),
     ]
 }
 
@@ -189,7 +193,7 @@ fn plan(world: &World, actor: Entity, target: SimId) -> Result<SimId, String> {
     }
     let tool = economy::free_items(world, actor)
         .into_iter()
-        .find(|(_, item)| item.kind == catalog::SPEAR && item.stack == 1)
+        .find(|(_, item)| item.kind == super::roles::roles(world).hunt_tool && item.stack == 1)
         .map(|(id, _)| id)
         .ok_or("carry an unreserved hunting spear first")?;
     let tool_entity = entity_of(world, tool).ok_or("carry an unreserved hunting spear first")?;
@@ -199,7 +203,7 @@ fn plan(world: &World, actor: Entity, target: SimId) -> Result<SimId, String> {
     {
         return Err("carry an unreserved hunting spear first".into());
     }
-    economy::fit_without(world, actor, &yield_items(), &[tool])?;
+    economy::fit_without(world, actor, &yield_items(world), &[tool])?;
     Ok(tool)
 }
 
@@ -289,14 +293,14 @@ fn finish_check(world: &World, actor: Entity, work: Hunting) -> Result<(), Strin
     let spear = entity_of(world, work.tool).ok_or("hunting spear is missing")?;
     if world
         .get::<Item>(spear)
-        .is_none_or(|item| item.kind != catalog::SPEAR || item.stack != 1)
+        .is_none_or(|item| item.kind != super::roles::roles(world).hunt_tool || item.stack != 1)
         || world
             .get::<CarriedBy>(spear)
             .is_none_or(|held| held.holder != me)
     {
         return Err("hunting spear is no longer carried".into());
     }
-    economy::fit_without(world, actor, &yield_items(), &[work.tool])
+    economy::fit_without(world, actor, &yield_items(world), &[work.tool])
 }
 
 /// The host calls once in sorted island Effects, before autonomous decisions.
@@ -348,9 +352,16 @@ pub fn tick(world: &mut World) {
         world.despawn(tool);
         let prey = entity_of(world, work.target).expect("checked animal");
         world.despawn(prey);
-        for item in yield_items() {
+        for item in yield_items(world) {
             economy::produce(world, &item.kind, item.stack);
             super::production::completed(world, id, &item.kind, item.stack);
+            super::live::booked(
+                world,
+                id,
+                super::live::Book::Gathered,
+                &item.kind,
+                item.stack,
+            );
             economy::grant(world, actor, item);
         }
         record_effect(

@@ -173,6 +173,9 @@ impl WorldSpec {
         }
         if let Some(policy) = &spec.island_ai {
             policy.validate()?;
+            if spec.living_world.is_some() {
+                policy.validate_regional()?;
+            }
             if spec.layout != Layout::Island
                 || spec.economy != crate::worlds::EconomyModel::NeedsDriven
             {

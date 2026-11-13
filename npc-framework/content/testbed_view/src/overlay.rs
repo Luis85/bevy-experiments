@@ -48,7 +48,7 @@ struct HashCache {
 }
 
 #[derive(Component)]
-struct OverlayText;
+pub(crate) struct OverlayText;
 
 pub(crate) fn plugin(app: &mut App) {
     app.init_resource::<OverlayState>()
@@ -123,12 +123,17 @@ fn configure_gizmos(store: Option<ResMut<GizmoConfigStore>>) {
     config.line.width = 2.5;
 }
 
-fn toggle_overlay(
+pub(crate) fn toggle_overlay(
     keys: Option<Res<ButtonInput<KeyCode>>>,
+    experience: Option<Res<crate::PlayerExperience>>,
+    developer: Option<Res<crate::DeveloperKeys>>,
     mut state: ResMut<OverlayState>,
     mut texts: Query<&mut Visibility, With<OverlayText>>,
 ) {
-    if keys.is_some_and(|k| k.just_pressed(KeyCode::F1)) {
+    // The visibility sync below still runs in the player session.
+    if crate::player_hud::developer_keys_allowed(experience.as_deref(), developer.as_deref())
+        && keys.is_some_and(|k| k.just_pressed(KeyCode::F1))
+    {
         state.visible = !state.visible;
     }
     let want = if state.visible {

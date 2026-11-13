@@ -1,43 +1,83 @@
 //! Colony tools are a view of the live simulation. Every edit is a recorded command.
+//!
+//! In the player session the island bar owns the mode switcher and the clock,
+//! and Shape mode has its own palette; this ledger is the Oversee workspace
+//! (village, economy, residents). Developer launches keep the ledger's own
+//! mode, clock and landscape rows.
+mod economy;
 mod model;
-use model::{Entry, entries};
+mod roster;
+#[cfg(test)]
+mod tests;
+mod widgets;
+
+pub(crate) use economy::{StockTrends, Trend, scopes, stock_totals, trade_display};
+use model::entries;
+pub(crate) use model::{Entry, Extra, manage_entries};
+pub(crate) use roster::capitalised;
 use std::collections::BTreeMap;
+use widgets::{button, reconcile, row, set_text};
+pub(crate) use widgets::{need_status, reconcile_rows};
+
+use crate::game_ui::icon::Icon;
+use crate::game_ui::scale;
+use crate::game_ui::tokens::{self as t, Surface};
+use crate::game_ui::tooltip::Tooltip;
+use crate::game_ui::widgets::{self as kit, Reach, Tone};
+use crate::island_shell::model::{Column, ColumnEvent, ColumnState, LedgerPage};
 
 use bevy::input::mouse::AccumulatedMouseScroll;
-use bevy::input_focus::tab_navigation::{NavAction, TabGroup, TabIndex, TabNavigation};
+use bevy::input_focus::tab_navigation::{NavAction, TabGroup, TabNavigation};
 use bevy::input_focus::{AcquireFocus, FocusCause, InputFocus};
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
 use bevy::ui::InteractionDisabled;
-use bevy::ui_widgets::{Activate, Button as WidgetButton, ScrollArea};
+use bevy::ui_widgets::{Activate, ScrollArea};
 use npc_framework::kernel::commands::{CommandLog, SkippedCommands};
 use npc_framework::prelude::{
     SimClock, SimCommand, SimConfig, SimControl, SimId, SimIndex, submit,
 };
 use npc_framework::view_helpers::command_ui::DragBox;
 use npc_framework::view_helpers::{Selected, ViewSystems, sim_to_world};
-use testbed_content::village::{
-    self, colony,
-    terrain::{Terraform, TerrainState, TerrainSurface},
-};
+use testbed_content::village::{self, colony};
 
 use crate::IslandMode;
 
-const PANEL: Color = Color::srgb(0.05, 0.06, 0.08);
-const TEXT: Color = Color::srgb(0.93, 0.95, 0.90);
-const MUTED: Color = Color::srgb(0.69, 0.77, 0.73);
-const GOLD: Color = Color::srgb(0.95, 0.80, 0.45);
-const BUTTON: Color = Color::srgb(0.20, 0.24, 0.30);
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum Tab {
+pub(crate) enum Tab {
     #[default]
     Overview,
+    Economy,
     Residents,
+    Projects,
+    Journal,
     Landscape,
 }
+
+impl Tab {
+    fn of(page: LedgerPage) -> Self {
+        match page {
+            LedgerPage::Village => Self::Overview,
+            LedgerPage::Economy => Self::Economy,
+            LedgerPage::People => Self::Residents,
+            LedgerPage::Projects => Self::Projects,
+            LedgerPage::Journal => Self::Journal,
+        }
+    }
+    /// The ledger page of a tab; the developer Landscape tab has none.
+    fn page(self) -> Option<LedgerPage> {
+        Some(match self {
+            Self::Overview => LedgerPage::Village,
+            Self::Economy => LedgerPage::Economy,
+            Self::Residents => LedgerPage::People,
+            Self::Projects => LedgerPage::Projects,
+            Self::Journal => LedgerPage::Journal,
+            Self::Landscape => return None,
+        })
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
-enum Action {
+pub(crate) enum Action {
     Toggle,
     Close,
     Mode(IslandMode),
@@ -52,46 +92,101 @@ enum Action {
     Settlement(SimId),
     Commission(SimId, SimId),
     CancelHome(SimId),
-    Surface(TerrainSurface),
-    Height(i32),
-    Radius(i32),
+    Scope(economy::Scope),
+    /// Order of the Residents roster.
+    Sort(roster::SortKey),
+    /// Economy page: the goods table, the professions or the priorities.
+    EconomyPage(economy::EconomyPage),
+    /// Jobs table: fewer or more of a trade wanted in a village, or the
+    /// village decides again (`SetProfessionTarget`).
+    Target {
+        settlement: SimId,
+        profession: String,
+        step: economy::TargetStep,
+    },
+    /// Priorities: one topic of a village at one level
+    /// (`SetVillagePriority`).
+    Priority {
+        settlement: SimId,
+        topic: &'static str,
+        profession: Option<String>,
+        level: village::frontier::oversee::PriorityLevel,
+    },
+    /// Economy page: select a good for its detail card, or put it back.
+    Good(String),
+    /// A header of the goods table: sort by that column, again to reverse.
+    SortGoods(u8),
+    /// Projects page: unfold or fold a section.
+    Fold(&'static str),
+    /// The resident inspector: show one of its tabs.
+    InspectorTab(crate::resident_inspector::Tab),
+    /// Bring the camera to a construction site and open its card.
+    Site(SimId),
+    /// Ask before abandoning a site, then abandon it or keep it.
+    CancelSite(SimId),
+    ConfirmCancelSite(SimId),
+    KeepSite,
+    /// Page Down (true) or Page Up over the open page.
+    Page(bool),
+    /// Journal page: frame an alert, unfold a day's notes, choose a filter.
+    AlertRow(u64),
+    AlertFold(u64),
+    AlertFilter(crate::island_alerts::model::Filter),
 }
 #[derive(Resource)]
 struct Ledger {
     open: bool,
     tab: Tab,
-    surface: TerrainSurface,
-    height_mm: i32,
-    radius: u32,
-    cell: Option<(i32, i32)>,
-    preview_error: Option<String>,
+    /// Settlement shown by the Economy tab and the Residents roster; `None`
+    /// is the whole island.
+    scope: economy::Scope,
+    sort: roster::SortKey,
+    /// Economy page: which table, and the selected good.
+    economy: economy::EconomyPage,
+    good: Option<String>,
+    /// The goods table's sorted column and whether it runs upwards.
+    goods_sort: Option<(u8, bool)>,
+    /// Projects page: the sections the player unfolded.
+    unfolded: std::collections::BTreeSet<&'static str>,
+    /// Village tab: the site whose cancellation waits for a second click.
+    confirm_site: Option<SimId>,
     message: String,
     requests: Vec<Action>,
     pending: Option<((u64, u32), String)>,
     last_mode: Option<IslandMode>,
     control_revision: u64,
     rows: BTreeMap<String, Entity>,
+    /// Rows kept under the scrolling body: the chosen good's detail card.
+    pinned: BTreeMap<String, Entity>,
     elapsed: f32,
     dirty: bool,
+    /// The resident and the building card last seen selected: a new one
+    /// replaces the ledger with its inspector.
+    subject: (Option<SimId>, Option<SimId>),
 }
 impl Default for Ledger {
     fn default() -> Self {
         Self {
-            open: true,
+            // Closed by default: a management screen opens on request.
+            open: false,
             tab: Tab::Overview,
-            surface: TerrainSurface::Grass,
-            height_mm: 0,
-            radius: 1,
-            cell: None,
-            preview_error: None,
-            message: "The village runs on its own. Select a resident to follow their day.".into(),
+            scope: None,
+            sort: roster::SortKey::default(),
+            economy: economy::EconomyPage::Goods,
+            good: None,
+            goods_sort: None,
+            unfolded: std::collections::BTreeSet::new(),
+            confirm_site: None,
+            message: String::new(),
             requests: Vec::new(),
             pending: None,
             last_mode: None,
             control_revision: 0,
             rows: BTreeMap::new(),
+            pinned: BTreeMap::new(),
             elapsed: 1.0,
             dirty: true,
+            subject: (None, None),
         }
     }
 }
@@ -99,6 +194,9 @@ impl Default for Ledger {
 pub(crate) struct LedgerRoot;
 #[derive(Component)]
 pub(crate) struct LedgerLauncher;
+/// The ledger's fixed foot, under its scrolling body.
+#[derive(Component)]
+struct LedgerFooter;
 #[derive(Component)]
 struct LedgerBody;
 #[derive(Component)]
@@ -106,20 +204,21 @@ struct LedgerStatus;
 #[derive(Component)]
 struct LedgerMessage;
 #[derive(Component, Clone)]
-struct LedgerAction(Action);
+pub(crate) struct LedgerAction(pub(crate) Action);
+/// A control inside the Oversee workspace's keyboard focus loop. The alert
+/// feed's rows carry it too, so Tab reaches them from the ledger.
 #[derive(Component)]
-struct LedgerControl;
-#[derive(Component)]
-struct LedgerTypography;
-#[derive(Resource)]
-struct LedgerFont(Handle<Font>);
+pub(crate) struct LedgerControl;
+
 pub(crate) fn plugin(app: &mut App) {
     if !colony::enabled(app.world()) {
         return;
     }
+    crate::game_ui::install(app);
     crate::panel_scroll::install(app);
     app.init_resource::<IslandMode>()
         .init_resource::<Ledger>()
+        .init_resource::<economy::StockTrends>()
         .init_resource::<InputFocus>()
         .add_observer(activate)
         .add_observer(acquire_focus)
@@ -130,152 +229,138 @@ pub(crate) fn plugin(app: &mut App) {
             (keys, pointer)
                 .chain()
                 .in_set(ViewSystems::OverlayInput)
+                .after(crate::island_shell::ShellInput)
                 .run_if(not(crate::player_hud::active))
                 .run_if(not(crate::modal_open)),
         )
         .add_systems(
             Update,
-            (process, refresh, typography, paint, brush_gizmo)
+            (economy::sample, process, refresh, sync)
                 .chain()
                 .in_set(ViewSystems::Present)
                 .after(crate::homestead_panel::refresh),
         );
 }
 
-fn text(value: impl Into<String>, size: f32, color: Color) -> impl Bundle {
-    (
-        LedgerTypography,
-        Text::new(value),
-        TextFont {
-            font_size: FontSize::Px(size),
-            ..default()
-        },
-        TextColor(color),
-        TextLayout::default().with_linebreak(bevy::text::LineBreak::WordOrCharacter),
-    )
+/// The player session's bar owns modes and the clock; see the module docs.
+fn shell(world: &World) -> bool {
+    crate::island_shell::enabled(world)
 }
-fn row(world: &mut World, parent: Entity) -> Entity {
-    world
-        .spawn((
-            ChildOf(parent),
-            Node {
-                flex_wrap: FlexWrap::Wrap,
-                column_gap: px(6),
-                row_gap: px(6),
-                flex_shrink: 0.0,
-                ..default()
-            },
-        ))
-        .id()
+
+/// The ledger for a test that walks the Tab ring.
+#[cfg(test)]
+pub(crate) fn spawn_for_tests(world: &mut World) {
+    world.init_resource::<Ledger>();
+    spawn(world);
 }
-fn button(world: &mut World, parent: Entity, label: &str, action: Action) -> Entity {
-    let entity = world
-        .spawn((
-            Name::new(format!("Colony: {label}")),
-            ChildOf(parent),
-            WidgetButton,
-            LedgerControl,
-            LedgerAction(action),
-            TabIndex(0),
-            Hovered::default(),
-            AccessibleLabel::new(label),
-            Node {
-                min_height: px(44),
-                padding: UiRect::axes(px(9), px(6)),
-                border: UiRect::all(px(1)),
-                align_items: AlignItems::Center,
-                flex_shrink: 0.0,
-                ..default()
-            },
-            BackgroundColor(BUTTON),
-            BorderColor::all(Color::NONE),
-        ))
-        .id();
-    world.spawn((ChildOf(entity), text(label, 15.0, TEXT)));
-    entity
-}
+
 fn spawn(world: &mut World) {
-    if let Some(mut fonts) = world.get_resource_mut::<Assets<Font>>() {
-        let font = Font::from_bytes(
-            include_bytes!(concat!(
-                env!("CARGO_MANIFEST_DIR"),
-                "/../../assets/fonts/Barlow-Regular.ttf"
-            ))
-            .to_vec(),
-        );
-        let handle = fonts.add(font);
-        world.insert_resource(LedgerFont(handle));
-    }
+    let shell = crate::player_hud::enabled(world);
+    // Developer launches open the ledger from a button; the player session
+    // uses the ledger dock.
     let launcher = world
         .spawn((
             Name::new("Colony ledger launcher"),
             LedgerLauncher,
+            crate::island_shell::focus::FocusRegion::Launcher,
             Hovered::default(),
             TabGroup::new(6),
-            GlobalZIndex(27),
+            GlobalZIndex(t::layer::CHROME),
             Node {
                 position_type: PositionType::Absolute,
                 right: px(12),
                 bottom: px(12),
+                display: Display::None,
                 ..default()
             },
         ))
         .id();
-    button(world, launcher, "Colony & landscape [F11]", Action::Toggle);
+    kit::button(
+        world,
+        launcher,
+        kit::ButtonSpec::new(
+            "Colony and landscape",
+            kit::Kind::Secondary,
+            Surface::Chrome,
+        )
+        .key("F11"),
+        (LedgerControl, LedgerAction(Action::Toggle)),
+    );
     let root = world
         .spawn((
             Name::new("Island colony ledger"),
             LedgerRoot,
-            Hovered::default(),
+            crate::game_ui::sound::PanelSound::default(),
+            crate::island_shell::focus::FocusRegion::Ledger,
             TabGroup::new(6),
-            GlobalZIndex(29),
-            BackgroundColor(PANEL),
-            Node {
+            GlobalZIndex(t::layer::PANEL),
+            kit::panel(Node {
                 position_type: PositionType::Absolute,
                 top: px(12),
-                right: px(12),
-                width: px(408),
+                right: px(t::SCREEN_MARGIN),
+                bottom: px(12),
+                width: px(t::COLUMN_LEDGER),
                 max_width: percent(94),
-                height: percent(91),
-                max_height: px(1100),
-                padding: UiRect::all(px(14)),
                 flex_direction: FlexDirection::Column,
-                row_gap: px(10),
+                row_gap: px(8),
+                display: Display::None,
                 ..default()
-            },
+            }),
         ))
         .id();
-    let title = row(world, root);
-    world.spawn((
-        ChildOf(title),
-        text("Island Village", 23.0, GOLD),
-        Node {
-            flex_grow: 1.0,
-            ..default()
-        },
-    ));
-    button(world, title, "Close", Action::Close);
-    let modes = row(world, root);
-    for (label, mode) in [
-        ("Inspect", IslandMode::Inspector),
-        ("Play character", IslandMode::Character),
-        ("Terraform", IslandMode::Editor),
-    ] {
-        button(world, modes, label, Action::Mode(mode));
+    let header = kit::panel_header(
+        world,
+        root,
+        Icon::Ledger,
+        if shell { "Ledger" } else { "Island Village" },
+    );
+    let close = kit::icon_button(
+        world,
+        header,
+        "Close",
+        Icon::Close,
+        Surface::Paper,
+        Reach::Tab(0),
+        (LedgerControl, LedgerAction(Action::Close)),
+    );
+    world
+        .entity_mut(close)
+        .insert(Tooltip::new("Close", "Close the ledger.").key("Esc"));
+    if !shell {
+        let modes = row(world, root);
+        for (label, mode) in [
+            ("Inspect", IslandMode::Inspector),
+            ("Play character", IslandMode::Character),
+            ("Terraform", IslandMode::Editor),
+        ] {
+            button(world, modes, label, Action::Mode(mode));
+        }
+        let status = kit::paragraph(world, root, "", t::DENSE, Tone::text(Surface::Paper));
+        world.entity_mut(status).insert(LedgerStatus);
+        let clock = row(world, root);
+        button(world, clock, "Pause / resume", Action::Pause);
+        for speed in [1, 3, 10] {
+            button(world, clock, &format!("{speed}x"), Action::Speed(speed));
+        }
     }
-    world.spawn((ChildOf(root), LedgerStatus, text("", 13.0, TEXT)));
-    let clock = row(world, root);
-    button(world, clock, "Pause / resume", Action::Pause);
-    for speed in [1, 3, 10] {
-        button(world, clock, &format!("{speed}x"), Action::Speed(speed));
+    let tabs = kit::tabs(world, root);
+    for page in LedgerPage::ALL {
+        widgets::tab(
+            world,
+            tabs,
+            page.label(),
+            page.icon(),
+            Action::Tab(Tab::of(page)),
+        );
     }
-    let tabs = row(world, root);
-    for (label, tab) in [
-        ("Village", Tab::Overview),
-        ("Residents", Tab::Residents),
-        ("Landscape", Tab::Landscape),
-    ] {
-        button(world, tabs, label, Action::Tab(tab));
+    if !shell {
+        widgets::tab(
+            world,
+            tabs,
+            "Landscape",
+            Icon::Shape,
+            Action::Tab(Tab::Landscape),
+        );
     }
     let body = world
         .spawn((
@@ -284,7 +369,6 @@ fn spawn(world: &mut World) {
             ScrollArea,
             Node {
                 flex_direction: FlexDirection::Column,
-                row_gap: px(7),
                 flex_grow: 1.0,
                 min_height: px(0),
                 overflow: Overflow::scroll_y(),
@@ -292,33 +376,52 @@ fn spawn(world: &mut World) {
             },
         ))
         .id();
-    for control in
-        crate::panel_scroll::attach(world, root, body, "Colony", ["Scroll up", "Scroll down"])
-    {
-        world.entity_mut(control).insert(LedgerControl);
+    // A rail, the wheel and the Page keys; no paging buttons, no hint text.
+    crate::panel_scroll::attach_rail(world, root, body, "Colony");
+    // Under the scrolling rows, always in view: a card of facts about the
+    // row chosen above it.
+    world.spawn((
+        ChildOf(root),
+        LedgerFooter,
+        Node {
+            flex_direction: FlexDirection::Column,
+            flex_shrink: 0.0,
+            ..default()
+        },
+    ));
+    let message = kit::paragraph(world, root, "", t::CAPTION, Tone::caption(Surface::Paper));
+    world.entity_mut(message).insert(LedgerMessage);
+    if !shell {
+        // Developer launches have no bar, no docks and no tooltips to carry this.
+        kit::paragraph(
+            world,
+            root,
+            "F11: ledger · F2: home and farm\nWASD: pan or walk · arrows: pan\nWheel: zoom · Q/E: orbit",
+            t::CAPTION,
+            Tone::caption(Surface::Paper),
+        );
     }
-    world.spawn((ChildOf(root), LedgerMessage, text("", 12.0, GOLD)));
-    let controls = if crate::player_hud::enabled(world) {
-        "Menu: pause / save · F11: ledger\nWASD / arrows: pan · Wheel: zoom\nQ/E: orbit · Play character: join the island"
-    } else {
-        "F11: ledger · F2: home & farm\nWASD: pan / walk · arrows: pan\nWheel: zoom · Q/E: orbit"
-    };
-    world.spawn((ChildOf(root), text(controls, 12.0, MUTED)));
 }
 fn activate(
     event: On<Activate>,
     actions: Query<(&LedgerAction, Has<InteractionDisabled>)>,
     mut state: ResMut<Ledger>,
 ) {
-    if let Ok((action, false)) = actions.get(event.entity)
-        && (state.open || action.0 == Action::Toggle)
-    {
+    // The resident inspector's rows are ledger actions too, so this does not
+    // ask whether the ledger itself is open.
+    if let Ok((action, false)) = actions.get(event.entity) {
         state.requests.push(action.0.clone());
     }
 }
 fn acquire_focus(
     mut event: On<AcquireFocus>,
-    controls: Query<(), With<LedgerControl>>,
+    controls: Query<
+        (),
+        (
+            With<LedgerControl>,
+            Without<crate::island_shell::focus::KeyReach>,
+        ),
+    >,
     mut focus: ResMut<InputFocus>,
 ) {
     if controls.contains(event.focused_entity) {
@@ -331,9 +434,12 @@ fn input_active(focus: Option<Res<InputFocus>>, controls: Query<(), With<LedgerC
         .and_then(|focus| focus.get())
         .is_some_and(|entity| controls.contains(entity))
 }
+/// F11, Esc and the Page keys, and Tab in developer launches. In the player
+/// session the bar's focus ring (`island_shell::focus`) takes Tab first and
+/// consumes it. Esc closes the ledger and goes no further this press.
 #[allow(clippy::too_many_arguments)]
 fn keys(
-    keys: Option<Res<ButtonInput<KeyCode>>>,
+    keys: Option<ResMut<ButtonInput<KeyCode>>>,
     mut state: ResMut<Ledger>,
     mut focus: ResMut<InputFocus>,
     controls: Query<(), With<LedgerControl>>,
@@ -342,7 +448,7 @@ fn keys(
     nav: TabNavigation,
     mut commands: Commands,
 ) {
-    let Some(keys) = keys else { return };
+    let Some(mut keys) = keys else { return };
     if focus
         .get()
         .is_some_and(|entity| !controls.contains(entity) && !windows.contains(entity))
@@ -357,6 +463,13 @@ fn keys(
     }
     if keys.just_pressed(KeyCode::Escape) {
         state.requests.push(Action::Close);
+        keys.reset(KeyCode::Escape);
+    }
+    for (key, direction) in [(KeyCode::PageUp, -1.0), (KeyCode::PageDown, 1.0)] {
+        if keys.just_pressed(key) {
+            state.requests.push(Action::Page(direction > 0.0));
+            keys.reset(key);
+        }
     }
     if keys.just_pressed(KeyCode::Tab) {
         let dir = if keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight) {
@@ -378,14 +491,13 @@ fn keys(
     }
 }
 
-fn pointer(world: &mut World) {
+/// Shield the world from clicks on any panel, and let a world click release
+/// keyboard focus. Shape-mode painting follows in `shape_tools`.
+pub(crate) fn pointer(world: &mut World) {
     let ui_hovered = world
         .query_filtered::<&Hovered, With<Node>>()
         .iter(world)
         .any(Hovered::get);
-    let click = world
-        .get_resource::<ButtonInput<MouseButton>>()
-        .is_some_and(|mouse| mouse.just_pressed(MouseButton::Left));
     if ui_hovered {
         if let Some(mut mouse) = world.get_resource_mut::<ButtonInput<MouseButton>>() {
             mouse.reset_all();
@@ -396,13 +508,13 @@ fn pointer(world: &mut World) {
         if let Some(mut drag) = world.get_resource_mut::<DragBox>() {
             drag.start = None;
         }
-        world.resource_mut::<Ledger>().cell = None;
         return;
     }
-    let world_click = click
-        || world
-            .get_resource::<ButtonInput<MouseButton>>()
-            .is_some_and(|mouse| mouse.just_pressed(MouseButton::Right));
+    let world_click = world
+        .get_resource::<ButtonInput<MouseButton>>()
+        .is_some_and(|mouse| {
+            mouse.just_pressed(MouseButton::Left) || mouse.just_pressed(MouseButton::Right)
+        });
     if world_click
         && world
             .resource::<InputFocus>()
@@ -411,94 +523,6 @@ fn pointer(world: &mut World) {
     {
         world.resource_mut::<InputFocus>().clear();
     }
-    if *world.resource::<IslandMode>() != IslandMode::Editor {
-        return;
-    }
-    let cursor = world
-        .query::<&Window>()
-        .iter(world)
-        .find_map(Window::cursor_position);
-    let ray = cursor.and_then(|cursor| {
-        world
-            .query_filtered::<(&Camera, &GlobalTransform), With<crate::RtsCamera>>()
-            .iter(world)
-            .find_map(|(camera, transform)| camera.viewport_to_world(transform, cursor).ok())
-    });
-    let cell = ray.and_then(|ray| {
-        if village::frontier::enabled(world) {
-            crate::colony_scene::living_scene::terrain_hit(world, ray)
-        } else {
-            terrain_hit(world.resource::<TerrainState>(), ray)
-        }
-    });
-    let command = cell.map(|(x, z)| {
-        let state = world.resource::<Ledger>();
-        Terraform {
-            x,
-            z,
-            radius: state.radius,
-            height_mm: state.height_mm,
-            surface: state.surface,
-        }
-    });
-    let error = command
-        .as_ref()
-        .and_then(|command| command.check(world).err());
-    {
-        let mut state = world.resource_mut::<Ledger>();
-        if state.cell != cell || state.preview_error != error {
-            state.dirty = true;
-        }
-        state.cell = cell;
-        state.preview_error = error;
-    }
-    if click && let Some(command) = command {
-        queue(
-            world,
-            SimCommand::content(&command),
-            format!("Landscape updated at {}, {}", command.x, command.z),
-        );
-    }
-    // Painting must never also select a villager or issue a movement order.
-    if let Some(mut mouse) = world.get_resource_mut::<ButtonInput<MouseButton>>() {
-        mouse.reset_all();
-    }
-    if let Some(mut drag) = world.get_resource_mut::<DragBox>() {
-        drag.start = None;
-    }
-}
-
-/// Intersect every bounded column's top, so raised cells stay pickable at their real elevation.
-fn terrain_hit(terrain: &TerrainState, ray: Ray3d) -> Option<(i32, i32)> {
-    if ray.direction.y.abs() < 0.000_01 {
-        return None;
-    }
-    let mut best: Option<(f32, i32, i32)> = None;
-    for z in -32..32 {
-        for x in -32..32 {
-            let Some(cell) = terrain.cell(x, z) else {
-                continue;
-            };
-            let y = if cell.surface == TerrainSurface::Water {
-                -0.12
-            } else {
-                cell.height_mm as f32 / 1000.0
-            };
-            let distance = (y - ray.origin.y) / ray.direction.y;
-            if distance < 0.0 || best.is_some_and(|(old, _, _)| old <= distance) {
-                continue;
-            }
-            let point = ray.get_point(distance);
-            if point.x >= x as f32
-                && point.x < (x + 1) as f32
-                && point.z >= z as f32
-                && point.z < (z + 1) as f32
-            {
-                best = Some((distance, x, z));
-            }
-        }
-    }
-    best.map(|(_, x, z)| (x, z))
 }
 
 fn queue(world: &mut World, command: SimCommand, success: String) {
@@ -520,28 +544,120 @@ fn process(world: &mut World) {
         match request {
             Action::Toggle => {
                 let open = world.resource::<Ledger>().open;
-                if open && *world.resource::<IslandMode>() == IslandMode::Editor {
+                // Without the palette the ledger is the editor; closing ends it.
+                if open && !shell(world) && *world.resource::<IslandMode>() == IslandMode::Editor {
                     switch_mode(world, IslandMode::Inspector);
                 }
-                world.resource_mut::<Ledger>().open = !open;
+                column_event(world, ColumnEvent::Last);
             }
             Action::Close => {
-                if *world.resource::<IslandMode>() == IslandMode::Editor {
+                if !shell(world) && *world.resource::<IslandMode>() == IslandMode::Editor {
                     switch_mode(world, IslandMode::Inspector);
                 }
-                world.resource_mut::<Ledger>().open = false;
+                column_event(world, ColumnEvent::Close);
                 world.resource_mut::<InputFocus>().clear();
             }
-            Action::Mode(mode) => switch_mode(world, mode),
-            Action::Tab(tab) => {
-                world.resource_mut::<Ledger>().tab = tab;
-                for mut scroll in world
-                    .query_filtered::<&mut ScrollPosition, With<LedgerBody>>()
+            Action::Page(down) => {
+                for (node, mut scroll) in world
+                    .query_filtered::<(&ComputedNode, &mut ScrollPosition), With<LedgerBody>>()
                     .iter_mut(world)
                 {
-                    scroll.0 = Vec2::ZERO;
+                    let visible = node.size().y * node.inverse_scale_factor();
+                    let most =
+                        (node.content_size().y * node.inverse_scale_factor() - visible).max(0.0);
+                    let step = visible * 0.85 * if down { 1.0 } else { -1.0 };
+                    scroll.y = (scroll.y + step).clamp(0.0, most);
                 }
             }
+            Action::AlertRow(serial) => crate::island_alerts::request_row(world, serial, false),
+            Action::AlertFold(day) => crate::island_alerts::request_row(world, day, true),
+            Action::AlertFilter(filter) => crate::island_alerts::request_filter(world, filter),
+            Action::Mode(mode) => switch_mode(world, mode),
+            Action::Tab(tab) => {
+                let mut state = world.resource_mut::<Ledger>();
+                state.tab = tab;
+                state.open = true;
+                state.confirm_site = None;
+                reset_scroll(world);
+            }
+            Action::Site(id) => {
+                // A building replaces whoever was inspected: one right column.
+                if shell(world) {
+                    crate::resident_inspector::close(world);
+                }
+                crate::island_build::focus_place(world, id);
+                if shell(world) {
+                    // The card takes the column, also when it was the card
+                    // the page had been opened over.
+                    column_event(world, ColumnEvent::Selected);
+                }
+            }
+            Action::CancelSite(id) => world.resource_mut::<Ledger>().confirm_site = Some(id),
+            Action::KeepSite => world.resource_mut::<Ledger>().confirm_site = None,
+            Action::ConfirmCancelSite(site) => {
+                world.resource_mut::<Ledger>().confirm_site = None;
+                queue(
+                    world,
+                    SimCommand::content(&village::civic::CancelBuilding { site }),
+                    "Site abandoned. Delivered materials went to the nearest store, or lie at the entrance."
+                        .into(),
+                );
+            }
+            Action::Scope(scope) => world.resource_mut::<Ledger>().scope = scope,
+            Action::Sort(sort) => {
+                world.resource_mut::<Ledger>().sort = sort;
+                reset_scroll(world);
+            }
+            Action::EconomyPage(page) => {
+                world.resource_mut::<Ledger>().economy = page;
+                reset_scroll(world);
+            }
+            Action::Target {
+                settlement,
+                profession,
+                step,
+            } => match economy::target_command(world, settlement, &profession, step) {
+                Ok(command) => {
+                    let success = economy::target_success(world, &command);
+                    queue(world, SimCommand::content(&command), success);
+                }
+                Err(reason) => {
+                    let mut state = world.resource_mut::<Ledger>();
+                    state.message = reason;
+                    state.dirty = true;
+                }
+            },
+            Action::Priority {
+                settlement,
+                topic,
+                profession,
+                level,
+            } => match economy::priority_command(world, settlement, topic, profession, level) {
+                Ok(command) => {
+                    let success = economy::priority_success(world, &command);
+                    queue(world, SimCommand::content(&command), success);
+                }
+                Err(reason) => {
+                    let mut state = world.resource_mut::<Ledger>();
+                    state.message = reason;
+                    state.dirty = true;
+                }
+            },
+            Action::SortGoods(column) => {
+                let mut state = world.resource_mut::<Ledger>();
+                state.goods_sort = economy::next_sort(state.goods_sort, column);
+            }
+            Action::Good(kind) => {
+                let mut state = world.resource_mut::<Ledger>();
+                state.good = (state.good.as_deref() != Some(kind.as_str())).then_some(kind);
+            }
+            Action::Fold(section) => {
+                let mut state = world.resource_mut::<Ledger>();
+                if !state.unfolded.remove(section) {
+                    state.unfolded.insert(section);
+                }
+            }
+            Action::InspectorTab(tab) => crate::resident_inspector::show_tab(world, tab),
             Action::Pause => {
                 let mut control = world.resource_mut::<SimControl>();
                 if control.is_stopped() {
@@ -577,15 +693,14 @@ fn process(world: &mut World) {
                     "Gathering policy updated.".into(),
                 );
             }
+            // Opens the resident inspector and brings the camera to them.
             Action::Resident(id) => {
-                world.get_resource_or_init::<Selected>().0 = Some(id);
-                let position = world
-                    .resource::<SimIndex>()
-                    .get(id)
-                    .and_then(|e| world.get::<npc_framework::prelude::SimPos>(e))
-                    .copied();
-                if let Some(position) = position {
-                    crate::island_camera::focus(world, sim_to_world(position), 12.0);
+                crate::resident_inspector::inspect(world, id);
+                crate::resident_inspector::from_roster(world, id);
+                if shell(world) {
+                    // Their row chosen again, with the People page over their
+                    // inspector, is no new selection: hand the column over.
+                    column_event(world, ColumnEvent::Selected);
                 }
             }
             Action::Profession(resident, workplace) => queue(
@@ -637,50 +752,6 @@ fn process(world: &mut World) {
                 }),
                 "Housing commission cancelled; unused materials remain with the builder.".into(),
             ),
-            Action::Surface(surface) => {
-                let mut state = world.resource_mut::<Ledger>();
-                state.surface = surface;
-                state.height_mm = if surface == TerrainSurface::Water {
-                    state.height_mm.min(0)
-                } else {
-                    state.height_mm.max(0)
-                };
-            }
-            Action::Height(delta) => {
-                let water = world.resource::<Ledger>().surface == TerrainSurface::Water;
-                let regional = village::frontier::enabled(world);
-                let value = world
-                    .resource::<Ledger>()
-                    .height_mm
-                    .saturating_add(delta)
-                    .clamp(
-                        if water {
-                            if regional { -2000 } else { -1000 }
-                        } else {
-                            0
-                        },
-                        if water {
-                            0
-                        } else if regional {
-                            12000
-                        } else {
-                            3000
-                        },
-                    );
-                world.resource_mut::<Ledger>().height_mm = value;
-            }
-            Action::Radius(delta) => {
-                let value = world
-                    .resource::<Ledger>()
-                    .radius
-                    .saturating_add_signed(delta)
-                    .min(if village::frontier::enabled(world) {
-                        8
-                    } else {
-                        3
-                    });
-                world.resource_mut::<Ledger>().radius = value;
-            }
         }
     }
     if let Some((key, success)) = world.resource::<Ledger>().pending.clone() {
@@ -705,14 +776,160 @@ fn process(world: &mut World) {
         }
     }
     sync_mode(world);
+    follow_selection(world);
     if let Some((revision, message)) = crate::island_control::status(world)
         && revision != world.resource::<Ledger>().control_revision
     {
         let (revision, message) = (revision, message.to_owned());
+        // The player session has the bar and its tooltips for this; the
+        // ledger's foot carries only the result of a command given here.
+        let shell = shell(world);
         let mut state = world.resource_mut::<Ledger>();
         state.control_revision = revision;
-        state.message = message;
+        if !shell {
+            state.message = message;
+        }
         state.dirty = true;
+    }
+}
+/// The ledger's part of the right column, as the pure column model sees it.
+fn column_state(world: &World) -> ColumnState {
+    let ledger = world.resource::<Ledger>();
+    let page = ledger.tab.page();
+    ColumnState {
+        ledger: page.filter(|_| ledger.open),
+        last: page.unwrap_or_default(),
+        selected: ledger.subject != (None, None),
+    }
+}
+
+/// Apply one event to the right column: the ledger opens, switches page or
+/// closes, and closing it also clears the selection it was hiding.
+fn column_event(world: &mut World, event: ColumnEvent) {
+    let shell = shell(world);
+    let before = column_state(world);
+    let developer_tab = world.resource::<Ledger>().tab.page().is_none();
+    let after = before.step(event);
+    {
+        let mut state = world.resource_mut::<Ledger>();
+        match after.ledger {
+            Some(page) if !developer_tab || event != ColumnEvent::Last => {
+                if state.tab != Tab::of(page) {
+                    state.tab = Tab::of(page);
+                    state.confirm_site = None;
+                }
+                state.open = true;
+            }
+            // F11 on the developer Landscape tab toggles it as it is.
+            Some(_) => state.open = !state.open,
+            None => state.open = false,
+        }
+        state.dirty = true;
+    }
+    if !shell {
+        return;
+    }
+    if after.ledger.is_some() && before.ledger != after.ledger {
+        // A page replaces a building card and the build tray, which would
+        // cover its lower part; a resident stays selected underneath.
+        crate::island_build::close_column(world);
+        reset_scroll(world);
+    }
+    if matches!(
+        event,
+        ColumnEvent::Close | ColumnEvent::Page(_) | ColumnEvent::Last
+    ) && before.ledger.is_some()
+        && after.ledger.is_none()
+    {
+        // Closing the column empties it: the selection goes with it.
+        crate::resident_inspector::close(world);
+        crate::island_build::close_card(world);
+        world.resource_mut::<Ledger>().subject = (None, None);
+    }
+}
+
+/// A newly selected resident or building replaces the ledger with its
+/// inspector: the right column never holds two things.
+fn follow_selection(world: &mut World) {
+    if !shell(world) {
+        return;
+    }
+    let resident = world
+        .get_resource::<Selected>()
+        .and_then(|selected| selected.0);
+    let card = crate::island_build::card_raw(world);
+    let before = world.resource::<Ledger>().subject;
+    if before == (resident, card) {
+        return;
+    }
+    let fresh =
+        (resident.is_some() && resident != before.0) || (card.is_some() && card != before.1);
+    world.resource_mut::<Ledger>().subject = (resident, card);
+    if fresh {
+        column_event(world, ColumnEvent::Selected);
+    } else if (resident, card) == (None, None) {
+        column_event(world, ColumnEvent::Deselected);
+    }
+}
+
+/// Reopen the ledger on its last page, or close it: F11 and the one Ledger
+/// tile of the Compact layout.
+pub(crate) fn toggle_last(world: &mut World) {
+    if world.contains_resource::<Ledger>() {
+        column_event(world, ColumnEvent::Last);
+    }
+}
+
+/// Open a ledger page; the same page again closes it. The dock tiles and
+/// F1 to F5 use this.
+pub(crate) fn toggle_page(world: &mut World, page: LedgerPage) {
+    if world.contains_resource::<Ledger>() {
+        column_event(world, ColumnEvent::Page(page));
+    }
+}
+
+/// Close the ledger and empty the right column: the alert stack asks for
+/// its rows back.
+pub(crate) fn close(world: &mut World) {
+    if open(world) {
+        column_event(world, ColumnEvent::Close);
+    }
+}
+
+/// Open a ledger page and leave it open: a top-bar total asks for its page.
+pub(crate) fn open_page(world: &mut World, page: LedgerPage) {
+    if world.contains_resource::<Ledger>() && self::page(world) != Some(page) {
+        column_event(world, ColumnEvent::Page(page));
+    }
+}
+
+/// The page the ledger shows, while it is open.
+pub(crate) fn page(world: &World) -> Option<LedgerPage> {
+    let ledger = world.get_resource::<Ledger>()?;
+    ledger.tab.page().filter(|_| ledger.open)
+}
+
+/// What the right column holds: a ledger page, the inspector of the
+/// selection, or nothing.
+pub(crate) fn column(world: &World) -> Column {
+    if world.contains_resource::<Ledger>() {
+        column_state(world).column()
+    } else {
+        Column::Empty
+    }
+}
+
+/// Whether the ledger holds the right column.
+pub(crate) fn open(world: &World) -> bool {
+    matches!(column(world), Column::Ledger(_))
+}
+
+fn reset_scroll(world: &mut World) {
+    for mut scroll in world
+        .query_filtered::<&mut ScrollPosition, With<LedgerBody>>()
+        .iter_mut(world)
+    {
+        scroll.0 = Vec2::ZERO;
     }
 }
 fn switch_mode(world: &mut World, mode: IslandMode) {
@@ -728,21 +945,37 @@ fn sync_mode(world: &mut World) {
     if world.resource::<Ledger>().last_mode == Some(mode) {
         return;
     }
+    let shell = shell(world);
     if mode == IslandMode::Character {
         crate::island_camera::character(world);
         crate::homestead_panel::set_open(world, true);
         world.resource_mut::<Ledger>().open = false;
     } else {
-        let initial = world.resource::<Ledger>().last_mode.is_none();
-        crate::island_camera::overview(world, initial);
+        let previous = world.resource::<Ledger>().last_mode;
+        // Oversee and Shape share the overview camera; keep its framing
+        // when the player only swaps tools.
+        if previous.is_none() || previous == Some(IslandMode::Character) || !shell {
+            crate::island_camera::overview(world, previous.is_none());
+        }
         crate::homestead_panel::set_open(world, false);
         let mut state = world.resource_mut::<Ledger>();
-        state.open = true;
-        state.tab = if mode == IslandMode::Editor {
-            Tab::Landscape
+        if shell {
+            // Shape has its own palette; the ledger is an Oversee reference
+            // book that opens on request and closes with the mode.
+            if mode != IslandMode::Inspector {
+                state.open = false;
+            }
+            if state.tab == Tab::Landscape {
+                state.tab = Tab::Overview;
+            }
         } else {
-            Tab::Overview
-        };
+            state.open = true;
+            state.tab = if mode == IslandMode::Editor {
+                Tab::Landscape
+            } else {
+                Tab::Overview
+            };
+        }
     }
     if let Some(mut follow) = world.get_resource_mut::<crate::village_world::FollowHero>()
         && follow.enabled != (mode == IslandMode::Character)
@@ -755,13 +988,6 @@ fn sync_mode(world: &mut World) {
     state.dirty = true;
 }
 
-fn set_text<M: Component>(world: &mut World, value: &str) {
-    for mut text in world.query_filtered::<&mut Text, With<M>>().iter_mut(world) {
-        if text.0 != value {
-            text.0 = value.into();
-        }
-    }
-}
 pub(crate) fn refresh(world: &mut World) {
     let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
     {
@@ -777,23 +1003,52 @@ pub(crate) fn refresh(world: &mut World) {
         world.resource::<Ledger>().open,
         *world.resource::<IslandMode>(),
     );
-    let narrow = world
-        .query::<&Window>()
-        .iter(world)
-        .next()
-        .is_some_and(|window| window.width() < 1150.0);
+    let shell = shell(world);
+    let top = crate::island_shell::content_top(world);
+    let bottom = crate::island_shell::content_bottom(world);
+    let class = scale::layout(world).class;
+    let width =
+        crate::island_shell::model::column_width(Column::Ledger(LedgerPage::default()), class);
+    let overseeing = !shell || crate::island_shell::overseeing(world);
+    let pictures = if crate::island_shell::model::ledger_tab_icons(class) {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    for mut node in world
+        .query_filtered::<&mut Node, With<widgets::TabIcon>>()
+        .iter_mut(world)
+    {
+        if node.display != pictures {
+            node.display = pictures;
+        }
+    }
     for mut node in world
         .query_filtered::<&mut Node, With<LedgerRoot>>()
         .iter_mut(world)
     {
-        node.display = if open { Display::Flex } else { Display::None };
-        node.width = px(if narrow { 352.0 } else { 384.0 });
+        node.display = if open && overseeing {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        node.width = px(width);
+        if shell {
+            // The right column: under the bar, above the docks.
+            node.top = px(top);
+            node.bottom = px(bottom);
+        }
     }
     for mut node in world
         .query_filtered::<&mut Node, With<LedgerLauncher>>()
         .iter_mut(world)
     {
-        node.display = if open { Display::None } else { Display::Flex };
+        // The player session opens the ledger from its dock.
+        node.display = if open || shell {
+            Display::None
+        } else {
+            Display::Flex
+        };
     }
     for mut node in world
         .query_filtered::<&mut Node, With<crate::village::Hud>>()
@@ -828,486 +1083,103 @@ pub(crate) fn refresh(world: &mut World) {
     set_text::<LedgerStatus>(world, &status);
     let message = world.resource::<Ledger>().message.clone();
     set_text::<LedgerMessage>(world, &message);
+    for mut node in world
+        .query_filtered::<&mut Node, With<LedgerMessage>>()
+        .iter_mut(world)
+    {
+        let display = if message.is_empty() {
+            Display::None
+        } else {
+            Display::Flex
+        };
+        if node.display != display {
+            node.display = display;
+        }
+    }
     if open {
         let rows = entries(world);
         reconcile(world, rows);
-    }
-    let state = world.resource::<Ledger>();
-    let regional = village::frontier::enabled(world);
-    let limits = if state.surface == TerrainSurface::Water {
-        (if regional { -2000 } else { -1000 }, 0)
-    } else {
-        (0, if regional { 12000 } else { 3000 })
-    };
-    let disabled: Vec<_> = world
-        .query::<(Entity, &LedgerAction)>()
-        .iter(world)
-        .map(|(entity, action)| {
-            let state = world.resource::<Ledger>();
-            (
-                entity,
-                match action.0 {
-                    Action::Height(delta) => {
-                        if delta < 0 {
-                            state.height_mm <= limits.0
-                        } else {
-                            state.height_mm >= limits.1
-                        }
-                    }
-                    Action::Radius(delta) => {
-                        if delta < 0 {
-                            state.radius == 0
-                        } else {
-                            state.radius == if regional { 8 } else { 3 }
-                        }
-                    }
-                    _ => false,
-                },
-            )
-        })
-        .collect();
-    for (entity, value) in disabled {
-        if value {
-            world.entity_mut(entity).insert(InteractionDisabled);
-        } else {
-            world.entity_mut(entity).remove::<InteractionDisabled>();
-        }
     }
     if !open
         && world
             .resource::<InputFocus>()
             .get()
-            .is_some_and(|entity| world.get::<LedgerControl>(entity).is_some())
+            .is_some_and(|entity| world.get::<LedgerAction>(entity).is_some())
     {
         world.resource_mut::<InputFocus>().clear();
     }
 }
-fn reconcile(world: &mut World, entries: Vec<Entry>) {
-    let Some(body) = world
-        .query_filtered::<Entity, With<LedgerBody>>()
-        .iter(world)
-        .next()
-    else {
-        return;
-    };
-    let old = std::mem::take(&mut world.resource_mut::<Ledger>().rows);
-    let mut live = BTreeMap::new();
-    let mut order = Vec::new();
-    for entry in entries {
-        let entity = old
-            .get(&entry.key)
-            .copied()
-            .filter(|e| world.get_entity(*e).is_ok())
-            .unwrap_or_else(|| {
-                if let Some(action) = &entry.action {
-                    button(world, body, &entry.text, action.clone())
-                } else {
-                    world
-                        .spawn((
-                            ChildOf(body),
-                            text(
-                                &entry.text,
-                                if entry.heading { 16.0 } else { 13.0 },
-                                if entry.heading { GOLD } else { TEXT },
-                            ),
-                            Node {
-                                margin: UiRect::top(px(if entry.heading { 10 } else { 1 })),
-                                flex_shrink: 0.0,
-                                ..default()
-                            },
-                        ))
-                        .id()
-                }
-            });
-        if let Some(action) = entry.action {
-            world
-                .entity_mut(entity)
-                .insert((LedgerAction(action), AccessibleLabel::new(&entry.text)));
-            let children = world
-                .get::<Children>(entity)
-                .map(|c| c.to_vec())
-                .unwrap_or_default();
-            for child in children {
-                if let Some(mut text) = world.get_mut::<Text>(child)
-                    && text.0 != entry.text
-                {
-                    text.0 = entry.text.clone();
-                }
-            }
-        } else if let Some(mut text) = world.get_mut::<Text>(entity)
-            && text.0 != entry.text
-        {
-            text.0 = entry.text;
-        }
-        live.insert(entry.key, entity);
-        order.push(entity);
-    }
-    for (key, entity) in old {
-        if !live.contains_key(&key) {
-            if world.resource::<InputFocus>().get() == Some(entity) {
-                world.resource_mut::<InputFocus>().clear();
-            }
-            world.despawn(entity);
-        }
-    }
-    if world
-        .get::<Children>(body)
-        .is_none_or(|children| children.as_ref() != order.as_slice())
-    {
-        world.entity_mut(body).replace_children(&order);
-    }
-    world.resource_mut::<Ledger>().rows = live;
-}
-fn paint(
-    state: Res<Ledger>,
-    mode: Res<IslandMode>,
-    focus: Res<InputFocus>,
-    colony: Res<colony::ColonyState>,
-    mut buttons: Query<
+/// Light the tab, filter, sort and row that are selected. The kit paints.
+fn sync(world: &mut World) {
+    let (tab, scope, sort, open, page, good) = {
+        let state = world.resource::<Ledger>();
         (
-            Entity,
-            &LedgerAction,
-            &Hovered,
-            Has<InteractionDisabled>,
-            &mut BackgroundColor,
-            &mut BorderColor,
-        ),
-        With<LedgerControl>,
-    >,
-) {
-    for (entity, action, hovered, disabled, mut background, mut border) in &mut buttons {
-        let selected = match action.0 {
-            Action::Mode(value) => value == *mode,
-            Action::Tab(value) => value == state.tab,
-            Action::Surface(value) => value == state.surface,
-            Action::Reserve(value) => value == colony.food_reserve_days,
+            state.tab,
+            state.scope,
+            state.sort,
+            state.open,
+            state.economy,
+            state.good.clone(),
+        )
+    };
+    if !open {
+        return;
+    }
+    let mode = *world.resource::<IslandMode>();
+    let reserve = world
+        .get_resource::<colony::ColonyState>()
+        .map(|colony| colony.food_reserve_days);
+    let inspected = world
+        .get_resource::<Selected>()
+        .and_then(|selected| selected.0);
+    let card = crate::island_build::card_raw(world);
+    let filter = crate::island_alerts::filter(world);
+    let controls: Vec<(Entity, Action)> = world
+        .query_filtered::<(Entity, &LedgerAction), With<LedgerControl>>()
+        .iter(world)
+        .map(|(entity, action)| (entity, action.0.clone()))
+        .collect();
+    // Each village's profession table, read once for all its buttons.
+    let mut tables: BTreeMap<
+        npc_framework::prelude::SimId,
+        Vec<village::frontier::oversee::ProfessionRowView>,
+    > = BTreeMap::new();
+    for (entity, action) in controls {
+        let selected = match action {
+            Action::Mode(value) => value == mode,
+            Action::Tab(value) => value == tab,
+            Action::Scope(value) => value == scope,
+            Action::Sort(value) => value == sort,
+            Action::EconomyPage(value) => value == page,
+            Action::Good(ref value) => good.as_deref() == Some(value.as_str()),
+            Action::Resident(value) => inspected == Some(value),
+            Action::Reserve(value) => reserve == Some(value),
+            Action::Site(value) => card == Some(value),
+            Action::AlertFilter(value) => filter == Some(value),
+            Action::Priority {
+                settlement,
+                topic,
+                ref profession,
+                level,
+            } => economy::priority_level(world, settlement, topic, profession.as_deref()) == level,
             _ => false,
         };
-        background.0 = if disabled {
-            Color::srgb(0.10, 0.12, 0.15)
-        } else if hovered.get() {
-            Color::srgb(0.27, 0.32, 0.40)
-        } else {
-            BUTTON
-        };
-        *border = BorderColor::all(if selected || focus.get() == Some(entity) {
-            GOLD
-        } else {
-            Color::NONE
-        });
-    }
-}
-fn typography(
-    font: Option<Res<LedgerFont>>,
-    mut text: Query<&mut TextFont, With<LedgerTypography>>,
-) {
-    let Some(font) = font else { return };
-    for mut text in &mut text {
-        if text.font != bevy::text::FontSource::Handle(font.0.clone()) {
-            text.font = font.0.clone().into();
-        }
-    }
-}
-fn brush_gizmo(
-    mode: Res<IslandMode>,
-    state: Res<Ledger>,
-    terrain: Option<Res<village::frontier::terrain::TerrainState>>,
-    mut gizmos: Gizmos,
-) {
-    if *mode != IslandMode::Editor {
-        return;
-    }
-    let Some((x, z)) = state.cell else { return };
-    let y = if state.surface == TerrainSurface::Water {
-        -0.10
-    } else {
-        state.height_mm as f32 / 1000.0 + 0.04
-    };
-    let color = if state.preview_error.is_some() {
-        Color::srgb(1.0, 0.30, 0.23)
-    } else {
-        GOLD
-    };
-    let cells = terrain.as_ref().map_or_else(
-        || brush_cells(x, z, state.radius),
-        |terrain| regional_brush_cells(terrain.bounds(), x, z, state.radius),
-    );
-    for (x, z) in cells {
-        gizmos.cube(
-            Transform::from_xyz(x as f32 + 0.5, y, z as f32 + 0.5)
-                .with_scale(Vec3::new(1.0, 0.06, 1.0)),
-            color,
-        );
-    }
-}
-
-fn regional_brush_cells(
-    bounds: npc_framework::prelude::GridBounds,
-    cx: i32,
-    cz: i32,
-    radius: u32,
-) -> Vec<(i32, i32)> {
-    let radius = radius.min(8) as i32;
-    (-radius..=radius)
-        .flat_map(|z| (-radius..=radius).map(move |x| (x, z)))
-        .filter(|(x, z)| x * x + z * z <= radius * radius)
-        .map(|(x, z)| (cx.saturating_add(x), cz.saturating_add(z)))
-        .filter(|(x, z)| bounds.contains(npc_framework::prelude::CellCoord::new(*x, *z)))
-        .collect()
-}
-
-fn brush_cells(cx: i32, cz: i32, radius: u32) -> Vec<(i32, i32)> {
-    let radius = radius.min(3) as i32;
-    (-radius..=radius)
-        .flat_map(|z| (-radius..=radius).map(move |x| (x, z)))
-        .filter(|(x, z)| x * x + z * z <= radius * radius)
-        .map(|(x, z)| (cx.saturating_add(x), cz.saturating_add(z)))
-        .filter(|(x, z)| (-31..31).contains(x) && (-31..31).contains(z))
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::player_actions;
-    use npc_framework::kernel::hash::state_hash;
-    use npc_framework::prelude::run_ticks;
-    use testbed_content::village::terrain::TerrainCell;
-    use testbed_content::village::{Role, Villager};
-
-    fn fixture() -> App {
-        let mut app = testbed_content::new_sim_app(7, "island_colony");
-        app.init_resource::<Ledger>()
-            .init_resource::<IslandMode>()
-            .init_resource::<InputFocus>()
-            .init_resource::<SimControl>()
-            .init_resource::<player_actions::NativeActions>()
-            .add_plugins(crate::island_control::plugin);
-        app
-    }
-
-    #[test]
-    fn a_ground_right_click_releases_ledger_focus_without_consuming_the_order() {
-        let mut app = fixture();
-        app.init_resource::<ButtonInput<MouseButton>>();
-        let control = app.world_mut().spawn((LedgerControl, Node::default())).id();
-        app.world_mut()
-            .resource_mut::<InputFocus>()
-            .set(control, FocusCause::Navigated);
-        app.world_mut()
-            .resource_mut::<ButtonInput<MouseButton>>()
-            .press(MouseButton::Right);
-        pointer(app.world_mut());
-        assert!(app.world().resource::<InputFocus>().get().is_none());
-        assert!(
-            app.world()
-                .resource::<ButtonInput<MouseButton>>()
-                .just_pressed(MouseButton::Right)
-        );
-    }
-
-    #[test]
-    fn preview_cells_match_the_authoritative_circular_terraform_brush() {
-        use std::collections::BTreeSet;
-        for radius in 0..=3 {
-            let mut app = fixture();
-            let before = app.world().resource::<TerrainState>().cells.clone();
-            let command = Terraform {
-                x: 14,
-                z: 16,
-                radius,
-                height_mm: 250,
-                surface: TerrainSurface::Stone,
-            };
-            command.perform(app.world_mut()).unwrap();
-            let changed: BTreeSet<_> = app
-                .world()
-                .resource::<TerrainState>()
-                .cells
+        kit::set_state(world, entity, selected, false);
+        // A step the simulation would refuse is dimmed; its tooltip says why.
+        if let Action::Target {
+            settlement,
+            ref profession,
+            step,
+        } = action
+        {
+            let rows = tables
+                .entry(settlement)
+                .or_insert_with(|| village::frontier::oversee::profession_table(world, settlement));
+            let allowed = rows
                 .iter()
-                .zip(&before)
-                .enumerate()
-                .filter(|(_, (after, before))| after != before)
-                .map(|(index, _)| ((index % 64) as i32 - 32, (index / 64) as i32 - 32))
-                .collect();
-            let preview: BTreeSet<_> = brush_cells(command.x, command.z, radius)
-                .into_iter()
-                .collect();
-            assert_eq!(
-                preview, changed,
-                "radius {radius} preview must outline exactly the cells the command modifies"
-            );
+                .find(|row| row.key == *profession)
+                .is_some_and(|row| economy::target_from_row(world, settlement, row, step).is_ok());
+            kit::set_enabled(world, entity, allowed);
         }
-    }
-
-    #[test]
-    fn inspecting_residents_and_plans_does_not_change_the_simulation() {
-        let mut app = fixture();
-        let resident = app
-            .world()
-            .resource::<SimIndex>()
-            .map
-            .iter()
-            .find(|(_, entity)| {
-                app.world()
-                    .get::<Villager>(**entity)
-                    .is_some_and(|person| person.role == Role::Farmer)
-            })
-            .map(|(id, _)| *id)
-            .unwrap();
-        app.insert_resource(Selected(Some(resident)));
-        let before = state_hash(app.world_mut());
-        assert!(
-            entries(app.world())
-                .iter()
-                .any(|entry| entry.text.contains("Homes & wellbeing"))
-        );
-        app.world_mut().resource_mut::<Ledger>().tab = Tab::Residents;
-        let rows = entries(app.world());
-        assert!(rows.iter().any(|entry| entry.text.contains("Ada")));
-        assert!(
-            rows.iter()
-                .any(|entry| matches!(entry.action, Some(Action::Home(..))))
-        );
-        assert_eq!(before, state_hash(app.world_mut()));
-    }
-
-    #[test]
-    fn colony_policy_button_queues_and_reports_the_actual_application() {
-        let mut app = fixture();
-        let before = state_hash(app.world_mut());
-        app.world_mut()
-            .resource_mut::<Ledger>()
-            .requests
-            .push(Action::Reserve(4));
-        process(app.world_mut());
-        assert_eq!(
-            app.world()
-                .resource::<colony::ColonyState>()
-                .food_reserve_days,
-            2
-        );
-        assert_eq!(
-            before,
-            state_hash(app.world_mut()),
-            "button queues rather than mutating authoritative state"
-        );
-        assert!(app.world().resource::<Ledger>().pending.is_some());
-        run_ticks(app.world_mut(), 2);
-        process(app.world_mut());
-        assert_eq!(
-            app.world()
-                .resource::<colony::ColonyState>()
-                .food_reserve_days,
-            4
-        );
-        assert!(app.world().resource::<Ledger>().pending.is_none());
-        assert!(
-            app.world()
-                .resource::<Ledger>()
-                .message
-                .contains("set to 4 days")
-        );
-    }
-
-    #[test]
-    fn blocked_terrain_edit_is_explained_without_queuing_it() {
-        let mut app = fixture();
-        let before = state_hash(app.world_mut());
-        let command = Terraform {
-            x: 100,
-            z: 0,
-            radius: 0,
-            height_mm: 0,
-            surface: TerrainSurface::Grass,
-        };
-        queue(
-            app.world_mut(),
-            SimCommand::content(&command),
-            "unexpected success".into(),
-        );
-        assert!(
-            app.world()
-                .resource::<Ledger>()
-                .message
-                .starts_with("Cannot apply:")
-        );
-        assert!(app.world().resource::<Ledger>().pending.is_none());
-        assert_eq!(before, state_hash(app.world_mut()));
-    }
-
-    #[test]
-    fn closing_landscape_tools_ends_painting_without_mutating_the_world() {
-        for action in [Action::Close, Action::Toggle] {
-            let mut app = fixture();
-            switch_mode(app.world_mut(), IslandMode::Editor);
-            let before = state_hash(app.world_mut());
-            app.world_mut()
-                .resource_mut::<Ledger>()
-                .requests
-                .push(action);
-            process(app.world_mut());
-            assert_eq!(*app.world().resource::<IslandMode>(), IslandMode::Inspector);
-            assert!(!app.world().resource::<Ledger>().open);
-            assert_eq!(before, state_hash(app.world_mut()));
-        }
-    }
-
-    #[test]
-    fn housing_controls_offer_another_resident_when_the_carpenter_is_committed() {
-        let mut app = fixture();
-        let first = entries(app.world())
-            .into_iter()
-            .find_map(|entry| match entry.action {
-                Some(Action::Commission(builder, plot)) => Some((builder, plot)),
-                _ => None,
-            })
-            .expect("a housing site can be commissioned");
-        app.world_mut()
-            .resource_mut::<Ledger>()
-            .requests
-            .push(Action::Commission(first.0, first.1));
-        process(app.world_mut());
-        run_ticks(app.world_mut(), 1);
-        let next = entries(app.world())
-            .into_iter()
-            .find_map(|entry| match entry.action {
-                Some(Action::Commission(builder, plot)) => Some((builder, plot)),
-                _ => None,
-            })
-            .expect("remaining empty sites are still offered");
-        assert_ne!(
-            first.0, next.0,
-            "one carpenter cannot hide every future housing option"
-        );
-        assert_ne!(first.1, next.1);
-    }
-
-    #[test]
-    fn terrain_picking_hits_raised_cells_at_their_actual_height() {
-        let mut terrain = TerrainState {
-            cells: vec![
-                TerrainCell {
-                    height_mm: 0,
-                    surface: TerrainSurface::Grass
-                };
-                4096
-            ],
-            revision: 0,
-        };
-        terrain.cells[32 * 64 + 32].height_mm = 3000;
-        // At y=3 the oblique ray hits cell(0,0); at y=0 it would hit cell(1,0).
-        let ray = Ray3d::new(
-            Vec3::new(-0.8, 6.0, 0.5),
-            Dir3::new(Vec3::new(0.4, -1.0, 0.0)).unwrap(),
-        );
-        assert_eq!(terrain_hit(&terrain, ray), Some((0, 0)));
-        assert_eq!(
-            terrain_hit(
-                &terrain,
-                Ray3d::new(Vec3::new(80.0, 10.0, 80.0), Dir3::NEG_Y)
-            ),
-            None
-        );
     }
 }

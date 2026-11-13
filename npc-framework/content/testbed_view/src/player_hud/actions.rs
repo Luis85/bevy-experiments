@@ -74,7 +74,9 @@ fn execute(world: &mut World, request: WorkRequest) -> Result<(), String> {
         .get_resource::<SimControl>()
         .is_some_and(|control| control.is_stopped())
     {
-        return Err("Open Menu and resume the world before starting work.".into());
+        return Err(
+            "The world is paused. Press Space or Resume in the top bar, then start work.".into(),
+        );
     }
     restore_follow(world);
     crate::island_control::clear_navigation_input(world);
@@ -149,6 +151,7 @@ pub(super) fn process(world: &mut World) {
                 }
                 let mut state = world.resource_mut::<PlayerState>();
                 state.tab = Some(tab);
+                state.need_filter = None;
                 if matches!(tab, Tab::Build | Tab::Garden)
                     && let Some(plot) = world.resource::<PlayerState>().plot
                 {
@@ -157,9 +160,36 @@ pub(super) fn process(world: &mut World) {
                 reset_workspace(world, preserve_focus);
                 Ok(())
             }
+            Action::Toggle(tab) => {
+                // The hotbar tile of the open workspace closes it.
+                let next = if world.resource::<PlayerState>().tab == Some(tab) {
+                    Action::Close
+                } else {
+                    Action::Open(tab)
+                };
+                world.resource_mut::<PlayerState>().requests.push(next);
+                Ok(())
+            }
             Action::Close => {
                 restore_follow(world);
-                world.resource_mut::<PlayerState>().tab = None;
+                let mut state = world.resource_mut::<PlayerState>();
+                state.tab = None;
+                state.need_filter = None;
+                state.gift_for = None;
+                Ok(())
+            }
+            Action::Item(kind) => {
+                let mut state = world.resource_mut::<PlayerState>();
+                state.item = (state.item.as_deref() != Some(kind.as_str())).then_some(kind);
+                Ok(())
+            }
+            Action::CraftAll(all) => {
+                world.resource_mut::<PlayerState>().craft_all = all;
+                Ok(())
+            }
+            Action::GoalFold => {
+                let mut state = world.resource_mut::<PlayerState>();
+                state.goal_folded = !state.goal_folded;
                 Ok(())
             }
             Action::Menu => {
@@ -181,7 +211,40 @@ pub(super) fn process(world: &mut World) {
                 player_actions::begin_successor(world)
                     .map(|_| world.resource_mut::<PlayerState>().successor_from = Some(id))
             }
-            Action::Stop => player_actions::stop(world).map(|_| ()),
+            Action::Stop => {
+                // Stop also ends a repeat order, so the next round does not start.
+                if depth::repeat_words(world).is_some() {
+                    let _ = depth::send(world, &depth::LiveRequest::new("stop_repeat"));
+                }
+                player_actions::stop(world).map(|_| ())
+            }
+            Action::Live(request) => {
+                if request.verb == "gift" {
+                    world.resource_mut::<PlayerState>().gift_for = None;
+                }
+                depth::send(world, &request)
+            }
+            Action::GiftFor(resident) => {
+                world.resource_mut::<PlayerState>().gift_for = resident;
+                reset_workspace(world, preserve_focus);
+                Ok(())
+            }
+            Action::NeedHelp(need) => {
+                let mut state = world.resource_mut::<PlayerState>();
+                state.need_filter = need;
+                state.item = None;
+                state.tab = Some(Tab::Pouch);
+                reset_workspace(world, preserve_focus);
+                Ok(())
+            }
+            Action::Repeat(count) => {
+                world.resource_mut::<PlayerState>().repeat = count;
+                Ok(())
+            }
+            Action::DismissSummary => {
+                rest::dismiss(world);
+                Ok(())
+            }
             Action::Plot(id) => {
                 let bed = player_actions::observe(world)
                     .ok()
@@ -270,21 +333,9 @@ fn reset_workspace(world: &mut World, focus_first: bool) {
     }
     world.resource_mut::<PlayerState>().focus_workspace = focus_first;
 }
-/// The content projection is the one source of objective priorities and facts.
-pub(super) fn guidance(observed: &Value) -> (String, String) {
-    let journey = testbed_content::village::player_journey::project(observed);
-    let detail = journey.next.progress.map_or_else(
-        || journey.next.detail.clone(),
-        |progress| {
-            format!(
-                "{}\n{} / {} {}",
-                journey.next.detail, progress.current, progress.target, progress.unit
-            )
-        },
-    );
-    (journey.next.title.into(), detail)
-}
-fn goal_action(world: &World, observed: &Value) -> Action {
+/// What the goal tracker's button does. The content projection is the one
+/// source of objective priorities and facts.
+pub(super) fn goal_action(world: &World, observed: &Value) -> Action {
     let task = testbed_content::village::player_journey::project(observed).next;
     if let Some(hint) = task.action {
         let door = if matches!(hint.verb.as_str(), "claim_plot" | "build_cottage") {

@@ -22,6 +22,18 @@ fn coherent_flow_hides_legacy_farm_controls_in_inspection_and_drops_hidden_reque
             .iter(app.world())
             .all(|node| node.display == Display::None)
     );
+    // Leaving the player session brings the launcher back: the hidden look
+    // is remembered, not assumed.
+    assert_eq!(app.world().resource::<FarmState>().look, Look::Hidden);
+    app.insert_resource(crate::PlayerExperience { enabled: false });
+    refresh(app.world_mut());
+    assert_eq!(app.world().resource::<FarmState>().look, Look::Closed);
+    assert!(
+        app.world_mut()
+            .query_filtered::<&Node, With<FarmLauncher>>()
+            .iter(app.world())
+            .all(|node| node.display == Display::Flex)
+    );
 }
 
 fn fixture(scene: &str) -> App {
@@ -407,4 +419,86 @@ fn crop_model_keeps_unknown_foreign_state_unknown_and_does_not_guess_positions()
             .any(|row| matches!(row.action, Some(Action::Walk(_))))
     );
     assert_eq!(before, state_hash(app.world_mut()));
+}
+
+fn rebuilds(app: &App) -> u64 {
+    app.world().resource::<FarmState>().rebuilds
+}
+
+#[test]
+fn a_closed_panel_builds_nothing_and_an_open_one_rebuilds_only_when_its_inputs_change() {
+    let mut app = fixture("living_village");
+    // Closed: the launcher is shown and no observation is built, tick or not.
+    for _ in 0..4 {
+        run_ticks(app.world_mut(), 1);
+        app.update();
+    }
+    assert_eq!(rebuilds(&app), 0, "a closed panel does no work");
+    assert!(app.world().resource::<FarmState>().shown.is_none());
+    assert_eq!(app.world().resource::<FarmState>().look, Look::Closed);
+    assert!(
+        app.world_mut()
+            .query_filtered::<&Node, With<FarmLauncher>>()
+            .iter(app.world())
+            .all(|node| node.display == Display::Flex)
+    );
+
+    // Opening builds it on that frame.
+    press(&mut app, &Action::Toggle);
+    assert_eq!(rebuilds(&app), 1);
+    let shown = texts(&mut app);
+    assert!(
+        shown.contains("Food "),
+        "the status strip is filled: {shown}"
+    );
+
+    // Idle frames over an unchanged world keep what is shown.
+    for _ in 0..6 {
+        app.update();
+    }
+    assert_eq!(rebuilds(&app), 1, "unchanged inputs: no rebuild");
+    assert_eq!(texts(&mut app), shown);
+
+    // A simulation tick is an input; so is a choice in the panel itself.
+    run_ticks(app.world_mut(), 1);
+    app.update();
+    assert_eq!(rebuilds(&app), 2);
+    app.update();
+    assert_eq!(rebuilds(&app), 2);
+    press(&mut app, &Action::Tab(Tab::Supplies));
+    assert_eq!(rebuilds(&app), 3, "a tab change shows on the same frame");
+    press(&mut app, &Action::Quantity(1));
+    assert_eq!(rebuilds(&app), 4);
+    app.world_mut().resource_mut::<SimControl>().paused = true;
+    app.update();
+    assert_eq!(rebuilds(&app), 5, "pausing changes the captions");
+    app.update();
+    assert_eq!(rebuilds(&app), 5);
+
+    // The gate never changes the content: a forced rebuild shows the same.
+    let gated = texts(&mut app);
+    app.world_mut().resource_mut::<FarmState>().shown = None;
+    app.update();
+    assert_eq!(rebuilds(&app), 6);
+    assert_eq!(texts(&mut app), gated);
+
+    // The staleness bound: an open panel is rebuilt once the recheck time passes.
+    app.world_mut().resource_mut::<FarmState>().since_refresh = RECHECK_SECS;
+    app.update();
+    assert_eq!(rebuilds(&app), 7);
+
+    // Closing stops the work again and hides the panel.
+    press(&mut app, &Action::Close);
+    let closed_at = rebuilds(&app);
+    for _ in 0..4 {
+        run_ticks(app.world_mut(), 1);
+        app.update();
+    }
+    assert_eq!(rebuilds(&app), closed_at);
+    assert!(
+        app.world_mut()
+            .query_filtered::<&Node, With<FarmRoot>>()
+            .iter(app.world())
+            .all(|node| node.display == Display::None)
+    );
 }

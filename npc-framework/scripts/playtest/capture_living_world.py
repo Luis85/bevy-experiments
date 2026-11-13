@@ -69,7 +69,8 @@ class LivingFlow(PlayerFlow):
         self.capture("chart-" + name.lower().replace(" ", "-"))
 
     def region(self, name):
-        self.click("Village")
+        # The settlements are rows of the ledger's Village page.
+        self.open_page("Village")
         rows, _, _ = self.ui()
         label = next(row["text"] for row in rows if row["text"].startswith(name + " · ")
                      and row["text"].endswith(" residents"))
@@ -184,7 +185,7 @@ def main():
             flow.click("New game")
             flow.capture("new-character")
             flow.click("Start on the island")
-            wait_for(lambda: flow.widget("Menu · Esc"))
+            wait_for(lambda: flow.widget("Menu"))
             flow.advance(4)
             visitors = [entity for entity in flow.state()["entities"]
                         if entity.get("components", {}).get("island_villager", {}).get("role") in ("visitor", "Visitor")]
@@ -202,15 +203,15 @@ def main():
                 for name in ["Alderwood", "Stone Ridge", "Harbour"]:
                     flow.travel(name)
                 report["checks"].append("Three chart destinations reached by actual player movement through native widgets")
-            flow.click("Menu · Esc")
+            flow.click("Menu")
             flow.click("Save game")
             flow.click("Save and title")
             flow.capture("saved-title")
             flow.click("Continue")
-            wait_for(lambda: flow.widget("Menu · Esc"))
+            wait_for(lambda: flow.widget("Menu"))
             flow.capture("continued-player")
-            flow.click("Menu · Esc")
-            flow.click("Inspect village")
+            flow.click("Menu")
+            flow.click("Oversee the village")
             flow.advance(4)
             flow.capture("inspector-overview")
             if args.confirm:
@@ -241,14 +242,16 @@ def main():
                     if entity["components"]["regional_resident_profile_v1"]["appearance"] % 8 == appearance), None)
                 if person is None:
                     continue
-                flow.click("Residents")
+                # The roster is the People page; a row hands the right column
+                # to that resident's inspector.
+                flow.open_page("People")
                 name = person["components"]["island_villager"]["name"]
-                label = next(row["text"] for row in flow.ui()[0] if row["text"].startswith(name + " · "))
-                flow.click(label)
+                flow.press_row(name + " · ")
+                time.sleep(0.8)
                 flow.capture("resident-model-" + str(appearance))
             flow.region("Harbour")
             before = flow.save_from_inspector(save)
-            flow.click("Terraform")
+            flow.click("Shape")
             flow.capture("landscape-tools")
             command = terrain_candidate(before, flow.state())
             receipt = flow.call("npc/command", {"cmd": command})
@@ -265,7 +268,7 @@ def main():
             flow.click("Save and title")
             flow.click("New game")
             flow.click("Oversee the village")
-            wait_for(lambda: flow.widget("Play character"))
+            wait_for(lambda: flow.widget("Live"))
             flow.call("npc/pause")
             flow.advance(200)
             flow.actor = None

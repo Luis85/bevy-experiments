@@ -45,6 +45,24 @@ pub fn activity(world: &World, entity: Entity) -> (&'static str, bool, &'static 
             true,
             "Wait for your cottage to finish, or use stop_work to release its materials.",
         )
+    } else if world.get::<super::live::UpgradeWork>(entity).is_some() {
+        (
+            "building",
+            true,
+            "Wait for the stage of work on the homestead to finish, or use stop_work to leave.",
+        )
+    } else if world.get::<super::civic::SiteWork>(entity).is_some() {
+        (
+            "building",
+            true,
+            "Wait for the building stage to finish, or use stop_work to leave the site.",
+        )
+    } else if world.get::<super::fields::FieldWork>(entity).is_some() {
+        (
+            "farming",
+            true,
+            "Wait for the field work to finish, or use stop_work to leave the plot.",
+        )
     } else if world
         .get::<super::frontier::activities::EcologyWork>(entity)
         .is_some()
@@ -169,7 +187,7 @@ fn offer(
         super::production::purchase_target(world, trader, kind)
             .saturating_sub(econ::count(world, trader, kind))
     } else {
-        catalog::stock_limit(kind).saturating_sub(quantity)
+        catalog::stock_limit_in(world, kind).saturating_sub(quantity)
     };
     json!({"direction":verb,"kind":kind,"unit_price":price,
         "stock":if verb=="buy"{Some(quantity)}else{None},
@@ -264,7 +282,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
                 .collect::<Vec<_>>()
                 .join("; ")
         ));
-        market.push(json!({"id":id,"name":v.name,"role":v.role,"activity":activity(world,e).0,"decision":super::behavior::decision(world,e),"stock":stock,"offers":offers,"bed_price":if v.role==Role::Innkeeper{Some(catalog::BED_PRICE)}else{None}}));
+        market.push(json!({"id":id,"name":v.name,"role":v.role,"activity":activity(world,e).0,"decision":super::behavior::decision(world,e),"stock":stock,"offers":offers,"bed_price":if super::frontier::economy_spec::is_service(world,v.role){Some(catalog::BED_PRICE)}else{None}}));
     }
     let (activity_kind, busy, recovery) = activity(world, ctx.entity);
     let heard_speech = super::speech::heard(world, ctx.unit);
@@ -272,7 +290,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
     let mut value = json!({"name":person.name,"role":person.role,"home":person.home,"environment":environment,"life":person.life,"alive":vital.died_at.is_none(),"health":vital.health,"died_at":vital.died_at,
         "coins":coins,"needs":{"hunger":econ::need(world,ctx.entity,"Hunger"),"thirst":econ::need(world,ctx.entity,"Thirst"),"energy":econ::need(world,ctx.entity,"Energy")},
         "resting_until":person.resting_until,"exhaustion_episodes":vital.exhaustion_ticks,"decision":super::behavior::decision(world,ctx.entity),"activity":{"kind":activity_kind,"busy":busy,"recovery":recovery},
-        "calendar":{"day":day+1,"season":season,"night":night,"days_per_season":DAYS_PER_SEASON},"nearby_market":market,"found_diaries":found,"heard_speech":heard_speech});
+        "calendar":{"day":day+1,"season":season,"night":night,"days_per_season":days_per_season(world)},"nearby_market":market,"found_diaries":found,"heard_speech":heard_speech});
     if super::needs_driven(world) {
         let mut news = super::market::public_book(world);
         for row in &mut news {
@@ -281,6 +299,11 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
             }
         }
         value["economy"] = json!({"model":"needs_driven","market":news,"own_offers":super::market::own_offers(world,ctx.entity),"job":super::production::job_summary(world,ctx.entity)});
+        // The roles of goods in this world (catalog data), for guidance.
+        let r = super::roles::roles(world);
+        value["economy"]["roles"] = json!({"drink":r.drink,"fuel":r.fuel,"garment":r.garment,
+            "timber":r.timber,"lumber":r.lumber,"baked":r.baked,"cooked":r.cooked,
+            "foraged":r.foraged,"grain":r.grain});
         value["needs"]["warmth"] = json!(econ::need(world, ctx.entity, "Warmth"));
         value["cold"] = json!(super::living::cold(world));
         value["wearing_warm_clothes"] = json!(super::living::has_coat(world, ctx.entity));
@@ -346,7 +369,7 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         section = section.line("Gather or hunt, craft finished goods and trade at current quoted prices. NPCs buy what their planned needs require; offer_goods posts your carried stock for physical purchase. Equip warm clothes to protect Warmth. The finite community fund circulates existing money; visitors receive no stipend.")
             .line("Your physical Diary survives permanent death; private Memory, Proposals, map notes and credentials do not become world items.");
     } else {
-        section=section.line(format!("Gather fallen wood or grain, or craft at village workstations, then sell to villagers who need the goods. Buy bread ({} coins) and clean water ({}); eat/drink from your pack. A bed at the inn costs {} coins. Water around the island cannot be crossed.", catalog::price("bread").unwrap_or(0),catalog::price(catalog::WATER).unwrap_or(0),catalog::BED_PRICE))
+        section=section.line(format!("Gather fallen wood or grain, or craft at village workstations, then sell to villagers who need the goods. Buy bread ({} coins) and clean water ({}); eat/drink from your pack. A bed at the inn costs {} coins. Water around the island cannot be crossed.", catalog::price_in(world, "bread").unwrap_or(0),catalog::price_in(world, catalog::WATER).unwrap_or(0),catalog::BED_PRICE))
         .line("NPC shops have finite stock and money. Merchant surplus circulates through a finite community fund; visiting actors receive no stipend. Winter reduces farming supply.")
         .line("Your Diary becomes a readable dropped item on permanent death. Memory, Proposals, map notes and credentials stay private. A successor is a different actor in the same continuing world.");
     }
@@ -399,11 +422,15 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
         let mut affordance = Affordance::new(verb, label);
         if verb == "eat" && super::needs_driven(world) {
             affordance.label = "Eat a finished food from your pack".into();
-            cmd.kind = ["bread", catalog::COOKED_MEAL, catalog::BERRIES]
-                .into_iter()
-                .find(|kind| econ::count(world, ctx.entity, kind) > 0)
-                .unwrap_or("bread")
-                .into();
+            cmd.kind = [
+                super::roles::roles(world).baked,
+                super::roles::roles(world).cooked,
+                super::roles::roles(world).foraged,
+            ]
+            .into_iter()
+            .find(|kind| econ::count(world, ctx.entity, kind) > 0)
+            .unwrap_or(super::roles::roles(world).baked)
+            .into();
             affordance = affordance.arg(
                 "kind",
                 "bread (default), village_cooked_meal, village_berries; raw meat must be cooked",
@@ -417,7 +444,7 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
             .iter()
             .find(|kind| econ::count(world, ctx.entity, kind) > 0)
             .copied()
-            .unwrap_or("log")
+            .unwrap_or(super::roles::roles(world).timber)
             .into();
         out.push(checked(
             Affordance::new(
@@ -594,7 +621,7 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
                 ),
                 check,
             ));
-            if v.role == Role::Innkeeper {
+            if super::frontier::economy_spec::is_service(world, v.role) {
                 out.push(checked(
                     Affordance::new(
                         "rest",

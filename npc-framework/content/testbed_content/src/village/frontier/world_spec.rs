@@ -77,6 +77,70 @@ pub struct LivingWorldSpec {
     pub actor_start: SimPos,
     pub settlements: Vec<SettlementDef>,
     pub plots: Vec<PlotDef>,
+    /// Goods, recipes, professions, patches, endowments and tuning. A file
+    /// without this block gets the built-in economy.
+    pub economy: super::economy_spec::EconomySpec,
+    /// Resident behaviour trees, traits, schedule and places. A file without
+    /// this block gets the built-in behaviour.
+    pub behavior: crate::village::resident::BehaviorSpec,
+    /// An exported world's terrain; without it the terrain is generated.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub terrain: Option<TerrainSpec>,
+    /// An exported world's resource patches; without them every settlement
+    /// gets the economy's patch list.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub resource_patches: Vec<PlacedPatch>,
+    /// Buildings and sites placed after the founding, laid out again when
+    /// the world is built.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub buildings: Vec<PlacedBuilding>,
+    /// Props placed with the Shape tools, laid out again when the world is
+    /// built.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub props: Vec<PlacedProp>,
+}
+
+/// Heights (millimetres) and surfaces of every cell, row by row from the
+/// map's lowest corner: `g` grass, `s` soil, `t` stone, `w` water.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TerrainSpec {
+    pub heights: Vec<i32>,
+    pub surfaces: String,
+}
+
+/// One resource patch of an exported world.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlacedPatch {
+    pub good: String,
+    pub x: i32,
+    pub z: i32,
+    pub capacity: u32,
+    /// Key of the settlement that works it.
+    pub settlement: String,
+}
+
+/// One building or site of an exported world: the catalogue key, its
+/// entrance cell and quarter turns, and whether it stands finished.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlacedBuilding {
+    pub building: String,
+    pub x: i32,
+    pub z: i32,
+    pub rotation: u8,
+    pub finished: bool,
+}
+/// One placed prop of an exported world: the catalog key, its cell and
+/// quarter turns (the `PlaceProp` command's values).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PlacedProp {
+    pub prop: String,
+    pub x: i32,
+    pub z: i32,
+    pub rotation: u8,
 }
 impl Default for LivingWorldSpec {
     fn default() -> Self {
@@ -185,6 +249,12 @@ impl Default for LivingWorldSpec {
             actor_start: SimPos::new(500, -43000),
             settlements,
             plots,
+            economy: super::economy_spec::EconomySpec::default(),
+            behavior: crate::village::resident::BehaviorSpec::default(),
+            terrain: None,
+            resource_patches: Vec::new(),
+            buildings: Vec::new(),
+            props: Vec::new(),
         }
     }
 }
@@ -265,17 +335,24 @@ impl LivingWorldSpec {
                     || !(1..=8).contains(&site.capacity)
                     || site.role == Role::Visitor
                     || !roles.insert(site.role)
-                    || (site.role == Role::Woodcutter && site.capacity < 2)
+                    || self.economy.profession(site.role).is_none()
                 {
                     return Err("Workplaces require unique keys, a resident occupation and valid position/capacity".into());
                 }
             }
-            if Role::RESIDENTS
-                .into_iter()
-                .chain([Role::Hunter, Role::Tanner, Role::Tailor, Role::Fisher])
-                .any(|role| !roles.contains(&role))
+            // Every founder needs a workplace of its trade at the founding.
+            if let Some(founder) = self
+                .economy
+                .seed
+                .founders
+                .iter()
+                .find(|founder| !roles.contains(&founder.role))
             {
-                return Err("Each settlement needs all thirteen resident occupations".into());
+                return Err(format!(
+                    "Settlement {} has no workplace for the founders' trade `{}`",
+                    settlement.label,
+                    founder.role.key()
+                ));
             }
             for home in &settlement.homes {
                 if home.key.is_empty()
@@ -287,7 +364,74 @@ impl LivingWorldSpec {
                 }
             }
         }
-        self.validate_footprints()
+        self.validate_footprints()?;
+        self.validate_export(&keys)?;
+        self.economy.validate()?;
+        self.behavior.validate(&self.economy, bounds)
+    }
+    /// The exported terrain, patches and buildings, when present.
+    fn validate_export(&self, settlements: &BTreeSet<&String>) -> Result<(), String> {
+        let cells = (self.width_cells * self.height_cells) as usize;
+        if let Some(terrain) = &self.terrain
+            && (terrain.heights.len() != cells
+                || terrain.surfaces.chars().count() != cells
+                || terrain.heights.iter().any(|h| !(-2000..=12000).contains(h))
+                || terrain
+                    .surfaces
+                    .chars()
+                    .any(|c| super::shape::surface_of(c).is_none()))
+        {
+            return Err(format!(
+                "terrain needs {cells} heights of -2000..12000 mm and {cells} surfaces of g, s, t or w"
+            ));
+        }
+        let bounds = self.bounds();
+        let inside = |x: i32, z: i32| {
+            bounds.contains(CellCoord::new(x.div_euclid(1000), z.div_euclid(1000)))
+        };
+        for patch in &self.resource_patches {
+            if !self
+                .economy
+                .patches
+                .iter()
+                .any(|def| def.good == patch.good)
+                || !settlements.contains(&patch.settlement)
+                || !inside(patch.x, patch.z)
+                || !(1..=1_000_000).contains(&patch.capacity)
+            {
+                return Err(format!(
+                    "resource patch of {} needs a patch good, a known settlement, a position inside the map and a capacity",
+                    patch.good
+                ));
+            }
+        }
+        for building in &self.buildings {
+            if !self
+                .economy
+                .buildings
+                .iter()
+                .any(|def| def.id == building.building)
+                || building.rotation > 3
+                || !bounds.contains(CellCoord::new(building.x, building.z))
+            {
+                return Err(format!(
+                    "building {} needs a catalogue key, a rotation 0..3 and an entrance cell inside the map",
+                    building.building
+                ));
+            }
+        }
+        for prop in &self.props {
+            if !self.economy.props.iter().any(|def| def.id == prop.prop)
+                || prop.rotation > 3
+                || !bounds.contains(CellCoord::new(prop.x, prop.z))
+            {
+                return Err(format!(
+                    "prop {} needs a catalog key, a rotation 0..3 and a cell inside the map",
+                    prop.prop
+                ));
+            }
+        }
+        Ok(())
     }
     fn validate_footprints(&self) -> Result<(), String> {
         let bounds = self.bounds();
@@ -302,7 +446,7 @@ impl LivingWorldSpec {
                     return Err(format!("Workplace {} shares another entrance", site.label));
                 }
                 doors.push((door, site.label.as_str()));
-                if !matches!(site.role, Role::WaterKeeper | Role::Fisher) {
+                if !super::economy_spec::open_workplace(&self.economy, site.role) {
                     occupy(
                         &mut occupied,
                         bounds,
@@ -409,7 +553,7 @@ impl SimHashResource for LivingWorldSpec {
             for site in &s.sites {
                 h.str(&site.key);
                 h.str(&site.label);
-                h.u8(site.role.tag());
+                site.role.sim_hash(h);
                 site.position.sim_hash(h);
                 h.u32(site.capacity);
             }
@@ -430,6 +574,50 @@ impl SimHashResource for LivingWorldSpec {
             h.i32(p.width_mm);
             h.i32(p.depth_mm);
             h.str(&p.use_kind);
+        }
+        self.economy.sim_hash(h);
+        self.behavior.sim_hash(h);
+        // Exported state is hashed only when present: an authored world's
+        // construction hash stays what it was.
+        if let Some(terrain) = &self.terrain {
+            h.str("terrain");
+            h.u32(terrain.heights.len() as u32);
+            for height in &terrain.heights {
+                h.i32(*height);
+            }
+            h.str(&terrain.surfaces);
+        }
+        if !self.resource_patches.is_empty() {
+            h.str("resource_patches");
+            h.u32(self.resource_patches.len() as u32);
+            for patch in &self.resource_patches {
+                h.str(&patch.good);
+                h.i32(patch.x);
+                h.i32(patch.z);
+                h.u32(patch.capacity);
+                h.str(&patch.settlement);
+            }
+        }
+        if !self.buildings.is_empty() {
+            h.str("buildings");
+            h.u32(self.buildings.len() as u32);
+            for building in &self.buildings {
+                h.str(&building.building);
+                h.i32(building.x);
+                h.i32(building.z);
+                h.u8(building.rotation);
+                h.u8(u8::from(building.finished));
+            }
+        }
+        if !self.props.is_empty() {
+            h.str("props");
+            h.u32(self.props.len() as u32);
+            for prop in &self.props {
+                h.str(&prop.prop);
+                h.i32(prop.x);
+                h.i32(prop.z);
+                h.u8(prop.rotation);
+            }
         }
     }
 }

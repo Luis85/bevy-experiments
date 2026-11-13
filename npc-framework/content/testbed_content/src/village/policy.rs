@@ -136,6 +136,20 @@ impl IslandAiPolicy {
     }
 }
 
+impl IslandAiPolicy {
+    /// The regional profile orders its branches in the resident tree file, so
+    /// an authored `routine` would be silently ignored there. Refuse it.
+    pub fn validate_regional(&self) -> Result<(), String> {
+        if self.routine != Self::default().routine {
+            return Err(
+                "island_ai.routine is not used by the regional living world: order the branches                  in the resident tree (trees/resident.json or living_world.behavior.trees) and                  leave routine out"
+                    .into(),
+            );
+        }
+        Ok(())
+    }
+}
+
 pub fn active(world: &World) -> Option<&IslandAiPolicy> {
     world.get_resource::<IslandAiPolicy>()
 }

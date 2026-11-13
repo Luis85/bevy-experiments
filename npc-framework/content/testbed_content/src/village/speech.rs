@@ -162,7 +162,7 @@ pub(super) fn speak(world: &mut World, actor: SimId, target: Option<SimId>, text
         .collect();
     let offer = if let Some(reply) = public_topic_reply(world, text) {
         reply
-    } else if person.role == Role::Innkeeper {
+    } else if super::frontier::economy_spec::is_service(world, person.role) {
         format!("A bed costs {} coins.", catalog::BED_PRICE)
     } else if goods.is_empty() {
         "Welcome to the village.".into()

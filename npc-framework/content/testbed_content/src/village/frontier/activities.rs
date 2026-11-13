@@ -113,7 +113,7 @@ impl FrontierAct {
         if world.resource::<Reservations>().count(self.target) > 0 {
             return Err("this site is already claimed by work".into());
         }
-        for (name, count) in ecology::work_inputs(kind(&self.verb)?) {
+        for (name, count) in ecology::work_inputs(world, kind(&self.verb)?) {
             economy::selected(world, actor, name, count)?;
         }
         Ok(())
@@ -122,7 +122,7 @@ impl FrontierAct {
         self.check(world)?;
         let actor = entity_of(world, self.unit).expect("checked actor");
         let mut materials = Vec::new();
-        for (name, count) in ecology::work_inputs(kind(&self.verb)?) {
+        for (name, count) in ecology::work_inputs(world, kind(&self.verb)?) {
             for (item, selected) in economy::selected(world, actor, name, count)? {
                 materials.push(BuildMaterial {
                     item,
@@ -216,7 +216,7 @@ pub fn validate_work(world: &World, actor: Entity, work: &EcologyWork) -> Result
     if !living(world, actor) || world.get::<Villager>(actor).is_none() {
         return Err("restoration work has no living resident".into());
     }
-    let expected: std::collections::BTreeMap<_, _> = ecology::work_inputs(kind(&work.verb)?)
+    let expected: std::collections::BTreeMap<_, _> = ecology::work_inputs(world, kind(&work.verb)?)
         .into_iter()
         .map(|(name, count)| (name.to_owned(), count))
         .collect();
@@ -411,7 +411,7 @@ fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         let actions: Vec<_> = VERBS.iter().map(|verb| {
             let check = FrontierAct { unit:ctx.unit,target:id,verb:(*verb).into() }.check(world);
             json!({"verb":verb,"available":check.is_ok(),"reason":check.err(),
-                "inputs":ecology::work_inputs(kind(verb).expect("declared verb")),"ticks":WORK_TICKS})
+                "inputs":ecology::work_inputs(world, kind(verb).expect("declared verb")),"ticks":WORK_TICKS})
         }).collect();
         let now=world.resource::<SimClock>().tick;
         let day=world.resource::<SimConfig>().day_length.max(1);

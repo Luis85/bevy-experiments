@@ -3,6 +3,7 @@
 //! Procurement targets and additional production are different quantities. A
 //! round reserves personal goods first, then expands funded shortages in reverse
 //! recipe order. Each physical or committed output lot is credited only once.
+use super::roles::{Roles, roles};
 use super::{Role, Villager, Wallet, catalog, economy as econ, market};
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -209,7 +210,9 @@ pub fn job_summary(world: &World, actor: Entity) -> Option<String> {
         return None;
     }
     let job = world.get::<JobIntent>(actor)?;
-    let good = match job.good.as_str() {
+    // Display names come from the catalog data; the Actor Testbed's
+    // scenarios, which have none, keep their own labels.
+    let good = catalog::display_in(world, &job.good).unwrap_or(match job.good.as_str() {
         catalog::GRAIN => "grain",
         catalog::FLOUR => "flour",
         catalog::WATER => "clean water",
@@ -229,29 +232,38 @@ pub fn job_summary(world: &World, actor: Entity) -> Option<String> {
         "ore" => "ore",
         "ingot" => "ingots",
         "hammer" => "hammers",
+        "axe" => "axes",
+        "pickaxe" => "pickaxes",
         _ => "supplies",
-    };
+    });
     Some(match job.verb.as_str() {
         "build_cottage" => "Build a cottage".into(),
+        "build" => "Work on a building site".into(),
+        "haul" => format!("Carry {good} to a building site"),
+        "fetch" => format!("Fetch {good} from the store"),
+        "store" => format!("Store {good}"),
+        "restock" => format!("Restock the stall with {good}"),
         "buy" => format!("Buy {good}"),
         "gather" => format!("Gather {good}"),
         "hunt" => "Hunt wildlife".into(),
         "equip" => "Put on warm clothes".into(),
-        "craft" => match job.recipe.as_str() {
-            catalog::MILL => "Mill flour",
-            catalog::BAKE => "Bake bread",
-            catalog::COOK => "Cook meals",
-            catalog::SAW => "Saw planks",
-            catalog::CARVE => "Carve bowls",
-            catalog::SMELT => "Smelt ingots",
-            catalog::TOOL => "Forge hammers",
-            catalog::FORGE_SPEAR => "Make hunting spears",
-            catalog::TAN => "Tan leather",
-            catalog::SPIN => "Spin thread",
-            catalog::TAILOR => "Sew warm clothes",
-            _ => "Craft supplies",
-        }
-        .into(),
+        "craft" => super::frontier::economy_spec::registry(world)
+            .and_then(|registry| registry.recipe_label(&job.recipe))
+            .unwrap_or(match job.recipe.as_str() {
+                catalog::MILL => "Mill flour",
+                catalog::BAKE => "Bake bread",
+                catalog::COOK => "Cook meals",
+                catalog::SAW => "Saw planks",
+                catalog::CARVE => "Carve bowls",
+                catalog::SMELT => "Smelt ingots",
+                catalog::TOOL => "Forge hammers",
+                catalog::FORGE_SPEAR => "Make hunting spears",
+                catalog::TAN => "Tan leather",
+                catalog::SPIN => "Spin thread",
+                catalog::TAILOR => "Sew warm clothes",
+                _ => "Craft supplies",
+            })
+            .into(),
         _ => "Work".into(),
     })
 }
@@ -280,11 +292,10 @@ pub(super) fn clear_intent(world: &mut World, actor: Entity) {
 
 pub fn food_preference(world: &World, actor: Entity) -> &'static str {
     if let Some(profile) = super::frontier::labor::profile(world, actor) {
-        return if profile.preferred_food == catalog::COOKED_MEAL {
-            catalog::COOKED_MEAL
-        } else {
-            "bread"
-        };
+        return super::frontier::economy_spec::registry(world)
+            .and_then(|registry| registry.good(&profile.preferred_food))
+            .filter(|good| good.food_value.is_some())
+            .map_or(roles(world).baked, |good| good.key);
     }
     // Item/entity spawn counts must not accidentally give every customer the
     // same diet. Stable profession identities provide a genuine consumer mix.
@@ -293,24 +304,25 @@ pub fn food_preference(world: &World, actor: Entity) -> &'static str {
             .get::<Villager>(actor)
             .is_some_and(|person| person.role != Role::Visitor && person.role.tag() % 3 == 0)
     {
-        catalog::COOKED_MEAL
+        roles(world).cooked
     } else {
-        "bread"
+        roles(world).baked
     }
 }
 
 pub fn food_choice(world: &World, actor: Entity) -> Option<&'static str> {
     let preferred = food_preference(world, actor);
-    let alternate = if preferred == "bread" {
-        catalog::COOKED_MEAL
+    let roles = roles(world);
+    let alternate = if preferred == roles.baked {
+        roles.cooked
     } else {
-        "bread"
+        roles.baked
     };
-    [preferred, alternate, catalog::BERRIES]
+    [preferred, alternate, roles.foraged]
         .into_iter()
         .find(|kind| econ::count(world, actor, kind) > 0)
         .or_else(|| {
-            [preferred, alternate, catalog::BERRIES]
+            [preferred, alternate, roles.foraged]
                 .into_iter()
                 .find(|kind| super::ai::market_supplier(world, actor, kind).is_some())
         })
@@ -323,10 +335,17 @@ pub fn garment_equipped(world: &World, actor: Entity) -> bool {
 fn recipes(world: &World) -> Vec<RecipeDef> {
     let registry = world.resource::<RecipeRegistry>();
     let mut names = BTreeSet::new();
-    for role in Role::RESIDENTS
-        .into_iter()
-        .chain([Role::Hunter, Role::Tanner, Role::Tailor])
-    {
+    // Every trade of the catalog data; the Actor Testbed's fixed trades.
+    let trades: Vec<Role> = super::frontier::economy_spec::registry(world).map_or_else(
+        || {
+            Role::RESIDENTS
+                .into_iter()
+                .chain([Role::Hunter, Role::Tanner, Role::Tailor])
+                .collect()
+        },
+        |registry| registry.spec.professions.iter().map(|p| p.role).collect(),
+    );
+    for role in trades {
         names.extend(catalog::recipes_for(world, role).iter().copied());
     }
     names
@@ -336,6 +355,7 @@ fn recipes(world: &World) -> Vec<RecipeDef> {
 }
 
 fn depth(
+    roles: &Roles,
     kind: &str,
     recipes: &[RecipeDef],
     visiting: &mut BTreeSet<String>,
@@ -348,15 +368,17 @@ fn depth(
         return Err(format!("cyclic living-economy material: {kind}"));
     }
     let mut value = 0;
-    if matches!(kind, catalog::RAW_MEAT | catalog::HIDE) {
-        value = depth(catalog::SPEAR, recipes, visiting, depths)?.saturating_add(1);
+    // What a hunt yields needs the hunting tool.
+    if kind == roles.meat || kind == roles.hide {
+        value = depth(roles, roles.hunt_tool, recipes, visiting, depths)?.saturating_add(1);
     }
     for recipe in recipes
         .iter()
         .filter(|recipe| recipe.outputs.iter().any(|output| output.kind == kind))
     {
         for input in &recipe.inputs {
-            value = value.max(depth(&input.key, recipes, visiting, depths)?.saturating_add(1));
+            value =
+                value.max(depth(roles, &input.key, recipes, visiting, depths)?.saturating_add(1));
         }
     }
     visiting.remove(kind);
@@ -374,7 +396,13 @@ pub fn validate(world: &World) -> Result<(), String> {
     let mut depths = BTreeMap::new();
     for recipe in &recipes {
         for output in &recipe.outputs {
-            depth(&output.kind, &recipes, &mut BTreeSet::new(), &mut depths)?;
+            depth(
+                roles(world),
+                &output.kind,
+                &recipes,
+                &mut BTreeSet::new(),
+                &mut depths,
+            )?;
         }
     }
     Ok(())
@@ -482,6 +510,8 @@ struct Builder<'a> {
     requests: BTreeMap<String, u32>,
     work_budget: BTreeMap<SimId, u32>,
     industrial: bool,
+    /// The settlement of this regional round.
+    settlement: Option<SimId>,
 }
 #[derive(Default)]
 struct MaterialBundle {
@@ -556,8 +586,9 @@ impl Builder<'_> {
                             && super::frontier::settlements::member(self.world, *entity) == region
                     })
             });
-        let prey = matches!(kind, catalog::RAW_MEAT | catalog::HIDE)
-            && self.people.iter().any(|(_, _, role)| *role == Role::Hunter)
+        let r = roles(self.world);
+        let prey = (kind == r.meat || kind == r.hide)
+            && self.people.iter().any(|(_, _, role)| *role == r.hunter)
             && super::hunting::available_prey(self.world)
                 .into_iter()
                 .any(|(_, entity, _)| {
@@ -999,20 +1030,19 @@ impl Builder<'_> {
                     }
                 }
             }
-            if role == Role::Hunter
-                && (needed.contains(catalog::RAW_MEAT) || needed.contains(catalog::HIDE))
-            {
-                let cost = if self.ledger.own_available(id, catalog::SPEAR) > 0 {
+            let r = roles(self.world);
+            if role == r.hunter && (needed.contains(r.meat) || needed.contains(r.hide)) {
+                let cost = if self.ledger.own_available(id, r.hunt_tool) > 0 {
                     0
                 } else {
-                    market::unit_price(self.world, catalog::SPEAR).unwrap_or(u32::MAX)
+                    market::unit_price(self.world, r.hunt_tool).unwrap_or(u32::MAX)
                 };
                 if cost <= budget || budget > 0 {
                     jobs.push((
-                        depths.get(catalog::HIDE).copied().unwrap_or(0),
+                        depths.get(r.hide).copied().unwrap_or(0),
                         cost.min(budget),
                         "hunt".into(),
-                        vec![(catalog::SPEAR.into(), 1)],
+                        vec![(r.hunt_tool.into(), 1)],
                     ));
                 }
             }
@@ -1028,7 +1058,16 @@ impl Builder<'_> {
             }
         }
     }
+    /// Regional make-to-stock rule: no new batch while the settlement's
+    /// unsold stock and open offers of the good exceed its stock target.
+    fn stocked(&self, kind: &str) -> bool {
+        self.settlement
+            .is_some_and(|region| super::stock::over_target(self.world, region, kind))
+    }
     fn manufacture(&mut self, kind: &str, missing: u32) {
+        if self.stocked(kind) {
+            return;
+        }
         if super::frontier::enabled(self.world) {
             let mut producers: Vec<_> = self
                 .people
@@ -1082,21 +1121,121 @@ impl Builder<'_> {
         };
         self.manufacture_for(id, entity, role, kind, missing);
     }
+    /// Regional: a gatherer whose good sells above its base price keeps a few
+    /// units on hand beyond its orders. Everybody else works to order, so
+    /// supply never exceeds demand, and a price that rose in a shortage would
+    /// have nothing to bring it down again once the makers can keep up. A
+    /// gatherer who cannot keep up never fills the shelf, and the price stays.
+    fn stock_shelves(&mut self) {
+        let Some(shelf) = super::frontier::economy_spec::tuning(self.world)
+            .map(|tuning| tuning.gatherer_shelf_units)
+            .filter(|shelf| *shelf > 0)
+        else {
+            return;
+        };
+        for (id, entity, role) in self.people.clone() {
+            if !super::frontier::labor::work_feasible(self.world, entity) {
+                continue;
+            }
+            for kind in catalog::outputs_for(self.world, role) {
+                if (*kind == roles(self.world).meat || *kind == roles(self.world).hide)
+                    || self.recipe_for(id, role, kind).is_some()
+                {
+                    continue;
+                }
+                let dear = market::unit_price(self.world, kind)
+                    .zip(catalog::price_in(self.world, kind))
+                    .is_some_and(|(price, base)| price > base);
+                let spare = self.ledger.own_available(id, kind);
+                if !dear || spare >= shelf || self.stocked(kind) {
+                    continue;
+                }
+                *self
+                    .plan
+                    .production
+                    .entry(id)
+                    .or_default()
+                    .entry((*kind).into())
+                    .or_default() += shelf - spare;
+            }
+        }
+    }
+    /// Living world: while anybody of the settlement lacks a coat, every
+    /// maker of coats keeps a shelf of `max(2, residents / 15)` of them, in
+    /// every season, financed from its own purse like any made-to-stock
+    /// batch. Production demand, not a grant.
+    fn stock_coats(&mut self) {
+        let coatless = self
+            .people
+            .iter()
+            .filter(|(_, entity, _)| {
+                !super::living::has_coat(self.world, *entity)
+                    && econ::count(self.world, *entity, roles(self.world).garment) == 0
+            })
+            .count();
+        let per = super::frontier::economy_spec::tuning(self.world)
+            .map_or(0, |tuning| tuning.coat_shelf_residents);
+        if per == 0 || coatless == 0 || self.stocked(roles(self.world).garment) {
+            return;
+        }
+        // The overseer's coat priority: low makes coats to order only; high
+        // stocks one for every resident without one.
+        let level = self.settlement.map_or_else(Default::default, |region| {
+            super::frontier::oversee::level(
+                self.world,
+                region,
+                super::frontier::oversee::PriorityTopic::Coats,
+                None,
+            )
+        });
+        let shelf = match level {
+            super::frontier::oversee::PriorityLevel::Low => return,
+            super::frontier::oversee::PriorityLevel::Normal => {
+                (self.people.len() as u32 / per).max(2)
+            }
+            super::frontier::oversee::PriorityLevel::High => {
+                (self.people.len() as u32 / per).max(2).max(coatless as u32)
+            }
+        };
+        for (id, entity, role) in self.people.clone() {
+            if !catalog::outputs_for(self.world, role).contains(&roles(self.world).garment)
+                || !super::frontier::labor::work_feasible(self.world, entity)
+            {
+                continue;
+            }
+            let spare = self.ledger.own_available(id, roles(self.world).garment);
+            let planned = self
+                .plan
+                .production
+                .get(&id)
+                .and_then(|goods| goods.get(roles(self.world).garment))
+                .copied()
+                .unwrap_or(0);
+            let missing = shelf.saturating_sub(spare.saturating_add(planned));
+            if missing > 0 {
+                self.manufacture_for(id, entity, role, roles(self.world).garment, missing);
+            }
+        }
+    }
     fn manufacture_for(&mut self, id: SimId, entity: Entity, role: Role, kind: &str, missing: u32) {
-        if matches!(kind, catalog::RAW_MEAT | catalog::HIDE) {
-            let per_hunt = if kind == catalog::RAW_MEAT { 2 } else { 1 };
-            let price = market::unit_price(self.world, catalog::SPEAR)
+        if kind == roles(self.world).meat || kind == roles(self.world).hide {
+            let per_hunt = if kind == roles(self.world).meat {
+                roles(self.world).meat_per_hunt
+            } else {
+                roles(self.world).hide_per_hunt
+            };
+            let price = market::unit_price(self.world, roles(self.world).hunt_tool)
                 .unwrap_or(u32::MAX)
                 .max(1);
             let cash = self.budget.get(&id).copied().unwrap_or(0);
-            let owned = self.ledger.own_available(id, catalog::SPEAR);
+            let owned = self.ledger.own_available(id, roles(self.world).hunt_tool);
             let financed = owned.saturating_add(cash / price).max(u32::from(cash > 0));
             let hunts = missing.div_ceil(per_hunt).min(4).min(financed);
             if hunts == 0 {
                 return;
             }
             let bundle = MaterialBundle {
-                leaves: [(catalog::SPEAR.into(), hunts)].into(),
+                leaves: [(roles(self.world).hunt_tool.into(), hunts)].into(),
                 ..Default::default()
             };
             if !self.finance_bundle(id, bundle) {
@@ -1109,15 +1248,20 @@ impl Builder<'_> {
                 .or_default()
                 .entry(kind.into())
                 .or_default() += hunts * per_hunt;
-            let other = if kind == catalog::RAW_MEAT {
-                catalog::HIDE
+            let other = if kind == roles(self.world).meat {
+                roles(self.world).hide
             } else {
-                catalog::RAW_MEAT
+                roles(self.world).meat
             };
             self.ledger.add(
                 id,
                 other,
-                hunts * if other == catalog::RAW_MEAT { 2 } else { 1 },
+                hunts
+                    * if other == roles(self.world).meat {
+                        roles(self.world).meat_per_hunt
+                    } else {
+                        roles(self.world).hide_per_hunt
+                    },
             );
             return;
         }
@@ -1166,6 +1310,38 @@ impl Builder<'_> {
     }
 }
 
+/// Standing stock a profession orders: `(good, count, reserve its inputs)`.
+/// The regional profile reads it from data; older profiles keep the inn's list.
+fn keeps(world: &World, role: Role) -> Vec<(&'static str, u32, bool)> {
+    // Standing stock is catalog data; the Actor Testbed keeps the inn's list.
+    let Some(registry) = super::frontier::economy_spec::registry(world) else {
+        return match role {
+            Role::Innkeeper => vec![
+                ("log", 2, true),
+                (catalog::BOWL, 1, true),
+                ("hammer", 1, true),
+            ],
+            Role::Fisher => vec![(catalog::FISHING_ROD, 1, false)],
+            _ => Vec::new(),
+        };
+    };
+    let Some(entry) = registry.definition(role) else {
+        return Vec::new();
+    };
+    entry
+        .keeps
+        .iter()
+        .filter_map(|keep| Some((registry.name(&keep.good)?, keep.count, keep.reserve_inputs)))
+        .chain(
+            entry
+                .tool
+                .as_ref()
+                .and_then(|tool| registry.name(tool))
+                .map(|tool| (tool, 1, true)),
+        )
+        .collect()
+}
+
 fn forecast(world: &World, actor: Entity, need: &str, restoration: u32) -> u32 {
     forecast_amount(world, actor, need)
         .div_ceil(u64::from(restoration.max(1)))
@@ -1180,44 +1356,60 @@ fn forecast_amount(world: &World, actor: Entity, need: &str) -> u64 {
     let reserve_days = world
         .get_resource::<super::colony::ColonyState>()
         .map_or(2, |colony| colony.food_reserve_days.clamp(1, 4));
+    // A storm tomorrow keeps everybody indoors for a day: residents who can
+    // read the sky lay in one more day of provisions (regional weather).
+    let reserve_days = reserve_days + u32::from(super::weather::storm_tomorrow(world));
     let horizon = world
         .resource::<SimConfig>()
         .day_length
         .saturating_mul(u64::from(reserve_days));
     let depleted = (100_000 - econ::need(world, actor, need)).max(0) as u64;
-    depleted.saturating_add(decay.saturating_mul(horizon))
+    // Children eat from the packs of the household's adults (regional only).
+    let dependants = if need == "Hunger" && super::frontier::enabled(world) {
+        super::demography::dependants_hunger(world, actor, horizon)
+    } else {
+        0
+    };
+    depleted
+        .saturating_add(decay.saturating_mul(horizon))
+        .saturating_add(dependants)
 }
 
 fn needed_materials(
     world: &World,
     people: &[(SimId, Entity, Role)],
     recipes: &[RecipeDef],
+    civic: &Goods,
 ) -> BTreeSet<String> {
-    let mut needed = BTreeSet::new();
+    let mut needed: BTreeSet<String> = civic.keys().cloned().collect();
     for (_, actor, role) in people {
-        let owned_food = ["bread", catalog::COOKED_MEAL, catalog::BERRIES]
-            .into_iter()
-            .map(|kind| {
-                u64::from(econ::count(world, *actor, kind))
-                    * catalog::food_restore(kind).unwrap_or(0).max(0) as u64
-            })
-            .sum::<u64>();
+        let owned_food = [
+            roles(world).baked,
+            roles(world).cooked,
+            roles(world).foraged,
+        ]
+        .into_iter()
+        .map(|kind| {
+            u64::from(econ::count(world, *actor, kind))
+                * catalog::food_restore_in(world, kind).unwrap_or(0).max(0) as u64
+        })
+        .sum::<u64>();
         if owned_food < forecast_amount(world, *actor, "Hunger") {
             needed.insert(food_preference(world, *actor).into());
         }
-        if econ::count(world, *actor, catalog::WATER) < forecast(world, *actor, "Thirst", 90_000) {
-            needed.insert(catalog::WATER.into());
+        if econ::count(world, *actor, roles(world).drink)
+            < forecast(world, *actor, "Thirst", 90_000)
+        {
+            needed.insert(roles(world).drink.into());
         }
-        if econ::count(world, *actor, catalog::WARM_CLOTHES)
+        if econ::count(world, *actor, roles(world).garment)
             < super::living::clothing_reserve_target(world, *actor)
         {
-            needed.insert(catalog::WARM_CLOTHES.into());
+            needed.insert(roles(world).garment.into());
         }
-        if *role == Role::Innkeeper {
-            for (kind, count) in [("log", 2), (catalog::BOWL, 1), ("hammer", 1)] {
-                if econ::count(world, *actor, kind) < count {
-                    needed.insert(kind.into());
-                }
+        for (kind, count, reserve_inputs) in keeps(world, *role) {
+            if reserve_inputs && econ::count(world, *actor, kind) < count {
+                needed.insert(kind.into());
             }
         }
         for (kind, quantity) in super::colony::construction_materials(world, *actor) {
@@ -1242,8 +1434,8 @@ fn needed_materials(
                 needed.extend(recipe.inputs.iter().map(|input| input.key.clone()));
             }
         }
-        if needed.contains(catalog::RAW_MEAT) || needed.contains(catalog::HIDE) {
-            needed.insert(catalog::SPEAR.into());
+        if needed.contains(roles(world).meat) || needed.contains(roles(world).hide) {
+            needed.insert(roles(world).hunt_tool.into());
         }
         if needed.len() == previous {
             break;
@@ -1301,17 +1493,25 @@ fn compute(world: &World) -> ProductionPlan {
 }
 
 fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
-    let people: Vec<_> = world
-        .resource::<SimIndex>()
-        .map
-        .iter()
-        .filter_map(|(id, e)| {
-            let person = world.get::<Villager>(*e)?;
-            (person.role != Role::Visitor
-                && super::living(world, *e)
-                && settlement.is_none_or(|region| economic_settlement(world, *e) == Some(region)))
-            .then_some((*id, *e, person.role))
+    // A query over the people in identity order, not a scan of every identity.
+    let mut everybody: Vec<(SimId, Entity, Role)> = world
+        .try_query::<(Entity, &SimId, &Villager)>()
+        .map(|mut query| {
+            query
+                .iter(world)
+                .map(|(e, id, person)| (*id, e, person.role))
+                .collect()
         })
+        .unwrap_or_default();
+    everybody.sort_unstable_by_key(|(id, _, _)| *id);
+    let people: Vec<_> = everybody
+        .iter()
+        .filter(|(_, e, role)| {
+            *role != Role::Visitor
+                && super::living(world, *e)
+                && settlement.is_none_or(|region| economic_settlement(world, *e) == Some(region))
+        })
+        .copied()
         .collect();
     let mut builder = Builder {
         world,
@@ -1326,6 +1526,7 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         requests: BTreeMap::new(),
         work_budget: BTreeMap::new(),
         industrial: false,
+        settlement,
     };
     for (id, e, role) in &people {
         for kind in catalog::outputs_for(world, *role) {
@@ -1335,11 +1536,26 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             *id,
             world.get::<Wallet>(*e).map_or(0, |wallet| wallet.coins),
         );
+        // Regional: the hearth's fuel reserve is never handed to a building
+        // site (`civic::kept`), so it is no supply for the sites' orders. The
+        // part the resident's own procurement already wants stays: own
+        // requests use it.
+        let mut reserved: BTreeMap<String, u32> = BTreeMap::new();
         for (_, item) in econ::free_items(world, *e) {
             if super::frontier::enabled(world) && market::sells(world, *e, &item.kind) {
                 builder.ledger.sellable.insert((*id, item.kind.clone()));
             }
-            builder.ledger.add(*id, &item.kind, item.stack);
+            let mut stack = item.stack;
+            if settlement.is_some() {
+                let left = reserved.entry(item.kind.clone()).or_insert_with(|| {
+                    super::civic::hearth_reserve(world, *e, &item.kind)
+                        .saturating_sub(desired_stock(world, *e, &item.kind))
+                });
+                let kept = (*left).min(stack);
+                *left -= kept;
+                stack -= kept;
+            }
+            builder.ledger.add(*id, &item.kind, stack);
         }
         if let Some(craft) = world.get::<Crafting>(*e)
             && let Some(recipe) = world
@@ -1372,31 +1588,34 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
                 .insert(patch.kind.clone(), 1);
         }
         if world.get::<super::hunting::Hunting>(*e).is_some() {
-            builder.ledger.add(*id, catalog::RAW_MEAT, 2);
-            builder.ledger.add(*id, catalog::HIDE, 1);
+            builder
+                .ledger
+                .add(*id, roles(world).meat, roles(world).meat_per_hunt);
+            builder
+                .ledger
+                .add(*id, roles(world).hide, roles(world).hide_per_hunt);
             builder
                 .plan
                 .committed
                 .entry(*id)
                 .or_default()
-                .insert(catalog::RAW_MEAT.into(), 2);
+                .insert(roles(world).meat.into(), roles(world).meat_per_hunt);
             builder
                 .plan
                 .committed
                 .entry(*id)
                 .or_default()
-                .insert(catalog::HIDE.into(), 1);
+                .insert(roles(world).hide.into(), roles(world).hide_per_hunt);
         }
     }
     // Explicit player offers are usable supply, never an inspection of an
     // unlisted visitor's private inventory.
-    for (id, e) in &world.resource::<SimIndex>().map {
-        if settlement.is_some_and(|region| economic_settlement(world, *e) != Some(region)) {
+    for (id, e, role) in &everybody {
+        if *role != Role::Visitor
+            || settlement.is_some_and(|region| economic_settlement(world, *e) != Some(region))
+        {
             continue;
         }
-        if world
-            .get::<Villager>(*e)
-            .is_some_and(|v| v.role == Role::Visitor)
         {
             for kind in catalog::trade_kinds(world) {
                 if market::asking_price(world, *e, kind) > market::unit_price(world, kind) {
@@ -1412,7 +1631,15 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
     }
     let mut depths = BTreeMap::new();
     for kind in catalog::trade_kinds(world) {
-        if depth(kind, &builder.recipes, &mut BTreeSet::new(), &mut depths).is_err() {
+        if depth(
+            roles(world),
+            kind,
+            &builder.recipes,
+            &mut BTreeSet::new(),
+            &mut depths,
+        )
+        .is_err()
+        {
             return ProductionPlan {
                 refreshed_at: Some(world.resource::<SimClock>().tick),
                 ..Default::default()
@@ -1424,11 +1651,11 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
     let mut critical = Targets::new();
     for (id, e, _) in &people {
         if econ::need(world, *e, "Thirst") < 55_000 {
-            builder.request(*id, catalog::WATER, 1);
+            builder.request(*id, roles(world).drink, 1);
             critical
                 .entry(*id)
                 .or_default()
-                .insert(catalog::WATER.into(), 1);
+                .insert(roles(world).drink.into(), 1);
         }
         if econ::need(world, *e, "Hunger") < 50_000 {
             let food = food_choice(world, *e).unwrap_or_else(|| food_preference(world, *e));
@@ -1467,44 +1694,79 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         );
         let clothing = super::living::clothing_reserve_target(world, *e);
         if econ::need(world, *e, "Warmth") < critical_need && clothing > 0 {
-            builder.request(*id, catalog::WARM_CLOTHES, clothing);
+            builder.request(*id, roles(world).garment, clothing);
             critical
                 .entry(*id)
                 .or_default()
-                .insert(catalog::WARM_CLOTHES.into(), clothing);
+                .insert(roles(world).garment.into(), clothing);
         }
         let bundle = builder.bundle_inputs(*id, materials);
         builder.finance_bundle(*id, bundle);
     }
-    let needed = needed_materials(world, &people, &builder.recipes);
+    // Open building sites order their materials like any buyer, paid by the
+    // civic fund on delivery. Goods on store shelves are supply.
+    // Players' homestead orders are demand the same way.
+    let mut civic_orders = settlement
+        .map(|region| super::civic::material_orders(world, region))
+        .unwrap_or_default();
+    if let Some(region) = settlement {
+        for (kind, units) in super::live::order_demand(world, region) {
+            *civic_orders.entry(kind).or_default() += units;
+        }
+        // The boat's announced order, at the port.
+        // The overseer's boat priority: none at low, twice at high.
+        let boat = super::frontier::oversee::level(
+            world,
+            region,
+            super::frontier::oversee::PriorityTopic::BoatOrders,
+            None,
+        );
+        for (kind, units) in super::merchant::order_demand(world, region) {
+            let units = match boat {
+                super::frontier::oversee::PriorityLevel::Low => 0,
+                super::frontier::oversee::PriorityLevel::Normal => units,
+                super::frontier::oversee::PriorityLevel::High => units.saturating_mul(2),
+            };
+            if units > 0 {
+                *civic_orders.entry(kind).or_default() += units;
+            }
+        }
+    }
+    if let Some(region) = settlement {
+        for (store, kind, units) in super::civic::depot_supply(world, region) {
+            builder.ledger.add(store, &kind, units);
+            builder.ledger.sellable.insert((store, kind));
+        }
+    }
+    let needed = needed_materials(world, &people, &builder.recipes, &civic_orders);
     builder.reserve_working_capital(&needed, &depths);
     for (id, e, role) in &people {
         let primary = food_preference(world, *e);
-        let alternate = if primary == "bread" {
-            catalog::COOKED_MEAL
+        let alternate = if primary == roles(world).baked {
+            roles(world).cooked
         } else {
-            "bread"
+            roles(world).baked
         };
         let provisioned = critical.get(id);
         let water = provisioned
-            .and_then(|goods| goods.get(catalog::WATER))
+            .and_then(|goods| goods.get(roles(world).drink))
             .copied()
             .unwrap_or(0);
         builder.request(
             *id,
-            catalog::WATER,
+            roles(world).drink,
             forecast(world, *e, "Thirst", 90_000).saturating_sub(water),
         );
         let mut hunger = forecast_amount(world, *e, "Hunger");
         if let Some(goods) = provisioned {
             for (kind, count) in goods {
-                if let Some(restoration) = catalog::food_restore(kind) {
+                if let Some(restoration) = catalog::food_restore_in(world, kind) {
                     hunger = hunger.saturating_sub(u64::from(*count) * restoration.max(0) as u64);
                 }
             }
         }
-        for kind in [primary, alternate, catalog::BERRIES] {
-            let restoration = catalog::food_restore(kind).unwrap_or(1).max(1) as u64;
+        for kind in [primary, alternate, roles(world).foraged] {
+            let restoration = catalog::food_restore_in(world, kind).unwrap_or(1).max(1) as u64;
             let critical = provisioned
                 .and_then(|goods| goods.get(kind))
                 .copied()
@@ -1515,25 +1777,25 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
             builder.request(*id, kind, reserve);
             hunger = hunger.saturating_sub(u64::from(reserve).saturating_mul(restoration));
         }
-        let restoration = catalog::food_restore(primary).unwrap_or(80_000).max(1) as u64;
+        let restoration = catalog::food_restore_in(world, primary)
+            .unwrap_or(80_000)
+            .max(1) as u64;
         builder.request(*id, primary, hunger.div_ceil(restoration).min(16) as u32);
         builder.request(
             *id,
-            catalog::WARM_CLOTHES,
+            roles(world).garment,
             super::living::clothing_reserve_target(world, *e).saturating_sub(
                 provisioned
-                    .and_then(|goods| goods.get(catalog::WARM_CLOTHES))
+                    .and_then(|goods| goods.get(roles(world).garment))
                     .copied()
                     .unwrap_or(0),
             ),
         );
-        if *role == Role::Innkeeper {
-            builder.request(*id, "log", 2);
-            builder.request(*id, catalog::BOWL, 1);
-            builder.request(*id, "hammer", 1);
-        }
-        if *role == Role::Fisher {
-            builder.request(*id, catalog::FISHING_ROD, 1);
+        // Standing stock, including one working tool, is ordinary funded demand:
+        // when a tool wears out the smith receives a real commission, and
+        // bare-handed work continues meanwhile.
+        for (kind, count, _) in keeps(world, *role) {
+            builder.request(*id, kind, count);
         }
         for (kind, quantity) in super::colony::household_materials(world, *e) {
             let urgent = provisioned
@@ -1549,6 +1811,10 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         *builder.budget.entry(id).or_default() += cash;
     }
     builder.industrial = true;
+    for (kind, units) in civic_orders {
+        let requested = builder.requests.entry(kind).or_default();
+        *requested = requested.saturating_add(units);
+    }
     let mut order: Vec<_> = depths.into_iter().collect();
     order.sort_by(|(a, da), (b, db)| db.cmp(da).then_with(|| a.cmp(b)));
     for (kind, _) in order {
@@ -1559,6 +1825,10 @@ fn compute_region(world: &World, settlement: Option<SimId>) -> ProductionPlan {
         if missing > 0 {
             builder.manufacture(&kind, missing);
         }
+    }
+    if settlement.is_some() {
+        builder.stock_shelves();
+        builder.stock_coats();
     }
     builder.plan
 }

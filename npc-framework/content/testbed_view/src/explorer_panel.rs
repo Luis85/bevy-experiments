@@ -560,6 +560,8 @@ struct KeyboardContext<'w, 's> {
     fields: Query<'w, 's, (), With<NoteField>>,
     controls: Query<'w, 's, (), With<NotesControl>>,
     actions: Query<'w, 's, &'static PanelAction>,
+    experience: Option<Res<'w, crate::PlayerExperience>>,
+    developer: Option<Res<'w, crate::DeveloperKeys>>,
 }
 
 /// Standard control traversal; Ctrl+Tab keeps fast book switching available.
@@ -584,7 +586,11 @@ fn keys(
         .focus
         .get()
         .is_some_and(|entity| keyboard.fields.contains(entity));
-    if keys.just_pressed(KeyCode::F7) && !typing {
+    let developer_keys = crate::player_hud::developer_keys_allowed(
+        keyboard.experience.as_deref(),
+        keyboard.developer.as_deref(),
+    );
+    if developer_keys && keys.just_pressed(KeyCode::F7) && !typing {
         panels.explorer = !panels.explorer;
         if !panels.explorer {
             keyboard.focus.clear();

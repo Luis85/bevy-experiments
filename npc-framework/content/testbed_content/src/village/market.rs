@@ -141,7 +141,7 @@ fn commodity(seed: u32) -> Commodity {
 /// Indicative commodity price in whole coins. Beliefs retain milli-coin precision.
 /// Quoting is pure; prices change only at simulation market rounds.
 pub fn unit_price(world: &World, kind: &str) -> Option<u32> {
-    let seed = catalog::price(kind)?;
+    let seed = catalog::price_in(world, kind)?;
     if !enabled(world) {
         return Some(seed);
     }
@@ -157,6 +157,30 @@ pub fn unit_price(world: &World, kind: &str) -> Option<u32> {
     )
 }
 
+/// The learned reference of a traded good in milli-coins (its base price
+/// before the first round).
+pub fn reference_milli(world: &World, kind: &str) -> Option<u32> {
+    let seed = catalog::price_in(world, kind)?;
+    Some(
+        world
+            .get_resource::<MarketState>()
+            .and_then(|state| state.commodities.get(kind))
+            .map_or(seed.saturating_mul(MILLI), |row| row.reference_milli),
+    )
+}
+
+/// The reservation price a seller holds to (regional): residents and stores
+/// do; a played character or visitor sets its own minimum in an offer.
+fn reservation_for(world: &World, seller: Entity, kind: &str) -> Option<u32> {
+    if world
+        .get::<Villager>(seller)
+        .is_some_and(|person| person.role == super::Role::Visitor)
+    {
+        return None;
+    }
+    super::stock::reservation(world, kind)
+}
+
 fn listing(world: &World, actor: Entity, kind: &str) -> Option<Listing> {
     let id = world.get::<SimId>(actor)?;
     world
@@ -165,6 +189,41 @@ fn listing(world: &World, actor: Entity, kind: &str) -> Option<Listing> {
         .get(id)?
         .get(kind)
         .copied()
+}
+
+/// Living world: `actor` (a resident with a trade) has no use for `kind`: it
+/// is not food, water, clothing, the hearth's fuel or the trade's tool, and
+/// its current trade neither makes nor uses it. Such goods (a former tailor's
+/// thread, say) are carried whole to a store (`civic::surplus_trip`), which
+/// sells them to the trade that uses them. (Not part of the per-person seller
+/// test: that runs in every market scan.)
+pub fn no_use(world: &World, actor: Entity, kind: &str) -> bool {
+    use super::frontier::economy_spec::GoodTag;
+    if !super::frontier::enabled(world) {
+        return false;
+    }
+    let Some(role) = world.get::<Villager>(actor).map(|person| person.role) else {
+        return false;
+    };
+    // What everybody uses is read from the data's tags: food, drink,
+    // clothing, fuel; the trade's own goods and tool from its profession.
+    if role == super::Role::Visitor
+        || catalog::outputs_for(world, role).contains(&kind)
+        || catalog::wants_for(world, role, kind)
+        || catalog::role_tool_in(world, role) == Some(kind)
+        || [
+            GoodTag::Food,
+            GoodTag::Drink,
+            GoodTag::Clothing,
+            GoodTag::Fuel,
+        ]
+        .into_iter()
+        .any(|tag| catalog::has_tag(world, kind, tag))
+        || !super::frontier::economy_spec::tuning(world).is_some_and(|t| t.unused_goods_to_market)
+    {
+        return false;
+    }
+    catalog::trade_kinds(world).contains(&kind)
 }
 
 /// Explicit offers can include a visitor's goods. Unlisted visitor stock is private.
@@ -183,6 +242,16 @@ fn automatic_seller(world: &World, actor: Entity, kind: &str) -> bool {
 }
 
 pub fn sells(world: &World, actor: Entity, kind: &str) -> bool {
+    // A store or stall is a seller of record for whatever lies on its shelf.
+    if let Some(depot) = world.get::<super::civic::Depot>(actor) {
+        return depot.stock(kind) > 0;
+    }
+    person_sells(world, actor, kind)
+}
+
+/// [`sells`] for a living actor only. Scans over every entity use this, so a
+/// store costs them nothing; stores are ranked through the civic index.
+pub(super) fn person_sells(world: &World, actor: Entity, kind: &str) -> bool {
     if !living(world, actor) {
         return false;
     }
@@ -194,6 +263,9 @@ pub fn sells(world: &World, actor: Entity, kind: &str) -> bool {
 
 /// Published quantity is bounded by actual, unreserved physical stock.
 pub fn available_to_sell(world: &World, actor: Entity, kind: &str) -> u32 {
+    if let Some(depot) = world.get::<super::civic::Depot>(actor) {
+        return depot.available(kind, None, world.resource::<SimClock>().tick);
+    }
     let stock = econ::count(world, actor, kind);
     if !enabled(world) {
         return stock;
@@ -213,6 +285,7 @@ pub fn asking_price(world: &World, seller: Entity, kind: &str) -> Option<u32> {
         listing(world, seller, kind)
             .and_then(|offer| offer.minimum_unit_price)
             .map_or(reference, |minimum| reference.max(minimum))
+            .max(reservation_for(world, seller, kind).unwrap_or(0))
     } else {
         reference
     })
@@ -244,6 +317,9 @@ pub fn quote(
     }
     let unit_price = asking_price(world, seller, kind).ok_or("this good is not traded here")?;
     let total = unit_price.checked_mul(n).ok_or("price overflow")?;
+    // A seller fond of a played character takes something off (regional).
+    let discount = super::live::discount_percent(world, buyer, seller);
+    let total = (total - total * discount / 100).max(1);
     let b = world.get::<Wallet>(buyer).ok_or("buyer has no wallet")?;
     let s = world.get::<Wallet>(seller).ok_or("seller has no wallet")?;
     if b.coins < total {
@@ -373,7 +449,7 @@ pub fn withdraw_offer(world: &mut World, actor: Entity, kind: &str) -> Result<()
 /// Successful physical transfers are the only trade samples accepted by learning.
 pub fn record_trade(
     world: &mut World,
-    _buyer: Entity,
+    buyer: Entity,
     seller: Entity,
     kind: &str,
     quantity: u32,
@@ -382,10 +458,12 @@ pub fn record_trade(
     if !enabled(world) {
         return;
     }
-    let Some(seed) = catalog::price(kind) else {
+    let Some(seed) = catalog::price_in(world, kind) else {
         return;
     };
     let seller_id = world.get::<SimId>(seller).copied();
+    super::stock::record(world, seller, kind, quantity);
+    super::live::trade_booked(world, buyer, seller, kind, quantity, total);
     let mut state = world.resource_mut::<MarketState>();
     let row = state
         .commodities
@@ -467,6 +545,14 @@ pub fn tick(world: &mut World) {
     {
         return;
     }
+    // No market day in a storm (regional weather): nobody can gather or
+    // carry, so an order that goes unfilled says nothing about scarcity.
+    // Prices rest until the weather clears; goods in hand still change hands.
+    if super::weather::storm(world) {
+        world.resource_mut::<MarketState>().last_round = Some(now);
+        super::stock::close_round(world);
+        return;
+    }
     let kinds = catalog::trade_kinds(world);
     let people: Vec<_> = world
         .resource::<SimIndex>()
@@ -481,11 +567,11 @@ pub fn tick(world: &mut World) {
     let mut affordability = BTreeMap::<String, u32>::new();
     let mut bid_kinds = kinds.to_vec();
     bid_kinds.sort_by_key(|kind| {
-        let priority = if *kind == catalog::WATER {
+        let priority = if *kind == super::roles::roles(world).drink {
             0
-        } else if catalog::food_restore(kind).is_some() {
+        } else if catalog::food_restore_in(world, kind).is_some() {
             1
-        } else if *kind == catalog::WARM_CLOTHES {
+        } else if *kind == super::roles::roles(world).garment {
             2
         } else {
             3
@@ -581,6 +667,21 @@ pub fn tick(world: &mut World) {
             }
         }
     }
+    // Shelves of stores and stalls are executable supply at the reference,
+    // unless the reference is below the good's reservation price (regional).
+    for (_, depot) in super::civic::all_depots(world) {
+        if let Some(depot) = world.get::<super::civic::Depot>(depot) {
+            for kind in depot.lots.keys() {
+                if super::stock::reservation(world, kind)
+                    .is_some_and(|reserve| Some(reserve) > unit_price(world, kind))
+                {
+                    continue;
+                }
+                let total = supply.entry(kind.clone()).or_default();
+                *total = total.saturating_add(depot.stock(kind));
+            }
+        }
+    }
     let live_offers: BTreeMap<_, BTreeMap<_, _>> = people
         .iter()
         .filter_map(|actor| {
@@ -606,11 +707,36 @@ pub fn tick(world: &mut World) {
             (!offers.is_empty()).then_some((id, offers))
         })
         .collect();
+    let seeds: BTreeMap<&str, u32> = kinds
+        .iter()
+        .filter_map(|kind| Some((*kind, catalog::price_in(world, kind)?)))
+        .collect();
+    let ceiling_percent =
+        super::frontier::economy_spec::tuning(world).map(|tuning| tuning.price_ceiling_percent);
+    let floor_percent = super::frontier::economy_spec::tuning(world)
+        .map(|tuning| tuning.price_floor_percent)
+        .filter(|percent| *percent > 0);
+    // Regional: stock up to the island's target is working stock. Only what is
+    // offered beyond it is a glut, and an order the stock on offer can fill is
+    // no scarcity.
+    let covers: Option<BTreeMap<&str, u32>> = super::frontier::economy_spec::tuning(world)
+        .filter(|tuning| tuning.stock_cover_pricing && tuning.stock_target_days > 0)
+        .map(|_| {
+            kinds
+                .iter()
+                .map(|kind| (*kind, super::stock::island_target(world, kind)))
+                .collect()
+        });
+    // Regional: the lowest price any resident or store sells each good at.
+    let reservations: BTreeMap<&str, u32> = kinds
+        .iter()
+        .filter_map(|kind| Some((*kind, super::stock::reservation(world, kind)?)))
+        .collect();
     let mut state = world.resource_mut::<MarketState>();
     state.listings = live_offers;
     state.last_round = Some(now);
     for kind in kinds {
-        let Some(seed) = catalog::price(kind) else {
+        let Some(seed) = seeds.get(kind).copied() else {
             continue;
         };
         let row = state
@@ -619,16 +745,86 @@ pub fn tick(world: &mut World) {
             .or_insert_with(|| commodity(seed));
         let offered = supply.get(*kind).copied().unwrap_or(0);
         let wanted = demand.get(*kind).copied().unwrap_or(0);
+        // Regional: units delivered this round answer as many unfilled orders.
+        // A good that is made to order never sits unsold, so without this one
+        // open order reads as total scarcity and holds the quote at its ceiling
+        // however fast the makers deliver.
+        let unmet = if ceiling_percent.is_some() {
+            wanted.saturating_sub(u32::try_from(row.pending_units).unwrap_or(u32::MAX))
+        } else {
+            wanted
+        };
         let offered_at_unit_price = whole_price(row.reference_milli);
         let maximum = affordability.get(*kind).copied();
+        // With stock cover, supply beyond the cover is a glut; within it the
+        // stock on offer answers the open orders it can fill, so the price
+        // moves with the share of orders left over, not with the stock itself.
+        let (glut, short, supply_term) = match covers.as_ref().and_then(|covers| covers.get(kind)) {
+            Some(cover) => {
+                let glut = offered.saturating_sub(*cover);
+                (
+                    glut,
+                    unmet.saturating_sub(offered),
+                    glut.max(offered.min(unmet)),
+                )
+            }
+            None => (offered, unmet, offered),
+        };
         let proposed = learn(
             row.reference_milli,
-            offered,
-            wanted,
+            supply_term,
+            unmet,
             row.pending_units,
             row.pending_turnover,
         );
         row.reference_milli = affordability_feedback(row.reference_milli, proposed, maximum);
+        if ceiling_percent.is_some()
+            && glut == 0
+            && short == 0
+            && row.reference_milli > seed * MILLI
+        {
+            // Regional: a quote above the base price with no order left unfilled
+            // and nobody undercutting is stale. Made-to-order goods are never
+            // left unsold, so without this a shortage price would stay up after
+            // the shortage.
+            let step = (row.reference_milli / 16).max(1);
+            row.reference_milli = row.reference_milli.saturating_sub(step).max(seed * MILLI);
+        }
+        if ceiling_percent.is_some()
+            && covers.is_some()
+            && glut == 0
+            && row.reference_milli < seed * MILLI
+        {
+            // Regional, with stock cover: a quote below the base price while
+            // the stock on offer is within the island's cover is as stale as
+            // one above it with nothing short. Without this a good nobody
+            // ordered for a while kept the low quote of an old glut.
+            let step = (row.reference_milli / 16).max(1);
+            row.reference_milli = row.reference_milli.saturating_add(step).min(seed * MILLI);
+        }
+        if let Some(reserve) = reservations.get(kind)
+            && glut == 0
+            && row.reference_milli < reserve * MILLI
+        {
+            // Regional: a quote below every seller's reservation price is not
+            // executable; it climbs towards the lowest ask by the usual step.
+            let step = (row.reference_milli / 16).max(1);
+            row.reference_milli = row
+                .reference_milli
+                .saturating_add(step)
+                .min(reserve * MILLI);
+        }
+        if let Some(percent) = ceiling_percent {
+            // Regional bound: scarcity may multiply a price, never without limit.
+            let ceiling = u64::from(seed) * u64::from(percent) * u64::from(MILLI) / 100;
+            row.reference_milli =
+                (u64::from(row.reference_milli).min(ceiling.max(u64::from(MILLI)))) as u32;
+        }
+        if let Some(percent) = floor_percent {
+            // Regional floor: unsold stock may halve a price, not erase it.
+            let floor = u64::from(seed) * u64::from(percent) * u64::from(MILLI) / 100;
+            row.reference_milli = (u64::from(row.reference_milli).max(floor)) as u32;
+        }
         row.history.push(MarketSample {
             tick: now,
             offered_at_unit_price,
@@ -646,6 +842,7 @@ pub fn tick(world: &mut World) {
         row.pending_units = 0;
         row.pending_turnover = 0;
     }
+    super::stock::close_round(world);
 }
 
 /// Published market news contains no individual wallet, inventory or position.

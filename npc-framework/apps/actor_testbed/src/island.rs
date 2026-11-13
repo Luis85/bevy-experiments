@@ -29,12 +29,48 @@ struct LocalIsland {
     seed: u64,
     last: Instant,
     message: String,
+    /// The last save attempt failed; `message` says why.
+    failed: bool,
+    /// The last save was the minute timer's own, not one the player asked
+    /// for. The player session announces only saves that were asked for.
+    routine: bool,
     // OS lock survives for the host lifetime and releases even after a crash.
     _lock: Option<File>,
     active: bool,
 }
 #[derive(Component)]
 struct SaveLabel;
+
+/// Where this session's world is saved; host files such as player settings
+/// live beside it.
+pub(crate) fn save_path(world: &World) -> Option<PathBuf> {
+    world
+        .get_resource::<LocalIsland>()
+        .map(|island| island.path.clone())
+}
+
+/// The latest save outcome, for the player session's one notice.
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct SaveNotice {
+    pub(crate) text: String,
+    pub(crate) failed: bool,
+    /// Written by the minute timer, not on the player's request.
+    pub(crate) routine: bool,
+    /// How long ago it was written.
+    pub(crate) age: Duration,
+}
+
+pub(crate) fn save_notice(world: &World) -> Option<SaveNotice> {
+    world
+        .get_resource::<LocalIsland>()
+        .filter(|island| island.active)
+        .map(|island| SaveNotice {
+            text: island.message.clone(),
+            failed: island.failed,
+            routine: island.routine,
+            age: island.last.elapsed(),
+        })
+}
 
 pub fn open(
     path: &Path,
@@ -58,7 +94,7 @@ pub fn open(
     attach_controllers(&doc, &mut loaded)?;
     let mut app = loaded.app;
     if let Some(saved) = &saved {
-        restore_validated(app.world_mut(), saved)?;
+        restore_validated(app.world_mut(), saved).map_err(|error| error.to_string())?;
     }
     install(&mut app, path, doc, seed, Some(lock), true);
     if fresh && path.exists() {
@@ -66,6 +102,45 @@ pub fn open(
     }
     save(app.world_mut())?;
     Ok(app)
+}
+
+/// The title's words for an island this build cannot continue: an older
+/// one, as the coordinator's brief words it; any other refusal is the
+/// simulation's own sentence, with the same promise about the file.
+pub(crate) const OLDER_SAVE: &str = "This island was saved by an older version and cannot be opened. It is kept as a backup; start a new island.";
+
+/// Why a save does not continue, for the title: the simulation's check in
+/// the player's words. The file is always kept.
+pub(crate) fn refusal(check: &testbed_content::village::island_save::IslandSaveCheck) -> String {
+    use testbed_content::village::island_save::IslandSaveCheck;
+    match check {
+        IslandSaveCheck::OlderIsland { .. } => OLDER_SAVE.to_owned(),
+        other => format!("{} It is kept as a backup.", other.sentence()),
+    }
+}
+
+/// Why a saved island could not be restored.
+#[derive(Debug)]
+pub(crate) enum RestoreError {
+    /// The simulation refuses this save (older, newer, unreadable): say its
+    /// sentence and keep the file.
+    Refused(String),
+    /// It should have loaded and did not.
+    Failed(String),
+}
+
+impl From<String> for RestoreError {
+    fn from(error: String) -> Self {
+        Self::Failed(error)
+    }
+}
+
+impl std::fmt::Display for RestoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Refused(text) | Self::Failed(text) => f.write_str(text),
+        }
+    }
 }
 
 fn lock_save(path: &Path) -> Result<File, String> {
@@ -143,6 +218,26 @@ fn fresh_construction(rules: Option<&Path>) -> Result<ScenarioDoc, String> {
     construction_from_preset(preset)
 }
 
+/// A world file the player chose for a new game, such as one Shape
+/// exported: read, parsed and checked exactly like the island rules.
+pub(crate) fn world_file_preset(
+    path: &Path,
+) -> Result<testbed_content::worlds::WorldPreset, String> {
+    let text = std::fs::read_to_string(path).map_err(|e| format!("it cannot be read: {e}"))?;
+    let preset = serde_json::from_str::<testbed_content::worlds::WorldPreset>(
+        text.trim_start_matches('\u{feff}'),
+    )
+    .map_err(|e| format!("it is not a world file: {e}"))?;
+    // The same guard every new island passes.
+    construction_from_preset(preset.clone())?;
+    Ok(preset)
+}
+
+/// The immutable construction of a chosen world file.
+pub(crate) fn world_file_construction(path: &Path) -> Result<ScenarioDoc, String> {
+    construction_from_preset(world_file_preset(path)?)
+}
+
 fn shipped_preset(rules: Option<&Path>) -> testbed_content::worlds::WorldPreset {
     let key = if rules
         .and_then(Path::file_stem)
@@ -184,7 +279,21 @@ fn construction_from_preset(
     Ok(doc)
 }
 
-fn restore_validated(world: &mut World, saved: &snapshot::WorldSnapshot) -> Result<(), String> {
+/// Restore `saved` into a fresh world of this build, after the
+/// simulation's own check: only a current save is restored (strictly, then
+/// validated); anything else is refused with its sentence and kept.
+fn restore_validated(
+    world: &mut World,
+    saved: &snapshot::WorldSnapshot,
+) -> Result<(), RestoreError> {
+    use testbed_content::village::island_save::{self, IslandSaveCheck};
+    match island_save::check_island_save(world, saved) {
+        IslandSaveCheck::Current => Ok(restore_current(world, saved)?),
+        refused => Err(RestoreError::Refused(refusal(&refused))),
+    }
+}
+
+fn restore_current(world: &mut World, saved: &snapshot::WorldSnapshot) -> Result<(), String> {
     let expected = snapshot::save(world)?;
     testbed_content::village::integrity::validate_snapshot_structure(&expected, saved)
         .map_err(|reason| format!("{reason}; the original island save has been preserved."))?;
@@ -212,6 +321,8 @@ fn install(
         last: Instant::now(),
         active,
         message: "Island saves automatically | Ctrl+S save now".into(),
+        failed: false,
+        routine: false,
         _lock: lock,
     })
     .add_systems(Startup, spawn_label)
@@ -250,7 +361,9 @@ pub(crate) fn save(world: &mut World) -> Result<(), String> {
     if local._lock.is_none() {
         return Err("This session does not own the save file".into());
     }
-    let mut snapshot = snapshot::save(world)?;
+    // Stamped with the island's save version and content: a later build
+    // tells an older save from a damaged one.
+    let mut snapshot = testbed_content::village::island_save::save_island(world)?;
     let local = world.resource::<LocalIsland>();
     snapshot.header.insert("local_island".into(), 1.into());
     snapshot.header.insert(
@@ -263,6 +376,9 @@ pub(crate) fn save(world: &mut World) -> Result<(), String> {
     let frontend = world.contains_resource::<crate::frontend::FrontendState>();
     let mut local = world.resource_mut::<LocalIsland>();
     local.last = Instant::now();
+    local.failed = false;
+    // Whoever asked for the save; the timer marks its own afterwards.
+    local.routine = false;
     local.message = if frontend {
         "Island saved · Ctrl+S"
     } else {
@@ -276,6 +392,7 @@ fn report_save(world: &mut World) -> bool {
         error!("{error}");
         let mut local = world.resource_mut::<LocalIsland>();
         local.last = Instant::now();
+        local.failed = true;
         local.message =
             format!("{error} | Free disk space or restore access, then Ctrl+S to retry");
         false
@@ -300,8 +417,11 @@ fn save_input(world: &mut World) {
                         .into_iter()
                         .any(|key| keys.pressed(key) || keys.just_pressed(key)))
         });
-    if due || key {
+    if key {
         report_save(world);
+    } else if due && report_save(world) {
+        // A failed autosave is still reported; a completed one is routine.
+        world.resource_mut::<LocalIsland>().routine = true;
     }
 }
 pub(crate) fn close_requested(world: &mut World) {
@@ -363,34 +483,28 @@ pub fn app_quit(
     Ok(answer)
 }
 fn spawn_label(mut commands: Commands, frontend: Option<Res<crate::frontend::FrontendState>>) {
-    let mut label = commands.spawn((
+    // The player session shows saves in its own fading notice (`save_notice`).
+    if frontend.is_some() {
+        return;
+    }
+    commands.spawn((
         SaveLabel,
         BackgroundColor(Color::srgba(0.04, 0.06, 0.07, 0.9)),
         Node {
             position_type: PositionType::Absolute,
-            bottom: px(if frontend.is_some() { 68 } else { 12 }),
-            left: px(if frontend.is_some() { 12 } else { 164 }),
-            min_width: px(if frontend.is_some() { 200 } else { 0 }),
-            max_width: percent(if frontend.is_some() { 40 } else { 55 }),
-            padding: UiRect::all(px(if frontend.is_some() { 8 } else { 5 })),
+            bottom: px(12),
+            left: px(164),
+            max_width: percent(55),
+            padding: UiRect::all(px(5)),
             ..default()
         },
+        Text::new(""),
+        TextFont {
+            font_size: FontSize::Px(12.),
+            ..default()
+        },
+        TextColor(Color::srgb(0.88, 0.91, 0.83)),
     ));
-    if frontend.is_some() {
-        label.insert((
-            testbed_view::FrontendUiRoot,
-            testbed_view::game_ui::text("", 14.0, testbed_view::game_ui::TEXT),
-        ));
-    } else {
-        label.insert((
-            Text::new(""),
-            TextFont {
-                font_size: FontSize::Px(12.),
-                ..default()
-            },
-            TextColor(Color::srgb(0.88, 0.91, 0.83)),
-        ));
-    }
 }
 fn refresh_label(
     local: Res<LocalIsland>,
@@ -611,6 +725,65 @@ mod tests {
         std::fs::remove_file(path).unwrap();
         std::fs::remove_file(dir.join("island.world.lock")).unwrap();
         std::fs::remove_file(dir.join("island.previous-1.json")).unwrap();
+        std::fs::remove_dir(dir).unwrap();
+    }
+
+    #[test]
+    fn only_the_timers_own_save_is_routine() {
+        let dir =
+            std::env::temp_dir().join(format!("npc-local-island-routine-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("island.json");
+        let mut app = open(&path, None, None, false, |_| {}).unwrap();
+        app.init_resource::<ButtonInput<KeyCode>>();
+        let overdue = |app: &mut App| {
+            app.world_mut().resource_mut::<LocalIsland>().last =
+                Instant::now() - Duration::from_secs(61);
+        };
+        // Not yet due and no key: nothing is written or said.
+        let before = save_notice(app.world()).unwrap();
+        save_input(app.world_mut());
+        let quiet = save_notice(app.world()).unwrap();
+        assert_eq!((quiet.text, quiet.routine), (before.text, false));
+
+        // The minute timer: saved, and marked as nobody's request.
+        run_ticks(app.world_mut(), 9);
+        overdue(&mut app);
+        save_input(app.world_mut());
+        let auto = save_notice(app.world()).unwrap();
+        assert!(auto.routine && !auto.failed);
+        assert!(auto.age < Duration::from_secs(5), "the timer was reset");
+        assert_eq!(snapshot::read(&path).unwrap().tick, 9);
+
+        // Ctrl+S (or F9) is a request, also when the timer is due as well.
+        overdue(&mut app);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F9);
+        save_input(app.world_mut());
+        let asked = save_notice(app.world()).unwrap();
+        assert!(!asked.routine && !asked.failed);
+        app.world_mut()
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .clear();
+        // So is a save from the pause menu, which calls `save` directly.
+        overdue(&mut app);
+        save_input(app.world_mut());
+        assert!(save_notice(app.world()).unwrap().routine);
+        save(app.world_mut()).unwrap();
+        assert!(!save_notice(app.world()).unwrap().routine);
+
+        // A failed autosave is a failure, never routine.
+        overdue(&mut app);
+        app.world_mut().resource_mut::<LocalIsland>().path =
+            dir.join("missing-parent").join("save.json");
+        save_input(app.world_mut());
+        let failed = save_notice(app.world()).unwrap();
+        assert!(failed.failed && !failed.routine);
+        assert!(failed.text.contains("Could not save"), "{}", failed.text);
+        drop(app);
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_file(dir.join("island.world.lock")).unwrap();
         std::fs::remove_dir(dir).unwrap();
     }
 

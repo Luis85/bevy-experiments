@@ -37,11 +37,36 @@ pub const FISHING_ROD: &str = "village_fishing_rod";
 pub const MAKE_ROD: &str = "village_make_rod";
 pub const COOK_FISH: &str = "village_cook_fish";
 pub const WEAVE_COAT: &str = "village_weave_coat";
-pub const FRONTIER_RECIPE_VERBS: &[&str] = &[
-    "craft:village_make_rod",
-    "craft:village_cook_fish",
-    "craft:village_weave_coat",
-];
+pub const HOE: &str = "village_hoe";
+pub const FORGE_AXE: &str = "village_forge_axe";
+pub const FORGE_PICKAXE: &str = "village_forge_pickaxe";
+pub const FORGE_HOE: &str = "village_forge_hoe";
+/// Completed gathers one regional work tool lasts before it breaks.
+pub const TOOL_DURABILITY: u32 = 120;
+/// Gathering duration with / without the matching tool, as a percentage of the
+/// base ticks of the patch. Bare hands stay possible so a new world cannot deadlock.
+pub const TOOL_GATHER_PERCENT: u32 = 75;
+pub const BARE_GATHER_PERCENT: u32 = 150;
+
+/// The work tool that speeds gathering this raw good in the regional profile.
+pub fn gather_tool(kind: &str) -> Option<&'static str> {
+    match kind {
+        "log" => Some("axe"),
+        "ore" => Some("pickaxe"),
+        GRAIN => Some(HOE),
+        _ => None,
+    }
+}
+
+/// The work tool a regional gathering profession keeps one of.
+pub fn role_tool(role: Role) -> Option<&'static str> {
+    match role {
+        Role::Woodcutter => Some("axe"),
+        Role::Miner => Some("pickaxe"),
+        Role::Farmer => Some(HOE),
+        _ => None,
+    }
+}
 pub const SAW_LOG_COST: u32 = 1;
 pub const SAW_PLANK_YIELD: u32 = 4;
 // Four full exposed cold days at one wear/tick: thirteen actors need 3.25
@@ -113,6 +138,7 @@ pub const FRONTIER_TRADE_KINDS: &[&str] = &[
     FLOUR,
     GRAIN,
     HIDE,
+    HOE,
     LEATHER,
     RAW_MEAT,
     SPEAR,
@@ -121,39 +147,142 @@ pub const FRONTIER_TRADE_KINDS: &[&str] = &[
     WATER,
 ];
 
-/// Additional renewable chains are registered only by the regional profile.
+fn frontier_profile(app: &App) -> bool {
+    app.world()
+        .contains_resource::<super::frontier::economy_spec::EconomyRegistry>()
+}
+
+/// The regional profile registers every good and recipe of its `economy` data
+/// block; the Rust tables below serve the older profiles only.
 pub fn register_frontier(app: &mut App) {
-    app.register_item_kind(ItemKindDef::new(FISH).weight_g(500).stackable(20))
-        .register_item_kind(
-            ItemKindDef::new(FISHING_ROD)
-                .weight_g(800)
-                .tag("tool:fishing"),
+    use npc_framework::agent_io::AgentIoAppExt;
+    let spec = app
+        .world()
+        .resource::<super::frontier::economy_spec::EconomyRegistry>()
+        .spec
+        .clone();
+    for good in &spec.goods {
+        let Some(item) = &good.item else {
+            continue;
+        };
+        let mut kind = ItemKindDef::new(&good.key).weight_g(item.weight_g);
+        if item.max_stack > 1 {
+            kind = kind.stackable(item.max_stack);
+        }
+        for tag in &item.tags {
+            kind = kind.tag(tag);
+        }
+        if let Some(slot) = &item.equip_slot {
+            kind = kind.equip_slot(slot);
+        }
+        app.register_item_kind(kind);
+    }
+    for recipe in &spec.recipes {
+        let mut def = RecipeDef::new(&recipe.key)
+            .station(&recipe.station)
+            .duration(recipe.duration);
+        for input in &recipe.inputs {
+            def = def.input(&input.good, input.count);
+        }
+        for output in &recipe.outputs {
+            def = def.output(&output.good, output.count);
+        }
+        if let Some(tool) = &recipe.tool {
+            def = def.tool(tool);
+        }
+        if let Some(skill) = &recipe.skill {
+            def = def.skill(&skill.name, skill.level);
+        }
+        app.register_recipe(def);
+        app.register_action_handler(
+            super::frontier::economy_spec::intern(&format!("craft:{}", recipe.key)),
+            npc_framework::glue::crafting_agent::craft_handler,
         );
-    for recipe in [
-        RecipeDef::new(MAKE_ROD)
-            .input("plank", 1)
-            .input(THREAD, 2)
-            .station(SAW)
-            .duration(180)
-            .output(FISHING_ROD, 1),
-        RecipeDef::new(COOK_FISH)
-            .input(FISH, 2)
-            .input(WATER, 1)
-            .input("log", 1)
-            .station(BAKE)
-            .duration(200)
-            .output(COOKED_MEAL, 2),
-        RecipeDef::new(WEAVE_COAT)
-            .input(THREAD, 8)
-            .input(FIBER, 4)
-            .station(TAILOR)
-            .duration(480)
-            .output(WARM_CLOTHES, 1),
-    ] {
-        app.register_recipe(recipe);
+    }
+    app.add_craft_hook("island.frontier_product_wear", |world, completed| {
+        for id in &completed.outputs {
+            let Some(entity) = world.resource::<SimIndex>().get(*id) else {
+                continue;
+            };
+            let durability = world
+                .get::<Item>(entity)
+                .and_then(|item| durability_in(world, &item.kind));
+            if let Some(durability) = durability {
+                world.entity_mut(entity).insert(Durability::new(durability));
+            }
+        }
+    });
+}
+
+/// Uses a freshly made or granted unit of this good lasts; regional data only.
+pub fn durability_in(world: &World, kind: &str) -> Option<u32> {
+    super::frontier::economy_spec::registry(world)?
+        .good(kind)?
+        .durability
+}
+/// Seed price of a good in this world.
+pub fn price_in(world: &World, kind: &str) -> Option<u32> {
+    match super::frontier::economy_spec::registry(world) {
+        Some(registry) => registry.good(kind).map(|good| good.base_price),
+        None => price(kind),
     }
 }
+pub fn stock_limit_in(world: &World, kind: &str) -> u32 {
+    match super::frontier::economy_spec::registry(world) {
+        Some(registry) => registry.good(kind).map_or(0, |good| good.stock_limit),
+        None => stock_limit(kind),
+    }
+}
+/// Hunger restored by a finished edible good in this world.
+pub fn food_restore_in(world: &World, kind: &str) -> Option<i32> {
+    match super::frontier::economy_spec::registry(world) {
+        Some(registry) => registry.good(kind).and_then(|good| good.food_value),
+        None => food_restore(kind),
+    }
+}
+pub fn gather_tool_in(world: &World, kind: &str) -> Option<&'static str> {
+    match super::frontier::economy_spec::registry(world) {
+        Some(registry) => registry.good(kind).and_then(|good| good.gather_tool),
+        None => gather_tool(kind),
+    }
+}
+pub fn role_tool_in(world: &World, role: Role) -> Option<&'static str> {
+    match super::frontier::economy_spec::registry(world) {
+        Some(registry) => registry.profession(role).and_then(|entry| entry.tool),
+        None => role_tool(role),
+    }
+}
+/// Living world: the first good the world's data tags with `tag` (its
+/// coats are the `Clothing` good, its fuel the `Fuel` good, ...), so logic
+/// reads a good's role from data instead of naming the good.
+pub fn good_with_tag(world: &World, tag: super::frontier::economy_spec::GoodTag) -> Option<&str> {
+    super::frontier::economy_spec::registry(world)?
+        .spec
+        .goods
+        .iter()
+        .find(|good| good.tags.contains(&tag))
+        .map(|good| good.key.as_str())
+}
+
+/// Living world: whether the world's data tags `kind` with `tag`.
+pub fn has_tag(world: &World, kind: &str, tag: super::frontier::economy_spec::GoodTag) -> bool {
+    super::frontier::economy_spec::registry(world).is_some_and(|registry| {
+        registry
+            .spec
+            .goods
+            .iter()
+            .any(|good| good.key == kind && good.tags.contains(&tag))
+    })
+}
+
+/// Lower-case display noun of a good, when the world's data names it.
+pub fn display_in(world: &World, kind: &str) -> Option<&'static str> {
+    super::frontier::economy_spec::registry(world)?
+        .good(kind)
+        .map(|good| good.display)
+}
 pub fn register(app: &mut App) {
+    let data_driven = frontier_profile(app);
     for (kind, grams, stack) in [
         (GRAIN, 250, 50),
         (FLOUR, 250, 50),
@@ -162,7 +291,13 @@ pub fn register(app: &mut App) {
         (DIARY, 300, 1),
         (COINS, 0, 1),
     ] {
+        if data_driven && !matches!(kind, DIARY | COINS) {
+            continue;
+        }
         app.register_item_kind(ItemKindDef::new(kind).weight_g(grams).stackable(stack));
+    }
+    if data_driven {
+        return;
     }
     for r in [
         RecipeDef::new(MILL)
@@ -207,6 +342,9 @@ pub fn register(app: &mut App) {
 /// Additional materials and joining production chains for the living economy.
 /// The original island's registrations, seed stock and recipe names stay separate.
 pub fn register_living(app: &mut App) {
+    if frontier_profile(app) {
+        return;
+    }
     for (kind, grams, stack) in [
         (RAW_MEAT, 500, 20),
         (HIDE, 500, 20),
@@ -287,8 +425,8 @@ pub fn food_restore(kind: &str) -> Option<i32> {
 }
 
 pub fn trade_kinds(world: &World) -> &'static [&'static str] {
-    if super::frontier::enabled(world) {
-        FRONTIER_TRADE_KINDS
+    if let Some(registry) = super::frontier::economy_spec::registry(world) {
+        registry.trade_kinds()
     } else if super::needs_driven(world) {
         LIVING_TRADE_KINDS
     } else {
@@ -297,12 +435,8 @@ pub fn trade_kinds(world: &World) -> &'static [&'static str] {
 }
 
 pub fn outputs_for(world: &World, role: Role) -> &'static [&'static str] {
-    if super::frontier::enabled(world) {
-        match role {
-            Role::Fisher => return &[FISH],
-            Role::Carpenter => return &["plank", BOWL, FISHING_ROD],
-            _ => {}
-        }
+    if let Some(registry) = super::frontier::economy_spec::registry(world) {
+        return registry.profession(role).map_or(&[], |entry| entry.outputs);
     }
     if !super::needs_driven(world) {
         return outputs(role);
@@ -319,15 +453,12 @@ pub fn outputs_for(world: &World, role: Role) -> &'static [&'static str] {
 }
 
 pub fn wants_for(world: &World, role: Role, kind: &str) -> bool {
-    if super::frontier::enabled(world)
-        && match role {
-            Role::Fisher => kind == FISHING_ROD,
-            Role::Baker => kind == FISH,
-            Role::Carpenter => kind == THREAD,
-            _ => false,
-        }
-    {
-        return true;
+    if let Some(registry) = super::frontier::economy_spec::registry(world) {
+        // Someone without a profession (a visitor) still accepts the staples.
+        return match registry.profession(role) {
+            Some(entry) => entry.wants.contains(&kind),
+            None => registry.good(kind).is_some_and(|good| good.staple),
+        };
     }
     if !super::needs_driven(world) {
         return wants(role, kind);
@@ -347,13 +478,8 @@ pub fn wants_for(world: &World, role: Role, kind: &str) -> bool {
 
 /// Candidate jobs; the NPC planner chooses from current backed demand, not this order.
 pub fn recipes_for(world: &World, role: Role) -> &'static [&'static str] {
-    if super::frontier::enabled(world) {
-        match role {
-            Role::Baker => return &[BAKE, COOK, COOK_FISH],
-            Role::Carpenter => return &[SAW, CARVE, MAKE_ROD],
-            Role::Tailor => return &[SPIN, TAILOR, WEAVE_COAT],
-            _ => {}
-        }
+    if let Some(registry) = super::frontier::economy_spec::registry(world) {
+        return registry.profession(role).map_or(&[], |entry| entry.recipes);
     }
     if super::needs_driven(world) {
         match role {
@@ -395,6 +521,7 @@ pub fn price(kind: &str) -> Option<u32> {
         BERRIES => 2,
         FISH => 4,
         FISHING_ROD => 12,
+        HOE => 14,
         _ => return None,
     })
 }
@@ -413,6 +540,7 @@ pub fn stock_limit(kind: &str) -> u32 {
         SPEAR => 8,
         FISH => 20,
         FISHING_ROD => 4,
+        HOE => 3,
         _ => 0,
     }
 }

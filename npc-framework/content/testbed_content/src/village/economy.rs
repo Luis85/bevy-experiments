@@ -299,7 +299,7 @@ pub fn merchant_check(
         let limit = if market::enabled(world) {
             super::production::purchase_target(world, trader, kind)
         } else {
-            catalog::stock_limit(kind)
+            catalog::stock_limit_in(world, kind)
         };
         if count(world, trader, kind).saturating_add(n) > limit {
             return Err(if market::enabled(world) {

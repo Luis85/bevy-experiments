@@ -187,21 +187,27 @@ pub(super) fn rows(
             ));
             home_heating(&observed["sections"]["village"], &mut rows);
         } else {
-            let (materials, have) = stock_text(stock, &farm["cottage"]["inputs"]);
-            rows.push(Row::note("cost", "Cottage materials", materials));
-            rows.push(Row::action(
-                "build_home",
-                "Build this cottage",
-                "Walk to the site and build with the materials in your pouch.",
-                work(
-                    "Build your cottage",
-                    "build_cottage",
-                    Some(target),
-                    json!({}),
-                    door,
-                ),
-                ready && have,
-            ));
+            // What the cottage takes, as chips on its own row; the button
+            // keeps its place and says what is short.
+            let inputs = recipe_inputs(stock, &farm["cottage"]["inputs"]);
+            let have = inputs.iter().all(|(_, owned, wanted)| owned >= wanted);
+            rows.push(Row {
+                reason: recipe_reason(&inputs, true),
+                inputs,
+                ..Row::action(
+                    "build_home",
+                    "Build this cottage",
+                    "Walk to the site and build with the materials in your pouch.",
+                    work(
+                        "Build your cottage",
+                        "build_cottage",
+                        Some(target),
+                        json!({}),
+                        door,
+                    ),
+                    ready && have,
+                )
+            });
             rows.push(Row::action(
                 "source_materials",
                 "Find building supplies",

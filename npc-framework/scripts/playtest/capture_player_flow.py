@@ -31,11 +31,26 @@ import subprocess
 import time
 import uuid
 
-from capture_native import ROOT, WINDOW, query
-from capture_native_homestead import Rehearsal, file_hash
+from capture_native import NODE, PARENT, ROOT, WINDOW, query, scalar
+from capture_native_homestead import TRANSFORM, Rehearsal, file_hash, translation
 
 BUTTON = "bevy_ui_widgets::button::Button"
 PRIMARY = "bevy_window::window::PrimaryWindow"
+NAME = "bevy_ecs::name::Name"
+# The redesigned Oversee shell (docs/island-ui.md). Every kit control carries a
+# `Name` ("Game: Menu"), icon-only ones too; panels are named as well.
+LEDGER = "Island colony ledger"
+LEDGER_DOCK = "Island dock: ledger"
+BUILD_DOCK = "Island dock: build"
+VIEW_DOCK = "Island dock: view"
+ALERTS = "Village alerts"
+LEGEND = "Resident marker legend"
+INSPECTOR = "Resident inspector"
+TRAY = "Build tray"
+BUILDING_CARD = "Building card"
+PAGES = ("Village", "Economy", "People", "Projects", "Journal")
+PAGE_MARKS = {"Village": "Housed", "Economy": "Goods", "People": "Wealth",
+              "Projects": "Building projects", "Journal": "Everything"}
 SIZES = ((1280, 720), (1024, 768))
 MAX_TICKS = 18000
 
@@ -53,6 +68,16 @@ def wait_for(predicate, seconds=30):
     raise RuntimeError(f"Native flow readiness timed out: {last}")
 
 
+def current_label(flow, label):
+    """Older scripts name controls by their old words with the key ("Craft ·
+    C"); the redesigned controls carry the word alone and show the key as a
+    key cap. An old label that no longer exists resolves to the word."""
+    match = re.fullmatch(r"(.+) · [A-Z]", label)
+    if match is None or flow.has_widget(label):
+        return label
+    return match.group(1)
+
+
 def friendly(kind):
     name = kind.removeprefix("village_").replace("_", " ")
     return name[:1].upper() + name[1:]
@@ -67,10 +92,78 @@ class PlayerFlow(Rehearsal):
         if len(windows) != 1 or len(query(self.url, [WINDOW])) != 1 or int(windows[0]["entity"]) != self.window:
             raise RuntimeError("Title and play did not retain exactly one primary window")
 
-    def widget(self, label, enabled=True):
+    def names(self):
+        """Every `Name` in the world: name -> entities."""
+        found = {}
+        for row in query(self.url, [NAME]):
+            value = row["components"][NAME]
+            name = value.get("name") if isinstance(value, dict) else str(value)
+            found.setdefault(name, []).append(int(row["entity"]))
+        return found
+
+    def shown(self):
+        """`displayed(entity)` over the UI as laid out now, and the parent map."""
+        nodes = {int(row["entity"]): row["components"][NODE] for row in query(self.url, [NODE])}
+        parents = {int(row["entity"]): int(scalar(row["components"][PARENT]))
+                   for row in query(self.url, [PARENT])}
+
+        def displayed(entity):
+            seen = set()
+            while entity not in seen:
+                seen.add(entity)
+                if nodes.get(entity, {}).get("display") == "None":
+                    return False
+                if entity not in parents:
+                    return True
+                entity = parents[entity]
+            return False
+
+        return displayed, parents
+
+    def within(self, panel):
+        """`inside(entity)` for the one panel named `panel`; None while there is no such panel."""
+        roots = self.names().get(panel, [])
+        if len(roots) != 1:
+            return None
+        _, parents = self.shown()
+
+        def inside(entity):
+            seen = set()
+            while entity in parents and entity not in seen:
+                seen.add(entity)
+                entity = parents[entity]
+                if entity == roots[0]:
+                    return True
+            return False
+
+        return inside
+
+    def controls(self, label):
+        """Displayed controls called `label`, by `Name`. "Panel > Control" looks
+        inside the panel of that name only: two panels may each have a "Hide"."""
+        panel, _, name = label.rpartition(" > ")
+        displayed, _ = self.shown()
+        buttons = {int(row["entity"]) for row in query(self.url, with_types=[BUTTON])}
+        found = [entity for entity in self.names().get("Game: " + name, [])
+                 if entity in buttons and displayed(entity)]
+        if panel:
+            inside = self.within(panel)
+            found = [entity for entity in found if inside is not None and inside(entity)]
+        return found
+
+    def matches(self, label):
+        """Visible widgets for `label`: by the text on them first, then by the
+        control's name, which icon-only controls have too. A row found by name
+        has no text entity."""
         rows, _, disabled = self.ui()
         widgets = {int(row["entity"]) for row in query(self.url, with_types=[BUTTON])}
-        matches = [row for row in rows if row["text"] == label and row["parent"] in widgets]
+        found = [row for row in rows if row["text"] == label and row["parent"] in widgets]
+        if not found:
+            found = [{"entity": None, "parent": entity, "text": label} for entity in self.controls(label)]
+        return found, disabled
+
+    def widget(self, label, enabled=True):
+        matches, disabled = self.matches(label)
         if len(matches) != 1:
             raise RuntimeError(f"Expected one visible widget {label!r}, found {len(matches)}")
         row = matches[0]
@@ -79,10 +172,93 @@ class PlayerFlow(Rehearsal):
         return row
 
     def has_widget(self, label, enabled=None):
-        rows, _, disabled = self.ui()
-        widgets = {int(row["entity"]) for row in query(self.url, with_types=[BUTTON])}
-        matches = [row for row in rows if row["text"] == label and row["parent"] in widgets]
+        matches, disabled = self.matches(label)
         return len(matches) == 1 and (enabled is None or (matches[0]["parent"] not in disabled) == enabled)
+
+    def reading_order(self, rows):
+        """Text rows as read: top to bottom, then left to right."""
+        at = {int(item["entity"]): translation(item["components"][TRANSFORM])[:2]
+              for item in query(self.url, [TRANSFORM])}
+
+        def place(row):
+            x, y = at.get(row["entity"], (0.0, 0.0))
+            return round(y / 6.0), x
+
+        return sorted(rows, key=place)
+
+    def panel_texts(self, panel):
+        """Displayed text inside the panel named `panel`, in reading order;
+        empty while it is closed."""
+        inside = self.within(panel)
+        if inside is None:
+            return []
+        rows = [row for row in self.ui()[0] if inside(row["entity"]) and str(row["text"])]
+        return [str(row["text"]) for row in self.reading_order(rows)]
+
+    def button_rows(self, panel):
+        """Controls of a panel with the text on them, top to bottom:
+        (entity, lines joined by a line break). A roster row or a build card
+        holds several texts; this is the row as a player reads it."""
+        inside = self.within(panel)
+        if inside is None:
+            return []
+        rows, parents, _ = self.ui()
+        widgets = {int(row["entity"]) for row in query(self.url, with_types=[BUTTON])}
+        grouped, first = {}, {}
+        for row in self.reading_order([row for row in rows if inside(row["entity"]) and str(row["text"])]):
+            entity, seen = row["entity"], set()
+            while entity in parents and entity not in widgets and entity not in seen:
+                seen.add(entity)
+                entity = parents[entity]
+            if entity in widgets:
+                grouped.setdefault(entity, []).append(str(row["text"]))
+                first.setdefault(entity, len(first))
+        return [(entity, "\n".join(grouped[entity])) for entity in sorted(grouped, key=first.get)]
+
+    def press_row(self, prefix, panel=LEDGER):
+        """Activate the one control of `panel` whose text starts with `prefix`."""
+        found = [(entity, text) for entity, text in self.button_rows(panel) if text.startswith(prefix)]
+        if len(found) != 1:
+            raise RuntimeError(f"Expected one row starting {prefix!r} in {panel!r}, found {len(found)}")
+        self.record("widget", label=found[0][1].split("\n")[0], entity=found[0][0])
+        self.call("world.trigger_event", {
+            "event": "bevy_ui_widgets::Activate", "value": {"entity": found[0][0]}})
+        time.sleep(0.3)
+        self.assert_window()
+        return found[0]
+
+    def ledger_page(self):
+        """The ledger page in the right column, or None while it holds no ledger.
+        The ledger's own tabs do not say which one is lit over BRP, so the page
+        is known by a text only it shows."""
+        texts = set(self.panel_texts(LEDGER))
+        return next((page for page, mark in PAGE_MARKS.items() if mark in texts), None)
+
+    def open_page(self, page):
+        """Show a ledger page from its dock tile. The ledger is closed by default
+        and the tile of the open page closes it, so this asks only when needed.
+        The Compact layout has one Ledger tile; there the page is one of the
+        ledger's own tabs."""
+        if self.ledger_page() == page:
+            return
+        tile = LEDGER_DOCK + " > " + page
+        if self.has_widget(tile):
+            self.click(tile)
+        else:
+            if self.ledger_page() is None:
+                self.click(LEDGER_DOCK + " > Ledger")
+                wait_for(lambda: self.ledger_page() is not None, 6)
+            if self.ledger_page() != page:
+                self.click(LEDGER + " > " + page)
+        wait_for(lambda: self.ledger_page() == page, 6)
+        time.sleep(0.4)
+
+    def close_ledger(self):
+        page = self.ledger_page()
+        if page is not None:
+            tile = LEDGER_DOCK + " > " + page
+            self.click(tile if self.has_widget(tile) else LEDGER_DOCK + " > Ledger")
+            wait_for(lambda: self.ledger_page() is None, 6)
 
     def select_site(self, chosen, tab):
         self.open_tab(tab)
@@ -91,7 +267,7 @@ class PlayerFlow(Rehearsal):
         self.click(chosen["name"])
 
     def select_person(self, person):
-        self.open_tab("People · N")
+        self.open_tab("People")
         if self.has_widget("Change neighbour"):
             self.click("Change neighbour")
         self.click(person["name"])
@@ -108,12 +284,15 @@ class PlayerFlow(Rehearsal):
     def click(self, label, prefix=False):
         if prefix:
             raise RuntimeError("Player flow requires exact widget labels")
+        label = current_label(self, label)
         try:
             row = wait_for(lambda: self.widget(label), 6)
             # The shared helper checks clipping and scrolls only view nodes. The
             # text override disambiguates a selected plot's matching heading.
-            self.reveal(label)
-            row = self.widget(label)
+            # A control found by its name has no text to bring into view.
+            if row["entity"] is not None:
+                self.reveal(label)
+                row = self.widget(label)
         except (RuntimeError, KeyError) as error:
             self.failure_context("widget_unavailable", label=label, error=str(error))
             raise
@@ -270,7 +449,7 @@ class PlayerFlow(Rehearsal):
 
     def spectator_entry(self):
         self.click("Oversee the village")
-        wait_for(lambda: self.widget("Play character"))
+        wait_for(lambda: self.widget("Live"))
         before = self.state()  # Operator verification, never navigation input.
         arrivals = [entity for entity in before["entities"]
                     if "island_awaiting_arrival_v1" in entity.get("components", {})]
@@ -295,7 +474,7 @@ class PlayerFlow(Rehearsal):
         self.report["spectator_entry"] = {"reserved_visitor": visitor, "before_tick": before["tick"],
             "after_tick": after["tick"], "npc_needs_changed": len(changed), "arrival_preserved": True}
         self.capture("spectator-running-village")
-        self.click("Play character")
+        self.click("Live")
         return visitor
 
     def death_check(self):
@@ -308,7 +487,7 @@ class PlayerFlow(Rehearsal):
         state = self.state()  # Identity/legacy verification only; never travel.
         estates = {entity["sim_id"]: entity["components"]["island_homestead_plot_v1"]
                    for entity in state["entities"] if entity.get("components", {}).get("island_homestead_plot_v1", {}).get("owner") == old}
-        self.click("Stop · X")
+        self.click("Stop")
         interventions = []
         for need in ["Hunger", "Thirst"]:
             command = {"type": "SetNeed", "unit": old, "need": need, "value": 0}
@@ -330,7 +509,7 @@ class PlayerFlow(Rehearsal):
         wait_for(lambda: self.widget("Keep watching the village"))
         self.capture("operator-induced-mortality")
         self.click("Keep watching the village")
-        wait_for(lambda: self.widget("Life choices · L"))
+        wait_for(lambda: self.widget("Life choices"))
         watching_tick = self.raw_observe(old)["tick"]
         self.capture("watching-after-death")
         self.call("npc/step", {"ticks": 100})
@@ -339,7 +518,7 @@ class PlayerFlow(Rehearsal):
             raise RuntimeError("Watching the village revived or replaced the old life")
         if self.tick <= watching_tick:
             raise RuntimeError("The village did not run while watching after death")
-        self.click("Life choices · L")
+        self.click("Life choices")
         self.capture("successor-life-choices")
         self.click("Begin a successor life")
 
@@ -351,7 +530,7 @@ class PlayerFlow(Rehearsal):
             return living[0]["sim_id"] if len(living) == 1 else None
 
         self.actor = wait_for(successor)
-        wait_for(lambda: self.widget("Menu · Esc"))
+        wait_for(lambda: self.widget("Menu"))
         self.call("npc/step", {"ticks": 20})
         living = self.observe()
         if living["sections"]["village"]["life"] != before["sections"]["village"]["life"] + 1:
@@ -462,7 +641,7 @@ class PlayerFlow(Rehearsal):
             self.care()
             self.return_to_workshop(remembered)
             self.wait_for_workshop(remembered)
-            self.open_tab("Craft · C")
+            self.open_tab("Craft")
             before = self.observe()
             quantity = self.inventory(before).get("plank", 0)
             previous_feedback = self.feedback_strings()
@@ -528,7 +707,11 @@ class PlayerFlow(Rehearsal):
             return found
         anchor = getattr(self, "arrival_anchor", None)
         if anchor is None:
-            raise RuntimeError("Exploration has no actor-observed arrival anchor")
+            # A part that began after the arrival (another script's flow)
+            # anchors where the actor first observes itself.
+            self.arrival_anchor = anchor = list(self.public_receipt(observed)["position"])
+            self.report["known_arrival_anchor"] = {
+                "position": anchor, "source": "actor-owned observation at the first search"}
         route, basis = self.discovery_route(resource_kind, southern_hint)
         budget = len(route) if max_moves is None else min(max_moves, len(route))
         self.record("discovery_phase", wanted=description, known_anchor=anchor,
@@ -571,7 +754,7 @@ class PlayerFlow(Rehearsal):
     def exploration_step(self, direction, description, basis, southern_hint=False):
         label = f"Walk 6 m {direction}"
         available = False
-        self.open_tab("Explore · M")
+        self.open_tab("Explore")
         if self.has_widget(label):
             wait_for(lambda: self.widget(label), 6)
             available = True
@@ -621,7 +804,7 @@ class PlayerFlow(Rehearsal):
             if observed["tick"] - before["tick"] >= budget:
                 self.record("exploration_budget_exhausted", observation=self.public_receipt(observed),
                             target=target, visible_feedback=self.feedback_strings())
-                self.click("Stop · X")
+                self.click("Stop")
                 self.until(lambda obs: obs["sections"]["village"]["activity"]["busy"] is False, budget=200)
                 return False
             self.call("npc/step", {"ticks": 20})
@@ -631,7 +814,7 @@ class PlayerFlow(Rehearsal):
         while self.inventory(self.observe()).get(kind, 0) < wanted:
             self.exploration(lambda obs: next((source for source in obs["sections"]["village"]["environment"]["resources"]
                 if source["kind"] == kind and source.get("remaining") != 0), None), friendly(kind), resource_kind=kind)
-            self.open_tab("Craft · C")
+            self.open_tab("Craft")
             previous = self.inventory(self.observe()).get(kind, 0)
             self.click("Gather " + friendly(kind))
             self.until(lambda obs: self.inventory(obs).get(kind, 0) > previous)
@@ -646,16 +829,16 @@ class PlayerFlow(Rehearsal):
             if observed["sections"]["village"]["needs"][need] >= 45000:
                 continue
             self.gather_to(kind, 1)
-            self.open_tab("Pouch · I")
+            self.open_tab("Pouch")
             before = self.inventory(self.observe()).get(kind, 0)
             self.click(friendly(kind))
             self.until(lambda obs: self.inventory(obs).get(kind, 0) < before, budget=300)
             self.record("self_care", need=need, item=kind)
         if self.observe()["sections"]["village"]["needs"]["energy"] < 40000:
-            self.open_tab("Pouch · I")
+            self.open_tab("Pouch")
             self.click("Go home and rest")
             self.until(lambda obs: obs["sections"]["village"]["needs"]["energy"] >= 70000, budget=2400)
-            self.click("Stop · X")
+            self.click("Stop")
             self.until(lambda obs: obs["sections"]["village"]["activity"]["busy"] is False, budget=200)
 
     def known_people(self, observed=None):
@@ -743,7 +926,7 @@ class PlayerFlow(Rehearsal):
             if observed["tick"] - before["tick"] >= budget or time.monotonic() >= end:
                 result = {"completed": False, "reason": "Conversation reached its 600-tick/45-second attempt budget",
                           "visible_feedback": feedback, "own_outcomes": outcomes, "after": self.public_receipt(observed)}
-                self.click("Stop · X")
+                self.click("Stop")
                 self.until(lambda obs: obs["sections"]["village"]["activity"]["busy"] is False, budget=200, chunk=1)
                 return result
             self.call("npc/step", {"ticks": 1})
@@ -755,7 +938,7 @@ class PlayerFlow(Rehearsal):
             if plot["use_kind"] == "housing" and plot.get("state_known") is True
             and (plot.get("owner") is None or plot.get("own") is True)), None),
             "a vacant house site", southern_hint=True)
-        self.select_site(chosen, "Build · B")
+        self.select_site(chosen, "Build")
         if chosen.get("own") is not True:
             self.click("Claim this site")
             self.until(lambda obs: self.plot(chosen["id"], obs).get("own") is True)
@@ -778,7 +961,7 @@ class PlayerFlow(Rehearsal):
         for _ in range(runs):
             self.craft_batch(workshop, recipe_label, output)
         self.capture("crafted-materials")
-        self.select_site(chosen, "Build · B")
+        self.select_site(chosen, "Build")
         before = self.inventory(self.observe())
         self.click("Build this cottage")
         built = self.until(lambda obs: self.plot(chosen["id"], obs).get("cottage_built") is True, budget=2400)
@@ -800,7 +983,7 @@ class PlayerFlow(Rehearsal):
         self.gather_to(crop["water_kind"], crop["water_count"] + 2)
         self.gather_to("village_berries", 2)
         self.care()
-        self.select_site(chosen, "Garden · G")
+        self.select_site(chosen, "Garden")
         bed = next(bed for bed in self.plot(chosen["id"])["beds"] if bed["stage"] == "empty")
         index = bed["index"]
         self.click(crop["label"])
@@ -821,7 +1004,7 @@ class PlayerFlow(Rehearsal):
             self.care()
             self.call("npc/step", {"ticks": min(120, max(1, deadline - self.tick + 1))})
             time.sleep(0.18)
-        self.select_site(chosen, "Garden · G")
+        self.select_site(chosen, "Garden")
         self.click(f"Bed {index + 1} · Ready to harvest")
         before = self.inventory(self.observe()).get(crop["yield_kind"], 0)
         self.click("Harvest this bed")
@@ -859,7 +1042,7 @@ class PlayerFlow(Rehearsal):
     def approach_merchant(self, person):
         self.select_person(person)
         before = self.observe()
-        self.click("Say hello")
+        self.click("Talk")
         end = time.monotonic() + 35
         while True:
             observed = self.observe()
@@ -875,14 +1058,14 @@ class PlayerFlow(Rehearsal):
                 return False
             if observed["tick"] - before["tick"] >= 700 or time.monotonic() >= end:
                 self.record("merchant_approach_bounded", merchant=person["name"], visible_feedback=feedback)
-                self.click("Stop · X")
+                self.click("Stop")
                 self.until(lambda obs: obs["sections"]["village"]["activity"]["busy"] is False, budget=200, chunk=1)
                 return False
             self.call("npc/step", {"ticks": 1})
             time.sleep(0.18)
 
     def sale(self, merchant_id, kind):
-        self.open_tab("Trade · T")
+        self.open_tab("Trade")
         label = "Sell " + friendly(kind)
         if not self.has_widget(label, enabled=True):
             self.record("trade_widget_unavailable", merchant=merchant_id, kind=kind,
@@ -950,7 +1133,7 @@ class PlayerFlow(Rehearsal):
         # A self-sustaining village need not buy surplus immediately. Observe a
         # bounded consumption/resupply window; the overall tick/wall budgets and
         # exact inventory, payment and receipt assertions still apply.
-        self.open_tab("Trade · T")
+        self.open_tab("Trade")
         label = "Offer " + friendly(kind) + " for sale"
         if not self.has_widget(label, enabled=True):
             self.record("posted_offer_widget_unavailable", kind=kind)
@@ -1071,7 +1254,7 @@ class PlayerFlow(Rehearsal):
         stock = self.inventory(self.observe())
         surplus = [kind for kind, count in stock.items() if count > reserve.get(kind, 0)]
         for kind in surplus:
-            self.open_tab("Trade · T")
+            self.open_tab("Trade")
             if self.has_widget("Offer " + friendly(kind) + " for sale", enabled=True):
                 if self.offered_sale(kind):
                     return
@@ -1176,7 +1359,7 @@ def main():
                     reserved_visitor = flow.spectator_entry()
                 else:
                     flow.click("Start on the island")
-            wait_for(lambda: flow.widget("Menu · Esc"))
+            wait_for(lambda: flow.widget("Menu"))
             def arrived_visitors():
                 visitors = [row for row in flow.state()["entities"]
                             if row.get("components", {}).get("island_villager", {}).get("role") in ("visitor", "Visitor")
@@ -1201,9 +1384,9 @@ def main():
             flow.arrival_anchor = list(report["arrival"]["position"])
             report["known_arrival_anchor"] = {"position": flow.arrival_anchor, "source": "actor-owned arrival observation"}
             flow.capture("arrival")
-            for label, shot in ([] if args.modes or args.trade_only else [("Pouch · I", "pouch"), ("Craft · C", "craft"),
-                                ("Build · B", "build"), ("Garden · G", "garden"),
-                                ("Trade · T", "trade"), ("People · N", "people"), ("Explore · M", "explore")]):
+            for label, shot in ([] if args.modes or args.trade_only else [("Pouch", "pouch"), ("Craft", "craft"),
+                                ("Build", "build"), ("Garden", "garden"),
+                                ("Trade", "trade"), ("People", "people"), ("Explore", "explore")]):
                 flow.open_tab(label)
                 flow.capture(shot)
             if args.build_cottage or args.life_loop:
@@ -1221,7 +1404,7 @@ def main():
                 if report.get("quoted_trade", {}).get("completed") is not True:
                     raise RuntimeError("Trade-only verification failed: no actual validated stock debit and coin credit were completed")
                 report["checks"].append("Fresh empty-handed actor gathered real goods for an observed bid and completed a sale with verified stock and coin settlement")
-            flow.click("Menu · Esc")
+            flow.click("Menu")
             wait_for(lambda: flow.widget("Resume"))
             paused_tick = flow.observe()["tick"]
             flow.capture("pause")
@@ -1237,7 +1420,7 @@ def main():
             if flow.state()["tick"] != saved_tick:
                 raise RuntimeError("Saved title advanced its world")
             flow.click("Continue")
-            wait_for(lambda: flow.widget("Menu · Esc"))
+            wait_for(lambda: flow.widget("Menu"))
             resumed = flow.observe()
             if resumed["unit"] != flow.actor or resumed["tick"] < saved_tick:
                 raise RuntimeError("Continue replaced or rewound the saved character")
@@ -1247,16 +1430,16 @@ def main():
             if not args.modes and not args.trade_only:
                 report["checks"].append("All seven player workspaces opened and captured at both sizes")
             if args.modes:
-                flow.click("Menu · Esc")
-                flow.click("Inspect village")
+                flow.click("Menu")
+                flow.click("Oversee the village")
                 flow.capture("inspector")
                 flow.click("3x")
                 flow.capture("inspector-3x")
-                flow.click("Play character")
-                wait_for(lambda: flow.widget("Menu · Esc"))
+                flow.click("Live")
+                wait_for(lambda: flow.widget("Menu"))
                 flow.capture("character-after-fast-inspection")
-                flow.click("Menu · Esc")
-                flow.click("Landscape tools")
+                flow.click("Menu")
+                flow.click("Shape the landscape")
                 flow.capture("landscape-tools")
                 flow.click("1x")
                 # Explicit inspector/editor input: this is a recorded brush,
@@ -1273,11 +1456,11 @@ def main():
                 report["mode_roundtrip"] = {"same_window": True, "terrain_revision": terrain["revision"],
                     "terrain_input": "recorded Terraform command; physical brush input not tested"}
                 flow.click("Resume")
-                flow.click("Play character")
-                wait_for(lambda: flow.widget("Menu · Esc"))
+                flow.click("Live")
+                wait_for(lambda: flow.widget("Menu"))
             if args.death_check:
                 flow.death_check()
-            flow.click("Menu · Esc")
+            flow.click("Menu")
             flow.click("Quit game")
             child.wait(timeout=30)
             if child.returncode != 0:

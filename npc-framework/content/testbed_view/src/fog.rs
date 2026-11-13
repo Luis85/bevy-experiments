@@ -380,7 +380,7 @@ pub(crate) struct FogDim(pub bool);
 
 /// On a mesh swapped to its dimmed material: the original.
 #[derive(Component, Clone, Debug)]
-struct FogTinted(Handle<StandardMaterial>);
+pub(crate) struct FogTinted(pub(crate) Handle<StandardMaterial>);
 
 /// Dimmed copies of materials, by original.
 #[derive(Resource, Default)]
@@ -415,7 +415,12 @@ pub(crate) fn plugin(app: &mut App) {
         .init_resource::<DimMaterials>()
         .init_resource::<DimPending>()
         .add_systems(Startup, spawn_mask)
-        .add_systems(Update, toggle_fog.in_set(ViewSystems::Input))
+        .add_systems(
+            Update,
+            toggle_fog
+                .run_if(crate::player_hud::developer_keys)
+                .in_set(ViewSystems::Input),
+        )
         .add_systems(
             Update,
             decide_looks.in_set(FogSet).in_set(ViewSystems::Animate),
@@ -427,7 +432,7 @@ pub(crate) fn plugin(app: &mut App) {
 }
 
 /// F8 toggles fog.
-fn toggle_fog(keys: Option<Res<ButtonInput<KeyCode>>>, mut fog: ResMut<FogOfWar>) {
+pub(crate) fn toggle_fog(keys: Option<Res<ButtonInput<KeyCode>>>, mut fog: ResMut<FogOfWar>) {
     if keys.is_some_and(|k| k.just_pressed(KeyCode::F8)) {
         fog.enabled = !fog.enabled;
     }

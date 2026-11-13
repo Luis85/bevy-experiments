@@ -39,10 +39,10 @@ pub fn summary(world: &World) -> ColonySummary {
         if world.get::<Villager>(*entity).is_some() && living(world, *entity) {
             result.residents += 1;
             for (_, item) in economy::free_items(world, *entity) {
-                if catalog::food_restore(&item.kind).is_some() {
+                if catalog::food_restore_in(world, &item.kind).is_some() {
                     result.food_units = result.food_units.saturating_add(item.stack);
                 }
-                if item.kind == catalog::WATER {
+                if item.kind == super::super::roles::roles(world).drink {
                     result.water_units = result.water_units.saturating_add(item.stack);
                 }
             }

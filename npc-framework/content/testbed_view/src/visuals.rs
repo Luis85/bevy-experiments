@@ -38,6 +38,7 @@ use testbed_content::{Prop, PropKind, TestbedUnit};
 
 use crate::assets::{ModelKind, Models, ViewAssets};
 use crate::fog::{FogArea, FogDim, FogSet, Fogged, Look};
+use crate::island_world::cast::{self, Cast};
 
 /// The view factor: KayKit 1:1 model units → metres.
 pub const V: f32 = 0.75;
@@ -45,7 +46,7 @@ pub const V: f32 = 0.75;
 const HEX: f32 = 4.0 * V;
 /// Kenney Survival models (workbench, anvil, campfire, tools).
 const SURVIVAL: f32 = 4.5 * V;
-const KENNEY_TOOL: f32 = 4.7;
+pub(crate) const KENNEY_TOOL: f32 = 4.7;
 const CART_SCALE: f32 = 3.0 * V;
 const RAM_SCALE: f32 = 2.5 * V;
 /// Length of a Dungeon wall piece in model units.
@@ -208,6 +209,10 @@ struct VehicleModel {
 pub(crate) struct Rings {
     mesh: Handle<Mesh>,
     owner: [Handle<StandardMaterial>; 3],
+    /// The played character's ring: wider and warm, the only thing that
+    /// marks their body apart from a resident's.
+    player_mesh: Handle<Mesh>,
+    player: Handle<StandardMaterial>,
 }
 
 pub(crate) fn plugin(app: &mut App) {
@@ -252,7 +257,19 @@ fn make_rings(
             mat(Color::srgb(0.2, 0.5, 1.0)),
             mat(Color::srgb(0.95, 0.18, 0.15)),
         ],
+        player_mesh: meshes.add(Annulus::new(0.5, 0.68)),
+        player: mat(Color::srgb(1.0, 0.78, 0.22)),
     });
+}
+
+/// The body the played character wears: the adventurer Knight, which no
+/// resident wears, unless its preset names a body that is not a robot.
+pub(crate) fn player_kind(kind: ModelKind, played: bool, named: bool) -> ModelKind {
+    if played && (!named || kind.is_robot()) {
+        ModelKind::Knight
+    } else {
+        kind
+    }
 }
 
 /// Ring colour index of an owner (0 = none/other, 1, 2).
@@ -283,6 +300,10 @@ fn spawn_visuals(
     assets: Option<Res<ViewAssets>>,
     rings: Option<Res<Rings>>,
     robots: Option<Res<crate::robots::RobotAssets>>,
+    (village, regional): (
+        Option<Res<testbed_content::village::VillageState>>,
+        Option<Res<testbed_content::village::frontier::terrain::TerrainState>>,
+    ),
     mut index: ResMut<VisualIndex>,
     alive: Query<(), With<VisualOf>>,
     props: Query<(Entity, Option<&SimId>, &Prop, &SimPos, Option<&GridBlocker>)>,
@@ -296,6 +317,7 @@ fn spawn_visuals(
             Option<&testbed_content::actors::ActorModel>,
             Option<&Sensors>,
             Option<&testbed_content::village::frontier::labor::ResidentProfile>,
+            Option<&SimId>,
         ),
         Without<Prop>,
     >,
@@ -496,14 +518,44 @@ fn spawn_visuals(
         index.map.insert(sim, root);
     }
 
-    for (sim, unit, pos, owner, preset_model, sensors, profile) in &actors {
+    // Only on the regional island: elsewhere a played robot stays a robot.
+    let played = village
+        .as_deref()
+        .filter(|_| regional.is_some())
+        .map(|state| state.played);
+    for (sim, unit, pos, owner, preset_model, sensors, profile, id) in &actors {
         if !fresh(&mut index, sim) {
             continue;
         }
-        let kind = profile
-            .map(|profile| ModelKind::for_resident(profile.appearance))
+        let is_played = id.is_some() && id.copied() == played;
+        // On the regional island one family of bodies (`island_world::cast`)
+        // dresses residents, children and the played character.
+        let cast = regional.is_some().then(Cast::current);
+        let (resident_kind, outfit) = match (profile, cast) {
+            (Some(profile), Some(cast)) => {
+                let (kind, outfit) =
+                    cast::resident(cast, id.map_or(0, |id| id.0), profile.appearance);
+                (Some(kind), outfit)
+            }
+            (Some(profile), None) => (Some(ModelKind::for_resident(profile.appearance)), None),
+            (None, _) => (None, None),
+        };
+        let kind = resident_kind
             .or_else(|| preset_model.and_then(|m| ModelKind::from_name(&m.0)))
             .unwrap_or_else(|| ModelKind::for_actor(&unit.template, owner.map(|o| o.0.0)));
+        // The island's played character has no resident profile: unless its
+        // preset names a body, it wears the Knight, which no resident wears,
+        // so it reads apart from the hooded rogues from above; poses, the
+        // door step, the cutaway and unblocking treat it as a resident.
+        let kind = player_kind(
+            kind,
+            is_played && profile.is_none(),
+            preset_model.is_some_and(|m| ModelKind::from_name(&m.0).is_some()),
+        );
+        let kind = match cast {
+            Some(cast) if is_played && profile.is_none() => cast::player(cast, kind),
+            _ => kind,
+        };
         if kind.is_robot() && robots.is_none() {
             continue;
         }
@@ -540,22 +592,33 @@ fn spawn_visuals(
                 hand_l: Some(left),
             });
         } else {
-            commands
-                .spawn((
-                    ChildOf(root),
-                    ActorModel { root },
-                    model(
-                        &assets.actor[kind.index()],
-                        Transform::from_scale(Vec3::splat(kind.scale())),
-                    ),
-                ))
-                .observe(crate::anim::on_actor_ready);
+            let scale = cast.map_or(kind.scale(), |cast| cast::adult_scale(cast, kind));
+            let mut body = commands.spawn((
+                ChildOf(root),
+                ActorModel { root },
+                model(
+                    &assets.actor[kind.index()],
+                    Transform::from_scale(Vec3::splat(scale)),
+                ),
+            ));
+            body.observe(crate::anim::on_actor_ready);
+            if cast.is_some() {
+                body.insert(cast::IslandBody { adult: scale });
+            }
+            if let Some(outfit) = outfit {
+                body.insert(outfit).observe(cast::on_outfit_ready);
+            }
         }
+        let (ring_name, ring_mesh, ring_material) = if is_played {
+            ("player ring", &rings.player_mesh, &rings.player)
+        } else {
+            ("faction ring", &rings.mesh, &rings.owner[owner_slot(owner)])
+        };
         commands.spawn((
             ChildOf(root),
-            Name::new("faction ring"),
-            Mesh3d(rings.mesh.clone()),
-            MeshMaterial3d(rings.owner[owner_slot(owner)].clone()),
+            Name::new(ring_name),
+            Mesh3d(ring_mesh.clone()),
+            MeshMaterial3d(ring_material.clone()),
             Transform::from_xyz(0.0, 0.03, 0.0).with_rotation(Quat::from_rotation_x(-PI / 2.0)),
         ));
         index.map.insert(sim, root);
@@ -705,6 +768,8 @@ type VisualSimKinds = Or<(
     With<testbed_content::village::hunting::Wildlife>,
     With<testbed_content::village::homestead::HomesteadPlot>,
     With<testbed_content::village::homestead::Cottage>,
+    With<testbed_content::village::civic::ConstructionSite>,
+    With<testbed_content::village::civic::Building>,
 )>;
 pub(crate) fn despawn_visuals(
     mut commands: Commands,
@@ -1153,6 +1218,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_played_character_wears_the_knight_unless_its_preset_names_a_body() {
+        use ModelKind::{Knight, Rogue, Rover, TravellerMan};
+        // Played, no named body: the Knight, whatever the faction default.
+        assert_eq!(player_kind(Rogue, true, false), Knight);
+        // A robot preset is never kept for the played character.
+        assert_eq!(player_kind(Rover, true, true), Knight);
+        // A preset that names a body keeps it.
+        assert_eq!(player_kind(TravellerMan, true, true), TravellerMan);
+        // Nobody else changes, robots included.
+        assert_eq!(player_kind(Rogue, false, false), Rogue);
+        assert_eq!(player_kind(Rover, false, true), Rover);
+        assert!(
+            (0..8)
+                .map(ModelKind::for_resident)
+                .all(|kind| kind != Knight)
+        );
+    }
+
+    #[test]
     fn living_wildlife_visuals_survive_cleanup_until_the_animal_is_gone() {
         let mut app = testbed_content::new_sim_app(7, "living_village");
         app.init_resource::<VisualIndex>()
@@ -1326,6 +1410,8 @@ mod tests {
         app.insert_resource(Rings {
             mesh: default(),
             owner: default(),
+            player_mesh: default(),
+            player: default(),
         });
         app.add_systems(
             Update,

@@ -18,6 +18,8 @@ use testbed_content::village::{
 };
 
 const SEED: u64 = 7;
+/// Seeds of the acceptance table: every bar holds on each.
+const SEEDS: [u64; 3] = [7, 11, 23];
 const SAMPLE: u64 = 300;
 const CHECKPOINT: u64 = 12_000;
 const END: u64 = 336_000;
@@ -54,6 +56,51 @@ fn money(world: &World) -> u64 {
         })
         .sum::<u64>()
         + u64::from(world.resource::<VillageState>().fund)
+        // The merchant boat's purse is the other half of the closed system.
+        + u64::from(village::merchant::purse(world))
+        + village::live::escrow(world)
+}
+
+/// What the civic planner and the overseer have built, and what the stores hold.
+fn civic_report(world: &World) -> Value {
+    let civic = world.resource::<village::civic::CivicState>();
+    let label = |id: SimId| settlements::definition(world, id).map(|region| region.key.clone());
+    let built: Vec<_> = village::civic::buildings(world)
+        .into_iter()
+        .map(|building| {
+            json!({"building":building.building,"settlement":label(building.settlement),
+            "completed_at":building.completed_at})
+        })
+        .collect();
+    let open: Vec<_> = village::civic::sites(world)
+        .into_iter()
+        .map(|site| {
+            json!({"building":site.building,"settlement":label(site.settlement),
+            "delivered":site.delivered,"cost":site.cost,"work_done":site.work_done,
+            "civic":site.civic,"reason":site.reason})
+        })
+        .collect();
+    let stores: Vec<_> = village::civic::depot_views(world)
+        .into_iter()
+        .map(|store| {
+            json!({"label":store.label,"used":store.used,"capacity":store.capacity,
+            "sold_units":store.sold_units,"turnover":store.turnover})
+        })
+        .collect();
+    let planners: BTreeMap<_, _> = civic
+        .planners
+        .iter()
+        .map(|(id, planner)| {
+            (
+                label(*id).unwrap_or_default(),
+                json!({"homeless":planner.homeless,"free_beds":planner.free_beds,
+                    "surplus_units":planner.surplus_units,"last_decision":planner.last_decision}),
+            )
+        })
+        .collect();
+    json!({"completed":civic.completed,"cancelled":civic.cancelled,"spent":civic.spent,
+        "held_for_building":village::civic::fund_hold(world),"built":built,"open_sites":open,
+        "stores":stores,"planners":planners})
 }
 
 fn finished_food(produced: &BTreeMap<String, u64>) -> u64 {
@@ -76,6 +123,15 @@ fn delta(before: &BTreeMap<String, u64>, after: &BTreeMap<String, u64>) -> BTree
 }
 
 struct Audit {
+    seed: u64,
+    /// Residents already reported for a need below 15000.
+    traced: BTreeSet<(SimId, &'static str)>,
+    /// Per trade: samples of a resident of it, and samples of physical work
+    /// (gathering, crafting, hunting, farming, building, restoring).
+    work: BTreeMap<String, (u64, u64)>,
+    /// Per need, the lowest value among living residents at each sample: the
+    /// series behind the 5th percentile of the acceptance table.
+    lowest_series: BTreeMap<&'static str, Vec<i32>>,
     identities: BTreeSet<SimId>,
     currency: u64,
     initial_patches: BTreeMap<SimId, u32>,
@@ -90,10 +146,73 @@ struct Audit {
     winter_after: BTreeMap<String, u64>,
     final_before: BTreeMap<String, u64>,
     final_transactions: u64,
+    /// Per good: (samples, at the lowest quote the market allows, at or below
+    /// half the base price).
+    prices: BTreeMap<&'static str, (u64, u64, u64)>,
+    /// Per good: samples above the base price, and the summed quote.
+    dear: BTreeMap<&'static str, (u64, u64)>,
+    /// Per good: summed supply and funded demand of the last market round.
+    flows: BTreeMap<&'static str, (u64, u64)>,
+}
+
+/// Goods whose quotes the audit watches for oversupply.
+const WATCHED: [&str; 7] = [
+    "bread",
+    "plank",
+    catalog::GRAIN,
+    catalog::WATER,
+    catalog::COOKED_MEAL,
+    "log",
+    catalog::FLOUR,
+];
+
+/// Merges `patch` into `target` (JSON merge patch: objects merge, the rest replaces).
+fn merge(target: &mut Value, patch: &Value) {
+    match (target, patch) {
+        (Value::Object(target), Value::Object(patch)) => {
+            for (key, value) in patch {
+                merge(target.entry(key.clone()).or_insert(Value::Null), value);
+            }
+        }
+        (target, patch) => *target = patch.clone(),
+    }
+}
+
+/// The shipped world, or (`REGIONAL_ECONOMY_PATCH`, a JSON merge patch of the
+/// world's economy block) a variant of it for an explicit A/B audit.
+fn audit_app(seed: u64) -> App {
+    let economy = std::env::var("REGIONAL_ECONOMY_PATCH").ok();
+    // `REGIONAL_AI_PATCH`: a merge patch of the world's `island_ai` policy.
+    let ai = std::env::var("REGIONAL_AI_PATCH").ok();
+    // `REGIONAL_WORLD_PATCH_FILE`: a merge patch of the whole world document.
+    let whole = std::env::var("REGIONAL_WORLD_PATCH_FILE").ok();
+    if economy.is_none() && ai.is_none() && whole.is_none() {
+        return testbed_content::new_sim_app(seed, "living_world");
+    }
+    let mut doc = testbed_content::scenario::scenario_doc("living_world").expect("scenario");
+    if let Some(text) = economy {
+        let patch: Value = serde_json::from_str(&text).expect("REGIONAL_ECONOMY_PATCH is JSON");
+        println!("REGIONAL_AUDIT_PATCH {patch}");
+        merge(&mut doc.world["living_world"]["economy"], &patch);
+    }
+    if let Some(text) = ai {
+        let patch: Value = serde_json::from_str(&text).expect("REGIONAL_AI_PATCH is JSON");
+        println!("REGIONAL_AUDIT_AI_PATCH {patch}");
+        merge(&mut doc.world["island_ai"], &patch);
+    }
+    if let Some(path) = whole {
+        let text = std::fs::read_to_string(&path).expect("world patch file");
+        let patch: Value = serde_json::from_str(&text).expect("world patch is JSON");
+        println!("REGIONAL_AUDIT_WORLD_PATCH {path}");
+        merge(&mut doc.world, &patch);
+    }
+    testbed_content::scenario::load_scenario(&doc, seed)
+        .unwrap_or_else(|error| panic!("{error}"))
+        .app
 }
 
 impl Audit {
-    fn new(world: &World) -> Self {
+    fn new(world: &World, seed: u64) -> Self {
         let identities = residents(world).into_iter().map(|(id, _)| id).collect();
         let patches: BTreeMap<_, _> = world
             .resource::<SimIndex>()
@@ -111,6 +230,10 @@ impl Audit {
             })
             .collect();
         Self {
+            seed,
+            traced: BTreeSet::new(),
+            work: BTreeMap::new(),
+            lowest_series: NEEDS.into_iter().map(|need| (need, Vec::new())).collect(),
             identities,
             currency: money(world),
             initial_patches: patches,
@@ -125,6 +248,9 @@ impl Audit {
             winter_after: BTreeMap::new(),
             final_before: BTreeMap::new(),
             final_transactions: 0,
+            prices: WATCHED.into_iter().map(|kind| (kind, (0, 0, 0))).collect(),
+            flows: WATCHED.into_iter().map(|kind| (kind, (0, 0))).collect(),
+            dear: WATCHED.into_iter().map(|kind| (kind, (0, 0))).collect(),
         }
     }
 
@@ -134,9 +260,24 @@ impl Audit {
             return Err("The audit must keep the ordinary 24000-tick day".into());
         }
         let people = residents(world);
+        for need in NEEDS {
+            let lowest = people
+                .iter()
+                .map(|(_, actor)| economy::need(world, *actor, need))
+                .min()
+                .unwrap_or(100_000);
+            self.lowest_series
+                .get_mut(need)
+                .expect("declared need")
+                .push(lowest);
+        }
         let current: BTreeSet<_> = people.iter().map(|(id, _)| *id).collect();
-        if current != self.identities || current.len() != 42 {
-            return Err("Founding resident identities changed; replacement is not survival".into());
+        // Settlers may land by boat; no founder may vanish, and (below) nobody
+        // at all may die in these fourteen ordinary days.
+        if !self.identities.is_subset(&current) || self.identities.len() != 42 {
+            return Err(
+                "A founding resident identity vanished; replacement is not survival".into(),
+            );
         }
         if money(world) != self.currency {
             return Err(format!(
@@ -185,8 +326,35 @@ impl Audit {
                         .critical_actor_samples
                         .get_mut(need)
                         .expect("declared need") += 1;
+                    // Who fell this low, doing what, where: the first time.
+                    if self.traced.insert((id, need)) {
+                        println!(
+                            "REGIONAL_LOW seed={} tick={now} {} ({}) {need}={value} role={}                              coat={} home_m={} inside={:?} activity={:?} decision={:?} coins={}                              weather={:?} calendar={:?}",
+                            self.seed,
+                            person.name,
+                            id.0,
+                            person.role.name(),
+                            village::living::has_coat(world, actor),
+                            world
+                                .get::<SimPos>(actor)
+                                .map_or(-1, |here| here.dist2(person.home).isqrt() / 1000),
+                            village::view::inside(world, id),
+                            village::view::activity_label(world, actor),
+                            village::behavior::decision(world, actor),
+                            world.get::<Wallet>(actor).map_or(0, |wallet| wallet.coins),
+                            village::view::weather(world).today,
+                            village::calendar(world),
+                        );
+                    }
                 }
             }
+            let doing = village::activity(world, actor).0;
+            let tally = self.work.entry(person.role.name().to_owned()).or_default();
+            tally.0 += 1;
+            tally.1 += u64::from(matches!(
+                doing,
+                "gathering" | "crafting" | "hunting" | "farming" | "building" | "restoring"
+            ));
             let assignment = (person.role, person.workplace);
             if self
                 .assignments
@@ -270,6 +438,32 @@ impl Audit {
                 }
             }
         }
+        let floor_percent = village::frontier::economy_spec::tuning(world)
+            .map_or(0, |tuning| tuning.price_floor_percent);
+        for kind in WATCHED {
+            let (Some(base), Some(row)) = (
+                catalog::price_in(world, kind),
+                world
+                    .resource::<village::market::MarketState>()
+                    .commodities
+                    .get(kind),
+            ) else {
+                continue;
+            };
+            let lowest = (base * floor_percent * 10).max(1000);
+            let tally = self.prices.get_mut(kind).expect("watched good");
+            tally.0 += 1;
+            tally.1 += u64::from(row.reference_milli <= lowest);
+            tally.2 += u64::from(row.reference_milli * 2 <= base * 1000);
+            let dear = self.dear.get_mut(kind).expect("watched good");
+            dear.0 += u64::from(row.reference_milli > base * 1000);
+            dear.1 += u64::from(row.reference_milli);
+            if let Some(last) = row.history.last() {
+                let flow = self.flows.get_mut(kind).expect("watched good");
+                flow.0 += u64::from(last.supply);
+                flow.1 += u64::from(last.funded_demand);
+            }
+        }
         let state = world.resource::<VillageState>();
         match now {
             WINTER_LATE_START => self.winter_before = state.produced.clone(),
@@ -283,6 +477,31 @@ impl Audit {
         if now.is_multiple_of(CHECKPOINT) {
             village::integrity::validate_colony(world)?;
         }
+        // The mechanism behind a raw good's price: every 2400 ticks, the
+        // quote, the last round's supply, funded demand and trades, and the
+        // stock on offer against the island's target.
+        if now.is_multiple_of(2_400) {
+            for kind in ["log", catalog::WATER] {
+                let market = world.resource::<village::market::MarketState>();
+                let Some(row) = market.commodities.get(kind) else {
+                    continue;
+                };
+                let last = row.history.last();
+                let offer: u32 = settlements::all(world)
+                    .into_iter()
+                    .map(|(id, _)| village::stock::on_offer(world, id, kind))
+                    .sum();
+                println!(
+                    "PRICE_TRACE seed={} tick={now} kind={kind} reference_milli={} supply={}                      demand={} traded={} on_offer={offer} island_target={}",
+                    self.seed,
+                    row.reference_milli,
+                    last.map_or(0, |sample| sample.supply),
+                    last.map_or(0, |sample| sample.funded_demand),
+                    last.map_or(0, |sample| sample.traded_units),
+                    village::stock::island_target(world, kind),
+                );
+            }
+        }
         Ok(())
     }
 
@@ -294,19 +513,49 @@ impl Audit {
             for (_, actor) in &people {
                 if let Some(person) = world.get::<Villager>(*actor) { *roles.entry(person.role.name()).or_insert(0_u32) += 1; }
             }
+            // Residents may work at another settlement's site, so staffing is
+            // also reported by the settlement of the workplace.
+            let mut workplaces = BTreeMap::new();
+            for (_, actor) in residents(world) {
+                if let Some(person) = world.get::<Villager>(actor)
+                    && world.resource::<SimIndex>().get(person.workplace)
+                        .and_then(|site| settlements::member(world, site)) == Some(id)
+                {
+                    *workplaces.entry(person.role.name()).or_insert(0_u32) += 1;
+                }
+            }
             let minimum: BTreeMap<_, _> = NEEDS.into_iter().map(|need| {
                 (need, people.iter().map(|(_, actor)| economy::need(world, *actor, need)).min().unwrap_or(0))
             }).collect();
             json!({"key":settlements::definition(world,id).map(|region|&region.key),"residents":people.len(),
                 "housed":people.iter().filter(|(resident,_)|colony::home_of(world,*resident).is_some()).count(),
                 "coated":people.iter().filter(|(_,actor)|village::living::has_coat(world,*actor)).count(),
-                "minimum_needs":minimum,"roles":roles})
+                "minimum_needs":minimum,"roles":roles,"workplace_roles":workplaces})
         }).collect();
-        json!({"seed":SEED,"tick":world.resource::<SimClock>().tick,"calendar":village::calendar(world),
-            "currency":money(world),"residents":self.identities.len(),"regions":regions,
+        json!({"seed":self.seed,"tick":world.resource::<SimClock>().tick,"calendar":village::calendar(world),
+            "currency":money(world),"founders":self.identities.len(),"residents":residents(world).len(),
+            "census":village::view::census(world),"weather":village::view::weather(world).today,
+            "weather_days":world.resource::<village::weather::WeatherState>().days,
+            "boat":{"purse":village::merchant::purse(world),"visits":village::view::boat(world).visits,
+                "berth":village::view::boat(world).berth,"dock":village::view::boat(world).dock,
+                "duty_paid":world.resource::<village::merchant::Merchant>().duty_paid,
+                "coins_traded":world.resource::<village::merchant::Merchant>().coins_paid
+                    + world.resource::<village::merchant::Merchant>().coins_earned,
+                "exported":world.resource::<village::merchant::Merchant>().exported,
+                "imported":world.resource::<village::merchant::Merchant>().imported},
+            "fields":village::view::fields(world).iter().map(|field| json!({"settlement":field.settlement,
+                "harvested":field.harvested_units,"lost_plots":field.lost_plots,"seed":field.seed_stock,
+                "stages":field.plots.iter().map(|plot| plot.stage).collect::<Vec<_>>()})).collect::<Vec<_>>(),
+            "regions":regions,
+            "fund":state.fund,"civic":civic_report(world),
             "transactions":state.transactions,"produced":state.produced,"social_events":world.resource::<colony::ColonyState>().social_events,
             "minimum_needs_so_far":self.minimum_needs,"critical_actor_samples":self.critical_actor_samples,
-            "observed_job_changes":self.observed_job_changes,"maximum_observed_blocked_ticks":self.max_blocked.0,
+            "observed_job_changes":self.observed_job_changes,"price_samples":self.prices.iter().map(|(kind,(n,floor,half))|
+                (*kind,json!({"samples":n,"at_floor":floor,"at_or_below_half_base":half,
+                "mean_supply":self.flows[kind].0/(*n).max(1),"mean_demand":self.flows[kind].1/(*n).max(1),
+                "above_base":self.dear[kind].0,"mean_price_milli":self.dear[kind].1/(*n).max(1),
+                "price":village::market::unit_price(world,kind)}))).collect::<BTreeMap<_,_>>(),
+            "maximum_observed_blocked_ticks":self.max_blocked.0,
             "ore_remaining":self.previous_ore.values().map(|count|u64::from(*count)).sum::<u64>()})
     }
 }
@@ -346,7 +595,26 @@ fn diagnostics(world: &World, reason: &str, audit: &Audit) -> Value {
     json!({"reason":reason,"progress":audit.progress(world),"people":people,"patches":patches,"habitats":habitats})
 }
 
+/// Units of every good held in the packs of residents who have no use for
+/// it (`market::no_use`): stock that never reaches the trade using it.
+fn stuck_goods(world: &World, seed: u64) {
+    let mut stuck: BTreeMap<&str, u32> = BTreeMap::new();
+    for (_, actor) in residents(world) {
+        for kind in catalog::trade_kinds(world) {
+            let count = village::economy::count(world, actor, kind);
+            if count > 0 && village::market::no_use(world, actor, kind) {
+                *stuck.entry(kind).or_default() += count;
+            }
+        }
+    }
+    println!(
+        "STUCK_GOODS seed={seed} total={} {stuck:?}",
+        stuck.values().sum::<u32>()
+    );
+}
+
 fn fail(app: &mut App, audit: &Audit, reason: &str) -> ! {
+    stuck_goods(app.world(), audit.seed);
     let tick = app.world().resource::<SimClock>().tick;
     let detail = diagnostics(app.world(), reason, audit);
     let directory = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -355,7 +623,11 @@ fn fail(app: &mut App, audit: &Audit, reason: &str) -> ! {
         .expect("content crate belongs to the workspace")
         .join("target")
         .join("regional-audit")
-        .join(format!("seed{SEED}-pid{}-tick{tick}", std::process::id()));
+        .join(format!(
+            "seed{}-pid{}-tick{tick}",
+            audit.seed,
+            std::process::id()
+        ));
     let artifacts = (|| -> Result<(), String> {
         std::fs::create_dir_all(&directory).map_err(|error| error.to_string())?;
         let snapshot = npc_framework::snapshot::save(app.world_mut())?;
@@ -375,10 +647,13 @@ fn fail(app: &mut App, audit: &Audit, reason: &str) -> ! {
     );
 }
 
-fn run_audit(end: u64) -> (App, Audit) {
-    let mut app = testbed_content::new_sim_app(SEED, "living_world");
-    let mut audit = Audit::new(app.world());
-    assert_eq!(audit.currency, 42 * u64::from(village::NPC_SEED_COINS));
+fn run_audit(seed: u64, end: u64) -> (App, Audit) {
+    let mut app = audit_app(seed);
+    let mut audit = Audit::new(app.world(), seed);
+    assert_eq!(
+        audit.currency,
+        42 * u64::from(village::NPC_SEED_COINS) + u64::from(village::merchant::purse(app.world()))
+    );
     if let Err(reason) = audit.sample(app.world()) {
         fail(&mut app, &audit, &reason);
     }
@@ -407,7 +682,7 @@ fn run_audit(end: u64) -> (App, Audit) {
 
 #[test]
 fn regional_first_shift_preserves_people_homes_currency_and_starts_physical_work() {
-    let (mut app, audit) = run_audit(7_200);
+    let (mut app, audit) = run_audit(SEED, 7_200);
     let state = app.world().resource::<VillageState>();
     // The finite initial bread covers this early shift. Requiring new bread
     // here would reward gratuitous overproduction rather than needs-driven work.
@@ -426,7 +701,114 @@ fn regional_first_shift_preserves_people_homes_currency_and_starts_physical_work
 #[test]
 #[ignore = "explicit 336000-tick regional survival, production and ecology release audit"]
 fn extended_regional_economy_survives_fourteen_normal_days() {
-    let (mut app, audit) = run_audit(END);
+    println!("REGIONAL_AUDIT_ROW {}", fourteen_days(SEED));
+}
+
+/// The acceptance table over seeds 7, 11 and 23 (fourteen days each, in
+/// parallel threads): for Hunger, Thirst and Warmth the absolute low and the
+/// 5th percentile of the per-sample lowest resident need, job changes and the
+/// share of samples at the price floor. Bars: p5 at least 30000 (Hunger,
+/// Thirst) and 20000 (Warmth), absolute low at least 15000, at most 150 job
+/// changes, bread, grain, plank and log at their floor in under 25% of samples.
+#[test]
+#[ignore = "explicit 336000-tick audit on seeds 7, 11 and 23; run in release"]
+fn fourteen_days_on_three_seeds_meet_the_acceptance_bars() {
+    let runs: Vec<(u64, Result<Value, String>)> = SEEDS
+        .into_iter()
+        .map(|seed| (seed, std::thread::spawn(move || fourteen_days(seed))))
+        .collect::<Vec<_>>()
+        .into_iter()
+        .map(|(seed, run)| {
+            (
+                seed,
+                run.join().map_err(|error| {
+                    error
+                        .downcast_ref::<String>()
+                        .cloned()
+                        .or_else(|| error.downcast_ref::<&str>().map(|text| (*text).to_owned()))
+                        .unwrap_or_default()
+                }),
+            )
+        })
+        .collect();
+    println!(
+        "\nACCEPTANCE_TABLE\n| seed | Hunger low / p5 | Thirst low / p5 | Warmth low / p5 | Energy low / p5 | job changes | bread / grain / plank / log at floor | verdict |\n|---|---|---|---|---|---|---|---|"
+    );
+    let mut failures = Vec::new();
+    for (seed, run) in &runs {
+        let row = match run {
+            Ok(row) => row,
+            Err(reason) => {
+                println!("| {seed} | failed: {reason} | | | | | | no |");
+                failures.push(format!("seed {seed} failed its audit"));
+                continue;
+            }
+        };
+        let need = |name: &str| {
+            (
+                row["low"][name].as_i64().unwrap_or(0),
+                row["p5"][name].as_i64().unwrap_or(0),
+            )
+        };
+        let floor = |kind: &str| row["at_floor_percent"][kind].as_u64().unwrap_or(100);
+        let jobs = row["job_changes"].as_u64().unwrap_or(u64::MAX);
+        let mut why = Vec::new();
+        for (name, bar) in [("Hunger", 30_000), ("Thirst", 30_000), ("Warmth", 20_000)] {
+            let (low, p5) = need(name);
+            if p5 < bar {
+                why.push(format!("{name} p5 {p5} < {bar}"));
+            }
+            if low < 15_000 {
+                why.push(format!("{name} low {low} < 15000"));
+            }
+        }
+        if jobs > 150 {
+            why.push(format!("{jobs} job changes"));
+        }
+        for kind in ["bread", catalog::GRAIN, "plank", "log"] {
+            if floor(kind) >= 25 {
+                why.push(format!("{kind} at floor {}%", floor(kind)));
+            }
+        }
+        let cell = |name: &str| {
+            let (low, p5) = need(name);
+            format!("{low} / {p5}")
+        };
+        println!(
+            "| {seed} | {} | {} | {} | {} | {jobs} | {}% / {}% / {}% / {}% | {} |",
+            cell("Hunger"),
+            cell("Thirst"),
+            cell("Warmth"),
+            cell("Energy"),
+            floor("bread"),
+            floor(catalog::GRAIN),
+            floor("plank"),
+            floor("log"),
+            if why.is_empty() {
+                "ok".to_owned()
+            } else {
+                why.join("; ")
+            }
+        );
+        failures.extend(
+            why.into_iter()
+                .map(|reason| format!("seed {seed}: {reason}")),
+        );
+    }
+    assert!(failures.is_empty(), "acceptance bars: {failures:?}");
+}
+
+/// The fifth percentile of a series (the value below which 5% of it lies).
+fn percentile_5(series: &[i32]) -> i32 {
+    let mut sorted = series.to_vec();
+    sorted.sort_unstable();
+    sorted.get(sorted.len() * 5 / 100).copied().unwrap_or(0)
+}
+
+/// Fourteen ordinary days on `seed`; panics on a failed invariant and returns
+/// the acceptance row.
+fn fourteen_days(seed: u64) -> Value {
+    let (mut app, audit) = run_audit(seed, END);
     let state = app.world().resource::<VillageState>();
     let winter = delta(&audit.winter_before, &audit.winter_after);
     let final_flow = delta(&audit.final_before, &state.produced);
@@ -446,11 +828,30 @@ fn extended_regional_economy_survives_fourteen_normal_days() {
                 &format!("Finished food production stopped during {label}"),
             );
         }
-        if flow.get(catalog::WARM_CLOTHES).copied().unwrap_or(0) == 0 {
+        // Garments are made to order. In late winter somebody always needs
+        // one; in the last, spring days a coat hardly wears (not at all
+        // indoors), so no garment made is a failure only while somebody goes
+        // without a coat or has an order for one that nobody has filled.
+        let wanted = residents(app.world())
+            .into_iter()
+            .filter(|(_, actor)| {
+                !village::living::has_coat(app.world(), *actor)
+                    || village::production::purchase_target(
+                        app.world(),
+                        *actor,
+                        catalog::WARM_CLOTHES,
+                    ) > village::economy::count(app.world(), *actor, catalog::WARM_CLOTHES)
+            })
+            .count();
+        if flow.get(catalog::WARM_CLOTHES).copied().unwrap_or(0) == 0
+            && (label == "late winter" || wanted > 0)
+        {
             fail(
                 &mut app,
                 &audit,
-                &format!("Warm garment production stopped during {label}"),
+                &format!(
+                    "Warm garment production stopped during {label} ({wanted} residents want one)"
+                ),
             );
         }
     }
@@ -478,6 +879,62 @@ fn extended_regional_economy_survives_fourteen_normal_days() {
     }
     println!(
         "REGIONAL_AUDIT_COMPLETE {}",
-        json!({"ok":true,"seed":SEED,"ticks":END})
+        json!({"ok":true,"seed":seed,"ticks":END})
     );
+    trade_audit(app.world(), seed, &audit);
+    acceptance_row(&audit)
+}
+
+/// For every trade: residents holding it at the end and the units of its
+/// outputs made in the run (an output two trades share counts for both).
+fn trade_audit(world: &World, seed: u64, audit: &Audit) {
+    let Some(registry) = village::frontier::economy_spec::registry(world) else {
+        return;
+    };
+    let produced = &world.resource::<VillageState>().produced;
+    stuck_goods(world, seed);
+    let people = residents(world);
+    let mut rows = Vec::new();
+    for profession in &registry.spec.professions {
+        let workers = people
+            .iter()
+            .filter(|(_, actor)| {
+                world
+                    .get::<Villager>(*actor)
+                    .is_some_and(|person| person.role == profession.role)
+            })
+            .count();
+        let output: u64 = profession
+            .outputs
+            .iter()
+            .map(|good| produced.get(good).copied().unwrap_or(0))
+            .sum();
+        // Hours of physical work per worker and day: the share of samples
+        // spent working, of a 24-hour day.
+        let (samples, working) = audit
+            .work
+            .get(profession.role.name())
+            .copied()
+            .unwrap_or_default();
+        rows.push(json!({"trade":profession.role.name(),"workers":workers,
+            "outputs":profession.outputs,"produced":output,
+            "work_tenths_of_hours_per_worker_day":working * 240 / samples.max(1)}));
+    }
+    println!("TRADE_AUDIT seed={seed} {}", Value::Array(rows));
+}
+
+fn acceptance_row(audit: &Audit) -> Value {
+    let p5: BTreeMap<_, _> = audit
+        .lowest_series
+        .iter()
+        .map(|(need, series)| (*need, percentile_5(series)))
+        .collect();
+    let at_floor: BTreeMap<_, _> = audit
+        .prices
+        .iter()
+        .map(|(kind, (samples, floor, _))| (*kind, floor * 100 / (*samples).max(1)))
+        .collect();
+    json!({"seed":audit.seed,"low":audit.minimum_needs,"p5":p5,
+        "job_changes":audit.observed_job_changes,"at_floor_percent":at_floor,
+        "samples":audit.lowest_series["Hunger"].len()})
 }

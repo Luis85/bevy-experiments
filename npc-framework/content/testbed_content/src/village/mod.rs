@@ -3,11 +3,14 @@ mod agent;
 mod ai;
 pub mod behavior;
 pub mod catalog;
+pub mod civic;
 pub mod colony;
 mod commands;
+pub mod demography;
 mod discovery;
 pub mod economy;
 pub mod environment;
+pub mod fields;
 pub mod frontier;
 pub mod geography;
 pub mod goap;
@@ -15,18 +18,28 @@ pub use geography as geometry;
 pub mod homestead;
 pub mod host;
 pub mod hunting;
+pub mod indoors;
 pub mod integrity;
+pub mod island_save;
+pub mod live;
 pub mod living;
 pub mod market;
+pub mod merchant;
 mod model;
 pub mod player_journey;
 pub mod policy;
 pub mod production;
 pub mod public_feedback;
+pub mod resident;
+pub mod roles;
 pub mod routing;
 mod scheduler;
 pub mod speech;
+pub mod stock;
 pub mod terrain;
+pub mod view;
+pub mod weather;
+pub mod wildlife;
 pub use agent::activity;
 use bevy_app::App;
 use bevy_ecs::prelude::*;
@@ -104,6 +117,7 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
         catalog::register_living(app);
         living::register(app);
         hunting::register(app);
+        wildlife::register(app);
         production::register(app);
         market::register(app);
         for verb in ["equip", "unequip"] {
@@ -112,12 +126,20 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
                 npc_framework::glue::interaction_agent::interaction_handler,
             );
         }
-        for verb in catalog::LIVING_RECIPE_VERBS {
-            app.register_action_handler(verb, npc_framework::glue::crafting_agent::craft_handler);
+        if !frontier::enabled(app.world()) {
+            for verb in catalog::LIVING_RECIPE_VERBS {
+                app.register_action_handler(
+                    verb,
+                    npc_framework::glue::crafting_agent::craft_handler,
+                );
+            }
         }
     }
-    for verb in catalog::RECIPE_VERBS {
-        app.register_action_handler(verb, npc_framework::glue::crafting_agent::craft_handler);
+    if !frontier::enabled(app.world()) {
+        // The regional profile registers one handler per recipe of its data.
+        for verb in catalog::RECIPE_VERBS {
+            app.register_action_handler(verb, npc_framework::glue::crafting_agent::craft_handler);
+        }
     }
     behavior::register(app);
     app.register_action(
@@ -226,6 +248,13 @@ pub fn prepare(app: &mut App, p: &crate::worlds::WorldPreset) {
                     production::completed(world, completed.unit, &output.kind, output.count);
                 }
                 economy::produce(world, &output.kind, output.count);
+                live::booked(
+                    world,
+                    completed.unit,
+                    live::Book::Made,
+                    &output.kind,
+                    output.count,
+                );
             }
         }
     });

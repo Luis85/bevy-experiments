@@ -55,6 +55,21 @@ pub fn plot_json(world: &World, plot: Entity, state_known: bool) -> Option<Value
         "owner":if state_known {estate.owner}else{None},"owner_name":if state_known {owner_name}else{None},
         "cottage_built":state_known.then_some(estate.cottage_built),"cottage_center":cottage_center(center),
         "front_door":front_door(center),"beds":beds});
+    // The living world's cottage is a catalogue body behind the door (and
+    // grows with the larger-cottage tier): report the body there is, or
+    // would be, instead of the old fixed offset.
+    if super::super::frontier::enabled(world) {
+        let built = estate
+            .cottage_entity
+            .and_then(|id| entity_of(world, id))
+            .and_then(|cottage| super::built_body(world, cottage));
+        let (body_center, body) = built.unwrap_or_else(|| {
+            let (centre, body, _) = super::cottage_body(world, front_door(center), None);
+            (centre, body)
+        });
+        value["cottage_center"] = json!(body_center);
+        value["cottage_half_extents_mm"] = json!([body.half_x_mm, body.half_z_mm]);
+    }
     if super::super::colony::enabled(world) {
         value["owner_alive"] = json!(if state_known {
             estate
@@ -98,9 +113,9 @@ pub fn observe(world: &World, ctx: &AgentCtx) -> Option<Section> {
         .get::<CottageBuild>(ctx.entity)
         .map(|build| json!({"plot":build.plot,"ends":build.ends}));
     let mut value = json!({"plots":rows,"building":building,
-        "cottage":{"inputs":[{"kind":"plank","count":PLANK_COST},{"kind":"log","count":LOG_COST}],"duration_ticks":BUILD_TICKS},
-        "crop":{"seed_kind":catalog::GRAIN,"seed_count":SEED_COUNT,"water_kind":catalog::WATER,"water_count":WATER_COUNT,
-            "growth_ticks":GROW_TICKS,"yield_kind":catalog::GRAIN,"yield_count":HARVEST_GRAIN},
+        "cottage":{"inputs":[{"kind":super::super::roles::roles(world).lumber,"count":PLANK_COST},{"kind":super::super::roles::roles(world).timber,"count":LOG_COST}],"duration_ticks":BUILD_TICKS},
+        "crop":{"seed_kind":super::super::roles::roles(world).grain,"seed_count":SEED_COUNT,"water_kind":super::super::roles::roles(world).drink,"water_count":WATER_COUNT,
+            "growth_ticks":GROW_TICKS,"yield_kind":super::super::roles::roles(world).grain,"yield_count":HARVEST_GRAIN},
         "claim_limits":{"housing":MAX_HOUSING_PLOTS,"garden":MAX_GARDEN_PLOTS}});
     if super::super::colony::enabled(world) {
         value["crops"] = json!(crop_catalog(world));
@@ -187,7 +202,11 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
                         candidates.push((bed, crop.kind, command.check(world)));
                     }
                 } else {
-                    candidates.push((bed, catalog::GRAIN, command.check(world)));
+                    candidates.push((
+                        bed,
+                        super::super::roles::roles(world).grain,
+                        command.check(world),
+                    ));
                 }
             }
             let selected = candidates
@@ -196,7 +215,13 @@ pub fn affordances(world: &World, ctx: &AgentCtx) -> Vec<Affordance> {
                 .or_else(|| candidates.first());
             let (bed, kind, check) = selected
                 .map(|(bed, kind, check)| (*bed, *kind, check.clone()))
-                .unwrap_or_else(|| (0, catalog::GRAIN, Err("this plot has no crop beds".into())));
+                .unwrap_or_else(|| {
+                    (
+                        0,
+                        super::super::roles::roles(world).grain,
+                        Err("this plot has no crop beds".into()),
+                    )
+                });
             let label = if super::super::colony::enabled(world) {
                 match verb {
                     "plant" => "Plant a crop from your pack",

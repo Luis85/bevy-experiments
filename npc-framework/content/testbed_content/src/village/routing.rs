@@ -11,6 +11,87 @@ use serde_json::json;
 const BLOCKED_TICKS: u32 = 40;
 const RETRY_TICKS: u64 = 100;
 const MAX_ATTEMPTS: u8 = 3;
+/// How long an abandoned destination is avoided before it may be tried again.
+pub const BLACKLIST_TICKS: u64 = 1200;
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+pub struct BlockedRoute {
+    pub destination: SimPos,
+    pub target: Option<SimId>,
+    pub until: u64,
+}
+
+/// Destinations this resident gave up on after its bounded detours (regional
+/// profile only). Entries expire; nothing here moves or teleports anyone.
+#[derive(Component, Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, Reflect)]
+#[reflect(Component)]
+pub struct RouteBlacklist {
+    pub entries: Vec<BlockedRoute>,
+}
+impl SimHash for RouteBlacklist {
+    const NAME: &'static str = "regional_route_blacklist_v1";
+    fn sim_hash(&self, hash: &mut Fnv64) {
+        hash.u32(self.entries.len() as u32);
+        for entry in &self.entries {
+            entry.destination.sim_hash(hash);
+            hash.opt(entry.target.as_ref(), |hash, id| hash.u32(id.0));
+            hash.u64(entry.until);
+        }
+    }
+}
+
+/// True once every bounded detour toward `goal` has been spent and the resident
+/// is still blocked after the last retry window. Pure; callers decide what to do.
+pub fn exhausted(world: &World, actor: Entity, goal: SimPos) -> bool {
+    let Some(state) = world.get::<RouteRecovery>(actor) else {
+        return false;
+    };
+    state.destination == goal
+        && state.attempts >= MAX_ATTEMPTS
+        && state.waypoint.is_none()
+        && world.resource::<SimClock>().tick >= state.retry_after
+        && matches!(world.get::<MoveStatus>(actor),
+            Some(MoveStatus::Blocked { ticks }) if *ticks >= BLOCKED_TICKS)
+}
+
+/// Whether this resident is currently avoiding the destination or target.
+pub fn avoiding(world: &World, actor: Entity, goal: SimPos, target: Option<SimId>) -> bool {
+    let now = world.resource::<SimClock>().tick;
+    world.get::<RouteBlacklist>(actor).is_some_and(|list| {
+        list.entries.iter().any(|entry| {
+            entry.until > now
+                && (entry.destination == goal || (target.is_some() && entry.target == target))
+        })
+    })
+}
+
+/// Give up on a destination: stop pushing at the obstacle, journal it and avoid
+/// the target for [`BLACKLIST_TICKS`]. The caller fails its own running leaf.
+pub(super) fn abandon(world: &mut World, actor: Entity, goal: SimPos, target: Option<SimId>) {
+    let now = world.resource::<SimClock>().tick;
+    let until = now.saturating_add(BLACKLIST_TICKS);
+    let mut list = world
+        .get::<RouteBlacklist>(actor)
+        .cloned()
+        .unwrap_or_default();
+    list.entries.retain(|entry| entry.until > now);
+    list.entries.push(BlockedRoute {
+        destination: goal,
+        target,
+        until,
+    });
+    world
+        .entity_mut(actor)
+        .remove::<(RouteRecovery, MoveIntent)>()
+        .insert(list);
+    let id = world.get::<SimId>(actor).copied();
+    record_effect(
+        world,
+        id,
+        "VillageRouteAbandoned",
+        &json!({"destination":goal,"target":target,"attempts":MAX_ATTEMPTS,"avoid_until":until}),
+    );
+}
 
 #[derive(Component, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Reflect)]
 #[reflect(Component)]
@@ -192,5 +273,54 @@ mod tests {
             world.get::<MoveStatus>(actor),
             Some(&MoveStatus::Blocked { ticks: 1000 })
         );
+    }
+
+    #[test]
+    fn exhausted_detours_are_abandoned_and_the_target_avoided_until_expiry() {
+        let mut world = World::new();
+        world.insert_resource(super::super::policy::IslandAiPolicy::default());
+        world.insert_resource(SimClock { tick: 100 });
+        let mut grid = SpatialGrid::new(1000, GridBounds::centered(4, 4));
+        for z in -2..2 {
+            for x in -2..2 {
+                grid.set_static(
+                    CellCoord::new(x, z),
+                    CellInfo {
+                        flags: CellFlags {
+                            blocking: true,
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    },
+                );
+            }
+        }
+        grid.set_static(CellCoord::new(0, 0), CellInfo::default());
+        world.insert_resource(grid);
+        let here = SimPos::new(500, 500);
+        let goal = SimPos::new(1500, 500);
+        let desired = MoveIntent::to(goal, 70);
+        let actor = world
+            .spawn((SimId(1), here, desired, MoveStatus::Blocked { ticks: 1000 }))
+            .id();
+        assert!(!exhausted(&world, actor, goal));
+        for tick in [100, 200, 300] {
+            world.resource_mut::<SimClock>().tick = tick;
+            intent(&mut world, actor, desired);
+        }
+        // The last retry window has not passed yet.
+        assert!(!exhausted(&world, actor, goal));
+        world.resource_mut::<SimClock>().tick = 400;
+        assert!(exhausted(&world, actor, goal));
+        assert!(!exhausted(&world, actor, SimPos::new(9000, 9000)));
+        abandon(&mut world, actor, goal, Some(SimId(7)));
+        assert!(world.get::<RouteRecovery>(actor).is_none());
+        assert!(world.get::<MoveIntent>(actor).is_none());
+        assert_eq!(world.get::<SimPos>(actor), Some(&here));
+        assert!(avoiding(&world, actor, goal, None));
+        assert!(avoiding(&world, actor, SimPos::new(0, 0), Some(SimId(7))));
+        assert!(!avoiding(&world, actor, SimPos::new(0, 0), Some(SimId(8))));
+        world.resource_mut::<SimClock>().tick = 400 + BLACKLIST_TICKS;
+        assert!(!avoiding(&world, actor, goal, Some(SimId(7))));
     }
 }

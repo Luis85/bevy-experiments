@@ -1,4 +1,18 @@
 //! Shared native game typography and controls. This module owns no simulation state.
+//!
+//! The island interface's design system lives in the submodules: [`tokens`]
+//! (colour, type, space, layers, motion), [`widgets`] (the kit), [`icon`]
+//! (pictures by concept), [`tooltip`] and [`scale`]. The constants and the
+//! `button` below are the older style, kept until each screen adopts the kit.
+pub mod gallery;
+pub mod icon;
+pub mod scale;
+pub mod sound;
+pub mod tokens;
+pub mod tooltip;
+pub mod widgets;
+pub mod words;
+
 use bevy::input_focus::{InputFocus, tab_navigation::TabIndex};
 use bevy::picking::hover::Hovered;
 use bevy::prelude::*;
@@ -21,12 +35,31 @@ pub const SUCCESS: Color = Color::srgb(0.66, 0.88, 0.68);
 
 #[derive(Component)]
 pub struct GameText;
+/// A control reached with Tab that a click does not focus: the session bar,
+/// the docks and the panels beside them. The island shell owns the ring.
+#[derive(Component)]
+pub struct KeyFocus;
 #[derive(Component)]
 pub struct GameButton {
     pub primary: bool,
 }
 #[derive(Resource)]
 pub struct GameFont(pub Handle<Font>);
+/// The SemiBold face, for text whose type step is SemiBold ([`Strong`]).
+#[derive(Resource)]
+pub struct GameFontStrong(pub Handle<Font>);
+/// Text set in the SemiBold face: a SemiBold step of the type scale, or the
+/// label of a selected tab.
+#[derive(Component)]
+pub struct Strong;
+
+/// The face for a weight, from the two loaded ones.
+pub fn face(weight: tokens::Weight, regular: &Handle<Font>, strong: &Handle<Font>) -> Handle<Font> {
+    match weight {
+        tokens::Weight::Regular => regular.clone(),
+        tokens::Weight::SemiBold => strong.clone(),
+    }
+}
 struct GameUiPlugin;
 
 pub fn install(app: &mut App) {
@@ -39,13 +72,47 @@ impl Plugin for GameUiPlugin {
         if !app.is_plugin_added::<bevy::ui_widgets::ButtonPlugin>() {
             app.add_plugins(bevy::ui_widgets::ButtonPlugin);
         }
+        if !app.is_plugin_added::<bevy::ui_widgets::SliderPlugin>() {
+            app.add_plugins(bevy::ui_widgets::SliderPlugin);
+        }
+        sound::install(app);
         app.init_resource::<InputFocus>()
+            .init_resource::<bevy::ui::UiScale>()
+            .init_resource::<tokens::Theme>()
+            .init_resource::<scale::Layout>()
+            .init_resource::<tooltip::TooltipDelay>()
+            .init_resource::<tooltip::TooltipState>()
             .add_systems(Startup, load_font)
-            .add_systems(Update, (typography, paint));
+            .add_systems(
+                Update,
+                (
+                    typography,
+                    paint,
+                    scale::apply,
+                    icon::pick_raster,
+                    widgets::place_thumbs,
+                ),
+            )
+            // After the screens have refreshed their state for this frame.
+            .add_systems(
+                Update,
+                (widgets::tones, widgets::paint, tooltip::update)
+                    .chain()
+                    .after(npc_framework::view_helpers::ViewSystems::Present),
+            );
     }
 }
 fn load_font(mut commands: Commands, fonts: Option<ResMut<Assets<Font>>>) {
     if let Some(mut fonts) = fonts {
+        commands.insert_resource(GameFontStrong(
+            fonts.add(Font::from_bytes(
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../../assets/fonts/Barlow-SemiBold.ttf"
+                ))
+                .to_vec(),
+            )),
+        ));
         commands.insert_resource(GameFont(
             fonts.add(Font::from_bytes(
                 include_bytes!(concat!(
@@ -134,12 +201,27 @@ pub fn button(
     world.spawn((ChildOf(entity), text(label, 16.0, TEXT)));
     entity
 }
-fn typography(font: Option<Res<GameFont>>, mut labels: Query<&mut TextFont, With<GameText>>) {
+fn typography(
+    font: Option<Res<GameFont>>,
+    strong: Option<Res<GameFontStrong>>,
+    mut labels: Query<(&mut TextFont, Has<Strong>, Option<&ChildOf>), With<GameText>>,
+    tabs: Query<&widgets::Control>,
+) {
     let Some(font) = font else { return };
-    let source: bevy::text::FontSource = font.0.clone().into();
-    for mut label in &mut labels {
+    let strong = strong.map_or_else(|| font.0.clone(), |strong| strong.0.clone());
+    for (mut label, marked, parent) in &mut labels {
+        // A selected tab's label is set strong, like a heading.
+        let selected_tab = parent
+            .and_then(|parent| tabs.get(parent.parent()).ok())
+            .is_some_and(|control| control.kind == widgets::Kind::Tab && control.on);
+        let weight = if marked || selected_tab {
+            tokens::Weight::SemiBold
+        } else {
+            tokens::Weight::Regular
+        };
+        let source: bevy::text::FontSource = face(weight, &font.0, &strong).into();
         if label.font != source {
-            label.font = source.clone();
+            label.font = source;
         }
     }
 }
@@ -183,5 +265,47 @@ fn paint(
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod weight_tests {
+    use super::*;
+
+    #[test]
+    fn the_type_scale_resolves_both_weights_to_their_own_face() {
+        let mut app = App::new();
+        app.init_resource::<Assets<Font>>()
+            .add_systems(Startup, load_font)
+            .add_systems(Update, typography);
+        app.update();
+        let regular = app.world().resource::<GameFont>().0.clone();
+        let strong = app.world().resource::<GameFontStrong>().0.clone();
+        assert_ne!(regular, strong, "two faces are loaded");
+        let parent = app.world_mut().spawn(Node::default()).id();
+        let heading = {
+            let world = app.world_mut();
+            widgets::label(
+                world,
+                parent,
+                "Title",
+                tokens::HEADING,
+                widgets::Tone::text(tokens::Surface::Paper),
+            )
+        };
+        let body = {
+            let world = app.world_mut();
+            widgets::label(
+                world,
+                parent,
+                "Text",
+                tokens::BODY,
+                widgets::Tone::text(tokens::Surface::Paper),
+            )
+        };
+        app.update();
+        let font = |entity| app.world().get::<TextFont>(entity).unwrap().font.clone();
+        assert_eq!(font(heading), bevy::text::FontSource::from(strong));
+        assert_eq!(font(body), bevy::text::FontSource::from(regular));
     }
 }

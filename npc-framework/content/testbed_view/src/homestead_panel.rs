@@ -1,5 +1,10 @@
 //! Native player input for the shared Island Village homestead actions.
 //! UI entities and pending navigation are view/host state; mutations use recorded actions.
+//!
+//! `refresh` builds a full actor observation, which is the most expensive
+//! thing any panel does. It therefore runs only while the panel is open and
+//! one of its inputs changed (`Inputs`): a closed panel builds nothing, and
+//! an open one over a paused or idle world keeps what it already shows.
 mod model;
 use std::collections::BTreeMap;
 
@@ -21,12 +26,13 @@ use crate::player_actions::{self, ControlState, NativeActions};
 use model::{Action, Context, Entry, Tab};
 
 // The incumbent native village palette; this is a control extension, not a new skin.
-const PANEL: Color = Color::srgb(0.05, 0.06, 0.08);
-const TEXT: Color = Color::srgb(0.93, 0.95, 0.90);
-const GOLD: Color = Color::srgb(0.95, 0.80, 0.45);
-const BUTTON: Color = Color::srgb(0.20, 0.24, 0.30);
-const HOVER: Color = Color::srgb(0.27, 0.32, 0.40);
-const DISABLED: Color = Color::srgb(0.10, 0.12, 0.15);
+// A developer panel: the design system's chrome colours, its own layout.
+const PANEL: Color = crate::game_ui::tokens::BARK_900;
+const TEXT: Color = crate::game_ui::tokens::CREAM_50;
+const GOLD: Color = crate::game_ui::tokens::HONEY_500;
+const BUTTON: Color = crate::game_ui::tokens::BARK_700;
+const HOVER: Color = crate::game_ui::tokens::BARK_600;
+const DISABLED: Color = crate::game_ui::tokens::BARK_800;
 
 #[derive(Resource)]
 struct FarmState {
@@ -40,7 +46,89 @@ struct FarmState {
     message: String,
     requests: Vec<Action>,
     rows: BTreeMap<String, Entity>,
+    /// The inputs the open panel currently shows; `None` forces a rebuild.
+    shown: Option<Inputs>,
+    /// Real seconds since the panel was last rebuilt.
+    since_refresh: f32,
+    /// Full rebuilds so far, for tests and reviews.
+    rebuilds: u64,
+    /// Which of the panel's resting looks is already applied to its nodes.
+    look: Look,
 }
+
+/// A resting look is applied once; after that the frame costs a few lookups.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum Look {
+    #[default]
+    Unknown,
+    /// Player session or a menu: neither panel nor launcher.
+    Hidden,
+    /// Launcher shown, panel hidden.
+    Closed,
+    Open,
+}
+
+/// Seconds after which an open panel is rebuilt even with unchanged inputs:
+/// a bound on staleness should an input ever be missing from `Inputs`.
+const RECHECK_SECS: f32 = 1.0;
+
+/// Everything the panel's contents depend on. The actor observation is a
+/// function of simulation state, which changes only when a tick runs; the
+/// rest is host and view state read directly.
+#[derive(Clone, Debug, PartialEq)]
+struct Inputs {
+    tick: u64,
+    epoch: u64,
+    stopped: bool,
+    control: ControlState,
+    control_pending: bool,
+    pending: Option<String>,
+    feedback: Option<String>,
+    tab: Tab,
+    plot: Option<u32>,
+    bed: u32,
+    quantity: u32,
+    waiting: bool,
+    message: String,
+    narrow: bool,
+}
+
+fn narrow(world: &mut World) -> bool {
+    world
+        .query::<&Window>()
+        .iter(world)
+        .next()
+        .is_some_and(|window| window.width() < 1200.0)
+}
+
+fn inputs(world: &mut World) -> Inputs {
+    let narrow = narrow(world);
+    let state = world.resource::<FarmState>();
+    let native = world.get_resource::<NativeActions>();
+    Inputs {
+        tick: world
+            .get_resource::<npc_framework::prelude::SimClock>()
+            .map_or(0, |clock| clock.tick),
+        epoch: npc_framework::agent_io::api::epoch(world),
+        stopped: world
+            .get_resource::<SimControl>()
+            .is_some_and(|control| control.is_stopped()),
+        control: player_actions::control(world),
+        control_pending: crate::island_control::control_pending(world),
+        pending: native
+            .and_then(|native| native.pending.as_ref())
+            .map(|pending| pending.label.clone()),
+        feedback: native.and_then(|native| native.feedback.clone()),
+        tab: state.tab,
+        plot: state.plot,
+        bed: state.bed,
+        quantity: state.quantity,
+        waiting: state.waiting_control,
+        message: state.message.clone(),
+        narrow,
+    }
+}
+
 impl Default for FarmState {
     fn default() -> Self {
         Self {
@@ -54,6 +142,10 @@ impl Default for FarmState {
             message: String::new(),
             requests: Vec::new(),
             rows: BTreeMap::new(),
+            shown: None,
+            since_refresh: 0.0,
+            rebuilds: 0,
+            look: Look::Unknown,
         }
     }
 }
@@ -578,13 +670,36 @@ pub(crate) fn refresh(world: &mut World) {
             .get_resource::<crate::FrontendGate>()
             .is_some_and(|gate| gate.0)
     {
-        for mut node in world
-            .query_filtered::<&mut Node, Or<(With<FarmRoot>, With<FarmLauncher>)>>()
-            .iter_mut(world)
-        {
-            node.display = Display::None;
+        if world.resource::<FarmState>().look != Look::Hidden {
+            for mut node in world
+                .query_filtered::<&mut Node, Or<(With<FarmRoot>, With<FarmLauncher>)>>()
+                .iter_mut(world)
+            {
+                node.display = Display::None;
+            }
+            let mut state = world.resource_mut::<FarmState>();
+            state.look = Look::Hidden;
+            state.shown = None;
         }
         return;
+    }
+    if !world.resource::<FarmState>().open {
+        // Closed: show the launcher and build nothing. What the panel holds
+        // is rebuilt on the frame it opens.
+        closed(world);
+        return;
+    }
+    world.resource_mut::<FarmState>().look = Look::Open;
+    let delta = world.get_resource::<Time>().map_or(0.0, Time::delta_secs);
+    let wanted = inputs(world);
+    {
+        let mut state = world.resource_mut::<FarmState>();
+        state.since_refresh += delta;
+        if state.shown.as_ref() == Some(&wanted) && state.since_refresh < RECHECK_SECS {
+            return;
+        }
+        state.since_refresh = 0.0;
+        state.rebuilds += 1;
     }
     let Ok(observation) = player_actions::observe(world) else {
         return;
@@ -731,18 +846,17 @@ pub(crate) fn refresh(world: &mut World) {
             node.display = display;
         }
     }
-    let narrow = world
-        .query::<&Window>()
-        .iter(world)
-        .next()
-        .is_some_and(|window| window.width() < 1200.0);
+    let narrow = narrow(world);
     let mut hud = world.query_filtered::<&mut Visibility, With<crate::village::Hud>>();
     for mut visibility in hud.iter_mut(world) {
-        *visibility = if open && narrow {
+        let wanted = if open && narrow {
             Visibility::Hidden
         } else {
             Visibility::Inherited
         };
+        if *visibility != wanted {
+            *visibility = wanted;
+        }
     }
     let mut actions = world.query::<(Entity, &FarmAction)>();
     let static_buttons: Vec<_> = actions
@@ -789,13 +903,53 @@ pub(crate) fn refresh(world: &mut World) {
     if open {
         reconcile(world, rows);
     }
-    if !open
-        && world
-            .resource::<InputFocus>()
-            .get()
-            .is_some_and(|entity| world.get::<FarmControl>(entity).is_some())
+    // The rebuild itself settles the plot selection and the waiting flag.
+    let shown = inputs(world);
+    world.resource_mut::<FarmState>().shown = Some(shown);
+}
+
+/// The closed panel: launcher shown, panel hidden, the status strip back and
+/// keyboard focus released. No observation is built.
+fn closed(world: &mut World) {
+    if world
+        .resource::<InputFocus>()
+        .get()
+        .is_some_and(|entity| world.get::<FarmControl>(entity).is_some())
     {
         world.resource_mut::<InputFocus>().clear();
+    }
+    // Applied once per close; after that a closed panel costs two lookups.
+    if world.resource::<FarmState>().look == Look::Closed {
+        return;
+    }
+    {
+        let mut state = world.resource_mut::<FarmState>();
+        state.shown = None;
+        state.look = Look::Closed;
+    }
+    for mut node in world
+        .query_filtered::<&mut Node, With<FarmRoot>>()
+        .iter_mut(world)
+    {
+        if node.display != Display::None {
+            node.display = Display::None;
+        }
+    }
+    for mut node in world
+        .query_filtered::<&mut Node, With<FarmLauncher>>()
+        .iter_mut(world)
+    {
+        if node.display != Display::Flex {
+            node.display = Display::Flex;
+        }
+    }
+    for mut visibility in world
+        .query_filtered::<&mut Visibility, With<crate::village::Hud>>()
+        .iter_mut(world)
+    {
+        if *visibility != Visibility::Inherited {
+            *visibility = Visibility::Inherited;
+        }
     }
 }
 fn disabled(world: &mut World, entity: Entity, value: bool) {

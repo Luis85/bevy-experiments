@@ -288,8 +288,11 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
                 .unwrap_or(&obs["sections"]["homestead"]["crop"]);
             let yield_count = definition["yield_count"].as_u64().unwrap_or(3);
             let yield_kind = definition["yield_kind"].as_str().unwrap_or(crop_kind);
-            rows.push(Entry::note("crop-cost", format!("Seeds {} | Clean water {}. One seed and one watering grow {yield_count} {}. Growth follows world time.", amount(crop_kind), amount(catalog::WATER), friendly(yield_kind))));
-            let harvest_label = format!("Harvest | {yield_count} {}", friendly(yield_kind));
+            rows.push(Entry::note("crop-cost", format!("Seeds {} | Clean water {}. One seed and one watering grow {}. Growth follows world time.", amount(crop_kind), amount(catalog::WATER), crate::game_ui::words::count(yield_count, yield_kind))));
+            let harvest_label = format!(
+                "Harvest | {}",
+                crate::game_ui::words::count(yield_count, yield_kind)
+            );
             let (verb, label, enabled) = match stage {
                 "empty" => ("plant", "Plant grain | 1 seed", amount(catalog::GRAIN) > 0),
                 "needs_water" => (
@@ -503,7 +506,10 @@ pub(super) fn entries(context: Context<'_>) -> Vec<Entry> {
                 if amount(kind) < u64::from(quantity) {
                     continue;
                 }
-                let label = format!("Offer {quantity} {} for sale", friendly(kind));
+                let label = format!(
+                    "Offer {} for sale",
+                    crate::game_ui::words::count(u64::from(quantity), kind)
+                );
                 rows.push(Entry::button(
                     format!("offer-{kind}"),
                     label.clone(),

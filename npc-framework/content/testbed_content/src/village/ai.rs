@@ -53,6 +53,7 @@ pub fn tick(world: &mut World) {
     finish_gathers(world, now);
     if super::needs_driven(world) {
         super::hunting::tick(world);
+        super::wildlife::tick(world);
     }
     dividends(world, day);
     if super::needs_driven(world) {
@@ -84,23 +85,50 @@ pub(super) fn work(world: &mut World, e: Entity) {
                 }
             }
         }
-        Role::Visitor | Role::Hunter | Role::Tanner | Role::Tailor | Role::Fisher => {}
+        Role::Visitor
+        | Role::Hunter
+        | Role::Tanner
+        | Role::Tailor
+        | Role::Fisher
+        | Role::Trade(_) => {}
     }
 }
 
 /// Select a real, affordable advertised seller, including explicit player offers.
 /// Distance is the only settlement condition deferred while approaching.
+/// A seller on the move is a target only this near (regional): farther off
+/// the buyer would trail it, and a slow buyer never catches up.
+pub const WALKING_SELLER_REACH_MM: i64 = 6_000;
+
 pub(super) fn market_supplier(world: &World, buyer: Entity, kind: &str) -> Option<Entity> {
     let coins = world.get::<Wallet>(buyer)?.coins;
     let here = *world.get::<SimPos>(buyer)?;
-    world
-        .resource::<SimIndex>()
-        .map
+    // Only the living can sell, so only actors with a vitality are looked at.
+    // The ranking key ends in the identity, so the order of the query does
+    // not matter.
+    let sellers: Vec<(SimId, Entity)> = world
+        .try_query::<(Entity, &SimId, &Vitality)>()
+        .map(|mut query| query.iter(world).map(|(e, id, _)| (*id, e)).collect())
+        .unwrap_or_default();
+    sellers
         .iter()
         .filter_map(|(id, seller)| {
             if *seller == buyer
-                || !super::market::sells(world, *seller, kind)
+                || !super::market::person_sells(world, *seller, kind)
                 || super::market::available_to_sell(world, *seller, kind) == 0
+                // Buy at a fixed place: a store, a stall, or somebody who
+                // stands still. A seller walking somewhere else is not one.
+                || (super::frontier::enabled(world)
+                    && world.get::<MoveIntent>(*seller).is_some()
+                    && here.dist2(*world.get::<SimPos>(*seller)?)
+                        > WALKING_SELLER_REACH_MM.pow(2))
+                || (super::frontier::enabled(world)
+                    && super::routing::avoiding(
+                        world,
+                        buyer,
+                        *world.get::<SimPos>(*seller)?,
+                        Some(*id),
+                    ))
             {
                 return None;
             }
@@ -139,11 +167,55 @@ pub(super) fn market_supplier(world: &World, buyer: Entity, kind: &str) -> Optio
                     == super::production::economic_settlement(world, *seller);
             Some((!local, price, distance, *id, *seller))
         })
+        .chain(depot_offers(world, buyer, kind, coins, here))
         .min_by_key(|(remote, price, distance, id, _)| (*remote, *price, *distance, *id))
         .map(|(_, _, _, _, seller)| seller)
 }
 
-fn buy_market_input(world: &mut World, actor: Entity, kind: &str, wanted: u32) -> bool {
+/// Stores and stalls that could sell `kind` to this buyer now, with the same
+/// ranking key as a person who sells: `(remote, price, distance, id, seller)`.
+fn depot_offers(
+    world: &World,
+    buyer: Entity,
+    kind: &str,
+    coins: u32,
+    here: SimPos,
+) -> Vec<(bool, u32, i64, SimId, Entity)> {
+    use super::civic;
+    if !civic::any_depot(world) {
+        return Vec::new();
+    }
+    let buyer_id = world.get::<SimId>(buyer).copied();
+    let Some(price) = super::market::unit_price(world, kind) else {
+        return Vec::new();
+    };
+    if price > coins
+        || super::production::purchase_bid_limit(world, buyer, kind)
+            .is_some_and(|limit| price > limit)
+        || econ::fit(world, buyer, &[Item::new(kind)]).is_err()
+    {
+        return Vec::new();
+    }
+    let region = super::production::economic_settlement(world, buyer);
+    civic::all_depots(world)
+        .into_iter()
+        .filter_map(|(id, depot)| {
+            let pos = *world.get::<SimPos>(depot)?;
+            if civic::depot_available(world, depot, kind, buyer_id) == 0
+                || !civic::serves(world, depot, buyer)
+                || super::routing::avoiding(world, buyer, pos, Some(id))
+            {
+                return None;
+            }
+            let distance =
+                i64::from(super::frontier::routes::estimate(world, here, pos)?.distance_mm);
+            let local = super::frontier::settlements::member(world, depot) == region;
+            Some((!local, price, distance, id, depot))
+        })
+        .collect()
+}
+
+pub(super) fn buy_market_input(world: &mut World, actor: Entity, kind: &str, wanted: u32) -> bool {
     let Some(seller) = market_supplier(world, actor, kind) else {
         return false;
     };
@@ -188,14 +260,21 @@ pub(super) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<
         return None;
     }
     let here = world.get::<SimPos>(actor).copied().unwrap_or_default();
-    world
-        .resource::<SimIndex>()
-        .map
+    // A query over the patches; the ranking key ends in the identity.
+    let patches: Vec<(SimId, Entity)> = world
+        .try_query::<(Entity, &SimId, &ResourcePatch)>()
+        .map(|mut query| query.iter(world).map(|(e, id, _)| (*id, e)).collect())
+        .unwrap_or_default();
+    patches
         .iter()
         .filter_map(|(id, e)| {
             let patch = world.get::<ResourcePatch>(*e)?;
             let pos = *world.get::<SimPos>(*e)?;
-            if patch.kind != kind || patch.remaining == 0 {
+            if patch.kind != kind
+                || patch.remaining == 0
+                || (super::frontier::enabled(world)
+                    && super::routing::avoiding(world, actor, pos, Some(*id)))
+            {
                 return None;
             }
             let distance = if super::frontier::enabled(world) {
@@ -209,7 +288,26 @@ pub(super) fn gather_source(world: &World, actor: Entity, kind: &str) -> Option<
         .map(|(_, id, entity)| (id, entity))
 }
 
-fn gather_job(world: &mut World, actor: Entity, kind: &str) -> bool {
+/// Regional residents fetch urgent hearth fuel from a patch that is closer than
+/// the nearest seller instead of freezing on a walk to another settlement.
+pub(super) fn patch_nearer_than_seller(world: &World, actor: Entity, kind: &str) -> bool {
+    if !super::frontier::enabled(world) {
+        return false;
+    }
+    let Some(here) = world.get::<SimPos>(actor).copied() else {
+        return false;
+    };
+    let Some(patch) = gather_source(world, actor, kind)
+        .and_then(|(_, source)| world.get::<SimPos>(source).copied())
+    else {
+        return false;
+    };
+    market_supplier(world, actor, kind)
+        .and_then(|seller| world.get::<SimPos>(seller).copied())
+        .is_none_or(|seller| seller.dist2(here) > patch.dist2(here))
+}
+
+pub(super) fn gather_job(world: &mut World, actor: Entity, kind: &str) -> bool {
     let Some((target, source)) = gather_source(world, actor, kind) else {
         return false;
     };
@@ -222,68 +320,20 @@ fn gather_job(world: &mut World, actor: Entity, kind: &str) -> bool {
     true
 }
 
-fn living_work(world: &mut World, actor: Entity) {
-    use super::{market, production};
-    let id = *world.get::<SimId>(actor).expect("actor identity");
-    let role = world.get::<Villager>(actor).expect("villager").role;
-    // Lack of purchasing power is not lack of a physical survival action.
-    // Use the exact finite gather command a player uses, then the ordinary
-    // thirst branch consumes the real item on its next decision.
-    if econ::need(world, actor, "Thirst") < 55_000
-        && econ::count(world, actor, catalog::WATER) == 0
-        && market_supplier(world, actor, catalog::WATER).is_none()
-        && gather_job(world, actor, catalog::WATER)
-    {
-        return;
-    }
-    if !production::garment_equipped(world, actor)
-        && npc_framework::agent_io::registry::verb_gate(world, actor, "equip").is_none()
-        && let Some(item) =
-            npc_framework::interaction::items::carried_matching(world, actor, catalog::WARM_CLOTHES)
-        && npc_framework::interaction::begin(
-            world,
-            actor,
-            "equip",
-            item,
-            None,
-            npc_framework::interaction::Source::Command,
-        )
-        .is_ok()
-    {
-        production::intent(world, actor, "equip", catalog::WARM_CLOTHES, "", Some(item));
-        return;
-    }
-    // Subsistence remains a physical action when all posted food is absent or
-    // unaffordable; this never creates a free recovery effect for NPCs.
-    if econ::need(world, actor, "Hunger") < 40_000
-        && production::food_choice(world, actor).is_none()
-        && gather_job(world, actor, catalog::BERRIES)
-    {
-        return;
-    }
+/// One wanted purchase: `(priority, distance squared, good, wanted stock)`.
+/// Priority 0 is water, 1 food, 2 clothing and 3 every industrial buffer.
+pub(super) type Procurement = (u8, i64, &'static str, u32);
 
-    // A cold resident with no usable hearth fuel must procure it before the
-    // night-home branch can hold them indoors. Buying and finite gathering use
-    // the normal shared actions; no warmth, fuel or currency is granted here.
-    if let Some(home) = super::behavior::warming_need(world, actor)
-        && !home.heated
-        && home.carried_fuel < home.fuel_required
-        && (buy_market_input(world, actor, home.fuel_kind, home.fuel_required)
-            || gather_job(world, actor, home.fuel_kind))
-    {
-        return;
-    }
-
-    if super::frontier::enabled(world) && super::frontier::labor::consider_assignment(world, actor)
-    {
-        return;
-    }
-
+/// Goods the funded plan of this actor wants and an affordable seller offers
+/// now, nearest first within each priority.
+pub(super) fn procurement(world: &World, actor: Entity) -> Vec<Procurement> {
+    use super::production;
     let mut procure: Vec<_> = catalog::trade_kinds(world)
         .iter()
         .filter_map(|kind| {
             let mut wanted = production::desired_stock(world, actor, kind);
-            if *kind == catalog::WARM_CLOTHES && super::policy::active(world).is_some() {
+            if *kind == super::roles::roles(world).garment && super::policy::active(world).is_some()
+            {
                 // Equipping a replacement can precede the next ledger refresh.
                 // A stale forecast must not buy another coat for the new one.
                 wanted = wanted.min(super::living::clothing_reserve_target(world, actor));
@@ -292,11 +342,11 @@ fn living_work(world: &mut World, actor: Entity) {
                 return None;
             }
             let supplier = market_supplier(world, actor, kind)?;
-            let priority = if *kind == catalog::WATER {
+            let priority = if *kind == super::roles::roles(world).drink {
                 0
-            } else if catalog::food_restore(kind).is_some() {
+            } else if catalog::food_restore_in(world, kind).is_some() {
                 1
-            } else if *kind == catalog::WARM_CLOTHES {
+            } else if *kind == super::roles::roles(world).garment {
                 2
             } else {
                 3
@@ -307,22 +357,91 @@ fn living_work(world: &mut World, actor: Entity) {
         })
         .collect();
     procure.sort_by_key(|(priority, distance, kind, _)| (*priority, *distance, *kind));
-    // Personal reserves retain priority. Industrial buffers must not send an
-    // actor away from a complete, financed job already waiting in their pack.
-    for (_, _, kind, wanted) in procure.iter().filter(|(priority, ..)| *priority < 3) {
-        if buy_market_input(world, actor, kind, *wanted) {
-            return;
+    procure
+}
+
+/// Buys the first listed good whose priority passes `wanted`.
+pub(super) fn buy_listed(
+    world: &mut World,
+    actor: Entity,
+    procure: &[Procurement],
+    wanted: impl Fn(u8) -> bool,
+) -> bool {
+    for (_, _, kind, target) in procure.iter().filter(|(priority, ..)| wanted(*priority)) {
+        if buy_market_input(world, actor, kind, *target) {
+            return true;
         }
     }
+    false
+}
 
-    if construction_step(world, actor) || planned_work(world, actor) {
-        return;
+/// Puts on a carried coat through the shared equip interaction.
+pub(super) fn equip_coat(world: &mut World, actor: Entity) -> bool {
+    use super::production;
+    if !production::garment_equipped(world, actor)
+        && npc_framework::agent_io::registry::verb_gate(world, actor, "equip").is_none()
+        && let Some(item) = npc_framework::interaction::items::carried_matching(
+            world,
+            actor,
+            super::roles::roles(world).garment,
+        )
+        && npc_framework::interaction::begin(
+            world,
+            actor,
+            "equip",
+            item,
+            None,
+            npc_framework::interaction::Source::Command,
+        )
+        .is_ok()
+    {
+        production::intent(
+            world,
+            actor,
+            "equip",
+            super::roles::roles(world).garment,
+            "",
+            Some(item),
+        );
+        return true;
     }
+    false
+}
 
-    // Candidate scores use the shared integer market and actual recipe costs.
-    // A pending need is required: price alone never causes inventory quotas.
+/// A cold resident with no usable hearth fuel must procure it before the
+/// night-home branch can hold them indoors. Buying and finite gathering use
+/// the normal shared actions; no warmth, fuel or currency is granted here.
+fn fetch_fuel(world: &mut World, actor: Entity) -> bool {
+    if let Some(home) = super::behavior::warming_need(world, actor)
+        && !home.heated
+        && home.carried_fuel < home.fuel_required
+        && ((patch_nearer_than_seller(world, actor, home.fuel_kind)
+            && gather_job(world, actor, home.fuel_kind))
+            || buy_market_input(world, actor, home.fuel_kind, home.fuel_required)
+            || gather_job(world, actor, home.fuel_kind))
+    {
+        return true;
+    }
+    false
+}
+
+/// Starts the best funded recipe whose inputs are already in the pack; with
+/// `only`, considers just that recipe. Candidate scores use the shared integer
+/// market and actual recipe costs. A pending need is required: price alone
+/// never causes inventory quotas. The ranked candidates are appended to `seen`.
+pub(super) fn craft_best(
+    world: &mut World,
+    actor: Entity,
+    only: Option<&str>,
+    seen: &mut Vec<(u64, String)>,
+) -> bool {
+    use super::{market, production};
+    let role = world.get::<Villager>(actor).expect("villager").role;
     let mut candidates = Vec::new();
     for name in catalog::recipes_for(world, role) {
+        if only.is_some_and(|only| only != *name) {
+            continue;
+        }
         let Some(recipe) = world.resource::<RecipeRegistry>().recipes.get(*name) else {
             continue;
         };
@@ -349,7 +468,7 @@ fn living_work(world: &mut World, actor: Entity) {
             .sum::<u64>();
         let cost = u64::from(market::input_cost(world, name).unwrap_or(u32::MAX));
         // The planner has already financed this genuine job. Real inputs in
-        // the actor's pack need no second payment at their current book value.
+        // the pack need no second payment at their current book value.
         // Keep that value for ranking, not as a refusal of ready owned work.
         let new_cash_required = recipe
             .inputs
@@ -363,8 +482,8 @@ fn living_work(world: &mut World, actor: Entity) {
             })
             .sum::<u64>();
         let essential = recipe.outputs.iter().any(|output| {
-            catalog::food_restore(&output.kind).is_some()
-                || output.kind == catalog::WARM_CLOTHES
+            catalog::food_restore_in(world, &output.kind).is_some()
+                || output.kind == super::roles::roles(world).garment
                 || production::internal_demand(world, actor, &output.kind) > 0
         });
         if revenue <= new_cash_required && !essential {
@@ -379,6 +498,11 @@ fn living_work(world: &mut World, actor: Entity) {
         candidates.push((score, name.to_string(), recipe.outputs[0].kind.clone()));
     }
     candidates.sort_by(|(a, ar, _), (b, br, _)| b.cmp(a).then_with(|| ar.cmp(br)));
+    seen.extend(
+        candidates
+            .iter()
+            .map(|(score, recipe, _)| (*score, recipe.clone())),
+    );
     if npc_framework::agent_io::registry::verb_gate(world, actor, "craft").is_none() {
         for (_, recipe, good) in candidates {
             let workplace = world.get::<Villager>(actor).expect("villager").workplace;
@@ -388,9 +512,12 @@ fn living_work(world: &mut World, actor: Entity) {
             let Some(pos) = world.get::<SimPos>(station).copied() else {
                 continue;
             };
+            if super::routing::avoiding(world, actor, pos, Some(workplace)) {
+                continue;
+            }
             production::intent(world, actor, "craft", &good, &recipe, Some(workplace));
             if !travel(world, actor, pos) {
-                return;
+                return true;
             }
             if begin_craft(
                 world,
@@ -402,51 +529,175 @@ fn living_work(world: &mut World, actor: Entity) {
             )
             .is_ok()
             {
-                return;
+                pace_craft(world, actor);
+                return true;
             }
         }
     }
-    if role == Role::Hunter
-        && (production::production_demand(world, actor, catalog::RAW_MEAT) > 0
-            || production::production_demand(world, actor, catalog::HIDE) > 0)
-        && npc_framework::interaction::items::carried_matching(world, actor, catalog::SPEAR)
-            .is_some()
-        && let Some((target, prey, _)) = prey_source(world, actor)
+    false
+}
+
+/// A hunter with a spear and funded demand approaches the nearest prey and hunts.
+pub(super) fn hunt(world: &mut World, actor: Entity) -> bool {
+    use super::production;
+    let id = *world.get::<SimId>(actor).expect("actor identity");
+    let role = world.get::<Villager>(actor).expect("villager").role;
+    if role == super::roles::roles(world).hunter
+        && (production::production_demand(world, actor, super::roles::roles(world).meat) > 0
+            || production::production_demand(world, actor, super::roles::roles(world).hide) > 0)
+        && npc_framework::interaction::items::carried_matching(
+            world,
+            actor,
+            super::roles::roles(world).hunt_tool,
+        )
+        .is_some()
+        && let Some((target, prey, at)) =
+            stalked_prey(world, actor).or_else(|| prey_source(world, actor))
     {
-        production::intent(world, actor, "hunt", catalog::RAW_MEAT, "", Some(target));
+        production::intent(
+            world,
+            actor,
+            "hunt",
+            super::roles::roles(world).meat,
+            "",
+            Some(target),
+        );
+        // Living world: the hunter keeps walking while its prey stays near
+        // where it was going; it re-paths only once the prey moved away.
+        if super::frontier::enabled(world)
+            && !econ::near(world, actor, prey)
+            && world
+                .get::<MoveIntent>(actor)
+                .is_some_and(|intent| intent.goal.dist2(at) <= STALK_REPATH_MM.pow(2))
+        {
+            return true;
+        }
         if !approach_work(world, actor, prey) {
-            return;
+            return true;
         }
         let mut command = VillageAct::new(id, "hunt");
         command.target = Some(target);
         if command.perform(world).is_ok() {
-            return;
+            return true;
         }
     }
-    for (_, _, kind, wanted) in procure.into_iter().filter(|(priority, ..)| *priority == 3) {
-        if buy_market_input(world, actor, kind, wanted) {
-            return;
-        }
-    }
+    false
+}
+
+/// Gathers the raw output of the profession with the most funded demand.
+pub(super) fn gather_outputs(world: &mut World, actor: Entity) -> bool {
+    use super::production;
+    let role = world.get::<Villager>(actor).expect("villager").role;
     let mut raw: Vec<_> = catalog::outputs_for(world, role)
         .iter()
         .filter_map(|kind| {
             let demand = production::production_demand(world, actor, kind);
-            (demand > 0).then_some((demand, *kind))
+            // Regional job ranking weighs funded demand by the realised margin
+            // of the good, so a glutted good yields to a better-paid one.
+            let weight = if super::frontier::enabled(world) {
+                (1000 + super::frontier::labor::good_margin_permille(world, role, kind)).max(100)
+                    as u64
+            } else {
+                1
+            };
+            // Regional: ingredients of food come before other raw goods.
+            let staple = super::frontier::economy_spec::registry(world)
+                .is_some_and(|registry| registry.feeds_food(kind));
+            (demand > 0).then_some((staple, u64::from(demand) * weight, *kind))
         })
         .collect();
-    raw.sort_by(|(a, ak), (b, bk)| b.cmp(a).then_with(|| ak.cmp(bk)));
-    for (_, kind) in raw {
+    raw.sort_by(|(af, a, ak), (bf, b, bk)| {
+        bf.cmp(af).then_with(|| b.cmp(a)).then_with(|| ak.cmp(bk))
+    });
+    for (_, _, kind) in raw {
         if gather_job(world, actor, kind) {
-            return;
+            return true;
         }
     }
-    production::clear_intent(world, actor);
+    false
+}
+
+/// Walks towards a free neighbour for a leisure meeting.
+pub(super) fn socialise(world: &mut World, actor: Entity) -> bool {
     if let Some((_, meeting)) = super::colony::social_target(world, actor) {
         travel(world, actor, meeting);
+        return true;
+    }
+    false
+}
+
+/// The work cascade of the profiles whose tree still has one decision leaf.
+/// The regional profile runs the same steps as separate tree leaves.
+fn living_work(world: &mut World, actor: Entity) {
+    use super::production;
+    // Lack of purchasing power is not lack of a physical survival action.
+    // Use the exact finite gather command a player uses, then the ordinary
+    // thirst branch consumes the real item on its next decision.
+    if econ::need(world, actor, "Thirst") < 55_000
+        && econ::count(world, actor, super::roles::roles(world).drink) == 0
+        && market_supplier(world, actor, super::roles::roles(world).drink).is_none()
+        && gather_job(world, actor, super::roles::roles(world).drink)
+    {
+        return;
+    }
+    if equip_coat(world, actor) {
+        return;
+    }
+    // Subsistence remains a physical action when all posted food is absent or
+    // unaffordable; this never creates a free recovery effect for NPCs.
+    if econ::need(world, actor, "Hunger") < 40_000
+        && production::food_choice(world, actor).is_none()
+        && gather_job(world, actor, super::roles::roles(world).foraged)
+    {
+        return;
+    }
+    if fetch_fuel(world, actor) {
+        return;
+    }
+    if super::frontier::enabled(world) && super::frontier::labor::consider_assignment(world, actor)
+    {
+        return;
+    }
+    let procure = procurement(world, actor);
+    // Personal reserves retain priority. Industrial buffers must not send an
+    // actor away from a complete, financed job already waiting in their pack.
+    if buy_listed(world, actor, &procure, |priority| priority < 3) {
+        return;
+    }
+    if construction_step(world, actor) || planned_work(world, actor) {
+        return;
+    }
+    if craft_best(world, actor, None, &mut Vec::new())
+        || hunt(world, actor)
+        || buy_listed(world, actor, &procure, |priority| priority == 3)
+        || gather_outputs(world, actor)
+    {
+        return;
+    }
+    production::clear_intent(world, actor);
+    if socialise(world, actor) {
         return;
     }
     world.entity_mut(actor).remove::<MoveIntent>();
+}
+
+/// A hunter re-paths to the animal it stalks only once the animal is this far
+/// from where the hunter is walking to.
+const STALK_REPATH_MM: i64 = 3_000;
+
+/// Living world: the animal this hunter already stalks (its hunt intent), if
+/// it is still prey: the hunter keeps it instead of choosing again.
+fn stalked_prey(world: &World, actor: Entity) -> Option<(SimId, Entity, SimPos)> {
+    if !super::frontier::enabled(world) {
+        return None;
+    }
+    let target = world
+        .get::<super::production::JobIntent>(actor)
+        .filter(|intent| intent.verb == "hunt")?
+        .target?;
+    super::hunting::available_prey(world)
+        .into_iter()
+        .find(|(id, ..)| *id == target)
 }
 
 fn prey_source(world: &World, actor: Entity) -> Option<(SimId, Entity, SimPos)> {
@@ -498,10 +749,53 @@ pub fn construction_step(world: &mut World, actor: Entity) -> bool {
         .is_ok()
 }
 
-fn planned_work(world: &mut World, actor: Entity) -> bool {
-    use super::goap::PlanStep;
-    let Some(plan) = super::goap::plan(world, actor) else {
-        return false;
+/// Morale paces a resident's own craft within the bounded band. Inputs,
+/// reservations and outputs are untouched; only the completion tick moves.
+fn pace_craft(world: &mut World, actor: Entity) {
+    if !super::frontier::enabled(world) {
+        return;
+    }
+    let pace = u64::from(super::colony::work_pace_percent(world, actor));
+    if let Some(mut craft) = world.get_mut::<Crafting>(actor) {
+        let duration = craft.ends.saturating_sub(craft.started);
+        craft.ends = craft.started.saturating_add((duration * pace / 100).max(1));
+    }
+}
+
+/// Stuck exhaustion: the caller's travel has failed for good. Fail the running
+/// life leaf so the tree chooses again instead of pushing at the obstacle.
+fn fail_travel(world: &mut World, actor: Entity, goal: SimPos, target: Option<SimId>) {
+    super::routing::abandon(world, actor, goal, target);
+    super::production::clear_intent(world, actor);
+    super::goap::forget(world, actor);
+    if let Some(mut leaf) = world.get_mut::<ActiveLeaf>(actor) {
+        leaf.status = Status::Failure;
+    }
+    // A leaf that is still starting has no `ActiveLeaf` yet.
+    super::resident::travel_failed(world);
+}
+
+pub(super) fn planned_work(world: &mut World, actor: Entity) -> bool {
+    use super::goap::{PlanStep, Recall};
+    let plan = match super::goap::recall(world, actor) {
+        Recall::Hit(plan) => plan,
+        outcome => {
+            if let Recall::Failed(reason) = outcome {
+                let actor_id = world.get::<SimId>(actor).copied();
+                record_effect(
+                    world,
+                    actor_id,
+                    "VillagePlanInvalidated",
+                    &json!({"reason":reason}),
+                );
+            }
+            let Some(plan) = super::goap::plan(world, actor) else {
+                super::goap::forget(world, actor);
+                return false;
+            };
+            super::goap::remember(world, actor, &plan);
+            plan
+        }
     };
     let Some(step) = plan.steps.first() else {
         return false;
@@ -526,8 +820,10 @@ fn planned_work(world: &mut World, actor: Entity) -> bool {
                 return false;
             };
             super::production::intent(world, actor, "craft", good, recipe, Some(*target));
-            !travel(world, actor, pos)
-                || begin_craft(
+            if !travel(world, actor, pos) {
+                true
+            } else {
+                let begun = begin_craft(
                     world,
                     actor,
                     recipe,
@@ -535,7 +831,12 @@ fn planned_work(world: &mut World, actor: Entity) -> bool {
                     CraftSource::Command,
                     None,
                 )
-                .is_ok()
+                .is_ok();
+                if begun {
+                    pace_craft(world, actor);
+                }
+                begun
+            }
         }
     };
     if started && previous.as_ref() != world.get::<super::production::JobIntent>(actor) {
@@ -549,6 +850,10 @@ fn planned_work(world: &mut World, actor: Entity) -> bool {
     }
     started
 }
+struct VitalRules {
+    needs: crate::worlds::NeedsSpec,
+    night_vision_pct: u8,
+}
 fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) {
     let mut v = *world.get::<Vitality>(e).expect("vitality");
     if v.died_at.is_some() {
@@ -557,10 +862,15 @@ fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) 
     let hunger = econ::need(world, e, "Hunger");
     let thirst = econ::need(world, e, "Thirst");
     let energy = econ::need(world, e, "Energy");
-    let rules = world
-        .resource::<crate::world_runtime::ActiveWorld>()
-        .0
-        .clone();
+    // Only the need rules and night sight are read; cloning the whole preset
+    // (settlements, economy and behaviour data) per resident per tick is waste.
+    let rules = {
+        let preset = &world.resource::<crate::world_runtime::ActiveWorld>().0;
+        VitalRules {
+            needs: preset.needs.clone(),
+            night_vision_pct: preset.day_night.night_vision_pct,
+        }
+    };
     v.starved_ticks = if hunger <= 100_000 - rules.needs.hunger.out_milli {
         v.starved_ticks.saturating_add(1)
     } else {
@@ -571,6 +881,25 @@ fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) 
     } else {
         0
     };
+    if super::frontier::enabled(world) {
+        // Onset events for the alerts feed; the journal never feeds the sim.
+        if v.starved_ticks == 1 {
+            record_effect(
+                world,
+                Some(id),
+                "VillageStarvationOnset",
+                &json!({"hunger":hunger,"health_loss_after_ticks":600}),
+            );
+        }
+        if v.dehydrated_ticks == 1 {
+            record_effect(
+                world,
+                Some(id),
+                "VillageThirstOnset",
+                &json!({"thirst":thirst,"health_loss_after_ticks":600}),
+            );
+        }
+    }
     if v.starved_ticks > 600 {
         v.health = v.health.saturating_sub(40);
     }
@@ -616,7 +945,7 @@ fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) 
             for s in &mut sensors.sensors {
                 if let npc_framework::perception::Sensor::Vision(vision) = s {
                     vision.range_mm = (i64::from(vision.range_mm)
-                        * i64::from(rules.day_night.night_vision_pct)
+                        * i64::from(rules.night_vision_pct)
                         / 100) as i32;
                 }
             }
@@ -635,8 +964,17 @@ fn vitals(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) 
     if v.health <= 0 {
         v.health = 0;
         v.died_at = Some(now);
+        let cause = if v.dehydrated_ticks > 600 {
+            "thirst"
+        } else if v.starved_ticks > 600 {
+            "hunger"
+        } else if super::frontier::enabled(world) && econ::need(world, e, "Warmth") < 20_000 {
+            "cold"
+        } else {
+            "exhaustion"
+        };
         world.entity_mut(e).insert(v);
-        die(world, id, e, person, now);
+        die(world, id, e, person, now, cause);
     } else {
         world.entity_mut(e).insert(v);
     }
@@ -652,6 +990,9 @@ pub(crate) fn stop_work(world: &mut World, e: Entity, reason: &str) {
 /// External queues remain the responsibility of `stop_work` / control ownership.
 pub(crate) fn cancel_owned_work(world: &mut World, e: Entity, reason: &str) {
     super::frontier::activities::cancel(world, e);
+    super::civic::cancel_work(world, e);
+    super::live::cancel_work(world, e);
+    super::fields::cancel(world, e);
     if world.get::<super::homestead::CottageBuild>(e).is_some() {
         super::homestead::cancel(world, e);
     }
@@ -671,8 +1012,29 @@ pub(crate) fn start_rest(world: &mut World, e: Entity, ticks: u64, rate: i32) {
     }
     world.entity_mut(e).remove::<MoveIntent>();
 }
-fn die(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) {
+/// Ends a life for a cause other than a failed need (old age). Regional only.
+pub(super) fn kill(world: &mut World, id: SimId, e: Entity, cause: &str) {
+    let now = world.resource::<SimClock>().tick;
+    let Some(person) = world.get::<Villager>(e).cloned() else {
+        return;
+    };
+    let Some(mut vitality) = world.get_mut::<Vitality>(e) else {
+        return;
+    };
+    if vitality.died_at.is_some() {
+        return;
+    }
+    vitality.died_at = Some(now);
+    die(world, id, e, &person, now, cause);
+}
+
+fn die(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64, cause: &str) {
     stop_work(world, e, "dead");
+    // Regional residents leave their coins and plain goods to the household,
+    // else to the civic fund; what is left is dropped as before.
+    if super::frontier::enabled(world) {
+        super::demography::bequeath(world, id, e, cause);
+    }
     let pos = world.get::<SimPos>(e).copied().unwrap_or_default();
     for item in items::carried_items(world, e) {
         if let Some(item) = entity_of(world, item) {
@@ -739,7 +1101,8 @@ fn die(world: &mut World, id: SimId, e: Entity, person: &Villager, now: u64) {
         world,
         Some(id),
         "VillageDeath",
-        &json!({"permanent":true,"diary":dropped,"pos":[pos.x,pos.z],"coins_dropped":coins}),
+        &json!({"permanent":true,"diary":dropped,"pos":[pos.x,pos.z],"coins_dropped":coins,
+            "cause":cause,"name":person.name}),
     );
 }
 pub(crate) fn travel(world: &mut World, e: Entity, pos: SimPos) -> bool {
@@ -748,6 +1111,16 @@ pub(crate) fn travel(world: &mut World, e: Entity, pos: SimPos) -> bool {
         world.entity_mut(e).remove::<MoveIntent>();
         super::routing::arrived(world, e);
         return true;
+    }
+    if super::frontier::enabled(world) {
+        if super::routing::avoiding(world, e, pos, None) {
+            world.entity_mut(e).remove::<MoveIntent>();
+            return false;
+        }
+        if super::routing::exhausted(world, e, pos) {
+            fail_travel(world, e, pos, None);
+            return false;
+        }
     }
     let speed = world
         .get::<Commandable>(e)
@@ -763,7 +1136,7 @@ pub(crate) fn travel(world: &mut World, e: Entity, pos: SimPos) -> bool {
 
 /// Living work uses the very same reach as its shared actor action. Home rest
 /// deliberately keeps the original tighter approach in `travel`.
-fn approach_work(world: &mut World, actor: Entity, target: Entity) -> bool {
+pub(super) fn approach_work(world: &mut World, actor: Entity, target: Entity) -> bool {
     if econ::near(world, actor, target) {
         world.entity_mut(actor).remove::<MoveIntent>();
         super::routing::arrived(world, actor);
@@ -772,6 +1145,17 @@ fn approach_work(world: &mut World, actor: Entity, target: Entity) -> bool {
     let Some(pos) = world.get::<SimPos>(target).copied() else {
         return false;
     };
+    if super::frontier::enabled(world) {
+        let id = world.get::<SimId>(target).copied();
+        if super::routing::avoiding(world, actor, pos, id) {
+            world.entity_mut(actor).remove::<MoveIntent>();
+            return false;
+        }
+        if super::routing::exhausted(world, actor, pos) {
+            fail_travel(world, actor, pos, id);
+            return false;
+        }
+    }
     let speed = world
         .get::<Commandable>(actor)
         .map_or(70, |c| c.speed_mm_per_tick);
@@ -816,7 +1200,7 @@ pub(super) fn satisfy(
         let price = if super::needs_driven(world) {
             super::market::asking_price(world, s, good)
         } else {
-            catalog::price(good)
+            catalog::price_in(world, good)
         };
         if world.get::<Wallet>(e).map_or(0, |w| w.coins) < price.unwrap_or(u32::MAX) {
             return false;
@@ -845,9 +1229,9 @@ pub(super) fn satisfy(
     // gather a real finite item, then consume it through the ordinary branch.
     if super::needs_driven(world) {
         let subsistence = if need == "Thirst" {
-            catalog::WATER
+            super::roles::roles(world).drink
         } else {
-            catalog::BERRIES
+            super::roles::roles(world).foraged
         };
         return gather_job(world, e, subsistence);
     }
@@ -855,7 +1239,7 @@ pub(super) fn satisfy(
     false
 }
 fn gather_for(world: &mut World, e: Entity, kind: &str) {
-    if econ::count(world, e, kind) >= catalog::stock_limit(kind) {
+    if econ::count(world, e, kind) >= catalog::stock_limit_in(world, kind) {
         return;
     }
     let mut patches: Vec<_> = world
@@ -895,7 +1279,14 @@ pub(crate) fn begin_gather(
         return Err("already hunting".into());
     }
     econ::fit(world, e, &[Item::new(&p.kind)])?;
-    let ends = world.resource::<SimClock>().tick + u64::from(p.gather_ticks);
+    let ends = world.resource::<SimClock>().tick
+        + u64::from(
+            super::living::gather_ticks(world, e, &p.kind, p.gather_ticks)
+                // A played character's tool shed shortens its gathering.
+                * super::live::gather_percent(world, e)
+                / 100,
+        )
+        .max(1);
     world
         .entity_mut(e)
         .remove::<MoveIntent>()
@@ -936,14 +1327,25 @@ fn finish_gathers(world: &mut World, now: u64) {
             super::frontier::ecology::harvested(world, g.patch, 1);
         }
         econ::grant(world, e, Item::new(&p.kind));
+        super::living::wear_gather_tool(world, e, id, &p.kind);
         econ::produce(world, &p.kind, 1);
         super::production::completed(world, id, &p.kind, 1);
+        super::live::booked(world, id, super::live::Book::Gathered, &p.kind, 1);
         record_effect(
             world,
             Some(id),
             "VillageGathered",
             &json!({"kind":p.kind,"patch":g.patch,"quantity":1}),
         );
+        if p.remaining == 1 && super::frontier::enabled(world) {
+            // The unit just taken was the last one: an alert without a scan.
+            record_effect(
+                world,
+                Some(id),
+                "VillagePatchDepleted",
+                &json!({"kind":p.kind,"patch":g.patch}),
+            );
+        }
     }
 }
 fn buy_input(world: &mut World, e: Entity, kind: &str, wanted: u32) -> bool {
@@ -970,7 +1372,7 @@ fn buy_input(world: &mut World, e: Entity, kind: &str, wanted: u32) -> bool {
             .saturating_sub(econ::count(world, e, kind))
             .min(available)
             .min(8)
-            .min(coins / catalog::price(kind).unwrap_or(1));
+            .min(coins / catalog::price_in(world, kind).unwrap_or(1));
         if n > 0 {
             let mut command = VillageAct::new(*world.get::<SimId>(e).expect("sim actor"), "buy");
             command.target = world.get::<SimId>(seller).copied();
@@ -1011,7 +1413,7 @@ fn manufacture(world: &mut World, e: Entity, v: &Villager) {
     if def
         .outputs
         .iter()
-        .all(|o| econ::count(world, e, &o.kind) >= catalog::stock_limit(&o.kind))
+        .all(|o| econ::count(world, e, &o.kind) >= catalog::stock_limit_in(world, &o.kind))
     {
         return;
     }
@@ -1051,6 +1453,10 @@ fn dividends(world: &mut World, day: u64) {
         .map(|(e, id, _)| (*id, e))
         .collect();
     people.sort_by_key(|(id, _)| *id);
+    if super::frontier::enabled(world) {
+        civic_levy(world, day, &people);
+        return;
+    }
     let mut fund = world.resource::<VillageState>().fund;
     let mut contributed = 0;
     let mut paid = 0;
@@ -1092,20 +1498,130 @@ fn dividends(world: &mut World, day: u64) {
         &json!({"day":day,"contributed":contributed,"paid":paid,"balance":fund}),
     );
 }
-pub(super) fn recover_found(world: &mut World, e: Entity) {
-    let mut lost: Vec<_> = world
-        .query::<(Entity, &SimId, &Item)>()
+/// Regional replacement for the daily wealth cap. Profit above the threshold is
+/// only levied proportionally, so earnings accumulate and prices keep meaning.
+/// The fund pays a destitution floor first; whatever exceeds its reserve returns
+/// as an equal per-resident dividend, which leaves relative wealth unchanged and
+/// keeps coins in circulation. No coin is created or destroyed.
+fn civic_levy(world: &mut World, day: u64, people: &[(SimId, Entity)]) {
+    let (threshold, percent, floor, reserve_each) = super::frontier::economy_spec::tuning(world)
+        .map_or(
+            (
+                LEVY_THRESHOLD,
+                LEVY_PERCENT,
+                DESTITUTION_FLOOR,
+                FUND_RESERVE_PER_RESIDENT,
+            ),
+            |tuning| {
+                (
+                    tuning.levy_threshold,
+                    tuning.levy_percent,
+                    tuning.destitution_floor,
+                    tuning.fund_reserve_per_resident,
+                )
+            },
+        );
+    let mut fund = world.resource::<VillageState>().fund;
+    let (mut contributed, mut granted, mut dividend) = (0_u32, 0_u32, 0_u32);
+    for (_, e) in people {
+        let mut wallet = world.get_mut::<Wallet>(*e).expect("wallet");
+        let levy =
+            (u64::from(wallet.coins.saturating_sub(threshold)) * u64::from(percent) / 100) as u32;
+        let levy = levy.min(u32::MAX - fund);
+        wallet.coins -= levy;
+        fund += levy;
+        contributed += levy;
+    }
+    // When the fund cannot bring everybody up to the floor, the rest is raised
+    // from coins above it (regional relief levy). Floor grants never take the
+    // coins the fund holds for open building sites: with them the sites
+    // starved for weeks while the grants grew (pass 4).
+    let wanted = people
+        .iter()
+        .map(|(_, e)| floor.saturating_sub(world.get::<Wallet>(*e).map_or(floor, |w| w.coins)))
+        .fold(0_u32, u32::saturating_add);
+    world.resource_mut::<VillageState>().fund = fund;
+    let site_hold = if super::frontier::economy_spec::tuning(world)
+        .is_some_and(|tuning| tuning.grants_spare_sites)
+    {
+        super::civic::fund_hold(world).min(fund)
+    } else {
+        0
+    };
+    let mut relief = 0;
+    if wanted > fund - site_hold {
+        relief = super::civic::raise_relief_levy(world, wanted - (fund - site_hold));
+        fund = world.resource::<VillageState>().fund;
+    }
+    let mut grantable = fund.saturating_sub(site_hold);
+    for (_, e) in people {
+        let mut wallet = world.get_mut::<Wallet>(*e).expect("wallet");
+        let grant = floor.saturating_sub(wallet.coins).min(grantable);
+        grantable -= grant;
+        wallet.coins += grant;
+        fund -= grant;
+        granted += grant;
+    }
+    super::civic::note_grants(world, granted, contributed);
+    let count = people.len() as u32;
+    // The reserve follows recent grants: what the planner and the grants may
+    // still need stays in the fund, and only the rest is handed back.
+    let reserve = count
+        .saturating_mul(reserve_each)
+        .max(super::civic::reserve(world));
+    // Coins open building sites still need are spent there, not handed back:
+    // the dividend returns only what the civic planner cannot use.
+    let hold = super::civic::fund_hold(world);
+    // Coins the building levy raised are already part of what sites hold.
+    let share = fund
+        .saturating_sub(reserve)
+        .saturating_sub(hold)
+        .checked_div(count)
+        .unwrap_or(0);
+    if share > 0 {
+        for (_, e) in people {
+            let mut wallet = world.get_mut::<Wallet>(*e).expect("wallet");
+            if wallet.coins.checked_add(share).is_some() {
+                wallet.coins += share;
+                fund -= share;
+                dividend += share;
+            }
+        }
+    }
+    let mut state = world.resource_mut::<VillageState>();
+    state.fund = fund;
+    state.last_dividend_day = day;
+    // Grants came first; what building still needs beyond the fund's means
+    // is raised from everybody's coins above the floor.
+    super::civic::settle_earmark(world);
+    super::civic::raise_building_levy(world);
+    let fund = world.resource::<VillageState>().fund;
+    record_effect(
+        world,
+        None,
+        "VillageCivicLevy",
+        &json!({"day":day,"levy_percent":percent,"threshold":threshold,
+            "contributed":contributed,"floor":floor,"floor_grants":granted,
+            "dividend":dividend,"balance":fund,"held_for_building":hold,
+            "reserve":reserve,"relief_levy":relief}),
+    );
+}
+pub(super) fn recover_found(world: &mut World, e: Entity) -> bool {
+    // Only purses and diaries on the ground are lost property: two small
+    // queries instead of a pass over every item in the world.
+    let mut lost: Vec<(SimId, Entity)> = Vec::new();
+    for (item, id, _) in world
+        .query_filtered::<(Entity, &SimId, &Item), bevy_ecs::query::Or<(With<DroppedDiary>, With<CoinPurse>)>>()
         .iter(world)
-        .filter(|(item, _, _)| {
-            world
-                .get::<npc_framework::interaction::CarriedBy>(*item)
-                .is_none()
-                && (world.get::<DroppedDiary>(*item).is_some()
-                    || world.get::<CoinPurse>(*item).is_some())
-                && econ::near(world, e, *item)
-        })
-        .map(|(e, id, _)| (*id, e))
-        .collect();
+    {
+        if world
+            .get::<npc_framework::interaction::CarriedBy>(item)
+            .is_none()
+            && econ::near(world, e, item)
+        {
+            lost.push((*id, item));
+        }
+    }
     lost.sort_by_key(|(id, _)| *id);
     if let Some((target, item)) = lost.first().copied() {
         let verb = if world.get::<CoinPurse>(item).is_some() {
@@ -1115,6 +1631,7 @@ pub(super) fn recover_found(world: &mut World, e: Entity) {
         };
         let mut command = VillageAct::new(*world.get::<SimId>(e).expect("sim actor"), verb);
         command.target = Some(target);
-        let _ = command.perform(world);
+        return command.perform(world).is_ok();
     }
+    false
 }
