@@ -45,6 +45,7 @@ fn options(textures: ArtTextures) -> RenderOptions {
         reduced: false,
         blood: true,
         scene: SceneLook::neutral(0),
+        sky: SkyClock::default(),
         // Beside the arena, so the canvas-clipped grade and vignette stay
         // out of the arena's own primitives, as in the battle screen.
         canvas: arena().expand(24.0),
@@ -2648,6 +2649,118 @@ fn cue_pass_paints_after_the_grade_and_the_vignette() {
         1,
         "a neutral stage paints the vignette only on the canvas"
     );
+}
+
+/// G7.3: the sky flash is one over-rect on the canvas, straight after the
+/// grade and under the vignette and the whole cue pass, so it cannot mask a
+/// cue; and it is not painted at all near an attack cue, while paused or in
+/// reduced effects.
+#[test]
+fn sky_flash_paints_under_cue_pass() {
+    use super::super::lighting::{self, Lighting, SceneLook, SkyClock, SkyQuiet};
+    let (game, view) = every_cue_view();
+    let canvas = arena().expand(24.0);
+    let storm_scene = SceneLook {
+        lighting: Lighting::Storm,
+        storm: true,
+        seed: 7,
+        ..SceneLook::neutral(0)
+    };
+    let peak = (0..200_000u64)
+        .find(|&ms| lighting::sky_flash(7, ms, SkyQuiet::default(), false, false, true) >= 1.0)
+        .expect("a pulse peak");
+    let sky = SkyClock {
+        wall_ms: peak as f64,
+        speed: 1,
+    };
+    let rgba = |rgb: [u8; 3], alpha: f32| {
+        egui::Color32::from_rgba_unmultiplied(rgb[0], rgb[1], rgb[2], (alpha * 255.0).round() as u8)
+    };
+    let storm = lighting::grade(Lighting::Storm);
+    let grade_fill = rgba(storm.tint, storm.alpha);
+    let flash_fill = rgba(lighting::SKY_RGB, lighting::SKY_PEAK_ALPHA);
+    let pass = |a: &horde_core::sim::Attempt, reduced: bool| {
+        let ctx = egui::Context::default();
+        let mut output = ctx.run_ui(Default::default(), |ui| {
+            let painter = ui.painter().with_clip_rect(arena());
+            let options = RenderOptions {
+                scene: storm_scene,
+                sky,
+                reduced,
+                canvas,
+                ..options(textures())
+            };
+            battlefield(&painter, arena(), &view, a, [10.0, 5.0], options);
+        });
+        output.textures_delta.clear();
+        output.shapes
+    };
+    let fills = |shapes: &[egui::epaint::ClippedShape], fill: egui::Color32| -> Vec<usize> {
+        shapes
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| matches!(&s.shape, egui::Shape::Rect(r) if r.fill == fill && r.rect == canvas))
+            .map(|(n, _)| n)
+            .collect()
+    };
+    // A calm moment of the same field: no cue event in the quiet windows.
+    let mut calm = game.attempt().unwrap().clone();
+    calm.events.clear();
+    calm.paused = false;
+    let shapes = pass(&calm, false);
+    let grade = fills(&shapes, grade_fill);
+    let flash = fills(&shapes, flash_fill);
+    assert_eq!(grade.len(), 1, "one storm grade rect");
+    assert_eq!(flash, [grade[0] + 1], "the flash follows the grade");
+    assert_eq!(shapes[flash[0]].clip_rect, canvas);
+    let vignette = &shapes[flash[0] + 1];
+    assert!(
+        vignette.clip_rect == canvas && matches!(vignette.shape, egui::Shape::Mesh(_)),
+        "the vignette follows the flash"
+    );
+    let texts: Vec<(usize, String)> = shapes
+        .iter()
+        .enumerate()
+        .filter_map(|(n, s)| match &s.shape {
+            egui::Shape::Text(text) => Some((n, text.galley.text().to_owned())),
+            _ => None,
+        })
+        .collect();
+    for cue in ["BOSS APPROACHING", "REINFORCEMENTS", "INCOMING", "+150c"] {
+        assert!(
+            texts
+                .iter()
+                .any(|(n, text)| text == cue && *n > flash[0] + 1),
+            "{cue} paints over the flash: {texts:?}"
+        );
+    }
+    assert!(
+        shapes[flash[0] + 2..]
+            .iter()
+            .all(|s| s.clip_rect == arena()),
+        "everything after the vignette is the arena-clipped grid and cue pass"
+    );
+    // Reduced effects and a paused battle: the static storm grade only.
+    assert!(fills(&pass(&calm, true), flash_fill).is_empty(), "reduced");
+    assert_eq!(fills(&pass(&calm, true), grade_fill).len(), 1, "reduced");
+    let mut paused = calm.clone();
+    paused.paused = true;
+    assert!(
+        fills(&pass(&paused, false), flash_fill).is_empty(),
+        "paused"
+    );
+    // A windup this tick: the flash stays out of the cue's way.
+    let mut windup = calm.clone();
+    let mut event: horde_core::sim::Event =
+        serde_json::from_str(r#"{"kind":"Windup","from":[0,0],"to":[0,0],"value":0,"tick":0}"#)
+            .unwrap();
+    event.tick = windup.tick;
+    windup.events.push_back(event);
+    assert!(
+        fills(&pass(&windup, false), flash_fill).is_empty(),
+        "windup"
+    );
+    assert_eq!(fills(&pass(&windup, false), grade_fill).len(), 1);
 }
 
 /// Cue bars and labels scale with the zoom (design-vfx-lighting, cue

@@ -212,8 +212,20 @@ pub(crate) struct BattleUi {
     pub(super) last_toggle_frame: u64,
     /// Pre-tick actor positions and this frame's blend; see `battle_view`.
     pub(crate) interpolation: crate::battle_view::ActorInterpolation,
+    /// The storm lightning clock in ms: real time over unpaused frames, or
+    /// the attempt's tick in a fixed-step export (presentation only; see
+    /// `battle_view::interpolation`).
+    pub(crate) sky_wall_ms: f64,
 }
 impl BattleUi {
+    /// This frame's lightning clock at the chosen observation speed.
+    pub(crate) fn sky_clock(&self) -> crate::art::SkyClock {
+        crate::art::SkyClock {
+            wall_ms: self.sky_wall_ms,
+            speed: self.speed,
+        }
+    }
+
     fn new(aim: [f32; 2]) -> Self {
         Self {
             construction: false,
@@ -248,6 +260,7 @@ impl BattleUi {
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,
             interpolation: crate::battle_view::ActorInterpolation::default(),
+            sky_wall_ms: 0.0,
         }
     }
     /// Opens or closes the construction overlay. Closing clears

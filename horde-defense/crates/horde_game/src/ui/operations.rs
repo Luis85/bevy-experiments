@@ -308,6 +308,7 @@ pub(super) fn operations(ui: &mut egui::Ui, f: &mut UiCtx) {
                             reduced: f.settings.reduced_effects,
                             blood: f.settings.blood,
                             scene,
+                            sky: f.battle.sky_clock(),
                             canvas: effects_clip,
                             textures: f.textures,
                             occluder: None,

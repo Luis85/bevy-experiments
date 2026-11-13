@@ -38,7 +38,7 @@ pub(crate) use terrain::{
 #[cfg(test)]
 mod tests;
 
-use super::{ArenaProjection, RED, SceneLook, backdrop, lighting, soft_shadow};
+use super::{ArenaProjection, RED, SceneLook, SkyClock, backdrop, lighting, soft_shadow};
 use crate::{
     animation::{self, SceneAnimation, SceneCache},
     battle_view::{BattleViewModel, SceneBlend},
@@ -58,6 +58,9 @@ pub struct RenderOptions {
     /// Backdrop theme, lighting grade and storm tag of the stage
     /// ([`super::scene_look`]).
     pub scene: SceneLook,
+    /// The lightning clock of this frame (wall time over unpaused frames
+    /// and the observation speed; W5-02). Only a storm stage reads it.
+    pub sky: SkyClock,
     /// The whole canvas this field sits on (the window, or an observer's
     /// box): the grade and the vignette cover it, clipped to it.
     pub canvas: Rect,
@@ -166,12 +169,14 @@ fn render(
     ordnance::thrown(p, arena, view, a, reduced, textures, equipment.as_ref());
     fx::events(p, arena, view, muzzle, &fx_options);
     fx::particles(p, arena, &view.particles);
-    // 2. Grade and 3. vignette, over the whole canvas. The sky pulse is
-    // W5-02's wall-clock lightning; until it lands no stage flashes.
+    // 2. Grade and 3. vignette, over the whole canvas. The sky pulse is the
+    // wall-clock lightning of a storm stage: under the vignette and every
+    // cue, and silent near a boss or attack cue.
     // (`with_clip_rect` would intersect with the arena clip `p` carries.)
     let mut canvas = p.clone();
     canvas.set_clip_rect(options.canvas);
-    let (grade, sky) = lighting::scene_grade(options.scene, reduced, 0.0);
+    let pulse = lighting::sky_pulse(options.scene, options.sky, a, reduced);
+    let (grade, sky) = lighting::scene_grade(options.scene, reduced, pulse);
     lighting::paint_grade(&canvas, options.canvas, grade, sky);
     backdrop::edge_shade(&canvas, options.canvas);
     // 4. Construction grid.

@@ -24,7 +24,7 @@ pub use battlefield::{RenderOptions, battlefield, battlefield_for_attempt, sampl
 pub use camera::{FieldFit, fit_field};
 pub use figures::{bar, figure, structure};
 use figures::{soft_shadow, structure_fallback};
-pub use lighting::{SceneLook, scene_look};
+pub use lighting::{SceneLook, SkyClock, scene_look};
 pub use palette::{AMBER, GREEN, INK, MUTED, PANEL, RED, TEXT};
 pub use projection::ArenaProjection;
 #[cfg(test)]

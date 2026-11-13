@@ -161,6 +161,150 @@ pub fn scene_grade(look: SceneLook, reduced: bool, pulse: f32) -> (Grade, f32) {
 pub const SKY_PEAK_ALPHA: f32 = 0.14;
 pub const SKY_RGB: [u8; 3] = [200, 214, 235];
 
+/// The lightning schedule (design §4 as amended by rulings RL and W-8), in
+/// wall-clock milliseconds: one slot per 8 s, a pulse in 60% of the slots,
+/// starting in the slot's first 4 s, so two pulse starts are always more
+/// than 4 s of wall time apart, whatever the observation speed.
+pub const SKY_SLOT_MS: u64 = 8000;
+pub const SKY_FIRE_PERCENT: u64 = 60;
+pub const SKY_OFFSET_RANGE_MS: u64 = 4000;
+/// A pulse rises linearly over `SKY_RISE_MS` and decays over `SKY_DECAY_MS`.
+pub const SKY_RISE_MS: u64 = 33;
+pub const SKY_DECAY_MS: u64 = 233;
+/// No flash within this much wall time after a BossWarning or Boss event.
+pub const SKY_QUIET_BOSS_MS: u64 = 1000;
+/// No flash within this much wall time after a Windup, Contact or Damage
+/// event.
+pub const SKY_QUIET_CUE_MS: u64 = 750;
+/// Domain tag of the schedule hash ("SKYFLASH").
+const SKY_TAG: u64 = 0x534B_5946_4C41_5348;
+
+/// The lightning clock of one frame: unscaled real time accumulated over
+/// unpaused frames, and the observation speed (it turns event ages in ticks
+/// into wall time for the quiet windows). Presentation state only.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SkyClock {
+    pub wall_ms: f64,
+    pub speed: u32,
+}
+
+impl SkyClock {
+    /// Adds one frame of real time; a frozen (paused) frame adds nothing.
+    pub fn advance(&mut self, dt_ms: f64, frozen: bool) {
+        if !frozen && dt_ms.is_finite() && dt_ms > 0.0 {
+            self.wall_ms += dt_ms;
+        }
+    }
+
+    /// The clock a fixed-step export or automated screenshot draws: the
+    /// attempt's own tick at 60 Hz, so its frames do not depend on the wall
+    /// clock.
+    pub fn of_tick(tick: u64, speed: u32) -> Self {
+        Self {
+            wall_ms: tick as f64 * 1000.0 / 60.0,
+            speed,
+        }
+    }
+}
+
+/// Wall time since the latest boss cue and the latest attack cue, each
+/// `None` when it is outside its quiet window.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct SkyQuiet {
+    pub boss_ms: Option<u64>,
+    pub cue_ms: Option<u64>,
+}
+
+/// The quiet windows of `a` at observation speed `speed`: an event `n`
+/// ticks old is `n * 1000 / (60 * speed)` ms of wall time old.
+pub fn sky_quiet(a: &Attempt, speed: u32) -> SkyQuiet {
+    use horde_core::sim::EventKind as K;
+    let per_second = 60 * u64::from(speed.max(1));
+    let mut quiet = SkyQuiet::default();
+    // Events are in ascending tick order: stop at the first one older than
+    // the longer window.
+    for event in a.events.iter().rev() {
+        let age = a.tick.saturating_sub(event.tick) * 1000 / per_second;
+        if age >= SKY_QUIET_BOSS_MS.max(SKY_QUIET_CUE_MS) {
+            break;
+        }
+        match event.kind {
+            K::BossWarning | K::Boss if quiet.boss_ms.is_none() => quiet.boss_ms = Some(age),
+            K::Windup | K::Contact | K::Damage
+                if quiet.cue_ms.is_none() && age < SKY_QUIET_CUE_MS =>
+            {
+                quiet.cue_ms = Some(age);
+            }
+            _ => {}
+        }
+    }
+    quiet
+}
+
+/// When the pulse of the slot holding `wall_ms` starts, if that slot fires.
+pub fn sky_pulse_start(seed: u64, wall_ms: u64) -> Option<u64> {
+    let slot = wall_ms / SKY_SLOT_MS;
+    let h = splitmix(seed ^ slot ^ SKY_TAG);
+    (h % 100 < SKY_FIRE_PERCENT).then(|| slot * SKY_SLOT_MS + (h >> 8) % SKY_OFFSET_RANGE_MS)
+}
+
+/// SplitMix64's finaliser: the schedule's own hash of the presentation seed
+/// and the slot.
+fn splitmix(mut z: u64) -> u64 {
+    z = z.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
+}
+
+/// The lightning intensity (0..=1) at `wall_ms` of the storm clock for a
+/// stage with presentation seed `seed`. Zero on a storm-free stage, while
+/// paused, in reduced effects (which shows the static Storm grade only) and
+/// inside a quiet window, so a flash never competes with a warning.
+pub fn sky_flash(
+    seed: u64,
+    wall_ms: u64,
+    quiet: SkyQuiet,
+    paused: bool,
+    reduced: bool,
+    storm: bool,
+) -> f32 {
+    let quiet = quiet.boss_ms.is_some_and(|ms| ms < SKY_QUIET_BOSS_MS)
+        || quiet.cue_ms.is_some_and(|ms| ms < SKY_QUIET_CUE_MS);
+    if !storm || paused || reduced || quiet {
+        return 0.0;
+    }
+    let Some(start) = sky_pulse_start(seed, wall_ms) else {
+        return 0.0;
+    };
+    // A pulse (266 ms) ends inside its own slot: it starts in the first 4 s.
+    let Some(t) = wall_ms.checked_sub(start) else {
+        return 0.0;
+    };
+    if t <= SKY_RISE_MS {
+        t as f32 / SKY_RISE_MS as f32
+    } else if t < SKY_RISE_MS + SKY_DECAY_MS {
+        1.0 - (t - SKY_RISE_MS) as f32 / SKY_DECAY_MS as f32
+    } else {
+        0.0
+    }
+}
+
+/// The pulse one frame of `a` asks [`scene_grade`] for.
+pub fn sky_pulse(look: SceneLook, clock: SkyClock, a: &Attempt, reduced: bool) -> f32 {
+    if !look.storm || reduced || a.paused {
+        return 0.0;
+    }
+    sky_flash(
+        look.seed,
+        clock.wall_ms.max(0.0) as u64,
+        sky_quiet(a, clock.speed),
+        a.paused,
+        reduced,
+        look.storm,
+    )
+}
+
 fn over(rgb: [u8; 3], alpha: f32) -> C {
     C::from_rgba_unmultiplied(
         rgb[0],
@@ -457,6 +601,319 @@ mod tests {
         let calm = SceneLook::of(1, Some(&theme("suburb", "mist", "dawn")));
         assert_eq!(scene_grade(calm, false, 1.0).1, 0.0);
         assert_eq!(scene_grade(SceneLook::neutral(0), false, 1.0).1, 0.0);
+    }
+
+    const SKY_SEEDS: [u64; 6] = [0, 1, 7, 0x00C0_FFEE, u64::MAX, 0x1234_5678_9ABC_DEF0];
+
+    /// G7.3 (rulings RL, W-8): lightning is paced on the wall clock. At 1x,
+    /// 2x and 4x observation speed, with even and uneven frame times, pulse
+    /// starts are at least 4,000 ms of wall time apart, the schedule is the
+    /// same at every speed, and paused frames do not move it.
+    #[test]
+    fn sky_flash_starts_at_least_4000_ms_apart_at_observation_speed_4x() {
+        // Ten minutes of frames; `frame_ms(n)` is the n-th frame's length.
+        let starts = |seed: u64, speed: u32, frame_ms: &dyn Fn(u32) -> f64| {
+            let mut clock = SkyClock {
+                wall_ms: 0.0,
+                speed,
+            };
+            let (mut starts, mut lit, mut ticks, mut frame) = (Vec::new(), false, 0u64, 0u32);
+            while clock.wall_ms < 600_000.0 {
+                clock.advance(frame_ms(frame), false);
+                // A paused frame every 50th: no wall time, no ticks.
+                if frame % 50 == 0 {
+                    let before = clock;
+                    clock.advance(frame_ms(frame), true);
+                    assert_eq!(clock, before, "a paused frame is excluded");
+                }
+                ticks += u64::from(speed);
+                frame += 1;
+                let now = sky_flash(
+                    seed,
+                    clock.wall_ms as u64,
+                    SkyQuiet::default(),
+                    false,
+                    false,
+                    true,
+                );
+                assert!((0.0..=1.0).contains(&now));
+                if now > 0.0 && !lit {
+                    starts.push(clock.wall_ms as u64);
+                }
+                lit = now > 0.0;
+            }
+            assert!(ticks >= 14_000 * u64::from(speed), "{ticks} ticks");
+            starts
+        };
+        let even = |_: u32| 1000.0 / 60.0;
+        let uneven = |n: u32| [7.0, 33.4, 16.7, 4.2, 41.0][n as usize % 5];
+        let mut pulses = 0;
+        for seed in SKY_SEEDS {
+            let at_1x = starts(seed, 1, &even);
+            for speed in [1, 2, 4] {
+                for frames in [&even as &dyn Fn(u32) -> f64, &uneven] {
+                    let s = starts(seed, speed, frames);
+                    assert!(
+                        s.len() >= 20,
+                        "seed {seed} at {speed}x: {} pulses in 10 minutes",
+                        s.len()
+                    );
+                    for pair in s.windows(2) {
+                        assert!(
+                            pair[1] - pair[0] >= 4000,
+                            "seed {seed} at {speed}x: starts {} and {} ms",
+                            pair[0],
+                            pair[1]
+                        );
+                    }
+                    pulses += s.len();
+                }
+                assert_eq!(starts(seed, speed, &even), at_1x, "seed {seed} at {speed}x");
+            }
+            // The scheduled starts themselves, slot by slot.
+            let scheduled: Vec<u64> = (0..600_000 / SKY_SLOT_MS)
+                .filter_map(|slot| sky_pulse_start(seed, slot * SKY_SLOT_MS))
+                .collect();
+            assert!(scheduled.windows(2).all(|p| p[1] - p[0] > 4000));
+            for start in scheduled {
+                assert!(start % SKY_SLOT_MS < SKY_OFFSET_RANGE_MS);
+            }
+        }
+        // 60% of 75 slots, 6 seeds, 6 runs each: about 1 pulse per 13 s.
+        assert!((1200..=2100).contains(&pulses), "{pulses} pulses");
+    }
+
+    /// The first wall time at which `seed`'s schedule is at full intensity.
+    fn first_peak_ms(seed: u64) -> u64 {
+        (0..200_000)
+            .find(|&ms| sky_flash(seed, ms, SkyQuiet::default(), false, false, true) >= 1.0)
+            .expect("a pulse reaches full intensity within 200 s")
+    }
+
+    /// G7.3: the flash at its peak raises the mean luminance of any graded
+    /// ground by less than 0.2, under gamma-space and linear-space blending,
+    /// and the pulse itself rises over 33 ms and decays over 233 ms.
+    #[test]
+    fn sky_flash_peak_delta_below_0_2_under_gamma_and_linear_blending() {
+        let flash = |ms| sky_flash(7, ms, SkyQuiet::default(), false, false, true);
+        let peak_ms = first_peak_ms(7);
+        let start = sky_pulse_start(7, peak_ms).expect("the peak's slot fires");
+        assert_eq!(peak_ms, start + SKY_RISE_MS);
+        let mut peak = 0.0_f32;
+        for ms in start.saturating_sub(50)..start + 400 {
+            let now = flash(ms);
+            assert!((0.0..=1.0).contains(&now), "{ms}: {now}");
+            peak = peak.max(now);
+            let lit = ms > start && ms < start + SKY_RISE_MS + SKY_DECAY_MS;
+            assert_eq!(now > 0.0, lit, "{ms} ms, start {start}: {now}");
+        }
+        assert_eq!(peak, 1.0);
+        assert!(flash(start + 10) < flash(start + 20), "rises");
+        assert!(flash(start + 100) > flash(start + 200), "decays");
+        let sky = Grade {
+            tint: SKY_RGB,
+            alpha: SKY_PEAK_ALPHA * peak,
+            light_gain: 0.0,
+        };
+        let mut worst = 0.0_f32;
+        for ground in grounds().into_iter().chain([[255; 3], [0; 3]]) {
+            for l in Lighting::ALL {
+                for blend in [Blend::Gamma, Blend::Linear] {
+                    let g = grade(l);
+                    let (dark, lit) = match blend {
+                        Blend::Gamma => {
+                            let graded = [0, 1, 2].map(|n| {
+                                (f32::from(g.tint[n]) * g.alpha
+                                    + f32::from(ground[n]) * (1.0 - g.alpha))
+                                    .round() as u8
+                            });
+                            (
+                                relative_luminance(graded),
+                                graded_luminance(graded, sky, blend),
+                            )
+                        }
+                        Blend::Linear => {
+                            let dark = graded_luminance(ground, g, blend);
+                            (
+                                dark,
+                                relative_luminance(SKY_RGB) * sky.alpha + dark * (1.0 - sky.alpha),
+                            )
+                        }
+                    };
+                    let delta = (lit - dark).abs();
+                    assert!(delta < 0.2, "{ground:?} {l:?} {blend:?}: dL {delta:.3}");
+                    worst = worst.max(delta);
+                }
+            }
+        }
+        // The flash is not invisible either.
+        assert!(worst > 0.01, "worst dL {worst:.3}");
+    }
+
+    /// A deployed attempt with an empty event window at tick 1000.
+    fn calm_attempt() -> Attempt {
+        use horde_core::sim::Game;
+        let mut game = Game::default();
+        game.campaign_mut().attempts = 1;
+        game.deploy(0, horde_core::content::Mode::Personal).unwrap();
+        let mut a = game.attempt().unwrap().clone();
+        a.events.clear();
+        a.tick = 1000;
+        a
+    }
+
+    fn storm_look() -> SceneLook {
+        SceneLook {
+            storm: true,
+            lighting: Lighting::Storm,
+            seed: 7,
+            ..SceneLook::neutral(0)
+        }
+    }
+
+    /// Never masks a cue: no flash while paused, in reduced effects, on a
+    /// storm-free stage, within 1,000 ms of a boss cue or within 750 ms of a
+    /// windup, contact or damage cue, in wall time at the observation speed.
+    #[test]
+    fn sky_flash_is_quiet_near_boss_and_attack_cues_in_wall_time() {
+        let peak = first_peak_ms(7);
+        let at = |quiet, paused, reduced, storm| sky_flash(7, peak, quiet, paused, reduced, storm);
+        let none = SkyQuiet::default();
+        assert_eq!(at(none, false, false, true), 1.0);
+        assert_eq!(at(none, true, false, true), 0.0, "paused");
+        assert_eq!(at(none, false, true, true), 0.0, "reduced");
+        assert_eq!(at(none, false, false, false), 0.0, "no storm");
+        let boss = |ms| SkyQuiet {
+            boss_ms: Some(ms),
+            cue_ms: None,
+        };
+        let cue = |ms| SkyQuiet {
+            boss_ms: None,
+            cue_ms: Some(ms),
+        };
+        assert_eq!(at(boss(0), false, false, true), 0.0);
+        assert_eq!(at(boss(SKY_QUIET_BOSS_MS - 1), false, false, true), 0.0);
+        assert_eq!(at(boss(SKY_QUIET_BOSS_MS), false, false, true), 1.0);
+        assert_eq!(at(cue(SKY_QUIET_CUE_MS - 1), false, false, true), 0.0);
+        assert_eq!(at(cue(SKY_QUIET_CUE_MS), false, false, true), 1.0);
+
+        // The windows are wall time: an event 100 ticks old is 1,666 ms old
+        // at 1x and 416 ms old at 4x.
+        use horde_core::sim::{Event, EventKind};
+        let mut a = calm_attempt();
+        let blank: Event =
+            serde_json::from_str(r#"{"kind":"Shot","from":[0,0],"to":[0,0],"value":0,"tick":0}"#)
+                .unwrap();
+        for (kind, tick) in [
+            (EventKind::BossWarning, 900),
+            (EventKind::Windup, 960),
+            (EventKind::Shot, 990),
+        ] {
+            a.events.push_back(Event {
+                kind,
+                tick,
+                ..blank.clone()
+            });
+        }
+        let quiet = |boss_ms, cue_ms| SkyQuiet { boss_ms, cue_ms };
+        assert_eq!(sky_quiet(&a, 1), quiet(None, Some(666)));
+        assert_eq!(sky_quiet(&a, 2), quiet(Some(833), Some(333)));
+        assert_eq!(sky_quiet(&a, 4), quiet(Some(416), Some(166)));
+        assert_eq!(sky_quiet(&a, 0), sky_quiet(&a, 1), "speed 0 reads as 1x");
+        for kind in [EventKind::Contact, EventKind::Damage, EventKind::Boss] {
+            let mut one = calm_attempt();
+            one.events.push_back(Event {
+                kind,
+                tick: 999,
+                ..blank.clone()
+            });
+            assert_ne!(sky_quiet(&one, 1), SkyQuiet::default(), "{kind:?}");
+        }
+        // The frame's pulse: quiet at 4x, lit once the cues have aged out.
+        let look = storm_look();
+        let clock = |speed| SkyClock {
+            wall_ms: peak as f64,
+            speed,
+        };
+        assert_eq!(sky_pulse(look, clock(4), &a, false), 0.0);
+        a.tick = 2000;
+        assert_eq!(sky_pulse(look, clock(4), &a, false), 1.0);
+        assert_eq!(sky_pulse(look, clock(4), &a, true), 0.0, "reduced");
+        a.paused = true;
+        assert_eq!(sky_pulse(look, clock(4), &a, false), 0.0, "paused");
+        a.paused = false;
+        let calm = SceneLook {
+            storm: false,
+            ..look
+        };
+        assert_eq!(sky_pulse(calm, clock(4), &a, false), 0.0, "no storm");
+        // A fixed-step export reads the attempt's tick at 60 Hz.
+        assert_eq!(
+            SkyClock::of_tick(600, 2),
+            SkyClock {
+                wall_ms: 10_000.0,
+                speed: 2
+            }
+        );
+    }
+
+    /// ISO-8: the lightning schedule is keyed by the stage's presentation
+    /// seed (`StageTheme::variation`) and the wall clock only. It reads no
+    /// core RNG and no keyed roll, and reading an attempt's quiet windows
+    /// leaves the attempt unchanged.
+    #[test]
+    fn sky_flash_never_reads_core_rng() {
+        let source = include_str!("lighting.rs").replace('\r', "");
+        let production = source
+            .split("\n#[cfg(test)]\nmod tests {")
+            .next()
+            .expect("the production part");
+        assert!(production.contains("pub fn sky_flash("));
+        assert!(!production.contains("fn sky_flash_never_reads_core_rng"));
+        let code: String = production
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        for needle in [".rng", "Rng", "hash::", "keyed", "rand::", "random"] {
+            assert!(!code.contains(needle), "lighting.rs reads `{needle}`");
+        }
+        // The schedule is a function of (seed, wall_ms): seeds differ, and
+        // the same seed repeats.
+        let schedule = |seed: u64| -> Vec<Option<u64>> {
+            (0..64)
+                .map(|slot| sky_pulse_start(seed, slot * SKY_SLOT_MS))
+                .collect()
+        };
+        for seed in SKY_SEEDS {
+            assert_eq!(schedule(seed), schedule(seed));
+            let fired = schedule(seed).iter().flatten().count();
+            assert!((24..=52).contains(&fired), "seed {seed}: {fired} of 64");
+        }
+        assert_ne!(schedule(0), schedule(1));
+        assert_ne!(schedule(7), schedule(8));
+        // Two attempts with different RNG states on the same stage look
+        // flash alike, and neither is changed by the read.
+        use horde_core::sim::Game;
+        let clock = SkyClock {
+            wall_ms: first_peak_ms(7) as f64,
+            speed: 1,
+        };
+        let mut pulses = Vec::new();
+        for ticks in [0, 240] {
+            let mut game = Game::default();
+            game.campaign_mut().attempts = 1;
+            game.deploy(0, horde_core::content::Mode::Personal).unwrap();
+            for _ in 0..ticks {
+                game.tick(horde_core::sim::Input::default());
+            }
+            let mut a = game.attempt().unwrap().clone();
+            a.events.clear();
+            let before = serde_json::to_string(&a).unwrap();
+            pulses.push(sky_pulse(storm_look(), clock, &a, false));
+            assert_eq!(serde_json::to_string(&a).unwrap(), before);
+        }
+        assert_eq!(pulses, [1.0, 1.0]);
     }
 
     /// The operations observer dressed a worker's battle by `a.level`; every

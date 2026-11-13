@@ -17,8 +17,49 @@ impl Plugin for BattleViewPlugin {
             FixedUpdate,
             record_tick_snapshots.before(RuntimeSet::Advance),
         )
-        .add_systems(Update, update_blend_fraction);
+        .add_systems(Update, (update_blend_fraction, advance_sky_clock));
     }
+}
+
+/// Advances the storm lightning clock (rulings RL, W-8): unscaled real time,
+/// paused frames excluded, so lightning keeps its wall-clock pacing at every
+/// observation speed.
+fn advance_sky_clock(
+    time: Res<Time<Real>>,
+    config: Res<LaunchConfig>,
+    session: Res<GameSession>,
+    mut battle: ResMut<BattleUi>,
+) {
+    let game = &session.game;
+    let fixed_step = config.sequence_path().is_some() || config.capture_path().is_some();
+    let frozen = game.global_paused() || !any_attempt_running(game);
+    battle.sky_wall_ms = sky_wall_ms(
+        battle.sky_wall_ms,
+        time.delta_secs_f64() * 1000.0,
+        frozen,
+        fixed_step.then(|| game.attempt().map_or(0, |a| a.tick)),
+    );
+}
+
+/// True while the active attempt or any parallel battle is unpaused.
+fn any_attempt_running(game: &horde_core::sim::Game) -> bool {
+    game.attempt().is_some_and(|a| !a.paused)
+        || game
+            .battles()
+            .iter()
+            .any(|b| b.game().attempt().is_some_and(|a| !a.paused))
+}
+
+/// The lightning clock after one frame of `dt_ms` real time. Fixed-step
+/// exports and automated screenshots (`export_tick`) read the attempt's
+/// tick at 60 Hz instead, so their frames do not depend on the wall clock.
+pub fn sky_wall_ms(wall_ms: f64, dt_ms: f64, frozen: bool, export_tick: Option<u64>) -> f64 {
+    if let Some(tick) = export_tick {
+        return crate::art::SkyClock::of_tick(tick, 1).wall_ms;
+    }
+    let mut clock = crate::art::SkyClock { wall_ms, speed: 1 };
+    clock.advance(dt_ms, frozen);
+    clock.wall_ms
 }
 
 /// Runs before each fixed step's ticks: what is drawn as "previous".
@@ -50,6 +91,28 @@ pub fn blend_fraction(config: &LaunchConfig, overstep: f32) -> f32 {
         overstep.clamp(0.0, 1.0)
     } else {
         1.0
+    }
+}
+
+#[cfg(test)]
+mod sky_clock_tests {
+    use super::sky_wall_ms;
+
+    /// The lightning clock counts real time over unpaused frames only, and a
+    /// fixed-step export reads the attempt's tick instead of the wall clock.
+    #[test]
+    fn sky_clock_counts_unpaused_real_time_and_exports_read_the_tick() {
+        let mut wall = 0.0;
+        for _ in 0..60 {
+            wall = sky_wall_ms(wall, 16.0, false, None);
+        }
+        assert_eq!(wall, 960.0);
+        assert_eq!(sky_wall_ms(wall, 16.0, true, None), 960.0, "paused");
+        assert_eq!(sky_wall_ms(wall, f64::NAN, false, None), 960.0);
+        assert_eq!(sky_wall_ms(wall, -5.0, false, None), 960.0);
+        // 600 ticks are 10 s of export time, whatever the wall clock says.
+        assert_eq!(sky_wall_ms(wall, 16.0, false, Some(600)), 10_000.0);
+        assert_eq!(sky_wall_ms(wall, 900.0, true, Some(600)), 10_000.0);
     }
 }
 

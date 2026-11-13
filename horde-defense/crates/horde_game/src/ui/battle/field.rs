@@ -106,6 +106,7 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                     reduced: f.settings.reduced_effects,
                     blood: f.settings.blood,
                     scene: art::SceneLook::of(view.theme, view.field.setting.as_ref()),
+                    sky: f.battle.sky_clock(),
                     canvas,
                     textures: f.textures,
                     // The construction panel is painted over the field below.

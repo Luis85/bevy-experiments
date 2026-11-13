@@ -246,6 +246,11 @@ pub fn sky_flash(seed: u64, tick: u64, recent: &[FxView], paused: bool, reduced:
 
 **Paint:** an `SKY_RGB` over-rect at alpha `0.14·I` in the grade pass, under lights, vignette and cues, so it cannot mask a cue.
 
+**As built (W5-02; rulings RL and W-8 supersede the tick schedule above):**
+- `art::lighting::sky_flash(seed, wall_ms, quiet: SkyQuiet, paused, reduced, storm) -> f32` on wall-clock milliseconds: `SKY_SLOT_MS` 8000, `SKY_FIRE_PERCENT` 60, `SKY_OFFSET_RANGE_MS` 4000, `SKY_RISE_MS` 33, `SKY_DECAY_MS` 233, `SKY_QUIET_BOSS_MS` 1000, `SKY_QUIET_CUE_MS` 750. `sky_pulse_start(seed, wall_ms)` is the slot's scheduled start; `h = splitmix(seed ^ slot ^ SKY_TAG)` with `seed = StageTheme::variation`.
+- `SkyClock { wall_ms, speed }` travels in `RenderOptions.sky`. `BattleUi.sky_wall_ms` is advanced by `battle_view::interpolation::advance_sky_clock` from `Time<Real>`, frozen while the game is globally paused or no attempt is running. A fixed-step export or automated screenshot (`sequence_path` / `capture_path`) reads the active attempt's tick at 60 Hz instead, so its frames are deterministic.
+- Quiet windows read `Attempt.events` (`sky_quiet(a, speed)`): an event `n` ticks old is `n * 1000 / (60 * speed)` ms old at the chosen observation speed. `sky_pulse(look, clock, a, reduced)` is what `render` passes to `scene_grade`.
+
 **Modelled:** worst mean ΔL is 0.091 (linear blend, storm-graded arid) and 0.03-0.05 in gamma space. Both are below the 0.2 gate.
 
 ## 5. Weapon FX, wave 5
