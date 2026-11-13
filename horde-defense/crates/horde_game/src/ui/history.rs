@@ -98,11 +98,8 @@ pub(super) fn show(root: &mut egui::Ui, f: &mut UiCtx) {
             } else { trend(ui, "Average DPS", &dps, RED); trend(ui, "Banked coins", &coins, AMBER); trend(ui, "Deployment threat", &threat, GREEN); }
         });
     });
-    if close
-        || (root.input(|i| i.key_pressed(egui::Key::Escape))
-            && !root.ctx().text_edit_focused()
-            && !root.ctx().any_popup_open())
-    {
+    // Escape closes the page through the router (ui/escape.rs).
+    if close {
         f.close_history();
     }
 }

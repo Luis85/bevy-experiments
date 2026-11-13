@@ -3,7 +3,7 @@ use crate::{
     art,
     battle_view::{self, BattleScreen},
     settings::Action,
-    ui::{UiCtx, feedback},
+    ui::{UiCtx, escape},
 };
 use bevy_egui::egui;
 use horde_core::{
@@ -43,7 +43,7 @@ pub(in crate::ui) fn controls(ctx: &egui::Context, f: &mut UiCtx, views: Option<
         return;
     }
     f.battle.last_control_frame = frame;
-    if feedback::overlay_owns_keyboard(ctx, f) {
+    if escape::keyboard_owner(ctx, f) != escape::KeyboardOwner::Free {
         return;
     }
     if f.settings.pressed(ctx, Action::Pause, false) {
@@ -77,11 +77,7 @@ pub(in crate::ui) fn gather_combat_input(
     f: &mut UiCtx,
     views: Option<&BattleFrame>,
 ) -> Input {
-    if f.battle.construction
-        || ctx.text_edit_focused()
-        || ctx.any_popup_open()
-        || f.status.feedback.details_open
-    {
+    if f.battle.construction || escape::keyboard_owner(ctx, f) != escape::KeyboardOwner::Free {
         return Input {
             aim: f.battle.aim,
             auto_reload: f.settings.auto_reload,

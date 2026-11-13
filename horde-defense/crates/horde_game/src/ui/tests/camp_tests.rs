@@ -24,7 +24,7 @@ fn first_country_selection_starts_and_saves_a_personal_defense_waiting_to_begin(
 }
 
 #[test]
-fn camp_escape_and_footer_control_pause_and_resume_all_parallel_work() {
+fn camp_pause_key_and_footer_control_pause_and_resume_all_parallel_work() {
     let mut fixture = IsolatedFrontend::new();
     let h = Harness::new();
     let f = &mut fixture.frontend;
@@ -50,8 +50,12 @@ fn camp_escape_and_footer_control_pause_and_resume_all_parallel_work() {
         .unwrap();
     f.game.deploy_survivor(recruit, "POL", 0).unwrap();
     // W3-02 rewrite: Camp home owns the clock and its key (decision 6).
+    // W3-04 rewrite: Escape on Camp home now goes back (to Results or the
+    // return-to-menu confirmation, ui/escape.rs), so the clock key is the
+    // Pause binding off Escape (W3-10 gives the clock its own binding).
     f.nav.tab = Tab::Home;
-    h.key(f, View::Camp, Key::Escape);
+    f.settings.bindings[Action::Pause as usize] = "P".into();
+    h.key(f, View::Full, Key::P);
     assert!(f.game.global_paused());
     let frozen = serde_json::to_value(&f.game).unwrap();
     for _ in 0..60 {

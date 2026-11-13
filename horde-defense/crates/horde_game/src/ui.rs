@@ -9,6 +9,8 @@ use horde_core::{content::Mode, sim::Input};
 #[cfg(test)]
 mod app_tests;
 mod context;
+mod escape;
+mod modal;
 mod notices;
 mod plugin;
 mod primary_action;
@@ -99,6 +101,8 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
     // Before anything draws, so the registry holds this frame's primaries.
     primary_action::clear_frame_primaries(ctx);
     settings::configure(ctx, f.settings.scale);
+    // Before any reader of the keyboard: Escape is decided and consumed here.
+    escape::escape_router(ctx, f);
     ctx.style_mut_of(egui::Theme::Dark, |style| {
         style.animation_time = if f.settings.reduced_effects {
             0.0
@@ -147,6 +151,7 @@ fn draw_screen(ctx: &egui::Context, f: &mut UiCtx, now: f32) {
         Screen::History => history::show(root, f),
         Screen::Settings => settings_ui(root, f),
     }
+    modal::show(ctx, f);
     // A transition requested this frame ends live control immediately.
     let active =
         f.screen == Screen::Battle && !f.leaving() && f.game.attempt().is_some_and(|a| !a.paused);

@@ -9,15 +9,8 @@ use bevy_egui::egui;
 use horde_core::command::Command;
 
 pub(super) fn settings_ui(root: &mut egui::Ui, f: &mut UiCtx) {
+    // Escape saves and returns through the router (ui/escape.rs).
     let ctx = root.ctx().clone();
-    if !f.runtime.durable_transition_pending()
-        && f.prefs.rebind.is_none()
-        && !ctx.text_edit_focused()
-        && !ctx.any_popup_open()
-        && ctx.input(|input| input.key_pressed(egui::Key::Escape))
-    {
-        f.request_save(SaveIntent::SettingsBack);
-    }
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK).inner_margin(20))
         .show(root, |ui| {

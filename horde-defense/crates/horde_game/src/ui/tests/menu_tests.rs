@@ -98,7 +98,9 @@ fn escape_closes_the_new_journey_confirmation_without_a_reset() {
     let before = serde_json::to_value(&f.game).unwrap();
     h.click(f, View::Menu, "New game");
     assert!(f.menu.new_journey_confirm);
-    h.key(f, View::Menu, Key::Escape);
+    // W3-04 rewrite: the Escape router closes the confirmation, so the press
+    // goes through the whole frame.
+    h.key(f, View::Full, Key::Escape);
     assert!(!f.menu.new_journey_confirm);
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);
 }

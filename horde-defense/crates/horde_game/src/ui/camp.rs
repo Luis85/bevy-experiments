@@ -1,6 +1,6 @@
 //! Campaign selection and the persistent preparation shell.
 use super::{
-    Screen, Tab, UiCtx, armory, briefing, character, chrome, feedback, home, muted, navigation,
+    Screen, Tab, UiCtx, armory, briefing, character, chrome, escape, home, muted, navigation,
     operations, primary, progress, status, survivor,
 };
 use crate::{
@@ -335,7 +335,7 @@ fn camp_controls(ctx: &egui::Context, f: &mut UiCtx) {
         return;
     }
     f.battle.last_control_frame = frame;
-    if feedback::overlay_owns_keyboard(ctx, f) || f.prefs.rebind.is_some() {
+    if escape::keyboard_owner(ctx, f) != escape::KeyboardOwner::Free {
         return;
     }
     // The camp's pause key drives the world clock only where the clock is

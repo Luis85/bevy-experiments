@@ -75,13 +75,6 @@ pub(super) fn primary_in_bar(ui: &mut egui::Ui, text: &str) -> Response {
 
 /// A modal's primary action: the screen primary's look, recorded on the
 /// modal surface.
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "W3-04's Quit and ReturnToMenu modals are its first callers"
-    )
-)]
 pub(super) fn primary_in_modal(ui: &mut egui::Ui, text: &str) -> Response {
     let min = vec2(
         ui.available_width().min(PRIMARY_MIN_SIZE.x),

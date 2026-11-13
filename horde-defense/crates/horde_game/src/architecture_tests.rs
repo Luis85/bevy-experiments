@@ -73,6 +73,21 @@ const RULES: &[Rule] = &[
     },
 ];
 
+/// UX-05 (W3-04): Escape is read in one place. The router decides what a
+/// press means and consumes it; a second reader would race it in the same frame.
+const ESCAPE_RULES: &[Rule] = &[
+    Rule {
+        needle: "Key::Escape",
+        allowed: &["ui/escape.rs"],
+        reason: "only the Escape router (ui/escape.rs) reads Escape",
+    },
+    Rule {
+        needle: "KeyCode::Escape",
+        allowed: &["ui/escape.rs"],
+        reason: "only the Escape router (ui/escape.rs) reads Escape",
+    },
+];
+
 const TEST_ATTRIBUTE: &str = "#[cfg(test)]";
 const TEST_FILE_ATTRIBUTE: &str = "#![cfg(test)]";
 
@@ -367,8 +382,13 @@ fn remove_inner_test_blocks(code: &mut [char]) {
     }
 }
 
-/// Scans one file's text; `path` is `/`-separated and relative to `src/`.
+/// Scans one file's text for the core-RNG rules; `path` is `/`-separated and
+/// relative to `src/`.
 fn scan_source(path: &str, text: &str) -> Scanned {
+    scan_source_with(path, text, RULES)
+}
+/// Scans one file's text for `rules`.
+fn scan_source_with(path: &str, text: &str, rules: &[Rule]) -> Scanned {
     let mut code = blank_comments_and_strings(text);
     if file_is_test_only(&code) {
         return Scanned {
@@ -381,7 +401,7 @@ fn scan_source(path: &str, text: &str) -> Scanned {
     let code: String = code.into_iter().collect();
     let mut hits = Vec::new();
     for (index, line) in code.lines().enumerate() {
-        for rule in RULES {
+        for rule in rules {
             let allowed = rule.allowed.iter().any(|prefix| path.starts_with(prefix));
             if !allowed && line.contains(rule.needle) {
                 hits.push(format!(
@@ -439,14 +459,18 @@ fn child_directory(path: &str) -> String {
     }
 }
 
-/// The scan of `directory`: hits, and the files it actually read.
+/// The core-RNG scan of `directory`: hits, and the files it actually read.
 fn scan_tree(directory: &Path) -> (Vec<String>, Vec<String>) {
+    scan_tree_with(directory, RULES)
+}
+/// The scan of `directory` for `rules`: hits, and the files it actually read.
+fn scan_tree_with(directory: &Path, rules: &[Rule]) -> (Vec<String>, Vec<String>) {
     let sources: Vec<(String, Scanned)> = rust_sources(directory)
         .into_iter()
         .map(|path| {
             let text = std::fs::read_to_string(directory.join(&path))
                 .unwrap_or_else(|error| panic!("read {path}: {error}"));
-            let scanned = scan_source(&path, &text);
+            let scanned = scan_source_with(&path, &text, rules);
             (path, scanned)
         })
         .collect();
@@ -554,6 +578,48 @@ fn presentation_never_reads_core_rng() {
     assert!(
         hits.is_empty(),
         "presentation reaches core randomness or the simulation step:\n{}",
+        hits.join("\n")
+    );
+}
+
+#[test]
+fn escape_is_read_only_by_the_router() {
+    // The scanner catches a planted read outside the router and allows the
+    // router's own.
+    let planted =
+        "fn back(ctx: &Context) -> bool { ctx.input(|i| i.key_pressed(egui::Key::Escape)) }\n";
+    let hits = scan_source_with("ui/history.rs", planted, ESCAPE_RULES).hits;
+    assert!(
+        hits.iter()
+            .any(|hit| hit.starts_with("ui/history.rs:1:") && hit.contains("Key::Escape")),
+        "the scanner missed a planted Escape read: {hits:?}"
+    );
+    assert!(
+        scan_source_with("ui/escape.rs", planted, ESCAPE_RULES)
+            .hits
+            .is_empty()
+    );
+    let bevy = "if keys.just_pressed(KeyCode::Escape) {}\n";
+    assert!(
+        !scan_source_with("ui/plugin.rs", bevy, ESCAPE_RULES)
+            .hits
+            .is_empty()
+    );
+    let (hits, read) = scan_tree_with(&source_directory(), ESCAPE_RULES);
+    for expected in [
+        "ui/escape.rs",
+        "ui/preferences.rs",
+        "ui/history.rs",
+        "ui/feedback.rs",
+    ] {
+        assert!(
+            read.iter().any(|path| path == expected),
+            "the scan never read {expected}: {read:?}"
+        );
+    }
+    assert!(
+        hits.is_empty(),
+        "Escape is read outside the router:\n{}",
         hits.join("\n")
     );
 }

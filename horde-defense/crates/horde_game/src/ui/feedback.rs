@@ -139,15 +139,6 @@ fn small_buttons_width(ui: &mut egui::Ui, labels: &[&str]) -> f32 {
     }
     probe.min_rect().width()
 }
-pub(super) fn overlay_owns_keyboard(ctx: &egui::Context, f: &mut UiCtx) -> bool {
-    if f.status.feedback.details_open {
-        if ctx.input(|input| input.key_pressed(egui::Key::Escape)) {
-            f.status.feedback.details_open = false;
-        }
-        return true;
-    }
-    ctx.text_edit_focused() || ctx.any_popup_open()
-}
 pub(super) fn tab_marker(
     ui: &egui::Ui,
     response: &egui::Response,

@@ -26,7 +26,9 @@ fn settings_from_main_menu_save_back_for_fresh_and_existing_profiles() {
         assert!(saved.global_paused());
         assert_eq!(Settings::load(&f.paths.settings()).master, 0.23);
         h.click(f, View::Menu, "Settings");
-        h.key(f, View::Settings, Key::Escape);
+        // W3-04 rewrite: Escape is routed by draw_screen (ui/escape.rs), so
+        // the press goes through the whole frame.
+        h.key(f, View::Full, Key::Escape);
         assert!(f.screen == Screen::Menu, "{}", f.status.message);
     }
 }
