@@ -1210,6 +1210,19 @@ fn equipment_autosell_rule_counts_only_below_uncommon_in_core() {
     assert!(f.game.attempt().is_none(), "staged in camp");
 }
 
+/// The briefing reads core's next defender (W3-16), so the Mara briefing
+/// scene stages her through `SetNextDefender`.
+#[test]
+fn briefing_npc_scene_stages_mara_as_the_next_defender() {
+    use horde_core::defenders::DefenderId;
+    let f = staged("briefing-npc");
+    assert!(f.screen == Screen::Camp && f.nav.tab == Tab::Briefing);
+    assert_eq!(f.game.campaign().next_defender, Some(DefenderId::Mara));
+    assert!(f.game.attempt().is_none());
+    let personal = staged("briefing");
+    assert_eq!(personal.game.next_defender(), DefenderId::Player);
+}
+
 #[test]
 fn briefing_recruit_staging_sets_next_defender_through_command() {
     use horde_core::{defenders::DefenderId, strategy::RecruitStatus};

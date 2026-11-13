@@ -1,6 +1,7 @@
 //! Pure briefing view model: the selected defense and the deployment forecast.
 use horde_core::{
     content::{LevelDefinition, Mode, Slot, content},
+    defenders::DefenderId,
     progression::ProgressionSnapshot,
     sim::Game,
     world::Country,
@@ -46,15 +47,24 @@ pub(super) struct BriefingView {
     pub loadout: Vec<LoadoutLine>,
     pub heal_ready: bool,
     pub character_points: u32,
-    pub npc_name: String,
-    pub npc_unspent: u32,
+    /// Who the briefing is for: the next defender.
+    pub defender: DefenderId,
+    /// The defender's card name.
+    pub defender_name: String,
+    /// A survivor defender's unspent training points (0 for the player).
+    pub training_unspent: u32,
     pub blueprints: usize,
 }
 
-/// The briefing for `stage` of the active country, or `None` before a front
-/// is chosen.
-pub(super) fn view_model(game: &Game, mode: Mode, stage: usize) -> Option<BriefingView> {
+/// The briefing for `defender` on `stage` of the active country, or `None`
+/// before a front is chosen. The loadout and the training line read the
+/// defender's own records; a recruit no longer on the roster reads as Mara.
+pub(super) fn view_model(game: &Game, defender: DefenderId, stage: usize) -> Option<BriefingView> {
     let campaign = game.campaign();
+    let mode = defender.mode();
+    let recruit = defender
+        .recruit()
+        .and_then(|id| game.strategy().roster.iter().find(|r| r.id == id));
     let country = campaign.world.active_country()?;
     let levels = country.level_count();
     let max_stage = campaign.world.completed(&country.id).min(levels - 1);
@@ -77,10 +87,11 @@ pub(super) fn view_model(game: &Game, mode: Mode, stage: usize) -> Option<Briefi
         }
     });
     let lanes = campaign.lane_count();
-    let loadout = match mode {
+    let loadout = game.defender_loadout(defender).unwrap_or(match mode {
         Mode::Personal => campaign.player.loadout,
         Mode::Npc => campaign.npc.loadout,
-    };
+    });
+    let npc = recruit.map_or(&campaign.npc, |r| &r.npc);
     Some(BriefingView {
         country,
         levels,
@@ -108,19 +119,27 @@ pub(super) fn view_model(game: &Game, mode: Mode, stage: usize) -> Option<Briefi
             (Slot::Accessory, "Accessory"),
         ]
         .into_iter()
-        .map(|(slot, label)| LoadoutLine {
-            label,
-            name: campaign.equipped(mode, slot).name.clone(),
-            level: campaign
+        .map(|(slot, label)| {
+            let item = campaign
                 .item(loadout[slot.index()])
-                .expect("equipped item exists")
-                .level,
+                .expect("equipped item exists");
+            LoadoutLine {
+                label,
+                name: item.definition().name.clone(),
+                level: item.level,
+            }
         })
         .collect(),
         heal_ready: campaign.profile(mode).heal,
         character_points: campaign.player.points,
-        npc_name: campaign.npc.name.clone(),
-        npc_unspent: campaign.npc.unspent,
+        defender,
+        defender_name: game
+            .defender_card(defender)
+            .map_or_else(|| npc.name.clone(), |card| card.name),
+        training_unspent: match mode {
+            Mode::Personal => 0,
+            Mode::Npc => npc.unspent,
+        },
         blueprints: campaign.blueprints.iter().filter(|v| **v).count(),
     })
 }
@@ -142,18 +161,18 @@ mod tests {
 
     #[test]
     fn no_briefing_before_a_front_is_chosen() {
-        assert_eq!(view_model(&Game::default(), Mode::Personal, 0), None);
+        assert_eq!(view_model(&Game::default(), DefenderId::Player, 0), None);
     }
 
     #[test]
     fn stage_is_clamped_to_the_next_unplayed_defense() {
         let mut game = started();
-        let view = view_model(&game, Mode::Personal, 7).unwrap();
+        let view = view_model(&game, DefenderId::Player, 7).unwrap();
         assert_eq!((view.max_stage, view.stage), (0, 0));
         assert_eq!(view.country.id, "DEU");
         assert_eq!(view.levels, world().country("DEU").unwrap().level_count());
         game.campaign_mut().record_country_stage_clear(0).unwrap();
-        let view = view_model(&game, Mode::Personal, 7).unwrap();
+        let view = view_model(&game, DefenderId::Player, 7).unwrap();
         assert_eq!((view.max_stage, view.stage), (1, 1));
         assert_eq!(view.level.name, content().levels[1].name);
     }
@@ -162,7 +181,7 @@ mod tests {
     fn forecast_and_deployment_facts_match_the_campaign() {
         let game = started();
         let c = game.campaign();
-        let view = view_model(&game, Mode::Personal, 0).unwrap();
+        let view = view_model(&game, DefenderId::Player, 0).unwrap();
         let forecast = view.forecast.as_ref().unwrap();
         let pressure = c.deployment_progression(Mode::Personal).unwrap();
         assert_eq!(forecast.pressure, pressure);
@@ -191,11 +210,18 @@ mod tests {
     #[test]
     fn npc_briefing_reads_the_npc_loadout() {
         let game = started();
-        let view = view_model(&game, Mode::Npc, 0).unwrap();
+        let view = view_model(&game, DefenderId::Mara, 0).unwrap();
         assert_eq!(
             view.loadout[1].name,
             game.campaign().equipped(Mode::Npc, Slot::Melee).name
         );
-        assert_eq!(view.npc_name, game.campaign().npc.name);
+        assert_eq!(view.defender_name, game.campaign().npc.name);
+        assert_eq!(view.training_unspent, game.campaign().npc.unspent);
+        let player = view_model(&game, DefenderId::Player, 0).unwrap();
+        assert_eq!(player.training_unspent, 0);
+        assert_eq!(
+            player.defender_name,
+            game.defender_card(DefenderId::Player).unwrap().name
+        );
     }
 }

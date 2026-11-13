@@ -37,7 +37,7 @@ pub(super) fn corner_hud(
                         progress(
                             ui,
                             view.hp as f32 / view.max_hp as f32,
-                            hp_text(view.defender, view.hp, view.max_hp, f.battle.low_hp),
+                            hp_text(&view.defender, view.hp, view.max_hp, f.battle.low_hp),
                             RED,
                         );
                         ui.horizontal(|ui| {

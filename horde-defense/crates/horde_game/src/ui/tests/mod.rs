@@ -596,6 +596,7 @@ mod briefing_tests;
 mod camp_tests;
 mod character_tests;
 mod chrome_tests;
+mod defender_tests;
 mod escape_tests;
 mod feedback_tests;
 mod frame_tests;

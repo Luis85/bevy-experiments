@@ -289,11 +289,12 @@ impl UiCtx<'_> {
             self.battle.fire_latched = !self.battle.fire_latched;
         }
     }
+    /// The Briefing primary (ruling D16): `BeginDefense` deploys core's
+    /// next defender on the planned stage. The UI names no mode.
     pub(super) fn begin(&mut self) {
         self.dispatch(
-            Command::Deploy {
+            Command::BeginDefense {
                 stage: self.campaign.stage,
-                mode: self.campaign.mode,
             },
             "Defense underway. Rewards stay banked if you retreat.",
         );

@@ -2,8 +2,9 @@
 //! attempt at its current tick; the HUD only lays it out.
 use horde_core::{
     content::Mode,
+    defenders::DefenderId,
     sim::{Attempt, EnemyPhase, EventKind, Game},
-    survivors::SurvivorId,
+    survivors::Appearance,
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -52,7 +53,9 @@ pub(in crate::ui) enum BossReadout {
 
 #[derive(Clone, Debug, PartialEq)]
 pub(in crate::ui) struct HudView {
-    pub defender: &'static str,
+    /// The defender's HUD name, from its core card (ROOK, MARA, ALEX).
+    pub defender: String,
+    /// The portrait the defender's own appearance selects.
     pub female_portrait: bool,
     pub hp: i32,
     pub max_hp: i32,
@@ -81,16 +84,10 @@ pub(in crate::ui) fn view_model(game: &Game) -> Option<HudView> {
     #[cfg(test)]
     crate::battle_view::builds::record(|b| &mut b.hud);
     let a = game.attempt()?;
+    let (defender, female_portrait) = identity(game, a);
     Some(HudView {
-        defender: if a.mode == Mode::Personal {
-            game.campaign()
-                .selected_survivor
-                .map_or("YOU", SurvivorId::name)
-        } else {
-            "MARA"
-        },
-        female_portrait: a.mode == Mode::Npc
-            || a.profile.appearance == horde_core::survivors::Appearance::Female,
+        defender,
+        female_portrait,
         hp: a.hp.max(0),
         max_hp: a.max_hp,
         ammo: a.ammo,
@@ -112,6 +109,27 @@ pub(in crate::ui) fn view_model(game: &Game) -> Option<HudView> {
         batch_size: a.progression.batch_size,
         gear_level: a.progression.item_level,
     })
+}
+
+/// The HUD name and portrait of whoever holds the defense (ruling D16):
+/// both come from the defender's core card, so a recruit taking over the
+/// main run is named and drawn as itself. The player keeps the survivor
+/// name and the appearance stamped on the attempt ("YOU" before a survivor
+/// is chosen); a defender without a card falls back to the attempt.
+fn identity(game: &Game, a: &Attempt) -> (String, bool) {
+    let stamped = a.profile.appearance == Appearance::Female;
+    match a.defender() {
+        DefenderId::Player => (
+            game.campaign()
+                .selected_survivor
+                .map_or_else(|| "YOU".to_owned(), |survivor| survivor.name().to_owned()),
+            stamped,
+        ),
+        defender => game.defender_card(defender).map_or_else(
+            || ("SURVIVOR".to_owned(), stamped),
+            |card| (card.hud_name, card.appearance == Appearance::Female),
+        ),
+    }
 }
 
 fn boss(a: &Attempt) -> BossReadout {

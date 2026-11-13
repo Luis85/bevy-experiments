@@ -6,6 +6,7 @@ use horde_core::{
     campaign::NpcTraining,
     command::{Command, MAX_RECALL_PERCENT, NpcTactics},
     content::{Mode, Policy, Slot},
+    defenders::DefenderId,
 };
 
 pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
@@ -124,8 +125,23 @@ pub(super) fn character(ui: &mut egui::Ui, f: &mut UiCtx) {
         muted(ui, "Body-development nodes share one journey tree. Legacy point payments and refunds remain in that tree; Mara retains separate training.");
     });
 }
+/// Mara's tactical policy (`SetNpcPolicy`).
 pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let npc = &f.game.campaign().npc;
+    tactics(ui, f, DefenderId::Mara);
+}
+/// The tactics of survivor defender `defender`, edited through core: Mara
+/// with `SetNpcPolicy`, a recruit (in camp, or defending the main run) with
+/// `SetRecruitTactics`. A recruit no longer on the roster shows nothing.
+pub(super) fn tactics(ui: &mut egui::Ui, f: &mut UiCtx, defender: DefenderId) {
+    let npc = match defender {
+        DefenderId::Recruit(id) => {
+            let Some(recruit) = f.game.strategy().roster.iter().find(|r| r.id == id) else {
+                return;
+            };
+            &recruit.npc
+        }
+        DefenderId::Player | DefenderId::Mara => &f.game.campaign().npc,
+    };
     let mut proposed = NpcTactics {
         policy: npc.policy,
         prefer_aim: npc.prefer_aim,
@@ -154,7 +170,13 @@ pub(super) fn policy(ui: &mut egui::Ui, f: &mut UiCtx) {
     });
     if proposed != before {
         f.dispatch(
-            Command::SetNpcPolicy(proposed),
+            match defender {
+                DefenderId::Recruit(id) => Command::SetRecruitTactics {
+                    id,
+                    tactics: proposed,
+                },
+                DefenderId::Player | DefenderId::Mara => Command::SetNpcPolicy(proposed),
+            },
             "Policy applies at the next legal decision.",
         );
     }

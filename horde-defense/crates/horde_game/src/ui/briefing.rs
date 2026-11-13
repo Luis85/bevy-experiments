@@ -4,6 +4,7 @@ use crate::art::{self, AMBER, GREEN, RED};
 use bevy_egui::egui::{self, Color32, RichText, Sense, vec2};
 use horde_core::{
     content::{Mode, content},
+    defenders::DefenderId,
     sim::Game,
     world::Country,
 };
@@ -11,7 +12,11 @@ mod view;
 use view::BriefingView;
 
 pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
-    let Some(view) = view::view_model(f.game, f.campaign.mode, f.campaign.stage) else {
+    // The briefing is for the next defender (ruling D16). The camp's
+    // equipment and training pages follow the same owner.
+    let defender = f.game.next_defender();
+    f.campaign.mode = defender.mode();
+    let Some(view) = view::view_model(f.game, defender, f.campaign.stage) else {
         chrome::page_title(
             ui,
             "Choose a front first",
@@ -19,7 +24,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         );
         return;
     };
-    let (country, mode) = (view.country, f.campaign.mode);
+    let country = view.country;
     f.campaign.stage = view.stage;
     // One header row: the defense, its picker and the defender. Readiness
     // and the field loadout follow directly, above the encounter detail.
@@ -47,14 +52,15 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
                 }
             });
         ui.add_space(16.0);
-        chrome::mode_picker(ui, f);
+        chrome::defender_picker(ui, f);
     });
     ui.add_space(6.0);
-    // A stage or defender picked this frame renders immediately.
-    let view = if (f.campaign.stage, f.campaign.mode) == (view.stage, mode) {
+    // A stage picked this frame renders immediately; a defender picked this
+    // frame is a queued command and shows once core has accepted it.
+    let view = if f.campaign.stage == view.stage {
         view
     } else {
-        view::view_model(f.game, f.campaign.mode, f.campaign.stage).expect("active country")
+        view::view_model(f.game, defender, f.campaign.stage).expect("active country")
     };
     if ui.available_width() >= 820.0 {
         let width = (ui.available_width() - 28.0) * 0.55;
@@ -123,7 +129,7 @@ pub(super) fn briefing(ui: &mut egui::Ui, f: &mut UiCtx) {
         ui.label(format!("Rank {} → {} · groups {} → {} · new gear Lv {} → {}", pressure.rank, next_pressure.rank, pressure.batch_size, next_pressure.batch_size, pressure.item_level, next_pressure.item_level));
         muted(ui, format!("Threat-only enemy health {:.2}× → {:.2}× · contact damage {:.2}× → {:.2}× · rewards {:.2}× → {:.2}×", pressure.enemy_health, next_pressure.enemy_health, pressure.enemy_damage, next_pressure.enemy_damage, pressure.reward_multiplier, next_pressure.reward_multiplier));
         ui.label(format!("Completion XP forecast: character {} → {} · lanes {} → {} · population cap {} → {}",view.character_level,view.level_after_victory,view.lanes,view.lanes_after_victory,pressure.enemy_cap,next_pressure.enemy_cap));
-        muted(ui,if view.max_level {"Character MAX is reached; victories continue raising future threat."} else if f.campaign.mode==Mode::Npc {"NPC kills do not grant personal XP. The known victory completion reward develops the character."} else {"The forecast includes known victory XP; additional personal kill XP may develop the character further before completion."});
+        muted(ui,if view.max_level {"Character MAX is reached; victories continue raising future threat."} else if view.defender.mode()==Mode::Npc {"NPC kills do not grant personal XP. The known victory completion reward develops the character."} else {"The forecast includes known victory XP; additional personal kill XP may develop the character further before completion."});
         ui.label(format!("Path forecast: {:.0} → {:.0} yd", view.path_yards, view.next_path_yards));
         muted(ui, "Every victory raises future threat, including replays and NPC victories. Defeats and withdrawals do not. Threat keeps growing after character MAX; this deployment snapshots its lane count and pressure.");
     });
@@ -163,7 +169,11 @@ fn loadout(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
         heading(ui, "Field loadout");
         ui.add_space(12.0);
         if ui.button("Change equipment").clicked() {
-            f.open_preparation(Tab::Armory);
+            // A recruit's gear is managed with the roster in Operations.
+            f.open_preparation(match view.defender {
+                DefenderId::Recruit(_) => Tab::Operations,
+                DefenderId::Player | DefenderId::Mara => Tab::Armory,
+            });
         }
     });
     // Two slots per row keep the loadout to two lines above the fold.
@@ -196,7 +206,7 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
             ui.label("Emergency aid ready");
         });
     }
-    if f.campaign.mode == Mode::Personal {
+    if view.defender == DefenderId::Player {
         let points = view.character_points;
         if points > 0 {
             ui.colored_label(AMBER, format!("{points} character points available"));
@@ -212,10 +222,17 @@ fn readiness(ui: &mut egui::Ui, f: &mut UiCtx, view: &BriefingView) {
     } else {
         ui.label(format!(
             "{} · {} unspent training points",
-            view.npc_name, view.npc_unspent
+            view.defender_name, view.training_unspent
         ));
-        if ui.button("Review survivor training").clicked() {
-            f.open_preparation(Tab::Survivor);
+        if ui
+            .button(format!("Review {}'s training", view.defender_name))
+            .clicked()
+        {
+            // Mara trains on her own page; recruits train in Operations.
+            f.open_preparation(match view.defender {
+                DefenderId::Recruit(_) => Tab::Operations,
+                DefenderId::Player | DefenderId::Mara => Tab::Survivor,
+            });
         }
     }
     let owned = view.blueprints;
@@ -258,7 +275,7 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             {
                 muted(
                     ui,
-                    format!("{} · {}", country.name, chrome::defender_name(f)),
+                    format!("{} · {}", country.name, chrome::next_defender_name(f.game)),
                 );
             }
         });
@@ -275,25 +292,26 @@ pub(super) fn mission_actions(ui: &mut egui::Ui, f: &mut UiCtx) {
             .completed(&country.id)
             .min(country.level_count() - 1),
     );
+    let defender = chrome::next_defender_name(f.game);
     ui.horizontal_wrapped(|ui| {
-        if primary(
-            ui,
-            if f.campaign.mode == Mode::Personal {
-                "Deploy personally"
-            } else {
-                "Deploy survivor"
-            },
-        )
-        .clicked()
-        {
+        if primary(ui, &deploy_label(f.game)).clicked() {
             f.begin();
         }
         ui.label(format!(
-            "{name} · Defense {} · {}",
-            f.campaign.stage + 1,
-            chrome::defender_name(f)
+            "{name} · Defense {} · {defender}",
+            f.campaign.stage + 1
         ));
     });
+}
+/// The briefing primary's label: "Deploy personally" for the player, else
+/// "Deploy <name>" with the next defender's card name.
+pub(super) fn deploy_label(game: &Game) -> String {
+    match game.next_defender() {
+        DefenderId::Player => "Deploy personally".into(),
+        DefenderId::Mara | DefenderId::Recruit(_) => {
+            format!("Deploy {}", chrome::next_defender_name(game))
+        }
+    }
 }
 
 #[cfg(test)]

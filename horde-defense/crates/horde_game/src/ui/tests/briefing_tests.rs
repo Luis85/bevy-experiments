@@ -13,7 +13,12 @@ fn preparation_keeps_the_planned_replay_and_defender_without_creating_an_attempt
         .world
         .country_levels
         .insert("DEU".into(), 2);
-    f.campaign.mode = Mode::Npc;
+    // The planned defender is core's next defender (W3-16, ruling D16).
+    f.game
+        .apply(&Command::SetNextDefender(
+            horde_core::defenders::DefenderId::Mara,
+        ))
+        .unwrap();
     f.campaign.stage = 0;
     f.act(|c| c.open_preparation(Tab::Armory));
     let before = serde_json::to_value(&f.game).unwrap();
@@ -21,6 +26,11 @@ fn preparation_keeps_the_planned_replay_and_defender_without_creating_an_attempt
     h.frame(f, View::Camp, vec![]);
     assert!(f.nav.tab == Tab::Briefing);
     assert_eq!(f.campaign.stage, 0);
+    assert_eq!(
+        f.game.next_defender(),
+        horde_core::defenders::DefenderId::Mara
+    );
+    // The camp's equipment and training pages follow the planned defender.
     assert!(f.campaign.mode == Mode::Npc);
     assert!(f.game.attempt().is_none());
     assert_eq!(serde_json::to_value(&f.game).unwrap(), before);

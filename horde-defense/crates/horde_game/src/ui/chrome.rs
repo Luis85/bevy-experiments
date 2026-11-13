@@ -5,7 +5,9 @@ use crate::{
     settings::{Palette, Settings},
 };
 use bevy_egui::egui::{self, Color32, FontId, Pos2, RichText, Sense, Stroke, vec2};
-use horde_core::{content::Mode, quality::Quality, survivors::SurvivorId};
+use horde_core::{
+    command::Command, content::Mode, defenders::DefenderId, quality::Quality, sim::Game,
+};
 
 pub(super) fn page_title(ui: &mut egui::Ui, title: &str, description: &str) {
     ui.label(
@@ -21,16 +23,14 @@ pub(super) fn section(ui: &mut egui::Ui, title: &str) {
     ui.label(RichText::new(title).size(18.0).strong());
     ui.add_space(4.0);
 }
-pub(super) fn defender_name<'a>(f: &UiCtx<'a>) -> &'a str {
-    if f.campaign.mode == Mode::Personal {
-        f.game
-            .campaign()
-            .selected_survivor
-            .map_or("You", SurvivorId::name)
-    } else {
-        &f.game.campaign().npc.name
-    }
+/// The name of whoever defends next, from its core card.
+pub(super) fn next_defender_name(game: &Game) -> String {
+    game.defender_card(game.next_defender())
+        .map_or_else(String::new, |card| card.name)
 }
+/// Whose equipment and training a camp page edits: the player's or Mara's.
+/// It is not the defender picker; the next defender is chosen with
+/// [`defender_picker`].
 pub(super) fn mode_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
     if !f
         .game
@@ -59,6 +59,97 @@ pub(super) fn mode_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
         );
     });
     if previous != f.campaign.mode {
+        f.campaign.improvement_focus = None;
+    }
+}
+/// The picker shows chips up to this many defenders and a combo box beyond.
+pub(super) const PICKER_CHIPS: usize = 3;
+/// One option of the defender picker, read from
+/// `Game::available_defenders`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(super) struct PickerEntry {
+    pub id: DefenderId,
+    /// The defender's card name.
+    pub name: String,
+    /// Whether this is the next defender.
+    pub selected: bool,
+    /// Core's reason `SetNextDefender` would reject this defender
+    /// (`DefenderBlocker::label`), verbatim.
+    pub blocked: Option<String>,
+}
+impl PickerEntry {
+    /// The option's text: the name, with the reason while it is blocked.
+    pub(super) fn label(&self) -> String {
+        match &self.blocked {
+            Some(reason) => format!("{} · {reason}", self.name),
+            None => self.name.clone(),
+        }
+    }
+}
+/// The picker's options in core order. Mara is listed once she can be
+/// chosen or trained, as on Camp home.
+pub(super) fn picker_entries(game: &Game) -> Vec<PickerEntry> {
+    let companion = game
+        .campaign()
+        .has_feature(horde_core::skill_catalog::CampaignFeature::Companion);
+    game.available_defenders()
+        .into_iter()
+        .filter(|option| option.card.id != DefenderId::Mara || companion)
+        .map(|option| PickerEntry {
+            id: option.card.id,
+            name: option.card.name,
+            selected: option.selected,
+            blocked: option.selectable.err().map(|blocker| blocker.label()),
+        })
+        .collect()
+}
+/// Who defends next (ruling D16): a row of chips, or a combo box beyond
+/// [`PICKER_CHIPS`] defenders. Choosing dispatches `SetNextDefender`; a
+/// defender core would reject is disabled and names core's reason. Nothing
+/// is drawn while a defense is live (core rejects every choice then) or
+/// while there is only one defender to choose.
+pub(super) fn defender_picker(ui: &mut egui::Ui, f: &mut UiCtx) {
+    if f.game.attempt().is_some() {
+        return;
+    }
+    let entries = picker_entries(f.game);
+    if entries.len() <= 1 {
+        return;
+    }
+    let mut chosen = None;
+    let mut options = |ui: &mut egui::Ui| {
+        for entry in &entries {
+            let response = ui
+                .add_enabled_ui(entry.blocked.is_none(), |ui| {
+                    ui.selectable_label(entry.selected, entry.label())
+                })
+                .inner;
+            let response = match &entry.blocked {
+                Some(reason) => response.on_disabled_hover_text(reason),
+                None => response,
+            };
+            if response.clicked() && !entry.selected {
+                chosen = Some(entry.id);
+            }
+        }
+    };
+    // Its own centred row, so the label meets its options wherever it is placed.
+    row(ui, |ui| {
+        ui.label("Defender");
+        if entries.len() <= PICKER_CHIPS {
+            options(ui);
+        } else {
+            let selected = entries
+                .iter()
+                .find(|entry| entry.selected)
+                .map_or_else(String::new, PickerEntry::label);
+            egui::ComboBox::from_id_salt("defender_picker")
+                .selected_text(selected)
+                .show_ui(ui, options);
+        }
+    });
+    if let Some(id) = chosen {
+        f.dispatch(Command::SetNextDefender(id), "");
         f.campaign.improvement_focus = None;
     }
 }

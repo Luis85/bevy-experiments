@@ -1,9 +1,10 @@
 //! Primary home after every main round. All rewards have already been settled.
-use super::{Screen, Tab, UiCtx, muted, navigation, primary, progression, status};
+use super::{Screen, Tab, UiCtx, chrome, muted, navigation, primary, progression, status};
 use crate::art::{AMBER, GREEN, INK, MUTED, RED, TEXT};
 use bevy_egui::egui::{self, Align, FontId, RichText, TextFormat, text::LayoutJob};
 use horde_core::{
     command::Command,
+    defenders::DefenderId,
     sim::{Outcome, Report},
     world::world,
 };
@@ -88,6 +89,18 @@ fn victory_line(f: &UiCtx, report: &Report) -> Option<String> {
     }
     (!parts.is_empty()).then(|| parts.join(" "))
 }
+/// " · <name>" when someone other than the player ran the defense, from
+/// the defender's core card; empty for the player or a defender no longer
+/// in camp.
+fn defender_suffix(f: &UiCtx, report: &Report) -> String {
+    match report.defender() {
+        DefenderId::Player => String::new(),
+        defender => f
+            .game
+            .defender_card(defender)
+            .map_or_else(String::new, |card| format!(" · {}", card.name)),
+    }
+}
 fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     let label = report.outcome.label();
     let color = match report.outcome {
@@ -104,7 +117,12 @@ fn outcome_strip(ui: &mut egui::Ui, f: &UiCtx, report: &Report) {
     let mut line = LayoutJob::default();
     line.append(label, 0.0, title(color));
     line.append(
-        &format!(" · {} · Defense {}", report.country_name, report.stage + 1),
+        &format!(
+            " · {} · Defense {}{}",
+            report.country_name,
+            report.stage + 1,
+            defender_suffix(f, report)
+        ),
         0.0,
         title(TEXT),
     );
@@ -155,6 +173,10 @@ pub(super) fn results(root: &mut egui::Ui, f: &mut UiCtx) {
             }
             ui.add_space(4.0);
             ui.horizontal_wrapped(|ui| actions(ui, f));
+            // Who defends next, between defenses of a running journey.
+            if f.game.campaign().journey_active && f.game.last_result().is_some() {
+                chrome::defender_picker(ui, f);
+            }
             if f.status.message_error || f.status.save_pending {
                 status(ui, f);
             }

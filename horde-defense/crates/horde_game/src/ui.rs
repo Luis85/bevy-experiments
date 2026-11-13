@@ -215,7 +215,7 @@ use self::camp::camp;
 #[cfg(test)]
 use self::camp::country_dossier;
 mod character;
-use self::character::{character, mode_selector, policy, survivor};
+use self::character::{character, mode_selector, survivor};
 mod armory;
 use self::armory::armory;
 mod battle;

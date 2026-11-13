@@ -15,7 +15,7 @@ use crate::{
     art::{self, INK, MUTED, TEXT},
     diagnostics::{self, InterfaceSpan},
     runner::SaveIntent,
-    ui::{Screen, UiCtx, armory, damage, loot, policy, primary_action, reticle, toast},
+    ui::{Screen, UiCtx, armory, character, damage, loot, primary_action, reticle, toast},
 };
 use bevy_egui::egui::{self, Align2, Color32, FontId, RichText, Sense, Stroke};
 use horde_core::{command::Command, content::Mode};
@@ -303,7 +303,14 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                                 format!("{speed}×"),
                             ));
                         }
-                        let response = rows.widget(ui.button("Survivor"));
+                        // Tactics edits whoever holds the defense: Mara,
+                        // or the recruit taking over (ruling D16).
+                        let defender = a.defender();
+                        let title = game.defender_card(defender).map_or_else(
+                            || "Tactics".to_owned(),
+                            |c| format!("{} · tactics", c.name),
+                        );
+                        let response = rows.widget(ui.button("Tactics"));
                         let mut popup = egui::Popup::menu(&response)
                             .width(300.0)
                             .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside);
@@ -317,12 +324,13 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                             egui::ScrollArea::vertical()
                                 .max_height((canvas.height() - 160.0).max(160.0))
                                 .show(ui, |ui| {
+                                    ui.label(RichText::new(&title).strong());
                                     crate::inspector::npc_decision(
                                         ui,
                                         a,
                                         f.launch.reviewing("npc-expanded"),
                                     );
-                                    policy(ui, f);
+                                    character::tactics(ui, f, defender);
                                 });
                         });
                     }

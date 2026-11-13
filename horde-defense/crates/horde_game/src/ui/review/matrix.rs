@@ -115,6 +115,12 @@ pub(in crate::ui) fn prepare(f: &mut FrontendParts) {
     if matches!(screen.as_str(), "briefing" | "briefing-npc") {
         if screen == "briefing-npc" {
             prepare_progression(&mut f.game);
+            // The briefing reads core's next defender (ruling D16).
+            f.game
+                .apply(&horde_core::command::Command::SetNextDefender(
+                    horde_core::defenders::DefenderId::Mara,
+                ))
+                .expect("Mara defends the briefing-npc scene");
             f.campaign.mode = Mode::Npc;
         }
         f.act(|c| c.open_briefing());

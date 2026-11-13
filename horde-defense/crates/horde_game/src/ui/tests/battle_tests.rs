@@ -975,7 +975,7 @@ fn battle_bar_rows_measure_todays_bar() {
         let mut fixture = fresh_battle(Mode::Npc, true);
         let f = &mut fixture.frontend;
         let output = h.frame_size(f, View::Battle, vec![], size);
-        for label in ["Pause", "Observe", "Survivor", "Recall & train"] {
+        for label in ["Pause", "Observe", "Tactics", "Recall & train"] {
             assert_eq!(text_count(&output, label), 1, "{size:?}: {label}");
         }
         assert_eq!(f.battle.bar_rows, observed, "{size:?}: observed");
@@ -1421,14 +1421,14 @@ fn battle_bar_stays_within_two_rows_at_small_size() {
                             (_, false) => &[
                                 "Build defenses",
                                 "Observe",
-                                "Survivor",
+                                "Tactics",
                                 "Recall & train",
                                 "Management",
                             ],
                             (_, true) => &[
                                 "Close construction",
                                 "Observe",
-                                "Survivor",
+                                "Tactics",
                                 "Recall & train",
                                 "Management",
                             ],

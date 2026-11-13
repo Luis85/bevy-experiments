@@ -57,7 +57,7 @@ fn npc_resolution_popup_and_observation_controls_fit_at_both_sizes() {
         h.frame_size(f, View::Battle, vec![], size);
         h.frame_size(f, View::Battle, vec![], size);
         let base = h.frame_size(f, View::Battle, vec![], size);
-        for label in ["Observe", "4×", "Survivor"] {
+        for label in ["Observe", "4×", "Tactics"] {
             let r = base
                 .shapes
                 .iter()
@@ -68,7 +68,7 @@ fn npc_resolution_popup_and_observation_controls_fit_at_both_sizes() {
                 "{label} escaped viewport {r:?}"
             );
         }
-        h.click_size(f, View::Battle, "Survivor", size);
+        h.click_size(f, View::Battle, "Tactics", size);
         for expanded in [false, true] {
             if expanded {
                 h.click_size(f, View::Battle, "Latest resolution", size);
