@@ -6,6 +6,7 @@ use super::{
     details::field_details,
     input::{preview_aim, reticle_ownership},
     layout::{BAR_BUTTON_PADDING_Y, BAR_ROW_GAP, PANEL_FILL_ALPHA, occluded_spawn_cues},
+    low_hp::{low_hp, low_hp_edge},
     overlays::{corner_hud, field_hint_callout, incoming_cues, pause_banner},
     projection,
     retreat::retreat_button,
@@ -27,12 +28,18 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
     let (Some(views), Some(a)) = (views, game.attempt()) else {
         f.battle.occluded_lanes.clear();
         f.battle.boss_banner_rect = None;
+        f.battle.low_hp = false;
         f.go(Screen::Results);
         return;
     };
     // The frame sampled the field's scene cache for this layer.
     debug_assert_eq!(root.layer_id(), egui::LayerId::background());
     let (view, hud_view) = (&views.screen, &views.hud);
+    // Low HP has hysteresis (UX-12): the remembered half is presentation
+    // state, and another attempt starts from "not low".
+    let was_low = f.battle.low_hp && f.battle.low_hp_attempt == view.boss.attempt;
+    f.battle.low_hp = low_hp(hud_view.hp, hud_view.max_hp, was_low);
+    f.battle.low_hp_attempt = view.boss.attempt;
     let ctx = root.ctx().clone();
     egui::CentralPanel::default()
         .frame(egui::Frame::new().fill(INK))
@@ -105,6 +112,15 @@ pub(in crate::ui) fn battle(root: &mut egui::Ui, f: &mut UiCtx, views: Option<&B
                 perf.record_battlefield_clip(field_painter.clip_rect());
             }
             art::world_atmosphere(ui.painter(), canvas);
+            if f.battle.low_hp {
+                // Over the field and the forest, under every HUD frame.
+                low_hp_edge(
+                    ui,
+                    canvas,
+                    !view.paused && !view.global_paused,
+                    f.settings.reduced_effects,
+                );
+            }
             if hovered {
                 crate::inspector::hover(&response, a, f.battle.aim);
                 if f.battle.construction {

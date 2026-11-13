@@ -190,6 +190,13 @@ pub(crate) struct BattleUi {
     /// Where the main battle painted its boss banner in the last drawn
     /// battle frame, `None` when it painted none (presentation only).
     pub(super) boss_banner_rect: Option<Rect>,
+    /// Whether the main battle's defender is low on HP, with the 30/35%
+    /// hysteresis of `battle::low_hp` (presentation only; UX-12): the edge
+    /// band and the HUD's "· LOW" read it. Written each battle frame.
+    pub(super) low_hp: bool,
+    /// The attempt `low_hp` was last judged for; another attempt starts from
+    /// "not low".
+    pub(super) low_hp_attempt: u64,
     pub(super) arena_hover: bool,
     pub(super) last_control_frame: u64,
     pub(super) last_toggle_frame: u64,
@@ -224,6 +231,8 @@ impl BattleUi {
             boss_banner: None,
             observer_boss_banner: None,
             boss_banner_rect: None,
+            low_hp: false,
+            low_hp_attempt: u64::MAX,
             arena_hover: false,
             last_control_frame: u64::MAX,
             last_toggle_frame: u64::MAX,

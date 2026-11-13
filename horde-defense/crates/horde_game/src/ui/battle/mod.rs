@@ -14,6 +14,7 @@ mod field;
 mod frame;
 mod input;
 mod layout;
+mod low_hp;
 mod overlays;
 mod retreat;
 #[cfg(test)]
