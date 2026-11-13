@@ -130,7 +130,10 @@ fn strategy_bot_acts_only_through_commands() {
 
 /// W2 review: the S1 row's grand-strategy paths act only through
 /// `Game::apply` too. Seed index 3 of the strategy row reaches them all
-/// inside 25 runs: country operations once grand strategy unlocks, an
+/// inside 40 runs (25 before W4-01: the Regional and Capstone boss terms
+/// slow the front, and at 25 runs none of seed indices 0-12 still answers
+/// an outbreak with the main run and resumes the country it left; 0-3 and
+/// 6-11 do at 40): country operations once grand strategy unlocks, an
 /// urgent outbreak answered by the main run (`SelectCountry` and
 /// `BeginDefense` with no `ContinueJourney`) and by guards, the guards
 /// released once it is contained, the interrupted country resumed, and
@@ -140,18 +143,37 @@ fn strategy_bot_acts_only_through_commands() {
 /// it.
 #[test]
 fn s1_strategy_bot_acts_only_through_commands() {
+    assert_eq!(
+        s1_paths(3, 40),
+        BTreeSet::from([
+            "AssignGuard",
+            "CountryOperation",
+            "FewestStages",
+            "ReleaseGuard",
+            "resume",
+            "urgent BeginDefense",
+            "urgent SelectCountry",
+        ])
+    );
+}
+
+/// The grand-strategy paths seed `index` of the S1 row takes inside
+/// `max_runs` runs, read from the state before each command while the
+/// bot's steps are replayed through `Game::apply` and the clock; the
+/// replay must rebuild the game the bot ended with.
+fn s1_paths(index: usize, max_runs: usize) -> BTreeSet<&'static str> {
     let profile = PacingProfile {
-        max_runs: 25,
+        max_runs,
         ..row(STRATEGY_PROFILE_ID)
     };
     let route = profile.plan.strategy.expect("S1 plan").route;
     assert_eq!(route, PacingRoute::FewestStages);
-    let trace = simulate_strategy_traced(&profile, 3).expect("the S1 row runs");
+    let trace = simulate_strategy_traced(&profile, index).expect("the S1 row runs");
     assert!(
         trace.report.strategy_unlock.is_some(),
         "grand strategy unlocks"
     );
-    let mut g = pacing_start(&profile, 3);
+    let mut g = pacing_start(&profile, index);
     let mut seen = BTreeSet::new();
     // A ContinueJourney earlier in this camp, and the country the main run
     // left to answer an outbreak.
@@ -220,18 +242,7 @@ fn s1_strategy_bot_acts_only_through_commands() {
         trace.digest,
         "the commands and the clock alone rebuild the game"
     );
-    assert_eq!(
-        seen,
-        BTreeSet::from([
-            "AssignGuard",
-            "CountryOperation",
-            "FewestStages",
-            "ReleaseGuard",
-            "resume",
-            "urgent BeginDefense",
-            "urgent SelectCountry",
-        ])
-    );
+    seen
 }
 
 /// The S1 main run's next country after a liberation: the enterable, not

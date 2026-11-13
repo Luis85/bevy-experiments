@@ -630,7 +630,8 @@ impl Campaign {
     /// enemy-balance §1 and §3): threat `rank` scaled by the balance
     /// settings for `lanes` in `mode`, with the preset's extras folded in
     /// and, on a country stage at `front`, the front ramp folded into enemy
-    /// health and arrival and the stage's boss rank stamped. `front` None
+    /// health and arrival and the stage's boss rank stamped with its
+    /// `boss_ranks` terms folded. `front` None
     /// (no country: GOLDEN and smoke) keeps the literal neutral ramp and a
     /// Sector boss. Pure.
     pub fn progression_for(
@@ -662,12 +663,14 @@ impl Campaign {
             result.enemy_health = (result.enemy_health * ramp).min(4096.0);
             result.arrival_multiplier = (result.arrival_multiplier * ramp).min(8.0);
         }
-        result.boss_rank = front.map_or_else(Default::default, |f| f.boss_rank());
-        // A Capstone boss gains a transition (ruling W-9), at most two.
-        result.boss_phases = result
-            .boss_phases
-            .saturating_add(result.boss_rank.extra_transitions())
-            .min(crate::progression::MAX_BOSS_PHASES);
+        // The stage's boss rank and its catalogue terms (rulings W-6 and
+        // W-9): Regional health and reward; Capstone health, armor, reward,
+        // damage and a transition. Without a country the boss is a Sector
+        // boss and nothing is folded.
+        if let Some(front) = front {
+            let boss_rank = front.boss_rank();
+            result.fold_boss_rank(boss_rank, cfg.boss_ranks.of(boss_rank));
+        }
         Ok(result)
     }
     /// The next deploy's rank snapshot, before any front position (the

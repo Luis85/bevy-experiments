@@ -270,7 +270,16 @@ impl Game {
         } else {
             d.npc_hp
         };
-        let max_hp = (base_hp as f32 * a.modifiers.enemy_health).round().max(1.0) as i32;
+        // The boss-rank health term (W4-01, ruling W-9), in the order of
+        // `encounter_health_bound`; the literal 1.0 on a Sector boss.
+        let rank_health = if boss {
+            a.progression.boss_health_multiplier
+        } else {
+            1.0
+        };
+        let max_hp = (base_hp as f32 * rank_health * a.modifiers.enemy_health)
+            .round()
+            .max(1.0) as i32;
         let id = a.next_id;
         a.next_id += 1;
         a.enemies.push(Enemy {

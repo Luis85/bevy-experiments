@@ -342,14 +342,23 @@ fn ranks_zero_to_four_lines() -> String {
 /// bp on Normal, times the preset's percent). W2-36 adds the other: a
 /// Capstone boss gains one phase transition on every preset (ruling W-9,
 /// design enemy-balance §6), so the Capstone lines, and only they, write
-/// `boss_phases` 1. With both keys cut out the lines hash to the W2-32
-/// value, and the keys are pinned on their own.
+/// `boss_phases` 1. W4-01 adds the boss-rank terms (ruling W-9): the
+/// Regional lines write health and reward x1.2, the Capstone lines health
+/// and reward x1.4, armor x1.25, NPC armor +2 and damage x1.1. With those
+/// keys cut out the lines hash to the W2-32 value, and the keys are pinned
+/// on their own.
 #[test]
 fn ranks_zero_to_four_snapshot_pinned() {
     let lines = ranks_zero_to_four_lines();
     assert_eq!(lines.lines().count(), 5 * (1 + 5 * 2 * 4));
     const KEY: &str = ",\"elite_rate_bp\":";
-    const PHASES: &str = ",\"boss_phases\":1";
+    // The Capstone's transition (W2-36) and its W4-01 boss-rank terms.
+    const PHASES: &str = ",\"boss_phases\":1,\"boss_armor_multiplier\":1.25,\
+        \"npc_boss_armor_add\":2,\"boss_health_multiplier\":1.4,\
+        \"boss_reward_multiplier\":1.4,\"boss_damage_multiplier\":1.1";
+    // The Regional terms (W4-01).
+    const REGIONAL: &str = ",\"boss_health_multiplier\":1.2,\"boss_reward_multiplier\":1.2";
+    let mut regionals = 0;
     let mut rates = BTreeSet::new();
     let mut stripped = String::new();
     let mut capstones = 0;
@@ -358,7 +367,14 @@ fn ranks_zero_to_four_snapshot_pinned() {
         assert_eq!(line.contains(PHASES), capstone, "{line}");
         assert_eq!(line.matches("boss_phases").count(), usize::from(capstone));
         capstones += usize::from(capstone);
-        let owned = line.replacen(PHASES, "", 1);
+        let regional = line.contains("\"boss_rank\":\"Regional\"");
+        assert_eq!(line.contains(REGIONAL), regional, "{line}");
+        assert_eq!(
+            line.matches("boss_health_multiplier").count(),
+            usize::from(capstone || regional)
+        );
+        regionals += usize::from(regional);
+        let owned = line.replacen(PHASES, "", 1).replacen(REGIONAL, "", 1);
         let line = owned.as_str();
         // The JSON object, after the front position's Debug braces.
         let json = &line[line.find("{\"").unwrap()..];
@@ -388,6 +404,7 @@ fn ranks_zero_to_four_snapshot_pinned() {
         5 * 5 * 2,
         "a Capstone front per rank, preset and mode"
     );
+    assert_eq!(regionals, capstones, "and a Regional front");
     assert_eq!(
         support::fnv1a(stripped.as_bytes()),
         RANKS_ZERO_TO_FOUR_FNV,

@@ -184,11 +184,13 @@ fn boss_damage_multiplier_follows_rank() {
     for rank in 5..=70 {
         assert!(at_rank(rank) >= at_rank(rank - 1), "monotone at {rank}");
     }
-    // The campaign snapshot carries it on every preset, mode and stage.
+    // The campaign snapshot carries it on every preset, mode and stage
+    // short of the Capstone, whose x1.10 (W4-01) is pinned in
+    // `boss_damage_capstone_factor_is_1_10`.
     let usa = world().country("USA").unwrap().level_count() as u32;
     for (name, c) in every_preset() {
         for mode in MODES {
-            for position in [None, front(0, usa), front(5, usa), front(usa - 1, usa)] {
+            for position in [None, front(0, usa), front(5, usa), front(usa - 2, usa)] {
                 assert_eq!(
                     at(&c, mode, 20, position).boss_damage_multiplier,
                     at_rank(20),
@@ -433,13 +435,26 @@ fn regional_checkpoint_distribution_is_219_12_4_7() {
 /// G6.8): the save of a USA game deployed on any of its stages 1-23, with
 /// every earlier stage (checkpoints among them) cleared, has the same key
 /// paths as stage 1's, except the attempt-scoped snapshot's `boss_rank`,
-/// written exactly on the Regional and Capstone stages, and the Capstone's
-/// `boss_phases`. (Stage 0 has no clear and a ramp of exactly 1.0, so its
+/// written exactly on the Regional and Capstone stages, the Capstone's
+/// `boss_phases`, and the boss-rank terms W4-01 folds into the attempt's
+/// snapshot (health and reward on both, armor, NPC armor and damage on the
+/// Capstone): copies of catalogue values, none of them per-stage state. (Stage 0 has no clear and a ramp of exactly 1.0, so its
 /// save lacks those keys; it is a Sector stage without `boss_rank`.)
 #[test]
 fn checkpoints_add_no_saved_field() {
     const BOSS_RANK: &str = "/attempt/progression/boss_rank";
     const BOSS_PHASES: &str = "/attempt/progression/boss_phases";
+    // The W4-01 boss-rank terms: both on a Regional and a Capstone stage.
+    const HEALTH_REWARD: [&str; 2] = [
+        "/attempt/progression/boss_health_multiplier",
+        "/attempt/progression/boss_reward_multiplier",
+    ];
+    // Capstone only.
+    const CAPSTONE_TERMS: [&str; 3] = [
+        "/attempt/progression/boss_armor_multiplier",
+        "/attempt/progression/npc_boss_armor_add",
+        "/attempt/progression/boss_damage_multiplier",
+    ];
     let usa = world().country("USA").unwrap();
     let saved = |stage: usize| {
         let mut g = support::country_game("USA");
@@ -465,6 +480,20 @@ fn checkpoints_add_no_saved_field() {
             rank == BossRank::Capstone,
             "stage {stage} ({rank:?}): boss_phases at rank 0"
         );
+        for key in HEALTH_REWARD {
+            assert_eq!(
+                paths.remove(key),
+                rank != BossRank::Sector,
+                "stage {stage} ({rank:?}): {key}"
+            );
+        }
+        for key in CAPSTONE_TERMS {
+            assert_eq!(
+                paths.remove(key),
+                rank == BossRank::Capstone,
+                "stage {stage} ({rank:?}): {key} at rank 0"
+            );
+        }
         let added: Vec<&String> = paths.symmetric_difference(&base).collect();
         assert!(
             added.is_empty(),
@@ -517,7 +546,9 @@ fn front_ramp_is_exactly_one_without_country() {
 }
 
 /// Pin: ranks 0-4 keep the literal 1.0 boss damage, on every preset, mode
-/// and stage, and a catalogue without the key keeps it at every rank.
+/// and stage short of the Capstone (its x1.10 is W4-01's, pinned in
+/// `boss_damage_capstone_factor_is_1_10`), and a catalogue without the key
+/// keeps it at every rank.
 #[test]
 fn boss_damage_multiplier_is_exactly_one_through_rank_4() {
     let one = 1.0f32.to_bits();
@@ -525,7 +556,7 @@ fn boss_damage_multiplier_is_exactly_one_through_rank_4() {
     for (name, c) in every_preset() {
         for mode in MODES {
             for rank in 0..=4 {
-                for stage in [None, front(0, usa), front(5, usa), front(usa - 1, usa)] {
+                for stage in [None, front(0, usa), front(5, usa), front(usa - 2, usa)] {
                     let value = at(&c, mode, rank, stage).boss_damage_multiplier;
                     assert_eq!(value.to_bits(), one, "{name} {mode:?} {rank} {stage:?}");
                 }
@@ -553,9 +584,10 @@ fn boss_damage_multiplier_is_exactly_one_through_rank_4() {
 /// round-trip byte-identically. Depth 0 here means no country or stage 0
 /// of a multi-stage front. A one-stage front is also at depth 0, but its
 /// only stage is its Capstone (ruling W-9), so it adds exactly the
-/// `boss_rank` key and, since W2-36, the Capstone's one boss phase
-/// transition (`boss_phases` 1, design enemy-balance §6); that exception is
-/// pinned below, not skipped.
+/// `boss_rank` key, since W2-36 the Capstone's one boss phase transition
+/// (`boss_phases` 1, design enemy-balance §6) and, since W4-01, the
+/// Capstone's five boss-rank terms; that exception is pinned below, not
+/// skipped.
 #[test]
 fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_depth_0() {
     let expected: BTreeSet<String> = SNAPSHOT_KEYS.into_iter().map(String::from).collect();
@@ -580,6 +612,16 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
     let mut capstone = expected.clone();
     capstone.insert("boss_rank".into());
     capstone.insert("boss_phases".into());
+    // W4-01: the Capstone's boss-rank terms (ruling W-9).
+    for key in [
+        "boss_armor_multiplier",
+        "npc_boss_armor_add",
+        "boss_health_multiplier",
+        "boss_reward_multiplier",
+        "boss_damage_multiplier",
+    ] {
+        capstone.insert(key.into());
+    }
     for (name, c) in every_preset() {
         for mode in MODES {
             for rank in 0..=4 {
@@ -591,7 +633,12 @@ fn neutral_snapshot_serializes_no_new_keys_for_ranks_0_to_4_on_every_preset_at_d
                     "{name} {mode:?} rank {rank} one stage"
                 );
                 assert!(
-                    text.contains("\"boss_rank\":\"Capstone\",\"boss_phases\":1"),
+                    text.contains(
+                        "\"boss_rank\":\"Capstone\",\"boss_phases\":1,\
+                         \"boss_armor_multiplier\":1.25,\"npc_boss_armor_add\":2,\
+                         \"boss_health_multiplier\":1.4,\"boss_reward_multiplier\":1.4,\
+                         \"boss_damage_multiplier\":1.1"
+                    ),
                     "{name} {mode:?} rank {rank}: {text}"
                 );
                 let restored: ProgressionSnapshot = serde_json::from_str(&text).unwrap();
@@ -723,3 +770,224 @@ const STAGE_THEMES_USA: [&str; 4] = ["roadside", "suburb", "waterfront", "indust
 /// FNV-1a of the checkpoint theme lines, recorded on the parent's theme code
 /// (W2-26 changes no theme).
 const CHECKPOINT_THEMES_FNV: u64 = 408_677_868_466_915_946;
+
+/// The boss-rank fields of a snapshot: health, reward, armor, NPC armor
+/// add, damage, transitions.
+fn boss_terms(s: &ProgressionSnapshot) -> (f32, f32, f32, i32, f32, u8) {
+    (
+        s.boss_health_multiplier,
+        s.boss_reward_multiplier,
+        s.boss_armor_multiplier,
+        s.npc_boss_armor_add,
+        s.boss_damage_multiplier,
+        s.boss_phases,
+    )
+}
+
+/// The hit points a boss spawns with when the attempt's snapshot carries
+/// `multiplier` as its `boss_health_multiplier`, and the level's boss
+/// health times the encounter's health modifier.
+fn boss_spawn_health(mode: Mode, multiplier: f32) -> (i32, f32) {
+    let mut g = support::game(mode);
+    g.attempt_mut().unwrap().progression.boss_health_multiplier = multiplier;
+    support::enemy(&mut g, 5, DEFENSE_LINE + 30.0, true);
+    let a = g.attempt().unwrap();
+    let level = &content().levels[a.level];
+    let base = if mode == Mode::Personal {
+        level.boss_health.max(a.progression.boss_health_floor)
+    } else {
+        level.boss_npc_hp.max(a.progression.npc_boss_health_floor)
+    };
+    let boss = &a.enemies[0];
+    assert_eq!(boss.hp, boss.max_hp);
+    (boss.max_hp, base as f32 * a.modifiers.enemy_health)
+}
+
+/// The coins the campaign gains when the NPC defender kills a one-hit boss
+/// under `multiplier` as the snapshot's `boss_reward_multiplier`, and the
+/// boss's base coins times the encounter's reward modifier.
+fn boss_kill_coins(multiplier: f32) -> (u64, f32) {
+    let mut g = support::game(Mode::Npc);
+    g.attempt_mut().unwrap().progression.boss_reward_multiplier = multiplier;
+    support::enemy(&mut g, 5, DEFENSE_LINE + 3.0, true);
+    let a = g.attempt_mut().unwrap();
+    let level = &content().levels[a.level];
+    let base = (level.boss_reward + level.completion_bonus) as f32 * a.modifiers.reward;
+    let e = &mut a.enemies[0];
+    (e.hp, e.max_hp, e.injury.hp, e.injury.max_hp, e.armor) = (1, 1, 1, 1, 0);
+    let before = g.campaign().coins;
+    for _ in 0..6_000 {
+        support::advance(&mut g, 1);
+        let dead = g
+            .attempt()
+            .is_none_or(|a| a.enemies.iter().all(|e| !e.boss));
+        if dead {
+            return (g.campaign().coins - before, base);
+        }
+    }
+    panic!("the boss outlived 6000 ticks");
+}
+
+/// W4-01 (ruling W-9, design enemy-balance §3): a Regional boss has 1.2x
+/// the health and 1.2x the reward of a Sector boss at equal rank and
+/// nothing else; a Capstone boss has health x1.4, armor x1.25, NPC armor
+/// +2, reward x1.4 and (ruling W-6) damage x1.10 on top of its W2
+/// transition. The spawn and the kill read the snapshot's two multipliers.
+#[test]
+fn regional_boss_health_and_reward_are_1_2x_sector_at_equal_rank() {
+    let usa = world().country("USA").unwrap().level_count() as u32;
+    for (name, c) in every_preset() {
+        for mode in MODES {
+            for rank in [0, 4, 5, 12, 20, 50] {
+                let sector = at(&c, mode, rank, front(4, usa));
+                let regional = at(&c, mode, rank, front(5, usa));
+                let capstone = at(&c, mode, rank, front(usa - 1, usa));
+                let label = format!("{name} {mode:?} rank {rank}");
+                assert_eq!(regional.boss_rank, BossRank::Regional, "{label}");
+                let (health, reward, armor, npc_armor, damage, phases) = boss_terms(&sector);
+                assert_eq!((health, reward), (1.0, 1.0), "{label}: Sector is neutral");
+                assert_eq!(
+                    boss_terms(&regional),
+                    (1.2, 1.2, armor, npc_armor, damage, phases),
+                    "{label}: Regional"
+                );
+                assert_eq!(
+                    boss_terms(&capstone),
+                    (
+                        1.4,
+                        1.4,
+                        (armor * 1.25).clamp(1.0, 4.0),
+                        npc_armor + 2,
+                        (damage * 1.10).clamp(1.0, 4.0),
+                        (phases + 1).min(2)
+                    ),
+                    "{label}: Capstone"
+                );
+                // Without a country the boss terms are the rank's own.
+                assert_eq!(
+                    boss_terms(&at(&c, mode, rank, None)),
+                    boss_terms(&sector),
+                    "{label}: no country"
+                );
+                for s in [&sector, &regional, &capstone] {
+                    s.validate().unwrap_or_else(|e| panic!("{label}: {e}"));
+                }
+            }
+        }
+    }
+    // The spawn read site, in both modes: health x multiplier, rounded.
+    for mode in MODES {
+        let (sector, base) = boss_spawn_health(mode, 1.0);
+        assert_eq!(sector, base.round() as i32, "{mode:?}");
+        for multiplier in [1.2, 1.4] {
+            let (hp, base) = boss_spawn_health(mode, multiplier);
+            assert_eq!(
+                hp,
+                (base * multiplier).round() as i32,
+                "{mode:?} x{multiplier}"
+            );
+            assert!(hp > sector, "{mode:?} x{multiplier}: {hp} > {sector}");
+        }
+    }
+    let (regional, _) = boss_spawn_health(Mode::Personal, 1.2);
+    let (sector, _) = boss_spawn_health(Mode::Personal, 1.0);
+    assert!(
+        (f64::from(regional) / f64::from(sector) - 1.2).abs() < 1e-3,
+        "{regional} / {sector}"
+    );
+    // The kill read site: the boss's coins x multiplier, rounded.
+    let (sector, base) = boss_kill_coins(1.0);
+    assert_eq!(sector, base.round().max(1.0) as u64);
+    for multiplier in [1.2, 1.4] {
+        let (coins, base) = boss_kill_coins(multiplier);
+        assert_eq!(coins, (base * multiplier).round() as u64, "x{multiplier}");
+        assert!(coins > sector, "x{multiplier}: {coins} > {sector}");
+    }
+}
+
+/// W4-01 (ruling W-6): `boss_ranks.capstone.damage` is 1.10, folded into
+/// the snapshot's `boss_damage_multiplier` on the rank term and clamped to
+/// 1..=4; Sector and Regional keep the rank term. The block's bounds hold.
+#[test]
+fn boss_damage_capstone_factor_is_1_10() {
+    let cfg = catalog();
+    let usa = world().country("USA").unwrap().level_count() as u32;
+    for (name, c) in every_preset() {
+        for mode in MODES {
+            for rank in [0, 4, 5, 20, 50, 60] {
+                let term = cfg.snapshot(rank).boss_damage_multiplier;
+                for position in [None, front(0, usa), front(5, usa)] {
+                    assert_eq!(
+                        at(&c, mode, rank, position).boss_damage_multiplier,
+                        term,
+                        "{name} {mode:?} rank {rank} {position:?}"
+                    );
+                }
+                let capstone = at(&c, mode, rank, front(usa - 1, usa)).boss_damage_multiplier;
+                assert_eq!(
+                    capstone,
+                    (term * 1.10).clamp(1.0, 4.0),
+                    "{name} {mode:?} rank {rank}"
+                );
+                assert!((capstone / term - 1.10).abs() < 1e-5);
+            }
+        }
+    }
+    // A one-stage country's only stage is its Capstone.
+    let single = at(&on(BalancePreset::Normal), Mode::Personal, 0, front(0, 1));
+    assert_eq!(single.boss_damage_multiplier, 1.10);
+    // The bundled block and its bounds.
+    let bundled: Value = serde_json::from_str(include_str!("../progression.json")).unwrap();
+    assert_eq!(
+        bundled["boss_ranks"],
+        serde_json::json!({
+            "regional": {"health": 1.2, "reward": 1.2},
+            "capstone": {
+                "health": 1.4, "armor": 1.25, "reward": 1.4, "damage": 1.1,
+                "npc_armor_add": 2, "extra_transitions": 1
+            }
+        })
+    );
+    let with = |pointer: &str, value: Value| {
+        let mut catalogue = bundled.clone();
+        *catalogue.pointer_mut(pointer).unwrap() = value;
+        ProgressionCatalog::from_json_str(&catalogue.to_string())
+    };
+    for key in ["health", "armor", "reward", "damage"] {
+        let pointer = format!("/boss_ranks/capstone/{key}");
+        for good in [1.0, 2.0] {
+            with(&pointer, good.into()).unwrap_or_else(|e| panic!("{key} = {good}: {e}"));
+        }
+        for bad in [0.99, 2.01] {
+            assert!(
+                with(&pointer, bad.into()).is_err(),
+                "{key} = {bad} accepted"
+            );
+        }
+    }
+    assert!(with("/boss_ranks/capstone/npc_armor_add", 10.into()).is_ok());
+    for bad in [-1, 11] {
+        assert!(with("/boss_ranks/capstone/npc_armor_add", bad.into()).is_err());
+    }
+    assert!(with("/boss_ranks/capstone/extra_transitions", 2.into()).is_ok());
+    assert!(with("/boss_ranks/capstone/extra_transitions", 3.into()).is_err());
+    assert!(with("/boss_ranks/capstone", serde_json::json!({"hp": 1.4})).is_err());
+    // A catalogue without the block keeps the wave-2 encounter: neutral
+    // multipliers and the Capstone's one transition.
+    let mut legacy = bundled.clone();
+    legacy.as_object_mut().unwrap().remove("boss_ranks");
+    let legacy = ProgressionCatalog::from_json_str(&legacy.to_string()).unwrap();
+    for rank in [BossRank::Sector, BossRank::Regional, BossRank::Capstone] {
+        let rank_only = legacy.snapshot(20);
+        let mut folded = rank_only.clone();
+        folded.fold_boss_rank(rank, legacy.boss_ranks.of(rank));
+        assert_eq!(folded.boss_rank, rank);
+        assert_eq!(
+            folded.boss_phases,
+            rank_only.boss_phases + rank.extra_transitions()
+        );
+        folded.boss_rank = BossRank::Sector;
+        folded.boss_phases = rank_only.boss_phases;
+        assert_eq!(folded, rank_only, "{rank:?}");
+    }
+}

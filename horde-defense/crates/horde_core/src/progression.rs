@@ -67,10 +67,103 @@ impl BossRank {
             BossRank::Capstone => "Capstone",
         }
     }
-    /// The boss phase transitions this rank adds (ruling W-9): one on a
-    /// Capstone, none otherwise.
+    /// The boss phase transitions this rank adds without an authored
+    /// `boss_ranks` block (ruling W-9): one on a Capstone, none otherwise.
+    /// The catalogue's [`BossRankScaling::extra_transitions`] is the value
+    /// a deploy folds.
     pub fn extra_transitions(self) -> u8 {
         u8::from(self == BossRank::Capstone)
+    }
+}
+/// What one boss rank adds to its stage's boss (design enemy-balance §3,
+/// rulings W-6 and W-9; schema v7 §7), folded into the encounter snapshot
+/// at deploy by [`ProgressionSnapshot::fold_boss_rank`]. The default is
+/// neutral.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BossRankScaling {
+    /// Boss hit points multiplier, both modes (1..=2).
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub health: f32,
+    /// Personal boss armor multiplier on the rank term (1..=2).
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub armor: f32,
+    /// Boss kill coins multiplier (1..=2).
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub reward: f32,
+    /// Boss damage multiplier on the rank term (1..=2).
+    #[serde(skip_serializing_if = "crate::schema::is_one_f32")]
+    pub damage: f32,
+    /// NPC boss armor added to the rank term (0..=10).
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub npc_armor_add: i32,
+    /// Boss phase transitions added (0..=2).
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub extra_transitions: u8,
+}
+impl Default for BossRankScaling {
+    fn default() -> Self {
+        Self {
+            health: 1.0,
+            armor: 1.0,
+            reward: 1.0,
+            damage: 1.0,
+            npc_armor_add: 0,
+            extra_transitions: 0,
+        }
+    }
+}
+impl BossRankScaling {
+    fn validate(&self) -> Result<(), String> {
+        if [self.health, self.armor, self.reward, self.damage]
+            .into_iter()
+            .any(|v| !finite(v, 1.0, 2.0))
+            || !(0..=10).contains(&self.npc_armor_add)
+            || self.extra_transitions > MAX_BOSS_PHASES
+        {
+            return Err("Invalid boss rank scaling".into());
+        }
+        Ok(())
+    }
+}
+/// The `boss_ranks` block of `progression.json`: one [`BossRankScaling`]
+/// per [`BossRank`]. Absent, it is the wave-2 encounter: every multiplier
+/// neutral and the Capstone's one transition.
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct BossRanks {
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub sector: BossRankScaling,
+    #[serde(skip_serializing_if = "crate::schema::is_default")]
+    pub regional: BossRankScaling,
+    pub capstone: BossRankScaling,
+}
+impl Default for BossRanks {
+    fn default() -> Self {
+        let neutral = |rank: BossRank| BossRankScaling {
+            extra_transitions: rank.extra_transitions(),
+            ..BossRankScaling::default()
+        };
+        Self {
+            sector: neutral(BossRank::Sector),
+            regional: neutral(BossRank::Regional),
+            capstone: neutral(BossRank::Capstone),
+        }
+    }
+}
+impl BossRanks {
+    /// The scaling of `rank`.
+    pub fn of(&self, rank: BossRank) -> BossRankScaling {
+        match rank {
+            BossRank::Sector => self.sector,
+            BossRank::Regional => self.regional,
+            BossRank::Capstone => self.capstone,
+        }
+    }
+    fn validate(&self) -> Result<(), String> {
+        self.sector.validate()?;
+        self.regional.validate()?;
+        self.capstone.validate()
     }
 }
 /// The most phase transitions one boss may enter (schema v7 §3.10).
@@ -157,6 +250,10 @@ pub struct ProgressionCatalog {
     /// (0..=100). Absent (0) keeps the level's NPC boss armor.
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
     pub npc_boss_armor_rank_step: u32,
+    /// What a Regional and a Capstone boss add to a Sector boss (W4-01).
+    /// Absent, only the Capstone's one transition.
+    #[serde(default, skip_serializing_if = "crate::schema::is_default")]
+    pub boss_ranks: BossRanks,
     /// The elite spawn curve (design enemy-balance §2 "Elite curve").
     /// Absent (the zero curve) means no elites at any rank.
     #[serde(default, skip_serializing_if = "crate::schema::is_default")]
@@ -492,6 +589,7 @@ impl ProgressionCatalog {
         }) {
             return Err("Progression pressure floors must be monotone".into());
         }
+        self.boss_ranks.validate()?;
         self.elite.validate()?;
         self.rewards.validate()
     }
@@ -521,8 +619,9 @@ impl ProgressionCatalog {
     }
     /// The boss damage multiplier at threat `rank`:
     /// `1 + boss_damage_per_rank × (min(rank, 50) - 4)`, clamped to 1..=4
-    /// (ruling W-6; the boss-rank factor arrives in wave 4). The literal 1.0
-    /// through rank 4 and without the catalogue key.
+    /// (ruling W-6). The literal 1.0 through rank 4 and without the
+    /// catalogue key. The boss-rank factor (`boss_ranks.*.damage`) is
+    /// folded at deploy by [`ProgressionSnapshot::fold_boss_rank`].
     pub fn boss_damage_multiplier(&self, rank: u32) -> f32 {
         let steps = rank
             .min(BOSS_SCALING_TO_RANK)
@@ -601,10 +700,10 @@ impl ProgressionCatalog {
             // §6): one transition past rank 4. The preset bonus and the
             // boss-rank term are folded in at deploy.
             boss_phases: u8::from(rank > BOSS_SCALING_FROM_RANK),
-            // front_ramp and boss_rank are written with the front position
-            // in Campaign::progression_for. boss_health_multiplier and
-            // boss_reward_multiplier stay 1.0 until their wave-4 writer
-            // (W4-01, ruling W-9).
+            // front_ramp, boss_rank and the boss-rank terms (among them
+            // boss_health_multiplier and boss_reward_multiplier) are
+            // written with the front position in
+            // Campaign::progression_for (fold_boss_rank, ruling W-9).
             ..ProgressionSnapshot::default()
         }
     }
@@ -691,9 +790,9 @@ impl ProgressionSnapshot {
     /// `boss_phase_bonus` transitions (at most 2). Normal's extras (100,
     /// 100, 0) change nothing, and the bonus adds no phase at ranks 0-4 on
     /// any preset (plan §2.5, the W2-26 pin reading). The rank term is the
-    /// rank snapshot's; the front-ramp percent and the boss-rank term
-    /// ([`BossRank::extra_transitions`]) are folded with the front position
-    /// in `Campaign::progression_for`.
+    /// rank snapshot's; the front-ramp percent and the boss-rank terms
+    /// ([`Self::fold_boss_rank`]) are folded with the front position in
+    /// `Campaign::progression_for`.
     pub fn fold_extras(&mut self, extras: crate::balance::PresetExtras) {
         if self.elite_rate_bp != 0 && extras.elite_rate_pct != 100 {
             let scaled = u64::from(self.elite_rate_bp) * u64::from(extras.elite_rate_pct) / 100;
@@ -705,6 +804,33 @@ impl ProgressionSnapshot {
                 .saturating_add(extras.boss_phase_bonus)
                 .min(MAX_BOSS_PHASES);
         }
+    }
+    /// Stamps the stage's boss `rank` and folds its catalogue `scaling`
+    /// into the boss terms (design enemy-balance §3, rulings W-6 and W-9):
+    /// boss health and reward take the rank's multipliers; armor and damage
+    /// multiply the rank term (clamped to 1..=4), NPC armor adds to it (at
+    /// most 20) and the transitions add (at most 2). A neutral scaling
+    /// changes no field but `boss_rank`.
+    pub fn fold_boss_rank(&mut self, rank: BossRank, scaling: BossRankScaling) {
+        self.boss_rank = rank;
+        self.boss_health_multiplier = scaling.health.clamp(1.0, 2.0);
+        self.boss_reward_multiplier = scaling.reward.clamp(1.0, 2.0);
+        if scaling.armor != 1.0 {
+            self.boss_armor_multiplier =
+                (self.boss_armor_multiplier * scaling.armor).clamp(1.0, 4.0);
+        }
+        if scaling.damage != 1.0 {
+            self.boss_damage_multiplier =
+                (self.boss_damage_multiplier * scaling.damage).clamp(1.0, 4.0);
+        }
+        self.npc_boss_armor_add = self
+            .npc_boss_armor_add
+            .saturating_add(scaling.npc_armor_add)
+            .clamp(0, 20);
+        self.boss_phases = self
+            .boss_phases
+            .saturating_add(scaling.extra_transitions)
+            .min(MAX_BOSS_PHASES);
     }
     pub fn validate(&self) -> Result<(), String> {
         if self.enemy_cap > GAMEPLAY_ENEMY_CAP {

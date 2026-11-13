@@ -974,7 +974,16 @@ impl Game {
             } else {
                 d.reward
             };
-            let coins = (base_coins as f32 * a.modifiers.reward).round().max(1.0) as u64;
+            // The boss-rank reward term (W4-01, ruling W-9); the literal
+            // 1.0 on a Sector boss, and regular enemies never read it.
+            let rank_reward = if e.boss {
+                a.progression.boss_reward_multiplier
+            } else {
+                1.0
+            };
+            let coins = (base_coins as f32 * rank_reward * a.modifiers.reward)
+                .round()
+                .max(1.0) as u64;
             let xp = if e.boss {
                 40 + a.level as u64 * 15
             } else {

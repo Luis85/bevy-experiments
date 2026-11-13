@@ -19,6 +19,20 @@
   "damage_per_rank_late": 0.018,
   "boss_armor_per_rank": 0.02,
   "npc_boss_armor_rank_step": 8,
+  "boss_ranks": {
+    "regional": {
+      "health": 1.2,
+      "reward": 1.2
+    },
+    "capstone": {
+      "health": 1.4,
+      "armor": 1.25,
+      "reward": 1.4,
+      "damage": 1.1,
+      "npc_armor_add": 2,
+      "extra_transitions": 1
+    }
+  },
   "pressure_floors": [
     {
       "start_rate": 0.0,
