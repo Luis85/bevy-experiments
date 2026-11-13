@@ -17,6 +17,7 @@
 
 pub mod bank;
 pub mod cue;
+pub mod duck;
 pub mod events;
 pub mod export;
 pub mod meter;

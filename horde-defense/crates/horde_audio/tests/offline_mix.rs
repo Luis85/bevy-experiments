@@ -407,3 +407,95 @@ fn max_sliders_60s_is_logged() {
         "the max-slider mix clips: file a follow-up ({loudness:?})"
     );
 }
+
+// ----- ducking and density (A6-11) -----
+
+/// A boss arrival pulls the rendered ambience 6 dB down for its hold and
+/// lets it back: the ambience under the cue, over the ambience alone.
+#[test]
+fn render_ducks_the_ambience_under_a_boss_arrival() {
+    let library = library();
+    let quiet = idle(Context::Battle, 600);
+    let mut arrival = quiet.clone();
+    arrival[300].cues.push(Cue::Boss);
+    let scene = default_scene(REFERENCE_WEIGHTS);
+    let silent_bed = Scene {
+        sliders: Sliders {
+            ambience: 0.0,
+            ..Sliders::DEFAULT
+        },
+        ..scene
+    };
+    let bed = render::render(&library, &quiet, &scene).left;
+    let both = render::render(&library, &arrival, &scene).left;
+    let cue = render::render(&library, &arrival, &silent_bed).left;
+    assert!(cue.iter().any(|sample| *sample != 0.0));
+    let ducked: Vec<f32> = both.iter().zip(&cue).map(|(a, b)| a - b).collect();
+    let share = |from: usize, to: usize| {
+        let window = from * FRAME_SAMPLES..to * FRAME_SAMPLES;
+        rms(&ducked[window.clone()]) / rms(&bed[window])
+    };
+    // Before the cue: untouched.
+    assert!((share(240, 300) - 1.0).abs() < 1e-3, "{}", share(240, 300));
+    // 100 ms to 1100 ms after it: inside the 1200 ms hold, 6 dB down.
+    let held = share(306, 366);
+    let expected = f64::from(mix::db_to_linear(-6.0));
+    assert!((held - expected).abs() < 0.01, "{held} is not {expected}");
+    // 30 + 1200 + 800 ms later it is back.
+    assert!((share(430, 500) - 1.0).abs() < 1e-3, "{}", share(430, 500));
+}
+
+/// Six effect voices at once play below their sum: the density gain of six
+/// voices, sqrt(4/6), is on every one of them. Four play at their sum.
+#[test]
+fn render_levels_a_crowd_of_effect_voices() {
+    let library = library();
+    let scene = Scene {
+        sliders: Sliders {
+            ambience: 0.0,
+            ..Sliders::DEFAULT
+        },
+        ..default_scene(REFERENCE_WEIGHTS)
+    };
+    let crowd = [
+        (0, Cue::Explosion),
+        (0, Cue::Structure),
+        (0, Cue::Damage),
+        (1, Cue::Molotov),
+        (1, Cue::Melee),
+        (1, Cue::Trap),
+    ];
+    let share = |cues: &[(usize, Cue)]| {
+        let mut frames = idle(Context::Battle, 30);
+        let mut sum = vec![0.0_f32; 30 * FRAME_SAMPLES];
+        for (frame, cue) in cues {
+            frames[*frame].cues.push(*cue);
+            let mut alone = idle(Context::Battle, 30);
+            alone[*frame].cues.push(*cue);
+            let single = render::render(&library, &alone, &scene).left;
+            for (total, sample) in sum.iter_mut().zip(single) {
+                *total += sample;
+            }
+        }
+        let together = render::render(&library, &frames, &scene).left;
+        // 67 ms to 133 ms: the compensation has come in, the clips still play.
+        let window = 4 * FRAME_SAMPLES..8 * FRAME_SAMPLES;
+        assert!(rms(&sum[window.clone()]) > 0.0);
+        rms(&together[window.clone()]) / rms(&sum[window])
+    };
+    let four = share(&crowd[..4]);
+    assert!((four - 1.0).abs() < 1e-4, "{four}");
+    let six = share(&crowd);
+    let expected = f64::from(mix::density_gain(6));
+    assert!((six - expected).abs() < 0.03, "{six} is not {expected}");
+    // The policy marks who takes the gain: not a warning.
+    let mut policy = VoicePolicy::default();
+    let starts = policy
+        .frame(vec![Cue::Boss, Cue::Impact], 0, false, &AUDIBLE, &[])
+        .starts;
+    let marks: Vec<(Cue, bool)> = starts
+        .iter()
+        .map(|start| (start.cue, start.compensated))
+        .collect();
+    assert_eq!(marks, [(Cue::Boss, false), (Cue::Impact, true)]);
+}

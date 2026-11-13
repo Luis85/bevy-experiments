@@ -10,6 +10,10 @@
 //! gain (`horde_audio::select::Variety`): presentation counters only, so no
 //! bank repeats a variant back to back and nothing reads the simulation.
 //!
+//! A started cue with a duck row pulls the ambience down ([`Ducking`],
+//! `horde_audio::duck`), and a crowd of effect voices is levelled by the
+//! density gain. Effects and UI voices never duck.
+//!
 //! A voice plays as a [`PannedClip`]: the cue's WAV into two channels at the
 //! gains of its lane pan (`horde_audio::pan`; centred with "Mono audio"). A
 //! variant whose WAV has not loaded yet plays as a plain centred
@@ -24,6 +28,7 @@ use bevy::{
     prelude::*,
 };
 use horde_audio::{
+    duck::{DuckGains, Ducker},
     mix::{Sliders, mix},
     pan::{self, Places},
     render::audible,
@@ -38,12 +43,14 @@ impl Plugin for SfxPlugin {
         app.add_message::<CueRequest>()
             .add_audio_source::<PannedClip>()
             .init_resource::<SfxState>()
+            .init_resource::<Ducking>()
             .add_systems(
                 Update,
                 (
                     // Cues written by this frame's runner passes play this frame.
                     play_sounds.after(RuntimeSet::Persist),
-                    update_effects_gain,
+                    // This frame's density gain reaches the voices this frame.
+                    update_effects_gain.after(play_sounds),
                 ),
             );
     }
@@ -56,6 +63,16 @@ struct SfxState {
     rotation: u64,
     gate: crate::audio::CueGate,
     variety: Variety,
+}
+
+/// Ducking and density compensation (`horde_audio::duck`): the state, and
+/// the gains of this frame. The ambience loops multiply in the Atmosphere
+/// duck, the compensated effect voices the density gain. Effects and UI never
+/// duck.
+#[derive(Resource, Default)]
+pub struct Ducking {
+    ducker: Ducker,
+    pub gains: DuckGains,
 }
 
 #[derive(Component)]
@@ -74,6 +91,9 @@ pub struct EffectVoice {
     /// fell back to the plain player sounds centred whatever this says.
     #[cfg_attr(not(test), allow(dead_code))]
     pan: [f32; 2],
+    /// The voice takes the density gain: not a warning, not the root
+    /// defender's own shot.
+    compensated: bool,
 }
 
 /// A stolen voice on its 40 ms fade. It holds no voice slot any more; its
@@ -165,6 +185,7 @@ fn play_sounds(
     settings: Res<Settings>,
     mut cues: MessageReader<CueRequest>,
     mut state: ResMut<SfxState>,
+    mut ducking: ResMut<Ducking>,
     voices: Query<(Entity, &EffectVoice), Without<Fading>>,
 ) {
     let sliders = settings.sliders();
@@ -228,6 +249,7 @@ fn play_sounds(
         }
         // The bank's next variant, and this start's speed and gain jitter.
         let pick = state.variety.pick_cue(cue);
+        ducking.ducker.trigger(cue);
         let voice_gain = bus_gain(sliders, cue) * mix(cue).level(reduced) * pick.jitter.gain;
         let gains = pan::voice_gains(cue, &places, reduced, settings.mono_audio);
         let handle: Handle<AudioSource> =
@@ -242,6 +264,7 @@ fn play_sounds(
                 jitter_gain: pick.jitter.gain,
                 cue,
                 pan: gains,
+                compensated: horde_audio::duck::compensated(start),
             },
             PlaybackSettings::DESPAWN
                 .with_volume(bevy::audio::Volume::Linear(voice_gain))
@@ -268,10 +291,17 @@ fn play_sounds(
             started_ms: now_ms,
         });
     }
+    // Real time, like the cue gates: the envelopes run on while the game is
+    // paused.
+    ducking.gains = ducking.ducker.advance(time.delta_secs(), &live);
 }
-/// Both pending PlaybackSettings and live sinks follow their cue's bus.
+/// Both pending PlaybackSettings and live sinks follow their cue's bus. A
+/// compensated voice also follows the density gain: its decoder ramps to it
+/// (no step), and a voice on the plain fallback player takes it in its
+/// volume.
 fn update_effects_gain(
     settings: Res<Settings>,
+    ducking: Option<Res<Ducking>>,
     mut voices: Query<(
         &mut EffectVoice,
         &mut PlaybackSettings,
@@ -280,9 +310,18 @@ fn update_effects_gain(
 ) {
     let sliders = settings.sliders();
     let reduced = settings.reduced_effects;
+    let density = ducking.map_or(1.0, |ducking| ducking.gains.density);
     for (mut voice, mut playback, sink) in &mut voices {
-        let voice_gain =
+        let mut voice_gain =
             bus_gain(sliders, voice.cue) * mix(voice.cue).level(reduced) * voice.jitter_gain;
+        if voice.compensated {
+            match &voice.control {
+                // A fading voice keeps its way to silence.
+                Some(control) if control.stopping() => {}
+                Some(control) => control.set_target(density),
+                None => voice_gain *= density,
+            }
+        }
         if (voice.last_gain - voice_gain).abs() > 0.00001 {
             playback.volume = bevy::audio::Volume::Linear(voice_gain);
             if let Some(mut sink) = sink {
@@ -316,6 +355,7 @@ mod tests {
                     jitter_gain: 1.0,
                     cue: SoundCue::Explosion,
                     pan: pan::CENTRE,
+                    compensated: false,
                 },
                 PlaybackSettings::DESPAWN.with_volume(bevy::audio::Volume::Linear(0.7)),
             ))
@@ -403,6 +443,7 @@ mod tests {
                         jitter_gain: 1.0,
                         cue,
                         pan: pan::CENTRE,
+                        compensated: false,
                     },
                     PlaybackSettings::DESPAWN,
                 ))
@@ -449,6 +490,7 @@ mod tests {
             .init_asset::<PannedClip>()
             .add_message::<CueRequest>()
             .init_resource::<SfxState>()
+            .init_resource::<Ducking>()
             .insert_resource(Settings {
                 effects: 0.0,
                 ..Settings::default()
@@ -511,6 +553,7 @@ mod tests {
             .init_asset::<PannedClip>()
             .add_message::<CueRequest>()
             .init_resource::<SfxState>()
+            .init_resource::<Ducking>()
             .insert_resource(settings)
             .add_systems(Update, play_sounds);
         app
@@ -880,5 +923,113 @@ mod tests {
             last = frame[0];
         }
         assert!(last < 0.01 * level, "{last}");
+    }
+
+    /// A boss arrival that starts triggers its duck; a cue without a duck
+    /// row, and a ducking cue its muted bus keeps from starting, do not.
+    #[test]
+    fn started_cues_trigger_their_duck() {
+        use horde_audio::mix::{Bus, db_to_linear};
+        let mut app = pan_app(Settings::default());
+        start(&mut app, CueRequest::centred(SoundCue::Impact));
+        assert!(!app.world().resource::<Ducking>().ducker.ducking());
+        start(&mut app, CueRequest::centred(SoundCue::Boss));
+        let mut ducker = app.world().resource::<Ducking>().ducker.clone();
+        assert!(ducker.ducking());
+        // The rest of the 30 ms attack: the ambience is 6 dB down.
+        let gains = ducker.advance(0.03, &[]);
+        let atmosphere = gains.duck[Bus::Atmosphere as usize];
+        assert!(
+            (atmosphere - db_to_linear(-6.0)).abs() < 1e-3,
+            "{atmosphere}"
+        );
+        // The published gains never touch Master, Effects or UI.
+        assert_eq!(app.world().resource::<Ducking>().gains.duck[..3], [1.0; 3]);
+
+        let mut app = pan_app(Settings {
+            effects: 0.0,
+            ..Settings::default()
+        });
+        app.world_mut()
+            .write_message(CueRequest::centred(SoundCue::Boss));
+        app.update();
+        assert!(!app.world().resource::<Ducking>().ducker.ducking());
+    }
+
+    /// A start is marked for the density gain unless it is a warning or the
+    /// root defender's own shot.
+    #[test]
+    fn starts_are_marked_for_density_compensation() {
+        let mut app = pan_app(Settings::default());
+        let marked = |app: &mut App, request: CueRequest| {
+            let voice = start(app, request);
+            app.world().get::<EffectVoice>(voice).unwrap().compensated
+        };
+        assert!(marked(&mut app, CueRequest::centred(SoundCue::Impact)));
+        assert!(marked(&mut app, CueRequest::centred(SoundCue::Rifle)));
+        assert!(!marked(&mut app, CueRequest::centred(SoundCue::Boss)));
+        assert!(!marked(&mut app, CueRequest::centred(SoundCue::Confirm)));
+        clear(&mut app);
+        assert!(!marked(
+            &mut app,
+            CueRequest {
+                player_weapon: true,
+                ..CueRequest::centred(SoundCue::Rifle)
+            }
+        ));
+    }
+
+    /// The density gain reaches a compensated voice through its control (the
+    /// decoder ramps to it), or through its volume on the plain fallback
+    /// player. A warning and a fading voice are left alone.
+    #[test]
+    fn density_gain_reaches_compensated_voices_only() {
+        let mut app = App::new();
+        app.insert_resource(Settings::default())
+            .insert_resource(Ducking {
+                gains: DuckGains {
+                    density: 0.5,
+                    ..DuckGains::NONE
+                },
+                ..Ducking::default()
+            })
+            .add_systems(Update, update_effects_gain);
+        let mut spawn = |cue: SoundCue, compensated: bool, control: Option<Arc<VoiceControl>>| {
+            app.world_mut()
+                .spawn((
+                    EffectVoice {
+                        started_ms: 0,
+                        control,
+                        last_gain: -1.0,
+                        jitter_gain: 1.0,
+                        cue,
+                        pan: pan::CENTRE,
+                        compensated,
+                    },
+                    PlaybackSettings::DESPAWN,
+                ))
+                .id()
+        };
+        let controls: [Arc<VoiceControl>; 3] = Default::default();
+        controls[2].fade_out();
+        let panned = spawn(SoundCue::Impact, true, Some(controls[0].clone()));
+        let warning = spawn(SoundCue::Boss, false, Some(controls[1].clone()));
+        let fading = spawn(SoundCue::Impact, true, Some(controls[2].clone()));
+        let plain = spawn(SoundCue::Impact, true, None);
+        app.update();
+        assert_eq!(controls[0].target(), 0.5);
+        assert_eq!(controls[1].target(), 1.0);
+        assert_eq!(controls[2].target(), 0.0);
+        let sliders = Settings::default().sliders();
+        let full = |cue: SoundCue| sliders.bus_gain(mix(cue).bus) * mix(cue).level(false);
+        assert_eq!(volume(&app, panned), full(SoundCue::Impact));
+        assert_eq!(volume(&app, warning), full(SoundCue::Boss));
+        assert_eq!(volume(&app, fading), full(SoundCue::Impact));
+        assert_eq!(volume(&app, plain), full(SoundCue::Impact) * 0.5);
+        // The crowd thins out: the voices come back.
+        app.world_mut().resource_mut::<Ducking>().gains.density = 1.0;
+        app.update();
+        assert_eq!(controls[0].target(), 1.0);
+        assert_eq!(volume(&app, plain), full(SoundCue::Impact));
     }
 }

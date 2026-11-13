@@ -361,3 +361,124 @@ pub const CONTEXT_GAIN: ContextGain = ContextGain {
     battle: 1.0,
     paused: 0.35,
 };
+
+/// How long a duck stays at its full depth.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DuckHold {
+    /// This many ms after the attack.
+    Ms(u32),
+    /// For as long as a voice of the triggering cue sounds (a stinger's clip
+    /// length), [`DUCK_HOLD_MAX_MS`] at most.
+    WhileSounding,
+}
+
+/// What a starting cue does to the ambience and the music tracks: it pulls
+/// them down over `attack_ms`, holds them there and lets them back over
+/// `release_ms`. A row has no column for Effects or UI: those never duck, so
+/// a late-battle warning is never pulled down.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Duck {
+    /// The depth on the Atmosphere bus, in dB (0 or negative).
+    pub atmosphere_db: f32,
+    /// The depth on the music tracks, in dB. The stingers, which ride the
+    /// Music bus too, are not ducked: they are what the tracks make room for.
+    pub music_db: f32,
+    pub attack_ms: u32,
+    pub hold: DuckHold,
+    pub release_ms: u32,
+}
+
+/// The attack of a duck whose row names none.
+pub const DUCK_ATTACK_MS: u32 = 30;
+/// The ducks of a bus add up in dB, down to this floor.
+pub const DUCK_FLOOR_DB: f32 = -9.0;
+/// The longest a [`DuckHold::WhileSounding`] duck holds, in ms.
+pub const DUCK_HOLD_MAX_MS: u32 = 8000;
+
+const fn ducks(atmosphere_db: f32, hold_ms: u32, release_ms: u32) -> Option<Duck> {
+    Some(Duck {
+        atmosphere_db,
+        music_db: 0.0,
+        attack_ms: DUCK_ATTACK_MS,
+        hold: DuckHold::Ms(hold_ms),
+        release_ms,
+    })
+}
+
+/// The duck a start of `cue` triggers.
+pub const fn duck(cue: Cue) -> Option<Duck> {
+    match cue {
+        // The attempt stingers, for their clip's length.
+        Cue::Victory | Cue::Defeat | Cue::Retreat => Some(Duck {
+            atmosphere_db: -6.0,
+            music_db: -9.0,
+            attack_ms: 40,
+            hold: DuckHold::WhileSounding,
+            release_ms: 600,
+        }),
+        // The boss arrival.
+        Cue::Boss => Some(Duck {
+            atmosphere_db: -6.0,
+            music_db: -9.0,
+            attack_ms: 30,
+            hold: DuckHold::Ms(1200),
+            release_ms: 800,
+        }),
+        Cue::Wave => ducks(-4.0, 600, 400),
+        Cue::Explosion => ducks(-3.0, 300, 400),
+        Cue::Pistol
+        | Cue::Smg
+        | Cue::Shotgun
+        | Cue::Rifle
+        | Cue::Marksman
+        | Cue::MachineGun
+        | Cue::NpcShot
+        | Cue::TurretShot
+        | Cue::Impact
+        | Cue::Armor
+        | Cue::Reload
+        | Cue::Throw
+        | Cue::Molotov
+        | Cue::Fire
+        | Cue::Damage
+        | Cue::Melee
+        | Cue::Ready
+        | Cue::Structure
+        | Cue::Trap
+        | Cue::Incoming
+        | Cue::Kill
+        | Cue::Confirm => None,
+    }
+}
+
+/// Density compensation: up to this many effect voices sound at their own
+/// level. Beyond it every compensated voice plays at
+/// `sqrt(DENSITY_FULL_VOICES / N)`, so the sum of N uncorrelated voices stops
+/// growing.
+pub const DENSITY_FULL_VOICES: usize = 4;
+/// The time constants of the compensation, in ms: it comes in fast and lets
+/// go slowly.
+pub const DENSITY_ATTACK_MS: f32 = 10.0;
+pub const DENSITY_RELEASE_MS: f32 = 250.0;
+/// The ambience makes room for a crowd of effect voices: this many dB at
+/// `DENSITY_ATMOSPHERE_FROM + DENSITY_ATMOSPHERE_SPAN` voices and more,
+/// nothing up to `DENSITY_ATMOSPHERE_FROM`, linear in between.
+pub const DENSITY_ATMOSPHERE_DB: f32 = -4.0;
+pub const DENSITY_ATMOSPHERE_FROM: usize = 2;
+pub const DENSITY_ATMOSPHERE_SPAN: usize = 4;
+pub const DENSITY_ATMOSPHERE_RELEASE_MS: f32 = 300.0;
+
+/// The gain of a compensated effect voice among `voices` sounding effect
+/// voices.
+pub fn density_gain(voices: usize) -> f32 {
+    if voices <= DENSITY_FULL_VOICES {
+        1.0
+    } else {
+        (DENSITY_FULL_VOICES as f32 / voices as f32).sqrt()
+    }
+}
+/// The ambience's density term among `voices` sounding effect voices, in dB.
+pub fn density_atmosphere_db(voices: usize) -> f32 {
+    let over = voices.saturating_sub(DENSITY_ATMOSPHERE_FROM) as f32;
+    DENSITY_ATMOSPHERE_DB * (over / DENSITY_ATMOSPHERE_SPAN as f32).clamp(0.0, 1.0)
+}

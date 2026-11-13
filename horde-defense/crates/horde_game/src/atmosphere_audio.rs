@@ -245,6 +245,7 @@ fn update_ambience(
     mut commands: Commands,
     assets: Res<AssetServer>,
     target: Res<SceneAudioTarget>,
+    ducking: Option<Res<crate::sfx::Ducking>>,
     time: Res<Time>,
     mut layers: Query<(
         &AtmosphereLayer,
@@ -265,8 +266,14 @@ fn update_ambience(
         *started = true;
     }
     let gains = envelope.advance(*target, time.delta_secs());
+    // The duck multiplies the crossfaded gains, so it never restarts the
+    // crossfade. A stinger, a boss arrival, a wave warning, an explosion and a
+    // crowd of effect voices pull the loops down (`horde_audio::duck`).
+    let duck = ducking.map_or(1.0, |ducking| {
+        ducking.gains.duck[horde_audio::mix::Bus::Atmosphere as usize]
+    });
     for (layer, mut playback, sink) in &mut layers {
-        let volume = Volume::Linear(gains[layer.channel.index()]);
+        let volume = Volume::Linear(gains[layer.channel.index()] * duck);
         // The component covers asynchronous asset/sink creation; the sink covers
         // already playing loops. No entity or decoder is recreated on a change.
         playback.volume = volume;
@@ -403,6 +410,53 @@ mod tests {
         for (a, b) in slow.current.into_iter().zip(fast.current) {
             assert!((a - b).abs() < 0.00001);
         }
+    }
+    /// The Atmosphere duck multiplies the loops' crossfaded gains; without
+    /// the effects plugin the loops play unducked.
+    #[test]
+    fn loops_follow_the_atmosphere_duck() {
+        use horde_audio::{duck::DuckGains, mix::Bus};
+        let target = SceneAudioTarget {
+            master: 1.0,
+            ambience: 1.0,
+            context: AudioContext::Battle,
+            ..Default::default()
+        };
+        let volumes = |duck: Option<f32>| {
+            let mut app = App::new();
+            app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()))
+                .init_asset::<AudioSource>()
+                .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                    std::time::Duration::from_millis(100),
+                ))
+                .insert_resource(target)
+                .add_systems(Update, update_ambience);
+            if let Some(duck) = duck {
+                let mut gains = DuckGains::NONE;
+                gains.duck[Bus::Atmosphere as usize] = duck;
+                let mut ducking = crate::sfx::Ducking::default();
+                ducking.gains = gains;
+                app.insert_resource(ducking);
+            }
+            // Past the 1.2 s crossfade.
+            for _ in 0..20 {
+                app.update();
+            }
+            let mut layers = app
+                .world_mut()
+                .query::<(&AtmosphereLayer, &PlaybackSettings)>();
+            let mut volumes = [0.0; CHANNEL_COUNT];
+            for (layer, playback) in layers.iter(app.world()) {
+                volumes[layer.channel.index()] = match playback.volume {
+                    Volume::Linear(gain) => gain,
+                    other => panic!("{other:?}"),
+                };
+            }
+            volumes
+        };
+        assert_eq!(volumes(None), target.gains());
+        assert_eq!(volumes(Some(1.0)), target.gains());
+        assert_eq!(volumes(Some(0.5)), target.gains().map(|gain| gain * 0.5));
     }
     #[test]
     fn paused_and_menu_profiles_duck_without_changing_settings() {

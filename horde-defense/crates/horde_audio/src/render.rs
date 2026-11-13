@@ -23,6 +23,11 @@
 //!   through the adapter's 1.2 s smoothstep crossfade, stepped per frame and
 //!   ramped linearly inside a frame.
 //!
+//! - **Ducking and density.** [Ducker] runs once a frame, as in the adapter:
+//!   the ambience gains are multiplied by the Atmosphere duck after the
+//!   crossfade, and a compensated voice ramps to the density gain through its
+//!   [VoiceControl]. There are no music tracks to duck yet.
+//!
 //! What it leaves out: device resampling, and the frame of latency between a
 //! request and its first sample. Clips at another rate than [`RATE`] (the
 //! 22.05 kHz loops) are resampled linearly on load.
@@ -30,6 +35,7 @@
 use crate::{
     bank::{AMBIENCE_FILES, variant_path},
     cue::Cue,
+    duck::Ducker,
     events::{push_cue, root_event_sound},
     meter::{self, Loudness},
     mix::{Bus, CONTEXT_GAIN, mix},
@@ -221,6 +227,8 @@ pub struct VoiceStart {
     pub gain: f32,
     /// The start's playback speed and gain factor.
     pub jitter: Jitter,
+    /// The voice takes the density gain ([`crate::duck::compensated`]).
+    pub compensated: bool,
 }
 
 /// What the executor does this frame: fade first, then start.
@@ -301,6 +309,7 @@ impl VoicePolicy {
                 priority,
                 gain: mix(cue).level(reduced),
                 jitter: pick.jitter,
+                compensated: crate::duck::compensated(start),
             });
             live.push(LiveVoice {
                 id: voice,
@@ -378,6 +387,8 @@ struct Voice<'a> {
     position: usize,
     /// Left and right.
     gains: [f32; 2],
+    /// The voice follows the density gain.
+    compensated: bool,
 }
 
 /// Renders `frames` at the scene's sliders and theme.
@@ -390,6 +401,7 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
     // The voices' left and right.
     let mut sides = [out.clone(), out.clone()];
     let mut policy = VoicePolicy::default();
+    let mut ducker = Ducker::default();
     let mut voices: Vec<Voice> = Vec::new();
     let mut envelope = Envelope::default();
     let mut loop_gains = [0.0_f32; 6];
@@ -421,7 +433,9 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
             }
         }
         for start in actions.starts {
+            ducker.trigger(start.cue);
             voices.push(Voice {
+                compensated: start.compensated,
                 id: start.voice,
                 cue: start.cue,
                 started_ms: now_ms,
@@ -445,6 +459,23 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
                 ),
             });
         }
+        // Ducking and density, on the voices that sound from this frame on.
+        let sounding: Vec<LiveVoice> = voices
+            .iter()
+            .filter(|voice| !voice.control.stopping())
+            .map(|voice| LiveVoice {
+                id: voice.id,
+                cue: voice.cue,
+                started_ms: voice.started_ms,
+            })
+            .collect();
+        let ducks = ducker.advance(1.0 / TICKS_PER_SECOND as f32, &sounding);
+        for voice in &voices {
+            // A fading voice keeps its way to silence.
+            if voice.compensated && !voice.control.stopping() {
+                voice.control.set_target(ducks.density);
+            }
+        }
         for voice in &mut voices {
             let rest = &voice.clip[voice.position..];
             let offset = index * FRAME_SAMPLES;
@@ -464,7 +495,11 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         }
         // Ambience.
         let wanted = weights.map(|weight| weight * ambience * frame.context.level());
-        let next = envelope.advance(wanted, ambience == 0.0, 1.0 / TICKS_PER_SECOND as f32);
+        // The duck multiplies the crossfaded gains: it never restarts the
+        // crossfade.
+        let next = envelope
+            .advance(wanted, ambience == 0.0, 1.0 / TICKS_PER_SECOND as f32)
+            .map(|gain| gain * ducks.duck[Bus::Atmosphere as usize]);
         for (channel, samples) in library.loops.iter().enumerate() {
             let (from, to) = (loop_gains[channel], next[channel]);
             if from == 0.0 && to == 0.0 {
