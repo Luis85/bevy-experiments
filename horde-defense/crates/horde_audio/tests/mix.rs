@@ -4,11 +4,7 @@
 
 use horde_audio::{
     cue::Cue,
-    mix::{
-        self, Bus, CONTEXT_GAIN, GateGroup, MAX_EFFECT_VOICES, MIX_CALIBRATION_DB, VisualTwin,
-        WARNING_TWINS, mix,
-    },
-    synth::legacy::PEAK,
+    mix::{self, Bus, CONTEXT_GAIN, GateGroup, MIX_CALIBRATION_DB, VisualTwin, WARNING_TWINS, mix},
 };
 use std::path::{Path, PathBuf};
 
@@ -104,7 +100,6 @@ fn mix_rows_keep_the_v1_numbers() {
     // The hidden x0.7 on the effects bus is now the calibration knob.
     assert_eq!(MIX_CALIBRATION_DB, -3.1);
     assert!((mix::calibration_gain() - 0.7).abs() < 0.0002);
-    assert_eq!(MAX_EFFECT_VOICES, 6);
     assert_eq!(
         [
             CONTEXT_GAIN.menu,
@@ -142,13 +137,6 @@ fn every_cue_reduced_gain_below_normal_and_cooldown_not_shorter() {
         assert!(row.level(true) < row.level(false), "{cue:?}");
         assert!(row.cooldown(true) >= row.cooldown(false), "{cue:?}");
     }
-}
-
-/// Carried over from the horde_game v1 assert: six voices at the top row and
-/// the calibration stay inside the old headroom.
-#[test]
-fn six_voices_keep_mix_headroom() {
-    assert!(PEAK * MAX_EFFECT_VOICES as f32 * mix::calibration_gain() <= 0.76);
 }
 
 #[test]

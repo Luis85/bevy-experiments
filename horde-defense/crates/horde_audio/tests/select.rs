@@ -7,12 +7,13 @@
 use horde_audio::{
     cue::Cue,
     events,
-    mix::{Bus, MAX_EFFECT_VOICES, Sliders, mix},
+    mix::{Bus, Sliders, mix},
     pan::Places,
-    render::{self, LegacyPolicy},
+    render::{self, VoicePolicy},
     select::{
         CueGate, Lane, START_BUDGET, SUBSUMES, Start, select_sounds, select_starts, start_budget,
     },
+    voices::LiveVoice,
 };
 use horde_core::{
     content::{Mode, StructureKind},
@@ -285,18 +286,6 @@ fn player_lane_gate_ignores_other_sources_of_the_same_cue() {
     assert!(gate.accept_start(Start::player(Cue::Shotgun), from + reduced, true));
 }
 
-/// At the voice cap the player's shot may replace a voice no more important
-/// than itself; a bus start needs a strictly less important one.
-#[test]
-fn player_start_displaces_an_equally_unimportant_voice() {
-    let fire = mix(Cue::Rifle).priority;
-    assert!(!Start::bus(Cue::Rifle).displaces(fire));
-    assert!(Start::player(Cue::Rifle).displaces(fire));
-    assert!(Start::bus(Cue::Rifle).displaces(fire + 1));
-    assert!(!Start::player(Cue::Rifle).displaces(fire - 1));
-    assert!(Start::bus(Cue::Boss).displaces(fire));
-}
-
 fn shot(shooter: Actor) -> SimEvent {
     SimEvent::Shot {
         shooter,
@@ -336,7 +325,7 @@ fn root_defender_shot_marks_the_player_weapon_lane() {
 }
 
 /// The policy end to end: the player's shot starts beside a full Effects
-/// budget, through another source's cooldown, and at the voice cap.
+/// budget, through another source's cooldown, and at the voice caps.
 #[test]
 fn policy_starts_the_player_shot_beside_a_full_budget_and_at_the_voice_cap() {
     let audible = Sliders::MAX.bus_gains();
@@ -345,39 +334,40 @@ fn policy_starts_the_player_shot_beside_a_full_budget_and_at_the_voice_cap() {
     };
     let rifle = Some(Cue::Rifle);
     let crowded = vec![Cue::Boss, Cue::Explosion, Cue::Structure, Cue::Rifle];
-    let mut policy = LegacyPolicy::default();
+    let mut policy = VoicePolicy::default();
     let with = policy.frame_requests(crowded.clone(), rifle, 0, false, &audible, &[]);
     assert_eq!(
         cues(&with),
         vec![Cue::Boss, Cue::Explosion, Cue::Structure, Cue::Rifle]
     );
     // The same frame without the lane: the rifle waits.
-    let without = LegacyPolicy::default().frame(crowded, 0, false, &audible, &[]);
+    let without = VoicePolicy::default().frame(crowded, 0, false, &audible, &[]);
     assert_eq!(
         cues(&without),
         vec![Cue::Boss, Cue::Explosion, Cue::Structure]
     );
     // Another defender's rifle 30 ms ago does not hold the player's.
-    let mut policy = LegacyPolicy::default();
+    let mut policy = VoicePolicy::default();
     let other = policy.frame(vec![Cue::Rifle], 0, false, &audible, &[]);
     assert_eq!(cues(&other), vec![Cue::Rifle]);
     let player = policy.frame_requests(vec![Cue::Rifle], rifle, 30, false, &audible, &[]);
     assert_eq!(cues(&player), vec![Cue::Rifle]);
     let held = policy.frame_requests(vec![Cue::Rifle], rifle, 60, false, &audible, &[]);
     assert!(held.starts.is_empty(), "{held:?}");
-    // Six fire voices sound: a bus rifle is dropped, the player's replaces one.
-    let fire = mix(Cue::Rifle).priority;
-    let live: Vec<(u64, u8)> = (100..100 + MAX_EFFECT_VOICES as u64)
-        .map(|voice| (voice, fire))
-        .collect();
-    let bus = LegacyPolicy::default().frame(vec![Cue::Rifle], 0, false, &audible, &live);
-    assert!(bus.starts.is_empty() && bus.stops.is_empty(), "{bus:?}");
+    // Two guns sound, the gun family's cap: the player's shot fades the
+    // older one out (`tests/voices.rs` has the caps).
+    let voice = |id, cue, started_ms| LiveVoice {
+        id,
+        cue,
+        started_ms,
+    };
+    let live = [voice(100, Cue::Smg, 40), voice(101, Cue::Pistol, 10)];
     let lane =
-        LegacyPolicy::default().frame_requests(vec![Cue::Rifle], rifle, 0, false, &audible, &live);
-    assert_eq!((lane.stops.len(), cues(&lane)), (1, vec![Cue::Rifle]));
-    // It never cuts a more important voice.
-    let important: Vec<(u64, u8)> = live.iter().map(|(voice, _)| (*voice, 2)).collect();
-    let kept = LegacyPolicy::default().frame_requests(
+        VoicePolicy::default().frame_requests(vec![Cue::Rifle], rifle, 60, false, &audible, &live);
+    assert_eq!((cues(&lane), lane.fades), (vec![Cue::Rifle], vec![101]));
+    // At a full Effects bus it never fades a more important voice.
+    let important: Vec<LiveVoice> = (100..108).map(|id| voice(id, Cue::Structure, 0)).collect();
+    let kept = VoicePolicy::default().frame_requests(
         vec![Cue::Rifle],
         rifle,
         0,
@@ -385,7 +375,7 @@ fn policy_starts_the_player_shot_beside_a_full_budget_and_at_the_voice_cap() {
         &audible,
         &important,
     );
-    assert!(kept.starts.is_empty() && kept.stops.is_empty(), "{kept:?}");
+    assert!(kept.starts.is_empty() && kept.fades.is_empty(), "{kept:?}");
     // On a muted Effects bus the lane starts nothing.
     let muted = Sliders {
         effects: 0.0,
@@ -393,6 +383,6 @@ fn policy_starts_the_player_shot_beside_a_full_budget_and_at_the_voice_cap() {
     }
     .bus_gains();
     let none =
-        LegacyPolicy::default().frame_requests(vec![Cue::Rifle], rifle, 0, false, &muted, &[]);
+        VoicePolicy::default().frame_requests(vec![Cue::Rifle], rifle, 0, false, &muted, &[]);
     assert!(none.starts.is_empty());
 }

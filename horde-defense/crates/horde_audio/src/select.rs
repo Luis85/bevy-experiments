@@ -60,16 +60,6 @@ impl Start {
             lane: Lane::PlayerWeapon,
         }
     }
-    /// Whether, at the voice cap, this start may replace a live voice of
-    /// priority `least` (the least important one). A bus start needs a
-    /// strictly less important voice; the player's shot also replaces one
-    /// exactly as unimportant as itself.
-    pub fn displaces(self, least: u8) -> bool {
-        match self.lane {
-            Lane::Bus => rank(self.cue) < least,
-            Lane::PlayerWeapon => rank(self.cue) <= least,
-        }
-    }
 }
 
 /// Coalesce repeated ticks and accelerated observation into a restrained real-

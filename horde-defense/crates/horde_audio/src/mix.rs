@@ -210,9 +210,6 @@ pub const fn mix(cue: Cue) -> CueMix {
     }
 }
 
-/// Effect voices that may sound at once.
-pub const MAX_EFFECT_VOICES: usize = 6;
-
 /// The one calibration knob of the voice buses (Effects, UI and Music), in
 /// dB. It replaces the hidden x0.7 the effects bus used to apply.
 pub const MIX_CALIBRATION_DB: f32 = -3.1;

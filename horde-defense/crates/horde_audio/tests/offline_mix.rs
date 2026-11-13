@@ -2,7 +2,7 @@
 //!
 //! The render runs the shipped assets through the runtime's own decisions
 //! (`events::event_sound`, `select::select_sounds`, `select::CueGate`, the mix
-//! table) and the v1 voice policy (`render::LegacyPolicy`), and meters the
+//! table) and the voice policy (`render::VoicePolicy`), and meters the
 //! result with `meter`. The gate tests are ignored and red until the mix is
 //! calibrated (A6-17); run them with
 //! `cargo test -p horde_audio --test offline_mix -- --ignored --nocapture`
@@ -11,12 +11,13 @@
 use horde_audio::{
     cue::Cue,
     meter::Loudness,
-    mix::{self, CONTEXT_GAIN, MAX_EFFECT_VOICES, mix},
+    mix::{self, Bus, CONTEXT_GAIN, mix},
     render::{
-        self, Context, FRAME_SAMPLES, Frame, LegacyPolicy, Library, RAIN_WEIGHTS, RATE,
-        REFERENCE_WEIGHTS, Scene, Sliders, Stereo,
+        self, Context, FRAME_SAMPLES, Frame, Library, RAIN_WEIGHTS, RATE, REFERENCE_WEIGHTS, Scene,
+        Sliders, Stereo, VoicePolicy,
     },
     select::select_sounds,
+    voices::{LiveVoice, bus_cap},
     wav,
 };
 use horde_core::{content::Mode, sim::Game};
@@ -99,10 +100,10 @@ fn pcm16_read_round_trips_write() {
 
 #[test]
 fn legacy_policy_starts_its_budget_per_frame_and_rotates_only_on_frames_with_requests() {
-    let mut policy = LegacyPolicy::default();
+    let mut policy = VoicePolicy::default();
     let requests = vec![Cue::Boss, Cue::Damage, Cue::Rifle];
     let first = policy.frame(requests.clone(), 0, false, &AUDIBLE, &[]);
-    assert!(first.stops.is_empty());
+    assert!(first.fades.is_empty());
     assert_eq!(
         first.starts.iter().map(|s| s.cue).collect::<Vec<_>>(),
         select_sounds(requests, 0)
@@ -137,28 +138,33 @@ fn legacy_policy_starts_its_budget_per_frame_and_rotates_only_on_frames_with_req
 }
 
 #[test]
-fn legacy_policy_caps_at_six_voices_and_cuts_the_least_important() {
-    assert_eq!(MAX_EFFECT_VOICES, 6);
-    let fire = mix(Cue::Rifle).priority;
-    let mut live: Vec<(u64, u8)> = (100..106).map(|voice| (voice, fire)).collect();
-    live[2].1 = mix(Cue::Fire).priority;
-    let mut policy = LegacyPolicy::default();
-    // A cue no more important than the least important live voice is dropped.
+fn policy_caps_at_eight_effects_and_fades_the_least_important() {
+    assert_eq!(bus_cap(Bus::Effects), 8);
+    let mut live: Vec<LiveVoice> = (100..108)
+        .map(|id| LiveVoice {
+            id,
+            cue: Cue::Trap,
+            started_ms: 0,
+        })
+        .collect();
+    let mut policy = VoicePolicy::default();
+    // A cue less important than every live voice is dropped.
     let dropped = policy.frame(vec![Cue::Fire], 0, false, &AUDIBLE, &live);
     assert!(
-        dropped.starts.is_empty() && dropped.stops.is_empty(),
+        dropped.starts.is_empty() && dropped.fades.is_empty(),
         "{dropped:?}"
     );
-    // A more important one cuts it at once.
+    // A more important one fades the least important voice out.
+    live[2].cue = Cue::Fire;
     let stolen = policy.frame(vec![Cue::Boss], 20, false, &AUDIBLE, &live);
-    assert_eq!(stolen.stops, vec![102]);
+    assert_eq!(stolen.fades, vec![102]);
     assert_eq!(stolen.starts.len(), 1);
-    // With a free voice nothing is cut.
-    let free = policy.frame(vec![Cue::Explosion], 40, false, &AUDIBLE, &live[..5]);
-    assert!(free.stops.is_empty());
+    // With a free voice nothing fades.
+    let free = policy.frame(vec![Cue::Explosion], 40, false, &AUDIBLE, &live[..7]);
+    assert!(free.fades.is_empty());
     assert_eq!(free.starts.len(), 1);
     // A muted bus starts nothing but still turns the rotation.
-    let mut muted = LegacyPolicy::default();
+    let mut muted = VoicePolicy::default();
     assert!(
         muted
             .frame(vec![Cue::Boss], 0, false, &[0.0; 5], &[])

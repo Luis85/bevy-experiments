@@ -7,7 +7,7 @@
 use horde_audio::{
     cue::Cue,
     mix::{self, Bus, Sliders, mix},
-    render::{self, Context, Frame, LegacyPolicy, Library, REFERENCE_WEIGHTS, Scene},
+    render::{self, Context, Frame, Library, REFERENCE_WEIGHTS, Scene, VoicePolicy},
 };
 use std::path::Path;
 
@@ -201,7 +201,7 @@ fn a_muted_bus_drops_its_cues_before_selection() {
         ..Sliders::MAX
     }
     .bus_gains();
-    let mut policy = LegacyPolicy::default();
+    let mut policy = VoicePolicy::default();
     // The muted Confirm starts nothing; the audible cues keep their starts.
     let requests = vec![Cue::Confirm, Cue::Damage, Cue::Kill];
     let actions = policy.frame(requests, 0, false, &ui_muted, &[]);
@@ -222,6 +222,6 @@ fn a_muted_bus_drops_its_cues_before_selection() {
         ..Sliders::MAX
     }
     .bus_gains();
-    let none = LegacyPolicy::default().frame(vec![Cue::Boss, Cue::Confirm], 0, false, &silent, &[]);
-    assert!(none.starts.is_empty() && none.stops.is_empty());
+    let none = VoicePolicy::default().frame(vec![Cue::Boss, Cue::Confirm], 0, false, &silent, &[]);
+    assert!(none.starts.is_empty() && none.fades.is_empty());
 }

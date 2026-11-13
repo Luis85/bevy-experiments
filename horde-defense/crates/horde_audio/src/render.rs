@@ -8,10 +8,11 @@
 //!
 //! What it models of the Bevy adapter:
 //!
-//! - **Effects.** [`LegacyPolicy`] is the v1 voice policy of `horde_game`'s
-//!   `SfxPlugin`: the per-bus start budgets and the player-weapon lane, a rotation that picks the
-//!   variant, [`MAX_EFFECT_VOICES`] voices, and a more important cue cutting
-//!   the least important voice at once. A voice plays its mono clip at
+//! - **Effects.** [`VoicePolicy`] is the voice policy of `horde_game`'s
+//!   `SfxPlugin`: the per-bus start budgets and the player-weapon lane, a
+//!   rotation that picks the variant, and the bus and family caps of
+//!   [`crate::voices`], where a start at a cap fades its victim out over
+//!   [`crate::voices::FADE_MS`]. A voice plays its mono clip at
 //!   `bus gain x row gain`, where the bus gain is
 //!   `master x the bus's slider x calibration` of the cue's own bus
 //!   ([`Sliders::bus_gain`]), into the two channels at the gains of its lane
@@ -30,9 +31,10 @@ use crate::{
     cue::Cue,
     events::{push_cue, root_event_sound},
     meter::{self, Loudness},
-    mix::{Bus, CONTEXT_GAIN, MAX_EFFECT_VOICES, mix},
+    mix::{Bus, CONTEXT_GAIN, mix},
     pan::{self, Places},
     select::{CueGate, select_starts},
+    voices::{Admission, LiveVoice, Ramp, VoiceControl, admit},
     wav,
 };
 use horde_core::sim::{BattleId, Game, TICKS_PER_SECOND, smoke_input};
@@ -189,7 +191,7 @@ fn resample(samples: &[f32], from: u32, to: u32, wrap: bool) -> Vec<f32> {
 /// One voice to start.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VoiceStart {
-    /// Unique per policy; a later [`FrameActions::stops`] names it.
+    /// Unique per policy; a later [`FrameActions::fades`] names it.
     pub voice: u64,
     pub cue: Cue,
     /// The bank variant to play (variants wrap).
@@ -200,23 +202,25 @@ pub struct VoiceStart {
     pub gain: f32,
 }
 
-/// What the executor does this frame: stop first, then start.
+/// What the executor does this frame: fade first, then start.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FrameActions {
-    /// Voices cut at once (v1 has no fade).
-    pub stops: Vec<u64>,
+    /// Stolen voices: each fades out over [`crate::voices::FADE_MS`] and
+    /// ends. A fading voice is no longer live.
+    pub fades: Vec<u64>,
     pub starts: Vec<VoiceStart>,
 }
 
-/// The v1 voice policy as a frame-actions state machine: the decisions of
-/// `horde_game`'s `play_sounds`, on [`select_starts`] and [`CueGate`].
+/// The voice policy as a frame-actions state machine: the decisions of
+/// `horde_game`'s `play_sounds`, on [`select_starts`], [`admit`] and
+/// [`CueGate`].
 #[derive(Debug, Default)]
-pub struct LegacyPolicy {
+pub struct VoicePolicy {
     rotation: u64,
     gate: CueGate,
     next_voice: u64,
 }
-impl LegacyPolicy {
+impl VoicePolicy {
     /// One frame without a player shot: [`Self::frame_requests`].
     pub fn frame(
         &mut self,
@@ -224,16 +228,17 @@ impl LegacyPolicy {
         now_ms: u64,
         reduced: bool,
         bus_gains: &[f32; 5],
-        live: &[(u64, u8)],
+        live: &[LiveVoice],
     ) -> FrameActions {
         self.frame_requests(cues, None, now_ms, reduced, bus_gains, live)
     }
 
     /// One frame. `cues` are the frame's requests, `player_shot` the cue of
     /// the root defender's own shot (the player-weapon lane), `bus_gains` is
-    /// [`Sliders::bus_gains`], and `live` lists the sounding voices as
-    /// `(voice, priority)`. A cue whose bus is muted is dropped before
+    /// [`Sliders::bus_gains`], and `live` lists the sounding voices, without
+    /// the fading ones. A cue whose bus is muted is dropped before
     /// selection: it takes no start slot and leaves its cooldown untouched.
+    /// So does a start the voice caps refuse.
     pub fn frame_requests(
         &mut self,
         mut cues: Vec<Cue>,
@@ -241,7 +246,7 @@ impl LegacyPolicy {
         now_ms: u64,
         reduced: bool,
         bus_gains: &[f32; 5],
-        live: &[(u64, u8)],
+        live: &[LiveVoice],
     ) -> FrameActions {
         let rotation = self.rotation;
         self.rotation = self
@@ -254,26 +259,13 @@ impl LegacyPolicy {
         for start in select_starts(cues, player_shot, rotation) {
             let cue = start.cue;
             let priority = mix(cue).priority;
-            let replace = if live.len() >= MAX_EFFECT_VOICES {
-                let Some((index, (_, least))) = live
-                    .iter()
-                    .enumerate()
-                    .max_by_key(|(_, (_, priority))| *priority)
-                else {
-                    continue;
-                };
-                if !start.displaces(*least) {
-                    continue;
-                }
-                Some(index)
-            } else {
-                None
-            };
-            if !self.gate.accept_start(start, now_ms, reduced) {
+            let admission = admit(start, &live);
+            if admission == Admission::Refuse || !self.gate.accept_start(start, now_ms, reduced) {
                 continue;
             }
-            if let Some(index) = replace {
-                actions.stops.push(live.remove(index).0);
+            if let Admission::Steal(victim) = admission {
+                live.retain(|voice| voice.id != victim);
+                actions.fades.push(victim);
             }
             let voice = self.next_voice;
             self.next_voice += 1;
@@ -284,7 +276,11 @@ impl LegacyPolicy {
                 priority,
                 gain: mix(cue).level(reduced),
             });
-            live.push((voice, priority));
+            live.push(LiveVoice {
+                id: voice,
+                cue,
+                started_ms: now_ms,
+            });
         }
         actions
     }
@@ -346,7 +342,11 @@ fn normalized(mut weights: [f32; 6]) -> [f32; 6] {
 
 struct Voice<'a> {
     id: u64,
-    priority: u8,
+    cue: Cue,
+    started_ms: u64,
+    /// The fade of a stolen voice, as the runtime's decoder runs it.
+    control: VoiceControl,
+    ramp: Ramp,
     clip: &'a [f32],
     position: usize,
     /// Left and right.
@@ -362,7 +362,7 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
     let mut out = vec![0.0_f32; frames.len() * FRAME_SAMPLES];
     // The voices' left and right.
     let mut sides = [out.clone(), out.clone()];
-    let mut policy = LegacyPolicy::default();
+    let mut policy = VoicePolicy::default();
     let mut voices: Vec<Voice> = Vec::new();
     let mut envelope = Envelope::default();
     let mut loop_gains = [0.0_f32; 6];
@@ -370,7 +370,15 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         let block = &mut out[index * FRAME_SAMPLES..(index + 1) * FRAME_SAMPLES];
         // Effects.
         voices.retain(|voice| voice.position < voice.clip.len());
-        let live: Vec<(u64, u8)> = voices.iter().map(|v| (v.id, v.priority)).collect();
+        let live: Vec<LiveVoice> = voices
+            .iter()
+            .filter(|voice| !voice.control.stopping())
+            .map(|voice| LiveVoice {
+                id: voice.id,
+                cue: voice.cue,
+                started_ms: voice.started_ms,
+            })
+            .collect();
         let now_ms = index as u64 * 1000 / u64::from(TICKS_PER_SECOND);
         let actions = policy.frame_requests(
             frame.cues.clone(),
@@ -380,11 +388,18 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
             &bus_gains,
             &live,
         );
-        voices.retain(|voice| !actions.stops.contains(&voice.id));
+        for voice in &voices {
+            if actions.fades.contains(&voice.id) {
+                voice.control.fade_out();
+            }
+        }
         for start in actions.starts {
             voices.push(Voice {
                 id: start.voice,
-                priority: start.priority,
+                cue: start.cue,
+                started_ms: now_ms,
+                control: VoiceControl::default(),
+                ramp: Ramp::new(RATE),
                 clip: library.clip(start.cue, start.variant),
                 position: 0,
                 gains: pan::voice_gains(start.cue, &frame.places, scene.reduced, scene.mono)
@@ -393,13 +408,20 @@ pub fn render(library: &Library, frames: &[Frame], scene: &Scene) -> Stereo {
         }
         for voice in &mut voices {
             let rest = &voice.clip[voice.position..];
-            for (side, gain) in sides.iter_mut().zip(voice.gains) {
-                let block = &mut side[index * FRAME_SAMPLES..(index + 1) * FRAME_SAMPLES];
-                for (sample, source) in block.iter_mut().zip(rest) {
-                    *sample += source * gain;
+            let offset = index * FRAME_SAMPLES;
+            let mut played = 0;
+            for (n, source) in rest.iter().take(FRAME_SAMPLES).enumerate() {
+                let Some(ramp) = voice.ramp.next(&voice.control) else {
+                    // The fade is over: the voice ends here.
+                    played = rest.len();
+                    break;
+                };
+                for (side, gain) in sides.iter_mut().zip(voice.gains) {
+                    side[offset + n] += source * gain * ramp;
                 }
+                played = n + 1;
             }
-            voice.position += FRAME_SAMPLES.min(rest.len());
+            voice.position += played;
         }
         // Ambience.
         let wanted = weights.map(|weight| weight * ambience * frame.context.level());

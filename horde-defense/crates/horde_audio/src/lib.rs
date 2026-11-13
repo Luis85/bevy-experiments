@@ -25,4 +25,5 @@ pub mod pan;
 pub mod render;
 pub mod select;
 pub mod synth;
+pub mod voices;
 pub mod wav;

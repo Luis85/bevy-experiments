@@ -3,7 +3,7 @@
 //! `horde_audio`. Only presentation time selects/coalesces variants.
 //! No combat RNG is read.
 
-pub use horde_audio::{bank::variant_path, cue::Cue, mix::MAX_EFFECT_VOICES, select::CueGate};
+pub use horde_audio::{bank::variant_path, cue::Cue, select::CueGate};
 
 /// One requested cue, written by the runner and the UI and played by
 /// `SfxPlugin`.
